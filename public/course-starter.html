@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Cash Systems — Starter Course</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{--gold:#C9A84C;--gold-light:#E8C96A;--gold-dark:#8A6A1F;--gold-muted:rgba(201,168,76,0.15);--bg:#0A0A0A;--bg2:#111111;--bg3:#181818;--text:#F0EAD6;--text-muted:#7A7060;--border:rgba(201,168,76,0.2);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
+nav{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid var(--border);background:rgba(10,10,10,0.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
+.logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;letter-spacing:2px;color:var(--gold);text-transform:uppercase;}
+.logo span{color:var(--text);font-weight:300;}
+.badge-dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);animation:pulse 2s infinite;display:inline-block;margin-right:6px;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.hero{padding:48px 32px 32px;max-width:900px;margin:0 auto;}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;background:var(--gold-muted);border:1px solid var(--border);border-radius:100px;padding:6px 16px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:20px;}
+.hero h1{font-family:'Cormorant Garamond',serif;font-size:clamp(36px,6vw,58px);font-weight:500;line-height:1.1;margin-bottom:16px;}
+.hero h1 em{font-style:italic;color:var(--gold);}
+.hero p{font-size:15px;color:var(--text-muted);max-width:520px;line-height:1.7;}
+.progress-bar-wrap{max-width:900px;margin:24px auto 0;padding:0 32px;}
+.progress-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;}
+.progress-track{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--gold-dark),var(--gold-light));border-radius:2px;transition:width 1.2s cubic-bezier(0.4,0,0.2,1);}
+.container{max-width:900px;margin:40px auto;padding:0 32px 80px;display:grid;gap:16px;}
+.module{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.module-header{display:flex;align-items:center;gap:16px;padding:20px 24px;cursor:pointer;user-select:none;transition:background 0.2s;}
+.module-header:hover{background:var(--bg3);}
+.module-num{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:300;color:var(--gold-dark);min-width:36px;line-height:1;}
+.module-info{flex:1;}
+.module-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--text);margin-bottom:4px;}
+.module-meta{font-size:12px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;}
+.module-toggle{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:18px;transition:transform 0.3s;flex-shrink:0;}
+.module.open .module-toggle{transform:rotate(45deg);background:var(--gold-muted);}
+.lessons{display:none;border-top:1px solid var(--border);}
+.module.open .lessons{display:block;}
+.lesson{display:flex;align-items:center;gap:16px;padding:16px 24px;cursor:pointer;border-bottom:1px solid rgba(201,168,76,0.08);transition:background 0.2s;}
+.lesson:last-child{border-bottom:none;}
+.lesson:hover{background:var(--bg3);}
+.lesson.active{background:var(--gold-muted);}
+.lesson.completed .lesson-icon{background:var(--gold-dark);color:var(--gold-light);}
+.lesson-icon{width:36px;height:36px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:all 0.2s;}
+.lesson-icon.completed{background:var(--gold-dark);color:var(--gold-light);}
+.lesson-body{flex:1;}
+.lesson-title{font-size:14px;font-weight:500;color:var(--text);margin-bottom:3px;}
+.lesson-desc{font-size:12px;color:var(--text-muted);}
+.lesson-tag{display:inline-block;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:var(--gold-muted);color:var(--gold);margin-top:4px;}
+.content-panel{display:none;max-width:900px;margin:0 auto 32px;padding:0 32px;}
+.content-panel.visible{display:block;}
+.panel-inner{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:32px;}
+.panel-breadcrumb{font-size:12px;color:var(--text-muted);margin-bottom:16px;letter-spacing:1px;}
+.panel-breadcrumb span{color:var(--gold);}
+.panel-title{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:600;margin-bottom:20px;color:var(--text);}
+.panel-content{font-size:14px;color:var(--text-muted);line-height:1.8;}
+.panel-content h3{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--text);margin:24px 0 12px;}
+.panel-content p{margin-bottom:14px;}
+.panel-content ul{padding-left:20px;margin-bottom:14px;}
+.panel-content ul li{margin-bottom:8px;}
+.panel-content strong{color:var(--text);}
+.panel-content .sb{background:var(--bg3);border-radius:10px;padding:20px;margin:16px 0;}
+.panel-content .sr{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px;}
+.panel-content .sr:last-child{margin-bottom:0;}
+.panel-content .sn{width:24px;height:24px;border-radius:6px;background:var(--gold-dark);color:var(--gold-light);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.panel-content .st{font-size:13px;color:var(--text);line-height:1.6;}
+.panel-content .pb{background:var(--bg);border-left:2px solid var(--gold);padding:16px 20px;margin:16px 0;border-radius:0 8px 8px 0;font-style:italic;font-size:13px;color:var(--text-muted);}
+.panel-content .ib{background:var(--gold-muted);border:1px solid var(--border);border-radius:10px;padding:20px;margin:16px 0;}
+.panel-content .ac{text-align:center;}
+.panel-content .tp{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);font-weight:600;min-width:80px;}
+.panel-actions{display:flex;gap:12px;margin-top:28px;padding-top:20px;border-top:1px solid var(--border);}
+.btn-gold{padding:12px 28px;background:linear-gradient(135deg,var(--gold-dark),var(--gold-light));border:none;border-radius:8px;color:#0A0A0A;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-outline{padding:12px 28px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">AI Cash <span>Systems</span></div>
+  <div style="display:flex;align-items:center;font-size:13px;color:var(--text-muted);">
+    <div class="badge-dot"></div>Starter Course
+  </div>
+</nav>
+<div class="hero">
+  <div class="hero-tag">✦ Starter Program</div>
+  <h1>Master <em>AI Automation</em><br>&amp; Get Paid For It</h1>
+  <p>8 modules, 24 lessons. Build real automations, find real clients, earn real income — step by step.</p>
+</div>
+<div class="progress-bar-wrap">
+  <div class="progress-meta"><span>Your Progress</span><span id="prog-label">0 / 24 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="prog-fill"></div></div>
+</div>
+<div class="content-panel" id="contentPanel">
+  <div class="panel-inner">
+    <div class="panel-breadcrumb" id="panelBreadcrumb">Module 1 · <span>Lesson 1</span></div>
+    <div class="panel-title" id="panelTitle"></div>
+    <div class="panel-content" id="panelContent"></div>
+    <div class="panel-actions">
+      <button class="btn-gold" onclick="completeLesson()">✓ Mark as Complete</button>
+      <button class="btn-outline" onclick="closePanel()">← Back to Modules</button>
+    </div>
+  </div>
+</div>
+<div class="container" id="modulesContainer">
