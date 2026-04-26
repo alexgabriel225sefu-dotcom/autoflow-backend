@@ -274,7 +274,8 @@ document.getElementById("payModal").addEventListener("click",function(e){if(e.ta
 /* STRIPE — EXACTLY AS IN WORKING VERSION */
 var STRIPE_KEY="pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS";
 
-var BACKEND="https://autoflow-backend-p9pc.onrender.com/api/stripe/create-payment";
+var BACKEND="https://autoflow-backend-p9pc.onrender.com/create-payment-intent";
+
 
 var PRODUCTS={starter:{name:"AI Automation Foundations",price:"$37",amount:3700,title:"Starter"},pro:{name:"AI Agency Mastery PRO",price:"$97",amount:9700,title:"PRO"}};
 var stripe,cardEl,curProd;
