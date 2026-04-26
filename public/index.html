@@ -206,9 +206,11 @@ footer{background:#080808;border-top:1px solid rgba(200,169,110,.08);padding:28p
 function toggleFaq(el){var i=el.parentElement,w=i.classList.contains("open");document.querySelectorAll(".faq-item").forEach(function(x){x.classList.remove("open")});if(!w)i.classList.add("open")}
 function closeModal(){document.getElementById("payModal").classList.remove("open");document.body.style.overflow=""}
 document.getElementById("payModal").addEventListener("click",function(e){if(e.target===this)closeModal()});
-var STRIPE_KEY="pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS
+var STRIPE_KEY="pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS";
 
-var BACKEND="https://autoflow-backend-p9pc.onrender.com/api/stripe/create-payment";
+var BACKEND="https://autoflow-backend-p9pc.onrender.com/create-payment-intent";
+
+
 var PRODUCTS={starter:{name:"AI Automation Foundations",price:"$37",amount:3700,title:"Starter"},pro:{name:"AI Agency Mastery PRO",price:"$97",amount:9700,title:"PRO"}};
 var stripe,cardEl,curProd;
 function initStripe(){stripe=Stripe(STRIPE_KEY);var el=stripe.elements({appearance:{theme:"night",variables:{colorPrimary:"#C8A96E",colorBackground:"#161616",colorText:"#F5F0E8",borderRadius:"7px"}}});cardEl=el.create("card",{style:{base:{color:"#F5F0E8",fontFamily:"Syne,sans-serif",fontSize:"13px"}},hidePostalCode:true});cardEl.mount("#card-element");cardEl.on("change",function(e){document.getElementById("card-errors").textContent=e.error?e.error.message:""})}
