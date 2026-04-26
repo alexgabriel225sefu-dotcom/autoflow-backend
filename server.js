@@ -17,11 +17,13 @@ app.post('/api/stripe/create-payment',async(req,res)=>{
     const pi=await stripe.paymentIntents.create({amount,currency,receipt_email:email,metadata:{name,product}});
     res.json({clientSecret:pi.client_secret});
   }catch(e){res.status(500).json({error:e.message});}
+  
+});
+app.get('/',(req,res)=>{
+  res.send('<h1 style="font-family:sans-serif;text-align:center;margin-top:100px;color:#C8A96E">AI Cash Systems — Coming Soon</h1>');
 });
 
-app.get('/',(req,res)=>{
-  res.redirect('https://aicashsystems-final.netlify.app');
-});
+
 
 const PORT=process.env.PORT||3000;
 app.listen(PORT,()=>console.log('AutoFlow on port '+PORT));
