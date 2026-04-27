@@ -108,25 +108,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .notif.show{transform:translateY(0);opacity:1;}
 .notif.success{border-color:var(--green);}
 .notif.error{border-color:var(--red);}
-.wizard-card{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:18px;margin-bottom:12px;cursor:pointer;transition:all .2s;}
-.wizard-card:hover{border-color:var(--gold);}
+.wizard-card{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:18px;margin-bottom:12px;transition:all .2s;}
 .wizard-card.selected{border-color:var(--gold);background:var(--gold-muted);}
-.wizard-header{display:flex;align-items:center;gap:14px;}
+.wizard-header{display:flex;align-items:center;gap:14px;cursor:pointer;}
 .wizard-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
 .wizard-info{flex:1;}
 .wizard-name{font-size:15px;font-weight:600;margin-bottom:3px;}
 .wizard-desc{font-size:12px;color:var(--text3);}
-.wizard-badge{font-size:10px;padding:3px 10px;border-radius:100px;background:var(--gold-muted);color:var(--gold);border:1px solid var(--border);}
+.wizard-badge{font-size:10px;padding:3px 10px;border-radius:100px;background:var(--gold-muted);color:var(--gold);border:1px solid var(--border);white-space:nowrap;}
 .wizard-fields{margin-top:16px;padding-top:16px;border-top:1px solid var(--border2);display:none;}
 .wizard-card.selected .wizard-fields{display:block;}
-.step-indicator{display:flex;align-items:center;gap:8px;margin-bottom:20px;}
-.step{width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text3);}
-.step.active{background:var(--gold);color:#0A0A0A;border-color:var(--gold);font-weight:700;}
-.step.done{background:var(--green);color:white;border-color:var(--green);}
-.step-line{flex:1;height:1px;background:var(--border2);}
-.result-box{background:var(--bg3);border:1px solid var(--green);border-radius:10px;padding:20px;margin-top:16px;}
-.result-title{font-size:14px;font-weight:600;color:var(--green);margin-bottom:8px;}
-.result-desc{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:14px;}
+.result-box{background:var(--bg2);border:1px solid var(--green);border-radius:12px;padding:20px;margin-top:16px;}
+.result-title{font-size:15px;font-weight:600;color:var(--green);margin-bottom:10px;}
+.result-desc{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:16px;}
 </style>
 </head>
 <body>
@@ -160,6 +154,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     </div>
   </div>
   <div class="main">
+
+    <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">
       <div class="page-title">Dashboard</div>
       <div class="page-sub" id="dashWelcome">Welcome back!</div>
@@ -167,113 +163,121 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
         <div class="stat-card"><div class="stat-card-icon">⚡</div><div class="stat-card-val" id="stat-total">0</div><div class="stat-card-label">Total Activities</div></div>
         <div class="stat-card"><div class="stat-card-icon">📧</div><div class="stat-card-val" id="stat-emails">0</div><div class="stat-card-label">Emails Sent</div></div>
         <div class="stat-card"><div class="stat-card-icon">🪝</div><div class="stat-card-val" id="stat-webhooks">0</div><div class="stat-card-label">Webhook Hits</div></div>
-        <div class="stat-card"><div class="stat-card-icon">🤖</div><div class="stat-card-val" id="stat-ai">0</div><div class="stat-card-label">AI Queries</div></div>
+        <div class="stat-card"><div class="stat-card-icon">🧙</div><div class="stat-card-val" id="stat-scenarios">0</div><div class="stat-card-label">Scenarios Built</div></div>
       </div>
       <div class="panel">
         <div class="panel-title"><span class="panel-icon">📋</span>Recent Activity</div>
         <div id="recentActivity"><div style="font-size:13px;color:var(--text3);">Loading...</div></div>
       </div>
     </div>
+
+    <!-- AUTOMATION WIZARD -->
     <div class="page" id="page-wizard">
       <div class="page-title">Automation Wizard</div>
-      <div class="page-sub">Choose an automation → fill in details → download your Make.com scenario ready to import.</div>
-      <div id="wizardStep1">
-        <div class="step-indicator">
-          <div class="step active" id="s1">1</div>
-          <div class="step-line"></div>
-          <div class="step" id="s2">2</div>
-          <div class="step-line"></div>
-          <div class="step" id="s3">3</div>
+      <div class="page-sub">Select automation → fill details → download Make.com scenario ready to import in 1 click.</div>
+
+      <div class="wizard-card" id="wc-whatsapp">
+        <div class="wizard-header" onclick="selectWizard('whatsapp')">
+          <div class="wizard-icon" style="background:rgba(34,197,94,.1)">📱</div>
+          <div class="wizard-info"><div class="wizard-name">WhatsApp AI Bot</div><div class="wizard-desc">Auto-reply to WhatsApp messages with GPT-4o — 24/7</div></div>
+          <div class="wizard-badge">$500–$2K</div>
         </div>
-        <p style="font-size:13px;color:var(--text3);margin-bottom:16px;">Select the automation you want to build:</p>
-        <div class="wizard-card" onclick="selectWizard(this,'whatsapp')">
-          <div class="wizard-header">
-            <div class="wizard-icon" style="background:rgba(34,197,94,.1)">📱</div>
-            <div class="wizard-info"><div class="wizard-name">WhatsApp AI Bot</div><div class="wizard-desc">Auto-reply to WhatsApp messages with GPT-4o — 24/7</div></div>
-            <div class="wizard-badge">$500–$2K</div>
-          </div>
-          <div class="wizard-fields">
-            <label class="input-label">Company Name</label>
-            <input class="text-input" id="wa-company" placeholder="e.g. Smith Restaurant"/>
-            <label class="input-label">What does the business do?</label>
-            <input class="text-input" id="wa-business" placeholder="e.g. Italian restaurant, open Mon-Sat 12-22"/>
-            <label class="input-label">Welcome message when someone messages</label>
-            <textarea class="text-area" id="wa-welcome" placeholder="e.g. Hello! Thanks for contacting us. How can I help you today?"></textarea>
-            <button class="btn-gold" onclick="generateWizard('whatsapp',event)">⚡ Generate Make.com Scenario</button>
-          </div>
+        <div class="wizard-fields">
+          <label class="input-label">Company Name</label>
+          <input class="text-input" id="wa-company" placeholder="e.g. Smith Restaurant"/>
+          <label class="input-label">What does the business do?</label>
+          <input class="text-input" id="wa-business" placeholder="e.g. Italian restaurant, open Mon-Sat 12-22"/>
+          <label class="input-label">Welcome message</label>
+          <textarea class="text-area" id="wa-welcome" placeholder="e.g. Hello! Thanks for contacting us. How can I help you?"></textarea>
+          <button class="btn-gold" id="btn-whatsapp" onclick="generateWizard('whatsapp')">⚡ Generate Make.com Scenario</button>
+          <div class="status-msg" id="status-whatsapp"></div>
+          <div id="result-whatsapp"></div>
         </div>
-        <div class="wizard-card" onclick="selectWizard(this,'leadfollowup')">
-          <div class="wizard-header">
-            <div class="wizard-icon" style="background:rgba(201,168,76,.1)">📧</div>
-            <div class="wizard-info"><div class="wizard-name">Lead Follow-Up Email</div><div class="wizard-desc">Google Form → GPT-4o → Gmail — instant personalized reply</div></div>
-            <div class="wizard-badge">$300–$800</div>
-          </div>
-          <div class="wizard-fields">
-            <label class="input-label">Company Name</label>
-            <input class="text-input" id="lf-company" placeholder="e.g. Johnson Consulting"/>
-            <label class="input-label">What service do you offer?</label>
-            <input class="text-input" id="lf-service" placeholder="e.g. Business consulting and strategy"/>
-            <label class="input-label">Your Gmail address (sends from)</label>
-            <input class="text-input" id="lf-email" placeholder="e.g. info@company.com" type="email"/>
-            <button class="btn-gold" onclick="generateWizard('leadfollowup',event)">⚡ Generate Make.com Scenario</button>
-          </div>
+      </div>
+
+      <div class="wizard-card" id="wc-leadfollowup">
+        <div class="wizard-header" onclick="selectWizard('leadfollowup')">
+          <div class="wizard-icon" style="background:rgba(201,168,76,.1)">📧</div>
+          <div class="wizard-info"><div class="wizard-name">Lead Follow-Up Email</div><div class="wizard-desc">Google Form → GPT-4o → Gmail — instant personalized reply</div></div>
+          <div class="wizard-badge">$300–$800</div>
         </div>
-        <div class="wizard-card" onclick="selectWizard(this,'instagram')">
-          <div class="wizard-header">
-            <div class="wizard-icon" style="background:rgba(239,68,68,.1)">📸</div>
-            <div class="wizard-info"><div class="wizard-name">Instagram DM Bot</div><div class="wizard-desc">Auto-reply to Instagram DMs with AI — never miss a lead</div></div>
-            <div class="wizard-badge">$500–$1.2K</div>
-          </div>
-          <div class="wizard-fields">
-            <label class="input-label">Instagram Handle</label>
-            <input class="text-input" id="ig-handle" placeholder="e.g. @smithrestaurant"/>
-            <label class="input-label">Brand personality / tone</label>
-            <input class="text-input" id="ig-tone" placeholder="e.g. Friendly, casual, use emojis"/>
-            <label class="input-label">What to say when someone DMs</label>
-            <textarea class="text-area" id="ig-reply" placeholder="e.g. Hey! Thanks for reaching out. We'd love to help. What are you looking for?"></textarea>
-            <button class="btn-gold" onclick="generateWizard('instagram',event)">⚡ Generate Make.com Scenario</button>
-          </div>
+        <div class="wizard-fields">
+          <label class="input-label">Company Name</label>
+          <input class="text-input" id="lf-company" placeholder="e.g. Johnson Consulting"/>
+          <label class="input-label">What service do you offer?</label>
+          <input class="text-input" id="lf-service" placeholder="e.g. Business consulting and strategy"/>
+          <label class="input-label">Gmail address (sends from)</label>
+          <input class="text-input" id="lf-email" placeholder="e.g. info@company.com" type="email"/>
+          <button class="btn-gold" id="btn-leadfollowup" onclick="generateWizard('leadfollowup')">⚡ Generate Make.com Scenario</button>
+          <div class="status-msg" id="status-leadfollowup"></div>
+          <div id="result-leadfollowup"></div>
         </div>
-        <div class="wizard-card" onclick="selectWizard(this,'coldemail')">
-          <div class="wizard-header">
-            <div class="wizard-icon" style="background:rgba(59,130,246,.1)">📤</div>
-            <div class="wizard-info"><div class="wizard-name">Cold Email Campaign</div><div class="wizard-desc">Apollo.io → GPT personalization → Instantly.ai — 50 emails/day</div></div>
-            <div class="wizard-badge">$800–$2K</div>
-          </div>
-          <div class="wizard-fields">
-            <label class="input-label">Your Name / Company</label>
-            <input class="text-input" id="ce-name" placeholder="e.g. Alex from AutoFlow Agency"/>
-            <label class="input-label">Target industry</label>
-            <input class="text-input" id="ce-industry" placeholder="e.g. Restaurant owners in Romania"/>
-            <label class="input-label">Your main offer</label>
-            <textarea class="text-area" id="ce-offer" placeholder="e.g. AI automation systems that save 20+ hours/week and respond to leads instantly"></textarea>
-            <button class="btn-gold" onclick="generateWizard('coldemail',event)">⚡ Generate Make.com Scenario</button>
-          </div>
+      </div>
+
+      <div class="wizard-card" id="wc-instagram">
+        <div class="wizard-header" onclick="selectWizard('instagram')">
+          <div class="wizard-icon" style="background:rgba(239,68,68,.1)">📸</div>
+          <div class="wizard-info"><div class="wizard-name">Instagram DM Bot</div><div class="wizard-desc">Auto-reply to Instagram DMs with AI — never miss a lead</div></div>
+          <div class="wizard-badge">$500–$1.2K</div>
         </div>
-        <div class="wizard-card" onclick="selectWizard(this,'crm')">
-          <div class="wizard-header">
-            <div class="wizard-icon" style="background:rgba(168,85,247,.1)">📊</div>
-            <div class="wizard-info"><div class="wizard-name">Google Sheets CRM</div><div class="wizard-desc">All lead sources → one Sheet → AI summary + weekly report</div></div>
-            <div class="wizard-badge">$300–$600</div>
-          </div>
-          <div class="wizard-fields">
-            <label class="input-label">Company Name</label>
-            <input class="text-input" id="crm-company" placeholder="e.g. Johnson Real Estate"/>
-            <label class="input-label">Lead sources (check what you use)</label>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
-              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-form" checked/> Google Forms</label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-wa"/> WhatsApp</label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-ig"/> Instagram</label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-email"/> Email</label>
-            </div>
-            <label class="input-label">Report sent to email</label>
-            <input class="text-input" id="crm-email-addr" placeholder="e.g. manager@company.com" type="email"/>
-            <button class="btn-gold" onclick="generateWizard('crm',event)">⚡ Generate Make.com Scenario</button>
-          </div>
+        <div class="wizard-fields">
+          <label class="input-label">Instagram Handle</label>
+          <input class="text-input" id="ig-handle" placeholder="e.g. @smithrestaurant"/>
+          <label class="input-label">Brand tone</label>
+          <input class="text-input" id="ig-tone" placeholder="e.g. Friendly, casual, use emojis"/>
+          <label class="input-label">Default reply when someone DMs</label>
+          <textarea class="text-area" id="ig-reply" placeholder="e.g. Hey! Thanks for reaching out. How can we help?"></textarea>
+          <button class="btn-gold" id="btn-instagram" onclick="generateWizard('instagram')">⚡ Generate Make.com Scenario</button>
+          <div class="status-msg" id="status-instagram"></div>
+          <div id="result-instagram"></div>
         </div>
-        <div id="wizardResult" style="display:none;"></div>
+      </div>
+
+      <div class="wizard-card" id="wc-coldemail">
+        <div class="wizard-header" onclick="selectWizard('coldemail')">
+          <div class="wizard-icon" style="background:rgba(59,130,246,.1)">📤</div>
+          <div class="wizard-info"><div class="wizard-name">Cold Email Campaign</div><div class="wizard-desc">Apollo.io → GPT personalization → Instantly.ai — 50 emails/day</div></div>
+          <div class="wizard-badge">$800–$2K</div>
+        </div>
+        <div class="wizard-fields">
+          <label class="input-label">Your Name / Company</label>
+          <input class="text-input" id="ce-name" placeholder="e.g. Alex from AutoFlow Agency"/>
+          <label class="input-label">Target industry</label>
+          <input class="text-input" id="ce-industry" placeholder="e.g. Restaurant owners in Romania"/>
+          <label class="input-label">Your main offer</label>
+          <textarea class="text-area" id="ce-offer" placeholder="e.g. AI systems that save 20+ hours/week and respond to leads instantly"></textarea>
+          <button class="btn-gold" id="btn-coldemail" onclick="generateWizard('coldemail')">⚡ Generate Make.com Scenario</button>
+          <div class="status-msg" id="status-coldemail"></div>
+          <div id="result-coldemail"></div>
+        </div>
+      </div>
+
+      <div class="wizard-card" id="wc-crm">
+        <div class="wizard-header" onclick="selectWizard('crm')">
+          <div class="wizard-icon" style="background:rgba(168,85,247,.1)">📊</div>
+          <div class="wizard-info"><div class="wizard-name">Google Sheets CRM</div><div class="wizard-desc">All lead sources → one Sheet → AI summary + weekly report</div></div>
+          <div class="wizard-badge">$300–$600</div>
+        </div>
+        <div class="wizard-fields">
+          <label class="input-label">Company Name</label>
+          <input class="text-input" id="crm-company" placeholder="e.g. Johnson Real Estate"/>
+          <label class="input-label">Lead sources</label>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-form" checked/> Google Forms</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-wa"/> WhatsApp</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-ig"/> Instagram</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-email"/> Email</label>
+          </div>
+          <label class="input-label">Weekly report sent to</label>
+          <input class="text-input" id="crm-email-addr" placeholder="e.g. manager@company.com" type="email"/>
+          <button class="btn-gold" id="btn-crm" onclick="generateWizard('crm')">⚡ Generate Make.com Scenario</button>
+          <div class="status-msg" id="status-crm"></div>
+          <div id="result-crm"></div>
+        </div>
       </div>
     </div>
+
+    <!-- EMAIL -->
     <div class="page" id="page-email">
       <div class="page-title">Email Automation</div>
       <div class="page-sub">Send real emails via Gmail — tracked and logged.</div>
@@ -298,6 +302,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
         <div class="template-item" onclick="useTemplate('proposal')"><div class="template-icon" style="background:rgba(59,130,246,.1)">📝</div><div class="template-info"><div class="template-name">Proposal Follow-Up</div><div class="template-desc">Follow up and create urgency</div></div><div class="btn-small">Use</div></div>
       </div>
     </div>
+
+    <!-- AI CHAT -->
     <div class="page" id="page-chat">
       <div class="page-title">AI Assistant</div>
       <div class="page-sub">GPT-4o — any language, analyze images, get help.</div>
@@ -323,6 +329,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
         </div>
       </div>
     </div>
+
+    <!-- WEBHOOKS -->
     <div class="page" id="page-webhooks">
       <div class="page-title">Webhooks</div>
       <div class="page-sub">Real endpoints — receive data from any app instantly.</div>
@@ -331,7 +339,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
         <div class="panel-title"><span class="panel-icon">🪝</span>Your Endpoints</div>
         <div id="webhookList"><div style="font-size:13px;color:var(--text3);">Loading...</div></div>
       </div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-icon">💡</span>How to Use</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.8;">1. Create a webhook above<br>2. Copy the URL<br>3. Paste in Make.com, Stripe, or any app<br>4. Every hit appears in Activity Logs instantly<br><span style="color:var(--gold);margin-top:8px;display:block;">Real-time data reception ✓</span></div>
+      </div>
     </div>
+
+    <!-- LOGS -->
     <div class="page" id="page-logs">
       <div class="page-title">Activity Logs</div>
       <div class="page-sub">Real-time log of all your activity.</div>
@@ -340,7 +354,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
         <div id="logList"><div style="font-size:13px;color:var(--text3);">Loading...</div></div>
       </div>
     </div>
+
   </div>
+
+  <!-- BOTTOM NAV -->
   <div class="bottom-nav">
     <button class="nav-btn active" id="nav-dashboard" onclick="showPage('dashboard',this)"><span class="nav-btn-icon">⚡</span><span class="nav-btn-label">Home</span></button>
     <button class="nav-btn" id="nav-wizard" onclick="showPage('wizard',this)"><span class="nav-btn-icon">🧙</span><span class="nav-btn-label">Wizard</span></button>
@@ -350,11 +367,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
   </div>
 </div>
 <div class="notif" id="notif"></div>
+
 <script>
 const API='https://autoflow-backend-p9pc.onrender.com';
 let token=localStorage.getItem('af_token');
 let currentUser=JSON.parse(localStorage.getItem('af_user')||'null');
 let attachedImage=null;
+
+// Store generated JSONs
+window.wizardResults={};
 
 async function handleLogin(){
   const email=document.getElementById('loginEmail').value.trim();
@@ -412,49 +433,55 @@ async function loadDashboard(){
     document.getElementById('stat-total').textContent=logs.length;
     document.getElementById('stat-emails').textContent=logs.filter(l=>l.type==='email').length;
     document.getElementById('stat-webhooks').textContent=logs.filter(l=>l.type==='webhook').length;
-    document.getElementById('stat-ai').textContent=logs.filter(l=>l.type==='ai').length;
+    document.getElementById('stat-scenarios').textContent=Object.keys(window.wizardResults).length;
     const el=document.getElementById('recentActivity');
     if(!logs.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0;">No activity yet.</div>';return;}
-    el.innerHTML=logs.slice(0,5).map(l=>`<div class="log-row"><div class="log-time">${new Date(l.time).toLocaleTimeString()}</div><div class="log-badge ${l.status}">${l.status.toUpperCase()}</div><div class="log-msg">${l.msg}</div></div>`).join('');
+    el.innerHTML=logs.slice(0,5).map(l=>'<div class="log-row"><div class="log-time">'+new Date(l.time).toLocaleTimeString()+'</div><div class="log-badge '+l.status+'">'+l.status.toUpperCase()+'</div><div class="log-msg">'+l.msg+'</div></div>').join('');
   }catch(e){}
 }
 
-function selectWizard(card,type){
-  document.querySelectorAll('.wizard-card').forEach(c=>{c.classList.remove('selected');});
-  card.classList.add('selected');
-  document.getElementById('wizardResult').style.display='none';
+// WIZARD
+function selectWizard(type){
+  document.querySelectorAll('.wizard-card').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('wc-'+type).classList.add('selected');
 }
 
-async function generateWizard(type,event){
-  event.stopPropagation();
-  const btn=event.target;
+async function generateWizard(type){
+  const btn=document.getElementById('btn-'+type);
+  const statusEl=document.getElementById('status-'+type);
+  const resultEl=document.getElementById('result-'+type);
+
   btn.disabled=true;btn.textContent='Generating...';
+  statusEl.textContent='AI is building your Make.com scenario...';statusEl.style.color='var(--text3)';
+  resultEl.innerHTML='';
+
   let prompt='';
-  let filename='';
+  let filename='scenario-'+type+'.json';
+
   if(type==='whatsapp'){
     const company=document.getElementById('wa-company').value||'My Company';
     const business=document.getElementById('wa-business').value||'a business';
     const welcome=document.getElementById('wa-welcome').value||'Hello! How can I help you?';
-    filename='whatsapp-bot-'+company.toLowerCase().replace(/\s/g,'-')+'.json';
-    prompt=`Create a complete Make.com scenario JSON for a WhatsApp AI Bot for "${company}" which is "${business}". The bot should: 1) Receive WhatsApp messages via 360dialog webhook, 2) Send message to OpenAI GPT-4o with system prompt "You are a helpful assistant for ${company}. ${business}. Welcome message: ${welcome}. Reply professionally in max 3 sentences.", 3) Send the AI reply back via 360dialog HTTP request. Include all Make.com modules with correct structure: webhook trigger, OpenAI module, HTTP module. Return ONLY valid Make.com JSON scenario, no explanations.`;
+    filename='whatsapp-bot.json';
+    prompt='Create a Make.com scenario blueprint JSON for a WhatsApp AI Bot. Company: "'+company+'". Business: "'+business+'". The bot receives WhatsApp messages via 360dialog webhook, sends to OpenAI GPT-4o with system prompt "You are assistant for '+company+'. '+business+'. Welcome: '+welcome+'", then replies via 360dialog HTTP. Return ONLY valid Make.com blueprint JSON with proper module structure. No explanations.';
   }else if(type==='leadfollowup'){
     const company=document.getElementById('lf-company').value||'My Company';
-    const service=document.getElementById('lf-service').value||'consulting services';
+    const service=document.getElementById('lf-service').value||'consulting';
     const email=document.getElementById('lf-email').value||'info@company.com';
-    filename='lead-followup-'+company.toLowerCase().replace(/\s/g,'-')+'.json';
-    prompt=`Create a complete Make.com scenario JSON for a Lead Follow-Up automation for "${company}" offering "${service}". The flow: 1) Google Sheets trigger - Watch New Rows, 2) OpenAI GPT-4o - generate personalized follow-up email using lead name and problem from sheet columns, system prompt: "You are a professional assistant for ${company}. Write a warm 80-word follow-up email to the lead. End with CTA to book a call.", 3) Gmail - Send Email to the lead's email address. Return ONLY valid Make.com JSON scenario.`;
+    filename='lead-followup.json';
+    prompt='Create a Make.com scenario blueprint JSON for Lead Follow-Up automation. Company: "'+company+'". Service: "'+service+'". Gmail: '+email+'. Flow: Google Sheets Watch New Rows -> OpenAI GPT-4o generate 80-word follow-up email -> Gmail Send Email. System prompt: "You are assistant for '+company+'. Write warm follow-up email. End with CTA to book call." Return ONLY valid Make.com blueprint JSON. No explanations.';
   }else if(type==='instagram'){
     const handle=document.getElementById('ig-handle').value||'@mybrand';
-    const tone=document.getElementById('ig-tone').value||'friendly and professional';
+    const tone=document.getElementById('ig-tone').value||'friendly';
     const reply=document.getElementById('ig-reply').value||'Thanks for reaching out!';
-    filename='instagram-bot-'+handle.replace('@','')+'.json';
-    prompt=`Create a complete Make.com scenario JSON for an Instagram DM Auto-Reply bot for "${handle}". The flow: 1) Instagram Business - Watch Direct Messages trigger, 2) OpenAI GPT-4o - generate reply with system prompt "You are the social media manager for ${handle}. Tone: ${tone}. Default greeting: ${reply}. Reply in max 2 sentences.", 3) Instagram Business - Send Message back to the sender. Return ONLY valid Make.com JSON scenario.`;
+    filename='instagram-dm-bot.json';
+    prompt='Create a Make.com scenario blueprint JSON for Instagram DM Bot. Handle: "'+handle+'". Tone: "'+tone+'". Default reply: "'+reply+'". Flow: Instagram Business Watch Direct Messages -> OpenAI GPT-4o generate reply -> Instagram Business Send Message. System prompt: "You are social media manager for '+handle+'. Tone: '+tone+'. Default: '+reply+'. Reply max 2 sentences." Return ONLY valid Make.com blueprint JSON. No explanations.';
   }else if(type==='coldemail'){
     const name=document.getElementById('ce-name').value||'Alex';
     const industry=document.getElementById('ce-industry').value||'business owners';
     const offer=document.getElementById('ce-offer').value||'AI automation services';
     filename='cold-email-campaign.json';
-    prompt=`Create a complete Make.com scenario JSON for a Cold Email Automation for "${name}" targeting "${industry}" offering "${offer}". The flow: 1) Google Sheets - Watch New Rows (prospect list from Apollo.io export), 2) OpenAI GPT-4o - personalize first paragraph of email using prospect name, company, industry. System prompt: "Write a 2-sentence personalized opening for a cold email from ${name} to {{prospect_name}} at {{company}}. Reference their industry: ${industry}. Our offer: ${offer}.", 3) HTTP module - POST to Instantly.ai API to add to campaign. Return ONLY valid Make.com JSON scenario.`;
+    prompt='Create a Make.com scenario blueprint JSON for Cold Email Campaign. Sender: "'+name+'". Target: "'+industry+'". Offer: "'+offer+'". Flow: Google Sheets Watch New Rows (Apollo export) -> OpenAI GPT-4o personalize opening paragraph -> HTTP POST to Instantly.ai API. GPT system prompt: "Write 2-sentence personalized cold email opening from '+name+' to prospect. Mention their industry: '+industry+'. Offer: '+offer+'." Return ONLY valid Make.com blueprint JSON. No explanations.';
   }else if(type==='crm'){
     const company=document.getElementById('crm-company').value||'My Company';
     const emailAddr=document.getElementById('crm-email-addr').value||'manager@company.com';
@@ -463,44 +490,54 @@ async function generateWizard(type,event){
     if(document.getElementById('crm-wa').checked)sources.push('WhatsApp');
     if(document.getElementById('crm-ig').checked)sources.push('Instagram');
     if(document.getElementById('crm-email').checked)sources.push('Email');
-    filename='crm-'+company.toLowerCase().replace(/\s/g,'-')+'.json';
-    prompt=`Create a complete Make.com scenario JSON for a Google Sheets CRM for "${company}". Sources: ${sources.join(', ')}. The flow: 1) Google Sheets - Watch New Rows trigger (main CRM sheet), 2) OpenAI GPT-4o - generate 20-word lead summary and suggest next action, 3) Google Sheets - Update the row with AI summary in column G and next action in column H, 4) Schedule trigger every Monday 9am - read weekly data, generate report with GPT, send via Gmail to ${emailAddr}. Return ONLY valid Make.com JSON scenario.`;
+    filename='crm-automation.json';
+    prompt='Create a Make.com scenario blueprint JSON for Google Sheets CRM. Company: "'+company+'". Sources: '+sources.join(', ')+'. Report to: '+emailAddr+'. Flow: Google Sheets Watch New Rows -> OpenAI GPT-4o generate 20-word lead summary and next action -> Google Sheets Update Row. Plus weekly scheduler: every Monday 9am read CRM data -> GPT generate report -> Gmail send to '+emailAddr+'. Return ONLY valid Make.com blueprint JSON. No explanations.';
   }
+
   try{
-    const r=await fetch(API+'/api/ai/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});
+    const r=await fetch(API+'/api/ai/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt})});
     const d=await r.json();
+
     if(d.output){
-      const json=d.output.replace(/```json/g,'').replace(/```/g,'').trim();
-      const resultEl=document.getElementById('wizardResult');
-      resultEl.style.display='block';
-      resultEl.innerHTML=`
-        <div class="result-box">
-          <div class="result-title">✓ Make.com Scenario Ready!</div>
-          <div class="result-desc">Your automation scenario has been generated. Download it and import directly into Make.com:<br><br><strong>How to import:</strong><br>1. Open Make.com → Scenarios<br>2. Click the 3 dots menu → Import Blueprint<br>3. Upload the downloaded JSON file<br>4. Fill in your API keys and connections<br>5. Click Enable → Done!</div>
-          <button class="btn-gold" onclick="downloadJSON('${filename}',\`${json.replace(/`/g,'\\`')}\`)">⬇️ Download Make.com Scenario</button>
-          <button class="btn-outline" onclick="copyJSON(\`${json.replace(/`/g,'\\`')}\`)">📋 Copy JSON</button>
-        </div>
-      `;
+      const json=d.output.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      window.wizardResults[type]={json:json,filename:filename};
+
+      statusEl.textContent='';
+      resultEl.innerHTML='<div class="result-box"><div class="result-title">✓ Make.com Scenario Ready!</div><div class="result-desc">Your scenario has been generated. Download and import into Make.com:<br><br><strong>How to import:</strong><br>1. Open Make.com → Scenarios<br>2. Click the 3 dots → Import Blueprint<br>3. Upload the JSON file<br>4. Add your API keys and connections<br>5. Enable → Done! ✓</div><button class="btn-gold" onclick="downloadWizard(\''+type+'\')">⬇️ Download Make.com Scenario</button><button class="btn-outline" onclick="copyWizard(\''+type+'\')">📋 Copy JSON</button></div>';
       resultEl.scrollIntoView({behavior:'smooth'});
       notify('Scenario generated ✓','success');
+    }else{
+      statusEl.textContent='Error generating. Please try again.';
+      statusEl.style.color='var(--red)';
     }
-  }catch(e){notify('Error generating. Try again.','error');}
+  }catch(e){
+    statusEl.textContent='Connection error. Please try again.';
+    statusEl.style.color='var(--red)';
+  }
+
   btn.disabled=false;btn.textContent='⚡ Generate Make.com Scenario';
 }
 
-function downloadJSON(filename,json){
-  const blob=new Blob([json],{type:'application/json'});
+function downloadWizard(type){
+  const data=window.wizardResults[type];
+  if(!data){notify('Generate a scenario first','error');return;}
+  const blob=new Blob([data.json],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=filename;
+  a.download=data.filename;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   notify('Downloaded ✓','success');
 }
 
-function copyJSON(json){
-  navigator.clipboard.writeText(json).then(()=>notify('JSON copied ✓','success')).catch(()=>notify('Copy failed','error'));
+function copyWizard(type){
+  const data=window.wizardResults[type];
+  if(!data){notify('Generate a scenario first','error');return;}
+  navigator.clipboard.writeText(data.json).then(function(){notify('JSON copied ✓','success');}).catch(function(){notify('Copy failed — try download instead','error');});
 }
 
+// EMAIL
 async function sendEmail(){
   const to=document.getElementById('emailTo').value.trim();
   const subject=document.getElementById('emailSubject').value.trim();
@@ -538,6 +575,7 @@ function useTemplate(type){
   if(tmpl){document.getElementById('emailSubject').value=tmpl.subject;document.getElementById('emailBody').value=tmpl.body;notify('Template loaded ✓','success');showPage('email',document.getElementById('nav-email'));}
 }
 
+// IMAGE UPLOAD
 function handleImageUpload(e){
   const file=e.target.files[0];
   if(!file)return;
@@ -558,6 +596,7 @@ function removeImage(){
   document.getElementById('imageUpload').value='';
 }
 
+// AI CHAT
 async function sendChat(){
   const input=document.getElementById('chatInput');
   const msg=input.value.trim();
@@ -595,13 +634,14 @@ function addMsg(text,role){
 
 function scrollChat(){const c=document.getElementById('chatMessages');c.scrollTop=c.scrollHeight;}
 
+// WEBHOOKS
 async function loadWebhooks(){
   try{
     const r=await fetch(API+'/api/webhooks',{headers:authH()});
     const wh=await r.json();
     const el=document.getElementById('webhookList');
     if(!wh.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);">No webhooks yet. Create your first one!</div>';return;}
-    el.innerHTML=wh.map(w=>`<div class="webhook-card"><div class="webhook-name">${w.name}</div><div class="webhook-url">${w.url}</div><div class="webhook-footer"><span class="webhook-hits">${w.hits} hits</span><button class="btn-small" onclick="copyUrl('${w.url}')">Copy URL</button></div></div>`).join('');
+    el.innerHTML=wh.map(function(w){return '<div class="webhook-card"><div class="webhook-name">'+w.name+'</div><div class="webhook-url">'+w.url+'</div><div class="webhook-footer"><span class="webhook-hits">'+w.hits+' hits</span><button class="btn-small" onclick="copyUrl(\''+w.url+'\')">Copy URL</button></div></div>';}).join('');
   }catch(e){}
 }
 
@@ -609,29 +649,31 @@ async function createWebhook(){
   const name=prompt('Webhook name:','My Webhook');
   if(!name)return;
   try{
-    await fetch(API+'/api/webhooks/create',{method:'POST',headers:authH(),body:JSON.stringify({name})});
+    await fetch(API+'/api/webhooks/create',{method:'POST',headers:authH(),body:JSON.stringify({name:name})});
     notify('Webhook created ✓','success');loadWebhooks();
   }catch(e){notify('Error','error');}
 }
 
 function copyUrl(url){
-  navigator.clipboard.writeText(url).then(()=>notify('URL copied ✓','success')).catch(()=>notify('Copy failed','error'));
+  navigator.clipboard.writeText(url).then(function(){notify('URL copied ✓','success');}).catch(function(){notify('Copy failed','error');});
 }
 
+// LOGS
 async function loadLogs(){
   try{
     const r=await fetch(API+'/api/logs',{headers:authH()});
     const logs=await r.json();
     const el=document.getElementById('logList');
     if(!logs.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0;">No activity yet.</div>';return;}
-    el.innerHTML=logs.map(l=>`<div class="log-row"><div class="log-time">${new Date(l.time).toLocaleTimeString()}</div><div class="log-badge ${l.status}">${l.status.toUpperCase()}</div><div class="log-msg">${l.msg}</div></div>`).join('');
+    el.innerHTML=logs.map(function(l){return '<div class="log-row"><div class="log-time">'+new Date(l.time).toLocaleTimeString()+'</div><div class="log-badge '+l.status+'">'+l.status.toUpperCase()+'</div><div class="log-msg">'+l.msg+'</div></div>';}).join('');
   }catch(e){}
 }
 
+// NOTIFY
 function notify(msg,type){
   const el=document.getElementById('notif');
   el.textContent=msg;el.className='notif show'+(type?' '+type:'');
-  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),3000);
+  clearTimeout(el._t);el._t=setTimeout(function(){el.classList.remove('show');},3000);
 }
 </script>
 </body>
