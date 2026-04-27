@@ -36,17 +36,22 @@ catch(e){res.status(401).json({error:'Invalid token'});}
 
 app.post('/api/ai/generate',async(req,res)=>{
 try{
-const OpenAI=require('openai');
-const openai=new OpenAI.OpenAI({apiKey:process.env.OPENAI_API_KEY});
+const Anthropic=require('@anthropic-ai/sdk');
+const client=new Anthropic.Anthropic({apiKey:process.env.ANTHROPIC_API_KEY});
 const{prompt}=req.body;
 if(!prompt)return res.status(400).json({error:'No prompt provided'});
-console.log('AI request received:',prompt.substring(0,50));
-const r=await openai.chat.completions.create({model:'gpt-4o',messages:[{role:'system',content:'You are AutoFlow AI Assistant, expert in AI automation, Make.com, webhooks, GPT integrations. Be helpful and practical.'},{role:'user',content:prompt}],max_tokens:600});
-const output=r.choices[0].message.content;
-console.log('AI response sent successfully');
+console.log('Claude request:',prompt.substring(0,50));
+const message=await client.messages.create({
+model:'claude-sonnet-4-5',
+max_tokens:1024,
+system:'You are AutoFlow AI Assistant, an expert in AI automation, Make.com, webhooks, GPT integrations, WhatsApp bots, Instagram automation, cold email outreach, and building AI automation agencies. Be helpful, concise and practical.',
+messages:[{role:'user',content:prompt}]
+});
+const output=message.content[0].text;
+console.log('Claude response sent');
 res.json({output});
 }catch(e){
-console.log('AI error:',e.message);
+console.log('Claude error:',e.message);
 res.status(500).json({error:e.message});
 }
 });
