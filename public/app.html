@@ -300,3 +300,225 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;}
   </div>
 </div>
 <div class="notification" id="notification"></div>
+<script>
+const API='https://autoflow-backend-p9pc.onrender.com';
+let token=localStorage.getItem('af_token');
+let currentUser=JSON.parse(localStorage.getItem('af_user')||'null');
+
+async function handleLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const code=document.getElementById('loginCode').value.trim();
+  const err=document.getElementById('loginError');
+  const btn=document.getElementById('loginBtn');
+  if(!email||!code){err.textContent='Please enter your email and access code.';return;}
+  btn.disabled=true;btn.textContent='Signing in...';
+  try{
+    const r=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,code})});
+    const d=await r.json();
+    if(!r.ok){err.textContent=d.error||'Invalid credentials.';btn.disabled=false;btn.textContent='Sign In to AutoFlow';return;}
+    token=d.token;currentUser=d.user;
+    localStorage.setItem('af_token',token);
+    localStorage.setItem('af_user',JSON.stringify(currentUser));
+    launchApp();
+  }catch(e){err.textContent='Connection error. Try again.';btn.disabled=false;btn.textContent='Sign In to AutoFlow';}
+}
+
+function launchApp(){
+  document.getElementById('loginScreen').style.display='none';
+  const app=document.getElementById('app');
+  app.classList.add('visible');
+  document.getElementById('userEmailDisplay').textContent=currentUser.email;
+  document.getElementById('userAvatar').textContent=currentUser.name?currentUser.name[0].toUpperCase():'A';
+  document.getElementById('dashWelcome').textContent='Welcome back, '+currentUser.name+'! Here is your automation overview.';
+  loadDashboard();
+  loadLogs();
+  loadWebhooks();
+}
+
+function handleLogout(){
+  localStorage.removeItem('af_token');
+  localStorage.removeItem('af_user');
+  location.reload();
+}
+
+function authHeaders(){return{'Content-Type':'application/json','Authorization':'Bearer '+token};}
+
+// AUTO LOGIN
+window.onload=function(){
+  if(token&&currentUser){
+    document.getElementById('loginEmail').value=currentUser.email;
+    launchApp();
+  }
+};
+
+// NAVIGATION
+function showPage(page,navEl){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  if(navEl)navEl.classList.add('active');
+  if(page==='logs')loadLogs();
+  if(page==='webhooks')loadWebhooks();
+  if(page==='dashboard')loadDashboard();
+}
+
+// DASHBOARD
+async function loadDashboard(){
+  try{
+    const r=await fetch(API+'/api/logs',{headers:authHeaders()});
+    const logs=await r.json();
+    document.getElementById('stat-logs').textContent=logs.length;
+    const emails=logs.filter(l=>l.type==='email').length;
+    const webhooks=logs.filter(l=>l.type==='webhook').length;
+    document.getElementById('stat-emails').textContent=emails;
+    document.getElementById('stat-webhooks').textContent=webhooks;
+    document.getElementById('stat-runs').textContent=logs.length;
+    const recent=document.getElementById('recentLogs');
+    if(logs.length===0){recent.innerHTML='<div style="font-size:13px;color:var(--text3);text-align:center;padding:20px;">No activity yet. Send an email or create a webhook to get started!</div>';return;}
+    recent.innerHTML=logs.slice(0,5).map(l=>`<div class="log-item"><div class="log-time">${new Date(l.time).toLocaleTimeString()}</div><div class="log-level ${l.status}">${l.status.toUpperCase()}</div><div class="log-msg">${l.msg}</div></div>`).join('');
+  }catch(e){console.log('Dashboard load error:',e);}
+}
+
+// EMAIL
+async function sendEmail(){
+  const to=document.getElementById('emailTo').value.trim();
+  const subject=document.getElementById('emailSubject').value.trim();
+  const body=document.getElementById('emailBody').value.trim();
+  const fromName=document.getElementById('emailFromName').value.trim();
+  const status=document.getElementById('emailStatus');
+  const btn=document.getElementById('sendEmailBtn');
+  if(!to||!subject||!body){status.textContent='Please fill in all fields.';status.style.color='var(--red)';return;}
+  btn.disabled=true;btn.textContent='Sending...';
+  status.textContent='';
+  try{
+    const r=await fetch(API+'/api/email/send',{method:'POST',headers:authHeaders(),body:JSON.stringify({to,subject,body,fromName})});
+    const d=await r.json();
+    if(!r.ok){status.textContent=d.error||'Failed to send.';status.style.color='var(--red)';}
+    else{status.textContent='✓ Email sent successfully to '+to;status.style.color='var(--green)';notify('Email sent to '+to+' ✓','success');loadDashboard();}
+  }catch(e){status.textContent='Connection error.';status.style.color='var(--red)';}
+  btn.disabled=false;btn.textContent='Send Email →';
+}
+
+async function generateEmailWithAI(){
+  const to=document.getElementById('emailTo').value.trim();
+  const subject=document.getElementById('emailSubject').value.trim();
+  if(!subject){notify('Enter a subject first','error');return;}
+  notify('Generating email with AI...','');
+  try{
+    const r=await fetch(API+'/api/ai/generate',{method:'POST',headers:authHeaders(),body:JSON.stringify({prompt:'Write a professional email with subject: "'+subject+'"'+(to?' to '+to:'')+'. Keep it concise, professional and action-oriented. Return only the email body HTML, no subject line.'})});
+    const d=await r.json();
+    if(d.output){document.getElementById('emailBody').value=d.output;notify('Email generated ✓','success');}
+  }catch(e){notify('AI generation failed','error');}
+}
+
+function loadTemplate(type){
+  const templates={
+    followup:{subject:'Quick follow-up — [Your Name]',body:'Hi [Name],\n\nI wanted to follow up on our recent conversation about automating your business processes.\n\nI have helped similar businesses save 20+ hours per week and increase their lead response rate by 300%.\n\nWould you have 15 minutes this week for a quick call?\n\nBest,\n[Your Name]'},
+    welcome:{subject:'Welcome to [Your Agency] — Next Steps Inside',body:'Hi [Name],\n\nWelcome! I am thrilled to have you on board.\n\nHere is what happens next:\n\n1. I will set up your automation system within 48 hours\n2. You will receive a testing link to review everything\n3. We go live after your approval\n\nAny questions? Just reply to this email.\n\nExcited to work together,\n[Your Name]'},
+    proposal:{subject:'Your proposal — one spot left this week',body:'Hi [Name],\n\nI sent over your proposal a few days ago and wanted to check in.\n\nI have one implementation spot available this week and wanted to give you first priority before offering it to another client.\n\nThe system we discussed would save your team approximately [X] hours per week — that is [X * hourly rate] per month in recovered productivity.\n\nWorth a 15-minute call to finalize?\n\n[Your Name]'}
+  };
+  const t=templates[type];
+  if(t){document.getElementById('emailSubject').value=t.subject;document.getElementById('emailBody').value=t.body;notify('Template loaded ✓','success');}
+}
+
+// AI CHAT
+async function sendChat(){
+  const input=document.getElementById('chatInput');
+  const msg=input.value.trim();
+  if(!msg)return;
+  addChatMsg(msg,'user');
+  input.value='';
+  const thinkingId='thinking-'+Date.now();
+  const thinkingEl=document.createElement('div');
+  thinkingEl.className='chat-msg ai';
+  thinkingEl.id=thinkingId;
+  thinkingEl.innerHTML='<div class="chat-avatar ai">A</div><div class="chat-bubble"><div class="chat-thinking"><span></span><span></span><span></span></div></div>';
+  document.getElementById('chatMessages').appendChild(thinkingEl);
+  scrollChat();
+  try{
+    const r=await fetch(API+'/api/ai/generate',{method:'POST',headers:authHeaders(),body:JSON.stringify({prompt:msg})});
+    const d=await r.json();
+    document.getElementById(thinkingId).remove();
+    addChatMsg(d.output||'Sorry, I could not process that. Please try again.','ai');
+  }catch(e){
+    document.getElementById(thinkingId).remove();
+    addChatMsg('Connection error. Make sure your OpenAI API key is set in Render environment variables.','ai');
+  }
+}
+
+function addChatMsg(text,role){
+  const el=document.createElement('div');
+  el.className='chat-msg '+role;
+  el.innerHTML='<div class="chat-avatar '+role+'">'+(role==='ai'?'A':'👤')+'</div><div class="chat-bubble">'+text.replace(/\n/g,'<br>')+'</div>';
+  document.getElementById('chatMessages').appendChild(el);
+  scrollChat();
+}
+
+function scrollChat(){const c=document.getElementById('chatMessages');c.scrollTop=c.scrollHeight;}
+function handleChatKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}}
+
+// WEBHOOKS
+async function loadWebhooks(){
+  try{
+    const r=await fetch(API+'/api/webhooks',{headers:authHeaders()});
+    const webhooks=await r.json();
+    const list=document.getElementById('webhookList');
+    if(!webhooks.length){list.innerHTML='<div style="font-size:13px;color:var(--text3);text-align:center;padding:20px;">No webhooks yet. Create your first one!</div>';return;}
+    list.innerHTML=webhooks.map(w=>`
+      <div class="webhook-item">
+        <div class="webhook-name">${w.name}</div>
+        <div class="webhook-url">${w.url}</div>
+        <div class="webhook-meta">
+          <span class="webhook-hits">${w.hits} hits${w.lastHit?' · Last: '+new Date(w.lastHit).toLocaleTimeString():''}</span>
+          <button class="copy-btn" onclick="copyWebhook('${w.url}')">Copy URL</button>
+        </div>
+      </div>
+    `).join('');
+  }catch(e){document.getElementById('webhookList').innerHTML='<div style="font-size:13px;color:var(--red);padding:20px;">Error loading webhooks.</div>';}
+}
+
+async function createWebhook(){
+  const name=prompt('Webhook name:','My Webhook');
+  if(!name)return;
+  try{
+    const r=await fetch(API+'/api/webhooks/create',{method:'POST',headers:authHeaders(),body:JSON.stringify({name})});
+    const d=await r.json();
+    notify('Webhook created ✓','success');
+    loadWebhooks();
+  }catch(e){notify('Error creating webhook','error');}
+}
+
+function copyWebhook(url){
+  navigator.clipboard.writeText(url).catch(()=>{});
+  notify('URL copied ✓','success');
+}
+
+// LOGS
+async function loadLogs(){
+  try{
+    const r=await fetch(API+'/api/logs',{headers:authHeaders()});
+    const logs=await r.json();
+    const list=document.getElementById('logList');
+    if(!logs.length){list.innerHTML='<div style="font-size:13px;color:var(--text3);text-align:center;padding:20px;">No activity yet.</div>';return;}
+    list.innerHTML=logs.map(l=>`<div class="log-item"><div class="log-time">${new Date(l.time).toLocaleTimeString()}</div><div class="log-level ${l.status}">${l.status.toUpperCase()}</div><div class="log-msg">${l.msg}</div></div>`).join('');
+  }catch(e){document.getElementById('logList').innerHTML='<div style="font-size:13px;color:var(--red);padding:20px;">Error loading logs.</div>';}
+}
+
+// NOTIFICATIONS
+function notify(msg,type){
+  const el=document.getElementById('notification');
+  el.textContent=msg;
+  el.className='notification show'+(type?' '+type:'');
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ENTER KEY LOGIN
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.getElementById('loginScreen').style.display!=='none'){
+    handleLogin();
+  }
+});
+</script>
+</body>
+</html>
