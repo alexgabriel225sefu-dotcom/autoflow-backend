@@ -1,485 +1,142 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>AutoFlow — AI Automation Platform</title>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
-<style>
-:root{--gold:#C9A84C;--gold-light:#E8C96A;--gold-dark:#8A6A1F;--gold-muted:rgba(201,168,76,0.12);--gold-glow:rgba(201,168,76,0.25);--bg:#0A0A0A;--bg2:#111111;--bg3:#181818;--bg4:#1E1E1E;--text:#F0EAD6;--text2:#B8A98A;--text3:#7A7060;--border:rgba(201,168,76,0.18);--border2:rgba(201,168,76,0.08);--green:#22C55E;--red:#EF4444;--blue:#3B82F6;}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html{height:100%;}
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100%;overflow-x:hidden;}
+const express=require('express');
+const cors=require('cors');
+const dotenv=require('dotenv');
+const jwt=require('jsonwebtoken');
+const{v4:uuidv4}=require('uuid');
+dotenv.config();
+const app=express();
+app.use(cors());
+app.use(express.static('public'));
+app.use('/webhook',express.raw({type:'application/json'}));
+app.use(express.json());
 
-/* LOGIN */
-#loginScreen{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;}
-.login-box{width:100%;max-width:420px;}
-.login-logo{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:600;letter-spacing:3px;color:var(--gold);text-transform:uppercase;text-align:center;margin-bottom:6px;}
-.login-sub{font-size:13px;color:var(--text3);text-align:center;margin-bottom:28px;letter-spacing:1px;}
-.login-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:32px 24px;}
-.login-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;margin-bottom:4px;}
-.login-desc{font-size:13px;color:var(--text3);margin-bottom:24px;}
-.form-group{margin-bottom:16px;}
-.form-label{display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-bottom:8px;}
-.form-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:14px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;transition:border-color .2s;}
-.form-input:focus{border-color:var(--gold);}
-.form-input::placeholder{color:var(--text3);}
-.login-btn{width:100%;padding:16px;background:linear-gradient(135deg,var(--gold-dark),var(--gold-light));border:none;border-radius:8px;color:#0A0A0A;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:8px;}
-.login-error{font-size:13px;color:var(--red);margin-top:12px;text-align:center;min-height:18px;}
-.login-note{font-size:12px;color:var(--text3);text-align:center;margin-top:16px;line-height:1.6;}
-.login-note strong{color:var(--gold);}
+const users={};
+const webhookLogs={};
+const userWebhooks={};
+const JWT_SECRET=process.env.JWT_SECRET||'autoflow-secret-2024';
 
-/* APP */
-#app{display:none;flex-direction:column;min-height:100vh;}
-#app.visible{display:flex;}
+users['alexgabriel225sefu@gmail.com']={email:'alexgabriel225sefu@gmail.com',code:'AF2024PRO',name:'Alex Gabriel',plan:'pro'};
 
-/* TOPBAR */
-.topbar{background:var(--bg2);border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:56px;position:sticky;top:0;z-index:100;flex-shrink:0;}
-.topbar-logo{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;letter-spacing:2px;color:var(--gold);text-transform:uppercase;}
-.topbar-logo span{color:var(--text2);font-weight:300;}
-.topbar-right{display:flex;align-items:center;gap:12px;}
-.topbar-status{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--green);}
-.status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite;flex-shrink:0;}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.user-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dark),var(--gold));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#0A0A0A;cursor:pointer;flex-shrink:0;}
+app.post('/api/auth/login',(req,res)=>{
+try{
+const{email,code}=req.body;
+const user=users[email.toLowerCase()];
+if(!user||user.code!==code.toUpperCase())return res.status(401).json({error:'Invalid email or access code'});
+const token=jwt.sign({email:user.email,name:user.name,plan:user.plan},JWT_SECRET,{expiresIn:'30d'});
+res.json({token,user:{email:user.email,name:user.name,plan:user.plan}});
+}catch(e){res.status(500).json({error:e.message});}
+});
 
-/* BOTTOM NAV */
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border2);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom);}
-.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px;cursor:pointer;transition:all .2s;border:none;background:transparent;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:.5px;gap:4px;}
-.nav-btn.active{color:var(--gold);}
-.nav-btn-icon{font-size:20px;}
-.nav-btn-label{font-size:10px;}
-
-/* MAIN */
-.main{flex:1;overflow-y:auto;padding:20px 16px;padding-bottom:80px;}
-.page{display:none;}
-.page.active{display:block;}
-.page-title{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;margin-bottom:4px;}
-.page-sub{font-size:13px;color:var(--text3);margin-bottom:20px;}
-
-/* CARDS */
-.cards-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
-.stat-card{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:16px;}
-.stat-card-icon{font-size:20px;margin-bottom:8px;}
-.stat-card-val{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;color:var(--gold);line-height:1;}
-.stat-card-label{font-size:11px;color:var(--text3);margin-top:3px;}
-
-/* PANEL */
-.panel{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:20px;margin-bottom:16px;}
-.panel-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
-.panel-icon{color:var(--gold);}
-
-/* BUTTONS */
-.btn-gold{padding:14px 24px;background:linear-gradient(135deg,var(--gold-dark),var(--gold-light));border:none;border-radius:8px;color:#0A0A0A;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-bottom:10px;}
-.btn-outline{padding:12px 24px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;width:100%;margin-bottom:10px;}
-.btn-small{padding:8px 16px;background:var(--gold-muted);border:1px solid var(--border);border-radius:6px;color:var(--gold);font-size:12px;font-weight:500;cursor:pointer;border:none;}
-
-/* CHAT */
-.chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 180px);}
-.chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding-bottom:8px;}
-.chat-msg{display:flex;gap:10px;max-width:88%;}
-.chat-msg.user{align-self:flex-end;flex-direction:row-reverse;}
-.chat-avatar{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;}
-.chat-avatar.ai{background:linear-gradient(135deg,var(--gold-dark),var(--gold));color:#0A0A0A;font-weight:700;}
-.chat-avatar.user{background:var(--bg3);border:1px solid var(--border);font-size:16px;}
-.chat-bubble{padding:12px 14px;border-radius:12px;font-size:14px;line-height:1.6;}
-.chat-msg.ai .chat-bubble{background:var(--bg3);border:1px solid var(--border2);border-top-left-radius:4px;}
-.chat-msg.user .chat-bubble{background:var(--gold-muted);border:1px solid var(--border);border-top-right-radius:4px;}
-.chat-input-row{display:flex;gap:10px;align-items:flex-end;padding-top:12px;border-top:1px solid var(--border2);}
-.chat-input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;resize:none;min-height:48px;max-height:100px;}
-.chat-input:focus{border-color:var(--gold);}
-.chat-send{width:48px;height:48px;min-width:48px;background:linear-gradient(135deg,var(--gold-dark),var(--gold));border:none;border-radius:12px;color:#0A0A0A;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.chat-thinking span{width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block;animation:thinking .8s infinite;margin:0 2px;}
-.chat-thinking span:nth-child(2){animation-delay:.15s;}
-.chat-thinking span:nth-child(3){animation-delay:.3s;}
-@keyframes thinking{0%,80%,100%{transform:scale(0);opacity:.3}40%{transform:scale(1);opacity:1}}
-
-/* FORM */
-.input-label{display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-bottom:6px;}
-.text-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:13px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;margin-bottom:14px;}
-.text-input:focus{border-color:var(--gold);}
-.text-area{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:13px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;resize:vertical;min-height:100px;margin-bottom:14px;}
-.text-area:focus{border-color:var(--gold);}
-
-/* WEBHOOK */
-.webhook-card{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:16px;margin-bottom:10px;}
-.webhook-name{font-size:14px;font-weight:600;margin-bottom:6px;}
-.webhook-url{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);margin-bottom:10px;word-break:break-all;line-height:1.5;}
-.webhook-footer{display:flex;align-items:center;justify-content:space-between;}
-.webhook-hits{font-size:12px;color:var(--text3);}
-
-/* LOGS */
-.log-row{padding:10px 0;border-bottom:1px solid var(--border2);display:flex;gap:10px;}
-.log-time{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);flex-shrink:0;width:70px;}
-.log-badge{font-size:10px;font-weight:700;flex-shrink:0;width:55px;}
-.log-badge.success{color:var(--green);}
-.log-badge.error{color:var(--red);}
-.log-badge.info{color:var(--blue);}
-.log-msg{font-size:12px;color:var(--text2);line-height:1.5;flex:1;}
-
-/* NOTIFICATION */
-.notif{position:fixed;bottom:80px;left:16px;right:16px;z-index:1000;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;font-size:13px;box-shadow:0 8px 32px rgba(0,0,0,.5);transform:translateY(120px);opacity:0;transition:all .3s;}
-.notif.show{transform:translateY(0);opacity:1;}
-.notif.success{border-color:var(--green);}
-.notif.error{border-color:var(--red);}
-
-/* TEMPLATE ITEMS */
-.template-item{display:flex;align-items:center;gap:14px;padding:14px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;margin-bottom:10px;cursor:pointer;}
-.template-icon{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
-.template-info{flex:1;}
-.template-name{font-size:14px;font-weight:500;margin-bottom:2px;}
-.template-desc{font-size:12px;color:var(--text3);}
-
-/* STATUS */
-.status-msg{font-size:13px;min-height:18px;margin-top:4px;}
-</style>
-</head>
-<body>
-
-<!-- LOGIN -->
-<div id="loginScreen">
-  <div class="login-box">
-    <div class="login-logo">Auto<span>Flow</span></div>
-    <div class="login-sub">AI Automation Platform · PRO Access</div>
-    <div class="login-card">
-      <div class="login-title">Welcome back</div>
-      <div class="login-desc">Sign in with your PRO account credentials.</div>
-      <div class="form-group">
-        <label class="form-label">Email Address</label>
-        <input class="form-input" type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Access Code</label>
-        <input class="form-input" type="password" id="loginCode" placeholder="Your access code" autocomplete="current-password"/>
-      </div>
-      <button class="login-btn" id="loginBtn" onclick="handleLogin()">Sign In to AutoFlow</button>
-      <div class="login-error" id="loginError"></div>
-      <div class="login-note">Exclusive to <strong>AI Cash Systems PRO</strong> members.</div>
-    </div>
-  </div>
-</div>
-
-<!-- APP -->
-<div id="app">
-  <div class="topbar">
-    <div class="topbar-logo">Auto<span>Flow</span></div>
-    <div class="topbar-right">
-      <div class="topbar-status"><div class="status-dot"></div>Live</div>
-      <div class="user-avatar" id="userAvatar" onclick="handleLogout()">A</div>
-    </div>
-  </div>
-
-  <div class="main">
-
-    <!-- DASHBOARD -->
-    <div class="page active" id="page-dashboard">
-      <div class="page-title">Dashboard</div>
-      <div class="page-sub" id="dashWelcome">Welcome back!</div>
-      <div class="cards-grid">
-        <div class="stat-card"><div class="stat-card-icon">⚡</div><div class="stat-card-val" id="stat-total">0</div><div class="stat-card-label">Total Activities</div></div>
-        <div class="stat-card"><div class="stat-card-icon">📧</div><div class="stat-card-val" id="stat-emails">0</div><div class="stat-card-label">Emails Sent</div></div>
-        <div class="stat-card"><div class="stat-card-icon">🪝</div><div class="stat-card-val" id="stat-webhooks">0</div><div class="stat-card-label">Webhook Hits</div></div>
-        <div class="stat-card"><div class="stat-card-icon">🤖</div><div class="stat-card-val" id="stat-ai">0</div><div class="stat-card-label">AI Queries</div></div>
-      </div>
-      <div class="panel">
-        <div class="panel-title"><span class="panel-icon">📋</span>Recent Activity</div>
-        <div id="recentActivity"><div style="font-size:13px;color:var(--text3);padding:10px 0;">Loading...</div></div>
-      </div>
-    </div>
-
-    <!-- EMAIL -->
-    <div class="page" id="page-email">
-      <div class="page-title">Email Automation</div>
-      <div class="page-sub">Send real emails via Gmail — tracked and logged.</div>
-      <div class="panel">
-        <div class="panel-title"><span class="panel-icon">📧</span>Send Email</div>
-        <label class="input-label">From Name</label>
-        <input class="text-input" id="emailFrom" value="AI Cash Systems" placeholder="Your name or company"/>
-        <label class="input-label">To Email</label>
-        <input class="text-input" id="emailTo" type="email" placeholder="client@email.com"/>
-        <label class="input-label">Subject</label>
-        <input class="text-input" id="emailSubject" placeholder="Your automation is ready!"/>
-        <label class="input-label">Message</label>
-        <textarea class="text-area" id="emailBody" placeholder="Write your message here..."></textarea>
-        <button class="btn-gold" onclick="sendEmail()">Send Email →</button>
-        <button class="btn-outline" onclick="generateEmail()">✨ Generate with AI</button>
-        <div class="status-msg" id="emailStatus"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-title"><span class="panel-icon">📨</span>Templates</div>
-        <div class="template-item" onclick="useTemplate('followup')">
-          <div class="template-icon" style="background:rgba(34,197,94,.1)">📬</div>
-          <div class="template-info"><div class="template-name">Lead Follow-Up</div><div class="template-desc">Warm follow-up for new leads</div></div>
-          <div class="btn-small">Use</div>
-        </div>
-        <div class="template-item" onclick="useTemplate('welcome')">
-          <div class="template-icon" style="background:rgba(201,168,76,.1)">👋</div>
-          <div class="template-info"><div class="template-name">Welcome Email</div><div class="template-desc">Onboard new clients professionally</div></div>
-          <div class="btn-small">Use</div>
-        </div>
-        <div class="template-item" onclick="useTemplate('proposal')">
-          <div class="template-icon" style="background:rgba(59,130,246,.1)">📝</div>
-          <div class="template-info"><div class="template-name">Proposal Follow-Up</div><div class="template-desc">Follow up and create urgency</div></div>
-          <div class="btn-small">Use</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- AI CHAT -->
-    <div class="page" id="page-chat">
-      <div class="page-title">AI Assistant</div>
-      <div class="page-sub">Real GPT-4o — ask anything about automations.</div>
-      <div class="chat-wrap">
-        <div class="chat-messages" id="chatMessages">
-          <div class="chat-msg ai">
-            <div class="chat-avatar ai">A</div>
-            <div class="chat-bubble">👋 Hello! I am your AutoFlow AI Assistant powered by GPT-4o.<br><br>Ask me anything about:<br>• Building Make.com automations<br>• WhatsApp & Instagram bots<br>• Email campaigns<br>• Finding and closing clients<br><br>What do you need help with?</div>
-          </div>
-        </div>
-        <div class="chat-input-row">
-          <textarea class="chat-input" id="chatInput" placeholder="Ask anything..." rows="1"></textarea>
-          <button class="chat-send" onclick="sendChat()">➤</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- WEBHOOKS -->
-    <div class="page" id="page-webhooks">
-      <div class="page-title">Webhooks</div>
-      <div class="page-sub">Real endpoints — receive data from any app instantly.</div>
-      <button class="btn-gold" onclick="createWebhook()">+ Create New Webhook</button>
-      <div class="panel">
-        <div class="panel-title"><span class="panel-icon">🪝</span>Your Endpoints</div>
-        <div id="webhookList"><div style="font-size:13px;color:var(--text3);">Loading...</div></div>
-      </div>
-      <div class="panel">
-        <div class="panel-title"><span class="panel-icon">💡</span>How to Use</div>
-        <div style="font-size:13px;color:var(--text3);line-height:1.8;">
-          1. Create a webhook above<br>
-          2. Copy the URL<br>
-          3. Paste in Make.com, Stripe, or any app<br>
-          4. Every hit appears in Activity Logs<br>
-          <span style="color:var(--gold);margin-top:8px;display:block;">Real-time data reception ✓</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- LOGS -->
-    <div class="page" id="page-logs">
-      <div class="page-title">Activity Logs</div>
-      <div class="page-sub">Real-time log of all your activity.</div>
-      <button class="btn-outline" style="margin-bottom:16px;" onclick="loadLogs()">↻ Refresh</button>
-      <div class="panel">
-        <div id="logList"><div style="font-size:13px;color:var(--text3);">Loading...</div></div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- BOTTOM NAV -->
-  <div class="bottom-nav">
-    <button class="nav-btn active" id="nav-dashboard" onclick="showPage('dashboard',this)">
-      <span class="nav-btn-icon">⚡</span>
-      <span class="nav-btn-label">Dashboard</span>
-    </button>
-    <button class="nav-btn" id="nav-email" onclick="showPage('email',this)">
-      <span class="nav-btn-icon">📧</span>
-      <span class="nav-btn-label">Email</span>
-    </button>
-    <button class="nav-btn" id="nav-chat" onclick="showPage('chat',this)">
-      <span class="nav-btn-icon">🤖</span>
-      <span class="nav-btn-label">AI Chat</span>
-    </button>
-    <button class="nav-btn" id="nav-webhooks" onclick="showPage('webhooks',this)">
-      <span class="nav-btn-icon">🪝</span>
-      <span class="nav-btn-label">Webhooks</span>
-    </button>
-    <button class="nav-btn" id="nav-logs" onclick="showPage('logs',this)">
-      <span class="nav-btn-icon">📋</span>
-      <span class="nav-btn-label">Logs</span>
-    </button>
-  </div>
-</div>
-
-<div class="notif" id="notif"></div>
-
-<script>
-const API='https://autoflow-backend-p9pc.onrender.com';
-let token=localStorage.getItem('af_token');
-let currentUser=JSON.parse(localStorage.getItem('af_user')||'null');
-
-// LOGIN
-async function handleLogin(){
-  const email=document.getElementById('loginEmail').value.trim();
-  const code=document.getElementById('loginCode').value.trim();
-  const err=document.getElementById('loginError');
-  const btn=document.getElementById('loginBtn');
-  if(!email||!code){err.textContent='Please enter your email and access code.';return;}
-  btn.disabled=true;btn.textContent='Signing in...';
-  try{
-    const r=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,code})});
-    const d=await r.json();
-    if(!r.ok){err.textContent=d.error||'Invalid credentials.';btn.disabled=false;btn.textContent='Sign In to AutoFlow';return;}
-    token=d.token;currentUser=d.user;
-    localStorage.setItem('af_token',token);
-    localStorage.setItem('af_user',JSON.stringify(currentUser));
-    launchApp();
-  }catch(e){err.textContent='Connection error. Please try again.';btn.disabled=false;btn.textContent='Sign In to AutoFlow';}
+function auth(req,res,next){
+const a=req.headers.authorization;
+if(!a||!a.startsWith('Bearer '))return res.status(401).json({error:'Unauthorized'});
+try{req.user=jwt.verify(a.split(' ')[1],JWT_SECRET);next();}
+catch(e){res.status(401).json({error:'Invalid token'});}
 }
 
-function launchApp(){
-  document.getElementById('loginScreen').style.display='none';
-  document.getElementById('app').classList.add('visible');
-  document.getElementById('userAvatar').textContent=currentUser.name?currentUser.name[0].toUpperCase():'A';
-  document.getElementById('dashWelcome').textContent='Welcome back, '+currentUser.name+'!';
-  loadDashboard();loadLogs();loadWebhooks();
+app.post('/api/ai/generate',async(req,res)=>{
+try{
+const OpenAI=require('openai');
+const openai=new OpenAI.OpenAI({apiKey:process.env.OPENAI_API_KEY});
+const{prompt}=req.body;
+if(!prompt)return res.status(400).json({error:'No prompt provided'});
+console.log('AI request received:',prompt.substring(0,50));
+const r=await openai.chat.completions.create({model:'gpt-4o',messages:[{role:'system',content:'You are AutoFlow AI Assistant, expert in AI automation, Make.com, webhooks, GPT integrations. Be helpful and practical.'},{role:'user',content:prompt}],max_tokens:600});
+const output=r.choices[0].message.content;
+console.log('AI response sent successfully');
+res.json({output});
+}catch(e){
+console.log('AI error:',e.message);
+res.status(500).json({error:e.message});
+}
+});
+
+app.post('/api/email/send',auth,async(req,res)=>{
+try{
+const nodemailer=require('nodemailer');
+const{to,subject,body,fromName}=req.body;
+if(!to||!subject||!body)return res.status(400).json({error:'Missing fields'});
+const t=nodemailer.createTransport({service:'gmail',auth:{user:process.env.GMAIL_USER,pass:process.env.GMAIL_APP_PASSWORD}});
+await t.sendMail({from:`"${fromName||'AutoFlow'}" <${process.env.GMAIL_USER}>`,to,subject,html:`<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px;">${body}</div>`});
+if(!webhookLogs[req.user.email])webhookLogs[req.user.email]=[];
+webhookLogs[req.user.email].unshift({time:new Date().toISOString(),type:'email',status:'success',msg:`Email sent to ${to}: ${subject}`});
+res.json({success:true});
+}catch(e){res.status(500).json({error:e.message});}
+});
+
+app.post('/api/webhooks/create',auth,(req,res)=>{
+const{name}=req.body;
+const id=uuidv4().split('-')[0];
+const webhook={id,name:name||'Custom Webhook',url:`https://autoflow-backend-p9pc.onrender.com/webhook/receive/${id}`,active:true,hits:0,createdAt:new Date().toISOString()};
+if(!userWebhooks[req.user.email])userWebhooks[req.user.email]=[];
+userWebhooks[req.user.email].push(webhook);
+res.json(webhook);
+});
+
+app.get('/api/webhooks',auth,(req,res)=>{
+res.json(userWebhooks[req.user.email]||[]);
+});
+
+app.post('/webhook/receive/:id',express.json(),(req,res)=>{
+const{id}=req.params;
+for(const email in userWebhooks){
+const wh=userWebhooks[email].find(w=>w.id===id);
+if(wh){
+wh.hits++;wh.lastHit=new Date().toISOString();wh.lastPayload=req.body;
+if(!webhookLogs[email])webhookLogs[email]=[];
+webhookLogs[email].unshift({time:new Date().toISOString(),type:'webhook',status:'success',msg:`Webhook "${wh.name}" received: ${JSON.stringify(req.body).substring(0,80)}`});
+break;
+}
+}
+res.json({received:true,id,timestamp:new Date().toISOString()});
+});
+
+app.get('/api/logs',auth,(req,res)=>{
+res.json((webhookLogs[req.user.email]||[]).slice(0,50));
+});
+
+app.get('/api/health',(req,res)=>{res.json({status:'ok',message:'AutoFlow running!'});});
+
+app.post('/create-payment-intent',async(req,res)=>{
+try{
+const stripe=require('stripe')(process.env.STRIPE_SECRET_KEY);
+const{amount,currency,email,name,product}=req.body;
+const pi=await stripe.paymentIntents.create({amount,currency,receipt_email:email,metadata:{name,product,email}});
+res.json({clientSecret:pi.client_secret});
+}catch(e){res.status(500).json({error:e.message});}
+});
+
+app.post('/webhook',async(req,res)=>{
+const stripe=require('stripe')(process.env.STRIPE_SECRET_KEY);
+const sig=req.headers['stripe-signature'];
+let event;
+try{event=stripe.webhooks.constructEvent(req.body,sig,process.env.STRIPE_WEBHOOK_SECRET);}
+catch(e){return res.status(400).send('Webhook Error: '+e.message);}
+if(event.type==='payment_intent.succeeded'){
+const pi=event.data.object;
+const email=pi.metadata.email;
+const name=pi.metadata.name;
+const product=pi.metadata.product;
+if(email&&!users[email.toLowerCase()]){
+const code=uuidv4().split('-')[0].toUpperCase();
+users[email.toLowerCase()]={email:email.toLowerCase(),code,name:name||email,plan:product==='pro'?'pro':'starter'};
+}
+await sendCourseEmail(email,name,product);
+}
+res.json({received:true});
+});
+
+async function sendCourseEmail(email,name,product){
+const nodemailer=require('nodemailer');
+const t=nodemailer.createTransport({service:'gmail',auth:{user:process.env.GMAIL_USER,pass:process.env.GMAIL_APP_PASSWORD}});
+const isStarter=product==='starter';
+const user=users[email.toLowerCase()];
+const accessCode=user?user.code:'AF2024PRO';
+const courseUrl=isStarter?'https://autoflow-backend-p9pc.onrender.com/course-starter.html':'https://autoflow-backend-p9pc.onrender.com/course-pro.html';
+const subject=isStarter?'Your AI Cash Systems Starter Course — Access Inside':'Your AI Cash Systems PRO Course + AutoFlow App — Access Inside';
+const html=`<div style="background:#080808;padding:40px;font-family:sans-serif;max-width:560px;margin:0 auto;"><div style="font-family:Georgia,serif;font-size:24px;color:#C8A96E;margin-bottom:8px;">AI Cash Systems</div><div style="height:1px;background:rgba(200,169,110,0.2);margin-bottom:32px;"></div><p style="color:#F5F0E8;font-size:18px;margin-bottom:8px;">Welcome, ${name}! 🎉</p><p style="color:#C8BEA8;font-size:14px;line-height:1.7;margin-bottom:24px;">Your payment was successful. You now have lifetime access to ${isStarter?'the AI Cash Systems Starter Course':'the AI Cash Systems PRO Course + AutoFlow App'}.</p><div style="background:#161616;border:1px solid rgba(200,169,110,0.2);border-radius:12px;padding:24px;margin-bottom:24px;"><p style="color:#C8A96E;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Your Access Link</p><a href="${courseUrl}" style="display:block;padding:14px 24px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border-radius:8px;color:#080808;font-weight:700;text-decoration:none;text-align:center;font-size:14px;letter-spacing:1px;text-transform:uppercase;">Access Your Course →</a></div>${!isStarter?`<div style="background:#161616;border:1px solid rgba(200,169,110,0.2);border-radius:12px;padding:24px;margin-bottom:24px;"><p style="color:#C8A96E;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">AutoFlow App Access</p><p style="color:#C8BEA8;font-size:13px;margin-bottom:8px;">Login at: <strong style="color:#F5F0E8;">https://autoflow-backend-p9pc.onrender.com/app.html</strong></p><p style="color:#C8BEA8;font-size:13px;">Your Access Code: <strong style="color:#C8A96E;font-size:18px;">${accessCode}</strong></p></div>`:''}<p style="color:#7A7060;font-size:12px;line-height:1.6;">Questions? <a href="mailto:support@aicashsystems.com" style="color:#C8A96E;">support@aicashsystems.com</a><br>© 2025 AI Cash Systems.</p></div>`;
+await t.sendMail({from:'"AI Cash Systems" <'+process.env.GMAIL_USER+'>',to:email,subject,html});
 }
 
-function handleLogout(){
-  if(confirm('Sign out?')){localStorage.removeItem('af_token');localStorage.removeItem('af_user');location.reload();}
-}
-
-function authH(){return{'Content-Type':'application/json','Authorization':'Bearer '+token};}
-
-window.onload=function(){
-  if(token&&currentUser)launchApp();
-  document.getElementById('loginCode').addEventListener('keydown',e=>{if(e.key==='Enter')handleLogin();});
-  document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}});
-};
-
-// NAVIGATION
-function showPage(page,btn){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-'+page).classList.add('active');
-  if(btn)btn.classList.add('active');
-  if(page==='logs')loadLogs();
-  if(page==='webhooks')loadWebhooks();
-  if(page==='dashboard')loadDashboard();
-  window.scrollTo(0,0);
-}
-
-// DASHBOARD
-async function loadDashboard(){
-  try{
-    const r=await fetch(API+'/api/logs',{headers:authH()});
-    const logs=await r.json();
-    document.getElementById('stat-total').textContent=logs.length;
-    document.getElementById('stat-emails').textContent=logs.filter(l=>l.type==='email').length;
-    document.getElementById('stat-webhooks').textContent=logs.filter(l=>l.type==='webhook').length;
-    document.getElementById('stat-ai').textContent=logs.filter(l=>l.type==='ai').length;
-    const el=document.getElementById('recentActivity');
-    if(!logs.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0;">No activity yet. Send an email or create a webhook!</div>';return;}
-    el.innerHTML=logs.slice(0,5).map(l=>`<div class="log-row"><div class="log-time">${new Date(l.time).toLocaleTimeString()}</div><div class="log-badge ${l.status}">${l.status.toUpperCase()}</div><div class="log-msg">${l.msg}</div></div>`).join('');
-  }catch(e){}
-}
-
-// EMAIL
-async function sendEmail(){
-  const to=document.getElementById('emailTo').value.trim();
-  const subject=document.getElementById('emailSubject').value.trim();
-  const body=document.getElementById('emailBody').value.trim();
-  const fromName=document.getElementById('emailFrom').value.trim();
-  const status=document.getElementById('emailStatus');
-  if(!to||!subject||!body){status.textContent='Please fill in all fields.';status.style.color='var(--red)';return;}
-  status.textContent='Sending...';status.style.color='var(--text3)';
-  try{
-    const r=await fetch(API+'/api/email/send',{method:'POST',headers:authH(),body:JSON.stringify({to,subject,body,fromName})});
-    const d=await r.json();
-    if(!r.ok){status.textContent=d.error||'Failed to send.';status.style.color='var(--red)';}
-    else{status.textContent='✓ Email sent to '+to;status.style.color='var(--green)';notify('Email sent ✓','success');loadDashboard();}
-  }catch(e){status.textContent='Connection error.';status.style.color='var(--red)';}
-}
-
-async function generateEmail(){
-  const subject=document.getElementById('emailSubject').value.trim();
-  if(!subject){notify('Enter a subject first','error');return;}
-  notify('Generating with AI...','');
-  try{
-    const r=await fetch(API+'/api/ai/generate',{method:'POST',headers:authH(),body:JSON.stringify({prompt:'Write a professional email body for subject: "'+subject+'". Keep it concise and action-oriented. Return only the email body text, no subject line.'})});
-    const d=await r.json();
-    if(d.output){document.getElementById('emailBody').value=d.output;notify('Email generated ✓','success');}
-  }catch(e){notify('AI error. Check OpenAI key.','error');}
-}
-
-function useTemplate(type){
-  const t={
-    followup:{subject:'Quick follow-up — [Your Name]',body:'Hi [Name],\n\nI wanted to follow up on our recent conversation about automating your business.\n\nI have helped similar businesses save 20+ hours per week and increase lead response rates by 300%.\n\nWould you have 15 minutes this week for a quick call?\n\nBest,\n[Your Name]'},
-    welcome:{subject:'Welcome — Next Steps Inside',body:'Hi [Name],\n\nWelcome! I am thrilled to have you on board.\n\nHere is what happens next:\n1. I will set up your automation within 48 hours\n2. You will receive a testing link\n3. We go live after your approval\n\nAny questions? Just reply.\n\n[Your Name]'},
-    proposal:{subject:'Your proposal — one spot left this week',body:'Hi [Name],\n\nI sent your proposal a few days ago and wanted to check in.\n\nI have one spot available this week and wanted to give you first priority.\n\nThe system we discussed would save your team approximately [X] hours per week.\n\nWorth a quick call to finalize?\n\n[Your Name]'}
-  };
-  const tmpl=t[type];
-  if(tmpl){document.getElementById('emailSubject').value=tmpl.subject;document.getElementById('emailBody').value=tmpl.body;notify('Template loaded ✓','success');showPage('email',document.getElementById('nav-email'));}
-}
-
-// AI CHAT
-async function sendChat(){
-  const input=document.getElementById('chatInput');
-  const msg=input.value.trim();
-  if(!msg)return;
-  addMsg(msg,'user');input.value='';
-  const tid='t'+Date.now();
-  const tel=document.createElement('div');
-  tel.className='chat-msg ai';tel.id=tid;
-  tel.innerHTML='<div class="chat-avatar ai">A</div><div class="chat-bubble"><div class="chat-thinking"><span></span><span></span><span></span></div></div>';
-  document.getElementById('chatMessages').appendChild(tel);scrollChat();
-  try{
-    const r=await fetch(API+'/api/ai/generate',{method:'POST',headers:authH(),body:JSON.stringify({prompt:msg})});
-    const d=await r.json();
-    document.getElementById(tid).remove();
-    addMsg(d.output||'Sorry, could not process that.','ai');
-  }catch(e){document.getElementById(tid).remove();addMsg('Connection error. Check your OpenAI API key in Render environment variables.','ai');}
-}
-
-function addMsg(text,role){
-  const el=document.createElement('div');
-  el.className='chat-msg '+role;
-  el.innerHTML='<div class="chat-avatar '+role+'">'+(role==='ai'?'A':'👤')+'</div><div class="chat-bubble">'+text.replace(/\n/g,'<br>')+'</div>';
-  document.getElementById('chatMessages').appendChild(el);scrollChat();
-}
-function scrollChat(){const c=document.getElementById('chatMessages');c.scrollTop=c.scrollHeight;}
-
-// WEBHOOKS
-async function loadWebhooks(){
-  try{
-    const r=await fetch(API+'/api/webhooks',{headers:authH()});
-    const wh=await r.json();
-    const el=document.getElementById('webhookList');
-    if(!wh.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);">No webhooks yet. Create your first one!</div>';return;}
-    el.innerHTML=wh.map(w=>`<div class="webhook-card"><div class="webhook-name">${w.name}</div><div class="webhook-url">${w.url}</div><div class="webhook-footer"><span class="webhook-hits">${w.hits} hits${w.lastHit?' · '+new Date(w.lastHit).toLocaleTimeString():''}</span><button class="btn-small" onclick="copyUrl('${w.url}')">Copy URL</button></div></div>`).join('');
-  }catch(e){}
-}
-
-async function createWebhook(){
-  const name=prompt('Webhook name:','My Webhook');
-  if(!name)return;
-  try{
-    await fetch(API+'/api/webhooks/create',{method:'POST',headers:authH(),body:JSON.stringify({name})});
-    notify('Webhook created ✓','success');loadWebhooks();
-  }catch(e){notify('Error creating webhook','error');}
-}
-
-function copyUrl(url){
-  navigator.clipboard.writeText(url).then(()=>notify('URL copied ✓','success')).catch(()=>notify('Copy failed — select and copy manually','error'));
-}
-
-// LOGS
-async function loadLogs(){
-  try{
-    const r=await fetch(API+'/api/logs',{headers:authH()});
-    const logs=await r.json();
-    const el=document.getElementById('logList');
-    if(!logs.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0;">No activity yet.</div>';return;}
-    el.innerHTML=logs.map(l=>`<div class="log-row"><div class="log-time">${new Date(l.time).toLocaleTimeString()}</div><div class="log-badge ${l.status}">${l.status.toUpperCase()}</div><div class="log-msg">${l.msg}</div></div>`).join('');
-  }catch(e){}
-}
-
-// NOTIFY
-function notify(msg,type){
-  const el=document.getElementById('notif');
-  el.textContent=msg;el.className='notif show'+(type?' '+type:'');
-  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),3000);
-}
-</script>
-</body>
-</html>
+const PORT=process.env.PORT||3000;
+app.listen(PORT,()=>console.log('AutoFlow server running on port '+PORT));
