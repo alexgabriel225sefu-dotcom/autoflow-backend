@@ -186,3 +186,117 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;}
     </div>
   </div>
   <div class="main">
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div class="page-title">Dashboard</div>
+        <div class="page-sub" id="dashWelcome">Welcome back! Here is your automation overview.</div>
+      </div>
+      <div class="cards-grid">
+        <div class="stat-card"><div class="stat-card-icon">🔄</div><div class="stat-card-val" id="stat-runs">0</div><div class="stat-card-label">Automations Run Today</div><div class="stat-card-change">↑ Live tracking</div></div>
+        <div class="stat-card"><div class="stat-card-icon">📧</div><div class="stat-card-val" id="stat-emails">0</div><div class="stat-card-label">Emails Sent</div><div class="stat-card-change">↑ Real count</div></div>
+        <div class="stat-card"><div class="stat-card-icon">🪝</div><div class="stat-card-val" id="stat-webhooks">0</div><div class="stat-card-label">Webhook Hits</div><div class="stat-card-change">↑ Live data</div></div>
+        <div class="stat-card"><div class="stat-card-icon">⚡</div><div class="stat-card-val" id="stat-logs">0</div><div class="stat-card-label">Total Activities</div><div class="stat-card-change">↑ All time</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-title-icon">⚡</span>Quick Actions</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <button class="toolbar-btn primary" onclick="showPage('email',document.querySelector('[onclick*=email]'))">Send Email</button>
+          <button class="toolbar-btn primary" onclick="showPage('chat',document.querySelector('[onclick*=chat]'))">Ask AI Assistant</button>
+          <button class="toolbar-btn primary" onclick="showPage('webhooks',document.querySelector('[onclick*=webhooks]'))">Create Webhook</button>
+          <button class="toolbar-btn secondary" onclick="showPage('logs',document.querySelector('[onclick*=logs]'))">View Logs</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-title-icon">📋</span>Recent Activity</div>
+        <div id="recentLogs"><div style="font-size:13px;color:var(--text3);text-align:center;padding:20px;">Loading activity...</div></div>
+      </div>
+    </div>
+
+    <div class="page" id="page-email">
+      <div class="page-header">
+        <div class="page-title">Email Automation</div>
+        <div class="page-sub">Send real emails via Gmail — automated, tracked, logged.</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-title-icon">📧</span>Send Email</div>
+        <div class="email-form">
+          <div><label class="email-label">From Name</label><input class="email-input" id="emailFromName" placeholder="AI Cash Systems" value="AI Cash Systems"/></div>
+          <div><label class="email-label">To Email</label><input class="email-input" id="emailTo" placeholder="client@email.com" type="email"/></div>
+          <div><label class="email-label">Subject</label><input class="email-input" id="emailSubject" placeholder="Your automation is ready!"/></div>
+          <div><label class="email-label">Message (HTML supported)</label><textarea class="email-textarea" id="emailBody" placeholder="Write your email here...&#10;&#10;You can use HTML: &lt;b&gt;bold&lt;/b&gt;, &lt;a href='...'&gt;links&lt;/a&gt; etc."></textarea></div>
+          <div style="display:flex;gap:12px;align-items:center;">
+            <button class="send-btn" id="sendEmailBtn" onclick="sendEmail()">Send Email →</button>
+            <button class="toolbar-btn secondary" onclick="generateEmailWithAI()">✨ Generate with AI</button>
+          </div>
+          <div id="emailStatus" style="font-size:13px;min-height:20px;"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-title-icon">📨</span>Email Templates</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div class="automation-item" style="cursor:pointer;" onclick="loadTemplate('followup')"><div class="auto-icon" style="background:rgba(34,197,94,.1)">📬</div><div class="auto-info"><div class="auto-name">Lead Follow-Up</div><div class="auto-desc">Warm follow-up for new leads — personalized, professional</div></div><button class="auto-run-btn">Use Template</button></div>
+          <div class="automation-item" style="cursor:pointer;" onclick="loadTemplate('welcome')"><div class="auto-icon" style="background:rgba(201,168,76,.1)">👋</div><div class="auto-info"><div class="auto-name">Welcome Email</div><div class="auto-desc">Onboard new clients with a professional welcome sequence</div></div><button class="auto-run-btn">Use Template</button></div>
+          <div class="automation-item" style="cursor:pointer;" onclick="loadTemplate('proposal')"><div class="auto-icon" style="background:rgba(59,130,246,.1)">📝</div><div class="auto-info"><div class="auto-name">Proposal Follow-Up</div><div class="auto-desc">Follow up on a sent proposal — creates urgency</div></div><button class="auto-run-btn">Use Template</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-chat">
+      <div class="page-header">
+        <div class="page-title">AI Assistant</div>
+        <div class="page-sub">Real GPT-4o — ask anything about automations, get help, generate content.</div>
+      </div>
+      <div class="chat-container">
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-msg ai">
+            <div class="chat-avatar ai">A</div>
+            <div class="chat-bubble">👋 Hello! I am your AutoFlow AI Assistant powered by GPT-4o.<br><br>I can help you:<br>• Build and optimize automation flows<br>• Write email templates and prompts<br>• Troubleshoot Make.com integrations<br>• Generate client proposals<br>• Answer any automation question<br><br>What would you like to work on?</div>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <textarea class="chat-input" id="chatInput" placeholder="Ask anything about automations..." rows="1" onkeydown="handleChatKey(event)"></textarea>
+          <button class="chat-send-btn" onclick="sendChat()">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-webhooks">
+      <div class="page-header">
+        <div class="page-title">Webhooks</div>
+        <div class="page-sub">Create real webhook endpoints — receive data from any app instantly.</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+        <button class="toolbar-btn primary" onclick="createWebhook()">+ Create Webhook</button>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-title-icon">🪝</span>Your Webhook Endpoints</div>
+        <div id="webhookList"><div style="font-size:13px;color:var(--text3);text-align:center;padding:20px;">Loading webhooks...</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-title-icon">💡</span>How to Use Webhooks</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.8;">
+          <p>1. Create a webhook endpoint above</p>
+          <p>2. Copy the URL</p>
+          <p>3. Paste it in Make.com, Stripe, Typeform, or any app that supports webhooks</p>
+          <p>4. When data is sent to your URL — it appears in Activity Logs instantly</p>
+          <p style="margin-top:12px;color:var(--gold);">Every webhook hit is logged in real time ✓</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-logs">
+      <div class="page-header">
+        <div class="page-title">Activity Logs</div>
+        <div class="page-sub">Real-time log of all your automation activity.</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+        <button class="toolbar-btn secondary" onclick="loadLogs()">↻ Refresh</button>
+      </div>
+      <div class="panel">
+        <div id="logList"><div style="font-size:13px;color:var(--text3);text-align:center;padding:20px;">Loading logs...</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<div class="notification" id="notification"></div>
