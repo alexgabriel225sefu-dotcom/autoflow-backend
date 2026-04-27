@@ -141,3 +141,115 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     </div>
   </div>
   <div class="main">
+    <div class="page active" id="page-dashboard">
+      <div class="page-title">Dashboard</div>
+      <div class="page-sub" id="dashWelcome">Welcome back!</div>
+      <div class="cards-grid">
+        <div class="stat-card"><div class="stat-card-icon">⚡</div><div class="stat-card-val" id="stat-total">0</div><div class="stat-card-label">Total Activities</div></div>
+        <div class="stat-card"><div class="stat-card-icon">📧</div><div class="stat-card-val" id="stat-emails">0</div><div class="stat-card-label">Emails Sent</div></div>
+        <div class="stat-card"><div class="stat-card-icon">🪝</div><div class="stat-card-val" id="stat-webhooks">0</div><div class="stat-card-label">Webhook Hits</div></div>
+        <div class="stat-card"><div class="stat-card-icon">🤖</div><div class="stat-card-val" id="stat-ai">0</div><div class="stat-card-label">AI Queries</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-icon">📋</span>Recent Activity</div>
+        <div id="recentActivity"><div style="font-size:13px;color:var(--text3);">Loading...</div></div>
+      </div>
+    </div>
+    <div class="page" id="page-email">
+      <div class="page-title">Email Automation</div>
+      <div class="page-sub">Send real emails via Gmail — tracked and logged.</div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-icon">📧</span>Send Email</div>
+        <label class="input-label">From Name</label>
+        <input class="text-input" id="emailFrom" value="AI Cash Systems" placeholder="Your name"/>
+        <label class="input-label">To Email</label>
+        <input class="text-input" id="emailTo" type="email" placeholder="client@email.com"/>
+        <label class="input-label">Subject</label>
+        <input class="text-input" id="emailSubject" placeholder="Subject..."/>
+        <label class="input-label">Message</label>
+        <textarea class="text-area" id="emailBody" placeholder="Write your message..."></textarea>
+        <button class="btn-gold" onclick="sendEmail()">Send Email →</button>
+        <button class="btn-outline" onclick="generateEmail()">✨ Generate with AI</button>
+        <div class="status-msg" id="emailStatus"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-icon">📨</span>Templates</div>
+        <div class="template-item" onclick="useTemplate('followup')">
+          <div class="template-icon" style="background:rgba(34,197,94,.1)">📬</div>
+          <div class="template-info"><div class="template-name">Lead Follow-Up</div><div class="template-desc">Warm follow-up for new leads</div></div>
+          <div class="btn-small">Use</div>
+        </div>
+        <div class="template-item" onclick="useTemplate('welcome')">
+          <div class="template-icon" style="background:rgba(201,168,76,.1)">👋</div>
+          <div class="template-info"><div class="template-name">Welcome Email</div><div class="template-desc">Onboard new clients professionally</div></div>
+          <div class="btn-small">Use</div>
+        </div>
+        <div class="template-item" onclick="useTemplate('proposal')">
+          <div class="template-icon" style="background:rgba(59,130,246,.1)">📝</div>
+          <div class="template-info"><div class="template-name">Proposal Follow-Up</div><div class="template-desc">Follow up and create urgency</div></div>
+          <div class="btn-small">Use</div>
+        </div>
+      </div>
+    </div>
+    <div class="page" id="page-chat">
+      <div class="page-title">AI Assistant</div>
+      <div class="page-sub">GPT-4o — ask anything, analyze images, get help in any language.</div>
+      <div class="chat-wrap">
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-msg ai">
+            <div class="chat-avatar ai">A</div>
+            <div class="chat-bubble">👋 Hello! I am your AutoFlow AI Assistant.<br><br>I can help you in <strong>any language</strong>:<br>• Build automation flows step by step<br>• Analyze screenshots and images<br>• Write emails and proposals<br>• Answer any automation question<br><br>You can also <strong>attach an image</strong> using the 📎 button below!</div>
+          </div>
+        </div>
+        <div class="chat-bottom">
+          <div class="chat-img-row" id="imgPreviewRow" style="display:none;">
+            <img id="imgPreviewThumb" class="img-preview-thumb" src="" alt="preview"/>
+            <button class="remove-img" onclick="removeImage()">✕</button>
+            <span style="font-size:12px;color:var(--text3);">Image attached</span>
+          </div>
+          <div class="chat-input-row">
+            <input type="file" id="imageUpload" accept="image/*" style="display:none;" onchange="handleImageUpload(event)"/>
+            <button class="chat-attach" onclick="document.getElementById('imageUpload').click()">📎</button>
+            <textarea class="chat-input" id="chatInput" placeholder="Ask anything in any language..." rows="1"></textarea>
+            <button class="chat-send" onclick="sendChat()">➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="page" id="page-webhooks">
+      <div class="page-title">Webhooks</div>
+      <div class="page-sub">Real endpoints — receive data from any app instantly.</div>
+      <button class="btn-gold" onclick="createWebhook()">+ Create New Webhook</button>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-icon">🪝</span>Your Endpoints</div>
+        <div id="webhookList"><div style="font-size:13px;color:var(--text3);">Loading...</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="panel-icon">💡</span>How to Use</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.8;">
+          1. Create a webhook above<br>
+          2. Copy the URL<br>
+          3. Paste in Make.com, Stripe, or any app<br>
+          4. Every hit appears in Activity Logs instantly<br>
+          <span style="color:var(--gold);margin-top:8px;display:block;">Real-time data reception ✓</span>
+        </div>
+      </div>
+    </div>
+    <div class="page" id="page-logs">
+      <div class="page-title">Activity Logs</div>
+      <div class="page-sub">Real-time log of all your activity.</div>
+      <button class="btn-outline" style="margin-bottom:16px;" onclick="loadLogs()">↻ Refresh</button>
+      <div class="panel">
+        <div id="logList"><div style="font-size:13px;color:var(--text3);">Loading...</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-btn active" id="nav-dashboard" onclick="showPage('dashboard',this)"><span class="nav-btn-icon">⚡</span><span class="nav-btn-label">Dashboard</span></button>
+    <button class="nav-btn" id="nav-email" onclick="showPage('email',this)"><span class="nav-btn-icon">📧</span><span class="nav-btn-label">Email</span></button>
+    <button class="nav-btn" id="nav-chat" onclick="showPage('chat',this)"><span class="nav-btn-icon">🤖</span><span class="nav-btn-label">AI Chat</span></button>
+    <button class="nav-btn" id="nav-webhooks" onclick="showPage('webhooks',this)"><span class="nav-btn-icon">🪝</span><span class="nav-btn-label">Webhooks</span></button>
+    <button class="nav-btn" id="nav-logs" onclick="showPage('logs',this)"><span class="nav-btn-icon">📋</span><span class="nav-btn-label">Logs</span></button>
+  </div>
+</div>
+<div class="notif" id="notif"></div>
