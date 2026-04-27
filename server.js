@@ -34,14 +34,21 @@ try{req.user=jwt.verify(a.split(' ')[1],JWT_SECRET);next();}
 catch(e){res.status(401).json({error:'Invalid token'});}
 }
 
-app.post('/api/ai/generate',auth,async(req,res)=>{
+app.post('/api/ai/generate',async(req,res)=>{
 try{
 const OpenAI=require('openai');
 const openai=new OpenAI.OpenAI({apiKey:process.env.OPENAI_API_KEY});
 const{prompt}=req.body;
+if(!prompt)return res.status(400).json({error:'No prompt provided'});
+console.log('AI request received:',prompt.substring(0,50));
 const r=await openai.chat.completions.create({model:'gpt-4o',messages:[{role:'system',content:'You are AutoFlow AI Assistant, expert in AI automation, Make.com, webhooks, GPT integrations. Be helpful and practical.'},{role:'user',content:prompt}],max_tokens:600});
-res.json({output:r.choices[0].message.content});
-}catch(e){res.status(500).json({error:e.message});}
+const output=r.choices[0].message.content;
+console.log('AI response sent successfully');
+res.json({output});
+}catch(e){
+console.log('AI error:',e.message);
+res.status(500).json({error:e.message});
+}
 });
 
 app.post('/api/email/send',auth,async(req,res)=>{
@@ -127,7 +134,7 @@ const user=users[email.toLowerCase()];
 const accessCode=user?user.code:'AF2024PRO';
 const courseUrl=isStarter?'https://autoflow-backend-p9pc.onrender.com/course-starter.html':'https://autoflow-backend-p9pc.onrender.com/course-pro.html';
 const subject=isStarter?'Your AI Cash Systems Starter Course — Access Inside':'Your AI Cash Systems PRO Course + AutoFlow App — Access Inside';
-const html=`<div style="background:#080808;padding:40px;font-family:sans-serif;max-width:560px;margin:0 auto;"><div style="font-family:Georgia,serif;font-size:24px;color:#C8A96E;margin-bottom:8px;">AI Cash Systems</div><div style="height:1px;background:rgba(200,169,110,0.2);margin-bottom:32px;"></div><p style="color:#F5F0E8;font-size:18px;margin-bottom:8px;">Welcome, ${name}! 🎉</p><p style="color:#C8BEA8;font-size:14px;line-height:1.7;margin-bottom:24px;">Your payment was successful. You now have lifetime access to ${isStarter?'the AI Cash Systems Starter Course':'the AI Cash Systems PRO Course + AutoFlow App'}.</p><div style="background:#161616;border:1px solid rgba(200,169,110,0.2);border-radius:12px;padding:24px;margin-bottom:24px;"><p style="color:#C8A96E;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Your Access Link</p><a href="${courseUrl}" style="display:block;padding:14px 24px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border-radius:8px;color:#080808;font-weight:700;text-decoration:none;text-align:center;font-size:14px;letter-spacing:1px;text-transform:uppercase;">Access Your Course →</a></div>${!isStarter?`<div style="background:#161616;border:1px solid rgba(200,169,110,0.2);border-radius:12px;padding:24px;margin-bottom:24px;"><p style="color:#C8A96E;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">AutoFlow App Access</p><p style="color:#C8BEA8;font-size:13px;margin-bottom:8px;">Login at: <strong style="color:#F5F0E8;">https://autoflow-backend-p9pc.onrender.com/app.html</strong></p><p style="color:#C8BEA8;font-size:13px;">Your Access Code: <strong style="color:#C8A96E;font-size:18px;">${accessCode}</strong></p></div>`:''}<p style="color:#7A7060;font-size:12px;line-height:1.6;">Questions? Email us at <a href="mailto:support@aicashsystems.com" style="color:#C8A96E;">support@aicashsystems.com</a><br>© 2025 AI Cash Systems. All rights reserved.</p></div>`;
+const html=`<div style="background:#080808;padding:40px;font-family:sans-serif;max-width:560px;margin:0 auto;"><div style="font-family:Georgia,serif;font-size:24px;color:#C8A96E;margin-bottom:8px;">AI Cash Systems</div><div style="height:1px;background:rgba(200,169,110,0.2);margin-bottom:32px;"></div><p style="color:#F5F0E8;font-size:18px;margin-bottom:8px;">Welcome, ${name}! 🎉</p><p style="color:#C8BEA8;font-size:14px;line-height:1.7;margin-bottom:24px;">Your payment was successful. You now have lifetime access to ${isStarter?'the AI Cash Systems Starter Course':'the AI Cash Systems PRO Course + AutoFlow App'}.</p><div style="background:#161616;border:1px solid rgba(200,169,110,0.2);border-radius:12px;padding:24px;margin-bottom:24px;"><p style="color:#C8A96E;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Your Access Link</p><a href="${courseUrl}" style="display:block;padding:14px 24px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border-radius:8px;color:#080808;font-weight:700;text-decoration:none;text-align:center;font-size:14px;letter-spacing:1px;text-transform:uppercase;">Access Your Course →</a></div>${!isStarter?`<div style="background:#161616;border:1px solid rgba(200,169,110,0.2);border-radius:12px;padding:24px;margin-bottom:24px;"><p style="color:#C8A96E;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">AutoFlow App Access</p><p style="color:#C8BEA8;font-size:13px;margin-bottom:8px;">Login at: <strong style="color:#F5F0E8;">https://autoflow-backend-p9pc.onrender.com/app.html</strong></p><p style="color:#C8BEA8;font-size:13px;">Your Access Code: <strong style="color:#C8A96E;font-size:18px;">${accessCode}</strong></p></div>`:''}<p style="color:#7A7060;font-size:12px;line-height:1.6;">Questions? <a href="mailto:support@aicashsystems.com" style="color:#C8A96E;">support@aicashsystems.com</a><br>© 2025 AI Cash Systems.</p></div>`;
 await t.sendMail({from:'"AI Cash Systems" <'+process.env.GMAIL_USER+'>',to:email,subject,html});
 }
 
