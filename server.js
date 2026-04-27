@@ -8,7 +8,7 @@ const app=express();
 app.use(cors());
 app.use(express.static('public'));
 app.use('/webhook',express.raw({type:'application/json'}));
-app.use(express.json());
+app.use(express.json({limit:'10mb'}));
 
 const users={};
 const webhookLogs={};
@@ -36,22 +36,32 @@ catch(e){res.status(401).json({error:'Invalid token'});}
 
 app.post('/api/ai/generate',async(req,res)=>{
 try{
-const Anthropic=require('@anthropic-ai/sdk');
-const client=new Anthropic.Anthropic({apiKey:process.env.ANTHROPIC_API_KEY});
-const{prompt}=req.body;
+const OpenAI=require('openai');
+const openai=new OpenAI.OpenAI({apiKey:process.env.OPENAI_API_KEY});
+const{prompt,imageBase64}=req.body;
 if(!prompt)return res.status(400).json({error:'No prompt provided'});
-console.log('Claude request:',prompt.substring(0,50));
-const message=await client.messages.create({
-model:'claude-sonnet-4-5',
-max_tokens:1024,
-system:'You are AutoFlow AI Assistant, an expert in AI automation, Make.com, webhooks, GPT integrations, WhatsApp bots, Instagram automation, cold email outreach, and building AI automation agencies. Be helpful, concise and practical.',
-messages:[{role:'user',content:prompt}]
-});
-const output=message.content[0].text;
-console.log('Claude response sent');
+console.log('AI request:',prompt.substring(0,60));
+let messages;
+if(imageBase64){
+messages=[
+{role:'system',content:'You are AutoFlow AI Assistant, expert in AI automation, Make.com, webhooks, WhatsApp bots, Instagram automation, cold email, and building automation agencies. Always respond in the same language the user writes in. When analyzing images, provide clear step-by-step instructions. Be helpful and practical.'},
+{role:'user',content:[
+{type:'image_url',image_url:{url:`data:image/jpeg;base64,${imageBase64}`}},
+{type:'text',text:prompt}
+]}
+];
+}else{
+messages=[
+{role:'system',content:'You are AutoFlow AI Assistant, expert in AI automation, Make.com, webhooks, WhatsApp bots, Instagram automation, cold email, and building automation agencies. Always respond in the same language the user writes in. Be helpful, concise and practical.'},
+{role:'user',content:prompt}
+];
+}
+const r=await openai.chat.completions.create({model:'gpt-4o',messages,max_tokens:800});
+const output=r.choices[0].message.content;
+console.log('AI response sent');
 res.json({output});
 }catch(e){
-console.log('Claude error:',e.message);
+console.log('AI error:',e.message);
 res.status(500).json({error:e.message});
 }
 });
