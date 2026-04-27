@@ -44,7 +44,7 @@ console.log('AI request:',prompt.substring(0,60));
 let messages;
 if(imageBase64){
 messages=[
-{role:'system',content:'You are AutoFlow AI Assistant, expert in AI automation, Make.com, webhooks, WhatsApp bots, Instagram automation, cold email, and building automation agencies. Always respond in the same language the user writes in. When analyzing images, provide clear step-by-step instructions. Be helpful and practical.'},
+{role:'system',content:'You are AutoFlow AI Assistant, expert in AI automation, Make.com, webhooks, WhatsApp bots, Instagram automation, cold email, and building automation agencies. Always respond in the same language the user writes in. When analyzing images, provide clear step-by-step instructions.'},
 {role:'user',content:[
 {type:'image_url',image_url:{url:`data:image/jpeg;base64,${imageBase64}`}},
 {type:'text',text:prompt}
@@ -56,7 +56,7 @@ messages=[
 {role:'user',content:prompt}
 ];
 }
-const r=await openai.chat.completions.create({model:'gpt-4o',messages,max_tokens:800});
+const r=await openai.chat.completions.create({model:'gpt-4o',messages,max_tokens:4000});
 const output=r.choices[0].message.content;
 console.log('AI response sent');
 res.json({output});
