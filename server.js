@@ -14,12 +14,10 @@ app.use(express.json({limit:'10mb'}));
 const supabase=createClient(process.env.SUPABASE_URL,process.env.SUPABASE_KEY);
 const JWT_SECRET=process.env.JWT_SECRET||'autoflow-secret-2024';
 
-// Redirect main site to Lovable
-app.get('/',( req,res)=>{
-res.redirect('https://aicashsystem.lovable.app');
+app.get('/',(req,res)=>{
+res.redirect('https://aicashsystem.lovable.app/#pricing');
 });
 
-// Serve static files AFTER redirect
 app.use(express.static('public'));
 
 app.post('/api/auth/login',async(req,res)=>{
