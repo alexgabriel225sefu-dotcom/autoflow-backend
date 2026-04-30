@@ -15,7 +15,11 @@ const supabase=createClient(process.env.SUPABASE_URL,process.env.SUPABASE_KEY);
 const JWT_SECRET=process.env.JWT_SECRET||'autoflow-secret-2024';
 
 app.get('/',(req,res)=>{
-res.redirect('https://aicashsystem.lovable.app/#pricing');
+res.redirect('https://aicashsystem.lovable.app');
+});
+
+app.get('/buy',(req,res)=>{
+res.sendFile(__dirname+'/public/buy.html');
 });
 
 app.use(express.static('public'));
