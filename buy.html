@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Cash Systems — Get Access</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#080808;color:#F0EAD6;font-family:sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.wrap{max-width:800px;width:100%;}
+.logo{font-family:Georgia,serif;font-size:24px;color:#C8A96E;text-align:center;margin-bottom:8px;}
+.sub{text-align:center;font-size:14px;color:#7A7060;margin-bottom:48px;}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.card{background:#111;border:1px solid rgba(200,169,110,0.15);border-radius:16px;padding:32px;position:relative;}
+.card.popular{border-color:#C8A96E;}
+.badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#C8A96E;color:#000;border-radius:100px;padding:4px 16px;font-size:11px;font-weight:700;}
+.plan{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7A7060;margin-bottom:12px;}
+.price{font-family:Georgia,serif;font-size:56px;color:#F0EAD6;line-height:1;margin-bottom:4px;}
+.price sup{font-size:24px;vertical-align:super;}
+.desc{font-size:13px;color:#7A7060;margin-bottom:24px;line-height:1.6;}
+.features{list-style:none;margin-bottom:28px;}
+.feature{display:flex;gap:10px;font-size:13px;color:#C8BEA8;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);}
+.feature:last-child{border-bottom:none;}
+.check{color:#C8A96E;}
+.btn{width:100%;padding:14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .2s;}
+.btn-gold{background:linear-gradient(135deg,#8A6A2E,#E8CB8A);color:#080808;}
+.btn-outline{background:transparent;border:1px solid rgba(200,169,110,0.3);color:#C8A96E;}
+.btn:hover{transform:translateY(-2px);opacity:.9;}
+@media(max-width:600px){.grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">AI Cash Systems</div>
+  <div class="sub">Choose your plan — lifetime access, one-time payment</div>
+  <div class="grid">
+    <div class="card">
+      <div class="plan">Starter</div>
+      <div class="price"><sup>$</sup>37</div>
+      <div class="desc">Everything you need to start building and selling AI automations.</div>
+      <ul class="features">
+        <li class="feature"><span class="check">✦</span>8 modules, 24 lessons</li>
+        <li class="feature"><span class="check">✦</span>WhatsApp Bot guide</li>
+        <li class="feature"><span class="check">✦</span>Instagram DM Bot</li>
+        <li class="feature"><span class="check">✦</span>Cold Email Campaign</li>
+        <li class="feature"><span class="check">✦</span>Google Sheets CRM</li>
+        <li class="feature"><span class="check">✦</span>Client outreach scripts</li>
+        <li class="feature"><span class="check">✦</span>Lifetime access</li>
+      </ul>
+      <button class="btn btn-outline" onclick="buyStarter()">Get Starter — $37</button>
+    </div>
+    <div class="card popular">
+      <div class="badge">Most Popular</div>
+      <div class="plan">PRO</div>
+      <div class="price"><sup>$</sup>97</div>
+      <div class="desc">Everything in Starter plus AutoFlow App and advanced modules.</div>
+      <ul class="features">
+        <li class="feature"><span class="check">✦</span>Everything in Starter</li>
+        <li class="feature"><span class="check">✦</span><strong style="color:#fff;">AutoFlow App access</strong></li>
+        <li class="feature"><span class="check">✦</span>Automation Generator</li>
+        <li class="feature"><span class="check">✦</span>Voice AI Agent module</li>
+        <li class="feature"><span class="check">✦</span>Stripe Recurring Billing</li>
+        <li class="feature"><span class="check">✦</span>Agency Website module</li>
+        <li class="feature"><span class="check">✦</span>Lifetime access + updates</li>
+      </ul>
+      <button class="btn btn-gold" onclick="buyPro()">Get PRO — $97</button>
+    </div>
+  </div>
+</div>
+<script>
+function buyStarter(){alert('Payment system coming soon! Contact us at support@aicashsystems.com');}
+function buyPro(){alert('Payment system coming soon! Contact us at support@aicashsystems.com');}
+</script>
+</body>
+</html>
