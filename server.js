@@ -8,12 +8,19 @@ dotenv.config();
 
 const app=express();
 app.use(cors());
-app.use(express.static('public'));
 app.use('/webhook',express.raw({type:'application/json'}));
 app.use(express.json({limit:'10mb'}));
 
 const supabase=createClient(process.env.SUPABASE_URL,process.env.SUPABASE_KEY);
 const JWT_SECRET=process.env.JWT_SECRET||'autoflow-secret-2024';
+
+// Redirect main site to Lovable
+app.get('/',( req,res)=>{
+res.redirect('https://aicashsystem.lovable.app');
+});
+
+// Serve static files AFTER redirect
+app.use(express.static('public'));
 
 app.post('/api/auth/login',async(req,res)=>{
 try{
@@ -85,12 +92,9 @@ app.get('/api/webhooks',auth,async(req,res)=>{
 try{
 const{data}=await supabase.from('webhooks').select('*').eq('user_email',req.user.email).order('created_at',{ascending:false});
 const webhooks=(data||[]).map(w=>({
-id:w.webhook_id,
-name:w.name,
+id:w.webhook_id,name:w.name,
 url:'https://autoflow-backend-p9pc.onrender.com/webhook/receive/'+w.webhook_id,
-hits:w.hits,
-lastHit:w.last_hit,
-active:true
+hits:w.hits,lastHit:w.last_hit,active:true
 }));
 res.json(webhooks);
 }catch(e){res.status(500).json({error:e.message});}
@@ -116,7 +120,7 @@ res.json(logs);
 }catch(e){res.json([]);}
 });
 
-app.get('/api/health',(req,res)=>{res.json({status:'ok',message:'AutoFlow running with Supabase!'});});
+app.get('/api/health',(req,res)=>{res.json({status:'ok',message:'AutoFlow running!'});});
 
 app.post('/create-payment-intent',async(req,res)=>{
 try{
