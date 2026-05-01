@@ -15,11 +15,7 @@ const supabase=createClient(process.env.SUPABASE_URL,process.env.SUPABASE_KEY);
 const JWT_SECRET=process.env.JWT_SECRET||'autoflow-secret-2024';
 
 app.get('/',(req,res)=>{
-res.redirect('https://aicashsystem.lovable.app');
-});
-
-app.get('/buy',(req,res)=>{
-res.sendFile(__dirname+'/public/buy.html');
+res.sendFile(__dirname+'/public/index.html');
 });
 
 app.use(express.static('public'));
@@ -189,4 +185,4 @@ await t.sendMail({from:'"AI Cash Systems" <'+process.env.GMAIL_USER+'>',to:email
 }
 
 const PORT=process.env.PORT||3000;
-app.listen(PORT,()=>console.log('AutoFlow + Supabase running on port '+PORT));
+app.listen(PORT,()=>console.log('AutoFlow running on port '+PORT));
