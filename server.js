@@ -37,6 +37,21 @@ try{req.user=jwt.verify(a.split(' ')[1],JWT_SECRET);next();}
 catch(e){res.status(401).json({error:'Invalid token'});}
 }
 
+app.post('/api/verify-code',async(req,res)=>{
+try{
+const{code}=req.body;
+if(!code)return res.json({valid:false});
+const{data:user}=await supabase.from('users').select('*').eq('code',code.toUpperCase()).single();
+if(user){
+res.json({valid:true,plan:user.plan,email:user.email});
+}else{
+res.json({valid:false});
+}
+}catch(e){
+res.json({valid:false});
+}
+});
+
 app.post('/api/ai/generate',async(req,res)=>{
 try{
 const OpenAI=require('openai');
@@ -46,7 +61,7 @@ if(!prompt)return res.status(400).json({error:'No prompt provided'});
 let messages;
 if(imageBase64){
 messages=[
-{role:'system',content:'You are AutoFlow AI Assistant, expert in AI automation, Make.com, webhooks, WhatsApp bots, Instagram automation, cold email, and building automation agencies. Always respond in the same language the user writes in. When analyzing images, provide clear step-by-step instructions.'},
+{role:'system',content:'You are AutoFlow AI Assistant, expert in AI automation, Make.com, webhooks, WhatsApp bots, Instagram automation, cold email, and building automation agencies. Always respond in the same language the user writes in.'},
 {role:'user',content:[{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+imageBase64}},{type:'text',text:prompt}]}
 ];
 }else{
@@ -59,7 +74,6 @@ const r=await openai.chat.completions.create({model:'gpt-4o',messages,max_tokens
 const output=r.choices[0].message.content;
 res.json({output});
 }catch(e){
-console.log('AI error:',e.message);
 res.status(500).json({error:e.message});
 }
 });
@@ -159,27 +173,23 @@ async function sendCourseEmail(email,name,product,accessCode){
 const nodemailer=require('nodemailer');
 const t=nodemailer.createTransport({service:'gmail',auth:{user:process.env.GMAIL_USER,pass:process.env.GMAIL_APP_PASSWORD}});
 const isStarter=product==='starter';
-const courseUrl=isStarter?'https://autoflow-backend-p9pc.onrender.com/course-starter.html':'https://autoflow-backend-p9pc.onrender.com/course-pro.html';
-const appUrl='https://autoflow-backend-p9pc.onrender.com/app.html';
-const subject=isStarter?'Your AI Cash Systems Starter Course — Access Inside':'Your AI Cash Systems PRO Course + AutoFlow App — Access Inside';
+const accessUrl='https://autoflow-backend-p9pc.onrender.com/access.html';
+const subject=isStarter?'Your AI Cash Systems Starter Course — Access Inside':'Your AI Cash Systems PRO Course — Access Inside';
 const html='<div style="background:#080808;padding:40px;font-family:sans-serif;max-width:560px;margin:0 auto;">'
 +'<div style="font-family:Georgia,serif;font-size:24px;color:#C8A96E;margin-bottom:8px;">AI Cash Systems</div>'
 +'<div style="height:1px;background:rgba(200,169,110,0.2);margin-bottom:32px;"></div>'
-+'<p style="color:#F5F0E8;font-size:18px;margin-bottom:8px;">Welcome, '+name+'! 🎉</p>'
-+'<p style="color:#C8BEA8;font-size:14px;line-height:1.7;margin-bottom:24px;">Your payment was successful. You now have lifetime access to '+(isStarter?'the AI Cash Systems Starter Course':'the AI Cash Systems PRO Course + AutoFlow App')+'.</p>'
-+'<div style="background:#161616;border:1px solid rgba(200,169,110,0.2);border-radius:12px;padding:24px;margin-bottom:16px;">'
-+'<p style="color:#C8A96E;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Your Course Access</p>'
-+'<a href="'+courseUrl+'" style="display:block;padding:14px 24px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border-radius:8px;color:#080808;font-weight:700;text-decoration:none;text-align:center;font-size:14px;letter-spacing:1px;text-transform:uppercase;">Access Your Course →</a>'
++'<p style="color:#F5F0E8;font-size:18px;margin-bottom:8px;">Welcome, '+(name||'friend')+'! 🎉</p>'
++'<p style="color:#C8BEA8;font-size:14px;line-height:1.7;margin-bottom:24px;">Your payment was successful. Here is your unique access code for '+(isStarter?'the Starter Course':'the PRO Course')+'.</p>'
++'<div style="background:#161616;border:1px solid rgba(200,169,110,0.2);border-radius:12px;padding:32px;margin-bottom:24px;text-align:center;">'
++'<p style="color:#C8BEA8;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;">Your Unique Access Code</p>'
++'<div style="font-family:Georgia,serif;font-size:40px;font-weight:700;color:#C8A96E;letter-spacing:6px;margin-bottom:16px;">'+accessCode+'</div>'
++'<p style="color:#7A7060;font-size:12px;margin-bottom:24px;">⚠️ Keep this code private — it is unique to your account.</p>'
++'<a href="'+accessUrl+'" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border-radius:8px;color:#080808;font-weight:700;text-decoration:none;font-size:14px;letter-spacing:1px;text-transform:uppercase;">Access My Course →</a>'
 +'</div>'
-+(isStarter?''
-:'<div style="background:#161616;border:1px solid rgba(200,169,110,0.2);border-radius:12px;padding:24px;margin-bottom:16px;">'
-+'<p style="color:#C8A96E;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">AutoFlow App Access</p>'
-+'<p style="color:#C8BEA8;font-size:13px;margin-bottom:6px;">Login at: <strong style="color:#F5F0E8;">'+appUrl+'</strong></p>'
-+'<p style="color:#C8BEA8;font-size:13px;">Email: <strong style="color:#F5F0E8;">'+email+'</strong></p>'
-+'<p style="color:#C8BEA8;font-size:13px;">Your Unique Code: <strong style="color:#C8A96E;font-size:20px;letter-spacing:2px;">'+accessCode+'</strong></p>'
-+'<p style="color:#7A7060;font-size:11px;margin-top:8px;">⚠️ Keep this code private — it is unique to your account.</p>'
-+'</div>')
-+'<p style="color:#7A7060;font-size:12px;line-height:1.6;">Questions? <a href="mailto:support@aicashsystems.com" style="color:#C8A96E;">support@aicashsystems.com</a><br>© 2025 AI Cash Systems.</p>'
++'<p style="color:#C8BEA8;font-size:13px;line-height:1.7;">Go to: <strong style="color:#F5F0E8;">'+accessUrl+'</strong><br>Enter your code above to access your course.</p>'
++'<div style="margin-top:32px;padding-top:20px;border-top:1px solid rgba(200,169,110,0.08);">'
++'<p style="color:#7A7060;font-size:12px;">Questions? <a href="mailto:support@aicashsystems.com" style="color:#C8A96E;">support@aicashsystems.com</a><br>© 2025 AI Cash Systems.</p>'
++'</div>'
 +'</div>';
 await t.sendMail({from:'"AI Cash Systems" <'+process.env.GMAIL_USER+'>',to:email,subject,html});
 }
