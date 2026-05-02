@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Module 4 — Scaling to $3K/Month</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(200,169,110,.08);backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;color:#C8A96E}
+.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:#C8A96E;color:#C8A96E}
+.module-hero{padding:56px 32px 40px;max-width:860px;margin:0 auto}
+.module-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(200,169,110,.12);border:1px solid rgba(200,169,110,.2);border-radius:100px;padding:5px 14px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.module-num{font-family:"Playfair Display",serif;font-size:80px;font-weight:900;color:rgba(200,169,110,.1);line-height:1;margin-bottom:-20px}
+.module-title{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:16px}
+.module-title em{font-style:italic;color:#C8A96E}
+.module-desc{font-size:15px;color:#C8BEA8;max-width:600px;line-height:1.75}
+.module-meta{display:flex;gap:20px;margin-top:28px;flex-wrap:wrap}
+.meta-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#C8BEA8}
+.meta-dot{width:6px;height:6px;border-radius:50%;background:#C8A96E}
+.progress-wrap{max-width:860px;margin:0 auto 40px;padding:0 32px}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.lessons-nav{max-width:860px;margin:0 auto 32px;padding:0 32px;display:flex;gap:8px;flex-wrap:wrap}
+.lesson-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(200,169,110,.1);background:transparent;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
+.lesson-tab:hover{border-color:rgba(200,169,110,.3);color:#F5F0E8}
+.lesson-tab.active{background:rgba(200,169,110,.15);border-color:#C8A96E;color:#C8A96E;font-weight:600}
+.lesson-tab.done::before{content:"✓ ";color:#C8A96E}
+.lesson-wrap{max-width:860px;margin:0 auto;padding:0 32px 80px}
+.lesson-content{display:none}
+.lesson-content.active{display:block}
+.lesson-header{background:#0f0f0f;border:1px solid rgba(200,169,110,.08);border-radius:14px;padding:32px;margin-bottom:28px}
+.lesson-tag{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:100px;border:1px solid rgba(200,169,110,.18);color:#C8A96E;background:rgba(200,169,110,.1);margin-bottom:14px}
+.lesson-title{font-family:"Playfair Display",serif;font-size:clamp(22px,3vw,32px);font-weight:700;margin-bottom:10px;line-height:1.1}
+.lesson-intro{font-size:14px;color:#C8BEA8;line-height:1.8}
+.block{margin-bottom:36px}
+.block-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:#F5F0E8;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.block-title::before{content:"";width:3px;height:20px;background:#C8A96E;border-radius:2px;flex-shrink:0}
+.block-text{font-size:14px;color:#C8BEA8;line-height:1.85;margin-bottom:14px}
+.steps{display:flex;flex-direction:column;gap:20px;margin:20px 0}
+.step{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;border-left:3px solid #C8A96E}
+.step-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#080808;flex-shrink:0}
+.step-title{font-size:15px;font-weight:700;color:#F5F0E8}
+.step-text{font-size:13px;color:#C8BEA8;line-height:1.8;margin-bottom:10px}
+.step-text:last-child{margin-bottom:0}
+.step-detail{background:#161616;border-radius:8px;padding:14px 16px;margin-top:10px;font-size:13px;color:#C8BEA8;line-height:1.75;border-left:2px solid rgba(200,169,110,.3)}
+.click{display:inline-flex;align-items:center;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:5px;padding:2px 10px;font-size:12px;color:#C8A96E;font-weight:600;margin:0 2px}
+.type-this{background:#0a0a0a;border:1px solid rgba(200,169,110,.2);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#F5F0E8;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap}
+.info-box{border-radius:10px;padding:20px 24px;margin:20px 0}
+.info-box.gold{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2)}
+.info-box.tip{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15)}
+.info-box.warn{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.15)}
+.info-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.info-box.gold .info-label{color:#C8A96E}
+.info-box.tip .info-label{color:#4ADE80}
+.info-box.warn .info-label{color:#e74c3c}
+.info-text{font-size:13px;color:#C8BEA8;line-height:1.75}
+.math-table{width:100%;border-collapse:collapse;margin:20px 0}
+.math-table th{background:#161616;padding:12px 16px;text-align:left;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;border-bottom:1px solid rgba(200,169,110,.15)}
+.math-table td{padding:12px 16px;font-size:13px;color:#C8BEA8;border-bottom:1px solid rgba(255,255,255,.04)}
+.math-table tr:last-child td{color:#F5F0E8;font-weight:600;border-bottom:none;background:rgba(200,169,110,.05)}
+.math-table .gold{color:#C8A96E;font-weight:700}
+.takeaways{background:#161616;border:1px solid rgba(200,169,110,.12);border-radius:12px;padding:28px;margin:28px 0}
+.takeaways-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E;margin-bottom:16px}
+.takeaway{display:flex;gap:12px;margin-bottom:12px;font-size:13px;color:#F5F0E8;line-height:1.6}
+.takeaway:last-child{margin-bottom:0}
+.takeaway::before{content:"◆";color:#C8A96E;font-size:8px;margin-top:5px;flex-shrink:0}
+.exercise{background:linear-gradient(135deg,rgba(200,169,110,.08),rgba(200,169,110,.03));border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:28px;margin:28px 0}
+.exercise-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:12px}
+.exercise-text{font-size:14px;color:#F5F0E8;line-height:1.75}
+.roadmap{display:flex;flex-direction:column;gap:2px;margin:20px 0}
+.roadmap-week{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:10px;padding:20px 24px;border-left:3px solid #C8A96E}
+.rw-header{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.rw-num{background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;color:#C8A96E;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+.rw-title{font-size:15px;font-weight:700;color:#F5F0E8}
+.rw-tasks{display:flex;flex-direction:column;gap:8px}
+.rw-task{font-size:13px;color:#C8BEA8;line-height:1.6;display:flex;gap:10px}
+.rw-task::before{content:"→";color:#C8A96E;flex-shrink:0}
+.lesson-actions{display:flex;gap:12px;margin-top:40px;flex-wrap:wrap}
+.btn-complete{padding:13px 28px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-complete:hover{opacity:.9;transform:translateY(-1px)}
+.btn-next{padding:13px 28px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:8px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-next:hover{border-color:#C8A96E;color:#C8A96E}
+@media(max-width:600px){.module-hero,.progress-wrap,.lessons-nav,.lesson-wrap{padding-left:16px;padding-right:16px}.lesson-header{padding:20px}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">AI Cash Systems</div>
+  <a href="/course-starter.html" class="back-btn">← Back to Course</a>
+</nav>
+
+<div class="module-hero">
+  <div class="module-badge">Module 4 of 8</div>
+  <div class="module-num">04</div>
+  <h1 class="module-title">Scaling to<br><em>$3K/Month</em></h1>
+  <p class="module-desc">Build a stack of recurring retainers, automate your own agency operations, and follow the exact 30-day plan to go from zero to your first $3,000 month.</p>
+  <div class="module-meta">
+    <div class="meta-item"><div class="meta-dot"></div>3 Lessons</div>
+    <div class="meta-item"><div class="meta-dot"></div>~60 minutes</div>
+    <div class="meta-item"><div class="meta-dot"></div>Growth</div>
+  </div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-label"><span>Module Progress</span><span id="progressLabel">0 / 3 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="lessons-nav">
+  <button class="lesson-tab active" onclick="showLesson(1)" id="tab1">Lesson 1 — Recurring Revenue</button>
+  <button class="lesson-tab" onclick="showLesson(2)" id="tab2">Lesson 2 — Systemize Your Agency</button>
+  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — 30-Day Action Plan</button>
+</div>
+
+<div class="lesson-wrap">
+
+<!-- LESSON 1 -->
+<div class="lesson-content active" id="lesson1">
+  <div class="lesson-header">
+    <div class="lesson-tag">Scaling · Lesson 1</div>
+    <h2 class="lesson-title">Building a Recurring Revenue Stack</h2>
+    <p class="lesson-intro">The goal is not one big project. The goal is multiple clients each paying you every month. Each client is a pillar. Build enough pillars and your income becomes stable, predictable and grows automatically.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Why Retainers Are Everything</div>
+    <div class="block-text">Most freelancers make money once per project and then have to find new clients again. This is exhausting and unstable. The automation agency model is different — you build a system once and charge every month to maintain it.</div>
+    <div class="block-text">This means every new client you land does not just add one payment to your income — it adds a permanent monthly stream. After 6 months of consistent work you could have 8–10 clients each paying $150–$400/month. That is $1,200–$4,000/month arriving automatically every month.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Math — How Retainers Stack Up</div>
+    <table class="math-table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>New Clients</th>
+          <th>Total Clients</th>
+          <th>Avg Retainer</th>
+          <th>Monthly Income</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Month 1</td><td>1</td><td>1</td><td>$200</td><td class="gold">$200</td></tr>
+        <tr><td>Month 2</td><td>1</td><td>2</td><td>$200</td><td class="gold">$400</td></tr>
+        <tr><td>Month 3</td><td>2</td><td>4</td><td>$220</td><td class="gold">$880</td></tr>
+        <tr><td>Month 4</td><td>2</td><td>6</td><td>$230</td><td class="gold">$1,380</td></tr>
+        <tr><td>Month 5</td><td>2</td><td>8</td><td>$250</td><td class="gold">$2,000</td></tr>
+        <tr><td>Month 6</td><td>3</td><td>11</td><td>$280</td><td class="gold">$3,080 ✓</td></tr>
+      </tbody>
+    </table>
+    <div class="block-text">This is a realistic timeline. Month 1 is hard — finding and closing your first client takes effort. But every client after that is easier because you have proof, experience and confidence. By Month 6 you have 11 clients each paying around $280/month.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">How to Keep Clients Paying Month After Month</div>
+    <div class="block-text">The most important question is not how to get clients — it is how to keep them. Here is exactly what you do to make sure clients never cancel:</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Send a monthly performance report</div></div>
+        <div class="step-text">Every month on the 1st, send each client a short email showing what happened last month. How many messages their bot replied to, how many leads were captured, any improvements you made.</div>
+        <div class="step-detail">
+          You can automate this report using Make.com + GPT-4o. Build a scenario that:<br/>
+          1. Runs on the 1st of every month at 9am<br/>
+          2. Reads the last 30 days of data from their Google Sheet<br/>
+          3. Sends the data to GPT-4o with the prompt: <em style="color:#C8BEA8">"Generate a professional monthly performance report in under 150 words based on this data: {{data}}. Include total messages handled, highlight the best result, and end with one recommendation for next month."</em><br/>
+          4. Sends the generated report via Gmail to the client<br/><br/>
+          Clients who receive a monthly report almost never cancel. They see the value in their inbox every month.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Make small improvements each month</div></div>
+        <div class="step-text">Every month, make one small improvement to each client's automation. Add a new reply template. Update the prompt to handle a new type of question. Add a new trigger. This keeps the system fresh and gives clients a reason to see the retainer as ongoing value — not just maintenance.</div>
+        <div class="step-detail">When you make an improvement, send the client a quick WhatsApp or email: <em style="color:#C8BEA8">"Hi [Name], I updated your bot this week to handle questions about weekend hours better. It should now give more accurate replies on Friday and Saturday evenings."</em> This takes 2 minutes and massively increases client satisfaction.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Set up automatic billing</div></div>
+        <div class="step-text">Never chase clients for payment manually. Set up automatic monthly billing from day one. Here are your options in order of simplicity:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Option 1 — Stripe (Recommended):</strong> Go to dashboard.stripe.com → create a Payment Link → set it to recurring monthly → send the link to your client → they enter their card once and you charge automatically every month. Stripe takes 2.9% + $0.30 per transaction.<br/><br/>
+          <strong style="color:#C8A96E">Option 2 — PayPal:</strong> Create a PayPal subscription button. Go to paypal.com → Products & Services → Subscriptions → Create a Plan → set monthly amount → get the subscription link → send to client.<br/><br/>
+          <strong style="color:#C8A96E">Option 3 — Bank transfer with reminder:</strong> If clients prefer bank transfer, send an invoice on the 25th of each month due on the 1st. Use a free invoicing tool like Invoice Ninja or Wave.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Ask for referrals at the right moment</div></div>
+        <div class="step-text">The best time to ask for a referral is exactly 2–3 weeks after delivering the automation — when the client has seen it working and is excited about the results.</div>
+        <div class="step-detail">
+          Send this message 2–3 weeks after delivery:<br/><br/>
+          <em style="color:#C8BEA8">"Hi [Name], glad to see the system is working well! Quick question — do you know any other business owners who might benefit from something similar? I'm looking to help 2–3 more businesses this month and your recommendation would mean a lot."</em><br/><br/>
+          This simple message gets referrals because: (1) it comes at the moment of maximum satisfaction, (2) it is personal and genuine, (3) it has a specific ask. Most clients know at least 3–5 other business owners with the same problems.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box gold">
+    <div class="info-label">✦ The Upsell Strategy</div>
+    <div class="info-text">Once a client has their WhatsApp bot running, they are already sold on AI automation. Offer them the next system: "Now that your WhatsApp bot is running perfectly, would you like me to add Instagram DM automation? It would catch all the leads coming through your Instagram that are currently going unanswered." This upsell costs you 2–4 hours and adds $100–$200/month to your retainer from an existing client — the easiest money in this business.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 1</div>
+    <div class="takeaway">Every new client adds a permanent monthly income stream. 11 clients at $280/month = $3,080/month.</div>
+    <div class="takeaway">Monthly performance reports are the single best way to prevent cancellations. Automate them with Make.com + GPT-4o.</div>
+    <div class="takeaway">Set up automatic billing from day one. Never chase clients for payment manually.</div>
+    <div class="takeaway">Ask for referrals 2–3 weeks after delivery — at the moment of maximum client satisfaction.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(1)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(2)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 2 -->
+<div class="lesson-content" id="lesson2">
+  <div class="lesson-header">
+    <div class="lesson-tag">Operations · Lesson 2</div>
+    <h2 class="lesson-title">Systemizing Your Agency — Work Less, Earn More</h2>
+    <p class="lesson-intro">At some point managing clients manually becomes your biggest bottleneck. The solution is to automate your own agency — use the exact same skills you sell to clients to run your business. This is also your best sales pitch.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Beautiful Irony</div>
+    <div class="block-text">The best proof that your automations work is showing prospects that your own agency runs on them. When a potential client asks "Does this really work?", you say: "Yes — every part of my agency is automated. My client reports write themselves. My billing collects automatically. My leads get followed up instantly. The same system I use to run my business is what I build for you." That is your best case study — for free.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Automation 1 — Automated Client Onboarding</div>
+    <div class="block-text">When you close a new client, instead of manually sending them all the onboarding information, build a Make.com scenario that does it automatically:</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a client intake Google Form</div></div>
+        <div class="step-text">Build a Google Form that collects everything you need from a new client: business name, contact person name, email, phone number, their WhatsApp number, their Instagram handle, what they want automated, their brand voice description, and any specific instructions.</div>
+        <div class="step-detail">Go to forms.google.com → create a new form → add all those fields → link it to a Google Sheet → share the form link with every new client immediately after they pay.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Build the onboarding automation in Make.com</div></div>
+        <div class="step-text">Create a Make.com scenario triggered by "Watch New Rows" on your client intake sheet. When a new client submits the form, the automation:</div>
+        <div class="step-detail">
+          → Sends them a welcome email with instructions on what happens next and your expected timeline<br/>
+          → Adds their details to your master client tracking Google Sheet<br/>
+          → Creates a task or reminder for you to start building their automation<br/><br/>
+          This makes every new client feel professionally welcomed — even when you are asleep or working on another client's project.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Automation 2 — Automated Monthly Reports</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Build the monthly report scenario in Make.com</div></div>
+        <div class="step-text">Create a new Make.com scenario. Set the trigger to "Schedule" — click the clock icon instead of choosing an app. Set it to run on the 1st of every month at 9:00 AM.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Read data from the client's Google Sheet</div></div>
+        <div class="step-text">Add a Google Sheets module → "Search Rows" action → connect to the client's automation log sheet → filter for rows from the last 30 days. This gives you the raw data: how many form submissions, how many emails sent, etc.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Send data to GPT-4o to write the report</div></div>
+        <div class="step-text">Add an OpenAI module → "Create a Chat Completion" → paste this prompt:</div>
+        <div class="type-this">You are a professional AI automation agency reporting to a client. Write a friendly monthly performance report in under 150 words based on this data:
+
+Client: {{client_name}}
+This month's automation data: {{sheet_data}}
+
+Include: total automations processed, the best result this month, one thing that is working well, and one recommendation for improvement next month. Keep the tone professional but warm.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Send via Gmail automatically</div></div>
+        <div class="step-text">Add a Gmail module → "Send an Email" → To: client email from your tracking sheet → Subject: <strong style="color:#C8A96E">Your AI Automation Report — [Month]</strong> → Content: the GPT-generated report. Click OK. The scenario now runs automatically on the 1st of every month, forever.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Automation 3 — Lead Follow-Up for Your Own Agency</div>
+    <div class="block-text">Set up the same lead follow-up automation from Module 2 — but for your own agency. When someone fills out a contact form on your website or Instagram asking about your services, they get an instant professional reply.</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a contact form for your agency</div></div>
+        <div class="step-text">Create a Google Form with fields: Name, Email, Business Type, What do you need automated, Monthly budget range. Share the link in your Instagram bio, WhatsApp status, and on your portfolio if you have one.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Build the follow-up automation exactly as in Module 2</div></div>
+        <div class="step-text">Use the exact same Make.com flow from Module 2 — Google Sheets → OpenAI → Gmail — but change the OpenAI System message to:</div>
+        <div class="type-this">You are the AI assistant of an AI automation agency. When a potential client submits a contact form, write a warm and professional follow-up email. Mention that we specialize in WhatsApp bots, lead follow-up systems, and Instagram automation. Invite them to book a free 15-minute discovery call. Keep it under 100 words. Sound like a real person, not a robot.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">How to Manage Multiple Clients Without Getting Overwhelmed</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a master client tracking sheet</div></div>
+        <div class="step-text">In Google Sheets, create one spreadsheet with a tab for each client. Each tab has: client name, what automation they have, the Make.com scenario URL, their monthly retainer amount, billing date, last report date, and notes.</div>
+        <div class="step-detail">This takes 10 minutes to set up and prevents you from ever losing track of a client's setup. When you have 10 clients, this sheet is your business dashboard.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Set a weekly 1-hour "agency maintenance" block</div></div>
+        <div class="step-text">Every week, set aside one hour to check on all your clients' automations. Open Make.com → go to each Scenario → check the "History" tab to see if any runs failed. Fix any errors you find. This one hour per week is how you maintain 10+ clients without stress.</div>
+        <div class="step-detail">Make.com sends email notifications when a Scenario fails. Go to your Make.com account settings → Notifications → turn on "Email me when a scenario fails." This way you only need to act when something goes wrong — not check proactively every day.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Create reusable scenario templates</div></div>
+        <div class="step-text">After building the same automation 3–4 times for different clients, save a clean version as your template. In Make.com, open a Scenario → click the three-dot menu → click "Make a copy." Rename it "TEMPLATE — WhatsApp Bot." When a new client needs a WhatsApp bot, clone this template instead of building from scratch. New client setup time drops from 4 hours to 1 hour.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">✓ The 1-Hour Per Client Rule</div>
+    <div class="info-text">A properly built automation should require at most 1 hour of your time per month per client — and that includes the monthly report, small improvements, and any issues. If you are spending more time than that on a client, the automation is not built well enough. Go back and improve the system so it handles more automatically.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 2</div>
+    <div class="takeaway">Automate your own agency first — it is both efficient and your best sales demonstration.</div>
+    <div class="takeaway">Automated monthly reports prevent cancellations and require zero manual work once built.</div>
+    <div class="takeaway">Turn on Make.com failure notifications so you only act when something actually breaks.</div>
+    <div class="takeaway">Create reusable scenario templates — build once, clone for every new client.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(2)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(3)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 3 -->
+<div class="lesson-content" id="lesson3">
+  <div class="lesson-header">
+    <div class="lesson-tag">Action Plan · Lesson 3</div>
+    <h2 class="lesson-title">Your 30-Day Action Plan — Zero to First Paying Client</h2>
+    <p class="lesson-intro">Everything you have learned means nothing without execution. This lesson gives you an exact week-by-week plan for your first 30 days. Follow it exactly and you will have your first paying client by Day 30.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Only Goal for Month 1</div>
+    <div class="block-text">One client. One retainer. That is enough to prove the entire model works. Do not try to build 5 automations, reach 100 people, or perfect everything. Focus all your energy on landing one paying client. The second client comes much faster once you have done it once.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Week 1 — Build Your Foundation</div>
+    <div class="roadmap">
+      <div class="roadmap-week">
+        <div class="rw-header"><div class="rw-num">Day 1–2</div><div class="rw-title">Complete Modules 1–2</div></div>
+        <div class="rw-tasks">
+          <div class="rw-task">Create your Make.com free account</div>
+          <div class="rw-task">Build the complete lead follow-up automation from Module 2 — Google Form → OpenAI → Gmail</div>
+          <div class="rw-task">Test it with your own email. Make sure you receive an AI-generated reply</div>
+          <div class="rw-task">Screenshot the successful test run — this is your proof of concept</div>
+        </div>
+      </div>
+      <div class="roadmap-week">
+        <div class="rw-header"><div class="rw-num">Day 3–4</div><div class="rw-title">Choose Your Niche & Build Your Prospect List</div></div>
+        <div class="rw-tasks">
+          <div class="rw-task">Pick ONE industry to focus on for Month 1 (restaurants, real estate, beauty, or whatever you have a connection to)</div>
+          <div class="rw-task">Open Google Maps and find 15 businesses in your city that match the criteria from Module 3</div>
+          <div class="rw-task">Write down: business name, phone number, Instagram handle, and one specific problem you noticed for each one</div>
+          <div class="rw-task">Visit each business's Instagram. Note which ones have unanswered comments or questions</div>
+        </div>
+      </div>
+      <div class="roadmap-week">
+        <div class="rw-header"><div class="rw-num">Day 5–7</div><div class="rw-title">Send Your First Outreach Messages</div></div>
+        <div class="rw-tasks">
+          <div class="rw-task">Personalize the WhatsApp or Instagram DM template from Module 3 for each of your 15 prospects</div>
+          <div class="rw-task">Send 5 messages on Day 5, 5 on Day 6, 5 on Day 7</div>
+          <div class="rw-task">Track who you contacted in a simple Google Sheet: Name, Platform, Date Sent, Reply (Yes/No)</div>
+          <div class="rw-task">If anyone replies, respond within 1 hour and offer a 15-minute call</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Week 2 — Your First Conversations</div>
+    <div class="roadmap">
+      <div class="roadmap-week">
+        <div class="rw-header"><div class="rw-num">Day 8–10</div><div class="rw-title">Follow Up & Book Discovery Calls</div></div>
+        <div class="rw-tasks">
+          <div class="rw-task">Send follow-up messages to anyone who did not reply from Week 1 (use the follow-up template from Module 3)</div>
+          <div class="rw-task">Send 5 new outreach messages to new prospects from your list</div>
+          <div class="rw-task">For anyone who replied positively — suggest two specific times for a 15-minute call</div>
+          <div class="rw-task">Confirm call times via WhatsApp or email</div>
+        </div>
+      </div>
+      <div class="roadmap-week">
+        <div class="rw-header"><div class="rw-num">Day 11–14</div><div class="rw-title">Run Discovery Calls</div></div>
+        <div class="rw-tasks">
+          <div class="rw-task">Before each call: spend 5 minutes reviewing their business (website, Instagram, Google Maps)</div>
+          <div class="rw-task">Run the call using the exact script from Module 3 — ask the 4 discovery questions, then present your solution</div>
+          <div class="rw-task">Quote your price confidently: $300–$600 setup + $150–$250/month retainer for a starter automation</div>
+          <div class="rw-task">If they say yes — ask for a 50% deposit to start. Send a PayPal or Stripe payment link immediately after the call</div>
+          <div class="rw-task">If they say "let me think" — follow up in 2 days with a short message</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Week 3 — Deliver and Get Paid</div>
+    <div class="roadmap">
+      <div class="roadmap-week">
+        <div class="rw-header"><div class="rw-num">Day 15–20</div><div class="rw-title">Build and Deliver Your First Client Automation</div></div>
+        <div class="rw-tasks">
+          <div class="rw-task">Ask the client to fill in your intake Google Form so you have all their information</div>
+          <div class="rw-task">Build their automation using your Make.com template — customize the prompt with their business name, services, and brand voice</div>
+          <div class="rw-task">Test the automation 3 times with different test inputs — make sure every reply sounds natural and correct</div>
+          <div class="rw-task">Schedule a 30-minute delivery call to show them the system live — share your screen, send a test message, show the AI reply arriving in seconds</div>
+          <div class="rw-task">After delivery — send the remaining 50% invoice. Set up their monthly recurring billing.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Week 4 — Scale and Repeat</div>
+    <div class="roadmap">
+      <div class="roadmap-week">
+        <div class="rw-header"><div class="rw-num">Day 21–30</div><div class="rw-title">Get the Testimonial & Find Client #2</div></div>
+        <div class="rw-tasks">
+          <div class="rw-task">Check in with Client #1 — ask how the automation is performing and if they have any feedback</div>
+          <div class="rw-task">At Day 21: ask for a written testimonial via WhatsApp — send them this message: <em style="color:#C8BEA8">"Hi [Name], glad to see the system is running well! Would you be willing to write 2–3 sentences about your experience so far? It would help me help more businesses like yours."</em></div>
+          <div class="rw-task">Use their testimonial in all future outreach — it is now your most powerful sales tool</div>
+          <div class="rw-task">Ask for a referral: <em style="color:#C8BEA8">"Do you know any other business owners who might benefit from something similar?"</em></div>
+          <div class="rw-task">Send 10 new outreach messages using Client #1's result as social proof in your hook</div>
+          <div class="rw-task">Continue at the same pace — 5–10 outreach messages per day, follow up after 3 days, book calls, close deals</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">What to Do If You Have No Replies After 2 Weeks</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Review your outreach message</div></div>
+        <div class="step-text">Re-read your messages honestly. Is the hook truly specific to each business? Does the pain you describe match what that type of business actually experiences? If your messages sound generic — rewrite them following the formula from Module 3 more carefully.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Try a different platform</div></div>
+        <div class="step-text">If WhatsApp is not getting replies, switch to Instagram DM or email. Different businesses respond better on different platforms. Restaurants often check WhatsApp. Coaches prefer Instagram DMs. B2B companies respond better to email or LinkedIn.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Offer a free demo instead of a call</div></div>
+        <div class="step-text">Instead of asking for a call, offer to send them a free demo. Message them: <em style="color:#C8BEA8">"No need for a call — can I just send you a quick demo of what I would build for [business name]? Takes 2 minutes to see."</em> Then send them a test message from your automation and let them experience the AI reply. This gets far more responses than asking for their time upfront.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">✓ The Most Important Thing</div>
+    <div class="info-text">Consistency beats perfection. Sending 5 imperfect messages per day for 30 days outperforms sending 1 perfect message per week. You will get better with every message you send, every call you run, and every client you deliver to. The only way to fail is to stop. Keep going.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 3</div>
+    <div class="takeaway">The only goal for Month 1 is ONE paying client. One retainer. That is proof the model works.</div>
+    <div class="takeaway">Send 5–10 personalized outreach messages per day. Track everything in a Google Sheet.</div>
+    <div class="takeaway">Ask for the testimonial at Day 21 — not at delivery, not at Month 2. Day 21 is the sweet spot.</div>
+    <div class="takeaway">If no replies after 2 weeks — change the platform first, then rewrite the message. Do not give up.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Your Commitment — Start Today</div>
+    <div class="exercise-text">Write down today's date. Write "Day 1" next to it. Write down your chosen industry. Write down the names of 3 businesses you will contact today. Then do it. The difference between people who make money from this and people who don't is not skill or knowledge — it is the willingness to send the first message. Send it today.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="window.location.href='/course-starter.html'">← Back to All Modules</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+var completed=JSON.parse(localStorage.getItem('m4_completed')||'[]');
+function updateProgress(){
+  var fill=document.getElementById('progressFill');
+  var label=document.getElementById('progressLabel');
+  fill.style.width=(completed.length/3*100)+'%';
+  label.textContent=completed.length+' / 3 lessons';
+  completed.forEach(function(n){var t=document.getElementById('tab'+n);if(t)t.classList.add('done');});
+}
+function showLesson(n){
+  document.querySelectorAll('.lesson-content').forEach(function(el){el.classList.remove('active')});
+  document.querySelectorAll('.lesson-tab').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('lesson'+n).classList.add('active');
+  document.getElementById('tab'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function completeLesson(n){
+  if(completed.indexOf(n)===-1){completed.push(n);localStorage.setItem('m4_completed',JSON.stringify(completed));}
+  updateProgress();
+  var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
+}
+updateProgress();
+</script>
+</body>
+</html>
