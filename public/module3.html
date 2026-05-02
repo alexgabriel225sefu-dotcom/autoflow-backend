@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Module 3 — Getting Your First Client</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(200,169,110,.08);backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;color:#C8A96E}
+.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:#C8A96E;color:#C8A96E}
+.module-hero{padding:56px 32px 40px;max-width:860px;margin:0 auto}
+.module-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(200,169,110,.12);border:1px solid rgba(200,169,110,.2);border-radius:100px;padding:5px 14px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.module-num{font-family:"Playfair Display",serif;font-size:80px;font-weight:900;color:rgba(200,169,110,.1);line-height:1;margin-bottom:-20px}
+.module-title{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:16px}
+.module-title em{font-style:italic;color:#C8A96E}
+.module-desc{font-size:15px;color:#C8BEA8;max-width:600px;line-height:1.75}
+.module-meta{display:flex;gap:20px;margin-top:28px;flex-wrap:wrap}
+.meta-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#C8BEA8}
+.meta-dot{width:6px;height:6px;border-radius:50%;background:#C8A96E}
+.progress-wrap{max-width:860px;margin:0 auto 40px;padding:0 32px}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.lessons-nav{max-width:860px;margin:0 auto 32px;padding:0 32px;display:flex;gap:8px;flex-wrap:wrap}
+.lesson-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(200,169,110,.1);background:transparent;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
+.lesson-tab:hover{border-color:rgba(200,169,110,.3);color:#F5F0E8}
+.lesson-tab.active{background:rgba(200,169,110,.15);border-color:#C8A96E;color:#C8A96E;font-weight:600}
+.lesson-tab.done::before{content:"✓ ";color:#C8A96E}
+.lesson-wrap{max-width:860px;margin:0 auto;padding:0 32px 80px}
+.lesson-content{display:none}
+.lesson-content.active{display:block}
+.lesson-header{background:#0f0f0f;border:1px solid rgba(200,169,110,.08);border-radius:14px;padding:32px;margin-bottom:28px}
+.lesson-tag{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:100px;border:1px solid rgba(200,169,110,.18);color:#C8A96E;background:rgba(200,169,110,.1);margin-bottom:14px}
+.lesson-title{font-family:"Playfair Display",serif;font-size:clamp(22px,3vw,32px);font-weight:700;margin-bottom:10px;line-height:1.1}
+.lesson-intro{font-size:14px;color:#C8BEA8;line-height:1.8}
+.block{margin-bottom:36px}
+.block-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:#F5F0E8;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.block-title::before{content:"";width:3px;height:20px;background:#C8A96E;border-radius:2px;flex-shrink:0}
+.block-text{font-size:14px;color:#C8BEA8;line-height:1.85;margin-bottom:14px}
+.steps{display:flex;flex-direction:column;gap:20px;margin:20px 0}
+.step{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;border-left:3px solid #C8A96E}
+.step-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#080808;flex-shrink:0}
+.step-title{font-size:15px;font-weight:700;color:#F5F0E8}
+.step-text{font-size:13px;color:#C8BEA8;line-height:1.8;margin-bottom:10px}
+.step-text:last-child{margin-bottom:0}
+.step-detail{background:#161616;border-radius:8px;padding:14px 16px;margin-top:10px;font-size:13px;color:#C8BEA8;line-height:1.75;border-left:2px solid rgba(200,169,110,.3)}
+.click{display:inline-flex;align-items:center;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:5px;padding:2px 10px;font-size:12px;color:#C8A96E;font-weight:600;margin:0 2px}
+.type-this{background:#0a0a0a;border:1px solid rgba(200,169,110,.2);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#F5F0E8;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap}
+.type-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;margin-bottom:6px;font-weight:600}
+.info-box{border-radius:10px;padding:20px 24px;margin:20px 0}
+.info-box.gold{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2)}
+.info-box.tip{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15)}
+.info-box.warn{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.15)}
+.info-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.info-box.gold .info-label{color:#C8A96E}
+.info-box.tip .info-label{color:#4ADE80}
+.info-box.warn .info-label{color:#e74c3c}
+.info-text{font-size:13px;color:#C8BEA8;line-height:1.75}
+.takeaways{background:#161616;border:1px solid rgba(200,169,110,.12);border-radius:12px;padding:28px;margin:28px 0}
+.takeaways-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E;margin-bottom:16px}
+.takeaway{display:flex;gap:12px;margin-bottom:12px;font-size:13px;color:#F5F0E8;line-height:1.6}
+.takeaway:last-child{margin-bottom:0}
+.takeaway::before{content:"◆";color:#C8A96E;font-size:8px;margin-top:5px;flex-shrink:0}
+.exercise{background:linear-gradient(135deg,rgba(200,169,110,.08),rgba(200,169,110,.03));border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:28px;margin:28px 0}
+.exercise-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:12px}
+.exercise-text{font-size:14px;color:#F5F0E8;line-height:1.75}
+.msg-template{background:#0a0a0a;border:1px solid rgba(200,169,110,.25);border-radius:12px;padding:24px;margin:16px 0}
+.msg-header{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.msg-header::before{content:"";width:20px;height:1px;background:#C8A96E}
+.msg-body{font-size:13px;color:#F5F0E8;line-height:1.9;font-style:italic}
+.msg-note{font-size:11px;color:#7A7060;margin-top:12px;font-style:normal}
+.lesson-actions{display:flex;gap:12px;margin-top:40px;flex-wrap:wrap}
+.btn-complete{padding:13px 28px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-complete:hover{opacity:.9;transform:translateY(-1px)}
+.btn-next{padding:13px 28px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:8px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-next:hover{border-color:#C8A96E;color:#C8A96E}
+@media(max-width:600px){.module-hero,.progress-wrap,.lessons-nav,.lesson-wrap{padding-left:16px;padding-right:16px}.lesson-header{padding:20px}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">AI Cash Systems</div>
+  <a href="/course-starter.html" class="back-btn">← Back to Course</a>
+</nav>
+
+<div class="module-hero">
+  <div class="module-badge">Module 3 of 8</div>
+  <div class="module-num">03</div>
+  <h1 class="module-title">Getting Your<br><em>First Client</em></h1>
+  <p class="module-desc">Find businesses that need your automation, send outreach messages that actually get replies, and close your first paid client — every step explained in complete detail.</p>
+  <div class="module-meta">
+    <div class="meta-item"><div class="meta-dot"></div>3 Lessons</div>
+    <div class="meta-item"><div class="meta-dot"></div>~60 minutes</div>
+    <div class="meta-item"><div class="meta-dot"></div>Client Acquisition</div>
+  </div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-label"><span>Module Progress</span><span id="progressLabel">0 / 3 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="lessons-nav">
+  <button class="lesson-tab active" onclick="showLesson(1)" id="tab1">Lesson 1 — Find Businesses</button>
+  <button class="lesson-tab" onclick="showLesson(2)" id="tab2">Lesson 2 — Outreach Messages</button>
+  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — Close the Deal</button>
+</div>
+
+<div class="lesson-wrap">
+
+<!-- LESSON 1 -->
+<div class="lesson-content active" id="lesson1">
+  <div class="lesson-header">
+    <div class="lesson-tag">Prospecting · Lesson 1</div>
+    <h2 class="lesson-title">Finding Businesses That Need You Right Now</h2>
+    <p class="lesson-intro">You do not need to cold call strangers or spend money on ads. The best clients are businesses you can find in 10 minutes online — businesses that are already showing signs they need what you offer.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Right Mindset — You Are Solving a Real Problem</div>
+    <div class="block-text">Before you start looking for clients, understand this: you are not a salesperson trying to convince someone to buy something they don't need. You are a problem solver approaching businesses that are already losing time and money every day because they don't have what you build.</div>
+    <div class="block-text">When a restaurant owner gets 30 WhatsApp messages per day and can only reply to 10 of them, they are losing clients right now. You have the solution. Your job is simply to show them that the solution exists and that you can build it for them.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Method 1 — Google Maps (Best for Beginners)</div>
+    <div class="block-text">Google Maps shows you every local business in any area. It is the fastest way to build a list of prospects because you can see their contact information, their reviews, and how active they are.</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Open Google Maps on your phone or computer</div></div>
+        <div class="step-text">Go to <strong style="color:#C8A96E">maps.google.com</strong> or open the Google Maps app on your phone. Make sure you are logged into your Google account.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Search for your chosen industry in your city</div></div>
+        <div class="step-text">In the search bar at the top, type your niche and city. Examples:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">restaurants Bucharest</strong><br/>
+          <strong style="color:#C8A96E">dental clinic Cluj</strong><br/>
+          <strong style="color:#C8A96E">real estate agency Timisoara</strong><br/>
+          <strong style="color:#C8A96E">beauty salon Iasi</strong><br/><br/>
+          Press Enter. The map shows all matching businesses with red pins. On the left side you see a list of businesses with their names, star ratings, and number of reviews.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Filter for the best prospects</div></div>
+        <div class="step-text">Look for businesses with these characteristics — they are the most likely to pay for your automation:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">✓ 50+ reviews</strong> — means they have enough customers to justify automation. A business with 5 reviews is too small.<br/><br/>
+          <strong style="color:#C8A96E">✓ 3.5–4.5 star rating</strong> — good enough to be credible but not perfect. Perfect businesses often don't feel urgency to improve.<br/><br/>
+          <strong style="color:#C8A96E">✓ Has a phone number listed</strong> — means they are contactable. Click on the business to see if they have a WhatsApp number.<br/><br/>
+          <strong style="color:#C8A96E">✓ Has a website or social media listed</strong> — means they care about their online presence.<br/><br/>
+          <strong style="color:#C8A96E">✗ Skip businesses with only 1–2 reviews</strong> — too small to invest in automation.<br/>
+          <strong style="color:#C8A96E">✗ Skip businesses that say "Permanently closed"</strong>.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Click on each business to get their contact details</div></div>
+        <div class="step-text">Click on a business in the list. A panel opens on the left showing: their name, address, phone number, website, hours, and sometimes a WhatsApp button. Write down or screenshot:</div>
+        <div class="step-detail">
+          — Business name<br/>
+          — Phone number (this is often their WhatsApp number too)<br/>
+          — Website URL (you will visit it to understand their business better)<br/>
+          — What type of business they are exactly<br/><br/>
+          Do this for 10–15 businesses. This is your prospect list.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Visit their website or Instagram to understand their pain</div></div>
+        <div class="step-text">Before contacting any business, spend 3 minutes on their website or Instagram. Ask yourself: Do they have a contact form? Do they list a WhatsApp number? Do they reply quickly to Instagram comments? This research helps you write a personalized message in Lesson 2.</div>
+        <div class="step-detail">The best signal: look at their Instagram or Facebook page. If they post regularly but have comments with questions like "What are your hours?" or "Do you take bookings?" with no replies — that business is losing clients every day because they cannot respond fast enough. That is your opportunity.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Method 2 — Instagram (Best for Coaches & Online Businesses)</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Open Instagram and use the search feature</div></div>
+        <div class="step-text">Open Instagram on your phone. Tap the search icon (magnifying glass) at the bottom. In the search bar type a hashtag related to your niche. Examples:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">#restaurantbucharest</strong><br/>
+          <strong style="color:#C8A96E">#coachonline</strong><br/>
+          <strong style="color:#C8A96E">#fitnesstrainer</strong><br/>
+          <strong style="color:#C8A96E">#realestateagent</strong><br/><br/>
+          Tap the hashtag. You see posts from businesses using that tag. Tap on posts that look like business accounts (not personal accounts).
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Look for the golden signal — unanswered DMs</div></div>
+        <div class="step-text">On a business's Instagram profile, look at their recent posts. Tap on the comments. Look for questions from followers that the business has NOT replied to — things like "What is the price?", "Do you ship to X?", "How do I book?", "Are you open on Sunday?"</div>
+        <div class="step-detail">If you see 5+ unanswered questions in their comments — that business is losing potential clients every day. They desperately need an automated reply system. This is your perfect prospect. Add them to your list.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Find their contact information</div></div>
+        <div class="step-text">On their Instagram profile page, look for:</div>
+        <div class="step-detail">
+          — Email button (tap it to see their business email)<br/>
+          — Phone/WhatsApp button (tap to see their number)<br/>
+          — Link in bio (often leads to their website where you can find more contact info)<br/>
+          — Direct message them on Instagram — many business owners check DMs regularly<br/><br/>
+          Add their contact details to your prospect list.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Method 3 — LinkedIn (Best for B2B and Agencies)</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to linkedin.com and use the search</div></div>
+        <div class="step-text">Open <strong style="color:#C8A96E">linkedin.com</strong>. In the search bar at the top, type a job title and location. Examples: <strong style="color:#C8A96E">CEO restaurant Bucharest</strong> or <strong style="color:#C8A96E">real estate agent Cluj</strong> or <strong style="color:#C8A96E">clinic owner Romania</strong>.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Filter results to "People"</div></div>
+        <div class="step-text">After searching, click the <span class="click">People</span> filter tab at the top of the results. This shows individual people — business owners, managers, directors — not company pages.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Look at their profile and connect</div></div>
+        <div class="step-text">Click on profiles that match your target. Look at their company size (in the "Experience" section) — aim for companies with 5–50 employees. Larger companies are harder to close, smaller ones may not have the budget. Click <span class="click">Connect</span> and add a personalized note.</div>
+        <div class="step-detail">LinkedIn connection note example:<br/><em style="color:#C8BEA8">"Hi [Name], I help restaurants in Romania automate their customer replies using AI — saving 10+ hours per week. Would love to connect and share how it works."</em></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box gold">
+    <div class="info-label">✦ The Golden Signal — Businesses Hiring Virtual Assistants</div>
+    <div class="info-text">Go to LinkedIn Jobs or Indeed.ro and search for "virtual assistant," "customer service," or "social media manager" in your city. Every company posting one of these jobs is paying $500–$1,500/month for a person to do work that your AI automation does for $150–$400/month. They already know they have a problem — you just offer a better solution.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 1</div>
+    <div class="takeaway">Google Maps is the fastest way to find local business prospects — 10 businesses in 10 minutes.</div>
+    <div class="takeaway">Unanswered Instagram comments = businesses actively losing clients. These are your best prospects.</div>
+    <div class="takeaway">Businesses hiring virtual assistants are pre-qualified prospects — they already know they need help with repetitive tasks.</div>
+    <div class="takeaway">Build a list of 10–15 prospects before writing a single message. Quality over quantity at this stage.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Build Your Prospect List Now</div>
+    <div class="exercise-text">Open Google Maps right now. Search for your chosen industry in your city. Find 10 businesses that match the criteria above. Write down their name, phone number, Instagram handle (if they have one), and one sentence about what repetitive problem they likely have. This is your first prospect list. Do not contact anyone yet — that comes in Lesson 2.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(1)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(2)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 2 -->
+<div class="lesson-content" id="lesson2">
+  <div class="lesson-header">
+    <div class="lesson-tag">Outreach · Lesson 2</div>
+    <h2 class="lesson-title">The Outreach Message That Gets Replies</h2>
+    <p class="lesson-intro">Most outreach fails because it talks about you. The message that works talks about what they are losing — time, leads, money. This lesson gives you exact copy-paste messages for WhatsApp, Instagram DM, and email.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Why Most Outreach Gets Ignored</div>
+    <div class="block-text">Business owners receive dozens of sales messages every week. Most of them say the same thing: "Hi, I offer digital marketing services, can we hop on a call?" These get ignored because they are generic, talk about the sender, and give no reason for the business owner to care.</div>
+    <div class="block-text">The message that gets a reply is specific to their business, identifies a real problem they have right now, and shows you already understand their situation — before they have told you anything.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Formula — Hook, Pain, Proof, Ask</div>
+    <div class="block-text">Every effective outreach message has four parts:</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">H</div><div class="step-title">Hook — A specific observation about their business</div></div>
+        <div class="step-text">Start with something specific about THEM — not about you. Reference something you noticed on their Google Maps, Instagram, or website. This immediately shows you are not sending a generic mass message.</div>
+        <div class="step-detail">Example: "I noticed you have 280 Google reviews which is impressive for a restaurant your size" or "I saw on your Instagram that you get a lot of comments asking about bookings."</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">P</div><div class="step-title">Pain — Name the exact problem and its consequence</div></div>
+        <div class="step-text">Describe the specific problem they have and what it costs them. Be concrete — mention time lost, leads lost, or money lost. People act when they feel the pain of a problem, not when they hear about abstract solutions.</div>
+        <div class="step-detail">Example: "That probably means you're getting 20–30 messages per day on WhatsApp and Instagram that you can't reply to fast enough — which means losing clients to competitors who reply instantly."</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">S</div><div class="step-title">Solution — What you do in one sentence</div></div>
+        <div class="step-text">Describe your solution in the simplest possible terms. No technical jargon. Focus on the outcome they get, not the technology you use.</div>
+        <div class="step-detail">Example: "I build AI systems that reply to every WhatsApp and Instagram message instantly — 24/7, even at 3am, with responses that sound exactly like your team."</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">A</div><div class="step-title">Ask — Request a 15-minute call, not a sale</div></div>
+        <div class="step-text">Never ask for a sale in the first message. Ask for a short call. A 15-minute call feels low commitment and easy to say yes to. You close the sale on the call — not in the message.</div>
+        <div class="step-detail">Example: "Would a 15-minute call this week make sense to show you exactly how it would work for your restaurant?"</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Copy-Paste Template 1 — WhatsApp Message (Restaurants)</div>
+    <div class="block-text">This is a complete WhatsApp message you can send to restaurant owners. Replace the parts in [brackets] with real details from your research:</div>
+    <div class="msg-template">
+      <div class="msg-header">WhatsApp — Restaurant</div>
+      <div class="msg-body">Hi [Owner Name],
+
+I noticed [Restaurant Name] has [X] Google reviews — impressive for a restaurant in [City].
+
+I'm guessing you and your team get a lot of WhatsApp and Instagram messages every day asking about your menu, hours, bookings, and prices — and it's probably impossible to reply to all of them quickly.
+
+I build AI systems that automatically reply to every message within seconds — 24/7, with responses that match your restaurant's style. Your team never has to answer the same question twice.
+
+A restaurant similar to yours in [City] implemented this and stopped losing bookings to unanswered messages.
+
+Would a 15-minute call this week make sense to show you exactly how it works?</div>
+      <div class="msg-note">Keep it as is. Do not add more. Do not make it longer. Short messages get more replies than long ones.</div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Copy-Paste Template 2 — Instagram DM (Any Business)</div>
+    <div class="msg-template">
+      <div class="msg-header">Instagram DM — Universal</div>
+      <div class="msg-body">Hi [Name] 👋
+
+I was looking at your profile and noticed you get quite a few comments and DMs asking questions — but a lot of them seem to go unanswered.
+
+That's probably costing you leads every day — people who message and don't hear back just go to a competitor.
+
+I build AI systems that reply instantly to every DM and comment automatically — 24/7, in your brand voice.
+
+Would you be open to a quick 15-min call to see if it could work for you?</div>
+      <div class="msg-note">Send this as a DM. If they have their DMs restricted, use the email from their bio instead.</div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Copy-Paste Template 3 — Email Outreach (Professional)</div>
+    <div class="msg-template">
+      <div class="msg-header">Email — Subject: Quick question about [Business Name]</div>
+      <div class="msg-body">Hi [Name],
+
+I came across [Business Name] on Google and was impressed by your [X] reviews.
+
+Quick question — how are you currently handling customer inquiries that come in outside business hours? WhatsApp messages, Instagram DMs, contact form submissions?
+
+The reason I ask: most businesses in your industry lose 20–40% of potential clients simply because they can't reply fast enough.
+
+I build AI automation systems that reply instantly to every inquiry — 24/7, personalized to your business — for a fraction of the cost of hiring someone.
+
+Would it be worth a 15-minute call this week to show you exactly how it works for businesses like yours?
+
+[Your Name]</div>
+      <div class="msg-note">Subject line: "Quick question about [Business Name]" — this subject line gets opened because it is personal and curiosity-inducing.</div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">How to Send — Platform by Platform</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Sending via WhatsApp</div></div>
+        <div class="step-text">Open WhatsApp. Tap the new chat icon. Enter the business phone number you found on Google Maps. Write or paste your message. Before sending, personalize the [brackets] with their real info. Read it once to check for mistakes. Send.</div>
+        <div class="step-detail">If the number is not on WhatsApp, it will say "This phone number is not registered on WhatsApp." In that case, call them directly or find their email and use Template 3.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Sending via Instagram DM</div></div>
+        <div class="step-text">Go to their Instagram profile. Tap the <span class="click">Message</span> button under their bio. The DM window opens. Paste Template 2 with their real name filled in. Tap Send.</div>
+        <div class="step-detail">Instagram sometimes restricts DMs from accounts that don't follow each other. If your DM request gets stuck in their "Message Requests" folder, it may take longer for them to see it. Follow their account before sending to increase visibility.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Sending via Email</div></div>
+        <div class="step-text">Open your Gmail. Click <span class="click">Compose</span>. In the "To" field enter their email address. In the "Subject" field type: <strong style="color:#C8A96E">Quick question about [Business Name]</strong>. Paste Template 3 in the body with their details filled in. Read it once. Click Send.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Follow up if no reply after 3 days</div></div>
+        <div class="step-text">If they don't reply in 3 days, send one follow-up message. Keep it short:</div>
+        <div class="step-detail">
+          <em style="color:#C8BEA8">"Hi [Name], just following up on my message from [day]. Totally understand if timing isn't right — just wanted to make sure it didn't get lost. Happy to share a quick example of what I've built for similar businesses if that would help."</em><br/><br/>
+          Send maximum 2 messages total — one initial and one follow-up. If they don't reply after 2 messages, move on to the next prospect. Never spam.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">How Many Messages to Send Per Day</div>
+    <div class="block-text">Send 5–10 personalized messages per day. This takes about 30–45 minutes if you have done your research from Lesson 1. After 2 weeks of consistent outreach you will have sent 70–140 messages. At a 10–15% reply rate that is 7–21 conversations. From those conversations you typically close 1–3 clients.</div>
+    <div class="block-text">The key word is personalized. Do not copy-paste the same message to 100 businesses without changing anything. Personalize the hook — the first line — for every single business. That is what separates a 2% reply rate from a 15% reply rate.</div>
+  </div>
+
+  <div class="info-box warn">
+    <div class="info-label">⚠️ What Not to Do</div>
+    <div class="info-text">Do not lead with price. Do not say "I offer cheap services." Do not send a long paragraph about your skills and experience. Do not use the word "freelancer" — say "I build AI systems" or "I run an automation agency." Do not ask for a long meeting — always ask for 15 minutes. Do not send more than 2 follow-ups to the same person.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 2</div>
+    <div class="takeaway">Every message must start with something specific about their business — not about you.</div>
+    <div class="takeaway">Always ask for a 15-minute call — never try to sell in the first message.</div>
+    <div class="takeaway">Send 5–10 personalized messages per day. Consistency beats volume.</div>
+    <div class="takeaway">Follow up once after 3 days. If no reply, move on. Never send more than 2 messages total.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Send Your First 5 Messages Today</div>
+    <div class="exercise-text">Take the prospect list you built in Lesson 1. Choose the 5 businesses you feel most confident about. Personalize Template 1 or 2 for each one — change the hook so it references something specific about that business. Send all 5 today. Write down who you contacted and when. This is the beginning of your pipeline.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(2)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(3)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 3 -->
+<div class="lesson-content" id="lesson3">
+  <div class="lesson-header">
+    <div class="lesson-tag">Sales · Lesson 3</div>
+    <h2 class="lesson-title">Closing the Deal & Setting Your Price</h2>
+    <p class="lesson-intro">Someone replied and wants to talk. Now you have a 15-minute call to understand their problem and close the deal. This lesson gives you the exact script — what to say, when to say it, and how to handle every common objection.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Before the Call — How to Prepare in 5 Minutes</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Research their business for 5 minutes</div></div>
+        <div class="step-text">Before the call, spend 5 minutes reviewing their website, Instagram, and Google Maps listing. Make notes of: how many reviews they have, what their main service is, whether they list a contact form or WhatsApp, and what problems their reviews mention.</div>
+        <div class="step-detail">The goal is to walk into the call already knowing their business so you can ask smart questions and give relevant examples. Nothing impresses a business owner more than someone who has done their homework.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Prepare your screen share or demo</div></div>
+        <div class="step-text">If you have already built the lead follow-up automation from Module 2, be ready to show it. Open Make.com and have your scenario visible so you can share your screen during the call and show it actually working.</div>
+        <div class="step-detail">If you have not built anything yet — build the Module 2 automation before your first call. Even a working demo with test data is 100x more convincing than a verbal description.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Call Script — Minute by Minute</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">0–2</div><div class="step-title">Opening — Build rapport quickly</div></div>
+        <div class="step-text">Start the call warmly and get to the point fast. Business owners respect people who value their time.</div>
+        <div class="step-detail">
+          <em style="color:#C8BEA8">"Hi [Name], thanks for taking the time. I know you're busy so I'll keep this to 15 minutes as I promised. Just to confirm — you're the owner of [Business Name], right? Great. I had a look at your [website/Instagram] before the call and I noticed [specific thing]. That's actually why I reached out."</em>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2–7</div><div class="step-title">Discovery — Ask these exact questions</div></div>
+        <div class="step-text">Your only job in this part of the call is to ask questions and listen. Do not talk about yourself or your service yet. Ask:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Question 1:</strong> <em style="color:#C8BEA8">"How do customers usually contact you when they want to inquire about [your service/product]?"</em><br/><br/>
+          <strong style="color:#C8A96E">Question 2:</strong> <em style="color:#C8BEA8">"How long does it usually take your team to reply to a WhatsApp or Instagram message?"</em><br/><br/>
+          <strong style="color:#C8A96E">Question 3:</strong> <em style="color:#C8BEA8">"Have you ever had a potential client go to a competitor just because you couldn't reply fast enough?"</em><br/><br/>
+          <strong style="color:#C8A96E">Question 4 (the money question):</strong> <em style="color:#C8BEA8">"Roughly how much is a new client worth to your business over their lifetime?"</em><br/><br/>
+          Listen carefully. Their answers tell you exactly what to focus on when you present your solution.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">7–12</div><div class="step-title">Presentation — Show the solution</div></div>
+        <div class="step-text">Now present your solution based on what they told you. Do not give a generic pitch — reference exactly what they said:</div>
+        <div class="step-detail">
+          <em style="color:#C8BEA8">"So based on what you told me — you get about [X] messages per day and it takes [Y] hours to reply — here's what I can build for you: an AI system that replies to every WhatsApp message within seconds, 24 hours a day. The reply sounds exactly like your team — I customize it with your menu, your prices, your style. No one knows it's automated."</em><br/><br/>
+          Then show your demo if you have one — share your screen and show the Make.com scenario and a sample email it generated. Even 60 seconds of a live demo is worth more than 10 minutes of talking.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">12–15</div><div class="step-title">Pricing and Close</div></div>
+        <div class="step-text">After the presentation, quote your price confidently. Do not apologize for your price and do not lower it immediately if they hesitate.</div>
+        <div class="step-detail">
+          <em style="color:#C8BEA8">"To build and set this up for your business it's [€400–€800] one time. After that it's [€150–€250] per month for me to maintain it, update it, and make sure it keeps working perfectly. The setup takes about a week."</em><br/><br/>
+          Then stop talking. Wait for their response. Silence is normal — let them think.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">How to Handle the Most Common Objections</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">"It's too expensive"</div></div>
+        <div class="step-text">Do not lower your price immediately. Instead, reframe the value:</div>
+        <div class="step-detail">
+          <em style="color:#C8BEA8">"I understand. Let me ask — you said a new client is worth about [€X] to you. If this system helps you capture just 2 extra clients per month that you would have otherwise lost, it pays for itself in the first month. After that it's pure profit. Does that make sense?"</em><br/><br/>
+          If they still hesitate after this, you can offer to lower the setup fee for your first client in exchange for a testimonial: <em style="color:#C8BEA8">"Since you'd be one of my first clients in this industry, I can do the setup for €200 instead of €600 — in exchange for a written review of the results after 30 days."</em>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">"Let me think about it"</div></div>
+        <div class="step-text">This usually means they are interested but have a specific concern they haven't voiced. Ask:</div>
+        <div class="step-detail">
+          <em style="color:#C8BEA8">"Of course, take your time. Can I ask — is there a specific concern you want to think through? I want to make sure I've answered all your questions before we end the call."</em><br/><br/>
+          This question often surfaces the real objection — price, trust, technical fear — which you can then address directly.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">"I'm not technical, I don't understand how this works"</div></div>
+        <div class="step-text">Reassure them that they don't need to understand the technology:</div>
+        <div class="step-detail">
+          <em style="color:#C8BEA8">"You don't need to understand any of the technical side — that's my job. You just tell me what you want the system to say and I set everything up. From your side, it's completely invisible. Messages come in, professional replies go out, and you never have to touch it."</em>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">"Can I see it working first before I pay?"</div></div>
+        <div class="step-text">This is a great sign — they are interested but want proof. Offer a mini demo:</div>
+        <div class="step-detail">
+          <em style="color:#C8BEA8">"Absolutely. Give me your WhatsApp number and I'll send you a test message right now so you can see exactly what your customers would receive."</em><br/><br/>
+          Then send them a message from your test automation and let them see the AI reply arrive in seconds. This closes more deals than any amount of talking.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Your Pricing Structure</div>
+    <div class="block-text">Use this pricing as your starting point. You can adjust based on the complexity of what they need and how much they told you they can spend:</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">$</div><div class="step-title">Simple automation — WhatsApp or Instagram bot only</div></div>
+        <div class="step-text">Setup fee: <strong style="color:#C8A96E">$300–$600</strong> one time. Monthly retainer: <strong style="color:#C8A96E">$100–$200/month</strong>. Build time: 2–4 hours.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">$$</div><div class="step-title">Full lead management system — form + email + CRM</div></div>
+        <div class="step-text">Setup fee: <strong style="color:#C8A96E">$600–$1,200</strong> one time. Monthly retainer: <strong style="color:#C8A96E">$200–$350/month</strong>. Build time: 4–8 hours.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">$$$</div><div class="step-title">Complete system — WhatsApp + Instagram + email + CRM + reports</div></div>
+        <div class="step-text">Setup fee: <strong style="color:#C8A96E">$1,200–$2,000</strong> one time. Monthly retainer: <strong style="color:#C8A96E">$300–$500/month</strong>. Build time: 8–16 hours.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">✦ Your First Client Strategy</div>
+    <div class="info-text">For your very first client, consider offering the setup for free or at a very low cost ($50–$100) in exchange for a monthly retainer and a written testimonial after 30 days. One real case study — "Restaurant X got 3 extra bookings in the first week after implementing the system" — is worth more than any amount of cold outreach. It becomes your most powerful sales tool for every client after.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 3</div>
+    <div class="takeaway">Spend the first 5 minutes of the call asking questions — not talking about yourself. Their answers tell you exactly how to close.</div>
+    <div class="takeaway">A live demo — even 60 seconds — closes more deals than 10 minutes of talking. Build the Module 2 automation before your first call.</div>
+    <div class="takeaway">When they say "it's too expensive" — reframe with value. Calculate how many clients the system would need to recover to pay for itself.</div>
+    <div class="takeaway">Your first client can be at a reduced price in exchange for a testimonial. That testimonial becomes your most powerful sales asset.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Book Your First Discovery Call</div>
+    <div class="exercise-text">Send your outreach messages from Lesson 2. When someone replies and shows interest, respond immediately and suggest two specific times for a 15-minute call. Example: "Great! Would Tuesday at 10am or Wednesday at 3pm work for a quick 15-minute call? I can show you exactly how it would work for [their business name]." Book the call. Practice the script from this lesson out loud before you get on the call. You know more than you think you do.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="window.location.href='/course-starter.html'">← Back to All Modules</button>
+  </div>
