@@ -737,7 +737,7 @@ async function generateAutomation(){
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({
-        prompt: `You are an expert AI automation agency consultant. Generate a complete automation package for a client.
+        prompt: `You are an expert AI automation agency consultant with deep knowledge of Make.com, OpenAI GPT-4o, WhatsApp Business API, Instagram Graph API, and cold email systems. Generate a complete, accurate automation package.
 
 Client Info:
 - Industry: ${industry}
@@ -746,15 +746,30 @@ Client Info:
 - Pain point: ${pain || 'Not specified'}
 - Budget range: ${budget}
 
-Generate a complete package in this EXACT JSON format (respond ONLY with JSON, no other text):
+IMPORTANT RULES:
+- Build time is always in HOURS (e.g. "3–5"), NEVER in weeks or days
+- Monthly retainer must be $150–$400/month minimum, NEVER below $100
+- Make.com modules must be EXACTLY correct for the automation type selected
+- GPT System Message must be complete, professional and ready to paste directly into Make.com
+- Outreach message must sound like a real human, casual and specific — NOT robotic or generic
+- All prices must reflect premium agency positioning
+
+For ${need}:
+${need.includes('WhatsApp') ? `- Correct modules: Webhooks (Custom Webhook) → OpenAI (Create Chat Completion) → HTTP (Make a Request to 360dialog API)` : ''}
+${need.includes('Instagram') ? `- Correct modules: Webhooks (Custom Webhook) → OpenAI (Create Chat Completion) → HTTP (Make a Request to Instagram Graph API)` : ''}
+${need.includes('Lead Follow') ? `- Correct modules: Google Sheets (Watch New Rows) → OpenAI (Create Chat Completion) → Gmail (Send an Email)` : ''}
+${need.includes('Cold Email') ? `- Correct modules: Google Sheets (Watch New Rows) → OpenAI (Create Chat Completion) → HTTP (Instantly.ai API)` : ''}
+${need.includes('CRM') ? `- Correct modules: Multiple triggers → OpenAI (Create Chat Completion) → Google Sheets (Add a Row) → Gmail (Send an Email)` : ''}
+
+Respond ONLY with this exact JSON format, no other text:
 {
-  "what": "Detailed description of exactly what you will build (2-3 sentences)",
-  "modules": "Exact Make.com modules needed, listed step by step",
-  "prompt": "Complete GPT System Message ready to paste into Make.com, customized for this industry",
-  "setupPrice": "$XXX–$XXX",
-  "monthlyPrice": "$XXX/month",
-  "buildTime": "X–X",
-  "outreach": "Complete personalized outreach message (WhatsApp/email) ready to send to this type of client"
+  "what": "2-3 sentences describing exactly what gets built and how it works for this specific industry",
+  "modules": "Step-by-step Make.com modules: Module 1 → Module 2 → Module 3 (with exact module names from Make.com)",
+  "prompt": "SYSTEM: You are the AI assistant of [Business Name], a [industry type]. [Complete professional system message with specific instructions for this industry, 4-6 sentences, ready to paste into Make.com]",
+  "setupPrice": "$400–$800",
+  "monthlyPrice": "$150–$300/month",
+  "buildTime": "4–6",
+  "outreach": "Hi [Name], I was looking at [business type] in [city] and noticed [specific observation]. I build AI systems that [specific benefit for their industry]. Would a 15-minute call make sense to show you exactly how it works for [business type]?"
 }`
       })
     });
@@ -812,46 +827,35 @@ async function sendChat(){
   document.getElementById('chatMessages').appendChild(el);
   scrollChat();
   try {
-    const systemPrompt = `You are AutoFlow AI — an expert assistant for AI automation agency owners. You have deep expertise in:
-- Make.com (all modules, scenarios, webhooks, routing, error handling)
-- WhatsApp Business API (360dialog, Twilio, Meta Business API)
-- Instagram Graph API (access tokens, webhooks, DM automation)
-- OpenAI GPT-4o (prompt engineering, system messages, API usage)
-- Cold email automation (Apollo.io, Instantly.ai)
-- Google Sheets CRM automation
-- Agency pricing, sales scripts, objection handling
-- Client outreach and acquisition strategies
+    const systemPrompt = `You are AutoFlow AI — an expert assistant for AI automation agency owners. You have deep expertise in Make.com, WhatsApp Business API, Instagram Graph API, OpenAI GPT-4o, cold email automation, Google Sheets CRM, agency pricing, sales scripts, and client outreach.
 
 CRITICAL RULES:
-1. Default language is ENGLISH. Always respond in English UNLESS the user specifically writes in another language — then match their language.
-2. Give COMPLETE, ACTIONABLE answers with exact steps, real code, real URLs, real prices
-3. Never say "I don't know" — always provide the best possible answer
-4. For Make.com questions: give exact module names and settings
-5. For pricing questions: give specific ranges with justification
-6. Format responses clearly with steps when appropriate`;
+1. Default language is ENGLISH. Always respond in English UNLESS the user writes in another language — then match their language.
+2. Give COMPLETE, ACTIONABLE answers with exact steps, real prices, real URLs.
+3. Never say you do not know — always provide the best possible answer.
+4. Format responses clearly with numbered steps when appropriate.`;
 
-    const messages = [{role:'system', content: systemPrompt}, ...chatHistory.slice(-10)];
-    const r = await fetch(API+'/api/ai/chat', {
+    const fullPrompt = systemPrompt + '\n\nConversation history:\n' + 
+      chatHistory.slice(-6).map(m => m.role.toUpperCase() + ': ' + m.content).join('\n') +
+      '\n\nRespond to the latest user message in the same language they used.';
+
+    const r = await fetch(API+'/api/ai/generate', {
       method:'POST',
       headers: authHeaders(),
-      body: JSON.stringify({messages})
+      body: JSON.stringify({ prompt: fullPrompt })
     });
-    let reply;
-    if(r.ok){
-      const d = await r.json();
-      reply = d.output || d.content || d.message || 'Sorry, I could not process that.';
-    } else {
-      // Fallback: use generate endpoint
-      const r2 = await fetch(API+'/api/ai/generate', {
-        method:'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({
-          prompt: systemPrompt + '\n\nUser message: ' + msg + '\n\nRespond in the same language as the user message.'
-        })
-      });
-      const d2 = await r2.json();
-      reply = d2.output || 'Connection error. Please try again.';
+    
+    if(!r.ok){
+      const errText = await r.text();
+      console.error('AI error:', r.status, errText);
+      document.getElementById(thinkingId).remove();
+      addChatMsg('Error ' + r.status + ': ' + errText, 'ai');
+      document.getElementById('chatSendBtn').disabled = false;
+      return;
     }
+    
+    const d = await r.json();
+    let reply = d.output || d.content || d.message || 'Sorry, I could not process that.';
     document.getElementById(thinkingId).remove();
     addChatMsg(reply, 'ai');
     chatHistory.push({role:'assistant', content: reply});
@@ -1122,4 +1126,3 @@ function notify(msg, type=''){
 }
 </script>
 </body>
-</html>
