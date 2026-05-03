@@ -2,162 +2,440 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>AI Cash Systems — Starter Course</title>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
-:root{--gold:#C9A84C;--gold-light:#E8C96A;--gold-dark:#8A6A1F;--gold-muted:rgba(201,168,76,0.15);--bg:#0A0A0A;--bg2:#111111;--bg3:#181818;--text:#F0EAD6;--text-muted:#7A7060;--border:rgba(201,168,76,0.2);}
-*{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
-nav{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid var(--border);background:rgba(10,10,10,0.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
-.logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;letter-spacing:2px;color:var(--gold);text-transform:uppercase;}
-.logo span{color:var(--text);font-weight:300;}
-.badge-dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);animation:pulse 2s infinite;display:inline-block;margin-right:6px;}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.hero{padding:48px 32px 32px;max-width:900px;margin:0 auto;}
-.hero-tag{display:inline-flex;align-items:center;gap:8px;background:var(--gold-muted);border:1px solid var(--border);border-radius:100px;padding:6px 16px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:20px;}
-.hero h1{font-family:'Cormorant Garamond',serif;font-size:clamp(36px,6vw,58px);font-weight:500;line-height:1.1;margin-bottom:16px;}
-.hero h1 em{font-style:italic;color:var(--gold);}
-.hero p{font-size:15px;color:var(--text-muted);max-width:520px;line-height:1.7;}
-.progress-bar-wrap{max-width:900px;margin:24px auto 0;padding:0 32px;}
-.progress-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;}
-.progress-track{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;}
-.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--gold-dark),var(--gold-light));border-radius:2px;transition:width 1.2s cubic-bezier(0.4,0,0.2,1);}
-.container{max-width:900px;margin:40px auto;padding:0 32px 80px;display:grid;gap:16px;}
-.module{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
-.module-header{display:flex;align-items:center;gap:16px;padding:20px 24px;cursor:pointer;user-select:none;transition:background 0.2s;}
-.module-header:hover{background:var(--bg3);}
-.module-num{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:300;color:var(--gold-dark);min-width:36px;line-height:1;}
-.module-info{flex:1;}
-.module-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--text);margin-bottom:4px;}
-.module-meta{font-size:12px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;}
-.module-toggle{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:18px;transition:transform 0.3s;flex-shrink:0;}
-.module.open .module-toggle{transform:rotate(45deg);background:var(--gold-muted);}
-.lessons{display:none;border-top:1px solid var(--border);}
-.module.open .lessons{display:block;}
-.lesson{display:flex;align-items:center;gap:16px;padding:16px 24px;cursor:pointer;border-bottom:1px solid rgba(201,168,76,0.08);transition:background 0.2s;}
-.lesson:last-child{border-bottom:none;}
-.lesson:hover{background:var(--bg3);}
-.lesson.active{background:var(--gold-muted);}
-.lesson.completed .lesson-icon{background:var(--gold-dark);color:var(--gold-light);}
-.lesson-icon{width:36px;height:36px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:all 0.2s;}
-.lesson-icon.completed{background:var(--gold-dark);color:var(--gold-light);}
-.lesson-body{flex:1;}
-.lesson-title{font-size:14px;font-weight:500;color:var(--text);margin-bottom:3px;}
-.lesson-desc{font-size:12px;color:var(--text-muted);}
-.lesson-tag{display:inline-block;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:var(--gold-muted);color:var(--gold);margin-top:4px;}
-.content-panel{display:none;max-width:900px;margin:0 auto 32px;padding:0 32px;}
-.content-panel.visible{display:block;}
-.panel-inner{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:32px;}
-.panel-breadcrumb{font-size:12px;color:var(--text-muted);margin-bottom:16px;letter-spacing:1px;}
-.panel-breadcrumb span{color:var(--gold);}
-.panel-title{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:600;margin-bottom:20px;color:var(--text);}
-.panel-content{font-size:14px;color:var(--text-muted);line-height:1.8;}
-.panel-content h3{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--text);margin:24px 0 12px;}
-.panel-content p{margin-bottom:14px;}
-.panel-content ul{padding-left:20px;margin-bottom:14px;}
-.panel-content ul li{margin-bottom:8px;}
-.panel-content strong{color:var(--text);}
-.panel-content .sb{background:var(--bg3);border-radius:10px;padding:20px;margin:16px 0;}
-.panel-content .sr{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px;}
-.panel-content .sr:last-child{margin-bottom:0;}
-.panel-content .sn{width:24px;height:24px;border-radius:6px;background:var(--gold-dark);color:var(--gold-light);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.panel-content .st{font-size:13px;color:var(--text);line-height:1.6;}
-.panel-content .pb{background:var(--bg);border-left:2px solid var(--gold);padding:16px 20px;margin:16px 0;border-radius:0 8px 8px 0;font-style:italic;font-size:13px;color:var(--text-muted);}
-.panel-content .ib{background:var(--gold-muted);border:1px solid var(--border);border-radius:10px;padding:20px;margin:16px 0;}
-.panel-content .ac{text-align:center;}
-.panel-content .tp{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);font-weight:600;min-width:80px;}
-.panel-actions{display:flex;gap:12px;margin-top:28px;padding-top:20px;border-top:1px solid var(--border);}
-.btn-gold{padding:12px 28px;background:linear-gradient(135deg,var(--gold-dark),var(--gold-light));border:none;border-radius:8px;color:#0A0A0A;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
-.btn-outline{padding:12px 28px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.4}
+nav{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid rgba(200,169,110,.08);background:rgba(8,8,8,.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E}
+.nav-badge{display:flex;align-items:center;gap:8px;font-size:13px;color:#C8BEA8}
+.badge-dot{width:8px;height:8px;border-radius:50%;background:#4ADE80;box-shadow:0 0 8px #4ADE80;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.hero{padding:48px 32px 32px;max-width:900px;margin:0 auto;animation:fadeUp .7s ease both}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.18);border-radius:100px;padding:6px 16px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.hero h1{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:14px}
+.hero h1 em{font-style:italic;color:#C8A96E}
+.hero p{font-size:15px;color:#C8BEA8;max-width:520px;line-height:1.7}
+.progress-bar-wrap{max-width:900px;margin:24px auto 0;padding:0 32px}
+.progress-meta{display:flex;justify-content:space-between;font-size:12px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.container{max-width:900px;margin:40px auto;padding:0 32px 80px;display:grid;gap:16px}
+.module{background:#111111;border:1px solid rgba(200,169,110,.08);border-radius:12px;overflow:hidden}
+.module-header{display:flex;align-items:center;gap:16px;padding:20px 24px;cursor:pointer;user-select:none;transition:background .2s}
+.module-header:hover{background:#161616}
+.module-num{font-family:"Playfair Display",serif;font-size:32px;font-weight:300;color:rgba(200,169,110,.4);min-width:36px;line-height:1}
+.module-info{flex:1}
+.module-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:600;color:#F5F0E8;margin-bottom:4px}
+.module-meta{font-size:12px;color:#C8BEA8;letter-spacing:1px;text-transform:uppercase}
+.module-toggle{width:32px;height:32px;border-radius:50%;border:1px solid rgba(200,169,110,.2);display:flex;align-items:center;justify-content:center;color:#C8A96E;font-size:18px;transition:transform .3s;flex-shrink:0}
+.module.open .module-toggle{transform:rotate(45deg);background:rgba(200,169,110,.1)}
+.lessons{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1)}
+.module.open .lessons{max-height:600px;border-top:1px solid rgba(200,169,110,.08)}
+.lesson{display:flex;align-items:flex-start;gap:16px;padding:18px 24px;border-bottom:1px solid rgba(200,169,110,.05);cursor:pointer;transition:background .2s;text-decoration:none;color:inherit;display:flex}
+.lesson:last-child{border-bottom:none}
+.lesson:hover{background:rgba(200,169,110,.04)}
+.lesson-icon{width:36px;height:36px;border-radius:8px;background:#161616;border:1px solid rgba(200,169,110,.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+.lesson.done .lesson-icon{background:rgba(200,169,110,.12);border-color:rgba(200,169,110,.3)}
+.lesson-body{flex:1}
+.lesson-title{font-size:15px;font-weight:500;color:#F5F0E8;margin-bottom:5px}
+.lesson-desc{font-size:13px;color:#C8BEA8;line-height:1.6}
+.lesson-tag{display:inline-block;margin-top:8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:100px;background:#161616;border:1px solid rgba(200,169,110,.12);color:#C8BEA8}
+.lesson-arrow{color:rgba(200,169,110,.4);font-size:18px;margin-top:6px;flex-shrink:0;transition:all .2s}
+.lesson:hover .lesson-arrow{transform:translateX(4px);color:#C8A96E}
+.module-completed .module-num{color:#4ADE80;opacity:.8}
+@media(max-width:600px){nav{padding:16px 20px}.hero,.progress-bar-wrap,.container{padding-left:20px;padding-right:20px}}
 </style>
 </head>
 <body>
+
 <nav>
-  <div class="logo">AI Cash <span>Systems</span></div>
-  <div style="display:flex;align-items:center;font-size:13px;color:var(--text-muted);">
-    <div class="badge-dot"></div>Starter Course
-  </div>
+  <div class="logo">AI Cash Systems</div>
+  <div class="nav-badge"><div class="badge-dot"></div>Starter Program</div>
 </nav>
+
 <div class="hero">
-  <div class="hero-tag">✦ Starter Program</div>
+  <div class="hero-tag">✦ Starter Program — $37</div>
   <h1>Master <em>AI Automation</em><br>&amp; Get Paid For It</h1>
-  <p>8 modules, 24 lessons. Build real automations, find real clients, earn real income — step by step.</p>
+  <p>8 modules, 24 lessons — everything you need to build, sell and deliver AI automation systems to real businesses.</p>
 </div>
+
 <div class="progress-bar-wrap">
-  <div class="progress-meta"><span>Your Progress</span><span id="prog-label">0 / 24 lessons</span></div>
-  <div class="progress-track"><div class="progress-fill" id="prog-fill"></div></div>
+  <div class="progress-meta">
+    <span>Your Progress</span>
+    <span id="prog-label">0 / 24 lessons</span>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
 </div>
-<div class="content-panel" id="contentPanel">
-  <div class="panel-inner">
-    <div class="panel-breadcrumb" id="panelBreadcrumb">Module 1 · <span>Lesson 1</span></div>
-    <div class="panel-title" id="panelTitle"></div>
-    <div class="panel-content" id="panelContent"></div>
-    <div class="panel-actions">
-      <button class="btn-gold" onclick="completeLesson()">✓ Mark as Complete</button>
-      <button class="btn-outline" onclick="closePanel()">← Back to Modules</button>
+
+<div class="container" id="modulesContainer">
+
+  <!-- MODULE 1 -->
+  <div class="module" id="mod-1">
+    <div class="module-header" onclick="toggleModule('mod-1')">
+      <div class="module-num">01</div>
+      <div class="module-info">
+        <div class="module-title">The AI Automation Opportunity</div>
+        <div class="module-meta">3 Lessons · Foundation · ~45 min</div>
+      </div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module1.html#lesson1" class="lesson" id="l-1-1" onclick="markDone('1-1')">
+        <div class="lesson-icon">📈</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Why AI Automation is the #1 Skill Right Now</div>
+          <div class="lesson-desc">The market gap nobody talks about — and how to position yourself to fill it.</div>
+          <div class="lesson-tag">Foundation</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module1.html#lesson2" class="lesson" id="l-1-2" onclick="markDone('1-2')">
+        <div class="lesson-icon">📐</div>
+        <div class="lesson-body">
+          <div class="lesson-title">How the Business Works — The Simple Model</div>
+          <div class="lesson-desc">The exact 3-step model: find, build, sell. No technical background needed.</div>
+          <div class="lesson-tag">Business Model</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module1.html#lesson3" class="lesson" id="l-1-3" onclick="markDone('1-3')">
+        <div class="lesson-icon">🎯</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Picking Your Niche &amp; First Target Industry</div>
+          <div class="lesson-desc">Why going deep beats going wide — the 4 best industries to start with.</div>
+          <div class="lesson-tag">Strategy</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
     </div>
   </div>
+
+  <!-- MODULE 2 -->
+  <div class="module" id="mod-2">
+    <div class="module-header" onclick="toggleModule('mod-2')">
+      <div class="module-num">02</div>
+      <div class="module-info">
+        <div class="module-title">Building Your First Automation</div>
+        <div class="module-meta">3 Lessons · Hands-On Build · ~90 min</div>
+      </div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module2.html#lesson1" class="lesson" id="l-2-1" onclick="markDone('2-1')">
+        <div class="lesson-icon">⚙️</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Make.com Setup — Your Automation Hub</div>
+          <div class="lesson-desc">Create your account and build your first scenario — click by click.</div>
+          <div class="lesson-tag">Tool Setup</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module2.html#lesson2" class="lesson" id="l-2-2" onclick="markDone('2-2')">
+        <div class="lesson-icon">🔄</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Build a Lead Follow-Up System — Complete Flow</div>
+          <div class="lesson-desc">Google Form → OpenAI → Gmail. Working in under 45 minutes.</div>
+          <div class="lesson-tag">Build</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module2.html#lesson3" class="lesson" id="l-2-3" onclick="markDone('2-3')">
+        <div class="lesson-icon">🚀</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Test Your Automation &amp; Make It Live</div>
+          <div class="lesson-desc">Run once, fix errors, activate scheduling — live 24/7.</div>
+          <div class="lesson-tag">Launch</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- MODULE 3 -->
+  <div class="module" id="mod-3">
+    <div class="module-header" onclick="toggleModule('mod-3')">
+      <div class="module-num">03</div>
+      <div class="module-info">
+        <div class="module-title">Getting Your First Client</div>
+        <div class="module-meta">3 Lessons · Client Acquisition · ~60 min</div>
+      </div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module3.html#lesson1" class="lesson" id="l-3-1" onclick="markDone('3-1')">
+        <div class="lesson-icon">🔍</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Finding Businesses That Need You Right Now</div>
+          <div class="lesson-desc">Google Maps, Instagram, LinkedIn — 10 prospects in 10 minutes.</div>
+          <div class="lesson-tag">Prospecting</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module3.html#lesson2" class="lesson" id="l-3-2" onclick="markDone('3-2')">
+        <div class="lesson-icon">✉️</div>
+        <div class="lesson-body">
+          <div class="lesson-title">The Outreach Message That Gets Replies</div>
+          <div class="lesson-desc">Copy-paste templates for WhatsApp, Instagram DM and Email.</div>
+          <div class="lesson-tag">Outreach</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module3.html#lesson3" class="lesson" id="l-3-3" onclick="markDone('3-3')">
+        <div class="lesson-icon">💰</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Closing the Deal &amp; Setting Your Price</div>
+          <div class="lesson-desc">The 15-minute call script — and how to handle every objection.</div>
+          <div class="lesson-tag">Sales</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- MODULE 4 -->
+  <div class="module" id="mod-4">
+    <div class="module-header" onclick="toggleModule('mod-4')">
+      <div class="module-num">04</div>
+      <div class="module-info">
+        <div class="module-title">Scaling to $3K/Month</div>
+        <div class="module-meta">3 Lessons · Growth · ~60 min</div>
+      </div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module4.html#lesson1" class="lesson" id="l-4-1" onclick="markDone('4-1')">
+        <div class="lesson-icon">📈</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Building a Recurring Revenue Stack</div>
+          <div class="lesson-desc">The retainer math and how to get to $3K/month systematically.</div>
+          <div class="lesson-tag">Scaling</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module4.html#lesson2" class="lesson" id="l-4-2" onclick="markDone('4-2')">
+        <div class="lesson-icon">🏗️</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Systemizing Your Agency — Work Less, Earn More</div>
+          <div class="lesson-desc">Automate your own agency so you can manage 10+ clients easily.</div>
+          <div class="lesson-tag">Operations</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module4.html#lesson3" class="lesson" id="l-4-3" onclick="markDone('4-3')">
+        <div class="lesson-icon">📋</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Your 30-Day Action Plan</div>
+          <div class="lesson-desc">Exact week-by-week plan from zero to your first paying client.</div>
+          <div class="lesson-tag">Action Plan</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- MODULE 5 -->
+  <div class="module" id="mod-5">
+    <div class="module-header" onclick="toggleModule('mod-5')">
+      <div class="module-num">05</div>
+      <div class="module-info">
+        <div class="module-title">WhatsApp Bot — Automated Replies 24/7</div>
+        <div class="module-meta">3 Lessons · WhatsApp Automation · ~90 min</div>
+      </div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module5.html#lesson1" class="lesson" id="l-5-1" onclick="markDone('5-1')">
+        <div class="lesson-icon">📱</div>
+        <div class="lesson-body">
+          <div class="lesson-title">WhatsApp Business API — Setup with 360dialog</div>
+          <div class="lesson-desc">Create your account, verify the number, get your API key.</div>
+          <div class="lesson-tag">Setup</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module5.html#lesson2" class="lesson" id="l-5-2" onclick="markDone('5-2')">
+        <div class="lesson-icon">🤖</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Build the Bot — Make.com + GPT-4o + WhatsApp</div>
+          <div class="lesson-desc">Webhook → OpenAI → HTTP send. Complete in under 2 hours.</div>
+          <div class="lesson-tag">Build</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module5.html#lesson3" class="lesson" id="l-5-3" onclick="markDone('5-3')">
+        <div class="lesson-icon">💰</div>
+        <div class="lesson-body">
+          <div class="lesson-title">How to Sell the WhatsApp Bot for $500–$2,000</div>
+          <div class="lesson-desc">The live demo script that closes deals in real time.</div>
+          <div class="lesson-tag">Sales</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- MODULE 6 -->
+  <div class="module" id="mod-6">
+    <div class="module-header" onclick="toggleModule('mod-6')">
+      <div class="module-num">06</div>
+      <div class="module-info">
+        <div class="module-title">Instagram Auto-Reply — AI DM Bot</div>
+        <div class="module-meta">3 Lessons · Instagram Automation · ~90 min</div>
+      </div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module6.html#lesson1" class="lesson" id="l-6-1" onclick="markDone('6-1')">
+        <div class="lesson-icon">📸</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Instagram Graph API — Complete Setup</div>
+          <div class="lesson-desc">Facebook App, access token, long-lived token — every step.</div>
+          <div class="lesson-tag">Setup</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module6.html#lesson2" class="lesson" id="l-6-2" onclick="markDone('6-2')">
+        <div class="lesson-icon">💬</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Build the DM Bot — Make.com + Instagram + GPT-4o</div>
+          <div class="lesson-desc">Webhook → OpenAI → Instagram reply. Bot live in under 2 hours.</div>
+          <div class="lesson-tag">Build</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module6.html#lesson3" class="lesson" id="l-6-3" onclick="markDone('6-3')">
+        <div class="lesson-icon">⭐</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Advanced Strategies + Sell for $600–$1,200</div>
+          <div class="lesson-desc">Comment auto-reply, keyword filters, complete Instagram package.</div>
+          <div class="lesson-tag">Advanced + Sales</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- MODULE 7 -->
+  <div class="module" id="mod-7">
+    <div class="module-header" onclick="toggleModule('mod-7')">
+      <div class="module-num">07</div>
+      <div class="module-info">
+        <div class="module-title">Cold Email Automation — 50 Emails/Day</div>
+        <div class="module-meta">3 Lessons · Cold Outreach · ~75 min</div>
+      </div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module7.html#lesson1" class="lesson" id="l-7-1" onclick="markDone('7-1')">
+        <div class="lesson-icon">🔍</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Apollo.io — 100 Verified Prospects in 10 Minutes</div>
+          <div class="lesson-desc">Free account, filters, export 100 verified emails to CSV.</div>
+          <div class="lesson-tag">Prospecting</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module7.html#lesson2" class="lesson" id="l-7-2" onclick="markDone('7-2')">
+        <div class="lesson-icon">📧</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Instantly.ai — Send 50 Personalized Emails/Day</div>
+          <div class="lesson-desc">Account setup, email warmup, campaign creation and templates.</div>
+          <div class="lesson-tag">Email Sending</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module7.html#lesson3" class="lesson" id="l-7-3" onclick="markDone('7-3')">
+        <div class="lesson-icon">⚡</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Connect Apollo + Instantly + Make.com Into One Flow</div>
+          <div class="lesson-desc">Full automated pipeline — GPT personalizes every email.</div>
+          <div class="lesson-tag">Full System</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- MODULE 8 -->
+  <div class="module" id="mod-8">
+    <div class="module-header" onclick="toggleModule('mod-8')">
+      <div class="module-num">08</div>
+      <div class="module-info">
+        <div class="module-title">Google Sheets CRM — Client Management</div>
+        <div class="module-meta">3 Lessons · CRM Automation · ~60 min</div>
+      </div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module8.html#lesson1" class="lesson" id="l-8-1" onclick="markDone('8-1')">
+        <div class="lesson-icon">📊</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Build a Mini-CRM in Google Sheets</div>
+          <div class="lesson-desc">10-column structure, dropdowns, color coding — 20 minutes.</div>
+          <div class="lesson-tag">Build</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module8.html#lesson2" class="lesson" id="l-8-2" onclick="markDone('8-2')">
+        <div class="lesson-icon">🔗</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Connect All Sources — Form + WhatsApp + Instagram</div>
+          <div class="lesson-desc">Every lead from every channel flows into one CRM automatically.</div>
+          <div class="lesson-tag">Integration</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module8.html#lesson3" class="lesson" id="l-8-3" onclick="markDone('8-3')">
+        <div class="lesson-icon">📈</div>
+        <div class="lesson-body">
+          <div class="lesson-title">Automated Weekly Report — AI Writes the Summary</div>
+          <div class="lesson-desc">Every Monday at 9am the client gets a GPT-written report.</div>
+          <div class="lesson-tag">Retention</div>
+        </div>
+        <div class="lesson-arrow">→</div>
+      </a>
+    </div>
+  </div>
+
 </div>
-<div class="container" id="modulesContainer">
-<div class="module open">
-<div class="module-header" onclick="toggleModule(this)">
-<div class="module-num">01</div>
-<div class="module-info"><div class="module-title">The AI Automation Opportunity</div><div class="module-meta">3 Lessons · Foundation</div></div>
-<div class="module-toggle">+</div>
-</div>
-<div class="lessons">
-<div class="lesson" onclick="openLesson(this)" data-module="Module 1" data-title="Why AI Automation is the #1 Skill Right Now" data-content="&lt;p&gt;Most people chasing money online get stuck in crowded markets. AI automation is different. Businesses are &lt;strong style='color:var(--gold)'&gt;desperately looking&lt;/strong&gt; for someone to build systems that save them time and money.&lt;/p&gt;&lt;h3&gt;What You Will Learn&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;Why AI automation has almost zero competition&lt;/li&gt;&lt;li&gt;The gap between what businesses need and what they can find&lt;/li&gt;&lt;li&gt;Why you do not need to be a developer&lt;/li&gt;&lt;li&gt;How one automation earns $500–$5,000 per client&lt;/li&gt;&lt;/ul&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;💡 Think about this&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Every business owner you know is overwhelmed with repetitive tasks. You can automate all of them and charge for it.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">💡</div><div class="lesson-body"><div class="lesson-title">Why AI Automation is the #1 Skill Right Now</div><div class="lesson-desc">The market gap nobody talks about — and how to position yourself.</div><div class="lesson-tag">Foundation</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 1" data-title="How the Business Works (Simple Model)" data-content="&lt;p&gt;You do not build products. You build &lt;strong style='color:var(--gold)'&gt;systems that make businesses run themselves.&lt;/strong&gt;&lt;/p&gt;&lt;h3&gt;The 3-Step Model&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Find&lt;/strong&gt; — Identify a business with a repetitive process&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Build&lt;/strong&gt; — Create an automation using Make.com&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Sell&lt;/strong&gt; — Charge a setup fee + monthly retainer&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Income Potential&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;1 client at $300/month = $3,600/year&lt;/li&gt;&lt;li&gt;5 clients = $18,000/year from systems you built once&lt;/li&gt;&lt;li&gt;Most automations take 2–6 hours to build&lt;/li&gt;&lt;/ul&gt;"><div class="lesson-icon">📐</div><div class="lesson-body"><div class="lesson-title">How the Business Works (Simple Model)</div><div class="lesson-desc">The exact 3-step model: find, build, sell.</div><div class="lesson-tag">Business Model</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 1" data-title="Picking Your Niche & First Target Industry" data-content="&lt;p&gt;The fastest path to your first client is going &lt;strong style='color:var(--gold)'&gt;deep on one industry.&lt;/strong&gt;&lt;/p&gt;&lt;h3&gt;Best Industries to Start&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;strong&gt;Real estate agencies&lt;/strong&gt; — lead follow-up, scheduling, document generation&lt;/li&gt;&lt;li&gt;&lt;strong&gt;E-commerce stores&lt;/strong&gt; — order confirmations, inventory alerts, review requests&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Coaches and consultants&lt;/strong&gt; — onboarding, session reminders, follow-up sequences&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Local service businesses&lt;/strong&gt; — booking systems, customer responses, invoicing&lt;/li&gt;&lt;/ul&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;✦ Pro tip&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Pick the industry where you have any existing connection. Even knowing someone in that field gives you a massive edge.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🎯</div><div class="lesson-body"><div class="lesson-title">Picking Your Niche & First Target Industry</div><div class="lesson-desc">Why going deep beats going wide — the 4 best industries.</div><div class="lesson-tag">Strategy</div></div></div>
-</div>
-</div>
-<div class="module">
-<div class="module-header" onclick="toggleModule(this)">
-<div class="module-num">02</div>
-<div class="module-info"><div class="module-title">Building Your First Automation</div><div class="module-meta">3 Lessons · Core Skill</div></div>
-<div class="module-toggle">+</div>
-</div>
-<div class="lessons">
-<div class="lesson" onclick="openLesson(this)" data-module="Module 2" data-title="Make.com Setup — Your Automation Hub" data-content="&lt;p&gt;Make.com is the visual platform you will use for all your automations. No coding needed — everything is drag and drop.&lt;/p&gt;&lt;h3&gt;Step 1 — Create Your Free Account&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Go to &lt;strong&gt;make.com&lt;/strong&gt; and click &lt;strong&gt;Get started free&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Choose the &lt;strong&gt;Free&lt;/strong&gt; plan — 1,000 operations/month, enough for your first clients&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Complete registration with your email and password&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Step 2 — Understand the Dashboard&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Scenarios&lt;/div&gt;&lt;div class='st'&gt;Your automations. Each scenario = one complete flow that runs automatically.&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Connections&lt;/div&gt;&lt;div class='st'&gt;Connected apps: Gmail, Google Sheets, OpenAI etc.&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Templates&lt;/div&gt;&lt;div class='st'&gt;Hundreds of ready-made automations you can copy and adapt.&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Step 3 — Create Your First Scenario&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Click &lt;strong&gt;+ Create a new scenario&lt;/strong&gt; in the top right corner&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;You will see a large circle with &lt;strong style='color:var(--gold)'&gt;?&lt;/strong&gt; — this is your Trigger&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Click the circle → search &lt;strong&gt;Google Sheets&lt;/strong&gt; → select &lt;strong&gt;Watch New Rows&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;✅ You are ready&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Trigger is set. Next lesson we add the actions — the AI email and Sheet logging. Everything takes under 45 minutes.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">⚙️</div><div class="lesson-body"><div class="lesson-title">Make.com Setup — Your Automation Hub</div><div class="lesson-desc">Set up your free account and build your first scenario in 10 minutes.</div><div class="lesson-tag">Tool Setup</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 2" data-title="Build a Lead Follow-Up System (Step by Step)" data-content="&lt;p&gt;When someone fills out a form, they receive a personalized AI-generated email in under 60 seconds — automatically, 24/7.&lt;/p&gt;&lt;div class='ib' style='display:flex;align-items:center;gap:14px'&gt;&lt;div style='font-size:22px'&gt;🗺&lt;/div&gt;&lt;div style='font-size:13px'&gt;&lt;strong style='color:var(--gold)'&gt;Complete flow:&lt;/strong&gt;&lt;br&gt;Google Form → Make.com → OpenAI GPT → Gmail → Google Sheet&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Step 1 — Set Up Your Google Form&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Go to &lt;strong&gt;forms.google.com&lt;/strong&gt; and create a new form&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Add fields: &lt;strong&gt;Name&lt;/strong&gt;, &lt;strong&gt;Email&lt;/strong&gt;, &lt;strong&gt;What is your problem?&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Click ⋮ → &lt;strong&gt;Link to Sheets&lt;/strong&gt; — Google Sheet created automatically&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Step 2 — Trigger in Make.com&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Create new Scenario → choose &lt;strong&gt;Google Sheets → Watch New Rows&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Connect your Google account → select the Sheet from the Form&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Set &lt;strong&gt;Limit = 1&lt;/strong&gt; → OK&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Step 3 — Add OpenAI&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Click &lt;strong&gt;+&lt;/strong&gt; after trigger → &lt;strong&gt;OpenAI → Create a Chat Completion&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Connect your OpenAI API key (details in next lesson)&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;In &lt;strong&gt;Message content&lt;/strong&gt; paste the prompt:&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='pb'&gt;"Write a friendly follow-up email to {{1.Name}} who submitted: {{1.Problem}}. Under 100 words. End with a CTA to book a free 15-min call."&lt;/div&gt;&lt;h3&gt;Step 4 — Send via Gmail&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Click &lt;strong&gt;+&lt;/strong&gt; → &lt;strong&gt;Gmail → Send an Email&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;To:&lt;/strong&gt; select variable &lt;strong&gt;{{1.Email}}&lt;/strong&gt; from Sheet&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Content:&lt;/strong&gt; select &lt;strong&gt;{{2.choices[].message.content}}&lt;/strong&gt; — the GPT reply&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Step 5 — Test and Activate&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Fill out the form with your own data as a test&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Click &lt;strong&gt;Run once&lt;/strong&gt; — you will see data flowing through each module&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Check your inbox — AI email should arrive in seconds&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;4&lt;/div&gt;&lt;div class='st'&gt;Click &lt;strong&gt;Scheduling ON&lt;/strong&gt; — runs non-stop now&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;🎉 Congratulations!&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;You just built your first AI automation. This alone is worth $300–$800 to a client. It works 24/7 without you doing anything.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🔄</div><div class="lesson-body"><div class="lesson-title">Build a Lead Follow-Up System (Step by Step)</div><div class="lesson-desc">The highest-value automation for beginners — builds in under an hour.</div><div class="lesson-tag">Build</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 2" data-title="Adding AI to Your Automations (GPT Integration)" data-content="&lt;p&gt;Now that you know how to connect apps, we add the brain — GPT. This lesson transforms simple automations into premium systems.&lt;/p&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;💡 Why This Matters&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;An automation without AI moves data. One with AI thinks, writes and decides. Price difference: $200 vs $1,500+.&lt;/p&gt;&lt;/div&gt;&lt;h3&gt;Step 1 — Get Your OpenAI API Key&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Go to &lt;strong&gt;platform.openai.com&lt;/strong&gt; → create a free account&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Click &lt;strong&gt;API Keys&lt;/strong&gt; in the menu → &lt;strong&gt;Create new secret key&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Copy the key immediately — &lt;strong style='color:var(--gold)'&gt;you will not see it again after closing the window!&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;4&lt;/div&gt;&lt;div class='st'&gt;Add at least &lt;strong&gt;$5 credit&lt;/strong&gt; in Billing — cost per generated email is under $0.01&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Step 2 — Connect in Make.com&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;In your scenario, click &lt;strong&gt;+&lt;/strong&gt; → search &lt;strong&gt;OpenAI → Create a Chat Completion&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;At &lt;strong&gt;Connection&lt;/strong&gt; click &lt;strong&gt;Add&lt;/strong&gt; → name it "OpenAI Main" → paste the API Key → Save&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;At &lt;strong&gt;Model&lt;/strong&gt; select &lt;strong&gt;gpt-4o&lt;/strong&gt; for best results&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Step 3 — 3 Ready-to-Use Prompts&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div style='font-size:11px;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px'&gt;📧 Email Follow-up&lt;/div&gt;&lt;div class='pb' style='margin:0'&gt;"You are a professional sales assistant. Write a warm follow-up email to {{Name}} who asked about {{Problem}}. Max 80 words. End with CTA: book a 15-min call."&lt;/div&gt;&lt;/div&gt;&lt;div class='sb'&gt;&lt;div style='font-size:11px;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px'&gt;📊 Lead Summary&lt;/div&gt;&lt;div class='pb' style='margin:0'&gt;"Summarize this lead in 3 bullets: Name: {{Name}}, Company: {{Company}}, Problem: {{Problem}}. Include: pain point, urgency (low/medium/high), next step."&lt;/div&gt;&lt;/div&gt;&lt;div class='sb'&gt;&lt;div style='font-size:11px;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px'&gt;💬 Instant DM Reply&lt;/div&gt;&lt;div class='pb' style='margin:0'&gt;"You are a friendly assistant. Reply to this message in max 2 sentences, casual but professional: {{message}}. Always offer to help further."&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;🚀 Ready to sell!&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Now you know how to build real AI automations. Module 3 teaches you how to find clients and sell exactly what you just built.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🤖</div><div class="lesson-body"><div class="lesson-title">Adding AI to Your Automations (GPT Integration)</div><div class="lesson-desc">How to plug GPT-4o into any workflow and 4x your pricing.</div><div class="lesson-tag">Advanced</div></div></div>
-</div>
-</div>
-<div class="module">
-<div class="module-header" onclick="toggleModule(this)">
-<div class="module-num">03</div>
-<div class="module-info"><div class="module-title">Getting Your First Client</div><div class="module-meta">3 Lessons · Client Acquisition</div></div>
-<div class="module-toggle">+</div>
-</div>
-<div class="lessons">
-<div class="lesson" onclick="openLesson(this)" data-module="Module 3" data-title="Where to Find Clients Who Need You Today" data-content="&lt;p&gt;You do not need to cold call people. The best clients are businesses you can find in 10 minutes — already showing signs they need automation.&lt;/p&gt;&lt;h3&gt;Where to Look&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Google Maps&lt;/div&gt;&lt;div class='st'&gt;Search businesses with many reviews but slow response times&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;LinkedIn&lt;/div&gt;&lt;div class='st'&gt;Search operations managers at small and medium companies&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Instagram&lt;/div&gt;&lt;div class='st'&gt;Coaches and consultants who post a lot but reply slowly&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Facebook&lt;/div&gt;&lt;div class='st'&gt;Local business groups where owners ask for help with admin tasks&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;✦ The Signal You Are Looking For&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Any business posting jobs for virtual assistant, admin support or customer service rep is a perfect target. They pay for manual work that AI does cheaper and better.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🔍</div><div class="lesson-body"><div class="lesson-title">Where to Find Clients Who Need You Today</div><div class="lesson-desc">The exact places to look and the signal that tells you they are ready to buy.</div><div class="lesson-tag">Prospecting</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 3" data-title="The Outreach Message That Gets Replies" data-content="&lt;p&gt;Most outreach messages fail because they talk about you. The message that works talks about what &lt;strong style='color:var(--gold)'&gt;they are losing&lt;/strong&gt; — time, leads, money.&lt;/p&gt;&lt;h3&gt;The Message Formula&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Hook&lt;/strong&gt; — A specific observation about their business&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Pain&lt;/strong&gt; — Name the exact problem and its financial consequence&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Proof&lt;/strong&gt; — A concrete result you can deliver&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;4&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;CTA&lt;/strong&gt; — Ask for a 15-minute call, not a sale&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Example Message — Copy-Paste Ready&lt;/h3&gt;&lt;div class='pb' style='font-style:normal;font-size:13px;line-height:1.9'&gt;I noticed you reply to Instagram messages in about 4-6 hours.&lt;br&gt;&lt;br&gt;That means you are probably losing leads every day — people who message and leave if they do not get a fast reply.&lt;br&gt;&lt;br&gt;I build AI systems that reply instantly to any message, qualify the lead and schedule a call — automatically, 24/7.&lt;br&gt;&lt;br&gt;Would a 15-minute call make sense to see if this would work for you?&lt;/div&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;Why It Works&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;You show you noticed something specific about them, identify a real problem with financial consequences, and offer a concrete solution — not a vague service.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">✉️</div><div class="lesson-body"><div class="lesson-title">The Outreach Message That Gets Replies</div><div class="lesson-desc">Hook, Pain, Proof, CTA — the formula with a copy-paste ready template.</div><div class="lesson-tag">Outreach</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 3" data-title="Closing Your First Sale ($300–$800)" data-content="&lt;p&gt;You do not need sales skills. You need to make the value so obvious that saying no feels like losing money.&lt;/p&gt;&lt;h3&gt;Pricing Structure&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;strong&gt;Setup fee:&lt;/strong&gt; $300–$1,500 depending on complexity&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Monthly retainer:&lt;/strong&gt; $100–$500 for maintenance and updates&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;The Closing Conversation&lt;/h3&gt;&lt;div class='pb' style='font-style:normal'&gt;On the call, ask: &lt;strong style='color:var(--gold)'&gt;"How much does a lost lead cost you?"&lt;/strong&gt;&lt;br&gt;&lt;br&gt;Let them answer. Then show how your system prevents that every day. The sale closes itself.&lt;/div&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;Your First Client Offer&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;For your first client: offer to build an automation for free or at cost ($50) in exchange for a testimonial and a monthly retainer. One good case study is worth more than 10 outreach messages.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">💰</div><div class="lesson-body"><div class="lesson-title">Closing Your First Sale ($300–$800)</div><div class="lesson-desc">Pricing structure, the closing question, and your first client offer.</div><div class="lesson-tag">Sales</div></div></div>
-</div>
-</div>
-<div class="module">
-<div class="module-header" onclick="toggleModule(this)">
-<div class="module-num">04</div>
-<div class="module-info"><div class="module-title">Scaling to $3K/Month</div><div class="module-meta">3 Lessons · Growth</div></div>
-<div class="module-toggle">+</div>
-</div>
-<div class="lessons">
-<div class="lesson" onclick="openLesson(this)" data-module="Module 4" data-title="Building a Recurring Retainer Stack" data-content="&lt;p&gt;The goal is not one big project — it is &lt;strong style='color:var(--gold)'&gt;more clients on monthly retainers.&lt;/strong&gt; Each client is a pillar. Build enough pillars and income becomes stable and predictable.&lt;/p&gt;&lt;h3&gt;The Math&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;5 clients × $200/month = &lt;strong style='color:var(--gold)'&gt;$1,000/month passive&lt;/strong&gt;&lt;/li&gt;&lt;li&gt;8 clients × $300/month = &lt;strong style='color:var(--gold)'&gt;$2,400/month passive&lt;/strong&gt;&lt;/li&gt;&lt;li&gt;10 clients × $300/month = &lt;strong style='color:var(--gold)'&gt;$3,000/month passive&lt;/strong&gt;&lt;/li&gt;&lt;/ul&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;✦ The Referral Rule&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Two weeks after delivery: "If you know anyone who would benefit from the same system, I would be happy to help them." Simple and extremely effective.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">📈</div><div class="lesson-body"><div class="lesson-title">Building a Recurring Retainer Stack</div><div class="lesson-desc">The math to $3K/month and how referrals become your main pipeline.</div><div class="lesson-tag">Growth</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 4" data-title="Automating Your Own Agency" data-content="&lt;p&gt;At some point, manually managing clients becomes your bottleneck. The solution: automate your own agency.&lt;/p&gt;&lt;h3&gt;What to Automate in Your Business&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;Automatic welcome sequence and information collection&lt;/li&gt;&lt;li&gt;Monthly reports auto-generated per client&lt;/li&gt;&lt;li&gt;Automatic invoicing via Stripe on the 1st of every month&lt;/li&gt;&lt;li&gt;Outreach system running 24/7 in the background&lt;/li&gt;&lt;/ul&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;The Beautiful Irony&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;The best proof that your systems work is showing clients that your own agency runs on them. That is your best case study — for free.&lt;/p&gt;&lt;/div&gt;&lt;div class='pb'&gt;You are not a freelancer selling hours. You are an agency owner selling systems. Systems scale. Hours do not.&lt;/div&gt;"><div class="lesson-icon">🏢</div><div class="lesson-body"><div class="lesson-title">Automating Your Own Agency</div><div class="lesson-desc">Use your own tools to run your business — the ultimate case study.</div><div class="lesson-tag">Operations</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 4" data-title="Your 30-Day Action Plan" data-content="&lt;p&gt;Everything you learned means nothing without execution. Here is your exact 30-day roadmap.&lt;/p&gt;&lt;h3&gt;Week 1 — Build&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Set up Make.com and build the lead follow-up system from Module 2&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Create a simple one-page portfolio (Notion or Carrd)&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Choose your target industry and identify 20 potential clients&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Week 2 — Reach Out&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Send 10 outreach messages per day using the template from Module 3&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Book your first discovery call&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Offer a free build in exchange for a testimonial and monthly retainer&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Weeks 3-4 — Deliver and Close&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Deliver the first automation and document the result&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Ask for a referral and propose a monthly retainer&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Start building your second client pipeline&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;The Only Goal&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;One client. One retainer. That is enough to prove it works. The rest comes naturally.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🗓️</div><div class="lesson-body"><div class="lesson-title">Your 30-Day Action Plan</div><div class="lesson-desc">Exact week by week steps — from zero to first paying client.</div><div class="lesson-tag">Action Plan</div></div></div>
-</div>
-</div>
-</div>
+
 <script>
-var completed=JSON.parse(localStorage.getItem('cs_completed')||'[]');
-var total=24;
-function updateProgress(){var p=Math.round(completed.length/total*100);document.getElementById('prog-fill').style.width=p+'%';document.getElementById('prog-label').textContent=completed.length+' / '+total+' lessons';}
-function toggleModule(el){var m=el.parentElement;m.classList.toggle('open');}
-function openLesson(el){document.querySelectorAll('.lesson').forEach(function(l){l.classList.remove('active')});el.classList.add('active');var mod=el.getAttribute('data-module');var title=el.getAttribute('data-title');var content=el.getAttribute('data-content');document.getElementById('panelBreadcrumb').innerHTML=mod+' · <span>'+title+'</span>';document.getElementById('panelTitle').textContent=title;document.getElementById('panelContent').innerHTML=content;var panel=document.getElementById('contentPanel');panel.classList.add('visible');panel.scrollIntoView({behavior:'smooth',block:'start'});}
-function closePanel(){document.getElementById('contentPanel').classList.remove('visible');document.querySelectorAll('.lesson').forEach(function(l){l.classList.remove('active')});}
-function completeLesson(){var active=document.querySelector('.lesson.active');if(!active)return;var title=active.getAttribute('data-title');if(completed.indexOf(title)===-1){completed.push(title);localStorage.setItem('cs_completed',JSON.stringify(completed));var icon=active.querySelector('.lesson-icon');icon.textContent='✓';icon.classList.add('completed');updateProgress();}}
+var done = JSON.parse(localStorage.getItem('starter_lessons') || '[]');
+
+function updateProgress(){
+  var pct = (done.length / 24) * 100;
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-label').textContent = done.length + ' / 24 lessons';
+  done.forEach(function(id){
+    var el = document.getElementById('l-' + id);
+    if(el) el.classList.add('done');
+  });
+}
+
+function markDone(id){
+  if(done.indexOf(id) === -1){
+    done.push(id);
+    localStorage.setItem('starter_lessons', JSON.stringify(done));
+  }
+}
+
+function toggleModule(id){
+  var mod = document.getElementById(id);
+  var isOpen = mod.classList.contains('open');
+  document.querySelectorAll('.module').forEach(function(m){ m.classList.remove('open'); });
+  if(!isOpen) mod.classList.add('open');
+}
+
 updateProgress();
+
+// Auto open first module
+document.getElementById('mod-1').classList.add('open');
 </script>
 </body>
 </html>
