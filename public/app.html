@@ -266,9 +266,12 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
   <!-- MAIN -->
   <div class="main">
     <div class="topbar">
-      <div>
-        <div class="topbar-title" id="topbarTitle">Dashboard</div>
-        <div class="topbar-sub" id="topbarSub">Welcome back! Your automations are running.</div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <button id="backBtn" onclick="goBack()" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:Syne,sans-serif;font-size:12px;color:var(--text3);cursor:pointer;transition:all .2s;white-space:nowrap" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">← Back</button>
+        <div>
+          <div class="topbar-title" id="topbarTitle">Dashboard</div>
+          <div class="topbar-sub" id="topbarSub">Welcome back! Your automations are running.</div>
+        </div>
       </div>
       <div class="topbar-right">
         <div class="status-dot"></div>
@@ -444,21 +447,21 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
           <div class="chat-msg">
             <div class="chat-avatar ai">A</div>
             <div class="chat-bubble ai">
-              👋 Salut! Sunt AutoFlow AI — asistentul tău personal pentru automatizări.<br><br>
-              Pot să te ajut cu <strong>orice</strong> — Make.com, WhatsApp API, Instagram API, GPT prompts, prețuri, outreach, obiecții de vânzare, sau orice altă întrebare.<br><br>
-              Răspund în limba în care îmi scrii. Ce vrei să știi?
+              👋 Hey! I'm AutoFlow AI — your personal automation expert.<br><br>
+              I can help you with <strong>anything</strong> — Make.com setup, WhatsApp API, Instagram API, GPT prompts, pricing strategies, sales scripts, objection handling, client outreach, and more.<br><br>
+              I respond in whatever language you write in. What do you want to know?
             </div>
           </div>
         </div>
         <div class="chat-suggestions" id="chatSuggestions">
-          <div class="suggestion" onclick="sendSuggestion(this)">Cum configurez webhook-ul în Make.com?</div>
-          <div class="suggestion" onclick="sendSuggestion(this)">Cât să cer pentru un WhatsApp bot?</div>
-          <div class="suggestion" onclick="sendSuggestion(this)">Cum răspund la obiecția "e prea scump"?</div>
-          <div class="suggestion" onclick="sendSuggestion(this)">Generează un System Message pentru restaurant</div>
+          <div class="suggestion" onclick="sendSuggestion(this)">How do I set up a webhook in Make.com?</div>
+          <div class="suggestion" onclick="sendSuggestion(this)">What should I charge for a WhatsApp bot?</div>
+          <div class="suggestion" onclick="sendSuggestion(this)">How do I handle the "too expensive" objection?</div>
+          <div class="suggestion" onclick="sendSuggestion(this)">Generate a GPT System Message for a restaurant</div>
           <div class="suggestion" onclick="sendSuggestion(this)">How do I connect 360dialog to Make.com?</div>
         </div>
         <div class="chat-input-wrap">
-          <textarea class="chat-textarea" id="chatInput" placeholder="Scrie orice întrebare — în română, engleză, sau orice altă limbă..." rows="1" onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
+          <textarea class="chat-textarea" id="chatInput" placeholder="Ask anything — Make.com, pricing, outreach, APIs, sales scripts..." rows="1" onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
           <button class="chat-send" id="chatSendBtn" onclick="sendChat()">➤</button>
         </div>
       </div>
@@ -661,11 +664,23 @@ window.onload = function(){
 };
 
 // ══ NAVIGATION ══
+let currentPage = 'dashboard';
+let previousPage = 'dashboard';
+
+function goBack(){
+  showPage(previousPage, document.querySelector('[onclick*='+previousPage+']'));
+}
+
 function showPage(page, navEl){
+  previousPage = currentPage;
+  currentPage = page;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   if(navEl) navEl.classList.add('active');
+  // Show back button only when not on dashboard
+  const backBtn = document.getElementById('backBtn');
+  if(backBtn) backBtn.style.display = page !== 'dashboard' ? 'block' : 'none';
   const titles = {
     dashboard: ['Dashboard', 'Welcome back! Your automations are running.'],
     wizard: ['Automation Wizard', 'Generate complete packages for any client in 30 seconds.'],
@@ -808,7 +823,7 @@ async function sendChat(){
 - Client outreach and acquisition strategies
 
 CRITICAL RULES:
-1. ALWAYS detect and respond in the SAME LANGUAGE the user writes in. If Romanian → Romanian. If English → English. If French → French. Never switch languages unless asked.
+1. Default language is ENGLISH. Always respond in English UNLESS the user specifically writes in another language — then match their language.
 2. Give COMPLETE, ACTIONABLE answers with exact steps, real code, real URLs, real prices
 3. Never say "I don't know" — always provide the best possible answer
 4. For Make.com questions: give exact module names and settings
