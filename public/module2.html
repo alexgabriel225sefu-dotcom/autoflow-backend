@@ -235,3 +235,440 @@ nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-co
           <strong style="color:#C8A96E">Spreadsheet field:</strong> Click the dropdown. Make.com shows all Google Sheets in your Google Drive. Select the spreadsheet where your form responses go. If you don't have one yet, create a test Google Sheet in Google Drive first.<br/><br/>
           <strong style="color:#C8A96E">Sheet field:</strong> After selecting the spreadsheet, this dropdown shows the tabs inside it. Select <span class="click">Sheet1</span> or the tab named "Form Responses 1" if it came from a Google Form.<br/><br/>
           <strong style="color:#C8A96E">Limit field:</strong> This field says how many rows to process each time the automation runs. Type the number <span class="click">1</span> here. This is very important — it prevents the system from processing old rows.<br/><br/>
+          Click <span class="click">OK</span> when done. The settings panel closes and you see your Google Sheets module on the canvas with a green icon.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">✓ Lesson 1 Complete</div>
+    <div class="info-text">You now have Make.com set up and your first Trigger configured. The Google Sheets module is on your canvas and connected to your Google account. In Lesson 2 you add OpenAI and Gmail to complete the full automation.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 1</div>
+    <div class="takeaway">Make.com free plan = 1,000 operations/month. Enough for your first 2–3 clients. No credit card needed.</div>
+    <div class="takeaway">A Scenario = one complete automation. Trigger + Actions = the full flow.</div>
+    <div class="takeaway">Always set the Limit field to 1 — this ensures the automation processes one row at a time, not all rows at once.</div>
+    <div class="takeaway">If a popup is blocked by your browser, look for the blocked popup icon in the address bar and allow it.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Do This Right Now</div>
+    <div class="exercise-text">Go to make.com, create your free account, and add the Google Sheets "Watch New Rows" trigger as described above. Don't move to Lesson 2 until you can see the Google Sheets circle on your canvas with a green icon and your Google account connected. This takes about 10 minutes.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(1)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(2)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 2 -->
+<div class="lesson-content" id="lesson2">
+  <div class="lesson-header">
+    <div class="lesson-tag">Hands-On Build · Lesson 2</div>
+    <h2 class="lesson-title">Build a Lead Follow-Up System — Complete Flow</h2>
+    <p class="lesson-intro">This lesson builds the complete automation: Google Form → Make.com → OpenAI GPT-4o → Gmail. When someone fills out a contact form, they receive a personalized AI-written reply in under 60 seconds. Automatically, forever.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Complete Flow — What You Are Building</div>
+    <div class="flow-diagram">
+      <div class="flow-step">
+        <span class="flow-step-icon">📋</span>
+        <div class="flow-step-name">Google Form</div>
+        <div class="flow-step-desc">Lead fills form</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="flow-step-icon">▤</span>
+        <div class="flow-step-name">Google Sheets</div>
+        <div class="flow-step-desc">Data saved here</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="flow-step-icon">◎</span>
+        <div class="flow-step-name">OpenAI GPT-4o</div>
+        <div class="flow-step-desc">Writes the email</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="flow-step-icon">✉</span>
+        <div class="flow-step-name">Gmail</div>
+        <div class="flow-step-desc">Sends the reply</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Create the Google Form</div>
+    <div class="block-text">First you need a contact form that captures leads. Here is how to create one in 5 minutes:</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to forms.google.com</div></div>
+        <div class="step-text">Open a new browser tab. In the address bar type <strong style="color:#C8A96E">forms.google.com</strong> and press Enter. Make sure you are logged into the same Google account you connected to Make.com.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Click the large "+" to create a blank form</div></div>
+        <div class="step-text">On the Google Forms homepage you see a section called "Start a new form." Click the large colorful <span class="click">+</span> icon that says "Blank" underneath it. A new empty form opens in a new tab.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Set the form title</div></div>
+        <div class="step-text">At the top of the form you see "Untitled form" in large text. Click on it and type: <span class="click">Contact Us</span> — or whatever name fits your client's business. Below that there is a "Form description" field — you can leave it empty or type a short description.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Add Question 1 — Full Name</div></div>
+        <div class="step-text">The form already has one empty question. Click on "Question" and type <strong style="color:#C8A96E">Full Name</strong>. On the right side of this question box there is a dropdown that says "Multiple choice" — click it and change it to <span class="click">Short answer</span>. Click the toggle that says "Required" to turn it ON (it turns blue).</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Add Question 2 — Email</div></div>
+        <div class="step-text">Below the first question, click the <span class="click">+</span> button on the right side toolbar to add a new question. Type <strong style="color:#C8A96E">Email Address</strong>. Change the type to <span class="click">Short answer</span>. Turn on Required.</div>
+        <div class="step-detail">Optional but recommended: Click the 3-dot menu icon (⋮) at the bottom right of this question → click "Response validation" → select "Text" → select "Email address." This prevents people from submitting invalid email addresses.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">6</div><div class="step-title">Add Question 3 — Their Problem</div></div>
+        <div class="step-text">Click <span class="click">+</span> again to add a third question. Type <strong style="color:#C8A96E">What is your main problem or question?</strong> Change the type to <span class="click">Paragraph</span> — this lets them write a longer answer. Turn on Required.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">7</div><div class="step-title">Link the form to Google Sheets</div></div>
+        <div class="step-text">At the top of the form editor you see tabs: "Questions" and "Responses." Click on <span class="click">Responses</span>. You will see a green Sheets icon (looks like a table with a green background) in the top right of the Responses section. Click it.</div>
+        <div class="step-detail">
+          A popup appears asking "Select response destination." Click <span class="click">Create a new spreadsheet</span>. The name will auto-fill as "Contact Us (Responses)" — you can keep this name or change it. Click <span class="click">Create</span>.<br/><br/>
+          Google Sheets opens automatically showing your new spreadsheet. The columns are already set up: Timestamp, Full Name, Email Address, What is your main problem or question? This spreadsheet is what Make.com will watch for new rows.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Add the OpenAI Module in Make.com</div>
+    <div class="block-text">Go back to Make.com. You should still have the Scenario open with the Google Sheets trigger. Now add the OpenAI module:</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Hover over the Google Sheets circle to reveal the "+" button</div></div>
+        <div class="step-text">Move your mouse over the right edge of the Google Sheets circle on the canvas. A small circle with a <span class="click">+</span> inside appears. Click it. The module search panel opens on the right.</div>
+        <div class="step-detail">On mobile: tap and hold the Google Sheets circle, then tap the + button that appears on its right side.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Search "OpenAI" and select "Create a Chat Completion"</div></div>
+        <div class="step-text">In the search box type <strong style="color:#C8A96E">OpenAI</strong>. The OpenAI app appears with a black circle icon. Click on it. A list of available actions appears. Find and click <span class="click">Create a Chat Completion</span>.</div>
+        <div class="step-detail">"Create a Chat Completion" means: send a message to GPT-4o and get a response back. This is the action that generates the personalized email.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Connect your OpenAI account — Add API Key</div></div>
+        <div class="step-text">The OpenAI settings panel opens. The first field says "Connection." Click the <span class="click">Add</span> button next to it.</div>
+        <div class="step-detail">
+          A popup appears with a field called "API Key." You need to get this key from OpenAI. Open a new tab, go to <strong style="color:#C8A96E">platform.openai.com</strong>, create an account if you don't have one, then go to the top right → click your profile → click <strong style="color:#C8A96E">API Keys</strong> → click <span class="click">+ Create new secret key</span> → name it "Make.com" → click Create → COPY THE KEY immediately (you cannot see it again) → paste it into the Make.com API Key field → click <span class="click">Save</span>.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Select Model: gpt-4o</div></div>
+        <div class="step-text">In the "Model" field, click the dropdown. Scroll until you find <span class="click">gpt-4o</span> and select it. This is the most capable model — it writes the best emails.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Set the System message — the AI's personality</div></div>
+        <div class="step-text">Find the field called "System" (sometimes labeled "System message"). Click inside it and type this exact text:</div>
+        <div class="type-this">You are a professional and friendly sales assistant. Your job is to write warm, helpful and concise email replies to people who have submitted a contact form. Always be professional, empathetic and end every email with a clear invitation to book a free 15-minute call. Reply in the same language the customer used.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">6</div><div class="step-title">Set the User message — with variables from the form</div></div>
+        <div class="step-text">Find the field called "Message content" or "User message." Click inside it. Now you need to mix regular text with variables from your Google Sheets data. Type this:</div>
+        <div class="type-this">Write a follow-up email to this person who submitted a contact form:
+
+Name: [click variable picker → select Google Sheets module → select "Full Name"]
+Their message: [click variable picker → select Google Sheets module → select "What is your main problem or question?"]
+
+Keep the email under 120 words. Be warm and professional.</div>
+        <div class="step-detail">
+          How to insert variables: When you see [click variable picker...] in the instructions above, you do NOT type those words. Instead:<br/><br/>
+          1. Position your cursor where you want the variable<br/>
+          2. Click the small icon that looks like a puzzle piece or a variable icon (it is usually to the right of the field or appears when you click inside the field)<br/>
+          3. A list of available modules appears — click on "1. Google Sheets"<br/>
+          4. A list of columns appears — click on "Full Name" for the first variable and "What is your main problem..." for the second<br/>
+          5. The variable appears in the field as a small colored tag like {"1.Full_Name"}
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">7</div><div class="step-title">Click OK to save the OpenAI module</div></div>
+        <div class="step-text">Scroll to the bottom of the settings panel and click <span class="click">OK</span>. The panel closes. You now have two circles on your canvas: Google Sheets → OpenAI, connected by a line.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 3 — Add the Gmail Module</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Click the "+" on the right side of the OpenAI circle</div></div>
+        <div class="step-text">Hover over the OpenAI circle. Click the <span class="click">+</span> button that appears on its right. The module search panel opens.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Search "Gmail" and select "Send an Email"</div></div>
+        <div class="step-text">Type <strong style="color:#C8A96E">Gmail</strong> in the search box. Click Gmail in the results. From the list of actions, click <span class="click">Send an Email</span>.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Connect your Gmail account</div></div>
+        <div class="step-text">Click <span class="click">Add</span> next to Connection → click <span class="click">Sign in with Google</span> → select the Gmail account you want to send from → click <span class="click">Allow</span>. The connection is saved.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Fill in the "To" field with the lead's email</div></div>
+        <div class="step-text">Click inside the "To" field. Click the variable picker icon. Select <span class="click">1. Google Sheets</span> → select <span class="click">Email Address</span>. The field now shows <strong style="color:#C8A96E">{"1.Email_Address"}</strong> — this means it will automatically send to whatever email was in the form.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Fill in the Subject</div></div>
+        <div class="step-text">Click inside the "Subject" field. Type:</div>
+        <div class="type-this">Thank you for reaching out, {"1.Full_Name"}</div>
+        <div class="step-detail">The {"1.Full_Name"} part is a variable — insert it using the variable picker just like before. The email subject will personalize itself with each person's real name.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">6</div><div class="step-title">Fill in the Content with the GPT-4o response</div></div>
+        <div class="step-text">Click inside the "Content" or "Body" field. Click the variable picker. Select <span class="click">2. OpenAI</span> → then look for <span class="click">choices[] → message → content</span> and click it. The field shows <strong style="color:#C8A96E">{"2.choices[].message.content"}</strong> — this is the AI-generated email text.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">7</div><div class="step-title">Click OK to save Gmail settings</div></div>
+        <div class="step-text">Scroll down and click <span class="click">OK</span>. You now have all three modules on your canvas: Google Sheets → OpenAI → Gmail.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 4 — Update the Google Sheets Trigger to Your New Sheet</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Click on the Google Sheets circle to open its settings</div></div>
+        <div class="step-text">Click once on the Google Sheets circle on the canvas. The settings panel opens. In the Spreadsheet dropdown, click it and find the spreadsheet you created from the form — it should be named "Contact Us (Responses)". Select it.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Select the correct Sheet tab</div></div>
+        <div class="step-text">In the Sheet dropdown, select <span class="click">Form Responses 1</span> — this is the tab automatically created by Google Forms. Make sure Limit is still set to <span class="click">1</span>. Click <span class="click">OK</span>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 2</div>
+    <div class="takeaway">The full flow is 3 modules: Google Sheets triggers → OpenAI generates the email → Gmail sends it.</div>
+    <div class="takeaway">Variables like {"1.Email_Address"} automatically pull real data from the form. Never type email addresses manually.</div>
+    <div class="takeaway">The Gmail Content field uses {"2.choices[].message.content"} — this is the exact text GPT-4o wrote.</div>
+    <div class="takeaway">Always connect Gmail with the account you want emails sent FROM — make sure it is your business email.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(2)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(3)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 3 -->
+<div class="lesson-content" id="lesson3">
+  <div class="lesson-header">
+    <div class="lesson-tag">Test & Launch · Lesson 3</div>
+    <h2 class="lesson-title">Test Your Automation & Make It Live</h2>
+    <p class="lesson-intro">Your automation is built. Now you test it with real data, fix any errors, and turn it on permanently. After this lesson your automation works 24/7 without you doing anything.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Submit a Test Form Response</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Open your Google Form and click the preview button</div></div>
+        <div class="step-text">Go back to forms.google.com. Open the form you created. At the top right of the form editor, click the eye icon (👁) or the "Preview" button. Your form opens as it would look to a real visitor.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Fill in the form with your own real information</div></div>
+        <div class="step-text">Fill in the form using your own real name and email address. For the "problem" question, write something realistic like: <em style="color:#C8BEA8">"I run a small restaurant and I am losing leads because I cannot reply to WhatsApp messages fast enough. I need a solution."</em> Click <span class="click">Submit</span>.</div>
+        <div class="step-detail">It is important to use your REAL email address for the test — this is where the AI-generated email will be sent so you can check it worked correctly.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Verify the response appeared in Google Sheets</div></div>
+        <div class="step-text">Open the Google Sheet linked to your form. You should see a new row at the bottom with your test submission: Timestamp, your name, your email, and your message. If this row is there, the trigger has data to work with.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Run the Test in Make.com</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go back to Make.com and open your Scenario</div></div>
+        <div class="step-text">Open Make.com. Go to <span class="click">Scenarios</span> in the left sidebar. Click on the scenario you built. The canvas opens showing your 3 modules.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Click "Run once" at the bottom left of the screen</div></div>
+        <div class="step-text">At the very bottom left of the Scenario editor screen, look for a button that says <span class="click">Run once</span>. It has a small play icon (▶). Click it once.</div>
+        <div class="step-detail">
+          "Run once" means: run the automation one time right now using the newest data in the spreadsheet. It does NOT turn on automatic scheduling — it is just for testing.<br/><br/>
+          After clicking, watch the canvas. The modules will light up one by one as data flows through them:<br/>
+          1. The Google Sheets circle lights up green — it found your test row<br/>
+          2. The OpenAI circle lights up green — it generated the email<br/>
+          3. The Gmail circle lights up green — it sent the email<br/><br/>
+          Each module shows a small number inside a bubble — this is how many records it processed. All three should show "1".
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">What to do if a module shows red instead of green</div></div>
+        <div class="step-text">If any module shows red or an error icon, click on that module. An error message explains what went wrong. Common errors:</div>
+        <div class="step-detail">
+          <strong style="color:#e74c3c">Google Sheets error:</strong> "No data found" — your test row was already processed. Submit the form again with new data, then run once again.<br/><br/>
+          <strong style="color:#e74c3c">OpenAI error:</strong> "Invalid API key" — your OpenAI key is wrong. Go back to platform.openai.com, create a new key, and update it in the Make.com OpenAI connection settings (go to Connections in the sidebar, find OpenAI, click Edit, paste the new key).<br/><br/>
+          <strong style="color:#e74c3c">OpenAI error:</strong> "Insufficient credits" — add $5 at platform.openai.com → Billing → Add to credit balance.<br/><br/>
+          <strong style="color:#e74c3c">Gmail error:</strong> "Authentication failed" — your Gmail connection expired. Go to Connections in Make.com sidebar, find Gmail, delete it, and reconnect by clicking Add in the Gmail module settings.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Check your email inbox</div></div>
+        <div class="step-text">Open the email inbox you used in the test form. Within 30 seconds you should see a new email arrive. The sender is the Gmail account you connected. The subject says "Thank you for reaching out, [Your Name]." The email body is an AI-generated professional reply to the message you wrote in the form.</div>
+        <div class="step-detail">Read the email carefully. It should sound natural, professional and helpful. It should end with an invitation to book a call. This is exactly what your client's leads will receive every time they fill in the contact form — automatically, 24 hours a day, 7 days a week, even when the client is sleeping.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 3 — Turn On the Automation Permanently</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Click the "Scheduling" toggle at the bottom left</div></div>
+        <div class="step-text">At the bottom left of the Scenario editor, next to the "Run once" button, there is a toggle switch that says "Scheduling." Right now it is grey and says OFF. Click on it to turn it ON — it turns green.</div>
+        <div class="step-detail">A popup may appear asking how often to run the scenario. The default is "Every 15 minutes" — this means Make.com checks the spreadsheet for new rows every 15 minutes and processes any new submissions. Click <span class="click">OK</span> to confirm.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Save your Scenario</div></div>
+        <div class="step-text">Click the <span class="click">Save</span> button in the top right corner of the editor (or press Ctrl+S on PC, Cmd+S on Mac). Your automation is now live and saving everything.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Verify it is running</div></div>
+        <div class="step-text">Go back to the Scenarios list by clicking <span class="click">Scenarios</span> in the left sidebar. You will see your scenario listed. It should show a green dot or "Active" label — this confirms it is running. You can also see the last time it ran and how many operations it used.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">🎉 Your First Automation is LIVE</div>
+    <div class="info-text">You just built a real AI automation that is now working 24/7. Every time someone fills out your contact form, they receive a personalized professional reply within 15 minutes — automatically, without you doing anything. This system alone is worth $300–$800 to a client plus $150–$300/month recurring. You built it in under 2 hours.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">How to Deliver This to a Client</div>
+    <div class="block-text">When you sell this to a business, here is exactly what you do:</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Use THEIR Google account, not yours</div></div>
+        <div class="step-text">When building for a client, connect their Google account to Make.com — not yours. Ask them to create a Make.com account, then add you as a team member so you can build in their workspace. This way the automation belongs to them and continues working even if you stop working together.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Customize the prompt for their business</div></div>
+        <div class="step-text">Change the System message in the OpenAI module to match the client's brand voice. For example: <em style="color:#C8BEA8">"You are the friendly AI assistant of [Restaurant Name]. Always mention our specialty dishes and invite people to visit or call us."</em></div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Add their form to their website</div></div>
+        <div class="step-text">In Google Forms, click the Send button → click the link icon (🔗) → copy the form URL → give it to the client so they can add it to their website or share it directly on WhatsApp and social media.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 3</div>
+    <div class="takeaway">Always test with "Run once" before turning Scheduling ON — this prevents accidental emails to real people during testing.</div>
+    <div class="takeaway">If a module shows red, click on it to read the error message — 90% of errors are connection or API key issues that take 2 minutes to fix.</div>
+    <div class="takeaway">Scheduling ON = automation runs every 15 minutes checking for new rows. It processes any new form submissions automatically.</div>
+    <div class="takeaway">When delivering to clients always use their Google account and their Make.com workspace — not yours.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Complete This Before Moving to Module 3</div>
+    <div class="exercise-text">Build the complete automation right now: create the Google Form, connect it to Make.com with Google Sheets → OpenAI → Gmail, submit a test response, click Run Once, and confirm you receive the AI-generated email in your inbox. Take a screenshot of the successful run in Make.com (all three modules showing green). This screenshot is your proof of work — you will show it to your first client.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="window.location.href='/course-starter.html'">← Back to All Modules</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+var completed=JSON.parse(localStorage.getItem('m2_completed')||'[]');
+function updateProgress(){
+  var fill=document.getElementById('progressFill');
+  var label=document.getElementById('progressLabel');
+  fill.style.width=(completed.length/3*100)+'%';
+  label.textContent=completed.length+' / 3 lessons';
+  completed.forEach(function(n){var t=document.getElementById('tab'+n);if(t)t.classList.add('done');});
+}
+function showLesson(n){
+  document.querySelectorAll('.lesson-content').forEach(function(el){el.classList.remove('active')});
+  document.querySelectorAll('.lesson-tab').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('lesson'+n).classList.add('active');
+  document.getElementById('tab'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function completeLesson(n){
+  if(completed.indexOf(n)===-1){completed.push(n);localStorage.setItem('m2_completed',JSON.stringify(completed));}
+  updateProgress();
+// Open lesson from URL hash
+var hash=window.location.hash;
+if(hash){
+  var n=parseInt(hash.replace("#lesson",""));
+  if(n>=1&&n<=3)showLesson(n);
+}
+  var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
+}
+updateProgress();
+// Open specific lesson from URL hash
+(function(){
+  var h = window.location.hash;
+  if(h && h.indexOf('lesson') !== -1){
+    var n = parseInt(h.replace('#lesson',''));
+    if(n >= 1 && n <= 3) showLesson(n);
+  }
+})();
+// Open lesson from URL hash
+var hash=window.location.hash;
+if(hash){
+  var n=parseInt(hash.replace("#lesson",""));
+  if(n>=1&&n<=3)showLesson(n);
+}
+</script>
+</body>
+</html>
