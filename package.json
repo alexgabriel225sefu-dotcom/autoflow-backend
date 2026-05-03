@@ -1,6 +1,7 @@
 {
   "name": "autoflow-backend",
   "version": "1.0.0",
+  "description": "AutoFlow AI Automation Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -8,13 +9,13 @@
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "stripe": "^14.0.0",
-    "openai": "^4.28.0",
-    "nodemailer": "^6.9.8",
-    "axios": "^1.6.7",
-    "uuid": "^9.0.0",
-    "jsonwebtoken": "^9.0.2",
-    "@supabase/supabase-js": "^2.39.0"
+    "nodemailer": "^6.9.7",
+    "@supabase/supabase-js": "^2.38.0",
+    "@anthropic-ai/sdk": "^0.20.0",
+    "stripe": "^14.5.0",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
