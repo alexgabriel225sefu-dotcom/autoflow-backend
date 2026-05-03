@@ -2,678 +2,1108 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>AutoFlow — AI Automation Platform</title>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,700&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
-:root{--gold:#C9A84C;--gold-light:#E8C96A;--gold-dark:#8A6A1F;--gold-muted:rgba(201,168,76,0.12);--gold-glow:rgba(201,168,76,0.25);--bg:#0A0A0A;--bg2:#111111;--bg3:#181818;--bg4:#1E1E1E;--text:#F0EAD6;--text2:#B8A98A;--text3:#7A7060;--border:rgba(201,168,76,0.18);--border2:rgba(201,168,76,0.08);--green:#22C55E;--red:#EF4444;--blue:#3B82F6;}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html{height:100%;}
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100%;overflow-x:hidden;}
-#loginScreen{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;}
-.login-box{width:100%;max-width:420px;}
-.login-logo{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:600;letter-spacing:3px;color:var(--gold);text-transform:uppercase;text-align:center;margin-bottom:6px;}
-.login-sub{font-size:13px;color:var(--text3);text-align:center;margin-bottom:28px;letter-spacing:1px;}
-.login-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:32px 24px;}
-.login-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;margin-bottom:4px;}
-.login-desc{font-size:13px;color:var(--text3);margin-bottom:24px;}
-.form-group{margin-bottom:16px;}
-.form-label{display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-bottom:8px;}
-.form-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:14px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;transition:border-color .2s;}
-.form-input:focus{border-color:var(--gold);}
-.form-input::placeholder{color:var(--text3);}
-.login-btn{width:100%;padding:16px;background:linear-gradient(135deg,var(--gold-dark),var(--gold-light));border:none;border-radius:8px;color:#0A0A0A;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:8px;}
-.login-error{font-size:13px;color:var(--red);margin-top:12px;text-align:center;min-height:18px;}
-.login-note{font-size:12px;color:var(--text3);text-align:center;margin-top:16px;line-height:1.6;}
-.login-note strong{color:var(--gold);}
-#app{display:none;flex-direction:column;min-height:100vh;}
-#app.visible{display:flex;}
-.topbar{background:var(--bg2);border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:56px;position:sticky;top:0;z-index:100;flex-shrink:0;}
-.topbar-logo{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;letter-spacing:2px;color:var(--gold);text-transform:uppercase;}
-.topbar-logo span{color:var(--text2);font-weight:300;}
-.topbar-right{display:flex;align-items:center;gap:12px;}
-.topbar-status{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--green);}
-.status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite;flex-shrink:0;}
+:root{
+  --gold:#C8A96E;--gold2:#E8CB8A;--gold3:#8A6A2E;
+  --bg:#070707;--bg2:#0f0f0f;--bg3:#161616;--bg4:#1e1e1e;
+  --text:#F5F0E8;--text2:#C8BEA8;--text3:#7A7060;
+  --border:rgba(200,169,110,.1);--border2:rgba(200,169,110,.2);
+  --green:#4ADE80;--red:#ef4444;--blue:#60a5fa;
+  --sidebar:220px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow:hidden;height:100vh}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--gold3);border-radius:2px}
+
+/* ── LOGIN ── */
+#loginScreen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:0}
+.login-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(200,169,110,.06) 0%,transparent 70%);pointer-events:none}
+.login-box{background:var(--bg2);border:1px solid var(--border2);border-radius:20px;padding:48px;width:100%;max-width:440px;position:relative;z-index:1}
+.login-logo{font-family:"Playfair Display",serif;font-size:26px;font-weight:900;color:var(--gold);text-align:center;margin-bottom:6px;letter-spacing:.5px}
+.login-sub{font-size:12px;color:var(--text3);text-align:center;letter-spacing:2px;text-transform:uppercase;margin-bottom:36px}
+.login-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;display:block}
+.login-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:13px 16px;font-family:Syne,sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color .2s;margin-bottom:16px}
+.login-input:focus{border-color:var(--gold)}
+.login-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--gold3),var(--gold2));border:none;border-radius:10px;font-family:Syne,sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#070707;cursor:pointer;transition:all .2s;margin-top:4px}
+.login-btn:hover{opacity:.9;transform:translateY(-1px)}
+.login-error{color:var(--red);font-size:12px;text-align:center;margin-top:12px;min-height:18px}
+
+/* ── APP SHELL ── */
+#app{display:none;height:100vh;flex-direction:row}
+#app.visible{display:flex}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;height:100vh;overflow:hidden}
+.sidebar-logo{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+.sidebar-logo-text{font-family:"Playfair Display",serif;font-size:18px;font-weight:900;color:var(--gold);letter-spacing:.5px}
+.sidebar-logo-sub{font-size:10px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.sidebar-nav{flex:1;padding:16px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:10px;cursor:pointer;transition:all .2s;color:var(--text3);font-size:13px;font-weight:500;border:1px solid transparent;text-decoration:none}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:rgba(200,169,110,.12);border-color:var(--border2);color:var(--gold)}
+.nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.nav-divider{height:1px;background:var(--border);margin:8px 4px}
+.sidebar-bottom{padding:16px 10px;border-top:1px solid var(--border)}
+.user-info{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:var(--bg3)}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold3),var(--gold));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#070707;flex-shrink:0}
+.user-email{font-size:11px;color:var(--text3);truncate:ellipsis;overflow:hidden;white-space:nowrap;max-width:120px}
+.logout-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:4px;margin-left:auto;transition:color .2s}
+.logout-btn:hover{color:var(--red)}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{padding:16px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-title{font-family:"Playfair Display",serif;font-size:22px;font-weight:700;color:var(--text)}
+.topbar-sub{font-size:12px;color:var(--text3);margin-top:2px}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.user-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dark),var(--gold));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#0A0A0A;cursor:pointer;flex-shrink:0;}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border2);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom);}
-.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 2px;cursor:pointer;transition:all .2s;border:none;background:transparent;color:var(--text3);font-family:'DM Sans',sans-serif;gap:3px;}
-.nav-btn.active{color:var(--gold);}
-.nav-btn-icon{font-size:18px;}
-.nav-btn-label{font-size:9px;}
-.main{flex:1;overflow-y:auto;padding:20px 16px;padding-bottom:90px;}
-.page{display:none;}
-.page.active{display:block;}
-.page-title{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;margin-bottom:4px;}
-.page-sub{font-size:13px;color:var(--text3);margin-bottom:20px;}
-.cards-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
-.stat-card{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:16px;}
-.stat-card-icon{font-size:20px;margin-bottom:8px;}
-.stat-card-val{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;color:var(--gold);line-height:1;}
-.stat-card-label{font-size:11px;color:var(--text3);margin-top:3px;}
-.panel{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:20px;margin-bottom:16px;}
-.panel-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
-.panel-icon{color:var(--gold);}
-.btn-gold{padding:14px 24px;background:linear-gradient(135deg,var(--gold-dark),var(--gold-light));border:none;border-radius:8px;color:#0A0A0A;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-bottom:10px;}
-.btn-outline{padding:12px 24px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;width:100%;margin-bottom:10px;}
-.btn-small{padding:8px 14px;background:var(--gold-muted);border:1px solid var(--border);border-radius:6px;color:var(--gold);font-size:12px;font-weight:500;cursor:pointer;}
-.chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 210px);}
-.chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding-bottom:8px;}
-.chat-msg{display:flex;gap:10px;max-width:90%;}
-.chat-msg.user{align-self:flex-end;flex-direction:row-reverse;}
-.chat-avatar{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;}
-.chat-avatar.ai{background:linear-gradient(135deg,var(--gold-dark),var(--gold));color:#0A0A0A;font-weight:700;}
-.chat-avatar.user{background:var(--bg3);border:1px solid var(--border);font-size:16px;}
-.chat-bubble{padding:12px 14px;border-radius:12px;font-size:14px;line-height:1.6;word-break:break-word;}
-.chat-msg.ai .chat-bubble{background:var(--bg3);border:1px solid var(--border2);border-top-left-radius:4px;}
-.chat-msg.user .chat-bubble{background:var(--gold-muted);border:1px solid var(--border);border-top-right-radius:4px;}
-.chat-img-preview{max-width:200px;border-radius:8px;margin-bottom:8px;display:block;}
-.chat-bottom{border-top:1px solid var(--border2);padding-top:12px;}
-.chat-img-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
-.img-preview-thumb{width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid var(--border);}
-.remove-img{width:24px;height:24px;border-radius:50%;background:var(--red);border:none;color:white;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.chat-input-row{display:flex;gap:10px;align-items:flex-end;}
-.chat-input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;resize:none;min-height:48px;max-height:100px;}
-.chat-input:focus{border-color:var(--gold);}
-.chat-attach{width:48px;height:48px;min-width:48px;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;color:var(--text3);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.chat-send{width:48px;height:48px;min-width:48px;background:linear-gradient(135deg,var(--gold-dark),var(--gold));border:none;border-radius:12px;color:#0A0A0A;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.chat-thinking span{width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block;animation:thinking .8s infinite;margin:0 2px;}
-.chat-thinking span:nth-child(2){animation-delay:.15s;}
-.chat-thinking span:nth-child(3){animation-delay:.3s;}
-@keyframes thinking{0%,80%,100%{transform:scale(0);opacity:.3}40%{transform:scale(1);opacity:1}}
-.input-label{display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-bottom:6px;}
-.text-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:13px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;margin-bottom:14px;}
-.text-input:focus{border-color:var(--gold);}
-.text-area{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:13px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;resize:vertical;min-height:80px;margin-bottom:14px;}
-.text-area:focus{border-color:var(--gold);}
-.webhook-card{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:16px;margin-bottom:10px;}
-.webhook-name{font-size:14px;font-weight:600;margin-bottom:6px;}
-.webhook-url{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);margin-bottom:10px;word-break:break-all;line-height:1.5;}
-.webhook-footer{display:flex;align-items:center;justify-content:space-between;}
-.webhook-hits{font-size:12px;color:var(--text3);}
-.log-row{padding:10px 0;border-bottom:1px solid var(--border2);display:flex;gap:10px;}
-.log-time{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);flex-shrink:0;width:70px;}
-.log-badge{font-size:10px;font-weight:700;flex-shrink:0;width:55px;}
-.log-badge.success{color:var(--green);}
-.log-badge.error{color:var(--red);}
-.log-badge.info{color:var(--blue);}
-.log-msg{font-size:12px;color:var(--text2);line-height:1.5;flex:1;}
-.template-item{display:flex;align-items:center;gap:14px;padding:14px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;margin-bottom:10px;cursor:pointer;}
-.template-icon{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
-.template-info{flex:1;}
-.template-name{font-size:14px;font-weight:500;margin-bottom:2px;}
-.template-desc{font-size:12px;color:var(--text3);}
-.status-msg{font-size:13px;min-height:18px;margin-top:4px;}
-.notif{position:fixed;bottom:80px;left:16px;right:16px;z-index:1000;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;font-size:13px;box-shadow:0 8px 32px rgba(0,0,0,.5);transform:translateY(120px);opacity:0;transition:all .3s;}
-.notif.show{transform:translateY(0);opacity:1;}
-.notif.success{border-color:var(--green);}
-.notif.error{border-color:var(--red);}
-.wizard-card{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:18px;margin-bottom:12px;transition:all .2s;}
-.wizard-card.selected{border-color:var(--gold);background:var(--gold-muted);}
-.wizard-header{display:flex;align-items:center;gap:14px;cursor:pointer;}
-.wizard-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
-.wizard-info{flex:1;}
-.wizard-name{font-size:15px;font-weight:600;margin-bottom:3px;}
-.wizard-desc{font-size:12px;color:var(--text3);}
-.wizard-badge{font-size:10px;padding:3px 10px;border-radius:100px;background:var(--gold-muted);color:var(--gold);border:1px solid var(--border);white-space:nowrap;}
-.wizard-fields{margin-top:16px;padding-top:16px;border-top:1px solid var(--border2);display:none;}
-.wizard-card.selected .wizard-fields{display:block;}
-.result-box{background:var(--bg2);border:1px solid var(--green);border-radius:12px;padding:20px;margin-top:16px;}
-.result-title{font-size:15px;font-weight:600;color:var(--green);margin-bottom:10px;}
-.result-desc{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:16px;}
+
+/* ── PAGES ── */
+.page{display:none;flex:1;overflow-y:auto;padding:28px}
+.page.active{display:block}
+
+/* ── DASHBOARD ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:22px;transition:border-color .2s}
+.stat-card:hover{border-color:var(--border2)}
+.stat-icon{font-size:22px;margin-bottom:12px}
+.stat-val{font-family:"Playfair Display",serif;font-size:32px;font-weight:700;color:var(--gold);line-height:1}
+.stat-label{font-size:11px;color:var(--text3);margin-top:6px;letter-spacing:1px;text-transform:uppercase}
+.stat-change{font-size:11px;color:var(--green);margin-top:4px}
+
+.section-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.section-title::before{content:"";width:3px;height:20px;background:var(--gold);border-radius:2px}
+
+.quick-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}
+.qa-btn{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;transition:all .2s;text-align:left}
+.qa-btn:hover{border-color:var(--border2);background:var(--bg3);transform:translateY(-2px)}
+.qa-icon{font-size:24px;margin-bottom:10px;display:block}
+.qa-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+.qa-desc{font-size:12px;color:var(--text3)}
+
+/* ── WIZARD ── */
+.wizard-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.wizard-form{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px}
+.wizard-output{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px;display:flex;flex-direction:column}
+.form-group{margin-bottom:18px}
+.form-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;display:block}
+.form-input,.form-select,.form-textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-family:Syne,sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color .2s}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--gold)}
+.form-select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237A7060' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.form-select option{background:#0f0f0f}
+.form-textarea{resize:vertical;min-height:90px;line-height:1.6}
+.generate-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--gold3),var(--gold2));border:none;border-radius:10px;font-family:Syne,sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#070707;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:10px}
+.generate-btn:hover{opacity:.9;transform:translateY(-1px)}
+.generate-btn:disabled{opacity:.5;cursor:wait;transform:none}
+.output-placeholder{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text3);font-size:13px;min-height:300px}
+.output-placeholder .icon{font-size:48px;opacity:.3}
+.output-content{display:none;flex-direction:column;gap:16px}
+.output-content.visible{display:flex}
+.output-section{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:18px}
+.output-section-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;font-weight:600}
+.output-text{font-size:13px;color:var(--text2);line-height:1.75;white-space:pre-wrap}
+.output-price{font-family:"Playfair Display",serif;font-size:28px;font-weight:700;color:var(--gold)}
+.output-price-sub{font-size:12px;color:var(--text3);margin-top:4px}
+.copy-btn{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-family:Syne,sans-serif;font-size:11px;color:var(--text3);cursor:pointer;transition:all .2s;margin-top:10px;letter-spacing:1px;text-transform:uppercase}
+.copy-btn:hover{border-color:var(--gold);color:var(--gold)}
+
+/* ── CHAT ── */
+.chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 120px)}
+.chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding:4px 0 20px}
+.chat-msg{display:flex;gap:12px;align-items:flex-start;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.chat-msg.user{flex-direction:row-reverse}
+.chat-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
+.chat-avatar.ai{background:linear-gradient(135deg,var(--gold3),var(--gold));color:#070707}
+.chat-avatar.user{background:var(--bg3);border:1px solid var(--border);color:var(--text3)}
+.chat-bubble{max-width:75%;padding:14px 18px;border-radius:14px;font-size:13px;line-height:1.75}
+.chat-bubble.ai{background:var(--bg2);border:1px solid var(--border);color:var(--text2);border-radius:4px 14px 14px 14px}
+.chat-bubble.user{background:rgba(200,169,110,.12);border:1px solid var(--border2);color:var(--text);border-radius:14px 4px 14px 14px}
+.chat-thinking{display:flex;gap:6px;padding:4px 0;align-items:center}
+.chat-thinking span{width:8px;height:8px;border-radius:50%;background:var(--gold);opacity:.4;animation:think .9s infinite}
+.chat-thinking span:nth-child(2){animation-delay:.2s}
+.chat-thinking span:nth-child(3){animation-delay:.4s}
+@keyframes think{0%,100%{opacity:.2;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+.chat-input-wrap{border-top:1px solid var(--border);padding-top:16px;display:flex;gap:12px;align-items:flex-end}
+.chat-textarea{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 16px;font-family:Syne,sans-serif;font-size:13px;color:var(--text);outline:none;resize:none;min-height:48px;max-height:160px;transition:border-color .2s;line-height:1.6}
+.chat-textarea:focus{border-color:var(--gold)}
+.chat-send{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--gold3),var(--gold));border:none;cursor:pointer;font-size:18px;color:#070707;transition:all .2s;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.chat-send:hover{opacity:.9;transform:translateY(-1px)}
+.chat-send:disabled{opacity:.4;cursor:wait;transform:none}
+.chat-suggestions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.suggestion{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--text3);cursor:pointer;transition:all .2s;white-space:nowrap}
+.suggestion:hover{border-color:var(--border2);color:var(--text)}
+
+/* ── EMAIL ── */
+.email-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.email-form-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px}
+.email-templates{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px}
+.template-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all .2s;margin-bottom:10px}
+.template-card:last-child{margin-bottom:0}
+.template-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+.template-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
+.template-desc{font-size:11px;color:var(--text3)}
+.send-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--gold3),var(--gold2));border:none;border-radius:10px;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#070707;cursor:pointer;transition:all .2s;margin-top:8px}
+.send-btn:hover{opacity:.9;transform:translateY(-1px)}
+.send-btn:disabled{opacity:.5;cursor:wait;transform:none}
+.email-status{font-size:12px;margin-top:10px;min-height:18px;text-align:center}
+
+/* ── TRACKER ── */
+.tracker-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.add-client-btn{background:linear-gradient(135deg,var(--gold3),var(--gold));border:none;border-radius:8px;padding:10px 20px;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:#070707;cursor:pointer;transition:all .2s}
+.add-client-btn:hover{opacity:.9}
+.clients-table{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.table-header{display:grid;grid-template-columns:2fr 1.5fr 1fr 1fr 1fr;gap:0;background:var(--bg3);border-bottom:1px solid var(--border)}
+.th{padding:12px 16px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);font-weight:600}
+.table-row{display:grid;grid-template-columns:2fr 1.5fr 1fr 1fr 1fr;border-bottom:1px solid var(--border);transition:background .2s}
+.table-row:last-child{border-bottom:none}
+.table-row:hover{background:var(--bg3)}
+.td{padding:14px 16px;font-size:13px;color:var(--text2);display:flex;align-items:center}
+.status-badge{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
+.status-active{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);color:var(--green)}
+.status-pending{background:rgba(200,169,110,.1);border:1px solid rgba(200,169,110,.2);color:var(--gold)}
+.status-paused{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:var(--red)}
+.revenue-total{background:rgba(200,169,110,.08);border:1px solid var(--border2);border-radius:10px;padding:16px 20px;margin-top:16px;display:flex;align-items:center;justify-content:space-between}
+.revenue-label{font-size:12px;color:var(--text3);letter-spacing:1px;text-transform:uppercase}
+.revenue-amount{font-family:"Playfair Display",serif;font-size:28px;font-weight:700;color:var(--gold)}
+
+/* ── LOGS ── */
+.log-item{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);transition:background .2s}
+.log-item:hover{background:var(--bg3)}
+.log-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.log-dot.success{background:var(--green)}
+.log-dot.error{background:var(--red)}
+.log-dot.info{background:var(--blue)}
+.log-time{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--text3);white-space:nowrap;margin-top:2px}
+.log-msg{font-size:13px;color:var(--text2);flex:1}
+.log-type{font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:4px;background:var(--bg3);color:var(--text3);white-space:nowrap}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);z-index:500;display:none;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:32px;width:100%;max-width:480px}
+.modal-title{font-family:"Playfair Display",serif;font-size:22px;font-weight:700;margin-bottom:20px;color:var(--text)}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.btn-primary{flex:1;padding:12px;background:linear-gradient(135deg,var(--gold3),var(--gold));border:none;border-radius:8px;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:#070707;cursor:pointer;transition:all .2s}
+.btn-secondary{flex:1;padding:12px;background:transparent;border:1px solid var(--border);border-radius:8px;font-family:Syne,sans-serif;font-size:12px;color:var(--text3);cursor:pointer;transition:all .2s}
+.btn-secondary:hover{border-color:var(--border2);color:var(--text)}
+
+/* ── NOTIFICATIONS ── */
+.notif{position:fixed;bottom:24px;right:24px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:14px 20px;font-size:13px;color:var(--text);z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;max-width:320px}
+.notif.show{transform:translateY(0);opacity:1}
+.notif.success{border-color:rgba(74,222,128,.3);color:var(--green)}
+.notif.error{border-color:rgba(239,68,68,.3);color:var(--red)}
+
+@media(max-width:768px){
+  .sidebar{display:none}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .wizard-grid,.email-grid{grid-template-columns:1fr}
+  .quick-actions{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
+
+<!-- ══════════════ LOGIN ══════════════ -->
 <div id="loginScreen">
+  <div class="login-bg"></div>
   <div class="login-box">
-    <div class="login-logo">Auto<span>Flow</span></div>
-    <div class="login-sub">AI Automation Platform · PRO Access</div>
-    <div class="login-card">
-      <div class="login-title">Welcome back</div>
-      <div class="login-desc">Sign in with your PRO account credentials.</div>
-      <div class="form-group">
-        <label class="form-label">Email Address</label>
-        <input class="form-input" type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Access Code</label>
-        <input class="form-input" type="password" id="loginCode" placeholder="Your access code"/>
-      </div>
-      <button class="login-btn" id="loginBtn" onclick="handleLogin()">Sign In to AutoFlow</button>
-      <div class="login-error" id="loginError"></div>
-      <div class="login-note">Exclusive to <strong>AI Cash Systems PRO</strong> members.</div>
-    </div>
+    <div class="login-logo">AutoFlow</div>
+    <div class="login-sub">AI Automation Platform</div>
+    <label class="login-label">Email Address</label>
+    <input class="login-input" id="loginEmail" type="email" placeholder="your@email.com" autocomplete="email"/>
+    <label class="login-label">Access Code</label>
+    <input class="login-input" id="loginCode" type="text" placeholder="Enter your access code" style="font-family:'JetBrains Mono',monospace;letter-spacing:2px"/>
+    <button class="login-btn" id="loginBtn" onclick="handleLogin()">Sign In to AutoFlow</button>
+    <div class="login-error" id="loginError"></div>
   </div>
 </div>
+
+<!-- ══════════════ APP ══════════════ -->
 <div id="app">
-  <div class="topbar">
-    <div class="topbar-logo">Auto<span>Flow</span></div>
-    <div class="topbar-right">
-      <div class="topbar-status"><div class="status-dot"></div>Live</div>
-      <div class="user-avatar" id="userAvatar" onclick="handleLogout()">A</div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text">AutoFlow</div>
+      <div class="sidebar-logo-sub">AI Platform</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" onclick="showPage('dashboard',this)">
+        <span class="nav-icon">📊</span>Dashboard
+      </div>
+      <div class="nav-item" onclick="showPage('wizard',this)">
+        <span class="nav-icon">⚡</span>Automation Wizard
+      </div>
+      <div class="nav-item" onclick="showPage('chat',this)">
+        <span class="nav-icon">🤖</span>AI Assistant
+      </div>
+      <div class="nav-item" onclick="showPage('email',this)">
+        <span class="nav-icon">✉️</span>Email Automation
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-item" onclick="showPage('tracker',this)">
+        <span class="nav-icon">💼</span>Client Tracker
+      </div>
+      <div class="nav-item" onclick="showPage('logs',this)">
+        <span class="nav-icon">📋</span>Activity Logs
+      </div>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">A</div>
+        <div class="user-email" id="userEmailDisplay">user@email.com</div>
+        <button class="logout-btn" onclick="handleLogout()" title="Logout">↩</button>
+      </div>
     </div>
   </div>
+
+  <!-- MAIN -->
   <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title" id="topbarTitle">Dashboard</div>
+        <div class="topbar-sub" id="topbarSub">Welcome back! Your automations are running.</div>
+      </div>
+      <div class="topbar-right">
+        <div class="status-dot"></div>
+        <span style="font-size:11px;color:var(--text3);letter-spacing:1px">ALL SYSTEMS ONLINE</span>
+      </div>
+    </div>
 
-    <!-- DASHBOARD -->
+    <!-- ── DASHBOARD ── -->
     <div class="page active" id="page-dashboard">
-      <div class="page-title">Dashboard</div>
-      <div class="page-sub" id="dashWelcome">Welcome back!</div>
-      <div class="cards-grid">
-        <div class="stat-card"><div class="stat-card-icon">⚡</div><div class="stat-card-val" id="stat-total">0</div><div class="stat-card-label">Total Activities</div></div>
-        <div class="stat-card"><div class="stat-card-icon">📧</div><div class="stat-card-val" id="stat-emails">0</div><div class="stat-card-label">Emails Sent</div></div>
-        <div class="stat-card"><div class="stat-card-icon">🪝</div><div class="stat-card-val" id="stat-webhooks">0</div><div class="stat-card-label">Webhook Hits</div></div>
-        <div class="stat-card"><div class="stat-card-icon">🧙</div><div class="stat-card-val" id="stat-scenarios">0</div><div class="stat-card-label">Scenarios Built</div></div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">⚡</div>
+          <div class="stat-val" id="stat-automations">0</div>
+          <div class="stat-label">Automations Built</div>
+          <div class="stat-change">↑ All time</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💼</div>
+          <div class="stat-val" id="stat-clients">0</div>
+          <div class="stat-label">Active Clients</div>
+          <div class="stat-change">↑ Monthly retainers</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-val" id="stat-revenue">$0</div>
+          <div class="stat-label">Monthly Revenue</div>
+          <div class="stat-change">↑ Recurring</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">✉️</div>
+          <div class="stat-val" id="stat-emails">0</div>
+          <div class="stat-label">Emails Sent</div>
+          <div class="stat-change">↑ This month</div>
+        </div>
       </div>
-      <div class="panel">
-        <div class="panel-title"><span class="panel-icon">📋</span>Recent Activity</div>
-        <div id="recentActivity"><div style="font-size:13px;color:var(--text3);">Loading...</div></div>
+
+      <div class="section-title">Quick Actions</div>
+      <div class="quick-actions">
+        <div class="qa-btn" onclick="showPage('wizard',document.querySelector('[onclick*=wizard]'))">
+          <span class="qa-icon">⚡</span>
+          <div class="qa-title">Generate Automation Package</div>
+          <div class="qa-desc">Create a complete Make.com scenario for any client in 30 seconds</div>
+        </div>
+        <div class="qa-btn" onclick="showPage('chat',document.querySelector('[onclick*=chat]'))">
+          <span class="qa-icon">🤖</span>
+          <div class="qa-title">Ask AI Assistant</div>
+          <div class="qa-desc">Get instant answers about Make.com, APIs, pricing, outreach — anything</div>
+        </div>
+        <div class="qa-btn" onclick="showPage('email',document.querySelector('[onclick*=email]'))">
+          <span class="qa-icon">✉️</span>
+          <div class="qa-title">Send Outreach Email</div>
+          <div class="qa-desc">Generate and send personalized cold emails to prospects instantly</div>
+        </div>
+      </div>
+
+      <div class="section-title">Recent Activity</div>
+      <div class="clients-table" id="dashActivity">
+        <div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">Loading activity...</div>
       </div>
     </div>
 
-    <!-- AUTOMATION WIZARD -->
+    <!-- ── WIZARD ── -->
     <div class="page" id="page-wizard">
-      <div class="page-title">Automation Wizard</div>
-      <div class="page-sub">Select automation → fill details → download Make.com scenario ready to import in 1 click.</div>
-
-      <div class="wizard-card" id="wc-whatsapp">
-        <div class="wizard-header" onclick="selectWizard('whatsapp')">
-          <div class="wizard-icon" style="background:rgba(34,197,94,.1)">📱</div>
-          <div class="wizard-info"><div class="wizard-name">WhatsApp AI Bot</div><div class="wizard-desc">Auto-reply to WhatsApp messages with GPT-4o — 24/7</div></div>
-          <div class="wizard-badge">$500–$2K</div>
-        </div>
-        <div class="wizard-fields">
-          <label class="input-label">Company Name</label>
-          <input class="text-input" id="wa-company" placeholder="e.g. Smith Restaurant"/>
-          <label class="input-label">What does the business do?</label>
-          <input class="text-input" id="wa-business" placeholder="e.g. Italian restaurant, open Mon-Sat 12-22"/>
-          <label class="input-label">Welcome message</label>
-          <textarea class="text-area" id="wa-welcome" placeholder="e.g. Hello! Thanks for contacting us. How can I help you?"></textarea>
-          <button class="btn-gold" id="btn-whatsapp" onclick="generateWizard('whatsapp')">⚡ Generate Make.com Scenario</button>
-          <div class="status-msg" id="status-whatsapp"></div>
-          <div id="result-whatsapp"></div>
-        </div>
-      </div>
-
-      <div class="wizard-card" id="wc-leadfollowup">
-        <div class="wizard-header" onclick="selectWizard('leadfollowup')">
-          <div class="wizard-icon" style="background:rgba(201,168,76,.1)">📧</div>
-          <div class="wizard-info"><div class="wizard-name">Lead Follow-Up Email</div><div class="wizard-desc">Google Form → GPT-4o → Gmail — instant personalized reply</div></div>
-          <div class="wizard-badge">$300–$800</div>
-        </div>
-        <div class="wizard-fields">
-          <label class="input-label">Company Name</label>
-          <input class="text-input" id="lf-company" placeholder="e.g. Johnson Consulting"/>
-          <label class="input-label">What service do you offer?</label>
-          <input class="text-input" id="lf-service" placeholder="e.g. Business consulting and strategy"/>
-          <label class="input-label">Gmail address (sends from)</label>
-          <input class="text-input" id="lf-email" placeholder="e.g. info@company.com" type="email"/>
-          <button class="btn-gold" id="btn-leadfollowup" onclick="generateWizard('leadfollowup')">⚡ Generate Make.com Scenario</button>
-          <div class="status-msg" id="status-leadfollowup"></div>
-          <div id="result-leadfollowup"></div>
-        </div>
-      </div>
-
-      <div class="wizard-card" id="wc-instagram">
-        <div class="wizard-header" onclick="selectWizard('instagram')">
-          <div class="wizard-icon" style="background:rgba(239,68,68,.1)">📸</div>
-          <div class="wizard-info"><div class="wizard-name">Instagram DM Bot</div><div class="wizard-desc">Auto-reply to Instagram DMs with AI — never miss a lead</div></div>
-          <div class="wizard-badge">$500–$1.2K</div>
-        </div>
-        <div class="wizard-fields">
-          <label class="input-label">Instagram Handle</label>
-          <input class="text-input" id="ig-handle" placeholder="e.g. @smithrestaurant"/>
-          <label class="input-label">Brand tone</label>
-          <input class="text-input" id="ig-tone" placeholder="e.g. Friendly, casual, use emojis"/>
-          <label class="input-label">Default reply when someone DMs</label>
-          <textarea class="text-area" id="ig-reply" placeholder="e.g. Hey! Thanks for reaching out. How can we help?"></textarea>
-          <button class="btn-gold" id="btn-instagram" onclick="generateWizard('instagram')">⚡ Generate Make.com Scenario</button>
-          <div class="status-msg" id="status-instagram"></div>
-          <div id="result-instagram"></div>
-        </div>
-      </div>
-
-      <div class="wizard-card" id="wc-coldemail">
-        <div class="wizard-header" onclick="selectWizard('coldemail')">
-          <div class="wizard-icon" style="background:rgba(59,130,246,.1)">📤</div>
-          <div class="wizard-info"><div class="wizard-name">Cold Email Campaign</div><div class="wizard-desc">Apollo.io → GPT personalization → Instantly.ai — 50 emails/day</div></div>
-          <div class="wizard-badge">$800–$2K</div>
-        </div>
-        <div class="wizard-fields">
-          <label class="input-label">Your Name / Company</label>
-          <input class="text-input" id="ce-name" placeholder="e.g. Alex from AutoFlow Agency"/>
-          <label class="input-label">Target industry</label>
-          <input class="text-input" id="ce-industry" placeholder="e.g. Restaurant owners in Romania"/>
-          <label class="input-label">Your main offer</label>
-          <textarea class="text-area" id="ce-offer" placeholder="e.g. AI systems that save 20+ hours/week and respond to leads instantly"></textarea>
-          <button class="btn-gold" id="btn-coldemail" onclick="generateWizard('coldemail')">⚡ Generate Make.com Scenario</button>
-          <div class="status-msg" id="status-coldemail"></div>
-          <div id="result-coldemail"></div>
-        </div>
-      </div>
-
-      <div class="wizard-card" id="wc-crm">
-        <div class="wizard-header" onclick="selectWizard('crm')">
-          <div class="wizard-icon" style="background:rgba(168,85,247,.1)">📊</div>
-          <div class="wizard-info"><div class="wizard-name">Google Sheets CRM</div><div class="wizard-desc">All lead sources → one Sheet → AI summary + weekly report</div></div>
-          <div class="wizard-badge">$300–$600</div>
-        </div>
-        <div class="wizard-fields">
-          <label class="input-label">Company Name</label>
-          <input class="text-input" id="crm-company" placeholder="e.g. Johnson Real Estate"/>
-          <label class="input-label">Lead sources</label>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-form" checked/> Google Forms</label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-wa"/> WhatsApp</label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-ig"/> Instagram</label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="crm-email"/> Email</label>
+      <div class="wizard-grid">
+        <div class="wizard-form">
+          <div class="section-title" style="margin-bottom:20px">Automation Generator</div>
+          <div class="form-group">
+            <label class="form-label">Client Industry *</label>
+            <select class="form-select" id="wIndustry">
+              <option value="">— Select industry —</option>
+              <option>Restaurant / Food & Beverage</option>
+              <option>Real Estate Agency</option>
+              <option>Beauty Salon / Spa</option>
+              <option>Medical / Dental Clinic</option>
+              <option>Fitness / Gym</option>
+              <option>E-commerce Store</option>
+              <option>Coach / Consultant</option>
+              <option>Law Firm</option>
+              <option>Construction / Renovation</option>
+              <option>Insurance Agency</option>
+              <option>Travel Agency</option>
+              <option>Other</option>
+            </select>
           </div>
-          <label class="input-label">Weekly report sent to</label>
-          <input class="text-input" id="crm-email-addr" placeholder="e.g. manager@company.com" type="email"/>
-          <button class="btn-gold" id="btn-crm" onclick="generateWizard('crm')">⚡ Generate Make.com Scenario</button>
-          <div class="status-msg" id="status-crm"></div>
-          <div id="result-crm"></div>
+          <div class="form-group">
+            <label class="form-label">What do they need automated? *</label>
+            <select class="form-select" id="wNeed">
+              <option value="">— Select automation type —</option>
+              <option>WhatsApp Auto-Reply Bot</option>
+              <option>Instagram DM Auto-Reply</option>
+              <option>Lead Follow-Up (Form → Email)</option>
+              <option>Cold Email Campaign System</option>
+              <option>Google Sheets CRM + Weekly Report</option>
+              <option>Appointment Booking System</option>
+              <option>Invoice & Payment Reminders</option>
+              <option>Social Media Auto-Post</option>
+              <option>Full Omnichannel Package</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Business Size</label>
+            <select class="form-select" id="wSize">
+              <option>Small (1–5 employees)</option>
+              <option>Medium (6–25 employees)</option>
+              <option>Large (25+ employees)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Client's Main Pain Point</label>
+            <textarea class="form-textarea" id="wPain" placeholder="e.g. They get 50+ WhatsApp messages per day and can't reply fast enough. Losing clients to competitors who reply instantly..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Client Budget Range</label>
+            <select class="form-select" id="wBudget">
+              <option>Unknown / To be discussed</option>
+              <option>$100–$300 setup</option>
+              <option>$300–$800 setup</option>
+              <option>$800–$2,000 setup</option>
+              <option>$2,000+ setup</option>
+            </select>
+          </div>
+          <button class="generate-btn" id="generateBtn" onclick="generateAutomation()">
+            <span>⚡</span> Generate Complete Package
+          </button>
+        </div>
+
+        <div class="wizard-output">
+          <div class="section-title" style="margin-bottom:20px">Generated Package</div>
+          <div class="output-placeholder" id="wizardPlaceholder">
+            <span class="icon">⚡</span>
+            <span>Fill in the form and click Generate to create a complete automation package for your client.</span>
+          </div>
+          <div class="output-content" id="wizardOutput">
+            <div class="output-section">
+              <div class="output-section-title">📋 What You Will Build</div>
+              <div class="output-text" id="outWhat"></div>
+            </div>
+            <div class="output-section">
+              <div class="output-section-title">⚙️ Make.com Modules Needed</div>
+              <div class="output-text" id="outModules"></div>
+            </div>
+            <div class="output-section">
+              <div class="output-section-title">🤖 GPT System Message</div>
+              <div class="output-text" id="outPrompt"></div>
+              <button class="copy-btn" onclick="copyText('outPrompt')">Copy Prompt</button>
+            </div>
+            <div class="output-section" style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <div class="output-section-title">💰 Recommended Pricing</div>
+                <div class="output-price" id="outPrice"></div>
+                <div class="output-price-sub" id="outPriceSub"></div>
+              </div>
+              <div style="text-align:right">
+                <div class="output-section-title">⏱️ Build Time</div>
+                <div class="output-price" id="outTime" style="font-size:22px"></div>
+                <div class="output-price-sub">estimated hours</div>
+              </div>
+            </div>
+            <div class="output-section">
+              <div class="output-section-title">✉️ Outreach Message</div>
+              <div class="output-text" id="outEmail"></div>
+              <button class="copy-btn" onclick="copyText('outEmail')">Copy Message</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- EMAIL -->
-    <div class="page" id="page-email">
-      <div class="page-title">Email Automation</div>
-      <div class="page-sub">Send real emails via Gmail — tracked and logged.</div>
-      <div class="panel">
-        <div class="panel-title"><span class="panel-icon">📧</span>Send Email</div>
-        <label class="input-label">From Name</label>
-        <input class="text-input" id="emailFrom" value="AI Cash Systems"/>
-        <label class="input-label">To Email</label>
-        <input class="text-input" id="emailTo" type="email" placeholder="client@email.com"/>
-        <label class="input-label">Subject</label>
-        <input class="text-input" id="emailSubject" placeholder="Subject..."/>
-        <label class="input-label">Message</label>
-        <textarea class="text-area" id="emailBody" placeholder="Write your message..."></textarea>
-        <button class="btn-gold" onclick="sendEmail()">Send Email →</button>
-        <button class="btn-outline" onclick="generateEmail()">✨ Generate with AI</button>
-        <div class="status-msg" id="emailStatus"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-title"><span class="panel-icon">📨</span>Templates</div>
-        <div class="template-item" onclick="useTemplate('followup')"><div class="template-icon" style="background:rgba(34,197,94,.1)">📬</div><div class="template-info"><div class="template-name">Lead Follow-Up</div><div class="template-desc">Warm follow-up for new leads</div></div><div class="btn-small">Use</div></div>
-        <div class="template-item" onclick="useTemplate('welcome')"><div class="template-icon" style="background:rgba(201,168,76,.1)">👋</div><div class="template-info"><div class="template-name">Welcome Email</div><div class="template-desc">Onboard new clients professionally</div></div><div class="btn-small">Use</div></div>
-        <div class="template-item" onclick="useTemplate('proposal')"><div class="template-icon" style="background:rgba(59,130,246,.1)">📝</div><div class="template-info"><div class="template-name">Proposal Follow-Up</div><div class="template-desc">Follow up and create urgency</div></div><div class="btn-small">Use</div></div>
-      </div>
-    </div>
-
-    <!-- AI CHAT -->
+    <!-- ── CHAT ── -->
     <div class="page" id="page-chat">
-      <div class="page-title">AI Assistant</div>
-      <div class="page-sub">GPT-4o — any language, analyze images, get help.</div>
       <div class="chat-wrap">
         <div class="chat-messages" id="chatMessages">
-          <div class="chat-msg ai">
+          <div class="chat-msg">
             <div class="chat-avatar ai">A</div>
-            <div class="chat-bubble">👋 Hello! I am your AutoFlow AI Assistant.<br><br>I can help in <strong>any language</strong>:<br>• Build automation flows step by step<br>• Analyze screenshots and images 📎<br>• Write emails and proposals<br>• Answer any automation question<br><br>Attach an image using the 📎 button!</div>
+            <div class="chat-bubble ai">
+              👋 Salut! Sunt AutoFlow AI — asistentul tău personal pentru automatizări.<br><br>
+              Pot să te ajut cu <strong>orice</strong> — Make.com, WhatsApp API, Instagram API, GPT prompts, prețuri, outreach, obiecții de vânzare, sau orice altă întrebare.<br><br>
+              Răspund în limba în care îmi scrii. Ce vrei să știi?
+            </div>
           </div>
         </div>
-        <div class="chat-bottom">
-          <div class="chat-img-row" id="imgPreviewRow" style="display:none;">
-            <img id="imgPreviewThumb" class="img-preview-thumb" src="" alt="preview"/>
-            <button class="remove-img" onclick="removeImage()">✕</button>
-            <span style="font-size:12px;color:var(--text3);">Image attached</span>
+        <div class="chat-suggestions" id="chatSuggestions">
+          <div class="suggestion" onclick="sendSuggestion(this)">Cum configurez webhook-ul în Make.com?</div>
+          <div class="suggestion" onclick="sendSuggestion(this)">Cât să cer pentru un WhatsApp bot?</div>
+          <div class="suggestion" onclick="sendSuggestion(this)">Cum răspund la obiecția "e prea scump"?</div>
+          <div class="suggestion" onclick="sendSuggestion(this)">Generează un System Message pentru restaurant</div>
+          <div class="suggestion" onclick="sendSuggestion(this)">How do I connect 360dialog to Make.com?</div>
+        </div>
+        <div class="chat-input-wrap">
+          <textarea class="chat-textarea" id="chatInput" placeholder="Scrie orice întrebare — în română, engleză, sau orice altă limbă..." rows="1" onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="chat-send" id="chatSendBtn" onclick="sendChat()">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EMAIL ── -->
+    <div class="page" id="page-email">
+      <div class="email-grid">
+        <div class="email-form-wrap">
+          <div class="section-title" style="margin-bottom:20px">Send Email</div>
+          <div class="form-group">
+            <label class="form-label">To (Email Address) *</label>
+            <input class="form-input" id="emailTo" type="email" placeholder="prospect@company.com"/>
           </div>
-          <div class="chat-input-row">
-            <input type="file" id="imageUpload" accept="image/*" style="display:none;" onchange="handleImageUpload(event)"/>
-            <button class="chat-attach" onclick="document.getElementById('imageUpload').click()">📎</button>
-            <textarea class="chat-input" id="chatInput" placeholder="Ask anything in any language..." rows="1"></textarea>
-            <button class="chat-send" onclick="sendChat()">➤</button>
+          <div class="form-group">
+            <label class="form-label">Their Name</label>
+            <input class="form-input" id="emailName" placeholder="John Smith"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Their Company</label>
+            <input class="form-input" id="emailCompany" placeholder="Restaurant Name / Agency Name"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Subject *</label>
+            <input class="form-input" id="emailSubject" placeholder="Quick question about [Company]"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Message *</label>
+            <textarea class="form-textarea" id="emailBody" style="min-height:160px" placeholder="Write your email or click a template on the right..."></textarea>
+          </div>
+          <button class="send-btn" id="sendEmailBtn" onclick="generateAndSendEmail()">✨ Generate with AI + Send</button>
+          <button class="send-btn" style="background:var(--bg3);color:var(--text);margin-top:8px;border:1px solid var(--border)" onclick="sendEmailDirect()">Send as Written</button>
+          <div class="email-status" id="emailStatus"></div>
+        </div>
+
+        <div class="email-templates">
+          <div class="section-title" style="margin-bottom:20px">Templates</div>
+          <div class="template-card" onclick="loadTemplate('cold')">
+            <div class="template-name">🎯 Cold Outreach — WhatsApp Bot</div>
+            <div class="template-desc">First contact for restaurant/local business WhatsApp automation</div>
+          </div>
+          <div class="template-card" onclick="loadTemplate('followup')">
+            <div class="template-name">🔄 Follow-Up — Day 3</div>
+            <div class="template-desc">Follow up on initial outreach with no reply after 3 days</div>
+          </div>
+          <div class="template-card" onclick="loadTemplate('proposal')">
+            <div class="template-name">📋 Proposal Follow-Up</div>
+            <div class="template-desc">Follow up after sending a proposal — create urgency</div>
+          </div>
+          <div class="template-card" onclick="loadTemplate('delivery')">
+            <div class="template-name">🎉 Delivery Confirmation</div>
+            <div class="template-desc">Send when delivering the completed automation to client</div>
+          </div>
+          <div class="template-card" onclick="loadTemplate('testimonial')">
+            <div class="template-name">⭐ Testimonial Request</div>
+            <div class="template-desc">Ask for a testimonial 2–3 weeks after delivery</div>
+          </div>
+          <div class="template-card" onclick="loadTemplate('referral')">
+            <div class="template-name">🤝 Referral Request</div>
+            <div class="template-desc">Ask happy clients for referrals</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- WEBHOOKS -->
-    <div class="page" id="page-webhooks">
-      <div class="page-title">Webhooks</div>
-      <div class="page-sub">Real endpoints — receive data from any app instantly.</div>
-      <button class="btn-gold" onclick="createWebhook()">+ Create New Webhook</button>
-      <div class="panel">
-        <div class="panel-title"><span class="panel-icon">🪝</span>Your Endpoints</div>
-        <div id="webhookList"><div style="font-size:13px;color:var(--text3);">Loading...</div></div>
+    <!-- ── CLIENT TRACKER ── -->
+    <div class="page" id="page-tracker">
+      <div class="tracker-header">
+        <div class="section-title" style="margin-bottom:0">Client Tracker</div>
+        <button class="add-client-btn" onclick="openAddClient()">+ Add Client</button>
       </div>
-      <div class="panel">
-        <div class="panel-title"><span class="panel-icon">💡</span>How to Use</div>
-        <div style="font-size:13px;color:var(--text3);line-height:1.8;">1. Create a webhook above<br>2. Copy the URL<br>3. Paste in Make.com, Stripe, or any app<br>4. Every hit appears in Activity Logs instantly<br><span style="color:var(--gold);margin-top:8px;display:block;">Real-time data reception ✓</span></div>
+      <div class="clients-table" id="clientsTable">
+        <div class="table-header">
+          <div class="th">Client</div>
+          <div class="th">Automation</div>
+          <div class="th">Status</div>
+          <div class="th">Retainer</div>
+          <div class="th">Since</div>
+        </div>
+        <div id="clientsBody">
+          <div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">No clients yet. Add your first client above.</div>
+        </div>
+      </div>
+      <div class="revenue-total">
+        <div>
+          <div class="revenue-label">Total Monthly Revenue</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px" id="clientCount">0 active clients</div>
+        </div>
+        <div class="revenue-amount" id="totalRevenue">$0/mo</div>
       </div>
     </div>
 
-    <!-- LOGS -->
+    <!-- ── LOGS ── -->
     <div class="page" id="page-logs">
-      <div class="page-title">Activity Logs</div>
-      <div class="page-sub">Real-time log of all your activity.</div>
-      <button class="btn-outline" style="margin-bottom:16px;" onclick="loadLogs()">↻ Refresh</button>
-      <div class="panel">
-        <div id="logList"><div style="font-size:13px;color:var(--text3);">Loading...</div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div class="section-title" style="margin-bottom:0">Activity Logs</div>
+        <button onclick="loadLogs()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 16px;font-family:Syne,sans-serif;font-size:12px;color:var(--text3);cursor:pointer">↻ Refresh</button>
+      </div>
+      <div class="clients-table" id="logsList">
+        <div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">Loading logs...</div>
       </div>
     </div>
 
-  </div>
+  </div><!-- end main -->
+</div><!-- end app -->
 
-  <!-- BOTTOM NAV -->
-  <div class="bottom-nav">
-    <button class="nav-btn active" id="nav-dashboard" onclick="showPage('dashboard',this)"><span class="nav-btn-icon">⚡</span><span class="nav-btn-label">Home</span></button>
-    <button class="nav-btn" id="nav-wizard" onclick="showPage('wizard',this)"><span class="nav-btn-icon">🧙</span><span class="nav-btn-label">Wizard</span></button>
-    <button class="nav-btn" id="nav-chat" onclick="showPage('chat',this)"><span class="nav-btn-icon">🤖</span><span class="nav-btn-label">AI Chat</span></button>
-    <button class="nav-btn" id="nav-email" onclick="showPage('email',this)"><span class="nav-btn-icon">📧</span><span class="nav-btn-label">Email</span></button>
-    <button class="nav-btn" id="nav-logs" onclick="showPage('logs',this)"><span class="nav-btn-icon">📋</span><span class="nav-btn-label">Logs</span></button>
+<!-- ADD CLIENT MODAL -->
+<div class="modal-overlay" id="addClientModal">
+  <div class="modal">
+    <div class="modal-title">Add New Client</div>
+    <div class="form-group">
+      <label class="form-label">Business Name *</label>
+      <input class="form-input" id="newClientName" placeholder="Restaurant La Mama"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Automation Type</label>
+      <select class="form-select" id="newClientAuto">
+        <option>WhatsApp Bot</option>
+        <option>Instagram DM Bot</option>
+        <option>Lead Follow-Up System</option>
+        <option>Cold Email System</option>
+        <option>Google Sheets CRM</option>
+        <option>Full Package</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Monthly Retainer ($)</label>
+      <input class="form-input" id="newClientRetainer" type="number" placeholder="200"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="addClient()">Add Client</button>
+    </div>
   </div>
 </div>
+
+<!-- NOTIFICATION -->
 <div class="notif" id="notif"></div>
 
 <script>
-const API='https://autoflow-backend-p9pc.onrender.com';
-let token=localStorage.getItem('af_token');
-let currentUser=JSON.parse(localStorage.getItem('af_user')||'null');
-let attachedImage=null;
+const API = 'https://autoflow-backend-p9pc.onrender.com';
+let token = localStorage.getItem('af_token');
+let currentUser = JSON.parse(localStorage.getItem('af_user') || 'null');
+let clients = JSON.parse(localStorage.getItem('af_clients') || '[]');
+let chatHistory = [];
 
-// Store generated JSONs
-window.wizardResults={};
-
+// ══ LOGIN ══
 async function handleLogin(){
-  const email=document.getElementById('loginEmail').value.trim();
-  const code=document.getElementById('loginCode').value.trim();
-  const err=document.getElementById('loginError');
-  const btn=document.getElementById('loginBtn');
-  if(!email||!code){err.textContent='Please enter your email and access code.';return;}
-  btn.disabled=true;btn.textContent='Signing in...';
-  try{
-    const r=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,code})});
-    const d=await r.json();
-    if(!r.ok){err.textContent=d.error||'Invalid credentials.';btn.disabled=false;btn.textContent='Sign In to AutoFlow';return;}
-    token=d.token;currentUser=d.user;
-    localStorage.setItem('af_token',token);
-    localStorage.setItem('af_user',JSON.stringify(currentUser));
+  const email = document.getElementById('loginEmail').value.trim();
+  const code = document.getElementById('loginCode').value.trim().toUpperCase();
+  const err = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+  if(!email || !code){ err.textContent = 'Please enter your email and access code.'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  try {
+    const r = await fetch(API + '/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, code})
+    });
+    const d = await r.json();
+    if(!r.ok){ err.textContent = d.error || 'Invalid email or access code.'; btn.disabled = false; btn.textContent = 'Sign In to AutoFlow'; return; }
+    token = d.token; currentUser = d.user;
+    localStorage.setItem('af_token', token);
+    localStorage.setItem('af_user', JSON.stringify(currentUser));
     launchApp();
-  }catch(e){err.textContent='Connection error. Please try again.';btn.disabled=false;btn.textContent='Sign In to AutoFlow';}
+  } catch(e) {
+    err.textContent = 'Connection error. Please try again.';
+    btn.disabled = false; btn.textContent = 'Sign In to AutoFlow';
+  }
 }
 
 function launchApp(){
-  document.getElementById('loginScreen').style.display='none';
-  document.getElementById('app').classList.add('visible');
-  document.getElementById('userAvatar').textContent=currentUser.name?currentUser.name[0].toUpperCase():'A';
-  document.getElementById('dashWelcome').textContent='Welcome back, '+currentUser.name+'!';
-  loadDashboard();loadLogs();loadWebhooks();
+  document.getElementById('loginScreen').style.display = 'none';
+  const app = document.getElementById('app');
+  app.classList.add('visible');
+  document.getElementById('userAvatar').textContent = currentUser.name ? currentUser.name[0].toUpperCase() : currentUser.email[0].toUpperCase();
+  document.getElementById('userEmailDisplay').textContent = currentUser.email;
+  loadDashboard();
+  loadLogs();
+  renderClients();
 }
 
 function handleLogout(){
-  if(confirm('Sign out?')){localStorage.removeItem('af_token');localStorage.removeItem('af_user');location.reload();}
+  localStorage.removeItem('af_token');
+  localStorage.removeItem('af_user');
+  location.reload();
 }
 
-function authH(){return{'Content-Type':'application/json','Authorization':'Bearer '+token};}
+function authHeaders(){ return {'Content-Type':'application/json','Authorization':'Bearer '+token}; }
 
-window.onload=function(){
-  if(token&&currentUser)launchApp();
-  document.getElementById('loginCode').addEventListener('keydown',e=>{if(e.key==='Enter')handleLogin();});
-  document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}});
+// ══ AUTO LOGIN ══
+window.onload = function(){
+  if(token && currentUser){
+    document.getElementById('loginEmail').value = currentUser.email;
+    launchApp();
+  }
+  document.getElementById('loginCode').addEventListener('keydown', e => { if(e.key==='Enter') handleLogin(); });
+  document.getElementById('loginEmail').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('loginCode').focus(); });
 };
 
-function showPage(page,btn){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+// ══ NAVIGATION ══
+function showPage(page, navEl){
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  if(btn)btn.classList.add('active');
-  if(page==='logs')loadLogs();
-  if(page==='webhooks')loadWebhooks();
-  if(page==='dashboard')loadDashboard();
-  window.scrollTo(0,0);
+  if(navEl) navEl.classList.add('active');
+  const titles = {
+    dashboard: ['Dashboard', 'Welcome back! Your automations are running.'],
+    wizard: ['Automation Wizard', 'Generate complete packages for any client in 30 seconds.'],
+    chat: ['AI Assistant', 'Ask anything — automation, pricing, outreach, Make.com, APIs.'],
+    email: ['Email Automation', 'Generate and send personalized outreach emails instantly.'],
+    tracker: ['Client Tracker', 'Manage your clients and track your recurring revenue.'],
+    logs: ['Activity Logs', 'Real-time log of all actions and events.']
+  };
+  if(titles[page]){
+    document.getElementById('topbarTitle').textContent = titles[page][0];
+    document.getElementById('topbarSub').textContent = titles[page][1];
+  }
+  if(page==='logs') loadLogs();
+  if(page==='dashboard') loadDashboard();
 }
 
+// ══ DASHBOARD ══
 async function loadDashboard(){
-  try{
-    const r=await fetch(API+'/api/logs',{headers:authH()});
-    const logs=await r.json();
-    document.getElementById('stat-total').textContent=logs.length;
-    document.getElementById('stat-emails').textContent=logs.filter(l=>l.type==='email').length;
-    document.getElementById('stat-webhooks').textContent=logs.filter(l=>l.type==='webhook').length;
-    document.getElementById('stat-scenarios').textContent=Object.keys(window.wizardResults).length;
-    const el=document.getElementById('recentActivity');
-    if(!logs.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0;">No activity yet.</div>';return;}
-    el.innerHTML=logs.slice(0,5).map(l=>'<div class="log-row"><div class="log-time">'+new Date(l.time).toLocaleTimeString()+'</div><div class="log-badge '+l.status+'">'+l.status.toUpperCase()+'</div><div class="log-msg">'+l.msg+'</div></div>').join('');
-  }catch(e){}
+  const active = clients.filter(c => c.status === 'Active');
+  const revenue = active.reduce((s,c) => s + (parseInt(c.retainer)||0), 0);
+  document.getElementById('stat-clients').textContent = active.length;
+  document.getElementById('stat-revenue').textContent = '$'+revenue;
+  document.getElementById('stat-automations').textContent = clients.length;
+  try {
+    const r = await fetch(API+'/api/logs', {headers: authHeaders()});
+    const logs = await r.json();
+    const emails = logs.filter(l => l.type==='email').length;
+    document.getElementById('stat-emails').textContent = emails;
+    const act = document.getElementById('dashActivity');
+    if(!logs.length){ act.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">No activity yet. Start by generating an automation or sending an email.</div>'; return; }
+    act.innerHTML = '<div class="table-header" style="grid-template-columns:1fr 1fr 1fr"><div class="th">Time</div><div class="th">Action</div><div class="th">Status</div></div>' +
+      logs.slice(0,8).map(l => `<div class="table-row" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="td" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3)">${new Date(l.time).toLocaleTimeString()}</div>
+        <div class="td">${l.msg}</div>
+        <div class="td"><span class="status-badge ${l.status==='success'?'status-active':l.status==='error'?'status-paused':'status-pending'}">${l.status||'info'}</span></div>
+      </div>`).join('');
+  } catch(e){ console.log('Dashboard load error'); }
 }
 
-// WIZARD
-function selectWizard(type){
-  document.querySelectorAll('.wizard-card').forEach(c=>c.classList.remove('selected'));
-  document.getElementById('wc-'+type).classList.add('selected');
-}
+// ══ AUTOMATION WIZARD ══
+async function generateAutomation(){
+  const industry = document.getElementById('wIndustry').value;
+  const need = document.getElementById('wNeed').value;
+  const size = document.getElementById('wSize').value;
+  const pain = document.getElementById('wPain').value;
+  const budget = document.getElementById('wBudget').value;
+  if(!industry || !need){ notify('Please select industry and automation type.', 'error'); return; }
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true; btn.innerHTML = '<span>⏳</span> Generating...';
+  document.getElementById('wizardPlaceholder').style.display = 'none';
+  document.getElementById('wizardOutput').classList.remove('visible');
+  try {
+    const r = await fetch(API+'/api/ai/generate', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        prompt: `You are an expert AI automation agency consultant. Generate a complete automation package for a client.
 
-async function generateWizard(type){
-  const btn=document.getElementById('btn-'+type);
-  const statusEl=document.getElementById('status-'+type);
-  const resultEl=document.getElementById('result-'+type);
+Client Info:
+- Industry: ${industry}
+- Automation needed: ${need}
+- Business size: ${size}
+- Pain point: ${pain || 'Not specified'}
+- Budget range: ${budget}
 
-  btn.disabled=true;btn.textContent='Generating...';
-  statusEl.textContent='AI is building your Make.com scenario...';statusEl.style.color='var(--text3)';
-  resultEl.innerHTML='';
-
-  let prompt='';
-  let filename='scenario-'+type+'.json';
-
-  if(type==='whatsapp'){
-    const company=document.getElementById('wa-company').value||'My Company';
-    const business=document.getElementById('wa-business').value||'a business';
-    const welcome=document.getElementById('wa-welcome').value||'Hello! How can I help you?';
-    filename='whatsapp-bot.json';
-    prompt='Create a Make.com scenario blueprint JSON for a WhatsApp AI Bot. Company: "'+company+'". Business: "'+business+'". The bot receives WhatsApp messages via 360dialog webhook, sends to OpenAI GPT-4o with system prompt "You are assistant for '+company+'. '+business+'. Welcome: '+welcome+'", then replies via 360dialog HTTP. Return ONLY valid Make.com blueprint JSON with proper module structure. No explanations.';
-  }else if(type==='leadfollowup'){
-    const company=document.getElementById('lf-company').value||'My Company';
-    const service=document.getElementById('lf-service').value||'consulting';
-    const email=document.getElementById('lf-email').value||'info@company.com';
-    filename='lead-followup.json';
-    prompt='Create a Make.com scenario blueprint JSON for Lead Follow-Up automation. Company: "'+company+'". Service: "'+service+'". Gmail: '+email+'. Flow: Google Sheets Watch New Rows -> OpenAI GPT-4o generate 80-word follow-up email -> Gmail Send Email. System prompt: "You are assistant for '+company+'. Write warm follow-up email. End with CTA to book call." Return ONLY valid Make.com blueprint JSON. No explanations.';
-  }else if(type==='instagram'){
-    const handle=document.getElementById('ig-handle').value||'@mybrand';
-    const tone=document.getElementById('ig-tone').value||'friendly';
-    const reply=document.getElementById('ig-reply').value||'Thanks for reaching out!';
-    filename='instagram-dm-bot.json';
-    prompt='Create a Make.com scenario blueprint JSON for Instagram DM Bot. Handle: "'+handle+'". Tone: "'+tone+'". Default reply: "'+reply+'". Flow: Instagram Business Watch Direct Messages -> OpenAI GPT-4o generate reply -> Instagram Business Send Message. System prompt: "You are social media manager for '+handle+'. Tone: '+tone+'. Default: '+reply+'. Reply max 2 sentences." Return ONLY valid Make.com blueprint JSON. No explanations.';
-  }else if(type==='coldemail'){
-    const name=document.getElementById('ce-name').value||'Alex';
-    const industry=document.getElementById('ce-industry').value||'business owners';
-    const offer=document.getElementById('ce-offer').value||'AI automation services';
-    filename='cold-email-campaign.json';
-    prompt='Create a Make.com scenario blueprint JSON for Cold Email Campaign. Sender: "'+name+'". Target: "'+industry+'". Offer: "'+offer+'". Flow: Google Sheets Watch New Rows (Apollo export) -> OpenAI GPT-4o personalize opening paragraph -> HTTP POST to Instantly.ai API. GPT system prompt: "Write 2-sentence personalized cold email opening from '+name+' to prospect. Mention their industry: '+industry+'. Offer: '+offer+'." Return ONLY valid Make.com blueprint JSON. No explanations.';
-  }else if(type==='crm'){
-    const company=document.getElementById('crm-company').value||'My Company';
-    const emailAddr=document.getElementById('crm-email-addr').value||'manager@company.com';
-    const sources=[];
-    if(document.getElementById('crm-form').checked)sources.push('Google Forms');
-    if(document.getElementById('crm-wa').checked)sources.push('WhatsApp');
-    if(document.getElementById('crm-ig').checked)sources.push('Instagram');
-    if(document.getElementById('crm-email').checked)sources.push('Email');
-    filename='crm-automation.json';
-    prompt='Create a Make.com scenario blueprint JSON for Google Sheets CRM. Company: "'+company+'". Sources: '+sources.join(', ')+'. Report to: '+emailAddr+'. Flow: Google Sheets Watch New Rows -> OpenAI GPT-4o generate 20-word lead summary and next action -> Google Sheets Update Row. Plus weekly scheduler: every Monday 9am read CRM data -> GPT generate report -> Gmail send to '+emailAddr+'. Return ONLY valid Make.com blueprint JSON. No explanations.';
-  }
-
-  try{
-    const r=await fetch(API+'/api/ai/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt})});
-    const d=await r.json();
-
-    if(d.output){
-      const json=d.output.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-      window.wizardResults[type]={json:json,filename:filename};
-
-      statusEl.textContent='';
-      resultEl.innerHTML='<div class="result-box"><div class="result-title">✓ Make.com Scenario Ready!</div><div class="result-desc">Your scenario has been generated. Download and import into Make.com:<br><br><strong>How to import:</strong><br>1. Open Make.com → Scenarios<br>2. Click the 3 dots → Import Blueprint<br>3. Upload the JSON file<br>4. Add your API keys and connections<br>5. Enable → Done! ✓</div><button class="btn-gold" onclick="downloadWizard(\''+type+'\')">⬇️ Download Make.com Scenario</button><button class="btn-outline" onclick="copyWizard(\''+type+'\')">📋 Copy JSON</button></div>';
-      resultEl.scrollIntoView({behavior:'smooth'});
-      notify('Scenario generated ✓','success');
-    }else{
-      statusEl.textContent='Error generating. Please try again.';
-      statusEl.style.color='var(--red)';
+Generate a complete package in this EXACT JSON format (respond ONLY with JSON, no other text):
+{
+  "what": "Detailed description of exactly what you will build (2-3 sentences)",
+  "modules": "Exact Make.com modules needed, listed step by step",
+  "prompt": "Complete GPT System Message ready to paste into Make.com, customized for this industry",
+  "setupPrice": "$XXX–$XXX",
+  "monthlyPrice": "$XXX/month",
+  "buildTime": "X–X",
+  "outreach": "Complete personalized outreach message (WhatsApp/email) ready to send to this type of client"
+}`
+      })
+    });
+    const d = await r.json();
+    let data;
+    try {
+      const clean = d.output.replace(/```json|```/g, '').trim();
+      data = JSON.parse(clean);
+    } catch(e) {
+      data = {
+        what: d.output,
+        modules: 'See output above',
+        prompt: 'Generated above',
+        setupPrice: 'To be determined',
+        monthlyPrice: 'To be determined',
+        buildTime: '4–8',
+        outreach: 'See output above'
+      };
     }
-  }catch(e){
-    statusEl.textContent='Connection error. Please try again.';
-    statusEl.style.color='var(--red)';
+    document.getElementById('outWhat').textContent = data.what || '';
+    document.getElementById('outModules').textContent = data.modules || '';
+    document.getElementById('outPrompt').textContent = data.prompt || '';
+    document.getElementById('outPrice').textContent = data.setupPrice || '';
+    document.getElementById('outPriceSub').textContent = 'Setup fee · Retainer: ' + (data.monthlyPrice || '');
+    document.getElementById('outTime').textContent = data.buildTime || '';
+    document.getElementById('outEmail').textContent = data.outreach || '';
+    document.getElementById('wizardOutput').classList.add('visible');
+    notify('Package generated! ✓', 'success');
+  } catch(e) {
+    notify('Generation failed. Check your connection.', 'error');
+    document.getElementById('wizardPlaceholder').style.display = 'flex';
   }
-
-  btn.disabled=false;btn.textContent='⚡ Generate Make.com Scenario';
+  btn.disabled = false; btn.innerHTML = '<span>⚡</span> Generate Complete Package';
 }
 
-function downloadWizard(type){
-  const data=window.wizardResults[type];
-  if(!data){notify('Generate a scenario first','error');return;}
-  const blob=new Blob([data.json],{type:'application/json'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=data.filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  notify('Downloaded ✓','success');
+function copyText(id){
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => notify('Copied to clipboard ✓', 'success'));
 }
 
-function copyWizard(type){
-  const data=window.wizardResults[type];
-  if(!data){notify('Generate a scenario first','error');return;}
-  navigator.clipboard.writeText(data.json).then(function(){notify('JSON copied ✓','success');}).catch(function(){notify('Copy failed — try download instead','error');});
-}
-
-// EMAIL
-async function sendEmail(){
-  const to=document.getElementById('emailTo').value.trim();
-  const subject=document.getElementById('emailSubject').value.trim();
-  const body=document.getElementById('emailBody').value.trim();
-  const fromName=document.getElementById('emailFrom').value.trim();
-  const status=document.getElementById('emailStatus');
-  if(!to||!subject||!body){status.textContent='Please fill in all fields.';status.style.color='var(--red)';return;}
-  status.textContent='Sending...';status.style.color='var(--text3)';
-  try{
-    const r=await fetch(API+'/api/email/send',{method:'POST',headers:authH(),body:JSON.stringify({to,subject,body,fromName})});
-    const d=await r.json();
-    if(!r.ok){status.textContent=d.error||'Failed.';status.style.color='var(--red)';}
-    else{status.textContent='✓ Email sent to '+to;status.style.color='var(--green)';notify('Email sent ✓','success');loadDashboard();}
-  }catch(e){status.textContent='Connection error.';status.style.color='var(--red)';}
-}
-
-async function generateEmail(){
-  const subject=document.getElementById('emailSubject').value.trim();
-  if(!subject){notify('Enter a subject first','error');return;}
-  notify('Generating...','');
-  try{
-    const r=await fetch(API+'/api/ai/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:'Write a professional email body for subject: "'+subject+'". Concise and action-oriented. Return only the email body text.'})});
-    const d=await r.json();
-    if(d.output){document.getElementById('emailBody').value=d.output;notify('Generated ✓','success');}
-  }catch(e){notify('Error','error');}
-}
-
-function useTemplate(type){
-  const t={
-    followup:{subject:'Quick follow-up',body:'Hi [Name],\n\nI wanted to follow up on our conversation about automating your business.\n\nI have helped similar businesses save 20+ hours per week.\n\nWould you have 15 minutes for a quick call?\n\nBest,\n[Your Name]'},
-    welcome:{subject:'Welcome — Next Steps Inside',body:'Hi [Name],\n\nWelcome! Here is what happens next:\n1. I will set up your automation within 48 hours\n2. You will receive a testing link\n3. We go live after your approval\n\n[Your Name]'},
-    proposal:{subject:'Your proposal — one spot left this week',body:'Hi [Name],\n\nI wanted to check in on the proposal I sent.\n\nI have one spot available this week and wanted to give you first priority.\n\nWorth a quick call?\n\n[Your Name]'}
-  };
-  const tmpl=t[type];
-  if(tmpl){document.getElementById('emailSubject').value=tmpl.subject;document.getElementById('emailBody').value=tmpl.body;notify('Template loaded ✓','success');showPage('email',document.getElementById('nav-email'));}
-}
-
-// IMAGE UPLOAD
-function handleImageUpload(e){
-  const file=e.target.files[0];
-  if(!file)return;
-  if(file.size>4*1024*1024){notify('Image too large. Max 4MB.','error');return;}
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    attachedImage=ev.target.result.split(',')[1];
-    document.getElementById('imgPreviewThumb').src=ev.target.result;
-    document.getElementById('imgPreviewRow').style.display='flex';
-    notify('Image attached ✓','success');
-  };
-  reader.readAsDataURL(file);
-}
-
-function removeImage(){
-  attachedImage=null;
-  document.getElementById('imgPreviewRow').style.display='none';
-  document.getElementById('imageUpload').value='';
-}
-
-// AI CHAT
+// ══ AI CHAT ══
 async function sendChat(){
-  const input=document.getElementById('chatInput');
-  const msg=input.value.trim();
-  if(!msg&&!attachedImage)return;
-  if(attachedImage){
-    const msgEl=document.createElement('div');
-    msgEl.className='chat-msg user';
-    msgEl.innerHTML='<div class="chat-avatar user">👤</div><div class="chat-bubble"><img src="'+document.getElementById('imgPreviewThumb').src+'" class="chat-img-preview"/>'+(msg?'<br>'+msg:'')+'</div>';
-    document.getElementById('chatMessages').appendChild(msgEl);
-  }else{addMsg(msg,'user');}
-  input.value='';
-  const imageToSend=attachedImage;
-  removeImage();
-  const tid='t'+Date.now();
-  const tel=document.createElement('div');
-  tel.className='chat-msg ai';tel.id=tid;
-  tel.innerHTML='<div class="chat-avatar ai">A</div><div class="chat-bubble"><div class="chat-thinking"><span></span><span></span><span></span></div></div>';
-  document.getElementById('chatMessages').appendChild(tel);scrollChat();
-  try{
-    const body={prompt:msg||(imageToSend?'Analyze this image and provide step-by-step instructions.':'')};
-    if(imageToSend)body.imageBase64=imageToSend;
-    const r=await fetch(API+'/api/ai/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d=await r.json();
-    document.getElementById(tid).remove();
-    addMsg(d.output||'Sorry, could not process that.','ai');
-  }catch(e){document.getElementById(tid).remove();addMsg('Connection error. Please try again.','ai');}
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if(!msg) return;
+  document.getElementById('chatSuggestions').style.display = 'none';
+  addChatMsg(msg, 'user');
+  chatHistory.push({role:'user', content: msg});
+  input.value = ''; input.style.height = 'auto';
+  document.getElementById('chatSendBtn').disabled = true;
+  const thinkingId = 'think-'+Date.now();
+  const el = document.createElement('div');
+  el.className = 'chat-msg'; el.id = thinkingId;
+  el.innerHTML = `<div class="chat-avatar ai">A</div><div class="chat-bubble ai"><div class="chat-thinking"><span></span><span></span><span></span></div></div>`;
+  document.getElementById('chatMessages').appendChild(el);
+  scrollChat();
+  try {
+    const systemPrompt = `You are AutoFlow AI — an expert assistant for AI automation agency owners. You have deep expertise in:
+- Make.com (all modules, scenarios, webhooks, routing, error handling)
+- WhatsApp Business API (360dialog, Twilio, Meta Business API)
+- Instagram Graph API (access tokens, webhooks, DM automation)
+- OpenAI GPT-4o (prompt engineering, system messages, API usage)
+- Cold email automation (Apollo.io, Instantly.ai)
+- Google Sheets CRM automation
+- Agency pricing, sales scripts, objection handling
+- Client outreach and acquisition strategies
+
+CRITICAL RULES:
+1. ALWAYS detect and respond in the SAME LANGUAGE the user writes in. If Romanian → Romanian. If English → English. If French → French. Never switch languages unless asked.
+2. Give COMPLETE, ACTIONABLE answers with exact steps, real code, real URLs, real prices
+3. Never say "I don't know" — always provide the best possible answer
+4. For Make.com questions: give exact module names and settings
+5. For pricing questions: give specific ranges with justification
+6. Format responses clearly with steps when appropriate`;
+
+    const messages = [{role:'system', content: systemPrompt}, ...chatHistory.slice(-10)];
+    const r = await fetch(API+'/api/ai/chat', {
+      method:'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({messages})
+    });
+    let reply;
+    if(r.ok){
+      const d = await r.json();
+      reply = d.output || d.content || d.message || 'Sorry, I could not process that.';
+    } else {
+      // Fallback: use generate endpoint
+      const r2 = await fetch(API+'/api/ai/generate', {
+        method:'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          prompt: systemPrompt + '\n\nUser message: ' + msg + '\n\nRespond in the same language as the user message.'
+        })
+      });
+      const d2 = await r2.json();
+      reply = d2.output || 'Connection error. Please try again.';
+    }
+    document.getElementById(thinkingId).remove();
+    addChatMsg(reply, 'ai');
+    chatHistory.push({role:'assistant', content: reply});
+  } catch(e) {
+    document.getElementById(thinkingId).remove();
+    addChatMsg('Connection error. Make sure your internet is working and try again.', 'ai');
+  }
+  document.getElementById('chatSendBtn').disabled = false;
 }
 
-function addMsg(text,role){
-  const el=document.createElement('div');
-  el.className='chat-msg '+role;
-  el.innerHTML='<div class="chat-avatar '+role+'">'+(role==='ai'?'A':'👤')+'</div><div class="chat-bubble">'+text.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')+'</div>';
-  document.getElementById('chatMessages').appendChild(el);scrollChat();
+function addChatMsg(text, role){
+  const el = document.createElement('div');
+  el.className = 'chat-msg ' + role;
+  const avatar = role==='ai' ? '<div class="chat-avatar ai">A</div>' : '<div class="chat-avatar user">👤</div>';
+  const formatted = text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>').replace(/`([^`]+)`/g,'<code style="background:var(--bg3);padding:1px 6px;border-radius:4px;font-family:JetBrains Mono,monospace;font-size:12px">$1</code>');
+  el.innerHTML = (role==='ai'?avatar:'') + `<div class="chat-bubble ${role}">${formatted}</div>` + (role==='user'?avatar:'');
+  document.getElementById('chatMessages').appendChild(el);
+  scrollChat();
 }
 
-function scrollChat(){const c=document.getElementById('chatMessages');c.scrollTop=c.scrollHeight;}
+function scrollChat(){ const c=document.getElementById('chatMessages'); c.scrollTop=c.scrollHeight; }
+function handleChatKey(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();} }
+function autoResize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,160)+'px'; }
+function sendSuggestion(el){ document.getElementById('chatInput').value=el.textContent; sendChat(); }
 
-// WEBHOOKS
-async function loadWebhooks(){
-  try{
-    const r=await fetch(API+'/api/webhooks',{headers:authH()});
-    const wh=await r.json();
-    const el=document.getElementById('webhookList');
-    if(!wh.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);">No webhooks yet. Create your first one!</div>';return;}
-    el.innerHTML=wh.map(function(w){return '<div class="webhook-card"><div class="webhook-name">'+w.name+'</div><div class="webhook-url">'+w.url+'</div><div class="webhook-footer"><span class="webhook-hits">'+w.hits+' hits</span><button class="btn-small" onclick="copyUrl(\''+w.url+'\')">Copy URL</button></div></div>';}).join('');
-  }catch(e){}
+// ══ EMAIL ══
+const templates = {
+  cold: {
+    subject: 'Quick question about {{company}}',
+    body: `Hi {{name}},
+
+I came across {{company}} and noticed you probably receive a lot of customer messages — WhatsApp, Instagram DMs, contact form submissions — that take a lot of time to reply to.
+
+I build AI systems that automatically reply to every customer inquiry within seconds, 24/7 — in your brand voice. Businesses using this stop losing leads to slow response times.
+
+Would a 15-minute call this week make sense to show you how it works for {{company}}?
+
+Best,
+[Your Name]`
+  },
+  followup: {
+    subject: 'Re: Quick question about {{company}}',
+    body: `Hi {{name}},
+
+Just following up on my message from a few days ago.
+
+I know timing might not be right — but if {{company}} is losing leads because of slow response times, I can show you a working solution in 15 minutes.
+
+Worth a quick look?
+
+[Your Name]`
+  },
+  proposal: {
+    subject: '{{company}} proposal — one spot left this week',
+    body: `Hi {{name}},
+
+I sent your proposal a few days ago and wanted to check in.
+
+I have one implementation spot available this week and wanted to give {{company}} first priority before offering it to another client.
+
+The system we discussed would save your team 10+ hours per week in manual replies and ensure no lead goes unanswered.
+
+Worth a 15-minute call to finalize?
+
+[Your Name]`
+  },
+  delivery: {
+    subject: '🎉 Your automation is live — {{company}}',
+    body: `Hi {{name}},
+
+Great news — your AI automation system is now live and running 24/7!
+
+Here is what is working right now:
+✓ Every message is replied to within seconds
+✓ Replies are customized for your business
+✓ All leads are logged automatically
+
+Over the next few days, test it by sending a few messages yourself. Let me know if you want any adjustments.
+
+Welcome to the future of customer communication! 🚀
+
+[Your Name]`
+  },
+  testimonial: {
+    subject: 'Quick favour — {{company}}',
+    body: `Hi {{name}},
+
+Glad to see the automation is working well for {{company}}!
+
+Would you be willing to write 2–3 sentences about your experience so far? It would help me help more businesses like yours.
+
+Something like: what problem it solved, how it is working, and whether you would recommend it.
+
+You can reply directly to this email — I will format it and share it (with your permission).
+
+Thanks so much,
+[Your Name]`
+  },
+  referral: {
+    subject: 'Do you know anyone who needs this?',
+    body: `Hi {{name}},
+
+I hope the automation is still saving you time every day!
+
+Quick question — do you know any other business owners who might benefit from the same system? Even a quick introduction would mean a lot.
+
+Most of my best clients come from referrals, and I always make sure the people I work with get priority attention.
+
+Thanks,
+[Your Name]`
+  }
+};
+
+function loadTemplate(type){
+  const t = templates[type];
+  if(!t) return;
+  const name = document.getElementById('emailName').value || '{{name}}';
+  const company = document.getElementById('emailCompany').value || '{{company}}';
+  document.getElementById('emailSubject').value = t.subject.replace(/{{name}}/g,name).replace(/{{company}}/g,company);
+  document.getElementById('emailBody').value = t.body.replace(/{{name}}/g,name).replace(/{{company}}/g,company);
+  notify('Template loaded ✓', 'success');
 }
 
-async function createWebhook(){
-  const name=prompt('Webhook name:','My Webhook');
-  if(!name)return;
-  try{
-    await fetch(API+'/api/webhooks/create',{method:'POST',headers:authH(),body:JSON.stringify({name:name})});
-    notify('Webhook created ✓','success');loadWebhooks();
-  }catch(e){notify('Error','error');}
+async function generateAndSendEmail(){
+  const to = document.getElementById('emailTo').value.trim();
+  const name = document.getElementById('emailName').value.trim() || 'there';
+  const company = document.getElementById('emailCompany').value.trim() || 'your business';
+  const subject = document.getElementById('emailSubject').value.trim();
+  const body = document.getElementById('emailBody').value.trim();
+  if(!to || !subject){ notify('Please fill in the recipient email and subject.', 'error'); return; }
+  const btn = document.getElementById('sendEmailBtn');
+  const status = document.getElementById('emailStatus');
+  btn.disabled = true; btn.textContent = '✨ Generating...';
+  status.style.color = 'var(--text3)'; status.textContent = 'Generating personalized email with AI...';
+  try {
+    const genR = await fetch(API+'/api/ai/generate', {
+      method:'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        prompt: `Write a professional cold outreach email.
+Subject: ${subject}
+Recipient name: ${name}
+Company: ${company}
+${body ? 'Base content to improve and personalize:\n'+body : 'Write a compelling cold email about AI automation services.'}
+
+Rules:
+- Keep it under 120 words
+- Sound like a real person, not a robot
+- End with a clear call to action for a 15-minute call
+- Return ONLY the email body text, no subject line, no "Dear" prefix`
+      })
+    });
+    const genD = await genR.json();
+    const finalBody = genD.output || body;
+    // Send the email
+    const sendR = await fetch(API+'/api/email/send', {
+      method:'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({to, subject, body: finalBody, fromName: 'AI Automation Agency'})
+    });
+    const sendD = await sendR.json();
+    if(sendR.ok){
+      status.style.color = 'var(--green)';
+      status.textContent = '✓ Email sent successfully to ' + to;
+      document.getElementById('emailBody').value = finalBody;
+      notify('Email sent! ✓', 'success');
+      loadLogs();
+    } else {
+      status.style.color = 'var(--red)';
+      status.textContent = sendD.error || 'Failed to send. Check your server.';
+    }
+  } catch(e) {
+    status.style.color = 'var(--red)';
+    status.textContent = 'Connection error. Try again.';
+  }
+  btn.disabled = false; btn.textContent = '✨ Generate with AI + Send';
 }
 
-function copyUrl(url){
-  navigator.clipboard.writeText(url).then(function(){notify('URL copied ✓','success');}).catch(function(){notify('Copy failed','error');});
+async function sendEmailDirect(){
+  const to = document.getElementById('emailTo').value.trim();
+  const subject = document.getElementById('emailSubject').value.trim();
+  const body = document.getElementById('emailBody').value.trim();
+  if(!to || !subject || !body){ notify('Please fill in all fields.', 'error'); return; }
+  const status = document.getElementById('emailStatus');
+  status.style.color = 'var(--text3)'; status.textContent = 'Sending...';
+  try {
+    const r = await fetch(API+'/api/email/send', {
+      method:'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({to, subject, body, fromName: 'AI Automation Agency'})
+    });
+    const d = await r.json();
+    if(r.ok){ status.style.color='var(--green)'; status.textContent='✓ Sent to '+to; notify('Email sent! ✓','success'); loadLogs(); }
+    else { status.style.color='var(--red)'; status.textContent=d.error||'Send failed.'; }
+  } catch(e){ status.style.color='var(--red)'; status.textContent='Connection error.'; }
 }
 
-// LOGS
+// ══ CLIENT TRACKER ══
+function renderClients(){
+  const body = document.getElementById('clientsBody');
+  if(!clients.length){
+    body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">No clients yet. Add your first client above.</div>';
+    document.getElementById('totalRevenue').textContent = '$0/mo';
+    document.getElementById('clientCount').textContent = '0 active clients';
+    return;
+  }
+  body.innerHTML = clients.map((c,i) => `
+    <div class="table-row">
+      <div class="td" style="font-weight:600">${c.name}</div>
+      <div class="td" style="color:var(--text3)">${c.automation}</div>
+      <div class="td"><span class="status-badge status-${c.status==='Active'?'active':c.status==='Pending'?'pending':'paused'}">${c.status}</span></div>
+      <div class="td" style="color:var(--gold);font-weight:600">$${c.retainer}/mo</div>
+      <div class="td" style="color:var(--text3)">${c.since}</div>
+    </div>`).join('');
+  const active = clients.filter(c=>c.status==='Active');
+  const total = active.reduce((s,c)=>s+(parseInt(c.retainer)||0),0);
+  document.getElementById('totalRevenue').textContent = '$'+total+'/mo';
+  document.getElementById('clientCount').textContent = active.length + ' active client' + (active.length!==1?'s':'');
+  document.getElementById('stat-clients').textContent = active.length;
+  document.getElementById('stat-revenue').textContent = '$'+total;
+  document.getElementById('stat-automations').textContent = clients.length;
+}
+
+function openAddClient(){ document.getElementById('addClientModal').classList.add('open'); }
+function closeModal(){ document.getElementById('addClientModal').classList.remove('open'); }
+
+function addClient(){
+  const name = document.getElementById('newClientName').value.trim();
+  const auto = document.getElementById('newClientAuto').value;
+  const retainer = document.getElementById('newClientRetainer').value || '0';
+  if(!name){ notify('Please enter a client name.', 'error'); return; }
+  const today = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  clients.push({name, automation:auto, status:'Active', retainer, since:today});
+  localStorage.setItem('af_clients', JSON.stringify(clients));
+  document.getElementById('newClientName').value = '';
+  document.getElementById('newClientRetainer').value = '';
+  closeModal();
+  renderClients();
+  notify('Client added! ✓', 'success');
+}
+
+// ══ LOGS ══
 async function loadLogs(){
-  try{
-    const r=await fetch(API+'/api/logs',{headers:authH()});
-    const logs=await r.json();
-    const el=document.getElementById('logList');
-    if(!logs.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0;">No activity yet.</div>';return;}
-    el.innerHTML=logs.map(function(l){return '<div class="log-row"><div class="log-time">'+new Date(l.time).toLocaleTimeString()+'</div><div class="log-badge '+l.status+'">'+l.status.toUpperCase()+'</div><div class="log-msg">'+l.msg+'</div></div>';}).join('');
-  }catch(e){}
+  try {
+    const r = await fetch(API+'/api/logs', {headers: authHeaders()});
+    const logs = await r.json();
+    const list = document.getElementById('logsList');
+    if(!logs.length){ list.innerHTML='<div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">No activity yet.</div>'; return; }
+    list.innerHTML = logs.map(l => `
+      <div class="log-item">
+        <div class="log-dot ${l.status==='success'?'success':l.status==='error'?'error':'info'}"></div>
+        <div style="flex:1">
+          <div class="log-msg">${l.msg}</div>
+          <div class="log-time">${new Date(l.time).toLocaleString()}</div>
+        </div>
+        <div class="log-type">${l.type||'event'}</div>
+      </div>`).join('');
+  } catch(e){ document.getElementById('logsList').innerHTML='<div style="padding:24px;text-align:center;color:var(--red);font-size:13px">Error loading logs.</div>'; }
 }
 
-// NOTIFY
-function notify(msg,type){
-  const el=document.getElementById('notif');
-  el.textContent=msg;el.className='notif show'+(type?' '+type:'');
-  clearTimeout(el._t);el._t=setTimeout(function(){el.classList.remove('show');},3000);
+// ══ NOTIFICATIONS ══
+function notify(msg, type=''){
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.className = 'notif show' + (type?' '+type:'');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'), 3000);
 }
 </script>
 </body>
