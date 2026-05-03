@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Module 5 — WhatsApp Bot</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(200,169,110,.08);backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;color:#C8A96E}
+.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:#C8A96E;color:#C8A96E}
+.module-hero{padding:56px 32px 40px;max-width:860px;margin:0 auto}
+.module-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(200,169,110,.12);border:1px solid rgba(200,169,110,.2);border-radius:100px;padding:5px 14px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.module-num{font-family:"Playfair Display",serif;font-size:80px;font-weight:900;color:rgba(200,169,110,.1);line-height:1;margin-bottom:-20px}
+.module-title{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:16px}
+.module-title em{font-style:italic;color:#C8A96E}
+.module-desc{font-size:15px;color:#C8BEA8;max-width:600px;line-height:1.75}
+.module-meta{display:flex;gap:20px;margin-top:28px;flex-wrap:wrap}
+.meta-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#C8BEA8}
+.meta-dot{width:6px;height:6px;border-radius:50%;background:#C8A96E}
+.progress-wrap{max-width:860px;margin:0 auto 40px;padding:0 32px}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.lessons-nav{max-width:860px;margin:0 auto 32px;padding:0 32px;display:flex;gap:8px;flex-wrap:wrap}
+.lesson-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(200,169,110,.1);background:transparent;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
+.lesson-tab:hover{border-color:rgba(200,169,110,.3);color:#F5F0E8}
+.lesson-tab.active{background:rgba(200,169,110,.15);border-color:#C8A96E;color:#C8A96E;font-weight:600}
+.lesson-tab.done::before{content:"✓ ";color:#C8A96E}
+.lesson-wrap{max-width:860px;margin:0 auto;padding:0 32px 80px}
+.lesson-content{display:none}
+.lesson-content.active{display:block}
+.lesson-header{background:#0f0f0f;border:1px solid rgba(200,169,110,.08);border-radius:14px;padding:32px;margin-bottom:28px}
+.lesson-tag{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:100px;border:1px solid rgba(200,169,110,.18);color:#C8A96E;background:rgba(200,169,110,.1);margin-bottom:14px}
+.lesson-title{font-family:"Playfair Display",serif;font-size:clamp(22px,3vw,32px);font-weight:700;margin-bottom:10px;line-height:1.1}
+.lesson-intro{font-size:14px;color:#C8BEA8;line-height:1.8}
+.block{margin-bottom:36px}
+.block-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:#F5F0E8;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.block-title::before{content:"";width:3px;height:20px;background:#C8A96E;border-radius:2px;flex-shrink:0}
+.block-text{font-size:14px;color:#C8BEA8;line-height:1.85;margin-bottom:14px}
+.steps{display:flex;flex-direction:column;gap:20px;margin:20px 0}
+.step{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;border-left:3px solid #C8A96E}
+.step-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#080808;flex-shrink:0}
+.step-title{font-size:15px;font-weight:700;color:#F5F0E8}
+.step-text{font-size:13px;color:#C8BEA8;line-height:1.8;margin-bottom:10px}
+.step-text:last-child{margin-bottom:0}
+.step-detail{background:#161616;border-radius:8px;padding:14px 16px;margin-top:10px;font-size:13px;color:#C8BEA8;line-height:1.75;border-left:2px solid rgba(200,169,110,.3)}
+.click{display:inline-flex;align-items:center;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:5px;padding:2px 10px;font-size:12px;color:#C8A96E;font-weight:600;margin:0 2px}
+.type-this{background:#0a0a0a;border:1px solid rgba(200,169,110,.2);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#F5F0E8;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap}
+.code-block{background:#0a0a0a;border:1px solid rgba(200,169,110,.15);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#C8A96E;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap;overflow-x:auto}
+.info-box{border-radius:10px;padding:20px 24px;margin:20px 0}
+.info-box.gold{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2)}
+.info-box.tip{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15)}
+.info-box.warn{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.15)}
+.info-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.info-box.gold .info-label{color:#C8A96E}
+.info-box.tip .info-label{color:#4ADE80}
+.info-box.warn .info-label{color:#e74c3c}
+.info-text{font-size:13px;color:#C8BEA8;line-height:1.75}
+.flow-diagram{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;margin:20px 0;display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap}
+.flow-step{text-align:center;padding:16px 20px;background:#161616;border:1px solid rgba(200,169,110,.15);border-radius:10px;min-width:130px}
+.flow-step-icon{font-size:24px;margin-bottom:8px;display:block}
+.flow-step-name{font-size:13px;font-weight:700;color:#F5F0E8;margin-bottom:4px}
+.flow-step-desc{font-size:11px;color:#C8BEA8}
+.flow-arrow{font-size:20px;color:rgba(200,169,110,.5);padding:0 10px;flex-shrink:0}
+.msg-template{background:#0a0a0a;border:1px solid rgba(200,169,110,.25);border-radius:12px;padding:24px;margin:16px 0}
+.msg-header{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.msg-header::before{content:"";width:20px;height:1px;background:#C8A96E}
+.msg-body{font-size:13px;color:#F5F0E8;line-height:1.9;font-style:italic}
+.msg-note{font-size:11px;color:#7A7060;margin-top:12px;font-style:normal}
+.takeaways{background:#161616;border:1px solid rgba(200,169,110,.12);border-radius:12px;padding:28px;margin:28px 0}
+.takeaways-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E;margin-bottom:16px}
+.takeaway{display:flex;gap:12px;margin-bottom:12px;font-size:13px;color:#F5F0E8;line-height:1.6}
+.takeaway:last-child{margin-bottom:0}
+.takeaway::before{content:"◆";color:#C8A96E;font-size:8px;margin-top:5px;flex-shrink:0}
+.exercise{background:linear-gradient(135deg,rgba(200,169,110,.08),rgba(200,169,110,.03));border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:28px;margin:28px 0}
+.exercise-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:12px}
+.exercise-text{font-size:14px;color:#F5F0E8;line-height:1.75}
+.lesson-actions{display:flex;gap:12px;margin-top:40px;flex-wrap:wrap}
+.btn-complete{padding:13px 28px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-complete:hover{opacity:.9;transform:translateY(-1px)}
+.btn-next{padding:13px 28px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:8px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-next:hover{border-color:#C8A96E;color:#C8A96E}
+@media(max-width:600px){.module-hero,.progress-wrap,.lessons-nav,.lesson-wrap{padding-left:16px;padding-right:16px}.lesson-header{padding:20px}.flow-diagram{flex-direction:column}.flow-arrow{transform:rotate(90deg)}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">AI Cash Systems</div>
+  <a href="/course-starter.html" class="back-btn">← Back to Course</a>
+</nav>
+
+<div class="module-hero">
+  <div class="module-badge">Module 5 of 8</div>
+  <div class="module-num">05</div>
+  <h1 class="module-title">WhatsApp Bot —<br><em>Automated Replies 24/7</em></h1>
+  <p class="module-desc">Build a complete WhatsApp bot using 360dialog + Make.com + GPT-4o. Every step explained from account creation to live bot — and how to sell it for $500–$2,000.</p>
+  <div class="module-meta">
+    <div class="meta-item"><div class="meta-dot"></div>3 Lessons</div>
+    <div class="meta-item"><div class="meta-dot"></div>~90 minutes</div>
+    <div class="meta-item"><div class="meta-dot"></div>WhatsApp Automation</div>
+  </div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-label"><span>Module Progress</span><span id="progressLabel">0 / 3 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="lessons-nav">
+  <button class="lesson-tab active" onclick="showLesson(1)" id="tab1">Lesson 1 — WhatsApp API Setup</button>
+  <button class="lesson-tab" onclick="showLesson(2)" id="tab2">Lesson 2 — Build the Bot</button>
+  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — Sell It</button>
+</div>
+
+<div class="lesson-wrap">
+
+<!-- LESSON 1 -->
+<div class="lesson-content active" id="lesson1">
+  <div class="lesson-header">
+    <div class="lesson-tag">Setup · Lesson 1</div>
+    <h2 class="lesson-title">WhatsApp Business API — What It Is and How to Get It</h2>
+    <p class="lesson-intro">WhatsApp has over 2 billion active users. Businesses that reply instantly convert 3–5x more leads than those that reply in hours. To build an automated WhatsApp bot you need API access — this lesson shows you exactly how to get it.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Why WhatsApp API and Not Just WhatsApp Business App</div>
+    <div class="block-text">There are two different things called "WhatsApp Business." The first is the free app you download on your phone — it lets you reply manually and set away messages, but it cannot be automated. The second is the WhatsApp Business API — this is a programmatic interface that allows Make.com to receive and send messages automatically.</div>
+    <div class="block-text">To build a real bot that replies 24/7 without human involvement, you need the API. You access it through a provider like 360dialog — they connect your phone number to the API and give you a key that Make.com uses to send and receive messages.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Three API Options — Which One to Use</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">360dialog — Recommended for beginners</div></div>
+        <div class="step-text">360dialog is the cheapest and simplest option. It costs approximately $5–$10/month per phone number and integrates directly with Make.com. Setup takes about 30 minutes. This is what we use in this module.</div>
+        <div class="step-detail">Website: <strong style="color:#C8A96E">360dialog.com</strong> — you create an account, connect a phone number, and get an API key. Make.com has a built-in 360dialog integration so no complex configuration needed.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Twilio — More stable, more expensive</div></div>
+        <div class="step-text">Twilio is a larger platform that also provides WhatsApp API. It costs more ($15–$20/month) but is more reliable for high message volumes. Use Twilio when a client sends or receives more than 500 messages per day.</div>
+        <div class="step-detail">Website: <strong style="color:#C8A96E">twilio.com</strong> — the setup is similar to 360dialog but more steps. The Make.com integration uses the HTTP module with Twilio's API endpoint.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Meta Business API — Free but complex</div></div>
+        <div class="step-text">Meta offers the WhatsApp Business API directly for free. There is no monthly fee but the setup requires creating a Meta Business account, a Facebook App, and going through a verification process that can take days. Use this option only once you are comfortable with the simpler options.</div>
+        <div class="step-detail">Website: <strong style="color:#C8A96E">developers.facebook.com</strong> — for your first bots use 360dialog and upgrade clients to Meta API later if they want to save on monthly fees.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step-by-Step — Create Your 360dialog Account</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to 360dialog.com and click "Get Started"</div></div>
+        <div class="step-text">Open your browser and go to <strong style="color:#C8A96E">360dialog.com</strong>. On the homepage click the button that says <span class="click">Get Started</span> or <span class="click">Sign Up</span>. A registration form appears asking for your name, email, and password. Fill it in and click <span class="click">Create Account</span>.</div>
+        <div class="step-detail">Use your business email — not a personal Gmail. This account will be associated with the phone numbers you manage for clients. If you are setting this up for a client, use their business email and create the account in their name.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Verify your email</div></div>
+        <div class="step-text">After registering, 360dialog sends a verification email. Open your email inbox, find the email from 360dialog, and click the verification link. You are taken back to the 360dialog dashboard.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Add a new WhatsApp number — click "Add Channel"</div></div>
+        <div class="step-text">In the 360dialog dashboard, look for a button that says <span class="click">Add Channel</span> or <span class="click">+ New Number</span> — it is usually in the top right or in the left sidebar under "Channels." Click it.</div>
+        <div class="step-detail">
+          Important: You need a dedicated phone number for the WhatsApp bot — NOT the client's personal number and NOT a number already registered on WhatsApp. Options:<br/><br/>
+          <strong style="color:#C8A96E">Option A:</strong> A new SIM card — buy a cheap prepaid SIM (~$5–$10) and use that number.<br/>
+          <strong style="color:#C8A96E">Option B:</strong> A virtual phone number — services like <strong style="color:#C8A96E">TextNow</strong>, <strong style="color:#C8A96E">Google Voice</strong> (US only), or <strong style="color:#C8A96E">MySudo</strong> give you a real phone number digitally. Some of these work for WhatsApp verification, some don't — test first.<br/><br/>
+          Tell the client: "We need a dedicated phone number for the bot. Buy a cheap prepaid SIM at any phone store for about $5. This becomes the bot's number."
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Choose your plan and enter the phone number</div></div>
+        <div class="step-text">360dialog asks you to select a plan. Choose the <span class="click">Basic</span> or <span class="click">Starter</span> plan — approximately $5–$10/month. Enter the phone number you want to use for the bot. Enter the country code first — for Romania it is +40, for example +40712345678.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Verify the phone number via SMS or call</div></div>
+        <div class="step-text">360dialog sends a verification code to the phone number you entered. Make sure you have access to that SIM card right now — the code expires in a few minutes. Enter the 6-digit code in the verification field and click <span class="click">Verify</span>.</div>
+        <div class="step-detail">If you are setting this up for a client remotely, ask them to be available to receive the SMS during this step. Have them read you the code over WhatsApp or email.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">6</div><div class="step-title">Copy your API Key and Webhook URL</div></div>
+        <div class="step-text">After verification, 360dialog shows you your channel settings. You need two things from this page — copy both and save them somewhere safe:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">API Key:</strong> A long string of letters and numbers that looks like <code style="color:#C8A96E">AbCdEf123456789...</code>. This is your authentication key — Make.com uses it to send messages on behalf of this number.<br/><br/>
+          <strong style="color:#C8A96E">Webhook URL field:</strong> This is where you will paste the Make.com webhook URL in Lesson 2. Leave this field empty for now — you will come back to it.<br/><br/>
+          Save the API Key in your Notes app or Google Keep right now.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box warn">
+    <div class="info-label">⚠️ Important — Number Registration Rules</div>
+    <div class="info-text">A phone number can only be registered on ONE WhatsApp account at a time. If the number is currently active on regular WhatsApp or WhatsApp Business app, you must first delete that WhatsApp account from the phone before registering it with 360dialog. Tell your client: "Once we register this number with the API, you cannot use it on your personal WhatsApp app anymore. That is why we use a dedicated SIM."</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 1</div>
+    <div class="takeaway">WhatsApp Business App cannot be automated — you need the WhatsApp Business API through a provider like 360dialog.</div>
+    <div class="takeaway">Always use a dedicated phone number for the bot — never the client's personal number.</div>
+    <div class="takeaway">360dialog costs $5–$10/month and is the fastest to set up. Perfect for your first bots.</div>
+    <div class="takeaway">Save your API Key immediately after creation — you will need it in Lesson 2.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Set Up 360dialog Now</div>
+    <div class="exercise-text">Go to 360dialog.com and create your account. If you have a spare SIM card or a number you can use for testing, register it and copy your API key. If not — just create the account and explore the dashboard so you know exactly where everything is when you do it for a client. The account is free to create, you only pay when you add a number.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(1)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(2)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 2 -->
+<div class="lesson-content" id="lesson2">
+  <div class="lesson-header">
+    <div class="lesson-tag">Build · Lesson 2</div>
+    <h2 class="lesson-title">Build the WhatsApp Bot — Make.com + GPT-4o</h2>
+    <p class="lesson-intro">This is the complete build: a WhatsApp message comes in → Make.com receives it via webhook → GPT-4o generates a reply → Make.com sends it back on WhatsApp. The entire flow completes in under 10 seconds.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Complete Flow</div>
+    <div class="flow-diagram">
+      <div class="flow-step">
+        <span class="flow-step-icon">📱</span>
+        <div class="flow-step-name">WhatsApp Message</div>
+        <div class="flow-step-desc">Customer sends message</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="flow-step-icon">🔗</span>
+        <div class="flow-step-name">360dialog</div>
+        <div class="flow-step-desc">Forwards to webhook</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="flow-step-icon">⚙️</span>
+        <div class="flow-step-name">Make.com</div>
+        <div class="flow-step-desc">Receives & processes</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="flow-step-icon">◎</span>
+        <div class="flow-step-name">GPT-4o</div>
+        <div class="flow-step-desc">Writes the reply</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="flow-step-icon">📱</span>
+        <div class="flow-step-name">WhatsApp Reply</div>
+        <div class="flow-step-desc">Sent in seconds</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Create the Webhook in Make.com</div>
+    <div class="block-text">Unlike the automations in Module 2 that use a scheduled trigger, the WhatsApp bot uses a Webhook trigger — it activates instantly every time a message arrives, 24/7.</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a new Scenario in Make.com</div></div>
+        <div class="step-text">Open Make.com. Go to Scenarios. Click <span class="click">+ Create a new scenario</span>. The canvas opens with the empty trigger circle.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Click the trigger circle and search "Webhooks"</div></div>
+        <div class="step-text">Click the trigger circle. In the search box type <strong style="color:#C8A96E">Webhooks</strong>. Click on the "Webhooks" app that appears — it has a purple icon. From the list of actions select <span class="click">Custom Webhook</span>.</div>
+        <div class="step-detail">"Custom Webhook" means Make.com will listen at a special URL and trigger the scenario every time data arrives at that URL. 360dialog will send WhatsApp messages to this URL.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Click "Add" to create a new webhook and copy the URL</div></div>
+        <div class="step-text">In the Webhooks settings, click <span class="click">Add</span> to create a new webhook. Give it a name like "WhatsApp Bot — [Client Name]". Click <span class="click">Save</span>. Make.com generates a unique webhook URL that looks like:</div>
+        <div class="step-detail"><code style="color:#C8A96E">https://hook.eu1.make.com/abcdef123456789...</code><br/><br/>Click the <span class="click">Copy address to clipboard</span> button to copy this URL. Save it — you will paste it into 360dialog in the next step.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Paste the webhook URL in 360dialog</div></div>
+        <div class="step-text">Go back to 360dialog. Open your channel settings (click on the phone number you registered). Find the field called <strong style="color:#C8A96E">Webhook URL</strong>. Paste the Make.com webhook URL you just copied. Click <span class="click">Save</span>.</div>
+        <div class="step-detail">This tells 360dialog: "Every time a WhatsApp message arrives on this number, send all the message data to this Make.com URL." From this moment, every incoming WhatsApp message triggers your Make.com scenario.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Send a test WhatsApp message to capture the data structure</div></div>
+        <div class="step-text">Go back to Make.com. The Webhooks module should now say "Waiting for data..." with a loading indicator. Send a WhatsApp message to the bot's phone number from your own phone — type anything like "Hello, test message."</div>
+        <div class="step-detail">
+          Within seconds Make.com receives the message data and the module stops showing "Waiting for data" — it now shows a green checkmark and "1 bundle." Click <span class="click">OK</span> to confirm the data structure.<br/><br/>
+          Make.com has now learned what data 360dialog sends. This data includes: the sender's phone number, the message text, the timestamp, and more. You will use these variables in the next steps.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Add the OpenAI Module</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Click "+" after the Webhooks module and add OpenAI</div></div>
+        <div class="step-text">Hover over the Webhooks circle and click the <span class="click">+</span> button. Search for <strong style="color:#C8A96E">OpenAI</strong> and select <span class="click">Create a Chat Completion</span>. Connect your OpenAI API key (same one from Module 2).</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Select Model: gpt-4o</div></div>
+        <div class="step-text">In the Model dropdown select <span class="click">gpt-4o</span>.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Set the System message — define the bot's personality</div></div>
+        <div class="step-text">In the System field, paste this template and customize it for the specific client:</div>
+        <div class="type-this">You are the AI assistant of [BUSINESS NAME], a [TYPE OF BUSINESS] located in [CITY].
+
+Your job is to reply to customer WhatsApp messages in a friendly, professional and helpful way.
+
+About the business:
+- Name: [BUSINESS NAME]
+- Services/Products: [LIST MAIN SERVICES]
+- Hours: [OPENING HOURS]
+- Address: [ADDRESS]
+- Phone for urgent matters: [PHONE]
+
+Rules:
+- Always reply in the same language the customer used
+- Keep replies short — maximum 3 sentences
+- If the customer asks something you don't know, say: "Great question! Let me check and get back to you shortly."
+- Always end with a helpful suggestion or question to keep the conversation going
+- Never make up information about prices, availability or services if you are not sure</div>
+        <div class="step-detail">Customize every line in [brackets] with the client's real information before going live. The quality of the bot's replies depends entirely on how well this System message is written.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Set the User message — the incoming WhatsApp message</div></div>
+        <div class="step-text">In the Message content field, click inside it. Then click the variable picker and find the Webhooks module data. Look for the field that contains the message text — it is usually called <strong style="color:#C8A96E">messages[] → text → body</strong> or similar. Click it to insert the variable.</div>
+        <div class="step-detail">
+          The exact variable name depends on how 360dialog formats the data. After capturing your test message in Step 1, click on the Webhooks module circle and look at the data it received. You will see a structure like:<br/><br/>
+          <code style="color:#C8A96E">messages[].text.body</code> — this is the message text<br/>
+          <code style="color:#C8A96E">messages[].from</code> — this is the sender's phone number<br/><br/>
+          Insert <code style="color:#C8A96E">messages[].text.body</code> as the User message.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Click OK to save the OpenAI module</div></div>
+        <div class="step-text">Scroll down and click <span class="click">OK</span>. The OpenAI circle appears on your canvas connected to the Webhooks circle.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 3 — Send the Reply Back via WhatsApp</div>
+    <div class="block-text">Now add the module that sends the AI-generated reply back to the customer on WhatsApp. You will use the HTTP module to call the 360dialog API directly.</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Click "+" and add the HTTP module</div></div>
+        <div class="step-text">Hover over the OpenAI circle and click <span class="click">+</span>. In the search box type <strong style="color:#C8A96E">HTTP</strong>. Click on the HTTP app. Select <span class="click">Make a Request</span>.</div>
+        <div class="step-detail">The HTTP module lets you call any API endpoint. You will use it to call the 360dialog API to send a WhatsApp message.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Configure the HTTP Request settings</div></div>
+        <div class="step-text">Fill in the HTTP module settings exactly as follows:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">URL:</strong>
+          <div class="code-block">https://waba.360dialog.io/v1/messages</div>
+          <strong style="color:#C8A96E">Method:</strong> Select <span class="click">POST</span> from the dropdown<br/><br/>
+          <strong style="color:#C8A96E">Headers:</strong> Click <span class="click">Add item</span> and add:<br/>
+          — Name: <code style="color:#C8A96E">D360-API-KEY</code> | Value: paste your 360dialog API key here<br/>
+          — Name: <code style="color:#C8A96E">Content-Type</code> | Value: <code style="color:#C8A96E">application/json</code><br/><br/>
+          <strong style="color:#C8A96E">Body type:</strong> Select <span class="click">Raw</span><br/><br/>
+          <strong style="color:#C8A96E">Content type:</strong> Select <span class="click">JSON (application/json)</span>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Set the Request Body — the message to send</div></div>
+        <div class="step-text">In the Body field, paste this JSON structure. Replace the variable parts using the variable picker:</div>
+        <div class="code-block">{
+  "recipient_type": "individual",
+  "to": "{{1.messages[].from}}",
+  "type": "text",
+  "text": {
+    "body": "{{2.choices[].message.content}}"
+  }
+}</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">{{1.messages[].from}}</strong> — this is the sender's phone number from the webhook data (Module 1). Click the variable picker to find and insert it.<br/><br/>
+          <strong style="color:#C8A96E">{{2.choices[].message.content}}</strong> — this is the AI-generated reply text from OpenAI (Module 2). Click the variable picker → select OpenAI module → choices[] → message → content.<br/><br/>
+          The phone number format must include the country code without the + sign. For example, a Romanian number +40712345678 becomes 40712345678 in the JSON body.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Click OK to save the HTTP module</div></div>
+        <div class="step-text">Click <span class="click">OK</span>. You now have all three modules on your canvas: Webhooks → OpenAI → HTTP (Send WhatsApp).</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 4 — Test the Complete Bot</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Turn on the Scenario</div></div>
+        <div class="step-text">Unlike Module 2 where you used "Run once," a webhook-based scenario stays on permanently. Click the <span class="click">Scheduling</span> toggle at the bottom left and turn it <span class="click">ON</span>. The scenario is now live and waiting.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Send a real WhatsApp message to the bot number</div></div>
+        <div class="step-text">From your personal phone, open WhatsApp and send a message to the bot's phone number. Send a realistic customer message like: <em style="color:#C8BEA8">"Hi, what are your opening hours?" or "Do you do deliveries?"</em></div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Wait 5–10 seconds and check for the reply</div></div>
+        <div class="step-text">Within 5–10 seconds you should receive a WhatsApp reply from the bot number. Read the reply carefully — does it sound natural? Does it match the business information you put in the System message? Is it in the right language?</div>
+        <div class="step-detail">
+          If you receive no reply after 30 seconds:<br/>
+          1. Open Make.com and check the Scenario history — click the clock icon at the bottom of the editor to see recent runs<br/>
+          2. If the Webhooks module shows no data — the webhook URL in 360dialog was not saved correctly. Go back and re-paste it.<br/>
+          3. If the OpenAI module shows red — check that your API key is correct and that you have credits<br/>
+          4. If the HTTP module shows red — the body JSON has a formatting error. Re-check the JSON structure for missing quotes or brackets
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Save the Scenario</div></div>
+        <div class="step-text">Click <span class="click">Save</span> in the top right. The bot is now live. Every WhatsApp message that arrives on this number will trigger the scenario and receive an AI reply within seconds.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">🎉 Your WhatsApp Bot is Live</div>
+    <div class="info-text">You just built a real WhatsApp AI bot. It replies to every message within seconds, 24 hours a day, 7 days a week, in any language the customer uses. This system alone is worth $500–$1,500 to a client plus $150–$300/month recurring. You built it in under 2 hours.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 2</div>
+    <div class="takeaway">WhatsApp bots use a Webhook trigger — not a scheduled trigger. They activate instantly every time a message arrives.</div>
+    <div class="takeaway">The System message is the most important part of the bot. The better you describe the business, the better the replies.</div>
+    <div class="takeaway">The phone number in the JSON body must not have a + sign — use the country code directly (e.g., 40712345678 not +40712345678).</div>
+    <div class="takeaway">Turn on the Scenario toggle and leave it on permanently — do not use "Run once" for webhook-based automations.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(2)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(3)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 3 -->
+<div class="lesson-content" id="lesson3">
+  <div class="lesson-header">
+    <div class="lesson-tag">Sales · Lesson 3</div>
+    <h2 class="lesson-title">How to Sell the WhatsApp Bot for $500–$2,000</h2>
+    <p class="lesson-intro">The WhatsApp bot is the easiest automation to sell because every business owner immediately understands the value. This lesson gives you the exact demo script, pricing, and how to close the deal live on a call.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Why WhatsApp Bots Are the Easiest to Sell</div>
+    <div class="block-text">Every business owner uses WhatsApp personally. They know exactly how frustrating it is to see a message and not have time to reply. When you show them an AI that replies in seconds — to their own business number, with accurate information, in the right language — the value is immediately obvious. You do not need to explain AI, automation, or technology. You just show them the demo.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Live Demo Script — Close on the Call</div>
+    <div class="block-text">The most powerful thing you can do on a sales call is demonstrate the bot live. Here is the exact script:</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Before the call — set up a demo bot</div></div>
+        <div class="step-text">Before any sales call with a restaurant owner, set up a demo bot customized for a restaurant. Use a test number you control. Configure the System message with generic restaurant information: hours, menu types, booking info.</div>
+        <div class="step-detail">Having a live demo ready before the call is non-negotiable. A verbal description of a bot is worth 10% of what a live demo is worth. Spend 30 minutes before your first sales call building a demo bot you can show to any restaurant or local business.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">On the call — say this exact line</div></div>
+        <div class="step-text">After your discovery questions, say:</div>
+        <div class="step-detail"><em style="color:#C8BEA8">"I want to show you something instead of just describing it. Can I send you a WhatsApp message right now on your business number?"</em><br/><br/>Wait for them to say yes. Then send a message from your personal phone to your demo bot number. Not their number — your demo bot. Say: <em style="color:#C8BEA8">"Watch this — I just sent a message asking about your hours. Tell me when you see the reply."</em></div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Let them see the reply arrive</div></div>
+        <div class="step-text">Within 5–10 seconds your demo bot sends a reply to your own phone. Show them the reply on your screen (or describe what they just saw). Then say:</div>
+        <div class="step-detail"><em style="color:#C8BEA8">"That reply just arrived in about 8 seconds. Automatically. If that had been a real customer messaging your business at 11pm on a Sunday, they would have got an instant professional response — and most likely booked or placed an order — instead of waiting until Monday morning and probably going to a competitor."</em><br/><br/>Then pause. Let the silence do the work. Most business owners say "that's incredible" at this point.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Quote the price confidently</div></div>
+        <div class="step-text">After the demo, say:</div>
+        <div class="step-detail"><em style="color:#C8BEA8">"To build this for your business — customized with your menu, your hours, your brand voice — the setup is [€500–€800]. After that it's [€150–€250]/month for me to maintain it, update it when your menu or hours change, and make sure it keeps working perfectly. Most clients see the investment pay off in the first week from leads they would have otherwise lost."</em><br/><br/>Then stop talking. Do not add more. Do not justify the price. Wait for their response.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Pricing Guide — What to Charge</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">$</div><div class="step-title">Basic WhatsApp Bot — single language, standard replies</div></div>
+        <div class="step-text">Setup: <strong style="color:#C8A96E">$300–$500</strong> | Monthly: <strong style="color:#C8A96E">$100–$150</strong> | Build time: 1–2 hours</div>
+        <div class="step-detail">Suitable for: small local businesses, single service, one language. The bot answers standard questions about hours, location, prices, and services.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">$$</div><div class="step-title">Advanced WhatsApp Bot — multi-topic, lead capture</div></div>
+        <div class="step-text">Setup: <strong style="color:#C8A96E">$600–$1,000</strong> | Monthly: <strong style="color:#C8A96E">$200–$300</strong> | Build time: 3–5 hours</div>
+        <div class="step-detail">Suitable for: restaurants, clinics, real estate agencies. The bot handles multiple topics, captures lead information (name, phone), logs conversations to a Google Sheet, and sends a daily summary to the business owner.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">$$$</div><div class="step-title">Premium System — WhatsApp + Instagram + CRM</div></div>
+        <div class="step-text">Setup: <strong style="color:#C8A96E">$1,500–$2,500</strong> | Monthly: <strong style="color:#C8A96E">$350–$500</strong> | Build time: 8–14 hours</div>
+        <div class="step-detail">Suitable for: businesses with active WhatsApp AND Instagram presence. Full omnichannel automation — the same AI handles both platforms, logs all leads in one CRM, and sends weekly performance reports.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Most Powerful Outreach Message for WhatsApp Bots</div>
+    <div class="msg-template">
+      <div class="msg-header">WhatsApp Message — Restaurant Owner</div>
+      <div class="msg-body">Hi [Name],
+
+I noticed [Restaurant Name] has [X] reviews on Google — you clearly have happy customers.
+
+I built a quick demo of an AI system that would automatically reply to every WhatsApp message your restaurant receives — instantly, 24/7, even at 3am.
+
+Want me to send you the demo right now? Takes 30 seconds to see.</div>
+      <div class="msg-note">This message works because it offers the demo immediately — no call needed, no commitment. When they say yes, you send a message to your demo bot from your phone and forward the AI reply to them. They see the value in 30 seconds.</div>
+    </div>
+  </div>
+
+  <div class="info-box gold">
+    <div class="info-label">✦ The Add-On That Doubles Your Revenue</div>
+    <div class="info-text">After delivering the WhatsApp bot, offer to add a "Lead Capture" upgrade: whenever a customer says they want to book, order, or get a quote — the bot asks for their name and phone number and logs it in a Google Sheet. The client gets a spreadsheet of warm leads every day. Charge $200 extra setup + $50/month more. This add-on takes 1 hour to build and dramatically increases the perceived value of your service.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 3</div>
+    <div class="takeaway">Always demo before you pitch price. A 10-second live demo closes more deals than any amount of talking.</div>
+    <div class="takeaway">Start with the Basic package for your first clients — build confidence and testimonials before charging premium prices.</div>
+    <div class="takeaway">The "Lead Capture" add-on doubles the value of any WhatsApp bot with 1 extra hour of work.</div>
+    <div class="takeaway">After closing — ask for a 50% deposit immediately. Send the Stripe or PayPal link while you are still on the call.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Build Your Demo Bot Today</div>
+    <div class="exercise-text">Set up a demo WhatsApp bot today using a spare number or a test SIM. Configure it as a generic restaurant or local business. Test it by sending 5 different questions to it and read the replies. Is it accurate? Does it sound natural? Refine the System message until every reply sounds like a real business assistant. This demo is your most powerful sales tool — it should be working perfectly before your first sales call.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="window.location.href='/course-starter.html'">← Back to All Modules</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+var completed=JSON.parse(localStorage.getItem('m5_completed')||'[]');
+function updateProgress(){
+  var fill=document.getElementById('progressFill');
+  var label=document.getElementById('progressLabel');
+  fill.style.width=(completed.length/3*100)+'%';
+  label.textContent=completed.length+' / 3 lessons';
+  completed.forEach(function(n){var t=document.getElementById('tab'+n);if(t)t.classList.add('done');});
+}
+function showLesson(n){
+  document.querySelectorAll('.lesson-content').forEach(function(el){el.classList.remove('active')});
+  document.querySelectorAll('.lesson-tab').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('lesson'+n).classList.add('active');
+  document.getElementById('tab'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function completeLesson(n){
+  if(completed.indexOf(n)===-1){completed.push(n);localStorage.setItem('m5_completed',JSON.stringify(completed));}
+  updateProgress();
+// Open lesson from URL hash
+var hash=window.location.hash;
+if(hash){
+  var n=parseInt(hash.replace("#lesson",""));
+  if(n>=1&&n<=3)showLesson(n);
+}
+  var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
+}
+updateProgress();
+// Open specific lesson from URL hash
+(function(){
+  var h = window.location.hash;
+  if(h && h.indexOf('lesson') !== -1){
+    var n = parseInt(h.replace('#lesson',''));
+    if(n >= 1 && n <= 3) showLesson(n);
+  }
+})();
+// Open lesson from URL hash
+var hash=window.location.hash;
+if(hash){
+  var n=parseInt(hash.replace("#lesson",""));
+  if(n>=1&&n<=3)showLesson(n);
+}
+</script>
+</body>
+</html>
