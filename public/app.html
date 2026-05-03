@@ -635,6 +635,7 @@ async function handleLogin(){
 }
 
 function launchApp(){
+  token = localStorage.getItem('af_token');
   document.getElementById('loginScreen').style.display = 'none';
   const app = document.getElementById('app');
   app.classList.add('visible');
@@ -651,7 +652,10 @@ function handleLogout(){
   location.reload();
 }
 
-function authHeaders(){ return {'Content-Type':'application/json','Authorization':'Bearer '+token}; }
+function authHeaders(){ 
+  const t = token || localStorage.getItem('af_token') || '';
+  return {'Content-Type':'application/json','Authorization':'Bearer '+t}; 
+}
 
 // ══ AUTO LOGIN ══
 window.onload = function(){
@@ -1126,3 +1130,4 @@ function notify(msg, type=''){
 }
 </script>
 </body>
+</html>
