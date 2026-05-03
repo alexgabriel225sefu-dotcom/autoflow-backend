@@ -408,18 +408,9 @@ res.status(400).json({ error: e.message });
 }
 });
 
-// ════════════════════════════════════════
-// CATCH ALL — serve correct HTML files
-// ════════════════════════════════════════
-app.get(’*’, (req, res) => {
-const file = req.path === ‘/’ ? ‘index.html’ : req.path.replace(’/’, ‘’);
-const filePath = path.join(__dirname, ‘public’, file);
-const fs = require(‘fs’);
-if (fs.existsSync(filePath)) {
-res.sendFile(filePath);
-} else {
+// Root redirect
+app.get(’/’, (req, res) => {
 res.sendFile(path.join(__dirname, ‘public’, ‘index.html’));
-}
 });
 
 // ════════════════════════════════════════
