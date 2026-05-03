@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Module 6 — Instagram Auto-Reply</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(200,169,110,.08);backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;color:#C8A96E}
+.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:#C8A96E;color:#C8A96E}
+.module-hero{padding:56px 32px 40px;max-width:860px;margin:0 auto}
+.module-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(200,169,110,.12);border:1px solid rgba(200,169,110,.2);border-radius:100px;padding:5px 14px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.module-num{font-family:"Playfair Display",serif;font-size:80px;font-weight:900;color:rgba(200,169,110,.1);line-height:1;margin-bottom:-20px}
+.module-title{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:16px}
+.module-title em{font-style:italic;color:#C8A96E}
+.module-desc{font-size:15px;color:#C8BEA8;max-width:600px;line-height:1.75}
+.module-meta{display:flex;gap:20px;margin-top:28px;flex-wrap:wrap}
+.meta-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#C8BEA8}
+.meta-dot{width:6px;height:6px;border-radius:50%;background:#C8A96E}
+.progress-wrap{max-width:860px;margin:0 auto 40px;padding:0 32px}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.lessons-nav{max-width:860px;margin:0 auto 32px;padding:0 32px;display:flex;gap:8px;flex-wrap:wrap}
+.lesson-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(200,169,110,.1);background:transparent;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
+.lesson-tab:hover{border-color:rgba(200,169,110,.3);color:#F5F0E8}
+.lesson-tab.active{background:rgba(200,169,110,.15);border-color:#C8A96E;color:#C8A96E;font-weight:600}
+.lesson-tab.done::before{content:"✓ ";color:#C8A96E}
+.lesson-wrap{max-width:860px;margin:0 auto;padding:0 32px 80px}
+.lesson-content{display:none}
+.lesson-content.active{display:block}
+.lesson-header{background:#0f0f0f;border:1px solid rgba(200,169,110,.08);border-radius:14px;padding:32px;margin-bottom:28px}
+.lesson-tag{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:100px;border:1px solid rgba(200,169,110,.18);color:#C8A96E;background:rgba(200,169,110,.1);margin-bottom:14px}
+.lesson-title{font-family:"Playfair Display",serif;font-size:clamp(22px,3vw,32px);font-weight:700;margin-bottom:10px;line-height:1.1}
+.lesson-intro{font-size:14px;color:#C8BEA8;line-height:1.8}
+.block{margin-bottom:36px}
+.block-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:#F5F0E8;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.block-title::before{content:"";width:3px;height:20px;background:#C8A96E;border-radius:2px;flex-shrink:0}
+.block-text{font-size:14px;color:#C8BEA8;line-height:1.85;margin-bottom:14px}
+.steps{display:flex;flex-direction:column;gap:20px;margin:20px 0}
+.step{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;border-left:3px solid #C8A96E}
+.step-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#080808;flex-shrink:0}
+.step-title{font-size:15px;font-weight:700;color:#F5F0E8}
+.step-text{font-size:13px;color:#C8BEA8;line-height:1.8;margin-bottom:10px}
+.step-text:last-child{margin-bottom:0}
+.step-detail{background:#161616;border-radius:8px;padding:14px 16px;margin-top:10px;font-size:13px;color:#C8BEA8;line-height:1.75;border-left:2px solid rgba(200,169,110,.3)}
+.click{display:inline-flex;align-items:center;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:5px;padding:2px 10px;font-size:12px;color:#C8A96E;font-weight:600;margin:0 2px}
+.type-this{background:#0a0a0a;border:1px solid rgba(200,169,110,.2);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#F5F0E8;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap}
+.code-block{background:#0a0a0a;border:1px solid rgba(200,169,110,.15);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#C8A96E;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap;overflow-x:auto}
+.info-box{border-radius:10px;padding:20px 24px;margin:20px 0}
+.info-box.gold{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2)}
+.info-box.tip{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15)}
+.info-box.warn{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.15)}
+.info-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.info-box.gold .info-label{color:#C8A96E}
+.info-box.tip .info-label{color:#4ADE80}
+.info-box.warn .info-label{color:#e74c3c}
+.info-text{font-size:13px;color:#C8BEA8;line-height:1.75}
+.flow-diagram{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;margin:20px 0;display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap}
+.flow-step{text-align:center;padding:14px 18px;background:#161616;border:1px solid rgba(200,169,110,.15);border-radius:10px;min-width:120px}
+.flow-step-icon{font-size:22px;margin-bottom:6px;display:block}
+.flow-step-name{font-size:12px;font-weight:700;color:#F5F0E8;margin-bottom:3px}
+.flow-step-desc{font-size:11px;color:#C8BEA8}
+.flow-arrow{font-size:18px;color:rgba(200,169,110,.5);padding:0 8px;flex-shrink:0}
+.takeaways{background:#161616;border:1px solid rgba(200,169,110,.12);border-radius:12px;padding:28px;margin:28px 0}
+.takeaways-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E;margin-bottom:16px}
+.takeaway{display:flex;gap:12px;margin-bottom:12px;font-size:13px;color:#F5F0E8;line-height:1.6}
+.takeaway:last-child{margin-bottom:0}
+.takeaway::before{content:"◆";color:#C8A96E;font-size:8px;margin-top:5px;flex-shrink:0}
+.exercise{background:linear-gradient(135deg,rgba(200,169,110,.08),rgba(200,169,110,.03));border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:28px;margin:28px 0}
+.exercise-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:12px}
+.exercise-text{font-size:14px;color:#F5F0E8;line-height:1.75}
+.lesson-actions{display:flex;gap:12px;margin-top:40px;flex-wrap:wrap}
+.btn-complete{padding:13px 28px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-complete:hover{opacity:.9;transform:translateY(-1px)}
+.btn-next{padding:13px 28px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:8px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-next:hover{border-color:#C8A96E;color:#C8A96E}
+@media(max-width:600px){.module-hero,.progress-wrap,.lessons-nav,.lesson-wrap{padding-left:16px;padding-right:16px}.lesson-header{padding:20px}.flow-diagram{flex-direction:column}.flow-arrow{transform:rotate(90deg)}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">AI Cash Systems</div>
+  <a href="/course-starter.html" class="back-btn">← Back to Course</a>
+</nav>
+
+<div class="module-hero">
+  <div class="module-badge">Module 6 of 8</div>
+  <div class="module-num">06</div>
+  <h1 class="module-title">Instagram Auto-Reply —<br><em>AI DM Bot</em></h1>
+  <p class="module-desc">Build a complete Instagram DM bot using the Meta Graph API + Make.com + GPT-4o. Every step from creating the Facebook App to the bot going live — plus how to sell it for $600–$1,200.</p>
+  <div class="module-meta">
+    <div class="meta-item"><div class="meta-dot"></div>3 Lessons</div>
+    <div class="meta-item"><div class="meta-dot"></div>~90 minutes</div>
+    <div class="meta-item"><div class="meta-dot"></div>Instagram Automation</div>
+  </div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-label"><span>Module Progress</span><span id="progressLabel">0 / 3 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="lessons-nav">
+  <button class="lesson-tab active" onclick="showLesson(1)" id="tab1">Lesson 1 — Meta API Setup</button>
+  <button class="lesson-tab" onclick="showLesson(2)" id="tab2">Lesson 2 — Build the DM Bot</button>
+  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — Advanced + Sell</button>
+</div>
+
+<div class="lesson-wrap">
+
+<!-- LESSON 1 -->
+<div class="lesson-content active" id="lesson1">
+  <div class="lesson-header">
+    <div class="lesson-tag">Setup · Lesson 1</div>
+    <h2 class="lesson-title">Instagram Graph API — Complete Setup</h2>
+    <p class="lesson-intro">To automate Instagram DMs you need access to the Instagram Graph API through a Facebook Developer App. This process has more steps than WhatsApp but it is completely free. Follow every step exactly and you will have API access in about 30 minutes.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">What You Need Before Starting</div>
+    <div class="block-text">Before you begin the setup, make sure these four things are in place. If any of them is missing, the setup will not work:</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">An Instagram Business Account (not Personal)</div></div>
+        <div class="step-text">The client's Instagram account must be set to "Business" — not Personal and not Creator. To check: open Instagram → go to the profile → tap the three lines menu (☰) → Settings → Account → Account type. If it says "Switch to Professional Account" — it is Personal. Tap it and switch to Business.</div>
+        <div class="step-detail">Why Business account? Only Instagram Business accounts can be connected to the Messenger API which is what we use for DM automation. Personal accounts cannot be automated at all.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">A Facebook Page connected to the Instagram account</div></div>
+        <div class="step-text">The Instagram Business account must be linked to a Facebook Page. To connect them: open Facebook on desktop → go to your Facebook Page → Settings → Instagram → click "Connect Account" → log in to the Instagram account.</div>
+        <div class="step-detail">If the client does not have a Facebook Page, they need to create one. Go to facebook.com → click "Create" → "Page" → fill in the business name and category → click Create Page. This takes 2 minutes.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Access to the Facebook account that manages the Page</div></div>
+        <div class="step-text">You need to be able to log in to the Facebook account that owns or administers the Facebook Page. During setup you will generate an access token using this account. If you are working for a client, they need to be present or give you temporary access to their Facebook account for this step.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">A developer account on developers.facebook.com</div></div>
+        <div class="step-text">Go to <strong style="color:#C8A96E">developers.facebook.com</strong> and log in with your Facebook account (not the client's). If it asks you to register as a developer, click <span class="click">Register</span> and confirm. This is free and instant.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Create a Facebook App</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to developers.facebook.com and click "My Apps"</div></div>
+        <div class="step-text">After logging in to developers.facebook.com, look at the top right corner of the page. You see a button or dropdown that says <span class="click">My Apps</span>. Click it. A page shows all your existing apps — it may be empty if this is your first time.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Click "Create App"</div></div>
+        <div class="step-text">On the My Apps page, click the green button <span class="click">Create App</span>. A setup wizard opens asking you to choose the type of app you want to build.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Select "Business" as the app type</div></div>
+        <div class="step-text">The wizard shows several app type options: Consumer, Business, None of the above. Select <span class="click">Business</span> and click <span class="click">Next</span>.</div>
+        <div class="step-detail">Why Business? The Business app type gives you access to the Instagram Messaging API and the Pages API — which are exactly what you need for DM automation.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Fill in the app details</div></div>
+        <div class="step-text">The next screen asks for:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">App name:</strong> Type something like "Instagram DM Bot — [Client Name]" or just "DM Automation"<br/><br/>
+          <strong style="color:#C8A96E">App contact email:</strong> Your email address<br/><br/>
+          <strong style="color:#C8A96E">Business Account:</strong> If you have a Meta Business Account, select it. If not, you can skip this for now — click "I don't want to connect a business portfolio yet"<br/><br/>
+          Click <span class="click">Create App</span>. Facebook may ask you to re-enter your password for security. Enter it and click Submit.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">You are now in the App Dashboard</div></div>
+        <div class="step-text">After creating the app, you land on the App Dashboard. This is where you add products and configure settings. On the left sidebar you see: Dashboard, Settings, Roles, and more. In the main area you see a list of products you can add to your app.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Add Instagram Messaging to Your App</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Find "Instagram" in the product list and click "Set up"</div></div>
+        <div class="step-text">In the App Dashboard main area, scroll down to find the products list. Look for <strong style="color:#C8A96E">Instagram</strong> — it has the Instagram gradient icon. Click the <span class="click">Set up</span> button next to it.</div>
+        <div class="step-detail">If you don't see Instagram in the list, look for a button that says "Add Product" or scroll to the bottom of the products section. You can also find it by going to the left sidebar → click the "+" icon next to Products.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">In the Instagram settings, click "API Setup with Instagram Login"</div></div>
+        <div class="step-text">After adding Instagram, the left sidebar now shows an "Instagram" section. Click on <span class="click">Instagram</span> in the sidebar to expand it. Click on <span class="click">API Setup</span> or <span class="click">Basic Display</span>.</div>
+        <div class="step-detail">The exact menu names change occasionally as Meta updates the interface. Look for anything related to "API Setup," "Messaging," or "Instagram Basic Display." The goal is to get to the page where you can generate an Access Token.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Add the Instagram account as a Tester</div></div>
+        <div class="step-text">On the Instagram API Setup page, look for a section called <strong style="color:#C8A96E">Instagram Testers</strong> or <strong style="color:#C8A96E">Add Instagram Testers</strong>. Click <span class="click">Add Instagram Testers</span>. In the popup, type the Instagram username of the business account you want to connect. Click <span class="click">Submit</span>.</div>
+        <div class="step-detail">
+          After adding them as a tester, the Instagram account owner needs to accept the tester invitation. To accept:<br/>
+          1. Open Instagram on the phone of the account owner<br/>
+          2. Go to Settings → Apps and Websites → Tester Invites<br/>
+          3. Find your app name and tap <span class="click">Accept</span><br/><br/>
+          Once accepted, the account is connected to your app as a tester.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 3 — Generate the Access Token</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to the Graph API Explorer</div></div>
+        <div class="step-text">Open a new tab and go to <strong style="color:#C8A96E">developers.facebook.com/tools/explorer</strong>. This is Meta's official tool for generating API tokens. Make sure you are logged in with the Facebook account that manages the Page.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Select your app from the dropdown</div></div>
+        <div class="step-text">At the top right of the Graph API Explorer you see a dropdown that says "Meta App." Click it and select the app you just created (the "Instagram DM Bot" app).</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Click "Generate Access Token"</div></div>
+        <div class="step-text">Click the blue button <span class="click">Generate Access Token</span>. A permissions popup appears. You need to add these specific permissions before generating:</div>
+        <div class="step-detail">
+          Click <span class="click">Add a Permission</span> and add each of these one by one:<br/><br/>
+          ✓ <strong style="color:#C8A96E">instagram_manage_messages</strong> — allows reading and sending DMs<br/>
+          ✓ <strong style="color:#C8A96E">pages_messaging</strong> — allows messaging through Facebook Pages<br/>
+          ✓ <strong style="color:#C8A96E">instagram_basic</strong> — basic Instagram account access<br/>
+          ✓ <strong style="color:#C8A96E">pages_show_list</strong> — allows listing connected Pages<br/><br/>
+          After adding all permissions, click <span class="click">Generate Access Token</span>. A Facebook login popup asks you to authorize the app — click <span class="click">Continue as [Your Name]</span> then <span class="click">Done</span>.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Copy the Short-Lived Token</div></div>
+        <div class="step-text">The Explorer now shows a long string in the "Access Token" field — this is a short-lived token that expires in about 1–2 hours. Copy it. You will convert it to a long-lived token in the next step.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Convert to a Long-Lived Token (valid 60 days)</div></div>
+        <div class="step-text">Open a new browser tab and paste this URL, replacing the placeholders with your real values:</div>
+        <div class="code-block">https://graph.facebook.com/v18.0/oauth/access_token?grant_type=fb_exchange_token&client_id=YOUR_APP_ID&client_secret=YOUR_APP_SECRET&fb_exchange_token=YOUR_SHORT_LIVED_TOKEN</div>
+        <div class="step-detail">
+          Where to find each value:<br/><br/>
+          <strong style="color:#C8A96E">YOUR_APP_ID:</strong> Go to your app dashboard → Settings → Basic → "App ID" is at the top<br/>
+          <strong style="color:#C8A96E">YOUR_APP_SECRET:</strong> Same page → "App Secret" — click "Show" to reveal it<br/>
+          <strong style="color:#C8A96E">YOUR_SHORT_LIVED_TOKEN:</strong> The token you just copied from Graph API Explorer<br/><br/>
+          Press Enter. The browser shows a JSON response like:<br/>
+          <code style="color:#C8A96E">{"access_token":"EAAB...long token here...","token_type":"bearer"}</code><br/><br/>
+          Copy the long access_token value. This is your Long-Lived Token — it lasts 60 days. Save it in your Notes app immediately.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">6</div><div class="step-title">Get the Page ID and Instagram Account ID</div></div>
+        <div class="step-text">You need two more values. Go back to Graph API Explorer. In the query field, replace the default text with:</div>
+        <div class="code-block">me/accounts</div>
+        <div class="step-detail">
+          Click <span class="click">Submit</span>. The response shows your Facebook Pages with their IDs. Find the Page connected to the Instagram account and copy its <strong style="color:#C8A96E">id</strong> value — this is your Page ID.<br/><br/>
+          Then query:
+          <div class="code-block">{PAGE_ID}?fields=instagram_business_account</div>
+          Replace {PAGE_ID} with the actual Page ID number. The response shows the Instagram account ID. Copy it — you will need it in Lesson 2.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box warn">
+    <div class="info-label">⚠️ Token Expiry — Set a Reminder</div>
+    <div class="info-text">Long-lived tokens expire after 60 days. Set a reminder in your calendar for Day 55 to refresh the token. To refresh: simply call the same long-lived token URL from Step 5 again with the current token. The response gives you a new 60-day token. Add this to your monthly maintenance routine for every Instagram bot client.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 1</div>
+    <div class="takeaway">Instagram requires a Business Account + connected Facebook Page before any automation is possible.</div>
+    <div class="takeaway">Always convert the short-lived token to a long-lived token (60 days) — the short one expires in 1–2 hours.</div>
+    <div class="takeaway">Save your App ID, App Secret, Long-Lived Token, Page ID, and Instagram Account ID in one secure document.</div>
+    <div class="takeaway">Set a calendar reminder at Day 55 to refresh the token before it expires.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Complete the API Setup</div>
+    <div class="exercise-text">Go through all the steps in this lesson using your own Instagram Business account (or a test account). Create the Facebook App, add Instagram, generate the long-lived token, and save all the values. By the end you should have: App ID, App Secret, Long-Lived Access Token, Page ID, and Instagram Account ID — all saved somewhere safe. You will use all of them in Lesson 2.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(1)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(2)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 2 -->
+<div class="lesson-content" id="lesson2">
+  <div class="lesson-header">
+    <div class="lesson-tag">Build · Lesson 2</div>
+    <h2 class="lesson-title">Build the Instagram DM Bot — Make.com + GPT-4o</h2>
+    <p class="lesson-intro">Now that you have API access, you build the complete flow: an Instagram DM arrives → Make.com detects it → GPT-4o generates a reply → Make.com sends it back. The bot replies within seconds, 24/7.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Complete Flow</div>
+    <div class="flow-diagram">
+      <div class="flow-step">
+        <span class="flow-step-icon">📸</span>
+        <div class="flow-step-name">Instagram DM</div>
+        <div class="flow-step-desc">Customer sends DM</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="flow-step-icon">🔗</span>
+        <div class="flow-step-name">Webhook</div>
+        <div class="flow-step-desc">Meta notifies Make.com</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="flow-step-icon">⚙️</span>
+        <div class="flow-step-name">Make.com</div>
+        <div class="flow-step-desc">Processes message</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="flow-step-icon">◎</span>
+        <div class="flow-step-name">GPT-4o</div>
+        <div class="flow-step-desc">Writes the reply</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="flow-step-icon">📸</span>
+        <div class="flow-step-name">Instagram Reply</div>
+        <div class="flow-step-desc">Sent automatically</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Create the Webhook in Make.com</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a new Scenario with a Custom Webhook trigger</div></div>
+        <div class="step-text">In Make.com, click <span class="click">+ Create a new scenario</span>. Click the trigger circle. Search <strong style="color:#C8A96E">Webhooks</strong> and select <span class="click">Custom Webhook</span>. Click <span class="click">Add</span> to create a new webhook, name it "Instagram DM Bot — [Client Name]", click <span class="click">Save</span>.</div>
+        <div class="step-detail">Copy the webhook URL that Make.com generates. It looks like: <code style="color:#C8A96E">https://hook.eu1.make.com/abc123...</code>. Save it — you will use it in the next step.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Register the Webhook with Meta — Step A: Verification</div></div>
+        <div class="step-text">Go back to your Facebook App dashboard at <strong style="color:#C8A96E">developers.facebook.com</strong>. In the left sidebar, find <strong style="color:#C8A96E">Webhooks</strong> or look under the Messenger/Instagram product. Click <span class="click">Add Callback URL</span> or <span class="click">Edit Callback URL</span>.</div>
+        <div class="step-detail">
+          Two fields appear:<br/><br/>
+          <strong style="color:#C8A96E">Callback URL:</strong> Paste your Make.com webhook URL here<br/>
+          <strong style="color:#C8A96E">Verify Token:</strong> Type any word you want — for example <code style="color:#C8A96E">myverifytoken123</code>. Remember this word — you need it in the next step.<br/><br/>
+          Click <span class="click">Verify and Save</span>. Meta sends a verification request to your Make.com webhook URL. Make.com must respond correctly for the verification to pass.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Handle the Webhook Verification in Make.com</div></div>
+        <div class="step-text">The Meta webhook verification sends a GET request with a challenge parameter that Make.com must return. To handle this automatically, before clicking "Verify and Save" in Meta, go to Make.com and click <span class="click">Run once</span> so it is actively listening. Then click Verify and Save in Meta.</div>
+        <div class="step-detail">
+          Make.com captures the verification request. The webhook module shows data. Click <span class="click">OK</span>.<br/><br/>
+          Note: Meta's webhook verification is more complex than 360dialog. If the verification fails the first time, do not panic. Try this alternative approach:<br/><br/>
+          1. In your Make.com scenario, add a Router module after the Webhook<br/>
+          2. One route handles GET requests (verification) — responds with the challenge value<br/>
+          3. The other route handles POST requests (actual messages)<br/><br/>
+          This advanced setup is covered in Module 11 (Webhook Mastery in the PRO course). For now, try the simple approach first.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Subscribe to Instagram Messages</div></div>
+        <div class="step-text">After the callback URL is verified, you need to subscribe to the specific events you want to receive. In the Webhooks section of your Facebook App, find <strong style="color:#C8A96E">Instagram</strong> in the list of subscription options. Check the box for <span class="click">messages</span>. Click <span class="click">Subscribe</span>.</div>
+        <div class="step-detail">This tells Meta: "Every time a DM arrives on the connected Instagram account, send the data to my Make.com webhook URL." You are now subscribed to message events.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Add the OpenAI Module</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Click "+" and add OpenAI → Create a Chat Completion</div></div>
+        <div class="step-text">In Make.com, hover over the Webhook circle and click <span class="click">+</span>. Search <strong style="color:#C8A96E">OpenAI</strong> and select <span class="click">Create a Chat Completion</span>. Connect your OpenAI API key. Select model <span class="click">gpt-4o</span>.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Write the System message for the Instagram bot</div></div>
+        <div class="step-text">The Instagram bot personality should be slightly more casual than the WhatsApp bot — Instagram is a social platform. Paste this in the System field and customize:</div>
+        <div class="type-this">You are the friendly AI assistant of [BUSINESS NAME] on Instagram.
+
+Your job is to reply to Instagram direct messages in a warm, casual and helpful tone that matches the brand's Instagram voice.
+
+About the business:
+- Name: [BUSINESS NAME]
+- What we sell/offer: [PRODUCTS OR SERVICES]
+- Price range: [PRICE RANGE]
+- Location/Delivery: [LOCATION OR DELIVERY INFO]
+- How to order/book: [ORDERING PROCESS]
+- Instagram handle: @[HANDLE]
+
+Rules:
+- Keep replies short — 1 to 3 sentences maximum
+- Use a friendly, natural tone — like a real person on Instagram
+- If asked about prices, give the range and invite them to DM for a custom quote
+- If asked about availability, say you will check and get back to them
+- Always end with a question or suggestion to keep the conversation going
+- Never make up specific prices or dates
+- Reply in the same language the person used</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Set the User message using the DM text from the webhook</div></div>
+        <div class="step-text">In the Message content field, use the variable picker to find the message text from the webhook data. After capturing a test DM, the webhook data structure from Meta looks like this:</div>
+        <div class="step-detail">
+          The message text is usually at: <code style="color:#C8A96E">entry[].messaging[].message.text</code><br/><br/>
+          Click the variable picker → select the Webhooks module → navigate to <code style="color:#C8A96E">entry</code> → <code style="color:#C8A96E">messaging</code> → <code style="color:#C8A96E">message</code> → <code style="color:#C8A96E">text</code><br/><br/>
+          The sender's ID (you need this to send the reply) is at: <code style="color:#C8A96E">entry[].messaging[].sender.id</code>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Capture a real test DM to confirm the data structure</div></div>
+        <div class="step-text">The easiest way to find the exact variable paths is to capture a real message first. Turn on your Make.com scenario (Scheduling ON). Send a DM to the Instagram account from your own Instagram account. Make.com receives the data. Click on the Webhook module to see the exact data structure and find the correct variable paths.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 3 — Send the Reply via Instagram</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Add the HTTP module to send the Instagram reply</div></div>
+        <div class="step-text">Hover over the OpenAI circle and click <span class="click">+</span>. Search <strong style="color:#C8A96E">HTTP</strong> and select <span class="click">Make a Request</span>.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Configure the HTTP module for Instagram Messaging API</div></div>
+        <div class="step-text">Fill in the HTTP module settings:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">URL:</strong>
+          <div class="code-block">https://graph.facebook.com/v18.0/me/messages</div>
+          <strong style="color:#C8A96E">Method:</strong> <span class="click">POST</span><br/><br/>
+          <strong style="color:#C8A96E">Query String — add these parameters:</strong><br/>
+          — Name: <code style="color:#C8A96E">access_token</code> | Value: paste your Long-Lived Access Token here<br/><br/>
+          <strong style="color:#C8A96E">Body type:</strong> <span class="click">Raw</span><br/>
+          <strong style="color:#C8A96E">Content type:</strong> <span class="click">JSON (application/json)</span>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Set the Request Body</div></div>
+        <div class="step-text">In the Body field paste this JSON. Replace the variable parts using the variable picker:</div>
+        <div class="code-block">{
+  "recipient": {
+    "id": "{{1.entry[].messaging[].sender.id}}"
+  },
+  "message": {
+    "text": "{{2.choices[].message.content}}"
+  },
+  "messaging_type": "RESPONSE"
+}</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">{{1.entry[].messaging[].sender.id}}</strong> — the sender's Instagram ID from the webhook (Module 1). Use the variable picker to find the exact path after capturing your test message.<br/><br/>
+          <strong style="color:#C8A96E">{{2.choices[].message.content}}</strong> — the GPT-4o generated reply (Module 2). Variable picker → OpenAI module → choices[] → message → content.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Test the complete bot</div></div>
+        <div class="step-text">Make sure the Scenario is ON (Scheduling toggle ON). Send a DM to the Instagram account from your own personal Instagram account. Wait 5–10 seconds. You should receive an AI-generated reply in your Instagram DMs.</div>
+        <div class="step-detail">
+          Common errors and fixes:<br/><br/>
+          <strong style="color:#e74c3c">"OAuthException: Invalid OAuth access token"</strong> — your Long-Lived Token has expired or is incorrect. Generate a new one following the steps in Lesson 1.<br/><br/>
+          <strong style="color:#e74c3c">"The recipient is not subscribed to this app"</strong> — the Instagram account needs to accept the tester invitation in Instagram Settings → Apps and Websites. Or your app needs to go through Meta's App Review for messaging permissions.<br/><br/>
+          <strong style="color:#e74c3c">No response received at all</strong> — the webhook subscription failed. Go back to your Facebook App → Webhooks → check that Instagram messages is subscribed and the callback URL is verified (shows a green checkmark).
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">🎉 Your Instagram DM Bot is Live</div>
+    <div class="info-text">Every Instagram DM sent to the business account now receives an AI-generated reply within seconds. The bot replies in the customer's language, matches the brand voice, and keeps the conversation going. This system is worth $600–$1,200 setup plus $200–$350/month to a client.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 2</div>
+    <div class="takeaway">Instagram DMs use a webhook trigger — the bot activates instantly every time a message arrives.</div>
+    <div class="takeaway">The access token goes in the Query String as a parameter, not in the Headers — this is different from the WhatsApp bot.</div>
+    <div class="takeaway">If you get "recipient not subscribed" — check that the Instagram account accepted the tester invitation.</div>
+    <div class="takeaway">Capture a real test DM first to see the exact webhook data structure before building the rest of the flow.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(2)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(3)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 3 -->
+<div class="lesson-content" id="lesson3">
+  <div class="lesson-header">
+    <div class="lesson-tag">Advanced + Sales · Lesson 3</div>
+    <h2 class="lesson-title">Advanced Strategies + How to Sell the Instagram Package</h2>
+    <p class="lesson-intro">Beyond basic DM replies, you can automate comment replies and story mention responses — making the package worth $1,200+ to a client. This lesson covers the advanced features and how to close the deal.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Advanced Feature 1 — Comment Auto-Reply</div>
+    <div class="block-text">When someone comments on a post asking a question, the bot can reply automatically in the comments. This is extremely valuable for businesses that post product photos and get flooded with "price?" and "available?" comments.</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Subscribe to Instagram Comments in your Facebook App</div></div>
+        <div class="step-text">Go back to your Facebook App → Webhooks. Find the Instagram subscription. Click <span class="click">Edit</span> and add <span class="click">comments</span> to the subscribed fields. Click <span class="click">Update</span>.</div>
+        <div class="step-detail">Now Meta sends data to your Make.com webhook not just for DMs but also for new comments on the Instagram account's posts.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Add a Router in Make.com to separate DMs from Comments</div></div>
+        <div class="step-text">Since the same webhook now receives both DMs and Comments, you need a Router to send them to different paths. In Make.com, click the <span class="click">+</span> after the Webhook module. Instead of adding a regular module, look for <span class="click">Router</span> in the search — it is a built-in Make.com tool that splits the flow into multiple paths.</div>
+        <div class="step-detail">
+          After adding the Router, you will see two (or more) paths. Configure them:<br/><br/>
+          <strong style="color:#C8A96E">Path 1 — DMs:</strong> Add a Filter → check if the data contains <code style="color:#C8A96E">entry[].messaging</code> — if yes, this is a DM. Connect the OpenAI + HTTP modules from Lesson 2 to this path.<br/><br/>
+          <strong style="color:#C8A96E">Path 2 — Comments:</strong> Add a Filter → check if the data contains <code style="color:#C8A96E">entry[].changes[].value.comments</code> — if yes, this is a comment. Add separate OpenAI and HTTP modules for comment replies to this path.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Configure the Comment Reply HTTP module</div></div>
+        <div class="step-text">To reply to a comment, use a different API endpoint. The HTTP module for comment replies uses:</div>
+        <div class="code-block">https://graph.facebook.com/v18.0/{COMMENT_ID}/replies</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Method:</strong> POST<br/>
+          <strong style="color:#C8A96E">Query String:</strong> access_token = your Long-Lived Token<br/>
+          <strong style="color:#C8A96E">Body (JSON):</strong>
+          <div class="code-block">{
+  "message": "{{openai_reply}}"
+}</div>
+          Where <code style="color:#C8A96E">{COMMENT_ID}</code> in the URL is replaced with the variable from the webhook data that contains the comment ID, and <code style="color:#C8A96E">{{openai_reply}}</code> is the GPT-4o generated response.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Add a Keyword Filter for Comment Replies</div></div>
+        <div class="step-text">Not every comment needs an automated reply. Add a Filter before the OpenAI module in the Comments path that only processes comments containing specific keywords.</div>
+        <div class="step-detail">
+          In Make.com, click the small wrench icon on the connection line between Router and OpenAI (in the comments path). A Filter window opens. Set the condition:<br/><br/>
+          Field: <code style="color:#C8A96E">comment text</code><br/>
+          Operator: <code style="color:#C8A96E">Contains one of</code><br/>
+          Values: <code style="color:#C8A96E">price, pret, cost, available, disponibil, how much, cat costa, order, comand, where, unde, delivery, livrare</code><br/><br/>
+          This way the bot only replies to comments asking about prices, availability, or ordering — the comments that matter most for business. Normal compliments and general comments are left for the business owner to handle personally.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">How to Package and Sell the Complete Instagram System</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">The Basic Instagram Package — DMs only</div></div>
+        <div class="step-text">Setup: <strong style="color:#C8A96E">$400–$600</strong> | Monthly: <strong style="color:#C8A96E">$150–$250</strong></div>
+        <div class="step-detail">Includes: automatic DM replies 24/7 in the client's brand voice, GPT-4o personalization, monthly token renewal, monthly System message updates.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">The Advanced Instagram Package — DMs + Comments</div></div>
+        <div class="step-text">Setup: <strong style="color:#C8A96E">$800–$1,200</strong> | Monthly: <strong style="color:#C8A96E">$250–$350</strong></div>
+        <div class="step-detail">Includes everything in Basic plus: comment auto-replies for purchase-intent keywords, lead capture to Google Sheets (when someone DMs with interest → their username and message are logged), weekly summary report of DM and comment interactions.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">The Omnichannel Package — Instagram + WhatsApp</div></div>
+        <div class="step-text">Setup: <strong style="color:#C8A96E">$1,500–$2,500</strong> | Monthly: <strong style="color:#C8A96E">$400–$600</strong></div>
+        <div class="step-detail">Combines the Instagram bot from this module with the WhatsApp bot from Module 5 into one unified system. All leads from both channels go into the same Google Sheets CRM. The client gets one weekly report covering both platforms. This is the premium offering and commands premium prices.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Best Outreach Approach for Instagram Bots</div>
+    <div class="block-text">The most effective way to sell Instagram automation is to demonstrate the problem in their own comments before you contact them. Here is the exact approach:</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Find 3 unanswered comments on their recent posts</div></div>
+        <div class="step-text">Before sending any message, go to the prospect's Instagram. Find their 3 most recent posts. Look in the comments for questions that have been left unanswered — "How much?", "Do you deliver?", "Is this available in blue?" Write down the specific post and the specific comment.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Use those comments in your outreach message</div></div>
+        <div class="step-text">Send this DM (personalized with their real data):</div>
+        <div class="step-detail">
+          <em style="color:#C8BEA8">"Hi [Name], I was looking at your recent posts and noticed you had some questions in the comments that were never answered — like [quote one specific comment]. Each one of those is a potential customer who might have already bought from a competitor.</em><br/><br/>
+          <em style="color:#C8BEA8">I build AI systems that automatically reply to every comment and DM within seconds — 24/7, in your brand voice.</em><br/><br/>
+          <em style="color:#C8BEA8">Want me to show you a 30-second demo?"</em><br/><br/>
+          This message is extremely effective because you are showing them a real, specific problem they have right now — not a hypothetical one.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box gold">
+    <div class="info-label">✦ The Token Renewal Service — Extra $50/Month</div>
+    <div class="info-text">Instagram access tokens expire every 60 days. Most clients will not remember to renew them. Offer "Token Maintenance" as a $50/month add-on — you set a recurring calendar reminder, renew the token every 55 days, and the client never has to worry about their bot going offline. This takes 5 minutes every 2 months and adds $600/year per client for essentially zero work.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 3</div>
+    <div class="takeaway">Comment auto-reply with keyword filtering turns a $500 service into a $1,200 service with 2 extra hours of work.</div>
+    <div class="takeaway">Always find specific unanswered comments before outreach — it makes your message impossible to ignore.</div>
+    <div class="takeaway">Combine Instagram + WhatsApp bots into an Omnichannel Package worth $1,500–$2,500 setup.</div>
+    <div class="takeaway">Offer Token Renewal as a $50/month add-on — 5 minutes of work every 2 months per client.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Find 3 Prospects With Unanswered Comments</div>
+    <div class="exercise-text">Open Instagram right now. Search for 5 businesses in your chosen industry. On each profile, look at their last 3 posts and check the comments. Find at least 3 businesses that have unanswered questions in their comments. Write down the business name, the specific post, and the specific unanswered comment. These are your highest-priority outreach prospects — they have a visible, specific problem you can reference in your message.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="window.location.href='/course-starter.html'">← Back to All Modules</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+var completed=JSON.parse(localStorage.getItem('m6_completed')||'[]');
+function updateProgress(){
+  var fill=document.getElementById('progressFill');
+  var label=document.getElementById('progressLabel');
+  fill.style.width=(completed.length/3*100)+'%';
+  label.textContent=completed.length+' / 3 lessons';
+  completed.forEach(function(n){var t=document.getElementById('tab'+n);if(t)t.classList.add('done');});
+}
+function showLesson(n){
+  document.querySelectorAll('.lesson-content').forEach(function(el){el.classList.remove('active')});
+  document.querySelectorAll('.lesson-tab').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('lesson'+n).classList.add('active');
+  document.getElementById('tab'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function completeLesson(n){
+  if(completed.indexOf(n)===-1){completed.push(n);localStorage.setItem('m6_completed',JSON.stringify(completed));}
+  updateProgress();
+// Open lesson from URL hash
+var hash=window.location.hash;
+if(hash){
+  var n=parseInt(hash.replace("#lesson",""));
+  if(n>=1&&n<=3)showLesson(n);
+}
+  var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
+}
+updateProgress();
+// Open specific lesson from URL hash
+(function(){
+  var h = window.location.hash;
+  if(h && h.indexOf('lesson') !== -1){
+    var n = parseInt(h.replace('#lesson',''));
+    if(n >= 1 && n <= 3) showLesson(n);
+  }
+})();
+// Open lesson from URL hash
+var hash=window.location.hash;
+if(hash){
+  var n=parseInt(hash.replace("#lesson",""));
+  if(n>=1&&n<=3)showLesson(n);
+}
+</script>
+</body>
+</html>
