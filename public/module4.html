@@ -530,9 +530,29 @@ function showLesson(n){
 function completeLesson(n){
   if(completed.indexOf(n)===-1){completed.push(n);localStorage.setItem('m4_completed',JSON.stringify(completed));}
   updateProgress();
+// Open lesson from URL hash
+var hash=window.location.hash;
+if(hash){
+  var n=parseInt(hash.replace("#lesson",""));
+  if(n>=1&&n<=3)showLesson(n);
+}
   var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
 }
 updateProgress();
+// Open specific lesson from URL hash
+(function(){
+  var h = window.location.hash;
+  if(h && h.indexOf('lesson') !== -1){
+    var n = parseInt(h.replace('#lesson',''));
+    if(n >= 1 && n <= 3) showLesson(n);
+  }
+})();
+// Open lesson from URL hash
+var hash=window.location.hash;
+if(hash){
+  var n=parseInt(hash.replace("#lesson",""));
+  if(n>=1&&n<=3)showLesson(n);
+}
 </script>
 </body>
 </html>
