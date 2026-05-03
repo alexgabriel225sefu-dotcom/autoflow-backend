@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Module 7 — Cold Email Automation</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(200,169,110,.08);backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;color:#C8A96E}
+.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:#C8A96E;color:#C8A96E}
+.module-hero{padding:56px 32px 40px;max-width:860px;margin:0 auto}
+.module-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(200,169,110,.12);border:1px solid rgba(200,169,110,.2);border-radius:100px;padding:5px 14px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.module-num{font-family:"Playfair Display",serif;font-size:80px;font-weight:900;color:rgba(200,169,110,.1);line-height:1;margin-bottom:-20px}
+.module-title{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:16px}
+.module-title em{font-style:italic;color:#C8A96E}
+.module-desc{font-size:15px;color:#C8BEA8;max-width:600px;line-height:1.75}
+.module-meta{display:flex;gap:20px;margin-top:28px;flex-wrap:wrap}
+.meta-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#C8BEA8}
+.meta-dot{width:6px;height:6px;border-radius:50%;background:#C8A96E}
+.progress-wrap{max-width:860px;margin:0 auto 40px;padding:0 32px}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.lessons-nav{max-width:860px;margin:0 auto 32px;padding:0 32px;display:flex;gap:8px;flex-wrap:wrap}
+.lesson-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(200,169,110,.1);background:transparent;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
+.lesson-tab:hover{border-color:rgba(200,169,110,.3);color:#F5F0E8}
+.lesson-tab.active{background:rgba(200,169,110,.15);border-color:#C8A96E;color:#C8A96E;font-weight:600}
+.lesson-tab.done::before{content:"✓ ";color:#C8A96E}
+.lesson-wrap{max-width:860px;margin:0 auto;padding:0 32px 80px}
+.lesson-content{display:none}
+.lesson-content.active{display:block}
+.lesson-header{background:#0f0f0f;border:1px solid rgba(200,169,110,.08);border-radius:14px;padding:32px;margin-bottom:28px}
+.lesson-tag{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:100px;border:1px solid rgba(200,169,110,.18);color:#C8A96E;background:rgba(200,169,110,.1);margin-bottom:14px}
+.lesson-title{font-family:"Playfair Display",serif;font-size:clamp(22px,3vw,32px);font-weight:700;margin-bottom:10px;line-height:1.1}
+.lesson-intro{font-size:14px;color:#C8BEA8;line-height:1.8}
+.block{margin-bottom:36px}
+.block-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:#F5F0E8;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.block-title::before{content:"";width:3px;height:20px;background:#C8A96E;border-radius:2px;flex-shrink:0}
+.block-text{font-size:14px;color:#C8BEA8;line-height:1.85;margin-bottom:14px}
+.steps{display:flex;flex-direction:column;gap:20px;margin:20px 0}
+.step{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;border-left:3px solid #C8A96E}
+.step-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#080808;flex-shrink:0}
+.step-title{font-size:15px;font-weight:700;color:#F5F0E8}
+.step-text{font-size:13px;color:#C8BEA8;line-height:1.8;margin-bottom:10px}
+.step-text:last-child{margin-bottom:0}
+.step-detail{background:#161616;border-radius:8px;padding:14px 16px;margin-top:10px;font-size:13px;color:#C8BEA8;line-height:1.75;border-left:2px solid rgba(200,169,110,.3)}
+.click{display:inline-flex;align-items:center;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:5px;padding:2px 10px;font-size:12px;color:#C8A96E;font-weight:600;margin:0 2px}
+.type-this{background:#0a0a0a;border:1px solid rgba(200,169,110,.2);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#F5F0E8;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap}
+.info-box{border-radius:10px;padding:20px 24px;margin:20px 0}
+.info-box.gold{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2)}
+.info-box.tip{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15)}
+.info-box.warn{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.15)}
+.info-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.info-box.gold .info-label{color:#C8A96E}
+.info-box.tip .info-label{color:#4ADE80}
+.info-box.warn .info-label{color:#e74c3c}
+.info-text{font-size:13px;color:#C8BEA8;line-height:1.75}
+.msg-template{background:#0a0a0a;border:1px solid rgba(200,169,110,.25);border-radius:12px;padding:24px;margin:16px 0}
+.msg-header{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.msg-header::before{content:"";width:20px;height:1px;background:#C8A96E}
+.msg-body{font-size:13px;color:#F5F0E8;line-height:1.9}
+.msg-note{font-size:11px;color:#7A7060;margin-top:12px}
+.takeaways{background:#161616;border:1px solid rgba(200,169,110,.12);border-radius:12px;padding:28px;margin:28px 0}
+.takeaways-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E;margin-bottom:16px}
+.takeaway{display:flex;gap:12px;margin-bottom:12px;font-size:13px;color:#F5F0E8;line-height:1.6}
+.takeaway:last-child{margin-bottom:0}
+.takeaway::before{content:"◆";color:#C8A96E;font-size:8px;margin-top:5px;flex-shrink:0}
+.exercise{background:linear-gradient(135deg,rgba(200,169,110,.08),rgba(200,169,110,.03));border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:28px;margin:28px 0}
+.exercise-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:12px}
+.exercise-text{font-size:14px;color:#F5F0E8;line-height:1.75}
+.lesson-actions{display:flex;gap:12px;margin-top:40px;flex-wrap:wrap}
+.btn-complete{padding:13px 28px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-complete:hover{opacity:.9;transform:translateY(-1px)}
+.btn-next{padding:13px 28px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:8px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-next:hover{border-color:#C8A96E;color:#C8A96E}
+@media(max-width:600px){.module-hero,.progress-wrap,.lessons-nav,.lesson-wrap{padding-left:16px;padding-right:16px}.lesson-header{padding:20px}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">AI Cash Systems</div>
+  <a href="/course-starter.html" class="back-btn">← Back to Course</a>
+</nav>
+
+<div class="module-hero">
+  <div class="module-badge">Module 7 of 8</div>
+  <div class="module-num">07</div>
+  <h1 class="module-title">Cold Email Automation —<br><em>50 Emails/Day on Autopilot</em></h1>
+  <p class="module-desc">Find 100 verified prospects in 10 minutes with Apollo.io, send 50 personalized emails per day automatically with Instantly.ai, and connect everything into one automated flow with Make.com.</p>
+  <div class="module-meta">
+    <div class="meta-item"><div class="meta-dot"></div>3 Lessons</div>
+    <div class="meta-item"><div class="meta-dot"></div>~75 minutes</div>
+    <div class="meta-item"><div class="meta-dot"></div>Cold Outreach</div>
+  </div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-label"><span>Module Progress</span><span id="progressLabel">0 / 3 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="lessons-nav">
+  <button class="lesson-tab active" onclick="showLesson(1)" id="tab1">Lesson 1 — Apollo.io Prospecting</button>
+  <button class="lesson-tab" onclick="showLesson(2)" id="tab2">Lesson 2 — Instantly.ai Sending</button>
+  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — Full Automated Flow</button>
+</div>
+
+<div class="lesson-wrap">
+
+<!-- LESSON 1 -->
+<div class="lesson-content active" id="lesson1">
+  <div class="lesson-header">
+    <div class="lesson-tag">Prospecting · Lesson 1</div>
+    <h2 class="lesson-title">Apollo.io — Find 100 Verified Prospects in 10 Minutes</h2>
+    <p class="lesson-intro">Apollo.io is a B2B database with over 275 million contacts. You can find verified email addresses, phone numbers and LinkedIn profiles of any business owner in any industry in any country — in minutes, for free.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">What is Apollo.io and Why We Use It</div>
+    <div class="block-text">Apollo.io is the most powerful free prospecting tool available. The free plan gives you 50 verified email exports per month — enough to start. You search by job title, industry, company size, location, and even the technology a company uses. Every result includes a verified business email address.</div>
+    <div class="block-text">This is not just a list of names. Apollo shows you the CEO's direct email, the company's LinkedIn, their estimated revenue, how many employees they have, and what software they use. This data makes your outreach hyper-targeted and relevant.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Create Your Free Apollo.io Account</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to apollo.io and click "Get started for free"</div></div>
+        <div class="step-text">Open your browser and go to <strong style="color:#C8A96E">apollo.io</strong>. On the homepage click the button that says <span class="click">Get started for free</span>. A registration page appears.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Sign up with Google for the fastest setup</div></div>
+        <div class="step-text">Click <span class="click">Sign up with Google</span>. Select your Google account. Apollo creates your account automatically and takes you to the dashboard. No credit card needed for the free plan.</div>
+        <div class="step-detail">Use a business email if possible — not a Gmail with a random name. Apollo's free plan gives you 50 email exports per month and 5 phone number exports. For your first client campaigns this is more than enough.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Connect your LinkedIn account (recommended)</div></div>
+        <div class="step-text">Apollo will ask you to connect LinkedIn. Click <span class="click">Connect LinkedIn</span> and log in. This gives Apollo access to LinkedIn data which dramatically improves the quality and accuracy of the contact information you find.</div>
+        <div class="step-detail">If you prefer not to connect LinkedIn right now, click "Skip" — you can still use Apollo without it. The contact data will be slightly less detailed but still very useful.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Find Your First 100 Prospects</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Click "Search" in the top navigation</div></div>
+        <div class="step-text">In the Apollo dashboard, look at the top navigation bar. Click on <span class="click">Search</span>. A dropdown appears with two options: "People" and "Companies." Click <span class="click">People</span> — this searches for individual contacts, not company profiles.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Set the Job Title filter</div></div>
+        <div class="step-text">On the People search page, look at the left sidebar — this is where all the filters are. Find the <strong style="color:#C8A96E">Job Title</strong> filter. Click on it. A text field appears. Type the job titles you want to target, pressing Enter after each one:</div>
+        <div class="step-detail">
+          For restaurant/food industry: <code style="color:#C8A96E">Owner</code>, <code style="color:#C8A96E">Manager</code>, <code style="color:#C8A96E">Restaurant Owner</code><br/><br/>
+          For real estate: <code style="color:#C8A96E">Real Estate Agent</code>, <code style="color:#C8A96E">Broker</code>, <code style="color:#C8A96E">Agency Owner</code><br/><br/>
+          For e-commerce: <code style="color:#C8A96E">CEO</code>, <code style="color:#C8A96E">Founder</code>, <code style="color:#C8A96E">E-commerce Manager</code><br/><br/>
+          For general B2B: <code style="color:#C8A96E">CEO</code>, <code style="color:#C8A96E">Founder</code>, <code style="color:#C8A96E">Managing Director</code>, <code style="color:#C8A96E">Operations Manager</code>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Set the Industry filter</div></div>
+        <div class="step-text">Find the <strong style="color:#C8A96E">Industry</strong> filter in the left sidebar. Click on it. Type your target industry and select from the dropdown suggestions. Examples: <code style="color:#C8A96E">Restaurants</code>, <code style="color:#C8A96E">Real Estate</code>, <code style="color:#C8A96E">Health, Wellness and Fitness</code>, <code style="color:#C8A96E">Retail</code>.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Set the Location filter</div></div>
+        <div class="step-text">Find the <strong style="color:#C8A96E">Location</strong> filter. Click it and type your target city or country. Examples: <code style="color:#C8A96E">Bucharest, Romania</code> or <code style="color:#C8A96E">Romania</code> or <code style="color:#C8A96E">United Kingdom</code>. Select the suggestion that appears.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Set the Company Size filter (optional but powerful)</div></div>
+        <div class="step-text">Find the <strong style="color:#C8A96E">Company Headcount</strong> or <strong style="color:#C8A96E"># Employees</strong> filter. Select <span class="click">1–10</span> and <span class="click">11–50</span>. This filters for small businesses — the ones most likely to need your automation services and most likely to have the owner as the decision maker.</div>
+        <div class="step-detail">Avoid targeting companies with 200+ employees for your first clients. Large companies have procurement processes, multiple decision makers, and long sales cycles. Small businesses (1–50 employees) can say yes on a call and pay the same day.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">6</div><div class="step-title">Review your results and check the numbers</div></div>
+        <div class="step-text">After setting your filters, Apollo shows you the total number of matching contacts on the right side. You want between 200 and 2,000 results — enough to run multiple campaigns. If you have fewer than 50 results, broaden your filters (larger location, more job titles). If you have more than 10,000, add more specific filters.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">7</div><div class="step-title">Select 100 contacts and export to CSV</div></div>
+        <div class="step-text">At the top of the results list, check the box to select all contacts on the current page (usually 25 per page). Select 4 pages to get 100 contacts total. Then click the <span class="click">Export</span> button — it looks like a download arrow icon. Select <span class="click">Export to CSV</span>.</div>
+        <div class="step-detail">
+          Apollo will use your free export credits. The free plan gives 50 email exports/month. If you need more, either:<br/>
+          — Create a second free account with a different email<br/>
+          — Upgrade to the Basic plan ($49/month) which gives 300 exports<br/>
+          — Use the exported contacts multiple times across different campaigns<br/><br/>
+          The CSV file downloads to your computer. Open it to verify the data — you should see columns for First Name, Last Name, Email, Company, Title, LinkedIn URL, and more.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box gold">
+    <div class="info-label">✦ The Technology Filter — Find The Best Prospects</div>
+    <div class="info-text">Apollo has a "Technologies Used" filter that shows what software a company uses. Search for companies using <strong style="color:#C8A96E">HubSpot</strong> or <strong style="color:#C8A96E">Salesforce</strong> — these companies already have a CRM, which means they care about their sales process and are much more receptive to AI automation. They already understand the concept of tools that improve efficiency. Filter by technology to dramatically increase your reply rates.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 1</div>
+    <div class="takeaway">Apollo.io free plan gives 50 email exports/month — enough for your first campaigns. No credit card needed.</div>
+    <div class="takeaway">Always filter by Company Size 1–50 employees for your first clients — they decide faster and pay faster.</div>
+    <div class="takeaway">The Technology filter (HubSpot/Salesforce users) gives you pre-qualified prospects who already value automation tools.</div>
+    <div class="takeaway">Export 100 contacts at a time to a CSV — this becomes the input for your Instantly.ai campaign in Lesson 2.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Export Your First 100 Prospects Now</div>
+    <div class="exercise-text">Go to apollo.io right now and create your free account. Set up the filters for your chosen industry and location. Export 100 contacts to a CSV file. Open the CSV and verify you have real names and email addresses. Save the file as "Prospects — [Industry] — [Date].csv" — you will upload it to Instantly.ai in Lesson 2.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(1)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(2)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 2 -->
+<div class="lesson-content" id="lesson2">
+  <div class="lesson-header">
+    <div class="lesson-tag">Email Sending · Lesson 2</div>
+    <h2 class="lesson-title">Instantly.ai — Send 50 Personalized Emails Per Day Automatically</h2>
+    <p class="lesson-intro">Instantly.ai is the platform that sends cold emails at scale without landing in spam. It warms up your email address, manages sending limits, handles follow-ups, and tracks replies — all automatically.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Why Instantly.ai and Not Just Gmail</div>
+    <div class="block-text">If you send 50 cold emails from a regular Gmail account, Google will flag your account as spam within days and suspend it. Instantly.ai solves this by: warming up your email address gradually (so Gmail and email providers trust it), spacing out sends to look natural, rotating between multiple email addresses if needed, and tracking opens, clicks, and replies.</div>
+    <div class="block-text">The result: your emails land in the inbox — not the spam folder — and you can send consistently without getting your account suspended.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Create Your Instantly.ai Account</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to instantly.ai and click "Start Free Trial"</div></div>
+        <div class="step-text">Open <strong style="color:#C8A96E">instantly.ai</strong> in your browser. Click the <span class="click">Start Free Trial</span> or <span class="click">Get Started</span> button. Fill in your name, email, and create a password. Click <span class="click">Create Account</span>.</div>
+        <div class="step-detail">Instantly.ai has a 14-day free trial on their Growth plan ($37/month after trial). The Growth plan lets you send up to 5,000 emails/month across unlimited email accounts. Start the trial — you can cancel before it charges if you decide not to continue.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Connect your sending email address</div></div>
+        <div class="step-text">After creating your account, Instantly.ai prompts you to connect an email account. Click <span class="click">Connect Email Account</span>. You have two options:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Option A — Google Workspace (recommended):</strong> If you have a custom domain email like yourname@youragency.com, connect it here. Click <span class="click">Google</span> → authorize access. Custom domain emails have much better deliverability than Gmail addresses.<br/><br/>
+          <strong style="color:#C8A96E">Option B — Regular Gmail:</strong> Click <span class="click">Google</span> and connect your Gmail. This works but has lower deliverability. Gmail accounts are more likely to get flagged as spam for cold outreach.<br/><br/>
+          For best results: buy a cheap domain ($10/year at Namecheap) and create a Google Workspace email ($6/month). The improved deliverability is worth far more than this cost.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Turn on Email Warmup — do this BEFORE sending</div></div>
+        <div class="step-text">This is the most important step. After connecting your email, find the <strong style="color:#C8A96E">Warmup</strong> section — it is in the left sidebar or in your email account settings. Toggle it <span class="click">ON</span>.</div>
+        <div class="step-detail">
+          Email warmup means Instantly.ai automatically sends and replies to emails from your account in the background — between real email addresses in their warmup network. This makes your email address look like it belongs to an active, trusted person.<br/><br/>
+          <strong style="color:#C8A96E">Wait 14 days after turning on warmup before sending your first cold email campaign.</strong> This is non-negotiable. Starting a campaign before warmup is complete will get your emails sent to spam.<br/><br/>
+          During warmup, Instantly sends 2–5 warmup emails per day from your account. You will see them in your Sent folder — ignore them, they are automated.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Create Your Cold Email Campaign</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Click "Campaigns" in the left sidebar then "New Campaign"</div></div>
+        <div class="step-text">In Instantly.ai, click <span class="click">Campaigns</span> in the left navigation. Click the <span class="click">+ New Campaign</span> button. A campaign creation wizard opens.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Name your campaign</div></div>
+        <div class="step-text">Give the campaign a clear name like "Restaurant Owners — Romania — October 2024." This helps you track performance across multiple campaigns. Click <span class="click">Continue</span>.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Upload your Apollo CSV — add your prospects</div></div>
+        <div class="step-text">The next step asks you to add leads. Click <span class="click">Upload CSV</span>. Select the CSV file you exported from Apollo in Lesson 1. Instantly.ai shows a preview of your data — columns for first name, last name, email, company, etc.</div>
+        <div class="step-detail">
+          Map the columns correctly — Instantly.ai asks you to match each column in your CSV to a variable name:<br/><br/>
+          — CSV column "First Name" → map to <code style="color:#C8A96E">{{firstName}}</code><br/>
+          — CSV column "Last Name" → map to <code style="color:#C8A96E">{{lastName}}</code><br/>
+          — CSV column "Company" → map to <code style="color:#C8A96E">{{companyName}}</code><br/>
+          — CSV column "Title" → map to <code style="color:#C8A96E">{{jobTitle}}</code><br/><br/>
+          These variable names are what you use in your email template to personalize each email automatically. Click <span class="click">Continue</span> after mapping.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Write your email sequence — Email 1 (Initial Outreach)</div></div>
+        <div class="step-text">The next step is writing your email. Click on the email template area. Fill in:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Subject line:</strong>
+          <div class="type-this">Quick question about {{companyName}}</div>
+          <strong style="color:#C8A96E">Email body — paste this and customize:</strong>
+        </div>
+        <div class="msg-template">
+          <div class="msg-header">Cold Email — Initial Outreach</div>
+          <div class="msg-body">Hi {{firstName}},
+
+I came across {{companyName}} and noticed you likely receive a lot of customer inquiries — WhatsApp messages, contact form submissions, emails — that take significant time to respond to.
+
+I build AI automation systems that reply to every customer inquiry within seconds, 24/7, in your brand voice. Businesses using this stop losing leads to slow response times.
+
+Would it be worth a 15-minute call this week to show you exactly how it works for {{companyName}}?
+
+[Your Name]</div>
+          <div class="msg-note">Keep it under 100 words. Short emails get more replies than long ones. The {{firstName}} and {{companyName}} variables are automatically replaced with real data from your CSV.</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Add a Follow-Up Email (Email 2) — sent 3 days later</div></div>
+        <div class="step-text">In Instantly.ai, after writing Email 1, click <span class="click">+ Add Step</span> to add a follow-up. Set the delay to <span class="click">3 days</span>. Write a short follow-up:</div>
+        <div class="msg-template">
+          <div class="msg-header">Follow-Up Email — Day 3</div>
+          <div class="msg-body">Hi {{firstName}},
+
+Just following up on my note from a few days ago.
+
+I know timing might not be right — but if {{companyName}} is losing leads because of slow response times, I can show you a working solution in 15 minutes.
+
+Worth a quick look?
+
+[Your Name]</div>
+          <div class="msg-note">Maximum 2 follow-ups. After 2 emails with no reply, stop. Never send more — it damages your sender reputation.</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">6</div><div class="step-title">Configure sending settings</div></div>
+        <div class="step-text">Before launching, set these critical sending settings. Find the <strong style="color:#C8A96E">Settings</strong> or <strong style="color:#C8A96E">Schedule</strong> tab in the campaign:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Daily sending limit:</strong> Set to <code style="color:#C8A96E">30–50 emails per day</code>. Never start with 50/day — start with 20/day for the first week, then increase to 50/day in week 2.<br/><br/>
+          <strong style="color:#C8A96E">Sending hours:</strong> Set to <code style="color:#C8A96E">Monday–Friday, 9:00 AM – 5:00 PM</code> in the recipient's timezone. Emails sent during business hours get more opens.<br/><br/>
+          <strong style="color:#C8A96E">Stop on reply:</strong> Make sure this is turned <span class="click">ON</span>. This stops sending follow-ups to anyone who replies — prevents you from looking like a bot by sending follow-ups to people who already responded.<br/><br/>
+          <strong style="color:#C8A96E">Tracking:</strong> Turn on open tracking and click tracking so you can see which emails are being read.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">7</div><div class="step-title">Launch the campaign</div></div>
+        <div class="step-text">After configuring everything, click <span class="click">Launch Campaign</span>. Instantly.ai starts sending emails according to your schedule. You can see real-time statistics in the campaign dashboard: emails sent, opens, clicks, replies.</div>
+        <div class="step-detail">
+          Check the campaign stats every morning. When someone replies, their email thread appears in the Instantly.ai inbox — you can reply directly from there. The goal of the cold email is not to close on email — it is to get them to say "yes" to a 15-minute call. Reply to every positive response within 1 hour and suggest two specific times for a call.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="info-box warn">
+    <div class="info-label">⚠️ Do Not Skip Email Warmup</div>
+    <div class="info-text">Sending cold emails without warming up your email address first will get your emails sent to spam and your account suspended within days. Wait 14 days after turning on warmup before launching any campaign. This is the single most common mistake beginners make. The 14-day wait feels frustrating but it is essential for long-term success.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 2</div>
+    <div class="takeaway">Turn on Email Warmup immediately after connecting your email. Wait 14 days before your first campaign.</div>
+    <div class="takeaway">Start with 20 emails/day for week 1, then increase to 50/day. Never start at maximum volume.</div>
+    <div class="takeaway">Always turn on "Stop on reply" — this prevents follow-ups going to people who already responded.</div>
+    <div class="takeaway">The goal of cold email is to get a "yes" to a call — not to close a deal via email.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(2)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(3)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 3 -->
+<div class="lesson-content" id="lesson3">
+  <div class="lesson-header">
+    <div class="lesson-tag">Full System · Lesson 3</div>
+    <h2 class="lesson-title">Connect Apollo + Instantly + Make.com Into One Flow</h2>
+    <p class="lesson-intro">The final step: connect Apollo, Instantly.ai and Make.com so the entire outreach process runs automatically. New prospects are imported, emails are personalized with GPT-4o, and replies trigger immediate follow-up actions — all without manual work.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Complete Automated Outreach Flow</div>
+    <div class="block-text">Here is the full flow you are building:</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Apollo → Google Sheets (manual import, automated processing)</div></div>
+        <div class="step-text">You export your Apollo CSV and upload it to a Google Sheet. Make.com watches this sheet for new rows and automatically processes each new prospect.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Google Sheets → OpenAI (personalized first line)</div></div>
+        <div class="step-text">For each new prospect, Make.com sends their data to GPT-4o to generate a personalized opening line for the email. This first line is unique for every prospect and dramatically increases reply rates.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">OpenAI → Instantly.ai API (add lead with personalized email)</div></div>
+        <div class="step-text">Make.com sends the prospect's data plus the GPT-generated first line to Instantly.ai via their API, adding the lead to your campaign automatically.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Instantly.ai → Gmail (sends the email automatically)</div></div>
+        <div class="step-text">Instantly.ai sends the personalized email from your connected sending address at the right time, with warmup running in the background to protect deliverability.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Set Up the Google Sheet as Input</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a new Google Sheet called "Outreach Prospects"</div></div>
+        <div class="step-text">Open <strong style="color:#C8A96E">sheets.google.com</strong>. Create a new spreadsheet. Name it "Outreach Prospects — [Industry]." Set up these column headers in Row 1:</div>
+        <div class="step-detail">
+          Column A: <code style="color:#C8A96E">First Name</code><br/>
+          Column B: <code style="color:#C8A96E">Last Name</code><br/>
+          Column C: <code style="color:#C8A96E">Email</code><br/>
+          Column D: <code style="color:#C8A96E">Company</code><br/>
+          Column E: <code style="color:#C8A96E">Job Title</code><br/>
+          Column F: <code style="color:#C8A96E">Industry</code><br/>
+          Column G: <code style="color:#C8A96E">Processed</code> (leave empty — Make.com writes "YES" here after processing each row)
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Copy your Apollo CSV data into the sheet</div></div>
+        <div class="step-text">Open your Apollo CSV export in Excel or Google Sheets. Copy the relevant columns and paste them into your Outreach Prospects sheet starting at Row 2. Make sure each column matches the headers you created.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Build the Make.com Scenario</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a new Scenario with Google Sheets trigger</div></div>
+        <div class="step-text">In Make.com, create a new Scenario. Click the trigger circle. Search <strong style="color:#C8A96E">Google Sheets</strong> and select <span class="click">Watch New Rows</span>. Connect your Google account. Select the "Outreach Prospects" spreadsheet and the Sheet tab. Set Limit to <span class="click">5</span> — this processes 5 new prospects per run. Click <span class="click">OK</span>.</div>
+        <div class="step-detail">Why Limit = 5? If you set Limit = 100, Make.com tries to process all 100 rows at once which costs 100 operations. Setting it to 5 means each scheduled run processes 5 rows, spreading the cost over multiple runs. Set the scenario to run every 15 minutes.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Add OpenAI to generate a personalized first line</div></div>
+        <div class="step-text">Click <span class="click">+</span> after Google Sheets. Add <strong style="color:#C8A96E">OpenAI → Create a Chat Completion</strong>. Connect your API key. Select <span class="click">gpt-4o</span>. In the Message content field, use this prompt with variables from the sheet:</div>
+        <div class="type-this">Write a single personalized opening sentence for a cold email to {{1.First_Name}} who is a {{1.Job_Title}} at {{1.Company}} in the {{1.Industry}} industry.
+
+The sentence should reference something specific about their role or industry that makes it feel personal and relevant. It should transition naturally into an email about AI automation services.
+
+Write ONLY the opening sentence — nothing else. Maximum 25 words. Sound natural, not salesy.</div>
+        <div class="step-detail">Example output from GPT-4o: <em style="color:#C8BEA8">"Managing customer inquiries for a growing restaurant group must take an enormous amount of your team's time every day."</em> — This is unique for every prospect and makes the email feel hand-written.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Add HTTP module to call Instantly.ai API</div></div>
+        <div class="step-text">Click <span class="click">+</span> after OpenAI. Add <strong style="color:#C8A96E">HTTP → Make a Request</strong>. Configure it to add the prospect to your Instantly.ai campaign:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">URL:</strong>
+          <div class="type-this">https://api.instantly.ai/api/v1/lead/add</div>
+          <strong style="color:#C8A96E">Method:</strong> POST<br/><br/>
+          <strong style="color:#C8A96E">Headers:</strong><br/>
+          — Content-Type: application/json<br/><br/>
+          <strong style="color:#C8A96E">Body (Raw JSON):</strong>
+          <div class="type-this">{
+  "api_key": "YOUR_INSTANTLY_API_KEY",
+  "campaign_id": "YOUR_CAMPAIGN_ID",
+  "skip_if_in_workspace": true,
+  "leads": [
+    {
+      "email": "{{1.Email}}",
+      "first_name": "{{1.First_Name}}",
+      "last_name": "{{1.Last_Name}}",
+      "company_name": "{{1.Company}}",
+      "personalization": "{{2.choices[].message.content}}"
+    }
+  ]
+}</div>
+          <strong style="color:#C8A96E">Where to find your Instantly API Key:</strong> In Instantly.ai → click your profile icon top right → API Keys → Create API Key → copy it.<br/><br/>
+          <strong style="color:#C8A96E">Where to find your Campaign ID:</strong> In Instantly.ai → Campaigns → click your campaign → look at the URL — the campaign ID is the long string after "/campaigns/"
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Update the "Processed" column in Google Sheets</div></div>
+        <div class="step-text">Add one more module after the HTTP call. Click <span class="click">+</span>. Search <strong style="color:#C8A96E">Google Sheets</strong> and select <span class="click">Update a Row</span>. Connect to your Outreach Prospects sheet. Set the Row Number to the current row variable from Module 1. In column G (Processed), type <code style="color:#C8A96E">YES</code>.</div>
+        <div class="step-detail">This marks each processed row so Make.com does not process the same prospect twice. Every time the scenario runs, it only picks up rows where column G is empty — skipping rows already marked "YES".</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Update your Instantly.ai email template to use the personalization variable</div></div>
+        <div class="step-text">Go back to Instantly.ai. Open your campaign. Edit the email template. In the email body, add the personalization variable at the very beginning:</div>
+        <div class="type-this">{{personalization}}
+
+I noticed {{companyName}} likely handles a lot of customer inquiries daily that take significant time to respond to.
+
+I build AI automation systems that reply to every customer inquiry within seconds, 24/7, in your brand voice.
+
+Would a 15-minute call this week make sense to show you how it works?
+
+[Your Name]</div>
+        <div class="step-detail">The <code style="color:#C8A96E">{{personalization}}</code> variable will be replaced with the unique GPT-generated opening sentence for each prospect. The rest of the email is the same for everyone — but that first sentence makes every email feel personal and handwritten.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">6</div><div class="step-title">Turn on the Make.com Scenario and test</div></div>
+        <div class="step-text">In Make.com, turn on the Scheduling toggle. Set it to run every 15 minutes. Click <span class="click">Run once</span> to test. Check your Instantly.ai campaign — you should see new leads appearing in the campaign dashboard within seconds.</div>
+        <div class="step-detail">After the test run, go to your Google Sheet — the rows that were processed should now show "YES" in column G. This confirms the full flow is working.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Expected Results — Realistic Numbers</div>
+    <div class="block-text">Here is what to expect from a well-run cold email campaign using this system:</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">📊</div><div class="step-title">Volume and Response Rates</div></div>
+        <div class="step-text">Sending 50 emails per day × 20 working days = 1,000 emails per month. With good personalization and targeting, expect:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Open rate:</strong> 40–60% (industry average is 20% — personalized emails open more)<br/>
+          <strong style="color:#C8A96E">Reply rate:</strong> 3–8% (industry average is 1–2% — personalized first lines double reply rates)<br/>
+          <strong style="color:#C8A96E">1,000 emails × 5% reply rate = 50 conversations</strong><br/>
+          <strong style="color:#C8A96E">50 conversations × 20% close rate = 10 calls booked</strong><br/>
+          <strong style="color:#C8A96E">10 calls × 30% close rate = 3 new clients per month</strong><br/><br/>
+          3 new clients per month at $200/month average retainer = $600 new recurring revenue added every month. After 6 months that is $3,600/month from cold email clients alone.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">✓ This System Runs Itself</div>
+    <div class="info-text">Once everything is set up, your only job is to add new prospects to the Google Sheet periodically. Make.com processes them automatically, GPT-4o personalizes each email, and Instantly.ai sends them on schedule. You wake up every morning to replies from interested prospects already in your inbox. The system works while you sleep.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 3</div>
+    <div class="takeaway">The "Processed" column in Google Sheets prevents duplicate processing — always include it.</div>
+    <div class="takeaway">GPT-4o generated first lines increase reply rates significantly compared to generic templates.</div>
+    <div class="takeaway">Realistic expectation: 3–8% reply rate from 1,000 emails = 30–80 conversations per month.</div>
+    <div class="takeaway">The full system runs automatically once built — add new prospects to the Sheet and everything else happens without you.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Build and Launch Your First Campaign</div>
+    <div class="exercise-text">Set up Instantly.ai, connect your email, turn on warmup, and wait 14 days. While waiting, build the Make.com scenario from this lesson. After 14 days, add your 100 Apollo prospects to the Google Sheet, turn on the Make.com scenario, and watch the leads flow into Instantly.ai automatically. Check your Instantly.ai dashboard every morning for replies. Respond to every positive reply within 1 hour.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="window.location.href='/course-starter.html'">← Back to All Modules</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+var completed=JSON.parse(localStorage.getItem('m7_completed')||'[]');
+function updateProgress(){
+  var fill=document.getElementById('progressFill');
+  var label=document.getElementById('progressLabel');
+  fill.style.width=(completed.length/3*100)+'%';
+  label.textContent=completed.length+' / 3 lessons';
+  completed.forEach(function(n){var t=document.getElementById('tab'+n);if(t)t.classList.add('done');});
+}
+function showLesson(n){
+  document.querySelectorAll('.lesson-content').forEach(function(el){el.classList.remove('active')});
+  document.querySelectorAll('.lesson-tab').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('lesson'+n).classList.add('active');
+  document.getElementById('tab'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function completeLesson(n){
+  if(completed.indexOf(n)===-1){completed.push(n);localStorage.setItem('m7_completed',JSON.stringify(completed));}
+  updateProgress();
+// Open lesson from URL hash
+var hash=window.location.hash;
+if(hash){
+  var n=parseInt(hash.replace("#lesson",""));
+  if(n>=1&&n<=3)showLesson(n);
+}
+  var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
+}
+updateProgress();
+// Open specific lesson from URL hash
+(function(){
+  var h = window.location.hash;
+  if(h && h.indexOf('lesson') !== -1){
+    var n = parseInt(h.replace('#lesson',''));
+    if(n >= 1 && n <= 3) showLesson(n);
+  }
+})();
+// Open lesson from URL hash
+var hash=window.location.hash;
+if(hash){
+  var n=parseInt(hash.replace("#lesson",""));
+  if(n>=1&&n<=3)showLesson(n);
+}
+</script>
+</body>
+</html>
