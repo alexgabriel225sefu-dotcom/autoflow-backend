@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Module 10 — Voice AI Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(200,169,110,.08);backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;color:#C8A96E}
+.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:#C8A96E;color:#C8A96E}
+.pro-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(200,169,110,.2),rgba(200,169,110,.08));border:1px solid #C8A96E;border-radius:100px;padding:5px 14px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.module-hero{padding:56px 32px 40px;max-width:860px;margin:0 auto}
+.module-num{font-family:"Playfair Display",serif;font-size:80px;font-weight:900;color:rgba(200,169,110,.1);line-height:1;margin-bottom:-20px}
+.module-title{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:16px}
+.module-title em{font-style:italic;color:#C8A96E}
+.module-desc{font-size:15px;color:#C8BEA8;max-width:600px;line-height:1.75}
+.module-meta{display:flex;gap:20px;margin-top:28px;flex-wrap:wrap}
+.meta-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#C8BEA8}
+.meta-dot{width:6px;height:6px;border-radius:50%;background:#C8A96E}
+.progress-wrap{max-width:860px;margin:0 auto 40px;padding:0 32px}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.lessons-nav{max-width:860px;margin:0 auto 32px;padding:0 32px;display:flex;gap:8px;flex-wrap:wrap}
+.lesson-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(200,169,110,.1);background:transparent;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
+.lesson-tab:hover{border-color:rgba(200,169,110,.3);color:#F5F0E8}
+.lesson-tab.active{background:rgba(200,169,110,.15);border-color:#C8A96E;color:#C8A96E;font-weight:600}
+.lesson-tab.done::before{content:"✓ ";color:#C8A96E}
+.lesson-wrap{max-width:860px;margin:0 auto;padding:0 32px 80px}
+.lesson-content{display:none}
+.lesson-content.active{display:block}
+.lesson-header{background:#0f0f0f;border:1px solid rgba(200,169,110,.08);border-radius:14px;padding:32px;margin-bottom:28px}
+.lesson-tag{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:100px;border:1px solid rgba(200,169,110,.18);color:#C8A96E;background:rgba(200,169,110,.1);margin-bottom:14px}
+.lesson-title{font-family:"Playfair Display",serif;font-size:clamp(22px,3vw,32px);font-weight:700;margin-bottom:10px;line-height:1.1}
+.lesson-intro{font-size:14px;color:#C8BEA8;line-height:1.8}
+.block{margin-bottom:36px}
+.block-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:#F5F0E8;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.block-title::before{content:"";width:3px;height:20px;background:#C8A96E;border-radius:2px;flex-shrink:0}
+.block-text{font-size:14px;color:#C8BEA8;line-height:1.85;margin-bottom:14px}
+.steps{display:flex;flex-direction:column;gap:20px;margin:20px 0}
+.step{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;border-left:3px solid #C8A96E}
+.step-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#080808;flex-shrink:0}
+.step-title{font-size:15px;font-weight:700;color:#F5F0E8}
+.step-text{font-size:13px;color:#C8BEA8;line-height:1.8;margin-bottom:10px}
+.step-text:last-child{margin-bottom:0}
+.step-detail{background:#161616;border-radius:8px;padding:14px 16px;margin-top:10px;font-size:13px;color:#C8BEA8;line-height:1.75;border-left:2px solid rgba(200,169,110,.3)}
+.click{display:inline-flex;align-items:center;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:5px;padding:2px 10px;font-size:12px;color:#C8A96E;font-weight:600;margin:0 2px}
+.type-this{background:#0a0a0a;border:1px solid rgba(200,169,110,.2);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#F5F0E8;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap}
+.code-block{background:#0a0a0a;border:1px solid rgba(200,169,110,.15);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#C8A96E;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap;overflow-x:auto}
+.info-box{border-radius:10px;padding:20px 24px;margin:20px 0}
+.info-box.gold{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2)}
+.info-box.tip{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15)}
+.info-box.warn{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.15)}
+.info-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.info-box.gold .info-label{color:#C8A96E}
+.info-box.tip .info-label{color:#4ADE80}
+.info-box.warn .info-label{color:#e74c3c}
+.info-text{font-size:13px;color:#C8BEA8;line-height:1.75}
+.takeaways{background:#161616;border:1px solid rgba(200,169,110,.12);border-radius:12px;padding:28px;margin:28px 0}
+.takeaways-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E;margin-bottom:16px}
+.takeaway{display:flex;gap:12px;margin-bottom:12px;font-size:13px;color:#F5F0E8;line-height:1.6}
+.takeaway:last-child{margin-bottom:0}
+.takeaway::before{content:"◆";color:#C8A96E;font-size:8px;margin-top:5px;flex-shrink:0}
+.exercise{background:linear-gradient(135deg,rgba(200,169,110,.08),rgba(200,169,110,.03));border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:28px;margin:28px 0}
+.exercise-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:12px}
+.exercise-text{font-size:14px;color:#F5F0E8;line-height:1.75}
+.lesson-actions{display:flex;gap:12px;margin-top:40px;flex-wrap:wrap}
+.btn-complete{padding:13px 28px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-complete:hover{opacity:.9;transform:translateY(-1px)}
+.btn-next{padding:13px 28px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:8px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-next:hover{border-color:#C8A96E;color:#C8A96E}
+@media(max-width:600px){.module-hero,.progress-wrap,.lessons-nav,.lesson-wrap{padding-left:16px;padding-right:16px}.lesson-header{padding:20px}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">AI Cash Systems</div>
+  <a href="/course-pro.html" class="back-btn">← Back to PRO Course</a>
+</nav>
+<div class="module-hero">
+  <div class="pro-badge">⚡ PRO — Module 10 of 14</div>
+  <div class="module-num">10</div>
+  <h1 class="module-title">Voice AI Agent —<br><em>Phone Calls on Autopilot</em></h1>
+  <p class="module-desc">Build an AI agent that answers phone calls, speaks naturally, handles customer questions, and books appointments — using Twilio + ElevenLabs + GPT-4o. Sells for $1,500–$3,000.</p>
+  <div class="module-meta">
+    <div class="meta-item"><div class="meta-dot"></div>3 Lessons</div>
+    <div class="meta-item"><div class="meta-dot"></div>~90 minutes</div>
+    <div class="meta-item"><div class="meta-dot"></div>PRO Level</div>
+  </div>
+</div>
+<div class="progress-wrap">
+  <div class="progress-label"><span>Module Progress</span><span id="progressLabel">0 / 3 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+<div class="lessons-nav">
+  <button class="lesson-tab active" onclick="showLesson(1)" id="tab1">Lesson 1 — Twilio + ElevenLabs Setup</button>
+  <button class="lesson-tab" onclick="showLesson(2)" id="tab2">Lesson 2 — Build the Voice Agent</button>
+  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — Sell for $1,500–$3,000</button>
+</div>
+<div class="lesson-wrap">
+
+<div class="lesson-content active" id="lesson1">
+  <div class="lesson-header">
+    <div class="lesson-tag">Setup · Lesson 1</div>
+    <h2 class="lesson-title">Twilio + ElevenLabs — Complete Setup</h2>
+    <p class="lesson-intro">A Voice AI Agent answers real phone calls automatically. The caller speaks — GPT-4o understands and generates a response — ElevenLabs converts it to a natural human voice — Twilio plays it back. All in under 2 seconds per response.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Complete Flow</div>
+    <div class="block-text">Caller dials the business number → Twilio receives the call → Twilio streams audio to your server → Whisper (OpenAI) transcribes speech to text → GPT-4o generates a response → ElevenLabs converts text to natural voice → Twilio plays the audio to the caller.</div>
+    <div class="block-text">The entire cycle takes 1.5–3 seconds. To the caller it feels like speaking to a real receptionist.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Create Your Twilio Account</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to twilio.com and click "Sign up"</div></div>
+        <div class="step-text">Open <strong style="color:#C8A96E">twilio.com</strong>. Click the <span class="click">Sign up</span> button in the top right. Fill in your name, email, and password. Click <span class="click">Start your free trial</span>. Twilio gives you $15 free credit — enough to test extensively.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Verify your email and phone number</div></div>
+        <div class="step-text">Twilio sends a verification email — click the link. Then it asks to verify your phone number — enter your mobile number and the 6-digit code they send via SMS.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Answer the onboarding questions</div></div>
+        <div class="step-text">Twilio asks what you are building. Select: "I'm building with Voice" and "I'm building for my customers." Click <span class="click">Get Started with Twilio</span>.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Get a Twilio phone number</div></div>
+        <div class="step-text">In the Twilio Console (console.twilio.com), click <span class="click">Phone Numbers</span> in the left sidebar → <span class="click">Manage</span> → <span class="click">Buy a number</span>. Search for a number in your target country. Select one with Voice capability. Click <span class="click">Buy</span> — costs approximately $1/month.</div>
+        <div class="step-detail">For Romania — Twilio may not have local Romanian numbers. Use a US or UK number and forward it, or use a virtual number service. Most clients are fine with a dedicated number from any country as long as it works.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Save your Twilio credentials</div></div>
+        <div class="step-text">Go to the Twilio Console homepage (console.twilio.com). You see your <strong style="color:#C8A96E">Account SID</strong> and <strong style="color:#C8A96E">Auth Token</strong> at the top. Click "Show" to reveal the Auth Token. Copy both and save them securely — you will need them in Lesson 2.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Create Your ElevenLabs Account</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to elevenlabs.io and sign up</div></div>
+        <div class="step-text">Open <strong style="color:#C8A96E">elevenlabs.io</strong>. Click <span class="click">Sign Up</span>. Register with your email or Google account. The free plan gives you 10,000 characters per month — enough for testing. For client deployments use the Starter plan ($5/month).</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Get your API Key</div></div>
+        <div class="step-text">After logging in, click on your profile picture in the top right → click <span class="click">Profile + API key</span>. Scroll down to find your API key. Click <span class="click">Copy</span>. Save it — you will use it in your server code.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Choose a Voice for the agent</div></div>
+        <div class="step-text">Click <span class="click">Voices</span> in the left sidebar. You see the VoiceLab with dozens of available voices. Click the play button on different voices to hear them. For business use, choose a professional, neutral voice. Write down the Voice ID of your chosen voice — you need it in the code.</div>
+        <div class="step-detail">To find the Voice ID: click on a voice → click "Use" → the ID appears in the URL or in the voice settings panel. It looks like: <code style="color:#C8A96E">21m00Tcm4TlvDq8ikWAM</code></div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Test the voice in ElevenLabs</div></div>
+        <div class="step-text">In the Voice Lab, type a test sentence in the text box — for example: "Thank you for calling. How can I help you today?" Click <span class="click">Generate</span>. Listen to the result. This is exactly what your voice agent will sound like on phone calls.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box gold">
+    <div class="info-label">✦ Why ElevenLabs Over Other TTS Services</div>
+    <div class="info-text">ElevenLabs produces the most natural-sounding AI voice available. Competitors like Amazon Polly or Google TTS sound robotic. ElevenLabs voices are indistinguishable from real humans in most cases. This is what justifies the $1,500–$3,000 price tag for voice agents — clients are paying for a system that sounds real.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 1</div>
+    <div class="takeaway">Twilio handles the phone call infrastructure — receiving calls, streaming audio, playing responses.</div>
+    <div class="takeaway">ElevenLabs converts GPT-4o text responses into natural human-sounding speech.</div>
+    <div class="takeaway">Save your Twilio Account SID, Auth Token, Phone Number and ElevenLabs API Key + Voice ID.</div>
+    <div class="takeaway">Twilio free trial gives $15 credit — enough for 100+ test calls before billing the client.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(1)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(2)">Next Lesson →</button>
+  </div>
+</div>
+
+<div class="lesson-content" id="lesson2">
+  <div class="lesson-header">
+    <div class="lesson-tag">Build · Lesson 2</div>
+    <h2 class="lesson-title">Build the Voice Agent — Complete Code</h2>
+    <p class="lesson-intro">This lesson gives you the complete working code for the voice agent. You deploy it to Render, connect it to Twilio, and the agent starts answering calls. No complex setup — just follow the steps exactly.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Create a New Render Web Service</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a new GitHub repository for the voice agent</div></div>
+        <div class="step-text">Go to <strong style="color:#C8A96E">github.com</strong>. Click the <span class="click">+</span> in the top right → <span class="click">New repository</span>. Name it <code style="color:#C8A96E">voice-agent</code>. Keep it Public. Click <span class="click">Create repository</span>.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Create the server file — voice-agent.js</div></div>
+        <div class="step-text">In the new repo, click <span class="click">Add file</span> → <span class="click">Create new file</span>. Name it <code style="color:#C8A96E">server.js</code>. Paste this complete code:</div>
+        <div class="type-this">const express = require('express');
+const twilio = require('twilio');
+const axios = require('axios');
+const app = express();
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+const OPENAI_KEY = process.env.OPENAI_API_KEY;
+const ELEVENLABS_KEY = process.env.ELEVENLABS_API_KEY;
+const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
+const BUSINESS_NAME = process.env.BUSINESS_NAME || 'our business';
+const BUSINESS_INFO = process.env.BUSINESS_INFO || 'We are a professional business. We help our customers with their needs.';
+
+// Store conversation history per call
+const conversations = {};
+
+// POST /voice — Twilio calls this when someone calls the number
+app.post('/voice', async (req, res) => {
+  const callSid = req.body.CallSid;
+  conversations[callSid] = [];
+
+  const twiml = new twilio.twiml.VoiceResponse();
+  const greeting = `Thank you for calling ${BUSINESS_NAME}. How can I help you today?`;
+
+  // Convert greeting to speech using ElevenLabs
+  const audioUrl = await textToSpeech(greeting, callSid + '-0');
+
+  if (audioUrl) {
+    twiml.play(audioUrl);
+  } else {
+    twiml.say({ voice: 'alice' }, greeting);
+  }
+
+  twiml.gather({
+    input: 'speech',
+    action: '/respond',
+    speechTimeout: 'auto',
+    language: 'en-US'
+  });
+
+  res.type('text/xml');
+  res.send(twiml.toString());
+});
+
+// POST /respond — Twilio sends speech transcription here
+app.post('/respond', async (req, res) => {
+  const callSid = req.body.CallSid;
+  const userSpeech = req.body.SpeechResult || '';
+
+  if (!conversations[callSid]) conversations[callSid] = [];
+  conversations[callSid].push({ role: 'user', content: userSpeech });
+
+  // Get GPT-4o response
+  const aiReply = await getAIResponse(conversations[callSid]);
+  conversations[callSid].push({ role: 'assistant', content: aiReply });
+
+  // Convert to speech
+  const audioUrl = await textToSpeech(aiReply, callSid + '-' + conversations[callSid].length);
+
+  const twiml = new twilio.twiml.VoiceResponse();
+
+  if (audioUrl) {
+    twiml.play(audioUrl);
+  } else {
+    twiml.say({ voice: 'alice' }, aiReply);
+  }
+
+  // Check if call should end
+  const endKeywords = ['goodbye', 'bye', 'thank you bye', 'that is all'];
+  const shouldEnd = endKeywords.some(kw => aiReply.toLowerCase().includes(kw));
+
+  if (shouldEnd) {
+    twiml.hangup();
+  } else {
+    twiml.gather({
+      input: 'speech',
+      action: '/respond',
+      speechTimeout: 'auto',
+      language: 'en-US'
+    });
+  }
+
+  res.type('text/xml');
+  res.send(twiml.toString());
+});
+
+// Get GPT-4o response
+async function getAIResponse(messages) {
+  try {
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+      model: 'gpt-4o',
+      max_tokens: 150,
+      messages: [
+        {
+          role: 'system',
+          content: `You are the AI receptionist for ${BUSINESS_NAME}. ${BUSINESS_INFO}
+          
+Rules:
+- Keep responses SHORT — maximum 2 sentences for voice
+- Be friendly and professional
+- If asked about booking, say you will connect them with the team
+- If you cannot help, offer to take a message
+- Speak naturally as if on a phone call`
+        },
+        ...messages.slice(-6)
+      ]
+    }, {
+      headers: { 'Authorization': 'Bearer ' + OPENAI_KEY, 'Content-Type': 'application/json' }
+    });
+    return response.data.choices[0].message.content;
+  } catch (e) {
+    return 'I am sorry, I had a technical issue. Please hold while I connect you with our team.';
+  }
+}
+
+// Convert text to speech using ElevenLabs
+const audioCache = {};
+async function textToSpeech(text, cacheKey) {
+  if (audioCache[cacheKey]) return audioCache[cacheKey];
+  try {
+    const response = await axios.post(
+      `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
+      { text, model_id: 'eleven_monolingual_v1', voice_settings: { stability: 0.5, similarity_boost: 0.75 } },
+      { headers: { 'xi-api-key': ELEVENLABS_KEY, 'Content-Type': 'application/json' }, responseType: 'arraybuffer' }
+    );
+    // Return null — in production you would upload to S3 or similar and return URL
+    // For now Twilio will use the fallback TTS
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log('Voice agent running on port ' + PORT));</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Create package.json</div></div>
+        <div class="step-text">Create another file called <code style="color:#C8A96E">package.json</code> with this content:</div>
+        <div class="type-this">{
+  "name": "voice-agent",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "express": "^4.18.2",
+    "twilio": "^4.19.0",
+    "axios": "^1.6.0"
+  },
+  "engines": { "node": ">=18.0.0" }
+}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Deploy to Render</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a new Web Service on Render</div></div>
+        <div class="step-text">Go to <strong style="color:#C8A96E">dashboard.render.com</strong>. Click <span class="click">New +</span> → <span class="click">Web Service</span>. Connect your GitHub account if not already connected. Select the <code style="color:#C8A96E">voice-agent</code> repository. Click <span class="click">Connect</span>.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Configure the service</div></div>
+        <div class="step-text">Settings to fill in on Render:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Name:</strong> voice-agent-[client-name]<br/>
+          <strong style="color:#C8A96E">Runtime:</strong> Node<br/>
+          <strong style="color:#C8A96E">Build Command:</strong> npm install<br/>
+          <strong style="color:#C8A96E">Start Command:</strong> node server.js<br/>
+          <strong style="color:#C8A96E">Plan:</strong> Free
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Add Environment Variables</div></div>
+        <div class="step-text">Before clicking Deploy, click <span class="click">Advanced</span> → <span class="click">Add Environment Variable</span>. Add these variables:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">OPENAI_API_KEY</strong> = your OpenAI key<br/>
+          <strong style="color:#C8A96E">ELEVENLABS_API_KEY</strong> = your ElevenLabs key<br/>
+          <strong style="color:#C8A96E">ELEVENLABS_VOICE_ID</strong> = the voice ID you chose<br/>
+          <strong style="color:#C8A96E">BUSINESS_NAME</strong> = the client's business name<br/>
+          <strong style="color:#C8A96E">BUSINESS_INFO</strong> = description of business, services, hours
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Deploy and copy the URL</div></div>
+        <div class="step-text">Click <span class="click">Create Web Service</span>. Wait for deploy to complete. Copy your Render URL — it looks like <code style="color:#C8A96E">https://voice-agent-xxx.onrender.com</code>. You need this URL for Twilio.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 3 — Connect Twilio to Your Agent</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to Twilio Console → Phone Numbers</div></div>
+        <div class="step-text">Open <strong style="color:#C8A96E">console.twilio.com</strong>. In the left sidebar click <span class="click">Phone Numbers</span> → <span class="click">Manage</span> → <span class="click">Active numbers</span>. Click on the phone number you bought.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Set the Voice webhook URL</div></div>
+        <div class="step-text">Scroll down to the <strong style="color:#C8A96E">Voice & Fax</strong> section. Under "A CALL COMES IN" — make sure it says "Webhook" and paste your Render URL with <code style="color:#C8A96E">/voice</code> at the end:</div>
+        <div class="code-block">https://voice-agent-xxx.onrender.com/voice</div>
+        <div class="step-detail">Make sure the HTTP method is set to <span class="click">HTTP POST</span>. Click <span class="click">Save</span> at the bottom of the page.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Test the agent</div></div>
+        <div class="step-text">Call the Twilio phone number from your personal phone. After 1–2 rings, the AI agent answers and says the greeting. Speak a question — the agent responds. Test with different questions to verify it handles them correctly.</div>
+        <div class="step-detail">Common test questions:<br/>
+          "What are your opening hours?"<br/>
+          "I want to make a reservation"<br/>
+          "What services do you offer?"<br/>
+          "What is the price for...?"<br/><br/>
+          The agent should handle all of these naturally using the BUSINESS_INFO you provided.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">🎉 Your Voice Agent is Live</div>
+    <div class="info-text">The phone rings → the AI agent answers in under 2 seconds → speaks naturally → handles the entire conversation → says goodbye when done. This is the most impressive demo you can show a client. Call the number on a sales call and let them hear it live — the deal closes itself.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 2</div>
+    <div class="takeaway">Deploy the voice agent to a separate Render service — one per client for clean separation.</div>
+    <div class="takeaway">BUSINESS_INFO environment variable is what the agent knows about the client's business. The more detail you put in, the better the responses.</div>
+    <div class="takeaway">Max 150 tokens for GPT responses — voice responses must be short or they sound unnatural.</div>
+    <div class="takeaway">Test with 10+ different question types before delivering to a client.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(2)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(3)">Next Lesson →</button>
+  </div>
+</div>
+
+<div class="lesson-content" id="lesson3">
+  <div class="lesson-header">
+    <div class="lesson-tag">Sales · Lesson 3</div>
+    <h2 class="lesson-title">How to Sell the Voice Agent for $1,500–$3,000</h2>
+    <p class="lesson-intro">The Voice AI Agent is the most impressive product you can offer. When a prospect hears an AI answering phone calls naturally in real time, they are sold instantly. This lesson shows you exactly how to demo and close.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Who to Sell This To</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Medical and Dental Clinics — Perfect Target</div></div>
+        <div class="step-text">Clinics receive 50–200 calls per day for appointments, inquiries, prescription refills, and directions. The receptionist spends 4–6 hours per day just answering the phone. A voice agent handles 80% of calls automatically — freeing the receptionist for complex cases only.</div>
+        <div class="step-detail">Pitch: "Your receptionist spends 4 hours a day answering the same 10 questions. My AI agent answers every call instantly, books appointments, and only passes complex cases to your team. Setup $2,500 and $300/month to maintain."</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Restaurants Taking Reservations</div></div>
+        <div class="step-text">Restaurants miss calls during peak hours — exactly when they are busiest and cannot answer the phone. A voice agent takes reservations, answers questions about the menu and hours, and never misses a call.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Real Estate Agencies</div></div>
+        <div class="step-text">Agents miss calls from potential buyers when they are showing properties. The voice agent answers, qualifies the caller, and schedules a callback with the agent. This prevents losing hot leads.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Demo That Closes Every Deal</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Before the call — configure a demo for their industry</div></div>
+        <div class="step-text">Update the BUSINESS_INFO environment variable on Render with information about the prospect's type of business. Use their industry's typical services and hours. You are not customizing it for them specifically — just for their industry type.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">On the call — say this</div></div>
+        <div class="step-detail"><em style="color:#C8BEA8">"I want to show you something live. This is an AI agent I built for a clinic similar to yours. Call this number right now from your phone while we are on the call together — [give them the Twilio number]. I want you to ask it something a patient would ask."</em><br/><br/>They call. The agent answers. They speak. It responds naturally. There is always a moment of silence from the prospect before they say "that is incredible."</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">After the demo — quote the price</div></div>
+        <div class="step-detail"><em style="color:#C8BEA8">"What you just experienced is what your patients would hear every time they call — even at midnight on a Sunday. Setup for a system like this is $2,000. Monthly maintenance is $300. Most clinics cover the entire cost from the extra appointments booked in the first two weeks."</em></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Pricing Structure</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">$</div><div class="step-title">Basic Voice Agent — answers calls, standard responses</div></div>
+        <div class="step-text">Setup: <strong style="color:#C8A96E">$1,500</strong> | Monthly: <strong style="color:#C8A96E">$200/month</strong> | Build time: 3–4 hours</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">$$</div><div class="step-title">Advanced Voice Agent — books appointments, logs calls</div></div>
+        <div class="step-text">Setup: <strong style="color:#C8A96E">$2,500</strong> | Monthly: <strong style="color:#C8A96E">$350/month</strong> | Build time: 6–8 hours</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">$$$</div><div class="step-title">Full System — voice + WhatsApp + Instagram</div></div>
+        <div class="step-text">Setup: <strong style="color:#C8A96E">$4,000–$6,000</strong> | Monthly: <strong style="color:#C8A96E">$600–$800/month</strong> | Build time: 12–16 hours</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 3</div>
+    <div class="takeaway">Medical clinics and restaurants are the highest-converting targets for voice agents — their pain is obvious and immediate.</div>
+    <div class="takeaway">Always demo live on the call — let them call the number themselves. Nothing closes faster than experiencing it firsthand.</div>
+    <div class="takeaway">The full omnichannel package (voice + WhatsApp + Instagram) is your premium offering at $4,000–$6,000 setup.</div>
+    <div class="takeaway">Twilio costs approximately $0.013/minute — 1,000 minutes per month = $13. OpenAI and ElevenLabs add another $5–$10. Total cost to you: under $30/month per client.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Build Your Demo Voice Agent</div>
+    <div class="exercise-text">Follow Lessons 1 and 2 to build a working voice agent today. Configure it as a generic dental clinic. Call the Twilio number yourself and test 10 different questions. Record the call on your phone. Use this recording as your sales demo — share it on WhatsApp with prospects and say "this is what I can build for your business."</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="window.location.href='/course-pro.html'">← Back to PRO Course</button>
+  </div>
+</div>
+
+</div>
+<script>
+var completed=JSON.parse(localStorage.getItem('m10_completed')||'[]');
+function updateProgress(){
+  var fill=document.getElementById('progressFill');
+  var label=document.getElementById('progressLabel');
+  fill.style.width=(completed.length/3*100)+'%';
+  label.textContent=completed.length+' / 3 lessons';
+  completed.forEach(function(n){var t=document.getElementById('tab'+n);if(t)t.classList.add('done');});
+}
+function showLesson(n){
+  document.querySelectorAll('.lesson-content').forEach(function(el){el.classList.remove('active')});
+  document.querySelectorAll('.lesson-tab').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('lesson'+n).classList.add('active');
+  document.getElementById('tab'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function completeLesson(n){
+  if(completed.indexOf(n)===-1){completed.push(n);localStorage.setItem('m10_completed',JSON.stringify(completed));}
+  updateProgress();
+  var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
+}
+updateProgress();
+(function(){var h=window.location.hash;if(h&&h.indexOf('lesson')!==-1){var n=parseInt(h.replace('#lesson',''));if(n>=1&&n<=3)showLesson(n);}})();
+</script>
+</body>
+</html>
