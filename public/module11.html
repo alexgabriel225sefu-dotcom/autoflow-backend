@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Module 11 — Webhook Mastery</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(200,169,110,.08);backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;color:#C8A96E}
+.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:#C8A96E;color:#C8A96E}
+.pro-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(200,169,110,.2),rgba(200,169,110,.08));border:1px solid #C8A96E;border-radius:100px;padding:5px 14px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.module-hero{padding:56px 32px 40px;max-width:860px;margin:0 auto}
+.module-num{font-family:"Playfair Display",serif;font-size:80px;font-weight:900;color:rgba(200,169,110,.1);line-height:1;margin-bottom:-20px}
+.module-title{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:16px}
+.module-title em{font-style:italic;color:#C8A96E}
+.module-desc{font-size:15px;color:#C8BEA8;max-width:600px;line-height:1.75}
+.module-meta{display:flex;gap:20px;margin-top:28px;flex-wrap:wrap}
+.meta-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#C8BEA8}
+.meta-dot{width:6px;height:6px;border-radius:50%;background:#C8A96E}
+.progress-wrap{max-width:860px;margin:0 auto 40px;padding:0 32px}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.lessons-nav{max-width:860px;margin:0 auto 32px;padding:0 32px;display:flex;gap:8px;flex-wrap:wrap}
+.lesson-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(200,169,110,.1);background:transparent;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
+.lesson-tab:hover{border-color:rgba(200,169,110,.3);color:#F5F0E8}
+.lesson-tab.active{background:rgba(200,169,110,.15);border-color:#C8A96E;color:#C8A96E;font-weight:600}
+.lesson-tab.done::before{content:"✓ ";color:#C8A96E}
+.lesson-wrap{max-width:860px;margin:0 auto;padding:0 32px 80px}
+.lesson-content{display:none}
+.lesson-content.active{display:block}
+.lesson-header{background:#0f0f0f;border:1px solid rgba(200,169,110,.08);border-radius:14px;padding:32px;margin-bottom:28px}
+.lesson-tag{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:100px;border:1px solid rgba(200,169,110,.18);color:#C8A96E;background:rgba(200,169,110,.1);margin-bottom:14px}
+.lesson-title{font-family:"Playfair Display",serif;font-size:clamp(22px,3vw,32px);font-weight:700;margin-bottom:10px;line-height:1.1}
+.lesson-intro{font-size:14px;color:#C8BEA8;line-height:1.8}
+.block{margin-bottom:36px}
+.block-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:#F5F0E8;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.block-title::before{content:"";width:3px;height:20px;background:#C8A96E;border-radius:2px;flex-shrink:0}
+.block-text{font-size:14px;color:#C8BEA8;line-height:1.85;margin-bottom:14px}
+.steps{display:flex;flex-direction:column;gap:20px;margin:20px 0}
+.step{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;border-left:3px solid #C8A96E}
+.step-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#080808;flex-shrink:0}
+.step-title{font-size:15px;font-weight:700;color:#F5F0E8}
+.step-text{font-size:13px;color:#C8BEA8;line-height:1.8;margin-bottom:10px}
+.step-text:last-child{margin-bottom:0}
+.step-detail{background:#161616;border-radius:8px;padding:14px 16px;margin-top:10px;font-size:13px;color:#C8BEA8;line-height:1.75;border-left:2px solid rgba(200,169,110,.3)}
+.click{display:inline-flex;align-items:center;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:5px;padding:2px 10px;font-size:12px;color:#C8A96E;font-weight:600;margin:0 2px}
+.type-this{background:#0a0a0a;border:1px solid rgba(200,169,110,.2);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#F5F0E8;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap}
+.code-block{background:#0a0a0a;border:1px solid rgba(200,169,110,.15);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#C8A96E;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap;overflow-x:auto}
+.info-box{border-radius:10px;padding:20px 24px;margin:20px 0}
+.info-box.gold{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2)}
+.info-box.tip{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15)}
+.info-box.warn{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.15)}
+.info-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.info-box.gold .info-label{color:#C8A96E}
+.info-box.tip .info-label{color:#4ADE80}
+.info-box.warn .info-label{color:#e74c3c}
+.info-text{font-size:13px;color:#C8BEA8;line-height:1.75}
+.takeaways{background:#161616;border:1px solid rgba(200,169,110,.12);border-radius:12px;padding:28px;margin:28px 0}
+.takeaways-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E;margin-bottom:16px}
+.takeaway{display:flex;gap:12px;margin-bottom:12px;font-size:13px;color:#F5F0E8;line-height:1.6}
+.takeaway:last-child{margin-bottom:0}
+.takeaway::before{content:"◆";color:#C8A96E;font-size:8px;margin-top:5px;flex-shrink:0}
+.exercise{background:linear-gradient(135deg,rgba(200,169,110,.08),rgba(200,169,110,.03));border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:28px;margin:28px 0}
+.exercise-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:12px}
+.exercise-text{font-size:14px;color:#F5F0E8;line-height:1.75}
+.lesson-actions{display:flex;gap:12px;margin-top:40px;flex-wrap:wrap}
+.btn-complete{padding:13px 28px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-complete:hover{opacity:.9;transform:translateY(-1px)}
+.btn-next{padding:13px 28px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:8px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-next:hover{border-color:#C8A96E;color:#C8A96E}
+@media(max-width:600px){.module-hero,.progress-wrap,.lessons-nav,.lesson-wrap{padding-left:16px;padding-right:16px}.lesson-header{padding:20px}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">AI Cash Systems</div>
+  <a href="/course-pro.html" class="back-btn">← Back to PRO Course</a>
+</nav>
+<div class="module-hero">
+  <div class="pro-badge">⚡ PRO — Module 11 of 14</div>
+  <div class="module-num">11</div>
+  <h1 class="module-title">Webhook Mastery —<br><em>Connect Anything to Anything</em></h1>
+  <p class="module-desc">Master webhooks completely — how they work, how to debug them, how to handle complex data structures, and how to build real-time integrations with any platform that has an API.</p>
+  <div class="module-meta">
+    <div class="meta-item"><div class="meta-dot"></div>3 Lessons</div>
+    <div class="meta-item"><div class="meta-dot"></div>~75 minutes</div>
+    <div class="meta-item"><div class="meta-dot"></div>Advanced Technical</div>
+  </div>
+</div>
+<div class="progress-wrap">
+  <div class="progress-label"><span>Module Progress</span><span id="progressLabel">0 / 3 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+<div class="lessons-nav">
+  <button class="lesson-tab active" onclick="showLesson(1)" id="tab1">Lesson 1 — How Webhooks Work</button>
+  <button class="lesson-tab" onclick="showLesson(2)" id="tab2">Lesson 2 — Advanced Patterns</button>
+  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — Debug & Troubleshoot</button>
+</div>
+<div class="lesson-wrap">
+
+<div class="lesson-content active" id="lesson1">
+  <div class="lesson-header">
+    <div class="lesson-tag">Technical · Lesson 1</div>
+    <h2 class="lesson-title">How Webhooks Work — Complete Understanding</h2>
+    <p class="lesson-intro">Webhooks are the foundation of every real-time automation. Understanding them deeply means you can connect any two platforms — even ones that don't have native Make.com integrations. This is what separates basic automators from advanced ones.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">What is a Webhook — Plain English Explanation</div>
+    <div class="block-text">A webhook is a URL address that listens for incoming data. When something happens on Platform A (a message arrives, a form is submitted, a payment is made), Platform A sends the data to Platform B's webhook URL. Platform B receives it instantly and can process it.</div>
+    <div class="block-text">Think of it like a phone number. You give your webhook URL to another platform. When something happens, they "call" that URL and send the data. Your automation answers the call and does something with the data.</div>
+    <div class="block-text">This is different from polling (which checks for new data every X minutes). Webhooks are instant — data arrives in milliseconds of the event happening.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Exact Technical Flow</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">You create a webhook URL in Make.com</div></div>
+        <div class="step-text">In Make.com, when you add a "Custom Webhook" trigger, Make.com generates a unique URL like <code style="color:#C8A96E">https://hook.eu1.make.com/abc123xyz...</code>. This URL is now listening 24/7 for incoming HTTP POST requests.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">You register the webhook URL with another platform</div></div>
+        <div class="step-text">You go to 360dialog (WhatsApp), Meta Developer Console (Instagram), Stripe, Shopify, or any other platform and tell it: "When X happens, send the data to this URL." This is called "registering" or "subscribing" to a webhook.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">An event happens on that platform</div></div>
+        <div class="step-text">A WhatsApp message arrives. A Stripe payment succeeds. An Instagram DM comes in. Immediately — in milliseconds — that platform makes an HTTP POST request to your webhook URL, sending all the event data as JSON in the request body.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Make.com receives the data and runs your scenario</div></div>
+        <div class="step-text">Make.com's webhook URL receives the POST request. Your scenario activates instantly. The JSON data from the request body becomes available as variables you can use in all subsequent modules.</div>
+        <div class="step-detail">Important: Make.com responds to the incoming webhook with HTTP 200 OK within a few seconds. Most platforms require this 200 response to confirm delivery. If Make.com is too slow or offline, the platform will retry the webhook delivery — usually 3–5 times over the next few hours.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Reading and Parsing JSON Webhook Data in Make.com</div>
+    <div class="block-text">Every webhook sends data as JSON. Understanding how to read and navigate JSON in Make.com is essential. Here is a real example of what a WhatsApp webhook payload looks like:</div>
+    <div class="code-block">{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "123456789",
+      "changes": [
+        {
+          "value": {
+            "messages": [
+              {
+                "from": "40712345678",
+                "id": "wamid.abc123",
+                "timestamp": "1699876543",
+                "text": {
+                  "body": "Hello, what are your hours?"
+                },
+                "type": "text"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}</div>
+    <div class="block-text">To access the message text in Make.com variables, you navigate: <code style="color:#C8A96E">entry[].changes[].value.messages[].text.body</code></div>
+    <div class="block-text">To access the sender's phone number: <code style="color:#C8A96E">entry[].changes[].value.messages[].from</code></div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">How to Use Webhooks.site to Inspect Any Webhook</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to webhook.site</div></div>
+        <div class="step-text">Open <strong style="color:#C8A96E">webhook.site</strong> in your browser. The page immediately gives you a unique URL like <code style="color:#C8A96E">https://webhook.site/abc-123-xyz</code>. This URL is free and lives for a few hours.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Use this URL as your webhook in any platform</div></div>
+        <div class="step-text">When you need to understand what data a platform sends, paste this webhook.site URL into the platform's webhook settings instead of your Make.com URL. Then trigger the event on that platform.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">See the exact JSON payload</div></div>
+        <div class="step-text">Webhook.site shows you the complete HTTP request in real time — headers, body, query parameters — everything. You can see exactly what data structure the platform sends. Use this to understand the correct variable paths before building in Make.com.</div>
+        <div class="step-detail">This technique saves hours of debugging. Before connecting any new platform to Make.com, always use webhook.site first to understand the exact data structure. Then build your Make.com scenario with the correct variable paths.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 1</div>
+    <div class="takeaway">Webhooks are instant — data arrives in milliseconds, not every 15 minutes like scheduled triggers.</div>
+    <div class="takeaway">Every webhook sends JSON data. The variable path tells you how to navigate the nested structure.</div>
+    <div class="takeaway">Always use webhook.site first to inspect the data structure before building in Make.com.</div>
+    <div class="takeaway">Make.com must respond with HTTP 200 OK or the sending platform will retry the webhook delivery.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(1)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(2)">Next Lesson →</button>
+  </div>
+</div>
+
+<div class="lesson-content" id="lesson2">
+  <div class="lesson-header">
+    <div class="lesson-tag">Advanced · Lesson 2</div>
+    <h2 class="lesson-title">Advanced Webhook Patterns in Make.com</h2>
+    <p class="lesson-intro">Once you understand basic webhooks, these advanced patterns let you handle complex real-world scenarios — multiple event types, webhook verification, error handling, and routing different events to different actions.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Pattern 1 — Router for Multiple Event Types</div>
+    <div class="block-text">Many platforms send different types of events to the same webhook URL. For example, Instagram sends both DMs and post comments to the same webhook. You need to route them to different paths in your scenario.</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Add a Router module after your Webhook trigger</div></div>
+        <div class="step-text">In Make.com, click <span class="click">+</span> after the Webhook module. Search for <strong style="color:#C8A96E">Router</strong> — it is in the Flow Control category. The Router splits your scenario into multiple parallel paths.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Set up Filter conditions on each path</div></div>
+        <div class="step-text">Click the wrench icon on the connection line between the Router and the first module in each path. A Filter dialog appears. Set a condition that identifies this event type.</div>
+        <div class="step-detail">
+          Example for Instagram:<br/>
+          Path 1 (DMs): Field = <code style="color:#C8A96E">entry[].messaging</code> — Condition = <span class="click">Exists</span><br/>
+          Path 2 (Comments): Field = <code style="color:#C8A96E">entry[].changes[].value.comments</code> — Condition = <span class="click">Exists</span><br/><br/>
+          This routes DM events to Path 1 and comment events to Path 2.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Build different actions on each path</div></div>
+        <div class="step-text">Path 1 continues with OpenAI → HTTP Send DM reply. Path 2 continues with a different OpenAI prompt → HTTP Send comment reply. Each path handles its event type independently.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Pattern 2 — Webhook Verification (GET + POST)</div>
+    <div class="block-text">Some platforms (Meta/Facebook/Instagram) send a GET request to verify your webhook before they start sending real events. Make.com's Custom Webhook only handles POST requests by default. Here is how to handle the GET verification:</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">The verification flow</div></div>
+        <div class="step-text">When you register a webhook with Meta, they send a GET request to your URL with three query parameters: <code style="color:#C8A96E">hub.mode</code>, <code style="color:#C8A96E">hub.challenge</code>, and <code style="color:#C8A96E">hub.verify_token</code>. Your server must respond with the <code style="color:#C8A96E">hub.challenge</code> value.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Handle verification in your Render server</div></div>
+        <div class="step-text">Add this route to your server.js on Render — this handles the Meta verification automatically:</div>
+        <div class="type-this">// Meta webhook verification
+app.get('/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  
+  const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'myverifytoken';
+  
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    console.log('Webhook verified');
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
+  }
+});
+
+// Receive actual webhook events
+app.post('/webhook', (req, res) => {
+  const body = req.body;
+  // Forward to Make.com
+  fetch(process.env.MAKE_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  res.sendStatus(200);
+});</div>
+        <div class="step-detail">Set <code style="color:#C8A96E">WEBHOOK_VERIFY_TOKEN</code> in Render environment variables to match the verify token you enter in Meta's webhook settings. Set <code style="color:#C8A96E">MAKE_WEBHOOK_URL</code> to your Make.com webhook URL.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Pattern 3 — Webhook Response with Data</div>
+    <div class="block-text">Some integrations require your webhook to respond with specific data — not just HTTP 200. For example, Stripe requires you to respond with a success confirmation, and some chatbot platforms expect your webhook to return the response text directly.</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Use the Webhook Response module in Make.com</div></div>
+        <div class="step-text">After your processing modules, add a <strong style="color:#C8A96E">Webhooks → Webhook Response</strong> module. This sends a custom HTTP response back to the platform that sent the webhook. Set the Status to 200, set the Body to whatever data the platform expects.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Return the AI response directly</div></div>
+        <div class="step-text">For chatbot platforms that expect the reply in the webhook response, set the Body to the OpenAI output variable: <code style="color:#C8A96E">{{2.choices[].message.content}}</code>. Set Content-Type header to <code style="color:#C8A96E">application/json</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 2</div>
+    <div class="takeaway">Use Router + Filters to handle multiple event types from one webhook URL.</div>
+    <div class="takeaway">Meta platforms require GET verification before sending POST events — handle this in your Render server.</div>
+    <div class="takeaway">The Webhook Response module lets you send custom data back to the platform that triggered the webhook.</div>
+    <div class="takeaway">For complex webhook setups, use your Render server as a middleware between the platform and Make.com.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(2)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(3)">Next Lesson →</button>
+  </div>
+</div>
+
+<div class="lesson-content" id="lesson3">
+  <div class="lesson-header">
+    <div class="lesson-tag">Debugging · Lesson 3</div>
+    <h2 class="lesson-title">Debug and Troubleshoot Any Webhook Problem</h2>
+    <p class="lesson-intro">Webhook problems are the most common technical issue you will face. This lesson gives you a systematic debugging process that solves 95% of webhook problems in under 10 minutes.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The 5-Step Debugging Process</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Verify the webhook URL is correct and active</div></div>
+        <div class="step-text">Go to Make.com → open your Scenario → click on the Webhook module → check that the webhook URL shown is exactly what you registered with the platform. Even one character difference breaks everything. Turn on Scheduling in Make.com so the webhook is actively listening.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Check Make.com Scenario History</div></div>
+        <div class="step-text">In Make.com, at the bottom of the Scenario editor, click the clock icon — this shows the History of all runs. Each run shows: when it happened, whether it succeeded or failed, and exactly where it failed. Click on a failed run to see the error message on the specific module that failed.</div>
+        <div class="step-detail">If the History is empty — Make.com is not receiving the webhook at all. The problem is in the registration or the URL. If History shows runs but with errors — the webhook arrives but something in your scenario is wrong.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Use webhook.site to verify the platform is sending data</div></div>
+        <div class="step-text">Temporarily replace your Make.com webhook URL with a webhook.site URL in the platform settings. Trigger the event. If webhook.site receives data — the platform is sending correctly and the problem is in your Make.com setup. If webhook.site receives nothing — the problem is in how you registered the webhook.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Check variable paths carefully</div></div>
+        <div class="step-text">The most common error after the webhook arrives is wrong variable paths. Click on the Webhook module circle in your scenario and look at the data structure. Compare it carefully with the variable paths you are using in subsequent modules. Even a small difference like <code style="color:#C8A96E">messages[].text.body</code> vs <code style="color:#C8A96E">messages[0].text.body</code> can cause failures.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Check the platform's webhook logs</div></div>
+        <div class="step-text">Most platforms (Stripe, Shopify, Meta) have a webhook log section in their dashboard. Go there and look at recent webhook deliveries. You can see: whether the delivery was attempted, what HTTP status code your webhook returned, and whether there were any errors. This is the most accurate source of truth for webhook problems.</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Stripe webhook logs:</strong> dashboard.stripe.com → Developers → Webhooks → click your endpoint → Events tab<br/><br/>
+          <strong style="color:#C8A96E">Meta webhook logs:</strong> developers.facebook.com → your app → Webhooks → look at the subscription status<br/><br/>
+          <strong style="color:#C8A96E">360dialog:</strong> app.360dialog.io → your channel → Settings → check the webhook status indicator
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Most Common Webhook Errors and Their Fixes</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">⚠</div><div class="step-title">Error: Webhook not receiving data at all</div></div>
+        <div class="step-text">Causes and fixes:</div>
+        <div class="step-detail">
+          1. Make.com Scheduling is OFF → turn it ON<br/>
+          2. Wrong webhook URL registered → copy the exact URL from Make.com and re-paste it<br/>
+          3. Platform requires HTTPS but your URL is HTTP → Make.com webhooks are always HTTPS, this should not happen<br/>
+          4. Platform requires webhook verification (GET) → add verification handler to your Render server
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">⚠</div><div class="step-title">Error: Data arrives but wrong variable</div></div>
+        <div class="step-text">The webhook data structure does not match your variable paths. Fix:</div>
+        <div class="step-detail">
+          1. Click "Run once" in Make.com<br/>
+          2. Trigger the event on the platform<br/>
+          3. Make.com captures the data<br/>
+          4. Click OK on the Webhook module<br/>
+          5. Now click on each subsequent module and use the variable picker to re-select the correct variables from the fresh data structure
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">⚠</div><div class="step-title">Error: "Bundle is undefined" or "Cannot read property"</div></div>
+        <div class="step-text">This means Make.com expected data at a certain path but found nothing. Usually happens when the webhook payload structure changes or when the event type is different from expected.</div>
+        <div class="step-detail">Add a Filter before the problem module that checks if the expected field exists. Set condition: field <span class="click">Exists</span>. This prevents the scenario from failing when unexpected data arrives.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">⚠</div><div class="step-title">Error: HTTP 403 or 401 on webhook response</div></div>
+        <div class="step-text">The platform is rejecting your webhook responses. Usually means your API key or authentication is wrong.</div>
+        <div class="step-detail">Check the Headers section of your HTTP module. Make sure the API key is correct, the header name is exactly right (case-sensitive), and the format is correct. For example, some APIs use <code style="color:#C8A96E">Authorization: Bearer YOUR_KEY</code> while others use a custom header like <code style="color:#C8A96E">D360-API-KEY: YOUR_KEY</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">✓ The Golden Rule of Webhook Debugging</div>
+    <div class="info-text">When something breaks, always start from the beginning: is the webhook URL correct? Is Make.com listening? Is the platform sending? Work through the flow step by step. Do not skip steps. 90% of webhook problems are simple configuration errors that take 2 minutes to fix once you identify them.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 3</div>
+    <div class="takeaway">Always check Make.com Scenario History first — it tells you exactly where the failure happened.</div>
+    <div class="takeaway">Use webhook.site to isolate whether the problem is in the platform sending or in Make.com receiving.</div>
+    <div class="takeaway">After fixing a variable path issue, use "Run once" to capture fresh data and re-select variables.</div>
+    <div class="takeaway">Most webhook problems are configuration errors — wrong URL, wrong API key, or wrong variable path.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Master Webhook Debugging</div>
+    <div class="exercise-text">Go to webhook.site right now. Copy the URL it gives you. Go to 360dialog and temporarily paste it as your webhook URL. Send yourself a WhatsApp message on the bot number. Look at what webhook.site receives — study the full JSON structure. Now you know exactly what variable paths to use in Make.com. Do this for every new platform you connect for the first time.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="window.location.href='/course-pro.html'">← Back to PRO Course</button>
+  </div>
+</div>
+
+</div>
+<script>
+var completed=JSON.parse(localStorage.getItem('m11_completed')||'[]');
+function updateProgress(){
+  var fill=document.getElementById('progressFill');
+  var label=document.getElementById('progressLabel');
+  fill.style.width=(completed.length/3*100)+'%';
+  label.textContent=completed.length+' / 3 lessons';
+  completed.forEach(function(n){var t=document.getElementById('tab'+n);if(t)t.classList.add('done');});
+}
+function showLesson(n){
+  document.querySelectorAll('.lesson-content').forEach(function(el){el.classList.remove('active')});
+  document.querySelectorAll('.lesson-tab').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('lesson'+n).classList.add('active');
+  document.getElementById('tab'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function completeLesson(n){
+  if(completed.indexOf(n)===-1){completed.push(n);localStorage.setItem('m11_completed',JSON.stringify(completed));}
+  updateProgress();
+  var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
+}
+updateProgress();
+(function(){var h=window.location.hash;if(h&&h.indexOf('lesson')!==-1){var n=parseInt(h.replace('#lesson',''));if(n>=1&&n<=3)showLesson(n);}})();
+</script>
+</body>
+</html>
