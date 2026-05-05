@@ -2,220 +2,301 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>AI Cash Systems — PRO Course</title>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
-:root{--gold:#C9A84C;--gold-light:#E8C96A;--gold-dark:#8A6A1F;--gold-muted:rgba(201,168,76,0.15);--bg:#0A0A0A;--bg2:#111111;--bg3:#181818;--text:#F0EAD6;--text-muted:#7A7060;--border:rgba(201,168,76,0.2);--purple:rgba(139,92,246,0.15);--purple-border:rgba(139,92,246,0.3);}
-*{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
-nav{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid var(--border);background:rgba(10,10,10,0.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
-.logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;letter-spacing:2px;color:var(--gold);text-transform:uppercase;}
-.logo span{color:var(--text);font-weight:300;}
-.pro-badge{display:inline-flex;align-items:center;gap:6px;background:var(--purple);border:1px solid var(--purple-border);border-radius:100px;padding:5px 14px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#A78BFA;}
-.badge-dot{width:7px;height:7px;border-radius:50%;background:#A78BFA;box-shadow:0 0 8px #A78BFA;animation:pulse 2s infinite;display:inline-block;}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.hero{padding:48px 32px 32px;max-width:900px;margin:0 auto;}
-.hero-tag{display:inline-flex;align-items:center;gap:8px;background:var(--purple);border:1px solid var(--purple-border);border-radius:100px;padding:6px 16px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#A78BFA;margin-bottom:20px;}
-.hero h1{font-family:'Cormorant Garamond',serif;font-size:clamp(36px,6vw,58px);font-weight:500;line-height:1.1;margin-bottom:16px;}
-.hero h1 em{font-style:italic;color:var(--gold);}
-.hero p{font-size:15px;color:var(--text-muted);max-width:560px;line-height:1.7;}
-.app-banner{max-width:900px;margin:24px auto 0;padding:0 32px;}
-.app-banner-inner{background:linear-gradient(135deg,rgba(139,92,246,0.1),rgba(201,168,76,0.1));border:1px solid var(--purple-border);border-radius:12px;padding:20px 24px;display:flex;align-items:center;gap:16px;}
-.app-banner-icon{font-size:32px;flex-shrink:0;}
-.app-banner-text{flex:1;}
-.app-banner-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px;}
-.app-banner-desc{font-size:13px;color:var(--text-muted);}
-.app-banner-btn{padding:10px 20px;background:linear-gradient(135deg,var(--gold-dark),var(--gold-light));border:none;border-radius:8px;color:#0A0A0A;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block;}
-.progress-bar-wrap{max-width:900px;margin:24px auto 0;padding:0 32px;}
-.progress-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;}
-.progress-track{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;}
-.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7C3AED,var(--gold-light));border-radius:2px;transition:width 1.2s cubic-bezier(0.4,0,0.2,1);}
-.container{max-width:900px;margin:40px auto;padding:0 32px 80px;display:grid;gap:16px;}
-.module{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
-.module.pro-module{border-color:var(--purple-border);}
-.module-header{display:flex;align-items:center;gap:16px;padding:20px 24px;cursor:pointer;user-select:none;transition:background 0.2s;}
-.module-header:hover{background:var(--bg3);}
-.module-num{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:300;color:var(--gold-dark);min-width:36px;line-height:1;}
-.module-num.pro{color:#7C3AED;}
-.module-info{flex:1;}
-.module-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--text);margin-bottom:4px;}
-.module-meta{font-size:12px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;}
-.module-toggle{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:18px;transition:transform 0.3s;flex-shrink:0;}
-.module.open .module-toggle{transform:rotate(45deg);background:var(--gold-muted);}
-.lessons{display:none;border-top:1px solid var(--border);}
-.module.open .lessons{display:block;}
-.lesson{display:flex;align-items:center;gap:16px;padding:16px 24px;cursor:pointer;border-bottom:1px solid rgba(201,168,76,0.08);transition:background 0.2s;}
-.lesson:last-child{border-bottom:none;}
-.lesson:hover{background:var(--bg3);}
-.lesson.active{background:var(--gold-muted);}
-.lesson-icon{width:36px;height:36px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:all 0.2s;}
-.lesson-icon.completed{background:var(--gold-dark);color:var(--gold-light);}
-.lesson-body{flex:1;}
-.lesson-title{font-size:14px;font-weight:500;color:var(--text);margin-bottom:3px;}
-.lesson-desc{font-size:12px;color:var(--text-muted);}
-.lesson-tag{display:inline-block;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:var(--gold-muted);color:var(--gold);margin-top:4px;}
-.lesson-tag.pro{background:var(--purple);color:#A78BFA;}
-.content-panel{display:none;max-width:900px;margin:0 auto 32px;padding:0 32px;}
-.content-panel.visible{display:block;}
-.panel-inner{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:32px;}
-.panel-breadcrumb{font-size:12px;color:var(--text-muted);margin-bottom:16px;letter-spacing:1px;}
-.panel-breadcrumb span{color:var(--gold);}
-.panel-title{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:600;margin-bottom:20px;color:var(--text);}
-.panel-content{font-size:14px;color:var(--text-muted);line-height:1.8;}
-.panel-content h3{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--text);margin:24px 0 12px;}
-.panel-content p{margin-bottom:14px;}
-.panel-content ul{padding-left:20px;margin-bottom:14px;}
-.panel-content ul li{margin-bottom:8px;}
-.panel-content strong{color:var(--text);}
-.panel-content .sb{background:var(--bg3);border-radius:10px;padding:20px;margin:16px 0;}
-.panel-content .sr{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px;}
-.panel-content .sr:last-child{margin-bottom:0;}
-.panel-content .sn{width:24px;height:24px;border-radius:6px;background:var(--gold-dark);color:var(--gold-light);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.panel-content .st{font-size:13px;color:var(--text);line-height:1.6;}
-.panel-content .pb{background:var(--bg);border-left:2px solid var(--gold);padding:16px 20px;margin:16px 0;border-radius:0 8px 8px 0;font-style:italic;font-size:13px;color:var(--text-muted);}
-.panel-content .ib{background:var(--gold-muted);border:1px solid var(--border);border-radius:10px;padding:20px;margin:16px 0;}
-.panel-content .ac{text-align:center;}
-.panel-content .tp{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);font-weight:600;min-width:80px;}
-.panel-actions{display:flex;gap:12px;margin-top:28px;padding-top:20px;border-top:1px solid var(--border);}
-.btn-gold{padding:12px 28px;background:linear-gradient(135deg,var(--gold-dark),var(--gold-light));border:none;border-radius:8px;color:#0A0A0A;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
-.btn-outline{padding:12px 28px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;}
-.included-banner{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text-muted);margin:0 24px 0;}
-.included-banner strong{color:var(--gold);}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+nav{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid rgba(200,169,110,.08);background:rgba(8,8,8,.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E}
+.nav-badge{display:flex;align-items:center;gap:8px;font-size:13px;color:#C8BEA8}
+.badge-dot{width:8px;height:8px;border-radius:50%;background:#C8A96E;box-shadow:0 0 8px #C8A96E;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.hero{padding:48px 32px 32px;max-width:900px;margin:0 auto;animation:fadeUp .7s ease both}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(200,169,110,.2),rgba(200,169,110,.08));border:1px solid rgba(200,169,110,.4);border-radius:100px;padding:6px 16px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.hero h1{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:14px}
+.hero h1 em{font-style:italic;color:#C8A96E}
+.hero p{font-size:15px;color:#C8BEA8;max-width:560px;line-height:1.7}
+.progress-bar-wrap{max-width:900px;margin:24px auto 0;padding:0 32px}
+.progress-meta{display:flex;justify-content:space-between;font-size:12px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.container{max-width:900px;margin:40px auto;padding:0 32px 80px;display:grid;gap:16px}
+.section-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;padding:0 4px;margin-top:8px;margin-bottom:4px}
+.module{background:#111111;border:1px solid rgba(200,169,110,.08);border-radius:12px;overflow:hidden}
+.module.pro-module{border-color:rgba(200,169,110,.15)}
+.module-header{display:flex;align-items:center;gap:16px;padding:20px 24px;cursor:pointer;user-select:none;transition:background .2s}
+.module-header:hover{background:#161616}
+.module-num{font-family:"Playfair Display",serif;font-size:32px;font-weight:300;color:rgba(200,169,110,.4);min-width:36px;line-height:1}
+.module.pro-module .module-num{color:rgba(200,169,110,.7)}
+.module-info{flex:1}
+.module-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:600;color:#F5F0E8;margin-bottom:4px}
+.module-meta-text{font-size:12px;color:#C8BEA8;letter-spacing:1px;text-transform:uppercase}
+.module-toggle{width:32px;height:32px;border-radius:50%;border:1px solid rgba(200,169,110,.2);display:flex;align-items:center;justify-content:center;color:#C8A96E;font-size:18px;transition:transform .3s,background .2s;flex-shrink:0}
+.module.open .module-toggle{transform:rotate(45deg);background:rgba(200,169,110,.1)}
+.lessons{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1)}
+.module.open .lessons{max-height:600px;border-top:1px solid rgba(200,169,110,.08)}
+.lesson{display:flex;align-items:flex-start;gap:16px;padding:18px 24px;border-bottom:1px solid rgba(200,169,110,.05);cursor:pointer;transition:background .2s;text-decoration:none;color:inherit}
+.lesson:last-child{border-bottom:none}
+.lesson:hover{background:rgba(200,169,110,.04)}
+.lesson-icon{width:36px;height:36px;border-radius:8px;background:#161616;border:1px solid rgba(200,169,110,.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+.lesson.done .lesson-icon{background:rgba(200,169,110,.12);border-color:rgba(200,169,110,.3)}
+.lesson-body{flex:1}
+.lesson-title{font-size:15px;font-weight:500;color:#F5F0E8;margin-bottom:5px}
+.lesson-desc{font-size:13px;color:#C8BEA8;line-height:1.6}
+.lesson-tag-badge{display:inline-block;margin-top:8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:100px;background:#161616;border:1px solid rgba(200,169,110,.12);color:#C8BEA8}
+.lesson-arrow{color:rgba(200,169,110,.4);font-size:18px;margin-top:6px;flex-shrink:0;transition:all .2s}
+.lesson:hover .lesson-arrow{transform:translateX(4px);color:#C8A96E}
+.pro-badge-inline{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(200,169,110,.2),rgba(200,169,110,.08));border:1px solid rgba(200,169,110,.3);border-radius:100px;padding:2px 10px;font-size:10px;letter-spacing:1px;color:#C8A96E;margin-left:8px;vertical-align:middle}
+@media(max-width:600px){nav{padding:16px 20px}.hero,.progress-bar-wrap,.container{padding-left:20px;padding-right:20px}}
 </style>
 </head>
 <body>
 <nav>
-  <div class="logo">AI Cash <span>Systems</span></div>
-  <div class="pro-badge"><div class="badge-dot"></div>PRO Member</div>
+  <div class="logo">AI Cash Systems</div>
+  <div class="nav-badge"><div class="badge-dot"></div>PRO Program</div>
 </nav>
+
 <div class="hero">
-  <div class="hero-tag">⚡ PRO Program</div>
-  <h1>AI Agency <em>Mastery</em><br>Complete System</h1>
-  <p>Everything in Starter plus Voice AI Agent, Webhook Mastery, AI Proposals, Stripe Billing, Agency Website and the AutoFlow App. Build a real agency.</p>
+  <div class="hero-tag">⚡ PRO Program — $97</div>
+  <h1>The Complete <em>AI Agency</em><br>Blueprint</h1>
+  <p>14 modules, 42 lessons — everything from your first WhatsApp bot to voice AI agents, enterprise clients, and $10K/month. All tools, all systems, all secrets.</p>
 </div>
-<div class="app-banner">
-  <div class="app-banner-inner">
-    <div class="app-banner-icon">⚡</div>
-    <div class="app-banner-text">
-      <div class="app-banner-title">AutoFlow App — Your Personal AI Automation Platform</div>
-      <div class="app-banner-desc">Dashboard, Flow Builder, AI Assistant, 10 integrations. Use it and sell access to clients.</div>
-    </div>
-    <a href="/app.html" class="app-banner-btn">Launch App →</a>
-  </div>
-</div>
+
 <div class="progress-bar-wrap">
   <div class="progress-meta"><span>Your Progress</span><span id="prog-label">0 / 42 lessons</span></div>
-  <div class="progress-track"><div class="progress-fill" id="prog-fill"></div></div>
+  <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
 </div>
-<div class="content-panel" id="contentPanel">
-  <div class="panel-inner">
-    <div class="panel-breadcrumb" id="panelBreadcrumb">Module 1 · <span>Lesson 1</span></div>
-    <div class="panel-title" id="panelTitle"></div>
-    <div class="panel-content" id="panelContent"></div>
-    <div class="panel-actions">
-      <button class="btn-gold" onclick="completeLesson()">✓ Mark as Complete</button>
-      <button class="btn-outline" onclick="closePanel()">← Back to Modules</button>
+
+<div class="container">
+
+  <div class="section-label">✦ Starter Modules — Included</div>
+
+  <!-- MODULE 1 -->
+  <div class="module" id="mod-1">
+    <div class="module-header" onclick="toggleModule('mod-1')">
+      <div class="module-num">01</div>
+      <div class="module-info"><div class="module-title">The AI Automation Opportunity</div><div class="module-meta-text">3 Lessons · Foundation · ~45 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module1.html#lesson1" class="lesson" onclick="markDone('1-1')"><div class="lesson-icon">📈</div><div class="lesson-body"><div class="lesson-title">Why AI Automation is the #1 Skill Right Now</div><div class="lesson-desc">The market gap nobody talks about — and how to position yourself to fill it.</div><div class="lesson-tag-badge">Foundation</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module1.html#lesson2" class="lesson" onclick="markDone('1-2')"><div class="lesson-icon">📐</div><div class="lesson-body"><div class="lesson-title">How the Business Works — The Simple Model</div><div class="lesson-desc">Find, build, sell. No technical background needed.</div><div class="lesson-tag-badge">Business Model</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module1.html#lesson3" class="lesson" onclick="markDone('1-3')"><div class="lesson-icon">🎯</div><div class="lesson-body"><div class="lesson-title">Picking Your Niche &amp; First Target Industry</div><div class="lesson-desc">Why going deep beats going wide — the 4 best industries.</div><div class="lesson-tag-badge">Strategy</div></div><div class="lesson-arrow">→</div></a>
     </div>
   </div>
+
+  <!-- MODULE 2 -->
+  <div class="module" id="mod-2">
+    <div class="module-header" onclick="toggleModule('mod-2')">
+      <div class="module-num">02</div>
+      <div class="module-info"><div class="module-title">Building Your First Automation</div><div class="module-meta-text">3 Lessons · Hands-On Build · ~90 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module2.html#lesson1" class="lesson" onclick="markDone('2-1')"><div class="lesson-icon">⚙️</div><div class="lesson-body"><div class="lesson-title">Make.com Setup — Your Automation Hub</div><div class="lesson-desc">Create your account and build your first scenario.</div><div class="lesson-tag-badge">Tool Setup</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module2.html#lesson2" class="lesson" onclick="markDone('2-2')"><div class="lesson-icon">🔄</div><div class="lesson-body"><div class="lesson-title">Build a Lead Follow-Up System</div><div class="lesson-desc">Google Form → OpenAI → Gmail. Working in 45 minutes.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module2.html#lesson3" class="lesson" onclick="markDone('2-3')"><div class="lesson-icon">🚀</div><div class="lesson-body"><div class="lesson-title">Test Your Automation &amp; Make It Live</div><div class="lesson-desc">Run once, fix errors, activate scheduling.</div><div class="lesson-tag-badge">Launch</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 3 -->
+  <div class="module" id="mod-3">
+    <div class="module-header" onclick="toggleModule('mod-3')">
+      <div class="module-num">03</div>
+      <div class="module-info"><div class="module-title">Getting Your First Client</div><div class="module-meta-text">3 Lessons · Client Acquisition · ~60 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module3.html#lesson1" class="lesson" onclick="markDone('3-1')"><div class="lesson-icon">🔍</div><div class="lesson-body"><div class="lesson-title">Finding Businesses That Need You Right Now</div><div class="lesson-desc">Google Maps, Instagram, LinkedIn — 10 prospects in 10 minutes.</div><div class="lesson-tag-badge">Prospecting</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module3.html#lesson2" class="lesson" onclick="markDone('3-2')"><div class="lesson-icon">✉️</div><div class="lesson-body"><div class="lesson-title">The Outreach Message That Gets Replies</div><div class="lesson-desc">Copy-paste templates for WhatsApp, Instagram DM and Email.</div><div class="lesson-tag-badge">Outreach</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module3.html#lesson3" class="lesson" onclick="markDone('3-3')"><div class="lesson-icon">💰</div><div class="lesson-body"><div class="lesson-title">Closing the Deal &amp; Setting Your Price</div><div class="lesson-desc">The 15-minute call script that closes every deal.</div><div class="lesson-tag-badge">Sales</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 4 -->
+  <div class="module" id="mod-4">
+    <div class="module-header" onclick="toggleModule('mod-4')">
+      <div class="module-num">04</div>
+      <div class="module-info"><div class="module-title">Scaling to $3K/Month</div><div class="module-meta-text">3 Lessons · Growth · ~60 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module4.html#lesson1" class="lesson" onclick="markDone('4-1')"><div class="lesson-icon">📈</div><div class="lesson-body"><div class="lesson-title">Building a Recurring Revenue Stack</div><div class="lesson-desc">The retainer math to $3K/month systematically.</div><div class="lesson-tag-badge">Scaling</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module4.html#lesson2" class="lesson" onclick="markDone('4-2')"><div class="lesson-icon">🏗️</div><div class="lesson-body"><div class="lesson-title">Systemizing Your Agency</div><div class="lesson-desc">Automate your own agency to manage 10+ clients easily.</div><div class="lesson-tag-badge">Operations</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module4.html#lesson3" class="lesson" onclick="markDone('4-3')"><div class="lesson-icon">📋</div><div class="lesson-body"><div class="lesson-title">Your 30-Day Action Plan</div><div class="lesson-desc">Exact week-by-week plan to your first paying client.</div><div class="lesson-tag-badge">Action Plan</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 5 -->
+  <div class="module" id="mod-5">
+    <div class="module-header" onclick="toggleModule('mod-5')">
+      <div class="module-num">05</div>
+      <div class="module-info"><div class="module-title">WhatsApp Bot — Automated Replies 24/7</div><div class="module-meta-text">3 Lessons · WhatsApp · ~90 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module5.html#lesson1" class="lesson" onclick="markDone('5-1')"><div class="lesson-icon">📱</div><div class="lesson-body"><div class="lesson-title">WhatsApp Business API Setup with 360dialog</div><div class="lesson-desc">Account, number verification, API key setup.</div><div class="lesson-tag-badge">Setup</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module5.html#lesson2" class="lesson" onclick="markDone('5-2')"><div class="lesson-icon">🤖</div><div class="lesson-body"><div class="lesson-title">Build the Bot — Make.com + GPT-4o + WhatsApp</div><div class="lesson-desc">Webhook → OpenAI → HTTP send. Complete in 2 hours.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module5.html#lesson3" class="lesson" onclick="markDone('5-3')"><div class="lesson-icon">💰</div><div class="lesson-body"><div class="lesson-title">How to Sell for $500–$2,000</div><div class="lesson-desc">The live demo script that closes deals in real time.</div><div class="lesson-tag-badge">Sales</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 6 -->
+  <div class="module" id="mod-6">
+    <div class="module-header" onclick="toggleModule('mod-6')">
+      <div class="module-num">06</div>
+      <div class="module-info"><div class="module-title">Instagram Auto-Reply — AI DM Bot</div><div class="module-meta-text">3 Lessons · Instagram · ~90 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module6.html#lesson1" class="lesson" onclick="markDone('6-1')"><div class="lesson-icon">📸</div><div class="lesson-body"><div class="lesson-title">Instagram Graph API — Complete Setup</div><div class="lesson-desc">Facebook App, access token, long-lived token.</div><div class="lesson-tag-badge">Setup</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module6.html#lesson2" class="lesson" onclick="markDone('6-2')"><div class="lesson-icon">💬</div><div class="lesson-body"><div class="lesson-title">Build the DM Bot</div><div class="lesson-desc">Webhook → OpenAI → Instagram reply. Live in 2 hours.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module6.html#lesson3" class="lesson" onclick="markDone('6-3')"><div class="lesson-icon">⭐</div><div class="lesson-body"><div class="lesson-title">Advanced Strategies + Sell for $600–$1,200</div><div class="lesson-desc">Comment auto-reply, keyword filters, full package.</div><div class="lesson-tag-badge">Advanced</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 7 -->
+  <div class="module" id="mod-7">
+    <div class="module-header" onclick="toggleModule('mod-7')">
+      <div class="module-num">07</div>
+      <div class="module-info"><div class="module-title">Cold Email Automation — 50 Emails/Day</div><div class="module-meta-text">3 Lessons · Cold Outreach · ~75 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module7.html#lesson1" class="lesson" onclick="markDone('7-1')"><div class="lesson-icon">🔍</div><div class="lesson-body"><div class="lesson-title">Apollo.io — 100 Verified Prospects in 10 Minutes</div><div class="lesson-desc">Free account, filters, CSV export.</div><div class="lesson-tag-badge">Prospecting</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module7.html#lesson2" class="lesson" onclick="markDone('7-2')"><div class="lesson-icon">📧</div><div class="lesson-body"><div class="lesson-title">Instantly.ai — Send 50 Personalized Emails/Day</div><div class="lesson-desc">Email warmup, campaign creation, templates.</div><div class="lesson-tag-badge">Sending</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module7.html#lesson3" class="lesson" onclick="markDone('7-3')"><div class="lesson-icon">⚡</div><div class="lesson-body"><div class="lesson-title">Connect Apollo + Instantly + Make.com</div><div class="lesson-desc">Full automated pipeline — GPT personalizes every email.</div><div class="lesson-tag-badge">Full System</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 8 -->
+  <div class="module" id="mod-8">
+    <div class="module-header" onclick="toggleModule('mod-8')">
+      <div class="module-num">08</div>
+      <div class="module-info"><div class="module-title">Google Sheets CRM — Client Management</div><div class="module-meta-text">3 Lessons · CRM · ~60 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module8.html#lesson1" class="lesson" onclick="markDone('8-1')"><div class="lesson-icon">📊</div><div class="lesson-body"><div class="lesson-title">Build a Mini-CRM in Google Sheets</div><div class="lesson-desc">10-column structure, dropdowns, color coding.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module8.html#lesson2" class="lesson" onclick="markDone('8-2')"><div class="lesson-icon">🔗</div><div class="lesson-body"><div class="lesson-title">Connect All Sources</div><div class="lesson-desc">Form + WhatsApp + Instagram → one CRM automatically.</div><div class="lesson-tag-badge">Integration</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module8.html#lesson3" class="lesson" onclick="markDone('8-3')"><div class="lesson-icon">📈</div><div class="lesson-body"><div class="lesson-title">Automated Weekly AI Report</div><div class="lesson-desc">Every Monday at 9am — GPT writes the report.</div><div class="lesson-tag-badge">Retention</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <div class="section-label">⚡ PRO Exclusive Modules</div>
+
+  <!-- MODULE 9 -->
+  <div class="module pro-module" id="mod-9">
+    <div class="module-header" onclick="toggleModule('mod-9')">
+      <div class="module-num">09</div>
+      <div class="module-info"><div class="module-title">AutoFlow App Full Access <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Platform · ~45 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module9.html#lesson1" class="lesson" onclick="markDone('9-1')"><div class="lesson-icon">📊</div><div class="lesson-body"><div class="lesson-title">AutoFlow App Overview</div><div class="lesson-desc">All 5 sections and how to use them daily.</div><div class="lesson-tag-badge">PRO Tool</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module9.html#lesson2" class="lesson" onclick="markDone('9-2')"><div class="lesson-icon">⚡</div><div class="lesson-body"><div class="lesson-title">Using the App in Your Daily Workflow</div><div class="lesson-desc">Sales calls, proposals, client delivery — all faster.</div><div class="lesson-tag-badge">Workflow</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module9.html#lesson3" class="lesson" onclick="markDone('9-3')"><div class="lesson-icon">💰</div><div class="lesson-body"><div class="lesson-title">Sell App Access to Clients</div><div class="lesson-desc">$49–$197/month passive income per client.</div><div class="lesson-tag-badge">Revenue</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 10 -->
+  <div class="module pro-module" id="mod-10">
+    <div class="module-header" onclick="toggleModule('mod-10')">
+      <div class="module-num">10</div>
+      <div class="module-info"><div class="module-title">Voice AI Agent — Phone Calls on Autopilot <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Voice AI · ~90 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module10.html#lesson1" class="lesson" onclick="markDone('10-1')"><div class="lesson-icon">📞</div><div class="lesson-body"><div class="lesson-title">Twilio + ElevenLabs Setup</div><div class="lesson-desc">Phone number, AI voice, API keys — complete setup.</div><div class="lesson-tag-badge">Setup</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module10.html#lesson2" class="lesson" onclick="markDone('10-2')"><div class="lesson-icon">🗣️</div><div class="lesson-body"><div class="lesson-title">Build the Voice Agent</div><div class="lesson-desc">Complete code, Render deploy, Twilio connection.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module10.html#lesson3" class="lesson" onclick="markDone('10-3')"><div class="lesson-icon">💰</div><div class="lesson-body"><div class="lesson-title">Sell for $1,500–$3,000</div><div class="lesson-desc">Demo script that closes on every call.</div><div class="lesson-tag-badge">Sales</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 11 -->
+  <div class="module pro-module" id="mod-11">
+    <div class="module-header" onclick="toggleModule('mod-11')">
+      <div class="module-num">11</div>
+      <div class="module-info"><div class="module-title">Webhook Mastery <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Advanced Technical · ~75 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module11.html#lesson1" class="lesson" onclick="markDone('11-1')"><div class="lesson-icon">🔗</div><div class="lesson-body"><div class="lesson-title">How Webhooks Work</div><div class="lesson-desc">Complete technical understanding — JSON, flows, inspection.</div><div class="lesson-tag-badge">Technical</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module11.html#lesson2" class="lesson" onclick="markDone('11-2')"><div class="lesson-icon">⚙️</div><div class="lesson-body"><div class="lesson-title">Advanced Webhook Patterns</div><div class="lesson-desc">Router, verification, response with data.</div><div class="lesson-tag-badge">Advanced</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module11.html#lesson3" class="lesson" onclick="markDone('11-3')"><div class="lesson-icon">🔧</div><div class="lesson-body"><div class="lesson-title">Debug &amp; Troubleshoot</div><div class="lesson-desc">5-step process that solves 95% of webhook problems.</div><div class="lesson-tag-badge">Debugging</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 12 -->
+  <div class="module pro-module" id="mod-12">
+    <div class="module-header" onclick="toggleModule('mod-12')">
+      <div class="module-num">12</div>
+      <div class="module-info"><div class="module-title">AI Proposal Generator <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Agency Ops · ~60 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module12.html#lesson1" class="lesson" onclick="markDone('12-1')"><div class="lesson-icon">📋</div><div class="lesson-body"><div class="lesson-title">The Proposal System That Closes More Deals</div><div class="lesson-desc">What every winning proposal includes and why.</div><div class="lesson-tag-badge">Strategy</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module12.html#lesson2" class="lesson" onclick="markDone('12-2')"><div class="lesson-icon">⚡</div><div class="lesson-body"><div class="lesson-title">Build the AI Proposal Generator</div><div class="lesson-desc">Post-call form → GPT → professional proposal in 60 seconds.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module12.html#lesson3" class="lesson" onclick="markDone('12-3')"><div class="lesson-icon">🔄</div><div class="lesson-body"><div class="lesson-title">Track &amp; Follow Up Automatically</div><div class="lesson-desc">Day 3 and Day 7 follow-ups sent automatically.</div><div class="lesson-tag-badge">Automation</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 13 -->
+  <div class="module pro-module" id="mod-13">
+    <div class="module-header" onclick="toggleModule('mod-13')">
+      <div class="module-num">13</div>
+      <div class="module-info"><div class="module-title">Stripe Recurring Billing <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Business Ops · ~60 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module13.html#lesson1" class="lesson" onclick="markDone('13-1')"><div class="lesson-icon">💳</div><div class="lesson-body"><div class="lesson-title">Stripe Setup — Professional Billing System</div><div class="lesson-desc">Account, products, API keys — complete setup.</div><div class="lesson-tag-badge">Setup</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module13.html#lesson2" class="lesson" onclick="markDone('13-2')"><div class="lesson-icon">🔁</div><div class="lesson-body"><div class="lesson-title">Create Monthly Subscriptions</div><div class="lesson-desc">Payment Links and Checkout Sessions — clients pay once, you collect forever.</div><div class="lesson-tag-badge">Billing</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module13.html#lesson3" class="lesson" onclick="markDone('13-3')"><div class="lesson-icon">⚡</div><div class="lesson-body"><div class="lesson-title">Automate All Billing Workflows</div><div class="lesson-desc">Welcome, failed payment recovery, cancellation handling.</div><div class="lesson-tag-badge">Automation</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 14 -->
+  <div class="module pro-module" id="mod-14">
+    <div class="module-header" onclick="toggleModule('mod-14')">
+      <div class="module-num">14</div>
+      <div class="module-info"><div class="module-title">Agency Website + Enterprise Growth <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Growth · ~75 min — FINAL</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="https://autoflow-backend-p9pc.onrender.com/module14.html#lesson1" class="lesson" onclick="markDone('14-1')"><div class="lesson-icon">🌐</div><div class="lesson-body"><div class="lesson-title">Build Your Agency Website in One Day</div><div class="lesson-desc">6 sections every agency site needs — built on Carrd.co free.</div><div class="lesson-tag-badge">Website</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module14.html#lesson2" class="lesson" onclick="markDone('14-2')"><div class="lesson-icon">📈</div><div class="lesson-body"><div class="lesson-title">Scale to $10K/Month</div><div class="lesson-desc">Pricing strategy, referral system, industry specialization.</div><div class="lesson-tag-badge">Growth</div></div><div class="lesson-arrow">→</div></a>
+      <a href="https://autoflow-backend-p9pc.onrender.com/module14.html#lesson3" class="lesson" onclick="markDone('14-3')"><div class="lesson-icon">🏢</div><div class="lesson-body"><div class="lesson-title">Landing Enterprise Clients — $5K–$20K Projects</div><div class="lesson-desc">Proposals, SLAs, pilot approach, LinkedIn strategy.</div><div class="lesson-tag-badge">Enterprise</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
 </div>
-<div class="container" id="modulesContainer">
-<div class="module open">
-<div class="module-header" onclick="toggleModule(this)">
-<div class="module-num">✦</div>
-<div class="module-info"><div class="module-title">Foundation — All 8 Starter Modules</div><div class="module-meta">Included · Full Access</div></div>
-<div class="module-toggle">+</div>
-</div>
-<div class="lessons">
-<div class="included-banner"><strong>✓ Included:</strong> &nbsp;All 24 lessons from the Starter course are fully included in your PRO membership. Complete them first as your foundation.</div>
-<div class="lesson" onclick="window.location.href='/course-starter.html'">
-<div class="lesson-icon">🚀</div>
-<div class="lesson-body"><div class="lesson-title">Go to Starter Course — All 8 Modules</div><div class="lesson-desc">Make.com, GPT-4o, WhatsApp Bot, Instagram Bot, Cold Email, CRM and more.</div><div class="lesson-tag">24 Lessons</div></div>
-</div>
-</div>
-</div>
-<div class="module pro-module">
-<div class="module-header" onclick="toggleModule(this)">
-<div class="module-num pro">09</div>
-<div class="module-info"><div class="module-title">AutoFlow App — Full Access & Setup</div><div class="module-meta">3 Lessons · Exclusive App</div></div>
-<div class="module-toggle">+</div>
-</div>
-<div class="lessons">
-<div class="lesson" onclick="openLesson(this)" data-module="Module 9" data-title="AutoFlow App — Complete Walkthrough" data-content="&lt;p&gt;AutoFlow is your personal AI automation platform. This lesson walks you through every feature so you can use it and sell access to clients.&lt;/p&gt;&lt;h3&gt;What AutoFlow Includes&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Dashboard&lt;/div&gt;&lt;div class='st'&gt;Real-time stats — automations run, emails sent, messages handled, hours saved&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Automations&lt;/div&gt;&lt;div class='st'&gt;All your flows in one place — toggle on/off, run manually, track performance&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Flow Builder&lt;/div&gt;&lt;div class='st'&gt;Visual drag-and-drop builder — triggers, actions, GPT nodes, all connected&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;AI Assistant&lt;/div&gt;&lt;div class='st'&gt;Chat with GPT-4o about automation, get help, generate content and prompts&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Integrations&lt;/div&gt;&lt;div class='st'&gt;Gmail, Google Sheets, OpenAI, WhatsApp, Instagram, Instantly, Apollo, Stripe, HubSpot, Slack&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Webhooks&lt;/div&gt;&lt;div class='st'&gt;Live endpoints for receiving data from any external app&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Analytics&lt;/div&gt;&lt;div class='st'&gt;Performance tracking — success rates, response times, leads processed&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;Access Code: AF2024PRO&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Login at /app.html with your email and this code. Each student gets a unique code after purchase.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">⚡</div><div class="lesson-body"><div class="lesson-title">AutoFlow App — Complete Walkthrough</div><div class="lesson-desc">Every feature explained — how to use it and how to sell it to clients.</div><div class="lesson-tag pro">Exclusive</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 9" data-title="How to Demo AutoFlow to Clients" data-content="&lt;p&gt;The AutoFlow App is your most powerful sales tool. When clients see a live demo, they understand immediately why they need automation.&lt;/p&gt;&lt;h3&gt;The 10-Minute Demo Script&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Open Dashboard&lt;/strong&gt; — Show real-time stats. Say: "This is what your business looks like when it runs on AI."&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Show Automations&lt;/strong&gt; — Point to WhatsApp Bot: "This replies to every customer message in 2 seconds, 24/7."&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Open Flow Builder&lt;/strong&gt; — Drag a block live: "I can build any custom flow for your specific business."&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;4&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Show AI Assistant&lt;/strong&gt; — Ask it something relevant to their business live on the call.&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;5&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Close&lt;/strong&gt; — "I can set this up for your business this week. Setup is $X, then $Y/month."&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;💡 Why This Works&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Clients do not buy automation. They buy the feeling of control and time saved. The app makes that tangible in real time.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🎯</div><div class="lesson-body"><div class="lesson-title">How to Demo AutoFlow to Clients</div><div class="lesson-desc">The 10-minute demo script that closes $1,500+ deals.</div><div class="lesson-tag pro">Sales</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 9" data-title="Selling App Access as a Recurring Revenue Stream" data-content="&lt;p&gt;Beyond using AutoFlow yourself, you can sell access to your clients as a monthly subscription — creating a second income stream that requires zero extra work.&lt;/p&gt;&lt;h3&gt;Pricing Model&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;strong&gt;Basic access:&lt;/strong&gt; $47/month — dashboard and automations only&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Full access:&lt;/strong&gt; $97/month — everything including Flow Builder and AI Assistant&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Agency white-label:&lt;/strong&gt; $197/month — branded with their company name&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;How to Set It Up&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Create a Stripe subscription product for each tier&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;After payment, generate a unique access code per client&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Send the code via email — client logs in immediately&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;The Math&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;10 clients at $97/month = $970/month pure recurring revenue from the app alone — on top of your automation retainers.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">💰</div><div class="lesson-body"><div class="lesson-title">Selling App Access as Recurring Revenue</div><div class="lesson-desc">How to monetize AutoFlow access — $47 to $197/month per client.</div><div class="lesson-tag pro">Revenue</div></div></div>
-</div>
-</div>
-<div class="module pro-module">
-<div class="module-header" onclick="toggleModule(this)">
-<div class="module-num pro">10</div>
-<div class="module-info"><div class="module-title">Voice AI Agent — Bot That Answers Phone Calls</div><div class="module-meta">3 Lessons · Advanced</div></div>
-<div class="module-toggle">+</div>
-</div>
-<div class="lessons">
-<div class="lesson" onclick="openLesson(this)" data-module="Module 10" data-title="What is a Voice AI Agent and Who Buys It" data-content="&lt;p&gt;A Voice AI Agent is a bot that &lt;strong style='color:var(--gold)'&gt;answers phone calls automatically&lt;/strong&gt; using AI — it speaks naturally, understands the caller, qualifies them, and books appointments. No human needed.&lt;/p&gt;&lt;h3&gt;Who Buys This&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;strong&gt;Medical clinics&lt;/strong&gt; — appointment booking, patient pre-qualification&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Real estate agencies&lt;/strong&gt; — qualify leads calling about properties&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Law firms&lt;/strong&gt; — intake calls, basic qualification&lt;/li&gt;&lt;li&gt;&lt;strong&gt;E-commerce&lt;/strong&gt; — order status, returns, support calls&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Pricing for Voice Agents&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;Setup fee: $1,500 to $5,000&lt;/li&gt;&lt;li&gt;Monthly retainer: $300 to $800&lt;/li&gt;&lt;li&gt;Per-minute pricing: $0.10 to $0.30/min for high volume&lt;/li&gt;&lt;/ul&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;✦ Why Voice is Premium&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Most clients are scared of phone automation. When you show them a live demo where the bot handles a real call naturally — they are amazed and ready to buy immediately.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">📞</div><div class="lesson-body"><div class="lesson-title">What is a Voice AI Agent and Who Buys It</div><div class="lesson-desc">The highest-value automation — sells for $1,500 to $5,000 setup.</div><div class="lesson-tag pro">Advanced</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 10" data-title="Build Your First Voice Agent with Bland.ai" data-content="&lt;p&gt;Bland.ai lets you create AI phone agents in minutes. No coding required — you define the script, voice, and logic through a simple interface.&lt;/p&gt;&lt;h3&gt;Step 1 — Setup Bland.ai&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Go to &lt;strong&gt;bland.ai&lt;/strong&gt; → Sign up → Get API key&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Go to &lt;strong&gt;Phone Numbers&lt;/strong&gt; → Buy a number (~$2/month)&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Go to &lt;strong&gt;Agents&lt;/strong&gt; → Create New Agent&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Step 2 — Configure the Agent&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Voice:&lt;/strong&gt; Choose a natural voice — recommend "Alexa" or "Josh" for professional tone&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Prompt:&lt;/strong&gt; Write the agent instructions (see template below)&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Goal:&lt;/strong&gt; Set what the agent should achieve — book appointment, qualify lead, answer FAQs&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Agent Prompt Template&lt;/h3&gt;&lt;div class='pb' style='font-style:normal;font-size:13px;line-height:1.9'&gt;You are a professional assistant for [Company Name]. Your goal is to qualify callers and book appointments.&lt;br&gt;&lt;br&gt;Start by greeting: "Hi, thank you for calling [Company]. My name is [Agent Name]. How can I help you today?"&lt;br&gt;&lt;br&gt;Qualify by asking: What service they need, their timeline, their budget range.&lt;br&gt;&lt;br&gt;If qualified: Book them using the calendar link or transfer to a human.&lt;br&gt;If not qualified: Politely end the call and offer to send info by email.&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;🎉 Your agent is live!&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Call your number to test it. The agent will answer, speak naturally, and follow your script. This is what you deliver to clients.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🤖</div><div class="lesson-body"><div class="lesson-title">Build Your First Voice Agent with Bland.ai</div><div class="lesson-desc">Step by step — from signup to live phone agent in under 30 minutes.</div><div class="lesson-tag pro">Build</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 10" data-title="Connect Voice Agent to Your CRM and Calendar" data-content="&lt;p&gt;The real power of a Voice Agent is when it is connected to your client's CRM and calendar — leads are automatically logged and appointments are booked without any human involvement.&lt;/p&gt;&lt;h3&gt;Connect to Google Calendar&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;In Bland.ai, go to &lt;strong&gt;Integrations&lt;/strong&gt; → Google Calendar → Connect&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Set available slots → the agent will offer real available times to callers&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;When caller confirms — appointment is booked automatically in the calendar&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Connect to Google Sheets CRM&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;After each call → Bland.ai webhook sends call data to Make.com&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Make.com logs: caller name, number, reason for call, qualification result&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;GPT generates a 2-line summary of the call → added to CRM automatically&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;Full System Value: $3,000–$8,000&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Voice Agent + Calendar + CRM + GPT Summary = a complete inbound lead system. This is what enterprise clients pay $3,000–$8,000 to have built.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🔗</div><div class="lesson-body"><div class="lesson-title">Connect Voice Agent to CRM and Calendar</div><div class="lesson-desc">Full system — calls logged, appointments booked, CRM updated automatically.</div><div class="lesson-tag pro">Integration</div></div></div>
-</div>
-</div>
-<div class="module pro-module">
-<div class="module-header" onclick="toggleModule(this)">
-<div class="module-num pro">11</div>
-<div class="module-info"><div class="module-title">Webhook Mastery — Connect Any App to Any App</div><div class="module-meta">3 Lessons · Technical</div></div>
-<div class="module-toggle">+</div>
-</div>
-<div class="lessons">
-<div class="lesson" onclick="openLesson(this)" data-module="Module 11" data-title="What Are Webhooks and Why They Matter" data-content="&lt;p&gt;Webhooks are the backbone of every advanced automation. While Make.com checks for new data every 15 minutes, a webhook &lt;strong style='color:var(--gold)'&gt;triggers your automation instantly&lt;/strong&gt; the moment something happens.&lt;/p&gt;&lt;h3&gt;Webhook vs Polling&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Polling&lt;/div&gt;&lt;div class='st'&gt;Make.com checks every 15 min — "Did anything new happen?" — slow, uses operations&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Webhook&lt;/div&gt;&lt;div class='st'&gt;App calls you instantly — "Something just happened!" — real-time, free, unlimited&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Real Examples&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;Stripe payment → instantly trigger email and CRM update&lt;/li&gt;&lt;li&gt;WhatsApp message → instantly trigger GPT reply&lt;/li&gt;&lt;li&gt;New form submission → instantly add to pipeline&lt;/li&gt;&lt;li&gt;Instagram DM → instantly route and reply&lt;/li&gt;&lt;/ul&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;✦ Why PRO clients pay more&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Webhook-powered automations feel instant and seamless. Clients notice the difference and are willing to pay 2-3x more for real-time systems vs 15-minute delayed ones.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🪝</div><div class="lesson-body"><div class="lesson-title">What Are Webhooks and Why They Matter</div><div class="lesson-desc">Webhook vs polling — why real-time automations are worth 2-3x more.</div><div class="lesson-tag pro">Concept</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 11" data-title="Build and Test Custom Webhooks" data-content="&lt;p&gt;In this lesson you will build your own webhook endpoint, send test data to it, and process it in Make.com — the exact skill you need for every advanced client project.&lt;/p&gt;&lt;h3&gt;Step 1 — Create Webhook in Make.com&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Create new Scenario → first module: &lt;strong&gt;Webhooks → Custom Webhook&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Click &lt;strong&gt;Add&lt;/strong&gt; → name it → copy the generated URL&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Click &lt;strong&gt;OK&lt;/strong&gt; → the webhook is now listening&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Step 2 — Test with Postman or curl&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Open &lt;strong&gt;hoppscotch.io&lt;/strong&gt; (free, browser-based) → POST request&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Paste your webhook URL → send this JSON body:&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='pb' style='font-style:normal;font-family:monospace;font-size:12px'&gt;{"name": "Test User", "email": "test@email.com", "message": "Hello from webhook"}&lt;/div&gt;&lt;h3&gt;Step 3 — Process the Data&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;In Make.com you will see the data arrive — all fields parsed automatically&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Add any action after — GPT, Gmail, Google Sheets, HTTP request&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Activate Scheduling ON — now any app that sends to this URL triggers your automation&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;You can now connect anything&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Any app that supports webhooks — Shopify, Typeform, Calendly, Stripe, Intercom — can now trigger your automations instantly.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🔧</div><div class="lesson-body"><div class="lesson-title">Build and Test Custom Webhooks</div><div class="lesson-desc">Create your endpoint, send test data, process it — the complete skill.</div><div class="lesson-tag pro">Build</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 11" data-title="Advanced Webhook Patterns — Error Handling and Retry Logic" data-content="&lt;p&gt;Production-level automations need to handle failures gracefully. This lesson covers error handling and retry logic — what separates amateur automations from professional ones.&lt;/p&gt;&lt;h3&gt;Error Handling in Make.com&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Right-click any module → &lt;strong&gt;Add error handler&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Choose &lt;strong&gt;Resume&lt;/strong&gt; (skip and continue), &lt;strong&gt;Retry&lt;/strong&gt; (try again), or &lt;strong&gt;Rollback&lt;/strong&gt; (undo all)&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Add &lt;strong&gt;Gmail notification&lt;/strong&gt; in error handler — you get emailed when something fails&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Retry Logic&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;Set &lt;strong&gt;Max number of retries: 3&lt;/strong&gt;&lt;/li&gt;&lt;li&gt;Set &lt;strong&gt;Interval between retries: 60 seconds&lt;/strong&gt;&lt;/li&gt;&lt;li&gt;Add fallback action if all retries fail — log to Sheet, send alert&lt;/li&gt;&lt;/ul&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;Why this justifies higher prices&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;When you tell a client "if anything fails, you get notified immediately and the system retries automatically" — that is enterprise-level reliability. Charge accordingly: $500+ extra for production-ready setups.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🛡️</div><div class="lesson-body"><div class="lesson-title">Advanced Webhooks — Error Handling and Retry Logic</div><div class="lesson-desc">Production-level automations — what justifies $500+ premium pricing.</div><div class="lesson-tag pro">Advanced</div></div></div>
-</div>
-</div>
-<div class="module pro-module">
-<div class="module-header" onclick="toggleModule(this)">
-<div class="module-num pro">12</div>
-<div class="module-info"><div class="module-title">AI Proposal Generator — Close Deals Faster</div><div class="module-meta">3 Lessons · Sales Tool</div></div>
-<div class="module-toggle">+</div>
-</div>
-<div class="lessons">
-<div class="lesson" onclick="openLesson(this)" data-module="Module 12" data-title="Build an AI Proposal Generator with GPT" data-content="&lt;p&gt;A professional proposal that would take 2 hours to write manually can be generated in 30 seconds with GPT. This lesson builds the system from scratch.&lt;/p&gt;&lt;h3&gt;The Proposal Structure&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;strong&gt;Executive Summary&lt;/strong&gt; — the problem and your solution in 3 sentences&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Scope of Work&lt;/strong&gt; — exactly what you will build&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Timeline&lt;/strong&gt; — week by week delivery&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Investment&lt;/strong&gt; — setup fee and monthly retainer&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Next Steps&lt;/strong&gt; — how to get started&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;The GPT Prompt&lt;/h3&gt;&lt;div class='pb' style='font-style:normal;font-size:13px;line-height:1.9'&gt;Write a professional automation proposal for: Client: {{client_name}}, Industry: {{industry}}, Problem: {{problem}}, Solution: {{automation_type}}, Setup Fee: {{price}}, Monthly Retainer: {{retainer}}.&lt;br&gt;&lt;br&gt;Format: Executive Summary, Scope of Work (3-5 bullet points), Timeline (2 weeks), Investment section, Next Steps. Professional tone. Max 400 words.&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;Result: A $5,000 proposal in 30 seconds&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Fill in the variables, GPT writes the proposal. You review, adjust the price, and send. Clients receive a professional document that matches agencies charging 10x more.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">📝</div><div class="lesson-body"><div class="lesson-title">Build an AI Proposal Generator with GPT</div><div class="lesson-desc">30-second proposals that look like they took 2 hours to write.</div><div class="lesson-tag pro">Sales Tool</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 12" data-title="Automate Proposal Delivery via Email" data-content="&lt;p&gt;After generating the proposal, automate the delivery — the client receives a formatted proposal email within minutes of your discovery call ending.&lt;/p&gt;&lt;h3&gt;The Flow&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;You fill a Google Form after the call with client details&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Make.com triggers → GPT generates full proposal&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Gmail sends formatted proposal email to client automatically&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;4&lt;/div&gt;&lt;div class='st'&gt;Proposal is logged in your CRM Sheet with status "Sent"&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;Why Speed Closes Deals&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Clients who receive a proposal within 30 minutes of a call close at 3x higher rates than those who wait 24+ hours. Speed signals professionalism and urgency.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">✉️</div><div class="lesson-body"><div class="lesson-title">Automate Proposal Delivery via Email</div><div class="lesson-desc">Client receives the proposal within 30 minutes of your call ending.</div><div class="lesson-tag pro">Automation</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 12" data-title="Follow-Up Sequence After Proposal" data-content="&lt;p&gt;80% of sales happen after the 5th follow-up. Most people send one email and give up. Automate the entire follow-up sequence so you never lose a deal to silence.&lt;/p&gt;&lt;h3&gt;The 5-Touch Follow-Up Sequence&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Day 1:&lt;/strong&gt; Proposal sent — "Here is everything we discussed, let me know if you have questions"&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Day 3:&lt;/strong&gt; Value add — send a relevant case study or result from a similar client&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Day 5:&lt;/strong&gt; Urgency — "I have one spot available this week, wanted to give you first priority"&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;4&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Day 8:&lt;/strong&gt; Last chance — "I will be moving this spot to another client tomorrow"&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;5&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Day 12:&lt;/strong&gt; Breakup — "No worries if the timing is not right, feel free to reach out when ready"&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;Automate All 5 Emails&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Set up the entire sequence in Make.com — it runs automatically after you submit the proposal form. You focus on new calls while the system follows up for you.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🔄</div><div class="lesson-body"><div class="lesson-title">Follow-Up Sequence After Proposal</div><div class="lesson-desc">5-touch automated follow-up — because 80% of sales happen after follow-up 5.</div><div class="lesson-tag pro">Sales</div></div></div>
-</div>
-</div>
-<div class="module pro-module">
-<div class="module-header" onclick="toggleModule(this)">
-<div class="module-num pro">13</div>
-<div class="module-info"><div class="module-title">Stripe Recurring Billing — Get Paid Automatically</div><div class="module-meta">3 Lessons · Revenue</div></div>
-<div class="module-toggle">+</div>
-</div>
-<div class="lessons">
-<div class="lesson" onclick="openLesson(this)" data-module="Module 13" data-title="Set Up Stripe Subscriptions for Your Clients" data-content="&lt;p&gt;Instead of chasing invoices every month, set up Stripe subscriptions — your clients are charged automatically on the 1st of every month. You get paid without doing anything.&lt;/p&gt;&lt;h3&gt;Step 1 — Create a Product in Stripe&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Go to &lt;strong&gt;dashboard.stripe.com&lt;/strong&gt; → Products → Add Product&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Name: "AI Automation Retainer — [Client Name]"&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Price: set your monthly amount → select &lt;strong&gt;Recurring&lt;/strong&gt; → Monthly&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;4&lt;/div&gt;&lt;div class='st'&gt;Click &lt;strong&gt;Save product&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Step 2 — Create Payment Link&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Go to &lt;strong&gt;Payment Links&lt;/strong&gt; → Create link → select your product&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Copy the link → send to client via email&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Client enters card once → charged automatically every month&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;Never Chase an Invoice Again&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Every client on Stripe subscription = automatic monthly income. 10 clients at $300/month = $3,000 that arrives without you doing anything.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">💳</div><div class="lesson-body"><div class="lesson-title">Set Up Stripe Subscriptions for Your Clients</div><div class="lesson-desc">Automatic monthly billing — never chase an invoice again.</div><div class="lesson-tag pro">Revenue</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 13" data-title="Automate Client Onboarding After Payment" data-content="&lt;p&gt;When a client pays their first month, trigger an automatic onboarding sequence — welcome email, access credentials, kick-off call booking link. All automated.&lt;/p&gt;&lt;h3&gt;The Onboarding Flow&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Stripe payment succeeds → webhook fires to Make.com&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Make.com sends welcome email with: next steps, what to expect, kick-off call link&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Client is added to your Google Sheets CRM with status "Active"&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;4&lt;/div&gt;&lt;div class='st'&gt;You receive a Slack/email notification: "New client: [Name] — $[Amount]/month"&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;First impression matters&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;An automated onboarding that feels personal and professional sets the tone for the entire relationship. Clients who have a great onboarding experience stay longer and refer more.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🎉</div><div class="lesson-body"><div class="lesson-title">Automate Client Onboarding After Payment</div><div class="lesson-desc">Welcome email, CRM update, and notification — all triggered by payment.</div><div class="lesson-tag pro">Automation</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 13" data-title="Handle Cancellations and Failed Payments Automatically" data-content="&lt;p&gt;Two inevitable events in any subscription business: failed payments and cancellations. Handle both automatically so you never lose revenue without knowing.&lt;/p&gt;&lt;h3&gt;Failed Payment Flow&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Stripe event: &lt;strong&gt;invoice.payment_failed&lt;/strong&gt; → webhook to Make.com&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Send friendly email: "Your payment did not go through — update your card here: [link]"&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Stripe automatically retries 3 times over 7 days — most recover automatically&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Cancellation Flow&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;Stripe event: &lt;strong&gt;customer.subscription.deleted&lt;/strong&gt; → webhook fires&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Send win-back email: "Sorry to see you go — here is what you will miss"&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Update CRM status to "Churned" and add to re-engagement sequence&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;Recovery rate: 40-60%&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;A well-timed win-back email recovers 40-60% of cancelled clients. Automate it and you recover revenue while you sleep.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🔄</div><div class="lesson-body"><div class="lesson-title">Handle Cancellations and Failed Payments</div><div class="lesson-desc">Automated recovery flows — recover 40-60% of failed payments automatically.</div><div class="lesson-tag pro">Revenue</div></div></div>
-</div>
-</div>
-<div class="module pro-module">
-<div class="module-header" onclick="toggleModule(this)">
-<div class="module-num pro">14</div>
-<div class="module-info"><div class="module-title">Agency Website + Enterprise Clients</div><div class="module-meta">3 Lessons · Scale</div></div>
-<div class="module-toggle">+</div>
-</div>
-<div class="lessons">
-<div class="lesson" onclick="openLesson(this)" data-module="Module 14" data-title="Build Your Agency Website in One Day" data-content="&lt;p&gt;Your agency website is your credibility anchor. When an enterprise client Googles you, they need to see a professional presence. This lesson builds it fast.&lt;/p&gt;&lt;h3&gt;What Your Website Needs&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;strong&gt;Hero section&lt;/strong&gt; — clear statement of what you do and for who&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Services section&lt;/strong&gt; — 3-5 core automations you offer with prices&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Case studies&lt;/strong&gt; — even 1 real result is enough to start&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Book a call button&lt;/strong&gt; — linked to Calendly or Cal.com&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Contact form&lt;/strong&gt; — connected to your CRM via Make.com&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Fastest Way to Build&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Carrd.co&lt;/strong&gt; — simplest, $19/year, professional one-page sites&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Framer.com&lt;/strong&gt; — more design control, free plan available&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;&lt;strong&gt;Webflow&lt;/strong&gt; — most professional, $14/month, worth it for enterprise&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib'&gt;&lt;strong style='color:var(--gold)'&gt;Domain Name Tip&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Buy your domain on Namecheap (~$10/year). Use your name or agency name + "automation" or "ai" — example: smithautomation.com or alexai.agency&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🌐</div><div class="lesson-body"><div class="lesson-title">Build Your Agency Website in One Day</div><div class="lesson-desc">The fastest path to a professional online presence — Carrd, Framer, or Webflow.</div><div class="lesson-tag pro">Setup</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 14" data-title="How to Land Enterprise Clients ($5,000–$15,000)" data-content="&lt;p&gt;Enterprise clients are not harder to close — they just require a different approach. They buy based on &lt;strong style='color:var(--gold)'&gt;ROI, reliability, and trust&lt;/strong&gt; — not price.&lt;/p&gt;&lt;h3&gt;Where Enterprise Clients Are&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;LinkedIn — search for Operations Directors, CTOs, Heads of Growth&lt;/li&gt;&lt;li&gt;Industry events and conferences (in person or virtual)&lt;/li&gt;&lt;li&gt;Referrals from existing clients — the best source&lt;/li&gt;&lt;li&gt;Partnerships with agencies that do not offer automation&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;The Enterprise Pitch&lt;/h3&gt;&lt;div class='pb' style='font-style:normal;font-size:13px;line-height:1.9'&gt;"We help [industry] companies automate their [process] using AI — typically saving 20-40 hours per week and reducing operational costs by 30-50%. Our clients see ROI within the first 60 days."&lt;/div&gt;&lt;h3&gt;What Enterprise Wants&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Reliability&lt;/div&gt;&lt;div class='st'&gt;99.9% uptime SLA — use Render or Railway for production hosting&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Security&lt;/div&gt;&lt;div class='st'&gt;Data stays in their environment — mention GDPR compliance&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='tp'&gt;Support&lt;/div&gt;&lt;div class='st'&gt;Dedicated Slack channel, monthly review calls, documented SOPs&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;One enterprise client = 3-6 months of income&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;A $10,000 setup + $1,500/month retainer from one enterprise client equals what 10 small clients pay. Focus on quality over quantity.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🏢</div><div class="lesson-body"><div class="lesson-title">How to Land Enterprise Clients ($5,000–$15,000)</div><div class="lesson-desc">The enterprise pitch, what they want, and how one client equals 10 small ones.</div><div class="lesson-tag pro">Enterprise</div></div></div>
-<div class="lesson" onclick="openLesson(this)" data-module="Module 14" data-title="Salesforce and HubSpot Integration for Enterprise" data-content="&lt;p&gt;Enterprise clients run on Salesforce or HubSpot. Knowing how to integrate with these platforms makes you irreplaceable — and justifies $5,000+ projects.&lt;/p&gt;&lt;h3&gt;HubSpot Integration via Make.com&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;In Make.com, search &lt;strong&gt;HubSpot&lt;/strong&gt; — native integration available&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Connect with HubSpot API key from your client's account&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Available actions: Create Contact, Update Deal, Log Activity, Send Email sequence&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;Salesforce Integration&lt;/h3&gt;&lt;div class='sb'&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;1&lt;/div&gt;&lt;div class='st'&gt;In Make.com, search &lt;strong&gt;Salesforce&lt;/strong&gt; — native integration available&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;2&lt;/div&gt;&lt;div class='st'&gt;Connect with OAuth — client authorizes in 2 clicks&lt;/div&gt;&lt;/div&gt;&lt;div class='sr'&gt;&lt;div class='sn'&gt;3&lt;/div&gt;&lt;div class='st'&gt;Available actions: Create Lead, Update Opportunity, Create Task, Log Call&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;h3&gt;The Automation That Sells Itself&lt;/h3&gt;&lt;div class='pb' style='font-style:normal'&gt;New lead from any source → AI qualifies automatically → if qualified, creates Salesforce Opportunity + assigns to sales rep + sends personalized email → if not qualified, adds to nurture sequence. All in real time.&lt;/div&gt;&lt;div class='ib ac'&gt;&lt;strong style='color:var(--gold)'&gt;This single automation = $8,000–$15,000&lt;/strong&gt;&lt;p style='font-size:13px;margin-top:6px'&gt;Enterprise companies pay this amount to have their lead qualification automated. You can build it in 2-3 days with Make.com and the skills from this course.&lt;/p&gt;&lt;/div&gt;"><div class="lesson-icon">🔗</div><div class="lesson-body"><div class="lesson-title">Salesforce and HubSpot Integration for Enterprise</div><div class="lesson-desc">The integrations that justify $8,000–$15,000 projects — step by step.</div><div class="lesson-tag pro">Enterprise</div></div></div>
-</div>
-</div>
-</div>
+
 <script>
-var completed=JSON.parse(localStorage.getItem('cp_completed')||'[]');
-var total=42;
-function updateProgress(){var p=Math.round(completed.length/total*100);document.getElementById('prog-fill').style.width=p+'%';document.getElementById('prog-label').textContent=completed.length+' / '+total+' lessons';}
-function toggleModule(el){var m=el.parentElement;m.classList.toggle('open');}
-function openLesson(el){document.querySelectorAll('.lesson').forEach(function(l){l.classList.remove('active')});el.classList.add('active');var mod=el.getAttribute('data-module');var title=el.getAttribute('data-title');var content=el.getAttribute('data-content');document.getElementById('panelBreadcrumb').innerHTML=mod+' · <span>'+title+'</span>';document.getElementById('panelTitle').textContent=title;document.getElementById('panelContent').innerHTML=content;var panel=document.getElementById('contentPanel');panel.classList.add('visible');panel.scrollIntoView({behavior:'smooth',block:'start'});}
-function closePanel(){document.getElementById('contentPanel').classList.remove('visible');document.querySelectorAll('.lesson').forEach(function(l){l.classList.remove('active')});}
-function completeLesson(){var active=document.querySelector('.lesson.active');if(!active)return;var title=active.getAttribute('data-title');if(!title)return;if(completed.indexOf(title)===-1){completed.push(title);localStorage.setItem('cp_completed',JSON.stringify(completed));var icon=active.querySelector('.lesson-icon');if(icon){icon.textContent='✓';icon.classList.add('completed');}updateProgress();}}
+var done = JSON.parse(localStorage.getItem('pro_lessons') || '[]');
+function updateProgress(){
+  var pct = (done.length / 42) * 100;
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-label').textContent = done.length + ' / 42 lessons';
+  done.forEach(function(id){
+    var rows = document.querySelectorAll('.lesson');
+    rows.forEach(function(r){ if(r.getAttribute('onclick') && r.getAttribute('onclick').includes("'"+id+"'")) r.classList.add('done'); });
+  });
+}
+function markDone(id){
+  if(done.indexOf(id)===-1){ done.push(id); localStorage.setItem('pro_lessons', JSON.stringify(done)); }
+}
+function toggleModule(id){
+  var mod = document.getElementById(id);
+  var isOpen = mod.classList.contains('open');
+  document.querySelectorAll('.module').forEach(function(m){ m.classList.remove('open'); });
+  if(!isOpen) mod.classList.add('open');
+}
 updateProgress();
+document.getElementById('mod-1').classList.add('open');
 </script>
 </body>
 </html>
