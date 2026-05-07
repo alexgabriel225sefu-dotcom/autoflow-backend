@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Module 9 — AutoFlow App Full Access</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(200,169,110,.08);backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;color:#C8A96E}
+.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:#C8A96E;color:#C8A96E}
+.pro-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(200,169,110,.2),rgba(200,169,110,.08));border:1px solid #C8A96E;border-radius:100px;padding:5px 14px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.module-hero{padding:56px 32px 40px;max-width:860px;margin:0 auto}
+.module-num{font-family:"Playfair Display",serif;font-size:80px;font-weight:900;color:rgba(200,169,110,.1);line-height:1;margin-bottom:-20px}
+.module-title{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:16px}
+.module-title em{font-style:italic;color:#C8A96E}
+.module-desc{font-size:15px;color:#C8BEA8;max-width:600px;line-height:1.75}
+.module-meta{display:flex;gap:20px;margin-top:28px;flex-wrap:wrap}
+.meta-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#C8BEA8}
+.meta-dot{width:6px;height:6px;border-radius:50%;background:#C8A96E}
+.progress-wrap{max-width:860px;margin:0 auto 40px;padding:0 32px}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.lessons-nav{max-width:860px;margin:0 auto 32px;padding:0 32px;display:flex;gap:8px;flex-wrap:wrap}
+.lesson-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(200,169,110,.1);background:transparent;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
+.lesson-tab:hover{border-color:rgba(200,169,110,.3);color:#F5F0E8}
+.lesson-tab.active{background:rgba(200,169,110,.15);border-color:#C8A96E;color:#C8A96E;font-weight:600}
+.lesson-tab.done::before{content:"✓ ";color:#C8A96E}
+.lesson-wrap{max-width:860px;margin:0 auto;padding:0 32px 80px}
+.lesson-content{display:none}
+.lesson-content.active{display:block}
+.lesson-header{background:#0f0f0f;border:1px solid rgba(200,169,110,.08);border-radius:14px;padding:32px;margin-bottom:28px}
+.lesson-tag{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:100px;border:1px solid rgba(200,169,110,.18);color:#C8A96E;background:rgba(200,169,110,.1);margin-bottom:14px}
+.lesson-title{font-family:"Playfair Display",serif;font-size:clamp(22px,3vw,32px);font-weight:700;margin-bottom:10px;line-height:1.1}
+.lesson-intro{font-size:14px;color:#C8BEA8;line-height:1.8}
+.block{margin-bottom:36px}
+.block-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:#F5F0E8;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.block-title::before{content:"";width:3px;height:20px;background:#C8A96E;border-radius:2px;flex-shrink:0}
+.block-text{font-size:14px;color:#C8BEA8;line-height:1.85;margin-bottom:14px}
+.steps{display:flex;flex-direction:column;gap:20px;margin:20px 0}
+.step{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;border-left:3px solid #C8A96E}
+.step-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#080808;flex-shrink:0}
+.step-title{font-size:15px;font-weight:700;color:#F5F0E8}
+.step-text{font-size:13px;color:#C8BEA8;line-height:1.8;margin-bottom:10px}
+.step-detail{background:#161616;border-radius:8px;padding:14px 16px;margin-top:10px;font-size:13px;color:#C8BEA8;line-height:1.75;border-left:2px solid rgba(200,169,110,.3)}
+.app-access-card{background:linear-gradient(135deg,rgba(200,169,110,.12),rgba(200,169,110,.04));border:1px solid rgba(200,169,110,.4);border-radius:16px;padding:36px;text-align:center;margin:28px 0}
+.app-access-title{font-family:"Playfair Display",serif;font-size:24px;font-weight:700;color:#C8A96E;margin-bottom:10px}
+.app-access-text{font-size:14px;color:#C8BEA8;line-height:1.75;margin-bottom:24px}
+.app-btn{display:inline-flex;align-items:center;gap:10px;padding:16px 36px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:10px;font-family:Syne,sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#080808;cursor:pointer;text-decoration:none;transition:all .2s}
+.app-btn:hover{opacity:.9;transform:translateY(-2px)}
+.feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0}
+.feature-card{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:10px;padding:20px}
+.feature-icon{font-size:24px;margin-bottom:10px;display:block}
+.feature-title{font-size:14px;font-weight:600;color:#F5F0E8;margin-bottom:6px}
+.feature-desc{font-size:12px;color:#C8BEA8;line-height:1.65}
+.info-box{border-radius:10px;padding:20px 24px;margin:20px 0}
+.info-box.gold{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2)}
+.info-box.tip{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15)}
+.info-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.info-box.gold .info-label{color:#C8A96E}
+.info-box.tip .info-label{color:#4ADE80}
+.info-text{font-size:13px;color:#C8BEA8;line-height:1.75}
+.takeaways{background:#161616;border:1px solid rgba(200,169,110,.12);border-radius:12px;padding:28px;margin:28px 0}
+.takeaways-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E;margin-bottom:16px}
+.takeaway{display:flex;gap:12px;margin-bottom:12px;font-size:13px;color:#F5F0E8;line-height:1.6}
+.takeaway:last-child{margin-bottom:0}
+.takeaway::before{content:"◆";color:#C8A96E;font-size:8px;margin-top:5px;flex-shrink:0}
+.exercise{background:linear-gradient(135deg,rgba(200,169,110,.08),rgba(200,169,110,.03));border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:28px;margin:28px 0}
+.exercise-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:12px}
+.exercise-text{font-size:14px;color:#F5F0E8;line-height:1.75}
+.lesson-actions{display:flex;gap:12px;margin-top:40px;flex-wrap:wrap}
+.btn-complete{padding:13px 28px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-complete:hover{opacity:.9;transform:translateY(-1px)}
+.btn-next{padding:13px 28px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:8px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-next:hover{border-color:#C8A96E;color:#C8A96E}
+@media(max-width:600px){.module-hero,.progress-wrap,.lessons-nav,.lesson-wrap{padding-left:16px;padding-right:16px}.lesson-header{padding:20px}.feature-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">AI Cash Systems</div>
+  <a href="/course-pro.html" class="back-btn">← Back to PRO Course</a>
+</nav>
+<div class="module-hero">
+  <div class="pro-badge">⚡ PRO — Module 9 of 14</div>
+  <div class="module-num">09</div>
+  <h1 class="module-title">AutoFlow App —<br><em>Full PRO Access</em></h1>
+  <p class="module-desc">Your complete AI automation command center. Generate automation packages, use the AI assistant, send outreach emails, track clients, and monitor everything — all in one platform built exclusively for PRO members.</p>
+  <div class="module-meta">
+    <div class="meta-item"><div class="meta-dot"></div>3 Lessons</div>
+    <div class="meta-item"><div class="meta-dot"></div>~45 minutes</div>
+    <div class="meta-item"><div class="meta-dot"></div>PRO Exclusive</div>
+  </div>
+</div>
+<div class="progress-wrap">
+  <div class="progress-label"><span>Module Progress</span><span id="progressLabel">0 / 3 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+<div class="lessons-nav">
+  <button class="lesson-tab active" onclick="showLesson(1)" id="tab1">Lesson 1 — App Overview</button>
+  <button class="lesson-tab" onclick="showLesson(2)" id="tab2">Lesson 2 — Daily Workflow</button>
+  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — Sell App Access</button>
+</div>
+<div class="lesson-wrap">
+
+<!-- LESSON 1 -->
+<div class="lesson-content active" id="lesson1">
+  <div class="lesson-header">
+    <div class="lesson-tag">PRO Tool · Lesson 1</div>
+    <h2 class="lesson-title">AutoFlow App — Complete Overview</h2>
+    <p class="lesson-intro">AutoFlow is your AI-powered command center for running your automation agency. Every feature is designed to save you time, help you close more clients, and deliver better results — all from one professional platform.</p>
+  </div>
+
+  <div class="app-access-card">
+    <div class="app-access-title">🚀 Access Your AutoFlow App</div>
+    <div class="app-access-text">Your PRO membership includes full access to the AutoFlow platform. Log in with your email and access code to get started immediately.</div>
+    <a href="https://autoflow-backend-p9pc.onrender.com/app.html" class="app-btn">Open AutoFlow App →</a>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The 5 Sections of AutoFlow</div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <span class="feature-icon">📊</span>
+        <div class="feature-title">Dashboard</div>
+        <div class="feature-desc">Live stats — active clients, monthly revenue, automations built, emails sent. Your agency at a glance.</div>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">⚡</span>
+        <div class="feature-title">Automation Wizard</div>
+        <div class="feature-desc">Select an industry and automation type — get a complete package in 30 seconds: Make.com modules, GPT prompt, pricing, and outreach message.</div>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🤖</span>
+        <div class="feature-title">AI Assistant</div>
+        <div class="feature-desc">Ask anything — Make.com, WhatsApp API, Instagram API, pricing, sales scripts, objection handling. Responds in your language instantly.</div>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">✉️</span>
+        <div class="feature-title">Email Automation</div>
+        <div class="feature-desc">6 professional templates + AI generation. Generate a personalized outreach email and send it in one click.</div>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">💼</span>
+        <div class="feature-title">Client Tracker</div>
+        <div class="feature-desc">Add clients, track their automation type and monthly retainer. See your total MRR update in real time.</div>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">📋</span>
+        <div class="feature-title">Activity Logs</div>
+        <div class="feature-desc">Real-time log of all actions — AI generations, emails sent, logins. Full transparency of every operation.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">How to Log In to AutoFlow</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Open the app</div></div>
+        <div class="step-text">Go to <strong style="color:#C8A96E">autoflow-backend-p9pc.onrender.com/app.html</strong> or click the button above. The login screen appears.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Enter your credentials</div></div>
+        <div class="step-text">Enter the email address you used to purchase the PRO course and your access code. Your access code was sent to your email after purchase. Click <strong style="color:#C8A96E">Sign In to AutoFlow</strong>.</div>
+        <div class="step-detail">If you cannot find your access code — check your spam folder. The email subject is "🎉 Your AI Cash Systems Access Code". If you still cannot find it, contact support.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">You are in — explore the Dashboard</div></div>
+        <div class="step-text">After login, you land on the Dashboard. Your stats start at zero — they update as you use the platform and add clients. Click through each section in the left sidebar to explore everything available to you.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 1</div>
+    <div class="takeaway">AutoFlow has 5 core sections — Dashboard, Wizard, AI Chat, Email, Client Tracker.</div>
+    <div class="takeaway">The Automation Wizard generates complete packages in 30 seconds — use it before every sales call.</div>
+    <div class="takeaway">The AI Assistant knows everything about Make.com, APIs, pricing and sales — ask it anything.</div>
+    <div class="takeaway">Client Tracker calculates your MRR automatically as you add clients.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(1)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(2)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 2 -->
+<div class="lesson-content" id="lesson2">
+  <div class="lesson-header">
+    <div class="lesson-tag">Workflow · Lesson 2</div>
+    <h2 class="lesson-title">Using AutoFlow in Your Daily Agency Workflow</h2>
+    <p class="lesson-intro">AutoFlow is not just a tool — it is your daily operating system for running the agency. This lesson shows you exactly how to use it at every stage: prospecting, sales calls, proposal generation, client delivery, and ongoing management.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Before Every Sales Call — Use the Wizard</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Open AutoFlow 10 minutes before the call</div></div>
+        <div class="step-text">Go to the Automation Wizard. Select the prospect's industry and the automation type you plan to propose. Fill in their pain point if you know it from your research. Click Generate.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Study the generated package</div></div>
+        <div class="step-text">Read through what gets built, the Make.com modules, and the recommended price. Now you walk into the call knowing exactly what to propose, how long it takes to build, and what to charge. You sound like an expert who has done this 100 times.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Copy the GPT System Message</div></div>
+        <div class="step-text">Copy the generated GPT System Message. After the call, when you build the automation in Make.com, paste it directly into the OpenAI module. This saves 30 minutes of prompt writing per client.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">During Prospecting — Use Email Automation</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to Email Automation section</div></div>
+        <div class="step-text">Click the Cold Outreach template. Enter the prospect's name, company, and email. Click Generate with AI + Send. AutoFlow writes a personalized email using their specific details and sends it immediately — all in under 60 seconds.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Use the Follow-Up templates</div></div>
+        <div class="step-text">3 days after the initial email with no reply — go back to Email Automation, select the Day 3 Follow-Up template, fill in their details, generate and send. Takes 45 seconds. Do this for every prospect systematically.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">After Signing a Client — Use Client Tracker</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Add them to Client Tracker immediately</div></div>
+        <div class="step-text">Go to Client Tracker → click Add Client. Enter their business name, automation type, and monthly retainer. Set status to Active. Your Dashboard MRR updates instantly.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Use AI Assistant for any technical questions</div></div>
+        <div class="step-text">While building their automation, if you hit a problem — open AI Assistant and ask. "How do I parse the WhatsApp message body in Make.com?" "What is the correct HTTP header for 360dialog?" The assistant answers instantly with exact steps.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">✓ The 15-Minute Daily Routine</div>
+    <div class="info-text">Every morning: open AutoFlow Dashboard — check stats. Send 3 outreach emails using Email Automation — 5 minutes. Check AI Assistant for any client questions — 5 minutes. Update Client Tracker if anything changed — 2 minutes. That is your complete agency management routine. Everything else is automated.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 2</div>
+    <div class="takeaway">Use the Wizard before every sales call — arrive knowing exactly what to propose and at what price.</div>
+    <div class="takeaway">Email Automation handles all outreach — 3 outreach emails take 3 minutes total.</div>
+    <div class="takeaway">Add every client to the Tracker immediately — your MRR updates automatically.</div>
+    <div class="takeaway">AI Assistant replaces 80% of Google searches about Make.com, APIs, and sales techniques.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(2)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(3)">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- LESSON 3 -->
+<div class="lesson-content" id="lesson3">
+  <div class="lesson-header">
+    <div class="lesson-tag">Revenue · Lesson 3</div>
+    <h2 class="lesson-title">Sell AutoFlow App Access to Your Clients</h2>
+    <p class="lesson-intro">Here is an advanced revenue opportunity most people miss: you can sell access to a white-labeled version of AutoFlow to your own clients as an add-on service. They pay you monthly for access to the platform — completely passive income on top of your retainers.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Concept — White Label the Platform</div>
+    <div class="block-text">Your clients — restaurants, agencies, coaches — also need tools to manage their own operations. AutoFlow's AI Assistant, Email templates, and Client Tracker are useful to any business owner. You offer them access as an add-on to their existing service with you.</div>
+    <div class="block-text">This works especially well for clients who are also selling services themselves — coaches who want to send outreach emails, consultants who track their own clients, small agencies that need AI tools but can't afford enterprise software.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">How to Position and Price It</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Position as "Your AI Operations Hub"</div></div>
+        <div class="step-text">Do not call it AutoFlow when selling to clients. Call it "[Your Agency Name] Client Portal" or "AI Operations Hub." The pitch: "As part of working with us, you get access to our proprietary AI platform — you can use it to send outreach emails, ask AI questions about your business, and track your own client pipeline."</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Pricing tiers</div></div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Add-on to existing retainer:</strong> +$49/month — access to AI Assistant and Email templates only<br/><br/>
+          <strong style="color:#C8A96E">Standalone access:</strong> $97/month — full platform access for clients who want all features<br/><br/>
+          <strong style="color:#C8A96E">Annual access:</strong> $797/year — save 30%, pay once
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Who to offer it to first</div></div>
+        <div class="step-text">Start with your happiest clients — the ones who already trust you and see results. In your next monthly check-in call, show them the platform live. Let them ask the AI Assistant a question themselves. Most clients say yes immediately when they see it working in real time.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Revenue Math</div>
+    <div class="block-text">If you have 10 clients on $200/month retainers and 5 of them add the platform at $49/month:</div>
+    <div class="step" style="background:#0f0f0f;border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:24px;border-left:3px solid #C8A96E">
+      <div class="step-text">10 clients × $200/month retainer = <strong style="color:#C8A96E">$2,000/month</strong></div>
+      <div class="step-text">5 clients × $49/month platform = <strong style="color:#C8A96E">$245/month</strong></div>
+      <div class="step-text">Total MRR = <strong style="color:#C8A96E">$2,245/month</strong></div>
+      <div class="step-text" style="margin-top:10px;color:#7A7060">The platform add-on costs you nothing extra — it is already built and running. Every dollar from it is pure profit.</div>
+    </div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Do This Today</div>
+    <div class="exercise-text">Open AutoFlow right now. Spend 15 minutes exploring every section. Use the AI Assistant — ask it a real question you have about Make.com or about how to close a specific type of client. Generate one automation package with the Wizard. Send yourself a test email. By the end of 15 minutes, you will know the platform well enough to demo it to a client confidently.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 3</div>
+    <div class="takeaway">White-label AutoFlow as your agency's proprietary client portal — do not mention the original name.</div>
+    <div class="takeaway">Start with $49/month add-on for existing clients — low friction, high conversion.</div>
+    <div class="takeaway">5 clients at $49/month = $245/month completely passive — zero extra work from you.</div>
+    <div class="takeaway">The live demo is the best sales tool — let the client ask the AI something themselves and watch their reaction.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="window.location.href='/course-pro.html'">← Back to PRO Course</button>
+  </div>
+</div>
+
+</div>
+<script>
+var completed=JSON.parse(localStorage.getItem('m9_completed')||'[]');
+function updateProgress(){
+  var fill=document.getElementById('progressFill');
+  var label=document.getElementById('progressLabel');
+  fill.style.width=(completed.length/3*100)+'%';
+  label.textContent=completed.length+' / 3 lessons';
+  completed.forEach(function(n){var t=document.getElementById('tab'+n);if(t)t.classList.add('done');});
+}
+function showLesson(n){
+  document.querySelectorAll('.lesson-content').forEach(function(el){el.classList.remove('active')});
+  document.querySelectorAll('.lesson-tab').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('lesson'+n).classList.add('active');
+  document.getElementById('tab'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function completeLesson(n){
+  if(completed.indexOf(n)===-1){completed.push(n);localStorage.setItem('m9_completed',JSON.stringify(completed));}
+  updateProgress();
+  var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
+}
+updateProgress();
+(function(){var h=window.location.hash;if(h&&h.indexOf('lesson')!==-1){var n=parseInt(h.replace('#lesson',''));if(n>=1&&n<=3)showLesson(n);}})();
+</script>
+</body>
+</html>
