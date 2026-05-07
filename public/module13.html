@@ -249,8 +249,8 @@ nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-co
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: 'https://autoflow-backend-p9pc.onrender.com/billing-success.html',
-      cancel_url: 'https://autoflow-backend-p9pc.onrender.com/billing-cancel.html'
+      success_url: 'https://aicashsystem.onrender.com/billing-success.html',
+      cancel_url: 'https://aicashsystem.onrender.com/billing-cancel.html'
     });
     
     res.json({ checkoutUrl: session.url });
@@ -297,7 +297,7 @@ nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-co
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Add your server webhook URL</div></div>
         <div class="step-text">In the "Endpoint URL" field, enter your Render server URL with <code style="color:#C8A96E">/stripe-webhook</code>:</div>
-        <div class="step-detail"><code style="color:#C8A96E">https://autoflow-backend-p9pc.onrender.com/stripe-webhook</code></div>
+        <div class="step-detail"><code style="color:#C8A96E">https://aicashsystem.onrender.com/stripe-webhook</code></div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">3</div><div class="step-title">Select events to listen for</div></div>
