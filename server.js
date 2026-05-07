@@ -389,7 +389,7 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
             <p><strong>Your Access Code:</strong></p>
             <div style="background:#161616;border:1px solid #C8A96E;border-radius:8px;padding:16px;font-size:24px;font-weight:bold;color:#C8A96E;text-align:center;letter-spacing:4px">${code}</div>
             <p style="margin-top:20px">Access your course here:</p>
-            <a href="https://autoflow-backend-p9pc.onrender.com/access.html" style="background:#C8A96E;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:bold">Access Course →</a>
+            <a href="https://aicashsystem.onrender.com/access.html" style="background:#C8A96E;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:bold">Access Course →</a>
             <p style="color:#7A7060;font-size:12px;margin-top:24px">Enter your email and the code above to access your course.</p>
           </div>`
         });
