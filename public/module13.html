@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Module 13 — Stripe Recurring Billing</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(200,169,110,.08);backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;color:#C8A96E}
+.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:#C8A96E;color:#C8A96E}
+.pro-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(200,169,110,.2),rgba(200,169,110,.08));border:1px solid #C8A96E;border-radius:100px;padding:5px 14px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.module-hero{padding:56px 32px 40px;max-width:860px;margin:0 auto}
+.module-num{font-family:"Playfair Display",serif;font-size:80px;font-weight:900;color:rgba(200,169,110,.1);line-height:1;margin-bottom:-20px}
+.module-title{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:16px}
+.module-title em{font-style:italic;color:#C8A96E}
+.module-desc{font-size:15px;color:#C8BEA8;max-width:600px;line-height:1.75}
+.module-meta{display:flex;gap:20px;margin-top:28px;flex-wrap:wrap}
+.meta-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#C8BEA8}
+.meta-dot{width:6px;height:6px;border-radius:50%;background:#C8A96E}
+.progress-wrap{max-width:860px;margin:0 auto 40px;padding:0 32px}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.lessons-nav{max-width:860px;margin:0 auto 32px;padding:0 32px;display:flex;gap:8px;flex-wrap:wrap}
+.lesson-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(200,169,110,.1);background:transparent;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
+.lesson-tab:hover{border-color:rgba(200,169,110,.3);color:#F5F0E8}
+.lesson-tab.active{background:rgba(200,169,110,.15);border-color:#C8A96E;color:#C8A96E;font-weight:600}
+.lesson-tab.done::before{content:"✓ ";color:#C8A96E}
+.lesson-wrap{max-width:860px;margin:0 auto;padding:0 32px 80px}
+.lesson-content{display:none}
+.lesson-content.active{display:block}
+.lesson-header{background:#0f0f0f;border:1px solid rgba(200,169,110,.08);border-radius:14px;padding:32px;margin-bottom:28px}
+.lesson-tag{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:100px;border:1px solid rgba(200,169,110,.18);color:#C8A96E;background:rgba(200,169,110,.1);margin-bottom:14px}
+.lesson-title{font-family:"Playfair Display",serif;font-size:clamp(22px,3vw,32px);font-weight:700;margin-bottom:10px;line-height:1.1}
+.lesson-intro{font-size:14px;color:#C8BEA8;line-height:1.8}
+.block{margin-bottom:36px}
+.block-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:#F5F0E8;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.block-title::before{content:"";width:3px;height:20px;background:#C8A96E;border-radius:2px;flex-shrink:0}
+.block-text{font-size:14px;color:#C8BEA8;line-height:1.85;margin-bottom:14px}
+.steps{display:flex;flex-direction:column;gap:20px;margin:20px 0}
+.step{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;border-left:3px solid #C8A96E}
+.step-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#080808;flex-shrink:0}
+.step-title{font-size:15px;font-weight:700;color:#F5F0E8}
+.step-text{font-size:13px;color:#C8BEA8;line-height:1.8;margin-bottom:10px}
+.step-text:last-child{margin-bottom:0}
+.step-detail{background:#161616;border-radius:8px;padding:14px 16px;margin-top:10px;font-size:13px;color:#C8BEA8;line-height:1.75;border-left:2px solid rgba(200,169,110,.3)}
+.click{display:inline-flex;align-items:center;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:5px;padding:2px 10px;font-size:12px;color:#C8A96E;font-weight:600;margin:0 2px}
+.type-this{background:#0a0a0a;border:1px solid rgba(200,169,110,.2);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#F5F0E8;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap}
+.info-box{border-radius:10px;padding:20px 24px;margin:20px 0}
+.info-box.gold{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2)}
+.info-box.tip{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15)}
+.info-box.warn{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.15)}
+.info-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.info-box.gold .info-label{color:#C8A96E}
+.info-box.tip .info-label{color:#4ADE80}
+.info-box.warn .info-label{color:#e74c3c}
+.info-text{font-size:13px;color:#C8BEA8;line-height:1.75}
+.takeaways{background:#161616;border:1px solid rgba(200,169,110,.12);border-radius:12px;padding:28px;margin:28px 0}
+.takeaways-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E;margin-bottom:16px}
+.takeaway{display:flex;gap:12px;margin-bottom:12px;font-size:13px;color:#F5F0E8;line-height:1.6}
+.takeaway:last-child{margin-bottom:0}
+.takeaway::before{content:"◆";color:#C8A96E;font-size:8px;margin-top:5px;flex-shrink:0}
+.exercise{background:linear-gradient(135deg,rgba(200,169,110,.08),rgba(200,169,110,.03));border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:28px;margin:28px 0}
+.exercise-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:12px}
+.exercise-text{font-size:14px;color:#F5F0E8;line-height:1.75}
+.lesson-actions{display:flex;gap:12px;margin-top:40px;flex-wrap:wrap}
+.btn-complete{padding:13px 28px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-complete:hover{opacity:.9;transform:translateY(-1px)}
+.btn-next{padding:13px 28px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:8px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-next:hover{border-color:#C8A96E;color:#C8A96E}
+@media(max-width:600px){.module-hero,.progress-wrap,.lessons-nav,.lesson-wrap{padding-left:16px;padding-right:16px}.lesson-header{padding:20px}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">AI Cash Systems</div>
+  <a href="/course-pro.html" class="back-btn">← Back to PRO Course</a>
+</nav>
+<div class="module-hero">
+  <div class="pro-badge">⚡ PRO — Module 13 of 14</div>
+  <div class="module-num">13</div>
+  <h1 class="module-title">Stripe Recurring Billing —<br><em>Get Paid Automatically</em></h1>
+  <p class="module-desc">Set up automatic monthly billing for every client using Stripe. Never chase payments again — clients enter their card once and you collect every month without lifting a finger.</p>
+  <div class="module-meta">
+    <div class="meta-item"><div class="meta-dot"></div>3 Lessons</div>
+    <div class="meta-item"><div class="meta-dot"></div>~60 minutes</div>
+    <div class="meta-item"><div class="meta-dot"></div>Business Operations</div>
+  </div>
+</div>
+<div class="progress-wrap">
+  <div class="progress-label"><span>Module Progress</span><span id="progressLabel">0 / 3 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+<div class="lessons-nav">
+  <button class="lesson-tab active" onclick="showLesson(1)" id="tab1">Lesson 1 — Stripe Setup</button>
+  <button class="lesson-tab" onclick="showLesson(2)" id="tab2">Lesson 2 — Create Subscriptions</button>
+  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — Automate Billing Flows</button>
+</div>
+<div class="lesson-wrap">
+
+<div class="lesson-content active" id="lesson1">
+  <div class="lesson-header">
+    <div class="lesson-tag">Setup · Lesson 1</div>
+    <h2 class="lesson-title">Stripe Setup — Your Professional Billing System</h2>
+    <p class="lesson-intro">Stripe is the world's leading payment platform. Setting it up correctly from day one means you can accept credit cards from any country, charge monthly retainers automatically, and look like a professional agency from your very first client.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Create Your Stripe Account</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to stripe.com and click "Start now"</div></div>
+        <div class="step-text">Open <strong style="color:#C8A96E">stripe.com</strong>. Click the <span class="click">Start now</span> button. Enter your email and create a password. Click <span class="click">Create account</span>.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Verify your email</div></div>
+        <div class="step-text">Stripe sends a verification email. Click the link in it. You are taken to the Stripe Dashboard.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Complete your business profile</div></div>
+        <div class="step-text">In the Stripe Dashboard, click <span class="click">Activate your account</span> or go to Settings → Business settings. Fill in your business details:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Business type:</strong> Individual or Company — if you are just starting, Individual works fine<br/>
+          <strong style="color:#C8A96E">Business name:</strong> Your agency name<br/>
+          <strong style="color:#C8A96E">Business website:</strong> Your server URL if you don't have a website yet<br/>
+          <strong style="color:#C8A96E">Business category:</strong> Select "Computer Programming, Data Processing" or "Consulting"<br/>
+          <strong style="color:#C8A96E">Description:</strong> "AI automation services for small businesses"<br/><br/>
+          Fill in your personal details and bank account information to receive payouts. Stripe needs this to verify your identity and deposit money to you.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Get your API keys</div></div>
+        <div class="step-text">In the Stripe Dashboard, click <span class="click">Developers</span> in the top right → click <span class="click">API keys</span>. You see two keys:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Publishable key</strong> — starts with <code style="color:#C8A96E">pk_live_...</code> — used in your frontend (website). Safe to expose publicly.<br/>
+          <strong style="color:#C8A96E">Secret key</strong> — starts with <code style="color:#C8A96E">sk_live_...</code> — used in your server. NEVER expose this publicly.<br/><br/>
+          Copy both. Add the Secret key to your Render environment variables as <code style="color:#C8A96E">STRIPE_SECRET_KEY</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Create Your Retainer Products in Stripe</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to Products in Stripe Dashboard</div></div>
+        <div class="step-text">In the Stripe Dashboard left sidebar, click <span class="click">Product catalog</span>. Click <span class="click">+ Add product</span>.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Create a product for each retainer tier</div></div>
+        <div class="step-text">Create one product per service tier. Here is the setup for a Basic WhatsApp Bot retainer:</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Name:</strong> WhatsApp Bot — Monthly Maintenance<br/>
+          <strong style="color:#C8A96E">Description:</strong> Monthly maintenance and optimization of your AI WhatsApp bot<br/>
+          <strong style="color:#C8A96E">Pricing:</strong> Click "Add a price" → Recurring → Monthly → $200 (or your actual price)<br/>
+          <strong style="color:#C8A96E">Currency:</strong> USD (or your local currency)<br/><br/>
+          Click <span class="click">Save product</span>. Repeat for each tier: $150, $200, $300, $400 monthly retainers.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Copy the Price ID for each product</div></div>
+        <div class="step-text">After saving each product, click on it to open it. Under "Pricing," you see the price listed with a Price ID that starts with <code style="color:#C8A96E">price_</code>. Copy this ID. You will use it when creating subscriptions for clients.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box warn">
+    <div class="info-label">⚠️ Test Mode vs Live Mode</div>
+    <div class="info-text">Stripe has a Test Mode and a Live Mode. In Test Mode, no real money moves. Use Test Mode to set everything up and verify it works. When ready for real clients, toggle to Live Mode (top left of the dashboard). All your products and prices need to be recreated in Live Mode — they do not transfer automatically from Test Mode.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 1</div>
+    <div class="takeaway">Complete your Stripe business profile and bank account before charging any real clients.</div>
+    <div class="takeaway">Secret key goes in Render environment variables only. Never put it in frontend code.</div>
+    <div class="takeaway">Create one product per retainer tier — $150, $200, $300, $400/month. Copy the Price IDs.</div>
+    <div class="takeaway">Always test in Test Mode first. Stripe provides test card numbers: 4242 4242 4242 4242 with any future date and any CVV.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(1)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(2)">Next Lesson →</button>
+  </div>
+</div>
+
+<div class="lesson-content" id="lesson2">
+  <div class="lesson-header">
+    <div class="lesson-tag">Billing · Lesson 2</div>
+    <h2 class="lesson-title">Create Monthly Subscriptions for Clients</h2>
+    <p class="lesson-intro">Once a client agrees to the monthly retainer, you create a Stripe subscription. They enter their card once and Stripe charges them automatically every month. You never have to ask for payment again.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Method 1 — Stripe Payment Link (Simplest)</div>
+    <div class="block-text">The fastest way to collect the first payment and set up recurring billing. Send the client a link — they click, enter their card, done.</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a Payment Link in Stripe</div></div>
+        <div class="step-text">In Stripe Dashboard, click <span class="click">Payment links</span> in the left sidebar. Click <span class="click">+ New payment link</span>.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Configure the payment link</div></div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Product:</strong> Click "Add a product" → select the retainer product you created (e.g., WhatsApp Bot Monthly Maintenance $200)<br/>
+          <strong style="color:#C8A96E">After payment:</strong> Set the confirmation page to show "Your automation service is now active. You will receive an email within 24 hours."<br/>
+          <strong style="color:#C8A96E">Collect customer details:</strong> Enable "Email" — so you know who paid<br/><br/>
+          Click <span class="click">Create link</span>. Copy the URL.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Send to the client</div></div>
+        <div class="step-text">Send the payment link to the client via WhatsApp or email: "To activate your monthly service, please complete the payment here: [link]. Your card will be charged $200 on the same date every month and you can cancel anytime."</div>
+        <div class="step-detail">The client clicks the link, enters their Visa or Mastercard details, and submits. Stripe processes the first payment immediately and then automatically charges the card on the same date every month. No action needed from you.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Method 2 — Stripe Customer Portal (Most Professional)</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Enable the Customer Portal in Stripe</div></div>
+        <div class="step-text">In Stripe Dashboard → Settings → Billing → Customer portal. Toggle it ON. Configure what clients can do: view invoices, update payment method, cancel subscription (you can disable cancellation if you want).</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Create a customer and subscription via Stripe API</div></div>
+        <div class="step-text">When a client agrees to the retainer, create them in Stripe using the API. Add this endpoint to your server.js:</div>
+        <div class="type-this">app.post('/api/billing/create-subscription', auth, async (req, res) => {
+  const { clientEmail, clientName, priceId } = req.body;
+  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  
+  try {
+    // Create customer
+    const customer = await stripe.customers.create({
+      email: clientEmail,
+      name: clientName
+    });
+    
+    // Create a checkout session for them to enter card
+    const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: 'subscription',
+      success_url: 'https://autoflow-backend-p9pc.onrender.com/billing-success.html',
+      cancel_url: 'https://autoflow-backend-p9pc.onrender.com/billing-cancel.html'
+    });
+    
+    res.json({ checkoutUrl: session.url });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Send the checkout URL to the client</div></div>
+        <div class="step-text">Call this endpoint from your app to get the checkout URL. Send it to the client. They go through Stripe's professional checkout flow, enter their card, and the subscription starts immediately.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 2</div>
+    <div class="takeaway">Payment Links are the simplest option — create once, send to client, done in 2 minutes.</div>
+    <div class="takeaway">Always send the payment link immediately after the client agrees on the call — while they are still in the buying mindset.</div>
+    <div class="takeaway">Stripe automatically sends receipts to clients and retries failed payments — you never have to chase.</div>
+    <div class="takeaway">For professional onboarding use Stripe Checkout Sessions — they provide a branded, secure payment experience.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(2)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(3)">Next Lesson →</button>
+  </div>
+</div>
+
+<div class="lesson-content" id="lesson3">
+  <div class="lesson-header">
+    <div class="lesson-tag">Automation · Lesson 3</div>
+    <h2 class="lesson-title">Automate Your Billing Workflows with Stripe Webhooks</h2>
+    <p class="lesson-intro">Connect Stripe webhooks to Make.com to automate every billing event — new subscriptions trigger onboarding, failed payments trigger follow-up emails, cancellations trigger offboarding. Everything automatic.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Set Up Stripe Webhooks</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to Stripe Dashboard → Developers → Webhooks</div></div>
+        <div class="step-text">In the Stripe Dashboard, click <span class="click">Developers</span> in the top right. Click <span class="click">Webhooks</span> in the left menu. Click <span class="click">+ Add endpoint</span>.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Add your server webhook URL</div></div>
+        <div class="step-text">In the "Endpoint URL" field, enter your Render server URL with <code style="color:#C8A96E">/stripe-webhook</code>:</div>
+        <div class="step-detail"><code style="color:#C8A96E">https://autoflow-backend-p9pc.onrender.com/stripe-webhook</code></div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Select events to listen for</div></div>
+        <div class="step-text">Click <span class="click">Select events</span>. Add these events:</div>
+        <div class="step-detail">
+          ✓ <code style="color:#C8A96E">customer.subscription.created</code> — new client subscribed<br/>
+          ✓ <code style="color:#C8A96E">invoice.payment_succeeded</code> — monthly payment collected<br/>
+          ✓ <code style="color:#C8A96E">invoice.payment_failed</code> — payment failed (card expired etc.)<br/>
+          ✓ <code style="color:#C8A96E">customer.subscription.deleted</code> — client cancelled<br/><br/>
+          Click <span class="click">Add endpoint</span>. Copy the <strong style="color:#C8A96E">Signing secret</strong> that appears — add it to Render as <code style="color:#C8A96E">STRIPE_WEBHOOK_SECRET</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Build Make.com Automations for Each Billing Event</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Automation 1 — New Subscription → Welcome Email</div></div>
+        <div class="step-text">When <code style="color:#C8A96E">customer.subscription.created</code> fires, your server receives it and can forward to Make.com. Build a Make.com scenario that: sends the client a welcome email with their access code and next steps, adds them to your Client Tracker sheet, creates a reminder for you to start building their automation.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Automation 2 — Failed Payment → Recovery Email</div></div>
+        <div class="step-text">When <code style="color:#C8A96E">invoice.payment_failed</code> fires, automatically send the client an email asking them to update their payment method. Include a direct link to the Stripe Customer Portal where they can update their card in 30 seconds.</div>
+        <div class="step-detail">The email should be friendly, not alarming: "Hi [Name], just a quick heads up — your payment for this month did not go through (possibly an expired card). Click here to update your payment method: [Stripe Portal Link]. Your service continues normally while you do this."</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Automation 3 — Monthly Payment → Update Revenue Tracker</div></div>
+        <div class="step-text">When <code style="color:#C8A96E">invoice.payment_succeeded</code> fires, automatically update your revenue tracking sheet. This gives you a real-time view of monthly recurring revenue without manually counting payments.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Automation 4 — Cancellation → Offboarding Email</div></div>
+        <div class="step-text">When <code style="color:#C8A96E">customer.subscription.deleted</code> fires, send a professional offboarding email: thank them for working with you, ask for feedback (what made them cancel?), offer to restart at any time, and remind them you are available for one-off projects.</div>
+        <div class="step-detail">Why this matters: 30% of cancellations come back within 6 months if handled professionally. A good offboarding email converts cancellations into future revenue.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">✓ The Complete Billing System</div>
+    <div class="info-text">You now have a fully automated billing operation: client pays → subscription created → welcome email sent → monthly payments collected automatically → failed payments recovered → cancellations handled professionally. You never manually send an invoice or chase a payment again. This is what a real agency operation looks like.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 3</div>
+    <div class="takeaway">Set up Stripe webhooks for all 4 key events: subscription created, payment succeeded, payment failed, subscription cancelled.</div>
+    <div class="takeaway">Failed payment recovery emails recover 40–60% of failed payments — always automate this.</div>
+    <div class="takeaway">Professional cancellation handling converts 30% of cancellations into future revenue.</div>
+    <div class="takeaway">Add STRIPE_WEBHOOK_SECRET to Render environment variables — without it, Stripe webhooks will be rejected by your server.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Set Up Stripe Today</div>
+    <div class="exercise-text">Create your Stripe account today. Create 3 products: $150/month Basic, $250/month Standard, $400/month Premium. Create a Payment Link for each. Test the checkout flow using Stripe's test card number (4242 4242 4242 4242). Send yourself the payment link and go through the checkout. This is exactly what your clients will experience — make sure it feels professional.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="window.location.href='/course-pro.html'">← Back to PRO Course</button>
+  </div>
+</div>
+
+</div>
+<script>
+var completed=JSON.parse(localStorage.getItem('m13_completed')||'[]');
+function updateProgress(){
+  var fill=document.getElementById('progressFill');
+  var label=document.getElementById('progressLabel');
+  fill.style.width=(completed.length/3*100)+'%';
+  label.textContent=completed.length+' / 3 lessons';
+  completed.forEach(function(n){var t=document.getElementById('tab'+n);if(t)t.classList.add('done');});
+}
+function showLesson(n){
+  document.querySelectorAll('.lesson-content').forEach(function(el){el.classList.remove('active')});
+  document.querySelectorAll('.lesson-tab').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('lesson'+n).classList.add('active');
+  document.getElementById('tab'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function completeLesson(n){
+  if(completed.indexOf(n)===-1){completed.push(n);localStorage.setItem('m13_completed',JSON.stringify(completed));}
+  updateProgress();
+  var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
+}
+updateProgress();
+(function(){var h=window.location.hash;if(h&&h.indexOf('lesson')!==-1){var n=parseInt(h.replace('#lesson',''));if(n>=1&&n<=3)showLesson(n);}})();
+</script>
+</body>
+</html>
