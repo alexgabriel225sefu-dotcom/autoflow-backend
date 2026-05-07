@@ -24,10 +24,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'autoflow-secret-2024';
 const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 const anthropic = ANTHROPIC_KEY ? new Anthropic({ apiKey: ANTHROPIC_KEY }) : null;
 
-// ── GMAIL TRANSPORTER ──
-const transporter = GMAIL_USER && GMAIL_PASS ? nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: GMAIL_USER, pass: GMAIL_PASS }
+// ── BREVO SMTP TRANSPORTER ──
+const BREVO_USER = process.env.BREVO_SMTP_USER;
+const BREVO_PASS = process.env.BREVO_SMTP_PASS;
+const transporter = BREVO_USER && BREVO_PASS ? nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false,
+  auth: { user: BREVO_USER, pass: BREVO_PASS }
 }) : null;
 
 // ── IN-MEMORY LOGS ──
@@ -187,7 +191,7 @@ app.get('/api/test', (req, res) => {
     status: 'ok', 
     openai: !!OPENAI_KEY,
     anthropic: !!anthropic,
-    gmail: !!transporter,
+    email: !!transporter,
     supabase: !!supabase
   });
 });
@@ -252,7 +256,7 @@ app.post('/api/email/send', auth, async (req, res) => {
   try {
     if (transporter) {
       await transporter.sendMail({
-        from: `"${fromName || 'AutoFlow Agency'}" <${GMAIL_USER}>`,
+        from: `"${fromName || 'AI Cash Systems'}" <support@aicashsystem.space>`,
         to,
         subject,
         text: body,
@@ -380,7 +384,7 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
       if (transporter && email) {
         const courseUrl = plan === 'pro' ? '/course-pro.html' : '/course-starter.html';
         await transporter.sendMail({
-          from: `"AI Cash Systems" <${GMAIL_USER}>`,
+          from: `"AI Cash Systems" <support@aicashsystem.space>`,
           to: email,
           subject: '🎉 Your AI Cash Systems Access Code',
           html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:32px;background:#0a0a0a;color:#F5F0E8">
