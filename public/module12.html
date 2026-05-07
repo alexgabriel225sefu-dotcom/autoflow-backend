@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Module 12 — AI Proposal Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(200,169,110,.08);backdrop-filter:blur(12px)}
+.logo{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;color:#C8A96E}
+.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:#C8A96E;color:#C8A96E}
+.pro-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(200,169,110,.2),rgba(200,169,110,.08));border:1px solid #C8A96E;border-radius:100px;padding:5px 14px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
+.module-hero{padding:56px 32px 40px;max-width:860px;margin:0 auto}
+.module-num{font-family:"Playfair Display",serif;font-size:80px;font-weight:900;color:rgba(200,169,110,.1);line-height:1;margin-bottom:-20px}
+.module-title{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:16px}
+.module-title em{font-style:italic;color:#C8A96E}
+.module-desc{font-size:15px;color:#C8BEA8;max-width:600px;line-height:1.75}
+.module-meta{display:flex;gap:20px;margin-top:28px;flex-wrap:wrap}
+.meta-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#C8BEA8}
+.meta-dot{width:6px;height:6px;border-radius:50%;background:#C8A96E}
+.progress-wrap{max-width:860px;margin:0 auto 40px;padding:0 32px}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.lessons-nav{max-width:860px;margin:0 auto 32px;padding:0 32px;display:flex;gap:8px;flex-wrap:wrap}
+.lesson-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(200,169,110,.1);background:transparent;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
+.lesson-tab:hover{border-color:rgba(200,169,110,.3);color:#F5F0E8}
+.lesson-tab.active{background:rgba(200,169,110,.15);border-color:#C8A96E;color:#C8A96E;font-weight:600}
+.lesson-tab.done::before{content:"✓ ";color:#C8A96E}
+.lesson-wrap{max-width:860px;margin:0 auto;padding:0 32px 80px}
+.lesson-content{display:none}
+.lesson-content.active{display:block}
+.lesson-header{background:#0f0f0f;border:1px solid rgba(200,169,110,.08);border-radius:14px;padding:32px;margin-bottom:28px}
+.lesson-tag{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:100px;border:1px solid rgba(200,169,110,.18);color:#C8A96E;background:rgba(200,169,110,.1);margin-bottom:14px}
+.lesson-title{font-family:"Playfair Display",serif;font-size:clamp(22px,3vw,32px);font-weight:700;margin-bottom:10px;line-height:1.1}
+.lesson-intro{font-size:14px;color:#C8BEA8;line-height:1.8}
+.block{margin-bottom:36px}
+.block-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:#F5F0E8;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.block-title::before{content:"";width:3px;height:20px;background:#C8A96E;border-radius:2px;flex-shrink:0}
+.block-text{font-size:14px;color:#C8BEA8;line-height:1.85;margin-bottom:14px}
+.steps{display:flex;flex-direction:column;gap:20px;margin:20px 0}
+.step{background:#0f0f0f;border:1px solid rgba(200,169,110,.1);border-radius:12px;padding:24px;border-left:3px solid #C8A96E}
+.step-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#080808;flex-shrink:0}
+.step-title{font-size:15px;font-weight:700;color:#F5F0E8}
+.step-text{font-size:13px;color:#C8BEA8;line-height:1.8;margin-bottom:10px}
+.step-text:last-child{margin-bottom:0}
+.step-detail{background:#161616;border-radius:8px;padding:14px 16px;margin-top:10px;font-size:13px;color:#C8BEA8;line-height:1.75;border-left:2px solid rgba(200,169,110,.3)}
+.click{display:inline-flex;align-items:center;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:5px;padding:2px 10px;font-size:12px;color:#C8A96E;font-weight:600;margin:0 2px}
+.type-this{background:#0a0a0a;border:1px solid rgba(200,169,110,.2);border-radius:8px;padding:16px 18px;font-family:monospace;font-size:12px;color:#F5F0E8;margin:12px 0;line-height:1.85;word-break:break-word;white-space:pre-wrap}
+.info-box{border-radius:10px;padding:20px 24px;margin:20px 0}
+.info-box.gold{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2)}
+.info-box.tip{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15)}
+.info-box.warn{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.15)}
+.info-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.info-box.gold .info-label{color:#C8A96E}
+.info-box.tip .info-label{color:#4ADE80}
+.info-box.warn .info-label{color:#e74c3c}
+.info-text{font-size:13px;color:#C8BEA8;line-height:1.75}
+.takeaways{background:#161616;border:1px solid rgba(200,169,110,.12);border-radius:12px;padding:28px;margin:28px 0}
+.takeaways-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E;margin-bottom:16px}
+.takeaway{display:flex;gap:12px;margin-bottom:12px;font-size:13px;color:#F5F0E8;line-height:1.6}
+.takeaway:last-child{margin-bottom:0}
+.takeaway::before{content:"◆";color:#C8A96E;font-size:8px;margin-top:5px;flex-shrink:0}
+.exercise{background:linear-gradient(135deg,rgba(200,169,110,.08),rgba(200,169,110,.03));border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:28px;margin:28px 0}
+.exercise-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;font-weight:600;margin-bottom:12px}
+.exercise-text{font-size:14px;color:#F5F0E8;line-height:1.75}
+.lesson-actions{display:flex;gap:12px;margin-top:40px;flex-wrap:wrap}
+.btn-complete{padding:13px 28px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-complete:hover{opacity:.9;transform:translateY(-1px)}
+.btn-next{padding:13px 28px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:8px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-next:hover{border-color:#C8A96E;color:#C8A96E}
+@media(max-width:600px){.module-hero,.progress-wrap,.lessons-nav,.lesson-wrap{padding-left:16px;padding-right:16px}.lesson-header{padding:20px}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">AI Cash Systems</div>
+  <a href="/course-pro.html" class="back-btn">← Back to PRO Course</a>
+</nav>
+<div class="module-hero">
+  <div class="pro-badge">⚡ PRO — Module 12 of 14</div>
+  <div class="module-num">12</div>
+  <h1 class="module-title">AI Proposal Generator —<br><em>Close More Deals Faster</em></h1>
+  <p class="module-desc">Build an automated system that generates professional client proposals in 60 seconds using GPT-4o — formatted, branded, and ready to send. Never spend 2 hours writing a proposal again.</p>
+  <div class="module-meta">
+    <div class="meta-item"><div class="meta-dot"></div>3 Lessons</div>
+    <div class="meta-item"><div class="meta-dot"></div>~60 minutes</div>
+    <div class="meta-item"><div class="meta-dot"></div>Agency Operations</div>
+  </div>
+</div>
+<div class="progress-wrap">
+  <div class="progress-label"><span>Module Progress</span><span id="progressLabel">0 / 3 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+<div class="lessons-nav">
+  <button class="lesson-tab active" onclick="showLesson(1)" id="tab1">Lesson 1 — The Proposal System</button>
+  <button class="lesson-tab" onclick="showLesson(2)" id="tab2">Lesson 2 — Build with Make.com</button>
+  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — Send & Track</button>
+</div>
+<div class="lesson-wrap">
+
+<div class="lesson-content active" id="lesson1">
+  <div class="lesson-header">
+    <div class="lesson-tag">Strategy · Lesson 1</div>
+    <h2 class="lesson-title">The Proposal System That Closes More Deals</h2>
+    <p class="lesson-intro">Most freelancers lose deals because their proposals are either too slow (sent days after the call) or too generic (clearly a template with the name changed). This system sends a personalized, professional proposal within 2 hours of every call — automatically.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Why Fast Proposals Win</div>
+    <div class="block-text">Research on B2B sales shows that proposals sent within 2 hours of a discovery call close at 3x the rate of proposals sent 24+ hours later. The client is most excited immediately after the call. A fast, professional proposal capitalizes on that excitement before it fades — and before they talk to a competitor.</div>
+    <div class="block-text">The problem: writing a good proposal manually takes 1–3 hours. By the time most agency owners finish writing it, the momentum is gone. The AI Proposal Generator solves this — you fill in a simple form immediately after the call and the full proposal is ready in 60 seconds.</div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">What the Perfect Proposal Includes</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Executive Summary — their problem in their words</div></div>
+        <div class="step-text">Start with a 2–3 sentence summary of their specific situation. Reference what they told you on the call — the exact pain points they described. This immediately shows you listened and understood. It makes the rest of the proposal feel tailored, not generic.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Proposed Solution — exactly what you will build</div></div>
+        <div class="step-text">Describe the automation system in plain language — not technical jargon. Focus on what it does for their business, not how it works technically. Include: what triggers it, what it does automatically, what the outcome is for their customers.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Expected Results — specific and measurable</div></div>
+        <div class="step-text">Include 3–5 specific expected results. For example: "Every customer inquiry receives a reply within 60 seconds instead of 4–6 hours." "Your team saves approximately 8 hours per week on manual message replies." These concrete numbers justify the price.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Investment — clear pricing with justification</div></div>
+        <div class="step-text">Present the setup fee and monthly retainer clearly. Add one sentence justifying the price: "Most clients recover this investment within the first month through leads that were previously lost to slow response times."</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Next Steps — clear call to action</div></div>
+        <div class="step-text">End with exactly what the client needs to do to proceed. "Reply to this email with 'Yes, let's start' and I will send the invoice for the 50% deposit. We can begin immediately after payment is received."</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box gold">
+    <div class="info-label">✦ The Proposal Mindset</div>
+    <div class="info-text">A proposal is not a document — it is a sales tool. Every sentence should move the client closer to saying yes. The Executive Summary shows you listened. The Solution section shows you can solve their problem. The Results section justifies the price. The Next Steps make it easy to say yes. Write every section with this goal in mind.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 1</div>
+    <div class="takeaway">Proposals sent within 2 hours close at 3x the rate of those sent 24+ hours later.</div>
+    <div class="takeaway">Every proposal section has a sales purpose — listening proof, solution clarity, ROI justification, easy next step.</div>
+    <div class="takeaway">Reference specific things the client said on the call — it makes the proposal feel tailored, not templated.</div>
+    <div class="takeaway">Always include concrete expected results with numbers — hours saved, response time reduced, leads not lost.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(1)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(2)">Next Lesson →</button>
+  </div>
+</div>
+
+<div class="lesson-content" id="lesson2">
+  <div class="lesson-header">
+    <div class="lesson-tag">Build · Lesson 2</div>
+    <h2 class="lesson-title">Build the AI Proposal Generator in Make.com</h2>
+    <p class="lesson-intro">You fill in a Google Form immediately after a sales call with the client's details. Make.com picks it up, sends everything to GPT-4o, and a complete professional proposal is generated and emailed to the client within 60 seconds.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Create the Post-Call Google Form</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a new Google Form called "Post-Call Notes"</div></div>
+        <div class="step-text">Go to <strong style="color:#C8A96E">forms.google.com</strong>. Create a new form. This form is private — only you fill it in, right after every sales call. Name it "Post-Call Notes — Proposal Generator."</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Add these fields to the form</div></div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">Client Name:</strong> Short answer — the business owner's name<br/>
+          <strong style="color:#C8A96E">Business Name:</strong> Short answer — the company name<br/>
+          <strong style="color:#C8A96E">Client Email:</strong> Short answer with email validation<br/>
+          <strong style="color:#C8A96E">Industry:</strong> Dropdown — Restaurant, Real Estate, Beauty, Clinic, E-commerce, Other<br/>
+          <strong style="color:#C8A96E">Automation Type:</strong> Dropdown — WhatsApp Bot, Instagram DM, Lead Follow-Up, Voice Agent, Full Package<br/>
+          <strong style="color:#C8A96E">Main Pain Point (their words):</strong> Paragraph — write exactly what they said their problem is<br/>
+          <strong style="color:#C8A96E">Setup Price:</strong> Short answer — e.g. $800<br/>
+          <strong style="color:#C8A96E">Monthly Retainer:</strong> Short answer — e.g. $250<br/>
+          <strong style="color:#C8A96E">Notes from the call:</strong> Paragraph — anything specific they mentioned, objections, timeline preferences
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Link the form to Google Sheets</div></div>
+        <div class="step-text">Click the Responses tab → click the green Sheets icon → click Create. A Google Sheet is created automatically. This is what Make.com will watch.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Build the Make.com Scenario</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a new Scenario with Google Sheets trigger</div></div>
+        <div class="step-text">In Make.com, create a new Scenario. Add Google Sheets → Watch New Rows. Connect to your Post-Call Notes spreadsheet. Set Limit to 1. Click OK.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Add OpenAI to generate the full proposal</div></div>
+        <div class="step-text">Add OpenAI → Create a Chat Completion. Model: gpt-4o. In the Message content field paste this prompt, inserting variables from Google Sheets:</div>
+        <div class="type-this">Write a professional AI automation agency proposal email for this client.
+
+Client Information:
+- Client Name: {{1.Client_Name}}
+- Business: {{1.Business_Name}}
+- Industry: {{1.Industry}}
+- Automation needed: {{1.Automation_Type}}
+- Their main problem: {{1.Main_Pain_Point}}
+- Setup investment: {{1.Setup_Price}}
+- Monthly retainer: {{1.Monthly_Retainer}}
+- Call notes: {{1.Notes_from_the_call}}
+
+Write a complete proposal email with these sections:
+1. Subject line (write "SUBJECT:" before it)
+2. Greeting
+3. Executive Summary (2 sentences referencing their specific situation)
+4. Proposed Solution (what you will build, in plain language, 3-4 sentences)
+5. Expected Results (3 specific bullet points with numbers)
+6. Investment section (setup fee and monthly retainer with one justification sentence)
+7. Clear Next Steps
+8. Professional closing
+
+Tone: professional, confident, warm. NOT corporate or robotic.
+Length: 300-400 words total.
+Do NOT use placeholders like [Company Name] — use the real information provided.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Parse the subject line from the GPT output</div></div>
+        <div class="step-text">Add a Text Parser module. This separates the subject line from the email body. In Make.com, search for <strong style="color:#C8A96E">Text Parser</strong> → select <strong style="color:#C8A96E">Match Pattern</strong>.</div>
+        <div class="step-detail">
+          Pattern: <code style="color:#C8A96E">SUBJECT: (.+)\n</code><br/>
+          Text: the OpenAI output variable<br/><br/>
+          This extracts everything after "SUBJECT: " on the first line as your email subject. The rest of the GPT output becomes the email body.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Send the proposal via Gmail</div></div>
+        <div class="step-text">Add Gmail → Send an Email.</div>
+        <div class="step-detail">
+          <strong style="color:#C8A96E">To:</strong> variable from Google Sheets → Client Email<br/>
+          <strong style="color:#C8A96E">Subject:</strong> the parsed subject line from Text Parser<br/>
+          <strong style="color:#C8A96E">Content:</strong> OpenAI output variable (full proposal text)<br/><br/>
+          Click OK. Turn on Scheduling. Save the Scenario.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Test the complete flow</div></div>
+        <div class="step-text">Fill in the Post-Call Notes form with test data — use your own email as the client email. Click Run once in Make.com. Check your inbox — the proposal email should arrive within 30 seconds. Read it and verify it sounds professional and personalized.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">✓ Result</div>
+    <div class="info-text">After every sales call, you spend 3 minutes filling in the form on your phone. Within 60 seconds the client receives a professional, personalized proposal in their inbox. You are the most responsive, professional agency they have ever encountered — and you did it in 3 minutes total work.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 2</div>
+    <div class="takeaway">Fill in the Post-Call form immediately after the call — while the details are fresh. Never delay more than 10 minutes.</div>
+    <div class="takeaway">The more detail you put in "Main Pain Point" and "Notes from the call" fields, the better the proposal GPT generates.</div>
+    <div class="takeaway">The Text Parser extracts the subject line — this is critical for the email to have the right subject, not the full proposal as subject.</div>
+    <div class="takeaway">Test with your own email first before it ever goes to a real client.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(2)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="showLesson(3)">Next Lesson →</button>
+  </div>
+</div>
+
+<div class="lesson-content" id="lesson3">
+  <div class="lesson-header">
+    <div class="lesson-tag">Sales · Lesson 3</div>
+    <h2 class="lesson-title">Track Proposals and Follow Up Automatically</h2>
+    <p class="lesson-intro">Sending the proposal is only half the battle. Most deals are won on the follow-up. This lesson adds automatic follow-up emails 3 days and 7 days after the proposal — without you remembering to do anything.</p>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 1 — Add Proposal Tracking to Your CRM Sheet</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Add a "Proposals" tab to your Google Sheets CRM</div></div>
+        <div class="step-text">Open your main CRM Google Sheet from Module 8. At the bottom, click the <span class="click">+</span> to add a new tab. Name it "Proposals." Set up these columns:</div>
+        <div class="step-detail">
+          Column A: Timestamp (when proposal was sent)<br/>
+          Column B: Client Name<br/>
+          Column C: Client Email<br/>
+          Column D: Business Name<br/>
+          Column E: Proposal Amount (setup price)<br/>
+          Column F: Status — New/Followed Up/Won/Lost<br/>
+          Column G: Follow Up 1 Sent (date)<br/>
+          Column H: Follow Up 2 Sent (date)<br/>
+          Column I: Notes
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Update the proposal scenario to log each proposal</div></div>
+        <div class="step-text">In your Make.com proposal scenario, after the Gmail module, add Google Sheets → Add a Row. Connect to the Proposals tab. Map: Timestamp = now, Client Name, Client Email, Business Name, Setup Price from the form fields. Status = "New". Click OK.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 2 — Automatic Follow-Up at Day 3</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a new Make.com Scenario for follow-ups</div></div>
+        <div class="step-text">Create a new Scenario. Set the trigger to Schedule → Every Day at 9:00 AM.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Search for proposals that need follow-up</div></div>
+        <div class="step-text">Add Google Sheets → Search Rows. Connect to the Proposals tab. Add filters:</div>
+        <div class="step-detail">
+          Filter 1: Column F (Status) = "New"<br/>
+          Filter 2: Column A (Timestamp) is between 3 and 4 days ago<br/><br/>
+          This finds all proposals sent 3 days ago that have not been responded to yet.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Generate and send the follow-up email</div></div>
+        <div class="step-text">Add OpenAI → Create a Chat Completion. Prompt:</div>
+        <div class="type-this">Write a short, friendly follow-up email for a proposal sent 3 days ago.
+
+Client name: {{client_name}}
+Business: {{business_name}}
+What they were interested in: {{automation_type}}
+Proposal amount: {{amount}}
+
+The email should:
+- Be maximum 80 words
+- Reference the proposal sent a few days ago
+- Create gentle urgency (limited availability this month)
+- End with a simple yes/no question
+- Sound like a real person, not a sales robot</div>
+        <div class="step-detail">After OpenAI, add Gmail → Send an Email to the client email. Subject: "Re: Your automation proposal — [Business Name]". Content: OpenAI output.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Mark the row as "Followed Up"</div></div>
+        <div class="step-text">After sending the email, add Google Sheets → Update a Row. Set Column F (Status) to "Followed Up" and Column G (Follow Up 1 Sent) to today's date. This prevents the same client from getting another Day 3 follow-up tomorrow.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Step 3 — Day 7 Final Follow-Up</div>
+    <div class="block-text">Create an identical scenario but filter for Status = "Followed Up" AND Timestamp between 7 and 8 days ago. The Day 7 email is shorter and more direct — either they are interested or they are not, and you want to find out.</div>
+    <div class="type-this">Write a final 50-word follow-up email for a proposal sent 7 days ago with no response.
+
+Client: {{client_name}}
+
+The email should ask directly if they are still interested or if timing is not right. No pressure. Sound genuine and human. If they say no, offer to reconnect in 3 months.</div>
+  </div>
+
+  <div class="info-box gold">
+    <div class="info-label">✦ The Revenue Impact</div>
+    <div class="info-text">Most agency owners follow up on 30% of proposals — they forget or feel awkward. With this system, 100% of proposals get followed up automatically, on time, every time. Industry data shows that 50% of sales happen after the 5th follow-up. Most people stop after 1. This automated follow-up system alone can double your closing rate.</div>
+  </div>
+
+  <div class="takeaways">
+    <div class="takeaways-title">Key Takeaways — Lesson 3</div>
+    <div class="takeaway">Automated follow-ups run 100% consistently — unlike manual follow-ups which get forgotten.</div>
+    <div class="takeaway">Always update the Status column after each follow-up — prevents duplicate emails.</div>
+    <div class="takeaway">Day 3 follow-up: create urgency. Day 7 follow-up: ask directly if they are still interested.</div>
+    <div class="takeaway">The complete proposal system (generate + send + follow up × 2) takes 3 minutes of your time per client — everything else is automated.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">✦ Action — Build and Test Today</div>
+    <div class="exercise-text">Build the Post-Call form and the Make.com proposal generation scenario today. After your next sales call — even if it does not go well — fill in the form with the client's details and let the system generate the proposal. Read it. Is it professional? Does it reference their specific situation? Adjust the prompt if needed until you are proud to send every proposal it generates.</div>
+  </div>
+
+  <div class="lesson-actions">
+    <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
+    <button class="btn-next" onclick="window.location.href='/course-pro.html'">← Back to PRO Course</button>
+  </div>
+</div>
+
+</div>
+<script>
+var completed=JSON.parse(localStorage.getItem('m12_completed')||'[]');
+function updateProgress(){
+  var fill=document.getElementById('progressFill');
+  var label=document.getElementById('progressLabel');
+  fill.style.width=(completed.length/3*100)+'%';
+  label.textContent=completed.length+' / 3 lessons';
+  completed.forEach(function(n){var t=document.getElementById('tab'+n);if(t)t.classList.add('done');});
+}
+function showLesson(n){
+  document.querySelectorAll('.lesson-content').forEach(function(el){el.classList.remove('active')});
+  document.querySelectorAll('.lesson-tab').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('lesson'+n).classList.add('active');
+  document.getElementById('tab'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function completeLesson(n){
+  if(completed.indexOf(n)===-1){completed.push(n);localStorage.setItem('m12_completed',JSON.stringify(completed));}
+  updateProgress();
+  var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
+}
+updateProgress();
+(function(){var h=window.location.hash;if(h&&h.indexOf('lesson')!==-1){var n=parseInt(h.replace('#lesson',''));if(n>=1&&n<=3)showLesson(n);}})();
+</script>
+</body>
+</html>
