@@ -408,9 +408,9 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
   }
 });
 
-// Root redirect
+// Root redirect — cinematic intro first
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'intro-epic.html'));
 });
 
 // ════════════════════════════════════════
