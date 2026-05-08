@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // ── ENV VARIABLES ──
 const SUPABASE_URL = process.env.SUPABASE_URL;
