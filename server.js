@@ -187,13 +187,17 @@ app.post('/api/ai/generate', auth, async (req, res) => {
 
 // GET /api/test — public test endpoint
 app.get('/api/test', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     openai: !!OPENAI_KEY,
     anthropic: !!anthropic,
     email: !!transporter,
     supabase: !!supabase
   });
+});
+
+app.get('/ping', (req, res) => {
+  res.json({ ok: true, version: 'v2-videos', time: new Date().toISOString() });
 });
 
 // POST /api/ai/chat — multi-turn conversation
