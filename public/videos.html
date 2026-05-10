@@ -6,39 +6,95 @@
 <title>TikTok Videos — AI Cash Systems</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#080808;color:#F5F0E8;font-family:sans-serif;padding:40px 24px}
-h1{font-size:22px;color:#C8A96E;margin-bottom:8px}
-p{font-size:13px;color:#C8BEA8;margin-bottom:36px}
-.grid{display:flex;gap:24px;flex-wrap:wrap;justify-content:center}
-.card{background:#111;border:1px solid rgba(200,169,110,.15);border-radius:16px;padding:20px;width:340px;text-align:center}
-.card h2{font-size:14px;color:#C8A96E;margin-bottom:4px}
-.card p{font-size:12px;color:#888;margin-bottom:14px}
-video{width:100%;border-radius:10px;max-height:600px;background:#000}
-.dl{display:inline-block;margin-top:12px;padding:10px 24px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border-radius:8px;color:#080808;font-size:12px;font-weight:700;text-decoration:none;letter-spacing:1px;text-transform:uppercase}
+body{background:#080808;color:#F5F0E8;font-family:sans-serif;padding:32px 20px}
+h1{font-size:20px;color:#C8A96E;margin-bottom:6px;text-align:center}
+.sub{font-size:12px;color:#C8BEA8;text-align:center;margin-bottom:8px}
+.hint{font-size:11px;color:#7A7060;text-align:center;margin-bottom:32px;background:#111;border:1px solid rgba(200,169,110,.1);border-radius:8px;padding:10px;max-width:600px;margin-left:auto;margin-right:auto}
+.grid{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+.player-wrap{text-align:center}
+.player-wrap h2{font-size:13px;color:#C8A96E;margin-bottom:4px}
+.player-wrap p{font-size:11px;color:#666;margin-bottom:10px}
+.player{position:relative;width:270px;height:480px;background:#080808;border-radius:16px;overflow:hidden;border:1px solid rgba(200,169,110,.2);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.accent-line{position:absolute;top:0;left:50%;transform:translateX(-50%);width:60px;height:2px;background:#C8A96E}
+.logo{position:absolute;top:16px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:2px;color:#C8A96E;white-space:nowrap}
+.beat-text{font-size:22px;font-weight:700;color:#F5F0E8;text-align:center;padding:0 20px;line-height:1.35;opacity:0;transition:opacity .4s ease}
+.beat-text.gold{color:#C8A96E}
+.beat-text.visible{opacity:1}
+.cta-bar{position:absolute;bottom:0;left:0;right:0;background:#0a0a06;padding:10px;text-align:center}
+.site{font-size:11px;color:#C8A96E;letter-spacing:.5px}
+.price{font-size:9px;color:#7A7060;margin-top:2px}
+.play-overlay{position:absolute;inset:0;background:rgba(8,8,8,.7);display:flex;align-items:center;justify-content:center;font-size:48px;transition:opacity .2s}
+.player.playing .play-overlay{opacity:0;pointer-events:none}
+.progress{position:absolute;bottom:56px;left:12px;right:12px;height:2px;background:rgba(200,169,110,.15);border-radius:2px}
+.progress-fill{height:100%;background:#C8A96E;border-radius:2px;width:0%}
+.rec-btn{display:inline-block;margin-top:10px;padding:8px 20px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border-radius:8px;color:#080808;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border:none;cursor:pointer}
 </style>
 </head>
 <body>
 <h1>TikTok Videos — AI Cash Systems</h1>
-<p>Branded 9:16 vertical videos, dark/gold. Descarcă și adaugă audio în CapCut.</p>
-<div class="grid">
-  <div class="card">
-    <h2>Video 1 — "$300 selling AI bots"</h2>
-    <p>20s · Hook puternic · CTA direct</p>
-    <video controls playsinline><source src="/videos/aicash_v1.mp4" type="video/mp4"/></video>
-    <a class="dl" href="/videos/aicash_v1.mp4" download>⬇ Download V1</a>
+<p class="sub">Click pe video pentru a-l reda · 9:16 · Dark/Gold branding</p>
+<div class="hint">💡 <strong>Cum faci screen record:</strong> Windows: Win+G → Record · Mac: Cmd+Shift+5 · Telefon: butonul de screen record din meniu rapid</div>
+<div class="grid" id="grid"></div>
+<script>
+const VIDEOS=[
+  {title:'Video 1 — "$300 selling AI bots"',desc:'20s · Hook direct · CTA',beats:[
+    {text:"I made $300 selling AI bots.\nI don't even know how to code.",dur:4500,gold:true},
+    {text:"I found a course called\nAI Cash Systems.",dur:3500,gold:false},
+    {text:"2 hours to build a bot\na business paid $400 for.",dur:4000,gold:false},
+    {text:"The course is $37.\nI made that back in week one.",dur:4000,gold:false},
+    {text:"Link in bio if you actually\nwant to learn this.",dur:3500,gold:true}
+  ]},
+  {title:'Video 2 — "One skill changes everything"',desc:'22s · Empatie · Motivational',beats:[
+    {text:"Nobody talks about how exhausting it is\nto work hard and still not have enough.",dur:5000,gold:false},
+    {text:"I started asking\na different question.",dur:3000,gold:true},
+    {text:"Not 'how do I work harder' —\nbut 'what skill pays me differently?'",dur:4500,gold:false},
+    {text:"AI automation was my answer.\nFirst client in 30 days.",dur:4000,gold:true},
+    {text:"You don't need to quit tomorrow.\nYou need one skill that gives you options.",dur:5000,gold:false}
+  ]},
+  {title:'Video 3 — "Businesses lose thousands"',desc:'20s · Problem/Solution · Urgency',beats:[
+    {text:"Businesses are losing thousands every month\nto problems a $37 course can fix.",dur:5000,gold:true},
+    {text:"They need someone to build\nWhatsApp bots, DM bots,\nlead follow-up systems.",dur:5000,gold:false},
+    {text:"You learn it once.\nThey pay you every month.",dur:3500,gold:true},
+    {text:"AI Cash Systems — $37 Starter.\nFirst client in 30 days.",dur:3500,gold:false},
+    {text:"Link in bio.",dur:2500,gold:true}
+  ]}
+];
+const grid=document.getElementById('grid');
+VIDEOS.forEach((v,i)=>{
+  const w=document.createElement('div');
+  w.className='player-wrap';
+  w.innerHTML=`<h2>${v.title}</h2><p>${v.desc}</p>
+  <div class="player" id="p${i}">
+    <div class="accent-line"></div>
+    <div class="logo">AI CASH SYSTEMS</div>
+    <div class="beat-text" id="bt${i}"></div>
+    <div class="progress"><div class="progress-fill" id="pf${i}"></div></div>
+    <div class="cta-bar"><div class="site">aicashsystem.space</div><div class="price">Starter $37 · PRO $97 · No coding required</div></div>
+    <div class="play-overlay">▶</div>
   </div>
-  <div class="card">
-    <h2>Video 2 — "One skill changes everything"</h2>
-    <p>22s · Empatie · Motivational</p>
-    <video controls playsinline><source src="/videos/aicash_v2.mp4" type="video/mp4"/></video>
-    <a class="dl" href="/videos/aicash_v2.mp4" download>⬇ Download V2</a>
-  </div>
-  <div class="card">
-    <h2>Video 3 — "Businesses lose thousands"</h2>
-    <p>20s · Problem/Solution · Urgency</p>
-    <video controls playsinline><source src="/videos/aicash_v3.mp4" type="video/mp4"/></video>
-    <a class="dl" href="/videos/aicash_v3.mp4" download>⬇ Download V3</a>
-  </div>
-</div>
+  <br><button class="rec-btn" onclick="toggle(${i})">▶ Play / Pause</button>`;
+  grid.appendChild(w);
+  document.getElementById('p'+i).addEventListener('click',()=>toggle(i));
+});
+const S=VIDEOS.map(()=>({on:false,t:null,b:0}));
+function toggle(i){S[i].on?pause(i):play(i)}
+function play(i){S[i].on=true;document.getElementById('p'+i).classList.add('playing');runBeat(i)}
+function pause(i){S[i].on=false;clearTimeout(S[i].t);document.getElementById('p'+i).classList.remove('playing')}
+function runBeat(i){
+  const s=S[i],v=VIDEOS[i];
+  if(s.b>=v.beats.length){pause(i);s.b=0;document.getElementById('bt'+i).className='beat-text';document.getElementById('pf'+i).style.cssText='width:0%;transition:none';return}
+  const beat=v.beats[s.b];
+  const bt=document.getElementById('bt'+i);
+  bt.className='beat-text'+(beat.gold?' gold':'');
+  bt.innerHTML=beat.text.replace(/\n/g,'<br>');
+  requestAnimationFrame(()=>bt.classList.add('visible'));
+  const tot=v.beats.reduce((a,b)=>a+b.dur,0);
+  const el=v.beats.slice(0,s.b).reduce((a,b)=>a+b.dur,0);
+  const pf=document.getElementById('pf'+i);
+  pf.style.cssText=`width:${el/tot*100}%;transition:none`;
+  requestAnimationFrame(()=>{pf.style.cssText=`width:${(el+beat.dur)/tot*100}%;transition:width ${beat.dur}ms linear`});
+  s.t=setTimeout(()=>{bt.classList.remove('visible');setTimeout(()=>{s.b++;if(s.on)runBeat(i)},350)},beat.dur-350);
+}
+</script>
 </body>
 </html>
