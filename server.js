@@ -157,6 +157,10 @@ app.get('/api/test', (req, res) => {
   res.json({ status: 'ok', openai: !!OPENAI_KEY, anthropic: !!anthropic, email: !!transporter, supabase: !!supabase });
 });
 
+app.get('/ping', (req, res) => {
+  res.json({ ok: true, version: 'v2-videos', time: new Date().toISOString() });
+});
+
 app.post('/api/ai/chat', auth, async (req, res) => {
   const { messages } = req.body;
   if (!messages || !messages.length) return res.status(400).json({ error: 'Messages required' });
