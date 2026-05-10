@@ -413,6 +413,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'intro-epic.html'));
 });
 
+// Explicit HTML page routes
+app.get('/videos.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'videos.html'));
+});
+app.get('/index.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // ════════════════════════════════════════
 // START SERVER
 // ════════════════════════════════════════
