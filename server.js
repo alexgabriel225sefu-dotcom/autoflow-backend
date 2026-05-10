@@ -293,7 +293,6 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
         await supabase.from('purchases').insert([{ email, code, plan, amount: pi.amount, created_at: new Date().toISOString() }]);
       }
       if (transporter && email) {
-        const courseUrl = plan === 'pro' ? '/course-pro.html' : '/course-starter.html';
         await transporter.sendMail({
           from: '"AI Cash Systems" <support@aicashsystem.space>',
           to: email,
@@ -327,6 +326,10 @@ app.get('/', (req, res) => {
 });
 
 app.get('/videos.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'videos.html'));
+});
+
+app.get('/tiktok', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'videos.html'));
 });
 
