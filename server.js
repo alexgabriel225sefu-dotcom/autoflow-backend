@@ -421,6 +421,9 @@ app.get('/', (req, res) => {
 app.get('/videos.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'videos.html'));
 });
+app.get('/tiktok', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'videos.html'));
+});
 app.get('/index.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
