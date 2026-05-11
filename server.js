@@ -486,6 +486,12 @@ app.get('/tiktok', (req, res) => {
 app.get('/index.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+app.get('/blueprints.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'blueprints.html'));
+});
+app.get('/blueprints', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'blueprints.html'));
+});
 
 // ════════════════════════════════════════
 // START SERVER
