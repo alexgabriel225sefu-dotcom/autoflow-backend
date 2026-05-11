@@ -412,6 +412,65 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
   }
 });
 
+// ════════════════════════════════════════
+// VIDEO DOWNLOAD ROUTES (Veo 3 generated)
+// ════════════════════════════════════════
+
+const VEO_FILES = {
+  v1: 'okco5vw2ygdo',
+  v2: 'kb3wyz27b6rg',
+  v3: 'wish204mx53o',
+  v4: 'mo5kg30u0q2x',
+  v5: 'wehowxf92z6t',
+  v6: 'ki993zeg87pw',
+  v7: 'hcu69oshg8qf',
+};
+
+app.get('/download/:id', async (req, res) => {
+  const fileId = VEO_FILES[req.params.id];
+  if (!fileId) return res.status(404).json({ error: 'Video not found' });
+  const apiKey = process.env.GOOGLE_AI_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/files/${fileId}:download?alt=media&key=${apiKey}`;
+    const response = await fetch(url);
+    if (!response.ok) return res.status(502).json({ error: 'Video expired or unavailable' });
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Disposition', `attachment; filename="aicash_ugc_${req.params.id}.mp4"`);
+    const { Readable } = require('stream');
+    Readable.fromWeb(response.body).pipe(res);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/descarcare', (req, res) => {
+  const videos = [
+    { id: 'v1', title: '"I Made $300 Selling AI Bots"', desc: 'Hook direct · 8s' },
+    { id: 'v2', title: '"One Skill Changes Everything"', desc: 'Empatie · 8s' },
+    { id: 'v3', title: '"I Failed First"', desc: 'Vulnerabil · 8s' },
+    { id: 'v4', title: '"Nobody Teaches You This"', desc: 'Educational · 8s' },
+    { id: 'v5', title: '"What Would You Do?"', desc: 'Aspirational · 8s' },
+    { id: 'v6', title: '"2025 Reality Check"', desc: 'Urgenta · 8s' },
+    { id: 'v7', title: '"To the Version of Me"', desc: 'Emotional · 8s' },
+  ];
+  const cards = videos.map(v => `
+    <div style="background:#111;border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:20px;display:flex;align-items:center;justify-content:space-between;gap:16px">
+      <div>
+        <div style="color:#C8A96E;font-weight:700;font-size:15px">${v.title}</div>
+        <div style="color:#666;font-size:12px;margin-top:4px">${v.desc} · Veo 3 · 9:16</div>
+      </div>
+      <a href="/download/${v.id}" style="background:linear-gradient(135deg,#8A6A2E,#E8CB8A);color:#000;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700;font-size:12px;white-space:nowrap">⬇ Download</a>
+    </div>`).join('');
+  res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Download Videoclipuri TikTok</title></head>
+  <body style="background:#080808;color:#F5F0E8;font-family:sans-serif;padding:24px 16px;max-width:600px;margin:0 auto">
+    <h1 style="color:#C8A96E;text-align:center;font-size:20px;margin-bottom:4px">Videoclipuri TikTok</h1>
+    <p style="text-align:center;color:#666;font-size:12px;margin-bottom:24px">Generate cu Veo 3 · Descarca pe telefon</p>
+    <div style="display:flex;flex-direction:column;gap:12px">${cards}</div>
+    <p style="text-align:center;color:#444;font-size:11px;margin-top:24px">Disponibile 48 ore · aicashsystem.space</p>
+  </body></html>`);
+});
+
 // Root redirect — cinematic intro first
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'intro-epic.html'));
