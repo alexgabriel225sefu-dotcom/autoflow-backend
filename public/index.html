@@ -117,7 +117,12 @@ footer{background:#080808;border-top:1px solid rgba(200,169,110,.08);padding:28p
 .fw-check{color:#C8A96E;font-size:18px;font-weight:700;flex-shrink:0;margin-top:1px}
 .fw-item strong{color:#F5F0E8;display:block;margin-bottom:4px;font-size:14px}
 .fw-item div{font-size:12px;color:#C8BEA8;line-height:1.65}
-.urgency-bar{background:linear-gradient(135deg,rgba(138,106,46,.25),rgba(232,203,138,.12));border:1px solid rgba(200,169,110,.22);border-radius:8px;padding:10px 18px;font-size:12px;color:#E8CB8A;letter-spacing:.5px;text-align:center;margin-bottom:32px}
+.urgent-bar{background:linear-gradient(135deg,#1a1200,#2a1e00);border-bottom:1px solid rgba(200,169,110,.2);padding:10px 16px;text-align:center;position:relative;z-index:99;margin-top:65px}
+.urgent-bar-inner{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+.urgent-tag{background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E}
+.urgent-text{font-size:13px;color:#F5F0E8}
+.urgent-text strong{color:#C8A96E}
+#countdown{font-family:monospace;font-size:15px;font-weight:700;color:#E8CB8A;letter-spacing:2px;background:rgba(200,169,110,.08);padding:3px 10px;border-radius:4px}
 .testi-s{background:#080808;padding:80px 24px;border-top:1px solid rgba(200,169,110,.06)}
 .tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
 .tcard{background:#111;border:1px solid rgba(200,169,110,.1);border-radius:14px;padding:28px;display:flex;flex-direction:column;gap:20px;transition:border-color .2s}
@@ -134,6 +139,15 @@ footer{background:#080808;border-top:1px solid rgba(200,169,110,.08);padding:28p
 </head>
 <body>
 <nav><div class="logo">AI Cash Systems</div><a href="#pricing" class="nav-cta">Get Started</a></nav>
+
+<div class="urgent-bar">
+  <div class="urgent-bar-inner">
+    <div class="urgent-tag">⚡ Launch Price</div>
+    <div class="urgent-text">Price increases to <strong>$67 / $147</strong> in</div>
+    <div id="countdown">00:00:00</div>
+    <div class="urgent-text">— <strong>lock in your spot now</strong></div>
+  </div>
+</div>
 
 <section class="hero">
 <div class="hero-tag">AI Automation · Real Skills · Real Income</div>
@@ -165,7 +179,6 @@ footer{background:#080808;border-top:1px solid rgba(200,169,110,.08);padding:28p
 
 <section class="pricing" id="pricing">
 <div class="si">
-<div class="urgency-bar" id="urgency-bar">⚡ 72-Hour Intro Offer — <del style="opacity:.6">$67</del> → <strong>$37</strong> &nbsp;&amp;&nbsp; <del style="opacity:.6">$147</del> → <strong>$97</strong> &nbsp;·&nbsp; Price goes up in: <span id="countdown" style="font-weight:700;font-size:14px;color:#F5F0E8;letter-spacing:1px">--:--:--</span></div>
 <div class="stag">Choose Your Path</div>
 <h2 class="sh">Two programs.<br><em>One mission.</em></h2>
 <div class="pgrid">
@@ -311,7 +324,7 @@ var PRODUCTS={starter:{name:"AI Automation Foundations",price:"$37",amount:3700,
 var stripe,cardEl,curProd;
 function initStripe(){stripe=Stripe(STRIPE_KEY);var el=stripe.elements({appearance:{theme:"night",variables:{colorPrimary:"#C8A96E",colorBackground:"#161616",colorText:"#F5F0E8",borderRadius:"7px"}}});cardEl=el.create("card",{style:{base:{color:"#F5F0E8",fontFamily:"Syne,sans-serif",fontSize:"13px"}},hidePostalCode:true});cardEl.mount("#card-element");cardEl.on("change",function(e){document.getElementById("card-errors").textContent=e.error?e.error.message:""})}
 function openModal(p){curProd=p;var pr=PRODUCTS[p];document.getElementById("modalBadge").textContent=pr.title;document.getElementById("modalTitle").textContent=pr.name;document.getElementById("modalPrice").textContent=pr.price;document.getElementById("btnText").textContent="Pay "+pr.price+" Now";document.getElementById("formView").style.display="block";document.getElementById("successView").style.display="none";document.getElementById("payModal").classList.add("open");document.body.style.overflow="hidden";if(!stripe)initStripe()}
-(function(){var k='aics_end',n=Date.now(),e=localStorage.getItem(k);if(!e||+e<n){e=n+72*60*60*1000;localStorage.setItem(k,e);}function t(){var r=+localStorage.getItem(k)-Date.now(),el=document.getElementById('countdown');if(!el)return;if(r<=0){el.textContent='00:00:00';return;}var h=Math.floor(r/3600000),m=Math.floor(r%3600000/60000),s=Math.floor(r%60000/1000);el.textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');setTimeout(t,1000);}t();}());
+(function(){var key='acs_deadline';var deadline=localStorage.getItem(key);if(!deadline){deadline=Date.now()+72*60*60*1000;localStorage.setItem(key,deadline);}deadline=parseInt(deadline);function update(){var diff=deadline-Date.now();if(diff<=0){document.getElementById('countdown').textContent='00:00:00';return;}var h=Math.floor(diff/3600000);var m=Math.floor((diff%3600000)/60000);var s=Math.floor((diff%60000)/1000);document.getElementById('countdown').textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}update();setInterval(update,1000);})();
 document.getElementById("paymentForm").addEventListener("submit",async function(e){e.preventDefault();
 var check=document.getElementById("termsCheck");
 if(!check.checked){document.getElementById("card-errors").textContent="Please accept the Terms of Service to continue.";return;}
