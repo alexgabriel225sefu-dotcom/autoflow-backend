@@ -13,18 +13,19 @@ body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hid
 nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:20px 32px;background:rgba(8,8,8,.95);backdrop-filter:blur(16px);border-bottom:1px solid rgba(200,169,110,.08)}
 .logo{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E}
 .nav-cta{padding:10px 22px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:6px;color:#080808;font-family:Syne,sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;text-decoration:none;display:inline-block}
-.urgent-bar{background:linear-gradient(135deg,#1a1200,#2a1e00);border-bottom:1px solid rgba(200,169,110,.2);padding:10px 16px;text-align:center;position:relative;z-index:99;margin-top:65px}
-.urgent-bar-inner{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
-.urgent-tag{background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.3);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#C8A96E}
-.urgent-text{font-size:13px;color:#F5F0E8}
-.urgent-text strong{color:#C8A96E}
-#countdown{font-family:monospace;font-size:15px;font-weight:700;color:#E8CB8A;letter-spacing:2px;background:rgba(200,169,110,.08);padding:3px 10px;border-radius:4px}
+.urgent-bar{background:linear-gradient(135deg,#130e00,#1e1600);border-bottom:1px solid rgba(200,169,110,.18);padding:16px 24px;text-align:center;position:relative;z-index:99;margin-top:65px}
+.urgent-top{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;margin-bottom:12px}
+.urgent-top strong{color:#E8CB8A}
+.cd-wrap{display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.cd-unit{display:flex;flex-direction:column;align-items:center;gap:4px}
+.cd-digit{font-family:"Playfair Display",serif;font-size:36px;font-weight:900;color:#E8CB8A;background:rgba(200,169,110,.1);border:1px solid rgba(200,169,110,.25);border-radius:8px;width:64px;height:56px;display:flex;align-items:center;justify-content:center;letter-spacing:1px;line-height:1}
+.cd-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#7A6840}
+.cd-sep{font-family:"Playfair Display",serif;font-size:28px;font-weight:900;color:rgba(200,169,110,.35);margin-bottom:18px;line-height:1}
 .hero{min-height:92vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 24px 60px;background:radial-gradient(ellipse 70% 60% at 50% 0%,rgba(200,169,110,.07) 0%,transparent 70%)}
 .hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.18);border-radius:100px;padding:6px 18px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;margin-bottom:28px}
 .hero h1{font-family:"Playfair Display",serif;font-size:clamp(36px,6vw,72px);font-weight:900;line-height:1.05;margin-bottom:22px;max-width:860px}
 .hero h1 em{font-style:italic;color:#C8A96E}
 .hero-sub{font-size:17px;color:rgba(245,240,232,.7);max-width:560px;line-height:1.75;margin:0 auto 14px}
-.hero-math{font-size:15px;color:#C8A96E;font-weight:600;margin-bottom:36px;letter-spacing:.3px}
 .btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:48px}
 .btn-p{padding:16px 36px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;text-decoration:none;display:inline-block;transition:transform .2s,box-shadow .2s}
 .btn-p:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(200,169,110,.35)}
@@ -137,19 +138,20 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 <nav><div class="logo">AI Cash Systems</div><a href="#pricing" class="nav-cta">Get Access Now</a></nav>
 
 <div class="urgent-bar">
-  <div class="urgent-bar-inner">
-    <div class="urgent-tag">⚡ Launch Price</div>
-    <div class="urgent-text">Price increases to <strong>$67 / $147</strong> in</div>
-    <div id="countdown">00:00:00</div>
-    <div class="urgent-text">— <strong>lock in your spot now</strong></div>
+  <div class="urgent-top">⚡ Launch price ends soon — increases to <strong>$67 / $147</strong> when timer hits zero</div>
+  <div class="cd-wrap">
+    <div class="cd-unit"><div class="cd-digit" id="cd-h">00</div><div class="cd-lbl">Hours</div></div>
+    <div class="cd-sep">:</div>
+    <div class="cd-unit"><div class="cd-digit" id="cd-m">00</div><div class="cd-lbl">Minutes</div></div>
+    <div class="cd-sep">:</div>
+    <div class="cd-unit"><div class="cd-digit" id="cd-s">00</div><div class="cd-lbl">Seconds</div></div>
   </div>
 </div>
 
 <section class="hero">
 <div class="hero-tag">AI Automation · Real Skill · Real Income</div>
 <h1>A Restaurant Owner Just Paid<br>$400 for a Bot Built<br><em>In 2 Hours.</em></h1>
-<p class="hero-sub">That bot took 2 hours to build using free tools. Cost $37 to learn how. The client now pays $150/month to keep it running. You could do this next week.</p>
-<p class="hero-math">$37 invested → $400 first client → <strong>$363 profit. Week 1.</strong></p>
+<p class="hero-sub">That bot took 2 hours to build using free tools. Cost $37 to learn. The client still pays every month. You could have your first client within 30 days.</p>
 <div class="btns">
   <a href="#pricing" class="btn-p">Start for $37 — Get Access Today</a>
   <a href="#what-they-pay" class="btn-s">See What Businesses Pay</a>
@@ -206,25 +208,25 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
     <div class="pay-icon">💬</div>
     <div class="pay-name">WhatsApp Bot</div>
     <div class="pay-range">$500 – $2,000</div>
-    <div class="pay-desc">Restaurants, salons, real estate, doctors — anyone with customers. Module 5. Build it in 2 hours.</div>
+    <div class="pay-desc">Restaurants, salons, real estate, clinics — any business with customers. Replies to messages 24/7 with AI, in any language.</div>
   </div>
   <div class="pay-card">
     <div class="pay-icon">📸</div>
     <div class="pay-name">Instagram DM Bot</div>
     <div class="pay-range">$800 – $1,500</div>
-    <div class="pay-desc">Every brand on Instagram ignores DMs. You automate it. Module 6 — full Meta API setup included.</div>
+    <div class="pay-desc">Every brand on Instagram leaves DMs unanswered. You automate replies, comment triggers, and story mentions for them.</div>
   </div>
   <div class="pay-card">
     <div class="pay-icon">📧</div>
     <div class="pay-name">Cold Email System</div>
     <div class="pay-range">$300 – $500/mo</div>
-    <div class="pay-desc">50 AI-personalized emails per day, running automatically. Module 7 — Apollo + Instantly.ai, zero daily work.</div>
+    <div class="pay-desc">50 AI-personalized emails per day, on autopilot. Clients pay monthly retainer — you set it up once and move on.</div>
   </div>
   <div class="pay-card">
     <div class="pay-icon">📊</div>
     <div class="pay-name">Lead Follow-up CRM</div>
     <div class="pay-range">$400 – $800</div>
-    <div class="pay-desc">All leads captured, followed up, and reported automatically. Module 8 — sells to any local business.</div>
+    <div class="pay-desc">All leads auto-captured, followed up, and reported. Any small business will pay for this — they're losing leads daily without it.</div>
   </div>
 </div>
 </div>
@@ -326,7 +328,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">What is the AutoFlow App included in PRO? <span class="faq-icon">+</span></div><div class="faq-a"><div class="faq-ai">AutoFlow is a complete AI automation platform — dashboard, visual flow builder, AI assistant, and 10 integrations. PRO members get full access and can sell monthly access to their clients as an extra recurring revenue stream.</div></div></div>
 <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Is this a one-time payment? <span class="faq-icon">+</span></div><div class="faq-a"><div class="faq-ai">Yes. Pay once, lifetime access, all future updates included. No subscriptions, no hidden fees. Ever.</div></div></div>
 <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How much do the tools cost? <span class="faq-icon">+</span></div><div class="faq-a"><div class="faq-ai">Make.com has a free plan with 1,000 operations/month — enough to start and land your first client. OpenAI costs under $0.01 per AI email. Total tool cost is under $50/month, recovered from your first client.</div></div></div>
-<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">What is the refund policy? <span class="faq-icon">+</span></div><div class="faq-a"><div class="faq-ai">Due to the digital nature of our products, all sales are final once access is granted. If you have a technical issue accessing your content, contact us at supportaicashsystem@gmail.com and we will resolve it immediately.</div></div></div>
+<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">What is the refund policy? <span class="faq-icon">+</span></div><div class="faq-a"><div class="faq-ai">All sales are final. This is a digital product — access is delivered instantly upon payment. By purchasing, you consent to immediate delivery of digital content and explicitly waive any right of withdrawal. No refunds are issued under any circumstances. If you have a technical issue accessing your content, email supportaicashsystem@gmail.com and we will fix it immediately.</div></div></div>
 </div>
 </div>
 </section>
@@ -376,7 +378,7 @@ document.getElementById("paymentForm").addEventListener("submit",async function(
 var check=document.getElementById("termsCheck");
 if(!check.checked){document.getElementById("card-errors").textContent="Please accept the Terms of Service to continue.";return;}
 var btn=document.getElementById("submitBtn"),spin=document.getElementById("spinner"),txt=document.getElementById("btnText");btn.disabled=true;spin.style.display="block";txt.textContent="Processing...";try{var r=await fetch(BACKEND,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:PRODUCTS[curProd].amount,currency:"usd",email:document.getElementById("customerEmail").value,name:document.getElementById("customerName").value,product:curProd})});var d=await r.json();var result=await stripe.confirmCardPayment(d.clientSecret,{payment_method:{card:cardEl,billing_details:{name:document.getElementById("customerName").value,email:document.getElementById("customerEmail").value}}});if(result.error){document.getElementById("card-errors").textContent=result.error.message;btn.disabled=false;spin.style.display="none";txt.textContent="Try Again"}else if(result.paymentIntent.status==="succeeded"){document.getElementById("formView").style.display="none";document.getElementById("successView").style.display="block"}}catch(err){document.getElementById("card-errors").textContent="Error: "+err.message;btn.disabled=false;spin.style.display="none";txt.textContent="Pay Now"}});
-(function(){var key='acs_deadline';var deadline=localStorage.getItem(key);if(!deadline){deadline=Date.now()+72*60*60*1000;localStorage.setItem(key,deadline);}deadline=parseInt(deadline);function update(){var diff=deadline-Date.now();if(diff<=0){document.getElementById('countdown').textContent='00:00:00';return;}var h=Math.floor(diff/3600000);var m=Math.floor((diff%3600000)/60000);var s=Math.floor((diff%60000)/1000);document.getElementById('countdown').textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}update();setInterval(update,1000);})();
+(function(){var key='acs_deadline';var deadline=localStorage.getItem(key);if(!deadline){deadline=Date.now()+72*60*60*1000;localStorage.setItem(key,deadline);}deadline=parseInt(deadline);function update(){var diff=deadline-Date.now();if(diff<=0){document.getElementById('cd-h').textContent='00';document.getElementById('cd-m').textContent='00';document.getElementById('cd-s').textContent='00';return;}var h=Math.floor(diff/3600000);var m=Math.floor((diff%3600000)/60000);var s=Math.floor((diff%60000)/1000);document.getElementById('cd-h').textContent=String(h).padStart(2,'0');document.getElementById('cd-m').textContent=String(m).padStart(2,'0');document.getElementById('cd-s').textContent=String(s).padStart(2,'0');}update();setInterval(update,1000);})();
 </script>
 
 <footer style="background:#050505;border-top:1px solid rgba(200,169,110,.08);padding:40px 32px;text-align:center">
