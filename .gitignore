@@ -3,3 +3,4 @@ node_modules/
 outputs/
 logs/
 *.log
+public/videos/*.mp4
