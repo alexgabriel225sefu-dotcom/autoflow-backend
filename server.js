@@ -471,6 +471,15 @@ app.get('/descarcare', (req, res) => {
   </body></html>`);
 });
 
+// Diagnostic route
+app.get('/debug', (req, res) => {
+  const fs = require('fs');
+  const publicPath = path.join(__dirname, 'public');
+  let files = [];
+  try { files = fs.readdirSync(publicPath); } catch(e) { files = ['ERROR: ' + e.message]; }
+  res.json({ ok: true, __dirname, publicPath, files, env: process.env.NODE_ENV, port: process.env.PORT });
+});
+
 // Root redirect — cinematic intro first
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'intro-epic.html'));
