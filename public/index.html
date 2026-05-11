@@ -165,7 +165,7 @@ footer{background:#080808;border-top:1px solid rgba(200,169,110,.08);padding:28p
 
 <section class="pricing" id="pricing">
 <div class="si">
-<div class="urgency-bar">⚡ Introductory pricing — Starter at $37 &amp; PRO at $97 · Price increases as the course grows</div>
+<div class="urgency-bar" id="urgency-bar">⚡ 72-Hour Intro Offer — <del style="opacity:.6">$67</del> → <strong>$37</strong> &nbsp;&amp;&nbsp; <del style="opacity:.6">$147</del> → <strong>$97</strong> &nbsp;·&nbsp; Price goes up in: <span id="countdown" style="font-weight:700;font-size:14px;color:#F5F0E8;letter-spacing:1px">--:--:--</span></div>
 <div class="stag">Choose Your Path</div>
 <h2 class="sh">Two programs.<br><em>One mission.</em></h2>
 <div class="pgrid">
@@ -173,6 +173,7 @@ footer{background:#080808;border-top:1px solid rgba(200,169,110,.08);padding:28p
 <div class="pbadge">Starter</div>
 <div class="pname">AI Automation<br>Foundations</div>
 <div class="ptag">Master the core skill. Build your first automation. Land your first client — step by step.</div>
+<div style="font-size:13px;color:#C8BEA8;text-decoration:line-through;margin-bottom:2px">$67</div>
 <div class="pamount"><div class="pcur">$</div><div class="pnum">37</div></div>
 <div class="pper">one-time · lifetime access</div>
 <div class="pdiv"></div>
@@ -196,6 +197,7 @@ footer{background:#080808;border-top:1px solid rgba(200,169,110,.08);padding:28p
 <div class="pbadge hot">⚡ Most Popular - PRO</div>
 <div class="pname">AI Agency<br>Mastery</div>
 <div class="ptag">Everything in Starter — plus the AutoFlow App, advanced systems, and the complete agency scaling blueprint.</div>
+<div style="font-size:13px;color:#C8BEA8;text-decoration:line-through;margin-bottom:2px">$147</div>
 <div class="pamount"><div class="pcur">$</div><div class="pnum">97</div></div>
 <div class="pper">one-time · lifetime access</div>
 <div class="pdiv"></div>
@@ -251,36 +253,6 @@ footer{background:#080808;border-top:1px solid rgba(200,169,110,.08);padding:28p
 </div>
 </section>
 
-<section class="testi-s">
-<div class="si">
-<div class="stag">Student Results</div>
-<h2 class="sh">Real people. <em>Real outcomes.</em></h2>
-<div class="tgrid">
-<div class="tcard">
-<div class="tquote">"I'd tried dropshipping twice and lost money both times. Two weeks into AI Cash Systems I built a WhatsApp bot for a local restaurant and charged $400. They're still paying me $150/month to keep it running."</div>
-<div class="tauthor">
-<div class="tavatar">M</div>
-<div><div class="tname">Marcus D.</div><div class="trole">Starter → PRO · First client in 18 days</div></div>
-</div>
-</div>
-<div class="tcard">
-<div class="tquote">"I work a 9-to-5 in logistics. I used the 30-day plan from Module 4 on weekends only. By month two I had two clients paying me $300/month each. That's $600 extra doing maybe 4 hours of work."</div>
-<div class="tauthor">
-<div class="tavatar">S</div>
-<div><div class="tname">Sofia R.</div><div class="trole">Starter · $600/month recurring · Part-time</div></div>
-</div>
-</div>
-<div class="tcard">
-<div class="tquote">"The AI Proposal Generator alone is worth more than $97. I send proposals in 30 seconds that look like I spent hours on them. Closed a $2,000 deal with it in my first month of PRO."</div>
-<div class="tauthor">
-<div class="tavatar">J</div>
-<div><div class="tname">James T.</div><div class="trole">PRO · $2,000 deal closed · Month 1</div></div>
-</div>
-</div>
-</div>
-<p style="font-size:11px;color:#C8BEA8;opacity:.5;text-align:center;margin-top:28px">Results are representative examples. Individual results vary based on effort, market, and execution.</p>
-</div>
-</section>
 
 <section class="faq-s" id="faq">
 <div class="si">
@@ -339,6 +311,7 @@ var PRODUCTS={starter:{name:"AI Automation Foundations",price:"$37",amount:3700,
 var stripe,cardEl,curProd;
 function initStripe(){stripe=Stripe(STRIPE_KEY);var el=stripe.elements({appearance:{theme:"night",variables:{colorPrimary:"#C8A96E",colorBackground:"#161616",colorText:"#F5F0E8",borderRadius:"7px"}}});cardEl=el.create("card",{style:{base:{color:"#F5F0E8",fontFamily:"Syne,sans-serif",fontSize:"13px"}},hidePostalCode:true});cardEl.mount("#card-element");cardEl.on("change",function(e){document.getElementById("card-errors").textContent=e.error?e.error.message:""})}
 function openModal(p){curProd=p;var pr=PRODUCTS[p];document.getElementById("modalBadge").textContent=pr.title;document.getElementById("modalTitle").textContent=pr.name;document.getElementById("modalPrice").textContent=pr.price;document.getElementById("btnText").textContent="Pay "+pr.price+" Now";document.getElementById("formView").style.display="block";document.getElementById("successView").style.display="none";document.getElementById("payModal").classList.add("open");document.body.style.overflow="hidden";if(!stripe)initStripe()}
+(function(){var k='aics_end',n=Date.now(),e=localStorage.getItem(k);if(!e||+e<n){e=n+72*60*60*1000;localStorage.setItem(k,e);}function t(){var r=+localStorage.getItem(k)-Date.now(),el=document.getElementById('countdown');if(!el)return;if(r<=0){el.textContent='00:00:00';return;}var h=Math.floor(r/3600000),m=Math.floor(r%3600000/60000),s=Math.floor(r%60000/1000);el.textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');setTimeout(t,1000);}t();}());
 document.getElementById("paymentForm").addEventListener("submit",async function(e){e.preventDefault();
 var check=document.getElementById("termsCheck");
 if(!check.checked){document.getElementById("card-errors").textContent="Please accept the Terms of Service to continue.";return;}
