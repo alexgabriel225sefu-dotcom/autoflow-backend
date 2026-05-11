@@ -106,7 +106,7 @@ app.post('/api/ai/generate', auth, async (req, res) => {
 });
 
 app.get('/api/test', (req, res) => res.json({ status: 'ok', openai: !!OPENAI_KEY, anthropic: !!anthropic, email: !!transporter, supabase: !!supabase }));
-app.get('/ping', (req, res) => res.json({ ok: true, version: 'v3-veo', time: new Date().toISOString() }));
+app.get('/ping', (req, res) => res.json({ ok: true, version: 'v4-veo-fresh', time: new Date().toISOString() }));
 
 app.post('/api/ai/chat', auth, async (req, res) => {
   const { messages } = req.body;
@@ -211,13 +211,13 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
 // ════════════════════════════════════════
 
 const VEO_FILES = {
-  v1: 'okco5vw2ygdo',
-  v2: 'kb3wyz27b6rg',
-  v3: 'wish204mx53o',
-  v4: 'mo5kg30u0q2x',
-  v5: 'wehowxf92z6t',
-  v6: 'ki993zeg87pw',
-  v7: 'hcu69oshg8qf',
+  v1: 'otzpyk09tm65',
+  v2: '65yzr9elxgjf',
+  v3: '6axbshdkjq8s',
+  v4: '7tw2k62f4ujo',
+  v5: '2jcz4teqwpho',
+  v6: 'h9ovsuebltgh',
+  v7: 's1igfy08w14j',
 };
 
 app.get('/download/:id', async (req, res) => {
