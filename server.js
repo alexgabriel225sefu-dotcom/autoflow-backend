@@ -503,6 +503,110 @@ app.get('/blueprints', (req, res) => {
 });
 
 // ════════════════════════════════════════
+// AI BUSINESS BUILDER ROUTES
+// ════════════════════════════════════════
+
+app.post('/api/builder/plan', async (req, res) => {
+  const { passions, hours, budget, name } = req.body;
+  if (!passions) return res.status(400).json({ error: 'Answers required' });
+
+  const prompt = `You are an expert online business strategist. Based on this user profile, create a complete online business plan. Return ONLY valid JSON, no markdown.
+
+USER:
+- Name: ${name || 'Friend'}
+- Passions/Skills: ${passions}
+- Hours per week: ${hours || '5-10h'}
+- Starting budget: ${budget || '$0'}
+
+Return this exact JSON structure:
+{
+  "business": {
+    "model": "specific business model name",
+    "description": "2 sentences what they will do daily",
+    "why_perfect": "1 sentence why this fits their specific profile",
+    "income_potential": "realistic range after 90 days (e.g. $500–$2,000/month)"
+  },
+  "brand": {
+    "name": "brand name (1-2 words, catchy)",
+    "tagline": "tagline under 7 words",
+    "personality": "3 adjectives",
+    "target_audience": "who they sell to"
+  },
+  "seven_day_plan": [
+    {"day": 1, "focus": "Setup & Foundation", "tasks": ["specific task", "specific task", "specific task"]},
+    {"day": 2, "focus": "...", "tasks": ["...", "...", "..."]},
+    {"day": 3, "focus": "...", "tasks": ["...", "...", "..."]},
+    {"day": 4, "focus": "...", "tasks": ["...", "...", "..."]},
+    {"day": 5, "focus": "...", "tasks": ["...", "...", "..."]},
+    {"day": 6, "focus": "...", "tasks": ["...", "...", "..."]},
+    {"day": 7, "focus": "First Outreach", "tasks": ["...", "...", "..."]}
+  ],
+  "content_hooks": [
+    {"platform": "TikTok", "hook": "opening 3 seconds exactly", "script": "30-second script outline"},
+    {"platform": "Instagram", "hook": "opening 3 seconds exactly", "script": "caption 100 words"},
+    {"platform": "TikTok", "hook": "opening 3 seconds exactly", "script": "30-second script outline"},
+    {"platform": "Instagram Reels", "hook": "opening 3 seconds exactly", "script": "script outline"},
+    {"platform": "TikTok", "hook": "opening 3 seconds exactly", "script": "30-second script outline"}
+  ],
+  "ad_copy": {
+    "headline": "ad headline under 10 words",
+    "body": "50-word ad body text",
+    "cta": "button text"
+  },
+  "daily_routine": [
+    {"time": "Morning", "duration": "30 min", "task": "specific task"},
+    {"time": "Midday", "duration": "1 hour", "task": "specific task"},
+    {"time": "Evening", "duration": "45 min", "task": "specific task"}
+  ],
+  "logo_prompt": "minimalist vector logo for [brand name], [describe style based on niche], clean lines, white background, professional"
+}`;
+
+  try {
+    let result;
+    if (OPENAI_KEY) {
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
+        body: JSON.stringify({ model: 'gpt-4o', max_tokens: 3500, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: prompt }] })
+      });
+      const d = await r.json();
+      if (d.choices?.[0]) result = JSON.parse(d.choices[0].message.content);
+    } else if (anthropic) {
+      const msg = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 3500, messages: [{ role: 'user', content: prompt }] });
+      const text = msg.content[0].text;
+      result = JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim());
+    }
+    if (!result) return res.status(500).json({ error: 'No AI provider configured' });
+    addLog(`Business plan generated for ${name || 'user'}`, 'builder', 'success');
+    res.json(result);
+  } catch (e) {
+    console.error('Builder plan error:', e);
+    res.status(500).json({ error: 'Generation failed: ' + e.message });
+  }
+});
+
+app.post('/api/builder/logo', async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'Prompt required' });
+  if (!OPENAI_KEY) return res.status(400).json({ error: 'OpenAI key required for logo generation' });
+  try {
+    const r = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
+      body: JSON.stringify({ model: 'dall-e-3', prompt, n: 1, size: '1024x1024', quality: 'standard' })
+    });
+    const d = await r.json();
+    if (d.data?.[0]) { addLog('Logo generated', 'builder', 'success'); return res.json({ url: d.data[0].url }); }
+    res.status(500).json({ error: d.error?.message || 'Logo generation failed' });
+  } catch (e) {
+    res.status(500).json({ error: 'Logo failed: ' + e.message });
+  }
+});
+
+app.get('/ai-builder', (req, res) => res.sendFile(path.join(__dirname, 'public', 'ai-builder.html')));
+app.get('/ai-builder.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'ai-builder.html')));
+
+// ════════════════════════════════════════
 // START SERVER
 // ════════════════════════════════════════
 const PORT = process.env.PORT || 3000;
