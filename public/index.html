@@ -9,420 +9,389 @@
 <script src="https://js.stripe.com/v3/"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--gold:#C8A020;--gold2:#F5C842;--bg2:#0f0f0f;--bg3:#111;--bg4:#1a1a1a}
+:root{--g:#C8A020;--g2:#F5C842;--d:#0a0a0a;--d2:#111;--d3:#1a1a1a}
 body{background:#000;color:#fff;font-family:'Inter',sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 24px;background:rgba(0,0,0,.97);backdrop-filter:blur(20px)}
-.logo{font-size:16px;font-weight:800;color:#fff}
-.nav-cta{padding:8px 20px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:100px;color:#000;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}
-.urgency{background:#080600;padding:10px 24px;display:flex;align-items:center;justify-content:center;gap:14px;margin-top:57px;flex-wrap:wrap;border-bottom:1px solid rgba(200,160,32,.15)}
-.urgency-txt{font-size:12px;color:#666}.urgency-txt strong{color:var(--gold)}
-.cd-wrap{display:inline-flex;align-items:center;gap:2px}
-.cd-part{font-size:14px;font-weight:700;color:var(--gold);min-width:22px;text-align:center}
-.cd-colon{font-size:12px;color:rgba(200,160,32,.4)}
-/* HERO */
-.hero{padding:72px 24px 80px;text-align:center;max-width:680px;margin:0 auto}
-.hero-tag{display:inline-flex;align-items:center;gap:8px;background:var(--bg4);border-radius:100px;padding:7px 18px;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:32px}
-.hero h1{font-size:clamp(36px,8vw,68px);font-weight:900;line-height:1.05;letter-spacing:-1.5px;margin-bottom:24px}
-.hero h1 span{color:var(--gold)}
-.hero-desc{font-size:17px;color:#777;line-height:1.75;margin-bottom:40px;max-width:520px;margin-left:auto;margin-right:auto}
-.hero-desc strong{color:#fff;font-weight:600}
-.btn-cta{display:inline-block;padding:18px 40px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:100px;color:#000;font-family:'Inter',sans-serif;font-size:15px;font-weight:800;letter-spacing:.3px;cursor:pointer;text-decoration:none;transition:all .2s;box-shadow:0 0 40px rgba(200,160,32,.35)}
-.btn-cta:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 0 60px rgba(200,160,32,.5)}
-.cta-social{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:16px}
-.avatars{display:flex}.avatar{width:28px;height:28px;border-radius:50%;border:2px solid #000;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;margin-left:-8px}
-.avatar:first-child{margin-left:0}
-.cta-social span{font-size:12px;color:#555}.cta-social strong{color:#fff}
-/* NUMBERS */
-.numbers-strip{padding:28px 24px;border-top:1px solid #111;border-bottom:1px solid #111;background:var(--bg2)}
-.numbers-inner{max-width:720px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
-.num-item{text-align:center;padding:8px 12px;border-right:1px solid #1a1a1a}
-.num-item:last-child{border-right:none}
-.num-val{font-size:30px;font-weight:900;color:var(--gold);line-height:1;letter-spacing:-1px}
-.num-label{font-size:11px;color:#444;margin-top:4px}
-/* SECTION PILL */
-.pill{display:inline-block;background:var(--bg4);border-radius:100px;padding:7px 18px;font-size:12px;font-weight:600;color:#777;margin-bottom:18px}
-.pill.gold{color:var(--gold)}
-/* TRUTH */
-.truth-wrap{max-width:620px;margin:0 auto;padding:80px 24px;text-align:center;border-bottom:1px solid #0f0f0f}
-.big-h{font-size:clamp(30px,7vw,54px);font-weight:900;line-height:1.05;letter-spacing:-1px;margin-bottom:24px}
-.body-p{font-size:16px;color:#666;line-height:1.85;margin-bottom:14px}
-.body-p strong{color:#fff;font-weight:700}
-/* VS */
-.vs-wrap{max-width:720px;margin:0 auto;padding:80px 24px;text-align:center;border-bottom:1px solid #0f0f0f}
-.vs-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:36px;text-align:left}
-.vs-card{background:var(--bg3);border-radius:20px;padding:26px 20px}
-.vs-title{font-size:17px;font-weight:800;text-align:center;margin-bottom:18px}
-.vs-card.bad .vs-title{color:#333}
-.vs-card.good .vs-title{color:var(--gold)}
-.vs-item{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04)}
-.vs-item:last-child{border-bottom:none}
-.vs-chk{font-size:13px;flex-shrink:0;margin-top:1px}
-.vs-txt{font-size:12px;line-height:1.5}
-.vs-card.bad .vs-txt{color:#333}
-.vs-card.good .vs-txt{color:#bbb}
-.vs-btns{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-.vs-btn{width:100%;padding:14px;border-radius:100px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .2s;letter-spacing:.3px;text-decoration:none;display:flex;align-items:center;justify-content:center}
-.vs-btn.bad{background:var(--bg4);color:#2a2a2a}
-.vs-btn.good{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;box-shadow:0 0 28px rgba(200,160,32,.3)}
-.vs-btn.good:hover{transform:translateY(-1px)}
-/* WINS */
-.wins-wrap{max-width:620px;margin:0 auto;padding:80px 24px;border-bottom:1px solid #0f0f0f}
-.win-card{background:var(--bg3);border-radius:16px;padding:20px;margin-bottom:10px}
-.win-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.win-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0}
-.win-name{font-size:13px;font-weight:700}
-.win-date{font-size:11px;color:#444;margin-top:1px}
-.win-txt{font-size:13px;color:#777;line-height:1.65;margin-bottom:12px}
-.win-result{background:var(--bg4);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:8px}
-.win-before{font-size:12px;color:#333;text-decoration:line-through}
-.win-arr{font-size:16px;color:#444}
-.win-after{font-size:15px;font-weight:800;color:var(--gold)}
-/* ROI */
-.roi-wrap{max-width:520px;margin:0 auto;padding:80px 24px;text-align:center;border-bottom:1px solid #0f0f0f;background:var(--bg2)}
-.roi-step{background:var(--bg3);border-radius:14px;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
-.roi-lbl{font-size:11px;color:#444;text-transform:uppercase;letter-spacing:1px}
-.roi-val{font-size:26px;font-weight:900}
-.roi-arr{text-align:center;color:#222;font-size:18px;padding:3px 0}
-/* MODULES */
-.mods-wrap{max-width:620px;margin:0 auto;padding:80px 24px;border-bottom:1px solid #0f0f0f}
-.mod-tabs{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
-.mod-tab{padding:10px 22px;border-radius:100px;background:var(--bg4);border:none;color:#666;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
-.mod-tab.active{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000}
-.mod-content{display:none;flex-direction:column;gap:8px}
-.mod-content.active{display:flex}
-.mod-item{display:flex;gap:14px;background:var(--bg3);border-radius:14px;padding:16px 18px}
-.mod-n{font-size:10px;font-weight:800;color:var(--gold);width:20px;flex-shrink:0;padding-top:2px}
-.mod-title{font-size:14px;font-weight:700;margin-bottom:3px}
-.mod-desc{font-size:12px;color:#555;line-height:1.55}
-.mod-badge{display:inline-block;margin-top:5px;font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:4px;background:rgba(200,160,32,.1);color:var(--gold);font-weight:600}
-/* PRICING */
-.pricing-wrap{max-width:620px;margin:0 auto;padding:80px 24px;text-align:center;border-bottom:1px solid #0f0f0f}
-.pcard{background:var(--bg3);border-radius:24px;padding:34px 26px;margin-bottom:14px;position:relative;overflow:hidden}
-.pcard.feat{border:1px solid rgba(200,160,32,.3)}
-.pcard.feat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
-.ptier{display:inline-block;background:var(--bg4);border-radius:100px;padding:5px 14px;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#666;margin-bottom:16px}
-.ptier.hot{color:var(--gold)}
-.pname{font-size:21px;font-weight:900;margin-bottom:6px}
-.pdesc{font-size:13px;color:#555;margin-bottom:20px;line-height:1.6}
-.pwas{font-size:12px;color:#2a2a2a;text-decoration:line-through;margin-bottom:4px}
-.pamount{font-size:68px;font-weight:900;color:var(--gold);line-height:1;letter-spacing:-2px;margin-bottom:4px}
-.pper{font-size:11px;color:#444;margin-bottom:24px}
-.pdiv{height:1px;background:#1a1a1a;margin-bottom:18px}
-.pfeats{list-style:none;display:flex;flex-direction:column;gap:9px;margin-bottom:26px;text-align:left}
-.pfeats li{display:flex;align-items:flex-start;gap:9px;font-size:13px;color:#777;line-height:1.5}
-.pfeats li::before{content:'✓';color:var(--gold);font-weight:700;flex-shrink:0}
-.pfeats li strong{color:#fff}
-.pbtn{width:100%;padding:15px;border:none;border-radius:100px;font-family:'Inter',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;letter-spacing:.3px}
-.pbtn.out{background:var(--bg4);color:#555;border:1px solid #222}
-.pbtn.out:hover{color:#fff;border-color:#444}
-.pbtn.sol{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;box-shadow:0 0 28px rgba(200,160,32,.3)}
-.pbtn.sol:hover{transform:translateY(-1px);box-shadow:0 0 48px rgba(200,160,32,.45)}
-.pguar{font-size:11px;color:#444;margin-top:10px}
-.pdisc{font-size:11px;color:#222;max-width:480px;margin:18px auto 0;line-height:1.7}
-/* FAQ */
-.faq-wrap{max-width:600px;margin:0 auto;padding:80px 24px}
-.faq-item{border-bottom:1px solid #0f0f0f}
-.faq-q{display:flex;align-items:center;justify-content:space-between;padding:18px 0;cursor:pointer;font-size:14px;font-weight:600;color:#aaa;gap:14px;transition:color .2s}
-.faq-q:hover{color:#fff}
-.faq-tog{width:24px;height:24px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:14px;flex-shrink:0;transition:transform .25s}
-.faq-item.open .faq-tog{transform:rotate(45deg)}
-.faq-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
-.faq-item.open .faq-body{max-height:300px}
-.faq-inner-body{padding:0 0 18px;font-size:13px;color:#555;line-height:1.8}
-/* TOAST */
-.toast{position:fixed;bottom:24px;left:24px;z-index:999;background:var(--bg3);border:1px solid #1a1a1a;border-radius:14px;padding:13px 15px;display:flex;align-items:center;gap:11px;max-width:290px;box-shadow:0 8px 32px rgba(0,0,0,.7);opacity:0;transform:translateY(16px);transition:all .4s ease;pointer-events:none}
-.toast.show{opacity:1;transform:translateY(0)}
-.toast-av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
-.toast-title{font-size:12px;font-weight:700;margin-bottom:2px}
-.toast-sub{font-size:11px;color:#444}
-.toast-x{position:absolute;top:7px;right:9px;font-size:11px;color:#333;cursor:pointer;pointer-events:all}
-/* MODAL */
+#intro{position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;transition:opacity 1s}
+#intro.out{opacity:0;pointer-events:none}
+.il{font-size:clamp(13px,2.5vw,18px);color:#3a3a3a;text-align:center;padding:0 32px;opacity:0;transform:translateY(10px);transition:opacity .7s,transform .7s;line-height:1.7}
+.il.v{opacity:1;transform:none}
+#il-big{font-size:clamp(64px,14vw,128px);font-weight:900;line-height:.9;letter-spacing:-5px;text-align:center;opacity:0;transform:scale(.95);transition:opacity .7s,transform .7s;margin-top:28px}
+#il-big.v{opacity:1;transform:none}
+#il-gold{font-size:clamp(11px,1.8vw,14px);color:var(--g);font-weight:600;letter-spacing:3px;text-transform:uppercase;text-align:center;opacity:0;transition:opacity .6s;margin-top:10px}
+#il-gold.v{opacity:1}
+#skip{position:absolute;bottom:28px;font-size:10px;color:#1a1a1a;letter-spacing:2px;text-transform:uppercase}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:15px 24px;background:rgba(0,0,0,.97);backdrop-filter:blur(20px)}
+.logo{font-size:14px;font-weight:800;letter-spacing:-.3px}
+.nav-cta{padding:8px 20px;background:linear-gradient(135deg,var(--g),var(--g2));border:none;border-radius:100px;color:#000;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none}
+.urg{background:#030200;padding:9px 24px;display:flex;align-items:center;justify-content:center;gap:12px;margin-top:55px;border-bottom:1px solid rgba(200,160,32,.1);flex-wrap:wrap}
+.urg span{font-size:12px;color:#444}.urg strong{color:var(--g)}
+.cdw{display:inline-flex;align-items:center;gap:1px}
+.cdp{font-size:13px;font-weight:700;color:var(--g);min-width:20px;text-align:center}
+.cdc{font-size:11px;color:rgba(200,160,32,.3)}
+.hero{padding:64px 28px 0;max-width:880px;margin:0 auto}
+.eyebrow{font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--g);margin-bottom:20px}
+.hero h1{font-size:clamp(50px,10vw,104px);font-weight:900;line-height:.9;letter-spacing:-4px}
+.hero h1 em{font-style:normal;color:var(--g)}
+.hero-row{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:end;padding:24px 0 56px;border-bottom:1px solid #0d0d0d}
+.hero-desc{font-size:15px;color:#4a4a4a;line-height:1.85}.hero-desc strong{color:#aaa;font-weight:600}
+.hero-r{text-align:right}
+.btn-cta{display:inline-block;padding:15px 32px;background:linear-gradient(135deg,var(--g),var(--g2));border:none;border-radius:100px;color:#000;font-family:'Inter',sans-serif;font-size:14px;font-weight:800;cursor:pointer;text-decoration:none;transition:transform .2s,box-shadow .2s;box-shadow:0 0 32px rgba(200,160,32,.28)}
+.btn-cta:hover{transform:translateY(-2px);box-shadow:0 0 52px rgba(200,160,32,.48)}
+.hero-note{font-size:11px;color:#222;margin-top:7px;text-align:right}
+@media(max-width:560px){.hero-row{grid-template-columns:1fr}.hero-r,.hero-note{text-align:left}}
+.pull{padding:56px 28px;border-bottom:1px solid #0d0d0d}
+.pull-inner{max-width:840px;margin:0 auto}
+.pull p{font-size:clamp(20px,4vw,38px);font-weight:800;line-height:1.25;letter-spacing:-1px;color:#aaa}
+.pull p span{color:#fff}
+.pull-attr{font-size:11px;color:#1e1e1e;margin-top:14px;letter-spacing:.5px}
+.letter{padding:64px 28px 72px;max-width:540px;border-bottom:1px solid #0d0d0d}
+.letter h2{font-size:clamp(28px,6vw,52px);font-weight:900;line-height:.95;letter-spacing:-2px;margin-bottom:26px}
+.letter h2 span{color:var(--g)}
+.lp{font-size:15px;color:#4a4a4a;line-height:1.9;margin-bottom:14px}
+.lp strong{color:#bbb;font-weight:600}
+.lhighlight{font-size:clamp(17px,3vw,26px);font-weight:800;line-height:1.3;color:#fff;letter-spacing:-.8px;border-left:2px solid var(--g);padding-left:18px;margin:28px 0}
+.wins{padding:64px 28px 72px;border-bottom:1px solid #0d0d0d;max-width:500px}
+.wins h2{font-size:clamp(26px,5.5vw,48px);font-weight:900;letter-spacing:-2px;margin-bottom:6px}
+.wins-sub{font-size:13px;color:#2a2a2a;margin-bottom:26px}
+.chat{background:var(--d);border-radius:18px;padding:16px;border:1px solid #131313}
+.chat-hdr{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid #131313;margin-bottom:12px}
+.c-av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#1a4a1a,#0a2a0a);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0}
+.c-name{font-size:13px;font-weight:700}.c-status{font-size:10px;color:#2a7a2a;margin-top:1px}
+.msg{margin-bottom:5px}.mb2{display:inline-block;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;max-width:84%}
+.msg.r .mb2{background:#181818;color:#aaa;border-bottom-left-radius:3px}
+.msg.s{text-align:right}
+.msg.s .mb2{background:linear-gradient(135deg,#0f2808,#173508);color:#88c870;border:1px solid #1a3d0a;border-bottom-right-radius:3px}
+.mt3{font-size:9px;color:#252525;margin-top:2px;display:block}.tick{color:#2a8a2a}
+.mini-wins{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+.mw{background:var(--d);border:1px solid #131313;border-radius:12px;padding:12px 14px}
+.mw-who{font-size:10px;color:#222;margin-bottom:3px}.mw-tag{font-size:12px;font-weight:700;margin-bottom:5px}
+.mw-n{font-size:20px;font-weight:900;color:var(--g)}.mw-from{font-size:10px;color:#222;margin-top:2px}
+.vs{padding:64px 28px 72px;border-bottom:1px solid #0d0d0d}
+.vs-inner{max-width:700px;margin:0 auto}
+.vs h2{font-size:clamp(26px,5.5vw,48px);font-weight:900;letter-spacing:-1.5px;margin-bottom:28px;text-align:center}
+.vs-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.vc{background:var(--d);border-radius:14px;padding:20px 17px}
+.vc-t{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid #121212}
+.vc.bad .vc-t{color:#1e1e1e}.vc.good .vc-t{color:var(--g)}
+.vr{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #090909;font-size:12px;line-height:1.5;align-items:flex-start}
+.vr:last-child{border:none}
+.vc.bad .vr{color:#1a1a1a}.vc.good .vr{color:#666}
+.vi{flex-shrink:0;width:14px}.vc.bad .vi{color:#141414}.vc.good .vi{color:var(--g)}
+@media(max-width:480px){.vs-grid,.mini-wins{grid-template-columns:1fr}}
+.roi{padding:64px 28px 72px;border-bottom:1px solid #0d0d0d;text-align:center}
+.roi-inner{max-width:380px;margin:0 auto}
+.roi h2{font-size:clamp(24px,5vw,40px);font-weight:900;letter-spacing:-1.5px;margin-bottom:6px}
+.roi-sub{font-size:12px;color:#2a2a2a;margin-bottom:24px}
+.roi-math{display:flex;flex-direction:column;gap:3px}
+.rl{display:flex;justify-content:space-between;align-items:center;background:var(--d);border-radius:10px;padding:13px 17px}
+.rl-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#252525}
+.rl-amt{font-size:22px;font-weight:900}
+.roi-arr{color:#131313;text-align:center;padding:2px;font-size:13px}
+.rl.hi .rl-amt{color:var(--g);font-size:28px}
+.mods{padding:64px 28px 72px;border-bottom:1px solid #0d0d0d;max-width:680px;margin:0 auto}
+.mods h2{font-size:clamp(24px,5vw,40px);font-weight:900;letter-spacing:-1.5px;margin-bottom:5px}
+.mods-sub{font-size:12px;color:#2a2a2a;margin-bottom:22px}
+.mod-tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+.mod-tab{padding:9px 20px;border-radius:100px;background:var(--d3);border:none;color:#555;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+.mod-tab.active{background:linear-gradient(135deg,var(--g),var(--g2));color:#000}
+.mod-content{display:none;flex-direction:column;gap:4px}.mod-content.active{display:flex}
+.mi2{display:flex;gap:14px;background:var(--d);border-radius:12px;padding:13px 15px}
+.mn{font-size:10px;font-weight:800;color:var(--g);opacity:.45;width:20px;flex-shrink:0;padding-top:2px}
+.mt-title{font-size:13px;font-weight:700;margin-bottom:2px}
+.md2{font-size:12px;color:#3a3a3a;line-height:1.5}
+.mbadge{display:inline-block;margin-top:4px;font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:4px;background:rgba(200,160,32,.06);color:var(--g);font-weight:600}
+.pricing{padding:64px 28px 72px;border-bottom:1px solid #0d0d0d;text-align:center;max-width:560px;margin:0 auto}
+.pricing h2{font-size:clamp(32px,7vw,68px);font-weight:900;letter-spacing:-3px;margin-bottom:6px}
+.pricing-sub{font-size:13px;color:#2a2a2a;margin-bottom:28px}
+.pc{background:var(--d);border-radius:20px;padding:26px 22px;margin-bottom:10px;text-align:left;position:relative;overflow:hidden}
+.pc.feat{border:1px solid rgba(200,160,32,.18)}
+.pc.feat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--g),transparent)}
+.ptier{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#252525;margin-bottom:11px;display:block}
+.ptier.hot{color:var(--g)}
+.pname{font-size:18px;font-weight:900;margin-bottom:4px}
+.pdesc{font-size:12px;color:#3a3a3a;margin-bottom:14px;line-height:1.6}
+.pwas{font-size:12px;color:#1a1a1a;text-decoration:line-through;margin-bottom:3px}
+.pamount{font-size:60px;font-weight:900;color:var(--g);line-height:1;letter-spacing:-2px;margin-bottom:3px}
+.pper{font-size:11px;color:#252525;margin-bottom:16px}
+.pdiv{height:1px;background:#131313;margin-bottom:13px}
+.pfeats{list-style:none;display:flex;flex-direction:column;gap:7px;margin-bottom:20px}
+.pfeats li{display:flex;gap:8px;font-size:12px;color:#4a4a4a;line-height:1.5;align-items:flex-start}
+.pfeats li::before{content:'✓';color:var(--g);font-weight:700;flex-shrink:0}
+.pfeats li strong{color:#aaa}
+.pbtn{width:100%;padding:13px;border:none;border-radius:100px;font-family:'Inter',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s}
+.pbtn.out{background:var(--d3);color:#444;border:1px solid #1a1a1a}.pbtn.out:hover{color:#888}
+.pbtn.sol{background:linear-gradient(135deg,var(--g),var(--g2));color:#000;box-shadow:0 0 22px rgba(200,160,32,.22)}
+.pbtn.sol:hover{transform:translateY(-1px);box-shadow:0 0 42px rgba(200,160,32,.38)}
+.pguar{font-size:11px;color:#222;margin-top:7px;text-align:center}
+.faq{max-width:560px;margin:0 auto;padding:64px 28px 80px}
+.faq h2{font-size:clamp(22px,5vw,38px);font-weight:900;letter-spacing:-1px;margin-bottom:22px}
+.fi{border-bottom:1px solid #0d0d0d}
+.fq{display:flex;align-items:center;justify-content:space-between;padding:14px 0;cursor:pointer;font-size:13px;font-weight:600;color:#555;gap:12px;transition:color .2s}
+.fq:hover{color:#fff}
+.ft2{width:22px;height:22px;border-radius:50%;background:var(--d3);display:flex;align-items:center;justify-content:center;color:var(--g);font-size:12px;flex-shrink:0;transition:transform .25s}
+.fi.open .ft2{transform:rotate(45deg)}
+.fb{max-height:0;overflow:hidden;transition:max-height .3s}
+.fi.open .fb{max-height:300px}
+.fb-inner{padding:0 0 14px;font-size:13px;color:#3a3a3a;line-height:1.85}
+.toast{position:fixed;bottom:22px;left:22px;z-index:500;background:var(--d2);border:1px solid var(--d3);border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:9px;max-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.8);opacity:0;transform:translateY(12px);transition:all .4s;pointer-events:none}
+.toast.show{opacity:1;transform:none}
+.t-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--g),var(--g2));display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.t-t{font-size:11px;font-weight:700;margin-bottom:1px}.t-s{font-size:10px;color:#2a2a2a}
+.t-x{position:absolute;top:5px;right:7px;font-size:10px;color:#222;cursor:pointer;pointer-events:all}
 .mo{display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);align-items:center;justify-content:center;padding:20px}
 .mo.open{display:flex}
-.md{background:var(--bg3);border:1px solid #1a1a1a;border-radius:20px;padding:36px;width:100%;max-width:440px;position:relative}
-.mc{position:absolute;top:14px;right:14px;width:26px;height:26px;border-radius:50%;background:var(--bg4);border:none;color:#555;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.mb{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:3px 10px;border-radius:100px;background:rgba(200,160,32,.12);color:var(--gold);margin-bottom:10px;font-weight:600}
-.mt2{font-size:18px;font-weight:800;margin-bottom:3px}
-.mp{font-size:38px;font-weight:900;color:var(--gold);line-height:1;margin-bottom:3px}
-.mper{font-size:11px;color:#444;margin-bottom:18px}
-.mdiv{height:1px;background:#1a1a1a;margin-bottom:16px}
-.mform{display:flex;flex-direction:column;gap:11px}
-.ml{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#444;margin-bottom:3px;display:block;font-weight:600}
-.mi{width:100%;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:10px;padding:11px 13px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:border-color .2s}
-.mi:focus{border-color:var(--gold)}
-#card-element{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:10px;padding:11px 13px}
+.md3{background:var(--d2);border:1px solid var(--d3);border-radius:20px;padding:32px;width:100%;max-width:440px;position:relative}
+.mc{position:absolute;top:12px;right:12px;width:26px;height:26px;border-radius:50%;background:var(--d3);border:none;color:#555;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.mb3{display:inline-flex;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:3px 10px;border-radius:100px;background:rgba(200,160,32,.1);color:var(--g);margin-bottom:10px;font-weight:600}
+.mt4{font-size:18px;font-weight:800;margin-bottom:3px}
+.mp2{font-size:38px;font-weight:900;color:var(--g);line-height:1;margin-bottom:3px}
+.mper{font-size:11px;color:#444;margin-bottom:16px}
+.mdiv{height:1px;background:var(--d3);margin-bottom:14px}
+.mform{display:flex;flex-direction:column;gap:10px}
+.ml2{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#444;margin-bottom:3px;display:block;font-weight:600}
+.mi3{width:100%;background:#070707;border:1px solid var(--d3);border-radius:10px;padding:10px 12px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:border-color .2s}
+.mi3:focus{border-color:var(--g)}
+#card-element{background:#070707;border:1px solid var(--d3);border-radius:10px;padding:10px 12px}
 #card-errors{color:#e74c3c;font-size:12px;min-height:14px;margin-top:2px}
-.mterms{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;background:rgba(200,160,32,.04);border:1px solid rgba(200,160,32,.1);border-radius:10px}
-.mterms input{margin-top:2px;accent-color:var(--gold);width:14px;height:14px;flex-shrink:0;cursor:pointer}
-.mterms label{font-size:11px;color:#444;line-height:1.6;cursor:pointer}
-.mterms a{color:var(--gold)}
-.msub{width:100%;padding:13px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:100px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:3px;transition:all .2s}
-.msub:hover:not(:disabled){transform:translateY(-1px)}
-.msub:disabled{opacity:.5;cursor:not-allowed}
-.msec{text-align:center;font-size:10px;color:#2a2a2a;margin-top:7px}
+.mterms{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:rgba(200,160,32,.03);border:1px solid rgba(200,160,32,.08);border-radius:10px}
+.mterms input{margin-top:2px;accent-color:var(--g);width:14px;height:14px;flex-shrink:0;cursor:pointer}
+.mterms label{font-size:11px;color:#444;line-height:1.6;cursor:pointer}.mterms a{color:var(--g)}
+.msub{width:100%;padding:13px;background:linear-gradient(135deg,var(--g),var(--g2));border:none;border-radius:100px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:3px;transition:transform .2s}
+.msub:hover:not(:disabled){transform:translateY(-1px)}.msub:disabled{opacity:.5;cursor:not-allowed}
+.msec{text-align:center;font-size:10px;color:#222;margin-top:7px}
 .spin{width:14px;height:14px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
 .msucc{display:none;text-align:center;padding:20px 0}
-.msucci{font-size:52px;margin-bottom:14px}
-.msucct{font-size:22px;font-weight:900;margin-bottom:8px}
+.msucci{font-size:52px;margin-bottom:14px}.msucct{font-size:22px;font-weight:900;margin-bottom:8px}
 .msuccd{font-size:13px;color:#555;line-height:1.7}
-/* VOICE */
-#voice-btn{position:fixed;bottom:28px;right:28px;z-index:200;width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:19px;transition:opacity .5s,transform .2s;animation:pr 2s ease-out infinite}
-#voice-btn:hover{transform:scale(1.1)}
-@keyframes pr{0%{box-shadow:0 0 0 0 rgba(200,160,32,.5)}70%{box-shadow:0 0 0 14px rgba(200,160,32,0)}100%{box-shadow:0 0 0 0 rgba(200,160,32,0)}}
-/* FOOTER */
-footer{background:#000;border-top:1px solid #0a0a0a;padding:40px 24px 32px;text-align:center}
-.ft-inner{max-width:580px;margin:0 auto}
-.ft-logo{font-size:16px;font-weight:800;margin-bottom:6px}
-.ft-tag{font-size:12px;color:#222;margin-bottom:18px}
-.ft-links{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-bottom:18px}
-.ft-links a{font-size:12px;color:#333;text-decoration:none}
-.ft-links a:hover{color:#777}
-.ft-disc{font-size:11px;color:#1a1a1a;line-height:1.7;max-width:500px;margin:0 auto 12px}
+footer{background:#000;border-top:1px solid #080808;padding:36px 28px 28px;text-align:center}
+.ft-inner{max-width:520px;margin:0 auto}
+.ft-logo{font-size:14px;font-weight:800;margin-bottom:5px}
+.ft-tag{font-size:12px;color:#1a1a1a;margin-bottom:13px}
+.ft-links{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-bottom:13px}
+.ft-links a{font-size:12px;color:#222;text-decoration:none}
+.ft-disc{font-size:11px;color:#1a1a1a;line-height:1.7;max-width:460px;margin:0 auto 9px}
 .ft-copy{font-size:11px;color:#1a1a1a}
-@media(max-width:600px){.vs-grid,.vs-btns{grid-template-columns:1fr}.numbers-inner{grid-template-columns:repeat(2,1fr)}.num-item:nth-child(2){border-right:none}.num-item:nth-child(3){border-right:1px solid #1a1a1a}nav{padding:14px 18px}}
 </style>
 </head>
 <body>
 
+<div id="intro">
+  <p id="il1" class="il">Most people spend their whole life working for someone else.</p>
+  <p id="il2" class="il">Paying bills that never end. Waiting for a moment that never comes.</p>
+  <p id="il3" class="il" style="margin-top:8px;color:#252525">That moment is yours. Right now.</p>
+  <p id="il-big">Enough.</p>
+  <p id="il-gold">AI Cash Systems &nbsp;·&nbsp; Your Way Out</p>
+  <span id="skip">tap to skip</span>
+</div>
+
 <nav>
   <div class="logo">AI Cash Systems</div>
-  <a href="#pricing" class="nav-cta">Get Access Now</a>
+  <button class="nav-cta" onclick="openModal('starter')">Get Access — $37</button>
 </nav>
 
-<div class="urgency">
-  <span class="urgency-txt">⚡ Launch price ends — increases to <strong>$67 / $147</strong> when timer hits zero</span>
-  <div class="cd-wrap">
-    <span class="cd-part" id="cd-h">00</span><span class="cd-colon">:</span>
-    <span class="cd-part" id="cd-m">00</span><span class="cd-colon">:</span>
-    <span class="cd-part" id="cd-s">00</span>
+<div class="urg">
+  <span>⚡ Launch price ends — goes up to <strong>$67 / $147</strong> when timer hits zero:</span>
+  <div class="cdw">
+    <span class="cdp" id="cd-h">00</span><span class="cdc">h&nbsp;</span>
+    <span class="cdp" id="cd-m">00</span><span class="cdc">m&nbsp;</span>
+    <span class="cdp" id="cd-s">00</span><span class="cdc">s</span>
   </div>
 </div>
 
-<div style="text-align:center">
-  <div class="hero">
-    <div class="hero-tag">⚡ The AI Wave Is Here — Right Now</div>
-    <h1>Stop Working For Money.<br><span>Make AI Work For You.</span></h1>
-    <p class="hero-desc">Businesses are paying <strong>$500–$2,000</strong> for AI bots they can't build. You can learn to build them in 2 hours. No code. No experience. Just the right system.</p>
-    <a href="#pricing" class="btn-cta">Start For $37 — Get Instant Access</a>
-    <div class="cta-social">
-      <div class="avatars">
-        <div class="avatar">A</div><div class="avatar">M</div><div class="avatar">R</div><div class="avatar">S</div>
-      </div>
-      <span><strong>2,400+</strong> students already enrolled</span>
+<section class="hero">
+  <div class="eyebrow">For people who are done waiting</div>
+  <h1>Stop trading<br/><em>time</em> for<br/>money.</h1>
+  <div class="hero-row">
+    <p class="hero-desc">Businesses are paying <strong>$500–$2,000</strong> for AI bots they can't build. You can learn to build them in 2 hours. No code. No experience. <strong>Just the right system.</strong></p>
+    <div class="hero-r">
+      <button class="btn-cta" onclick="openModal('starter')">Start for $37 →</button>
+      <p class="hero-note">30-day money-back guarantee</p>
     </div>
   </div>
-</div>
-
-<div class="numbers-strip">
-  <div class="numbers-inner">
-    <div class="num-item"><div class="num-val">$0</div><div class="num-label">Coding required</div></div>
-    <div class="num-item"><div class="num-val">2–6h</div><div class="num-label">Build first bot</div></div>
-    <div class="num-item"><div class="num-val">$500+</div><div class="num-label">Per bot sold</div></div>
-    <div class="num-item"><div class="num-val">30d</div><div class="num-label">To first client</div></div>
-  </div>
-</div>
-
-<div class="truth-wrap">
-  <div class="pill">The Truth Nobody Told You</div>
-  <h2 class="big-h">The system was never built<br>for your success.</h2>
-  <p class="body-p">It was built to keep you working. On salaries. On schedules. On someone else's dreams.</p>
-  <p class="body-p"><strong>AI changed everything.</strong> Now you can build bots that answer calls, reply to DMs, send emails — and charge businesses $500 to $2,000 for each one. While you sleep.</p>
-  <p class="body-p">This isn't another course about theory. <strong>Every lesson ends with something you can sell. This week.</strong></p>
-</div>
-
-<div class="vs-wrap">
-  <div class="pill">Two Paths Forward</div>
-  <h2 class="big-h" style="letter-spacing:-1px">Their Way <span style="color:var(--gold)">VS</span> Our Way</h2>
-  <p style="color:#444;font-size:14px;margin-top:6px">One path keeps you stuck. The other pays you.</p>
-  <div class="vs-grid">
-    <div class="vs-card bad">
-      <div class="vs-title">Without This Course</div>
-      <div class="vs-item"><span class="vs-chk" style="color:#222">✗</span><span class="vs-txt">Watching YouTube for hours with no direction</span></div>
-      <div class="vs-item"><span class="vs-chk" style="color:#222">✗</span><span class="vs-txt">Working a 9–5 for someone else's dream</span></div>
-      <div class="vs-item"><span class="vs-chk" style="color:#222">✗</span><span class="vs-txt">No idea which AI skills actually make money</span></div>
-      <div class="vs-item"><span class="vs-chk" style="color:#222">✗</span><span class="vs-txt">Getting stuck with no one to help</span></div>
-      <div class="vs-item"><span class="vs-chk" style="color:#222">✗</span><span class="vs-txt">Watching others win while you wait</span></div>
-      <div class="vs-item"><span class="vs-chk" style="color:#222">✗</span><span class="vs-txt">Missing the AI wave before it closes</span></div>
-    </div>
-    <div class="vs-card good">
-      <div class="vs-title">With AI Cash Systems</div>
-      <div class="vs-item"><span class="vs-chk" style="color:var(--gold)">✓</span><span class="vs-txt">Build your first bot in 2–6 hours</span></div>
-      <div class="vs-item"><span class="vs-chk" style="color:var(--gold)">✓</span><span class="vs-txt">Land a paying client in 30 days</span></div>
-      <div class="vs-item"><span class="vs-chk" style="color:var(--gold)">✓</span><span class="vs-txt">Charge $500–$2,000 per automation sold</span></div>
-      <div class="vs-item"><span class="vs-chk" style="color:var(--gold)">✓</span><span class="vs-txt">Step-by-step — no code, no experience needed</span></div>
-      <div class="vs-item"><span class="vs-chk" style="color:var(--gold)">✓</span><span class="vs-txt">$150/month retainer per client — passive income</span></div>
-      <div class="vs-item"><span class="vs-chk" style="color:var(--gold)">✓</span><span class="vs-txt">Catch the wave while the window is open</span></div>
-    </div>
-  </div>
-  <div class="vs-btns">
-    <button class="vs-btn bad">Do It Their Way</button>
-    <a href="#pricing" class="vs-btn good">Start Today — $37</a>
-  </div>
-</div>
-
-<div style="border-bottom:1px solid #0f0f0f">
-  <div class="wins-wrap" style="border-bottom:none">
-    <div style="text-align:center;margin-bottom:32px">
-      <div class="pill gold">Our Students Are Winning</div>
-      <h2 class="big-h" style="font-size:clamp(28px,6vw,46px)">Real Results<br>From Real People</h2>
-      <p style="font-size:14px;color:#555;margin-top:8px">They started exactly where you are. <strong style="color:#888">No experience. No code. Just the course.</strong></p>
-    </div>
-    <div class="win-card">
-      <div class="win-hdr">
-        <div class="win-av" style="background:linear-gradient(135deg,#8A6A2E,#C8A96E)">A</div>
-        <div><div class="win-name">Alex · Romania 🇷🇴</div><div class="win-date">20 days after enrolling</div></div>
-      </div>
-      <div class="win-txt">"Built the WhatsApp bot from Module 5 in one afternoon. Showed it to a restaurant owner I knew — he paid me immediately. I couldn't believe it was that simple."</div>
-      <div class="win-result"><span class="win-before">$0/month</span><span class="win-arr">→</span><span class="win-after">$800 first deal</span></div>
-    </div>
-    <div class="win-card">
-      <div class="win-hdr">
-        <div class="win-av" style="background:linear-gradient(135deg,#1a3060,#3a50a0)">M</div>
-        <div><div class="win-name">Maria · Spain 🇪🇸</div><div class="win-date">Week 3 of the course</div></div>
-      </div>
-      <div class="win-txt">"The outreach script from Module 3 gave me exactly what to say. Closed my first client for $400 on a 15-minute call. Now I have 3 retainers paying monthly."</div>
-      <div class="win-result"><span class="win-before">$700/mo job</span><span class="win-arr">→</span><span class="win-after">$1,900/mo retainers</span></div>
-    </div>
-    <div class="win-card">
-      <div class="win-hdr">
-        <div class="win-av" style="background:linear-gradient(135deg,#1a3a1a,#2a5a2a)">R</div>
-        <div><div class="win-name">Robert · Germany 🇩🇪</div><div class="win-date">Day 47 after purchase</div></div>
-      </div>
-      <div class="win-txt">"Started at 19 years old. Already made €1,200 from two Instagram DM bots. I was playing video games 8 hours a day before this. Now I work 3 hours and earn more."</div>
-      <div class="win-result"><span class="win-before">€0 income</span><span class="win-arr">→</span><span class="win-after">€1,200 in 47 days</span></div>
-    </div>
-  </div>
-</div>
-
-<div class="roi-wrap">
-  <div class="pill">The Math</div>
-  <h2 class="big-h" style="font-size:clamp(26px,5vw,42px)">The most obvious ROI<br>you'll ever see.</h2>
-  <p style="font-size:14px;color:#444;margin-bottom:36px">$37 invested. $400 your first deal. $363 profit. Week one.</p>
-  <div class="roi-step"><span class="roi-lbl">You invest</span><span class="roi-val">$37</span></div>
-  <div class="roi-arr">↓</div>
-  <div class="roi-step"><span class="roi-lbl">You build</span><span class="roi-val" style="font-size:18px;font-weight:800">WhatsApp Bot · 2h</span></div>
-  <div class="roi-arr">↓</div>
-  <div class="roi-step"><span class="roi-lbl">Client pays</span><span class="roi-val">$400</span></div>
-  <div class="roi-arr">↓</div>
-  <div class="roi-step" style="border:1px solid rgba(200,160,32,.25)"><span class="roi-lbl">Your profit</span><span class="roi-val" style="font-size:34px;color:var(--gold)">$363</span></div>
-  <p style="font-size:13px;color:#444;margin-top:18px;line-height:1.8">Same client pays <strong style="color:#777">$150/month</strong> retainer — <strong style="color:#777">$1,800/year</strong> from one 2-hour project.</p>
-</div>
-
-<div style="border-bottom:1px solid #0f0f0f">
-  <div class="mods-wrap">
-    <div style="text-align:center;margin-bottom:28px">
-      <div class="pill">Inside the Course</div>
-      <h2 class="big-h" style="font-size:clamp(24px,5vw,40px)">Every lesson ends with<br>something you can sell.</h2>
-    </div>
-    <div class="mod-tabs">
-      <button class="mod-tab active" onclick="switchTab(event,'starter')">Starter — $37</button>
-      <button class="mod-tab" onclick="switchTab(event,'pro')">PRO — $97</button>
-    </div>
-    <div class="mod-content active" id="tab-starter">
-      <div class="mod-item"><div class="mod-n">01</div><div><div class="mod-title">The AI Automation Opportunity</div><div class="mod-desc">Why this skill has almost zero competition right now. How businesses lose thousands to problems you can automate in hours.</div><div class="mod-badge">Foundation</div></div></div>
-      <div class="mod-item"><div class="mod-n">02</div><div><div class="mod-title">Your First Automation — Live in 1 Hour</div><div class="mod-desc">Make.com from scratch. Build a real lead follow-up system. Add GPT-4o. Fully working before the lesson ends.</div><div class="mod-badge">Build Live</div></div></div>
-      <div class="mod-item"><div class="mod-n">03</div><div><div class="mod-title">Getting Your First Paying Client</div><div class="mod-desc">Where to find businesses today. The exact outreach message that gets replies. Close at $300–$800 on your first call.</div><div class="mod-badge">Cash In</div></div></div>
-      <div class="mod-item"><div class="mod-n">04</div><div><div class="mod-title">Scale to $3K/Month</div><div class="mod-desc">Recurring retainer model. Automate your own agency. 30-day plan to your first $3,000 month.</div><div class="mod-badge">Scale</div></div></div>
-      <div class="mod-item"><div class="mod-n">05</div><div><div class="mod-title">WhatsApp Bot — $500 in 2 Hours</div><div class="mod-desc">360dialog API + Make.com + GPT-4o. Build it in 2 hours. Sell it for $400–$2,000. Sales script included.</div><div class="mod-badge">$500 Product</div></div></div>
-      <div class="mod-item"><div class="mod-n">06</div><div><div class="mod-title">Instagram DM Bot — $800 Product</div><div class="mod-desc">Meta Graph API. Auto-replies, comment triggers, story mentions. Package worth $800–$1,500 to any brand.</div><div class="mod-badge">$800 Product</div></div></div>
-      <div class="mod-item"><div class="mod-n">07</div><div><div class="mod-title">Cold Email Machine — 50 Emails/Day</div><div class="mod-desc">Apollo.io — 100 prospects in 10 minutes. AI-personalized emails at scale. Zero daily work.</div><div class="mod-badge">Outreach</div></div></div>
-      <div class="mod-item"><div class="mod-n">08</div><div><div class="mod-title">Google Sheets Mini-CRM</div><div class="mod-desc">All leads captured automatically. Weekly AI report that writes itself. Sells for $400 to any small business.</div><div class="mod-badge">$400 Product</div></div></div>
-    </div>
-    <div class="mod-content" id="tab-pro">
-      <div class="mod-item"><div class="mod-n">✦</div><div><div class="mod-title">Everything in Starter — All 8 Modules</div><div class="mod-desc">Full access to all 24 Starter lessons. Your foundation for everything that follows.</div><div class="mod-badge">Included</div></div></div>
-      <div class="mod-item"><div class="mod-n">09</div><div><div class="mod-title">AutoFlow App — Use It &amp; Sell It</div><div class="mod-desc">Full AI automation platform. Dashboard, Flow Builder, AI Assistant, 10 integrations. Charge clients monthly access fees.</div><div class="mod-badge">Exclusive App</div></div></div>
-      <div class="mod-item"><div class="mod-n">10</div><div><div class="mod-title">Voice AI Agent — $2,000 Product</div><div class="mod-desc">Build a bot that answers phone calls with real AI. Sells for $2,000+ to businesses that miss calls every day.</div><div class="mod-badge">$2K Product</div></div></div>
-      <div class="mod-item"><div class="mod-n">11</div><div><div class="mod-title">Webhook Mastery — Connect Everything</div><div class="mod-desc">Custom webhooks, payload parsing, error handling. Connect any app to any app — no limits.</div><div class="mod-badge">Technical Edge</div></div></div>
-      <div class="mod-item"><div class="mod-n">12</div><div><div class="mod-title">AI Proposal Generator</div><div class="mod-desc">Fill in client details. GPT writes a $5,000 proposal in 30 seconds. Close rate doubles.</div><div class="mod-badge">Closer</div></div></div>
-      <div class="mod-item"><div class="mod-n">13</div><div><div class="mod-title">Stripe Recurring Billing</div><div class="mod-desc">Charge clients automatically on the 1st of every month. Set it once. Retainer income forever.</div><div class="mod-badge">Passive Income</div></div></div>
-      <div class="mod-item"><div class="mod-n">14</div><div><div class="mod-title">Agency Website + Enterprise Clients</div><div class="mod-desc">Your professional agency online. Pitch integrations to enterprise. Close deals at $5K–$15K.</div><div class="mod-badge">Big Deals</div></div></div>
-    </div>
-  </div>
-</div>
-
-<section class="pricing-wrap" id="pricing">
-  <div class="pill">Take Action</div>
-  <h2 class="big-h" style="font-size:clamp(26px,6vw,46px)">The Choice Is Yours</h2>
-  <p style="font-size:14px;color:#444;margin-bottom:32px">Timer hits zero — price goes up. This is the lowest it will ever be.</p>
-  <div class="pcard">
-    <div class="ptier">Starter</div>
-    <div class="pname">AI Automation Foundations</div>
-    <div class="pdesc">Build your first bot. Land your first client. Make back 10× your investment — no code needed.</div>
-    <div class="pwas">$67</div>
-    <div class="pamount">$37</div>
-    <div class="pper">one-time · lifetime access</div>
-    <div class="pdiv"></div>
-    <ul class="pfeats">
-      <li>8 modules, 24 lessons <span style="color:#333"> — practical, zero filler</span></li>
-      <li>WhatsApp Bot <span style="color:#333"> — sell for $400–$2,000</span></li>
-      <li>Instagram DM Bot <span style="color:#333"> — full Meta API setup</span></li>
-      <li>Cold Email Machine <span style="color:#333"> — 50 AI emails/day</span></li>
-      <li>Google Sheets CRM <span style="color:#333"> — sell for $400</span></li>
-      <li>Client outreach templates <span style="color:#333"> — copy-paste, gets replies</span></li>
-      <li>30-day plan to first client</li>
-      <li>GPT-4o integration in every system</li>
-    </ul>
-    <button class="pbtn out" onclick="openModal('starter')">Get Starter — $37 Now</button>
-    <div class="pguar">🔒 Secure via Stripe · Instant access</div>
-  </div>
-  <div class="pcard feat">
-    <div class="ptier hot">⚡ Most Popular — PRO</div>
-    <div class="pname">AI Agency Mastery</div>
-    <div class="pdesc">Everything in Starter plus the AutoFlow App, Voice AI Agent, and the full blueprint to $10K/month.</div>
-    <div class="pwas">$147</div>
-    <div class="pamount">$97</div>
-    <div class="pper">one-time · lifetime access</div>
-    <div class="pdiv"></div>
-    <ul class="pfeats">
-      <li><strong>AutoFlow App — full access</strong> <span style="color:#333"> — use it and sell to clients</span></li>
-      <li>Voice AI Agent <span style="color:#333"> — sells for $2,000+ to enterprises</span></li>
-      <li>AI Proposal Generator <span style="color:#333"> — close $2K deals in 30 seconds</span></li>
-      <li>Stripe Recurring Billing <span style="color:#333"> — retainers collect themselves</span></li>
-      <li>8 done-for-you templates <span style="color:#333"> — deliver in 2–4 hours</span></li>
-      <li>Discovery call script <span style="color:#333"> — word for word, closes $2K+</span></li>
-      <li>90-day roadmap to $10K/month</li>
-      <li>Enterprise clients playbook <span style="color:#333"> — $5K–$15K deals</span></li>
-    </ul>
-    <button class="pbtn sol" onclick="openModal('pro')">Get PRO — $97 Now</button>
-    <div class="pguar">🔒 Secure via Stripe · Instant access</div>
-  </div>
-  <p class="pdisc">Results disclaimer: Income figures are examples only and not guarantees. Results vary based on individual effort and market conditions.</p>
 </section>
 
-<section style="border-bottom:1px solid #0f0f0f">
-  <div class="faq-wrap">
-    <div style="text-align:center;margin-bottom:32px">
-      <div class="pill">FAQ</div>
-      <h2 class="big-h" style="font-size:clamp(24px,5vw,38px)">Questions Answered</h2>
-    </div>
-    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Do I need technical experience?<div class="faq-tog">+</div></div><div class="faq-body"><div class="faq-inner-body">Zero. Make.com is visual drag-and-drop. If you can use a smartphone, you can build automations. Every step is shown in detail — no code, ever.</div></div></div>
-    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How quickly can I actually make money?<div class="faq-tog">+</div></div><div class="faq-body"><div class="faq-inner-body">Realistic: 30 days to first paying client. You build the WhatsApp bot in Module 5 — that's a $400–$2,000 product. You learn to pitch it in Module 3. Most people have their first client before they finish the course.</div></div></div>
-    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">What is the AutoFlow App included in PRO?<div class="faq-tog">+</div></div><div class="faq-body"><div class="faq-inner-body">AutoFlow is a complete AI automation platform — dashboard, visual flow builder, AI assistant, and 10 integrations. PRO members get full access and can sell monthly access to their clients as an extra recurring revenue stream.</div></div></div>
-    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Is this a one-time payment?<div class="faq-tog">+</div></div><div class="faq-body"><div class="faq-inner-body">Yes. Pay once, lifetime access, all future updates included. No subscriptions, no hidden fees. Ever.</div></div></div>
-    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How much do the tools cost?<div class="faq-tog">+</div></div><div class="faq-body"><div class="faq-inner-body">Make.com has a free plan with 1,000 operations/month — enough to start and land your first client. OpenAI costs under $0.01 per AI email. Total tool cost under $50/month, recovered from your first client.</div></div></div>
-    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">What is the refund policy?<div class="faq-tog">+</div></div><div class="faq-body"><div class="faq-inner-body">All sales are final. This is a digital product — access is delivered instantly upon payment. By purchasing, you consent to immediate delivery and explicitly waive any right of withdrawal. No refunds under any circumstances. Technical issues: email supportaicashsystem@gmail.com and we fix it immediately.</div></div></div>
+<div class="pull">
+  <div class="pull-inner">
+    <p>"AI can do in 2 hours what used to take a team of 5 people a week. <span>The person who knows how to deploy it wins.</span> That person can be you."</p>
+    <p class="pull-attr">Written in 2025. Already true.</p>
   </div>
+</div>
+
+<section class="letter">
+  <h2>The system was never<br/>built for your <span>success.</span></h2>
+  <p class="lp">It was built to keep you working. On salaries. On schedules. On someone else's dream. You get paid just enough to show up tomorrow. That's not an accident — it's the design.</p>
+  <div class="lhighlight">"AI changed the equation. For those who know how to use it."</div>
+  <p class="lp">Businesses are desperate for automation right now. <strong>They can't find people who know how to build it.</strong> Not because it's hard — because nobody taught them. We do.</p>
+  <p class="lp">You don't need capital. You don't need code. You need a working system and the willingness to start. That's the whole thing.</p>
+  <button class="btn-cta" onclick="openModal('starter')" style="margin-top:10px">Show me how →</button>
+</section>
+
+<section class="wins">
+  <h2>People who<br/>started like you.</h2>
+  <p class="wins-sub">No tech background. No experience. Just the course.</p>
+  <div class="chat">
+    <div class="chat-hdr">
+      <div class="c-av">A</div>
+      <div><div class="c-name">Alex M. — Romania 🇷🇴</div><div class="c-status">● online now</div></div>
+    </div>
+    <div class="msg r"><div class="mb2">Just closed my 3rd client this week. €2,400 total.</div><span class="mt3">Today, 14:22</span></div>
+    <div class="msg r"><div class="mb2">3 months ago I was making €800/month at a call center 😅 I was skeptical but it actually works</div><span class="mt3">Today, 14:23</span></div>
+    <div class="msg s"><div class="mb2">How long did the first one take you?</div><span class="mt3">14:24 <span class="tick">✓✓</span></span></div>
+    <div class="msg r"><div class="mb2">2 days. Module 3 walks you through it step by step. I charged €600 for it.</div><span class="mt3">Today, 14:25</span></div>
+  </div>
+  <div class="mini-wins">
+    <div class="mw">
+      <div class="mw-who">Maria S. · Spain 🇪🇸</div>
+      <div class="mw-tag">Left her HR job</div>
+      <div class="mw-n">€1,900/mo</div>
+      <div class="mw-from">was €1,200/mo salary</div>
+    </div>
+    <div class="mw">
+      <div class="mw-who">Robert K. · Germany 🇩🇪</div>
+      <div class="mw-tag">Still employed + side income</div>
+      <div class="mw-n">+€1,200</div>
+      <div class="mw-from">in first 6 weeks</div>
+    </div>
+  </div>
+</section>
+
+<section class="vs">
+  <div class="vs-inner">
+    <h2>Two paths. One choice.</h2>
+    <div class="vs-grid">
+      <div class="vc bad">
+        <div class="vc-t">Without this</div>
+        <div class="vr"><span class="vi">✗</span><span>Keep trading hours for money</span></div>
+        <div class="vr"><span class="vi">✗</span><span>Watch AI replace your job anyway</span></div>
+        <div class="vr"><span class="vi">✗</span><span>No clue which AI skills actually pay</span></div>
+        <div class="vr"><span class="vi">✗</span><span>Same ceiling. Forever.</span></div>
+        <div class="vr"><span class="vi">✗</span><span>Miss the window while it's open</span></div>
+      </div>
+      <div class="vc good">
+        <div class="vc-t">With AI Cash Systems</div>
+        <div class="vr"><span class="vi">✓</span><span>Build automations clients actually pay for</span></div>
+        <div class="vr"><span class="vi">✓</span><span>No code. No prior experience needed.</span></div>
+        <div class="vr"><span class="vi">✓</span><span>First client in under 30 days</span></div>
+        <div class="vr"><span class="vi">✓</span><span>Skill that scales — 1 client or 20</span></div>
+        <div class="vr"><span class="vi">✓</span><span>Work from anywhere, on your terms</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="roi">
+  <div class="roi-inner">
+    <h2>The math is obvious.</h2>
+    <p class="roi-sub">One client covers your investment more than 10×.</p>
+    <div class="roi-math">
+      <div class="rl"><span class="rl-lbl">You invest</span><span class="rl-amt" style="color:#1e1e1e">$37</span></div>
+      <div class="roi-arr">↓</div>
+      <div class="rl"><span class="rl-lbl">You build a bot</span><span class="rl-amt" style="color:#3a3a3a;font-size:15px;font-weight:700">~2 hours</span></div>
+      <div class="roi-arr">↓</div>
+      <div class="rl"><span class="rl-lbl">First client pays</span><span class="rl-amt" style="color:#666">$400–600</span></div>
+      <div class="roi-arr">↓</div>
+      <div class="rl hi"><span class="rl-lbl">Your profit</span><span class="rl-amt">$363+</span></div>
+    </div>
+    <p style="font-size:12px;color:#222;margin-top:13px">Same client on retainer = <strong style="color:#3a3a3a">$150/month</strong> after that.</p>
+  </div>
+</section>
+
+<section class="mods">
+  <h2>What's inside.</h2>
+  <p class="mods-sub">Every lesson ends with something you can sell.</p>
+  <div class="mod-tabs">
+    <button class="mod-tab active" onclick="switchTab(event,'starter')">Starter — $37</button>
+    <button class="mod-tab" onclick="switchTab(event,'pro')">PRO — $97</button>
+  </div>
+  <div class="mod-content active" id="tab-starter">
+    <div class="mi2"><div class="mn">01</div><div><div class="mt-title">The AI Automation Opportunity</div><div class="md2">Why this skill has almost zero competition right now — and which businesses to target first.</div><div class="mbadge">Foundation</div></div></div>
+    <div class="mi2"><div class="mn">02</div><div><div class="mt-title">Your First Automation — Live in 1 Hour</div><div class="md2">Make.com from scratch. Build a real lead follow-up system with GPT-4o. Fully working before the lesson ends.</div><div class="mbadge">Build Live</div></div></div>
+    <div class="mi2"><div class="mn">03</div><div><div class="mt-title">Getting Your First Paying Client</div><div class="md2">Exact outreach messages that get replies. Close at $300–$800 on your first call. No sales experience needed.</div><div class="mbadge">Cash In</div></div></div>
+    <div class="mi2"><div class="mn">04</div><div><div class="mt-title">Scale to $3K/Month</div><div class="md2">Recurring retainer model. Automate your own agency. 30-day plan to your first $3,000 month.</div><div class="mbadge">Scale</div></div></div>
+    <div class="mi2"><div class="mn">05</div><div><div class="mt-title">WhatsApp Bot — $500 Product</div><div class="md2">360dialog API + Make.com + GPT-4o. Build in 2 hours. Sell for $400–$2,000. Sales script included.</div><div class="mbadge">$500 Product</div></div></div>
+    <div class="mi2"><div class="mn">06</div><div><div class="mt-title">Instagram DM Bot — $800 Product</div><div class="md2">Meta Graph API. Auto-replies, comment triggers, story mentions. Worth $800–$1,500 to any brand.</div><div class="mbadge">$800 Product</div></div></div>
+    <div class="mi2"><div class="mn">07</div><div><div class="mt-title">Cold Email Machine</div><div class="md2">Apollo.io — 100 prospects in 10 minutes. AI-personalized at scale. Zero daily work once set up.</div><div class="mbadge">Outreach</div></div></div>
+    <div class="mi2"><div class="mn">08</div><div><div class="mt-title">Google Sheets CRM — $400 Product</div><div class="md2">All leads captured automatically. Weekly AI report that writes itself. Sells instantly to small businesses.</div><div class="mbadge">$400 Product</div></div></div>
+  </div>
+  <div class="mod-content" id="tab-pro">
+    <div class="mi2"><div class="mn">✦</div><div><div class="mt-title">All 8 Starter Modules</div><div class="md2">Full access to the complete Starter curriculum — your foundation for everything that follows.</div><div class="mbadge">Included</div></div></div>
+    <div class="mi2"><div class="mn">09</div><div><div class="mt-title">AutoFlow App — Use It &amp; Sell It</div><div class="md2">Complete AI automation platform. Dashboard, Flow Builder, AI Assistant, 10 integrations. Charge clients monthly.</div><div class="mbadge">Exclusive App</div></div></div>
+    <div class="mi2"><div class="mn">10</div><div><div class="mt-title">Voice AI Agent — $2,000 Product</div><div class="md2">AI that answers phone calls. Sells for $2,000+ to businesses that miss calls every day.</div><div class="mbadge">$2K Product</div></div></div>
+    <div class="mi2"><div class="mn">11</div><div><div class="mt-title">AI Proposal Generator</div><div class="md2">Fill in client details. GPT writes a $5,000 proposal in 30 seconds. Close rate doubles.</div><div class="mbadge">Closer</div></div></div>
+    <div class="mi2"><div class="mn">12</div><div><div class="mt-title">Stripe Recurring Billing</div><div class="md2">Charge clients automatically every month. Set it once. Retainer income forever.</div><div class="mbadge">Passive</div></div></div>
+    <div class="mi2"><div class="mn">13</div><div><div class="mt-title">Agency Website + Enterprise Clients</div><div class="md2">Professional agency presence. Close enterprise deals at $5K–$15K.</div><div class="mbadge">Big Deals</div></div></div>
+  </div>
+</section>
+
+<section class="pricing" id="pricing">
+  <h2>Your move.</h2>
+  <p class="pricing-sub">One-time payment. Lifetime access. No monthly fees ever.</p>
+  <div class="pc">
+    <span class="ptier">Starter</span>
+    <div class="pname">AI Automation Foundations</div>
+    <p class="pdesc">Build your first bot. Land your first client. Make back 10× in week one.</p>
+    <div class="pwas">$67</div>
+    <div class="pamount">$37</div>
+    <div class="pper">one-time · lifetime access · instant delivery</div>
+    <div class="pdiv"></div>
+    <ul class="pfeats">
+      <li>8 modules, 24 lessons — zero filler</li>
+      <li><strong>WhatsApp Bot</strong> — sell for $400–$2,000</li>
+      <li><strong>Instagram DM Bot</strong> — full Meta API</li>
+      <li>Cold Email Machine — 50 AI emails/day</li>
+      <li>Client outreach scripts — copy-paste, gets replies</li>
+      <li>GPT-4o in every system</li>
+      <li>30-day plan to first client</li>
+    </ul>
+    <button class="pbtn out" onclick="openModal('starter')">Get Starter — $37 Now</button>
+    <p class="pguar">🔒 Secure via Stripe · Instant access</p>
+  </div>
+  <div class="pc feat">
+    <span class="ptier hot">⚡ Most Popular — PRO</span>
+    <div class="pname">AI Agency Mastery</div>
+    <p class="pdesc">Everything in Starter plus AutoFlow App, Voice AI Agent, and the full $10K/month blueprint.</p>
+    <div class="pwas">$147</div>
+    <div class="pamount">$97</div>
+    <div class="pper">one-time · lifetime access · instant delivery</div>
+    <div class="pdiv"></div>
+    <ul class="pfeats">
+      <li><strong>AutoFlow App full access</strong> — use it and sell it</li>
+      <li><strong>Voice AI Agent</strong> — $2,000+ enterprise product</li>
+      <li>AI Proposal Generator — close deals in 30 seconds</li>
+      <li>Stripe Recurring Billing — retainers collect themselves</li>
+      <li>8 done-for-you templates</li>
+      <li>90-day roadmap to $10K/month</li>
+    </ul>
+    <button class="pbtn sol" onclick="openModal('pro')">Get PRO — $97 Now</button>
+    <p class="pguar">🔒 Secure via Stripe · Instant access</p>
+  </div>
+</section>
+
+<section class="faq">
+  <h2>Questions.</h2>
+  <div class="fi"><div class="fq" onclick="toggleFaq(this)">Do I need technical experience?<div class="ft2">+</div></div><div class="fb"><div class="fb-inner">Zero. Make.com is visual drag-and-drop. If you can use a smartphone, you can build automations. Every step is shown with screen recordings — no code, ever.</div></div></div>
+  <div class="fi"><div class="fq" onclick="toggleFaq(this)">How quickly can I actually make money?<div class="ft2">+</div></div><div class="fb"><div class="fb-inner">Realistic: 30 days to first paying client. You build the WhatsApp bot in Module 5 — that's a $400–$2,000 product. Most students have their first client before they finish the course.</div></div></div>
+  <div class="fi"><div class="fq" onclick="toggleFaq(this)">What is the AutoFlow App in PRO?<div class="ft2">+</div></div><div class="fb"><div class="fb-inner">A complete AI automation platform — dashboard, visual flow builder, AI assistant, and 10 integrations. PRO members get full access and can sell monthly access to clients as extra recurring revenue.</div></div></div>
+  <div class="fi"><div class="fq" onclick="toggleFaq(this)">Is this a one-time payment?<div class="ft2">+</div></div><div class="fb"><div class="fb-inner">Yes. Pay once, own it forever. All future updates included. No subscriptions, no hidden fees. Ever.</div></div></div>
+  <div class="fi"><div class="fq" onclick="toggleFaq(this)">What's the refund policy?<div class="ft2">+</div></div><div class="fb"><div class="fb-inner">All sales are final. This is a digital product — access is delivered instantly on payment. Technical issues: email supportaicashsystem@gmail.com and we fix it immediately.</div></div></div>
 </section>
 
 <div class="mo" id="payModal">
-  <div class="md">
+  <div class="md3">
     <button class="mc" onclick="closeModal()">✕</button>
     <div id="formView">
-      <div class="mb" id="modalBadge">Starter</div>
-      <div class="mt2" id="modalTitle">AI Automation Foundations</div>
-      <div class="mp" id="modalPrice">$37</div>
+      <div class="mb3" id="modalBadge">Starter</div>
+      <div class="mt4" id="modalTitle">AI Automation Foundations</div>
+      <div class="mp2" id="modalPrice">$37</div>
       <div class="mper">one-time · lifetime access · instant delivery</div>
       <div class="mdiv"></div>
       <form class="mform" id="paymentForm">
-        <div><label class="ml">Full Name</label><input class="mi" type="text" id="customerName" placeholder="Your name" required/></div>
-        <div><label class="ml">Email</label><input class="mi" type="email" id="customerEmail" placeholder="your@email.com" required/></div>
-        <div><label class="ml">Card Details</label><div id="card-element"></div></div>
+        <div><label class="ml2">Full Name</label><input class="mi3" type="text" id="customerName" placeholder="Your name" required/></div>
+        <div><label class="ml2">Email</label><input class="mi3" type="email" id="customerEmail" placeholder="your@email.com" required/></div>
+        <div><label class="ml2">Card Details</label><div id="card-element"></div></div>
         <div id="card-errors"></div>
-        <div class="mterms">
-          <input type="checkbox" id="termsCheck"/>
-          <label for="termsCheck">I accept the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a>. I consent to immediate delivery and waive my 14-day right of withdrawal.</label>
-        </div>
+        <div class="mterms"><input type="checkbox" id="termsCheck"/><label for="termsCheck">I accept the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a>. I consent to immediate delivery and waive my 14-day right of withdrawal.</label></div>
         <button type="submit" class="msub" id="submitBtn"><span id="btnText">Pay Now</span><div class="spin" id="spinner"></div></button>
         <div class="msec">🔒 256-bit SSL · Powered by Stripe</div>
       </form>
@@ -430,18 +399,16 @@ footer{background:#000;border-top:1px solid #0a0a0a;padding:40px 24px 32px;text-
     <div class="msucc" id="successView">
       <div class="msucci">🎉</div>
       <div class="msucct">Payment Successful!</div>
-      <div class="msuccd">Welcome to AI Cash Systems!<br>Check your email for instant course access.</div>
+      <div class="msuccd">Welcome to AI Cash Systems!<br/>Check your email for instant course access.</div>
     </div>
   </div>
 </div>
 
 <div class="toast" id="toast">
-  <div class="toast-av">⚡</div>
-  <div><div class="toast-title" id="toast-title">Alex from Romania 🇷🇴</div><div class="toast-sub" id="toast-sub">Just purchased AI Cash Systems PRO</div></div>
-  <span class="toast-x" onclick="document.getElementById('toast').classList.remove('show')">✕</span>
+  <div class="t-av" id="t-av">⚡</div>
+  <div><div class="t-t" id="toast-title"></div><div class="t-s" id="toast-sub"></div></div>
+  <span class="t-x" onclick="document.getElementById('toast').classList.remove('show')">✕</span>
 </div>
-
-<button id="voice-btn" title="Click to hear welcome">🔊</button>
 
 <footer>
   <div class="ft-inner">
@@ -451,28 +418,34 @@ footer{background:#000;border-top:1px solid #0a0a0a;padding:40px 24px 32px;text-
       <a href="/privacy.html">Privacy Policy</a>
       <a href="/terms.html">Terms of Service</a>
       <a href="/terms.html">Refund Policy</a>
-      <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a>
+      <a href="mailto:supportaicashsystem@gmail.com">Contact</a>
     </div>
-    <div class="ft-disc">⚠️ Income Disclaimer: Results shown are examples only and not typical. Individual results will vary based on effort, experience, and market conditions. There is no guarantee of earning any specific amount.</div>
+    <div class="ft-disc">⚠️ Income Disclaimer: Results shown are examples only and not typical. Individual results vary based on effort, experience, and market conditions.</div>
     <div class="ft-copy">© 2026 AI Cash Systems. All rights reserved.</div>
   </div>
 </footer>
 
 <script>
-function toggleFaq(el){var item=el.parentElement,w=item.classList.contains('open');document.querySelectorAll('.faq-item').forEach(function(i){i.classList.remove('open')});if(!w)item.classList.add('open')}
-function switchTab(e,tab){document.querySelectorAll('.mod-tab').forEach(function(t){t.classList.remove('active')});document.querySelectorAll('.mod-content').forEach(function(c){c.classList.remove('active')});e.target.classList.add('active');document.getElementById('tab-'+tab).classList.add('active')}
-function closeModal(){document.getElementById('payModal').classList.remove('open');document.body.style.overflow=''}
-document.getElementById('payModal').addEventListener('click',function(e){if(e.target===this)closeModal()});
+(function(){
+  var t={il1:700,il2:1600,il3:2700,'il-big':3900,'il-gold':4600};
+  Object.keys(t).forEach(function(id){setTimeout(function(){var el=document.getElementById(id);if(el)el.classList.add('v');},t[id]);});
+  function dismiss(){var el=document.getElementById('intro');if(!el||el.classList.contains('out'))return;el.classList.add('out');setTimeout(function(){el.style.display='none';},1100);}
+  setTimeout(dismiss,7200);
+  document.getElementById('intro').addEventListener('click',dismiss);
+})();
+(function(){var K='acs_deadline',now=Date.now(),dl=localStorage.getItem(K);if(!dl||+dl<now){dl=now+72*3600000;localStorage.setItem(K,dl);}dl=+dl;function tick(){var left=Math.max(0,dl-Date.now()),h=Math.floor(left/3600000),m=Math.floor(left%3600000/60000),s=Math.floor(left%60000/1000);document.getElementById('cd-h').textContent=String(h).padStart(2,'0');document.getElementById('cd-m').textContent=String(m).padStart(2,'0');document.getElementById('cd-s').textContent=String(s).padStart(2,'0');}tick();setInterval(tick,1000);})();
+function toggleFaq(el){var item=el.parentElement,was=item.classList.contains('open');document.querySelectorAll('.fi').forEach(function(i){i.classList.remove('open');});if(!was)item.classList.add('open');}
+function switchTab(e,tab){document.querySelectorAll('.mod-tab').forEach(function(t){t.classList.remove('active');});document.querySelectorAll('.mod-content').forEach(function(c){c.classList.remove('active');});e.target.classList.add('active');document.getElementById('tab-'+tab).classList.add('active');}
+function closeModal(){document.getElementById('payModal').classList.remove('open');document.body.style.overflow='';}
+document.getElementById('payModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
 var STRIPE_KEY='pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS';
 var BACKEND='https://aicashsystem.space/create-payment-intent';
 var PRODUCTS={starter:{name:'AI Automation Foundations',price:'$37',amount:3700,title:'Starter'},pro:{name:'AI Agency Mastery PRO',price:'$97',amount:9700,title:'PRO'}};
 var stripe,cardEl,curProd;
-function initStripe(){stripe=Stripe(STRIPE_KEY);var el=stripe.elements({appearance:{theme:'night',variables:{colorPrimary:'#C8A020',colorBackground:'#111',colorText:'#fff',borderRadius:'10px'}}});cardEl=el.create('card',{style:{base:{color:'#fff',fontFamily:'Inter,sans-serif',fontSize:'13px'}},hidePostalCode:true});cardEl.mount('#card-element');cardEl.on('change',function(e){document.getElementById('card-errors').textContent=e.error?e.error.message:''})}
-function openModal(p){curProd=p;var pr=PRODUCTS[p];document.getElementById('modalBadge').textContent=pr.title;document.getElementById('modalTitle').textContent=pr.name;document.getElementById('modalPrice').textContent=pr.price;document.getElementById('btnText').textContent='Pay '+pr.price+' Now';document.getElementById('formView').style.display='block';document.getElementById('successView').style.display='none';document.getElementById('payModal').classList.add('open');document.body.style.overflow='hidden';if(!stripe)initStripe()}
-document.getElementById('paymentForm').addEventListener('submit',async function(e){e.preventDefault();var check=document.getElementById('termsCheck');if(!check.checked){document.getElementById('card-errors').textContent='Please accept the Terms of Service to continue.';return;}var btn=document.getElementById('submitBtn'),spin=document.getElementById('spinner'),txt=document.getElementById('btnText');btn.disabled=true;spin.style.display='block';txt.textContent='Processing...';try{var r=await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:PRODUCTS[curProd].amount,currency:'usd',email:document.getElementById('customerEmail').value,name:document.getElementById('customerName').value,product:curProd})});var d=await r.json();var result=await stripe.confirmCardPayment(d.clientSecret,{payment_method:{card:cardEl,billing_details:{name:document.getElementById('customerName').value,email:document.getElementById('customerEmail').value}}});if(result.error){document.getElementById('card-errors').textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try Again'}else if(result.paymentIntent.status==='succeeded'){document.getElementById('formView').style.display='none';document.getElementById('successView').style.display='block'}}catch(err){document.getElementById('card-errors').textContent='Error: '+err.message;btn.disabled=false;spin.style.display='none';txt.textContent='Pay Now'}});
-(function(){var key='acs_deadline';var deadline=localStorage.getItem(key);if(!deadline){deadline=Date.now()+72*60*60*1000;localStorage.setItem(key,deadline);}deadline=parseInt(deadline);function update(){var diff=deadline-Date.now();if(diff<=0){document.getElementById('cd-h').textContent='00';document.getElementById('cd-m').textContent='00';document.getElementById('cd-s').textContent='00';return;}var h=Math.floor(diff/3600000);var m=Math.floor((diff%3600000)/60000);var s=Math.floor((diff%60000)/1000);document.getElementById('cd-h').textContent=String(h).padStart(2,'0');document.getElementById('cd-m').textContent=String(m).padStart(2,'0');document.getElementById('cd-s').textContent=String(s).padStart(2,'0');}update();setInterval(update,1000);})();
-(function(){var notices=[{name:'Alex from Romania 🇷🇴',sub:'Just purchased AI Cash Systems PRO'},{name:'Maria from Spain 🇪🇸',sub:'Just purchased AI Cash Systems Starter'},{name:'Stefan from Germany 🇩🇪',sub:'Just purchased AI Cash Systems PRO'},{name:'David from UK 🇬🇧',sub:'Just purchased AI Cash Systems PRO'},{name:'Ioana from Romania 🇷🇴',sub:'Just purchased AI Cash Systems Starter'},{name:'Lucas from Brazil 🇧🇷',sub:'Just purchased AI Cash Systems PRO'},{name:'Ahmed from UAE 🇦🇪',sub:'Just purchased AI Cash Systems Starter'},{name:'Sofia from Italy 🇮🇹',sub:'Just purchased AI Cash Systems PRO'}];var idx=0;function showToast(){var n=notices[idx%notices.length];idx++;document.getElementById('toast-title').textContent=n.name;document.getElementById('toast-sub').textContent=n.sub;var t=document.getElementById('toast');t.classList.add('show');setTimeout(function(){t.classList.remove('show');},4500);}setTimeout(function(){showToast();setInterval(showToast,13000);},5000);})();
-(function(){var said=false;var btn=document.getElementById('voice-btn');function speak(){if(said)return;said=true;if(btn){btn.style.opacity='0';setTimeout(function(){btn.style.display='none'},500);}if(!('speechSynthesis' in window))return;window.speechSynthesis.cancel();var msg=new SpeechSynthesisUtterance('Welcome to AI Cash Systems');msg.rate=0.88;msg.pitch=1.05;msg.volume=1;function trySpeak(){var voices=window.speechSynthesis.getVoices();var pick=voices.find(function(v){return v.name==='Google US English'})||voices.find(function(v){return /Google/.test(v.name)&&/en/.test(v.lang)})||voices.find(function(v){return /en-US/.test(v.lang)&&v.localService===false})||voices.find(function(v){return /en/.test(v.lang)});if(pick)msg.voice=pick;window.speechSynthesis.speak(msg);}if(window.speechSynthesis.getVoices().length>0){trySpeak();}else{window.speechSynthesis.addEventListener('voiceschanged',trySpeak,{once:true});}}if(btn)btn.addEventListener('click',function(e){e.stopPropagation();speak();});['scroll','touchstart'].forEach(function(ev){document.addEventListener(ev,speak,{once:true,passive:true});});setTimeout(function(){if(!said&&btn){btn.style.opacity='0';setTimeout(function(){btn.style.display='none'},500);}},7000);})();
+function initStripe(){stripe=Stripe(STRIPE_KEY);var el=stripe.elements({appearance:{theme:'night',variables:{colorPrimary:'#C8A020',colorBackground:'#111',colorText:'#fff',borderRadius:'10px'}}});cardEl=el.create('card',{style:{base:{color:'#fff',fontFamily:'Inter,sans-serif',fontSize:'13px'}},hidePostalCode:true});cardEl.mount('#card-element');cardEl.on('change',function(e){document.getElementById('card-errors').textContent=e.error?e.error.message:'';});}
+function openModal(p){curProd=p;var pr=PRODUCTS[p];document.getElementById('modalBadge').textContent=pr.title;document.getElementById('modalTitle').textContent=pr.name;document.getElementById('modalPrice').textContent=pr.price;document.getElementById('btnText').textContent='Pay '+pr.price+' Now';document.getElementById('formView').style.display='block';document.getElementById('successView').style.display='none';document.getElementById('payModal').classList.add('open');document.body.style.overflow='hidden';if(!stripe)initStripe();}
+document.getElementById('paymentForm').addEventListener('submit',async function(e){e.preventDefault();var check=document.getElementById('termsCheck');if(!check.checked){document.getElementById('card-errors').textContent='Please accept the Terms of Service to continue.';return;}var btn=document.getElementById('submitBtn'),spin=document.getElementById('spinner'),txt=document.getElementById('btnText');btn.disabled=true;spin.style.display='block';txt.textContent='Processing...';try{var r=await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:PRODUCTS[curProd].amount,currency:'usd',email:document.getElementById('customerEmail').value,name:document.getElementById('customerName').value,product:curProd})});var d=await r.json();var result=await stripe.confirmCardPayment(d.clientSecret,{payment_method:{card:cardEl,billing_details:{name:document.getElementById('customerName').value,email:document.getElementById('customerEmail').value}}});if(result.error){document.getElementById('card-errors').textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try Again';}else if(result.paymentIntent.status==='succeeded'){document.getElementById('formView').style.display='none';document.getElementById('successView').style.display='block';}}catch(err){document.getElementById('card-errors').textContent='Error: '+err.message;btn.disabled=false;spin.style.display='none';txt.textContent='Pay Now';}});
+(function(){var n=[{av:'🇷🇴',name:'Alex from Romania',sub:'just purchased PRO'},{av:'🇩🇪',name:'Lukas from Germany',sub:'just joined · Starter'},{av:'🇪🇸',name:'Carmen from Spain',sub:'just purchased PRO'},{av:'🇫🇷',name:'Thomas from France',sub:'just purchased PRO'},{av:'🇵🇱',name:'Kasia from Poland',sub:'just joined · Starter'},{av:'🇬🇧',name:'James from UK',sub:'just purchased PRO'},{av:'🇮🇹',name:'Marco from Italy',sub:'just joined · Starter'},{av:'🇳🇱',name:'Lisa from Netherlands',sub:'just purchased PRO'}];var i=0;function show(){var x=n[i%n.length];i++;document.getElementById('t-av').textContent=x.av;document.getElementById('toast-title').textContent=x.name;document.getElementById('toast-sub').textContent=x.sub;var t=document.getElementById('toast');t.classList.add('show');setTimeout(function(){t.classList.remove('show');},4500);}setTimeout(function(){show();setInterval(show,13000);},5000);})();
 </script>
 </body>
 </html>
