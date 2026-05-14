@@ -535,6 +535,32 @@ function initStripe(){stripe=Stripe(STRIPE_KEY);var el=stripe.elements({appearan
 function openModal(p){curProd=p;var pr=PRODUCTS[p];document.getElementById('modalBadge').textContent=pr.title;document.getElementById('modalTitle').textContent=pr.name;document.getElementById('modalPrice').textContent=pr.price;document.getElementById('btnText').textContent='Pay '+pr.price+' Now';document.getElementById('formView').style.display='block';document.getElementById('successView').style.display='none';document.getElementById('payModal').classList.add('open');document.body.style.overflow='hidden';if(!stripe)initStripe()}
 document.getElementById('paymentForm').addEventListener('submit',async function(e){e.preventDefault();var check=document.getElementById('termsCheck');if(!check.checked){document.getElementById('card-errors').textContent='Please accept the Terms of Service to continue.';return;}var btn=document.getElementById('submitBtn'),spin=document.getElementById('spinner'),txt=document.getElementById('btnText');btn.disabled=true;spin.style.display='block';txt.textContent='Processing...';try{var r=await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:PRODUCTS[curProd].amount,currency:'usd',email:document.getElementById('customerEmail').value,name:document.getElementById('customerName').value,product:curProd})});var d=await r.json();var result=await stripe.confirmCardPayment(d.clientSecret,{payment_method:{card:cardEl,billing_details:{name:document.getElementById('customerName').value,email:document.getElementById('customerEmail').value}}});if(result.error){document.getElementById('card-errors').textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try Again'}else if(result.paymentIntent.status==='succeeded'){document.getElementById('formView').style.display='none';document.getElementById('successView').style.display='block'}}catch(err){document.getElementById('card-errors').textContent='Error: '+err.message;btn.disabled=false;spin.style.display='none';txt.textContent='Pay Now'}});
 (function(){var key='acs_deadline';var deadline=localStorage.getItem(key);if(!deadline){deadline=Date.now()+72*60*60*1000;localStorage.setItem(key,deadline);}deadline=parseInt(deadline);function update(){var diff=deadline-Date.now();if(diff<=0){document.getElementById('cd-h').textContent='00';document.getElementById('cd-m').textContent='00';document.getElementById('cd-s').textContent='00';return;}var h=Math.floor(diff/3600000);var m=Math.floor((diff%3600000)/60000);var s=Math.floor((diff%60000)/1000);document.getElementById('cd-h').textContent=String(h).padStart(2,'0');document.getElementById('cd-m').textContent=String(m).padStart(2,'0');document.getElementById('cd-s').textContent=String(s).padStart(2,'0');}update();setInterval(update,1000);})();
+(function(){
+  var said=false;
+  function speak(){
+    if(said)return;
+    said=true;
+    if(!('speechSynthesis' in window))return;
+    var msg=new SpeechSynthesisUtterance('Welcome to AI Cash Systems');
+    msg.rate=0.88;msg.pitch=1.05;msg.volume=1;
+    function trySpeak(){
+      var voices=window.speechSynthesis.getVoices();
+      var pick=voices.find(function(v){return v.name==='Google US English'})
+        ||voices.find(function(v){return /Google/.test(v.name)&&/en/.test(v.lang)})
+        ||voices.find(function(v){return /en-US/.test(v.lang)&&v.localService===false})
+        ||voices.find(function(v){return /en/.test(v.lang)});
+      if(pick)msg.voice=pick;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(msg);
+    }
+    if(window.speechSynthesis.getVoices().length){trySpeak();}
+    else{window.speechSynthesis.onvoiceschanged=trySpeak;}
+  }
+  setTimeout(speak,1200);
+  ['click','scroll','keydown','touchstart'].forEach(function(ev){
+    document.addEventListener(ev,speak,{once:true});
+  });
+})();
 </script>
 </body>
 </html>
