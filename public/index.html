@@ -501,6 +501,13 @@ footer{background:var(--bg3);border-top:1px solid var(--line);padding:48px 48px 
   </div>
 </div>
 
+<style>
+#voice-btn{position:fixed;bottom:28px;right:28px;z-index:200;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#E2BC7A);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 20px rgba(200,169,110,.4);transition:opacity .5s,transform .2s;animation:pulse-ring 2s ease-out infinite}
+#voice-btn:hover{transform:scale(1.1)}
+@keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(200,169,110,.5)}70%{box-shadow:0 0 0 14px rgba(200,169,110,0)}100%{box-shadow:0 0 0 0 rgba(200,169,110,0)}}
+</style>
+<button id="voice-btn" title="Click to hear welcome">🔊</button>
+
 <footer>
   <div class="footer-inner">
     <div class="footer-top">
@@ -537,10 +544,13 @@ document.getElementById('paymentForm').addEventListener('submit',async function(
 (function(){var key='acs_deadline';var deadline=localStorage.getItem(key);if(!deadline){deadline=Date.now()+72*60*60*1000;localStorage.setItem(key,deadline);}deadline=parseInt(deadline);function update(){var diff=deadline-Date.now();if(diff<=0){document.getElementById('cd-h').textContent='00';document.getElementById('cd-m').textContent='00';document.getElementById('cd-s').textContent='00';return;}var h=Math.floor(diff/3600000);var m=Math.floor((diff%3600000)/60000);var s=Math.floor((diff%60000)/1000);document.getElementById('cd-h').textContent=String(h).padStart(2,'0');document.getElementById('cd-m').textContent=String(m).padStart(2,'0');document.getElementById('cd-s').textContent=String(s).padStart(2,'0');}update();setInterval(update,1000);})();
 (function(){
   var said=false;
+  var btn=document.getElementById('voice-btn');
   function speak(){
     if(said)return;
     said=true;
+    if(btn){btn.style.opacity='0';setTimeout(function(){btn.style.display='none'},500);}
     if(!('speechSynthesis' in window))return;
+    window.speechSynthesis.cancel();
     var msg=new SpeechSynthesisUtterance('Welcome to AI Cash Systems');
     msg.rate=0.88;msg.pitch=1.05;msg.volume=1;
     function trySpeak(){
@@ -550,16 +560,14 @@ document.getElementById('paymentForm').addEventListener('submit',async function(
         ||voices.find(function(v){return /en-US/.test(v.lang)&&v.localService===false})
         ||voices.find(function(v){return /en/.test(v.lang)});
       if(pick)msg.voice=pick;
-      window.speechSynthesis.cancel();
       window.speechSynthesis.speak(msg);
     }
-    if(window.speechSynthesis.getVoices().length){trySpeak();}
-    else{window.speechSynthesis.onvoiceschanged=trySpeak;}
+    if(window.speechSynthesis.getVoices().length>0){trySpeak();}
+    else{window.speechSynthesis.addEventListener('voiceschanged',trySpeak,{once:true});}
   }
-  setTimeout(speak,1200);
-  ['click','scroll','keydown','touchstart'].forEach(function(ev){
-    document.addEventListener(ev,speak,{once:true});
-  });
+  if(btn)btn.addEventListener('click',function(e){e.stopPropagation();speak();});
+  ['scroll','touchstart'].forEach(function(ev){document.addEventListener(ev,speak,{once:true,passive:true});});
+  setTimeout(function(){if(!said&&btn){btn.style.opacity='0';setTimeout(function(){btn.style.display='none'},500);}},7000);
 })();
 </script>
 </body>
