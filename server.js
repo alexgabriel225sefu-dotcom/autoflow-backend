@@ -249,6 +249,64 @@ app.post('/api/ai/chat', auth, async (req, res) => {
 });
 
 // ════════════════════════════════════════
+// MAKE.COM INTEGRATION ROUTES
+// ════════════════════════════════════════
+
+// POST /api/make/connect — verify API key and return teams
+app.post('/api/make/connect', auth, async (req, res) => {
+  const { apiKey, zone } = req.body;
+  if (!apiKey) return res.status(400).json({ error: 'API key required' });
+  const host = (zone || 'eu1.make.com').replace(/^https?:\/\//, '');
+  try {
+    const r = await fetch(`https://${host}/api/v2/teams`, {
+      headers: { 'Authorization': `Token ${apiKey}`, 'Content-Type': 'application/json' }
+    });
+    const data = await r.json();
+    if (!r.ok) return res.status(r.status).json({ error: data.message || 'Invalid API key or zone' });
+    addLog('Make.com account connected', 'make', 'success');
+    res.json({ teams: data.teams || [] });
+  } catch (e) {
+    res.status(500).json({ error: 'Cannot reach Make.com: ' + e.message });
+  }
+});
+
+// POST /api/make/create — create scenario from a blueprint file
+app.post('/api/make/create', auth, async (req, res) => {
+  const { apiKey, zone, teamId, blueprintFile, scenarioName } = req.body;
+  if (!apiKey || !teamId || !blueprintFile) return res.status(400).json({ error: 'apiKey, teamId and blueprintFile required' });
+
+  const host = (zone || 'eu1.make.com').replace(/^https?:\/\//, '');
+  const fs = require('fs');
+  const safeName = path.basename(blueprintFile).replace(/[^a-zA-Z0-9._-]/g, '');
+  const bpPath = path.join(__dirname, 'public', 'blueprints', safeName);
+
+  let blueprint;
+  try {
+    blueprint = JSON.parse(fs.readFileSync(bpPath, 'utf8'));
+  } catch (e) {
+    return res.status(404).json({ error: 'Blueprint file not found' });
+  }
+
+  if (scenarioName) blueprint.name = scenarioName;
+
+  try {
+    const r = await fetch(`https://${host}/api/v2/scenarios`, {
+      method: 'POST',
+      headers: { 'Authorization': `Token ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blueprint, teamId: parseInt(teamId), scheduling: { type: 'on-demand' } })
+    });
+    const data = await r.json();
+    if (!r.ok) return res.status(r.status).json({ error: data.message || 'Make.com rejected the request' });
+    const scenarioId = data.scenario?.id || data.id;
+    addLog(`Make.com scenario created: ${blueprint.name} (ID: ${scenarioId})`, 'make', 'success');
+    res.json({ success: true, scenarioId, scenarioName: blueprint.name, editUrl: `https://${host}/scenarios/${scenarioId}/edit` });
+  } catch (e) {
+    addLog('Make.com create failed: ' + e.message, 'make', 'error');
+    res.status(500).json({ error: 'Failed to create scenario: ' + e.message });
+  }
+});
+
+// ════════════════════════════════════════
 // EMAIL ROUTES
 // ════════════════════════════════════════
 

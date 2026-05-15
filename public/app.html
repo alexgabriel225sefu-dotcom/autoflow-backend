@@ -4,255 +4,307 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>AutoFlow — AI Automation Platform</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,700&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
 :root{
-  --gold:#C8A96E;--gold2:#E8CB8A;--gold3:#8A6A2E;
-  --bg:#070707;--bg2:#0f0f0f;--bg3:#161616;--bg4:#1e1e1e;
-  --text:#F5F0E8;--text2:#C8BEA8;--text3:#7A7060;
-  --border:rgba(200,169,110,.1);--border2:rgba(200,169,110,.2);
-  --green:#4ADE80;--red:#ef4444;--blue:#60a5fa;
-  --sidebar:220px;
+  --r:#E53E2E;--r2:#FF5544;--r3:rgba(229,62,46,.1);--r4:rgba(229,62,46,.06);
+  --bg:#000;--bg2:#080808;--bg3:#0f0f0f;--bg4:#161616;
+  --t1:#ffffff;--t2:#c8c8c8;--t3:#888888;--t4:#555555;
+  --border:rgba(255,255,255,.06);--border2:rgba(229,62,46,.2);
+  --green:#4ADE80;--err:#ef4444;--blue:#60a5fa;
+  --sidebar:224px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow:hidden;height:100vh}
+body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflow:hidden;height:100vh;-webkit-font-smoothing:antialiased}
 ::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-thumb{background:var(--gold3);border-radius:2px}
+::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:2px}
 
-/* ── LOGIN ── */
-#loginScreen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:0}
-.login-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(200,169,110,.06) 0%,transparent 70%);pointer-events:none}
-.login-box{background:var(--bg2);border:1px solid var(--border2);border-radius:20px;padding:48px;width:100%;max-width:440px;position:relative;z-index:1}
-.login-logo{font-family:"Playfair Display",serif;font-size:26px;font-weight:900;color:var(--gold);text-align:center;margin-bottom:6px;letter-spacing:.5px}
-.login-sub{font-size:12px;color:var(--text3);text-align:center;letter-spacing:2px;text-transform:uppercase;margin-bottom:36px}
-.login-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;display:block}
-.login-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:13px 16px;font-family:Syne,sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color .2s;margin-bottom:16px}
-.login-input:focus{border-color:var(--gold)}
-.login-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--gold3),var(--gold2));border:none;border-radius:10px;font-family:Syne,sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#070707;cursor:pointer;transition:all .2s;margin-top:4px}
-.login-btn:hover{opacity:.9;transform:translateY(-1px)}
-.login-error{color:var(--red);font-size:12px;text-align:center;margin-top:12px;min-height:18px}
+/* LOGIN */
+#loginScreen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000}
+.login-bg{position:absolute;inset:0;background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(229,62,46,.06) 0%,transparent 70%);pointer-events:none}
+.login-box{background:var(--bg2);border:1px solid #1a1a1a;border-radius:20px;padding:48px;width:100%;max-width:420px;position:relative;z-index:1}
+.login-logo{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:6px}
+.login-logo::before{content:'';width:22px;height:22px;background:var(--r);clip-path:polygon(50% 0%,100% 100%,0% 100%);flex-shrink:0}
+.login-logo-text{font-size:22px;font-weight:900;color:var(--t1);letter-spacing:-.5px}
+.login-sub{font-size:11px;color:var(--t4);text-align:center;letter-spacing:2px;text-transform:uppercase;margin-bottom:36px}
+.login-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t4);margin-bottom:8px;display:block;font-weight:600}
+.login-input{width:100%;background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:13px 16px;font-family:'Inter',sans-serif;font-size:14px;color:var(--t1);outline:none;transition:border-color .2s;margin-bottom:16px}
+.login-input:focus{border-color:var(--r)}
+.login-btn{width:100%;padding:14px;background:var(--r);border:none;border-radius:10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#fff;cursor:pointer;transition:all .2s;margin-top:4px}
+.login-btn:hover{background:var(--r2);transform:translateY(-1px)}
+.login-btn:disabled{opacity:.5;cursor:wait;transform:none}
+.login-error{color:var(--err);font-size:12px;text-align:center;margin-top:12px;min-height:18px}
 
-/* ── APP SHELL ── */
+/* APP SHELL */
 #app{display:none;height:100vh;flex-direction:row}
 #app.visible{display:flex}
 
-/* ── SIDEBAR ── */
-.sidebar{width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;height:100vh;overflow:hidden}
-.sidebar-logo{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
-.sidebar-logo-text{font-family:"Playfair Display",serif;font-size:18px;font-weight:900;color:var(--gold);letter-spacing:.5px}
-.sidebar-logo-sub{font-size:10px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
-.sidebar-nav{flex:1;padding:16px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
-.nav-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:10px;cursor:pointer;transition:all .2s;color:var(--text3);font-size:13px;font-weight:500;border:1px solid transparent;text-decoration:none}
-.nav-item:hover{background:var(--bg3);color:var(--text)}
-.nav-item.active{background:rgba(200,169,110,.12);border-color:var(--border2);color:var(--gold)}
-.nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
-.nav-divider{height:1px;background:var(--border);margin:8px 4px}
-.sidebar-bottom{padding:16px 10px;border-top:1px solid var(--border)}
-.user-info{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:var(--bg3)}
-.user-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold3),var(--gold));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#070707;flex-shrink:0}
-.user-email{font-size:11px;color:var(--text3);truncate:ellipsis;overflow:hidden;white-space:nowrap;max-width:120px}
-.logout-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:4px;margin-left:auto;transition:color .2s}
-.logout-btn:hover{color:var(--red)}
+/* SIDEBAR */
+.sidebar{width:var(--sidebar);background:var(--bg2);border-right:1px solid #111;display:flex;flex-direction:column;flex-shrink:0;height:100vh;overflow:hidden}
+.sidebar-logo{padding:22px 18px 18px;border-bottom:1px solid #111;display:flex;align-items:center;gap:10px}
+.sidebar-logo::before{content:'';width:18px;height:18px;background:var(--r);clip-path:polygon(50% 0%,100% 100%,0% 100%);flex-shrink:0}
+.sidebar-logo-text{font-size:16px;font-weight:900;color:var(--t1);letter-spacing:-.3px}
+.sidebar-nav{flex:1;padding:14px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:9px;cursor:pointer;transition:all .2s;color:var(--t4);font-size:12px;font-weight:500;border:1px solid transparent;text-decoration:none}
+.nav-item:hover{background:var(--bg3);color:var(--t2)}
+.nav-item.active{background:var(--r3);border-color:var(--border2);color:var(--r);font-weight:600}
+.nav-icon{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.nav-divider{height:1px;background:#111;margin:6px 4px}
+.sidebar-bottom{padding:14px 10px;border-top:1px solid #111}
+.user-info{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:9px;background:var(--bg3)}
+.user-avatar{width:30px;height:30px;border-radius:50%;background:var(--r);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0}
+.user-email{font-size:11px;color:var(--t4);overflow:hidden;white-space:nowrap;max-width:110px;text-overflow:ellipsis}
+.logout-btn{background:none;border:none;color:var(--t4);cursor:pointer;font-size:13px;padding:4px;margin-left:auto;transition:color .2s}
+.logout-btn:hover{color:var(--err)}
 
-/* ── MAIN ── */
+/* MAIN */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.topbar{padding:16px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.topbar-title{font-family:"Playfair Display",serif;font-size:22px;font-weight:700;color:var(--text)}
-.topbar-sub{font-size:12px;color:var(--text3);margin-top:2px}
-.topbar-right{display:flex;align-items:center;gap:12px}
-.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.topbar{padding:14px 26px;border-bottom:1px solid #111;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-title{font-size:20px;font-weight:800;color:var(--t1);letter-spacing:-.5px}
+.topbar-sub{font-size:11px;color:var(--t4);margin-top:2px}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 7px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
-/* ── PAGES ── */
-.page{display:none;flex:1;overflow-y:auto;padding:28px}
+/* PAGES */
+.page{display:none;flex:1;overflow-y:auto;padding:26px}
 .page.active{display:block}
 
-/* ── DASHBOARD ── */
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
-.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:22px;transition:border-color .2s}
-.stat-card:hover{border-color:var(--border2)}
-.stat-icon{font-size:22px;margin-bottom:12px}
-.stat-val{font-family:"Playfair Display",serif;font-size:32px;font-weight:700;color:var(--gold);line-height:1}
-.stat-label{font-size:11px;color:var(--text3);margin-top:6px;letter-spacing:1px;text-transform:uppercase}
+/* SECTION TITLES */
+.section-title{font-size:18px;font-weight:800;color:var(--t1);margin-bottom:16px;display:flex;align-items:center;gap:10px;letter-spacing:-.4px}
+.section-title::before{content:"";width:3px;height:20px;background:var(--r);border-radius:2px;flex-shrink:0}
+
+/* DASHBOARD */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px}
+.stat-card{background:var(--bg2);border:1px solid #111;border-radius:14px;padding:20px;transition:border-color .2s}
+.stat-card:hover{border-color:#222}
+.stat-icon{font-size:20px;margin-bottom:10px}
+.stat-val{font-size:30px;font-weight:900;color:var(--r);line-height:1;letter-spacing:-1px}
+.stat-label{font-size:10px;color:var(--t4);margin-top:6px;letter-spacing:1px;text-transform:uppercase;font-weight:600}
 .stat-change{font-size:11px;color:var(--green);margin-top:4px}
 
-.section-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:10px}
-.section-title::before{content:"";width:3px;height:20px;background:var(--gold);border-radius:2px}
+.quick-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:26px}
+.qa-btn{background:var(--bg2);border:1px solid #111;border-radius:12px;padding:18px;cursor:pointer;transition:all .2s;text-align:left}
+.qa-btn:hover{border-color:#222;background:var(--bg3);transform:translateY(-2px)}
+.qa-icon{font-size:22px;margin-bottom:10px;display:block}
+.qa-title{font-size:13px;font-weight:700;color:var(--t1);margin-bottom:4px}
+.qa-desc{font-size:12px;color:var(--t4)}
 
-.quick-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}
-.qa-btn{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;transition:all .2s;text-align:left}
-.qa-btn:hover{border-color:var(--border2);background:var(--bg3);transform:translateY(-2px)}
-.qa-icon{font-size:24px;margin-bottom:10px;display:block}
-.qa-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
-.qa-desc{font-size:12px;color:var(--text3)}
-
-/* ── WIZARD ── */
-.wizard-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-.wizard-form{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px}
-.wizard-output{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px;display:flex;flex-direction:column}
-.form-group{margin-bottom:18px}
-.form-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;display:block}
-.form-input,.form-select,.form-textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-family:Syne,sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color .2s}
-.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--gold)}
-.form-select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237A7060' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+/* FORM ELEMENTS */
+.form-group{margin-bottom:17px}
+.form-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t4);margin-bottom:8px;display:block;font-weight:700}
+.form-input,.form-select,.form-textarea{width:100%;background:var(--bg3);border:1px solid #1a1a1a;border-radius:8px;padding:11px 14px;font-family:'Inter',sans-serif;font-size:13px;color:var(--t1);outline:none;transition:border-color .2s}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--r)}
+.form-select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23555' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .form-select option{background:#0f0f0f}
 .form-textarea{resize:vertical;min-height:90px;line-height:1.6}
-.generate-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--gold3),var(--gold2));border:none;border-radius:10px;font-family:Syne,sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#070707;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:10px}
-.generate-btn:hover{opacity:.9;transform:translateY(-1px)}
-.generate-btn:disabled{opacity:.5;cursor:wait;transform:none}
-.output-placeholder{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text3);font-size:13px;min-height:300px}
-.output-placeholder .icon{font-size:48px;opacity:.3}
-.output-content{display:none;flex-direction:column;gap:16px}
-.output-content.visible{display:flex}
-.output-section{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:18px}
-.output-section-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;font-weight:600}
-.output-text{font-size:13px;color:var(--text2);line-height:1.75;white-space:pre-wrap}
-.output-price{font-family:"Playfair Display",serif;font-size:28px;font-weight:700;color:var(--gold)}
-.output-price-sub{font-size:12px;color:var(--text3);margin-top:4px}
-.copy-btn{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-family:Syne,sans-serif;font-size:11px;color:var(--text3);cursor:pointer;transition:all .2s;margin-top:10px;letter-spacing:1px;text-transform:uppercase}
-.copy-btn:hover{border-color:var(--gold);color:var(--gold)}
 
-/* ── CHAT ── */
+/* WIZARD */
+.wizard-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.wizard-form,.wizard-output{background:var(--bg2);border:1px solid #111;border-radius:14px;padding:26px}
+.wizard-output{display:flex;flex-direction:column}
+.generate-btn{width:100%;padding:13px;background:var(--r);border:none;border-radius:9px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#fff;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:10px}
+.generate-btn:hover{background:var(--r2);transform:translateY(-1px)}
+.generate-btn:disabled{opacity:.5;cursor:wait;transform:none}
+.output-placeholder{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--t4);font-size:13px;min-height:300px;text-align:center}
+.output-placeholder .icon{font-size:40px;opacity:.2}
+.output-content{display:none;flex-direction:column;gap:14px}
+.output-content.visible{display:flex}
+.output-section{background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:16px}
+.output-section-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--r);margin-bottom:10px;font-weight:700}
+.output-text{font-size:13px;color:var(--t2);line-height:1.75;white-space:pre-wrap}
+.output-price{font-size:26px;font-weight:900;color:var(--r);letter-spacing:-1px}
+.output-price-sub{font-size:12px;color:var(--t4);margin-top:4px}
+.copy-btn{background:var(--bg4);border:1px solid #1a1a1a;border-radius:6px;padding:6px 14px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;transition:all .2s;margin-top:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700}
+.copy-btn:hover{border-color:var(--r);color:var(--r)}
+.download-bp-btn{background:rgba(229,62,46,.08);border:1px solid var(--border2);border-radius:8px;padding:11px 18px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;color:var(--r);cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:8px;text-decoration:none;margin-top:14px;letter-spacing:.3px}
+.download-bp-btn:hover{background:rgba(229,62,46,.14);transform:translateY(-1px)}
+
+/* CHAT */
 .chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 120px)}
-.chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding:4px 0 20px}
+.chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:4px 0 20px}
 .chat-msg{display:flex;gap:12px;align-items:flex-start;animation:fadeIn .3s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .chat-msg.user{flex-direction:row-reverse}
-.chat-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
-.chat-avatar.ai{background:linear-gradient(135deg,var(--gold3),var(--gold));color:#070707}
-.chat-avatar.user{background:var(--bg3);border:1px solid var(--border);color:var(--text3)}
-.chat-bubble{max-width:75%;padding:14px 18px;border-radius:14px;font-size:13px;line-height:1.75}
-.chat-bubble.ai{background:var(--bg2);border:1px solid var(--border);color:var(--text2);border-radius:4px 14px 14px 14px}
-.chat-bubble.user{background:rgba(200,169,110,.12);border:1px solid var(--border2);color:var(--text);border-radius:14px 4px 14px 14px}
-.chat-thinking{display:flex;gap:6px;padding:4px 0;align-items:center}
-.chat-thinking span{width:8px;height:8px;border-radius:50%;background:var(--gold);opacity:.4;animation:think .9s infinite}
+.chat-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0}
+.chat-avatar.ai{background:var(--r);color:#fff}
+.chat-avatar.user{background:var(--bg3);border:1px solid #1a1a1a;color:var(--t3)}
+.chat-bubble{max-width:75%;padding:13px 17px;border-radius:14px;font-size:13px;line-height:1.75}
+.chat-bubble.ai{background:var(--bg2);border:1px solid #1a1a1a;color:var(--t2);border-radius:4px 14px 14px 14px}
+.chat-bubble.user{background:var(--r3);border:1px solid var(--border2);color:var(--t1);border-radius:14px 4px 14px 14px}
+.chat-thinking{display:flex;gap:5px;padding:4px 0;align-items:center}
+.chat-thinking span{width:7px;height:7px;border-radius:50%;background:var(--r);opacity:.4;animation:think .9s infinite}
 .chat-thinking span:nth-child(2){animation-delay:.2s}
 .chat-thinking span:nth-child(3){animation-delay:.4s}
 @keyframes think{0%,100%{opacity:.2;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
-.chat-input-wrap{border-top:1px solid var(--border);padding-top:16px;display:flex;gap:12px;align-items:flex-end}
-.chat-textarea{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 16px;font-family:Syne,sans-serif;font-size:13px;color:var(--text);outline:none;resize:none;min-height:48px;max-height:160px;transition:border-color .2s;line-height:1.6}
-.chat-textarea:focus{border-color:var(--gold)}
-.chat-send{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--gold3),var(--gold));border:none;cursor:pointer;font-size:18px;color:#070707;transition:all .2s;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-.chat-send:hover{opacity:.9;transform:translateY(-1px)}
+.chat-input-wrap{border-top:1px solid #111;padding-top:14px;display:flex;gap:10px;align-items:flex-end}
+.chat-textarea{flex:1;background:var(--bg2);border:1px solid #1a1a1a;border-radius:10px;padding:12px 15px;font-family:'Inter',sans-serif;font-size:13px;color:var(--t1);outline:none;resize:none;min-height:46px;max-height:160px;transition:border-color .2s;line-height:1.6}
+.chat-textarea:focus{border-color:var(--r)}
+.chat-send{width:46px;height:46px;border-radius:10px;background:var(--r);border:none;cursor:pointer;font-size:16px;color:#fff;transition:all .2s;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.chat-send:hover{background:var(--r2);transform:translateY(-1px)}
 .chat-send:disabled{opacity:.4;cursor:wait;transform:none}
 .chat-suggestions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.suggestion{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--text3);cursor:pointer;transition:all .2s;white-space:nowrap}
-.suggestion:hover{border-color:var(--border2);color:var(--text)}
+.suggestion{background:var(--bg3);border:1px solid #1a1a1a;border-radius:20px;padding:6px 14px;font-size:12px;color:var(--t4);cursor:pointer;transition:all .2s;white-space:nowrap}
+.suggestion:hover{border-color:var(--border2);color:var(--r)}
 
-/* ── EMAIL ── */
-.email-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-.email-form-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px}
-.email-templates{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px}
-.template-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all .2s;margin-bottom:10px}
+/* EMAIL */
+.email-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.email-form-wrap,.email-templates{background:var(--bg2);border:1px solid #111;border-radius:14px;padding:26px}
+.template-card{background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:15px;cursor:pointer;transition:all .2s;margin-bottom:10px}
 .template-card:last-child{margin-bottom:0}
 .template-card:hover{border-color:var(--border2);transform:translateY(-1px)}
-.template-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
-.template-desc{font-size:11px;color:var(--text3)}
-.send-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--gold3),var(--gold2));border:none;border-radius:10px;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#070707;cursor:pointer;transition:all .2s;margin-top:8px}
-.send-btn:hover{opacity:.9;transform:translateY(-1px)}
+.template-name{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px}
+.template-desc{font-size:11px;color:var(--t4)}
+.send-btn{width:100%;padding:12px;background:var(--r);border:none;border-radius:9px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#fff;cursor:pointer;transition:all .2s;margin-top:8px}
+.send-btn:hover{background:var(--r2);transform:translateY(-1px)}
 .send-btn:disabled{opacity:.5;cursor:wait;transform:none}
+.send-btn-alt{background:var(--bg3);color:var(--t2);border:1px solid #1a1a1a}
+.send-btn-alt:hover{border-color:#333;background:var(--bg4)}
 .email-status{font-size:12px;margin-top:10px;min-height:18px;text-align:center}
 
-/* ── TRACKER ── */
+/* TRACKER */
 .tracker-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.add-client-btn{background:linear-gradient(135deg,var(--gold3),var(--gold));border:none;border-radius:8px;padding:10px 20px;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:#070707;cursor:pointer;transition:all .2s}
-.add-client-btn:hover{opacity:.9}
-.clients-table{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-.table-header{display:grid;grid-template-columns:2fr 1.5fr 1fr 1fr 1fr;gap:0;background:var(--bg3);border-bottom:1px solid var(--border)}
-.th{padding:12px 16px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);font-weight:600}
-.table-row{display:grid;grid-template-columns:2fr 1.5fr 1fr 1fr 1fr;border-bottom:1px solid var(--border);transition:background .2s}
+.add-client-btn{background:var(--r);border:none;border-radius:8px;padding:10px 18px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;color:#fff;cursor:pointer;transition:all .2s}
+.add-client-btn:hover{background:var(--r2)}
+.clients-table{background:var(--bg2);border:1px solid #111;border-radius:14px;overflow:hidden}
+.table-header{display:grid;grid-template-columns:2fr 1.5fr 1fr 1fr 1fr;background:var(--bg3);border-bottom:1px solid #111}
+.th{padding:11px 15px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t4);font-weight:700}
+.table-row{display:grid;grid-template-columns:2fr 1.5fr 1fr 1fr 1fr;border-bottom:1px solid #111;transition:background .2s}
 .table-row:last-child{border-bottom:none}
 .table-row:hover{background:var(--bg3)}
-.td{padding:14px 16px;font-size:13px;color:var(--text2);display:flex;align-items:center}
-.status-badge{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
-.status-active{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);color:var(--green)}
-.status-pending{background:rgba(200,169,110,.1);border:1px solid rgba(200,169,110,.2);color:var(--gold)}
-.status-paused{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:var(--red)}
-.revenue-total{background:rgba(200,169,110,.08);border:1px solid var(--border2);border-radius:10px;padding:16px 20px;margin-top:16px;display:flex;align-items:center;justify-content:space-between}
-.revenue-label{font-size:12px;color:var(--text3);letter-spacing:1px;text-transform:uppercase}
-.revenue-amount{font-family:"Playfair Display",serif;font-size:28px;font-weight:700;color:var(--gold)}
+.td{padding:13px 15px;font-size:13px;color:var(--t2);display:flex;align-items:center}
+.status-badge{display:inline-flex;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.status-active{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);color:var(--green)}
+.status-pending{background:rgba(229,62,46,.08);border:1px solid rgba(229,62,46,.2);color:var(--r)}
+.status-paused{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);color:var(--err)}
+.revenue-total{background:var(--r3);border:1px solid var(--border2);border-radius:10px;padding:15px 20px;margin-top:14px;display:flex;align-items:center;justify-content:space-between}
+.revenue-label{font-size:11px;color:var(--t4);letter-spacing:1px;text-transform:uppercase;font-weight:700}
+.revenue-amount{font-size:28px;font-weight:900;color:var(--r);letter-spacing:-1px}
 
-/* ── LOGS ── */
-.log-item{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);transition:background .2s}
+/* LOGS */
+.log-item{display:flex;align-items:flex-start;gap:12px;padding:12px 15px;border-bottom:1px solid #111;transition:background .2s}
 .log-item:hover{background:var(--bg3)}
-.log-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.log-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px}
 .log-dot.success{background:var(--green)}
-.log-dot.error{background:var(--red)}
+.log-dot.error{background:var(--err)}
 .log-dot.info{background:var(--blue)}
-.log-time{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--text3);white-space:nowrap;margin-top:2px}
-.log-msg{font-size:13px;color:var(--text2);flex:1}
-.log-type{font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:4px;background:var(--bg3);color:var(--text3);white-space:nowrap}
+.log-time{font-family:'Courier New',monospace;font-size:10px;color:var(--t4);white-space:nowrap;margin-top:3px}
+.log-msg{font-size:13px;color:var(--t2);flex:1}
+.log-type{font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:4px;background:var(--bg3);color:var(--t4);white-space:nowrap}
 
-/* ── MODAL ── */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);z-index:500;display:none;align-items:center;justify-content:center}
+/* BLUEPRINTS */
+.bp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.bp-card{background:var(--bg2);border:1px solid #111;border-radius:14px;padding:22px;transition:all .2s;display:flex;flex-direction:column}
+.bp-card:hover{border-color:#222;transform:translateY(-2px)}
+.bp-icon{font-size:28px;margin-bottom:12px}
+.bp-name{font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px;letter-spacing:-.3px}
+.bp-desc{font-size:12px;color:var(--t4);line-height:1.6;flex:1;margin-bottom:16px}
+.bp-modules{font-size:11px;color:var(--t4);background:var(--bg3);border:1px solid #1a1a1a;border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.7}
+.bp-modules strong{color:var(--r);font-weight:700}
+.bp-download{display:inline-flex;align-items:center;gap:7px;background:var(--r3);border:1px solid var(--border2);border-radius:8px;padding:9px 16px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--r);text-decoration:none;cursor:pointer;transition:all .2s;letter-spacing:.3px;text-transform:uppercase;width:100%;justify-content:center}
+.bp-download:hover{background:rgba(229,62,46,.14);transform:translateY(-1px)}
+.bp-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.15);border-radius:100px;padding:3px 10px;font-size:10px;color:var(--green);font-weight:700;letter-spacing:.5px;margin-bottom:12px}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);z-index:500;display:none;align-items:center;justify-content:center}
 .modal-overlay.open{display:flex}
-.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:32px;width:100%;max-width:480px}
-.modal-title{font-family:"Playfair Display",serif;font-size:22px;font-weight:700;margin-bottom:20px;color:var(--text)}
+.modal{background:var(--bg2);border:1px solid #1a1a1a;border-radius:16px;padding:30px;width:100%;max-width:460px}
+.modal-title{font-size:20px;font-weight:800;margin-bottom:20px;color:var(--t1);letter-spacing:-.4px}
 .modal-actions{display:flex;gap:10px;margin-top:20px}
-.btn-primary{flex:1;padding:12px;background:linear-gradient(135deg,var(--gold3),var(--gold));border:none;border-radius:8px;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:#070707;cursor:pointer;transition:all .2s}
-.btn-secondary{flex:1;padding:12px;background:transparent;border:1px solid var(--border);border-radius:8px;font-family:Syne,sans-serif;font-size:12px;color:var(--text3);cursor:pointer;transition:all .2s}
-.btn-secondary:hover{border-color:var(--border2);color:var(--text)}
+.btn-primary{flex:1;padding:11px;background:var(--r);border:none;border-radius:8px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;color:#fff;cursor:pointer;transition:all .2s}
+.btn-primary:hover{background:var(--r2)}
+.btn-secondary{flex:1;padding:11px;background:transparent;border:1px solid #1a1a1a;border-radius:8px;font-family:'Inter',sans-serif;font-size:12px;color:var(--t4);cursor:pointer;transition:all .2s;font-weight:500}
+.btn-secondary:hover{border-color:#333;color:var(--t2)}
 
-/* ── NOTIFICATIONS ── */
-.notif{position:fixed;bottom:24px;right:24px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:14px 20px;font-size:13px;color:var(--text);z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;max-width:320px}
+/* NOTIFICATIONS */
+.notif{position:fixed;bottom:22px;right:22px;background:var(--bg2);border:1px solid #222;border-radius:10px;padding:13px 18px;font-size:13px;color:var(--t1);z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;max-width:300px;font-weight:500}
 .notif.show{transform:translateY(0);opacity:1}
-.notif.success{border-color:rgba(74,222,128,.3);color:var(--green)}
-.notif.error{border-color:rgba(239,68,68,.3);color:var(--red)}
+.notif.success{border-color:rgba(74,222,128,.25);color:var(--green)}
+.notif.error{border-color:rgba(239,68,68,.25);color:var(--err)}
+
+/* BACK BUTTON */
+.back-btn-app{background:var(--bg3);border:1px solid #1a1a1a;border-radius:8px;padding:7px 13px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:var(--t4);cursor:pointer;transition:all .2s;white-space:nowrap}
+.back-btn-app:hover{border-color:#333;color:var(--t2)}
+
+/* MAKE.COM CONNECT */
+.make-connect-bar{padding:10px 13px;border-radius:9px;background:var(--bg3);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px;margin-bottom:8px;border:1px solid #111}
+.make-connect-bar:hover{border-color:#222}
+.make-dot{width:7px;height:7px;border-radius:50%;background:#333;flex-shrink:0;transition:background .3s}
+.make-dot.connected{background:var(--green);box-shadow:0 0 6px var(--green)}
+.make-connect-label{font-size:11px;font-weight:600;color:var(--t4)}
+.make-connect-sub{font-size:10px;color:#333;margin-top:1px}
+.create-make-btn{display:inline-flex;align-items:center;gap:7px;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.18);border-radius:8px;padding:9px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--green);cursor:pointer;transition:all .2s;letter-spacing:.3px;text-transform:uppercase;width:100%;justify-content:center;margin-top:8px}
+.create-make-btn:hover{background:rgba(74,222,128,.14);transform:translateY(-1px)}
+.create-make-btn:disabled{opacity:.4;cursor:wait;transform:none}
 
 @media(max-width:768px){
   .sidebar{display:none}
   .stats-grid{grid-template-columns:1fr 1fr}
   .wizard-grid,.email-grid{grid-template-columns:1fr}
   .quick-actions{grid-template-columns:1fr}
+  .bp-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
 <body>
 
-<!-- ══════════════ LOGIN ══════════════ -->
+<!-- LOGIN -->
 <div id="loginScreen">
   <div class="login-bg"></div>
   <div class="login-box">
-    <div class="login-logo">AutoFlow</div>
+    <div class="login-logo">
+      <div class="login-logo-text">AutoFlow</div>
+    </div>
     <div class="login-sub">AI Automation Platform</div>
     <label class="login-label">Email Address</label>
     <input class="login-input" id="loginEmail" type="email" placeholder="your@email.com" autocomplete="email"/>
     <label class="login-label">Access Code</label>
-    <input class="login-input" id="loginCode" type="text" placeholder="Enter your access code" style="font-family:'JetBrains Mono',monospace;letter-spacing:2px"/>
+    <input class="login-input" id="loginCode" type="text" placeholder="Enter your access code" style="font-family:'Courier New',monospace;letter-spacing:2px"/>
     <button class="login-btn" id="loginBtn" onclick="handleLogin()">Sign In to AutoFlow</button>
     <div class="login-error" id="loginError"></div>
   </div>
 </div>
 
-<!-- ══════════════ APP ══════════════ -->
+<!-- APP -->
 <div id="app">
 
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sidebar-logo">
       <div class="sidebar-logo-text">AutoFlow</div>
-      <div class="sidebar-logo-sub">AI Platform</div>
     </div>
     <div class="sidebar-nav">
       <div class="nav-item active" onclick="showPage('dashboard',this)">
-        <span class="nav-icon">📊</span>Dashboard
+        <span class="nav-icon">◈</span>Dashboard
       </div>
       <div class="nav-item" onclick="showPage('wizard',this)">
         <span class="nav-icon">⚡</span>Automation Wizard
       </div>
-      <div class="nav-item" onclick="showPage('chat',this)">
-        <span class="nav-icon">🤖</span>AI Assistant
+      <div class="nav-item" onclick="showPage('blueprints',this)">
+        <span class="nav-icon">⬇</span>Blueprint Library
       </div>
-
+      <div class="nav-item" onclick="showPage('chat',this)">
+        <span class="nav-icon">◎</span>AI Assistant
+      </div>
+      <div class="nav-item" onclick="showPage('email',this)">
+        <span class="nav-icon">✉</span>Email Outreach
+      </div>
       <div class="nav-divider"></div>
       <div class="nav-item" onclick="showPage('tracker',this)">
-        <span class="nav-icon">💼</span>Client Tracker
+        <span class="nav-icon">◉</span>Client Tracker
       </div>
       <div class="nav-item" onclick="showPage('logs',this)">
-        <span class="nav-icon">📋</span>Activity Logs
+        <span class="nav-icon">≡</span>Activity Logs
       </div>
     </div>
     <div class="sidebar-bottom">
+      <div class="make-connect-bar" onclick="openMakeSettings()">
+        <div class="make-dot" id="makeDot"></div>
+        <div>
+          <div class="make-connect-label" id="makeLabel">Connect Make.com</div>
+          <div class="make-connect-sub" id="makeSub">Click to configure</div>
+        </div>
+      </div>
       <div class="user-info">
         <div class="user-avatar" id="userAvatar">A</div>
         <div class="user-email" id="userEmailDisplay">user@email.com</div>
@@ -264,20 +316,20 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
   <!-- MAIN -->
   <div class="main">
     <div class="topbar">
-      <div style="display:flex;align-items:center;gap:14px">
-        <button id="backBtn" onclick="goBack()" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:Syne,sans-serif;font-size:12px;color:var(--text3);cursor:pointer;transition:all .2s;white-space:nowrap" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">← Back</button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button id="backBtn" onclick="goBack()" class="back-btn-app" style="display:none">← Back</button>
         <div>
           <div class="topbar-title" id="topbarTitle">Dashboard</div>
-          <div class="topbar-sub" id="topbarSub">Welcome back! Your automations are running.</div>
+          <div class="topbar-sub" id="topbarSub">Welcome back. Your automations are running.</div>
         </div>
       </div>
       <div class="topbar-right">
         <div class="status-dot"></div>
-        <span style="font-size:11px;color:var(--text3);letter-spacing:1px">ALL SYSTEMS ONLINE</span>
+        <span style="font-size:10px;color:var(--t4);letter-spacing:1.5px;font-weight:700">ALL SYSTEMS ONLINE</span>
       </div>
     </div>
 
-    <!-- ── DASHBOARD ── -->
+    <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">
       <div class="stats-grid">
         <div class="stat-card">
@@ -287,19 +339,19 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
           <div class="stat-change">↑ All time</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">💼</div>
+          <div class="stat-icon">◉</div>
           <div class="stat-val" id="stat-clients">0</div>
           <div class="stat-label">Active Clients</div>
           <div class="stat-change">↑ Monthly retainers</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">💰</div>
+          <div class="stat-icon">$</div>
           <div class="stat-val" id="stat-revenue">$0</div>
           <div class="stat-label">Monthly Revenue</div>
           <div class="stat-change">↑ Recurring</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">✉️</div>
+          <div class="stat-icon">✉</div>
           <div class="stat-val" id="stat-emails">0</div>
           <div class="stat-label">Emails Sent</div>
           <div class="stat-change">↑ This month</div>
@@ -313,21 +365,25 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
           <div class="qa-title">Generate Automation Package</div>
           <div class="qa-desc">Create a complete Make.com scenario for any client in 30 seconds</div>
         </div>
-        <div class="qa-btn" onclick="showPage('chat',document.querySelector('[onclick*=chat]'))">
-          <span class="qa-icon">🤖</span>
-          <div class="qa-title">Ask AI Assistant</div>
-          <div class="qa-desc">Get instant answers about Make.com, APIs, pricing, outreach — anything</div>
+        <div class="qa-btn" onclick="showPage('blueprints',document.querySelector('[onclick*=blueprints]'))">
+          <span class="qa-icon">⬇</span>
+          <div class="qa-title">Download Blueprints</div>
+          <div class="qa-desc">Import ready-made Make.com scenarios directly into your account</div>
         </div>
-
+        <div class="qa-btn" onclick="showPage('chat',document.querySelector('[onclick*=chat]'))">
+          <span class="qa-icon">◎</span>
+          <div class="qa-title">Ask AI Assistant</div>
+          <div class="qa-desc">Get instant answers — pricing, outreach, Make.com, APIs, anything</div>
+        </div>
       </div>
 
       <div class="section-title">Recent Activity</div>
       <div class="clients-table" id="dashActivity">
-        <div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">Loading activity...</div>
+        <div style="padding:28px;text-align:center;color:var(--t4);font-size:13px">Loading activity...</div>
       </div>
     </div>
 
-    <!-- ── WIZARD ── -->
+    <!-- AUTOMATION WIZARD -->
     <div class="page" id="page-wizard">
       <div class="wizard-grid">
         <div class="wizard-form">
@@ -336,7 +392,7 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
             <label class="form-label">Client Industry *</label>
             <select class="form-select" id="wIndustry">
               <option value="">— Select industry —</option>
-              <option>Restaurant / Food & Beverage</option>
+              <option>Restaurant / Food &amp; Beverage</option>
               <option>Real Estate Agency</option>
               <option>Beauty Salon / Spa</option>
               <option>Medical / Dental Clinic</option>
@@ -352,18 +408,21 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
           </div>
           <div class="form-group">
             <label class="form-label">What do they need automated? *</label>
-            <select class="form-select" id="wNeed">
+            <select class="form-select" id="wNeed" onchange="updateBlueprintHint()">
               <option value="">— Select automation type —</option>
               <option>WhatsApp Auto-Reply Bot</option>
               <option>Instagram DM Auto-Reply</option>
               <option>Lead Follow-Up (Form → Email)</option>
               <option>Cold Email Campaign System</option>
               <option>Google Sheets CRM + Weekly Report</option>
+              <option>Invoice &amp; Payment Reminders</option>
               <option>Appointment Booking System</option>
-              <option>Invoice & Payment Reminders</option>
               <option>Social Media Auto-Post</option>
               <option>Full Omnichannel Package</option>
             </select>
+          </div>
+          <div id="blueprintHint" style="display:none;background:var(--r3);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--r);font-weight:600">
+            ⬇ Ready-made blueprint available for this automation type
           </div>
           <div class="form-group">
             <label class="form-label">Business Size</label>
@@ -375,7 +434,7 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
           </div>
           <div class="form-group">
             <label class="form-label">Client's Main Pain Point</label>
-            <textarea class="form-textarea" id="wPain" placeholder="e.g. They get 50+ WhatsApp messages per day and can't reply fast enough. Losing clients to competitors who reply instantly..."></textarea>
+            <textarea class="form-textarea" id="wPain" placeholder="e.g. They get 50+ WhatsApp messages per day and can't reply fast enough..."></textarea>
           </div>
           <div class="form-group">
             <label class="form-label">Client Budget Range</label>
@@ -396,52 +455,144 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
           <div class="section-title" style="margin-bottom:20px">Generated Package</div>
           <div class="output-placeholder" id="wizardPlaceholder">
             <span class="icon">⚡</span>
-            <span>Fill in the form and click Generate to create a complete automation package for your client.</span>
+            <span>Fill in the client details and click Generate to create a complete automation package.</span>
           </div>
           <div class="output-content" id="wizardOutput">
             <div class="output-section">
-              <div class="output-section-title">📋 What You Will Build</div>
+              <div class="output-section-title">What You Will Build</div>
               <div class="output-text" id="outWhat"></div>
             </div>
             <div class="output-section">
-              <div class="output-section-title">⚙️ Make.com Modules Needed</div>
+              <div class="output-section-title">Make.com Modules</div>
               <div class="output-text" id="outModules"></div>
             </div>
             <div class="output-section">
-              <div class="output-section-title">🤖 GPT System Message</div>
+              <div class="output-section-title">GPT System Message</div>
               <div class="output-text" id="outPrompt"></div>
               <button class="copy-btn" onclick="copyText('outPrompt')">Copy Prompt</button>
             </div>
             <div class="output-section" style="display:flex;justify-content:space-between;align-items:flex-start">
               <div>
-                <div class="output-section-title">💰 Recommended Pricing</div>
+                <div class="output-section-title">Recommended Pricing</div>
                 <div class="output-price" id="outPrice"></div>
                 <div class="output-price-sub" id="outPriceSub"></div>
               </div>
               <div style="text-align:right">
-                <div class="output-section-title">⏱️ Build Time</div>
+                <div class="output-section-title">Build Time</div>
                 <div class="output-price" id="outTime" style="font-size:22px"></div>
                 <div class="output-price-sub">estimated hours</div>
               </div>
             </div>
             <div class="output-section">
-              <div class="output-section-title">✉️ Outreach Message</div>
+              <div class="output-section-title">Outreach Message</div>
               <div class="output-text" id="outEmail"></div>
               <button class="copy-btn" onclick="copyText('outEmail')">Copy Message</button>
+            </div>
+            <div id="wizardBlueprintSection" style="display:none">
+              <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--r);font-weight:700;margin-bottom:10px">Make.com Blueprint</div>
+              <a id="wizardBlueprintLink" href="#" download class="download-bp-btn">
+                ⬇ Download Blueprint (.json)
+              </a>
+              <button id="wizardCreateMakeBtn" class="create-make-btn" onclick="createMakeScenarioFromWizard()" style="margin-top:8px">
+                ◈ Create Scenario in Make.com
+              </button>
+              <div style="font-size:11px;color:var(--t4);margin-top:8px;line-height:1.6">Import the .json file into Make.com manually, or use "Create in Make.com" if you've connected your account.</div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── CHAT ── -->
+    <!-- BLUEPRINT LIBRARY -->
+    <div class="page" id="page-blueprints">
+      <div style="margin-bottom:24px">
+        <div style="font-size:13px;color:var(--t4);line-height:1.7;max-width:640px">
+          Download ready-made Make.com scenarios. Import each .json file directly into Make.com: open your account → <strong style="color:var(--t2)">Create a new scenario</strong> → <strong style="color:var(--t2)">Import Blueprint</strong> → select the file.
+        </div>
+      </div>
+      <div class="bp-grid">
+
+        <div class="bp-card">
+          <div class="bp-icon">💬</div>
+          <div class="bp-badge">✓ Ready to import</div>
+          <div class="bp-name">WhatsApp Auto-Reply Bot</div>
+          <div class="bp-desc">Automatically reply to every WhatsApp message in seconds using GPT-4. Works 24/7 with your custom system prompt.</div>
+          <div class="bp-modules"><strong>Modules:</strong> Webhook → OpenAI (GPT-4) → 360dialog HTTP Request</div>
+          <a href="/blueprints/whatsapp-bot.json" download="whatsapp-bot.json" class="bp-download">⬇ Download Blueprint</a>
+          <button class="create-make-btn" onclick="createMakeScenario('whatsapp-bot.json','WhatsApp Auto-Reply Bot')">◈ Create in Make.com</button>
+        </div>
+
+        <div class="bp-card">
+          <div class="bp-icon">📸</div>
+          <div class="bp-badge">✓ Ready to import</div>
+          <div class="bp-name">Instagram DM Auto-Reply</div>
+          <div class="bp-desc">Respond to Instagram DMs automatically using AI. Capture leads from DMs without any manual work.</div>
+          <div class="bp-modules"><strong>Modules:</strong> Webhook → OpenAI (GPT-4) → Instagram Graph API</div>
+          <a href="/blueprints/instagram-dm-bot.json" download="instagram-dm-bot.json" class="bp-download">⬇ Download Blueprint</a>
+          <button class="create-make-btn" onclick="createMakeScenario('instagram-dm-bot.json','Instagram DM Auto-Reply')">◈ Create in Make.com</button>
+        </div>
+
+        <div class="bp-card">
+          <div class="bp-icon">🎯</div>
+          <div class="bp-badge">✓ Ready to import</div>
+          <div class="bp-name">Lead Follow-Up System</div>
+          <div class="bp-desc">Watch a Google Sheet for new leads and automatically send a personalized follow-up email using AI within minutes.</div>
+          <div class="bp-modules"><strong>Modules:</strong> Google Sheets (Watch Rows) → OpenAI → Gmail (Send Email)</div>
+          <a href="/blueprints/lead-followup-system.json" download="lead-followup-system.json" class="bp-download">⬇ Download Blueprint</a>
+          <button class="create-make-btn" onclick="createMakeScenario('lead-followup-system.json','Lead Follow-Up System')">◈ Create in Make.com</button>
+        </div>
+
+        <div class="bp-card">
+          <div class="bp-icon">📧</div>
+          <div class="bp-badge">✓ Ready to import</div>
+          <div class="bp-name">Cold Email Pipeline</div>
+          <div class="bp-desc">Pull prospects from a Google Sheet and send AI-personalized cold emails at scale using Instantly.ai integration.</div>
+          <div class="bp-modules"><strong>Modules:</strong> Google Sheets → OpenAI → Instantly.ai HTTP Request</div>
+          <a href="/blueprints/cold-email-pipeline.json" download="cold-email-pipeline.json" class="bp-download">⬇ Download Blueprint</a>
+          <button class="create-make-btn" onclick="createMakeScenario('cold-email-pipeline.json','Cold Email Pipeline')">◈ Create in Make.com</button>
+        </div>
+
+        <div class="bp-card">
+          <div class="bp-icon">📊</div>
+          <div class="bp-badge">✓ Ready to import</div>
+          <div class="bp-name">Google Sheets CRM</div>
+          <div class="bp-desc">Full CRM automation — log new contacts, generate weekly revenue reports, and send automated client updates via email.</div>
+          <div class="bp-modules"><strong>Modules:</strong> Webhook → Google Sheets → OpenAI → Gmail (Weekly Report)</div>
+          <a href="/blueprints/google-sheets-crm.json" download="google-sheets-crm.json" class="bp-download">⬇ Download Blueprint</a>
+          <button class="create-make-btn" onclick="createMakeScenario('google-sheets-crm.json','Google Sheets CRM')">◈ Create in Make.com</button>
+        </div>
+
+        <div class="bp-card">
+          <div class="bp-icon">💳</div>
+          <div class="bp-badge">✓ Ready to import</div>
+          <div class="bp-name">Invoice &amp; Payment Reminders</div>
+          <div class="bp-desc">Monitor Stripe for overdue invoices and automatically send personalized payment reminder emails to clients.</div>
+          <div class="bp-modules"><strong>Modules:</strong> Stripe (Watch Events) → OpenAI → Gmail (Payment Reminder)</div>
+          <a href="/blueprints/stripe-billing-automation.json" download="stripe-billing-automation.json" class="bp-download">⬇ Download Blueprint</a>
+          <button class="create-make-btn" onclick="createMakeScenario('stripe-billing-automation.json','Invoice & Payment Reminders')">◈ Create in Make.com</button>
+        </div>
+
+        <div class="bp-card">
+          <div class="bp-icon">📝</div>
+          <div class="bp-badge">✓ Ready to import</div>
+          <div class="bp-name">AI Proposal Generator</div>
+          <div class="bp-desc">Auto-generate professional client proposals from a form submission. Sends a polished PDF-ready proposal email instantly.</div>
+          <div class="bp-modules"><strong>Modules:</strong> Webhook → OpenAI (Proposal) → Gmail (Send Proposal)</div>
+          <a href="/blueprints/ai-proposal-generator.json" download="ai-proposal-generator.json" class="bp-download">⬇ Download Blueprint</a>
+          <button class="create-make-btn" onclick="createMakeScenario('ai-proposal-generator.json','AI Proposal Generator')">◈ Create in Make.com</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- AI CHAT -->
     <div class="page" id="page-chat">
       <div class="chat-wrap">
         <div class="chat-messages" id="chatMessages">
           <div class="chat-msg">
             <div class="chat-avatar ai">A</div>
             <div class="chat-bubble ai">
-              👋 Hey! I'm AutoFlow AI — your personal automation expert.<br><br>
+              Hey! I'm AutoFlow AI — your personal automation expert.<br><br>
               I can help you with <strong>anything</strong> — Make.com setup, WhatsApp API, Instagram API, GPT prompts, pricing strategies, sales scripts, objection handling, client outreach, and more.<br><br>
               I respond in whatever language you write in. What do you want to know?
             </div>
@@ -461,7 +612,7 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
       </div>
     </div>
 
-    <!-- ── EMAIL ── -->
+    <!-- EMAIL OUTREACH -->
     <div class="page" id="page-email">
       <div class="email-grid">
         <div class="email-form-wrap">
@@ -476,7 +627,7 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
           </div>
           <div class="form-group">
             <label class="form-label">Their Company</label>
-            <input class="form-input" id="emailCompany" placeholder="Restaurant Name / Agency Name"/>
+            <input class="form-input" id="emailCompany" placeholder="Restaurant / Agency Name"/>
           </div>
           <div class="form-group">
             <label class="form-label">Subject *</label>
@@ -484,44 +635,43 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
           </div>
           <div class="form-group">
             <label class="form-label">Message *</label>
-            <textarea class="form-textarea" id="emailBody" style="min-height:160px" placeholder="Write your email or click a template on the right..."></textarea>
+            <textarea class="form-textarea" id="emailBody" style="min-height:150px" placeholder="Write your email or click a template on the right..."></textarea>
           </div>
-          <button class="send-btn" id="sendEmailBtn" onclick="generateAndSendEmail()">✨ Generate with AI + Send</button>
-          <button class="send-btn" style="background:var(--bg3);color:var(--text);margin-top:8px;border:1px solid var(--border)" onclick="sendEmailDirect()">Send as Written</button>
+          <button class="send-btn" id="sendEmailBtn" onclick="generateAndSendEmail()">✦ Generate with AI + Send</button>
+          <button class="send-btn send-btn-alt" onclick="sendEmailDirect()">Send as Written</button>
           <div class="email-status" id="emailStatus"></div>
         </div>
-
         <div class="email-templates">
           <div class="section-title" style="margin-bottom:20px">Templates</div>
           <div class="template-card" onclick="loadTemplate('cold')">
-            <div class="template-name">🎯 Cold Outreach — WhatsApp Bot</div>
-            <div class="template-desc">First contact for restaurant/local business WhatsApp automation</div>
+            <div class="template-name">Cold Outreach — WhatsApp Bot</div>
+            <div class="template-desc">First contact for restaurant/local business automation</div>
           </div>
           <div class="template-card" onclick="loadTemplate('followup')">
-            <div class="template-name">🔄 Follow-Up — Day 3</div>
-            <div class="template-desc">Follow up on initial outreach with no reply after 3 days</div>
+            <div class="template-name">Follow-Up — Day 3</div>
+            <div class="template-desc">Follow up with no reply after 3 days</div>
           </div>
           <div class="template-card" onclick="loadTemplate('proposal')">
-            <div class="template-name">📋 Proposal Follow-Up</div>
+            <div class="template-name">Proposal Follow-Up</div>
             <div class="template-desc">Follow up after sending a proposal — create urgency</div>
           </div>
           <div class="template-card" onclick="loadTemplate('delivery')">
-            <div class="template-name">🎉 Delivery Confirmation</div>
-            <div class="template-desc">Send when delivering the completed automation to client</div>
+            <div class="template-name">Delivery Confirmation</div>
+            <div class="template-desc">Send when delivering the completed automation</div>
           </div>
           <div class="template-card" onclick="loadTemplate('testimonial')">
-            <div class="template-name">⭐ Testimonial Request</div>
+            <div class="template-name">Testimonial Request</div>
             <div class="template-desc">Ask for a testimonial 2–3 weeks after delivery</div>
           </div>
           <div class="template-card" onclick="loadTemplate('referral')">
-            <div class="template-name">🤝 Referral Request</div>
+            <div class="template-name">Referral Request</div>
             <div class="template-desc">Ask happy clients for referrals</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── CLIENT TRACKER ── -->
+    <!-- CLIENT TRACKER -->
     <div class="page" id="page-tracker">
       <div class="tracker-header">
         <div class="section-title" style="margin-bottom:0">Client Tracker</div>
@@ -536,31 +686,69 @@ body{background:var(--bg);color:var(--text);font-family:Syne,sans-serif;overflow
           <div class="th">Since</div>
         </div>
         <div id="clientsBody">
-          <div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">No clients yet. Add your first client above.</div>
+          <div style="padding:28px;text-align:center;color:var(--t4);font-size:13px">No clients yet. Add your first client above.</div>
         </div>
       </div>
       <div class="revenue-total">
         <div>
           <div class="revenue-label">Total Monthly Revenue</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:4px" id="clientCount">0 active clients</div>
+          <div style="font-size:11px;color:var(--t4);margin-top:4px" id="clientCount">0 active clients</div>
         </div>
         <div class="revenue-amount" id="totalRevenue">$0/mo</div>
       </div>
     </div>
 
-    <!-- ── LOGS ── -->
+    <!-- ACTIVITY LOGS -->
     <div class="page" id="page-logs">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
         <div class="section-title" style="margin-bottom:0">Activity Logs</div>
-        <button onclick="loadLogs()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 16px;font-family:Syne,sans-serif;font-size:12px;color:var(--text3);cursor:pointer">↻ Refresh</button>
+        <button onclick="loadLogs()" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:8px;padding:8px 15px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:var(--t4);cursor:pointer;letter-spacing:.5px">↻ Refresh</button>
       </div>
       <div class="clients-table" id="logsList">
-        <div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">Loading logs...</div>
+        <div style="padding:28px;text-align:center;color:var(--t4);font-size:13px">Loading logs...</div>
       </div>
     </div>
 
   </div><!-- end main -->
 </div><!-- end app -->
+
+<!-- MAKE.COM SETTINGS MODAL -->
+<div class="modal-overlay" id="makeModal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title">Connect Make.com</div>
+    <div style="font-size:12px;color:var(--t4);margin-bottom:20px;line-height:1.7">
+      Enter your Make.com API key to create scenarios directly from AutoFlow.<br>
+      Get your key at <strong style="color:var(--t2)">make.com → Profile → API access</strong>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Make.com API Key *</label>
+      <input class="form-input" id="makeApiKey" type="password" placeholder="Paste your Make.com API key here" style="font-family:'Courier New',monospace"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Region / Zone</label>
+      <select class="form-select" id="makeZone">
+        <option value="eu1.make.com">eu1.make.com (Europe — default)</option>
+        <option value="eu2.make.com">eu2.make.com (Europe 2)</option>
+        <option value="us1.make.com">us1.make.com (United States)</option>
+        <option value="us2.make.com">us2.make.com (United States 2)</option>
+      </select>
+    </div>
+    <div id="makeTeamSection" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Select Team *</label>
+        <select class="form-select" id="makeTeamSelect"></select>
+      </div>
+    </div>
+    <div id="makeStatus" style="font-size:12px;min-height:18px;margin-top:4px;margin-bottom:12px"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeMakeModal()">Cancel</button>
+      <button class="btn-primary" id="makeConnectBtn" onclick="connectMake()">Connect Account</button>
+    </div>
+    <div id="makeDisconnectWrap" style="display:none;margin-top:12px;text-align:center">
+      <button onclick="disconnectMake()" style="background:none;border:none;font-size:11px;color:var(--t4);cursor:pointer;text-decoration:underline">Disconnect account</button>
+    </div>
+  </div>
+</div>
 
 <!-- ADD CLIENT MODAL -->
 <div class="modal-overlay" id="addClientModal">
@@ -602,7 +790,17 @@ let currentUser = JSON.parse(localStorage.getItem('af_user') || 'null');
 let clients = JSON.parse(localStorage.getItem('af_clients') || '[]');
 let chatHistory = [];
 
-// ══ LOGIN ══
+// Blueprint mapping for wizard
+const BLUEPRINT_MAP = {
+  'WhatsApp Auto-Reply Bot': '/blueprints/whatsapp-bot.json',
+  'Instagram DM Auto-Reply': '/blueprints/instagram-dm-bot.json',
+  'Lead Follow-Up (Form → Email)': '/blueprints/lead-followup-system.json',
+  'Cold Email Campaign System': '/blueprints/cold-email-pipeline.json',
+  'Google Sheets CRM + Weekly Report': '/blueprints/google-sheets-crm.json',
+  'Invoice & Payment Reminders': '/blueprints/stripe-billing-automation.json'
+};
+
+// LOGIN
 async function handleLogin(){
   const email = document.getElementById('loginEmail').value.trim();
   const code = document.getElementById('loginCode').value.trim().toUpperCase();
@@ -635,6 +833,7 @@ function launchApp(){
   app.classList.add('visible');
   document.getElementById('userAvatar').textContent = currentUser.name ? currentUser.name[0].toUpperCase() : currentUser.email[0].toUpperCase();
   document.getElementById('userEmailDisplay').textContent = currentUser.email;
+  updateMakeSidebar();
   loadDashboard();
   loadLogs();
   renderClients();
@@ -646,12 +845,12 @@ function handleLogout(){
   location.reload();
 }
 
-function authHeaders(){ 
+function authHeaders(){
   const t = token || localStorage.getItem('af_token') || '';
-  return {'Content-Type':'application/json','Authorization':'Bearer '+t}; 
+  return {'Content-Type':'application/json','Authorization':'Bearer '+t};
 }
 
-// ══ AUTO LOGIN ══
+// AUTO LOGIN
 window.onload = function(){
   if(token && currentUser){
     document.getElementById('loginEmail').value = currentUser.email;
@@ -661,7 +860,7 @@ window.onload = function(){
   document.getElementById('loginEmail').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('loginCode').focus(); });
 };
 
-// ══ NAVIGATION ══
+// NAVIGATION
 let currentPage = 'dashboard';
 let previousPage = 'dashboard';
 
@@ -676,14 +875,14 @@ function showPage(page, navEl){
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   if(navEl) navEl.classList.add('active');
-  // Show back button only when not on dashboard
   const backBtn = document.getElementById('backBtn');
   if(backBtn) backBtn.style.display = page !== 'dashboard' ? 'block' : 'none';
   const titles = {
-    dashboard: ['Dashboard', 'Welcome back! Your automations are running.'],
+    dashboard: ['Dashboard', 'Welcome back. Your automations are running.'],
     wizard: ['Automation Wizard', 'Generate complete packages for any client in 30 seconds.'],
+    blueprints: ['Blueprint Library', 'Download ready-made Make.com scenarios and import them instantly.'],
     chat: ['AI Assistant', 'Ask anything — automation, pricing, outreach, Make.com, APIs.'],
-    email: ['Email Automation', 'Generate and send personalized outreach emails instantly.'],
+    email: ['Email Outreach', 'Generate and send personalized outreach emails instantly.'],
     tracker: ['Client Tracker', 'Manage your clients and track your recurring revenue.'],
     logs: ['Activity Logs', 'Real-time log of all actions and events.']
   };
@@ -695,7 +894,7 @@ function showPage(page, navEl){
   if(page==='dashboard') loadDashboard();
 }
 
-// ══ DASHBOARD ══
+// DASHBOARD
 async function loadDashboard(){
   const active = clients.filter(c => c.status === 'Active');
   const revenue = active.reduce((s,c) => s + (parseInt(c.retainer)||0), 0);
@@ -708,17 +907,24 @@ async function loadDashboard(){
     const emails = logs.filter(l => l.type==='email').length;
     document.getElementById('stat-emails').textContent = emails;
     const act = document.getElementById('dashActivity');
-    if(!logs.length){ act.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">No activity yet. Start by generating an automation or sending an email.</div>'; return; }
-    act.innerHTML = '<div class="table-header" style="grid-template-columns:1fr 1fr 1fr"><div class="th">Time</div><div class="th">Action</div><div class="th">Status</div></div>' +
-      logs.slice(0,8).map(l => `<div class="table-row" style="grid-template-columns:1fr 1fr 1fr">
-        <div class="td" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3)">${new Date(l.time).toLocaleTimeString()}</div>
-        <div class="td">${l.msg}</div>
+    if(!logs.length){ act.innerHTML = '<div style="padding:24px;text-align:center;color:var(--t4);font-size:13px">No activity yet. Start by generating an automation or sending an email.</div>'; return; }
+    act.innerHTML = '<div class="table-header" style="grid-template-columns:1fr 1.5fr 1fr"><div class="th">Time</div><div class="th">Action</div><div class="th">Status</div></div>' +
+      logs.slice(0,8).map(l => `<div class="table-row" style="grid-template-columns:1fr 1.5fr 1fr">
+        <div class="td" style="font-family:'Courier New',monospace;font-size:10px;color:var(--t4)">${new Date(l.time).toLocaleTimeString()}</div>
+        <div class="td" style="font-size:12px">${l.msg}</div>
         <div class="td"><span class="status-badge ${l.status==='success'?'status-active':l.status==='error'?'status-paused':'status-pending'}">${l.status||'info'}</span></div>
       </div>`).join('');
   } catch(e){ console.log('Dashboard load error'); }
 }
 
-// ══ AUTOMATION WIZARD ══
+// WIZARD - blueprint hint
+function updateBlueprintHint(){
+  const need = document.getElementById('wNeed').value;
+  const hint = document.getElementById('blueprintHint');
+  hint.style.display = BLUEPRINT_MAP[need] ? 'block' : 'none';
+}
+
+// AUTOMATION WIZARD
 async function generateAutomation(){
   const industry = document.getElementById('wIndustry').value;
   const need = document.getElementById('wNeed').value;
@@ -753,11 +959,11 @@ IMPORTANT RULES:
 - All prices must reflect premium agency positioning
 
 For ${need}:
-${need.includes('WhatsApp') ? `- Correct modules: Webhooks (Custom Webhook) → OpenAI (Create Chat Completion) → HTTP (Make a Request to 360dialog API)` : ''}
-${need.includes('Instagram') ? `- Correct modules: Webhooks (Custom Webhook) → OpenAI (Create Chat Completion) → HTTP (Make a Request to Instagram Graph API)` : ''}
-${need.includes('Lead Follow') ? `- Correct modules: Google Sheets (Watch New Rows) → OpenAI (Create Chat Completion) → Gmail (Send an Email)` : ''}
-${need.includes('Cold Email') ? `- Correct modules: Google Sheets (Watch New Rows) → OpenAI (Create Chat Completion) → HTTP (Instantly.ai API)` : ''}
-${need.includes('CRM') ? `- Correct modules: Multiple triggers → OpenAI (Create Chat Completion) → Google Sheets (Add a Row) → Gmail (Send an Email)` : ''}
+${need.includes('WhatsApp') ? '- Correct modules: Webhooks (Custom Webhook) → OpenAI (Create Chat Completion) → HTTP (Make a Request to 360dialog API)' : ''}
+${need.includes('Instagram') ? '- Correct modules: Webhooks (Custom Webhook) → OpenAI (Create Chat Completion) → HTTP (Make a Request to Instagram Graph API)' : ''}
+${need.includes('Lead Follow') ? '- Correct modules: Google Sheets (Watch New Rows) → OpenAI (Create Chat Completion) → Gmail (Send an Email)' : ''}
+${need.includes('Cold Email') ? '- Correct modules: Google Sheets (Watch New Rows) → OpenAI (Create Chat Completion) → HTTP (Instantly.ai API)' : ''}
+${need.includes('CRM') ? '- Correct modules: Multiple triggers → OpenAI (Create Chat Completion) → Google Sheets (Add a Row) → Gmail (Send an Email)' : ''}
 
 Respond ONLY with this exact JSON format, no other text:
 {
@@ -777,15 +983,7 @@ Respond ONLY with this exact JSON format, no other text:
       const clean = d.output.replace(/```json|```/g, '').trim();
       data = JSON.parse(clean);
     } catch(e) {
-      data = {
-        what: d.output,
-        modules: 'See output above',
-        prompt: 'Generated above',
-        setupPrice: 'To be determined',
-        monthlyPrice: 'To be determined',
-        buildTime: '4–8',
-        outreach: 'See output above'
-      };
+      data = { what: d.output, modules: 'See output above', prompt: 'Generated above', setupPrice: 'TBD', monthlyPrice: 'TBD', buildTime: '4–8', outreach: 'See output above' };
     }
     document.getElementById('outWhat').textContent = data.what || '';
     document.getElementById('outModules').textContent = data.modules || '';
@@ -794,6 +992,22 @@ Respond ONLY with this exact JSON format, no other text:
     document.getElementById('outPriceSub').textContent = 'Setup fee · Retainer: ' + (data.monthlyPrice || '');
     document.getElementById('outTime').textContent = data.buildTime || '';
     document.getElementById('outEmail').textContent = data.outreach || '';
+
+    // Show blueprint download if available
+    const bpSection = document.getElementById('wizardBlueprintSection');
+    const bpLink = document.getElementById('wizardBlueprintLink');
+    const bpUrl = BLUEPRINT_MAP[need];
+    if(bpUrl){
+      bpLink.href = bpUrl;
+      const fname = bpUrl.split('/').pop();
+      bpLink.download = fname;
+      wizardBlueprintFile = fname;
+      bpSection.style.display = 'block';
+    } else {
+      wizardBlueprintFile = '';
+      bpSection.style.display = 'none';
+    }
+
     document.getElementById('wizardOutput').classList.add('visible');
     notify('Package generated! ✓', 'success');
   } catch(e) {
@@ -805,10 +1019,10 @@ Respond ONLY with this exact JSON format, no other text:
 
 function copyText(id){
   const text = document.getElementById(id).textContent;
-  navigator.clipboard.writeText(text).then(() => notify('Copied to clipboard ✓', 'success'));
+  navigator.clipboard.writeText(text).then(() => notify('Copied ✓', 'success'));
 }
 
-// ══ AI CHAT ══
+// AI CHAT
 async function sendChat(){
   const input = document.getElementById('chatInput');
   const msg = input.value.trim();
@@ -833,7 +1047,7 @@ CRITICAL RULES:
 3. Never say you do not know — always provide the best possible answer.
 4. Format responses clearly with numbered steps when appropriate.`;
 
-    const fullPrompt = systemPrompt + '\n\nConversation history:\n' + 
+    const fullPrompt = systemPrompt + '\n\nConversation history:\n' +
       chatHistory.slice(-6).map(m => m.role.toUpperCase() + ': ' + m.content).join('\n') +
       '\n\nRespond to the latest user message in the same language they used.';
 
@@ -842,16 +1056,15 @@ CRITICAL RULES:
       headers: authHeaders(),
       body: JSON.stringify({ prompt: fullPrompt })
     });
-    
+
     if(!r.ok){
       const errText = await r.text();
-      console.error('AI error:', r.status, errText);
       document.getElementById(thinkingId).remove();
       addChatMsg('Error ' + r.status + ': ' + errText, 'ai');
       document.getElementById('chatSendBtn').disabled = false;
       return;
     }
-    
+
     const d = await r.json();
     let reply = d.output || d.content || d.message || 'Sorry, I could not process that.';
     document.getElementById(thinkingId).remove();
@@ -867,8 +1080,8 @@ CRITICAL RULES:
 function addChatMsg(text, role){
   const el = document.createElement('div');
   el.className = 'chat-msg ' + role;
-  const avatar = role==='ai' ? '<div class="chat-avatar ai">A</div>' : '<div class="chat-avatar user">👤</div>';
-  const formatted = text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>').replace(/`([^`]+)`/g,'<code style="background:var(--bg3);padding:1px 6px;border-radius:4px;font-family:JetBrains Mono,monospace;font-size:12px">$1</code>');
+  const avatar = role==='ai' ? '<div class="chat-avatar ai">A</div>' : '<div class="chat-avatar user">U</div>';
+  const formatted = text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>').replace(/`([^`]+)`/g,'<code style="background:var(--bg3);padding:1px 6px;border-radius:4px;font-family:Courier New,monospace;font-size:12px">$1</code>');
   el.innerHTML = (role==='ai'?avatar:'') + `<div class="chat-bubble ${role}">${formatted}</div>` + (role==='user'?avatar:'');
   document.getElementById('chatMessages').appendChild(el);
   scrollChat();
@@ -879,7 +1092,7 @@ function handleChatKey(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();s
 function autoResize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,160)+'px'; }
 function sendSuggestion(el){ document.getElementById('chatInput').value=el.textContent; sendChat(); }
 
-// ══ EMAIL ══
+// EMAIL
 const templates = {
   cold: {
     subject: 'Quick question about {{company}}',
@@ -921,7 +1134,7 @@ Worth a 15-minute call to finalize?
 [Your Name]`
   },
   delivery: {
-    subject: '🎉 Your automation is live — {{company}}',
+    subject: 'Your automation is live — {{company}}',
     body: `Hi {{name}},
 
 Great news — your AI automation system is now live and running 24/7!
@@ -933,7 +1146,7 @@ Here is what is working right now:
 
 Over the next few days, test it by sending a few messages yourself. Let me know if you want any adjustments.
 
-Welcome to the future of customer communication! 🚀
+Welcome to the future of customer communication!
 
 [Your Name]`
   },
@@ -986,8 +1199,8 @@ async function generateAndSendEmail(){
   if(!to || !subject){ notify('Please fill in the recipient email and subject.', 'error'); return; }
   const btn = document.getElementById('sendEmailBtn');
   const status = document.getElementById('emailStatus');
-  btn.disabled = true; btn.textContent = '✨ Generating...';
-  status.style.color = 'var(--text3)'; status.textContent = 'Generating personalized email with AI...';
+  btn.disabled = true; btn.textContent = 'Generating...';
+  status.style.color = 'var(--t4)'; status.textContent = 'Generating personalized email with AI...';
   try {
     const genR = await fetch(API+'/api/ai/generate', {
       method:'POST',
@@ -1008,7 +1221,6 @@ Rules:
     });
     const genD = await genR.json();
     const finalBody = genD.output || body;
-    // Send the email
     const sendR = await fetch(API+'/api/email/send', {
       method:'POST',
       headers: authHeaders(),
@@ -1017,19 +1229,19 @@ Rules:
     const sendD = await sendR.json();
     if(sendR.ok){
       status.style.color = 'var(--green)';
-      status.textContent = '✓ Email sent successfully to ' + to;
+      status.textContent = '✓ Email sent to ' + to;
       document.getElementById('emailBody').value = finalBody;
       notify('Email sent! ✓', 'success');
       loadLogs();
     } else {
-      status.style.color = 'var(--red)';
-      status.textContent = sendD.error || 'Failed to send. Check your server.';
+      status.style.color = 'var(--err)';
+      status.textContent = sendD.error || 'Failed to send.';
     }
   } catch(e) {
-    status.style.color = 'var(--red)';
+    status.style.color = 'var(--err)';
     status.textContent = 'Connection error. Try again.';
   }
-  btn.disabled = false; btn.textContent = '✨ Generate with AI + Send';
+  btn.disabled = false; btn.textContent = '✦ Generate with AI + Send';
 }
 
 async function sendEmailDirect(){
@@ -1038,7 +1250,7 @@ async function sendEmailDirect(){
   const body = document.getElementById('emailBody').value.trim();
   if(!to || !subject || !body){ notify('Please fill in all fields.', 'error'); return; }
   const status = document.getElementById('emailStatus');
-  status.style.color = 'var(--text3)'; status.textContent = 'Sending...';
+  status.style.color = 'var(--t4)'; status.textContent = 'Sending...';
   try {
     const r = await fetch(API+'/api/email/send', {
       method:'POST',
@@ -1047,26 +1259,26 @@ async function sendEmailDirect(){
     });
     const d = await r.json();
     if(r.ok){ status.style.color='var(--green)'; status.textContent='✓ Sent to '+to; notify('Email sent! ✓','success'); loadLogs(); }
-    else { status.style.color='var(--red)'; status.textContent=d.error||'Send failed.'; }
-  } catch(e){ status.style.color='var(--red)'; status.textContent='Connection error.'; }
+    else { status.style.color='var(--err)'; status.textContent=d.error||'Send failed.'; }
+  } catch(e){ status.style.color='var(--err)'; status.textContent='Connection error.'; }
 }
 
-// ══ CLIENT TRACKER ══
+// CLIENT TRACKER
 function renderClients(){
   const body = document.getElementById('clientsBody');
   if(!clients.length){
-    body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">No clients yet. Add your first client above.</div>';
+    body.innerHTML = '<div style="padding:28px;text-align:center;color:var(--t4);font-size:13px">No clients yet. Add your first client above.</div>';
     document.getElementById('totalRevenue').textContent = '$0/mo';
     document.getElementById('clientCount').textContent = '0 active clients';
     return;
   }
   body.innerHTML = clients.map((c,i) => `
     <div class="table-row">
-      <div class="td" style="font-weight:600">${c.name}</div>
-      <div class="td" style="color:var(--text3)">${c.automation}</div>
+      <div class="td" style="font-weight:700">${c.name}</div>
+      <div class="td" style="color:var(--t4)">${c.automation}</div>
       <div class="td"><span class="status-badge status-${c.status==='Active'?'active':c.status==='Pending'?'pending':'paused'}">${c.status}</span></div>
-      <div class="td" style="color:var(--gold);font-weight:600">$${c.retainer}/mo</div>
-      <div class="td" style="color:var(--text3)">${c.since}</div>
+      <div class="td" style="color:var(--r);font-weight:700">$${c.retainer}/mo</div>
+      <div class="td" style="color:var(--t4)">${c.since}</div>
     </div>`).join('');
   const active = clients.filter(c=>c.status==='Active');
   const total = active.reduce((s,c)=>s+(parseInt(c.retainer)||0),0);
@@ -1095,13 +1307,13 @@ function addClient(){
   notify('Client added! ✓', 'success');
 }
 
-// ══ LOGS ══
+// LOGS
 async function loadLogs(){
   try {
     const r = await fetch(API+'/api/logs', {headers: authHeaders()});
     const logs = await r.json();
     const list = document.getElementById('logsList');
-    if(!logs.length){ list.innerHTML='<div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">No activity yet.</div>'; return; }
+    if(!logs.length){ list.innerHTML='<div style="padding:28px;text-align:center;color:var(--t4);font-size:13px">No activity yet.</div>'; return; }
     list.innerHTML = logs.map(l => `
       <div class="log-item">
         <div class="log-dot ${l.status==='success'?'success':l.status==='error'?'error':'info'}"></div>
@@ -1111,10 +1323,154 @@ async function loadLogs(){
         </div>
         <div class="log-type">${l.type||'event'}</div>
       </div>`).join('');
-  } catch(e){ document.getElementById('logsList').innerHTML='<div style="padding:24px;text-align:center;color:var(--red);font-size:13px">Error loading logs.</div>'; }
+  } catch(e){ document.getElementById('logsList').innerHTML='<div style="padding:24px;text-align:center;color:var(--err);font-size:13px">Error loading logs.</div>'; }
 }
 
-// ══ NOTIFICATIONS ══
+// MAKE.COM INTEGRATION
+let makeConfig = JSON.parse(localStorage.getItem('af_make') || 'null');
+
+function updateMakeSidebar(){
+  const dot = document.getElementById('makeDot');
+  const label = document.getElementById('makeLabel');
+  const sub = document.getElementById('makeSub');
+  if(!dot) return;
+  if(makeConfig && makeConfig.teamId){
+    dot.className = 'make-dot connected';
+    label.textContent = 'Make.com Connected';
+    label.style.color = 'var(--green)';
+    sub.textContent = makeConfig.teamName || makeConfig.zone;
+    sub.style.color = 'var(--green)';
+  } else {
+    dot.className = 'make-dot';
+    label.textContent = 'Connect Make.com';
+    label.style.color = 'var(--t4)';
+    sub.textContent = 'Click to configure';
+    sub.style.color = '#333';
+  }
+}
+
+function openMakeSettings(){
+  const modal = document.getElementById('makeModal');
+  modal.classList.add('open');
+  if(makeConfig){
+    document.getElementById('makeApiKey').value = makeConfig.apiKey || '';
+    document.getElementById('makeZone').value = makeConfig.zone || 'eu1.make.com';
+    if(makeConfig.teamId){
+      document.getElementById('makeTeamSection').style.display = 'block';
+      document.getElementById('makeTeamSelect').innerHTML = `<option value="${makeConfig.teamId}">${makeConfig.teamName || 'Team '+makeConfig.teamId}</option>`;
+      document.getElementById('makeDisconnectWrap').style.display = 'block';
+      document.getElementById('makeConnectBtn').textContent = 'Re-connect';
+    }
+  }
+}
+
+function closeMakeModal(){ document.getElementById('makeModal').classList.remove('open'); }
+
+function disconnectMake(){
+  makeConfig = null;
+  localStorage.removeItem('af_make');
+  closeMakeModal();
+  updateMakeSidebar();
+  document.getElementById('makeTeamSection').style.display = 'none';
+  document.getElementById('makeDisconnectWrap').style.display = 'none';
+  document.getElementById('makeStatus').textContent = '';
+  notify('Make.com disconnected', '');
+}
+
+async function connectMake(){
+  const apiKey = document.getElementById('makeApiKey').value.trim();
+  const zone = document.getElementById('makeZone').value;
+  if(!apiKey){ document.getElementById('makeStatus').innerHTML = '<span style="color:var(--err)">API key required</span>'; return; }
+  const btn = document.getElementById('makeConnectBtn');
+  const status = document.getElementById('makeStatus');
+  btn.disabled = true; btn.textContent = 'Connecting...';
+  status.innerHTML = '<span style="color:var(--t4)">Verifying with Make.com...</span>';
+  try {
+    const r = await fetch(API+'/api/make/connect', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ apiKey, zone })
+    });
+    const d = await r.json();
+    if(!r.ok){ status.innerHTML = `<span style="color:var(--err)">${d.error}</span>`; btn.disabled = false; btn.textContent = 'Connect Account'; return; }
+    const teams = d.teams || [];
+    if(!teams.length){ status.innerHTML = '<span style="color:var(--err)">No teams found on this account.</span>'; btn.disabled = false; btn.textContent = 'Connect Account'; return; }
+    // Populate team dropdown
+    const sel = document.getElementById('makeTeamSelect');
+    sel.innerHTML = teams.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+    document.getElementById('makeTeamSection').style.display = 'block';
+    document.getElementById('makeDisconnectWrap').style.display = 'block';
+    status.innerHTML = '<span style="color:var(--green)">✓ Connected! Select your team and save.</span>';
+    btn.disabled = false; btn.textContent = 'Save Connection';
+    btn.onclick = saveMakeConnection;
+  } catch(e) {
+    status.innerHTML = `<span style="color:var(--err)">Error: ${e.message}</span>`;
+    btn.disabled = false; btn.textContent = 'Connect Account';
+  }
+}
+
+function saveMakeConnection(){
+  const apiKey = document.getElementById('makeApiKey').value.trim();
+  const zone = document.getElementById('makeZone').value;
+  const sel = document.getElementById('makeTeamSelect');
+  const teamId = sel.value;
+  const teamName = sel.options[sel.selectedIndex]?.text || '';
+  makeConfig = { apiKey, zone, teamId, teamName };
+  localStorage.setItem('af_make', JSON.stringify(makeConfig));
+  closeMakeModal();
+  updateMakeSidebar();
+  notify('Make.com connected! ✓', 'success');
+  document.getElementById('makeConnectBtn').onclick = connectMake;
+}
+
+function createMakeScenario(blueprintFile, scenarioName){
+  const btn = event.currentTarget;
+  createMakeScenarioWithBtn(blueprintFile, scenarioName, btn);
+}
+
+let wizardBlueprintFile = '';
+
+async function createMakeScenarioFromWizard(){
+  if(!wizardBlueprintFile) return;
+  const industry = document.getElementById('wIndustry').value;
+  const need = document.getElementById('wNeed').value;
+  const btn = document.getElementById('wizardCreateMakeBtn');
+  await createMakeScenarioWithBtn(wizardBlueprintFile, `${industry} — ${need}`, btn);
+}
+
+async function createMakeScenarioWithBtn(blueprintFile, scenarioName, btn){
+  if(!makeConfig || !makeConfig.teamId){
+    notify('Connect Make.com first (bottom of sidebar)', 'error');
+    openMakeSettings();
+    return;
+  }
+  const origHtml = btn.innerHTML;
+  btn.disabled = true; btn.textContent = '⏳ Creating...';
+  try {
+    const r = await fetch(API+'/api/make/create', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        apiKey: makeConfig.apiKey,
+        zone: makeConfig.zone,
+        teamId: makeConfig.teamId,
+        blueprintFile,
+        scenarioName
+      })
+    });
+    const d = await r.json();
+    if(!r.ok){ notify(d.error || 'Failed to create scenario', 'error'); btn.disabled = false; btn.innerHTML = origHtml; return; }
+    notify('Scenario created in Make.com! ✓', 'success');
+    btn.innerHTML = '✓ Created in Make.com';
+    btn.style.background = 'rgba(74,222,128,.12)';
+    if(d.editUrl) setTimeout(() => window.open(d.editUrl, '_blank'), 600);
+  } catch(e) {
+    notify('Error: ' + e.message, 'error');
+    btn.disabled = false; btn.innerHTML = origHtml;
+  }
+}
+
+// NOTIFICATIONS
 function notify(msg, type=''){
   const el = document.getElementById('notif');
   el.textContent = msg;
