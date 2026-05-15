@@ -668,7 +668,7 @@ app.get('/ai-builder.html', (req, res) => res.sendFile(path.join(__dirname, 'pub
 // START SERVER
 // ════════════════════════════════════════
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`AutoFlow server running on port ${PORT}`);
   addLog('Server started', 'system', 'success');
 });
