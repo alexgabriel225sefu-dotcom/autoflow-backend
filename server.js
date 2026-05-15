@@ -665,10 +665,22 @@ app.get('/ai-builder', (req, res) => res.sendFile(path.join(__dirname, 'public',
 app.get('/ai-builder.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'ai-builder.html')));
 
 // ════════════════════════════════════════
+// CATCH-ALL 404
+// ════════════════════════════════════════
+app.use((req, res) => {
+  res.status(404).json({ error: 'route not found', path: req.path, method: req.method });
+});
+
+// ════════════════════════════════════════
 // START SERVER
 // ════════════════════════════════════════
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`AutoFlow server running on port ${PORT}`);
+  console.log(`AutoFlow server running on port ${PORT} (0.0.0.0)`);
   addLog('Server started', 'system', 'success');
+  // Self-test so we can see in Render logs if routes work
+  fetch(`http://127.0.0.1:${PORT}/ping`)
+    .then(r => r.json())
+    .then(d => console.log('SELF-TEST OK:', JSON.stringify(d)))
+    .catch(e => console.error('SELF-TEST FAIL:', e.message));
 });

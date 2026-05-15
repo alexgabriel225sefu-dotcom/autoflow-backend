@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: autoflow-backend
-    env: node
-    buildCommand: npm install
-    startCommand: node server.js
-    plan: free
-    branch: main
-    healthCheckPath: /ping
