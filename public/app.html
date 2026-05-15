@@ -204,6 +204,11 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
 .bp-download{display:inline-flex;align-items:center;gap:7px;background:var(--r3);border:1px solid var(--border2);border-radius:8px;padding:9px 16px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--r);text-decoration:none;cursor:pointer;transition:all .2s;letter-spacing:.3px;text-transform:uppercase;width:100%;justify-content:center}
 .bp-download:hover{background:rgba(229,62,46,.14);transform:translateY(-1px)}
 .bp-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.15);border-radius:100px;padding:3px 10px;font-size:10px;color:var(--green);font-weight:700;letter-spacing:.5px;margin-bottom:12px}
+.bp-setup{background:var(--bg3);border:1px solid #1a1a1a;border-radius:8px;padding:12px 14px;margin:10px 0;font-size:11px;color:var(--t4);line-height:1.8;display:none}
+.bp-setup.open{display:block}
+.bp-setup strong{color:var(--t2)}
+.bp-setup-toggle{background:none;border:none;font-size:11px;color:var(--t4);cursor:pointer;padding:0;margin-top:6px;text-decoration:underline;font-family:'Inter',sans-serif}
+.bp-setup-toggle:hover{color:var(--t2)}
 
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);z-index:500;display:none;align-items:center;justify-content:center}
@@ -505,9 +510,31 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
 
     <!-- BLUEPRINT LIBRARY -->
     <div class="page" id="page-blueprints">
-      <div style="margin-bottom:24px">
-        <div style="font-size:13px;color:var(--t4);line-height:1.7;max-width:640px">
-          Download ready-made Make.com scenarios. Import each .json file directly into Make.com: open your account → <strong style="color:var(--t2)">Create a new scenario</strong> → <strong style="color:var(--t2)">Import Blueprint</strong> → select the file.
+      <!-- SETUP GUIDE -->
+      <div style="background:var(--bg2);border:1px solid #1a1a1a;border-radius:14px;padding:24px;margin-bottom:26px">
+        <div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:18px;letter-spacing:-.3px;display:flex;align-items:center;gap:10px">
+          <span style="width:3px;height:18px;background:var(--r);border-radius:2px;flex-shrink:0;display:inline-block"></span>
+          How to use these blueprints
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+          <div style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:16px">
+            <div style="font-size:22px;margin-bottom:8px">①</div>
+            <div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:6px">Get your API key</div>
+            <div style="font-size:12px;color:var(--t4);line-height:1.7">Go to <strong style="color:var(--r)">make.com</strong> → click your avatar → <strong style="color:var(--t2)">Profile</strong> → <strong style="color:var(--t2)">API access</strong> → click <strong style="color:var(--t2)">Generate new token</strong> → copy it</div>
+          </div>
+          <div style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:16px">
+            <div style="font-size:22px;margin-bottom:8px">②</div>
+            <div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:6px">Connect your account</div>
+            <div style="font-size:12px;color:var(--t4);line-height:1.7">Click <strong style="color:var(--r)">Connect Make.com</strong> in the bottom-left of the sidebar → paste your API key → select your zone and team → click <strong style="color:var(--t2)">Connect Account</strong></div>
+          </div>
+          <div style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:16px">
+            <div style="font-size:22px;margin-bottom:8px">③</div>
+            <div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:6px">Create the scenario</div>
+            <div style="font-size:12px;color:var(--t4);line-height:1.7">Click <strong style="color:var(--r)">◈ Create in Make.com</strong> on any blueprint below → the scenario appears in your Make.com account automatically</div>
+          </div>
+        </div>
+        <div style="background:rgba(229,62,46,.04);border:1px solid rgba(229,62,46,.12);border-radius:8px;padding:12px 16px;font-size:12px;color:var(--t4);line-height:1.7">
+          <strong style="color:var(--r)">After creation in Make.com:</strong> Open the scenario → connect your apps (OpenAI, Gmail, Google Sheets etc.) → replace the placeholder values (API keys, spreadsheet IDs) → turn the scenario ON. Each blueprint has a <strong style="color:var(--t2)">notes section</strong> with exact setup steps.
         </div>
       </div>
       <div class="bp-grid">
@@ -518,6 +545,16 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
           <div class="bp-name">WhatsApp Auto-Reply Bot</div>
           <div class="bp-desc">Automatically reply to every WhatsApp message in seconds using GPT-4. Works 24/7 with your custom system prompt.</div>
           <div class="bp-modules"><strong>Modules:</strong> Webhook → OpenAI (GPT-4) → 360dialog HTTP Request</div>
+          <button class="bp-setup-toggle" onclick="toggleSetup(this)">▸ View setup steps</button>
+          <div class="bp-setup">
+            <strong>After creating the scenario:</strong><br>
+            1. In Make.com open the scenario → click the <strong>Webhooks</strong> module → copy the webhook URL<br>
+            2. In your <strong>360dialog</strong> dashboard → Settings → set webhook URL to the one you copied<br>
+            3. Click the <strong>OpenAI</strong> module → connect your OpenAI account → customize the system prompt with your client's business name<br>
+            4. Click the <strong>HTTP</strong> module → replace <strong>YOUR_360DIALOG_API_KEY</strong> with your 360dialog key<br>
+            5. Click the <strong>Google Sheets</strong> module → connect your Google account → select or create a spreadsheet<br>
+            6. Click the ON/OFF toggle to activate the scenario
+          </div>
           <a href="/blueprints/whatsapp-bot.json" download="whatsapp-bot.json" class="bp-download">⬇ Download Blueprint</a>
           <button class="create-make-btn" onclick="createMakeScenario('whatsapp-bot.json','WhatsApp Auto-Reply Bot')">◈ Create in Make.com</button>
         </div>
@@ -528,6 +565,16 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
           <div class="bp-name">Instagram DM Auto-Reply</div>
           <div class="bp-desc">Respond to Instagram DMs automatically using AI. Capture leads from DMs without any manual work.</div>
           <div class="bp-modules"><strong>Modules:</strong> Webhook → OpenAI (GPT-4) → Instagram Graph API</div>
+          <button class="bp-setup-toggle" onclick="toggleSetup(this)">▸ View setup steps</button>
+          <div class="bp-setup">
+            <strong>After creating the scenario:</strong><br>
+            1. In Make.com open the scenario → click the <strong>Webhooks</strong> module → copy the webhook URL<br>
+            2. In <strong>Meta Developer Console</strong> → your App → Webhooks → set the callback URL and verify token<br>
+            3. Subscribe to <strong>messages</strong> webhook event on your Instagram Page<br>
+            4. Click the <strong>OpenAI</strong> module → connect your OpenAI account → customize the system prompt<br>
+            5. Click the <strong>HTTP</strong> module → replace <strong>YOUR_PAGE_ACCESS_TOKEN</strong> with your Meta token<br>
+            6. Activate the scenario
+          </div>
           <a href="/blueprints/instagram-dm-bot.json" download="instagram-dm-bot.json" class="bp-download">⬇ Download Blueprint</a>
           <button class="create-make-btn" onclick="createMakeScenario('instagram-dm-bot.json','Instagram DM Auto-Reply')">◈ Create in Make.com</button>
         </div>
@@ -538,6 +585,16 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
           <div class="bp-name">Lead Follow-Up System</div>
           <div class="bp-desc">Watch a Google Sheet for new leads and automatically send a personalized follow-up email using AI within minutes.</div>
           <div class="bp-modules"><strong>Modules:</strong> Google Sheets (Watch Rows) → OpenAI → Gmail (Send Email)</div>
+          <button class="bp-setup-toggle" onclick="toggleSetup(this)">▸ View setup steps</button>
+          <div class="bp-setup">
+            <strong>After creating the scenario:</strong><br>
+            1. Click the <strong>Google Sheets</strong> module → connect your Google account → select your leads spreadsheet → choose the sheet tab<br>
+            2. Make sure your sheet has columns: <strong>Name, Email, Company, Message</strong><br>
+            3. Click the <strong>OpenAI</strong> module → connect your OpenAI account → customize the follow-up prompt<br>
+            4. Click the <strong>Gmail</strong> module → connect your Gmail account → verify the "From" name<br>
+            5. Click "Run once" to test → add a row to your sheet → check your Gmail Sent folder<br>
+            6. Activate the scenario
+          </div>
           <a href="/blueprints/lead-followup-system.json" download="lead-followup-system.json" class="bp-download">⬇ Download Blueprint</a>
           <button class="create-make-btn" onclick="createMakeScenario('lead-followup-system.json','Lead Follow-Up System')">◈ Create in Make.com</button>
         </div>
@@ -548,6 +605,16 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
           <div class="bp-name">Cold Email Pipeline</div>
           <div class="bp-desc">Pull prospects from a Google Sheet and send AI-personalized cold emails at scale using Instantly.ai integration.</div>
           <div class="bp-modules"><strong>Modules:</strong> Google Sheets → OpenAI → Instantly.ai HTTP Request</div>
+          <button class="bp-setup-toggle" onclick="toggleSetup(this)">▸ View setup steps</button>
+          <div class="bp-setup">
+            <strong>After creating the scenario:</strong><br>
+            1. Click the <strong>Google Sheets</strong> module → connect your Google account → select your prospects sheet<br>
+            2. Sheet columns needed: <strong>Name, Email, Company, Status</strong> (Status = "New" for unsent leads)<br>
+            3. Click the <strong>OpenAI</strong> module → connect your OpenAI account<br>
+            4. Click the <strong>HTTP</strong> module → replace <strong>YOUR_INSTANTLY_API_KEY</strong> with your Instantly.ai key (or switch to Gmail if you don't use Instantly)<br>
+            5. Test with one row → verify email is sent → change Status to "Sent" manually or add a Sheets update module<br>
+            6. Set scheduling to run every hour → activate
+          </div>
           <a href="/blueprints/cold-email-pipeline.json" download="cold-email-pipeline.json" class="bp-download">⬇ Download Blueprint</a>
           <button class="create-make-btn" onclick="createMakeScenario('cold-email-pipeline.json','Cold Email Pipeline')">◈ Create in Make.com</button>
         </div>
@@ -558,6 +625,15 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
           <div class="bp-name">Google Sheets CRM</div>
           <div class="bp-desc">Full CRM automation — log new contacts, generate weekly revenue reports, and send automated client updates via email.</div>
           <div class="bp-modules"><strong>Modules:</strong> Webhook → Google Sheets → OpenAI → Gmail (Weekly Report)</div>
+          <button class="bp-setup-toggle" onclick="toggleSetup(this)">▸ View setup steps</button>
+          <div class="bp-setup">
+            <strong>After creating the scenario:</strong><br>
+            1. Click the <strong>Webhooks</strong> module → copy the webhook URL → use it in your contact form or landing page<br>
+            2. Click the <strong>Google Sheets</strong> module → connect your Google account → create a sheet with columns: <strong>Date, Name, Email, Phone, Source, Status</strong><br>
+            3. Click the <strong>OpenAI</strong> module → connect OpenAI → customize the weekly report prompt<br>
+            4. Click the <strong>Gmail</strong> module → connect Gmail → set the recipient email (your client's email)<br>
+            5. Set scheduling for the report section to run every Monday → activate
+          </div>
           <a href="/blueprints/google-sheets-crm.json" download="google-sheets-crm.json" class="bp-download">⬇ Download Blueprint</a>
           <button class="create-make-btn" onclick="createMakeScenario('google-sheets-crm.json','Google Sheets CRM')">◈ Create in Make.com</button>
         </div>
@@ -568,6 +644,15 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
           <div class="bp-name">Invoice &amp; Payment Reminders</div>
           <div class="bp-desc">Monitor Stripe for overdue invoices and automatically send personalized payment reminder emails to clients.</div>
           <div class="bp-modules"><strong>Modules:</strong> Stripe (Watch Events) → OpenAI → Gmail (Payment Reminder)</div>
+          <button class="bp-setup-toggle" onclick="toggleSetup(this)">▸ View setup steps</button>
+          <div class="bp-setup">
+            <strong>After creating the scenario:</strong><br>
+            1. Click the <strong>Stripe</strong> module → connect your Stripe account → select the <strong>invoice.payment_failed</strong> event<br>
+            2. Click the <strong>OpenAI</strong> module → connect OpenAI → the prompt generates a personalized reminder<br>
+            3. Click the <strong>Gmail</strong> module → connect Gmail → verify the "From" name matches your business<br>
+            4. Test: create a test invoice in Stripe and mark it as failed → verify the email arrives<br>
+            5. Activate — all future failed payments will trigger automatic reminders
+          </div>
           <a href="/blueprints/stripe-billing-automation.json" download="stripe-billing-automation.json" class="bp-download">⬇ Download Blueprint</a>
           <button class="create-make-btn" onclick="createMakeScenario('stripe-billing-automation.json','Invoice & Payment Reminders')">◈ Create in Make.com</button>
         </div>
@@ -578,6 +663,16 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
           <div class="bp-name">AI Proposal Generator</div>
           <div class="bp-desc">Auto-generate professional client proposals from a form submission. Sends a polished PDF-ready proposal email instantly.</div>
           <div class="bp-modules"><strong>Modules:</strong> Webhook → OpenAI (Proposal) → Gmail (Send Proposal)</div>
+          <button class="bp-setup-toggle" onclick="toggleSetup(this)">▸ View setup steps</button>
+          <div class="bp-setup">
+            <strong>After creating the scenario:</strong><br>
+            1. Click the <strong>Webhooks</strong> module → copy the webhook URL → connect it to your contact form (Typeform, Tally, or any form)<br>
+            2. Map the form fields: <strong>client_name, company, service_needed, budget, timeline</strong><br>
+            3. Click the <strong>OpenAI</strong> module → connect OpenAI → customize the proposal template prompt with your agency name and services<br>
+            4. Click the <strong>Gmail</strong> module → connect Gmail → set the "From" name to your agency name<br>
+            5. Test: submit your form once → check if the proposal email arrives<br>
+            6. Activate — every form submission now generates and sends a proposal instantly
+          </div>
           <a href="/blueprints/ai-proposal-generator.json" download="ai-proposal-generator.json" class="bp-download">⬇ Download Blueprint</a>
           <button class="create-make-btn" onclick="createMakeScenario('ai-proposal-generator.json','AI Proposal Generator')">◈ Create in Make.com</button>
         </div>
@@ -714,11 +809,17 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
 
 <!-- MAKE.COM SETTINGS MODAL -->
 <div class="modal-overlay" id="makeModal">
-  <div class="modal" style="max-width:500px">
+  <div class="modal" style="max-width:520px">
     <div class="modal-title">Connect Make.com</div>
-    <div style="font-size:12px;color:var(--t4);margin-bottom:20px;line-height:1.7">
-      Enter your Make.com API key to create scenarios directly from AutoFlow.<br>
-      Get your key at <strong style="color:var(--t2)">make.com → Profile → API access</strong>
+    <div style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:14px 16px;margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;color:var(--r);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">How to get your API key</div>
+      <div style="font-size:12px;color:var(--t4);line-height:1.9">
+        <div>1. Go to <strong style="color:var(--t2)">make.com</strong> and log into your account</div>
+        <div>2. Click your <strong style="color:var(--t2)">avatar</strong> (top right) → <strong style="color:var(--t2)">Profile</strong></div>
+        <div>3. Scroll down to <strong style="color:var(--t2)">API access</strong></div>
+        <div>4. Click <strong style="color:var(--t2)">Generate new token</strong></div>
+        <div>5. Copy the token and paste it below</div>
+      </div>
     </div>
     <div class="form-group">
       <label class="form-label">Make.com API Key *</label>
@@ -789,6 +890,13 @@ let token = localStorage.getItem('af_token');
 let currentUser = JSON.parse(localStorage.getItem('af_user') || 'null');
 let clients = JSON.parse(localStorage.getItem('af_clients') || '[]');
 let chatHistory = [];
+
+// Toggle blueprint setup steps
+function toggleSetup(btn){
+  const setup = btn.nextElementSibling;
+  const open = setup.classList.toggle('open');
+  btn.textContent = open ? '▾ Hide setup steps' : '▸ View setup steps';
+}
 
 // Blueprint mapping for wizard
 const BLUEPRINT_MAP = {
