@@ -6,39 +6,39 @@ const Anthropic = require('@anthropic-ai/sdk');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
-process.on('uncaughtException', err => console.error('UNCAUGHT:', err));
-process.on('unhandledRejection', err => console.error('UNHANDLED:', err));
+process.on('uncaughtException', err => console.error('UNCAUGHT EXCEPTION:', err.stack || err));
+process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION:', err));
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
-// Health check — always works, no auth, no files
+// Health check — first route, no deps, always responds
 app.get('/health', (req, res) => res.json({ ok: true, node: process.version, time: new Date().toISOString() }));
+app.get('/ping', (req, res) => res.json({ ok: true, version: 'v5-stable', time: new Date().toISOString() }));
 
 // ── ENV VARIABLES ──
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_PASS = process.env.GMAIL_PASS;
 const JWT_SECRET = process.env.JWT_SECRET || 'autoflow-secret-2024';
 
-// ── CLIENTS ──
-const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
-const anthropic = ANTHROPIC_KEY ? new Anthropic({ apiKey: ANTHROPIC_KEY }) : null;
+// ── CLIENTS (wrapped in try-catch so a bad key never crashes the server) ──
+let supabase = null;
+try { if (SUPABASE_URL && SUPABASE_KEY) supabase = createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) { console.error('Supabase init error:', e.message); }
+
+let anthropic = null;
+try { if (ANTHROPIC_KEY) anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY }); } catch(e) { console.error('Anthropic init error:', e.message); }
 
 // ── BREVO SMTP TRANSPORTER ──
 const BREVO_USER = process.env.BREVO_SMTP_USER;
 const BREVO_PASS = process.env.BREVO_SMTP_PASS;
-const transporter = BREVO_USER && BREVO_PASS ? nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com',
-  port: 587,
-  secure: false,
-  auth: { user: BREVO_USER, pass: BREVO_PASS }
-}) : null;
+let transporter = null;
+try {
+  if (BREVO_USER && BREVO_PASS) transporter = nodemailer.createTransport({ host: 'smtp-relay.brevo.com', port: 587, secure: false, auth: { user: BREVO_USER, pass: BREVO_PASS } });
+} catch(e) { console.error('Nodemailer init error:', e.message); }
 
 // ── IN-MEMORY LOGS ──
 const logs = [];
