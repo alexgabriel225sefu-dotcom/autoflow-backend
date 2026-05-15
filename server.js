@@ -6,10 +6,16 @@ const Anthropic = require('@anthropic-ai/sdk');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
+process.on('uncaughtException', err => console.error('UNCAUGHT:', err));
+process.on('unhandledRejection', err => console.error('UNHANDLED:', err));
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+
+// Health check — always works, no auth, no files
+app.get('/health', (req, res) => res.json({ ok: true, node: process.version, time: new Date().toISOString() }));
 
 // ── ENV VARIABLES ──
 const SUPABASE_URL = process.env.SUPABASE_URL;
