@@ -812,18 +812,20 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
   <div class="modal" style="max-width:520px">
     <div class="modal-title">Connect Make.com</div>
     <div style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:14px 16px;margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;color:var(--r);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">How to get your API key</div>
+      <div style="font-size:11px;font-weight:700;color:var(--r);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">Setup in 3 steps</div>
       <div style="font-size:12px;color:var(--t4);line-height:1.9">
-        <div>1. Go to <strong style="color:var(--t2)">make.com</strong> and log into your account</div>
-        <div>2. Click your <strong style="color:var(--t2)">avatar</strong> (top right) → <strong style="color:var(--t2)">Profile</strong></div>
-        <div>3. Scroll down to <strong style="color:var(--t2)">API access</strong></div>
-        <div>4. Click <strong style="color:var(--t2)">Generate new token</strong></div>
-        <div>5. Copy the token and paste it below</div>
+        <div><strong style="color:var(--t2)">API Key:</strong> make.com → avatar → Profile → API access → Generate new token</div>
+        <div><strong style="color:var(--t2)">Team ID:</strong> log into make.com — the number in your URL: make.com/<strong style="color:var(--r)">123456</strong>/dashboard</div>
+        <div><strong style="color:var(--t2)">Zone:</strong> same region as your make.com account (usually eu1 or eu2)</div>
       </div>
     </div>
     <div class="form-group">
       <label class="form-label">Make.com API Key *</label>
       <input class="form-input" id="makeApiKey" type="password" placeholder="Paste your Make.com API key here" style="font-family:'Courier New',monospace"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Team ID * <span style="color:var(--t4);font-weight:400">(number from your Make.com URL)</span></label>
+      <input class="form-input" id="makeTeamId" type="text" placeholder="e.g. 123456" style="font-family:'Courier New',monospace"/>
     </div>
     <div class="form-group">
       <label class="form-label">Region / Zone</label>
@@ -834,16 +836,10 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
         <option value="us2.make.com">us2.make.com (United States 2)</option>
       </select>
     </div>
-    <div id="makeTeamSection" style="display:none">
-      <div class="form-group">
-        <label class="form-label">Select Team *</label>
-        <select class="form-select" id="makeTeamSelect"></select>
-      </div>
-    </div>
     <div id="makeStatus" style="font-size:12px;min-height:18px;margin-top:4px;margin-bottom:12px"></div>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="closeMakeModal()">Cancel</button>
-      <button class="btn-primary" id="makeConnectBtn" onclick="connectMake()">Connect Account</button>
+      <button class="btn-primary" id="makeConnectBtn" onclick="saveMakeLocal()">Save Connection</button>
     </div>
     <div id="makeDisconnectWrap" style="display:none;margin-top:12px;text-align:center">
       <button onclick="disconnectMake()" style="background:none;border:none;font-size:11px;color:var(--t4);cursor:pointer;text-decoration:underline">Disconnect account</button>
@@ -1463,12 +1459,8 @@ function openMakeSettings(){
   if(makeConfig){
     document.getElementById('makeApiKey').value = makeConfig.apiKey || '';
     document.getElementById('makeZone').value = makeConfig.zone || 'eu1.make.com';
-    if(makeConfig.teamId){
-      document.getElementById('makeTeamSection').style.display = 'block';
-      document.getElementById('makeTeamSelect').innerHTML = `<option value="${makeConfig.teamId}">${makeConfig.teamName || 'Team '+makeConfig.teamId}</option>`;
-      document.getElementById('makeDisconnectWrap').style.display = 'block';
-      document.getElementById('makeConnectBtn').textContent = 'Re-connect';
-    }
+    document.getElementById('makeTeamId').value = makeConfig.teamId || '';
+    if(makeConfig.teamId) document.getElementById('makeDisconnectWrap').style.display = 'block';
   }
 }
 
@@ -1485,50 +1477,24 @@ function disconnectMake(){
   notify('Make.com disconnected', '');
 }
 
-async function connectMake(){
+function saveMakeLocal(){
   const apiKey = document.getElementById('makeApiKey').value.trim();
+  const teamId = document.getElementById('makeTeamId').value.trim();
   const zone = document.getElementById('makeZone').value;
-  if(!apiKey){ document.getElementById('makeStatus').innerHTML = '<span style="color:var(--err)">API key required</span>'; return; }
-  const btn = document.getElementById('makeConnectBtn');
   const status = document.getElementById('makeStatus');
-  btn.disabled = true; btn.textContent = 'Connecting...';
-  status.innerHTML = '<span style="color:var(--t4)">Verifying with Make.com...</span>';
-  try {
-    const r = await fetch(API+'/api/make/connect', {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({ apiKey, zone })
-    });
-    const d = await r.json();
-    if(!r.ok){ status.innerHTML = `<span style="color:var(--err)">${d.error}</span>`; btn.disabled = false; btn.textContent = 'Connect Account'; return; }
-    const teams = d.teams || [];
-    if(!teams.length){ status.innerHTML = '<span style="color:var(--err)">No teams found on this account.</span>'; btn.disabled = false; btn.textContent = 'Connect Account'; return; }
-    // Populate team dropdown
-    const sel = document.getElementById('makeTeamSelect');
-    sel.innerHTML = teams.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
-    document.getElementById('makeTeamSection').style.display = 'block';
-    document.getElementById('makeDisconnectWrap').style.display = 'block';
-    status.innerHTML = '<span style="color:var(--green)">✓ Connected! Select your team and save.</span>';
-    btn.disabled = false; btn.textContent = 'Save Connection';
-    btn.onclick = saveMakeConnection;
-  } catch(e) {
-    status.innerHTML = `<span style="color:var(--err)">Error: ${e.message}</span>`;
-    btn.disabled = false; btn.textContent = 'Connect Account';
-  }
-}
-
-function saveMakeConnection(){
-  const apiKey = document.getElementById('makeApiKey').value.trim();
-  const zone = document.getElementById('makeZone').value;
-  const sel = document.getElementById('makeTeamSelect');
-  const teamId = sel.value;
-  const teamName = sel.options[sel.selectedIndex]?.text || '';
-  makeConfig = { apiKey, zone, teamId, teamName };
+  if(!apiKey){ status.innerHTML = '<span style="color:var(--err)">API key required</span>'; return; }
+  if(!teamId){ status.innerHTML = '<span style="color:var(--err)">Team ID required — check your Make.com URL</span>'; return; }
+  makeConfig = { apiKey, zone, teamId, teamName: 'My Team' };
   localStorage.setItem('af_make', JSON.stringify(makeConfig));
   closeMakeModal();
   updateMakeSidebar();
   notify('Make.com connected! ✓', 'success');
-  document.getElementById('makeConnectBtn').onclick = connectMake;
+}
+
+async function connectMake(){ saveMakeLocal(); }
+
+function saveMakeConnection(){
+  saveMakeLocal();
 }
 
 function createMakeScenario(blueprintFile, scenarioName){
