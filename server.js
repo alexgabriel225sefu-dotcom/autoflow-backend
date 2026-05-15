@@ -544,21 +544,15 @@ app.get('/', (req, res) => {
 });
 
 // Explicit HTML page routes
-app.get('/videos.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'videos.html'));
+const pages = ['app','index','videos','blueprints','access','ai-builder','course-pro','course-starter','privacy','terms',
+  'module1','module2','module3','module4','module5','module6','module7','module8','module9',
+  'module10','module11','module12','module13','module14','intro-epic'];
+pages.forEach(p => {
+  app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
+  app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
 });
-app.get('/tiktok', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'videos.html'));
-});
-app.get('/index.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-app.get('/blueprints.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'blueprints.html'));
-});
-app.get('/blueprints', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'blueprints.html'));
-});
+app.get('/tiktok', (req, res) => res.sendFile(path.join(__dirname, 'public', 'videos.html')));
+app.get('/blueprints', (req, res) => res.sendFile(path.join(__dirname, 'public', 'blueprints.html')));
 
 // ════════════════════════════════════════
 // AI BUSINESS BUILDER ROUTES
