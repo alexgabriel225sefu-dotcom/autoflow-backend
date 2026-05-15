@@ -263,14 +263,46 @@ app.post('/api/make/connect', auth, async (req, res) => {
   const { apiKey, zone } = req.body;
   if (!apiKey) return res.status(400).json({ error: 'API key required' });
   const host = (zone || 'eu1.make.com').replace(/^https?:\/\//, '');
+  const headers = { 'Authorization': `Token ${apiKey}`, 'Content-Type': 'application/json' };
+  const safeJson = async (response) => {
+    const text = await response.text();
+    try { return JSON.parse(text); } catch { return { message: text.slice(0, 200) }; }
+  };
   try {
-    const r = await fetch(`https://${host}/api/v2/teams`, {
-      headers: { 'Authorization': `Token ${apiKey}`, 'Content-Type': 'application/json' }
-    });
-    const data = await r.json();
-    if (!r.ok) return res.status(r.status).json({ error: data.message || 'Invalid API key or zone' });
+    // Step 1: verify key via /users/me
+    const meR = await fetch(`https://${host}/api/v2/users/me`, { headers });
+    const meData = await safeJson(meR);
+    if (!meR.ok) {
+      return res.status(meR.status).json({ error: meData.message || meData.detail || `Make.com returned ${meR.status}. Check your API key and zone.` });
+    }
+
+    // Step 2: get organizations
+    const orgR = await fetch(`https://${host}/api/v2/organizations`, { headers });
+    const orgData = orgR.ok ? await safeJson(orgR) : { organizations: [] };
+    const orgs = orgData.organizations || [];
+
+    // Step 3: collect teams from each org
+    let teams = [];
+    for (const org of orgs) {
+      const tR = await fetch(`https://${host}/api/v2/teams?organizationId=${org.id}`, { headers });
+      if (tR.ok) {
+        const tData = await safeJson(tR);
+        teams = teams.concat(tData.teams || []);
+      }
+    }
+
+    // Fallback: treat orgs as teams if none found
+    if (!teams.length) {
+      teams = orgs.map(o => ({ id: o.id, name: o.name }));
+    }
+
+    // Last resort: create a default team entry from user info
+    if (!teams.length) {
+      teams = [{ id: meData.organizationId || meData.id || 1, name: meData.name || 'My Team' }];
+    }
+
     addLog('Make.com account connected', 'make', 'success');
-    res.json({ teams: data.teams || [] });
+    res.json({ teams, user: meData });
   } catch (e) {
     res.status(500).json({ error: 'Cannot reach Make.com: ' + e.message });
   }
