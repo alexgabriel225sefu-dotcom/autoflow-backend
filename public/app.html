@@ -1171,6 +1171,7 @@ async function loadMyAutomations(){
         <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${a.config?.notify_email?'rgba(74,222,128,.05)':'var(--bg3)'};border:1px solid ${a.config?.notify_email?'rgba(74,222,128,.15)':'#1a1a1a'};border-radius:7px;margin-bottom:10px;min-width:0">
           <span style="font-size:10px;color:var(--t4);font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0">✉</span>
           <span style="font-size:11px;color:${a.config?.notify_email?'var(--green)':'#555'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${a.config?.notify_email||'No email alert set'}</span>
+          ${a.config?.notify_email ? `<button onclick="sendTestEmail('${a.config.notify_email}')" style="background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);border-radius:5px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:10px;color:var(--green);cursor:pointer;flex-shrink:0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Send test</button>` : ''}
           <button onclick="setAlertEmail('${a.webhook_id}','${a.config?.notify_email||''}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;flex-shrink:0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Edit</button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
@@ -1202,6 +1203,22 @@ async function setAlertEmail(id, current){
     notify(email.trim() ? 'Alert email set ✓ — you\'ll receive an email for each new message.' : 'Alert email removed.', 'success');
     loadMyAutomations();
   } catch(e){ notify('Failed to update.', 'error'); }
+}
+
+async function sendTestEmail(to){
+  notify('Sending test email to '+to+' ...', 'success');
+  try {
+    const r = await fetch(API+'/api/test-email', {
+      method:'POST', headers: authHeaders(),
+      body: JSON.stringify({ to })
+    });
+    const d = await r.json();
+    if(d.success){
+      notify('✓ Test email sent! Check your inbox (and spam folder).', 'success');
+    } else {
+      alert('Email failed (' + (d.method||'?') + '):\n\n' + (d.error||'Unknown error') + '\n\nBrevo user: ' + (d.brevo_user||'not set') + '\nAPI key set: ' + d.brevo_api_key + '\nSMTP set: ' + d.smtp);
+    }
+  } catch(e){ notify('Request failed: '+e.message,'error'); }
 }
 
 async function toggleAutomation(id, btn){
