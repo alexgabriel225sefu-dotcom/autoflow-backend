@@ -328,13 +328,22 @@ app.post('/api/make/create', auth, async (req, res) => {
   if (scenarioName) blueprint.name = scenarioName;
 
   try {
+    const body = {
+      blueprint,
+      teamId: parseInt(teamId),
+      organizationId: parseInt(teamId),
+      scheduling: { type: 'INDEFINITELY', interval: 900 }
+    };
     const r = await fetch(`https://${host}/api/v2/scenarios`, {
       method: 'POST',
       headers: { 'Authorization': `Token ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ blueprint, teamId: parseInt(teamId), scheduling: { type: 'on-demand' } })
+      body: JSON.stringify(body)
     });
-    const data = await r.json();
-    if (!r.ok) return res.status(r.status).json({ error: data.message || 'Make.com rejected the request' });
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { message: text.slice(0, 300) }; }
+    console.log('Make.com create response:', r.status, JSON.stringify(data).slice(0, 500));
+    if (!r.ok) return res.status(r.status).json({ error: data.message || data.detail || `Make.com ${r.status}: ${text.slice(0,200)}` });
     const scenarioId = data.scenario?.id || data.id;
     addLog(`Make.com scenario created: ${blueprint.name} (ID: ${scenarioId})`, 'make', 'success');
     res.json({ success: true, scenarioId, scenarioName: blueprint.name, editUrl: `https://${host}/scenarios/${scenarioId}/edit` });
