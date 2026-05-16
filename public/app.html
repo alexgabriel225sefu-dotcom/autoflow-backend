@@ -119,6 +119,8 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
 .copy-btn:hover{border-color:var(--r);color:var(--r)}
 .download-bp-btn{background:rgba(229,62,46,.08);border:1px solid var(--border2);border-radius:8px;padding:11px 18px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;color:var(--r);cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:8px;text-decoration:none;margin-top:14px;letter-spacing:.3px}
 .download-bp-btn:hover{background:rgba(229,62,46,.14);transform:translateY(-1px)}
+.chip{background:var(--bg3);border:1px solid #1a1a1a;border-radius:20px;padding:6px 13px;font-family:'Inter',sans-serif;font-size:11px;color:var(--t3);cursor:pointer;transition:all .2s;font-weight:500}
+.chip:hover{border-color:var(--r);color:var(--r);background:var(--r3)}
 
 /* CHAT */
 .chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 120px)}
@@ -392,87 +394,62 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
     <div class="page" id="page-wizard">
       <div class="wizard-grid">
         <div class="wizard-form">
-          <div class="section-title" style="margin-bottom:20px">Automation Generator</div>
+          <div class="section-title" style="margin-bottom:6px">Automation Generator</div>
+          <div style="font-size:12px;color:var(--t4);margin-bottom:18px;line-height:1.6">Describe what you want to automate in plain language — the app will generate a complete, step-by-step build plan.</div>
           <div class="form-group">
-            <label class="form-label">Client Industry *</label>
-            <select class="form-select" id="wIndustry">
-              <option value="">— Select industry —</option>
-              <option>Restaurant / Food &amp; Beverage</option>
-              <option>Real Estate Agency</option>
-              <option>Beauty Salon / Spa</option>
-              <option>Medical / Dental Clinic</option>
-              <option>Fitness / Gym</option>
-              <option>E-commerce Store</option>
-              <option>Coach / Consultant</option>
-              <option>Law Firm</option>
-              <option>Construction / Renovation</option>
-              <option>Insurance Agency</option>
-              <option>Travel Agency</option>
-              <option>Other</option>
-            </select>
+            <label class="form-label">Describe the automation *</label>
+            <textarea class="form-textarea" id="wDescription" style="min-height:130px;font-size:13px;line-height:1.7" placeholder="e.g. A restaurant gets 60+ WhatsApp messages per day asking about the menu and table reservations. I want an AI bot that replies automatically, answers menu questions, and sends a booking link when someone asks to reserve a table."></textarea>
           </div>
-          <div class="form-group">
-            <label class="form-label">What do they need automated? *</label>
-            <select class="form-select" id="wNeed" onchange="updateBlueprintHint()">
-              <option value="">— Select automation type —</option>
-              <option>WhatsApp Auto-Reply Bot</option>
-              <option>Instagram DM Auto-Reply</option>
-              <option>Lead Follow-Up (Form → Email)</option>
-              <option>Cold Email Campaign System</option>
-              <option>Google Sheets CRM + Weekly Report</option>
-              <option>Invoice &amp; Payment Reminders</option>
-              <option>Appointment Booking System</option>
-              <option>Social Media Auto-Post</option>
-              <option>Full Omnichannel Package</option>
-            </select>
+          <div style="margin-bottom:18px">
+            <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t4);margin-bottom:10px;font-weight:700">Or pick an example</div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px" id="exampleChips">
+              <button class="chip" onclick="useChip(this)" data-val="A real estate agency gets leads from a contact form on their website. Automatically send a personalized follow-up email to each new lead within 5 minutes, using AI to write the email based on the property they were interested in.">Real estate lead follow-up</button>
+              <button class="chip" onclick="useChip(this)" data-val="A beauty salon receives appointment requests via Instagram DMs. Set up an AI bot that replies instantly, collects the client's name and preferred date, and adds the booking to a Google Sheet automatically.">Salon Instagram DM bot</button>
+              <button class="chip" onclick="useChip(this)" data-val="An e-commerce store wants to automatically send unpaid invoice reminders via WhatsApp 24h and 72h after a purchase is made but not paid. The message should include the invoice link and a friendly AI-written reminder.">E-commerce payment reminders</button>
+              <button class="chip" onclick="useChip(this)" data-val="A consultant wants to run cold email outreach. Every morning, pull 20 new leads from a Google Sheet, use AI to write a personalized cold email for each one, and send them via Gmail automatically.">Cold email outreach system</button>
+              <button class="chip" onclick="useChip(this)" data-val="A dental clinic wants to send automated appointment reminders via WhatsApp 24 hours before each appointment. Pull appointments from Google Sheets and send a custom AI-written reminder with the patient's name and appointment details.">Dental appointment reminders</button>
+              <button class="chip" onclick="useChip(this)" data-val="A fitness gym wants to post motivational content to Instagram and Facebook every day at 8am automatically. Use AI to generate fresh captions with relevant hashtags from a list of topics I provide.">Daily social media auto-post</button>
+            </div>
           </div>
-          <div id="blueprintHint" style="display:none;background:var(--r3);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--r);font-weight:600">
-            ⬇ Ready-made blueprint available for this automation type
-          </div>
-          <div class="form-group">
-            <label class="form-label">Business Size</label>
-            <select class="form-select" id="wSize">
-              <option>Small (1–5 employees)</option>
-              <option>Medium (6–25 employees)</option>
-              <option>Large (25+ employees)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Client's Main Pain Point</label>
-            <textarea class="form-textarea" id="wPain" placeholder="e.g. They get 50+ WhatsApp messages per day and can't reply fast enough..."></textarea>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Client Budget Range</label>
-            <select class="form-select" id="wBudget">
-              <option>Unknown / To be discussed</option>
-              <option>$100–$300 setup</option>
-              <option>$300–$800 setup</option>
-              <option>$800–$2,000 setup</option>
-              <option>$2,000+ setup</option>
-            </select>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:17px">
+            <div>
+              <label class="form-label">Client name (optional)</label>
+              <input class="form-input" id="wClient" placeholder="e.g. Mario's Restaurant">
+            </div>
+            <div>
+              <label class="form-label">Budget range</label>
+              <select class="form-select" id="wBudget">
+                <option>Unknown / To discuss</option>
+                <option>$100–$300 setup</option>
+                <option>$300–$800 setup</option>
+                <option>$800–$2,000 setup</option>
+                <option>$2,000+ setup</option>
+              </select>
+            </div>
           </div>
           <button class="generate-btn" id="generateBtn" onclick="generateAutomation()">
-            <span>⚡</span> Generate Complete Package
+            <span>⚡</span> Generate Automation Plan
           </button>
         </div>
 
         <div class="wizard-output">
-          <div class="section-title" style="margin-bottom:20px">Generated Package</div>
+          <div class="section-title" style="margin-bottom:20px">Your Automation Plan</div>
           <div class="output-placeholder" id="wizardPlaceholder">
             <span class="icon">⚡</span>
-            <span>Fill in the client details and click Generate to create a complete automation package.</span>
+            <span>Describe what you want to automate and click Generate — you'll get a complete, step-by-step build plan.</span>
           </div>
           <div class="output-content" id="wizardOutput">
             <div class="output-section">
-              <div class="output-section-title">What You Will Build</div>
+              <div class="output-section-title">What Gets Built</div>
               <div class="output-text" id="outWhat"></div>
             </div>
             <div class="output-section">
-              <div class="output-section-title">Make.com Modules</div>
+              <div class="output-section-title">Step-by-Step Make.com Build Guide</div>
               <div class="output-text" id="outModules"></div>
+              <button class="copy-btn" onclick="copyText('outModules')">Copy Guide</button>
             </div>
             <div class="output-section">
-              <div class="output-section-title">GPT System Message</div>
+              <div class="output-section-title">AI System Prompt (paste into Make.com → OpenAI module)</div>
               <div class="output-text" id="outPrompt"></div>
               <button class="copy-btn" onclick="copyText('outPrompt')">Copy Prompt</button>
             </div>
@@ -489,7 +466,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
               </div>
             </div>
             <div class="output-section">
-              <div class="output-section-title">Outreach Message</div>
+              <div class="output-section-title">Outreach / Pitch Message</div>
               <div class="output-text" id="outEmail"></div>
               <button class="copy-btn" onclick="copyText('outEmail')">Copy Message</button>
             </div>
@@ -498,10 +475,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
               <a id="wizardBlueprintLink" href="#" download class="download-bp-btn">
                 ⬇ Download Blueprint (.json)
               </a>
-              <button id="wizardCreateMakeBtn" class="create-make-btn" onclick="createMakeScenarioFromWizard()" style="margin-top:8px">
-                ◈ Create Scenario in Make.com
-              </button>
-              <div style="font-size:11px;color:var(--t4);margin-top:8px;line-height:1.6">Import the .json file into Make.com manually, or use "Create in Make.com" if you've connected your account.</div>
+              <div style="font-size:11px;color:var(--t4);margin-top:8px;line-height:1.6">Import this .json into Make.com: open Make.com → Create new scenario → click the three-dot menu → Import blueprint → upload this file.</div>
             </div>
           </div>
         </div>
@@ -1025,21 +999,17 @@ async function loadDashboard(){
   } catch(e){ console.log('Dashboard load error'); }
 }
 
-// WIZARD - blueprint hint
-function updateBlueprintHint(){
-  const need = document.getElementById('wNeed').value;
-  const hint = document.getElementById('blueprintHint');
-  hint.style.display = BLUEPRINT_MAP[need] ? 'block' : 'none';
+function useChip(el){
+  document.getElementById('wDescription').value = el.getAttribute('data-val');
+  document.getElementById('wDescription').focus();
 }
 
 // AUTOMATION WIZARD
 async function generateAutomation(){
-  const industry = document.getElementById('wIndustry').value;
-  const need = document.getElementById('wNeed').value;
-  const size = document.getElementById('wSize').value;
-  const pain = document.getElementById('wPain').value;
+  const description = document.getElementById('wDescription').value.trim();
+  const client = document.getElementById('wClient').value.trim();
   const budget = document.getElementById('wBudget').value;
-  if(!industry || !need){ notify('Please select industry and automation type.', 'error'); return; }
+  if(!description || description.length < 20){ notify('Please describe the automation you want to build (at least 20 characters).', 'error'); return; }
   const btn = document.getElementById('generateBtn');
   btn.disabled = true; btn.innerHTML = '<span>⏳</span> Generating...';
   document.getElementById('wizardPlaceholder').style.display = 'none';
@@ -1049,39 +1019,34 @@ async function generateAutomation(){
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({
-        prompt: `You are an expert AI automation agency consultant with deep knowledge of Make.com, OpenAI GPT-4o, WhatsApp Business API, Instagram Graph API, and cold email systems. Generate a complete, accurate automation package.
+        prompt: `You are an expert Make.com automation consultant. A user wants to sell or build an automation and needs a complete, actionable plan. Your job is to produce a detailed, beginner-friendly step-by-step guide so they can build it in Make.com even without deep technical knowledge.
 
-Client Info:
-- Industry: ${industry}
-- Automation needed: ${need}
-- Business size: ${size}
-- Pain point: ${pain || 'Not specified'}
-- Budget range: ${budget}
+AUTOMATION REQUEST:
+"${description}"
+${client ? `Client name: ${client}` : ''}
+Budget: ${budget}
 
-IMPORTANT RULES:
-- Build time is always in HOURS (e.g. "3–5"), NEVER in weeks or days
-- Monthly retainer must be $150–$400/month minimum, NEVER below $100
-- Make.com modules must be EXACTLY correct for the automation type selected
-- GPT System Message must be complete, professional and ready to paste directly into Make.com
-- Outreach message must sound like a real human, casual and specific — NOT robotic or generic
-- All prices must reflect premium agency positioning
+RULES:
+- Build time in HOURS only (e.g. "3–5"), never days or weeks
+- Monthly retainer minimum $150/month, never below
+- Make.com module names must be exact (e.g. "Webhooks > Custom Webhook", "OpenAI > Create a Chat Completion", "Gmail > Send an Email", "Google Sheets > Watch New Rows")
+- The step-by-step guide must be so clear that a non-technical person can follow it
+- Each step must say: which module to add, what field to fill, and what value/setting to use
+- The AI system prompt must be complete, professional, and ready to paste directly into the OpenAI module in Make.com — no placeholders except [Business Name] and [City]
+- Outreach message must sound human, friendly, specific — NOT generic or sales-y
+- If the automation involves WhatsApp, note they need a 360dialog account or WhatsApp Business API
+- If it involves Instagram DMs, note they need Facebook Developer App with Instagram permissions
+- Pricing must reflect real agency positioning (premium, not cheap)
 
-For ${need}:
-${need.includes('WhatsApp') ? '- Correct modules: Webhooks (Custom Webhook) → OpenAI (Create Chat Completion) → HTTP (Make a Request to 360dialog API)' : ''}
-${need.includes('Instagram') ? '- Correct modules: Webhooks (Custom Webhook) → OpenAI (Create Chat Completion) → HTTP (Make a Request to Instagram Graph API)' : ''}
-${need.includes('Lead Follow') ? '- Correct modules: Google Sheets (Watch New Rows) → OpenAI (Create Chat Completion) → Gmail (Send an Email)' : ''}
-${need.includes('Cold Email') ? '- Correct modules: Google Sheets (Watch New Rows) → OpenAI (Create Chat Completion) → HTTP (Instantly.ai API)' : ''}
-${need.includes('CRM') ? '- Correct modules: Multiple triggers → OpenAI (Create Chat Completion) → Google Sheets (Add a Row) → Gmail (Send an Email)' : ''}
-
-Respond ONLY with this exact JSON format, no other text:
+Respond ONLY with this exact JSON (no markdown, no extra text):
 {
-  "what": "2-3 sentences describing exactly what gets built and how it works for this specific industry",
-  "modules": "Step-by-step Make.com modules: Module 1 → Module 2 → Module 3 (with exact module names from Make.com)",
-  "prompt": "SYSTEM: You are the AI assistant of [Business Name], a [industry type]. [Complete professional system message with specific instructions for this industry, 4-6 sentences, ready to paste into Make.com]",
-  "setupPrice": "$400–$800",
-  "monthlyPrice": "$150–$300/month",
-  "buildTime": "4–6",
-  "outreach": "Hi [Name], I was looking at [business type] in [city] and noticed [specific observation]. I build AI systems that [specific benefit for their industry]. Would a 15-minute call make sense to show you exactly how it works for [business type]?"
+  "what": "3-4 sentences explaining clearly what this automation does, how it works end-to-end, and what problem it solves. Write as if explaining to a business owner.",
+  "modules": "STEP-BY-STEP BUILD GUIDE:\\n\\nSTEP 1 — Create a new scenario in Make.com\\n[exact instruction]\\n\\nSTEP 2 — Add the [exact module name] module\\n[what field to fill, what value to use]\\n\\nSTEP 3 — [continue for each module]\\n\\n[Include: how to connect accounts, what webhook URL to copy, where to paste the AI system prompt, how to test it, and how to activate]",
+  "prompt": "SYSTEM: You are the AI assistant of [Business Name]. [Complete 5-8 sentence system prompt tailored to this specific automation — include: what the AI should do, tone of voice, what information to collect if needed, what to say when it doesn't know something, language to use]",
+  "setupPrice": "$XXX–$XXX",
+  "monthlyPrice": "$XXX–$XXX/month",
+  "buildTime": "X–X",
+  "outreach": "Hi [Name], [1 specific observation about their business]. [1 sentence about what you build]. [Specific benefit for their situation]. Would a quick 15-minute call this week make sense? [Sign-off]"
 }`
       })
     });
@@ -1091,7 +1056,7 @@ Respond ONLY with this exact JSON format, no other text:
       const clean = d.output.replace(/```json|```/g, '').trim();
       data = JSON.parse(clean);
     } catch(e) {
-      data = { what: d.output, modules: 'See output above', prompt: 'Generated above', setupPrice: 'TBD', monthlyPrice: 'TBD', buildTime: '4–8', outreach: 'See output above' };
+      data = { what: d.output, modules: 'See full output above', prompt: 'See output above', setupPrice: 'TBD', monthlyPrice: 'TBD/month', buildTime: '4–8', outreach: 'See output above' };
     }
     document.getElementById('outWhat').textContent = data.what || '';
     document.getElementById('outModules').textContent = data.modules || '';
@@ -1101,15 +1066,18 @@ Respond ONLY with this exact JSON format, no other text:
     document.getElementById('outTime').textContent = data.buildTime || '';
     document.getElementById('outEmail').textContent = data.outreach || '';
 
-    // Show blueprint download if available
+    // Try to match a blueprint based on keywords in the description
+    const desc = description.toLowerCase();
+    let bpUrl = '';
+    for(const [key, url] of Object.entries(BLUEPRINT_MAP)){
+      if(desc.includes(key.toLowerCase().split(' ')[0])){ bpUrl = url; break; }
+    }
     const bpSection = document.getElementById('wizardBlueprintSection');
     const bpLink = document.getElementById('wizardBlueprintLink');
-    const bpUrl = BLUEPRINT_MAP[need];
     if(bpUrl){
       bpLink.href = bpUrl;
-      const fname = bpUrl.split('/').pop();
-      bpLink.download = fname;
-      wizardBlueprintFile = fname;
+      bpLink.download = bpUrl.split('/').pop();
+      wizardBlueprintFile = bpUrl.split('/').pop();
       bpSection.style.display = 'block';
     } else {
       wizardBlueprintFile = '';
@@ -1117,12 +1085,12 @@ Respond ONLY with this exact JSON format, no other text:
     }
 
     document.getElementById('wizardOutput').classList.add('visible');
-    notify('Package generated! ✓', 'success');
+    notify('Plan generated! ✓', 'success');
   } catch(e) {
     notify('Generation failed. Check your connection.', 'error');
     document.getElementById('wizardPlaceholder').style.display = 'flex';
   }
-  btn.disabled = false; btn.innerHTML = '<span>⚡</span> Generate Complete Package';
+  btn.disabled = false; btn.innerHTML = '<span>⚡</span> Generate Automation Plan';
 }
 
 function copyText(id){
