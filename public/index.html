@@ -10,6 +10,10 @@
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
   --r:#E53E2E;--r2:#FF5544;--r3:rgba(229,62,46,.15);
+  --amber:#F59E0B;--amber2:rgba(245,158,11,.15);
+  --violet:#8B5CF6;--violet2:rgba(139,92,246,.15);
+  --cyan:#06B6D4;--cyan2:rgba(6,182,212,.15);
+  --green:#22C55E;--green2:rgba(34,197,94,.15);
   --bg:#030303;--bg2:#070707;--bg3:#0c0c0c;
   --border:rgba(255,255,255,.06);--border2:rgba(229,62,46,.2);
   --t1:#fff;--t2:rgba(255,255,255,.7);--t3:rgba(255,255,255,.4);--t4:rgba(255,255,255,.2);
@@ -33,7 +37,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:64px;display:flex;ali
 
 /* ── HERO ── */
 .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 24px 80px;position:relative;overflow:hidden}
-.hero-glow{position:absolute;width:800px;height:800px;background:radial-gradient(circle,rgba(229,62,46,.12) 0%,transparent 65%);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;animation:pulse-glow 4s ease-in-out infinite}
+.hero-glow{position:absolute;width:900px;height:900px;background:conic-gradient(from 0deg at 50% 50%,rgba(229,62,46,.09),rgba(139,92,246,.07),rgba(6,182,212,.06),rgba(229,62,46,.09));top:50%;left:50%;transform:translate(-50%,-55%);pointer-events:none;animation:pulse-glow 6s ease-in-out infinite;filter:blur(40px);border-radius:50%}
+.hero-glow2{position:absolute;width:500px;height:500px;background:radial-gradient(circle,rgba(229,62,46,.14) 0%,transparent 60%);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;animation:pulse-glow 4s ease-in-out infinite reverse}
 @keyframes pulse-glow{0%,100%{opacity:.7;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}}
 .hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 60% at 50% 50%,black,transparent);pointer-events:none}
 .badge{display:inline-flex;align-items:center;gap:8px;padding:7px 16px;border:1px solid var(--border2);border-radius:100px;font-size:11px;font-weight:600;color:var(--r);letter-spacing:.5px;background:rgba(229,62,46,.05);margin-bottom:32px;position:relative;z-index:1}
@@ -312,12 +317,66 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
 <!-- HERO -->
 <section class="hero">
   <div class="hero-glow"></div>
+  <div class="hero-glow2"></div>
   <div class="hero-grid"></div>
 
   <div class="badge">
     <div class="badge-dot"></div>
     AI Automation For The Next Generation
   </div>
+
+  <style>
+  /* ── MULTI-COLOR ACCENTS ── */
+  .stat:nth-child(1) .stat-num span{color:var(--r)}
+  .stat:nth-child(2) .stat-num{color:var(--amber)}
+  .stat:nth-child(3) .stat-num{color:var(--cyan)}.stat:nth-child(3) .stat-num span{color:var(--cyan)}
+  .stat:nth-child(4) .stat-num span{color:var(--green)}
+
+  .hiw-step:nth-child(1).active .step-num{background:var(--r);border-color:var(--r);box-shadow:0 0 20px rgba(229,62,46,.4)}
+  .hiw-step:nth-child(2).active .step-num{background:var(--amber);border-color:var(--amber);box-shadow:0 0 20px rgba(245,158,11,.4);color:#000}
+  .hiw-step:nth-child(3).active .step-num{background:var(--violet);border-color:var(--violet);box-shadow:0 0 20px rgba(139,92,246,.4)}
+
+  .mod-item:nth-child(1) .mod-badge,.mod-item:nth-child(2) .mod-badge{background:rgba(229,62,46,.06);border-color:rgba(229,62,46,.12);color:var(--r)}
+  .mod-item:nth-child(3) .mod-badge{background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.12);color:var(--amber)}
+  .mod-item:nth-child(4) .mod-badge,.mod-item:nth-child(5) .mod-badge{background:rgba(139,92,246,.06);border-color:rgba(139,92,246,.12);color:var(--violet)}
+  .mod-item:nth-child(6) .mod-badge,.mod-item:nth-child(7) .mod-badge{background:rgba(6,182,212,.06);border-color:rgba(6,182,212,.12);color:var(--cyan)}
+  .mod-item:nth-child(8) .mod-badge{background:rgba(34,197,94,.06);border-color:rgba(34,197,94,.12);color:var(--green)}
+  .mod-item:nth-child(9) .mod-badge{background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.12);color:var(--amber)}
+
+  .kpi:nth-child(1) .kpi-fill{background:linear-gradient(90deg,var(--r),var(--r2))}
+  .kpi:nth-child(2) .kpi-fill{background:linear-gradient(90deg,var(--amber),#FBBF24)}
+  .kpi:nth-child(3) .kpi-fill{background:linear-gradient(90deg,var(--violet),#A78BFA)}
+
+  .tc:nth-child(1) .tc-av{background:rgba(229,62,46,.08);border-color:rgba(229,62,46,.15);color:var(--r)}
+  .tc:nth-child(2) .tc-av{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.15);color:var(--amber)}
+  .tc:nth-child(3) .tc-av{background:rgba(139,92,246,.08);border-color:rgba(139,92,246,.15);color:var(--violet)}
+  .tc:nth-child(4) .tc-av{background:rgba(6,182,212,.08);border-color:rgba(6,182,212,.15);color:var(--cyan)}
+
+  .tc:nth-child(1) .tc-stars{color:var(--r)}
+  .tc:nth-child(2) .tc-stars{color:var(--amber)}
+  .tc:nth-child(3) .tc-stars{color:var(--violet)}
+  .tc:nth-child(4) .tc-stars{color:var(--cyan)}
+
+  .proof-av:nth-child(1){color:var(--r)}
+  .proof-av:nth-child(2){color:var(--amber)}
+  .proof-av:nth-child(3){color:var(--violet)}
+  .proof-av:nth-child(4){color:var(--cyan)}
+  .proof-av:nth-child(5){color:var(--green)}
+
+  .partner:nth-child(1):hover{color:var(--r)}
+  .partner:nth-child(2):hover{color:var(--amber)}
+  .partner:nth-child(3):hover{color:var(--violet)}
+  .partner:nth-child(4):hover{color:var(--cyan)}
+  .partner:nth-child(5):hover{color:var(--green)}
+  .partner:nth-child(6):hover{color:#25D366}
+  .partner:nth-child(7):hover{color:var(--r2)}
+
+  .feed:nth-child(2) .feed-icon{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.2)}
+  .feed:nth-child(3) .feed-icon{background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.2)}
+  .feed:nth-child(4) .feed-icon{background:rgba(6,182,212,.1);border-color:rgba(6,182,212,.2)}
+
+  .price-card.featured .price-card::before{background:linear-gradient(90deg,transparent,var(--violet) 30%,var(--cyan) 70%,transparent)}
+  </style>
 
   <h1>
     Build Income With<br>
@@ -456,7 +515,7 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
 <!-- HOW IT WORKS -->
 <section class="section" id="how">
   <div class="section-inner">
-    <div class="section-tag reveal">How It Works</div>
+    <div class="section-tag reveal" style="color:var(--amber)">How It Works</div>
     <h2 class="section-h reveal">Three steps.<br>Infinite scale.</h2>
     <p class="section-sub reveal">Build AI systems once. Let them work forever.</p>
 
@@ -507,7 +566,7 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
 <!-- TESTIMONIALS -->
 <section class="testi-section" id="testimonials">
   <div class="section-inner">
-    <div class="section-tag reveal">Student Feedback</div>
+    <div class="section-tag reveal" style="color:var(--violet)">Student Feedback</div>
     <h2 class="section-h reveal">Real people,<br>real progress.</h2>
     <div class="testi-grid">
       <div class="tc reveal">
@@ -582,7 +641,7 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
 <!-- MODULES -->
 <section class="mods-section" id="modules">
   <div class="mods-inner">
-    <div class="section-tag reveal">What's Inside</div>
+    <div class="section-tag reveal" style="color:var(--cyan)">What's Inside</div>
     <h2 class="section-h reveal">Inside the course.</h2>
     <p class="section-sub reveal">Every lesson ends with something you can sell immediately.</p>
     <div class="mods-tabs reveal">
