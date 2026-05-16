@@ -140,7 +140,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:64px;display:flex;ali
 .section{padding:120px 24px}
 .section-inner{max-width:1080px;margin:0 auto}
 .section-tag{display:inline-flex;align-items:center;gap:8px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--r);margin-bottom:20px}
-.section-tag::before{content:'';width:20px;height:1px;background:var(--r)}
+.section-tag::before{content:'';width:20px;height:1px;background:currentColor}
 .section-h{font-size:clamp(32px,5vw,56px);font-weight:900;letter-spacing:-2.5px;line-height:1;margin-bottom:16px;color:var(--t1)}
 .section-sub{font-size:16px;color:var(--t3);line-height:1.75;max-width:520px;font-weight:300}
 
@@ -185,11 +185,14 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:64px;display:flex;ali
 @media(max-width:680px){.testi-grid{grid-template-columns:1fr}}
 
 /* ── PARTNERS ── */
-.partners-section{padding:48px 24px;border-bottom:1px solid var(--border)}
-.partners-inner{max-width:800px;margin:0 auto;text-align:center}
-.partners-label{font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--t4);margin-bottom:28px}
-.partners-row{display:flex;align-items:center;justify-content:center;gap:40px;flex-wrap:wrap}
-.partner{font-size:15px;font-weight:700;color:var(--t4);opacity:.35;transition:all .2s;letter-spacing:-.3px}.partner:hover{opacity:.7;color:var(--t2)}
+.partners-section{padding:36px 0;border-bottom:1px solid var(--border);overflow:hidden}
+.partners-inner{text-align:center}
+.partners-label{font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--t4);margin-bottom:24px;padding:0 24px}
+.partners-track{display:flex;align-items:center;gap:0;animation:marquee 18s linear infinite}
+.partners-track:hover{animation-play-state:paused}
+.partners-row{display:flex;align-items:center;gap:56px;padding:0 28px;flex-shrink:0}
+.partner{font-size:14px;font-weight:700;color:var(--t4);opacity:.3;white-space:nowrap;letter-spacing:-.2px;transition:all .2s}.partner:hover{opacity:.7;color:var(--t2)}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 
 /* ── MODULES ── */
 .mods-section{padding:120px 24px;border-bottom:1px solid var(--border)}
@@ -642,14 +645,29 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
 <div class="partners-section">
   <div class="partners-inner">
     <div class="partners-label">Built Using Industry-Leading Tools</div>
-    <div class="partners-row">
-      <div class="partner">make</div>
-      <div class="partner">OpenAI</div>
-      <div class="partner">Stripe</div>
-      <div class="partner">Zapier</div>
-      <div class="partner">Notion</div>
-      <div class="partner">WhatsApp</div>
-      <div class="partner">Apollo</div>
+    <div class="partners-track">
+      <div class="partners-row">
+        <div class="partner">make</div>
+        <div class="partner">OpenAI</div>
+        <div class="partner">Stripe</div>
+        <div class="partner">Zapier</div>
+        <div class="partner">Notion</div>
+        <div class="partner">WhatsApp</div>
+        <div class="partner">Apollo</div>
+        <div class="partner">360dialog</div>
+        <div class="partner">Meta API</div>
+      </div>
+      <div class="partners-row" aria-hidden="true">
+        <div class="partner">make</div>
+        <div class="partner">OpenAI</div>
+        <div class="partner">Stripe</div>
+        <div class="partner">Zapier</div>
+        <div class="partner">Notion</div>
+        <div class="partner">WhatsApp</div>
+        <div class="partner">Apollo</div>
+        <div class="partner">360dialog</div>
+        <div class="partner">Meta API</div>
+      </div>
     </div>
   </div>
 </div>
@@ -819,8 +837,8 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
 
 // ── SCROLL REVEAL ──
 const observer = new IntersectionObserver(entries => {
-  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
-}, {threshold:.12,rootMargin:'0px 0px -40px 0px'});
+  entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('visible'); observer.unobserve(e.target); } });
+}, {threshold:0.05, rootMargin:'0px 0px 0px 0px'});
 document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
 // ── HOW IT WORKS TABS ──
