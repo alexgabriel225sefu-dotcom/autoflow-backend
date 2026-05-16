@@ -27,8 +27,19 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 /* ── NAV ── */
 nav{position:fixed;top:0;left:0;right:0;z-index:200;height:64px;display:flex;align-items:center;padding:0 48px;justify-content:space-between;border-bottom:1px solid var(--border);backdrop-filter:blur(32px) saturate(180%);background:rgba(3,3,3,.85);transition:all .3s}
 .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
-.logo-mark{width:28px;height:28px;background:var(--r);clip-path:polygon(50% 0%,100% 100%,0% 100%);flex-shrink:0;filter:drop-shadow(0 0 8px rgba(229,62,46,.5))}
-.logo-text{font-size:13px;font-weight:800;letter-spacing:.8px;color:var(--t1);text-transform:uppercase}
+/* ── LOGO MARK ── */
+.logo-mark{width:32px;height:32px;flex-shrink:0;position:relative;cursor:pointer}
+.logo-mark svg{width:32px;height:32px;transition:transform .4s cubic-bezier(.34,1.56,.64,1),filter .3s}
+.logo-mark:hover svg{transform:rotate(90deg) scale(1.1);filter:drop-shadow(0 0 10px rgba(229,62,46,.8))}
+.logo-text{font-size:13px;font-weight:800;letter-spacing:.5px;color:var(--t1);text-transform:uppercase}
+.logo-text span{color:var(--r)}
+
+/* ── INTRO ── */
+#site-intro{position:fixed;inset:0;z-index:9999;background:#000;display:flex;align-items:center;justify-content:center;pointer-events:none}
+#site-intro.hide{animation:intro-out .8s ease forwards}
+@keyframes intro-out{to{opacity:0;pointer-events:none}}
+.intro-act{font-size:clamp(72px,16vw,160px);font-weight:900;line-height:1;letter-spacing:-6px;color:var(--r);opacity:0;transform:scale(.9);animation:intro-in .6s .2s cubic-bezier(.34,1.56,.64,1) forwards;filter:drop-shadow(0 0 60px rgba(229,62,46,.4));text-align:center}
+@keyframes intro-in{to{opacity:1;transform:scale(1)}}
 .nav-links{display:flex;gap:32px}
 .nav-links a{font-size:12px;color:var(--t3);text-decoration:none;font-weight:500;letter-spacing:.3px;transition:color .2s}.nav-links a:hover{color:var(--t1)}
 .nav-btn{padding:9px 22px;background:var(--r);border:none;border-radius:6px;color:#fff;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:all .2s;box-shadow:0 0 20px rgba(229,62,46,.3)}
@@ -279,7 +290,7 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
 .footer-inner{max-width:1000px;margin:0 auto}
 .footer-top{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:40px;margin-bottom:48px}
 .footer-brand{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-.footer-brand .logo-mark{width:24px;height:24px}
+.footer-brand .logo-mark{width:24px;height:24px}.footer-brand .logo-mark svg{width:24px;height:24px}
 .footer-brand-name{font-size:13px;font-weight:800;letter-spacing:.5px}
 .footer-tagline{font-size:12px;color:var(--t4);line-height:1.8;max-width:220px}
 .footer-col h5{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t4);margin-bottom:16px}
@@ -299,11 +310,16 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
 </head>
 <body>
 
+<!-- INTRO -->
+<div id="site-intro">
+  <div class="intro-act">ACT<br>NOW.</div>
+</div>
+
 <!-- NAV -->
 <nav>
   <a href="#" class="nav-logo">
-    <div class="logo-mark"></div>
-    <span class="logo-text">AI Cash Systems</span>
+    <div class="logo-mark"><svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="lg1" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#FF5544"/><stop offset="100%" stop-color="#E53E2E"/></linearGradient><linearGradient id="lg2" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#E53E2E"/></linearGradient></defs><rect x="1" y="1" width="30" height="30" rx="9" fill="url(#lg1)" opacity=".12"/><rect x="1" y="1" width="30" height="30" rx="9" stroke="url(#lg2)" stroke-width="1.2" opacity=".5"/><path d="M9 22L13 10L16 17L19 13L23 22" stroke="url(#lg1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="23" cy="22" r="2" fill="#E53E2E"/><circle cx="9" cy="22" r="1.5" fill="rgba(229,62,46,.5)"/></svg></div>
+    <span class="logo-text">AI <span>CASH</span> SYSTEMS</span>
   </a>
   <div class="nav-links">
     <a href="#how">How It Works</a>
@@ -793,6 +809,14 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
 </footer>
 
 <script>
+// ── INTRO ──
+(function(){
+  var intro = document.getElementById('site-intro');
+  function dismiss(){ intro.classList.add('hide'); setTimeout(function(){ intro.style.display='none'; }, 800); }
+  setTimeout(dismiss, 2200);
+  intro.addEventListener('click', dismiss);
+})();
+
 // ── SCROLL REVEAL ──
 const observer = new IntersectionObserver(entries => {
   entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
