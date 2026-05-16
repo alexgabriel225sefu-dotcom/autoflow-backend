@@ -287,6 +287,9 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
       <div class="nav-item" onclick="showPage('wizard',this)">
         <span class="nav-icon">⚡</span>Automation Wizard
       </div>
+      <div class="nav-item" onclick="showPage('myautomations',this)">
+        <span class="nav-icon">▶</span>My Automations
+      </div>
       <div class="nav-item" onclick="showPage('blueprints',this)">
         <span class="nav-icon">⬇</span>Blueprint Library
       </div>
@@ -475,9 +478,30 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
               <a id="wizardBlueprintLink" href="#" download class="download-bp-btn">
                 ⬇ Download Blueprint (.json)
               </a>
-              <div style="font-size:11px;color:var(--t4);margin-top:8px;line-height:1.6">Import this .json into Make.com: open Make.com → Create new scenario → click the three-dot menu → Import blueprint → upload this file.</div>
             </div>
+            <button class="generate-btn" id="activateBtn" onclick="openActivateModal()" style="margin-top:4px;background:var(--green);color:#000">
+              <span>▶</span> Activate This Automation
+            </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MY AUTOMATIONS PAGE -->
+    <div class="page" id="page-myautomations">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+        <div>
+          <div class="section-title" style="margin-bottom:4px">My Automations</div>
+          <div style="font-size:12px;color:var(--t4)">Live automations running on AutoFlow servers — no Make.com needed.</div>
+        </div>
+        <button class="generate-btn" onclick="showPage('wizard',document.querySelector('.nav-item:nth-child(2)'))" style="width:auto;padding:10px 20px">
+          <span>⚡</span> New Automation
+        </button>
+      </div>
+      <div id="automationsList">
+        <div style="text-align:center;padding:60px 20px;color:var(--t4);font-size:13px">
+          <div style="font-size:36px;margin-bottom:14px;opacity:.2">▶</div>
+          <div>No automations yet. Go to Automation Wizard and click <strong style="color:var(--t3)">Activate This Automation</strong>.</div>
         </div>
       </div>
     </div>
@@ -781,6 +805,70 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
   </div><!-- end main -->
 </div><!-- end app -->
 
+<!-- ACTIVATE AUTOMATION MODAL -->
+<div class="modal-overlay" id="activateModal" onclick="if(event.target===this)closeActivateModal()">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title">Activate Automation</div>
+    <div style="font-size:12px;color:var(--t4);margin-bottom:20px;line-height:1.7">AutoFlow will run this automation on our servers. Choose what type of trigger it listens to.</div>
+
+    <div class="form-group">
+      <label class="form-label">Automation Name *</label>
+      <input class="form-input" id="actName" placeholder="e.g. WhatsApp bot for Mario's Restaurant">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Trigger Type *</label>
+      <select class="form-select" id="actType" onchange="updateActivateFields()">
+        <option value="http">Generic Webhook (any platform)</option>
+        <option value="whatsapp">WhatsApp Bot (via 360dialog)</option>
+        <option value="email">Lead Email Auto-Reply (form → email)</option>
+      </select>
+    </div>
+
+    <!-- WhatsApp fields -->
+    <div id="actWhatsappFields" style="display:none">
+      <div style="background:var(--r3);border:1px solid var(--border2);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--t3);line-height:1.7">
+        Need a <strong style="color:var(--r)">360dialog</strong> account (~€15/month). Go to <strong>app.360dialog.com</strong> → get your API Key → paste below.
+      </div>
+      <div class="form-group">
+        <label class="form-label">360dialog API Key</label>
+        <input class="form-input" id="actWaKey" placeholder="Your 360dialog API key">
+      </div>
+    </div>
+
+    <!-- Email fields -->
+    <div id="actEmailFields" style="display:none">
+      <div style="background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.15);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--t3);line-height:1.7">
+        AutoFlow will receive form submissions and auto-reply to each lead's email. Works with Tally, Typeform, or any form with webhooks.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reply Email Subject</label>
+        <input class="form-input" id="actEmailSubject" placeholder="Thank you for reaching out!" value="Thank you for reaching out!">
+      </div>
+    </div>
+
+    <!-- Generic fields -->
+    <div id="actHttpFields">
+      <div class="form-group">
+        <label class="form-label">Callback URL (optional)</label>
+        <input class="form-input" id="actCallback" placeholder="https://your-app.com/callback — AI reply posted here">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">AI System Prompt</label>
+      <textarea class="form-textarea" id="actPrompt" style="min-height:100px" placeholder="You are the AI assistant of..."></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="generate-btn" onclick="activateAutomation()" style="flex:1">
+        <span>▶</span> Activate
+      </button>
+      <button onclick="closeActivateModal()" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:9px;padding:13px 20px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;color:var(--t4);cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- MAKE.COM SETTINGS MODAL -->
 <div class="modal-overlay" id="makeModal">
   <div class="modal" style="max-width:520px">
@@ -966,7 +1054,8 @@ function showPage(page, navEl){
     chat: ['AI Assistant', 'Ask anything — automation, pricing, outreach, Make.com, APIs.'],
     email: ['Email Outreach', 'Generate and send personalized outreach emails instantly.'],
     tracker: ['Client Tracker', 'Manage your clients and track your recurring revenue.'],
-    logs: ['Activity Logs', 'Real-time log of all actions and events.']
+    logs: ['Activity Logs', 'Real-time log of all actions and events.'],
+    myautomations: ['My Automations', 'Live automations running on AutoFlow servers — no Make.com needed.']
   };
   if(titles[page]){
     document.getElementById('topbarTitle').textContent = titles[page][0];
@@ -974,6 +1063,124 @@ function showPage(page, navEl){
   }
   if(page==='logs') loadLogs();
   if(page==='dashboard') loadDashboard();
+  if(page==='myautomations') loadMyAutomations();
+}
+
+// MY AUTOMATIONS
+let lastGeneratedPrompt = '';
+
+async function loadMyAutomations(){
+  const el = document.getElementById('automationsList');
+  el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--t4);font-size:13px">Loading...</div>';
+  try {
+    const r = await fetch(API+'/api/automations', {headers: authHeaders()});
+    const d = await r.json();
+    const list = d.automations || [];
+    if(!list.length){
+      el.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--t4);font-size:13px"><div style="font-size:36px;margin-bottom:14px;opacity:.2">▶</div><div>No automations yet. Go to <strong style="color:var(--t3)">Automation Wizard</strong> and click <strong style="color:var(--t3)">Activate This Automation</strong>.</div></div>';
+      return;
+    }
+    el.innerHTML = list.map(a => `
+      <div style="background:var(--bg2);border:1px solid ${a.active?'rgba(74,222,128,.2)':'#1a1a1a'};border-radius:12px;padding:18px 20px;margin-bottom:12px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <span style="width:8px;height:8px;border-radius:50%;background:${a.active?'var(--green)':'#444'};flex-shrink:0;${a.active?'box-shadow:0 0 6px rgba(74,222,128,.5)':''}"></span>
+              <span style="font-size:14px;font-weight:700;color:var(--t1)">${a.name}</span>
+              <span style="font-size:10px;background:var(--bg3);border:1px solid #1a1a1a;border-radius:20px;padding:2px 10px;color:var(--t4);text-transform:uppercase;letter-spacing:1px">${a.type}</span>
+            </div>
+            <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.6">${a.messages_count||0} messages processed · Created ${new Date(a.created_at).toLocaleDateString()}</div>
+            <div style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:8px 12px;display:flex;align-items:center;gap:10px">
+              <span style="font-size:10px;color:var(--t4);font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0">Webhook URL</span>
+              <code style="font-size:11px;color:var(--r);word-break:break-all;flex:1">${location.origin}/webhook/${a.webhook_id}</code>
+              <button onclick="copyWebhook('${location.origin}/webhook/${a.webhook_id}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 10px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;flex-shrink:0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Copy</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+            <button onclick="toggleAutomation('${a.webhook_id}',this)" style="background:${a.active?'rgba(74,222,128,.1)':'var(--bg3)'};border:1px solid ${a.active?'rgba(74,222,128,.2)':'#1a1a1a'};border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:${a.active?'var(--green)':'var(--t4)'};cursor:pointer">${a.active?'⏸ Pause':'▶ Resume'}</button>
+            <button onclick="deleteAutomation('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:#555;cursor:pointer">✕ Delete</button>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e){
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--t4);font-size:13px">Failed to load automations.</div>';
+  }
+}
+
+function copyWebhook(url){
+  navigator.clipboard.writeText(url).then(() => notify('Webhook URL copied ✓', 'success'));
+}
+
+async function toggleAutomation(id, btn){
+  btn.disabled = true;
+  try {
+    await fetch(API+'/api/automations/'+id+'/toggle', {method:'PATCH', headers: authHeaders()});
+    loadMyAutomations();
+  } catch(e){ notify('Failed to toggle automation.','error'); btn.disabled = false; }
+}
+
+async function deleteAutomation(id){
+  if(!confirm('Delete this automation? This cannot be undone.')) return;
+  try {
+    await fetch(API+'/api/automations/'+id, {method:'DELETE', headers: authHeaders()});
+    notify('Automation deleted.','success');
+    loadMyAutomations();
+  } catch(e){ notify('Failed to delete.','error'); }
+}
+
+function openActivateModal(){
+  const prompt = document.getElementById('outPrompt').textContent;
+  const name = document.getElementById('wDescription').value.slice(0,50) || 'My Automation';
+  document.getElementById('actName').value = name;
+  document.getElementById('actPrompt').value = prompt;
+  document.getElementById('activateModal').style.display = 'flex';
+}
+
+function closeActivateModal(){
+  document.getElementById('activateModal').style.display = 'none';
+}
+
+function updateActivateFields(){
+  const type = document.getElementById('actType').value;
+  document.getElementById('actWhatsappFields').style.display = type === 'whatsapp' ? 'block' : 'none';
+  document.getElementById('actEmailFields').style.display = type === 'email' ? 'block' : 'none';
+  document.getElementById('actHttpFields').style.display = type === 'http' ? 'block' : 'none';
+}
+
+async function activateAutomation(){
+  const name = document.getElementById('actName').value.trim();
+  const type = document.getElementById('actType').value;
+  const system_prompt = document.getElementById('actPrompt').value.trim();
+  if(!name || !system_prompt){ notify('Fill in name and system prompt.','error'); return; }
+
+  const config = {};
+  if(type === 'whatsapp'){
+    const key = document.getElementById('actWaKey').value.trim();
+    if(!key){ notify('Enter your 360dialog API Key.','error'); return; }
+    config.api_key = key;
+  } else if(type === 'email'){
+    config.email_subject = document.getElementById('actEmailSubject').value.trim() || 'Thank you for reaching out!';
+  } else {
+    const cb = document.getElementById('actCallback').value.trim();
+    if(cb) config.callback_url = cb;
+  }
+
+  const btn = document.querySelector('#activateModal .generate-btn');
+  btn.disabled = true; btn.innerHTML = '<span>⏳</span> Activating...';
+  try {
+    const r = await fetch(API+'/api/automations', {
+      method:'POST', headers: authHeaders(),
+      body: JSON.stringify({ name, type, system_prompt, config })
+    });
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+    closeActivateModal();
+    notify('Automation activated! ✓', 'success');
+    showPage('myautomations', document.querySelectorAll('.nav-item')[2]);
+  } catch(e){
+    notify('Failed to activate: ' + e.message, 'error');
+  }
+  btn.disabled = false; btn.innerHTML = '<span>▶</span> Activate';
 }
 
 // DASHBOARD

@@ -191,6 +191,180 @@ app.post('/api/ai/generate', auth, async (req, res) => {
   }
 });
 
+// ════════════════════════════════════════
+// AUTOMATION ENGINE
+// ════════════════════════════════════════
+
+// In-memory fallback (used if Supabase table doesn't exist yet)
+const automationStore = new Map();
+
+async function callAI(systemPrompt, userMessage) {
+  if (OPENAI_KEY) {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
+      body: JSON.stringify({ model: 'gpt-4o', max_tokens: 600,
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }] })
+    });
+    const d = await r.json();
+    if (d.choices && d.choices[0]) return d.choices[0].message.content;
+  }
+  if (anthropic) {
+    const msg = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 600,
+      system: systemPrompt, messages: [{ role: 'user', content: userMessage }] });
+    return msg.content[0].text;
+  }
+  throw new Error('No AI provider configured');
+}
+
+async function getAutomation(webhookId) {
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('automations').select('*').eq('webhook_id', webhookId).single();
+      if (data) return data;
+    } catch(e) {}
+  }
+  return automationStore.get(webhookId) || null;
+}
+
+async function incrementCount(webhookId, current) {
+  if (supabase) {
+    try { await supabase.from('automations').update({ messages_count: (current || 0) + 1 }).eq('webhook_id', webhookId); } catch(e) {}
+  }
+  if (automationStore.has(webhookId)) automationStore.get(webhookId).messages_count = (current || 0) + 1;
+}
+
+// GET /api/automations
+app.get('/api/automations', auth, async (req, res) => {
+  const userId = String(req.user.id);
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('automations').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+      if (!error) return res.json({ automations: data || [] });
+    } catch(e) {}
+  }
+  const items = [...automationStore.values()].filter(a => String(a.user_id) === userId);
+  res.json({ automations: items });
+});
+
+// POST /api/automations
+app.post('/api/automations', auth, async (req, res) => {
+  const { name, type, system_prompt, config } = req.body;
+  if (!name || !type || !system_prompt) return res.status(400).json({ error: 'name, type, system_prompt required' });
+  const webhook_id = crypto.randomBytes(10).toString('hex');
+  const automation = {
+    id: webhook_id,
+    user_id: String(req.user.id),
+    webhook_id, name, type, system_prompt,
+    config: config || {},
+    active: true, messages_count: 0,
+    created_at: new Date().toISOString()
+  };
+  const webhookUrl = `${req.protocol}://${req.get('host')}/webhook/${webhook_id}`;
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('automations').insert([automation]).select().single();
+      if (!error && data) {
+        addLog(`Automation created: ${name}`, 'automation', 'success');
+        return res.json({ automation: data, webhook_url: webhookUrl });
+      }
+    } catch(e) {}
+  }
+  automationStore.set(webhook_id, automation);
+  addLog(`Automation created (memory): ${name}`, 'automation', 'success');
+  res.json({ automation, webhook_url: webhookUrl });
+});
+
+// DELETE /api/automations/:id
+app.delete('/api/automations/:id', auth, async (req, res) => {
+  if (supabase) {
+    try { await supabase.from('automations').delete().eq('webhook_id', req.params.id).eq('user_id', String(req.user.id)); } catch(e) {}
+  }
+  automationStore.delete(req.params.id);
+  res.json({ success: true });
+});
+
+// PATCH /api/automations/:id/toggle
+app.patch('/api/automations/:id/toggle', auth, async (req, res) => {
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('automations').select('active').eq('webhook_id', req.params.id).single();
+      if (data) {
+        const { data: updated } = await supabase.from('automations').update({ active: !data.active }).eq('webhook_id', req.params.id).select().single();
+        return res.json({ automation: updated });
+      }
+    } catch(e) {}
+  }
+  const a = automationStore.get(req.params.id);
+  if (a) { a.active = !a.active; return res.json({ automation: a }); }
+  res.status(404).json({ error: 'Not found' });
+});
+
+// POST /webhook/:webhookId — PUBLIC execution endpoint
+app.post('/webhook/:webhookId', async (req, res) => {
+  const { webhookId } = req.params;
+  try {
+    const automation = await getAutomation(webhookId);
+    if (!automation) return res.status(404).json({ error: 'Automation not found' });
+    if (!automation.active) return res.json({ message: 'Automation paused' });
+
+    const body = req.body;
+    let userMessage = '';
+    let aiReply = '';
+
+    if (automation.type === 'whatsapp') {
+      // 360dialog / WhatsApp Cloud API format
+      const msg = body?.messages?.[0] || body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+      userMessage = msg?.text?.body || msg?.interactive?.button_reply?.title || JSON.stringify(body).slice(0, 500);
+      const from = msg?.from || body?.messages?.[0]?.from;
+      aiReply = await callAI(automation.system_prompt, userMessage);
+      if (automation.config?.api_key && from) {
+        const apiKey = automation.config.api_key;
+        await fetch('https://waba.360dialog.io/v1/messages', {
+          method: 'POST',
+          headers: { 'D360-API-KEY': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: from, type: 'text', text: { body: aiReply } })
+        });
+      }
+    } else if (automation.type === 'email') {
+      // Tally / Typeform / generic form webhook
+      const fields = body?.data?.fields || body?.fields || [];
+      const emailVal = fields.find(f => f.type === 'EMAIL' || (f.label||'').toLowerCase().includes('email'))?.value || body?.email || body?.Email || '';
+      const nameVal = fields.find(f => (f.label||'').toLowerCase().includes('name'))?.value || body?.name || body?.Name || 'there';
+      const msgVal = fields.find(f => ['LONG_TEXT','SHORT_TEXT','TEXTAREA'].includes(f.type) || (f.label||'').toLowerCase().includes('message'))?.value || body?.message || body?.Message || JSON.stringify(body).slice(0,300);
+      userMessage = `Name: ${nameVal}\nMessage: ${msgVal}`;
+      aiReply = await callAI(automation.system_prompt, userMessage);
+      if (transporter && emailVal) {
+        await transporter.sendMail({
+          from: automation.config?.from_email || BREVO_USER || 'noreply@aicashsystem.space',
+          to: emailVal,
+          subject: automation.config?.email_subject || 'Thank you for reaching out!',
+          text: aiReply,
+          html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px"><p>${aiReply.replace(/\n/g,'<br>')}</p></div>`
+        });
+      }
+    } else {
+      // Generic HTTP: receive any JSON, reply with AI output
+      userMessage = body?.message || body?.text || body?.content || body?.query || JSON.stringify(body).slice(0,500);
+      aiReply = await callAI(automation.system_prompt, userMessage);
+      if (automation.config?.callback_url) {
+        await fetch(automation.config.callback_url, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reply: aiReply, original: body })
+        });
+      }
+    }
+
+    await incrementCount(webhookId, automation.messages_count);
+    addLog(`Automation fired: ${automation.name}`, 'automation', 'success');
+    res.json({ success: true, reply: aiReply });
+  } catch(e) {
+    console.error('Webhook execution error:', e);
+    addLog('Automation error: ' + e.message, 'automation', 'error');
+    res.status(500).json({ error: 'Automation failed: ' + e.message });
+  }
+});
+
 // GET /api/test — public test endpoint
 app.get('/api/test', (req, res) => {
   res.json({
