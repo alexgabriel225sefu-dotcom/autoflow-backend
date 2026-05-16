@@ -221,19 +221,21 @@ function saveStore() {
 loadStore();
 
 async function callAI(systemPrompt, userMessage) {
+  const today = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const fullSystem = `${systemPrompt}\n\nToday's date is: ${today}.`;
   if (OPENAI_KEY) {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
       body: JSON.stringify({ model: 'gpt-4o', max_tokens: 600,
-        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }] })
+        messages: [{ role: 'system', content: fullSystem }, { role: 'user', content: userMessage }] })
     });
     const d = await r.json();
     if (d.choices && d.choices[0]) return d.choices[0].message.content;
   }
   if (anthropic) {
     const msg = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 600,
-      system: systemPrompt, messages: [{ role: 'user', content: userMessage }] });
+      system: fullSystem, messages: [{ role: 'user', content: userMessage }] });
     return msg.content[0].text;
   }
   throw new Error('No AI provider configured');
