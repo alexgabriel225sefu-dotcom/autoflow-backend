@@ -511,6 +511,49 @@ app.get('/chat/:webhookId', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'chat.html'));
 });
 
+// POST /api/test-email — send a real test email and return result
+app.post('/api/test-email', auth, async (req, res) => {
+  const to = req.body.to || req.user.email;
+  const result = { to, brevo_api_key: !!BREVO_API_KEY, smtp: !!transporter, brevo_user: BREVO_USER || null };
+
+  if (BREVO_API_KEY) {
+    try {
+      const senderEmail = BREVO_USER || 'noreply@aicashsystem.space';
+      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender: { name: 'AutoFlow', email: senderEmail },
+          to: [{ email: to }],
+          subject: 'AutoFlow — Test Email',
+          htmlContent: '<p>Test email from AutoFlow. If you see this, email notifications work!</p>'
+        })
+      });
+      const body = await r.text();
+      if (r.ok) return res.json({ ...result, method: 'brevo_api', success: true });
+      return res.json({ ...result, method: 'brevo_api', success: false, error: body });
+    } catch(e) {
+      return res.json({ ...result, method: 'brevo_api', success: false, error: e.message });
+    }
+  }
+
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: BREVO_USER || 'noreply@aicashsystem.space',
+        to,
+        subject: 'AutoFlow — Test Email',
+        html: '<p>Test email from AutoFlow. If you see this, email notifications work!</p>'
+      });
+      return res.json({ ...result, method: 'smtp', success: true });
+    } catch(e) {
+      return res.json({ ...result, method: 'smtp', success: false, error: e.message });
+    }
+  }
+
+  res.json({ ...result, method: 'none', success: false, error: 'No email provider configured' });
+});
+
 // GET /api/test — public test endpoint
 app.get('/api/test', (req, res) => {
   res.json({
@@ -518,6 +561,7 @@ app.get('/api/test', (req, res) => {
     openai: !!OPENAI_KEY,
     anthropic: !!anthropic,
     email: !!transporter,
+    brevo_api: !!BREVO_API_KEY,
     supabase: !!supabase
   });
 });
