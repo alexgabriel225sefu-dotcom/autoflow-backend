@@ -1127,6 +1127,7 @@ async function loadMyAutomations(){
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+            <button onclick="shareChatLink('${a.webhook_id}')" style="background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.25);border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--r);cursor:pointer">⬡ Share Chat</button>
             <button onclick="testAutomation('${a.webhook_id}')" style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--green);cursor:pointer">▷ Test</button>
             <button onclick="viewMessages('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--t3);cursor:pointer">◎ Messages</button>
             <button onclick="toggleAutomation('${a.webhook_id}',this)" style="background:${a.active?'rgba(74,222,128,.1)':'var(--bg3)'};border:1px solid ${a.active?'rgba(74,222,128,.2)':'#1a1a1a'};border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:${a.active?'var(--green)':'var(--t4)'};cursor:pointer">${a.active?'⏸ Pause':'▶ Resume'}</button>
@@ -1158,6 +1159,11 @@ async function deleteAutomation(id){
     notify('Automation deleted.','success');
     loadMyAutomations();
   } catch(e){ notify('Failed to delete.','error'); }
+}
+
+function shareChatLink(id){
+  const url = location.origin+'/chat/'+id;
+  navigator.clipboard.writeText(url).then(() => notify('Chat link copied! Share it with your client ✓','success'));
 }
 
 let testWebhookId = '';

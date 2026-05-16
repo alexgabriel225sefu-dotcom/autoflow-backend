@@ -421,6 +421,18 @@ app.post('/webhook/:webhookId', async (req, res) => {
   }
 });
 
+// GET /api/chat/:webhookId/info — public: returns automation name for chat page
+app.get('/api/chat/:webhookId/info', async (req, res) => {
+  const a = await getAutomation(req.params.webhookId);
+  if (!a) return res.status(404).json({ error: 'Not found' });
+  res.json({ name: a.name, active: a.active });
+});
+
+// GET /chat/:webhookId — serve public chat page
+app.get('/chat/:webhookId', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'chat.html'));
+});
+
 // GET /api/test — public test endpoint
 app.get('/api/test', (req, res) => {
   res.json({
