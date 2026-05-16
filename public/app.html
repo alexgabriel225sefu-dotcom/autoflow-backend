@@ -959,6 +959,10 @@ window.onload = function(){
   if(token && currentUser){
     document.getElementById('loginEmail').value = currentUser.email;
     launchApp();
+  } else {
+    // Pre-fill access code if coming from course page
+    var savedCode = localStorage.getItem('acs_code');
+    if(savedCode) document.getElementById('loginCode').value = savedCode;
   }
   document.getElementById('loginCode').addEventListener('keydown', e => { if(e.key==='Enter') handleLogin(); });
   document.getElementById('loginEmail').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('loginCode').focus(); });
