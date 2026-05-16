@@ -413,6 +413,29 @@ app.post('/webhook/:webhookId', async (req, res) => {
 
     await incrementCount(webhookId, automation.messages_count, userMessage, aiReply);
     addLog(`Automation fired: ${automation.name} | "${userMessage.slice(0,60)}"`, 'automation', 'success');
+
+    // Email notification to owner
+    if (transporter && automation.config?.notify_email) {
+      transporter.sendMail({
+        from: BREVO_USER || 'noreply@aicashsystem.space',
+        to: automation.config.notify_email,
+        subject: `💬 New message — ${automation.name}`,
+        html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9f9f9">
+          <h2 style="color:#E53E2E;margin-bottom:4px">New customer message</h2>
+          <p style="color:#666;font-size:13px;margin-bottom:24px">via AutoFlow · ${automation.name}</p>
+          <div style="background:#fff;border-radius:10px;padding:18px;margin-bottom:16px;border-left:4px solid #ddd">
+            <p style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;margin-bottom:8px">Customer wrote</p>
+            <p style="font-size:15px;color:#222;line-height:1.6">${userMessage.replace(/\n/g,'<br>')}</p>
+          </div>
+          <div style="background:#fff;border-radius:10px;padding:18px;border-left:4px solid #E53E2E">
+            <p style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;margin-bottom:8px">AI replied</p>
+            <p style="font-size:15px;color:#222;line-height:1.6">${aiReply.replace(/\n/g,'<br>')}</p>
+          </div>
+          <p style="color:#aaa;font-size:11px;margin-top:20px;text-align:center">Powered by AutoFlow · aicashsystem.space</p>
+        </div>`
+      }).catch(e => console.error('Notify email error:', e.message));
+    }
+
     res.json({ success: true, reply: aiReply });
   } catch(e) {
     console.error('Webhook execution error:', e);

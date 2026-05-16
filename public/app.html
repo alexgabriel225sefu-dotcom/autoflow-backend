@@ -886,6 +886,11 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
     </div>
 
     <div class="form-group">
+      <label class="form-label">Notify owner at email (optional)</label>
+      <input class="form-input" id="actNotifyEmail" placeholder="e.g. restaurant@gmail.com — gets an email for each new message">
+    </div>
+
+    <div class="form-group">
       <label class="form-label">AI System Prompt</label>
       <textarea class="form-textarea" id="actPrompt" style="min-height:100px" placeholder="You are the AI assistant of..."></textarea>
     </div>
@@ -1258,6 +1263,8 @@ async function activateAutomation(){
   if(!name || !system_prompt){ notify('Fill in name and system prompt.','error'); return; }
 
   const config = {};
+  const notifyEmail = document.getElementById('actNotifyEmail').value.trim();
+  if(notifyEmail) config.notify_email = notifyEmail;
   if(type === 'whatsapp'){
     const key = document.getElementById('actWaKey').value.trim();
     if(!key){ notify('Enter your 360dialog API Key.','error'); return; }
