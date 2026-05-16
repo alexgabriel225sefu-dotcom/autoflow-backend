@@ -45,7 +45,7 @@
     <div class="steps">
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to stripe.com and click "Start now"</div></div>
-        <div class="step-text">Open <strong style="color:#C8A96E">stripe.com</strong>. Click the <span class="click">Start now</span> button. Enter your email and create a password. Click <span class="click">Create account</span>.</div>
+        <div class="step-text">Open <strong style="color:#E53E2E">stripe.com</strong>. Click the <span class="click">Start now</span> button. Enter your email and create a password. Click <span class="click">Create account</span>.</div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Verify your email</div></div>
@@ -55,11 +55,11 @@
         <div class="step-header"><div class="step-num">3</div><div class="step-title">Complete your business profile</div></div>
         <div class="step-text">In the Stripe Dashboard, click <span class="click">Activate your account</span> or go to Settings → Business settings. Fill in your business details:</div>
         <div class="step-detail">
-          <strong style="color:#C8A96E">Business type:</strong> Individual or Company — if you are just starting, Individual works fine<br/>
-          <strong style="color:#C8A96E">Business name:</strong> Your agency name<br/>
-          <strong style="color:#C8A96E">Business website:</strong> Your server URL if you don't have a website yet<br/>
-          <strong style="color:#C8A96E">Business category:</strong> Select "Computer Programming, Data Processing" or "Consulting"<br/>
-          <strong style="color:#C8A96E">Description:</strong> "AI automation services for small businesses"<br/><br/>
+          <strong style="color:#E53E2E">Business type:</strong> Individual or Company — if you are just starting, Individual works fine<br/>
+          <strong style="color:#E53E2E">Business name:</strong> Your agency name<br/>
+          <strong style="color:#E53E2E">Business website:</strong> Your server URL if you don't have a website yet<br/>
+          <strong style="color:#E53E2E">Business category:</strong> Select "Computer Programming, Data Processing" or "Consulting"<br/>
+          <strong style="color:#E53E2E">Description:</strong> "AI automation services for small businesses"<br/><br/>
           Fill in your personal details and bank account information to receive payouts. Stripe needs this to verify your identity and deposit money to you.
         </div>
       </div>
@@ -67,9 +67,9 @@
         <div class="step-header"><div class="step-num">4</div><div class="step-title">Get your API keys</div></div>
         <div class="step-text">In the Stripe Dashboard, click <span class="click">Developers</span> in the top right → click <span class="click">API keys</span>. You see two keys:</div>
         <div class="step-detail">
-          <strong style="color:#C8A96E">Publishable key</strong> — starts with <code style="color:#C8A96E">pk_live_...</code> — used in your frontend (website). Safe to expose publicly.<br/>
-          <strong style="color:#C8A96E">Secret key</strong> — starts with <code style="color:#C8A96E">sk_live_...</code> — used in your server. NEVER expose this publicly.<br/><br/>
-          Copy both. Add the Secret key to your Render environment variables as <code style="color:#C8A96E">STRIPE_SECRET_KEY</code>.
+          <strong style="color:#E53E2E">Publishable key</strong> — starts with <code style="color:#E53E2E">pk_live_...</code> — used in your frontend (website). Safe to expose publicly.<br/>
+          <strong style="color:#E53E2E">Secret key</strong> — starts with <code style="color:#E53E2E">sk_live_...</code> — used in your server. NEVER expose this publicly.<br/><br/>
+          Copy both. Add the Secret key to your Render environment variables as <code style="color:#E53E2E">STRIPE_SECRET_KEY</code>.
         </div>
       </div>
     </div>
@@ -86,16 +86,16 @@
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Create a product for each retainer tier</div></div>
         <div class="step-text">Create one product per service tier. Here is the setup for a Basic WhatsApp Bot retainer:</div>
         <div class="step-detail">
-          <strong style="color:#C8A96E">Name:</strong> WhatsApp Bot — Monthly Maintenance<br/>
-          <strong style="color:#C8A96E">Description:</strong> Monthly maintenance and optimization of your AI WhatsApp bot<br/>
-          <strong style="color:#C8A96E">Pricing:</strong> Click "Add a price" → Recurring → Monthly → $200 (or your actual price)<br/>
-          <strong style="color:#C8A96E">Currency:</strong> USD (or your local currency)<br/><br/>
+          <strong style="color:#E53E2E">Name:</strong> WhatsApp Bot — Monthly Maintenance<br/>
+          <strong style="color:#E53E2E">Description:</strong> Monthly maintenance and optimization of your AI WhatsApp bot<br/>
+          <strong style="color:#E53E2E">Pricing:</strong> Click "Add a price" → Recurring → Monthly → $200 (or your actual price)<br/>
+          <strong style="color:#E53E2E">Currency:</strong> USD (or your local currency)<br/><br/>
           Click <span class="click">Save product</span>. Repeat for each tier: $150, $200, $300, $400 monthly retainers.
         </div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">3</div><div class="step-title">Copy the Price ID for each product</div></div>
-        <div class="step-text">After saving each product, click on it to open it. Under "Pricing," you see the price listed with a Price ID that starts with <code style="color:#C8A96E">price_</code>. Copy this ID. You will use it when creating subscriptions for clients.</div>
+        <div class="step-text">After saving each product, click on it to open it. Under "Pricing," you see the price listed with a Price ID that starts with <code style="color:#E53E2E">price_</code>. Copy this ID. You will use it when creating subscriptions for clients.</div>
       </div>
     </div>
   </div>
@@ -137,9 +137,9 @@
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Configure the payment link</div></div>
         <div class="step-detail">
-          <strong style="color:#C8A96E">Product:</strong> Click "Add a product" → select the retainer product you created (e.g., WhatsApp Bot Monthly Maintenance $200)<br/>
-          <strong style="color:#C8A96E">After payment:</strong> Set the confirmation page to show "Your automation service is now active. You will receive an email within 24 hours."<br/>
-          <strong style="color:#C8A96E">Collect customer details:</strong> Enable "Email" — so you know who paid<br/><br/>
+          <strong style="color:#E53E2E">Product:</strong> Click "Add a product" → select the retainer product you created (e.g., WhatsApp Bot Monthly Maintenance $200)<br/>
+          <strong style="color:#E53E2E">After payment:</strong> Set the confirmation page to show "Your automation service is now active. You will receive an email within 24 hours."<br/>
+          <strong style="color:#E53E2E">Collect customer details:</strong> Enable "Email" — so you know who paid<br/><br/>
           Click <span class="click">Create link</span>. Copy the URL.
         </div>
       </div>
@@ -225,18 +225,18 @@
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Add your server webhook URL</div></div>
-        <div class="step-text">In the "Endpoint URL" field, enter your Render server URL with <code style="color:#C8A96E">/stripe-webhook</code>:</div>
-        <div class="step-detail"><code style="color:#C8A96E">https://aicashsystem.onrender.com/stripe-webhook</code></div>
+        <div class="step-text">In the "Endpoint URL" field, enter your Render server URL with <code style="color:#E53E2E">/stripe-webhook</code>:</div>
+        <div class="step-detail"><code style="color:#E53E2E">https://aicashsystem.onrender.com/stripe-webhook</code></div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">3</div><div class="step-title">Select events to listen for</div></div>
         <div class="step-text">Click <span class="click">Select events</span>. Add these events:</div>
         <div class="step-detail">
-          ✓ <code style="color:#C8A96E">customer.subscription.created</code> — new client subscribed<br/>
-          ✓ <code style="color:#C8A96E">invoice.payment_succeeded</code> — monthly payment collected<br/>
-          ✓ <code style="color:#C8A96E">invoice.payment_failed</code> — payment failed (card expired etc.)<br/>
-          ✓ <code style="color:#C8A96E">customer.subscription.deleted</code> — client cancelled<br/><br/>
-          Click <span class="click">Add endpoint</span>. Copy the <strong style="color:#C8A96E">Signing secret</strong> that appears — add it to Render as <code style="color:#C8A96E">STRIPE_WEBHOOK_SECRET</code>.
+          ✓ <code style="color:#E53E2E">customer.subscription.created</code> — new client subscribed<br/>
+          ✓ <code style="color:#E53E2E">invoice.payment_succeeded</code> — monthly payment collected<br/>
+          ✓ <code style="color:#E53E2E">invoice.payment_failed</code> — payment failed (card expired etc.)<br/>
+          ✓ <code style="color:#E53E2E">customer.subscription.deleted</code> — client cancelled<br/><br/>
+          Click <span class="click">Add endpoint</span>. Copy the <strong style="color:#E53E2E">Signing secret</strong> that appears — add it to Render as <code style="color:#E53E2E">STRIPE_WEBHOOK_SECRET</code>.
         </div>
       </div>
     </div>
@@ -247,20 +247,20 @@
     <div class="steps">
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Automation 1 — New Subscription → Welcome Email</div></div>
-        <div class="step-text">When <code style="color:#C8A96E">customer.subscription.created</code> fires, your server receives it and can forward to Make.com. Build a Make.com scenario that: sends the client a welcome email with their access code and next steps, adds them to your Client Tracker sheet, creates a reminder for you to start building their automation.</div>
+        <div class="step-text">When <code style="color:#E53E2E">customer.subscription.created</code> fires, your server receives it and can forward to Make.com. Build a Make.com scenario that: sends the client a welcome email with their access code and next steps, adds them to your Client Tracker sheet, creates a reminder for you to start building their automation.</div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Automation 2 — Failed Payment → Recovery Email</div></div>
-        <div class="step-text">When <code style="color:#C8A96E">invoice.payment_failed</code> fires, automatically send the client an email asking them to update their payment method. Include a direct link to the Stripe Customer Portal where they can update their card in 30 seconds.</div>
+        <div class="step-text">When <code style="color:#E53E2E">invoice.payment_failed</code> fires, automatically send the client an email asking them to update their payment method. Include a direct link to the Stripe Customer Portal where they can update their card in 30 seconds.</div>
         <div class="step-detail">The email should be friendly, not alarming: "Hi [Name], just a quick heads up — your payment for this month did not go through (possibly an expired card). Click here to update your payment method: [Stripe Portal Link]. Your service continues normally while you do this."</div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">3</div><div class="step-title">Automation 3 — Monthly Payment → Update Revenue Tracker</div></div>
-        <div class="step-text">When <code style="color:#C8A96E">invoice.payment_succeeded</code> fires, automatically update your revenue tracking sheet. This gives you a real-time view of monthly recurring revenue without manually counting payments.</div>
+        <div class="step-text">When <code style="color:#E53E2E">invoice.payment_succeeded</code> fires, automatically update your revenue tracking sheet. This gives you a real-time view of monthly recurring revenue without manually counting payments.</div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">4</div><div class="step-title">Automation 4 — Cancellation → Offboarding Email</div></div>
-        <div class="step-text">When <code style="color:#C8A96E">customer.subscription.deleted</code> fires, send a professional offboarding email: thank them for working with you, ask for feedback (what made them cancel?), offer to restart at any time, and remind them you are available for one-off projects.</div>
+        <div class="step-text">When <code style="color:#E53E2E">customer.subscription.deleted</code> fires, send a professional offboarding email: thank them for working with you, ask for feedback (what made them cancel?), offer to restart at any time, and remind them you are available for one-off projects.</div>
         <div class="step-detail">Why this matters: 30% of cancellations come back within 6 months if handled professionally. A good offboarding email converts cancellations into future revenue.</div>
       </div>
     </div>

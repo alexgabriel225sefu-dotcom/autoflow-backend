@@ -52,7 +52,7 @@
     <div class="steps">
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">You create a webhook URL in Make.com</div></div>
-        <div class="step-text">In Make.com, when you add a "Custom Webhook" trigger, Make.com generates a unique URL like <code style="color:#C8A96E">https://hook.eu1.make.com/abc123xyz...</code>. This URL is now listening 24/7 for incoming HTTP POST requests.</div>
+        <div class="step-text">In Make.com, when you add a "Custom Webhook" trigger, Make.com generates a unique URL like <code style="color:#E53E2E">https://hook.eu1.make.com/abc123xyz...</code>. This URL is now listening 24/7 for incoming HTTP POST requests.</div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">You register the webhook URL with another platform</div></div>
@@ -98,8 +98,8 @@
     }
   ]
 }</div>
-    <div class="block-text">To access the message text in Make.com variables, you navigate: <code style="color:#C8A96E">entry[].changes[].value.messages[].text.body</code></div>
-    <div class="block-text">To access the sender's phone number: <code style="color:#C8A96E">entry[].changes[].value.messages[].from</code></div>
+    <div class="block-text">To access the message text in Make.com variables, you navigate: <code style="color:#E53E2E">entry[].changes[].value.messages[].text.body</code></div>
+    <div class="block-text">To access the sender's phone number: <code style="color:#E53E2E">entry[].changes[].value.messages[].from</code></div>
   </div>
 
   <div class="block">
@@ -107,7 +107,7 @@
     <div class="steps">
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to webhook.site</div></div>
-        <div class="step-text">Open <strong style="color:#C8A96E">webhook.site</strong> in your browser. The page immediately gives you a unique URL like <code style="color:#C8A96E">https://webhook.site/abc-123-xyz</code>. This URL is free and lives for a few hours.</div>
+        <div class="step-text">Open <strong style="color:#E53E2E">webhook.site</strong> in your browser. The page immediately gives you a unique URL like <code style="color:#E53E2E">https://webhook.site/abc-123-xyz</code>. This URL is free and lives for a few hours.</div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Use this URL as your webhook in any platform</div></div>
@@ -148,15 +148,15 @@
     <div class="steps">
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Add a Router module after your Webhook trigger</div></div>
-        <div class="step-text">In Make.com, click <span class="click">+</span> after the Webhook module. Search for <strong style="color:#C8A96E">Router</strong> — it is in the Flow Control category. The Router splits your scenario into multiple parallel paths.</div>
+        <div class="step-text">In Make.com, click <span class="click">+</span> after the Webhook module. Search for <strong style="color:#E53E2E">Router</strong> — it is in the Flow Control category. The Router splits your scenario into multiple parallel paths.</div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Set up Filter conditions on each path</div></div>
         <div class="step-text">Click the wrench icon on the connection line between the Router and the first module in each path. A Filter dialog appears. Set a condition that identifies this event type.</div>
         <div class="step-detail">
           Example for Instagram:<br/>
-          Path 1 (DMs): Field = <code style="color:#C8A96E">entry[].messaging</code> — Condition = <span class="click">Exists</span><br/>
-          Path 2 (Comments): Field = <code style="color:#C8A96E">entry[].changes[].value.comments</code> — Condition = <span class="click">Exists</span><br/><br/>
+          Path 1 (DMs): Field = <code style="color:#E53E2E">entry[].messaging</code> — Condition = <span class="click">Exists</span><br/>
+          Path 2 (Comments): Field = <code style="color:#E53E2E">entry[].changes[].value.comments</code> — Condition = <span class="click">Exists</span><br/><br/>
           This routes DM events to Path 1 and comment events to Path 2.
         </div>
       </div>
@@ -173,7 +173,7 @@
     <div class="steps">
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">The verification flow</div></div>
-        <div class="step-text">When you register a webhook with Meta, they send a GET request to your URL with three query parameters: <code style="color:#C8A96E">hub.mode</code>, <code style="color:#C8A96E">hub.challenge</code>, and <code style="color:#C8A96E">hub.verify_token</code>. Your server must respond with the <code style="color:#C8A96E">hub.challenge</code> value.</div>
+        <div class="step-text">When you register a webhook with Meta, they send a GET request to your URL with three query parameters: <code style="color:#E53E2E">hub.mode</code>, <code style="color:#E53E2E">hub.challenge</code>, and <code style="color:#E53E2E">hub.verify_token</code>. Your server must respond with the <code style="color:#E53E2E">hub.challenge</code> value.</div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Handle verification in your Render server</div></div>
@@ -205,7 +205,7 @@ app.post('/webhook', (req, res) => {
   });
   res.sendStatus(200);
 });</div>
-        <div class="step-detail">Set <code style="color:#C8A96E">WEBHOOK_VERIFY_TOKEN</code> in Render environment variables to match the verify token you enter in Meta's webhook settings. Set <code style="color:#C8A96E">MAKE_WEBHOOK_URL</code> to your Make.com webhook URL.</div>
+        <div class="step-detail">Set <code style="color:#E53E2E">WEBHOOK_VERIFY_TOKEN</code> in Render environment variables to match the verify token you enter in Meta's webhook settings. Set <code style="color:#E53E2E">MAKE_WEBHOOK_URL</code> to your Make.com webhook URL.</div>
       </div>
     </div>
   </div>
@@ -216,11 +216,11 @@ app.post('/webhook', (req, res) => {
     <div class="steps">
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Use the Webhook Response module in Make.com</div></div>
-        <div class="step-text">After your processing modules, add a <strong style="color:#C8A96E">Webhooks → Webhook Response</strong> module. This sends a custom HTTP response back to the platform that sent the webhook. Set the Status to 200, set the Body to whatever data the platform expects.</div>
+        <div class="step-text">After your processing modules, add a <strong style="color:#E53E2E">Webhooks → Webhook Response</strong> module. This sends a custom HTTP response back to the platform that sent the webhook. Set the Status to 200, set the Body to whatever data the platform expects.</div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Return the AI response directly</div></div>
-        <div class="step-text">For chatbot platforms that expect the reply in the webhook response, set the Body to the OpenAI output variable: <code style="color:#C8A96E">{{2.choices[].message.content}}</code>. Set Content-Type header to <code style="color:#C8A96E">application/json</code>.</div>
+        <div class="step-text">For chatbot platforms that expect the reply in the webhook response, set the Body to the OpenAI output variable: <code style="color:#E53E2E">{{2.choices[].message.content}}</code>. Set Content-Type header to <code style="color:#E53E2E">application/json</code>.</div>
       </div>
     </div>
   </div>
@@ -264,15 +264,15 @@ app.post('/webhook', (req, res) => {
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">4</div><div class="step-title">Check variable paths carefully</div></div>
-        <div class="step-text">The most common error after the webhook arrives is wrong variable paths. Click on the Webhook module circle in your scenario and look at the data structure. Compare it carefully with the variable paths you are using in subsequent modules. Even a small difference like <code style="color:#C8A96E">messages[].text.body</code> vs <code style="color:#C8A96E">messages[0].text.body</code> can cause failures.</div>
+        <div class="step-text">The most common error after the webhook arrives is wrong variable paths. Click on the Webhook module circle in your scenario and look at the data structure. Compare it carefully with the variable paths you are using in subsequent modules. Even a small difference like <code style="color:#E53E2E">messages[].text.body</code> vs <code style="color:#E53E2E">messages[0].text.body</code> can cause failures.</div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">5</div><div class="step-title">Check the platform's webhook logs</div></div>
         <div class="step-text">Most platforms (Stripe, Shopify, Meta) have a webhook log section in their dashboard. Go there and look at recent webhook deliveries. You can see: whether the delivery was attempted, what HTTP status code your webhook returned, and whether there were any errors. This is the most accurate source of truth for webhook problems.</div>
         <div class="step-detail">
-          <strong style="color:#C8A96E">Stripe webhook logs:</strong> dashboard.stripe.com → Developers → Webhooks → click your endpoint → Events tab<br/><br/>
-          <strong style="color:#C8A96E">Meta webhook logs:</strong> developers.facebook.com → your app → Webhooks → look at the subscription status<br/><br/>
-          <strong style="color:#C8A96E">360dialog:</strong> app.360dialog.io → your channel → Settings → check the webhook status indicator
+          <strong style="color:#E53E2E">Stripe webhook logs:</strong> dashboard.stripe.com → Developers → Webhooks → click your endpoint → Events tab<br/><br/>
+          <strong style="color:#E53E2E">Meta webhook logs:</strong> developers.facebook.com → your app → Webhooks → look at the subscription status<br/><br/>
+          <strong style="color:#E53E2E">360dialog:</strong> app.360dialog.io → your channel → Settings → check the webhook status indicator
         </div>
       </div>
     </div>
@@ -310,7 +310,7 @@ app.post('/webhook', (req, res) => {
       <div class="step">
         <div class="step-header"><div class="step-num">⚠</div><div class="step-title">Error: HTTP 403 or 401 on webhook response</div></div>
         <div class="step-text">The platform is rejecting your webhook responses. Usually means your API key or authentication is wrong.</div>
-        <div class="step-detail">Check the Headers section of your HTTP module. Make sure the API key is correct, the header name is exactly right (case-sensitive), and the format is correct. For example, some APIs use <code style="color:#C8A96E">Authorization: Bearer YOUR_KEY</code> while others use a custom header like <code style="color:#C8A96E">D360-API-KEY: YOUR_KEY</code>.</div>
+        <div class="step-detail">Check the Headers section of your HTTP module. Make sure the API key is correct, the header name is exactly right (case-sensitive), and the format is correct. For example, some APIs use <code style="color:#E53E2E">Authorization: Bearer YOUR_KEY</code> while others use a custom header like <code style="color:#E53E2E">D360-API-KEY: YOUR_KEY</code>.</div>
       </div>
     </div>
   </div>

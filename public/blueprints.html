@@ -4,44 +4,44 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Make.com Blueprints — AI Cash Systems</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
-nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(200,169,110,.08);backdrop-filter:blur(12px)}
-.logo{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;color:#C8A96E}
-.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8BEA8;font-family:Syne,sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
-.back-btn:hover{border-color:#C8A96E;color:#C8A96E}
+body{background:#080808;color:#f5f5f5;font-family:'Inter',sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#E53E2E;border-radius:2px}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;background:rgba(8,8,8,.97);border-bottom:1px solid rgba(229,62,46,.08);backdrop-filter:blur(12px)}
+.logo{font-family:'Inter',sans-serif;font-size:16px;font-weight:700;color:#E53E2E}
+.back-btn{display:flex;align-items:center;gap:8px;padding:8px 18px;background:transparent;border:1px solid rgba(229,62,46,.2);border-radius:6px;color:#999999;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:#E53E2E;color:#E53E2E}
 .hero{padding:56px 32px 40px;max-width:900px;margin:0 auto}
-.hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(200,169,110,.12);border:1px solid rgba(200,169,110,.2);border-radius:100px;padding:6px 16px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
-.hero h1{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:14px}
-.hero h1 em{font-style:italic;color:#C8A96E}
-.hero p{font-size:15px;color:#C8BEA8;max-width:600px;line-height:1.7}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(229,62,46,.12);border:1px solid rgba(229,62,46,.2);border-radius:100px;padding:6px 16px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#E53E2E;margin-bottom:20px}
+.hero h1{font-family:'Inter',sans-serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:14px}
+.hero h1 em{font-style:italic;color:#E53E2E}
+.hero p{font-size:15px;color:#999999;max-width:600px;line-height:1.7}
 .how-to{max-width:900px;margin:0 auto 48px;padding:0 32px}
-.how-to-card{background:#111;border:1px solid rgba(200,169,110,.1);border-radius:14px;padding:28px 32px}
-.how-to-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E;margin-bottom:16px}
+.how-to-card{background:#111;border:1px solid rgba(229,62,46,.1);border-radius:14px;padding:28px 32px}
+.how-to-title{font-family:'Inter',sans-serif;font-size:18px;font-weight:700;color:#E53E2E;margin-bottom:16px}
 .steps{display:flex;gap:24px;flex-wrap:wrap}
 .step{display:flex;gap:12px;align-items:flex-start;flex:1;min-width:200px}
-.step-num{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#8A6A2E,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#080808;flex-shrink:0;margin-top:2px}
-.step-text{font-size:13px;color:#C8BEA8;line-height:1.65}
-.step-text strong{color:#F5F0E8;display:block;margin-bottom:3px}
+.step-num{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#B52318,#E53E2E);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#080808;flex-shrink:0;margin-top:2px}
+.step-text{font-size:13px;color:#999999;line-height:1.65}
+.step-text strong{color:#f5f5f5;display:block;margin-bottom:3px}
 .container{max-width:900px;margin:0 auto;padding:0 32px 80px;display:grid;gap:16px}
-.section-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;padding:0 4px;margin-top:8px;margin-bottom:4px}
-.blueprint-card{background:#111;border:1px solid rgba(200,169,110,.08);border-radius:14px;padding:28px;display:flex;align-items:center;gap:24px;transition:border-color .2s}
-.blueprint-card:hover{border-color:rgba(200,169,110,.2)}
-.blueprint-card.pro{border-color:rgba(200,169,110,.15)}
-.bp-icon{width:56px;height:56px;border-radius:12px;background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.15);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.section-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#E53E2E;padding:0 4px;margin-top:8px;margin-bottom:4px}
+.blueprint-card{background:#111;border:1px solid rgba(229,62,46,.08);border-radius:14px;padding:28px;display:flex;align-items:center;gap:24px;transition:border-color .2s}
+.blueprint-card:hover{border-color:rgba(229,62,46,.2)}
+.blueprint-card.pro{border-color:rgba(229,62,46,.15)}
+.bp-icon{width:56px;height:56px;border-radius:12px;background:rgba(229,62,46,.08);border:1px solid rgba(229,62,46,.15);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
 .bp-body{flex:1}
-.bp-module{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;margin-bottom:5px}
-.bp-title{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#F5F0E8;margin-bottom:6px}
-.bp-desc{font-size:13px;color:#C8BEA8;line-height:1.6;margin-bottom:10px}
+.bp-module{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#E53E2E;margin-bottom:5px}
+.bp-title{font-family:'Inter',sans-serif;font-size:18px;font-weight:700;color:#f5f5f5;margin-bottom:6px}
+.bp-desc{font-size:13px;color:#999999;line-height:1.6;margin-bottom:10px}
 .bp-tags{display:flex;gap:8px;flex-wrap:wrap}
-.bp-tag{font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:100px;background:#161616;border:1px solid rgba(200,169,110,.1);color:#C8BEA8}
+.bp-tag{font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:100px;background:#161616;border:1px solid rgba(229,62,46,.1);color:#999999}
 .bp-actions{display:flex;flex-direction:column;gap:8px;flex-shrink:0}
-.btn-download{display:flex;align-items:center;gap:8px;padding:10px 20px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:Syne,sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;text-decoration:none;transition:opacity .2s;white-space:nowrap}
+.btn-download{display:flex;align-items:center;gap:8px;padding:10px 20px;background:linear-gradient(135deg,#B52318,#FF5544);border:none;border-radius:8px;color:#080808;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;text-decoration:none;transition:opacity .2s;white-space:nowrap}
 .btn-download:hover{opacity:.9}
-.pro-badge{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(200,169,110,.2),rgba(200,169,110,.08));border:1px solid rgba(200,169,110,.3);border-radius:100px;padding:2px 10px;font-size:10px;letter-spacing:1px;color:#C8A96E;margin-left:8px;vertical-align:middle}
+.pro-badge{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(229,62,46,.2),rgba(229,62,46,.08));border:1px solid rgba(229,62,46,.3);border-radius:100px;padding:2px 10px;font-size:10px;letter-spacing:1px;color:#E53E2E;margin-left:8px;vertical-align:middle}
 @media(max-width:640px){.blueprint-card{flex-direction:column}.bp-actions{flex-direction:row;width:100%}.steps{flex-direction:column}.hero,.how-to,.container{padding-left:20px;padding-right:20px}}
 </style>
 </head>

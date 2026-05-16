@@ -4,52 +4,52 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>AI Cash Systems — Starter Course</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#080808;color:#F5F0E8;font-family:Syne,sans-serif;overflow-x:hidden}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C8A96E;border-radius:2px}
+body{background:#080808;color:#f5f5f5;font-family:'Inter',sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#E53E2E;border-radius:2px}
 body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.4}
-nav{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid rgba(200,169,110,.08);background:rgba(8,8,8,.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
-.logo{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;color:#C8A96E}
-.nav-badge{display:flex;align-items:center;gap:8px;font-size:13px;color:#C8BEA8}
-.nav-bp{display:flex;align-items:center;gap:8px;padding:7px 16px;border:1px solid rgba(200,169,110,.2);border-radius:6px;color:#C8A96E;font-size:12px;text-decoration:none;font-family:Syne,sans-serif;transition:all .2s}
-.nav-bp:hover{background:rgba(200,169,110,.08);border-color:#C8A96E}
+nav{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid rgba(229,62,46,.08);background:rgba(8,8,8,.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.logo{font-family:'Inter',sans-serif;font-size:18px;font-weight:700;color:#E53E2E}
+.nav-badge{display:flex;align-items:center;gap:8px;font-size:13px;color:#999999}
+.nav-bp{display:flex;align-items:center;gap:8px;padding:7px 16px;border:1px solid rgba(229,62,46,.2);border-radius:6px;color:#E53E2E;font-size:12px;text-decoration:none;font-family:'Inter',sans-serif;transition:all .2s}
+.nav-bp:hover{background:rgba(229,62,46,.08);border-color:#E53E2E}
 .badge-dot{width:8px;height:8px;border-radius:50%;background:#4ADE80;box-shadow:0 0 8px #4ADE80;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
 .hero{padding:48px 32px 32px;max-width:900px;margin:0 auto;animation:fadeUp .7s ease both}
-.hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(200,169,110,.15);border:1px solid rgba(200,169,110,.18);border-radius:100px;padding:6px 16px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#C8A96E;margin-bottom:20px}
-.hero h1{font-family:"Playfair Display",serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:14px}
-.hero h1 em{font-style:italic;color:#C8A96E}
-.hero p{font-size:15px;color:#C8BEA8;max-width:520px;line-height:1.7}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(229,62,46,.15);border:1px solid rgba(229,62,46,.18);border-radius:100px;padding:6px 16px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#E53E2E;margin-bottom:20px}
+.hero h1{font-family:'Inter',sans-serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:14px}
+.hero h1 em{font-style:italic;color:#E53E2E}
+.hero p{font-size:15px;color:#999999;max-width:520px;line-height:1.7}
 .progress-bar-wrap{max-width:900px;margin:24px auto 0;padding:0 32px}
-.progress-meta{display:flex;justify-content:space-between;font-size:12px;color:#C8BEA8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.progress-meta{display:flex;justify-content:space-between;font-size:12px;color:#999999;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
 .progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
-.progress-fill{height:100%;background:linear-gradient(90deg,#8A6A2E,#E8CB8A);border-radius:2px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.progress-fill{height:100%;background:linear-gradient(90deg,#B52318,#FF5544);border-radius:2px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
 .container{max-width:900px;margin:40px auto;padding:0 32px 80px;display:grid;gap:16px}
-.module{background:#111111;border:1px solid rgba(200,169,110,.08);border-radius:12px;overflow:hidden}
+.module{background:#111111;border:1px solid rgba(229,62,46,.08);border-radius:12px;overflow:hidden}
 .module-header{display:flex;align-items:center;gap:16px;padding:20px 24px;cursor:pointer;user-select:none;transition:background .2s}
 .module-header:hover{background:#161616}
-.module-num{font-family:"Playfair Display",serif;font-size:32px;font-weight:300;color:rgba(200,169,110,.4);min-width:36px;line-height:1}
+.module-num{font-family:'Inter',sans-serif;font-size:32px;font-weight:300;color:rgba(229,62,46,.4);min-width:36px;line-height:1}
 .module-info{flex:1}
-.module-title{font-family:"Playfair Display",serif;font-size:20px;font-weight:600;color:#F5F0E8;margin-bottom:4px}
-.module-meta{font-size:12px;color:#C8BEA8;letter-spacing:1px;text-transform:uppercase}
-.module-toggle{width:32px;height:32px;border-radius:50%;border:1px solid rgba(200,169,110,.2);display:flex;align-items:center;justify-content:center;color:#C8A96E;font-size:18px;transition:transform .3s;flex-shrink:0}
-.module.open .module-toggle{transform:rotate(45deg);background:rgba(200,169,110,.1)}
+.module-title{font-family:'Inter',sans-serif;font-size:20px;font-weight:600;color:#f5f5f5;margin-bottom:4px}
+.module-meta{font-size:12px;color:#999999;letter-spacing:1px;text-transform:uppercase}
+.module-toggle{width:32px;height:32px;border-radius:50%;border:1px solid rgba(229,62,46,.2);display:flex;align-items:center;justify-content:center;color:#E53E2E;font-size:18px;transition:transform .3s;flex-shrink:0}
+.module.open .module-toggle{transform:rotate(45deg);background:rgba(229,62,46,.1)}
 .lessons{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1)}
-.module.open .lessons{max-height:600px;border-top:1px solid rgba(200,169,110,.08)}
-.lesson{display:flex;align-items:flex-start;gap:16px;padding:18px 24px;border-bottom:1px solid rgba(200,169,110,.05);cursor:pointer;transition:background .2s;text-decoration:none;color:inherit;display:flex}
+.module.open .lessons{max-height:600px;border-top:1px solid rgba(229,62,46,.08)}
+.lesson{display:flex;align-items:flex-start;gap:16px;padding:18px 24px;border-bottom:1px solid rgba(229,62,46,.05);cursor:pointer;transition:background .2s;text-decoration:none;color:inherit;display:flex}
 .lesson:last-child{border-bottom:none}
-.lesson:hover{background:rgba(200,169,110,.04)}
-.lesson-icon{width:36px;height:36px;border-radius:8px;background:#161616;border:1px solid rgba(200,169,110,.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
-.lesson.done .lesson-icon{background:rgba(200,169,110,.12);border-color:rgba(200,169,110,.3)}
+.lesson:hover{background:rgba(229,62,46,.04)}
+.lesson-icon{width:36px;height:36px;border-radius:8px;background:#161616;border:1px solid rgba(229,62,46,.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+.lesson.done .lesson-icon{background:rgba(229,62,46,.12);border-color:rgba(229,62,46,.3)}
 .lesson-body{flex:1}
-.lesson-title{font-size:15px;font-weight:500;color:#F5F0E8;margin-bottom:5px}
-.lesson-desc{font-size:13px;color:#C8BEA8;line-height:1.6}
-.lesson-tag{display:inline-block;margin-top:8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:100px;background:#161616;border:1px solid rgba(200,169,110,.12);color:#C8BEA8}
-.lesson-arrow{color:rgba(200,169,110,.4);font-size:18px;margin-top:6px;flex-shrink:0;transition:all .2s}
-.lesson:hover .lesson-arrow{transform:translateX(4px);color:#C8A96E}
+.lesson-title{font-size:15px;font-weight:500;color:#f5f5f5;margin-bottom:5px}
+.lesson-desc{font-size:13px;color:#999999;line-height:1.6}
+.lesson-tag{display:inline-block;margin-top:8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:100px;background:#161616;border:1px solid rgba(229,62,46,.12);color:#999999}
+.lesson-arrow{color:rgba(229,62,46,.4);font-size:18px;margin-top:6px;flex-shrink:0;transition:all .2s}
+.lesson:hover .lesson-arrow{transform:translateX(4px);color:#E53E2E}
 .module-completed .module-num{color:#4ADE80;opacity:.8}
 @media(max-width:600px){nav{padding:16px 20px}.hero,.progress-bar-wrap,.container{padding-left:20px;padding-right:20px}}
 </style>

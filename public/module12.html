@@ -103,20 +103,20 @@
     <div class="steps">
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a new Google Form called "Post-Call Notes"</div></div>
-        <div class="step-text">Go to <strong style="color:#C8A96E">forms.google.com</strong>. Create a new form. This form is private — only you fill it in, right after every sales call. Name it "Post-Call Notes — Proposal Generator."</div>
+        <div class="step-text">Go to <strong style="color:#E53E2E">forms.google.com</strong>. Create a new form. This form is private — only you fill it in, right after every sales call. Name it "Post-Call Notes — Proposal Generator."</div>
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Add these fields to the form</div></div>
         <div class="step-detail">
-          <strong style="color:#C8A96E">Client Name:</strong> Short answer — the business owner's name<br/>
-          <strong style="color:#C8A96E">Business Name:</strong> Short answer — the company name<br/>
-          <strong style="color:#C8A96E">Client Email:</strong> Short answer with email validation<br/>
-          <strong style="color:#C8A96E">Industry:</strong> Dropdown — Restaurant, Real Estate, Beauty, Clinic, E-commerce, Other<br/>
-          <strong style="color:#C8A96E">Automation Type:</strong> Dropdown — WhatsApp Bot, Instagram DM, Lead Follow-Up, Voice Agent, Full Package<br/>
-          <strong style="color:#C8A96E">Main Pain Point (their words):</strong> Paragraph — write exactly what they said their problem is<br/>
-          <strong style="color:#C8A96E">Setup Price:</strong> Short answer — e.g. $800<br/>
-          <strong style="color:#C8A96E">Monthly Retainer:</strong> Short answer — e.g. $250<br/>
-          <strong style="color:#C8A96E">Notes from the call:</strong> Paragraph — anything specific they mentioned, objections, timeline preferences
+          <strong style="color:#E53E2E">Client Name:</strong> Short answer — the business owner's name<br/>
+          <strong style="color:#E53E2E">Business Name:</strong> Short answer — the company name<br/>
+          <strong style="color:#E53E2E">Client Email:</strong> Short answer with email validation<br/>
+          <strong style="color:#E53E2E">Industry:</strong> Dropdown — Restaurant, Real Estate, Beauty, Clinic, E-commerce, Other<br/>
+          <strong style="color:#E53E2E">Automation Type:</strong> Dropdown — WhatsApp Bot, Instagram DM, Lead Follow-Up, Voice Agent, Full Package<br/>
+          <strong style="color:#E53E2E">Main Pain Point (their words):</strong> Paragraph — write exactly what they said their problem is<br/>
+          <strong style="color:#E53E2E">Setup Price:</strong> Short answer — e.g. $800<br/>
+          <strong style="color:#E53E2E">Monthly Retainer:</strong> Short answer — e.g. $250<br/>
+          <strong style="color:#E53E2E">Notes from the call:</strong> Paragraph — anything specific they mentioned, objections, timeline preferences
         </div>
       </div>
       <div class="step">
@@ -164,9 +164,9 @@ Do NOT use placeholders like [Company Name] — use the real information provide
       </div>
       <div class="step">
         <div class="step-header"><div class="step-num">3</div><div class="step-title">Parse the subject line from the GPT output</div></div>
-        <div class="step-text">Add a Text Parser module. This separates the subject line from the email body. In Make.com, search for <strong style="color:#C8A96E">Text Parser</strong> → select <strong style="color:#C8A96E">Match Pattern</strong>.</div>
+        <div class="step-text">Add a Text Parser module. This separates the subject line from the email body. In Make.com, search for <strong style="color:#E53E2E">Text Parser</strong> → select <strong style="color:#E53E2E">Match Pattern</strong>.</div>
         <div class="step-detail">
-          Pattern: <code style="color:#C8A96E">SUBJECT: (.+)\n</code><br/>
+          Pattern: <code style="color:#E53E2E">SUBJECT: (.+)\n</code><br/>
           Text: the OpenAI output variable<br/><br/>
           This extracts everything after "SUBJECT: " on the first line as your email subject. The rest of the GPT output becomes the email body.
         </div>
@@ -175,9 +175,9 @@ Do NOT use placeholders like [Company Name] — use the real information provide
         <div class="step-header"><div class="step-num">4</div><div class="step-title">Send the proposal via Gmail</div></div>
         <div class="step-text">Add Gmail → Send an Email.</div>
         <div class="step-detail">
-          <strong style="color:#C8A96E">To:</strong> variable from Google Sheets → Client Email<br/>
-          <strong style="color:#C8A96E">Subject:</strong> the parsed subject line from Text Parser<br/>
-          <strong style="color:#C8A96E">Content:</strong> OpenAI output variable (full proposal text)<br/><br/>
+          <strong style="color:#E53E2E">To:</strong> variable from Google Sheets → Client Email<br/>
+          <strong style="color:#E53E2E">Subject:</strong> the parsed subject line from Text Parser<br/>
+          <strong style="color:#E53E2E">Content:</strong> OpenAI output variable (full proposal text)<br/><br/>
           Click OK. Turn on Scheduling. Save the Scenario.
         </div>
       </div>

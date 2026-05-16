@@ -58,7 +58,7 @@
 
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to sheets.google.com and create a new spreadsheet</div></div>
-        <div class="step-text">Open <strong style="color:#C8A96E">sheets.google.com</strong>. Click the large <span class="click">+</span> to create a blank spreadsheet. Click on "Untitled spreadsheet" at the top left and rename it: <strong style="color:#C8A96E">[Client Name] — Lead CRM</strong>.</div>
+        <div class="step-text">Open <strong style="color:#E53E2E">sheets.google.com</strong>. Click the large <span class="click">+</span> to create a blank spreadsheet. Click on "Untitled spreadsheet" at the top left and rename it: <strong style="color:#E53E2E">[Client Name] — Lead CRM</strong>.</div>
       </div>
 
       <div class="step">
@@ -101,7 +101,7 @@
         <div class="step-detail">
           In the rule settings:<br/>
           — Criteria: select <span class="click">Dropdown</span><br/>
-          — Add these options one by one: <code style="color:#C8A96E">New</code>, <code style="color:#C8A96E">Contacted</code>, <code style="color:#C8A96E">Call Scheduled</code>, <code style="color:#C8A96E">Client</code>, <code style="color:#C8A96E">Lost</code><br/>
+          — Add these options one by one: <code style="color:#E53E2E">New</code>, <code style="color:#E53E2E">Contacted</code>, <code style="color:#E53E2E">Call Scheduled</code>, <code style="color:#E53E2E">Client</code>, <code style="color:#E53E2E">Lost</code><br/>
           — Click <span class="click">Done</span><br/><br/>
           Now every cell in column G has a dropdown menu. The client clicks a cell and selects the lead status from the list — no typing needed, no mistakes.
         </div>
@@ -178,7 +178,7 @@
 
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Add OpenAI to generate the AI Summary</div></div>
-        <div class="step-text">After the Gmail module, click <span class="click">+</span>. Add <strong style="color:#C8A96E">OpenAI → Create a Chat Completion</strong>. Use the same connection (your API key). Model: gpt-4o. In the Message content field paste this prompt with variables:</div>
+        <div class="step-text">After the Gmail module, click <span class="click">+</span>. Add <strong style="color:#E53E2E">OpenAI → Create a Chat Completion</strong>. Use the same connection (your API key). Model: gpt-4o. In the Message content field paste this prompt with variables:</div>
         <div class="type-this">Summarize this lead in maximum 2 sentences and suggest one specific next action.
 
 Lead name: {{1.Full_Name}}
@@ -193,18 +193,18 @@ Next Action: [one specific recommended action]</div>
 
       <div class="step">
         <div class="step-header"><div class="step-num">3</div><div class="step-title">Add Google Sheets "Add a Row" to log the lead in the CRM</div></div>
-        <div class="step-text">After the OpenAI summary module, click <span class="click">+</span>. Add <strong style="color:#C8A96E">Google Sheets → Add a Row</strong>. Connect the same Google account. Select the CRM spreadsheet you built in Lesson 1. Map each column:</div>
+        <div class="step-text">After the OpenAI summary module, click <span class="click">+</span>. Add <strong style="color:#E53E2E">Google Sheets → Add a Row</strong>. Connect the same Google account. Select the CRM spreadsheet you built in Lesson 1. Map each column:</div>
         <div class="step-detail">
-          — <strong style="color:#C8A96E">Column A (Timestamp):</strong> Click variable picker → select the built-in function <code style="color:#C8A96E">now()</code> or type <code style="color:#C8A96E">{{now}}</code><br/>
-          — <strong style="color:#C8A96E">Column B (Lead Name):</strong> Variable → Google Sheets module → Full Name field<br/>
-          — <strong style="color:#C8A96E">Column C (Email):</strong> Variable → Google Sheets module → Email Address field<br/>
-          — <strong style="color:#C8A96E">Column D (Phone):</strong> Leave empty — Google Forms usually don't capture phone<br/>
-          — <strong style="color:#C8A96E">Column E (Source):</strong> Type <code style="color:#C8A96E">Google Form</code> directly — this is always the same for this scenario<br/>
-          — <strong style="color:#C8A96E">Column F (Message):</strong> Variable → Google Sheets module → What is your main problem field<br/>
-          — <strong style="color:#C8A96E">Column G (Status):</strong> Type <code style="color:#C8A96E">New</code> — all new leads start as New<br/>
-          — <strong style="color:#C8A96E">Column H (AI Summary):</strong> Variable → last OpenAI module → choices[] → message → content<br/>
-          — <strong style="color:#C8A96E">Column I (Next Action):</strong> Same variable as H — the GPT output contains both summary and next action<br/>
-          — <strong style="color:#C8A96E">Column J (Notes):</strong> Leave empty — the client fills this manually<br/><br/>
+          — <strong style="color:#E53E2E">Column A (Timestamp):</strong> Click variable picker → select the built-in function <code style="color:#E53E2E">now()</code> or type <code style="color:#E53E2E">{{now}}</code><br/>
+          — <strong style="color:#E53E2E">Column B (Lead Name):</strong> Variable → Google Sheets module → Full Name field<br/>
+          — <strong style="color:#E53E2E">Column C (Email):</strong> Variable → Google Sheets module → Email Address field<br/>
+          — <strong style="color:#E53E2E">Column D (Phone):</strong> Leave empty — Google Forms usually don't capture phone<br/>
+          — <strong style="color:#E53E2E">Column E (Source):</strong> Type <code style="color:#E53E2E">Google Form</code> directly — this is always the same for this scenario<br/>
+          — <strong style="color:#E53E2E">Column F (Message):</strong> Variable → Google Sheets module → What is your main problem field<br/>
+          — <strong style="color:#E53E2E">Column G (Status):</strong> Type <code style="color:#E53E2E">New</code> — all new leads start as New<br/>
+          — <strong style="color:#E53E2E">Column H (AI Summary):</strong> Variable → last OpenAI module → choices[] → message → content<br/>
+          — <strong style="color:#E53E2E">Column I (Next Action):</strong> Same variable as H — the GPT output contains both summary and next action<br/>
+          — <strong style="color:#E53E2E">Column J (Notes):</strong> Leave empty — the client fills this manually<br/><br/>
           Click <span class="click">OK</span>. Save the scenario.
         </div>
       </div>
@@ -223,7 +223,7 @@ Next Action: [one specific recommended action]</div>
 
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Add OpenAI for the CRM summary after the HTTP module</div></div>
-        <div class="step-text">Click <span class="click">+</span> after the HTTP module. Add <strong style="color:#C8A96E">OpenAI → Create a Chat Completion</strong>. Paste this prompt:</div>
+        <div class="step-text">Click <span class="click">+</span> after the HTTP module. Add <strong style="color:#E53E2E">OpenAI → Create a Chat Completion</strong>. Paste this prompt:</div>
         <div class="type-this">Summarize this WhatsApp lead in maximum 2 sentences and suggest one specific next action.
 
 Sender phone number: {{1.messages[].from}}
@@ -237,18 +237,18 @@ Next Action: [one specific recommended action]</div>
 
       <div class="step">
         <div class="step-header"><div class="step-num">3</div><div class="step-title">Add Google Sheets "Add a Row" to log the WhatsApp lead</div></div>
-        <div class="step-text">Click <span class="click">+</span>. Add <strong style="color:#C8A96E">Google Sheets → Add a Row</strong>. Select the same CRM sheet. Map the columns:</div>
+        <div class="step-text">Click <span class="click">+</span>. Add <strong style="color:#E53E2E">Google Sheets → Add a Row</strong>. Select the same CRM sheet. Map the columns:</div>
         <div class="step-detail">
-          — <strong style="color:#C8A96E">Column A (Timestamp):</strong> <code style="color:#C8A96E">{{now}}</code><br/>
-          — <strong style="color:#C8A96E">Column B (Lead Name):</strong> Leave empty — WhatsApp doesn't always provide a name. Type "WhatsApp Contact" or leave blank.<br/>
-          — <strong style="color:#C8A96E">Column C (Email):</strong> Leave empty<br/>
-          — <strong style="color:#C8A96E">Column D (Phone):</strong> Variable → Webhooks module → messages[] → from (this is their WhatsApp number)<br/>
-          — <strong style="color:#C8A96E">Column E (Source):</strong> Type <code style="color:#C8A96E">WhatsApp</code><br/>
-          — <strong style="color:#C8A96E">Column F (Message):</strong> Variable → Webhooks module → messages[] → text → body<br/>
-          — <strong style="color:#C8A96E">Column G (Status):</strong> Type <code style="color:#C8A96E">New</code><br/>
-          — <strong style="color:#C8A96E">Column H (AI Summary):</strong> Variable → new OpenAI module → choices[] → message → content<br/>
-          — <strong style="color:#C8A96E">Column I (Next Action):</strong> Same<br/>
-          — <strong style="color:#C8A96E">Column J (Notes):</strong> Leave empty<br/><br/>
+          — <strong style="color:#E53E2E">Column A (Timestamp):</strong> <code style="color:#E53E2E">{{now}}</code><br/>
+          — <strong style="color:#E53E2E">Column B (Lead Name):</strong> Leave empty — WhatsApp doesn't always provide a name. Type "WhatsApp Contact" or leave blank.<br/>
+          — <strong style="color:#E53E2E">Column C (Email):</strong> Leave empty<br/>
+          — <strong style="color:#E53E2E">Column D (Phone):</strong> Variable → Webhooks module → messages[] → from (this is their WhatsApp number)<br/>
+          — <strong style="color:#E53E2E">Column E (Source):</strong> Type <code style="color:#E53E2E">WhatsApp</code><br/>
+          — <strong style="color:#E53E2E">Column F (Message):</strong> Variable → Webhooks module → messages[] → text → body<br/>
+          — <strong style="color:#E53E2E">Column G (Status):</strong> Type <code style="color:#E53E2E">New</code><br/>
+          — <strong style="color:#E53E2E">Column H (AI Summary):</strong> Variable → new OpenAI module → choices[] → message → content<br/>
+          — <strong style="color:#E53E2E">Column I (Next Action):</strong> Same<br/>
+          — <strong style="color:#E53E2E">Column J (Notes):</strong> Leave empty<br/><br/>
           Click <span class="click">OK</span>. Save the scenario.
         </div>
       </div>
@@ -267,7 +267,7 @@ Next Action: [one specific recommended action]</div>
 
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Add OpenAI for the CRM summary</div></div>
-        <div class="step-text">Click <span class="click">+</span> after the HTTP module. Add <strong style="color:#C8A96E">OpenAI → Create a Chat Completion</strong>. Paste:</div>
+        <div class="step-text">Click <span class="click">+</span> after the HTTP module. Add <strong style="color:#E53E2E">OpenAI → Create a Chat Completion</strong>. Paste:</div>
         <div class="type-this">Summarize this Instagram DM lead in maximum 2 sentences and suggest one specific next action.
 
 Sender Instagram ID: {{1.entry[].messaging[].sender.id}}
@@ -281,18 +281,18 @@ Next Action: [one specific recommended action]</div>
 
       <div class="step">
         <div class="step-header"><div class="step-num">3</div><div class="step-title">Add Google Sheets "Add a Row"</div></div>
-        <div class="step-text">Click <span class="click">+</span>. Add <strong style="color:#C8A96E">Google Sheets → Add a Row</strong>. Select the CRM sheet. Map:</div>
+        <div class="step-text">Click <span class="click">+</span>. Add <strong style="color:#E53E2E">Google Sheets → Add a Row</strong>. Select the CRM sheet. Map:</div>
         <div class="step-detail">
-          — <strong style="color:#C8A96E">Column A:</strong> <code style="color:#C8A96E">{{now}}</code><br/>
-          — <strong style="color:#C8A96E">Column B:</strong> Leave empty or type "Instagram User"<br/>
-          — <strong style="color:#C8A96E">Column C:</strong> Leave empty<br/>
-          — <strong style="color:#C8A96E">Column D:</strong> Leave empty<br/>
-          — <strong style="color:#C8A96E">Column E:</strong> Type <code style="color:#C8A96E">Instagram DM</code><br/>
-          — <strong style="color:#C8A96E">Column F:</strong> Variable → message text from webhook<br/>
-          — <strong style="color:#C8A96E">Column G:</strong> Type <code style="color:#C8A96E">New</code><br/>
-          — <strong style="color:#C8A96E">Column H:</strong> Variable → OpenAI output<br/>
-          — <strong style="color:#C8A96E">Column I:</strong> Same<br/>
-          — <strong style="color:#C8A96E">Column J:</strong> Leave empty<br/><br/>
+          — <strong style="color:#E53E2E">Column A:</strong> <code style="color:#E53E2E">{{now}}</code><br/>
+          — <strong style="color:#E53E2E">Column B:</strong> Leave empty or type "Instagram User"<br/>
+          — <strong style="color:#E53E2E">Column C:</strong> Leave empty<br/>
+          — <strong style="color:#E53E2E">Column D:</strong> Leave empty<br/>
+          — <strong style="color:#E53E2E">Column E:</strong> Type <code style="color:#E53E2E">Instagram DM</code><br/>
+          — <strong style="color:#E53E2E">Column F:</strong> Variable → message text from webhook<br/>
+          — <strong style="color:#E53E2E">Column G:</strong> Type <code style="color:#E53E2E">New</code><br/>
+          — <strong style="color:#E53E2E">Column H:</strong> Variable → OpenAI output<br/>
+          — <strong style="color:#E53E2E">Column I:</strong> Same<br/>
+          — <strong style="color:#E53E2E">Column J:</strong> Leave empty<br/><br/>
           Click <span class="click">OK</span>. Save the scenario.
         </div>
       </div>
@@ -349,7 +349,7 @@ Next Action: [one specific recommended action]</div>
 
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Create a new Scenario in Make.com</div></div>
-        <div class="step-text">In Make.com, click <span class="click">+ Create a new scenario</span>. Click the trigger circle. Instead of choosing an app, look for the <strong style="color:#C8A96E">Clock icon</strong> or search for <strong style="color:#C8A96E">Scheduling</strong>. This is Make.com's built-in time-based trigger. Select it.</div>
+        <div class="step-text">In Make.com, click <span class="click">+ Create a new scenario</span>. Click the trigger circle. Instead of choosing an app, look for the <strong style="color:#E53E2E">Clock icon</strong> or search for <strong style="color:#E53E2E">Scheduling</strong>. This is Make.com's built-in time-based trigger. Select it.</div>
         <div class="step-detail">The Scheduling trigger runs the scenario at a specific time on a recurring schedule — without needing any external event to trigger it. This is different from the Google Sheets "Watch New Rows" trigger which needs data to arrive.</div>
       </div>
 
@@ -357,10 +357,10 @@ Next Action: [one specific recommended action]</div>
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Configure the schedule — Every Monday at 9:00 AM</div></div>
         <div class="step-text">In the Scheduling settings, configure:</div>
         <div class="step-detail">
-          — <strong style="color:#C8A96E">Run scenario:</strong> Select <span class="click">Weekly</span><br/>
-          — <strong style="color:#C8A96E">Day of the week:</strong> Select <span class="click">Monday</span><br/>
-          — <strong style="color:#C8A96E">Time:</strong> Set to <code style="color:#C8A96E">09:00</code><br/>
-          — <strong style="color:#C8A96E">Timezone:</strong> Select the client's local timezone<br/><br/>
+          — <strong style="color:#E53E2E">Run scenario:</strong> Select <span class="click">Weekly</span><br/>
+          — <strong style="color:#E53E2E">Day of the week:</strong> Select <span class="click">Monday</span><br/>
+          — <strong style="color:#E53E2E">Time:</strong> Set to <code style="color:#E53E2E">09:00</code><br/>
+          — <strong style="color:#E53E2E">Timezone:</strong> Select the client's local timezone<br/><br/>
           Click <span class="click">OK</span>. The scenario will now run automatically every Monday at 9am.
         </div>
       </div>
@@ -374,20 +374,20 @@ Next Action: [one specific recommended action]</div>
 
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Add Google Sheets "Search Rows" module</div></div>
-        <div class="step-text">Click <span class="click">+</span> after the Schedule trigger. Search <strong style="color:#C8A96E">Google Sheets</strong> and select <span class="click">Search Rows</span> (not Watch New Rows — you want to read existing data, not watch for new ones).</div>
+        <div class="step-text">Click <span class="click">+</span> after the Schedule trigger. Search <strong style="color:#E53E2E">Google Sheets</strong> and select <span class="click">Search Rows</span> (not Watch New Rows — you want to read existing data, not watch for new ones).</div>
         <div class="step-detail">Connect your Google account. Select the client's CRM spreadsheet. Select the correct sheet tab.</div>
       </div>
 
       <div class="step">
         <div class="step-header"><div class="step-num">2</div><div class="step-title">Filter for rows from the last 7 days</div></div>
-        <div class="step-text">In the Search Rows settings, find the <strong style="color:#C8A96E">Filter</strong> field. Set up a filter to only return rows where the Timestamp (Column A) is from the last 7 days.</div>
+        <div class="step-text">In the Search Rows settings, find the <strong style="color:#E53E2E">Filter</strong> field. Set up a filter to only return rows where the Timestamp (Column A) is from the last 7 days.</div>
         <div class="step-detail">
           Click <span class="click">Add filter rule</span>:<br/>
-          — Column: <code style="color:#C8A96E">A</code> (Timestamp)<br/>
+          — Column: <code style="color:#E53E2E">A</code> (Timestamp)<br/>
           — Condition: <span class="click">Greater than or equal to</span><br/>
-          — Value: Use the Make.com formula function. Click the variable picker and look for date functions. Type: <code style="color:#C8A96E">{{addDays(now; -7)}}</code><br/><br/>
+          — Value: Use the Make.com formula function. Click the variable picker and look for date functions. Type: <code style="color:#E53E2E">{{addDays(now; -7)}}</code><br/><br/>
           This formula means "7 days ago from right now." Make.com will only return rows where the Timestamp is from the last 7 days.<br/><br/>
-          Set the Limit to <code style="color:#C8A96E">200</code> — returns up to 200 rows from the last week.
+          Set the Limit to <code style="color:#E53E2E">200</code> — returns up to 200 rows from the last week.
         </div>
       </div>
 
@@ -402,12 +402,12 @@ Next Action: [one specific recommended action]</div>
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Add a Text Aggregator to combine all rows into one text block</div></div>
         <div class="step-text">The Search Rows module returns multiple rows — one bundle per row. But GPT-4o needs all the data as one single text input. You need to combine all rows into one string first.</div>
         <div class="step-detail">
-          Click <span class="click">+</span>. Search for <strong style="color:#C8A96E">Text aggregator</strong> — it is in the Tools category. Select it.<br/><br/>
+          Click <span class="click">+</span>. Search for <strong style="color:#E53E2E">Text aggregator</strong> — it is in the Tools category. Select it.<br/><br/>
           In the Text aggregator settings:<br/>
-          — <strong style="color:#C8A96E">Source Module:</strong> Select the Google Sheets Search Rows module<br/>
-          — <strong style="color:#C8A96E">Text:</strong> Type this template using variable picker for each value:
+          — <strong style="color:#E53E2E">Source Module:</strong> Select the Google Sheets Search Rows module<br/>
+          — <strong style="color:#E53E2E">Text:</strong> Type this template using variable picker for each value:
           <div class="type-this">Lead: {{2.B}} | Source: {{2.E}} | Message: {{2.F}} | Status: {{2.G}}</div>
-          — <strong style="color:#C8A96E">Row separator:</strong> Type a line break (press Enter once in the field)<br/><br/>
+          — <strong style="color:#E53E2E">Row separator:</strong> Type a line break (press Enter once in the field)<br/><br/>
           The Text aggregator runs once for each row from Google Sheets and combines all of them into one big text block. Click <span class="click">OK</span>.
         </div>
       </div>
@@ -421,7 +421,7 @@ Next Action: [one specific recommended action]</div>
 
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Add OpenAI to write the weekly report</div></div>
-        <div class="step-text">Click <span class="click">+</span>. Add <strong style="color:#C8A96E">OpenAI → Create a Chat Completion</strong>. Model: gpt-4o. In the Message content field paste this prompt, inserting the Text aggregator output as the variable:</div>
+        <div class="step-text">Click <span class="click">+</span>. Add <strong style="color:#E53E2E">OpenAI → Create a Chat Completion</strong>. Model: gpt-4o. In the Message content field paste this prompt, inserting the Text aggregator output as the variable:</div>
         <div class="type-this">You are writing a professional weekly performance report for a business owner.
 
 Here is the lead data from the past 7 days:
@@ -448,12 +448,12 @@ Do not use bullet points — write in natural paragraphs.</div>
 
       <div class="step">
         <div class="step-header"><div class="step-num">1</div><div class="step-title">Add Gmail "Send an Email" module</div></div>
-        <div class="step-text">Click <span class="click">+</span>. Add <strong style="color:#C8A96E">Gmail → Send an Email</strong>. Connect the sending Gmail account. Configure:</div>
+        <div class="step-text">Click <span class="click">+</span>. Add <strong style="color:#E53E2E">Gmail → Send an Email</strong>. Connect the sending Gmail account. Configure:</div>
         <div class="step-detail">
-          — <strong style="color:#C8A96E">To:</strong> Type the client's email address directly (or use a variable from a settings sheet if you want to make this reusable)<br/>
-          — <strong style="color:#C8A96E">Subject:</strong>
+          — <strong style="color:#E53E2E">To:</strong> Type the client's email address directly (or use a variable from a settings sheet if you want to make this reusable)<br/>
+          — <strong style="color:#E53E2E">Subject:</strong>
           <div class="type-this">Your Weekly Lead Report — {{formatDate(now; "DD MMMM YYYY")}}</div>
-          — <strong style="color:#C8A96E">Content:</strong> Variable picker → OpenAI module → choices[] → message → content<br/><br/>
+          — <strong style="color:#E53E2E">Content:</strong> Variable picker → OpenAI module → choices[] → message → content<br/><br/>
           Click <span class="click">OK</span>.
         </div>
       </div>
