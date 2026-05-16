@@ -1130,6 +1130,11 @@ async function loadMyAutomations(){
               <code style="font-size:11px;color:var(--r);word-break:break-all;flex:1">${location.origin}/webhook/${a.webhook_id}</code>
               <button onclick="copyWebhook('${location.origin}/webhook/${a.webhook_id}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 10px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;flex-shrink:0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Copy</button>
             </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 10px;background:${a.config?.notify_email?'rgba(74,222,128,.05)':'var(--bg3)'};border:1px solid ${a.config?.notify_email?'rgba(74,222,128,.15)':'#1a1a1a'};border-radius:7px">
+              <span style="font-size:10px;color:var(--t4);font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0">✉ Email alerts</span>
+              <span style="font-size:11px;color:${a.config?.notify_email?'var(--green)':'#333'};flex:1">${a.config?.notify_email||'Not set'}</span>
+              <button onclick="setAlertEmail('${a.webhook_id}','${a.config?.notify_email||''}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 10px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Edit</button>
+            </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
             <button onclick="shareChatLink('${a.webhook_id}')" style="background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.25);border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--r);cursor:pointer">⬡ Share Chat</button>
@@ -1147,6 +1152,20 @@ async function loadMyAutomations(){
 
 function copyWebhook(url){
   navigator.clipboard.writeText(url).then(() => notify('Webhook URL copied ✓', 'success'));
+}
+
+async function setAlertEmail(id, current){
+  const email = prompt('Email address to receive alerts when a customer sends a message:\n(Leave empty to remove)', current || '');
+  if(email === null) return;
+  try {
+    const r = await fetch(API+'/api/automations/'+id, {
+      method:'PATCH', headers: authHeaders(),
+      body: JSON.stringify({ notify_email: email.trim() })
+    });
+    if(!r.ok) throw new Error('Server error');
+    notify(email.trim() ? 'Alert email set ✓ — you\'ll receive an email for each new message.' : 'Alert email removed.', 'success');
+    loadMyAutomations();
+  } catch(e){ notify('Failed to update.', 'error'); }
 }
 
 async function toggleAutomation(id, btn){

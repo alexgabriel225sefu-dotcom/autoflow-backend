@@ -261,15 +261,17 @@ async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
   // Try Brevo API first (no SMTP setup needed)
   if (BREVO_API_KEY) {
     try {
-      await fetch('https://api.brevo.com/v3/smtp/email', {
+      const senderEmail = BREVO_USER || 'noreply@aicashsystem.space';
+      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sender: { name: 'AutoFlow', email: 'noreply@aicashsystem.space' },
+          sender: { name: 'AutoFlow', email: senderEmail },
           to: [{ email: to }],
           subject, htmlContent: html
         })
       });
+      if (!r.ok) { const e = await r.text(); throw new Error(e); }
       addLog(`Notify email sent to ${to}`, 'email', 'success');
       return;
     } catch(e) { console.error('Brevo API email error:', e.message); }
@@ -386,6 +388,28 @@ app.delete('/api/automations/:id', auth, async (req, res) => {
   automationStore.delete(req.params.id);
   saveStore();
   res.json({ success: true });
+});
+
+// PATCH /api/automations/:id — update notify_email (and other config fields)
+app.patch('/api/automations/:id', auth, async (req, res) => {
+  const { notify_email } = req.body;
+  if (supabase) {
+    try {
+      const { data: cur } = await supabase.from('automations').select('config,user_id').eq('webhook_id', req.params.id).single();
+      if (cur && String(cur.user_id) === String(req.user.id)) {
+        const newConfig = { ...(cur.config || {}), notify_email: notify_email || undefined };
+        if (!notify_email) delete newConfig.notify_email;
+        const { data: updated } = await supabase.from('automations').update({ config: newConfig }).eq('webhook_id', req.params.id).select().single();
+        if (updated) return res.json({ automation: updated });
+      }
+    } catch(e) {}
+  }
+  const a = automationStore.get(req.params.id);
+  if (!a || String(a.user_id) !== String(req.user.id)) return res.status(404).json({ error: 'Not found' });
+  if (notify_email) a.config = { ...(a.config || {}), notify_email };
+  else if (a.config) delete a.config.notify_email;
+  saveStore();
+  res.json({ automation: a });
 });
 
 // PATCH /api/automations/:id/toggle
