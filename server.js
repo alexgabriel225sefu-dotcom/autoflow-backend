@@ -195,8 +195,30 @@ app.post('/api/ai/generate', auth, async (req, res) => {
 // AUTOMATION ENGINE
 // ════════════════════════════════════════
 
-// In-memory fallback (used if Supabase table doesn't exist yet)
+// Persistent store — file-based fallback so automations survive Render restarts
+const fs = require('fs');
+const STORE_FILE = path.join(__dirname, 'data', 'automations.json');
 const automationStore = new Map();
+
+function loadStore() {
+  try {
+    if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
+    if (fs.existsSync(STORE_FILE)) {
+      const items = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
+      items.forEach(a => automationStore.set(a.webhook_id, a));
+      console.log(`Loaded ${items.length} automations from disk`);
+    }
+  } catch(e) { console.error('Store load error:', e.message); }
+}
+
+function saveStore() {
+  try {
+    if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
+    fs.writeFileSync(STORE_FILE, JSON.stringify([...automationStore.values()]), 'utf8');
+  } catch(e) { console.error('Store save error:', e.message); }
+}
+
+loadStore();
 
 async function callAI(systemPrompt, userMessage) {
   if (OPENAI_KEY) {
@@ -231,7 +253,7 @@ async function incrementCount(webhookId, current) {
   if (supabase) {
     try { await supabase.from('automations').update({ messages_count: (current || 0) + 1 }).eq('webhook_id', webhookId); } catch(e) {}
   }
-  if (automationStore.has(webhookId)) automationStore.get(webhookId).messages_count = (current || 0) + 1;
+  if (automationStore.has(webhookId)) { automationStore.get(webhookId).messages_count = (current || 0) + 1; saveStore(); }
 }
 
 // GET /api/automations
@@ -271,7 +293,8 @@ app.post('/api/automations', auth, async (req, res) => {
     } catch(e) {}
   }
   automationStore.set(webhook_id, automation);
-  addLog(`Automation created (memory): ${name}`, 'automation', 'success');
+  saveStore();
+  addLog(`Automation created: ${name}`, 'automation', 'success');
   res.json({ automation, webhook_url: webhookUrl });
 });
 
@@ -281,6 +304,7 @@ app.delete('/api/automations/:id', auth, async (req, res) => {
     try { await supabase.from('automations').delete().eq('webhook_id', req.params.id).eq('user_id', String(req.user.id)); } catch(e) {}
   }
   automationStore.delete(req.params.id);
+  saveStore();
   res.json({ success: true });
 });
 
@@ -296,7 +320,7 @@ app.patch('/api/automations/:id/toggle', auth, async (req, res) => {
     } catch(e) {}
   }
   const a = automationStore.get(req.params.id);
-  if (a) { a.active = !a.active; return res.json({ automation: a }); }
+  if (a) { a.active = !a.active; saveStore(); return res.json({ automation: a }); }
   res.status(404).json({ error: 'Not found' });
 });
 
@@ -581,14 +605,9 @@ app.post('/api/webhooks/create', auth, (req, res) => {
   res.json(webhook);
 });
 
-// ANY /webhook/:id — receive webhook data
-app.all('/webhook/:id', (req, res) => {
-  const hook = webhooks.find(w => w.id === req.params.id);
-  if (!hook) return res.status(404).json({ error: 'Webhook not found' });
-  hook.hits++;
-  hook.lastHit = new Date().toISOString();
-  addLog(`Webhook hit: ${hook.name} — ${JSON.stringify(req.body).slice(0, 100)}`, 'webhook', 'success');
-  res.json({ received: true, webhook: hook.name, time: hook.lastHit });
+// GET /webhook/:id — friendly info page (POST is handled by automation engine above)
+app.get('/webhook/:id', (req, res) => {
+  res.json({ info: 'This is an AutoFlow automation webhook. Send a POST request with {"message":"your text"} to trigger it.', id: req.params.id });
 });
 
 // ════════════════════════════════════════
