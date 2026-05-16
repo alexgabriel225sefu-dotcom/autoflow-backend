@@ -251,21 +251,38 @@ async function getAutomation(webhookId) {
 
 async function incrementCount(webhookId, current, userMessage, aiReply) {
   const newCount = (current || 0) + 1;
-  if (supabase) {
-    try { await supabase.from('automations').update({ messages_count: newCount }).eq('webhook_id', webhookId); } catch(e) {}
-  }
+  const logEntry = { time: new Date().toISOString(), user: userMessage?.slice(0,300), reply: aiReply?.slice(0,500) };
+
+  // Update in-memory store
   if (automationStore.has(webhookId)) {
     const a = automationStore.get(webhookId);
     a.messages_count = newCount;
     if (!a.message_log) a.message_log = [];
-    a.message_log.unshift({ time: new Date().toISOString(), user: userMessage?.slice(0,300), reply: aiReply?.slice(0,500) });
+    a.message_log.unshift(logEntry);
     if (a.message_log.length > 20) a.message_log.pop();
     saveStore();
+  }
+
+  // Update Supabase
+  if (supabase) {
+    try {
+      const { data: cur } = await supabase.from('automations').select('message_log').eq('webhook_id', webhookId).single();
+      const existingLog = cur?.message_log || [];
+      existingLog.unshift(logEntry);
+      if (existingLog.length > 20) existingLog.pop();
+      await supabase.from('automations').update({ messages_count: newCount, message_log: existingLog }).eq('webhook_id', webhookId);
+    } catch(e) {}
   }
 }
 
 // GET /api/automations/:id/messages
 app.get('/api/automations/:id/messages', auth, async (req, res) => {
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('automations').select('message_log,user_id').eq('webhook_id', req.params.id).single();
+      if (data && String(data.user_id) === String(req.user.id)) return res.json({ messages: data.message_log || [] });
+    } catch(e) {}
+  }
   const a = automationStore.get(req.params.id);
   if (!a || String(a.user_id) !== String(req.user.id)) return res.status(404).json({ error: 'Not found' });
   res.json({ messages: a.message_log || [] });
