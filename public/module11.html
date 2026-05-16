@@ -9,16 +9,16 @@
 <body>
 <nav>
   <div class="logo">AI Cash Systems</div>
-  <a href="/course-pro.html" class="back-btn">← Back to PRO Course</a>
+  <a href="/course-pro.html" class="back-btn">← Back to Course</a>
 </nav>
 <div class="module-hero">
-  <div class="pro-badge">⚡ PRO — Module 11 of 14</div>
+  <div class="module-badge">Module 3 of 5</div>
   <div class="module-num">11</div>
-  <h1 class="module-title">Webhook Mastery —<br><em>Connect Anything to Anything</em></h1>
-  <p class="module-desc">Master webhooks completely — how they work, how to debug them, how to handle complex data structures, and how to build real-time integrations with any platform that has an API.</p>
+  <h1 class="module-title">Webhook Mastery — Connect Anything to Anything</h1>
+  <p class="module-desc">Understand webhooks completely — what they are, how JSON payloads work, how to build advanced routing patterns in Make.com, and how to debug any webhook problem in under 10 minutes.</p>
   <div class="module-meta">
     <div class="meta-item"><div class="meta-dot"></div>3 Lessons</div>
-    <div class="meta-item"><div class="meta-dot"></div>~75 minutes</div>
+    <div class="meta-item"><div class="meta-dot"></div>~90 minutes</div>
     <div class="meta-item"><div class="meta-dot"></div>Advanced Technical</div>
   </div>
 </div>
@@ -29,50 +29,45 @@
 <div class="lessons-nav">
   <button class="lesson-tab active" onclick="showLesson(1)" id="tab1">Lesson 1 — How Webhooks Work</button>
   <button class="lesson-tab" onclick="showLesson(2)" id="tab2">Lesson 2 — Advanced Patterns</button>
-  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — Debug & Troubleshoot</button>
+  <button class="lesson-tab" onclick="showLesson(3)" id="tab3">Lesson 3 — Debug Any Problem</button>
 </div>
 <div class="lesson-wrap">
 
+<!-- LESSON 1 -->
 <div class="lesson-content active" id="lesson1">
   <div class="lesson-header">
     <div class="lesson-tag">Technical · Lesson 1</div>
     <h2 class="lesson-title">How Webhooks Work — Complete Understanding</h2>
-    <p class="lesson-intro">Webhooks are the foundation of every real-time automation. Understanding them deeply means you can connect any two platforms — even ones that don't have native Make.com integrations. This is what separates basic automators from advanced ones.</p>
+    <p class="lesson-intro">Webhooks are the foundation of every real-time automation. Once you understand them fully, you can connect any two platforms — even ones that do not have native Make.com integrations. This is the skill that separates basic automators from advanced ones who can build anything.</p>
   </div>
 
   <div class="block">
-    <div class="block-title">What is a Webhook — Plain English Explanation</div>
-    <div class="block-text">A webhook is a URL address that listens for incoming data. When something happens on Platform A (a message arrives, a form is submitted, a payment is made), Platform A sends the data to Platform B's webhook URL. Platform B receives it instantly and can process it.</div>
-    <div class="block-text">Think of it like a phone number. You give your webhook URL to another platform. When something happens, they "call" that URL and send the data. Your automation answers the call and does something with the data.</div>
-    <div class="block-text">This is different from polling (which checks for new data every X minutes). Webhooks are instant — data arrives in milliseconds of the event happening.</div>
+    <div class="block-title">What a Webhook Is — Plain English</div>
+    <div class="block-text">A <strong style="color:#E53E2E">webhook</strong> is a URL that receives data when something happens somewhere else. Think of it like a phone number you give to another app: "When something happens on your side, send the data to this URL." The app calls that URL with the data, and your automation runs instantly.</div>
+    <div class="block-text">The opposite of a webhook is <strong style="color:#E53E2E">polling</strong> — where you check every 15 minutes to see if anything new happened. Polling is slow and wastes API calls. Webhooks are instant: data arrives in milliseconds of the triggering event. This is why WhatsApp bots and payment confirmations use webhooks — speed matters.</div>
   </div>
 
   <div class="block">
-    <div class="block-title">The Exact Technical Flow</div>
+    <div class="block-title">The 3 Parts of Every Webhook</div>
     <div class="steps">
       <div class="step">
-        <div class="step-header"><div class="step-num">1</div><div class="step-title">You create a webhook URL in Make.com</div></div>
-        <div class="step-text">In Make.com, when you add a "Custom Webhook" trigger, Make.com generates a unique URL like <code style="color:#E53E2E">https://hook.eu1.make.com/abc123xyz...</code>. This URL is now listening 24/7 for incoming HTTP POST requests.</div>
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">The Sender</div></div>
+        <div class="step-text">The app that sends data when something happens. Examples: <strong style="color:#E53E2E">360dialog</strong> sends a webhook when a WhatsApp message arrives. <strong style="color:#E53E2E">Stripe</strong> sends a webhook when a payment succeeds. <strong style="color:#E53E2E">Typeform</strong> sends a webhook when someone submits a form. <strong style="color:#E53E2E">Calendly</strong> sends a webhook when someone books an appointment. <strong style="color:#E53E2E">Shopify</strong> sends a webhook when a new order comes in.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">2</div><div class="step-title">You register the webhook URL with another platform</div></div>
-        <div class="step-text">You go to 360dialog (WhatsApp), Meta Developer Console (Instagram), Stripe, Shopify, or any other platform and tell it: "When X happens, send the data to this URL." This is called "registering" or "subscribing" to a webhook.</div>
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">The URL (Endpoint)</div></div>
+        <div class="step-text">The address that receives the data. In Make.com, when you add a "Custom Webhook" trigger module, Make.com generates a unique URL that looks like: <code style="color:#E53E2E">https://hook.eu1.make.com/abc123xyz456...</code>. You copy this URL and paste it into the sender app's webhook settings. This URL is now listening 24/7 for incoming data.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">3</div><div class="step-title">An event happens on that platform</div></div>
-        <div class="step-text">A WhatsApp message arrives. A Stripe payment succeeds. An Instagram DM comes in. Immediately — in milliseconds — that platform makes an HTTP POST request to your webhook URL, sending all the event data as JSON in the request body.</div>
-      </div>
-      <div class="step">
-        <div class="step-header"><div class="step-num">4</div><div class="step-title">Make.com receives the data and runs your scenario</div></div>
-        <div class="step-text">Make.com's webhook URL receives the POST request. Your scenario activates instantly. The JSON data from the request body becomes available as variables you can use in all subsequent modules.</div>
-        <div class="step-detail">Important: Make.com responds to the incoming webhook with HTTP 200 OK within a few seconds. Most platforms require this 200 response to confirm delivery. If Make.com is too slow or offline, the platform will retry the webhook delivery — usually 3–5 times over the next few hours.</div>
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">The Payload</div></div>
+        <div class="step-text">The JSON data sent in the HTTP request body. This is the actual content — the message text, the payment amount, the form answers, the order details. Every webhook payload is structured differently depending on the platform sending it. Learning to read the payload is the core skill of webhook mastery.</div>
       </div>
     </div>
   </div>
 
   <div class="block">
-    <div class="block-title">Reading and Parsing JSON Webhook Data in Make.com</div>
-    <div class="block-text">Every webhook sends data as JSON. Understanding how to read and navigate JSON in Make.com is essential. Here is a real example of what a WhatsApp webhook payload looks like:</div>
+    <div class="block-title">What JSON Looks Like — Real WhatsApp Payload Example</div>
+    <div class="block-text">When a WhatsApp message arrives via 360dialog, the payload sent to your webhook looks like this. Study this structure carefully — you will navigate it in Make.com using variable paths:</div>
     <div class="code-block">{
   "object": "whatsapp_business_account",
   "entry": [
@@ -83,50 +78,114 @@
           "value": {
             "messages": [
               {
-                "from": "40712345678",
+                "from": "447712345678",
                 "id": "wamid.abc123",
                 "timestamp": "1699876543",
                 "text": {
-                  "body": "Hello, what are your hours?"
+                  "body": "Hello, what are your opening hours?"
                 },
                 "type": "text"
               }
+            ],
+            "contacts": [
+              {
+                "profile": { "name": "John Smith" },
+                "wa_id": "447712345678"
+              }
             ]
-          }
+          },
+          "field": "messages"
         }
       ]
     }
   ]
 }</div>
-    <div class="block-text">To access the message text in Make.com variables, you navigate: <code style="color:#E53E2E">entry[].changes[].value.messages[].text.body</code></div>
-    <div class="block-text">To access the sender's phone number: <code style="color:#E53E2E">entry[].changes[].value.messages[].from</code></div>
+    <div class="block-text">To access the <strong style="color:#E53E2E">message text</strong> in Make.com, the variable path is: <code style="color:#E53E2E">entry[].changes[].value.messages[].text.body</code></div>
+    <div class="block-text">To access the <strong style="color:#E53E2E">sender's phone number</strong>: <code style="color:#E53E2E">entry[].changes[].value.messages[].from</code></div>
+    <div class="block-text">To access the <strong style="color:#E53E2E">sender's name</strong>: <code style="color:#E53E2E">entry[].changes[].value.contacts[].profile.name</code></div>
   </div>
 
   <div class="block">
-    <div class="block-title">How to Use Webhooks.site to Inspect Any Webhook</div>
+    <div class="block-title">How Make.com Handles Webhooks — Step by Step</div>
     <div class="steps">
       <div class="step">
-        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to webhook.site</div></div>
-        <div class="step-text">Open <strong style="color:#E53E2E">webhook.site</strong> in your browser. The page immediately gives you a unique URL like <code style="color:#E53E2E">https://webhook.site/abc-123-xyz</code>. This URL is free and lives for a few hours.</div>
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Add the Custom Webhook trigger in Make.com</div></div>
+        <div class="step-text">Open your Make.com scenario editor. Click the <span class="click">+</span> to add the first module. In the search bar, type <code style="color:#E53E2E">webhook</code>. Under the Webhooks category, click <span class="click">Custom Webhook</span>. A dialog appears asking you to create or select a webhook. Click <span class="click">Add</span>. Give the webhook a descriptive name (e.g., "WhatsApp 360dialog"). Click <span class="click">Save</span>. Make.com generates a unique URL — it appears in the webhook configuration dialog.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">2</div><div class="step-title">Use this URL as your webhook in any platform</div></div>
-        <div class="step-text">When you need to understand what data a platform sends, paste this webhook.site URL into the platform's webhook settings instead of your Make.com URL. Then trigger the event on that platform.</div>
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Copy the webhook URL</div></div>
+        <div class="step-text">Click the <span class="click">Copy address to clipboard</span> button next to the generated URL. It looks like: <code style="color:#E53E2E">https://hook.eu1.make.com/abcdefg1234567</code>. Keep this URL — you are about to paste it into the sending platform.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">3</div><div class="step-title">See the exact JSON payload</div></div>
-        <div class="step-text">Webhook.site shows you the complete HTTP request in real time — headers, body, query parameters — everything. You can see exactly what data structure the platform sends. Use this to understand the correct variable paths before building in Make.com.</div>
-        <div class="step-detail">This technique saves hours of debugging. Before connecting any new platform to Make.com, always use webhook.site first to understand the exact data structure. Then build your Make.com scenario with the correct variable paths.</div>
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Register the URL with the sending platform</div></div>
+        <div class="step-text">Go to the platform that will send data (360dialog, Stripe, Typeform, etc.). Find their Webhook settings — usually under Settings → Integrations → Webhooks. Paste your Make.com URL into the webhook URL field. Save. The platform will now send data to Make.com every time the triggering event happens.</div>
+        <div class="step-detail"><strong style="color:#E53E2E">360dialog:</strong> app.360dialog.io → Settings → Webhook URL field<br/><br/><strong style="color:#E53E2E">Stripe:</strong> dashboard.stripe.com → Developers → Webhooks → Add endpoint<br/><br/><strong style="color:#E53E2E">Typeform:</strong> your form → Connect → Webhooks → Add webhook</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Capture the first webhook payload in Make.com</div></div>
+        <div class="step-text">Back in Make.com, click <span class="click">Run once</span> at the bottom of the scenario editor. Make.com is now listening for one incoming request. Go to the sending platform and trigger the event manually — send a test WhatsApp message to the bot number, or complete a test form submission. Return to Make.com. The Custom Webhook module now shows a small bubble indicating it received data. Click <span class="click">OK</span>.</div>
+        <div class="step-detail">After capturing the first payload, Make.com learns the data structure. When you click on any subsequent module and open its field configuration, you can use the variable picker (click the small icon inside any field) to browse and insert variables from the captured payload. The variable paths are automatically resolved for you.</div>
       </div>
     </div>
   </div>
 
+  <div class="block">
+    <div class="block-title">Common Webhook Senders and Their Payload Formats</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">A</div><div class="step-title">Stripe — payment.succeeded event</div></div>
+        <div class="step-text">Key fields: <code style="color:#E53E2E">data.object.amount</code> (payment amount in cents), <code style="color:#E53E2E">data.object.customer_email</code> (customer email), <code style="color:#E53E2E">data.object.metadata</code> (any custom fields you added).</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">B</div><div class="step-title">Typeform — form submission</div></div>
+        <div class="step-text">Key fields: <code style="color:#E53E2E">form_response.answers[].text</code> (text answers), <code style="color:#E53E2E">form_response.answers[].email</code> (email answers), <code style="color:#E53E2E">form_response.hidden</code> (hidden fields for tracking).</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">C</div><div class="step-title">Calendly — invitee.created event</div></div>
+        <div class="step-text">Key fields: <code style="color:#E53E2E">payload.invitee.name</code> (name), <code style="color:#E53E2E">payload.invitee.email</code> (email), <code style="color:#E53E2E">payload.event.start_time</code> (appointment start), <code style="color:#E53E2E">payload.questions_and_answers</code> (custom questions).</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">D</div><div class="step-title">Shopify — orders/create event</div></div>
+        <div class="step-text">Key fields: <code style="color:#E53E2E">customer.email</code>, <code style="color:#E53E2E">customer.first_name</code>, <code style="color:#E53E2E">line_items[].title</code> (product names), <code style="color:#E53E2E">total_price</code>, <code style="color:#E53E2E">shipping_address.address1</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">How to Inspect Any Webhook Before Building</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Go to webhook.site in your browser</div></div>
+        <div class="step-text">Open a new browser tab and navigate to <strong style="color:#E53E2E">webhook.site</strong>. The page loads and immediately gives you a unique URL — something like <code style="color:#E53E2E">https://webhook.site/abc-123-xyz-456</code>. You do not need to register or log in. This URL is free and stays active for a few hours.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Paste this URL into the sending platform temporarily</div></div>
+        <div class="step-text">Go to 360dialog (or Stripe, Typeform, or any platform). Temporarily replace your Make.com webhook URL with the webhook.site URL. Save the setting. Trigger the event — send a WhatsApp message to the bot number, or complete a form, or make a test payment.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Read the full JSON payload on webhook.site</div></div>
+        <div class="step-text">Return to the webhook.site tab. You see a new entry in the left column — click on it. The right panel shows the complete HTTP request: headers, query parameters, and the full JSON body. Read the structure carefully. Note the exact field names and the nesting depth. This tells you exactly which variable paths to use in Make.com.</div>
+        <div class="step-detail">This technique saves 1–2 hours per new platform integration. Always use webhook.site first when connecting a platform you have not worked with before. Once you understand the payload structure, switch back to your Make.com URL in the platform settings and build with confidence.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-label">The Single Most Important Habit in Webhook Work</div>
+    <div class="info-text">Before connecting any new platform to Make.com, always inspect the webhook payload on webhook.site first. This takes 5 minutes and prevents 2 hours of debugging wrong variable paths. Professionals do this every time — even when they think they know the payload format. APIs change their structures without warning. Always verify before you build.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">Exercise — Inspect a Live Webhook Payload</div>
+    <div class="exercise-text">Go to webhook.site right now. Copy the URL it gives you. Open your 360dialog dashboard. Go to Settings and temporarily paste the webhook.site URL as your WhatsApp webhook. Save it. Now open WhatsApp and send a test message to your bot number. Return to webhook.site and click the new entry on the left. Read the entire JSON payload. Find the message body and the sender's phone number in the structure. Write down their exact variable paths. Then restore your Make.com URL in 360dialog. You now understand exactly what Make.com receives for every WhatsApp message.</div>
+  </div>
+
   <div class="takeaways">
     <div class="takeaways-title">Key Takeaways — Lesson 1</div>
-    <div class="takeaway">Webhooks are instant — data arrives in milliseconds, not every 15 minutes like scheduled triggers.</div>
-    <div class="takeaway">Every webhook sends JSON data. The variable path tells you how to navigate the nested structure.</div>
-    <div class="takeaway">Always use webhook.site first to inspect the data structure before building in Make.com.</div>
-    <div class="takeaway">Make.com must respond with HTTP 200 OK or the sending platform will retry the webhook delivery.</div>
+    <div class="takeaway">Webhooks are instant — data arrives in milliseconds, not every 15 minutes like polling.</div>
+    <div class="takeaway">Every webhook has 3 parts: the sender, the URL endpoint, and the JSON payload.</div>
+    <div class="takeaway">Use webhook.site to inspect any platform's payload before building in Make.com.</div>
+    <div class="takeaway">After capturing the first payload in Make.com, the variable picker shows all available fields automatically.</div>
   </div>
 
   <div class="lesson-actions">
@@ -135,102 +194,105 @@
   </div>
 </div>
 
+<!-- LESSON 2 -->
 <div class="lesson-content" id="lesson2">
   <div class="lesson-header">
     <div class="lesson-tag">Advanced · Lesson 2</div>
     <h2 class="lesson-title">Advanced Webhook Patterns in Make.com</h2>
-    <p class="lesson-intro">Once you understand basic webhooks, these advanced patterns let you handle complex real-world scenarios — multiple event types, webhook verification, error handling, and routing different events to different actions.</p>
+    <p class="lesson-intro">These 5 patterns solve real production problems — routing different event types, handling errors, responding back to the sender, managing concurrent webhooks, and collecting batches of data. Every professional automation agency uses at least 3 of these regularly.</p>
   </div>
 
   <div class="block">
-    <div class="block-title">Pattern 1 — Router for Multiple Event Types</div>
-    <div class="block-text">Many platforms send different types of events to the same webhook URL. For example, Instagram sends both DMs and post comments to the same webhook. You need to route them to different paths in your scenario.</div>
+    <div class="block-title">Pattern 1 — The Router: Send Data Down Different Paths</div>
+    <div class="block-text">Use case: a WhatsApp bot receives messages about different topics. Messages about "price" should go to a pricing flow. Messages about "booking" should go to a booking flow. Messages about "complaint" should escalate to a human. One webhook, three paths — the Router handles this.</div>
     <div class="steps">
       <div class="step">
-        <div class="step-header"><div class="step-num">1</div><div class="step-title">Add a Router module after your Webhook trigger</div></div>
-        <div class="step-text">In Make.com, click <span class="click">+</span> after the Webhook module. Search for <strong style="color:#E53E2E">Router</strong> — it is in the Flow Control category. The Router splits your scenario into multiple parallel paths.</div>
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Add the Router module after your Webhook trigger</div></div>
+        <div class="step-text">In the Make.com scenario editor, after your Webhook trigger module, click the <span class="click">+</span> button. In the module search bar, type <code style="color:#E53E2E">router</code>. Under the Flow Control category, click <span class="click">Router</span>. The Router appears and automatically creates two empty paths branching from it. You can add more paths by clicking <span class="click">Add route</span> on the Router module.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">2</div><div class="step-title">Set up Filter conditions on each path</div></div>
-        <div class="step-text">Click the wrench icon on the connection line between the Router and the first module in each path. A Filter dialog appears. Set a condition that identifies this event type.</div>
-        <div class="step-detail">
-          Example for Instagram:<br/>
-          Path 1 (DMs): Field = <code style="color:#E53E2E">entry[].messaging</code> — Condition = <span class="click">Exists</span><br/>
-          Path 2 (Comments): Field = <code style="color:#E53E2E">entry[].changes[].value.comments</code> — Condition = <span class="click">Exists</span><br/><br/>
-          This routes DM events to Path 1 and comment events to Path 2.
-        </div>
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Set filter conditions on each path</div></div>
+        <div class="step-text">Click the wrench icon on the line connecting the Router to the first module on Path 1. A Filter configuration dialog opens. In the "Condition" section, click the field on the left and select the message body variable: <code style="color:#E53E2E">entry[].changes[].value.messages[].text.body</code>. Set the operator to <span class="click">Contains (case insensitive)</span>. In the value field on the right, type <code style="color:#E53E2E">price</code>. Click <span class="click">OK</span>.</div>
+        <div class="step-detail">Path 1 now only activates when the message contains the word "price." Repeat for Path 2 with "booking" and Path 3 with "complaint." You can use multiple conditions on one path using AND/OR logic — click the + button in the filter dialog to add more conditions.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">3</div><div class="step-title">Build different actions on each path</div></div>
-        <div class="step-text">Path 1 continues with OpenAI → HTTP Send DM reply. Path 2 continues with a different OpenAI prompt → HTTP Send comment reply. Each path handles its event type independently.</div>
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Build different modules on each path</div></div>
+        <div class="step-text">Path 1 (price): add an OpenAI module with a pricing-specific prompt, then an HTTP module that sends the WhatsApp reply. Path 2 (booking): add a Google Calendar module to check availability, then a reply module. Path 3 (complaint): skip OpenAI and add a direct HTTP module that sends an alert to the business owner via Slack or email, then a polite WhatsApp reply to the customer. Each path is fully independent.</div>
       </div>
     </div>
   </div>
 
   <div class="block">
-    <div class="block-title">Pattern 2 — Webhook Verification (GET + POST)</div>
-    <div class="block-text">Some platforms (Meta/Facebook/Instagram) send a GET request to verify your webhook before they start sending real events. Make.com's Custom Webhook only handles POST requests by default. Here is how to handle the GET verification:</div>
+    <div class="block-title">Pattern 2 — The Aggregator: Process Data in Batches</div>
+    <div class="block-text">Use case: collect all new leads from a form over the past hour and send one consolidated email summary to the sales team instead of 40 individual emails.</div>
     <div class="steps">
       <div class="step">
-        <div class="step-header"><div class="step-num">1</div><div class="step-title">The verification flow</div></div>
-        <div class="step-text">When you register a webhook with Meta, they send a GET request to your URL with three query parameters: <code style="color:#E53E2E">hub.mode</code>, <code style="color:#E53E2E">hub.challenge</code>, and <code style="color:#E53E2E">hub.verify_token</code>. Your server must respond with the <code style="color:#E53E2E">hub.challenge</code> value.</div>
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Add an Array Aggregator after the data-generating modules</div></div>
+        <div class="step-text">In the scenario editor, after the module that produces multiple data bundles, click <span class="click">+</span>. Search for <code style="color:#E53E2E">array aggregator</code>. Select it from the Flow Control category. In its configuration, set "Source Module" to the module that generates the individual items. Set the fields you want to aggregate. The aggregator collects all bundles into a single array before passing them to the next module.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">2</div><div class="step-title">Handle verification in your Render server</div></div>
-        <div class="step-text">Add this route to your server.js on Render — this handles the Meta verification automatically:</div>
-        <div class="type-this">// Meta webhook verification
-app.get('/webhook', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-  
-  const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'myverifytoken';
-  
-  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-    console.log('Webhook verified');
-    res.status(200).send(challenge);
-  } else {
-    res.sendStatus(403);
-  }
-});
-
-// Receive actual webhook events
-app.post('/webhook', (req, res) => {
-  const body = req.body;
-  // Forward to Make.com
-  fetch(process.env.MAKE_WEBHOOK_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  res.sendStatus(200);
-});</div>
-        <div class="step-detail">Set <code style="color:#E53E2E">WEBHOOK_VERIFY_TOKEN</code> in Render environment variables to match the verify token you enter in Meta's webhook settings. Set <code style="color:#E53E2E">MAKE_WEBHOOK_URL</code> to your Make.com webhook URL.</div>
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Use the aggregated data in a single email or message</div></div>
+        <div class="step-text">After the Array Aggregator, add an Email module or a Slack module. In the message body, use the aggregated output variable — it contains all items formatted as a list. This sends one notification with all the data instead of one notification per item. Clients love this pattern for daily or hourly summary digests.</div>
       </div>
     </div>
   </div>
 
   <div class="block">
-    <div class="block-title">Pattern 3 — Webhook Response with Data</div>
-    <div class="block-text">Some integrations require your webhook to respond with specific data — not just HTTP 200. For example, Stripe requires you to respond with a success confirmation, and some chatbot platforms expect your webhook to return the response text directly.</div>
+    <div class="block-title">Pattern 3 — Error Handling: What to Do When a Module Fails</div>
     <div class="steps">
       <div class="step">
-        <div class="step-header"><div class="step-num">1</div><div class="step-title">Use the Webhook Response module in Make.com</div></div>
-        <div class="step-text">After your processing modules, add a <strong style="color:#E53E2E">Webhooks → Webhook Response</strong> module. This sends a custom HTTP response back to the platform that sent the webhook. Set the Status to 200, set the Body to whatever data the platform expects.</div>
+        <div class="step-header"><div class="step-num">6</div><div class="step-title">Add a Break directive on modules that might fail</div></div>
+        <div class="step-text">Right-click on the module you want to add error handling to (for example, the OpenAI module). A context menu appears. Click <span class="click">Add error handler</span>. A "Break" path appears in red below the module. Any module you add to this red path will run when the main module fails — instead of the scenario stopping entirely.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">2</div><div class="step-title">Return the AI response directly</div></div>
-        <div class="step-text">For chatbot platforms that expect the reply in the webhook response, set the Body to the OpenAI output variable: <code style="color:#E53E2E">{{2.choices[].message.content}}</code>. Set Content-Type header to <code style="color:#E53E2E">application/json</code>.</div>
+        <div class="step-header"><div class="step-num">7</div><div class="step-title">Set up email alerts when an automation fails</div></div>
+        <div class="step-text">On the error handler path (the red path), add an Email module. Configure it to send to your email address. In the Subject field, type: <code style="color:#E53E2E">Automation error — [scenario name]</code>. In the Body field, include: the error message variable, the scenario name, and the time. Click <span class="click">OK</span>. Now when anything fails in that scenario, you receive an email immediately — you know before the client does.</div>
+        <div class="step-detail">This is a professional practice that prevents silent failures. Without error handlers, Make.com stops the scenario and logs the error — but you only see it if you manually check the scenario history. Email alerts mean problems are caught and fixed before clients notice the automation stopped working.</div>
       </div>
     </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Pattern 4 — Webhook Response: Send Data Back to the Sender</div>
+    <div class="block-text">Use case: a chatbot platform sends a webhook to Make.com and expects the AI response in the HTTP response body — not as a separate API call. The platform waits for your response before displaying the reply to the user.</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">8</div><div class="step-title">Add the Webhook Response module at the end of your scenario</div></div>
+        <div class="step-text">Click <span class="click">+</span> after your final processing module. Search for <code style="color:#E53E2E">webhook response</code>. Under the Webhooks category, select <span class="click">Webhook Response</span>. The configuration dialog opens. Set <strong style="color:#E53E2E">Status</strong> to <code style="color:#E53E2E">200</code>. In the <strong style="color:#E53E2E">Body</strong> field, use the variable picker to select your OpenAI output: <code style="color:#E53E2E">{{2.choices[].message.content}}</code>. In the Headers section, add a header: <strong style="color:#E53E2E">Content-Type</strong> = <code style="color:#E53E2E">application/json</code>. Click <span class="click">OK</span>.</div>
+        <div class="step-detail">Make.com must reach the Webhook Response module within 40 seconds of receiving the incoming webhook — otherwise the sending platform times out. For slow operations, consider running heavy processing asynchronously and sending a quick acknowledgment first.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Pattern 5 — Webhook Queuing and Concurrent Executions</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">9</div><div class="step-title">What happens when 100 messages arrive simultaneously</div></div>
+        <div class="step-text">Make.com runs multiple scenario executions in parallel by default. If 100 WhatsApp messages arrive within 1 second, Make.com starts 100 parallel executions of your scenario. For most scenarios this is fine — but if your scenario modifies shared state (like a database record or a Google Sheet), parallel execution can cause race conditions.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">10</div><div class="step-title">Enable Sequential Processing to prevent race conditions</div></div>
+        <div class="step-text">To make your scenario process one webhook at a time: open your scenario settings (click the three dots or the gear icon on the scenario). Find the <strong style="color:#E53E2E">Sequential processing</strong> option. Toggle it to <span class="click">On</span>. Save. Now Make.com queues incoming webhooks and processes them one at a time. This prevents data conflicts but means high-volume scenarios may fall behind — monitor the execution queue in the scenario history.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">11</div><div class="step-title">Understanding the execution queue</div></div>
+        <div class="step-text">When sequential processing is on, incoming webhooks are added to a queue. Make.com processes them in order. In the scenario history (click the clock icon at the bottom), you see queued executions waiting to run. If the queue grows very long (50+), your scenario may not be able to keep up with the volume. In that case, consider splitting the scenario into lighter modules or upgrading your Make.com plan for more concurrent executions.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box gold">
+    <div class="info-label">Which Pattern to Use When</div>
+    <div class="info-text">Router: when different event types need different actions. Aggregator: when you need summaries instead of individual notifications. Error Handler: on every production scenario — always. Webhook Response: when the sending platform expects a reply in the HTTP response. Sequential Processing: when your scenario writes to shared resources and you cannot afford race conditions. You will use the Router and Error Handler on almost every scenario you build.</div>
   </div>
 
   <div class="takeaways">
     <div class="takeaways-title">Key Takeaways — Lesson 2</div>
-    <div class="takeaway">Use Router + Filters to handle multiple event types from one webhook URL.</div>
-    <div class="takeaway">Meta platforms require GET verification before sending POST events — handle this in your Render server.</div>
-    <div class="takeaway">The Webhook Response module lets you send custom data back to the platform that triggered the webhook.</div>
-    <div class="takeaway">For complex webhook setups, use your Render server as a middleware between the platform and Make.com.</div>
+    <div class="takeaway">Use the Router with Filter conditions to send different webhook events down different paths in one scenario.</div>
+    <div class="takeaway">Add error handlers with email alerts on every production scenario — silent failures are the biggest client risk.</div>
+    <div class="takeaway">The Webhook Response module sends data back to the platform that triggered the webhook — use it for synchronous chatbot platforms.</div>
+    <div class="takeaway">Enable Sequential Processing when your scenario writes to shared state to prevent race conditions.</div>
   </div>
 
   <div class="lesson-actions">
@@ -239,103 +301,121 @@ app.post('/webhook', (req, res) => {
   </div>
 </div>
 
+<!-- LESSON 3 -->
 <div class="lesson-content" id="lesson3">
   <div class="lesson-header">
     <div class="lesson-tag">Debugging · Lesson 3</div>
     <h2 class="lesson-title">Debug and Troubleshoot Any Webhook Problem</h2>
-    <p class="lesson-intro">Webhook problems are the most common technical issue you will face. This lesson gives you a systematic debugging process that solves 95% of webhook problems in under 10 minutes.</p>
+    <p class="lesson-intro">Webhook problems are the most common technical issue in automation work. This lesson gives you a step-by-step debugging framework that solves 95% of webhook problems in under 10 minutes — no guessing, no trial and error.</p>
   </div>
 
   <div class="block">
-    <div class="block-title">The 5-Step Debugging Process</div>
+    <div class="block-title">Problem 1 — "My Webhook Trigger Shows No Data"</div>
     <div class="steps">
       <div class="step">
-        <div class="step-header"><div class="step-num">1</div><div class="step-title">Verify the webhook URL is correct and active</div></div>
-        <div class="step-text">Go to Make.com → open your Scenario → click on the Webhook module → check that the webhook URL shown is exactly what you registered with the platform. Even one character difference breaks everything. Turn on Scheduling in Make.com so the webhook is actively listening.</div>
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Check that the webhook URL is correctly pasted in the sending app</div></div>
+        <div class="step-text">Go to Make.com. Open your scenario. Click on the Webhook trigger module. In the module panel, find the webhook URL — copy it. Now go to the sending platform (360dialog, Stripe, Typeform, etc.) and open their Webhook settings. Compare the URL there to what you just copied. Even one wrong character — a missing letter, an extra space, or a truncated URL — breaks the connection. Paste the correct URL fresh from Make.com.</div>
+        <div class="step-detail">A common mistake: copying the URL from an old email or a notes app where it got truncated. Always copy directly from Make.com's webhook module panel.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">2</div><div class="step-title">Check Make.com Scenario History</div></div>
-        <div class="step-text">In Make.com, at the bottom of the Scenario editor, click the clock icon — this shows the History of all runs. Each run shows: when it happened, whether it succeeded or failed, and exactly where it failed. Click on a failed run to see the error message on the specific module that failed.</div>
-        <div class="step-detail">If the History is empty — Make.com is not receiving the webhook at all. The problem is in the registration or the URL. If History shows runs but with errors — the webhook arrives but something in your scenario is wrong.</div>
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Verify the sending app is actually sending to this URL</div></div>
+        <div class="step-text">Some platforms have a test/staging mode and a production mode. Confirm you are pasting the webhook URL into the production webhook settings — not a test environment. Also confirm the scenario is actively listening: in Make.com, the scenario must have <strong style="color:#E53E2E">Scheduling</strong> turned ON or be in "Run once" mode to receive webhooks. Click the power toggle at the bottom of the scenario editor to turn scheduling on.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">3</div><div class="step-title">Use webhook.site to verify the platform is sending data</div></div>
-        <div class="step-text">Temporarily replace your Make.com webhook URL with a webhook.site URL in the platform settings. Trigger the event. If webhook.site receives data — the platform is sending correctly and the problem is in your Make.com setup. If webhook.site receives nothing — the problem is in how you registered the webhook.</div>
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Use "Run once" mode to capture a test event</div></div>
+        <div class="step-text">In Make.com, click <span class="click">Run once</span> at the bottom-left of the scenario editor. Make.com is now waiting for one incoming request. Go to the sending platform and trigger the event manually — send a test WhatsApp message, submit a test form, or click "Send test webhook" in the platform's webhook settings. Return to Make.com — watch whether the Webhook module lights up and shows a number indicating data was received.</div>
+        <div class="step-detail">If Make.com receives the data in Run Once mode but NOT during normal scheduling — your scenario scheduling is probably off. Turn it on. If Make.com receives nothing even in Run Once mode — the problem is definitively in the sender or the URL.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">4</div><div class="step-title">Check variable paths carefully</div></div>
-        <div class="step-text">The most common error after the webhook arrives is wrong variable paths. Click on the Webhook module circle in your scenario and look at the data structure. Compare it carefully with the variable paths you are using in subsequent modules. Even a small difference like <code style="color:#E53E2E">messages[].text.body</code> vs <code style="color:#E53E2E">messages[0].text.body</code> can cause failures.</div>
-      </div>
-      <div class="step">
-        <div class="step-header"><div class="step-num">5</div><div class="step-title">Check the platform's webhook logs</div></div>
-        <div class="step-text">Most platforms (Stripe, Shopify, Meta) have a webhook log section in their dashboard. Go there and look at recent webhook deliveries. You can see: whether the delivery was attempted, what HTTP status code your webhook returned, and whether there were any errors. This is the most accurate source of truth for webhook problems.</div>
-        <div class="step-detail">
-          <strong style="color:#E53E2E">Stripe webhook logs:</strong> dashboard.stripe.com → Developers → Webhooks → click your endpoint → Events tab<br/><br/>
-          <strong style="color:#E53E2E">Meta webhook logs:</strong> developers.facebook.com → your app → Webhooks → look at the subscription status<br/><br/>
-          <strong style="color:#E53E2E">360dialog:</strong> app.360dialog.io → your channel → Settings → check the webhook status indicator
-        </div>
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Use webhook.site to isolate the problem</div></div>
+        <div class="step-text">Go to <strong style="color:#E53E2E">webhook.site</strong>. Copy the URL it provides. Go to the sending platform. Temporarily replace your Make.com URL with the webhook.site URL. Trigger the event again. Check webhook.site — does data arrive? If yes: the platform is sending correctly, the problem is in Make.com (wrong URL, scheduling off). If no: the platform is not sending at all — check the platform's own settings, event subscriptions, or account permissions.</div>
       </div>
     </div>
   </div>
 
   <div class="block">
-    <div class="block-title">Most Common Webhook Errors and Their Fixes</div>
+    <div class="block-title">Problem 2 — "Module Shows Red — 400 Bad Request"</div>
     <div class="steps">
       <div class="step">
-        <div class="step-header"><div class="step-num">⚠</div><div class="step-title">Error: Webhook not receiving data at all</div></div>
-        <div class="step-text">Causes and fixes:</div>
-        <div class="step-detail">
-          1. Make.com Scheduling is OFF → turn it ON<br/>
-          2. Wrong webhook URL registered → copy the exact URL from Make.com and re-paste it<br/>
-          3. Platform requires HTTPS but your URL is HTTP → Make.com webhooks are always HTTPS, this should not happen<br/>
-          4. Platform requires webhook verification (GET) → add verification handler to your Render server
-        </div>
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Understand what 400 means</div></div>
+        <div class="step-text">A 400 Bad Request error means the API you are calling rejected your request because the data you sent was malformed or incomplete. This is NOT a server error — it means your request had a problem. The fix is always in how you are building the request body or URL.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">⚠</div><div class="step-title">Error: Data arrives but wrong variable</div></div>
-        <div class="step-text">The webhook data structure does not match your variable paths. Fix:</div>
-        <div class="step-detail">
-          1. Click "Run once" in Make.com<br/>
-          2. Trigger the event on the platform<br/>
-          3. Make.com captures the data<br/>
-          4. Click OK on the Webhook module<br/>
-          5. Now click on each subsequent module and use the variable picker to re-select the correct variables from the fresh data structure
-        </div>
+        <div class="step-header"><div class="step-num">6</div><div class="step-title">Check the error details in the execution history</div></div>
+        <div class="step-text">In Make.com, click the clock icon at the bottom of the scenario editor. Click the failed execution (shown with a red icon). Click on the specific module that failed (shown with a red border). In the right panel, look for the "Error" section — it shows the exact response the API returned. Read it carefully. The API usually tells you exactly what is wrong: "Required field 'to' is missing" or "Invalid phone number format."</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">⚠</div><div class="step-title">Error: "Bundle is undefined" or "Cannot read property"</div></div>
-        <div class="step-text">This means Make.com expected data at a certain path but found nothing. Usually happens when the webhook payload structure changes or when the event type is different from expected.</div>
-        <div class="step-detail">Add a Filter before the problem module that checks if the expected field exists. Set condition: field <span class="click">Exists</span>. This prevents the scenario from failing when unexpected data arrives.</div>
+        <div class="step-header"><div class="step-num">7</div><div class="step-title">Validate your JSON with jsonlint.com</div></div>
+        <div class="step-text">If your module sends a JSON body, go to <strong style="color:#E53E2E">jsonlint.com</strong>. Copy the JSON you are sending (from the module's Body field in Make.com). Paste it into jsonlint.com and click <span class="click">Validate JSON</span>. Common errors: a trailing comma after the last field in an object, a missing quote around a string value, or mismatched brackets. jsonlint.com highlights the exact line with the error.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Problem 3 — "Module Shows Red — 401 Unauthorized"</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">8</div><div class="step-title">Your API key is wrong, expired, or formatted incorrectly</div></div>
+        <div class="step-text">A 401 error means authentication failed. The API rejected your API key. Causes: the key was copied incorrectly (extra space, truncated), the key was regenerated on the API provider's side and the old one is no longer valid, or the Authorization header format is wrong.</div>
       </div>
       <div class="step">
-        <div class="step-header"><div class="step-num">⚠</div><div class="step-title">Error: HTTP 403 or 401 on webhook response</div></div>
-        <div class="step-text">The platform is rejecting your webhook responses. Usually means your API key or authentication is wrong.</div>
-        <div class="step-detail">Check the Headers section of your HTTP module. Make sure the API key is correct, the header name is exactly right (case-sensitive), and the format is correct. For example, some APIs use <code style="color:#E53E2E">Authorization: Bearer YOUR_KEY</code> while others use a custom header like <code style="color:#E53E2E">D360-API-KEY: YOUR_KEY</code>.</div>
+        <div class="step-header"><div class="step-num">9</div><div class="step-title">Re-enter the API key through Make.com Connections</div></div>
+        <div class="step-text">In Make.com, click your name/avatar in the top-right corner and select <span class="click">Connections</span>. The Connections page shows all your API connections. Find the connection that is failing. Click <span class="click">Edit</span> (the pencil icon). Delete the existing API key value. Go back to the API provider's dashboard, copy a fresh API key, and paste it into the Make.com connection field. Click <span class="click">Save</span>. Return to your scenario and re-run.</div>
+        <div class="step-detail">For HTTP modules that use headers directly (not Make.com Connections): click on the failing module, find the Headers section, look for the Authorization header, and re-paste the API key there. Common format errors: writing <code style="color:#E53E2E">Bearer[KEY]</code> instead of <code style="color:#E53E2E">Bearer [KEY]</code> (note the space after "Bearer"), or using the wrong header name (e.g., some APIs use <code style="color:#E53E2E">X-API-Key</code> not <code style="color:#E53E2E">Authorization</code>).</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Problem 4 — "Automation Runs but Sends Wrong Data"</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">10</div><div class="step-title">Read the Output of each module in the execution history</div></div>
+        <div class="step-text">Click the clock icon to open Scenario History. Click the execution where wrong data was sent. A visual map of the scenario appears. Click on each module in sequence. For each module, you see two panels: Input (what it received) and Output (what it sent to the next module). Trace the data flow step by step until you find where the correct data was transformed into incorrect data.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">11</div><div class="step-title">Verify the exact variable value being used</div></div>
+        <div class="step-text">Found the problem module? Click on it in the scenario editor (not in history — in the live editor). Open the field that is sending wrong data. You see a variable reference like <code style="color:#E53E2E">{{1.entry[].changes[].value.messages[].text.body}}</code>. To verify this variable's current value: go back to execution history, click the same execution, click the Webhook trigger module, and look at its Output. Find the field that corresponds to your variable path. If it is empty or wrong, your variable path is incorrect — update it.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">The Make.com Execution History — Your Primary Debugging Tool</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-header"><div class="step-num">12</div><div class="step-title">How to open and read the Execution History</div></div>
+        <div class="step-text">In the Make.com scenario editor, look at the very bottom of the screen. You see a row of icons. Click the clock icon (hover shows "History"). The History panel opens on the right side. Each row is one execution — the most recent one is at the top. Each row shows: a green checkmark (success) or red X (failure), the timestamp, and the number of operations used.</div>
+        <div class="step-detail">Click any row to expand it. You see a visual representation of your scenario with the data flow highlighted. Every module that ran is shown. Click on a module circle to see its Input bundle (what data it received) and its Output bundle (what data it produced and passed to the next module). This is the most accurate view of what actually happened inside a scenario execution.</div>
+      </div>
+      <div class="step">
+        <div class="step-header"><div class="step-num">13</div><div class="step-title">Use Execution History as your first debugging step — always</div></div>
+        <div class="step-text">Before checking anything else when a scenario breaks, open Execution History. Look at the failed execution. Find the first red module. That is where the failure started. Everything else is a consequence of that first failure. Fix the root cause, not the symptoms. After fixing, click <span class="click">Run once</span> and trigger a test event to confirm the fix.</div>
       </div>
     </div>
   </div>
 
   <div class="info-box tip">
-    <div class="info-label">✓ The Golden Rule of Webhook Debugging</div>
-    <div class="info-text">When something breaks, always start from the beginning: is the webhook URL correct? Is Make.com listening? Is the platform sending? Work through the flow step by step. Do not skip steps. 90% of webhook problems are simple configuration errors that take 2 minutes to fix once you identify them.</div>
+    <div class="info-label">The Golden Rule of Webhook Debugging</div>
+    <div class="info-text">Work from the beginning, not from the end. When something breaks, the instinct is to look at the last module that failed. But the real problem is almost always earlier in the chain — wrong variable path, wrong API key, wrong data format at the source. Start with Execution History, find the first red module, read its error. That is your answer. Fix one thing at a time and test after each fix — do not change three things simultaneously or you won't know which one solved it.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-title">Exercise — Practice Debugging With a Real Error</div>
+    <div class="exercise-text">Intentionally break one of your existing Make.com scenarios: open any HTTP module and change the API key to a random wrong value. Run the scenario. Now debug it: open Execution History, find the failed module, read the error. Can you identify it as a 401 Unauthorized? Now fix it: go to Connections, update the key to the correct value. Run again. Watch the scenario succeed. This exercise builds the muscle memory of the debugging flow so that when a real production error occurs, you respond methodically instead of frantically.</div>
   </div>
 
   <div class="takeaways">
     <div class="takeaways-title">Key Takeaways — Lesson 3</div>
-    <div class="takeaway">Always check Make.com Scenario History first — it tells you exactly where the failure happened.</div>
-    <div class="takeaway">Use webhook.site to isolate whether the problem is in the platform sending or in Make.com receiving.</div>
-    <div class="takeaway">After fixing a variable path issue, use "Run once" to capture fresh data and re-select variables.</div>
-    <div class="takeaway">Most webhook problems are configuration errors — wrong URL, wrong API key, or wrong variable path.</div>
-  </div>
-
-  <div class="exercise">
-    <div class="exercise-title">✦ Action — Master Webhook Debugging</div>
-    <div class="exercise-text">Go to webhook.site right now. Copy the URL it gives you. Go to 360dialog and temporarily paste it as your webhook URL. Send yourself a WhatsApp message on the bot number. Look at what webhook.site receives — study the full JSON structure. Now you know exactly what variable paths to use in Make.com. Do this for every new platform you connect for the first time.</div>
+    <div class="takeaway">Always check Make.com Execution History first — it shows exactly which module failed and why.</div>
+    <div class="takeaway">Use webhook.site to isolate whether the problem is in the sender or in Make.com — it tells you definitively within 2 minutes.</div>
+    <div class="takeaway">400 errors = your request is malformed. 401 errors = your API key is wrong or expired. Always check the error details in the module output.</div>
+    <div class="takeaway">After fixing any variable path issue, use "Run once" to capture fresh data and re-select the corrected variables.</div>
   </div>
 
   <div class="lesson-actions">
     <button class="btn-complete" onclick="completeLesson(3)">✓ Mark as Complete</button>
-    <button class="btn-next" onclick="window.location.href='/course-pro.html'">← Back to PRO Course</button>
+    <button class="btn-next" onclick="window.location.href='/course-pro.html'">← Back to Course</button>
   </div>
 </div>
 
@@ -362,7 +442,13 @@ function completeLesson(n){
   var t=document.getElementById('tab'+n);if(t)t.classList.add('done');
 }
 updateProgress();
-(function(){var h=window.location.hash;if(h&&h.indexOf('lesson')!==-1){var n=parseInt(h.replace('#lesson',''));if(n>=1&&n<=3)showLesson(n);}})();
+(function(){
+  var h = window.location.hash;
+  if(h && h.indexOf('lesson') !== -1){
+    var n = parseInt(h.replace('#lesson',''));
+    if(n >= 1 && n <= 3) showLesson(n);
+  }
+})();
 </script>
 </body>
 </html>
