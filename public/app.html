@@ -1156,33 +1156,29 @@ async function loadMyAutomations(){
       return;
     }
     el.innerHTML = list.map(a => `
-      <div style="background:var(--bg2);border:1px solid ${a.active?'rgba(74,222,128,.2)':'#1a1a1a'};border-radius:12px;padding:18px 20px;margin-bottom:12px">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
-          <div style="flex:1;min-width:200px">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-              <span style="width:8px;height:8px;border-radius:50%;background:${a.active?'var(--green)':'#444'};flex-shrink:0;${a.active?'box-shadow:0 0 6px rgba(74,222,128,.5)':''}"></span>
-              <span style="font-size:14px;font-weight:700;color:var(--t1)">${a.name}</span>
-              <span style="font-size:10px;background:var(--bg3);border:1px solid #1a1a1a;border-radius:20px;padding:2px 10px;color:var(--t4);text-transform:uppercase;letter-spacing:1px">${a.type}</span>
-            </div>
-            <div style="font-size:11px;color:var(--t4);margin-bottom:10px;line-height:1.6">${a.messages_count||0} messages processed · Created ${new Date(a.created_at).toLocaleDateString()}</div>
-            <div style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:8px 12px;display:flex;align-items:center;gap:10px">
-              <span style="font-size:10px;color:var(--t4);font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0">Webhook URL</span>
-              <code style="font-size:11px;color:var(--r);word-break:break-all;flex:1">${location.origin}/webhook/${a.webhook_id}</code>
-              <button onclick="copyWebhook('${location.origin}/webhook/${a.webhook_id}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 10px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;flex-shrink:0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Copy</button>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 10px;background:${a.config?.notify_email?'rgba(74,222,128,.05)':'var(--bg3)'};border:1px solid ${a.config?.notify_email?'rgba(74,222,128,.15)':'#1a1a1a'};border-radius:7px">
-              <span style="font-size:10px;color:var(--t4);font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0">✉ Email alerts</span>
-              <span style="font-size:11px;color:${a.config?.notify_email?'var(--green)':'#333'};flex:1">${a.config?.notify_email||'Not set'}</span>
-              <button onclick="setAlertEmail('${a.webhook_id}','${a.config?.notify_email||''}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 10px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Edit</button>
-            </div>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
-            <button onclick="shareChatLink('${a.webhook_id}')" style="background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.25);border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--r);cursor:pointer">⬡ Share Chat</button>
-            <button onclick="testAutomation('${a.webhook_id}')" style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--green);cursor:pointer">▷ Test</button>
-            <button onclick="viewMessages('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--t3);cursor:pointer">◎ Messages</button>
-            <button onclick="toggleAutomation('${a.webhook_id}',this)" style="background:${a.active?'rgba(74,222,128,.1)':'var(--bg3)'};border:1px solid ${a.active?'rgba(74,222,128,.2)':'#1a1a1a'};border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:${a.active?'var(--green)':'var(--t4)'};cursor:pointer">${a.active?'⏸ Pause':'▶ Resume'}</button>
-            <button onclick="deleteAutomation('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:#555;cursor:pointer">✕ Delete</button>
-          </div>
+      <div style="background:var(--bg2);border:1px solid ${a.active?'rgba(74,222,128,.2)':'#1a1a1a'};border-radius:12px;padding:16px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <span style="width:8px;height:8px;border-radius:50%;background:${a.active?'var(--green)':'#444'};flex-shrink:0;${a.active?'box-shadow:0 0 6px rgba(74,222,128,.5)':''}"></span>
+          <span style="font-size:14px;font-weight:700;color:var(--t1);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.name}</span>
+          <span style="font-size:10px;background:var(--bg3);border:1px solid #1a1a1a;border-radius:20px;padding:2px 10px;color:var(--t4);text-transform:uppercase;letter-spacing:1px;flex-shrink:0">${a.type}</span>
+        </div>
+        <div style="font-size:11px;color:var(--t4);margin-bottom:10px">${a.messages_count||0} messages · ${new Date(a.created_at).toLocaleDateString()}</div>
+        <div style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:8px 10px;display:flex;align-items:center;gap:8px;margin-bottom:6px;min-width:0">
+          <span style="font-size:10px;color:var(--t4);font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0">URL</span>
+          <code style="font-size:10px;color:var(--r);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${location.origin}/webhook/${a.webhook_id}</code>
+          <button onclick="copyWebhook('${location.origin}/webhook/${a.webhook_id}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;flex-shrink:0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Copy</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${a.config?.notify_email?'rgba(74,222,128,.05)':'var(--bg3)'};border:1px solid ${a.config?.notify_email?'rgba(74,222,128,.15)':'#1a1a1a'};border-radius:7px;margin-bottom:10px;min-width:0">
+          <span style="font-size:10px;color:var(--t4);font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0">✉</span>
+          <span style="font-size:11px;color:${a.config?.notify_email?'var(--green)':'#555'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${a.config?.notify_email||'No email alert set'}</span>
+          <button onclick="setAlertEmail('${a.webhook_id}','${a.config?.notify_email||''}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;flex-shrink:0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Edit</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+          <button onclick="shareChatLink('${a.webhook_id}')" style="background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.25);border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--r);cursor:pointer">⬡ Share</button>
+          <button onclick="testAutomation('${a.webhook_id}')" style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--green);cursor:pointer">▷ Test</button>
+          <button onclick="viewMessages('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--t3);cursor:pointer">◎ Msgs</button>
+          <button onclick="toggleAutomation('${a.webhook_id}',this)" style="background:${a.active?'rgba(74,222,128,.1)':'var(--bg3)'};border:1px solid ${a.active?'rgba(74,222,128,.2)':'#1a1a1a'};border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:${a.active?'var(--green)':'var(--t4)'};cursor:pointer">${a.active?'⏸ Pause':'▶ Resume'}</button>
+          <button onclick="deleteAutomation('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:#555;cursor:pointer">✕ Delete</button>
         </div>
       </div>`).join('');
   } catch(e){
