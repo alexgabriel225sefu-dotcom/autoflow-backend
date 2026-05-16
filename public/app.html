@@ -530,7 +530,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
           <div style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:16px">
             <div style="font-size:22px;margin-bottom:8px">③</div>
             <div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:6px">Create the scenario</div>
-            <div style="font-size:12px;color:var(--t4);line-height:1.7">Click <strong style="color:var(--r)">◈ Create in Make.com</strong> on any blueprint below → the scenario appears in your Make.com account automatically</div>
+            <div style="font-size:12px;color:var(--t4);line-height:1.7">Click <strong style="color:var(--r)">⬇ Import in Make.com</strong> on any blueprint below → the scenario appears in your Make.com account automatically</div>
           </div>
         </div>
         <div style="background:rgba(229,62,46,.04);border:1px solid rgba(229,62,46,.12);border-radius:8px;padding:12px 16px;font-size:12px;color:var(--t4);line-height:1.7">
@@ -556,7 +556,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
             6. Click the ON/OFF toggle to activate the scenario
           </div>
           <a href="/blueprints/whatsapp-bot.json" download="whatsapp-bot.json" class="bp-download">⬇ Download Blueprint</a>
-          <button class="create-make-btn" onclick="createMakeScenario('whatsapp-bot.json','WhatsApp Auto-Reply Bot')">◈ Create in Make.com</button>
+          <button class="create-make-btn" onclick="createMakeScenario('whatsapp-bot.json','WhatsApp Auto-Reply Bot')">⬇ Import in Make.com</button>
         </div>
 
         <div class="bp-card">
@@ -576,7 +576,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
             6. Activate the scenario
           </div>
           <a href="/blueprints/instagram-dm-bot.json" download="instagram-dm-bot.json" class="bp-download">⬇ Download Blueprint</a>
-          <button class="create-make-btn" onclick="createMakeScenario('instagram-dm-bot.json','Instagram DM Auto-Reply')">◈ Create in Make.com</button>
+          <button class="create-make-btn" onclick="createMakeScenario('instagram-dm-bot.json','Instagram DM Auto-Reply')">⬇ Import in Make.com</button>
         </div>
 
         <div class="bp-card">
@@ -596,7 +596,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
             6. Activate the scenario
           </div>
           <a href="/blueprints/lead-followup-system.json" download="lead-followup-system.json" class="bp-download">⬇ Download Blueprint</a>
-          <button class="create-make-btn" onclick="createMakeScenario('lead-followup-system.json','Lead Follow-Up System')">◈ Create in Make.com</button>
+          <button class="create-make-btn" onclick="createMakeScenario('lead-followup-system.json','Lead Follow-Up System')">⬇ Import in Make.com</button>
         </div>
 
         <div class="bp-card">
@@ -616,7 +616,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
             6. Set scheduling to run every hour → activate
           </div>
           <a href="/blueprints/cold-email-pipeline.json" download="cold-email-pipeline.json" class="bp-download">⬇ Download Blueprint</a>
-          <button class="create-make-btn" onclick="createMakeScenario('cold-email-pipeline.json','Cold Email Pipeline')">◈ Create in Make.com</button>
+          <button class="create-make-btn" onclick="createMakeScenario('cold-email-pipeline.json','Cold Email Pipeline')">⬇ Import in Make.com</button>
         </div>
 
         <div class="bp-card">
@@ -635,7 +635,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
             5. Set scheduling for the report section to run every Monday → activate
           </div>
           <a href="/blueprints/google-sheets-crm.json" download="google-sheets-crm.json" class="bp-download">⬇ Download Blueprint</a>
-          <button class="create-make-btn" onclick="createMakeScenario('google-sheets-crm.json','Google Sheets CRM')">◈ Create in Make.com</button>
+          <button class="create-make-btn" onclick="createMakeScenario('google-sheets-crm.json','Google Sheets CRM')">⬇ Import in Make.com</button>
         </div>
 
         <div class="bp-card">
@@ -654,7 +654,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
             5. Activate — all future failed payments will trigger automatic reminders
           </div>
           <a href="/blueprints/stripe-billing-automation.json" download="stripe-billing-automation.json" class="bp-download">⬇ Download Blueprint</a>
-          <button class="create-make-btn" onclick="createMakeScenario('stripe-billing-automation.json','Invoice & Payment Reminders')">◈ Create in Make.com</button>
+          <button class="create-make-btn" onclick="createMakeScenario('stripe-billing-automation.json','Invoice & Payment Reminders')">⬇ Import in Make.com</button>
         </div>
 
         <div class="bp-card">
@@ -674,7 +674,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
             6. Activate — every form submission now generates and sends a proposal instantly
           </div>
           <a href="/blueprints/ai-proposal-generator.json" download="ai-proposal-generator.json" class="bp-download">⬇ Download Blueprint</a>
-          <button class="create-make-btn" onclick="createMakeScenario('ai-proposal-generator.json','AI Proposal Generator')">◈ Create in Make.com</button>
+          <button class="create-make-btn" onclick="createMakeScenario('ai-proposal-generator.json','AI Proposal Generator')">⬇ Import in Make.com</button>
         </div>
 
       </div>
@@ -1513,35 +1513,38 @@ async function createMakeScenarioFromWizard(){
 }
 
 async function createMakeScenarioWithBtn(blueprintFile, scenarioName, btn){
-  if(!makeConfig || !makeConfig.teamId){
-    notify('Connect Make.com first (bottom of sidebar)', 'error');
-    openMakeSettings();
+  const origHtml = btn.innerHTML;
+  btn.disabled = true; btn.textContent = '⬇ Downloading...';
+
+  // Download the blueprint JSON
+  try {
+    const r = await fetch('/blueprints/' + blueprintFile);
+    const blueprint = await r.json();
+    if (scenarioName) blueprint.name = scenarioName;
+    const blob = new Blob([JSON.stringify(blueprint, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = blueprintFile;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    notify('Download failed: ' + e.message, 'error');
+    btn.disabled = false; btn.innerHTML = origHtml;
     return;
   }
-  const origHtml = btn.innerHTML;
-  btn.disabled = true; btn.textContent = '⏳ Creating...';
-  try {
-    const r = await fetch(API+'/api/make/create', {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({
-        apiKey: makeConfig.apiKey,
-        zone: makeConfig.zone,
-        teamId: makeConfig.teamId,
-        blueprintFile,
-        scenarioName
-      })
-    });
-    const d = await r.json();
-    if(!r.ok){ notify(d.error || 'Failed to create scenario', 'error'); btn.disabled = false; btn.innerHTML = origHtml; return; }
-    notify('Scenario created in Make.com! ✓', 'success');
-    btn.innerHTML = '✓ Created in Make.com';
-    btn.style.background = 'rgba(74,222,128,.12)';
-    if(d.editUrl) setTimeout(() => window.open(d.editUrl, '_blank'), 600);
-  } catch(e) {
-    notify('Error: ' + e.message, 'error');
+
+  btn.textContent = '✓ Downloaded!';
+  btn.style.background = 'rgba(74,222,128,.12)';
+
+  // Open Make.com import guide
+  setTimeout(() => {
+    const zone = makeConfig?.zone || 'eu1.make.com';
+    const makeUrl = `https://${zone}`;
+    notify('Blueprint downloaded! Now import it in Make.com → Create new scenario → … → Import Blueprint', 'success');
+    setTimeout(() => window.open(makeUrl, '_blank'), 1000);
     btn.disabled = false; btn.innerHTML = origHtml;
-  }
+  }, 800);
 }
 
 // NOTIFICATIONS
