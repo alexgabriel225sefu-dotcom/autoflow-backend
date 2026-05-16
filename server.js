@@ -24,6 +24,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const JWT_SECRET = process.env.JWT_SECRET || 'autoflow-secret-2024';
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
 // ── CLIENTS (wrapped in try-catch so a bad key never crashes the server) ──
 let supabase = null;
@@ -241,6 +242,51 @@ async function callAI(systemPrompt, userMessage) {
   throw new Error('No AI provider configured');
 }
 
+async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
+  const subject = `New message — ${automationName}`;
+  const html = `<div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:24px">
+    <h2 style="color:#E53E2E;margin-bottom:4px">💬 New customer message</h2>
+    <p style="color:#888;font-size:13px;margin-bottom:20px">${automationName} · AutoFlow</p>
+    <div style="background:#f5f5f5;border-radius:10px;padding:16px;margin-bottom:14px">
+      <p style="font-size:11px;text-transform:uppercase;color:#999;margin-bottom:6px">Customer</p>
+      <p style="font-size:14px;color:#222;line-height:1.6;margin:0">${userMsg.replace(/\n/g,'<br>')}</p>
+    </div>
+    <div style="background:#fff3f2;border-left:3px solid #E53E2E;border-radius:10px;padding:16px">
+      <p style="font-size:11px;text-transform:uppercase;color:#E53E2E;margin-bottom:6px">AI Reply</p>
+      <p style="font-size:14px;color:#222;line-height:1.6;margin:0">${aiMsg.replace(/\n/g,'<br>')}</p>
+    </div>
+    <p style="color:#ccc;font-size:11px;margin-top:18px;text-align:center">AutoFlow · aicashsystem.space</p>
+  </div>`;
+
+  // Try Brevo API first (no SMTP setup needed)
+  if (BREVO_API_KEY) {
+    try {
+      await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender: { name: 'AutoFlow', email: 'noreply@aicashsystem.space' },
+          to: [{ email: to }],
+          subject, htmlContent: html
+        })
+      });
+      addLog(`Notify email sent to ${to}`, 'email', 'success');
+      return;
+    } catch(e) { console.error('Brevo API email error:', e.message); }
+  }
+
+  // Fallback: SMTP transporter
+  if (transporter) {
+    transporter.sendMail({ from: BREVO_USER || 'noreply@aicashsystem.space', to, subject, html })
+      .then(() => addLog(`Notify email sent (SMTP) to ${to}`, 'email', 'success'))
+      .catch(e => console.error('SMTP email error:', e.message));
+    return;
+  }
+
+  console.warn('No email provider configured. Set BREVO_API_KEY in Render environment variables.');
+  addLog('Email not sent — no email provider configured', 'email', 'error');
+}
+
 async function getAutomation(webhookId) {
   if (supabase) {
     try {
@@ -417,25 +463,8 @@ app.post('/webhook/:webhookId', async (req, res) => {
     addLog(`Automation fired: ${automation.name} | "${userMessage.slice(0,60)}"`, 'automation', 'success');
 
     // Email notification to owner
-    if (transporter && automation.config?.notify_email) {
-      transporter.sendMail({
-        from: BREVO_USER || 'noreply@aicashsystem.space',
-        to: automation.config.notify_email,
-        subject: `💬 New message — ${automation.name}`,
-        html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9f9f9">
-          <h2 style="color:#E53E2E;margin-bottom:4px">New customer message</h2>
-          <p style="color:#666;font-size:13px;margin-bottom:24px">via AutoFlow · ${automation.name}</p>
-          <div style="background:#fff;border-radius:10px;padding:18px;margin-bottom:16px;border-left:4px solid #ddd">
-            <p style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;margin-bottom:8px">Customer wrote</p>
-            <p style="font-size:15px;color:#222;line-height:1.6">${userMessage.replace(/\n/g,'<br>')}</p>
-          </div>
-          <div style="background:#fff;border-radius:10px;padding:18px;border-left:4px solid #E53E2E">
-            <p style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;margin-bottom:8px">AI replied</p>
-            <p style="font-size:15px;color:#222;line-height:1.6">${aiReply.replace(/\n/g,'<br>')}</p>
-          </div>
-          <p style="color:#aaa;font-size:11px;margin-top:20px;text-align:center">Powered by AutoFlow · aicashsystem.space</p>
-        </div>`
-      }).catch(e => console.error('Notify email error:', e.message));
+    if (automation.config?.notify_email) {
+      sendNotifyEmail(automation.config.notify_email, automation.name, userMessage, aiReply);
     }
 
     res.json({ success: true, reply: aiReply });
