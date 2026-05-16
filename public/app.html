@@ -805,6 +805,25 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
   </div><!-- end main -->
 </div><!-- end app -->
 
+<!-- TEST MODAL -->
+<div class="modal-overlay" id="testModal" onclick="if(event.target===this)document.getElementById('testModal').style.display='none'">
+  <div class="modal" style="max-width:480px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="modal-title" style="margin-bottom:0">Test Automation</div>
+      <button onclick="document.getElementById('testModal').style.display='none'" style="background:none;border:none;color:var(--t4);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Message (simulates what a customer sends)</label>
+      <textarea class="form-textarea" id="testMessage" style="min-height:80px" placeholder="e.g. Buna ziua, vreau sa fac o programare pentru maine"></textarea>
+    </div>
+    <button class="generate-btn" id="testSendBtn" onclick="sendTestMessage()"><span>▷</span> Send Test Message</button>
+    <div id="testResult" style="display:none;margin-top:16px">
+      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--r);font-weight:700;margin-bottom:8px">AI Reply</div>
+      <div id="testReplyText" style="background:var(--bg3);border:1px solid rgba(229,62,46,.15);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--t2);line-height:1.75;white-space:pre-wrap"></div>
+    </div>
+  </div>
+</div>
+
 <!-- MESSAGES MODAL -->
 <div class="modal-overlay" id="messagesModal" onclick="if(event.target===this)document.getElementById('messagesModal').style.display='none'">
   <div class="modal" style="max-width:580px;max-height:80vh;display:flex;flex-direction:column">
@@ -1108,6 +1127,7 @@ async function loadMyAutomations(){
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+            <button onclick="testAutomation('${a.webhook_id}')" style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--green);cursor:pointer">▷ Test</button>
             <button onclick="viewMessages('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--t3);cursor:pointer">◎ Messages</button>
             <button onclick="toggleAutomation('${a.webhook_id}',this)" style="background:${a.active?'rgba(74,222,128,.1)':'var(--bg3)'};border:1px solid ${a.active?'rgba(74,222,128,.2)':'#1a1a1a'};border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:${a.active?'var(--green)':'var(--t4)'};cursor:pointer">${a.active?'⏸ Pause':'▶ Resume'}</button>
             <button onclick="deleteAutomation('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:#555;cursor:pointer">✕ Delete</button>
@@ -1138,6 +1158,42 @@ async function deleteAutomation(id){
     notify('Automation deleted.','success');
     loadMyAutomations();
   } catch(e){ notify('Failed to delete.','error'); }
+}
+
+let testWebhookId = '';
+
+function testAutomation(id){
+  testWebhookId = id;
+  document.getElementById('testMessage').value = '';
+  document.getElementById('testResult').style.display = 'none';
+  document.getElementById('testSendBtn').disabled = false;
+  document.getElementById('testSendBtn').innerHTML = '<span>▷</span> Send Test Message';
+  document.getElementById('testModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('testMessage').focus(), 100);
+}
+
+async function sendTestMessage(){
+  const msg = document.getElementById('testMessage').value.trim();
+  if(!msg){ notify('Scrie un mesaj de test.','error'); return; }
+  const btn = document.getElementById('testSendBtn');
+  btn.disabled = true; btn.innerHTML = '<span>⏳</span> Waiting for AI...';
+  document.getElementById('testResult').style.display = 'none';
+  try {
+    const r = await fetch(API+'/webhook/'+testWebhookId, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg})
+    });
+    const d = await r.json();
+    if(d.reply){
+      document.getElementById('testReplyText').textContent = d.reply;
+      document.getElementById('testResult').style.display = 'block';
+      loadMyAutomations();
+    } else {
+      notify('Error: '+(d.error||'No reply'),'error');
+    }
+  } catch(e){ notify('Failed to send.','error'); }
+  btn.disabled = false; btn.innerHTML = '<span>▷</span> Send Test Message';
 }
 
 async function viewMessages(id){
