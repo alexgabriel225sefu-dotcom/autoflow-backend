@@ -249,12 +249,27 @@ async function getAutomation(webhookId) {
   return automationStore.get(webhookId) || null;
 }
 
-async function incrementCount(webhookId, current) {
+async function incrementCount(webhookId, current, userMessage, aiReply) {
+  const newCount = (current || 0) + 1;
   if (supabase) {
-    try { await supabase.from('automations').update({ messages_count: (current || 0) + 1 }).eq('webhook_id', webhookId); } catch(e) {}
+    try { await supabase.from('automations').update({ messages_count: newCount }).eq('webhook_id', webhookId); } catch(e) {}
   }
-  if (automationStore.has(webhookId)) { automationStore.get(webhookId).messages_count = (current || 0) + 1; saveStore(); }
+  if (automationStore.has(webhookId)) {
+    const a = automationStore.get(webhookId);
+    a.messages_count = newCount;
+    if (!a.message_log) a.message_log = [];
+    a.message_log.unshift({ time: new Date().toISOString(), user: userMessage?.slice(0,300), reply: aiReply?.slice(0,500) });
+    if (a.message_log.length > 20) a.message_log.pop();
+    saveStore();
+  }
 }
+
+// GET /api/automations/:id/messages
+app.get('/api/automations/:id/messages', auth, async (req, res) => {
+  const a = automationStore.get(req.params.id);
+  if (!a || String(a.user_id) !== String(req.user.id)) return res.status(404).json({ error: 'Not found' });
+  res.json({ messages: a.message_log || [] });
+});
 
 // GET /api/automations
 app.get('/api/automations', auth, async (req, res) => {
@@ -379,8 +394,8 @@ app.post('/webhook/:webhookId', async (req, res) => {
       }
     }
 
-    await incrementCount(webhookId, automation.messages_count);
-    addLog(`Automation fired: ${automation.name}`, 'automation', 'success');
+    await incrementCount(webhookId, automation.messages_count, userMessage, aiReply);
+    addLog(`Automation fired: ${automation.name} | "${userMessage.slice(0,60)}"`, 'automation', 'success');
     res.json({ success: true, reply: aiReply });
   } catch(e) {
     console.error('Webhook execution error:', e);

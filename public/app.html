@@ -805,6 +805,17 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
   </div><!-- end main -->
 </div><!-- end app -->
 
+<!-- MESSAGES MODAL -->
+<div class="modal-overlay" id="messagesModal" onclick="if(event.target===this)document.getElementById('messagesModal').style.display='none'">
+  <div class="modal" style="max-width:580px;max-height:80vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="modal-title" style="margin-bottom:0">Message Log</div>
+      <button onclick="document.getElementById('messagesModal').style.display='none'" style="background:none;border:none;color:var(--t4);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div id="messagesBody" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px"></div>
+  </div>
+</div>
+
 <!-- ACTIVATE AUTOMATION MODAL -->
 <div class="modal-overlay" id="activateModal" onclick="if(event.target===this)closeActivateModal()">
   <div class="modal" style="max-width:500px">
@@ -1097,6 +1108,7 @@ async function loadMyAutomations(){
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+            <button onclick="viewMessages('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--t3);cursor:pointer">◎ Messages</button>
             <button onclick="toggleAutomation('${a.webhook_id}',this)" style="background:${a.active?'rgba(74,222,128,.1)':'var(--bg3)'};border:1px solid ${a.active?'rgba(74,222,128,.2)':'#1a1a1a'};border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:${a.active?'var(--green)':'var(--t4)'};cursor:pointer">${a.active?'⏸ Pause':'▶ Resume'}</button>
             <button onclick="deleteAutomation('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:#555;cursor:pointer">✕ Delete</button>
           </div>
@@ -1126,6 +1138,36 @@ async function deleteAutomation(id){
     notify('Automation deleted.','success');
     loadMyAutomations();
   } catch(e){ notify('Failed to delete.','error'); }
+}
+
+async function viewMessages(id){
+  const modal = document.getElementById('messagesModal');
+  const body = document.getElementById('messagesBody');
+  body.innerHTML = '<div style="text-align:center;color:var(--t4);padding:20px;font-size:13px">Loading...</div>';
+  modal.style.display = 'flex';
+  try {
+    const r = await fetch(API+'/api/automations/'+id+'/messages', {headers: authHeaders()});
+    const d = await r.json();
+    const msgs = d.messages || [];
+    if(!msgs.length){
+      body.innerHTML = '<div style="text-align:center;color:var(--t4);padding:40px 20px;font-size:13px"><div style="font-size:28px;margin-bottom:10px;opacity:.2">◎</div>No messages yet. Send a POST request to the webhook URL to test.</div>';
+      return;
+    }
+    body.innerHTML = msgs.map(m => `
+      <div style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:14px 16px">
+        <div style="font-size:10px;color:var(--t4);margin-bottom:10px;font-family:'Courier New',monospace">${new Date(m.time).toLocaleString()}</div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t4);font-weight:700;margin-bottom:4px">Customer</div>
+          <div style="font-size:13px;color:var(--t2);line-height:1.6;background:var(--bg4);border-radius:7px;padding:10px 12px">${m.user || '—'}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--r);font-weight:700;margin-bottom:4px">AI Reply</div>
+          <div style="font-size:13px;color:var(--t2);line-height:1.6;background:rgba(229,62,46,.05);border:1px solid rgba(229,62,46,.1);border-radius:7px;padding:10px 12px">${m.reply || '—'}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    body.innerHTML = '<div style="text-align:center;color:var(--t4);padding:20px;font-size:13px">Failed to load messages.</div>';
+  }
 }
 
 function openActivateModal(){
