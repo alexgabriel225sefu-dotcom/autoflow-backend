@@ -1178,7 +1178,7 @@ const TRANSLATIONS = {
   }
 };
 
-let currentLang = localStorage.getItem('af_lang') || 'ro';
+let currentLang = localStorage.getItem('af_lang') || 'en';
 
 function t(key){ return (TRANSLATIONS[currentLang]||TRANSLATIONS.en)[key] || (TRANSLATIONS.en)[key] || key; }
 
