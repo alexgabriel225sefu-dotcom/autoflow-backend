@@ -1125,58 +1125,319 @@ const LANGUAGES = [
 
 const TRANSLATIONS = {
   en:{
+    // nav
     nav_dashboard:'Dashboard', nav_wizard:'Automation Wizard', nav_mybots:'My Automations',
     nav_blueprints:'Blueprint Library', nav_chat:'AI Assistant', nav_email:'Email Outreach',
     nav_tracker:'Client Tracker', nav_logs:'Activity Logs',
-    login_title:'AI Automation Platform', login_email:'Email Address', login_code:'Access Code',
-    login_btn:'Sign In to AutoFlow', login_signing:'Signing in...',
+    // mobile nav
     mob_home:'Home', mob_mybots:'My Bots', mob_wizard:'Wizard', mob_chat:'AI Chat', mob_logs:'Logs',
-    selectLanguage:'Select Language', systems_online:'ALL SYSTEMS ONLINE'
+    // login
+    login_sub:'AI Automation Platform', login_email:'Email Address', login_code:'Access Code',
+    login_btn:'Sign In to AutoFlow', login_signing:'Signing in...',
+    login_email_ph:'your@email.com', login_code_ph:'Enter your access code',
+    // dashboard
+    stat_automations:'Automations Built', stat_clients:'Active Clients',
+    stat_revenue:'Monthly Revenue', stat_emails:'Emails Sent',
+    stat_alltime:'↑ All time', stat_retainers:'↑ Monthly retainers',
+    stat_recurring:'↑ Recurring', stat_month:'↑ This month',
+    dash_quick:'Quick Actions', dash_activity:'Recent Activity',
+    qa_gen_title:'Generate Automation Package', qa_gen_desc:'Create a complete Make.com scenario for any client in 30 seconds',
+    qa_bp_title:'Download Blueprints', qa_bp_desc:'Import ready-made Make.com scenarios directly into your account',
+    qa_chat_title:'Ask AI Assistant', qa_chat_desc:'Get instant answers — pricing, outreach, Make.com, APIs, anything',
+    // wizard
+    wiz_title:'Automation Generator', wiz_sub:'Describe what you want to automate in plain language — the app will generate a complete, step-by-step build plan.',
+    wiz_desc_label:'Describe the automation *', wiz_examples:'Or pick an example',
+    wiz_client:'Client name (optional)', wiz_budget:'Budget range',
+    wiz_btn:'Generate Automation Plan', wiz_out_title:'Your Automation Plan',
+    wiz_placeholder:'Describe what you want to automate and click Generate — you\'ll get a complete, step-by-step build plan.',
+    wiz_activate:'Activate This Automation',
+    wiz_desc_ph:'e.g. A restaurant gets 60+ WhatsApp messages per day asking about the menu...',
+    wiz_client_ph:"e.g. Mario's Restaurant",
+    // my automations
+    mybot_title:'My Automations', mybot_sub:'Live automations running on AutoFlow servers — no Make.com needed.',
+    mybot_new:'New Automation', mybot_empty:'No automations yet. Go to Automation Wizard and click Activate This Automation.',
+    // activate modal
+    act_title:'Activate Automation', act_sub:'AutoFlow will run this automation on our servers. Choose what type of trigger it listens to.',
+    act_name_label:'Automation Name *', act_name_ph:"e.g. WhatsApp bot for Mario's Restaurant",
+    act_type_label:'Trigger Type *', act_notify_label:'Notify owner at email (optional)',
+    act_notify_ph:'e.g. restaurant@gmail.com — gets an email for each new message',
+    act_prompt_label:'AI System Prompt', act_prompt_ph:'You are the AI assistant of...',
+    act_btn:'Activate', act_cancel:'Cancel',
+    // test modal
+    test_title:'Test Automation', test_msg_label:'Message (simulates what a customer sends)',
+    test_msg_ph:'e.g. Hello, I want to make a reservation for tomorrow',
+    test_send:'Send Test Message', test_reply:'AI Reply',
+    // messages modal
+    msg_title:'Message Log', msg_empty:'No messages yet. Send a POST request to the webhook URL to test.',
+    msg_customer:'Customer', msg_ai:'AI Reply',
+    // blueprints
+    bp_title:'Blueprint Library', bp_howto:'How to use these blueprints',
+    // chat
+    chat_title:'AI Assistant', chat_sub:'Ask anything — automation, pricing, outreach, Make.com, APIs.',
+    chat_ph:'Ask me anything...', chat_send:'Send',
+    // email
+    email_title:'Email Outreach', email_sub:'Generate and send personalized outreach emails instantly.',
+    // tracker
+    tracker_title:'Client Tracker', tracker_sub:'Manage your clients and track your recurring revenue.',
+    tracker_add:'Add Client',
+    // logs
+    logs_title:'Activity Logs', logs_sub:'Real-time log of all actions and events.',
+    // misc
+    selectLanguage:'Select Language', systems_online:'ALL SYSTEMS ONLINE',
+    back:'← Back', copy:'Copy', edit:'Edit', delete:'Delete', pause:'Pause', resume:'Resume',
+    share_chat:'Share Chat', test:'Test', messages:'Messages', send_test_email:'Send test',
+    webhook_url:'Webhook URL', email_alerts:'Email alerts', no_email:'No email alert set',
+    loading:'Loading...', confirm_delete:'Delete this automation? This cannot be undone.'
   },
   ro:{
     nav_dashboard:'Panou principal', nav_wizard:'Generator automatizări', nav_mybots:'Automatizările mele',
     nav_blueprints:'Bibliotecă blueprint', nav_chat:'Asistent AI', nav_email:'Email outreach',
     nav_tracker:'Tracker clienți', nav_logs:'Jurnale activitate',
-    login_title:'Platformă de automatizări AI', login_email:'Adresă email', login_code:'Cod de acces',
-    login_btn:'Conectare AutoFlow', login_signing:'Se conectează...',
     mob_home:'Acasă', mob_mybots:'Boții mei', mob_wizard:'Generator', mob_chat:'Chat AI', mob_logs:'Jurnale',
-    selectLanguage:'Selectează limba', systems_online:'TOATE SISTEMELE ONLINE'
+    login_sub:'Platformă de automatizări AI', login_email:'Adresă email', login_code:'Cod de acces',
+    login_btn:'Conectare AutoFlow', login_signing:'Se conectează...',
+    login_email_ph:'emailul@tau.com', login_code_ph:'Introdu codul de acces',
+    stat_automations:'Automatizări create', stat_clients:'Clienți activi',
+    stat_revenue:'Venit lunar', stat_emails:'Emailuri trimise',
+    stat_alltime:'↑ Total', stat_retainers:'↑ Retainere lunare',
+    stat_recurring:'↑ Recurent', stat_month:'↑ Luna aceasta',
+    dash_quick:'Acțiuni rapide', dash_activity:'Activitate recentă',
+    qa_gen_title:'Generează pachet automatizare', qa_gen_desc:'Creează un scenariu Make.com complet pentru orice client în 30 de secunde',
+    qa_bp_title:'Descarcă blueprints', qa_bp_desc:'Importă scenarii Make.com gata făcute direct în contul tău',
+    qa_chat_title:'Întreabă asistentul AI', qa_chat_desc:'Răspunsuri instant — prețuri, outreach, Make.com, API-uri, orice',
+    wiz_title:'Generator automatizări', wiz_sub:'Descrie ce vrei să automatizezi — aplicația va genera un plan complet, pas cu pas.',
+    wiz_desc_label:'Descrie automatizarea *', wiz_examples:'Sau alege un exemplu',
+    wiz_client:'Numele clientului (opțional)', wiz_budget:'Buget estimat',
+    wiz_btn:'Generează planul', wiz_out_title:'Planul tău de automatizare',
+    wiz_placeholder:'Descrie ce vrei să automatizezi și apasă Generează — vei primi un plan complet.',
+    wiz_activate:'Activează această automatizare',
+    wiz_desc_ph:'ex. Un restaurant primește 60+ mesaje WhatsApp zilnic cu întrebări despre meniu...',
+    wiz_client_ph:'ex. Restaurant Mario',
+    mybot_title:'Automatizările mele', mybot_sub:'Automatizări live pe serverele AutoFlow — fără Make.com.',
+    mybot_new:'Automatizare nouă', mybot_empty:'Nicio automatizare. Mergi la Generator și apasă Activează.',
+    act_title:'Activează automatizarea', act_sub:'AutoFlow va rula automatizarea pe serverele noastre.',
+    act_name_label:'Numele automatizării *', act_name_ph:'ex. Bot WhatsApp pentru Restaurant Mario',
+    act_type_label:'Tip trigger *', act_notify_label:'Notifică proprietarul la email (opțional)',
+    act_notify_ph:'ex. restaurant@gmail.com — primești email la fiecare mesaj nou',
+    act_prompt_label:'Prompt sistem AI', act_prompt_ph:'Ești asistentul AI al...',
+    act_btn:'Activează', act_cancel:'Anulează',
+    test_title:'Testează automatizarea', test_msg_label:'Mesaj (simulează ce trimite un client)',
+    test_msg_ph:'ex. Bună ziua, vreau să fac o rezervare pentru mâine',
+    test_send:'Trimite mesaj test', test_reply:'Răspuns AI',
+    msg_title:'Jurnal mesaje', msg_empty:'Niciun mesaj. Trimite un POST la webhook URL pentru a testa.',
+    msg_customer:'Client', msg_ai:'Răspuns AI',
+    bp_title:'Bibliotecă blueprints', bp_howto:'Cum folosești blueprinturile',
+    chat_title:'Asistent AI', chat_sub:'Întreabă orice — automatizări, prețuri, Make.com, API-uri.',
+    chat_ph:'Întreabă-mă orice...', chat_send:'Trimite',
+    email_title:'Email outreach', email_sub:'Generează și trimite emailuri personalizate instant.',
+    tracker_title:'Tracker clienți', tracker_sub:'Gestionează clienții și urmărește venitul recurent.',
+    tracker_add:'Adaugă client',
+    logs_title:'Jurnale activitate', logs_sub:'Log în timp real al tuturor acțiunilor.',
+    selectLanguage:'Selectează limba', systems_online:'TOATE SISTEMELE ONLINE',
+    back:'← Înapoi', copy:'Copiază', edit:'Editează', delete:'Șterge', pause:'Pauză', resume:'Reia',
+    share_chat:'Trimite chat', test:'Test', messages:'Mesaje', send_test_email:'Test email',
+    webhook_url:'URL Webhook', email_alerts:'Alerte email', no_email:'Nicio alertă email setată',
+    loading:'Se încarcă...', confirm_delete:'Ștergi automatizarea? Acțiunea e ireversibilă.'
   },
   de:{
     nav_dashboard:'Dashboard', nav_wizard:'Automatisierungs-Assistent', nav_mybots:'Meine Automatisierungen',
     nav_blueprints:'Blueprint-Bibliothek', nav_chat:'KI-Assistent', nav_email:'E-Mail-Outreach',
     nav_tracker:'Kunden-Tracker', nav_logs:'Aktivitätsprotokolle',
-    login_title:'KI-Automatisierungsplattform', login_email:'E-Mail-Adresse', login_code:'Zugangscode',
-    login_btn:'Bei AutoFlow anmelden', login_signing:'Anmelden...',
     mob_home:'Start', mob_mybots:'Meine Bots', mob_wizard:'Assistent', mob_chat:'KI-Chat', mob_logs:'Protokolle',
-    selectLanguage:'Sprache wählen', systems_online:'ALLE SYSTEME ONLINE'
+    login_sub:'KI-Automatisierungsplattform', login_email:'E-Mail-Adresse', login_code:'Zugangscode',
+    login_btn:'Bei AutoFlow anmelden', login_signing:'Anmelden...',
+    login_email_ph:'ihre@email.de', login_code_ph:'Zugangscode eingeben',
+    stat_automations:'Erstelle Automatisierungen', stat_clients:'Aktive Kunden',
+    stat_revenue:'Monatlicher Umsatz', stat_emails:'Gesendete E-Mails',
+    stat_alltime:'↑ Insgesamt', stat_retainers:'↑ Monatliche Retainer',
+    stat_recurring:'↑ Wiederkehrend', stat_month:'↑ Diesen Monat',
+    dash_quick:'Schnellaktionen', dash_activity:'Letzte Aktivität',
+    qa_gen_title:'Automatisierungspaket erstellen', qa_gen_desc:'Erstellen Sie in 30 Sekunden ein vollständiges Make.com-Szenario für jeden Kunden',
+    qa_bp_title:'Blueprints herunterladen', qa_bp_desc:'Fertige Make.com-Szenarien direkt in Ihr Konto importieren',
+    qa_chat_title:'KI-Assistent fragen', qa_chat_desc:'Sofortige Antworten — Preise, Outreach, Make.com, APIs, alles',
+    wiz_title:'Automatisierungs-Generator', wiz_sub:'Beschreiben Sie, was Sie automatisieren möchten — die App erstellt einen vollständigen Plan.',
+    wiz_desc_label:'Automatisierung beschreiben *', wiz_examples:'Oder ein Beispiel wählen',
+    wiz_client:'Kundenname (optional)', wiz_budget:'Budgetrahmen',
+    wiz_btn:'Automatisierungsplan erstellen', wiz_out_title:'Ihr Automatisierungsplan',
+    wiz_placeholder:'Beschreiben Sie, was Sie automatisieren möchten, und klicken Sie auf Erstellen.',
+    wiz_activate:'Diese Automatisierung aktivieren',
+    wiz_desc_ph:'z.B. Ein Restaurant erhält täglich 60+ WhatsApp-Nachrichten zu Speisekarte...',
+    wiz_client_ph:'z.B. Marios Restaurant',
+    mybot_title:'Meine Automatisierungen', mybot_sub:'Live-Automatisierungen auf AutoFlow-Servern — kein Make.com nötig.',
+    mybot_new:'Neue Automatisierung', mybot_empty:'Noch keine Automatisierungen. Gehen Sie zum Assistenten und aktivieren Sie eine.',
+    act_title:'Automatisierung aktivieren', act_sub:'AutoFlow führt diese Automatisierung auf unseren Servern aus.',
+    act_name_label:'Name der Automatisierung *', act_name_ph:'z.B. WhatsApp-Bot für Marios Restaurant',
+    act_type_label:'Trigger-Typ *', act_notify_label:'Besitzer per E-Mail benachrichtigen (optional)',
+    act_notify_ph:'z.B. restaurant@gmail.com',
+    act_prompt_label:'KI-System-Prompt', act_prompt_ph:'Sie sind der KI-Assistent von...',
+    act_btn:'Aktivieren', act_cancel:'Abbrechen',
+    test_title:'Automatisierung testen', test_msg_label:'Nachricht (simuliert eine Kundennachricht)',
+    test_msg_ph:'z.B. Guten Tag, ich möchte einen Tisch für morgen reservieren',
+    test_send:'Testnachricht senden', test_reply:'KI-Antwort',
+    msg_title:'Nachrichtenprotokoll', msg_empty:'Noch keine Nachrichten.',
+    msg_customer:'Kunde', msg_ai:'KI-Antwort',
+    bp_title:'Blueprint-Bibliothek', bp_howto:'So verwenden Sie diese Blueprints',
+    chat_title:'KI-Assistent', chat_sub:'Fragen Sie alles — Automatisierung, Preise, Make.com, APIs.',
+    chat_ph:'Fragen Sie mich alles...', chat_send:'Senden',
+    email_title:'E-Mail-Outreach', email_sub:'Personalisierte Outreach-E-Mails sofort generieren und senden.',
+    tracker_title:'Kunden-Tracker', tracker_sub:'Verwalten Sie Kunden und verfolgen Sie wiederkehrende Einnahmen.',
+    tracker_add:'Kunden hinzufügen',
+    logs_title:'Aktivitätsprotokolle', logs_sub:'Echtzeit-Protokoll aller Aktionen.',
+    selectLanguage:'Sprache wählen', systems_online:'ALLE SYSTEME ONLINE',
+    back:'← Zurück', copy:'Kopieren', edit:'Bearbeiten', delete:'Löschen', pause:'Pause', resume:'Fortsetzen',
+    share_chat:'Chat teilen', test:'Testen', messages:'Nachrichten', send_test_email:'Test-E-Mail',
+    webhook_url:'Webhook-URL', email_alerts:'E-Mail-Benachrichtigungen', no_email:'Keine E-Mail-Benachrichtigung',
+    loading:'Laden...', confirm_delete:'Automatisierung löschen? Diese Aktion kann nicht rückgängig gemacht werden.'
   },
   fr:{
     nav_dashboard:'Tableau de bord', nav_wizard:'Assistant automatisation', nav_mybots:'Mes automatisations',
     nav_blueprints:'Bibliothèque', nav_chat:'Assistant IA', nav_email:'Campagne email',
     nav_tracker:'Suivi clients', nav_logs:'Journaux',
-    login_title:'Plateforme d\'automatisation IA', login_email:'Adresse email', login_code:'Code d\'accès',
-    login_btn:'Se connecter à AutoFlow', login_signing:'Connexion...',
     mob_home:'Accueil', mob_mybots:'Mes Bots', mob_wizard:'Assistant', mob_chat:'Chat IA', mob_logs:'Journaux',
-    selectLanguage:'Choisir la langue', systems_online:'TOUS SYSTÈMES EN LIGNE'
+    login_sub:"Plateforme d'automatisation IA", login_email:'Adresse email', login_code:"Code d'accès",
+    login_btn:'Se connecter à AutoFlow', login_signing:'Connexion...',
+    login_email_ph:'votre@email.fr', login_code_ph:"Entrez votre code d'accès",
+    stat_automations:'Automatisations créées', stat_clients:'Clients actifs',
+    stat_revenue:'Revenus mensuels', stat_emails:'Emails envoyés',
+    stat_alltime:'↑ Total', stat_retainers:'↑ Retainers mensuels',
+    stat_recurring:'↑ Récurrent', stat_month:'↑ Ce mois',
+    dash_quick:'Actions rapides', dash_activity:'Activité récente',
+    qa_gen_title:"Générer un package d'automatisation", qa_gen_desc:'Créez un scénario Make.com complet pour tout client en 30 secondes',
+    qa_bp_title:'Télécharger des Blueprints', qa_bp_desc:'Importez des scénarios Make.com prêts à utiliser directement dans votre compte',
+    qa_chat_title:"Demander à l'assistant IA", qa_chat_desc:'Réponses instantanées — tarifs, prospection, Make.com, APIs, tout',
+    wiz_title:"Générateur d'automatisation", wiz_sub:"Décrivez ce que vous souhaitez automatiser — l'application générera un plan complet.",
+    wiz_desc_label:"Décrivez l'automatisation *", wiz_examples:'Ou choisissez un exemple',
+    wiz_client:'Nom du client (optionnel)', wiz_budget:'Fourchette budgétaire',
+    wiz_btn:"Générer le plan d'automatisation", wiz_out_title:"Votre plan d'automatisation",
+    wiz_placeholder:"Décrivez ce que vous souhaitez automatiser et cliquez sur Générer.",
+    wiz_activate:'Activer cette automatisation',
+    wiz_desc_ph:'ex. Un restaurant reçoit 60+ messages WhatsApp par jour sur le menu...',
+    wiz_client_ph:'ex. Restaurant Mario',
+    mybot_title:'Mes automatisations', mybot_sub:"Automatisations en direct sur les serveurs AutoFlow — sans Make.com.",
+    mybot_new:'Nouvelle automatisation', mybot_empty:"Aucune automatisation. Allez dans l'assistant et activez-en une.",
+    act_title:"Activer l'automatisation", act_sub:'AutoFlow exécutera cette automatisation sur nos serveurs.',
+    act_name_label:"Nom de l'automatisation *", act_name_ph:'ex. Bot WhatsApp pour Restaurant Mario',
+    act_type_label:'Type de déclencheur *', act_notify_label:'Notifier le propriétaire par email (optionnel)',
+    act_notify_ph:'ex. restaurant@gmail.com',
+    act_prompt_label:'Prompt système IA', act_prompt_ph:"Vous êtes l'assistant IA de...",
+    act_btn:'Activer', act_cancel:'Annuler',
+    test_title:"Tester l'automatisation", test_msg_label:'Message (simule ce qu\'envoie un client)',
+    test_msg_ph:'ex. Bonjour, je voudrais réserver une table pour demain',
+    test_send:'Envoyer un message test', test_reply:'Réponse IA',
+    msg_title:'Journal des messages', msg_empty:'Aucun message pour l\'instant.',
+    msg_customer:'Client', msg_ai:'Réponse IA',
+    bp_title:'Bibliothèque de blueprints', bp_howto:'Comment utiliser ces blueprints',
+    chat_title:'Assistant IA', chat_sub:'Posez n\'importe quelle question — automatisation, tarifs, Make.com, APIs.',
+    chat_ph:'Posez-moi n\'importe quelle question...', chat_send:'Envoyer',
+    email_title:'Campagne email', email_sub:'Générez et envoyez des emails de prospection personnalisés instantanément.',
+    tracker_title:'Suivi clients', tracker_sub:'Gérez vos clients et suivez vos revenus récurrents.',
+    tracker_add:'Ajouter un client',
+    logs_title:'Journaux d\'activité', logs_sub:'Journal en temps réel de toutes les actions.',
+    selectLanguage:'Choisir la langue', systems_online:'TOUS SYSTÈMES EN LIGNE',
+    back:'← Retour', copy:'Copier', edit:'Modifier', delete:'Supprimer', pause:'Pause', resume:'Reprendre',
+    share_chat:'Partager le chat', test:'Tester', messages:'Messages', send_test_email:'Test email',
+    webhook_url:'URL Webhook', email_alerts:'Alertes email', no_email:'Aucune alerte email définie',
+    loading:'Chargement...', confirm_delete:'Supprimer cette automatisation ? Cette action est irréversible.'
   },
   es:{
     nav_dashboard:'Panel', nav_wizard:'Asistente de automatización', nav_mybots:'Mis automatizaciones',
     nav_blueprints:'Biblioteca', nav_chat:'Asistente IA', nav_email:'Campaña email',
     nav_tracker:'Seguimiento clientes', nav_logs:'Registros',
-    login_title:'Plataforma de automatización IA', login_email:'Correo electrónico', login_code:'Código de acceso',
-    login_btn:'Iniciar sesión en AutoFlow', login_signing:'Iniciando sesión...',
     mob_home:'Inicio', mob_mybots:'Mis Bots', mob_wizard:'Asistente', mob_chat:'Chat IA', mob_logs:'Registros',
-    selectLanguage:'Seleccionar idioma', systems_online:'TODOS LOS SISTEMAS EN LÍNEA'
+    login_sub:'Plataforma de automatización IA', login_email:'Correo electrónico', login_code:'Código de acceso',
+    login_btn:'Iniciar sesión en AutoFlow', login_signing:'Iniciando sesión...',
+    login_email_ph:'tu@correo.com', login_code_ph:'Introduce tu código de acceso',
+    stat_automations:'Automatizaciones creadas', stat_clients:'Clientes activos',
+    stat_revenue:'Ingresos mensuales', stat_emails:'Correos enviados',
+    stat_alltime:'↑ Total', stat_retainers:'↑ Retainers mensuales',
+    stat_recurring:'↑ Recurrente', stat_month:'↑ Este mes',
+    dash_quick:'Acciones rápidas', dash_activity:'Actividad reciente',
+    qa_gen_title:'Generar paquete de automatización', qa_gen_desc:'Crea un escenario completo de Make.com para cualquier cliente en 30 segundos',
+    qa_bp_title:'Descargar Blueprints', qa_bp_desc:'Importa escenarios Make.com listos directamente en tu cuenta',
+    qa_chat_title:'Preguntar al asistente IA', qa_chat_desc:'Respuestas instantáneas — precios, prospección, Make.com, APIs, todo',
+    wiz_title:'Generador de automatizaciones', wiz_sub:'Describe lo que quieres automatizar — la app generará un plan completo.',
+    wiz_desc_label:'Describe la automatización *', wiz_examples:'O elige un ejemplo',
+    wiz_client:'Nombre del cliente (opcional)', wiz_budget:'Rango de presupuesto',
+    wiz_btn:'Generar plan de automatización', wiz_out_title:'Tu plan de automatización',
+    wiz_placeholder:'Describe lo que quieres automatizar y haz clic en Generar.',
+    wiz_activate:'Activar esta automatización',
+    wiz_desc_ph:'ej. Un restaurante recibe 60+ mensajes de WhatsApp al día sobre el menú...',
+    wiz_client_ph:'ej. Restaurante Mario',
+    mybot_title:'Mis automatizaciones', mybot_sub:'Automatizaciones en vivo en servidores AutoFlow — sin Make.com.',
+    mybot_new:'Nueva automatización', mybot_empty:'Sin automatizaciones. Ve al asistente y activa una.',
+    act_title:'Activar automatización', act_sub:'AutoFlow ejecutará esta automatización en nuestros servidores.',
+    act_name_label:'Nombre de la automatización *', act_name_ph:'ej. Bot de WhatsApp para Restaurante Mario',
+    act_type_label:'Tipo de disparador *', act_notify_label:'Notificar al propietario por email (opcional)',
+    act_notify_ph:'ej. restaurante@gmail.com',
+    act_prompt_label:'Prompt del sistema IA', act_prompt_ph:'Eres el asistente IA de...',
+    act_btn:'Activar', act_cancel:'Cancelar',
+    test_title:'Probar automatización', test_msg_label:'Mensaje (simula lo que envía un cliente)',
+    test_msg_ph:'ej. Hola, quisiera reservar una mesa para mañana',
+    test_send:'Enviar mensaje de prueba', test_reply:'Respuesta IA',
+    msg_title:'Registro de mensajes', msg_empty:'Sin mensajes todavía.',
+    msg_customer:'Cliente', msg_ai:'Respuesta IA',
+    bp_title:'Biblioteca de blueprints', bp_howto:'Cómo usar estos blueprints',
+    chat_title:'Asistente IA', chat_sub:'Pregunta cualquier cosa — automatización, precios, Make.com, APIs.',
+    chat_ph:'Pregúntame cualquier cosa...', chat_send:'Enviar',
+    email_title:'Campaña de email', email_sub:'Genera y envía emails de prospección personalizados al instante.',
+    tracker_title:'Seguimiento de clientes', tracker_sub:'Gestiona tus clientes y sigue tus ingresos recurrentes.',
+    tracker_add:'Agregar cliente',
+    logs_title:'Registros de actividad', logs_sub:'Registro en tiempo real de todas las acciones.',
+    selectLanguage:'Seleccionar idioma', systems_online:'TODOS LOS SISTEMAS EN LÍNEA',
+    back:'← Atrás', copy:'Copiar', edit:'Editar', delete:'Eliminar', pause:'Pausar', resume:'Reanudar',
+    share_chat:'Compartir chat', test:'Probar', messages:'Mensajes', send_test_email:'Test email',
+    webhook_url:'URL de Webhook', email_alerts:'Alertas de email', no_email:'Sin alerta de email',
+    loading:'Cargando...', confirm_delete:'¿Eliminar esta automatización? Esta acción no se puede deshacer.'
   },
   it:{
     nav_dashboard:'Dashboard', nav_wizard:'Assistente automazione', nav_mybots:'Le mie automazioni',
     nav_blueprints:'Biblioteca', nav_chat:'Assistente IA', nav_email:'Email outreach',
     nav_tracker:'Tracker clienti', nav_logs:'Registro attività',
-    login_title:'Piattaforma di automazione IA', login_email:'Indirizzo email', login_code:'Codice di accesso',
-    login_btn:'Accedi ad AutoFlow', login_signing:'Accesso in corso...',
     mob_home:'Home', mob_mybots:'I miei Bot', mob_wizard:'Assistente', mob_chat:'Chat IA', mob_logs:'Registro',
-    selectLanguage:'Seleziona lingua', systems_online:'TUTTI I SISTEMI ONLINE'
+    login_sub:'Piattaforma di automazione IA', login_email:'Indirizzo email', login_code:'Codice di accesso',
+    login_btn:'Accedi ad AutoFlow', login_signing:'Accesso in corso...',
+    login_email_ph:'tua@email.it', login_code_ph:'Inserisci il tuo codice di accesso',
+    stat_automations:'Automazioni create', stat_clients:'Clienti attivi',
+    stat_revenue:'Entrate mensili', stat_emails:'Email inviate',
+    stat_alltime:'↑ Totale', stat_retainers:'↑ Retainer mensili',
+    stat_recurring:'↑ Ricorrente', stat_month:'↑ Questo mese',
+    dash_quick:'Azioni rapide', dash_activity:'Attività recente',
+    qa_gen_title:'Genera pacchetto automazione', qa_gen_desc:'Crea uno scenario Make.com completo per qualsiasi cliente in 30 secondi',
+    qa_bp_title:'Scarica Blueprint', qa_bp_desc:'Importa scenari Make.com pronti direttamente nel tuo account',
+    qa_chat_title:"Chiedi all'assistente IA", qa_chat_desc:'Risposte immediate — prezzi, outreach, Make.com, API, tutto',
+    wiz_title:'Generatore di automazioni', wiz_sub:"Descrivi cosa vuoi automatizzare — l'app genererà un piano completo.",
+    wiz_desc_label:"Descrivi l'automazione *", wiz_examples:'O scegli un esempio',
+    wiz_client:'Nome del cliente (opzionale)', wiz_budget:'Fascia di budget',
+    wiz_btn:'Genera piano di automazione', wiz_out_title:'Il tuo piano di automazione',
+    wiz_placeholder:"Descrivi cosa vuoi automatizzare e clicca su Genera.",
+    wiz_activate:'Attiva questa automazione',
+    wiz_desc_ph:"es. Un ristorante riceve 60+ messaggi WhatsApp al giorno sul menu...",
+    wiz_client_ph:"es. Ristorante Mario",
+    mybot_title:'Le mie automazioni', mybot_sub:'Automazioni live sui server AutoFlow — senza Make.com.',
+    mybot_new:'Nuova automazione', mybot_empty:'Nessuna automazione. Vai all\'assistente e attivane una.',
+    act_title:"Attiva l'automazione", act_sub:'AutoFlow eseguirà questa automazione sui nostri server.',
+    act_name_label:"Nome dell'automazione *", act_name_ph:"es. Bot WhatsApp per Ristorante Mario",
+    act_type_label:'Tipo di trigger *', act_notify_label:'Notifica il proprietario via email (opzionale)',
+    act_notify_ph:'es. ristorante@gmail.com',
+    act_prompt_label:'Prompt di sistema IA', act_prompt_ph:"Sei l'assistente IA di...",
+    act_btn:'Attiva', act_cancel:'Annulla',
+    test_title:"Testa l'automazione", test_msg_label:'Messaggio (simula cosa invia un cliente)',
+    test_msg_ph:'es. Buongiorno, vorrei prenotare un tavolo per domani',
+    test_send:'Invia messaggio di prova', test_reply:'Risposta IA',
+    msg_title:'Registro messaggi', msg_empty:'Nessun messaggio ancora.',
+    msg_customer:'Cliente', msg_ai:'Risposta IA',
+    bp_title:'Biblioteca blueprint', bp_howto:'Come usare questi blueprint',
+    chat_title:'Assistente IA', chat_sub:'Chiedi qualsiasi cosa — automazione, prezzi, Make.com, API.',
+    chat_ph:'Chiedimi qualsiasi cosa...', chat_send:'Invia',
+    email_title:'Email outreach', email_sub:'Genera e invia email di prospecting personalizzate istantaneamente.',
+    tracker_title:'Tracker clienti', tracker_sub:'Gestisci i tuoi clienti e monitora i ricavi ricorrenti.',
+    tracker_add:'Aggiungi cliente',
+    logs_title:'Registro attività', logs_sub:'Log in tempo reale di tutte le azioni.',
+    selectLanguage:'Seleziona lingua', systems_online:'TUTTI I SISTEMI ONLINE',
+    back:'← Indietro', copy:'Copia', edit:'Modifica', delete:'Elimina', pause:'Pausa', resume:'Riprendi',
+    share_chat:'Condividi chat', test:'Testa', messages:'Messaggi', send_test_email:'Test email',
+    webhook_url:'URL Webhook', email_alerts:'Avvisi email', no_email:'Nessun avviso email impostato',
+    loading:'Caricamento...', confirm_delete:'Eliminare questa automazione? Questa azione non può essere annullata.'
   }
 };
 
@@ -1184,10 +1445,15 @@ let currentLang = localStorage.getItem('af_lang') || 'en';
 
 function t(key){ return (TRANSLATIONS[currentLang]||TRANSLATIONS.en)[key] || (TRANSLATIONS.en)[key] || key; }
 
+function setText(id, key){ const el = document.getElementById(id); if(el) el.textContent = t(key); }
+function setHTML(id, html){ const el = document.getElementById(id); if(el) el.innerHTML = html; }
+function setPH(id, key){ const el = document.getElementById(id); if(el) el.placeholder = t(key); }
+function setTxt(sel, key){ const el = document.querySelector(sel); if(el) el.textContent = t(key); }
+
 function applyTranslations(){
   const lang = LANGUAGES.find(l => l.code === currentLang) || LANGUAGES[0];
-  document.getElementById('langFlag').textContent = lang.flag;
-  document.getElementById('langCode').textContent = lang.code.toUpperCase();
+  const el = document.getElementById('langFlag');
+  if(el){ el.textContent = lang.flag; document.getElementById('langCode').textContent = lang.code.toUpperCase(); }
   document.documentElement.lang = currentLang;
 
   // nav items
@@ -1196,28 +1462,105 @@ function applyTranslations(){
   navItems.forEach((el,i) => { if(navKeys[i]){ const icon = el.querySelector('.nav-icon'); el.innerHTML = ''; if(icon) el.appendChild(icon); el.append(t(navKeys[i])); } });
 
   // mobile nav
-  const mobLabels = {
-    'mob-dashboard':'mob_home','mob-myautomations':'mob_mybots','mob-wizard':'mob_wizard',
-    'mob-chat':'mob_chat','mob-logs':'mob_logs'
-  };
-  Object.entries(mobLabels).forEach(([id, key]) => {
+  const mobMap = {'mob-dashboard':'mob_home','mob-myautomations':'mob_mybots','mob-wizard':'mob_wizard','mob-chat':'mob_chat','mob-logs':'mob_logs'};
+  Object.entries(mobMap).forEach(([id, key]) => {
     const btn = document.getElementById(id);
     if(btn){ const icon = btn.querySelector('.mob-icon'); btn.innerHTML = ''; if(icon) btn.appendChild(icon); btn.append(t(key)); }
   });
 
+  // topbar titles map
+  const pageTitles = {
+    dashboard:[t('nav_dashboard'), t('dash_activity')],
+    wizard:[t('nav_wizard'), t('wiz_sub')],
+    blueprints:[t('nav_blueprints'), ''],
+    chat:[t('nav_chat'), t('chat_sub')],
+    email:[t('nav_email'), t('email_sub')],
+    tracker:[t('nav_tracker'), t('tracker_sub')],
+    logs:[t('nav_logs'), t('logs_sub')],
+    myautomations:[t('mybot_title'), t('mybot_sub')]
+  };
+  const titleEl = document.getElementById('topbarTitle');
+  const subEl = document.getElementById('topbarSub');
+  if(titleEl && pageTitles[currentPage]) titleEl.textContent = pageTitles[currentPage][0];
+  if(subEl && pageTitles[currentPage]) subEl.textContent = pageTitles[currentPage][1];
+
   // misc
-  const sysEl = document.getElementById('systemStatus');
-  if(sysEl) sysEl.textContent = t('systems_online');
-  const searchEl = document.getElementById('langSearch');
-  if(searchEl) searchEl.placeholder = t('selectLanguage')+'...';
+  setText('systemStatus','systems_online');
+  setPH('langSearch','selectLanguage');
+  setText('backBtn','back');
 
   // login
-  const lblEmail = document.querySelector('.login-label');
-  const lblCode = document.querySelectorAll('.login-label')[1];
+  setTxt('.login-sub','login_sub');
+  const labels = document.querySelectorAll('.login-label');
+  if(labels[0]) labels[0].textContent = t('login_email');
+  if(labels[1]) labels[1].textContent = t('login_code');
   const loginBtn = document.getElementById('loginBtn');
-  if(lblEmail) lblEmail.textContent = t('login_email');
-  if(lblCode) lblCode.textContent = t('login_code');
   if(loginBtn && !loginBtn.disabled) loginBtn.textContent = t('login_btn');
+  setPH('loginEmail','login_email_ph');
+  setPH('loginCode','login_code_ph');
+
+  // dashboard
+  setTxt('#page-dashboard .stat-card:nth-child(1) .stat-label','stat_automations');
+  setTxt('#page-dashboard .stat-card:nth-child(1) .stat-change','stat_alltime');
+  setTxt('#page-dashboard .stat-card:nth-child(2) .stat-label','stat_clients');
+  setTxt('#page-dashboard .stat-card:nth-child(2) .stat-change','stat_retainers');
+  setTxt('#page-dashboard .stat-card:nth-child(3) .stat-label','stat_revenue');
+  setTxt('#page-dashboard .stat-card:nth-child(3) .stat-change','stat_recurring');
+  setTxt('#page-dashboard .stat-card:nth-child(4) .stat-label','stat_emails');
+  setTxt('#page-dashboard .stat-card:nth-child(4) .stat-change','stat_month');
+  const dashTitles = document.querySelectorAll('#page-dashboard .section-title');
+  if(dashTitles[0]) dashTitles[0].childNodes[dashTitles[0].childNodes.length-1].textContent = t('dash_quick');
+  if(dashTitles[1]) dashTitles[1].childNodes[dashTitles[1].childNodes.length-1].textContent = t('dash_activity');
+  const qas = document.querySelectorAll('#page-dashboard .qa-btn');
+  if(qas[0]){ qas[0].querySelector('.qa-title').textContent = t('qa_gen_title'); qas[0].querySelector('.qa-desc').textContent = t('qa_gen_desc'); }
+  if(qas[1]){ qas[1].querySelector('.qa-title').textContent = t('qa_bp_title'); qas[1].querySelector('.qa-desc').textContent = t('qa_bp_desc'); }
+  if(qas[2]){ qas[2].querySelector('.qa-title').textContent = t('qa_chat_title'); qas[2].querySelector('.qa-desc').textContent = t('qa_chat_desc'); }
+
+  // wizard
+  const wizLabels = document.querySelectorAll('#page-wizard .form-label');
+  if(wizLabels[0]) wizLabels[0].textContent = t('wiz_desc_label');
+  if(wizLabels[1]) wizLabels[1].textContent = t('wiz_client');
+  if(wizLabels[2]) wizLabels[2].textContent = t('wiz_budget');
+  setPH('wDescription','wiz_desc_ph'); setPH('wClient','wiz_client_ph');
+  const genBtn = document.getElementById('generateBtn');
+  if(genBtn){ const sp = genBtn.querySelector('span'); genBtn.textContent = ''; if(sp) genBtn.appendChild(sp); genBtn.append(' '+t('wiz_btn')); }
+  const exTxt = document.querySelector('#page-wizard .form-group ~ div > div:first-child');
+  if(exTxt) exTxt.textContent = t('wiz_examples');
+  const actBtn = document.getElementById('activateBtn');
+  if(actBtn){ const sp = actBtn.querySelector('span'); actBtn.textContent = ''; if(sp) actBtn.appendChild(sp); actBtn.append(' '+t('wiz_activate')); }
+
+  // my automations section title
+  const myTitle = document.querySelector('#page-myautomations .section-title');
+  if(myTitle) myTitle.childNodes[myTitle.childNodes.length-1].textContent = t('mybot_title');
+
+  // activate modal
+  setTxt('#activateModal .modal-title','act_title');
+  const actLabels = document.querySelectorAll('#activateModal .form-label');
+  if(actLabels[0]) actLabels[0].textContent = t('act_name_label');
+  if(actLabels[1]) actLabels[1].textContent = t('act_type_label');
+  if(actLabels[actLabels.length-2]) actLabels[actLabels.length-2].textContent = t('act_notify_label');
+  if(actLabels[actLabels.length-1]) actLabels[actLabels.length-1].textContent = t('act_prompt_label');
+  setPH('actName','act_name_ph'); setPH('actNotifyEmail','act_notify_ph'); setPH('actPrompt','act_prompt_ph');
+
+  // test modal
+  setTxt('#testModal .modal-title','test_title');
+  const testLabel = document.querySelector('#testModal .form-label');
+  if(testLabel) testLabel.textContent = t('test_msg_label');
+  setPH('testMessage','test_msg_ph');
+  const testBtn = document.getElementById('testSendBtn');
+  if(testBtn && !testBtn.disabled){ const sp = testBtn.querySelector('span'); testBtn.textContent = ''; if(sp) testBtn.appendChild(sp); testBtn.append(' '+t('test_send')); }
+  const testReplyLabel = document.querySelector('#testModal #testResult > div:first-child');
+  if(testReplyLabel) testReplyLabel.textContent = t('test_reply');
+
+  // messages modal
+  setTxt('#messagesModal .modal-title','msg_title');
+
+  // chat page
+  setPH('chatInput','chat_ph');
+
+  // tracker
+  const trackerAdd = document.querySelector('.add-client-btn');
+  if(trackerAdd) trackerAdd.textContent = t('tracker_add');
 }
 
 function openLangModal(){
@@ -1332,18 +1675,18 @@ function showPage(page, navEl){
   const backBtn = document.getElementById('backBtn');
   if(backBtn) backBtn.style.display = page !== 'dashboard' ? 'block' : 'none';
   const titles = {
-    dashboard: ['Dashboard', 'Welcome back. Your automations are running.'],
-    wizard: ['Automation Wizard', 'Generate complete packages for any client in 30 seconds.'],
-    blueprints: ['Blueprint Library', 'Download ready-made Make.com scenarios and import them instantly.'],
-    chat: ['AI Assistant', 'Ask anything — automation, pricing, outreach, Make.com, APIs.'],
-    email: ['Email Outreach', 'Generate and send personalized outreach emails instantly.'],
-    tracker: ['Client Tracker', 'Manage your clients and track your recurring revenue.'],
-    logs: ['Activity Logs', 'Real-time log of all actions and events.'],
-    myautomations: ['My Automations', 'Live automations running on AutoFlow servers — no Make.com needed.']
+    dashboard: ['nav_dashboard', 'dash_activity'],
+    wizard: ['nav_wizard', 'wiz_sub'],
+    blueprints: ['nav_blueprints', 'bp_howto'],
+    chat: ['nav_chat', 'chat_sub'],
+    email: ['nav_email', 'email_sub'],
+    tracker: ['nav_tracker', 'tracker_sub'],
+    logs: ['nav_logs', 'logs_sub'],
+    myautomations: ['mybot_title', 'mybot_sub']
   };
   if(titles[page]){
-    document.getElementById('topbarTitle').textContent = titles[page][0];
-    document.getElementById('topbarSub').textContent = titles[page][1];
+    document.getElementById('topbarTitle').textContent = t(titles[page][0]);
+    document.getElementById('topbarSub').textContent = t(titles[page][1]);
   }
   if(page==='logs') loadLogs();
   if(page==='dashboard') loadDashboard();
@@ -1361,13 +1704,13 @@ let lastGeneratedPrompt = '';
 
 async function loadMyAutomations(){
   const el = document.getElementById('automationsList');
-  el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--t4);font-size:13px">Loading...</div>';
+  el.innerHTML = `<div style="padding:24px;text-align:center;color:var(--t4);font-size:13px">${t('loading')}</div>`;
   try {
     const r = await fetch(API+'/api/automations', {headers: authHeaders()});
     const d = await r.json();
     const list = d.automations || [];
     if(!list.length){
-      el.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--t4);font-size:13px"><div style="font-size:36px;margin-bottom:14px;opacity:.2">▶</div><div>No automations yet. Go to <strong style="color:var(--t3)">Automation Wizard</strong> and click <strong style="color:var(--t3)">Activate This Automation</strong>.</div></div>';
+      el.innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--t4);font-size:13px"><div style="font-size:36px;margin-bottom:14px;opacity:.2">▶</div><div>${t('mybot_empty')}</div></div>`;
       return;
     }
     el.innerHTML = list.map(a => `
@@ -1377,24 +1720,24 @@ async function loadMyAutomations(){
           <span style="font-size:14px;font-weight:700;color:var(--t1);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.name}</span>
           <span style="font-size:10px;background:var(--bg3);border:1px solid #1a1a1a;border-radius:20px;padding:2px 10px;color:var(--t4);text-transform:uppercase;letter-spacing:1px;flex-shrink:0">${a.type}</span>
         </div>
-        <div style="font-size:11px;color:var(--t4);margin-bottom:10px">${a.messages_count||0} messages · ${new Date(a.created_at).toLocaleDateString()}</div>
+        <div style="font-size:11px;color:var(--t4);margin-bottom:10px">${a.messages_count||0} msg · ${new Date(a.created_at).toLocaleDateString()}</div>
         <div style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:8px 10px;display:flex;align-items:center;gap:8px;margin-bottom:6px;min-width:0">
           <span style="font-size:10px;color:var(--t4);font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0">URL</span>
           <code style="font-size:10px;color:var(--r);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${location.origin}/webhook/${a.webhook_id}</code>
-          <button onclick="copyWebhook('${location.origin}/webhook/${a.webhook_id}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;flex-shrink:0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Copy</button>
+          <button onclick="copyWebhook('${location.origin}/webhook/${a.webhook_id}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;flex-shrink:0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">${t('copy')}</button>
         </div>
         <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${a.config?.notify_email?'rgba(74,222,128,.05)':'var(--bg3)'};border:1px solid ${a.config?.notify_email?'rgba(74,222,128,.15)':'#1a1a1a'};border-radius:7px;margin-bottom:10px;min-width:0">
-          <span style="font-size:10px;color:var(--t4);font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0">✉</span>
-          <span style="font-size:11px;color:${a.config?.notify_email?'var(--green)':'#555'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${a.config?.notify_email||'No email alert set'}</span>
-          ${a.config?.notify_email ? `<button onclick="sendTestEmail('${a.config.notify_email}')" style="background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);border-radius:5px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:10px;color:var(--green);cursor:pointer;flex-shrink:0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Send test</button>` : ''}
-          <button onclick="setAlertEmail('${a.webhook_id}','${a.config?.notify_email||''}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;flex-shrink:0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Edit</button>
+          <span style="font-size:10px;color:var(--t4);font-weight:700;flex-shrink:0">✉</span>
+          <span style="font-size:11px;color:${a.config?.notify_email?'var(--green)':'#555'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${a.config?.notify_email||t('no_email')}</span>
+          ${a.config?.notify_email ? `<button onclick="sendTestEmail('${a.config.notify_email}')" style="background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);border-radius:5px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:10px;color:var(--green);cursor:pointer;flex-shrink:0;font-weight:700">${t('send_test_email')}</button>` : ''}
+          <button onclick="setAlertEmail('${a.webhook_id}','${a.config?.notify_email||''}')" style="background:var(--bg4);border:1px solid #1a1a1a;border-radius:5px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;flex-shrink:0;font-weight:700">${t('edit')}</button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-          <button onclick="shareChatLink('${a.webhook_id}')" style="background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.25);border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--r);cursor:pointer">⬡ Share</button>
-          <button onclick="testAutomation('${a.webhook_id}')" style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--green);cursor:pointer">▷ Test</button>
-          <button onclick="viewMessages('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--t3);cursor:pointer">◎ Msgs</button>
-          <button onclick="toggleAutomation('${a.webhook_id}',this)" style="background:${a.active?'rgba(74,222,128,.1)':'var(--bg3)'};border:1px solid ${a.active?'rgba(74,222,128,.2)':'#1a1a1a'};border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:${a.active?'var(--green)':'var(--t4)'};cursor:pointer">${a.active?'⏸ Pause':'▶ Resume'}</button>
-          <button onclick="deleteAutomation('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:#555;cursor:pointer">✕ Delete</button>
+          <button onclick="shareChatLink('${a.webhook_id}')" style="background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.25);border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--r);cursor:pointer">⬡ ${t('share_chat')}</button>
+          <button onclick="testAutomation('${a.webhook_id}')" style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--green);cursor:pointer">▷ ${t('test')}</button>
+          <button onclick="viewMessages('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--t3);cursor:pointer">◎ ${t('messages')}</button>
+          <button onclick="toggleAutomation('${a.webhook_id}',this)" style="background:${a.active?'rgba(74,222,128,.1)':'var(--bg3)'};border:1px solid ${a.active?'rgba(74,222,128,.2)':'#1a1a1a'};border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:${a.active?'var(--green)':'var(--t4)'};cursor:pointer">${a.active?'⏸ '+t('pause'):'▶ '+t('resume')}</button>
+          <button onclick="deleteAutomation('${a.webhook_id}')" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:9px 6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:#555;cursor:pointer">✕ ${t('delete')}</button>
         </div>
       </div>`).join('');
   } catch(e){
@@ -1445,7 +1788,7 @@ async function toggleAutomation(id, btn){
 }
 
 async function deleteAutomation(id){
-  if(!confirm('Delete this automation? This cannot be undone.')) return;
+  if(!confirm(t('confirm_delete'))) return;
   try {
     await fetch(API+'/api/automations/'+id, {method:'DELETE', headers: authHeaders()});
     notify('Automation deleted.','success');
