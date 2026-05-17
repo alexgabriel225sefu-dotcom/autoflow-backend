@@ -233,6 +233,19 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
 .back-btn-app{background:var(--bg3);border:1px solid #1a1a1a;border-radius:8px;padding:7px 13px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:var(--t4);cursor:pointer;transition:all .2s;white-space:nowrap}
 .back-btn-app:hover{border-color:#333;color:var(--t2)}
 
+/* LANGUAGE SWITCHER */
+.lang-btn{background:var(--bg3);border:1px solid #1a1a1a;border-radius:8px;padding:6px 12px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;color:var(--t4);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px}
+.lang-btn:hover{border-color:#333;color:var(--t2)}
+.lang-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);z-index:600;display:none;align-items:center;justify-content:center}
+.lang-modal.open{display:flex}
+.lang-modal-box{background:var(--bg2);border:1px solid #1a1a1a;border-radius:16px;padding:24px;width:100%;max-width:460px;max-height:80vh;display:flex;flex-direction:column}
+.lang-search{width:100%;background:var(--bg3);border:1px solid #1a1a1a;border-radius:8px;padding:10px 14px;font-family:'Inter',sans-serif;font-size:13px;color:var(--t1);outline:none;margin-bottom:14px}
+.lang-search:focus{border-color:var(--r)}
+.lang-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;overflow-y:auto;flex:1}
+.lang-option{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:8px;font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;transition:background .15s;border:1px solid transparent}
+.lang-option:hover{background:var(--bg3)}
+.lang-option.active{border-color:var(--border2);color:var(--r);background:var(--r4);font-weight:700}
+
 /* MAKE.COM CONNECT */
 .make-connect-bar{padding:10px 13px;border-radius:9px;background:var(--bg3);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px;margin-bottom:8px;border:1px solid #111}
 .make-connect-bar:hover{border-color:#222}
@@ -347,8 +360,12 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
         </div>
       </div>
       <div class="topbar-right">
+        <button class="lang-btn" onclick="openLangModal()">
+          <span id="langFlag">🇷🇴</span>
+          <span id="langCode">RO</span>
+        </button>
         <div class="status-dot"></div>
-        <span style="font-size:10px;color:var(--t4);letter-spacing:1.5px;font-weight:700">ALL SYSTEMS ONLINE</span>
+        <span style="font-size:10px;color:var(--t4);letter-spacing:1.5px;font-weight:700" id="systemStatus">ALL SYSTEMS ONLINE</span>
       </div>
     </div>
 
@@ -987,6 +1004,18 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
   </div>
 </div>
 
+<!-- LANGUAGE MODAL -->
+<div class="lang-modal" id="langModal" onclick="if(event.target===this)closeLangModal()">
+  <div class="lang-modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:800;color:var(--t1)" data-i18n="selectLanguage">Select Language</div>
+      <button onclick="closeLangModal()" style="background:none;border:none;color:var(--t4);font-size:20px;cursor:pointer">×</button>
+    </div>
+    <input class="lang-search" id="langSearch" placeholder="Search language..." oninput="filterLangs(this.value)"/>
+    <div class="lang-grid" id="langGrid"></div>
+  </div>
+</div>
+
 <!-- NOTIFICATION -->
 <div class="notif" id="notif"></div>
 
@@ -1035,6 +1064,189 @@ const BLUEPRINT_MAP = {
   'Invoice & Payment Reminders': '/blueprints/stripe-billing-automation.json'
 };
 
+// ════════════════════════════════════════
+// LANGUAGE / i18n
+// ════════════════════════════════════════
+const LANGUAGES = [
+  {code:'ro',flag:'🇷🇴',name:'Română'},
+  {code:'en',flag:'🇬🇧',name:'English'},
+  {code:'de',flag:'🇩🇪',name:'Deutsch'},
+  {code:'fr',flag:'🇫🇷',name:'Français'},
+  {code:'es',flag:'🇪🇸',name:'Español'},
+  {code:'it',flag:'🇮🇹',name:'Italiano'},
+  {code:'pt',flag:'🇵🇹',name:'Português'},
+  {code:'nl',flag:'🇳🇱',name:'Nederlands'},
+  {code:'pl',flag:'🇵🇱',name:'Polski'},
+  {code:'ru',flag:'🇷🇺',name:'Русский'},
+  {code:'uk',flag:'🇺🇦',name:'Українська'},
+  {code:'hu',flag:'🇭🇺',name:'Magyar'},
+  {code:'cs',flag:'🇨🇿',name:'Čeština'},
+  {code:'sk',flag:'🇸🇰',name:'Slovenčina'},
+  {code:'hr',flag:'🇭🇷',name:'Hrvatski'},
+  {code:'bg',flag:'🇧🇬',name:'Български'},
+  {code:'sv',flag:'🇸🇪',name:'Svenska'},
+  {code:'no',flag:'🇳🇴',name:'Norsk'},
+  {code:'da',flag:'🇩🇰',name:'Dansk'},
+  {code:'fi',flag:'🇫🇮',name:'Suomi'},
+  {code:'el',flag:'🇬🇷',name:'Ελληνικά'},
+  {code:'tr',flag:'🇹🇷',name:'Türkçe'},
+  {code:'ar',flag:'🇸🇦',name:'العربية'},
+  {code:'he',flag:'🇮🇱',name:'עברית'},
+  {code:'fa',flag:'🇮🇷',name:'فارسی'},
+  {code:'hi',flag:'🇮🇳',name:'हिन्दी'},
+  {code:'bn',flag:'🇧🇩',name:'বাংলা'},
+  {code:'zh',flag:'🇨🇳',name:'中文'},
+  {code:'ja',flag:'🇯🇵',name:'日本語'},
+  {code:'ko',flag:'🇰🇷',name:'한국어'},
+  {code:'vi',flag:'🇻🇳',name:'Tiếng Việt'},
+  {code:'th',flag:'🇹🇭',name:'ภาษาไทย'},
+  {code:'id',flag:'🇮🇩',name:'Bahasa Indonesia'},
+  {code:'ms',flag:'🇲🇾',name:'Bahasa Melayu'},
+  {code:'tl',flag:'🇵🇭',name:'Filipino'},
+  {code:'sw',flag:'🇰🇪',name:'Kiswahili'},
+  {code:'am',flag:'🇪🇹',name:'አማርኛ'},
+  {code:'af',flag:'🇿🇦',name:'Afrikaans'},
+  {code:'ca',flag:'🏳️',name:'Català'},
+  {code:'lt',flag:'🇱🇹',name:'Lietuvių'},
+  {code:'lv',flag:'🇱🇻',name:'Latviešu'},
+  {code:'et',flag:'🇪🇪',name:'Eesti'},
+  {code:'sl',flag:'🇸🇮',name:'Slovenščina'},
+  {code:'sr',flag:'🇷🇸',name:'Srpski'},
+  {code:'mk',flag:'🇲🇰',name:'Македонски'},
+  {code:'sq',flag:'🇦🇱',name:'Shqip'},
+  {code:'az',flag:'🇦🇿',name:'Azərbaycanca'},
+  {code:'ka',flag:'🇬🇪',name:'ქართული'},
+  {code:'hy',flag:'🇦🇲',name:'Հայերեն'},
+  {code:'uz',flag:'🇺🇿',name:'Oʻzbekcha'},
+  {code:'kk',flag:'🇰🇿',name:'Қазақша'},
+];
+
+const TRANSLATIONS = {
+  en:{
+    nav_dashboard:'Dashboard', nav_wizard:'Automation Wizard', nav_mybots:'My Automations',
+    nav_blueprints:'Blueprint Library', nav_chat:'AI Assistant', nav_email:'Email Outreach',
+    nav_tracker:'Client Tracker', nav_logs:'Activity Logs',
+    login_title:'AI Automation Platform', login_email:'Email Address', login_code:'Access Code',
+    login_btn:'Sign In to AutoFlow', login_signing:'Signing in...',
+    mob_home:'Home', mob_mybots:'My Bots', mob_wizard:'Wizard', mob_chat:'AI Chat', mob_logs:'Logs',
+    selectLanguage:'Select Language', systems_online:'ALL SYSTEMS ONLINE'
+  },
+  ro:{
+    nav_dashboard:'Panou principal', nav_wizard:'Generator automatizări', nav_mybots:'Automatizările mele',
+    nav_blueprints:'Bibliotecă blueprint', nav_chat:'Asistent AI', nav_email:'Email outreach',
+    nav_tracker:'Tracker clienți', nav_logs:'Jurnale activitate',
+    login_title:'Platformă de automatizări AI', login_email:'Adresă email', login_code:'Cod de acces',
+    login_btn:'Conectare AutoFlow', login_signing:'Se conectează...',
+    mob_home:'Acasă', mob_mybots:'Boții mei', mob_wizard:'Generator', mob_chat:'Chat AI', mob_logs:'Jurnale',
+    selectLanguage:'Selectează limba', systems_online:'TOATE SISTEMELE ONLINE'
+  },
+  de:{
+    nav_dashboard:'Dashboard', nav_wizard:'Automatisierungs-Assistent', nav_mybots:'Meine Automatisierungen',
+    nav_blueprints:'Blueprint-Bibliothek', nav_chat:'KI-Assistent', nav_email:'E-Mail-Outreach',
+    nav_tracker:'Kunden-Tracker', nav_logs:'Aktivitätsprotokolle',
+    login_title:'KI-Automatisierungsplattform', login_email:'E-Mail-Adresse', login_code:'Zugangscode',
+    login_btn:'Bei AutoFlow anmelden', login_signing:'Anmelden...',
+    mob_home:'Start', mob_mybots:'Meine Bots', mob_wizard:'Assistent', mob_chat:'KI-Chat', mob_logs:'Protokolle',
+    selectLanguage:'Sprache wählen', systems_online:'ALLE SYSTEME ONLINE'
+  },
+  fr:{
+    nav_dashboard:'Tableau de bord', nav_wizard:'Assistant automatisation', nav_mybots:'Mes automatisations',
+    nav_blueprints:'Bibliothèque', nav_chat:'Assistant IA', nav_email:'Campagne email',
+    nav_tracker:'Suivi clients', nav_logs:'Journaux',
+    login_title:'Plateforme d\'automatisation IA', login_email:'Adresse email', login_code:'Code d\'accès',
+    login_btn:'Se connecter à AutoFlow', login_signing:'Connexion...',
+    mob_home:'Accueil', mob_mybots:'Mes Bots', mob_wizard:'Assistant', mob_chat:'Chat IA', mob_logs:'Journaux',
+    selectLanguage:'Choisir la langue', systems_online:'TOUS SYSTÈMES EN LIGNE'
+  },
+  es:{
+    nav_dashboard:'Panel', nav_wizard:'Asistente de automatización', nav_mybots:'Mis automatizaciones',
+    nav_blueprints:'Biblioteca', nav_chat:'Asistente IA', nav_email:'Campaña email',
+    nav_tracker:'Seguimiento clientes', nav_logs:'Registros',
+    login_title:'Plataforma de automatización IA', login_email:'Correo electrónico', login_code:'Código de acceso',
+    login_btn:'Iniciar sesión en AutoFlow', login_signing:'Iniciando sesión...',
+    mob_home:'Inicio', mob_mybots:'Mis Bots', mob_wizard:'Asistente', mob_chat:'Chat IA', mob_logs:'Registros',
+    selectLanguage:'Seleccionar idioma', systems_online:'TODOS LOS SISTEMAS EN LÍNEA'
+  },
+  it:{
+    nav_dashboard:'Dashboard', nav_wizard:'Assistente automazione', nav_mybots:'Le mie automazioni',
+    nav_blueprints:'Biblioteca', nav_chat:'Assistente IA', nav_email:'Email outreach',
+    nav_tracker:'Tracker clienti', nav_logs:'Registro attività',
+    login_title:'Piattaforma di automazione IA', login_email:'Indirizzo email', login_code:'Codice di accesso',
+    login_btn:'Accedi ad AutoFlow', login_signing:'Accesso in corso...',
+    mob_home:'Home', mob_mybots:'I miei Bot', mob_wizard:'Assistente', mob_chat:'Chat IA', mob_logs:'Registro',
+    selectLanguage:'Seleziona lingua', systems_online:'TUTTI I SISTEMI ONLINE'
+  }
+};
+
+let currentLang = localStorage.getItem('af_lang') || 'ro';
+
+function t(key){ return (TRANSLATIONS[currentLang]||TRANSLATIONS.en)[key] || (TRANSLATIONS.en)[key] || key; }
+
+function applyTranslations(){
+  const lang = LANGUAGES.find(l => l.code === currentLang) || LANGUAGES[0];
+  document.getElementById('langFlag').textContent = lang.flag;
+  document.getElementById('langCode').textContent = lang.code.toUpperCase();
+  document.documentElement.lang = currentLang;
+
+  // nav items
+  const navItems = document.querySelectorAll('.nav-item');
+  const navKeys = ['nav_dashboard','nav_wizard','nav_mybots','nav_blueprints','nav_chat','nav_email','nav_tracker','nav_logs'];
+  navItems.forEach((el,i) => { if(navKeys[i]){ const icon = el.querySelector('.nav-icon'); el.innerHTML = ''; if(icon) el.appendChild(icon); el.append(t(navKeys[i])); } });
+
+  // mobile nav
+  const mobLabels = {
+    'mob-dashboard':'mob_home','mob-myautomations':'mob_mybots','mob-wizard':'mob_wizard',
+    'mob-chat':'mob_chat','mob-logs':'mob_logs'
+  };
+  Object.entries(mobLabels).forEach(([id, key]) => {
+    const btn = document.getElementById(id);
+    if(btn){ const icon = btn.querySelector('.mob-icon'); btn.innerHTML = ''; if(icon) btn.appendChild(icon); btn.append(t(key)); }
+  });
+
+  // misc
+  const sysEl = document.getElementById('systemStatus');
+  if(sysEl) sysEl.textContent = t('systems_online');
+  const searchEl = document.getElementById('langSearch');
+  if(searchEl) searchEl.placeholder = t('selectLanguage')+'...';
+
+  // login
+  const lblEmail = document.querySelector('.login-label');
+  const lblCode = document.querySelectorAll('.login-label')[1];
+  const loginBtn = document.getElementById('loginBtn');
+  if(lblEmail) lblEmail.textContent = t('login_email');
+  if(lblCode) lblCode.textContent = t('login_code');
+  if(loginBtn && !loginBtn.disabled) loginBtn.textContent = t('login_btn');
+}
+
+function openLangModal(){
+  renderLangGrid(LANGUAGES);
+  document.getElementById('langSearch').value = '';
+  document.getElementById('langModal').classList.add('open');
+}
+function closeLangModal(){ document.getElementById('langModal').classList.remove('open'); }
+
+function renderLangGrid(list){
+  document.getElementById('langGrid').innerHTML = list.map(l =>
+    `<div class="lang-option${l.code===currentLang?' active':''}" onclick="setLang('${l.code}')">
+      <span style="font-size:20px">${l.flag}</span>
+      <span>${l.name}</span>
+    </div>`
+  ).join('');
+}
+
+function filterLangs(q){
+  const filtered = LANGUAGES.filter(l => l.name.toLowerCase().includes(q.toLowerCase()) || l.code.includes(q.toLowerCase()));
+  renderLangGrid(filtered);
+}
+
+function setLang(code){
+  currentLang = code;
+  localStorage.setItem('af_lang', code);
+  applyTranslations();
+  closeLangModal();
+  notify((LANGUAGES.find(l=>l.code===code)||{name:code}).name + ' ✓', 'success');
+}
+
 // LOGIN
 async function handleLogin(){
   const email = document.getElementById('loginEmail').value.trim();
@@ -1068,6 +1280,7 @@ function launchApp(){
   app.classList.add('visible');
   document.getElementById('userAvatar').textContent = currentUser.name ? currentUser.name[0].toUpperCase() : currentUser.email[0].toUpperCase();
   document.getElementById('userEmailDisplay').textContent = currentUser.email;
+  applyTranslations();
   updateMakeSidebar();
   loadDashboard();
   loadLogs();
@@ -1087,11 +1300,11 @@ function authHeaders(){
 
 // AUTO LOGIN
 window.onload = function(){
+  applyTranslations();
   if(token && currentUser){
     document.getElementById('loginEmail').value = currentUser.email;
     launchApp();
   } else {
-    // Pre-fill access code if coming from course page
     var savedCode = localStorage.getItem('acs_code');
     if(savedCode) document.getElementById('loginCode').value = savedCode;
   }
