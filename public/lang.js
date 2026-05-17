@@ -176,14 +176,26 @@ function _setCookie(lang){
     'path=/; domain=.'+location.hostname);
 }
 
-// Google Translate init — autoDisplay:true so GT reads cookie and auto-translates
+// Google Translate init — autoDisplay:false suppresses banner; we trigger manually
 window.googleTranslateElementInit=function(){
   if(typeof google==='undefined'||!google.translate)return;
   new google.translate.TranslateElement({
     pageLanguage:'en',
-    autoDisplay:true,
+    autoDisplay:false,
     multilanguagePage:false
   },'af-gte');
+  if(curLang==='en')return;
+  // Poll for GT's internal <select> and fire a change event to apply translation
+  var _t=0;
+  var _iv=setInterval(function(){
+    _t++;
+    var sel=document.querySelector('.goog-te-combo');
+    if(sel){
+      clearInterval(_iv);
+      sel.value=curLang;
+      sel.dispatchEvent(new Event('change',{bubbles:true}));
+    }else if(_t>80){clearInterval(_iv);}
+  },150);
 };
 
 document.addEventListener('DOMContentLoaded',function(){
