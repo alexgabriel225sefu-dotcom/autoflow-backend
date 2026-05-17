@@ -141,17 +141,17 @@ var LANGS=[
 
 var curLang=localStorage.getItem('af_lang')||'en';
 
-// CSS — hide GT banner iframe only; DO NOT hide .skiptranslate (breaks translation)
+// CSS — hide GT banner; body>.skiptranslate is the direct wrapper GT injects into <body>
 var _css=document.createElement('style');
 _css.textContent=
   'iframe.goog-te-banner-frame,'+
   '.goog-te-banner-frame,'+
+  'body>.skiptranslate,'+
   '#goog-gt-tt,'+
   '.goog-te-balloon-frame,'+
   '.goog-te-ftab-float,'+
-  '[id^="google_translate_element"],'+
   '.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,'+
-  '.VIpgJd-ZVi9od-aZ2wEe{display:none!important}'+
+  '.VIpgJd-ZVi9od-aZ2wEe{display:none!important;height:0!important;overflow:hidden!important}'+
   'body{top:0!important;margin-top:0!important;padding-top:0!important}'+
   '#af-gte{position:absolute;top:-999px;left:-999px;width:1px;height:1px;overflow:hidden}'+
   '.goog-tooltip,.goog-tooltip-input,.goog-te-balloon-frame{display:none!important}'+
@@ -212,14 +212,32 @@ document.addEventListener('DOMContentLoaded',function(){
   sc.async=true;
   document.body.appendChild(sc);
 
-  // Keep GT banner hidden even after GT dynamically injects it
-  var _bannerObs=new MutationObserver(function(){
-    var fr=document.querySelector('iframe.goog-te-banner-frame,.goog-te-banner-frame');
-    if(fr){fr.style.setProperty('display','none','important');}
+  // Force-hide GT banner elements whenever GT injects/modifies them
+  function _killBanner(){
+    document.querySelectorAll(
+      'iframe.goog-te-banner-frame,.goog-te-banner-frame,body>.skiptranslate'
+    ).forEach(function(el){
+      el.style.setProperty('display','none','important');
+      el.style.setProperty('height','0','important');
+    });
     document.body.style.setProperty('top','0','important');
     document.body.style.setProperty('margin-top','0','important');
+  }
+  var _bannerObs=new MutationObserver(_killBanner);
+  _bannerObs.observe(document.body,{childList:true,subtree:false,attributes:true,attributeFilter:['style']});
+  // Also watch for GT adding children directly to <body>
+  var _childObs=new MutationObserver(function(muts){
+    muts.forEach(function(m){
+      m.addedNodes.forEach(function(n){
+        if(n.nodeType===1&&(n.tagName==='IFRAME'||n.classList&&n.classList.contains('skiptranslate'))){
+          n.style.setProperty('display','none','important');
+          n.style.setProperty('height','0','important');
+        }
+      });
+    });
+    _killBanner();
   });
-  _bannerObs.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style']});
+  _childObs.observe(document.body,{childList:true,subtree:false});
 
   // Lang picker modal
   var modal=document.createElement('div');
