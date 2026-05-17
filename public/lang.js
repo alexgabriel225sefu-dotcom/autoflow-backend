@@ -144,8 +144,15 @@ var curLang=localStorage.getItem('af_lang')||'en';
 // CSS — hide GT banner iframe only; DO NOT hide .skiptranslate (breaks translation)
 var _css=document.createElement('style');
 _css.textContent=
-  'iframe.goog-te-banner-frame{display:none!important}'+
-  'body{top:0!important}'+
+  'iframe.goog-te-banner-frame,'+
+  '.goog-te-banner-frame,'+
+  '#goog-gt-tt,'+
+  '.goog-te-balloon-frame,'+
+  '.goog-te-ftab-float,'+
+  '[id^="google_translate_element"],'+
+  '.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,'+
+  '.VIpgJd-ZVi9od-aZ2wEe{display:none!important}'+
+  'body{top:0!important;margin-top:0!important;padding-top:0!important}'+
   '#af-gte{position:absolute;top:-999px;left:-999px;width:1px;height:1px;overflow:hidden}'+
   '.goog-tooltip,.goog-tooltip-input,.goog-te-balloon-frame{display:none!important}'+
   '.af-lang-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;align-items:center;justify-content:center}'+
@@ -192,6 +199,15 @@ document.addEventListener('DOMContentLoaded',function(){
   sc.src='//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
   sc.async=true;
   document.body.appendChild(sc);
+
+  // Keep GT banner hidden even after GT dynamically injects it
+  var _bannerObs=new MutationObserver(function(){
+    var fr=document.querySelector('iframe.goog-te-banner-frame,.goog-te-banner-frame');
+    if(fr){fr.style.setProperty('display','none','important');}
+    document.body.style.setProperty('top','0','important');
+    document.body.style.setProperty('margin-top','0','important');
+  });
+  _bannerObs.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style']});
 
   // Lang picker modal
   var modal=document.createElement('div');
