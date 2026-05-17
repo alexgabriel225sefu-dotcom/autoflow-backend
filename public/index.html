@@ -330,7 +330,10 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
     <a href="#pricing">Pricing</a>
     <a href="mailto:supportaicashsystem@gmail.com">Contact</a>
   </div>
-  <button class="nav-btn" onclick="openModal('starter')">GET STARTED →</button>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="af-lang-btn" onclick="AF_openLang()" style="border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.7)"><span id="langFlag">🇬🇧</span> <span id="langCode">EN</span></button>
+    <button class="nav-btn" onclick="openModal('starter')">GET STARTED →</button>
+  </div>
 </nav>
 
 <!-- HERO -->
@@ -923,5 +926,6 @@ window.addEventListener('scroll',function(){
   document.querySelector('nav').style.background=window.scrollY>40?'rgba(3,3,3,.95)':'rgba(3,3,3,.85)';
 });
 </script>
+<script src="/lang.js"></script>
 </body>
 </html>
