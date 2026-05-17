@@ -54,17 +54,34 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 3
 .lesson:hover .lesson-arrow{transform:translateX(4px);color:#E53E2E}
 .pro-badge-inline{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(229,62,46,.2),rgba(229,62,46,.08));border:1px solid rgba(229,62,46,.3);border-radius:100px;padding:2px 10px;font-size:10px;letter-spacing:1px;color:#E53E2E;margin-left:8px;vertical-align:middle}
 @media(max-width:600px){nav{padding:16px 20px}.hero,.progress-bar-wrap,.container{padding-left:20px;padding-right:20px}}
+.lang-btn{display:flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid rgba(229,62,46,.2);border-radius:6px;background:none;color:#E53E2E;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s}
+.lang-btn:hover{background:rgba(229,62,46,.08)}
+.lang-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;align-items:center;justify-content:center}
+.lang-modal.open{display:flex}
+.lang-modal-box{background:#111;border:1px solid rgba(229,62,46,.2);border-radius:12px;padding:20px;width:min(90vw,480px);max-height:72vh;display:flex;flex-direction:column;gap:10px}
+.lang-search{background:#161616;border:1px solid rgba(229,62,46,.15);border-radius:6px;padding:8px 12px;color:#f5f5f5;font-size:14px;width:100%;outline:none;font-family:'Inter',sans-serif}
+.lang-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:6px;overflow-y:auto}
+.lang-opt{padding:7px 10px;border-radius:6px;border:1px solid rgba(229,62,46,.1);background:#161616;cursor:pointer;font-size:12px;color:#f5f5f5;text-align:left;font-family:'Inter',sans-serif}
+.lang-opt:hover,.lang-opt.active{background:rgba(229,62,46,.12);border-color:rgba(229,62,46,.4)}
 </style>
 </head>
 <body>
 <nav>
   <div class="logo">AI Cash Systems</div>
   <div style="display:flex;align-items:center;gap:12px">
+    <button class="lang-btn" onclick="openLangModal()"><span id="langFlag">🇬🇧</span> <span id="langCode">EN</span></button>
     <a href="/app" class="nav-bp" style="background:rgba(229,62,46,.1);border-color:#E53E2E">⚡ AutoFlow App</a>
     <a href="/blueprints.html" class="nav-bp">↓ Blueprints</a>
     <div class="nav-badge"><div class="badge-dot"></div>PRO Program</div>
   </div>
 </nav>
+
+<div class="lang-modal" id="langModal" onclick="if(event.target===this)closeLangModal()">
+  <div class="lang-modal-box">
+    <input class="lang-search" id="langSearch" placeholder="Search language..." oninput="filterLangs(this.value)" autocomplete="off"/>
+    <div class="lang-grid" id="langGrid"></div>
+  </div>
+</div>
 
 <div class="hero">
   <div class="hero-tag">⚡ PRO Program — $97</div>
@@ -314,6 +331,41 @@ function toggleModule(id){
 }
 updateProgress();
 document.getElementById('mod-1').classList.add('open');
+
+// ── Language Picker ──────────────────────────────────────────────────────────
+var LANGS=[['en','🇬🇧','English'],['ro','🇷🇴','Română'],['de','🇩🇪','Deutsch'],['fr','🇫🇷','Français'],['es','🇪🇸','Español'],['it','🇮🇹','Italiano'],['pt','🇵🇹','Português'],['nl','🇳🇱','Nederlands'],['pl','🇵🇱','Polski'],['sv','🇸🇪','Svenska'],['no','🇳🇴','Norsk'],['da','🇩🇰','Dansk'],['fi','🇫🇮','Suomi'],['cs','🇨🇿','Čeština'],['sk','🇸🇰','Slovenčina'],['hu','🇭🇺','Magyar'],['hr','🇭🇷','Hrvatski'],['bg','🇧🇬','Български'],['uk','🇺🇦','Українська'],['ru','🇷🇺','Русский'],['el','🇬🇷','Ελληνικά'],['tr','🇹🇷','Türkçe'],['ar','🇸🇦','العربية'],['he','🇮🇱','עברית'],['fa','🇮🇷','فارسی'],['hi','🇮🇳','हिन्दी'],['bn','🇧🇩','বাংলা'],['ur','🇵🇰','اردو'],['zh','🇨🇳','中文'],['ja','🇯🇵','日本語'],['ko','🇰🇷','한국어'],['vi','🇻🇳','Tiếng Việt'],['th','🇹🇭','ภาษาไทย'],['id','🇮🇩','Bahasa Indonesia'],['ms','🇲🇾','Bahasa Melayu'],['tl','🇵🇭','Filipino'],['sw','🇰🇪','Kiswahili'],['am','🇪🇹','አማርኛ'],['ha','🇳🇬','Hausa'],['yo','🇳🇬','Yorùbá'],['ig','🇳🇬','Igbo'],['zu','🇿🇦','isiZulu'],['af','🇿🇦','Afrikaans'],['lt','🇱🇹','Lietuvių'],['lv','🇱🇻','Latviešu'],['et','🇪🇪','Eesti'],['sl','🇸🇮','Slovenščina'],['sr','🇷🇸','Српски'],['mk','🇲🇰','Македонски'],['sq','🇦🇱','Shqip'],['ka','🇬🇪','ქართული'],['hy','🇦🇲','Հայերեն'],['az','🇦🇿','Azərbaycan'],['kk','🇰🇿','Қазақша'],['uz','🇺🇿','O\'zbek'],['mn','🇲🇳','Монгол'],['my','🇲🇲','မြန်မာ'],['km','🇰🇭','ខ្មែរ'],['lo','🇱🇦','ລາວ'],['si','🇱🇰','සිංහල'],['ne','🇳🇵','नेपाली'],['gu','🇮🇳','ગુજરાતી'],['ta','🇮🇳','தமிழ்'],['te','🇮🇳','తెలుగు'],['kn','🇮🇳','ಕನ್ನಡ'],['ml','🇮🇳','മലയാളം'],['mr','🇮🇳','मराठी'],['pa','🇮🇳','ਪੰਜਾਬੀ'],['so','🇸🇴','Soomaali'],['rw','🇷🇼','Kinyarwanda'],['mg','🇲🇬','Malagasy'],['mt','🇲🇹','Malti'],['is','🇮🇸','Íslenska'],['eu','🇪🇸','Euskara'],['gl','🇪🇸','Galego'],['ca','🇪🇸','Català'],['cy','🏴󠁧󠁢󠁷󠁬󠁳󠁿','Cymraeg'],['ga','🇮🇪','Gaeilge'],['lb','🇱🇺','Lëtzebuergesch'],['tk','🇹🇲','Türkmen'],['ps','🇦🇫','پښتو'],['ku','🏳️','Kurdî']];
+var TRANS={en:{hero_tag:'⚡ PRO Program — $97',h1:'The Complete <em>AI Agency</em><br>Blueprint',hero_p:'14 modules, 42 lessons — everything from your first WhatsApp bot to voice AI agents, enterprise clients, and $10K/month. All tools, all systems, all secrets.',prog:'Your Progress',lessons_fmt:'/ 42 lessons'},ro:{hero_tag:'⚡ Program PRO — $97',h1:'Blueprint-ul Complet al <em>Agenției AI</em>',hero_p:'14 module, 42 lecții — de la primul bot WhatsApp până la agenți vocali, clienți enterprise și $10K/lună. Toate instrumentele, toate sistemele.',prog:'Progresul Tău',lessons_fmt:'/ 42 lecții'},de:{hero_tag:'⚡ PRO-Programm — $97',h1:'Der vollständige <em>KI-Agentur</em>-Blueprint',hero_p:'14 Module, 42 Lektionen — vom ersten WhatsApp-Bot bis zu Sprach-KI-Agenten, Enterprise-Kunden und $10K/Monat.',prog:'Dein Fortschritt',lessons_fmt:'/ 42 Lektionen'},fr:{hero_tag:'⚡ Programme PRO — $97',h1:'Le Blueprint Complet de <em>l\'Agence IA</em>',hero_p:'14 modules, 42 leçons — du premier bot WhatsApp aux agents vocaux IA, clients entreprise et $10K/mois.',prog:'Ta Progression',lessons_fmt:'/ 42 leçons'},es:{hero_tag:'⚡ Programa PRO — $97',h1:'El Blueprint Completo de <em>Agencia IA</em>',hero_p:'14 módulos, 42 lecciones — desde tu primer bot de WhatsApp hasta agentes de voz IA, clientes empresariales y $10K/mes.',prog:'Tu Progreso',lessons_fmt:'/ 42 lecciones'},it:{hero_tag:'⚡ Programma PRO — $97',h1:'Il Blueprint Completo dell\'<em>Agenzia AI</em>',hero_p:'14 moduli, 42 lezioni — dal primo bot WhatsApp agli agenti vocali AI, clienti enterprise e $10K/mese.',prog:'Il Tuo Progresso',lessons_fmt:'/ 42 lezioni'}};
+var curLang=localStorage.getItem('af_lang')||'en';
+function applyCourseLang(code){
+  var T=TRANS[code]||TRANS['en'];
+  document.documentElement.lang=code;
+  document.querySelector('.hero-tag').textContent=T.hero_tag;
+  document.querySelector('.hero h1').innerHTML=T.h1;
+  document.querySelector('.hero p').textContent=T.hero_p;
+  document.querySelector('.progress-meta span:first-child').textContent=T.prog;
+  var pl=document.getElementById('prog-label');
+  if(pl){var n=pl.textContent.split('/')[0].trim();pl.textContent=n+' '+T.lessons_fmt;}
+  document.getElementById('langFlag').textContent=LANGS.find(function(l){return l[0]===code;})?.[1]||'🌐';
+  document.getElementById('langCode').textContent=code.toUpperCase();
+  localStorage.setItem('af_lang',code);
+  curLang=code;
+}
+var allLangs=LANGS;
+function buildLangGrid(list){
+  var g=document.getElementById('langGrid');g.innerHTML='';
+  list.forEach(function(l){
+    var b=document.createElement('button');
+    b.className='lang-opt'+(l[0]===curLang?' active':'');
+    b.textContent=l[1]+' '+l[2];
+    b.onclick=function(){applyCourseLang(l[0]);closeLangModal();};
+    g.appendChild(b);
+  });
+}
+function filterLangs(q){buildLangGrid(q?allLangs.filter(function(l){return l[2].toLowerCase().includes(q.toLowerCase());}):allLangs);}
+function openLangModal(){document.getElementById('langModal').classList.add('open');document.getElementById('langSearch').value='';buildLangGrid(allLangs);document.getElementById('langSearch').focus();}
+function closeLangModal(){document.getElementById('langModal').classList.remove('open');}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLangModal();});
+applyCourseLang(curLang);
 </script>
 </body>
 </html>
