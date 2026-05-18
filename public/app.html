@@ -1471,9 +1471,12 @@ function disconnectMake(){
   localStorage.removeItem('af_make');
   closeMakeModal();
   updateMakeSidebar();
-  document.getElementById('makeTeamSection').style.display = 'none';
-  document.getElementById('makeDisconnectWrap').style.display = 'none';
-  document.getElementById('makeStatus').textContent = '';
+  const teamSection = document.getElementById('makeTeamSection');
+  if (teamSection) teamSection.style.display = 'none';
+  const disconnectWrap = document.getElementById('makeDisconnectWrap');
+  if (disconnectWrap) disconnectWrap.style.display = 'none';
+  const makeStatus = document.getElementById('makeStatus');
+  if (makeStatus) makeStatus.textContent = '';
   notify('Make.com disconnected', '');
 }
 

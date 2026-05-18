@@ -47,28 +47,26 @@ function addLog(msg, type = 'info', status = 'success') {
   if (logs.length > 200) logs.pop();
 }
 
-// ── SIMPLE JWT ──
+// ── SIMPLE SIGNED TOKEN ──
 function createToken(user) {
-  const payload = Buffer.from(JSON.stringify({ id: user.id, email: user.email, exp: Date.now() + 30*24*60*60*1000 })).toString('base64');
-  return payload;
+  const payload = JSON.stringify({ id: user.id, email: user.email, exp: Date.now() + 30*24*60*60*1000 });
+  const sig = crypto.createHmac('sha256', JWT_SECRET).update(payload).digest('hex').slice(0, 32);
+  return Buffer.from(payload).toString('base64') + '.' + sig;
 }
 function verifyToken(token) {
   try {
-    // Try base64 decode
-    const decoded = Buffer.from(token, 'base64').toString('utf8');
-    const payload = JSON.parse(decoded);
+    if (!token || !token.includes('.')) return null;
+    const dot = token.lastIndexOf('.');
+    const b64 = token.slice(0, dot);
+    const sig = token.slice(dot + 1);
+    const payload = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+    const expected = crypto.createHmac('sha256', JWT_SECRET).update(JSON.stringify({ id: payload.id, email: payload.email, exp: payload.exp })).update('').digest('hex');
+    // Verify signature — recompute from the raw base64 segment
+    const check = crypto.createHmac('sha256', JWT_SECRET).update(Buffer.from(b64, 'base64').toString('utf8')).digest('hex').slice(0, 32);
+    if (check !== sig) return null;
     if (payload.exp && payload.exp < Date.now()) return null;
     return payload;
-  } catch(e) {
-    // If base64 fails, try as plain JSON
-    try {
-      const payload = JSON.parse(token);
-      return payload;
-    } catch(e2) {
-      // Accept any token that looks valid for now
-      return { id: 'user', email: 'user@autoflow.com' };
-    }
-  }
+  } catch(e) { return null; }
 }
 
 // ── AUTH MIDDLEWARE ──
@@ -189,6 +187,369 @@ app.post('/api/ai/generate', auth, async (req, res) => {
     addLog('AI generation failed: ' + e.message, 'ai', 'error');
     res.status(500).json({ error: 'AI generation failed: ' + e.message });
   }
+});
+
+// ════════════════════════════════════════
+// AUTOMATION ENGINE
+// ════════════════════════════════════════
+
+// Persistent store — file-based fallback so automations survive Render restarts
+const fs = require('fs');
+const STORE_FILE = path.join(__dirname, 'data', 'automations.json');
+const automationStore = new Map();
+
+function loadStore() {
+  try {
+    if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
+    if (fs.existsSync(STORE_FILE)) {
+      const items = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
+      items.forEach(a => automationStore.set(a.webhook_id, a));
+      console.log(`Loaded ${items.length} automations from disk`);
+    }
+  } catch(e) { console.error('Store load error:', e.message); }
+}
+
+function saveStore() {
+  try {
+    if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
+    fs.writeFileSync(STORE_FILE, JSON.stringify([...automationStore.values()]), 'utf8');
+  } catch(e) { console.error('Store save error:', e.message); }
+}
+
+loadStore();
+
+async function callAI(systemPrompt, userMessage) {
+  const today = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const fullSystem = `${systemPrompt}\n\nToday's date is: ${today}.`;
+  if (OPENAI_KEY) {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
+      body: JSON.stringify({ model: 'gpt-4o', max_tokens: 600,
+        messages: [{ role: 'system', content: fullSystem }, { role: 'user', content: userMessage }] })
+    });
+    const d = await r.json();
+    if (d.choices && d.choices[0]) return d.choices[0].message.content;
+  }
+  if (anthropic) {
+    const msg = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 600,
+      system: fullSystem, messages: [{ role: 'user', content: userMessage }] });
+    return msg.content[0].text;
+  }
+  throw new Error('No AI provider configured');
+}
+
+async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
+  const subject = `New message — ${automationName}`;
+  const html = `<div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:24px">
+    <h2 style="color:#E53E2E;margin-bottom:4px">💬 New customer message</h2>
+    <p style="color:#888;font-size:13px;margin-bottom:20px">${automationName} · AutoFlow</p>
+    <div style="background:#f5f5f5;border-radius:10px;padding:16px;margin-bottom:14px">
+      <p style="font-size:11px;text-transform:uppercase;color:#999;margin-bottom:6px">Customer</p>
+      <p style="font-size:14px;color:#222;line-height:1.6;margin:0">${userMsg.replace(/\n/g,'<br>')}</p>
+    </div>
+    <div style="background:#fff3f2;border-left:3px solid #E53E2E;border-radius:10px;padding:16px">
+      <p style="font-size:11px;text-transform:uppercase;color:#E53E2E;margin-bottom:6px">AI Reply</p>
+      <p style="font-size:14px;color:#222;line-height:1.6;margin:0">${aiMsg.replace(/\n/g,'<br>')}</p>
+    </div>
+    <p style="color:#ccc;font-size:11px;margin-top:18px;text-align:center">AutoFlow · aicashsystem.space</p>
+  </div>`;
+
+  // Try Brevo API first (no SMTP setup needed)
+  if (BREVO_API_KEY) {
+    try {
+      const senderEmail = SENDER_EMAIL;
+      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+          to: [{ email: to }],
+          subject, htmlContent: html
+        })
+      });
+      if (!r.ok) { const e = await r.text(); throw new Error(e); }
+      addLog(`Notify email sent to ${to}`, 'email', 'success');
+      return;
+    } catch(e) { console.error('Brevo API email error:', e.message); }
+  }
+
+  // Fallback: SMTP transporter
+  if (transporter) {
+    transporter.sendMail({ from: SENDER_EMAIL, to, subject, html })
+      .then(() => addLog(`Notify email sent (SMTP) to ${to}`, 'email', 'success'))
+      .catch(e => console.error('SMTP email error:', e.message));
+    return;
+  }
+
+  console.warn('No email provider configured. Set BREVO_API_KEY in Render environment variables.');
+  addLog('Email not sent — no email provider configured', 'email', 'error');
+}
+
+async function getAutomation(webhookId) {
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('automations').select('*').eq('webhook_id', webhookId).single();
+      if (data) return data;
+    } catch(e) {}
+  }
+  return automationStore.get(webhookId) || null;
+}
+
+async function incrementCount(webhookId, current, userMessage, aiReply) {
+  const newCount = (current || 0) + 1;
+  const logEntry = { time: new Date().toISOString(), user: userMessage?.slice(0,300), reply: aiReply?.slice(0,500) };
+
+  // Update in-memory store
+  if (automationStore.has(webhookId)) {
+    const a = automationStore.get(webhookId);
+    a.messages_count = newCount;
+    if (!a.message_log) a.message_log = [];
+    a.message_log.unshift(logEntry);
+    if (a.message_log.length > 20) a.message_log.pop();
+    saveStore();
+  }
+
+  // Update Supabase
+  if (supabase) {
+    try {
+      const { data: cur } = await supabase.from('automations').select('message_log').eq('webhook_id', webhookId).single();
+      const existingLog = cur?.message_log || [];
+      existingLog.unshift(logEntry);
+      if (existingLog.length > 20) existingLog.pop();
+      await supabase.from('automations').update({ messages_count: newCount, message_log: existingLog }).eq('webhook_id', webhookId);
+    } catch(e) {}
+  }
+}
+
+// GET /api/automations/:id/messages
+app.get('/api/automations/:id/messages', auth, async (req, res) => {
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('automations').select('message_log,user_id').eq('webhook_id', req.params.id).single();
+      if (data && String(data.user_id) === String(req.user.id)) return res.json({ messages: data.message_log || [] });
+    } catch(e) {}
+  }
+  const a = automationStore.get(req.params.id);
+  if (!a || String(a.user_id) !== String(req.user.id)) return res.status(404).json({ error: 'Not found' });
+  res.json({ messages: a.message_log || [] });
+});
+
+// GET /api/automations
+app.get('/api/automations', auth, async (req, res) => {
+  const userId = String(req.user.id);
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('automations').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+      if (!error) return res.json({ automations: data || [] });
+    } catch(e) {}
+  }
+  const items = [...automationStore.values()].filter(a => String(a.user_id) === userId);
+  res.json({ automations: items });
+});
+
+// POST /api/automations
+app.post('/api/automations', auth, async (req, res) => {
+  const { name, type, system_prompt, config } = req.body;
+  if (!name || !type || !system_prompt) return res.status(400).json({ error: 'name, type, system_prompt required' });
+  const webhook_id = crypto.randomBytes(10).toString('hex');
+  const automation = {
+    id: webhook_id,
+    user_id: String(req.user.id),
+    webhook_id, name, type, system_prompt,
+    config: config || {},
+    active: true, messages_count: 0,
+    created_at: new Date().toISOString()
+  };
+  const webhookUrl = `${req.protocol}://${req.get('host')}/webhook/${webhook_id}`;
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('automations').insert([automation]).select().single();
+      if (!error && data) {
+        addLog(`Automation created: ${name}`, 'automation', 'success');
+        return res.json({ automation: data, webhook_url: webhookUrl });
+      }
+    } catch(e) {}
+  }
+  automationStore.set(webhook_id, automation);
+  saveStore();
+  addLog(`Automation created: ${name}`, 'automation', 'success');
+  res.json({ automation, webhook_url: webhookUrl });
+});
+
+// DELETE /api/automations/:id
+app.delete('/api/automations/:id', auth, async (req, res) => {
+  if (supabase) {
+    try { await supabase.from('automations').delete().eq('webhook_id', req.params.id).eq('user_id', String(req.user.id)); } catch(e) {}
+  }
+  automationStore.delete(req.params.id);
+  saveStore();
+  res.json({ success: true });
+});
+
+// PATCH /api/automations/:id — update notify_email (and other config fields)
+app.patch('/api/automations/:id', auth, async (req, res) => {
+  const { notify_email } = req.body;
+  if (supabase) {
+    try {
+      const { data: cur } = await supabase.from('automations').select('config,user_id').eq('webhook_id', req.params.id).single();
+      if (cur && String(cur.user_id) === String(req.user.id)) {
+        const newConfig = { ...(cur.config || {}), notify_email: notify_email || undefined };
+        if (!notify_email) delete newConfig.notify_email;
+        const { data: updated } = await supabase.from('automations').update({ config: newConfig }).eq('webhook_id', req.params.id).select().single();
+        if (updated) return res.json({ automation: updated });
+      }
+    } catch(e) {}
+  }
+  const a = automationStore.get(req.params.id);
+  if (!a || String(a.user_id) !== String(req.user.id)) return res.status(404).json({ error: 'Not found' });
+  if (notify_email) a.config = { ...(a.config || {}), notify_email };
+  else if (a.config) delete a.config.notify_email;
+  saveStore();
+  res.json({ automation: a });
+});
+
+// PATCH /api/automations/:id/toggle
+app.patch('/api/automations/:id/toggle', auth, async (req, res) => {
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('automations').select('active,user_id').eq('webhook_id', req.params.id).single();
+      if (data) {
+        if (String(data.user_id) !== String(req.user.id)) return res.status(403).json({ error: 'Forbidden' });
+        const { data: updated } = await supabase.from('automations').update({ active: !data.active }).eq('webhook_id', req.params.id).select().single();
+        return res.json({ automation: updated });
+      }
+    } catch(e) {}
+  }
+  const a = automationStore.get(req.params.id);
+  if (!a || String(a.user_id) !== String(req.user.id)) return res.status(404).json({ error: 'Not found' });
+  a.active = !a.active; saveStore(); return res.json({ automation: a });
+});
+
+// POST /webhook/:webhookId — PUBLIC execution endpoint
+app.post('/webhook/:webhookId', async (req, res) => {
+  const { webhookId } = req.params;
+  try {
+    const automation = await getAutomation(webhookId);
+    if (!automation) return res.status(404).json({ error: 'Automation not found' });
+    if (!automation.active) return res.json({ message: 'Automation paused' });
+
+    const body = req.body;
+    let userMessage = '';
+    let aiReply = '';
+
+    if (automation.type === 'whatsapp') {
+      // 360dialog / WhatsApp Cloud API format
+      const msg = body?.messages?.[0] || body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+      userMessage = msg?.text?.body || msg?.interactive?.button_reply?.title || JSON.stringify(body).slice(0, 500);
+      const from = msg?.from || body?.messages?.[0]?.from;
+      aiReply = await callAI(automation.system_prompt, userMessage);
+      if (automation.config?.api_key && from) {
+        const apiKey = automation.config.api_key;
+        await fetch('https://waba.360dialog.io/v1/messages', {
+          method: 'POST',
+          headers: { 'D360-API-KEY': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: from, type: 'text', text: { body: aiReply } })
+        });
+      }
+    } else if (automation.type === 'email') {
+      // Tally / Typeform / generic form webhook
+      const fields = body?.data?.fields || body?.fields || [];
+      const emailVal = fields.find(f => f.type === 'EMAIL' || (f.label||'').toLowerCase().includes('email'))?.value || body?.email || body?.Email || '';
+      const nameVal = fields.find(f => (f.label||'').toLowerCase().includes('name'))?.value || body?.name || body?.Name || 'there';
+      const msgVal = fields.find(f => ['LONG_TEXT','SHORT_TEXT','TEXTAREA'].includes(f.type) || (f.label||'').toLowerCase().includes('message'))?.value || body?.message || body?.Message || JSON.stringify(body).slice(0,300);
+      userMessage = `Name: ${nameVal}\nMessage: ${msgVal}`;
+      aiReply = await callAI(automation.system_prompt, userMessage);
+      if (transporter && emailVal) {
+        await transporter.sendMail({
+          from: automation.config?.from_email || SENDER_EMAIL,
+          to: emailVal,
+          subject: automation.config?.email_subject || 'Thank you for reaching out!',
+          text: aiReply,
+          html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px"><p>${aiReply.replace(/\n/g,'<br>')}</p></div>`
+        });
+      }
+    } else {
+      // Generic HTTP: receive any JSON, reply with AI output
+      userMessage = body?.message || body?.text || body?.content || body?.query || JSON.stringify(body).slice(0,500);
+      aiReply = await callAI(automation.system_prompt, userMessage);
+      if (automation.config?.callback_url) {
+        await fetch(automation.config.callback_url, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reply: aiReply, original: body })
+        });
+      }
+    }
+
+    await incrementCount(webhookId, automation.messages_count, userMessage, aiReply);
+    addLog(`Automation fired: ${automation.name} | "${userMessage.slice(0,60)}"`, 'automation', 'success');
+
+    // Email notification to owner
+    if (automation.config?.notify_email) {
+      sendNotifyEmail(automation.config.notify_email, automation.name, userMessage, aiReply);
+    }
+
+    res.json({ success: true, reply: aiReply });
+  } catch(e) {
+    console.error('Webhook execution error:', e);
+    addLog('Automation error: ' + e.message, 'automation', 'error');
+    res.status(500).json({ error: 'Automation failed: ' + e.message });
+  }
+});
+
+// GET /api/chat/:webhookId/info — public: returns automation name for chat page
+app.get('/api/chat/:webhookId/info', async (req, res) => {
+  const a = await getAutomation(req.params.webhookId);
+  if (!a) return res.status(404).json({ error: 'Not found' });
+  res.json({ name: a.name, active: a.active });
+});
+
+// GET /chat/:webhookId — serve public chat page
+app.get('/chat/:webhookId', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'chat.html'));
+});
+
+// POST /api/test-email — send a real test email and return result
+app.post('/api/test-email', auth, async (req, res) => {
+  const to = req.body.to || req.user.email;
+  const result = { to, brevo_api_key: !!BREVO_API_KEY, smtp: !!transporter, brevo_user: BREVO_USER || null };
+
+  if (BREVO_API_KEY) {
+    try {
+      const senderEmail = SENDER_EMAIL;
+      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+          to: [{ email: to }],
+          subject: 'AutoFlow — Test Email',
+          htmlContent: '<p>Test email from AutoFlow. If you see this, email notifications work!</p>'
+        })
+      });
+      const body = await r.text();
+      if (r.ok) return res.json({ ...result, method: 'brevo_api', success: true });
+      return res.json({ ...result, method: 'brevo_api', success: false, error: body });
+    } catch(e) {
+      return res.json({ ...result, method: 'brevo_api', success: false, error: e.message });
+    }
+  }
+
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: SENDER_EMAIL,
+        to,
+        subject: 'AutoFlow — Test Email',
+        html: '<p>Test email from AutoFlow. If you see this, email notifications work!</p>'
+      });
+      return res.json({ ...result, method: 'smtp', success: true });
+    } catch(e) {
+      return res.json({ ...result, method: 'smtp', success: false, error: e.message });
+    }
+  }
+
+  res.json({ ...result, method: 'none', success: false, error: 'No email provider configured' });
 });
 
 // GET /api/test — public test endpoint
@@ -363,21 +724,38 @@ app.post('/api/email/send', auth, async (req, res) => {
   if (!to || !subject || !body) return res.status(400).json({ error: 'To, subject and body are required' });
 
   try {
+    // Try SMTP first
     if (transporter) {
       await transporter.sendMail({
-        from: `"${fromName || 'AI Cash Systems'}" <support@aicashsystem.space>`,
-        to,
-        subject,
+        from: `"${fromName || SENDER_NAME}" <${SENDER_EMAIL}>`,
+        to, subject,
         text: body,
         html: body.replace(/\n/g, '<br>')
       });
       addLog(`Email sent to ${to}: ${subject}`, 'email', 'success');
-      return res.json({ success: true, message: 'Email sent successfully to ' + to });
+      return res.json({ success: true, message: 'Email sent to ' + to });
     }
-
-    // If no Gmail configured — simulate success and log
-    addLog(`[DEMO] Email would be sent to ${to}: ${subject}`, 'email', 'success');
-    return res.json({ success: true, message: 'Email logged (configure GMAIL_USER and GMAIL_PASS in Render to actually send)' });
+    // Fallback: Brevo API
+    if (BREVO_API_KEY) {
+      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender: { name: fromName || SENDER_NAME, email: SENDER_EMAIL },
+          to: [{ email: to }],
+          subject,
+          textContent: body,
+          htmlContent: body.replace(/\n/g, '<br>')
+        })
+      });
+      if (r.ok) {
+        addLog(`Email sent (Brevo API) to ${to}: ${subject}`, 'email', 'success');
+        return res.json({ success: true, message: 'Email sent to ' + to });
+      }
+      const err = await r.text();
+      throw new Error('Brevo API: ' + err);
+    }
+    return res.status(500).json({ error: 'No email provider configured. Set BREVO_SMTP_USER/PASS in Render.' });
   } catch (e) {
     console.error('Email error:', e);
     addLog(`Email failed to ${to}: ${e.message}`, 'email', 'error');
@@ -576,14 +954,58 @@ app.get('/descarcare', (req, res) => {
   </body></html>`);
 });
 
-// Diagnostic route
-app.get('/debug', (req, res) => {
-  const fs = require('fs');
-  const publicPath = path.join(__dirname, 'public');
-  let files = [];
-  try { files = fs.readdirSync(publicPath); } catch(e) { files = ['ERROR: ' + e.message]; }
-  res.json({ ok: true, __dirname, publicPath, files, env: process.env.NODE_ENV, port: process.env.PORT });
+// Diagnostic route — admin only
+app.get('/debug', auth, (req, res) => {
+  res.json({ ok: true, env: process.env.NODE_ENV, port: process.env.PORT });
 });
+
+app.get('/api/stripe-config', auth, async (req, res) => {
+  const key = process.env.STRIPE_SECRET_KEY || '';
+  const isLive = key.startsWith('sk_live_');
+  const isTest = key.startsWith('sk_test_');
+  let accountInfo = null;
+  if (key) {
+    try {
+      const stripe = require('stripe')(key);
+      const account = await stripe.accounts.retrieve();
+      accountInfo = {
+        name: account.settings?.dashboard?.display_name || account.business_profile?.name || 'N/A',
+        email: account.email,
+        country: account.country,
+        payouts_enabled: account.payouts_enabled,
+        charges_enabled: account.charges_enabled,
+        currency: account.default_currency,
+      };
+    } catch(e) { accountInfo = { error: e.message }; }
+  }
+  res.json({
+    key_present: !!key,
+    mode: isLive ? '🟢 LIVE — banii intra real' : isTest ? '🟡 TEST — banii nu sunt reali' : '❌ Nicio cheie',
+    webhook_secret: !!process.env.STRIPE_WEBHOOK_SECRET,
+    account: accountInfo,
+  });
+});
+
+app.get('/api/app-status', auth, (req, res) => res.json({
+  ai_openai:       !!process.env.OPENAI_API_KEY,
+  ai_anthropic:    !!process.env.ANTHROPIC_API_KEY,
+  ai_works:        !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY),
+  email_works:     !!(process.env.BREVO_API_KEY || (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_PASS)),
+  stripe_live:     (process.env.STRIPE_SECRET_KEY||'').startsWith('sk_live_'),
+  stripe_webhook:  !!process.env.STRIPE_WEBHOOK_SECRET,
+  supabase:        !!process.env.SUPABASE_URL,
+  verdict: !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY) ? '✅ Aplicatia functioneaza complet' : '❌ Lipseste cheia AI — Wizard/Chat/Email nu merg'
+}));
+
+app.get('/api/email-config', auth, (req, res) => res.json({
+  brevo_api_key:  !!process.env.BREVO_API_KEY,
+  brevo_smtp_user: !!process.env.BREVO_SMTP_USER,
+  brevo_smtp_pass: !!process.env.BREVO_SMTP_PASS,
+  sender_email:   process.env.SENDER_EMAIL || 'supportaicashsystem@gmail.com (default)',
+  supabase:       !!process.env.SUPABASE_URL,
+  stripe:         !!process.env.STRIPE_SECRET_KEY,
+  email_will_send: !!(process.env.BREVO_API_KEY || (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_PASS)),
+}));
 
 // Root redirect — cinematic intro first
 app.get('/', (req, res) => {
@@ -605,7 +1027,7 @@ app.get('/blueprints', (req, res) => res.sendFile(path.join(__dirname, 'public',
 // AI BUSINESS BUILDER ROUTES
 // ════════════════════════════════════════
 
-app.post('/api/builder/plan', async (req, res) => {
+app.post('/api/builder/plan', auth, async (req, res) => {
   const { passions, hours, budget, name } = req.body;
   if (!passions) return res.status(400).json({ error: 'Answers required' });
 
@@ -684,7 +1106,7 @@ Return this exact JSON structure:
   }
 });
 
-app.post('/api/builder/logo', async (req, res) => {
+app.post('/api/builder/logo', auth, async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
   if (!OPENAI_KEY) return res.status(400).json({ error: 'OpenAI key required for logo generation' });
