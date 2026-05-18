@@ -22,6 +22,32 @@ app.use((req, res, next) => {
 // Health check — first route, no deps, always responds
 app.get('/health', (req, res) => res.json({ ok: true, node: process.version, time: new Date().toISOString() }));
 app.get('/ping', (req, res) => res.json({ ok: true, version: 'v5-stable', time: new Date().toISOString() }));
+app.get('/api/stripe-config', async (req, res) => {
+  const key = process.env.STRIPE_SECRET_KEY || '';
+  const isLive = key.startsWith('sk_live_');
+  const isTest = key.startsWith('sk_test_');
+  let accountInfo = null;
+  if (key) {
+    try {
+      const stripe = require('stripe')(key);
+      const account = await stripe.accounts.retrieve();
+      accountInfo = {
+        name: account.settings?.dashboard?.display_name || account.business_profile?.name || 'N/A',
+        email: account.email,
+        country: account.country,
+        payouts_enabled: account.payouts_enabled,
+        charges_enabled: account.charges_enabled,
+        currency: account.default_currency,
+      };
+    } catch(e) { accountInfo = { error: e.message }; }
+  }
+  res.json({
+    key_present: !!key,
+    mode: isLive ? '🟢 LIVE — banii intra real' : isTest ? '🟡 TEST — banii nu sunt reali' : '❌ Nicio cheie',
+    webhook_secret: !!process.env.STRIPE_WEBHOOK_SECRET,
+    account: accountInfo,
+  });
+});
 app.get('/api/email-config', (req, res) => res.json({
   brevo_api_key:  !!process.env.BREVO_API_KEY,
   brevo_smtp_user: !!process.env.BREVO_SMTP_USER,
