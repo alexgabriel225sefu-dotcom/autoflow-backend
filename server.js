@@ -1235,8 +1235,6 @@ app.post('/api/builder/logo', auth, _aiLimiter, async (req, res) => {
   }
 });
 
-app.get('/ai-builder', (req, res) => res.sendFile(path.join(__dirname, 'public', 'ai-builder.html')));
-app.get('/ai-builder.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'ai-builder.html')));
 
 // ════════════════════════════════════════
 // CATCH-ALL 404
