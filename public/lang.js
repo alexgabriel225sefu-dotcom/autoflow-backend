@@ -176,26 +176,14 @@ function _setCookie(lang){
     'path=/; domain=.'+location.hostname);
 }
 
-// Google Translate init — autoDisplay:false suppresses banner; we trigger manually
+// Google Translate init — autoDisplay:true ensures full page translation including footer
 window.googleTranslateElementInit=function(){
   if(typeof google==='undefined'||!google.translate)return;
   new google.translate.TranslateElement({
     pageLanguage:'en',
-    autoDisplay:false,
+    autoDisplay:true,
     multilanguagePage:false
   },'af-gte');
-  if(curLang==='en')return;
-  // Poll for GT's internal <select> and fire a change event to apply translation
-  var _t=0;
-  var _iv=setInterval(function(){
-    _t++;
-    var sel=document.querySelector('.goog-te-combo');
-    if(sel){
-      clearInterval(_iv);
-      sel.value=curLang;
-      sel.dispatchEvent(new Event('change',{bubbles:true}));
-    }else if(_t>80){clearInterval(_iv);}
-  },150);
 };
 
 document.addEventListener('DOMContentLoaded',function(){
@@ -238,6 +226,14 @@ document.addEventListener('DOMContentLoaded',function(){
     _killBanner();
   });
   _childObs.observe(document.body,{childList:true,subtree:false});
+
+  // Pulse reset: GT sometimes sets body.top via inline !important on mobile Safari;
+  // an interval beats it until GT stabilises (clears after 8 s)
+  var _resetIv=setInterval(function(){
+    document.body.style.setProperty('top','0','important');
+    document.body.style.setProperty('margin-top','0','important');
+  },50);
+  setTimeout(function(){clearInterval(_resetIv);},8000);
 
   // Lang picker modal
   var modal=document.createElement('div');
