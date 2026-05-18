@@ -40,7 +40,7 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const JWT_SECRET = process.env.JWT_SECRET || 'autoflow-secret-2024';
 const COOKIE_SECRET = process.env.COOKIE_SECRET || JWT_SECRET + '-cookie';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
-const SENDER_EMAIL = process.env.SENDER_EMAIL || 'supportaicashsystem@gmail.com';
+const SENDER_EMAIL = process.env.SENDER_EMAIL || process.env.BREVO_SMTP_USER || 'supportaicashsystem@gmail.com';
 const SENDER_NAME  = process.env.SENDER_NAME  || 'AI Cash Systems';
 
 // ── COURSE ACCESS COOKIE HELPERS ──
