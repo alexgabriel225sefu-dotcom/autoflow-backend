@@ -48,6 +48,16 @@ app.get('/api/stripe-config', async (req, res) => {
     account: accountInfo,
   });
 });
+app.get('/api/app-status', (req, res) => res.json({
+  ai_openai:       !!process.env.OPENAI_API_KEY,
+  ai_anthropic:    !!process.env.ANTHROPIC_API_KEY,
+  ai_works:        !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY),
+  email_works:     !!(process.env.BREVO_API_KEY || (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_PASS)),
+  stripe_live:     (process.env.STRIPE_SECRET_KEY||'').startsWith('sk_live_'),
+  stripe_webhook:  !!process.env.STRIPE_WEBHOOK_SECRET,
+  supabase:        !!process.env.SUPABASE_URL,
+  verdict: !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY) ? '✅ Aplicatia functioneaza complet' : '❌ Lipseste cheia AI — Wizard/Chat/Email nu merg'
+}));
 app.get('/api/email-config', (req, res) => res.json({
   brevo_api_key:  !!process.env.BREVO_API_KEY,
   brevo_smtp_user: !!process.env.BREVO_SMTP_USER,
