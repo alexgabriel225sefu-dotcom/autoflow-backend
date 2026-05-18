@@ -183,8 +183,10 @@ const _aiLimiter   = rateLimit({ windowMs: 60*1000, max: 5, standardHeaders: tru
 // AUTH ROUTES
 // ════════════════════════════════════════
 
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'alexgabriel225sefu@gmail.com').toLowerCase();
-const ADMIN_CODE  = process.env.ADMIN_CODE  || 'AF2024PRO';
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').toLowerCase();
+const ADMIN_CODE  = process.env.ADMIN_CODE  || '';
+const COURSE_BYPASS_CODE = process.env.COURSE_BYPASS_CODE || '';
+if (!ADMIN_EMAIL || !ADMIN_CODE) console.warn('[WARN] ADMIN_EMAIL or ADMIN_CODE env var not set — admin login disabled');
 
 // POST /api/auth/login
 app.post('/api/auth/login', _authLimiter, async (req, res) => {
@@ -921,8 +923,8 @@ app.post('/api/verify-code', _codeLimiter, async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Access code required' });
 
-  // Admin bypass — owner can access everything without a purchase
-  if (code.toUpperCase() === ADMIN_CODE) {
+  // Owner bypass — requires COURSE_BYPASS_CODE env var to be set
+  if (COURSE_BYPASS_CODE && code.toUpperCase() === COURSE_BYPASS_CODE.toUpperCase()) {
     const maxAge = 60 * 60 * 24 * 30;
     const secure = process.env.NODE_ENV === 'production' || process.env.RENDER ? '; Secure' : '';
     res.setHeader('Set-Cookie', `af_access=${_signAccess('pro')}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`);
@@ -971,7 +973,7 @@ app.post('/create-payment-intent', async (req, res) => {
     });
     res.json({ clientSecret: paymentIntent.client_secret });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Payment processing failed' });
   }
 });
 
