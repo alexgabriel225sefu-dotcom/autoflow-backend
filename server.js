@@ -22,6 +22,15 @@ app.use((req, res, next) => {
 // Health check — first route, no deps, always responds
 app.get('/health', (req, res) => res.json({ ok: true, node: process.version, time: new Date().toISOString() }));
 app.get('/ping', (req, res) => res.json({ ok: true, version: 'v5-stable', time: new Date().toISOString() }));
+app.get('/api/email-config', (req, res) => res.json({
+  brevo_api_key:  !!process.env.BREVO_API_KEY,
+  brevo_smtp_user: !!process.env.BREVO_SMTP_USER,
+  brevo_smtp_pass: !!process.env.BREVO_SMTP_PASS,
+  sender_email:   process.env.SENDER_EMAIL || 'supportaicashsystem@gmail.com (default)',
+  supabase:       !!process.env.SUPABASE_URL,
+  stripe:         !!process.env.STRIPE_SECRET_KEY,
+  email_will_send: !!(process.env.BREVO_API_KEY || (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_PASS)),
+}));
 
 // ── ENV VARIABLES ──
 const SUPABASE_URL = process.env.SUPABASE_URL;
