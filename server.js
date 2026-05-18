@@ -153,7 +153,7 @@ function verifyToken(token) {
     const sig = token.slice(dot + 1);
     const raw = Buffer.from(b64, 'base64').toString('utf8');
     const check = crypto.createHmac('sha256', JWT_SECRET).update(raw).digest('hex').slice(0, 32);
-    if (check !== sig) return null;
+    try { if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(check))) return null; } catch { return null; }
     const payload = JSON.parse(raw);
     if (payload.exp && payload.exp < Date.now()) return null;
     return payload;
@@ -239,14 +239,15 @@ app.post('/api/auth/login', _authLimiter, async (req, res) => {
 });
 
 // POST /api/auth/create-user (admin only)
-app.post('/api/auth/create-user', auth, async (req, res) => {
+app.post('/api/auth/create-user', auth, _authLimiter, async (req, res) => {
+  if (req.user.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Forbidden' });
   const { email, name, plan } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
   const code = crypto.randomBytes(4).toString('hex').toUpperCase();
   try {
     if (supabase) {
       const { data, error } = await supabase.from('users').insert([{ email: email.toLowerCase(), name, code, plan: plan || 'starter' }]).select().single();
-      if (error) return res.status(400).json({ error: error.message });
+      if (error) return res.status(400).json({ error: 'Could not create user' });
       addLog(`New user created: ${email}`, 'auth', 'success');
       return res.json({ success: true, email, code, plan: plan || 'starter' });
     }
@@ -500,8 +501,8 @@ app.delete('/api/automations/:id', auth, async (req, res) => {
   if (supabase) {
     try { await supabase.from('automations').delete().eq('webhook_id', req.params.id).eq('user_id', String(req.user.id)); } catch(e) {}
   }
-  automationStore.delete(req.params.id);
-  saveStore();
+  const a = automationStore.get(req.params.id);
+  if (a && String(a.user_id) === String(req.user.id)) { automationStore.delete(req.params.id); saveStore(); }
   res.json({ success: true });
 });
 
@@ -596,7 +597,10 @@ app.post('/webhook/:webhookId', async (req, res) => {
           const _cbUrl = new URL(automation.config.callback_url);
           if (!['http:','https:'].includes(_cbUrl.protocol)) throw new Error('bad protocol');
           const _h = _cbUrl.hostname;
-          if (_h === 'localhost' || _h === '127.0.0.1' || _h.startsWith('169.254.') || _h.startsWith('10.') || _h.startsWith('192.168.')) throw new Error('private host');
+          const _b = parseInt((_h.match(/^172\.(\d+)\./) || [])[1] || '0');
+          if (_h === 'localhost' || _h === '127.0.0.1' || _h === '0.0.0.0' || _h === '::1'
+            || _h.startsWith('169.254.') || _h.startsWith('10.') || _h.startsWith('192.168.')
+            || (_b >= 16 && _b <= 31)) throw new Error('private host');
           await fetch(automation.config.callback_url, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reply: aiReply, original: body })
@@ -623,9 +627,11 @@ app.post('/webhook/:webhookId', async (req, res) => {
 
 // GET /api/chat/:webhookId/info — public: returns automation name for chat page
 app.get('/api/chat/:webhookId/info', async (req, res) => {
-  const a = await getAutomation(req.params.webhookId);
-  if (!a) return res.status(404).json({ error: 'Not found' });
-  res.json({ name: a.name, active: a.active });
+  try {
+    const a = await getAutomation(req.params.webhookId);
+    if (!a) return res.status(404).json({ error: 'Not found' });
+    res.json({ name: a.name, active: a.active });
+  } catch(e) { res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /chat/:webhookId — serve public chat page
@@ -676,8 +682,8 @@ app.post('/api/test-email', auth, async (req, res) => {
   res.json({ ...result, method: 'none', success: false, error: 'No email provider configured' });
 });
 
-// GET /api/test — public test endpoint
-app.get('/api/test', (req, res) => {
+// GET /api/test — admin only
+app.get('/api/test', auth, (req, res) => {
   res.json({
     status: 'ok',
     openai: !!OPENAI_KEY,
@@ -686,10 +692,6 @@ app.get('/api/test', (req, res) => {
     brevo_api: !!BREVO_API_KEY,
     supabase: !!supabase
   });
-});
-
-app.get('/ping', (req, res) => {
-  res.json({ ok: true, version: 'v2-videos', time: new Date().toISOString() });
 });
 
 // POST /api/ai/chat — multi-turn conversation
@@ -844,30 +846,33 @@ app.post('/api/make/create', auth, async (req, res) => {
 // ════════════════════════════════════════
 
 // POST /api/email/send
-app.post('/api/email/send', auth, async (req, res) => {
+app.post('/api/email/send', auth, _authLimiter, async (req, res) => {
   const { to, subject, body, fromName } = req.body;
   if (!to || !subject || !body) return res.status(400).json({ error: 'To, subject and body are required' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: 'Invalid recipient email' });
 
+  const htmlBody = _he(body).replace(/\n/g, '<br>');
   try {
-    if (transporter) {
-      await transporter.sendMail({
-        from: `"${fromName || SENDER_NAME}" <${SENDER_EMAIL}>`,
-        to,
-        subject,
-        text: body,
-        html: body.replace(/\n/g, '<br>')
+    if (BREVO_API_KEY) {
+      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: { name: fromName || SENDER_NAME, email: SENDER_EMAIL },
+          to: [{ email: to }], subject, htmlContent: htmlBody })
       });
-      addLog(`Email sent to ${to}: ${subject}`, 'email', 'success');
-      return res.json({ success: true, message: 'Email sent successfully to ' + to });
+      if (r.ok) { addLog(`Email sent to ${to}: ${subject}`, 'email', 'success'); return res.json({ success: true }); }
     }
-
-    // If no Gmail configured — simulate success and log
-    addLog(`[DEMO] Email would be sent to ${to}: ${subject}`, 'email', 'success');
-    return res.json({ success: true, message: 'Email logged (configure GMAIL_USER and GMAIL_PASS in Render to actually send)' });
+    if (transporter) {
+      await transporter.sendMail({ from: `"${fromName || SENDER_NAME}" <${SENDER_EMAIL}>`,
+        to, subject, text: body, html: htmlBody });
+      addLog(`Email sent to ${to}: ${subject}`, 'email', 'success');
+      return res.json({ success: true });
+    }
+    addLog(`Email not sent — no provider configured`, 'email', 'error');
+    return res.status(503).json({ error: 'Email provider not configured' });
   } catch (e) {
     console.error('Email error:', e);
-    addLog(`Email failed to ${to}: ${e.message}`, 'email', 'error');
-    res.status(500).json({ error: 'Failed to send email: ' + e.message });
+    res.status(500).json({ error: 'Failed to send email' });
   }
 });
 
@@ -952,13 +957,15 @@ app.get('/api/logout', (req, res) => {
 });
 
 // POST /create-payment-intent — Stripe
+const VALID_AMOUNTS = [3700, 9700]; // $37 starter, $97 pro (in cents)
 app.post('/create-payment-intent', async (req, res) => {
   const { amount, currency } = req.body;
+  const safeAmount = VALID_AMOUNTS.includes(Number(amount)) ? Number(amount) : 3700;
   try {
     if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe not configured' });
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount || 3700,
+      amount: safeAmount,
       currency: currency || 'usd',
       automatic_payment_methods: { enabled: true }
     });
@@ -991,23 +998,37 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
         await supabase.from('purchases').insert([{ email, code, plan, amount: pi.amount, created_at: new Date().toISOString() }]);
       }
 
-      // Send access email
-      if (transporter && email) {
-        const courseUrl = plan === 'pro' ? '/course-pro.html' : '/course-starter.html';
-        await transporter.sendMail({
-          from: `"${SENDER_NAME}" <${SENDER_EMAIL}>`,
-          to: email,
-          subject: '🎉 Your AI Cash Systems Access Code',
-          html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:32px;background:#0a0a0a;color:#F5F0E8">
+      // Send access email — try Brevo API first, then SMTP
+      if (email) {
+        const emailHtml = `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:32px;background:#0a0a0a;color:#F5F0E8">
             <h2 style="color:#C8A96E;font-family:Georgia,serif">Welcome to AI Cash Systems!</h2>
-            <p>Your ${plan.toUpperCase()} course access is ready.</p>
+            <p>Your ${_he(plan.toUpperCase())} course access is ready.</p>
             <p><strong>Your Access Code:</strong></p>
-            <div style="background:#161616;border:1px solid #C8A96E;border-radius:8px;padding:16px;font-size:24px;font-weight:bold;color:#C8A96E;text-align:center;letter-spacing:4px">${code}</div>
+            <div style="background:#161616;border:1px solid #C8A96E;border-radius:8px;padding:16px;font-size:24px;font-weight:bold;color:#C8A96E;text-align:center;letter-spacing:4px">${_he(code)}</div>
             <p style="margin-top:20px">Access your course here:</p>
-            <a href="https://aicashsystem.onrender.com/access.html" style="background:#C8A96E;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:bold">Access Course →</a>
-            <p style="color:#7A7060;font-size:12px;margin-top:24px">Enter your email and the code above to access your course.</p>
-          </div>`
-        });
+            <a href="https://aicashsystem.space/access.html" style="background:#C8A96E;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:bold">Access Course →</a>
+            <p style="color:#7A7060;font-size:12px;margin-top:24px">Enter the code above to access your course.</p>
+          </div>`;
+        let emailSent = false;
+        if (BREVO_API_KEY) {
+          try {
+            const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+              method: 'POST',
+              headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sender: { name: SENDER_NAME, email: SENDER_EMAIL }, to: [{ email }],
+                subject: '🎉 Your AI Cash Systems Access Code', htmlContent: emailHtml })
+            });
+            if (r.ok) emailSent = true;
+          } catch(e) {}
+        }
+        if (!emailSent && transporter) {
+          try {
+            await transporter.sendMail({ from: `"${SENDER_NAME}" <${SENDER_EMAIL}>`, to: email,
+              subject: '🎉 Your AI Cash Systems Access Code', html: emailHtml });
+            emailSent = true;
+          } catch(e) {}
+        }
+        if (!emailSent) addLog(`Email NOT sent for ${email} — no provider`, 'email', 'error');
       }
 
       addLog(`Payment succeeded: ${email} — ${plan} plan — Code: ${code}`, 'payment', 'success');
@@ -1033,7 +1054,7 @@ const VEO_FILES = {
   v7: 'hcu69oshg8qf',
 };
 
-app.get('/download/:id', async (req, res) => {
+app.get('/download/:id', requireCourse('any'), async (req, res) => {
   const fileId = VEO_FILES[req.params.id];
   if (!fileId) return res.status(404).json({ error: 'Video not found' });
   const apiKey = process.env.GOOGLE_AI_API_KEY;
@@ -1045,13 +1066,15 @@ app.get('/download/:id', async (req, res) => {
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Content-Disposition', `attachment; filename="aicash_ugc_${req.params.id}.mp4"`);
     const { Readable } = require('stream');
-    Readable.fromWeb(response.body).pipe(res);
+    const stream = Readable.fromWeb(response.body);
+    stream.on('error', () => { if (!res.headersSent) res.status(500).end(); });
+    stream.pipe(res);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Download failed' });
   }
 });
 
-app.get('/descarcare', (req, res) => {
+app.get('/descarcare', requireCourse('any'), (req, res) => {
   const videos = [
     { id: 'v1', title: '"I Made $300 Selling AI Bots"', desc: 'Hook direct · 8s' },
     { id: 'v2', title: '"One Skill Changes Everything"', desc: 'Empatie · 8s' },
