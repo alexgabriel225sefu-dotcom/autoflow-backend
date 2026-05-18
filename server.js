@@ -10,7 +10,11 @@ process.on('uncaughtException', err => console.error('UNCAUGHT EXCEPTION:', err.
 process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION:', err));
 
 const app = express();
-app.use(cors());
+const rateLimit = require('express-rate-limit');
+app.use(cors({
+  origin: ['https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'],
+  credentials: true
+}));
 app.use(express.json());
 // Serve static assets (JS, CSS, images) but NOT HTML — HTML goes through route handlers
 const _serveStatic = express.static(path.join(__dirname, 'public'), { index: false });
@@ -22,7 +26,7 @@ app.use((req, res, next) => {
 // Health check — first route, no deps, always responds
 app.get('/health', (req, res) => res.json({ ok: true, node: process.version, time: new Date().toISOString() }));
 app.get('/ping', (req, res) => res.json({ ok: true, version: 'v5-stable', time: new Date().toISOString() }));
-app.get('/api/stripe-config', async (req, res) => {
+app.get('/api/stripe-config', auth, async (req, res) => {
   const key = process.env.STRIPE_SECRET_KEY || '';
   const isLive = key.startsWith('sk_live_');
   const isTest = key.startsWith('sk_test_');
@@ -48,7 +52,7 @@ app.get('/api/stripe-config', async (req, res) => {
     account: accountInfo,
   });
 });
-app.get('/api/app-status', (req, res) => res.json({
+app.get('/api/app-status', auth, (req, res) => res.json({
   ai_openai:       !!process.env.OPENAI_API_KEY,
   ai_anthropic:    !!process.env.ANTHROPIC_API_KEY,
   ai_works:        !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY),
@@ -58,7 +62,7 @@ app.get('/api/app-status', (req, res) => res.json({
   supabase:        !!process.env.SUPABASE_URL,
   verdict: !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY) ? '✅ Aplicatia functioneaza complet' : '❌ Lipseste cheia AI — Wizard/Chat/Email nu merg'
 }));
-app.get('/api/email-config', (req, res) => res.json({
+app.get('/api/email-config', auth, (req, res) => res.json({
   brevo_api_key:  !!process.env.BREVO_API_KEY,
   brevo_smtp_user: !!process.env.BREVO_SMTP_USER,
   brevo_smtp_pass: !!process.env.BREVO_SMTP_PASS,
@@ -73,7 +77,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
-const JWT_SECRET = process.env.JWT_SECRET || 'autoflow-secret-2024';
+const JWT_SECRET = process.env.JWT_SECRET || (() => { console.warn('[WARN] JWT_SECRET not set — using insecure default. Set this env var in Render.'); return 'autoflow-secret-2024-change-me'; })();
 const COOKIE_SECRET = process.env.COOKIE_SECRET || JWT_SECRET + '-cookie';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const SENDER_EMAIL = process.env.SENDER_EMAIL || process.env.BREVO_SMTP_USER || 'supportaicashsystem@gmail.com';
@@ -89,7 +93,7 @@ function _parseCookies(req) {
   return out;
 }
 function _signAccess(plan) {
-  const sig = crypto.createHmac('sha256', COOKIE_SECRET).update(plan).digest('hex').slice(0, 24);
+  const sig = crypto.createHmac('sha256', COOKIE_SECRET).update(plan).digest('hex');
   return plan + '.' + sig;
 }
 function _verifyAccess(signed) {
@@ -97,8 +101,11 @@ function _verifyAccess(signed) {
   const dot = signed.lastIndexOf('.');
   const plan = signed.slice(0, dot);
   const sig = signed.slice(dot + 1);
-  const expected = crypto.createHmac('sha256', COOKIE_SECRET).update(plan).digest('hex').slice(0, 24);
-  return sig === expected ? plan : null;
+  const expected = crypto.createHmac('sha256', COOKIE_SECRET).update(plan).digest('hex');
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return null;
+  } catch { return null; }
+  return plan;
 }
 function requireCourse(minPlan) {
   return (req, res, next) => {
@@ -132,28 +139,25 @@ function addLog(msg, type = 'info', status = 'success') {
   if (logs.length > 200) logs.pop();
 }
 
-// ── SIMPLE JWT ──
+// ── SIGNED TOKEN ──
 function createToken(user) {
-  const payload = Buffer.from(JSON.stringify({ id: user.id, email: user.email, exp: Date.now() + 30*24*60*60*1000 })).toString('base64');
-  return payload;
+  const payload = JSON.stringify({ id: user.id, email: user.email, exp: Date.now() + 30*24*60*60*1000 });
+  const sig = crypto.createHmac('sha256', JWT_SECRET).update(payload).digest('hex').slice(0, 32);
+  return Buffer.from(payload).toString('base64') + '.' + sig;
 }
 function verifyToken(token) {
   try {
-    // Try base64 decode
-    const decoded = Buffer.from(token, 'base64').toString('utf8');
-    const payload = JSON.parse(decoded);
+    if (!token || !token.includes('.')) return null;
+    const dot = token.lastIndexOf('.');
+    const b64 = token.slice(0, dot);
+    const sig = token.slice(dot + 1);
+    const raw = Buffer.from(b64, 'base64').toString('utf8');
+    const check = crypto.createHmac('sha256', JWT_SECRET).update(raw).digest('hex').slice(0, 32);
+    if (check !== sig) return null;
+    const payload = JSON.parse(raw);
     if (payload.exp && payload.exp < Date.now()) return null;
     return payload;
-  } catch(e) {
-    // If base64 fails, try as plain JSON
-    try {
-      const payload = JSON.parse(token);
-      return payload;
-    } catch(e2) {
-      // Accept any token that looks valid for now
-      return { id: 'user', email: 'user@autoflow.com' };
-    }
-  }
+  } catch(e) { return null; }
 }
 
 // ── AUTH MIDDLEWARE ──
@@ -167,12 +171,23 @@ function auth(req, res, next) {
   next();
 }
 
+// ── RATE LIMITERS ──
+const _authLimiter = rateLimit({ windowMs: 15*60*1000, max: 10, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Too many attempts. Try again in 15 minutes.' } });
+const _codeLimiter = rateLimit({ windowMs: 15*60*1000, max: 8, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Too many code attempts. Try again in 15 minutes.' } });
+const _aiLimiter   = rateLimit({ windowMs: 60*1000, max: 5, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Too many AI requests. Slow down.' } });
+
 // ════════════════════════════════════════
 // AUTH ROUTES
 // ════════════════════════════════════════
 
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'alexgabriel225sefu@gmail.com').toLowerCase();
+const ADMIN_CODE  = process.env.ADMIN_CODE  || 'AF2024PRO';
+
 // POST /api/auth/login
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', _authLimiter, async (req, res) => {
   const { email, code } = req.body;
   if (!email || !code) return res.status(400).json({ error: 'Email and code required' });
 
@@ -208,7 +223,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Fallback hardcoded admin access
-    if (email.toLowerCase() === 'alexgabriel225sefu@gmail.com' && code.toUpperCase() === 'AF2024PRO') {
+    if (email.toLowerCase() === ADMIN_EMAIL && code.toUpperCase() === ADMIN_CODE) {
       const user = { id: 'admin', email: email.toLowerCase(), name: 'Admin', plan: 'pro' };
       const token = createToken(user);
       addLog(`Admin logged in: ${email}`, 'auth', 'success');
@@ -286,7 +301,7 @@ app.post('/api/ai/generate', auth, async (req, res) => {
   } catch (e) {
     console.error('AI generate error:', e);
     addLog('AI generation failed: ' + e.message, 'ai', 'error');
-    res.status(500).json({ error: 'AI generation failed: ' + e.message });
+    res.status(500).json({ error: 'AI generation failed. Please try again.' });
   }
 });
 
@@ -340,18 +355,20 @@ async function callAI(systemPrompt, userMessage) {
   throw new Error('No AI provider configured');
 }
 
+function _he(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
-  const subject = `New message — ${automationName}`;
+  const subject = `New message — ${_he(automationName)}`;
   const html = `<div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:24px">
     <h2 style="color:#E53E2E;margin-bottom:4px">💬 New customer message</h2>
-    <p style="color:#888;font-size:13px;margin-bottom:20px">${automationName} · AutoFlow</p>
+    <p style="color:#888;font-size:13px;margin-bottom:20px">${_he(automationName)} · AutoFlow</p>
     <div style="background:#f5f5f5;border-radius:10px;padding:16px;margin-bottom:14px">
       <p style="font-size:11px;text-transform:uppercase;color:#999;margin-bottom:6px">Customer</p>
-      <p style="font-size:14px;color:#222;line-height:1.6;margin:0">${userMsg.replace(/\n/g,'<br>')}</p>
+      <p style="font-size:14px;color:#222;line-height:1.6;margin:0">${_he(userMsg).replace(/\n/g,'<br>')}</p>
     </div>
     <div style="background:#fff3f2;border-left:3px solid #E53E2E;border-radius:10px;padding:16px">
       <p style="font-size:11px;text-transform:uppercase;color:#E53E2E;margin-bottom:6px">AI Reply</p>
-      <p style="font-size:14px;color:#222;line-height:1.6;margin:0">${aiMsg.replace(/\n/g,'<br>')}</p>
+      <p style="font-size:14px;color:#222;line-height:1.6;margin:0">${_he(aiMsg).replace(/\n/g,'<br>')}</p>
     </div>
     <p style="color:#ccc;font-size:11px;margin-top:18px;text-align:center">AutoFlow · aicashsystem.space</p>
   </div>`;
@@ -514,16 +531,17 @@ app.patch('/api/automations/:id', auth, async (req, res) => {
 app.patch('/api/automations/:id/toggle', auth, async (req, res) => {
   if (supabase) {
     try {
-      const { data } = await supabase.from('automations').select('active').eq('webhook_id', req.params.id).single();
+      const { data } = await supabase.from('automations').select('active,user_id').eq('webhook_id', req.params.id).single();
       if (data) {
+        if (String(data.user_id) !== String(req.user.id)) return res.status(403).json({ error: 'Forbidden' });
         const { data: updated } = await supabase.from('automations').update({ active: !data.active }).eq('webhook_id', req.params.id).select().single();
         return res.json({ automation: updated });
       }
     } catch(e) {}
   }
   const a = automationStore.get(req.params.id);
-  if (a) { a.active = !a.active; saveStore(); return res.json({ automation: a }); }
-  res.status(404).json({ error: 'Not found' });
+  if (!a || String(a.user_id) !== String(req.user.id)) return res.status(404).json({ error: 'Not found' });
+  a.active = !a.active; saveStore(); return res.json({ automation: a });
 });
 
 // POST /webhook/:webhookId — PUBLIC execution endpoint
@@ -574,10 +592,16 @@ app.post('/webhook/:webhookId', async (req, res) => {
       userMessage = body?.message || body?.text || body?.content || body?.query || JSON.stringify(body).slice(0,500);
       aiReply = await callAI(automation.system_prompt, userMessage);
       if (automation.config?.callback_url) {
-        await fetch(automation.config.callback_url, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reply: aiReply, original: body })
-        });
+        try {
+          const _cbUrl = new URL(automation.config.callback_url);
+          if (!['http:','https:'].includes(_cbUrl.protocol)) throw new Error('bad protocol');
+          const _h = _cbUrl.hostname;
+          if (_h === 'localhost' || _h === '127.0.0.1' || _h.startsWith('169.254.') || _h.startsWith('10.') || _h.startsWith('192.168.')) throw new Error('private host');
+          await fetch(automation.config.callback_url, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reply: aiReply, original: body })
+          });
+        } catch(cbErr) { console.error('Callback URL error:', cbErr.message); }
       }
     }
 
@@ -593,7 +617,7 @@ app.post('/webhook/:webhookId', async (req, res) => {
   } catch(e) {
     console.error('Webhook execution error:', e);
     addLog('Automation error: ' + e.message, 'automation', 'error');
-    res.status(500).json({ error: 'Automation failed: ' + e.message });
+    res.status(500).json({ error: 'Automation failed. Please try again.' });
   }
 });
 
@@ -712,7 +736,7 @@ app.post('/api/ai/chat', auth, async (req, res) => {
   } catch (e) {
     console.error('AI chat error:', e);
     addLog('AI chat failed: ' + e.message, 'ai', 'error');
-    res.status(500).json({ error: 'AI chat failed: ' + e.message });
+    res.status(500).json({ error: 'AI chat failed. Please try again.' });
   }
 });
 
@@ -888,14 +912,14 @@ app.get('/api/logs', auth, (req, res) => {
 // ════════════════════════════════════════
 
 // POST /api/verify-code — verify course access code
-app.post('/api/verify-code', async (req, res) => {
+app.post('/api/verify-code', _codeLimiter, async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Access code required' });
 
   // Admin bypass — owner can access everything without a purchase
-  if (code.toUpperCase() === 'AF2024PRO') {
+  if (code.toUpperCase() === ADMIN_CODE) {
     const maxAge = 60 * 60 * 24 * 30;
-    const secure = process.env.RENDER ? '; Secure' : '';
+    const secure = process.env.NODE_ENV === 'production' || process.env.RENDER ? '; Secure' : '';
     res.setHeader('Set-Cookie', `af_access=${_signAccess('pro')}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`);
     return res.json({ success: true, plan: 'pro', redirect: '/course-pro.html' });
   }
@@ -910,7 +934,7 @@ app.post('/api/verify-code', async (req, res) => {
       if (data) {
         const plan = data.plan || 'starter';
         const maxAge = 60 * 60 * 24 * 30; // 30 days
-        const secure = process.env.RENDER ? '; Secure' : '';
+        const secure = process.env.NODE_ENV === 'production' || process.env.RENDER ? '; Secure' : '';
         res.setHeader('Set-Cookie', `af_access=${_signAccess(plan)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`);
         return res.json({ success: true, plan, redirect: plan === 'pro' ? '/course-pro.html' : '/course-starter.html' });
       }
@@ -951,7 +975,8 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
   const sig = req.headers['stripe-signature'];
   try {
     if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
-      return res.json({ received: true });
+      console.error('[STRIPE] Missing keys — webhook rejected');
+      return res.status(400).json({ error: 'Webhook not configured' });
     }
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     const event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
@@ -1053,13 +1078,9 @@ app.get('/descarcare', (req, res) => {
   </body></html>`);
 });
 
-// Diagnostic route
-app.get('/debug', (req, res) => {
-  const fs = require('fs');
-  const publicPath = path.join(__dirname, 'public');
-  let files = [];
-  try { files = fs.readdirSync(publicPath); } catch(e) { files = ['ERROR: ' + e.message]; }
-  res.json({ ok: true, __dirname, publicPath, files, env: process.env.NODE_ENV, port: process.env.PORT });
+// Diagnostic route — admin only
+app.get('/debug', auth, (req, res) => {
+  res.json({ ok: true, env: process.env.NODE_ENV, port: process.env.PORT });
 });
 
 // Root redirect — cinematic intro first
@@ -1094,7 +1115,7 @@ app.get('/tiktok', requireCourse('any'), (req, res) => res.sendFile(path.join(__
 // AI BUSINESS BUILDER ROUTES
 // ════════════════════════════════════════
 
-app.post('/api/builder/plan', async (req, res) => {
+app.post('/api/builder/plan', auth, _aiLimiter, async (req, res) => {
   const { passions, hours, budget, name } = req.body;
   if (!passions) return res.status(400).json({ error: 'Answers required' });
 
@@ -1173,7 +1194,7 @@ Return this exact JSON structure:
   }
 });
 
-app.post('/api/builder/logo', async (req, res) => {
+app.post('/api/builder/logo', auth, _aiLimiter, async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
   if (!OPENAI_KEY) return res.status(400).json({ error: 'OpenAI key required for logo generation' });
@@ -1187,7 +1208,7 @@ app.post('/api/builder/logo', async (req, res) => {
     if (d.data?.[0]) { addLog('Logo generated', 'builder', 'success'); return res.json({ url: d.data[0].url }); }
     res.status(500).json({ error: d.error?.message || 'Logo generation failed' });
   } catch (e) {
-    res.status(500).json({ error: 'Logo failed: ' + e.message });
+    res.status(500).json({ error: 'Logo generation failed. Please try again.' });
   }
 });
 
