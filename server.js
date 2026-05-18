@@ -1142,6 +1142,13 @@ app.use((req, res) => {
   res.status(404).json({ error: 'route not found', path: req.path, method: req.method });
 });
 
+// GLOBAL ERROR HANDLER — catches any unhandled async throws
+app.use((err, req, res, next) => {
+  console.error('EXPRESS ERROR:', err.stack || err.message || err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 // ════════════════════════════════════════
 // START SERVER
 // ════════════════════════════════════════
