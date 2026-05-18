@@ -31,6 +31,8 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const JWT_SECRET = process.env.JWT_SECRET || 'autoflow-secret-2024';
 const COOKIE_SECRET = process.env.COOKIE_SECRET || JWT_SECRET + '-cookie';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const SENDER_EMAIL = process.env.SENDER_EMAIL || 'supportaicashsystem@gmail.com';
+const SENDER_NAME  = process.env.SENDER_NAME  || 'AI Cash Systems';
 
 // ── COURSE ACCESS COOKIE HELPERS ──
 function _parseCookies(req) {
@@ -298,12 +300,12 @@ async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
   // Try Brevo API first (no SMTP setup needed)
   if (BREVO_API_KEY) {
     try {
-      const senderEmail = BREVO_USER || 'noreply@aicashsystem.space';
+      const senderEmail = SENDER_EMAIL;
       const r = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sender: { name: 'AutoFlow', email: senderEmail },
+          sender: { name: SENDER_NAME, email: SENDER_EMAIL },
           to: [{ email: to }],
           subject, htmlContent: html
         })
@@ -316,7 +318,7 @@ async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
 
   // Fallback: SMTP transporter
   if (transporter) {
-    transporter.sendMail({ from: BREVO_USER || 'noreply@aicashsystem.space', to, subject, html })
+    transporter.sendMail({ from: SENDER_EMAIL, to, subject, html })
       .then(() => addLog(`Notify email sent (SMTP) to ${to}`, 'email', 'success'))
       .catch(e => console.error('SMTP email error:', e.message));
     return;
@@ -501,7 +503,7 @@ app.post('/webhook/:webhookId', async (req, res) => {
       aiReply = await callAI(automation.system_prompt, userMessage);
       if (transporter && emailVal) {
         await transporter.sendMail({
-          from: automation.config?.from_email || BREVO_USER || 'noreply@aicashsystem.space',
+          from: automation.config?.from_email || SENDER_EMAIL,
           to: emailVal,
           subject: automation.config?.email_subject || 'Thank you for reaching out!',
           text: aiReply,
@@ -555,12 +557,12 @@ app.post('/api/test-email', auth, async (req, res) => {
 
   if (BREVO_API_KEY) {
     try {
-      const senderEmail = BREVO_USER || 'noreply@aicashsystem.space';
+      const senderEmail = SENDER_EMAIL;
       const r = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sender: { name: 'AutoFlow', email: senderEmail },
+          sender: { name: SENDER_NAME, email: SENDER_EMAIL },
           to: [{ email: to }],
           subject: 'AutoFlow — Test Email',
           htmlContent: '<p>Test email from AutoFlow. If you see this, email notifications work!</p>'
@@ -577,7 +579,7 @@ app.post('/api/test-email', auth, async (req, res) => {
   if (transporter) {
     try {
       await transporter.sendMail({
-        from: BREVO_USER || 'noreply@aicashsystem.space',
+        from: SENDER_EMAIL,
         to,
         subject: 'AutoFlow — Test Email',
         html: '<p>Test email from AutoFlow. If you see this, email notifications work!</p>'
@@ -766,7 +768,7 @@ app.post('/api/email/send', auth, async (req, res) => {
   try {
     if (transporter) {
       await transporter.sendMail({
-        from: `"${fromName || 'AI Cash Systems'}" <support@aicashsystem.space>`,
+        from: `"${fromName || SENDER_NAME}" <${SENDER_EMAIL}>`,
         to,
         subject,
         text: body,
@@ -900,7 +902,7 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
       if (transporter && email) {
         const courseUrl = plan === 'pro' ? '/course-pro.html' : '/course-starter.html';
         await transporter.sendMail({
-          from: `"AI Cash Systems" <support@aicashsystem.space>`,
+          from: `"${SENDER_NAME}" <${SENDER_EMAIL}>`,
           to: email,
           subject: '🎉 Your AI Cash Systems Access Code',
           html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:32px;background:#0a0a0a;color:#F5F0E8">
