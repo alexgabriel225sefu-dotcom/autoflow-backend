@@ -108,19 +108,10 @@ async function checkCode(){
       load.style.display = 'none';
     }
   } catch(e) {
-    const savedCode = localStorage.getItem('acs_code');
-    if(savedCode && savedCode === code){
-      succ.classList.add('show');
-      setTimeout(() => {
-        const plan = localStorage.getItem('acs_plan') || 'starter';
-        window.location.href = plan === 'pro' ? '/course-pro.html' : '/course-starter.html';
-      }, 1400);
-    } else {
-      err.textContent = 'Connection error. Please try again.';
-      err.classList.add('show');
-      btn.disabled = false;
-      load.style.display = 'none';
-    }
+    err.textContent = 'Connection error. Please try again.';
+    err.classList.add('show');
+    btn.disabled = false;
+    load.style.display = 'none';
   }
 }
 

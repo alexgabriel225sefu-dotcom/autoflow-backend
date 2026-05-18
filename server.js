@@ -828,14 +828,13 @@ app.get('/api/logs', auth, (req, res) => {
 
 // POST /api/verify-code — verify course access code
 app.post('/api/verify-code', async (req, res) => {
-  const { email, code } = req.body;
-  if (!email || !code) return res.status(400).json({ error: 'Email and code required' });
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Access code required' });
   try {
     if (supabase) {
       const { data, error } = await supabase
         .from('purchases')
         .select('*')
-        .eq('email', email.toLowerCase())
         .eq('code', code.toUpperCase())
         .single();
       if (data) {
