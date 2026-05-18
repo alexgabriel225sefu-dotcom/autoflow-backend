@@ -141,19 +141,33 @@ app.post('/api/auth/login', async (req, res) => {
   if (!email || !code) return res.status(400).json({ error: 'Email and code required' });
 
   try {
-    // Check in Supabase first
     if (supabase) {
-      const { data, error } = await supabase
+      // Check users table first (manually created accounts)
+      const { data: userData } = await supabase
         .from('users')
         .select('*')
         .eq('email', email.toLowerCase())
         .eq('code', code.toUpperCase())
         .single();
 
-      if (data) {
-        const token = createToken(data);
+      if (userData) {
+        const token = createToken(userData);
         addLog(`User logged in: ${email}`, 'auth', 'success');
-        return res.json({ token, user: { id: data.id, email: data.email, name: data.name || email.split('@')[0], plan: data.plan || 'pro' } });
+        return res.json({ token, user: { id: userData.id, email: userData.email, name: userData.name || email.split('@')[0], plan: userData.plan || 'pro' } });
+      }
+
+      // Also check purchases table (course buyers logging into the app)
+      const { data: purchaseData } = await supabase
+        .from('purchases')
+        .select('*')
+        .eq('email', email.toLowerCase())
+        .eq('code', code.toUpperCase())
+        .single();
+
+      if (purchaseData) {
+        const token = createToken(purchaseData);
+        addLog(`Buyer logged in: ${email}`, 'auth', 'success');
+        return res.json({ token, user: { id: purchaseData.id || purchaseData.email, email: purchaseData.email, name: email.split('@')[0], plan: purchaseData.plan || 'starter' } });
       }
     }
 
