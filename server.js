@@ -855,6 +855,15 @@ app.get('/api/logs', auth, (req, res) => {
 app.post('/api/verify-code', async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Access code required' });
+
+  // Admin bypass — owner can access everything without a purchase
+  if (code.toUpperCase() === 'AF2024PRO') {
+    const maxAge = 60 * 60 * 24 * 30;
+    const secure = process.env.RENDER ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `af_access=${_signAccess('pro')}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`);
+    return res.json({ success: true, plan: 'pro', redirect: '/course-pro.html' });
+  }
+
   try {
     if (supabase) {
       const { data, error } = await supabase
