@@ -12,7 +12,12 @@ process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION:', er
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+// Serve static assets (JS, CSS, images) but NOT HTML — HTML goes through route handlers
+const _serveStatic = express.static(path.join(__dirname, 'public'), { index: false });
+app.use((req, res, next) => {
+  if (/\.html?$/i.test(req.path)) return next();
+  _serveStatic(req, res, next);
+});
 
 // Health check — first route, no deps, always responds
 app.get('/health', (req, res) => res.json({ ok: true, node: process.version, time: new Date().toISOString() }));
@@ -24,7 +29,39 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const JWT_SECRET = process.env.JWT_SECRET || 'autoflow-secret-2024';
+const COOKIE_SECRET = process.env.COOKIE_SECRET || JWT_SECRET + '-cookie';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
+
+// ── COURSE ACCESS COOKIE HELPERS ──
+function _parseCookies(req) {
+  const out = {};
+  (req.headers.cookie || '').split(';').forEach(p => {
+    const [k, ...v] = p.trim().split('=');
+    if (k) out[k.trim()] = decodeURIComponent(v.join('='));
+  });
+  return out;
+}
+function _signAccess(plan) {
+  const sig = crypto.createHmac('sha256', COOKIE_SECRET).update(plan).digest('hex').slice(0, 24);
+  return plan + '.' + sig;
+}
+function _verifyAccess(signed) {
+  if (!signed || !signed.includes('.')) return null;
+  const dot = signed.lastIndexOf('.');
+  const plan = signed.slice(0, dot);
+  const sig = signed.slice(dot + 1);
+  const expected = crypto.createHmac('sha256', COOKIE_SECRET).update(plan).digest('hex').slice(0, 24);
+  return sig === expected ? plan : null;
+}
+function requireCourse(minPlan) {
+  return (req, res, next) => {
+    const cookies = _parseCookies(req);
+    const plan = _verifyAccess(cookies.af_access || '');
+    if (!plan) return res.redirect('/access.html');
+    if (minPlan === 'pro' && plan !== 'pro') return res.redirect('/access.html');
+    next();
+  };
+}
 
 // ── CLIENTS (wrapped in try-catch so a bad key never crashes the server) ──
 let supabase = null;
@@ -801,12 +838,24 @@ app.post('/api/verify-code', async (req, res) => {
         .eq('email', email.toLowerCase())
         .eq('code', code.toUpperCase())
         .single();
-      if (data) return res.json({ success: true, plan: data.plan || 'starter', redirect: data.plan === 'pro' ? '/course-pro.html' : '/course-starter.html' });
+      if (data) {
+        const plan = data.plan || 'starter';
+        const maxAge = 60 * 60 * 24 * 30; // 30 days
+        const secure = process.env.RENDER ? '; Secure' : '';
+        res.setHeader('Set-Cookie', `af_access=${_signAccess(plan)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`);
+        return res.json({ success: true, plan, redirect: plan === 'pro' ? '/course-pro.html' : '/course-starter.html' });
+      }
     }
     return res.status(401).json({ error: 'Invalid access code.' });
   } catch (e) {
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// GET /api/logout — clear course access cookie
+app.get('/api/logout', (req, res) => {
+  res.setHeader('Set-Cookie', 'af_access=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+  res.redirect('/access.html');
 });
 
 // POST /create-payment-intent — Stripe
@@ -950,15 +999,27 @@ app.get('/', (req, res) => {
 });
 
 // Explicit HTML page routes
-const pages = ['app','index','videos','blueprints','access','ai-builder','course-pro','course-starter','privacy','terms',
-  'module1','module2','module3','module4','module5','module6','module7','module8','module9',
-  'module10','module11','module12','module13','module14','intro-epic'];
-pages.forEach(p => {
+// Public pages — no auth required
+const publicPages = ['index','access','privacy','terms','intro-epic'];
+publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
 });
-app.get('/tiktok', (req, res) => res.sendFile(path.join(__dirname, 'public', 'videos.html')));
-app.get('/blueprints', (req, res) => res.sendFile(path.join(__dirname, 'public', 'blueprints.html')));
+
+// Protected pages — require any valid course purchase
+const protectedPages = ['app','videos','blueprints','ai-builder','course-starter',
+  'module1','module2','module3','module4','module5','module6','module7','module8','module9',
+  'module10','module11','module12','module13','module14','chat'];
+protectedPages.forEach(p => {
+  app.get(`/${p}.html`, requireCourse('any'), (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
+  app.get(`/${p}`, requireCourse('any'), (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
+});
+
+// Pro-only pages
+app.get('/course-pro.html', requireCourse('pro'), (req, res) => res.sendFile(path.join(__dirname, 'public', 'course-pro.html')));
+app.get('/course-pro', requireCourse('pro'), (req, res) => res.sendFile(path.join(__dirname, 'public', 'course-pro.html')));
+
+app.get('/tiktok', requireCourse('any'), (req, res) => res.sendFile(path.join(__dirname, 'public', 'videos.html')));
 
 // ════════════════════════════════════════
 // AI BUSINESS BUILDER ROUTES
