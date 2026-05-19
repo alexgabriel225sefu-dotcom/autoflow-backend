@@ -274,20 +274,31 @@ app.post('/api/ai/generate', auth, async (req, res) => {
     if (OPENAI_KEY) {
       const body = {
         model: 'gpt-4o',
-        max_tokens: 4000,
+        max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }]
       };
       if (jsonMode) body.response_format = { type: 'json_object' };
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
-        body: JSON.stringify(body)
-      });
-      const data = await response.json();
-      if (data.choices && data.choices[0]) {
-        const output = data.choices[0].message.content;
-        addLog('AI generation completed', 'ai', 'success');
-        return res.json({ output });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
+          body: JSON.stringify(body),
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        const data = await response.json();
+        if (data.choices && data.choices[0]) {
+          const output = data.choices[0].message.content;
+          addLog('AI generation completed', 'ai', 'success');
+          return res.json({ output });
+        }
+        console.error('OpenAI unexpected response:', JSON.stringify(data).slice(0, 200));
+      } catch (fetchErr) {
+        clearTimeout(timeout);
+        if (fetchErr.name === 'AbortError') console.error('OpenAI request timed out after 30s');
+        else console.error('OpenAI fetch error:', fetchErr.message);
       }
     }
 
@@ -295,7 +306,7 @@ app.post('/api/ai/generate', auth, async (req, res) => {
     if (anthropic) {
       const msg = await anthropic.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 4000,
+        max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }]
       });
       const output = msg.content[0].text;

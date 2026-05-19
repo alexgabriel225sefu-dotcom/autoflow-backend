@@ -409,10 +409,13 @@ async function generateAutomation(){
   if(desc.length<20){ notify('Please describe your automation (at least 20 characters).','error'); return; }
   const btn=document.getElementById('genBtn');
   btn.disabled=true; btn.textContent='⏳ Generating…';
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>{ controller.abort(); },45000);
   try{
     const r=await fetch(API+'/api/ai/generate',{
       method:'POST',
       headers:authHeaders(),
+      signal:controller.signal,
       body:JSON.stringify({
         jsonMode:true,
         prompt:`You are an expert Make.com automation consultant. Analyze this request and return a complete plan.
@@ -454,7 +457,12 @@ Return ONLY valid JSON, no markdown:
     showOutput(data);
     buildBlueprint(desc, data.prompt||'');
     notify('Automation generated! ✓','success');
-  }catch(e){ notify('Generation failed. Check your connection.','error'); }
+  }catch(e){
+    if(e.name==='AbortError') notify('Timeout — AI is slow right now. Try again.','error');
+    else notify('Generation failed. Check your connection.','error');
+  }finally{
+    clearTimeout(timeout);
+  }
   btn.disabled=false; btn.textContent='⚡ Generate My Automation';
 }
 
