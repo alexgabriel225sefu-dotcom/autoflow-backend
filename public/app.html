@@ -246,6 +246,49 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
 .lang-option:hover{background:var(--bg3)}
 .lang-option.active{border-color:var(--border2);color:var(--r);background:var(--r4);font-weight:700}
 
+/* BLUEPRINT HERO */
+.bp-hero{background:linear-gradient(135deg,rgba(74,222,128,.08),rgba(74,222,128,.04));border:1px solid rgba(74,222,128,.2);border-radius:14px;padding:24px;text-align:center;margin-bottom:2px}
+.bp-hero-check{width:44px;height:44px;background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--green);margin:0 auto 12px}
+.bp-hero-title{font-size:17px;font-weight:900;color:var(--green);letter-spacing:-.4px;margin-bottom:4px}
+.bp-hero-sub{font-size:11px;color:var(--t4);margin-bottom:16px}
+.bp-hero-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.bp-hero-btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:8px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.3px;text-decoration:none;border:none}
+.bp-hero-btn-primary{background:var(--green);color:#000}
+.bp-hero-btn-primary:hover{background:#22d46a;transform:translateY(-1px)}
+.bp-hero-btn-secondary{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.25);color:var(--green)}
+.bp-hero-btn-secondary:hover{background:rgba(74,222,128,.15)}
+/* IMPORT GUIDE */
+.import-guide{background:var(--bg2);border:1px solid #111;border-radius:12px;padding:20px;margin-bottom:2px}
+.import-guide-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--r);font-weight:700;margin-bottom:12px}
+.import-steps{display:flex;flex-direction:column;gap:9px}
+.import-step{display:flex;align-items:flex-start;gap:12px}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--r3);border:1px solid var(--border2);font-size:10px;font-weight:800;color:var(--r);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-text{font-size:12px;color:var(--t4);line-height:1.65}
+.step-text strong{color:var(--t2)}
+/* NICHE IDEAS */
+.niche-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:28px}
+.niche-card{background:var(--bg2);border:1px solid #111;border-radius:12px;padding:16px 12px;cursor:pointer;transition:all .2s;text-align:center}
+.niche-card:hover{border-color:var(--border2);transform:translateY(-2px)}
+.niche-card.selected{border-color:var(--r);background:var(--r3)}
+.niche-icon{font-size:28px;margin-bottom:8px}
+.niche-label{font-size:12px;font-weight:700;color:var(--t2)}
+.idea-card{background:var(--bg2);border:1px solid #111;border-radius:14px;padding:22px;margin-bottom:12px;transition:border-color .2s}
+.idea-card:hover{border-color:#222}
+.idea-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.idea-name{font-size:14px;font-weight:800;color:var(--t1);letter-spacing:-.3px}
+.idea-diff{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:100px}
+.diff-easy{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);color:var(--green)}
+.diff-medium{background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);color:#EAB308}
+.diff-hard{background:rgba(229,62,46,.08);border:1px solid rgba(229,62,46,.2);color:var(--r)}
+.idea-desc{font-size:13px;color:var(--t4);line-height:1.7;margin-bottom:14px}
+.idea-pricing{display:flex;gap:16px;margin-bottom:14px}
+.idea-price-block{flex:1;background:var(--bg3);border:1px solid #1a1a1a;border-radius:8px;padding:10px 13px}
+.idea-price-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t4);font-weight:700;margin-bottom:4px}
+.idea-price-val{font-size:18px;font-weight:900;color:var(--r);letter-spacing:-.5px}
+.use-wizard-btn{display:inline-flex;align-items:center;gap:6px;background:var(--r3);border:1px solid var(--border2);border-radius:7px;padding:8px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;color:var(--r);cursor:pointer;transition:all .2s;letter-spacing:.3px;text-transform:uppercase}
+.use-wizard-btn:hover{background:rgba(229,62,46,.14)}
+/* PROPOSAL */
+.proposal-preview{background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:20px;font-size:13px;color:var(--t2);line-height:1.85;white-space:pre-wrap;max-height:340px;overflow-y:auto;margin-top:14px}
 /* MAKE.COM CONNECT */
 .make-connect-bar{padding:10px 13px;border-radius:9px;background:var(--bg3);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px;margin-bottom:8px;border:1px solid #111}
 .make-connect-bar:hover{border-color:#222}
@@ -320,6 +363,9 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
       </div>
       <div class="nav-item" onclick="showPage('blueprints',this)">
         <span class="nav-icon">⬇</span>Blueprint Library
+      </div>
+      <div class="nav-item" onclick="showPage('niche',this)">
+        <span class="nav-icon">💡</span>Niche Ideas
       </div>
       <div class="nav-item" onclick="showPage('chat',this)">
         <span class="nav-icon">◎</span>AI Assistant
@@ -471,49 +517,80 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
           <div class="section-title" style="margin-bottom:20px">Your Automation Plan</div>
           <div class="output-placeholder" id="wizardPlaceholder">
             <span class="icon">⚡</span>
-            <span>Describe what you want to automate and click Generate — you'll get a complete, step-by-step build plan.</span>
+            <span>Describe what you want to automate and click Generate — you'll get a ready-to-import Make.com blueprint + complete plan.</span>
           </div>
           <div class="output-content" id="wizardOutput">
+
+            <!-- BLUEPRINT HERO -->
+            <div class="bp-hero" id="bpHero">
+              <div class="bp-hero-check">✓</div>
+              <div class="bp-hero-title" id="bpHeroTitle">Blueprint Ready</div>
+              <div class="bp-hero-sub" id="bpHeroSub">Customized for your automation — import it directly into Make.com</div>
+              <div class="bp-hero-actions">
+                <a id="bpDownloadBtn" href="#" download="automation-blueprint.json" class="bp-hero-btn bp-hero-btn-primary">⬇ Download Blueprint (.json)</a>
+                <button id="bpImportBtn" class="bp-hero-btn bp-hero-btn-secondary" onclick="importBlueprintInMake()">⬇ Import in Make.com</button>
+              </div>
+            </div>
+
+            <!-- IMPORT GUIDE -->
+            <div class="import-guide">
+              <div class="import-guide-title">How to import in Make.com — 5 steps</div>
+              <div class="import-steps">
+                <div class="import-step"><div class="step-num">1</div><div class="step-text">Go to <strong>make.com</strong> → click <strong style="color:var(--r)">Create a new scenario</strong></div></div>
+                <div class="import-step"><div class="step-num">2</div><div class="step-text">Click the <strong>... (three dots)</strong> icon top-right → click <strong>Import Blueprint</strong> → upload the .json file you downloaded</div></div>
+                <div class="import-step"><div class="step-num">3</div><div class="step-text">Connect your apps: <strong id="importNeeds">OpenAI account + the required platform accounts</strong></div></div>
+                <div class="import-step"><div class="step-num">4</div><div class="step-text">The <strong>AI system prompt is already written</strong> and embedded in the blueprint — no manual editing needed</div></div>
+                <div class="import-step"><div class="step-num">5</div><div class="step-text">Click the <strong>ON / OFF toggle</strong> at the bottom left of Make.com → <strong style="color:var(--green)">Done — it's live!</strong></div></div>
+              </div>
+            </div>
+
+            <!-- WHAT IT DOES -->
             <div class="output-section">
               <div class="output-section-title">What Gets Built</div>
               <div class="output-text" id="outWhat"></div>
             </div>
+
+            <!-- SYSTEM PROMPT -->
             <div class="output-section">
-              <div class="output-section-title">Step-by-Step Make.com Build Guide</div>
-              <div class="output-text" id="outModules"></div>
-              <button class="copy-btn" onclick="copyText('outModules')">Copy Guide</button>
-            </div>
-            <div class="output-section">
-              <div class="output-section-title">AI System Prompt (paste into Make.com → OpenAI module)</div>
-              <div class="output-text" id="outPrompt"></div>
+              <div class="output-section-title">AI System Prompt (already embedded in blueprint)</div>
+              <div class="output-text" id="outPrompt" style="max-height:130px;overflow:hidden"></div>
               <button class="copy-btn" onclick="copyText('outPrompt')">Copy Prompt</button>
             </div>
-            <div class="output-section" style="display:flex;justify-content:space-between;align-items:flex-start">
-              <div>
-                <div class="output-section-title">Recommended Pricing</div>
+
+            <!-- PRICING + OUTREACH -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="output-section">
+                <div class="output-section-title">Pricing</div>
                 <div class="output-price" id="outPrice"></div>
                 <div class="output-price-sub" id="outPriceSub"></div>
+                <div style="margin-top:10px;font-size:11px;color:var(--t4)">Build time: <strong id="outTime" style="color:var(--t2)"></strong>h</div>
               </div>
-              <div style="text-align:right">
-                <div class="output-section-title">Build Time</div>
-                <div class="output-price" id="outTime" style="font-size:22px"></div>
-                <div class="output-price-sub">estimated hours</div>
+              <div class="output-section">
+                <div class="output-section-title">Outreach Message</div>
+                <div class="output-text" id="outEmail" style="font-size:12px;max-height:100px;overflow:hidden"></div>
+                <button class="copy-btn" onclick="copyText('outEmail')">Copy</button>
               </div>
             </div>
-            <div class="output-section">
-              <div class="output-section-title">Outreach / Pitch Message</div>
-              <div class="output-text" id="outEmail"></div>
-              <button class="copy-btn" onclick="copyText('outEmail')">Copy Message</button>
+
+            <!-- DETAILED GUIDE (collapsible) -->
+            <div class="output-section" id="modulesSection" style="display:none">
+              <div class="output-section-title" style="cursor:pointer" onclick="toggleModules()">▸ Detailed Make.com Build Guide <span style="font-weight:400;color:var(--t4)">(advanced)</span></div>
+              <div id="outModulesWrap" style="display:none;margin-top:10px">
+                <div class="output-text" id="outModules"></div>
+                <button class="copy-btn" onclick="copyText('outModules')">Copy Guide</button>
+              </div>
             </div>
-            <div id="wizardBlueprintSection" style="display:none">
-              <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--r);font-weight:700;margin-bottom:10px">Make.com Blueprint</div>
-              <a id="wizardBlueprintLink" href="#" download class="download-bp-btn">
-                ⬇ Download Blueprint (.json)
-              </a>
+
+            <!-- ACTIONS -->
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+              <button class="generate-btn" id="proposalBtn" onclick="openProposalModal()" style="background:var(--bg2);border:1px solid var(--border2);color:var(--r)">
+                <span>📄</span> Generate Client Proposal
+              </button>
+              <button class="generate-btn" id="activateBtn" onclick="openActivateModal()" style="background:var(--bg3);border:1px solid #222;color:var(--t3)">
+                <span>▶</span> Activate on AutoFlow Servers (no Make.com)
+              </button>
             </div>
-            <button class="generate-btn" id="activateBtn" onclick="openActivateModal()" style="margin-top:4px;background:var(--green);color:#000">
-              <span>▶</span> Activate This Automation
-            </button>
+
           </div>
         </div>
       </div>
@@ -535,6 +612,37 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
           <div style="font-size:36px;margin-bottom:14px;opacity:.2">▶</div>
           <div>No automations yet. Go to Automation Wizard and click <strong style="color:var(--t3)">Activate This Automation</strong>.</div>
         </div>
+      </div>
+    </div>
+
+    <!-- NICHE IDEAS -->
+    <div class="page" id="page-niche">
+      <div style="margin-bottom:22px">
+        <div class="section-title" style="margin-bottom:6px">Niche Ideas</div>
+        <div style="font-size:12px;color:var(--t4);line-height:1.6">Pick a business type — the AI will suggest 5 profitable automations you can sell to that niche, with pricing and difficulty.</div>
+      </div>
+      <div class="niche-grid" id="nicheGrid">
+        <div class="niche-card" onclick="selectNiche(this,'Restaurant')"><div class="niche-icon">🍕</div><div class="niche-label">Restaurant</div></div>
+        <div class="niche-card" onclick="selectNiche(this,'Dental Clinic')"><div class="niche-icon">🦷</div><div class="niche-label">Dental Clinic</div></div>
+        <div class="niche-card" onclick="selectNiche(this,'Beauty Salon')"><div class="niche-icon">💅</div><div class="niche-label">Beauty Salon</div></div>
+        <div class="niche-card" onclick="selectNiche(this,'Real Estate Agency')"><div class="niche-icon">🏠</div><div class="niche-label">Real Estate</div></div>
+        <div class="niche-card" onclick="selectNiche(this,'E-commerce Store')"><div class="niche-icon">🛒</div><div class="niche-label">E-commerce</div></div>
+        <div class="niche-card" onclick="selectNiche(this,'Gym / Fitness Studio')"><div class="niche-icon">💪</div><div class="niche-label">Gym / Fitness</div></div>
+        <div class="niche-card" onclick="selectNiche(this,'Law Firm')"><div class="niche-icon">⚖️</div><div class="niche-label">Law Firm</div></div>
+        <div class="niche-card" onclick="selectNiche(this,'Car Dealership')"><div class="niche-icon">🚗</div><div class="niche-label">Car Dealership</div></div>
+        <div class="niche-card" onclick="selectNiche(this,'Hotel / B&amp;B')"><div class="niche-icon">🏨</div><div class="niche-label">Hotel / B&amp;B</div></div>
+        <div class="niche-card" onclick="selectNiche(this,'Accounting Firm')"><div class="niche-icon">📊</div><div class="niche-label">Accounting</div></div>
+      </div>
+      <div id="nicheLoading" style="display:none;text-align:center;padding:40px 0;color:var(--t4)">
+        <div style="width:40px;height:40px;border:2px solid rgba(229,62,46,.1);border-top-color:var(--r);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px"></div>
+        <div style="font-size:13px">AI is generating ideas for your niche...</div>
+      </div>
+      <div id="nicheResults" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <div class="section-title" style="margin-bottom:0" id="nicheSectionTitle">Automation Opportunities</div>
+          <button onclick="clearNiche()" style="background:var(--bg3);border:1px solid #1a1a1a;border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:var(--t4);cursor:pointer">← Change Niche</button>
+        </div>
+        <div id="nicheIdeasList"></div>
       </div>
     </div>
 
@@ -976,6 +1084,47 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
   </div>
 </div>
 
+<!-- PROPOSAL MODAL -->
+<div class="modal-overlay" id="proposalModal" onclick="if(event.target===this)closeProposalModal()">
+  <div class="modal" style="max-width:580px;max-height:90vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-shrink:0">
+      <div class="modal-title" style="margin-bottom:0">Client Proposal</div>
+      <button onclick="closeProposalModal()" style="background:none;border:none;color:var(--t4);font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div id="proposalFormWrap" style="flex-shrink:0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Client / Business Name</label>
+          <input class="form-input" id="propClientName" placeholder="e.g. Mario's Restaurant"/>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Client Email</label>
+          <input class="form-input" id="propClientEmail" type="email" placeholder="client@email.com"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Your Name</label>
+          <input class="form-input" id="propYourName" placeholder="e.g. Alex"/>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Your Contact / WhatsApp</label>
+          <input class="form-input" id="propYourContact" placeholder="e.g. +40 712 345 678"/>
+        </div>
+      </div>
+      <button class="generate-btn" id="propGenerateBtn" onclick="generateProposal()"><span>⚡</span> Generate Proposal</button>
+    </div>
+    <div id="proposalResultWrap" style="display:none;flex:1;overflow:hidden;flex-direction:column;margin-top:16px">
+      <div class="proposal-preview" id="proposalText"></div>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-shrink:0">
+        <button class="copy-btn" style="flex:1;padding:10px;border-radius:8px;font-size:12px" onclick="copyProposal()">📋 Copy Proposal</button>
+        <button class="copy-btn" style="flex:1;padding:10px;border-radius:8px;font-size:12px" onclick="printProposal()">🖨 Print / PDF</button>
+        <button class="copy-btn" style="flex:1;padding:10px;border-radius:8px;font-size:12px" onclick="document.getElementById('proposalResultWrap').style.display='none';document.getElementById('proposalFormWrap').style.display='block'">← Redo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ADD CLIENT MODAL -->
 <div class="modal-overlay" id="addClientModal">
   <div class="modal">
@@ -1127,7 +1276,7 @@ const TRANSLATIONS = {
   en:{
     // nav
     nav_dashboard:'Dashboard', nav_wizard:'Automation Wizard', nav_mybots:'My Automations',
-    nav_blueprints:'Blueprint Library', nav_chat:'AI Assistant', nav_email:'Email Outreach',
+    nav_blueprints:'Blueprint Library', nav_niche:'Niche Ideas', nav_chat:'AI Assistant', nav_email:'Email Outreach',
     nav_tracker:'Client Tracker', nav_logs:'Activity Logs',
     // mobile nav
     mob_home:'Home', mob_mybots:'My Bots', mob_wizard:'Wizard', mob_chat:'AI Chat', mob_logs:'Logs',
@@ -1191,7 +1340,7 @@ const TRANSLATIONS = {
   },
   ro:{
     nav_dashboard:'Panou principal', nav_wizard:'Generator automatizări', nav_mybots:'Automatizările mele',
-    nav_blueprints:'Bibliotecă blueprint', nav_chat:'Asistent AI', nav_email:'Email outreach',
+    nav_blueprints:'Bibliotecă blueprint', nav_niche:'Idei nișă', nav_chat:'Asistent AI', nav_email:'Email outreach',
     nav_tracker:'Tracker clienți', nav_logs:'Jurnale activitate',
     mob_home:'Acasă', mob_mybots:'Boții mei', mob_wizard:'Generator', mob_chat:'Chat AI', mob_logs:'Jurnale',
     login_sub:'Platformă de automatizări AI', login_email:'Adresă email', login_code:'Cod de acces',
@@ -2013,27 +2162,13 @@ Respond ONLY with this exact JSON (no markdown, no extra text):
     document.getElementById('outPriceSub').textContent = 'Setup fee · Retainer: ' + (data.monthlyPrice || '');
     document.getElementById('outTime').textContent = data.buildTime || '';
     document.getElementById('outEmail').textContent = data.outreach || '';
-
-    // Try to match a blueprint based on keywords in the description
-    const desc = description.toLowerCase();
-    let bpUrl = '';
-    for(const [key, url] of Object.entries(BLUEPRINT_MAP)){
-      if(desc.includes(key.toLowerCase().split(' ')[0])){ bpUrl = url; break; }
-    }
-    const bpSection = document.getElementById('wizardBlueprintSection');
-    const bpLink = document.getElementById('wizardBlueprintLink');
-    if(bpUrl){
-      bpLink.href = bpUrl;
-      bpLink.download = bpUrl.split('/').pop();
-      wizardBlueprintFile = bpUrl.split('/').pop();
-      bpSection.style.display = 'block';
-    } else {
-      wizardBlueprintFile = '';
-      bpSection.style.display = 'none';
-    }
+    if(data.modules) document.getElementById('modulesSection').style.display = 'block';
 
     document.getElementById('wizardOutput').classList.add('visible');
-    notify('Plan generated! ✓', 'success');
+
+    // Build and customize the Make.com blueprint automatically
+    buildBlueprint(description, client, data.prompt || '', data.what || description);
+    notify('Plan generated! Building blueprint...', 'success');
   } catch(e) {
     notify('Generation failed. Check your connection.', 'error');
     document.getElementById('wizardPlaceholder').style.display = 'flex';
@@ -2044,6 +2179,111 @@ Respond ONLY with this exact JSON (no markdown, no extra text):
 function copyText(id){
   const text = document.getElementById(id).textContent;
   navigator.clipboard.writeText(text).then(() => notify('Copied ✓', 'success'));
+}
+
+function toggleModules(){
+  const wrap = document.getElementById('outModulesWrap');
+  const title = document.querySelector('#modulesSection .output-section-title');
+  const open = wrap.style.display === 'none';
+  wrap.style.display = open ? 'block' : 'none';
+  title.textContent = (open ? '▾' : '▸') + ' Detailed Make.com Build Guide (advanced)';
+}
+
+// BLUEPRINT TYPE DETECTION
+var BLUEPRINT_TYPES = [
+  { keys: ['whatsapp'], file: 'whatsapp-bot.json', label: 'WhatsApp Auto-Reply Bot', needs: 'OpenAI account + 360dialog API key + Google Sheets' },
+  { keys: ['instagram', 'dm'], file: 'instagram-dm-bot.json', label: 'Instagram DM Bot', needs: 'OpenAI account + Facebook Developer App (Instagram permissions)' },
+  { keys: ['cold email', 'outreach', 'cold'], file: 'cold-email-pipeline.json', label: 'Cold Email Campaign', needs: 'OpenAI account + Gmail + Google Sheets' },
+  { keys: ['lead', 'form', 'contact form', 'follow-up', 'followup'], file: 'lead-followup-system.json', label: 'Lead Follow-Up System', needs: 'OpenAI account + Google Forms + Gmail + Google Sheets' },
+  { keys: ['stripe', 'invoice', 'payment', 'billing'], file: 'stripe-billing-automation.json', label: 'Payment & Billing Automation', needs: 'Stripe account + Gmail' },
+  { keys: ['proposal', 'quote'], file: 'ai-proposal-generator.json', label: 'AI Proposal Generator', needs: 'OpenAI account + Google Forms + Gmail' },
+];
+
+var currentBlueprintBlob = null;
+var wizardBlueprintFile = '';
+
+function detectBlueprintType(description) {
+  var d = description.toLowerCase();
+  for (var i = 0; i < BLUEPRINT_TYPES.length; i++) {
+    var t = BLUEPRINT_TYPES[i];
+    for (var j = 0; j < t.keys.length; j++) {
+      if (d.includes(t.keys[j])) return t;
+    }
+  }
+  // Default: WhatsApp bot (most common use case)
+  return { file: 'whatsapp-bot.json', label: 'AI Automation Bot', needs: 'OpenAI account + your chosen platform (WhatsApp, Email, or Webhook)' };
+}
+
+async function buildBlueprint(description, clientName, systemPrompt, whatItDoes) {
+  try {
+    var type = detectBlueprintType(description);
+    wizardBlueprintFile = type.file;
+
+    // Update import guide needs
+    document.getElementById('importNeeds').textContent = type.needs;
+
+    // Fetch the template
+    var r = await fetch('/blueprints/' + type.file);
+    var blueprint = await r.json();
+
+    // Customize name
+    var name = clientName ? type.label + ' — ' + clientName : type.label;
+    blueprint.name = name;
+
+    // Patch system prompt into OpenAI module
+    if (systemPrompt && systemPrompt.length > 20) {
+      var cleaned = systemPrompt.replace(/^SYSTEM:\s*/i, '').trim();
+      for (var i = 0; i < blueprint.flow.length; i++) {
+        var mod = blueprint.flow[i];
+        if (mod.module && mod.module.includes('openai')) {
+          if (mod.mapper && mod.mapper.messages) {
+            for (var j = 0; j < mod.mapper.messages.length; j++) {
+              if (mod.mapper.messages[j].role === 'system') {
+                mod.mapper.messages[j].content = cleaned;
+                break;
+              }
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    // Create download blob
+    var json = JSON.stringify(blueprint, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    currentBlueprintBlob = { url: url, name: name.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '.json', blueprint: blueprint };
+
+    // Update hero
+    document.getElementById('bpHeroTitle').textContent = 'Blueprint Ready — ' + name;
+    document.getElementById('bpDownloadBtn').href = url;
+    document.getElementById('bpDownloadBtn').download = currentBlueprintBlob.name;
+    notify('Blueprint ready! ✓', 'success');
+  } catch(e) {
+    document.getElementById('bpHeroSub').textContent = 'Could not generate blueprint — download from the Blueprint Library instead.';
+    console.error('Blueprint build error:', e);
+  }
+}
+
+function importBlueprintInMake() {
+  if (!currentBlueprintBlob) { notify('Generate an automation first.', 'error'); return; }
+  if (!makeConfig || !makeConfig.apiKey || !makeConfig.teamId) {
+    // Trigger download + open Make.com
+    var a = document.createElement('a');
+    a.href = currentBlueprintBlob.url;
+    a.download = currentBlueprintBlob.name;
+    a.click();
+    setTimeout(function() {
+      var zone = 'eu1.make.com';
+      window.open('https://' + zone, '_blank');
+      notify('Blueprint downloaded! Now import it: Create scenario → ... → Import Blueprint', 'success');
+    }, 500);
+    return;
+  }
+  // Connected — create directly via API
+  var btn = document.getElementById('bpImportBtn');
+  createMakeScenarioWithBtn(wizardBlueprintFile, currentBlueprintBlob.name.replace('.json',''), btn);
 }
 
 // AI CHAT
@@ -2477,6 +2717,171 @@ function notify(msg, type=''){
   el.className = 'notif show' + (type?' '+type:'');
   clearTimeout(el._t);
   el._t = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+// ═══════════════════════════════════════
+// NICHE IDEAS
+// ═══════════════════════════════════════
+let selectedNiche = '';
+
+function selectNiche(el, niche) {
+  document.querySelectorAll('.niche-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedNiche = niche;
+  loadNicheIdeas(niche);
+}
+
+function clearNiche() {
+  selectedNiche = '';
+  document.querySelectorAll('.niche-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('nicheResults').style.display = 'none';
+  document.getElementById('nicheGrid').style.display = 'grid';
+}
+
+async function loadNicheIdeas(niche) {
+  document.getElementById('nicheGrid').style.display = 'none';
+  document.getElementById('nicheResults').style.display = 'none';
+  document.getElementById('nicheLoading').style.display = 'block';
+
+  try {
+    const r = await fetch(API + '/api/ai/generate', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        prompt: `You are an expert AI automation consultant. A freelancer wants to sell automation services to ${niche} businesses.
+
+Generate exactly 5 profitable automation ideas they can sell to ${niche} owners. Focus on real, practical automations using Make.com + AI that solve actual daily problems.
+
+Respond ONLY with this exact JSON array (no markdown, no extra text):
+[
+  {
+    "name": "Automation name (5-7 words max)",
+    "description": "2-3 sentences: what it does, how it works technically, what problem it solves for the business owner.",
+    "pitch": "One compelling sentence to say to a ${niche} owner to make them want this.",
+    "setupPrice": "$XXX-$XXX",
+    "monthlyRetainer": "$XXX/month",
+    "difficulty": "Easy",
+    "trigger": "What triggers it (e.g. WhatsApp message, form submission, new booking, daily schedule)"
+  }
+]
+
+Rules:
+- difficulty must be exactly "Easy", "Medium", or "Advanced"
+- setupPrice: minimum $200, no more than $2,000
+- monthlyRetainer: $100-$500/month
+- Make sure all 5 automations are genuinely different — mix channels (WhatsApp, email, social media, CRM)
+- Prioritize automations that ${niche} owners feel the pain of daily`
+      })
+    });
+    const d = await r.json();
+    let ideas;
+    try {
+      const clean = d.output.replace(/```json|```/g, '').trim();
+      ideas = JSON.parse(clean);
+    } catch(e) {
+      notify('Failed to parse AI response. Try again.', 'error');
+      document.getElementById('nicheLoading').style.display = 'none';
+      document.getElementById('nicheGrid').style.display = 'grid';
+      return;
+    }
+    document.getElementById('nicheLoading').style.display = 'none';
+    document.getElementById('nicheSectionTitle').textContent = niche + ' — Automation Opportunities';
+    const list = document.getElementById('nicheIdeasList');
+    list.innerHTML = ideas.map(function(idea, i) {
+      const diffClass = idea.difficulty === 'Easy' ? 'diff-easy' : idea.difficulty === 'Advanced' ? 'diff-hard' : 'diff-medium';
+      const wizardText = 'A ' + niche + ' wants to automate: ' + idea.name + '. ' + idea.description + ' Trigger: ' + idea.trigger;
+      const safeWizard = wizardText.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      return '<div class="idea-card">' +
+        '<div class="idea-header"><div class="idea-name">' + (i+1) + '. ' + idea.name + '</div><span class="idea-diff ' + diffClass + '">' + idea.difficulty + '</span></div>' +
+        '<div class="idea-desc">' + idea.description + '</div>' +
+        '<div style="background:rgba(229,62,46,.05);border:1px solid rgba(229,62,46,.1);border-radius:8px;padding:10px 13px;margin-bottom:14px;font-size:12px;color:var(--t3);line-height:1.6"><strong style="color:var(--r)">Pitch:</strong> "' + idea.pitch + '"</div>' +
+        '<div class="idea-pricing">' +
+          '<div class="idea-price-block"><div class="idea-price-label">Setup Fee</div><div class="idea-price-val">' + idea.setupPrice + '</div></div>' +
+          '<div class="idea-price-block"><div class="idea-price-label">Monthly Retainer</div><div class="idea-price-val">' + idea.monthlyRetainer + '</div></div>' +
+          '<div class="idea-price-block"><div class="idea-price-label">Trigger</div><div style="font-size:11px;color:var(--t4);margin-top:2px;line-height:1.5">' + idea.trigger + '</div></div>' +
+        '</div>' +
+        '<button class="use-wizard-btn" onclick="useIdeaInWizard(\'' + safeWizard + '\')">⚡ Use in Wizard</button>' +
+        '</div>';
+    }).join('');
+    document.getElementById('nicheResults').style.display = 'block';
+  } catch(e) {
+    notify('Failed to load ideas. Check your connection.', 'error');
+    document.getElementById('nicheLoading').style.display = 'none';
+    document.getElementById('nicheGrid').style.display = 'grid';
+  }
+}
+
+function useIdeaInWizard(description) {
+  document.getElementById('wDescription').value = description;
+  const wizNav = document.querySelector('.nav-item:nth-child(2)');
+  showPage('wizard', wizNav);
+  notify('Idea loaded in Wizard — click Generate ✓', 'success');
+}
+
+// ═══════════════════════════════════════
+// CLIENT PROPOSAL GENERATOR
+// ═══════════════════════════════════════
+var lastWizardData = {};
+
+function openProposalModal() {
+  lastWizardData = {
+    desc: document.getElementById('wDescription').value,
+    client: document.getElementById('wClient').value,
+    what: document.getElementById('outWhat').textContent,
+    setupPrice: document.getElementById('outPrice').textContent,
+    monthlyPrice: document.getElementById('outPriceSub').textContent
+  };
+  var clientEl = document.getElementById('propClientName');
+  if (lastWizardData.client) clientEl.value = lastWizardData.client;
+  document.getElementById('proposalFormWrap').style.display = 'block';
+  document.getElementById('proposalResultWrap').style.display = 'none';
+  document.getElementById('proposalModal').classList.add('open');
+}
+
+function closeProposalModal() {
+  document.getElementById('proposalModal').classList.remove('open');
+}
+
+async function generateProposal() {
+  var clientName = document.getElementById('propClientName').value.trim() || 'the client';
+  var clientEmail = document.getElementById('propClientEmail').value.trim();
+  var yourName = document.getElementById('propYourName').value.trim() || 'Your Name';
+  var yourContact = document.getElementById('propYourContact').value.trim();
+  var btn = document.getElementById('propGenerateBtn');
+  btn.disabled = true; btn.innerHTML = '<span>⏳</span> Generating...';
+
+  try {
+    var today = new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'});
+    var r = await fetch(API + '/api/ai/generate', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        prompt: 'Write a professional, concise client proposal for an AI automation freelancer. The proposal is a plain-text document (no markdown symbols like ** or ##) that the freelancer will send to their prospect.\n\nAUTOMATION DETAILS:\n- What it does: ' + (lastWizardData.what || lastWizardData.desc) + '\n- Client: ' + clientName + '\n- Setup price: ' + (lastWizardData.setupPrice || 'to be discussed') + '\n- Monthly retainer: ' + (lastWizardData.monthlyPrice || 'to be discussed') + '\n\nFORMAT — write exactly in this structure (plain text, professional tone):\n---\nAUTOMATION PROPOSAL\nFor: ' + clientName + (clientEmail ? '\nEmail: ' + clientEmail : '') + '\nDate: ' + today + '\nFrom: ' + yourName + (yourContact ? ' | ' + yourContact : '') + '\n---\n\nWHAT WE BUILD FOR YOU\n[2-3 sentences describing exactly what the automation does, in simple business language]\n\nTHE PROBLEM IT SOLVES\n[2 sentences about the specific pain point this eliminates for ' + clientName + ']\n\nHOW IT WORKS\n[3-4 short bullet points explaining the flow: trigger to AI processing to action]\n\nWHAT YOU GET\n[4-5 bullet points listing concrete deliverables]\n\nINVESTMENT\nSetup: ' + (lastWizardData.setupPrice || 'Custom quote') + '\nMonthly maintenance: ' + (lastWizardData.monthlyPrice || 'Custom quote') + '\nSetup time: 3-5 business days\n\nWHY WORK WITH US\n[2-3 sentences about reliability, support, expertise]\n\nNEXT STEPS\nReply to this proposal and we will schedule a free 15-minute setup call to get started.\n\n' + yourName + '\n' + (yourContact || '') + '\n---\n\nWrite ONLY the proposal text. No markdown. No extra commentary.'
+      })
+    });
+    var d = await r.json();
+    var proposal = d.output || '';
+    document.getElementById('proposalText').textContent = proposal;
+    document.getElementById('proposalFormWrap').style.display = 'none';
+    var resultWrap = document.getElementById('proposalResultWrap');
+    resultWrap.style.display = 'flex';
+    resultWrap.style.flexDirection = 'column';
+  } catch(e) {
+    notify('Failed to generate proposal. Try again.', 'error');
+  }
+  btn.disabled = false; btn.innerHTML = '<span>⚡</span> Generate Proposal';
+}
+
+function copyProposal() {
+  var text = document.getElementById('proposalText').textContent;
+  navigator.clipboard.writeText(text).then(function() { notify('Proposal copied ✓', 'success'); });
+}
+
+function printProposal() {
+  var text = document.getElementById('proposalText').textContent;
+  var win = window.open('', '_blank');
+  win.document.write('<!DOCTYPE html><html><head><title>Client Proposal</title><style>body{font-family:Georgia,serif;max-width:680px;margin:40px auto;padding:0 24px;line-height:1.85;color:#222;font-size:15px}pre{white-space:pre-wrap;font-family:inherit;font-size:15px}</style></head><body><pre>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre><script>window.onload=function(){window.print()}<\/script></body></html>');
+  win.document.close();
 }
 </script>
 <script src="/lang.js"></script>
