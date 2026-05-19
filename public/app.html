@@ -148,7 +148,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
 .guide-steps{display:flex;flex-direction:column;gap:12px}
 .guide-step{display:flex;align-items:center;gap:16px;background:var(--bg2);border:1px solid #181818;border-radius:14px;padding:16px;position:relative}
 .guide-step::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(229,62,46,.15),transparent)}
-.guide-svg-wrap{width:60px;height:60px;flex-shrink:0;border-radius:10px;overflow:hidden;background:#080808}
+.guide-svg-wrap{width:60px;height:60px;flex-shrink:0;border-radius:10px;overflow:hidden;background:#141414;border:1px solid #2a2a2a}
 .guide-svg{width:60px;height:60px}
 .guide-step-num{width:24px;height:24px;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--r);flex-shrink:0}
 .guide-step-text{font-size:13px;color:var(--t3);line-height:1.55;flex:1}
@@ -584,7 +584,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
               <div class="guide-svg-wrap">
                 <!-- SVG Step 1: Download -->
                 <svg class="guide-svg" viewBox="0 0 80 80" fill="none">
-                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#0f0f0f" stroke="#1e1e1e" stroke-width="1.5"/>
+                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#1a1a1a" stroke="#333" stroke-width="1.5"/>
                   <rect x="24" y="20" width="32" height="24" rx="3" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5"/>
                   <rect x="28" y="25" width="16" height="2" rx="1" fill="#333"/>
                   <rect x="28" y="30" width="12" height="2" rx="1" fill="#333"/>
@@ -603,7 +603,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
               <div class="guide-svg-wrap">
                 <!-- SVG Step 2: Open Make.com -->
                 <svg class="guide-svg" viewBox="0 0 80 80" fill="none">
-                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#0f0f0f" stroke="#1e1e1e" stroke-width="1.5"/>
+                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#1a1a1a" stroke="#333" stroke-width="1.5"/>
                   <!-- browser window -->
                   <rect x="12" y="18" width="56" height="40" rx="5" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5"/>
                   <rect x="12" y="18" width="56" height="12" rx="5" fill="#222"/>
@@ -627,7 +627,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
               <div class="guide-svg-wrap">
                 <!-- SVG Step 3: Import Blueprint -->
                 <svg class="guide-svg" viewBox="0 0 80 80" fill="none">
-                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#0f0f0f" stroke="#1e1e1e" stroke-width="1.5"/>
+                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#1a1a1a" stroke="#333" stroke-width="1.5"/>
                   <!-- scenario canvas -->
                   <rect x="10" y="14" width="60" height="44" rx="5" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5"/>
                   <!-- three dots menu -->
@@ -651,7 +651,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
               <div class="guide-svg-wrap">
                 <!-- SVG Step 4: Connect Apps -->
                 <svg class="guide-svg" viewBox="0 0 80 80" fill="none">
-                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#0f0f0f" stroke="#1e1e1e" stroke-width="1.5"/>
+                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#1a1a1a" stroke="#333" stroke-width="1.5"/>
                   <!-- modules connected -->
                   <rect x="10" y="30" width="20" height="20" rx="5" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5"/>
                   <circle cx="20" cy="40" r="5" fill="#222"/>
@@ -676,7 +676,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
               <div class="guide-svg-wrap">
                 <!-- SVG Step 5: Turn ON -->
                 <svg class="guide-svg" viewBox="0 0 80 80" fill="none">
-                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#0f0f0f" stroke="#1e1e1e" stroke-width="1.5"/>
+                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#1a1a1a" stroke="#333" stroke-width="1.5"/>
                   <!-- toggle -->
                   <rect x="22" y="32" width="36" height="16" rx="8" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5" class="toggle-track"/>
                   <rect x="22" y="32" width="36" height="16" rx="8" fill="#4ADE80" opacity="0" class="toggle-fill"/>
@@ -2304,8 +2304,6 @@ Respond ONLY with this exact JSON (no markdown, no extra text):
     document.getElementById('outPriceSub').textContent = 'Setup fee · Retainer: ' + (data.monthlyPrice || '');
     document.getElementById('outTime').textContent = data.buildTime || '';
     document.getElementById('outEmail').textContent = data.outreach || '';
-    if(data.modules) document.getElementById('modulesSection').style.display = 'block';
-
     document.getElementById('studioOutput').style.display = 'block';
     document.getElementById('studioOutput').scrollIntoView({behavior:'smooth', block:'start'});
 
