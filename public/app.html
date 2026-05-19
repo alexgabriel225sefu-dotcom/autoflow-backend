@@ -2258,6 +2258,7 @@ async function generateAutomation(){
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({
+        jsonMode: true,
         prompt: `You are an expert Make.com automation consultant. A user wants to sell or build an automation and needs a complete, actionable plan. Your job is to produce a detailed, beginner-friendly step-by-step guide so they can build it in Make.com even without deep technical knowledge.
 
 AUTOMATION REQUEST:
@@ -2292,10 +2293,20 @@ Respond ONLY with this exact JSON (no markdown, no extra text):
     const d = await r.json();
     let data;
     try {
-      const clean = d.output.replace(/```json|```/g, '').trim();
-      data = JSON.parse(clean);
+      let raw = d.output || '';
+      // Try direct parse first (json_object mode returns clean JSON)
+      try { data = JSON.parse(raw); } catch(_) {
+        // Strip markdown code fences
+        raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+        try { data = JSON.parse(raw); } catch(_2) {
+          // Extract between first { and last } as last resort
+          const s = raw.indexOf('{'), e2 = raw.lastIndexOf('}');
+          if (s !== -1 && e2 > s) data = JSON.parse(raw.slice(s, e2 + 1));
+          else throw new Error('no json');
+        }
+      }
     } catch(e) {
-      data = { what: d.output, modules: 'See full output above', prompt: 'See output above', setupPrice: 'TBD', monthlyPrice: 'TBD/month', buildTime: '4–8', outreach: 'See output above' };
+      data = { what: d.output || '', modules: '', prompt: '', setupPrice: 'TBD', monthlyPrice: 'TBD/month', buildTime: '4–8', outreach: '' };
     }
     document.getElementById('outWhat').textContent = data.what || '';
     document.getElementById('outModules').textContent = data.modules || '';

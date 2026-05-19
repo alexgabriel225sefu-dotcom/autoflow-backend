@@ -266,20 +266,22 @@ app.post('/api/auth/create-user', auth, _authLimiter, async (req, res) => {
 
 // POST /api/ai/generate — single prompt generation
 app.post('/api/ai/generate', auth, async (req, res) => {
-  const { prompt } = req.body;
+  const { prompt, jsonMode } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
   try {
     // Try OpenAI first
     if (OPENAI_KEY) {
+      const body = {
+        model: 'gpt-4o',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: prompt }]
+      };
+      if (jsonMode) body.response_format = { type: 'json_object' };
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          max_tokens: 2000,
-          messages: [{ role: 'user', content: prompt }]
-        })
+        body: JSON.stringify(body)
       });
       const data = await response.json();
       if (data.choices && data.choices[0]) {
@@ -293,7 +295,7 @@ app.post('/api/ai/generate', auth, async (req, res) => {
     if (anthropic) {
       const msg = await anthropic.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [{ role: 'user', content: prompt }]
       });
       const output = msg.content[0].text;
