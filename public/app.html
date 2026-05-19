@@ -1194,8 +1194,8 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
 <script>
 const API = '';
 let token = localStorage.getItem('af_token');
-let currentUser = JSON.parse(localStorage.getItem('af_user') || 'null');
-let clients = JSON.parse(localStorage.getItem('af_clients') || '[]');
+let currentUser = (() => { try { return JSON.parse(localStorage.getItem('af_user') || 'null'); } catch(e) { localStorage.removeItem('af_user'); return null; } })();
+let clients = (() => { try { return JSON.parse(localStorage.getItem('af_clients') || '[]'); } catch(e) { localStorage.removeItem('af_clients'); return []; } })();
 let chatHistory = [];
 
 // Toggle blueprint setup steps
@@ -1607,7 +1607,7 @@ function applyTranslations(){
 
   // nav items
   const navItems = document.querySelectorAll('.nav-item');
-  const navKeys = ['nav_dashboard','nav_wizard','nav_mybots','nav_blueprints','nav_chat','nav_email','nav_tracker','nav_logs'];
+  const navKeys = ['nav_dashboard','nav_wizard','nav_mybots','nav_blueprints','nav_niche','nav_chat','nav_email','nav_tracker','nav_logs'];
   navItems.forEach((el,i) => { if(navKeys[i]){ const icon = el.querySelector('.nav-icon'); el.innerHTML = ''; if(icon) el.appendChild(icon); el.append(t(navKeys[i])); } });
 
   // mobile nav
