@@ -1670,10 +1670,11 @@ function applyTranslations(){
   if(qas[2]){ qas[2].querySelector('.qa-title').textContent = t('qa_chat_title'); qas[2].querySelector('.qa-desc').textContent = t('qa_chat_desc'); }
 
   // wizard
+  const wizStudioLabel = document.querySelector('#page-wizard .studio-label');
+  if(wizStudioLabel) wizStudioLabel.textContent = t('wiz_desc_label');
   const wizLabels = document.querySelectorAll('#page-wizard .form-label');
-  if(wizLabels[0]) wizLabels[0].textContent = t('wiz_desc_label');
-  if(wizLabels[1]) wizLabels[1].textContent = t('wiz_client');
-  if(wizLabels[2]) wizLabels[2].textContent = t('wiz_budget');
+  if(wizLabels[0]) wizLabels[0].textContent = t('wiz_client');
+  if(wizLabels[1]) wizLabels[1].textContent = t('wiz_budget');
   setPH('wDescription','wiz_desc_ph'); setPH('wClient','wiz_client_ph');
   const genBtn = document.getElementById('generateBtn');
   if(genBtn){ const sp = genBtn.querySelector('span'); genBtn.textContent = ''; if(sp) genBtn.appendChild(sp); genBtn.append(' '+t('wiz_btn')); }
