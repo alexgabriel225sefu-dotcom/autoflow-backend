@@ -2665,8 +2665,6 @@ function createMakeScenario(blueprintFile, scenarioName){
   createMakeScenarioWithBtn(blueprintFile, scenarioName, btn);
 }
 
-let wizardBlueprintFile = '';
-
 async function createMakeScenarioFromWizard(){
   if(!wizardBlueprintFile) return;
   const industry = document.getElementById('wIndustry').value;
