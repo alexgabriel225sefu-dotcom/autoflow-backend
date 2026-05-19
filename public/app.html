@@ -533,14 +533,13 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
         <!-- HERO -->
         <div class="studio-hero">
           <div class="studio-badge">⚡ Automation Studio</div>
-          <div class="studio-title">Build any automation<br><span>in seconds</span></div>
-          <div class="studio-sub">Describe what you want — we generate a ready-to-import Make.com blueprint + complete build guide.</div>
+          <div class="studio-title">What do you want<br><span>to automate?</span></div>
+          <div class="studio-sub">Describe it in plain language — we build the full Make.com automation for you.</div>
         </div>
 
         <!-- INPUT CARD -->
         <div class="studio-card">
-          <div class="studio-label">Describe your automation</div>
-          <textarea class="studio-textarea" id="wDescription" placeholder="e.g. A restaurant gets 60+ WhatsApp messages per day. I want an AI bot that replies automatically, answers menu questions, and sends a booking link when someone asks to reserve a table."></textarea>
+          <textarea class="studio-textarea" id="wDescription" placeholder="e.g. A restaurant gets 60+ WhatsApp messages per day. I want an AI bot that replies automatically, answers questions, and sends a booking link when someone asks to reserve."></textarea>
           <div class="studio-chips" id="exampleChips">
             <button class="chip" onclick="useChip(this)" data-val="A real estate agency gets leads from a contact form on their website. Automatically send a personalized follow-up email to each new lead within 5 minutes, using AI to write the email based on the property they were interested in.">Real estate lead follow-up</button>
             <button class="chip" onclick="useChip(this)" data-val="A beauty salon receives appointment requests via Instagram DMs. Set up an AI bot that replies instantly, collects the client's name and preferred date, and adds the booking to a Google Sheet automatically.">Salon Instagram DM bot</button>
@@ -549,110 +548,194 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
             <button class="chip" onclick="useChip(this)" data-val="A dental clinic wants to send automated appointment reminders via WhatsApp 24 hours before each appointment. Pull appointments from Google Sheets and send a custom AI-written reminder.">Dental appointment reminders</button>
             <button class="chip" onclick="useChip(this)" data-val="A fitness gym wants to post motivational content to Instagram and Facebook every day at 8am automatically. Use AI to generate fresh captions with relevant hashtags.">Daily social media auto-post</button>
           </div>
-          <div class="studio-row">
-            <div>
-              <label class="form-label">Client name (optional)</label>
-              <input class="form-input" id="wClient" placeholder="e.g. Mario's Restaurant">
+          <button class="studio-gen-btn" id="generateBtn" onclick="generateAutomation()">
+            <span class="studio-gen-icon">⚡</span>
+            <span class="studio-gen-text">Generate My Automation</span>
+          </button>
+        </div>
+
+        <!-- OUTPUT — hidden until generation completes -->
+        <div id="studioOutput" style="display:none">
+
+          <!-- BLUEPRINT READY CARD -->
+          <div class="ready-card" id="bpHero">
+            <div class="ready-check" id="readyCheck">
+              <svg viewBox="0 0 44 44" fill="none">
+                <circle cx="22" cy="22" r="20" stroke="#4ADE80" stroke-width="2" class="check-circle"/>
+                <path d="M13 22l6 6 12-12" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="check-mark"/>
+              </svg>
             </div>
-            <div>
-              <label class="form-label">Budget range</label>
-              <select class="form-select" id="wBudget">
-                <option>Unknown / To discuss</option>
-                <option>$100–$300 setup</option>
-                <option>$300–$800 setup</option>
-                <option>$800–$2,000 setup</option>
-                <option>$2,000+ setup</option>
-              </select>
+            <div class="ready-info">
+              <div class="ready-label">Blueprint Ready</div>
+              <div class="ready-name" id="bpHeroTitle">Your Automation Blueprint</div>
+              <div class="ready-sub" id="bpHeroSub">Customized and ready to import into Make.com</div>
+            </div>
+            <div class="ready-actions">
+              <a id="bpDownloadBtn" href="#" download="automation-blueprint.json" class="ready-btn ready-btn-dl">⬇ Download .json</a>
+              <button id="bpImportBtn" class="ready-btn ready-btn-make" onclick="importBlueprintInMake()">Open Make.com →</button>
             </div>
           </div>
-          <div style="margin-top:20px">
-            <button class="generate-btn" id="generateBtn" onclick="generateAutomation()">
-              <span>⚡</span> Generate Automation Plan
+
+          <!-- ANIMATED IMPORT GUIDE -->
+          <div class="guide-title">How to import in 5 steps</div>
+          <div class="guide-steps">
+
+            <div class="guide-step">
+              <div class="guide-svg-wrap">
+                <!-- SVG Step 1: Download -->
+                <svg class="guide-svg" viewBox="0 0 80 80" fill="none">
+                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#0f0f0f" stroke="#1e1e1e" stroke-width="1.5"/>
+                  <rect x="24" y="20" width="32" height="24" rx="3" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5"/>
+                  <rect x="28" y="25" width="16" height="2" rx="1" fill="#333"/>
+                  <rect x="28" y="30" width="12" height="2" rx="1" fill="#333"/>
+                  <rect x="28" y="35" width="14" height="2" rx="1" fill="#333"/>
+                  <!-- arrow animated down -->
+                  <line x1="40" y1="48" x2="40" y2="58" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" class="dl-arrow-line"/>
+                  <polyline points="34,54 40,62 46,54" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dl-arrow-head"/>
+                  <rect x="28" y="60" width="24" height="4" rx="2" fill="#4ADE80" opacity="0.15" class="dl-bar"/>
+                </svg>
+              </div>
+              <div class="guide-step-num">1</div>
+              <div class="guide-step-text"><strong>Download</strong> the .json blueprint file using the button above</div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-svg-wrap">
+                <!-- SVG Step 2: Open Make.com -->
+                <svg class="guide-svg" viewBox="0 0 80 80" fill="none">
+                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#0f0f0f" stroke="#1e1e1e" stroke-width="1.5"/>
+                  <!-- browser window -->
+                  <rect x="12" y="18" width="56" height="40" rx="5" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5"/>
+                  <rect x="12" y="18" width="56" height="12" rx="5" fill="#222"/>
+                  <rect x="12" y="25" width="56" height="5" fill="#222"/>
+                  <!-- dots -->
+                  <circle cx="20" cy="24" r="2" fill="#E53E2E" opacity="0.7"/>
+                  <circle cx="27" cy="24" r="2" fill="#fbbf24" opacity="0.7"/>
+                  <circle cx="34" cy="24" r="2" fill="#4ADE80" opacity="0.7"/>
+                  <!-- url bar -->
+                  <rect x="40" y="20" width="22" height="8" rx="3" fill="#2a2a2a"/>
+                  <text x="43" y="26" font-size="4" fill="#666" font-family="monospace">make.com</text>
+                  <!-- M logo animated -->
+                  <text x="28" y="48" font-size="18" fill="#E53E2E" font-weight="bold" font-family="sans-serif" class="make-logo-pulse">M</text>
+                </svg>
+              </div>
+              <div class="guide-step-num">2</div>
+              <div class="guide-step-text">Go to <strong style="color:#E53E2E">make.com</strong> → click <strong>Create a new scenario</strong></div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-svg-wrap">
+                <!-- SVG Step 3: Import Blueprint -->
+                <svg class="guide-svg" viewBox="0 0 80 80" fill="none">
+                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#0f0f0f" stroke="#1e1e1e" stroke-width="1.5"/>
+                  <!-- scenario canvas -->
+                  <rect x="10" y="14" width="60" height="44" rx="5" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5"/>
+                  <!-- three dots menu -->
+                  <circle cx="60" cy="20" r="1.5" fill="#888"/>
+                  <circle cx="64" cy="20" r="1.5" fill="#888"/>
+                  <circle cx="68" cy="20" r="1.5" fill="#888"/>
+                  <!-- dropdown menu -->
+                  <rect x="50" y="24" width="22" height="18" rx="3" fill="#222" stroke="#333" stroke-width="1" class="import-menu"/>
+                  <rect x="53" y="28" width="16" height="2" rx="1" fill="#555" class="import-menu"/>
+                  <rect x="53" y="32" width="12" height="2" rx="1" fill="#E53E2E" class="import-menu"/>
+                  <rect x="53" y="36" width="14" height="2" rx="1" fill="#555" class="import-menu"/>
+                  <!-- cursor -->
+                  <polygon points="58,36 62,44 63,40 67,41" fill="#fff" opacity="0.9" class="cursor-click"/>
+                </svg>
+              </div>
+              <div class="guide-step-num">3</div>
+              <div class="guide-step-text">Click <strong>···</strong> (three dots) top-right → <strong style="color:#E53E2E">Import Blueprint</strong> → upload the file</div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-svg-wrap">
+                <!-- SVG Step 4: Connect Apps -->
+                <svg class="guide-svg" viewBox="0 0 80 80" fill="none">
+                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#0f0f0f" stroke="#1e1e1e" stroke-width="1.5"/>
+                  <!-- modules connected -->
+                  <rect x="10" y="30" width="20" height="20" rx="5" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5"/>
+                  <circle cx="20" cy="40" r="5" fill="#222"/>
+                  <text x="17" y="43" font-size="7" fill="#E53E2E">W</text>
+                  <!-- connection line animated -->
+                  <line x1="30" y1="40" x2="50" y2="40" stroke="#E53E2E" stroke-width="1.5" stroke-dasharray="4 3" class="connect-line"/>
+                  <rect x="50" y="30" width="20" height="20" rx="5" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5"/>
+                  <circle cx="60" cy="40" r="5" fill="#222"/>
+                  <text x="57" y="43" font-size="7" fill="#60a5fa">AI</text>
+                  <!-- checkmarks -->
+                  <circle cx="20" cy="22" r="5" fill="#4ADE80" opacity="0.15" class="conn-check"/>
+                  <text x="17" y="25" font-size="7" fill="#4ADE80" class="conn-check">✓</text>
+                  <circle cx="60" cy="22" r="5" fill="#4ADE80" opacity="0.15" class="conn-check"/>
+                  <text x="57" y="25" font-size="7" fill="#4ADE80" class="conn-check">✓</text>
+                </svg>
+              </div>
+              <div class="guide-step-num">4</div>
+              <div class="guide-step-text">Connect your accounts (the blueprint shows which ones you need)</div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-svg-wrap">
+                <!-- SVG Step 5: Turn ON -->
+                <svg class="guide-svg" viewBox="0 0 80 80" fill="none">
+                  <rect x="4" y="4" width="72" height="72" rx="12" fill="#0f0f0f" stroke="#1e1e1e" stroke-width="1.5"/>
+                  <!-- toggle -->
+                  <rect x="22" y="32" width="36" height="16" rx="8" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5" class="toggle-track"/>
+                  <rect x="22" y="32" width="36" height="16" rx="8" fill="#4ADE80" opacity="0" class="toggle-fill"/>
+                  <circle cx="30" cy="40" r="7" fill="#333" class="toggle-thumb"/>
+                  <!-- live label -->
+                  <text x="27" y="62" font-size="8" fill="#4ADE80" font-weight="bold" font-family="sans-serif" opacity="0" class="live-label">LIVE ✓</text>
+                  <!-- glow -->
+                  <circle cx="40" cy="40" r="25" fill="#4ADE80" opacity="0" class="toggle-glow"/>
+                </svg>
+              </div>
+              <div class="guide-step-num">5</div>
+              <div class="guide-step-text">Click the <strong style="color:#4ADE80">ON/OFF toggle</strong> → your automation is <strong style="color:#4ADE80">live!</strong></div>
+            </div>
+
+          </div><!-- end guide-steps -->
+
+          <!-- WHAT IT DOES -->
+          <div class="output-section" style="margin-top:16px">
+            <div class="output-section-title">What gets built</div>
+            <div class="output-text" id="outWhat"></div>
+          </div>
+
+          <!-- PRICING ROW -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+            <div class="output-section">
+              <div class="output-section-title">Your price to client</div>
+              <div class="output-price" id="outPrice"></div>
+              <div class="output-price-sub" id="outPriceSub"></div>
+              <div style="margin-top:8px;font-size:11px;color:var(--t4)">Build time: <strong id="outTime" style="color:var(--t2)"></strong>h</div>
+            </div>
+            <div class="output-section">
+              <div class="output-section-title">Outreach message</div>
+              <div class="output-text" id="outEmail" style="font-size:12px;max-height:100px;overflow:hidden"></div>
+              <button class="copy-btn" onclick="copyText('outEmail')">Copy</button>
+            </div>
+          </div>
+
+          <!-- AI PROMPT (hidden - embedded in blueprint) -->
+          <div style="display:none">
+            <div id="outPrompt"></div>
+            <div id="outModules"></div>
+            <div id="outPriceSub2"></div>
+          </div>
+          <div id="modulesSection" style="display:none"></div>
+
+          <!-- PROPOSAL BUTTON -->
+          <div style="margin-top:16px">
+            <button class="generate-btn" id="proposalBtn" onclick="openProposalModal()" style="background:var(--bg2);border:1px solid var(--border2);color:var(--r)">
+              <span>📄</span> Generate Client Proposal
             </button>
           </div>
-        </div>
 
-        <!-- OUTPUT CARD -->
-        <div class="studio-card" id="studioOutput" style="display:none">
-          <div class="output-placeholder" id="wizardPlaceholder" style="display:none">
-            <span class="icon">⚡</span>
-            <span>Your plan will appear here.</span>
-          </div>
-          <div class="output-content" id="wizardOutput">
+        </div><!-- end studioOutput -->
 
-            <!-- BLUEPRINT HERO -->
-            <div class="bp-hero" id="bpHero">
-              <div class="bp-hero-check">✓</div>
-              <div class="bp-hero-title" id="bpHeroTitle">Blueprint Ready</div>
-              <div class="bp-hero-sub" id="bpHeroSub">Customized for your automation — import it directly into Make.com</div>
-              <div class="bp-hero-actions">
-                <a id="bpDownloadBtn" href="#" download="automation-blueprint.json" class="bp-hero-btn bp-hero-btn-primary">⬇ Download Blueprint (.json)</a>
-                <button id="bpImportBtn" class="bp-hero-btn bp-hero-btn-secondary" onclick="importBlueprintInMake()">⬇ Import in Make.com</button>
-              </div>
-            </div>
+        <!-- hidden -->
+        <div id="wizardOutput" style="display:none" class="output-content"></div>
+        <div id="wizardPlaceholder" style="display:none"></div>
 
-            <!-- IMPORT GUIDE -->
-            <div class="import-guide">
-              <div class="import-guide-title">How to import in Make.com — 5 steps</div>
-              <div class="import-steps">
-                <div class="import-step"><div class="step-num">1</div><div class="step-text">Go to <strong>make.com</strong> → click <strong style="color:var(--r)">Create a new scenario</strong></div></div>
-                <div class="import-step"><div class="step-num">2</div><div class="step-text">Click the <strong>... (three dots)</strong> icon top-right → click <strong>Import Blueprint</strong> → upload the .json file you downloaded</div></div>
-                <div class="import-step"><div class="step-num">3</div><div class="step-text">Connect your apps: <strong id="importNeeds">OpenAI account + the required platform accounts</strong></div></div>
-                <div class="import-step"><div class="step-num">4</div><div class="step-text">The <strong>AI system prompt is already written</strong> and embedded in the blueprint — no manual editing needed</div></div>
-                <div class="import-step"><div class="step-num">5</div><div class="step-text">Click the <strong>ON / OFF toggle</strong> at the bottom left of Make.com → <strong style="color:var(--green)">Done — it's live!</strong></div></div>
-              </div>
-            </div>
-
-            <!-- WHAT IT DOES -->
-            <div class="output-section">
-              <div class="output-section-title">What Gets Built</div>
-              <div class="output-text" id="outWhat"></div>
-            </div>
-
-            <!-- SYSTEM PROMPT -->
-            <div class="output-section">
-              <div class="output-section-title">AI System Prompt (already embedded in blueprint)</div>
-              <div class="output-text" id="outPrompt" style="max-height:130px;overflow:hidden"></div>
-              <button class="copy-btn" onclick="copyText('outPrompt')">Copy Prompt</button>
-            </div>
-
-            <!-- PRICING + OUTREACH -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div class="output-section">
-                <div class="output-section-title">Pricing</div>
-                <div class="output-price" id="outPrice"></div>
-                <div class="output-price-sub" id="outPriceSub"></div>
-                <div style="margin-top:10px;font-size:11px;color:var(--t4)">Build time: <strong id="outTime" style="color:var(--t2)"></strong>h</div>
-              </div>
-              <div class="output-section">
-                <div class="output-section-title">Outreach Message</div>
-                <div class="output-text" id="outEmail" style="font-size:12px;max-height:100px;overflow:hidden"></div>
-                <button class="copy-btn" onclick="copyText('outEmail')">Copy</button>
-              </div>
-            </div>
-
-            <!-- DETAILED GUIDE (collapsible) -->
-            <div class="output-section" id="modulesSection" style="display:none">
-              <div class="output-section-title" style="cursor:pointer" onclick="toggleModules()">▸ Detailed Make.com Build Guide <span style="font-weight:400;color:var(--t4)">(advanced)</span></div>
-              <div id="outModulesWrap" style="display:none;margin-top:10px">
-                <div class="output-text" id="outModules"></div>
-                <button class="copy-btn" onclick="copyText('outModules')">Copy Guide</button>
-              </div>
-            </div>
-
-            <!-- ACTIONS -->
-            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
-              <button class="generate-btn" id="proposalBtn" onclick="openProposalModal()" style="background:var(--bg2);border:1px solid var(--border2);color:var(--r)">
-                <span>📄</span> Generate Client Proposal
-              </button>
-              <button class="generate-btn" id="activateBtn" onclick="openActivateModal()" style="background:var(--bg3);border:1px solid #222;color:var(--t3)">
-                <span>▶</span> Activate on AutoFlow Servers (no Make.com)
-              </button>
-            </div>
-
-          </div>
-        </div>
-      </div>
+      </div><!-- end studio-wrap -->
     </div>
 
     <!-- MY AUTOMATIONS PAGE -->
@@ -2164,13 +2247,12 @@ function useChip(el){
 // AUTOMATION WIZARD
 async function generateAutomation(){
   const description = document.getElementById('wDescription').value.trim();
-  const client = document.getElementById('wClient').value.trim();
-  const budget = document.getElementById('wBudget').value;
+  const client = '';
+  const budget = 'Unknown / To discuss';
   if(!description || description.length < 20){ notify('Please describe the automation you want to build (at least 20 characters).', 'error'); return; }
   const btn = document.getElementById('generateBtn');
-  btn.disabled = true; btn.innerHTML = '<span>⏳</span> Generating...';
+  btn.disabled = true; btn.innerHTML = '<span class="studio-gen-icon">⏳</span><span class="studio-gen-text"> Generating your automation...</span>';
   document.getElementById('wizardPlaceholder').style.display = 'none';
-  document.getElementById('wizardOutput').classList.remove('visible');
   try {
     const r = await fetch(API+'/api/ai/generate', {
       method: 'POST',
@@ -2225,7 +2307,7 @@ Respond ONLY with this exact JSON (no markdown, no extra text):
     if(data.modules) document.getElementById('modulesSection').style.display = 'block';
 
     document.getElementById('studioOutput').style.display = 'block';
-    document.getElementById('wizardOutput').classList.add('visible');
+    document.getElementById('studioOutput').scrollIntoView({behavior:'smooth', block:'start'});
 
     // Build and customize the Make.com blueprint automatically
     buildBlueprint(description, client, data.prompt || '', data.what || description);
@@ -2234,7 +2316,7 @@ Respond ONLY with this exact JSON (no markdown, no extra text):
     notify('Generation failed. Check your connection.', 'error');
     document.getElementById('wizardPlaceholder').style.display = 'flex';
   }
-  btn.disabled = false; btn.innerHTML = '<span>⚡</span> Generate Automation Plan';
+  btn.disabled = false; btn.innerHTML = '<span class="studio-gen-icon">⚡</span><span class="studio-gen-text"> Generate My Automation</span>';
 }
 
 function copyText(id){
@@ -2280,8 +2362,7 @@ async function buildBlueprint(description, clientName, systemPrompt, whatItDoes)
     var type = detectBlueprintType(description);
     wizardBlueprintFile = type.file;
 
-    // Update import guide needs
-    document.getElementById('importNeeds').textContent = type.needs;
+    // Update import guide needs (element removed in new design)
 
     // Fetch the template
     var r = await fetch('/blueprints/' + type.file);
