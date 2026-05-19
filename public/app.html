@@ -99,28 +99,41 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
 .form-select option{background:#0f0f0f}
 .form-textarea{resize:vertical;min-height:90px;line-height:1.6}
 
-/* WIZARD */
-.wizard-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
-.wizard-form,.wizard-output{background:var(--bg2);border:1px solid #111;border-radius:14px;padding:26px}
-.wizard-output{display:flex;flex-direction:column}
-.generate-btn{width:100%;padding:13px;background:var(--r);border:none;border-radius:9px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#fff;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:10px}
-.generate-btn:hover{background:var(--r2);transform:translateY(-1px)}
-.generate-btn:disabled{opacity:.5;cursor:wait;transform:none}
-.output-placeholder{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--t4);font-size:13px;min-height:300px;text-align:center}
-.output-placeholder .icon{font-size:40px;opacity:.2}
+/* AUTOMATION STUDIO */
+.studio-wrap{max-width:800px;margin:0 auto;width:100%}
+.studio-hero{text-align:center;padding:32px 0 28px;position:relative}
+.studio-hero::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:600px;height:200px;background:radial-gradient(ellipse 60% 80% at 50% 0%,rgba(229,62,46,.12) 0%,transparent 70%);pointer-events:none}
+.studio-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(229,62,46,.08);border:1px solid rgba(229,62,46,.2);border-radius:20px;padding:5px 14px;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--r);margin-bottom:18px}
+.studio-title{font-size:clamp(26px,4vw,36px);font-weight:900;letter-spacing:-1.5px;color:#fff;margin-bottom:10px;line-height:1.1}
+.studio-title span{background:linear-gradient(135deg,#E53E2E 0%,#ff7a6b 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.studio-sub{font-size:13px;color:var(--t4);max-width:480px;margin:0 auto;line-height:1.7}
+.studio-card{background:var(--bg2);border:1px solid #181818;border-radius:18px;padding:28px;margin-bottom:16px;position:relative;overflow:hidden}
+.studio-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(229,62,46,.3),transparent)}
+.studio-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--r);font-weight:700;margin-bottom:10px}
+.studio-textarea{width:100%;background:#050505;border:1px solid #1e1e1e;border-radius:12px;padding:16px;font-family:'Inter',sans-serif;font-size:13px;color:var(--t2);line-height:1.75;resize:none;min-height:140px;transition:border-color .2s,box-shadow .2s;outline:none}
+.studio-textarea:focus{border-color:rgba(229,62,46,.35);box-shadow:0 0 0 3px rgba(229,62,46,.06)}
+.studio-textarea::placeholder{color:var(--t4)}
+.studio-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.chip{background:rgba(255,255,255,.03);border:1px solid #1e1e1e;border-radius:20px;padding:6px 14px;font-family:'Inter',sans-serif;font-size:11px;color:var(--t4);cursor:pointer;transition:all .2s;font-weight:500}
+.chip:hover{border-color:rgba(229,62,46,.4);color:var(--r);background:rgba(229,62,46,.05)}
+.studio-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.generate-btn{width:100%;padding:16px;background:var(--r);border:none;border-radius:12px;font-family:'Inter',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#fff;cursor:pointer;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 24px rgba(229,62,46,.25)}
+.generate-btn:hover{background:var(--r2);transform:translateY(-2px);box-shadow:0 8px 32px rgba(229,62,46,.4)}
+.generate-btn:disabled{opacity:.4;cursor:wait;transform:none;box-shadow:none}
+.output-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--t4);font-size:13px;min-height:220px;text-align:center}
+.output-placeholder .icon{font-size:44px;opacity:.12}
 .output-content{display:none;flex-direction:column;gap:14px}
 .output-content.visible{display:flex}
-.output-section{background:var(--bg3);border:1px solid #1a1a1a;border-radius:10px;padding:16px}
+.output-section{background:#050505;border:1px solid #181818;border-radius:12px;padding:18px}
 .output-section-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--r);margin-bottom:10px;font-weight:700}
 .output-text{font-size:13px;color:var(--t2);line-height:1.75;white-space:pre-wrap}
-.output-price{font-size:26px;font-weight:900;color:var(--r);letter-spacing:-1px}
+.output-price{font-size:30px;font-weight:900;color:var(--r);letter-spacing:-1.5px}
 .output-price-sub{font-size:12px;color:var(--t4);margin-top:4px}
-.copy-btn{background:var(--bg4);border:1px solid #1a1a1a;border-radius:6px;padding:6px 14px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;transition:all .2s;margin-top:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700}
+.copy-btn{background:transparent;border:1px solid #222;border-radius:7px;padding:7px 16px;font-family:'Inter',sans-serif;font-size:10px;color:var(--t4);cursor:pointer;transition:all .2s;margin-top:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700}
 .copy-btn:hover{border-color:var(--r);color:var(--r)}
 .download-bp-btn{background:rgba(229,62,46,.08);border:1px solid var(--border2);border-radius:8px;padding:11px 18px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;color:var(--r);cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:8px;text-decoration:none;margin-top:14px;letter-spacing:.3px}
 .download-bp-btn:hover{background:rgba(229,62,46,.14);transform:translateY(-1px)}
-.chip{background:var(--bg3);border:1px solid #1a1a1a;border-radius:20px;padding:6px 13px;font-family:'Inter',sans-serif;font-size:11px;color:var(--t3);cursor:pointer;transition:all .2s;font-weight:500}
-.chip:hover{border-color:var(--r);color:var(--r);background:var(--r3)}
+@media(max-width:768px){.studio-row{grid-template-columns:1fr}.studio-hero{padding:20px 0 18px}}
 
 /* CHAT */
 .chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 120px)}
@@ -356,7 +369,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
         <span class="nav-icon">◈</span>Dashboard
       </div>
       <div class="nav-item" onclick="showPage('wizard',this)">
-        <span class="nav-icon">⚡</span>Automation Wizard
+        <span class="nav-icon">⚡</span>Automation Studio
       </div>
       <div class="nav-item" onclick="showPage('niche',this)">
         <span class="nav-icon">💡</span>Niche Ideas
@@ -458,28 +471,30 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
       </div>
     </div>
 
-    <!-- AUTOMATION WIZARD -->
+    <!-- AUTOMATION STUDIO -->
     <div class="page" id="page-wizard">
-      <div class="wizard-grid">
-        <div class="wizard-form">
-          <div class="section-title" style="margin-bottom:6px">Automation Generator</div>
-          <div style="font-size:12px;color:var(--t4);margin-bottom:18px;line-height:1.6">Describe what you want to automate in plain language — the app will generate a complete, step-by-step build plan.</div>
-          <div class="form-group">
-            <label class="form-label">Describe the automation *</label>
-            <textarea class="form-textarea" id="wDescription" style="min-height:130px;font-size:13px;line-height:1.7" placeholder="e.g. A restaurant gets 60+ WhatsApp messages per day asking about the menu and table reservations. I want an AI bot that replies automatically, answers menu questions, and sends a booking link when someone asks to reserve a table."></textarea>
+      <div class="studio-wrap">
+
+        <!-- HERO -->
+        <div class="studio-hero">
+          <div class="studio-badge">⚡ Automation Studio</div>
+          <div class="studio-title">Build any automation<br><span>in seconds</span></div>
+          <div class="studio-sub">Describe what you want — we generate a ready-to-import Make.com blueprint + complete build guide.</div>
+        </div>
+
+        <!-- INPUT CARD -->
+        <div class="studio-card">
+          <div class="studio-label">Describe your automation</div>
+          <textarea class="studio-textarea" id="wDescription" placeholder="e.g. A restaurant gets 60+ WhatsApp messages per day. I want an AI bot that replies automatically, answers menu questions, and sends a booking link when someone asks to reserve a table."></textarea>
+          <div class="studio-chips" id="exampleChips">
+            <button class="chip" onclick="useChip(this)" data-val="A real estate agency gets leads from a contact form on their website. Automatically send a personalized follow-up email to each new lead within 5 minutes, using AI to write the email based on the property they were interested in.">Real estate lead follow-up</button>
+            <button class="chip" onclick="useChip(this)" data-val="A beauty salon receives appointment requests via Instagram DMs. Set up an AI bot that replies instantly, collects the client's name and preferred date, and adds the booking to a Google Sheet automatically.">Salon Instagram DM bot</button>
+            <button class="chip" onclick="useChip(this)" data-val="An e-commerce store wants to automatically send unpaid invoice reminders via WhatsApp 24h and 72h after a purchase is made but not paid.">E-commerce payment reminders</button>
+            <button class="chip" onclick="useChip(this)" data-val="A consultant wants to run cold email outreach. Every morning, pull 20 new leads from a Google Sheet, use AI to write a personalized cold email for each one, and send them via Gmail automatically.">Cold email outreach</button>
+            <button class="chip" onclick="useChip(this)" data-val="A dental clinic wants to send automated appointment reminders via WhatsApp 24 hours before each appointment. Pull appointments from Google Sheets and send a custom AI-written reminder.">Dental appointment reminders</button>
+            <button class="chip" onclick="useChip(this)" data-val="A fitness gym wants to post motivational content to Instagram and Facebook every day at 8am automatically. Use AI to generate fresh captions with relevant hashtags.">Daily social media auto-post</button>
           </div>
-          <div style="margin-bottom:18px">
-            <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t4);margin-bottom:10px;font-weight:700">Or pick an example</div>
-            <div style="display:flex;flex-wrap:wrap;gap:7px" id="exampleChips">
-              <button class="chip" onclick="useChip(this)" data-val="A real estate agency gets leads from a contact form on their website. Automatically send a personalized follow-up email to each new lead within 5 minutes, using AI to write the email based on the property they were interested in.">Real estate lead follow-up</button>
-              <button class="chip" onclick="useChip(this)" data-val="A beauty salon receives appointment requests via Instagram DMs. Set up an AI bot that replies instantly, collects the client's name and preferred date, and adds the booking to a Google Sheet automatically.">Salon Instagram DM bot</button>
-              <button class="chip" onclick="useChip(this)" data-val="An e-commerce store wants to automatically send unpaid invoice reminders via WhatsApp 24h and 72h after a purchase is made but not paid. The message should include the invoice link and a friendly AI-written reminder.">E-commerce payment reminders</button>
-              <button class="chip" onclick="useChip(this)" data-val="A consultant wants to run cold email outreach. Every morning, pull 20 new leads from a Google Sheet, use AI to write a personalized cold email for each one, and send them via Gmail automatically.">Cold email outreach system</button>
-              <button class="chip" onclick="useChip(this)" data-val="A dental clinic wants to send automated appointment reminders via WhatsApp 24 hours before each appointment. Pull appointments from Google Sheets and send a custom AI-written reminder with the patient's name and appointment details.">Dental appointment reminders</button>
-              <button class="chip" onclick="useChip(this)" data-val="A fitness gym wants to post motivational content to Instagram and Facebook every day at 8am automatically. Use AI to generate fresh captions with relevant hashtags from a list of topics I provide.">Daily social media auto-post</button>
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:17px">
+          <div class="studio-row">
             <div>
               <label class="form-label">Client name (optional)</label>
               <input class="form-input" id="wClient" placeholder="e.g. Mario's Restaurant">
@@ -495,16 +510,18 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
               </select>
             </div>
           </div>
-          <button class="generate-btn" id="generateBtn" onclick="generateAutomation()">
-            <span>⚡</span> Generate Automation Plan
-          </button>
+          <div style="margin-top:20px">
+            <button class="generate-btn" id="generateBtn" onclick="generateAutomation()">
+              <span>⚡</span> Generate Automation Plan
+            </button>
+          </div>
         </div>
 
-        <div class="wizard-output">
-          <div class="section-title" style="margin-bottom:20px">Your Automation Plan</div>
-          <div class="output-placeholder" id="wizardPlaceholder">
+        <!-- OUTPUT CARD -->
+        <div class="studio-card" id="studioOutput" style="display:none">
+          <div class="output-placeholder" id="wizardPlaceholder" style="display:none">
             <span class="icon">⚡</span>
-            <span>Describe what you want to automate and click Generate — you'll get a ready-to-import Make.com blueprint + complete plan.</span>
+            <span>Your plan will appear here.</span>
           </div>
           <div class="output-content" id="wizardOutput">
 
@@ -1164,7 +1181,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
       <span class="mob-icon">◈</span>Home
     </button>
     <button class="mob-btn" id="mob-wizard" onclick="showPage('wizard',null);setMobActive('mob-wizard')">
-      <span class="mob-icon">⚡</span>Wizard
+      <span class="mob-icon">⚡</span>Studio
     </button>
     <button class="mob-btn" id="mob-niche" onclick="showPage('niche',null);setMobActive('mob-niche')">
       <span class="mob-icon">💡</span>Niche
@@ -1262,7 +1279,7 @@ const LANGUAGES = [
 const TRANSLATIONS = {
   en:{
     // nav
-    nav_dashboard:'Dashboard', nav_wizard:'Automation Wizard', nav_mybots:'My Automations',
+    nav_dashboard:'Dashboard', nav_wizard:'Automation Studio', nav_mybots:'My Automations',
     nav_blueprints:'Blueprint Library', nav_niche:'Niche Ideas', nav_chat:'AI Assistant', nav_email:'Email Outreach',
     nav_tracker:'Client Tracker', nav_logs:'Activity Logs',
     // mobile nav
@@ -1326,7 +1343,7 @@ const TRANSLATIONS = {
     loading:'Loading...', confirm_delete:'Delete this automation? This cannot be undone.'
   },
   ro:{
-    nav_dashboard:'Panou principal', nav_wizard:'Generator automatizări', nav_mybots:'Automatizările mele',
+    nav_dashboard:'Panou principal', nav_wizard:'Automation Studio', nav_mybots:'Automatizările mele',
     nav_blueprints:'Bibliotecă blueprint', nav_niche:'Idei nișă', nav_chat:'Asistent AI', nav_email:'Email outreach',
     nav_tracker:'Tracker clienți', nav_logs:'Jurnale activitate',
     mob_home:'Acasă', mob_mybots:'Boții mei', mob_wizard:'Generator', mob_chat:'Chat AI', mob_logs:'Jurnale',
@@ -1376,7 +1393,7 @@ const TRANSLATIONS = {
     loading:'Se încarcă...', confirm_delete:'Ștergi automatizarea? Acțiunea e ireversibilă.'
   },
   de:{
-    nav_dashboard:'Dashboard', nav_wizard:'Automatisierungs-Assistent', nav_mybots:'Meine Automatisierungen',
+    nav_dashboard:'Dashboard', nav_wizard:'Automation Studio', nav_mybots:'Meine Automatisierungen',
     nav_blueprints:'Blueprint-Bibliothek', nav_chat:'KI-Assistent', nav_email:'E-Mail-Outreach',
     nav_tracker:'Kunden-Tracker', nav_logs:'Aktivitätsprotokolle',
     mob_home:'Start', mob_mybots:'Meine Bots', mob_wizard:'Assistent', mob_chat:'KI-Chat', mob_logs:'Protokolle',
@@ -1426,7 +1443,7 @@ const TRANSLATIONS = {
     loading:'Laden...', confirm_delete:'Automatisierung löschen? Diese Aktion kann nicht rückgängig gemacht werden.'
   },
   fr:{
-    nav_dashboard:'Tableau de bord', nav_wizard:'Assistant automatisation', nav_mybots:'Mes automatisations',
+    nav_dashboard:'Tableau de bord', nav_wizard:'Automation Studio', nav_mybots:'Mes automatisations',
     nav_blueprints:'Bibliothèque', nav_chat:'Assistant IA', nav_email:'Campagne email',
     nav_tracker:'Suivi clients', nav_logs:'Journaux',
     mob_home:'Accueil', mob_mybots:'Mes Bots', mob_wizard:'Assistant', mob_chat:'Chat IA', mob_logs:'Journaux',
@@ -1476,7 +1493,7 @@ const TRANSLATIONS = {
     loading:'Chargement...', confirm_delete:'Supprimer cette automatisation ? Cette action est irréversible.'
   },
   es:{
-    nav_dashboard:'Panel', nav_wizard:'Asistente de automatización', nav_mybots:'Mis automatizaciones',
+    nav_dashboard:'Panel', nav_wizard:'Automation Studio', nav_mybots:'Mis automatizaciones',
     nav_blueprints:'Biblioteca', nav_chat:'Asistente IA', nav_email:'Campaña email',
     nav_tracker:'Seguimiento clientes', nav_logs:'Registros',
     mob_home:'Inicio', mob_mybots:'Mis Bots', mob_wizard:'Asistente', mob_chat:'Chat IA', mob_logs:'Registros',
@@ -1526,7 +1543,7 @@ const TRANSLATIONS = {
     loading:'Cargando...', confirm_delete:'¿Eliminar esta automatización? Esta acción no se puede deshacer.'
   },
   it:{
-    nav_dashboard:'Dashboard', nav_wizard:'Assistente automazione', nav_mybots:'Le mie automazioni',
+    nav_dashboard:'Dashboard', nav_wizard:'Automation Studio', nav_mybots:'Le mie automazioni',
     nav_blueprints:'Biblioteca', nav_chat:'Assistente IA', nav_email:'Email outreach',
     nav_tracker:'Tracker clienti', nav_logs:'Registro attività',
     mob_home:'Home', mob_mybots:'I miei Bot', mob_wizard:'Assistente', mob_chat:'Chat IA', mob_logs:'Registro',
@@ -2151,6 +2168,7 @@ Respond ONLY with this exact JSON (no markdown, no extra text):
     document.getElementById('outEmail').textContent = data.outreach || '';
     if(data.modules) document.getElementById('modulesSection').style.display = 'block';
 
+    document.getElementById('studioOutput').style.display = 'block';
     document.getElementById('wizardOutput').classList.add('visible');
 
     // Build and customize the Make.com blueprint automatically
