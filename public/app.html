@@ -572,7 +572,7 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
             </div>
             <div class="ready-actions">
               <a id="bpDownloadBtn" href="#" download="automation-blueprint.json" class="ready-btn ready-btn-dl">⬇ Download .json</a>
-              <button id="bpImportBtn" class="ready-btn ready-btn-make" onclick="importBlueprintInMake()">Open Make.com →</button>
+              <a id="bpImportBtn" href="https://www.make.com/en/hq/scenarios/create" target="_blank" class="ready-btn ready-btn-make">Open Make.com →</a>
             </div>
           </div>
 
@@ -2408,22 +2408,11 @@ async function buildBlueprint(description, clientName, systemPrompt, whatItDoes)
 
 function importBlueprintInMake() {
   if (!currentBlueprintBlob) { notify('Generate an automation first.', 'error'); return; }
-  if (!makeConfig || !makeConfig.apiKey || !makeConfig.teamId) {
-    // Trigger download + open Make.com
-    var a = document.createElement('a');
-    a.href = currentBlueprintBlob.url;
-    a.download = currentBlueprintBlob.name;
-    a.click();
-    setTimeout(function() {
-      var zone = 'eu1.make.com';
-      window.open('https://' + zone, '_blank');
-      notify('Blueprint downloaded! Now import it: Create scenario → ... → Import Blueprint', 'success');
-    }, 500);
-    return;
+  if (makeConfig && makeConfig.apiKey && makeConfig.teamId) {
+    var btn = document.getElementById('bpImportBtn');
+    createMakeScenarioWithBtn(wizardBlueprintFile, currentBlueprintBlob.name.replace('.json',''), btn);
   }
-  // Connected — create directly via API
-  var btn = document.getElementById('bpImportBtn');
-  createMakeScenarioWithBtn(wizardBlueprintFile, currentBlueprintBlob.name.replace('.json',''), btn);
+  // No Make API — button is already a direct link to make.com
 }
 
 // AI CHAT
