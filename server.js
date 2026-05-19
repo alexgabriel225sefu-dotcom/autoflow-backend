@@ -10,6 +10,7 @@ process.on('uncaughtException', err => console.error('UNCAUGHT EXCEPTION:', err.
 process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION:', err));
 
 const app = express();
+app.set('trust proxy', 1);
 const rateLimit = require('express-rate-limit');
 app.use(cors({
   origin: ['https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'],
@@ -172,9 +173,9 @@ function auth(req, res, next) {
 }
 
 // ── RATE LIMITERS ──
-const _authLimiter = rateLimit({ windowMs: 15*60*1000, max: 10, standardHeaders: true, legacyHeaders: false,
+const _authLimiter = rateLimit({ windowMs: 15*60*1000, max: 50, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many attempts. Try again in 15 minutes.' } });
-const _codeLimiter = rateLimit({ windowMs: 15*60*1000, max: 8, standardHeaders: true, legacyHeaders: false,
+const _codeLimiter = rateLimit({ windowMs: 15*60*1000, max: 30, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many code attempts. Try again in 15 minutes.' } });
 const _aiLimiter   = rateLimit({ windowMs: 60*1000, max: 5, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many AI requests. Slow down.' } });
