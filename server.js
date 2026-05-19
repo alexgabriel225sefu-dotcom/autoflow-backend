@@ -225,7 +225,7 @@ app.post('/api/auth/login', _authLimiter, async (req, res) => {
     }
 
     // Fallback hardcoded admin access
-    if (email.toLowerCase() === ADMIN_EMAIL && code.toUpperCase() === ADMIN_CODE) {
+    if (email.toLowerCase() === ADMIN_EMAIL && code.toUpperCase() === ADMIN_CODE.toUpperCase()) {
       const user = { id: 'admin', email: email.toLowerCase(), name: 'Admin', plan: 'pro' };
       const token = createToken(user);
       addLog(`Admin logged in: ${email}`, 'auth', 'success');
