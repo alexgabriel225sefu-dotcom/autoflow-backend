@@ -358,27 +358,14 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
       <div class="nav-item" onclick="showPage('wizard',this)">
         <span class="nav-icon">⚡</span>Automation Wizard
       </div>
-      <div class="nav-item" onclick="showPage('myautomations',this)">
-        <span class="nav-icon">▶</span>My Automations
+      <div class="nav-item" onclick="showPage('niche',this)">
+        <span class="nav-icon">💡</span>Niche Ideas
       </div>
       <div class="nav-item" onclick="showPage('blueprints',this)">
         <span class="nav-icon">⬇</span>Blueprint Library
       </div>
-      <div class="nav-item" onclick="showPage('niche',this)">
-        <span class="nav-icon">💡</span>Niche Ideas
-      </div>
-      <div class="nav-item" onclick="showPage('chat',this)">
-        <span class="nav-icon">◎</span>AI Assistant
-      </div>
-      <div class="nav-item" onclick="showPage('email',this)">
-        <span class="nav-icon">✉</span>Email Outreach
-      </div>
-      <div class="nav-divider"></div>
-      <div class="nav-item" onclick="showPage('tracker',this)">
-        <span class="nav-icon">◉</span>Client Tracker
-      </div>
-      <div class="nav-item" onclick="showPage('logs',this)">
-        <span class="nav-icon">≡</span>Activity Logs
+      <div class="nav-item" onclick="showPage('myautomations',this)">
+        <span class="nav-icon">▶</span>My Automations
       </div>
     </div>
     <div class="sidebar-bottom">
@@ -1182,11 +1169,11 @@ body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflo
     <button class="mob-btn" id="mob-niche" onclick="showPage('niche',null);setMobActive('mob-niche')">
       <span class="mob-icon">💡</span>Niche
     </button>
-    <button class="mob-btn" id="mob-myautomations" onclick="showPage('myautomations',null);setMobActive('mob-myautomations')">
-      <span class="mob-icon">▶</span>My Bots
+    <button class="mob-btn" id="mob-blueprints" onclick="showPage('blueprints',null);setMobActive('mob-blueprints')">
+      <span class="mob-icon">⬇</span>Blueprints
     </button>
-    <button class="mob-btn" id="mob-chat" onclick="showPage('chat',null);setMobActive('mob-chat')">
-      <span class="mob-icon">◎</span>AI Chat
+    <button class="mob-btn" id="mob-myautomations" onclick="showPage('myautomations',null);setMobActive('mob-myautomations')">
+      <span class="mob-icon">▶</span>My Plans
     </button>
   </div>
 </nav>
@@ -1607,7 +1594,7 @@ function applyTranslations(){
 
   // nav items
   const navItems = document.querySelectorAll('.nav-item');
-  const navKeys = ['nav_dashboard','nav_wizard','nav_mybots','nav_blueprints','nav_niche','nav_chat','nav_email','nav_tracker','nav_logs'];
+  const navKeys = ['nav_dashboard','nav_wizard','nav_niche','nav_blueprints','nav_mybots'];
   navItems.forEach((el,i) => { if(navKeys[i]){ const icon = el.querySelector('.nav-icon'); el.innerHTML = ''; if(icon) el.appendChild(icon); el.append(t(navKeys[i])); } });
 
   // mobile nav
