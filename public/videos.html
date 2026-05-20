@@ -122,55 +122,52 @@ h1{font-size:18px;color:#E53E2E;margin-bottom:4px;text-align:center;font-weight:
 <script>
 /* ═══════ SVG SCENE TEMPLATES ═══════ */
 const SC={
-  trading:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
+  trading:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="240" height="340">
     <rect width="240" height="340" fill="#080808"/>
-    <rect width="240" height="340" fill="url(#rg)"/>
-    <defs><radialGradient id="rg" cx="50%" cy="80%"><stop offset="0%" stop-color="#E53E2E" stop-opacity=".06"/><stop offset="100%" stop-color="transparent"/></radialGradient></defs>
-    <!-- grid -->
-    <line x1="22" y1="55" x2="218" y2="55" stroke="#151515" stroke-width="1"/>
-    <line x1="22" y1="95" x2="218" y2="95" stroke="#151515" stroke-width="1"/>
-    <line x1="22" y1="135" x2="218" y2="135" stroke="#151515" stroke-width="1"/>
-    <line x1="22" y1="175" x2="218" y2="175" stroke="#151515" stroke-width="1"/>
-    <!-- green candles -->
-    <g class="c1"><rect x="28" y="158" width="14" height="22" fill="#4ADE80" rx="2"/><line x1="35" y1="153" x2="35" y2="184" stroke="#4ADE80" stroke-width="1.5"/></g>
-    <g class="c2"><rect x="55" y="138" width="14" height="32" fill="#4ADE80" rx="2"/><line x1="62" y1="132" x2="62" y2="175" stroke="#4ADE80" stroke-width="1.5"/></g>
-    <g class="c3"><rect x="82" y="112" width="14" height="42" fill="#4ADE80" rx="2"/><line x1="89" y1="106" x2="89" y2="158" stroke="#4ADE80" stroke-width="1.5"/></g>
-    <!-- crash candles -->
-    <g class="c4r"><rect x="109" y="118" width="14" height="58" fill="#E53E2E" rx="2"/><line x1="116" y1="108" x2="116" y2="182" stroke="#E53E2E" stroke-width="1.5"/></g>
-    <g class="c5r"><rect x="136" y="135" width="14" height="48" fill="#E53E2E" rx="2"/><line x1="143" y1="125" x2="143" y2="188" stroke="#E53E2E" stroke-width="1.5"/></g>
-    <g class="c6r"><rect x="163" y="150" width="14" height="38" fill="#E53E2E" rx="2"/><line x1="170" y1="142" x2="170" y2="193" stroke="#E53E2E" stroke-width="1.5"/></g>
-    <!-- crash line -->
-    <polyline class="crash-ln" points="89,106 116,108 143,125 170,142 198,175" stroke="#E53E2E" stroke-width="2.5" fill="none" opacity=".7"/>
-    <!-- arrow down -->
-    <text x="198" y="195" fill="#E53E2E" font-size="18" class="c6r">↓</text>
-    <!-- big X -->
-    <text class="x-pop" x="120" y="248" text-anchor="middle" fill="#E53E2E" font-size="52" font-family="sans-serif">❌</text>
-    <text x="120" y="286" text-anchor="middle" fill="#E53E2E" font-size="24" font-weight="900" font-family="-apple-system,sans-serif">TRADING</text>
-    <text x="120" y="310" text-anchor="middle" fill="#666" font-size="14" font-family="-apple-system,sans-serif">Lost $2,400</text>
+    <!-- broker photo -->
+    <image href="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=240&h=190&q=72" x="0" y="0" width="240" height="190" preserveAspectRatio="xMidYMid slice"/>
+    <!-- dark overlay -->
+    <rect x="0" y="0" width="240" height="190" fill="rgba(8,8,8,0.58)"/>
+    <!-- red chart crash line over photo -->
+    <polyline class="crash-ln" points="15,130 55,100 90,80 125,95 165,138 218,185" stroke="#E53E2E" stroke-width="3" fill="none"/>
+    <polygon class="c5r" points="214,178 224,192 206,192" fill="#E53E2E"/>
+    <!-- candle shadows on photo -->
+    <g class="c1" opacity=".55"><rect x="28" y="148" width="10" height="22" fill="#4ADE80" rx="1"/></g>
+    <g class="c2" opacity=".55"><rect x="50" y="128" width="10" height="32" fill="#4ADE80" rx="1"/></g>
+    <g class="c3" opacity=".55"><rect x="72" y="108" width="10" height="42" fill="#4ADE80" rx="1"/></g>
+    <g class="c4r" opacity=".7"><rect x="94" y="108" width="10" height="52" fill="#E53E2E" rx="1"/></g>
+    <g class="c5r" opacity=".7"><rect x="116" y="122" width="10" height="48" fill="#E53E2E" rx="1"/></g>
+    <!-- bottom section -->
+    <rect x="0" y="190" width="240" height="150" fill="#080808"/>
+    <text class="x-pop" x="120" y="244" text-anchor="middle" fill="#E53E2E" font-size="50">❌</text>
+    <text x="120" y="278" text-anchor="middle" fill="#E53E2E" font-size="24" font-weight="900" font-family="-apple-system,sans-serif">TRADING</text>
+    <text x="120" y="300" text-anchor="middle" fill="#555" font-size="13" font-family="-apple-system,sans-serif">Lost $2,400 · 6 months wasted</text>
+    <text x="120" y="320" text-anchor="middle" fill="#333" font-size="11" font-family="-apple-system,sans-serif">90% of traders lose money</text>
   </svg>`,
 
-  drop:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
+  drop:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="240" height="340">
     <rect width="240" height="340" fill="#080808"/>
-    <!-- boxes -->
-    <g class="c1">
-      <rect x="80" y="130" width="80" height="70" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5" rx="4"/>
-      <line x1="80" y1="155" x2="160" y2="155" stroke="#2a2a2a" stroke-width="1"/>
-      <line x1="120" y1="130" x2="120" y2="200" stroke="#2a2a2a" stroke-width="1"/>
-      <text x="120" y="172" text-anchor="middle" fill="#333" font-size="11" font-family="sans-serif">SHIPMENT</text>
-    </g>
-    <g class="c2">
-      <rect x="58" y="200" width="124" height="14" fill="#222" rx="3"/>
-    </g>
-    <!-- sad face on box -->
-    <g class="box-shake c3">
-      <circle cx="105" cy="163" r="3" fill="#444"/>
-      <circle cx="135" cy="163" r="3" fill="#444"/>
-      <path d="M 105 178 Q 120 172 135 178" stroke="#444" stroke-width="2" fill="none" stroke-linecap="round"/>
-    </g>
-    <!-- 0 orders -->
-    <text class="x-pop" x="120" y="250" text-anchor="middle" fill="#E53E2E" font-size="48">❌</text>
-    <text x="120" y="285" text-anchor="middle" fill="#E53E2E" font-size="22" font-weight="900" font-family="-apple-system,sans-serif">DROPSHIPPING</text>
-    <text x="120" y="308" text-anchor="middle" fill="#666" font-size="13" font-family="-apple-system,sans-serif">0 profit · 3 months wasted</text>
+    <!-- product photo -->
+    <image href="https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&w=240&h=190&q=72" x="0" y="0" width="240" height="190" preserveAspectRatio="xMidYMid slice"/>
+    <!-- dark overlay -->
+    <rect x="0" y="0" width="240" height="190" fill="rgba(8,8,8,0.6)"/>
+    <!-- stat pills over photo -->
+    <rect class="c2" x="10" y="12" width="98" height="38" fill="rgba(6,6,6,0.88)" stroke="#1c1c1c" stroke-width="1" rx="7"/>
+    <text class="c2" x="59" y="28" text-anchor="middle" fill="#555" font-size="8" font-family="sans-serif">ORDERS</text>
+    <text class="c3" x="59" y="45" text-anchor="middle" fill="#E53E2E" font-size="18" font-weight="900" font-family="sans-serif">0</text>
+    <rect class="c3" x="132" y="12" width="98" height="38" fill="rgba(6,6,6,0.88)" stroke="#1c1c1c" stroke-width="1" rx="7"/>
+    <text class="c3" x="181" y="28" text-anchor="middle" fill="#555" font-size="8" font-family="sans-serif">PROFIT</text>
+    <text class="c4r" x="181" y="45" text-anchor="middle" fill="#E53E2E" font-size="18" font-weight="900" font-family="sans-serif">$0</text>
+    <!-- ads burned label -->
+    <rect class="c4r" x="10" y="155" width="220" height="26" fill="rgba(6,6,6,0.9)" stroke="#E53E2E" stroke-width=".5" rx="6"/>
+    <text class="c5r" x="120" y="164" text-anchor="middle" fill="#666" font-size="8" font-family="sans-serif">Ad spend burned</text>
+    <text class="c5r" x="120" y="177" text-anchor="middle" fill="#E53E2E" font-size="10" font-weight="700" font-family="sans-serif">-$1,200 on ads · still 0 sales</text>
+    <!-- bottom -->
+    <rect x="0" y="190" width="240" height="150" fill="#080808"/>
+    <text class="x-pop" x="120" y="244" text-anchor="middle" fill="#E53E2E" font-size="50">❌</text>
+    <text x="120" y="278" text-anchor="middle" fill="#E53E2E" font-size="22" font-weight="900" font-family="-apple-system,sans-serif">DROPSHIPPING</text>
+    <text x="120" y="300" text-anchor="middle" fill="#555" font-size="13" font-family="-apple-system,sans-serif">$0 profit · 3 months · $1,200 in ads</text>
+    <text x="120" y="320" text-anchor="middle" fill="#333" font-size="11" font-family="-apple-system,sans-serif">Margins dead · competition brutal</text>
   </svg>`,
 
   crypto:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
@@ -242,27 +239,54 @@ const SC={
     <text x="120" y="314" text-anchor="middle" fill="#666" font-size="13" font-family="-apple-system,sans-serif">$5/hr · burned out</text>
   </svg>`,
 
-  ai:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
-    <rect width="240" height="340" fill="#080808"/>
-    <defs><radialGradient id="gg" cx="50%" cy="50%"><stop offset="0%" stop-color="#4ADE80" stop-opacity=".08"/><stop offset="100%" stop-color="transparent"/></radialGradient></defs>
-    <rect width="240" height="340" fill="url(#gg)"/>
-    <!-- rising chart bars -->
-    <g class="bar1"><rect x="30" y="152" width="22" height="28" fill="#1a4a2a" stroke="#4ADE80" stroke-width="1" rx="3"/></g>
-    <g class="bar2"><rect x="60" y="128" width="22" height="52" fill="#1a4a2a" stroke="#4ADE80" stroke-width="1" rx="3"/></g>
-    <g class="bar3"><rect x="90" y="100" width="22" height="80" fill="#1f5a32" stroke="#4ADE80" stroke-width="1.5" rx="3"/></g>
-    <g class="bar4"><rect x="120" y="70" width="22" height="110" fill="#245e38" stroke="#4ADE80" stroke-width="2" rx="3"/></g>
-    <!-- rising line -->
-    <polyline class="rise-ln" points="20,185 41,165 71,145 101,115 131,85 165,55" stroke="#4ADE80" stroke-width="2.5" fill="none" stroke-dasharray="350"/>
-    <!-- arrow up -->
-    <polygon class="chk-pop" points="165,45 172,62 158,62" fill="#4ADE80"/>
+  ai:()=>`<svg viewBox="0 0 240 400" xmlns="http://www.w3.org/2000/svg" width="240" height="400">
+    <rect width="240" height="400" fill="#060606"/>
+    <defs><radialGradient id="gg3" cx="50%" cy="40%"><stop offset="0%" stop-color="#4ADE80" stop-opacity=".07"/><stop offset="100%" stop-color="transparent"/></radialGradient></defs>
+    <rect width="240" height="400" fill="url(#gg3)"/>
+    <!-- ── Blueprint Studio interface mockup ── -->
+    <!-- Header bar -->
+    <rect class="c1" x="0" y="0" width="240" height="32" fill="#060606"/>
+    <text class="c1" x="14" y="21" fill="#E53E2E" font-size="8" font-weight="900" font-family="sans-serif" letter-spacing="1.5">⚡ BLUEPRINT STUDIO</text>
+    <rect class="c1" x="158" y="8" width="72" height="16" fill="#E53E2E" rx="4"/>
+    <text class="c1" x="194" y="20" text-anchor="middle" fill="white" font-size="7" font-weight="700" font-family="sans-serif">Get Access — $97</text>
+    <!-- Input card -->
+    <rect class="c2" x="8" y="38" width="224" height="72" fill="#0f0f0f" stroke="#1c1c1c" stroke-width="1" rx="8"/>
+    <text class="c2" x="16" y="52" fill="#444" font-size="6.5" font-family="sans-serif" letter-spacing=".5">DESCRIBE YOUR AUTOMATION</text>
+    <rect class="c2" x="13" y="57" width="214" height="44" fill="#0a0a0a" stroke="#272727" stroke-width="1" rx="5"/>
+    <text class="c3" x="20" y="73" fill="#777" font-size="8" font-family="sans-serif">WhatsApp AI bot for my</text>
+    <text class="c3" x="20" y="85" fill="#777" font-size="8" font-family="sans-serif">restaurant 🍕 auto-reply 24/7</text>
+    <rect class="c3" x="20" y="88" width="1.5" height="9" fill="#E53E2E"/>
+    <!-- Generate button -->
+    <rect class="c3" x="8" y="116" width="224" height="24" fill="#E53E2E" rx="6"/>
+    <text class="c3" x="120" y="132" text-anchor="middle" fill="white" font-size="9.5" font-weight="700" font-family="sans-serif">⚡ Generate My Automation — Free</text>
+    <!-- What gets built card -->
+    <rect class="c4r" x="8" y="147" width="224" height="48" fill="#0f0f0f" stroke="#1c1c1c" stroke-width="1" rx="7"/>
+    <text class="c4r" x="16" y="160" fill="#444" font-size="6" letter-spacing=".5" font-family="sans-serif">WHAT GETS BUILT</text>
+    <text class="c4r" x="16" y="173" fill="#f0f0f0" font-size="8" font-family="sans-serif">WhatsApp AI bot — automatically replies</text>
+    <text class="c4r" x="16" y="185" fill="#f0f0f0" font-size="8" font-family="sans-serif">to customers 24/7 via Make.com + OpenAI</text>
+    <!-- Price card -->
+    <rect class="c5r" x="8" y="202" width="108" height="50" fill="#0f0f0f" stroke="#1c1c1c" stroke-width="1" rx="7"/>
+    <text class="c5r" x="16" y="215" fill="#444" font-size="6" font-family="sans-serif">YOUR PRICE TO CLIENT</text>
+    <text class="c5r" x="16" y="238" fill="#E53E2E" font-size="24" font-weight="900" font-family="sans-serif">$900</text>
+    <text class="c5r" x="16" y="249" fill="#555" font-size="7" font-family="sans-serif">+$200/month retainer</text>
+    <!-- Locked blueprint card -->
+    <rect class="c5r" x="122" y="202" width="110" height="50" fill="#0f0f0f" stroke="rgba(229,62,46,.35)" stroke-width="1" rx="7"/>
+    <text class="c5r" x="177" y="215" text-anchor="middle" fill="#444" font-size="6" font-family="sans-serif">BLUEPRINT .JSON</text>
+    <text class="x-pop" x="177" y="238" text-anchor="middle" fill="#E53E2E" font-size="20">🔒</text>
+    <text class="c5r" x="177" y="249" text-anchor="middle" fill="#E53E2E" font-size="7" font-weight="700" font-family="sans-serif">LOCKED — $97</text>
+    <!-- FOMO CTA -->
+    <rect class="chk-pop" x="8" y="259" width="224" height="62" fill="#0a0101" stroke="rgba(229,62,46,.25)" stroke-width="1" rx="9"/>
+    <text class="chk-pop" x="120" y="276" text-anchor="middle" fill="#E53E2E" font-size="9" font-weight="700" font-family="sans-serif">⚡ Don't leave $1,200 on the table</text>
+    <rect class="chk-pop" x="14" y="281" width="212" height="30" fill="#E53E2E" rx="7"/>
+    <text class="chk-pop" x="120" y="301" text-anchor="middle" fill="white" font-size="11" font-weight="800" font-family="sans-serif">Unlock Everything — $97</text>
     <!-- floating money -->
-    <text class="money1" x="170" y="120" fill="#4ADE80" font-size="16" font-family="sans-serif">+$900</text>
-    <text class="money2" x="155" y="155" fill="#4ADE80" font-size="13" font-family="sans-serif">+$1,100</text>
-    <text class="money3" x="162" y="185" fill="#4ADE80" font-size="11" font-family="sans-serif">+$800/mo</text>
-    <!-- checkmark -->
-    <text class="chk-pop" x="120" y="262" text-anchor="middle" fill="#4ADE80" font-size="52">✅</text>
-    <text x="120" y="293" text-anchor="middle" fill="#4ADE80" font-size="22" font-weight="900" font-family="-apple-system,sans-serif">AI AGENCY</text>
-    <text x="120" y="315" text-anchor="middle" fill="#4ADE80" font-size="13" font-family="-apple-system,sans-serif" class="puls">$900 · first client · 60 seconds</text>
+    <text class="money1" x="178" y="168" fill="#4ADE80" font-size="13" font-family="sans-serif" font-weight="700">+$900</text>
+    <text class="money2" x="170" y="190" fill="#4ADE80" font-size="11" font-family="sans-serif">+$1,100</text>
+    <text class="money3" x="174" y="210" fill="#4ADE80" font-size="10" font-family="sans-serif">+$800/mo</text>
+    <!-- Result label -->
+    <text class="chk-pop" x="120" y="352" text-anchor="middle" fill="#4ADE80" font-size="22">✅</text>
+    <text class="chk-pop" x="120" y="375" text-anchor="middle" fill="#4ADE80" font-size="20" font-weight="900" font-family="-apple-system,sans-serif">AI AGENCY</text>
+    <text class="chk-pop puls" x="120" y="393" text-anchor="middle" fill="#4ADE80" font-size="11" font-family="-apple-system,sans-serif">$900 first client · built in 60 seconds</text>
   </svg>`,
 };
 
