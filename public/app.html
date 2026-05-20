@@ -488,13 +488,23 @@ function showStudio(){ document.getElementById('screen-login').style.display='no
 function useChip(btn){ document.getElementById('wDesc').value=btn.dataset.val; document.getElementById('wDesc').focus(); }
 
 async function generateAutomation(){
+  const T=UI[lang]||UI.en;
   const desc=document.getElementById('wDesc').value.trim();
-  if(desc.length<20){ notify('Please describe your automation (at least 20 characters).','error'); return; }
+  if(desc.length<20){ notify(T.minChars,'error'); return; }
   const btn=document.getElementById('genBtn');
-  btn.disabled=true; btn.textContent='⏳ Generating…';
+  btn.disabled=true; btn.textContent='⏳ '+T.generating.replace('⏳ ','');
+  const resetBtn=function(){ btn.disabled=false; btn.textContent=T.genBtn; };
   const controller=new AbortController();
-  const timeout=setTimeout(()=>{ controller.abort(); },45000);
+  // Wake up server first (Render free tier sleeps), then generate
+  const pingTimer=setTimeout(function(){
+    btn.textContent='🔄 Starting server…';
+  },5000);
+  const timeout=setTimeout(function(){ controller.abort(); },90000);
   try{
+    // Quick ping to wake server before heavy AI call
+    try{ await fetch(API+'/ping',{signal:controller.signal,method:'GET'}); }catch(_){}
+    clearTimeout(pingTimer);
+    btn.textContent='⏳ '+T.generating.replace('⏳ ','');
     const r=await fetch(API+'/api/ai/generate',{
       method:'POST',
       headers:authHeaders(),
@@ -523,7 +533,7 @@ Return ONLY valid JSON, no markdown:
 }`
       })
     });
-    if(r.status===401){ notify('Session expired. Please sign in again.','error'); doLogout(); return; }
+    if(r.status===401){ notify(T.expired,'error'); doLogout(); resetBtn(); return; }
     const d=await r.json();
     let data={};
     try{
@@ -539,14 +549,15 @@ Return ONLY valid JSON, no markdown:
     lastData=data;
     showOutput(data);
     buildBlueprint(desc, data.prompt||'');
-    notify('Automation generated! ✓','success');
+    notify(T.generated,'success');
   }catch(e){
-    if(e.name==='AbortError') notify('Timeout — AI is slow right now. Try again.','error');
-    else notify('Generation failed. Check your connection.','error');
+    if(e.name==='AbortError') notify(T.timeout,'error');
+    else notify(T.failed,'error');
   }finally{
+    clearTimeout(pingTimer);
     clearTimeout(timeout);
+    resetBtn();
   }
-  btn.disabled=false; btn.textContent='⚡ Generate My Automation';
 }
 
 function showOutput(data){
