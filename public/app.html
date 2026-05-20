@@ -157,25 +157,6 @@ body{background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSyst
 .sicon{width:36px;height:36px;background:#141414;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 /* LANG TOGGLE */
 .lang-toggle{display:flex;align-items:center;gap:4px;background:#141414;border:1px solid var(--border2);border-radius:8px;padding:3px}
-.lang-btn{background:transparent;border:none;color:var(--t3);font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;transition:all .15s;letter-spacing:.5px}
-.lang-btn.active{background:var(--red);color:#fff}
-.lang-btn:not(.active):hover{color:var(--t1)}
-.lang-opt{display:block;width:100%;background:transparent;border:none;color:var(--t2);font-size:12px;font-weight:500;padding:9px 14px;text-align:left;cursor:pointer;transition:background .15s}
-.lang-opt:hover{background:#1e1e1e;color:var(--t1)}
-/* LANG MODAL */
-#langModalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;display:none;align-items:center;justify-content:center;padding:24px}
-#langModalOverlay.open{display:flex}
-.lang-modal{background:#111;border:1px solid var(--border2);border-radius:16px;width:100%;max-width:380px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden}
-.lang-modal-top{padding:16px 16px 12px;border-bottom:1px solid var(--border)}
-.lang-search{width:100%;background:#0d0d0d;border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--t1);font-size:14px;outline:none}
-.lang-search:focus{border-color:var(--red)}
-.lang-list{overflow-y:auto;padding:6px}
-.lang-item{display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:none;color:var(--t2);font-size:13px;padding:9px 10px;border-radius:8px;cursor:pointer;text-align:left;transition:background .12s}
-.lang-item:hover{background:#1a1a1a;color:var(--t1)}
-.lang-item.selected{background:rgba(229,62,46,.1);color:var(--red)}
-.lang-item-flag{font-size:16px;flex-shrink:0}
-.lang-item-name{flex:1}
-.lang-no-results{text-align:center;color:var(--t3);font-size:13px;padding:20px}
 
 /* TOAST */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1a1a;border:1px solid var(--border2);color:var(--t1);padding:12px 20px;border-radius:10px;font-size:14px;font-weight:500;z-index:9999;transition:transform .3s ease;white-space:nowrap;pointer-events:none}
@@ -473,16 +454,6 @@ body{background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSyst
 
     </div><!-- /output-wrap -->
   </main>
-</div>
-
-<!-- LANGUAGE MODAL -->
-<div id="langModalOverlay" onclick="if(event.target===this)closeLangModal()">
-  <div class="lang-modal">
-    <div class="lang-modal-top">
-      <input class="lang-search" id="langSearch" placeholder="Search language / Caută limba…" oninput="filterLangs(this.value)" autocomplete="off">
-    </div>
-    <div class="lang-list" id="langList"></div>
-  </div>
 </div>
 
 <!-- PROPOSAL MODAL -->
@@ -875,106 +846,16 @@ function setHTML(id,val){var e=document.getElementById(id);if(e)e.innerHTML=val;
 function setAttr(id,attr,val){var e=document.getElementById(id);if(e)e.setAttribute(attr,val);}
 function setTxtQ(sel,idx,val){var els=document.querySelectorAll(sel);if(els[idx])els[idx].textContent=val;}
 
-// All 140 world languages
-var LANGUAGES=[
-  {c:'en',f:'🇬🇧',n:'English'},{c:'ro',f:'🇷🇴',n:'Română'},{c:'es',f:'🇪🇸',n:'Español'},
-  {c:'fr',f:'🇫🇷',n:'Français'},{c:'it',f:'🇮🇹',n:'Italiano'},{c:'de',f:'🇩🇪',n:'Deutsch'},
-  {c:'pt',f:'🇵🇹',n:'Português'},{c:'nl',f:'🇳🇱',n:'Nederlands'},{c:'ru',f:'🇷🇺',n:'Русский'},
-  {c:'ar',f:'🇸🇦',n:'العربية'},{c:'zh',f:'🇨🇳',n:'中文 (简体)'},{c:'zh-TW',f:'🇹🇼',n:'中文 (繁體)'},
-  {c:'ja',f:'🇯🇵',n:'日本語'},{c:'ko',f:'🇰🇷',n:'한국어'},{c:'hi',f:'🇮🇳',n:'हिन्दी'},
-  {c:'bn',f:'🇧🇩',n:'বাংলা'},{c:'ur',f:'🇵🇰',n:'اردو'},{c:'pa',f:'🇮🇳',n:'ਪੰਜਾਬੀ'},
-  {c:'te',f:'🇮🇳',n:'తెలుగు'},{c:'ta',f:'🇮🇳',n:'தமிழ்'},{c:'mr',f:'🇮🇳',n:'मराठी'},
-  {c:'gu',f:'🇮🇳',n:'ગુજરાતી'},{c:'kn',f:'🇮🇳',n:'ಕನ್ನಡ'},{c:'ml',f:'🇮🇳',n:'മലയാളം'},
-  {c:'or',f:'🇮🇳',n:'ଓଡ଼ିଆ'},{c:'as',f:'🇮🇳',n:'অসমীয়া'},{c:'ne',f:'🇳🇵',n:'नेपाली'},
-  {c:'si',f:'🇱🇰',n:'සිංහල'},{c:'my',f:'🇲🇲',n:'မြန်မာ'},{c:'km',f:'🇰🇭',n:'ភាសាខ្មែរ'},
-  {c:'th',f:'🇹🇭',n:'ภาษาไทย'},{c:'lo',f:'🇱🇦',n:'ພາສາລາວ'},{c:'vi',f:'🇻🇳',n:'Tiếng Việt'},
-  {c:'id',f:'🇮🇩',n:'Bahasa Indonesia'},{c:'ms',f:'🇲🇾',n:'Bahasa Melayu'},{c:'tl',f:'🇵🇭',n:'Filipino'},
-  {c:'jv',f:'🇮🇩',n:'Javanese'},{c:'ceb',f:'🇵🇭',n:'Cebuano'},{c:'su',f:'🇮🇩',n:'Sundanese'},
-  {c:'fa',f:'🇮🇷',n:'فارسی'},{c:'ps',f:'🇦🇫',n:'پښتو'},{c:'ku',f:'🇮🇶',n:'Kurdî'},
-  {c:'he',f:'🇮🇱',n:'עברית'},{c:'yi',f:'🇮🇱',n:'יידיש'},{c:'tr',f:'🇹🇷',n:'Türkçe'},
-  {c:'az',f:'🇦🇿',n:'Azərbaycan'},{c:'kk',f:'🇰🇿',n:'Қазақша'},{c:'uz',f:'🇺🇿',n:'Oʻzbek'},
-  {c:'ky',f:'🇰🇬',n:'Кыргызча'},{c:'tk',f:'🇹🇲',n:'Türkmen'},{c:'tg',f:'🇹🇯',n:'Тоҷикӣ'},
-  {c:'mn',f:'🇲🇳',n:'Монгол'},{c:'ka',f:'🇬🇪',n:'ქართული'},{c:'hy',f:'🇦🇲',n:'Հայerен'},
-  {c:'uk',f:'🇺🇦',n:'Українська'},{c:'be',f:'🇧🇾',n:'Беларуская'},{c:'pl',f:'🇵🇱',n:'Polski'},
-  {c:'cs',f:'🇨🇿',n:'Čeština'},{c:'sk',f:'🇸🇰',n:'Slovenčina'},{c:'hu',f:'🇭🇺',n:'Magyar'},
-  {c:'bg',f:'🇧🇬',n:'Български'},{c:'hr',f:'🇭🇷',n:'Hrvatski'},{c:'sr',f:'🇷🇸',n:'Српски'},
-  {c:'bs',f:'🇧🇦',n:'Bosanski'},{c:'sl',f:'🇸🇮',n:'Slovenščina'},{c:'mk',f:'🇲🇰',n:'Македонски'},
-  {c:'sq',f:'🇦🇱',n:'Shqip'},{c:'el',f:'🇬🇷',n:'Ελληνικά'},{c:'lt',f:'🇱🇹',n:'Lietuvių'},
-  {c:'lv',f:'🇱🇻',n:'Latviešu'},{c:'et',f:'🇪🇪',n:'Eesti'},{c:'sv',f:'🇸🇪',n:'Svenska'},
-  {c:'no',f:'🇳🇴',n:'Norsk'},{c:'da',f:'🇩🇰',n:'Dansk'},{c:'fi',f:'🇫🇮',n:'Suomi'},
-  {c:'is',f:'🇮🇸',n:'Íslenska'},{c:'fo',f:'🇫🇴',n:'Føroyskt'},{c:'ga',f:'🇮🇪',n:'Gaeilge'},
-  {c:'cy',f:'🏴󠁧󠁢󠁷󠁬󠁳󠁿',n:'Cymraeg'},{c:'gd',f:'🏴󠁧󠁢󠁳󠁣󠁴󠁿',n:'Gàidhlig'},{c:'eu',f:'🇪🇸',n:'Euskara'},
-  {c:'ca',f:'🇪🇸',n:'Català'},{c:'gl',f:'🇪🇸',n:'Galego'},{c:'oc',f:'🇫🇷',n:'Occitan'},
-  {c:'br',f:'🇫🇷',n:'Brezhoneg'},{c:'co',f:'🇫🇷',n:'Corsu'},{c:'lb',f:'🇱🇺',n:'Lëtzebuergesch'},
-  {c:'mt',f:'🇲🇹',n:'Malti'},{c:'af',f:'🇿🇦',n:'Afrikaans'},{c:'zu',f:'🇿🇦',n:'isiZulu'},
-  {c:'xh',f:'🇿🇦',n:'isiXhosa'},{c:'st',f:'🇿🇦',n:'Sesotho'},{c:'tn',f:'🇧🇼',n:'Setswana'},
-  {c:'ts',f:'🇿🇦',n:'Xitsonga'},{c:'ve',f:'🇿🇦',n:'Tshivenḓa'},{c:'ss',f:'🇸🇿',n:'siSwati'},
-  {c:'nd',f:'🇿🇼',n:'isiNdebele'},{c:'sn',f:'🇿🇼',n:'chiShona'},{c:'ny',f:'🇲🇼',n:'Chichewa'},
-  {c:'sw',f:'🇰🇪',n:'Kiswahili'},{c:'yo',f:'🇳🇬',n:'Yorùbá'},{c:'ig',f:'🇳🇬',n:'Igbo'},
-  {c:'ha',f:'🇳🇬',n:'Hausa'},{c:'ak',f:'🇬🇭',n:'Akan'},{c:'so',f:'🇸🇴',n:'Soomaali'},
-  {c:'am',f:'🇪🇹',n:'አማርኛ'},{c:'om',f:'🇪🇹',n:'Afaan Oromoo'},{c:'ti',f:'🇪🇷',n:'ትግርኛ'},
-  {c:'rw',f:'🇷🇼',n:'Kinyarwanda'},{c:'lg',f:'🇺🇬',n:'Luganda'},{c:'ln',f:'🇨🇩',n:'Lingala'},
-  {c:'ki',f:'🇰🇪',n:'Gĩkũyũ'},{c:'mg',f:'🇲🇬',n:'Malagasy'},{c:'ht',f:'🇭🇹',n:'Kreyòl ayisyen'},
-  {c:'ug',f:'🇨🇳',n:'ئۇيغۇرچە'},{c:'bo',f:'🇨🇳',n:'བོད་སྐད།'},{c:'sd',f:'🇵🇰',n:'سنڌي'},
-  {c:'tt',f:'🇷🇺',n:'Татарча'},{c:'ba',f:'🇷🇺',n:'Башҡортса'},{c:'ce',f:'🇷🇺',n:'Нохчийн'},
-  {c:'os',f:'🇷🇺',n:'Ирон'},{c:'fy',f:'🇳🇱',n:'Frysk'},{c:'eo',f:'🌍',n:'Esperanto'},
-  {c:'la',f:'🏛️',n:'Latina'},{c:'hmn',f:'🇨🇳',n:'Hmong'},{c:'yue',f:'🇭🇰',n:'廣東話'},
-  {c:'mai',f:'🇮🇳',n:'मैथिली'},{c:'ks',f:'🇮🇳',n:'कश्मीरी'},{c:'kok',f:'🇮🇳',n:'कोंकणी'},
-  {c:'doi',f:'🇮🇳',n:'डोगरी'},{c:'sat',f:'🇮🇳',n:'ᱥᱟᱱᱛᱟᱲᱤ'},{c:'mni',f:'🇮🇳',n:'মৈতৈ'}
-];
-
-// Init — runs after all var declarations so LANGUAGES.find() works correctly
+// Init
 (function(){
   try{
     token=localStorage.getItem('af_token')||'';
     lang=localStorage.getItem('af_lang')||'en';
     if(token)showStudio();
-    var savedLang=LANGUAGES.find(function(x){return x.c===lang;})||LANGUAGES[0];
-    document.getElementById('langFlag').textContent=savedLang.f;
-    document.getElementById('langCode').textContent=savedLang.c.toUpperCase().slice(0,2);
     document.documentElement.lang=lang;
     applyLang();
   }catch(e){ token=''; }
 })();
-
-function openLangModal(){
-  document.getElementById('langModalOverlay').classList.add('open');
-  document.getElementById('langSearch').value='';
-  renderLangList('');
-  setTimeout(function(){document.getElementById('langSearch').focus();},100);
-}
-function closeLangModal(){
-  document.getElementById('langModalOverlay').classList.remove('open');
-}
-function renderLangList(q){
-  var filtered=q?LANGUAGES.filter(function(l){
-    return l.n.toLowerCase().includes(q.toLowerCase())||l.c.toLowerCase().includes(q.toLowerCase());
-  }):LANGUAGES;
-  var html='';
-  if(!filtered.length){html='<div class="lang-no-results">No results</div>';}
-  else{
-    filtered.forEach(function(l){
-      html+='<button class="lang-item'+(l.c===lang?' selected':'')+'" onclick="setLang(\''+l.c+'\')">'+
-        '<span class="lang-item-flag">'+l.f+'</span>'+
-        '<span class="lang-item-name">'+l.n+'</span>'+
-        '</button>';
-    });
-  }
-  document.getElementById('langList').innerHTML=html;
-}
-function filterLangs(q){renderLangList(q);}
-
-function setLang(l){
-  lang=l;
-  try{localStorage.setItem('af_lang',l);}catch(e){}
-  closeLangModal();
-  // Update flag+code button
-  var found=LANGUAGES.find(function(x){return x.c===l;})||{f:'🌍',c:l.toUpperCase().slice(0,2)};
-  document.getElementById('langFlag').textContent=found.f;
-  document.getElementById('langCode').textContent=found.c.toUpperCase().slice(0,2);
-  document.documentElement.lang=l;
-  applyLang();
-}
 
 function detectType(desc){
   var d=desc.toLowerCase();
@@ -1049,5 +930,6 @@ function notify(msg,type){
   _toastTimer=setTimeout(()=>{ el.className=''; },3000);
 }
 </script>
+<script src="/lang.js"></script>
 </body>
 </html>
