@@ -6,418 +6,551 @@
 <title>TikTok Videos — Blueprint Studio</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#080808;color:#f5f5f5;font-family:sans-serif;padding:32px 20px}
-h1{font-size:20px;color:#E53E2E;margin-bottom:6px;text-align:center}
-.sub{font-size:12px;color:#999;text-align:center;margin-bottom:8px}
-.hint{font-size:11px;color:#666;text-align:center;margin-bottom:32px;background:#111;border:1px solid rgba(229,62,46,.1);border-radius:8px;padding:10px;max-width:700px;margin-left:auto;margin-right:auto}
-.section-title{font-size:13px;color:#666;letter-spacing:2px;text-transform:uppercase;text-align:center;margin:32px 0 16px;border-top:1px solid #1a1a1a;padding-top:24px}
-.grid{display:flex;gap:24px;flex-wrap:wrap;justify-content:center}
+body{background:#060606;color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:28px 16px}
+h1{font-size:18px;color:#E53E2E;margin-bottom:4px;text-align:center;font-weight:900;letter-spacing:.5px}
+.sub{font-size:11px;color:#555;text-align:center;margin-bottom:12px}
+.voice-bar{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.voice-toggle{background:#111;border:1px solid #2a2a2a;border-radius:8px;color:#f5f5f5;font-size:12px;padding:8px 16px;cursor:pointer;transition:all .2s}
+.voice-toggle.on{border-color:rgba(74,222,128,.5);color:#4ADE80;background:rgba(74,222,128,.06)}
+.voice-sel{background:#111;border:1px solid #2a2a2a;border-radius:8px;color:#f5f5f5;font-size:11px;padding:7px 10px;max-width:200px}
+.vstat{font-size:10px;color:#444}
+.hint{font-size:10px;color:#444;text-align:center;margin-bottom:24px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:8px;padding:10px;max-width:680px;margin-left:auto;margin-right:auto;line-height:1.7}
+.sec{font-size:11px;color:#444;letter-spacing:2px;text-transform:uppercase;text-align:center;margin:28px 0 14px;border-top:1px solid #111;padding-top:22px}
+.grid{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+.pw{text-align:center}
+.pw h2{font-size:11px;color:#E53E2E;margin-bottom:2px;max-width:270px;font-weight:700}
+.pw p{font-size:10px;color:#444;margin-bottom:8px}
+.player{position:relative;width:270px;height:480px;background:#080808;border-radius:20px;overflow:hidden;border:1px solid #181818;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:border-color .2s}
+.player:hover{border-color:#2a2a2a}
+.player.playing{border-color:rgba(229,62,46,.3)}
+.p-logo{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:2px;color:#E53E2E;white-space:nowrap;font-weight:800;z-index:10}
+.p-progress{position:absolute;bottom:46px;left:12px;right:12px;height:2px;background:#111;border-radius:2px;z-index:10}
+.p-bar{height:100%;background:#E53E2E;border-radius:2px;width:0%;transition:width .5s linear}
+.p-cta{position:absolute;bottom:0;left:0;right:0;background:rgba(6,6,6,.96);padding:8px;text-align:center;border-top:1px solid #111;z-index:10}
+.p-cta-site{font-size:9px;color:#E53E2E;letter-spacing:.5px;font-weight:700}
+.p-cta-sub{font-size:8px;color:#333;margin-top:1px}
+.p-overlay{position:absolute;inset:0;background:rgba(6,6,6,.8);display:flex;align-items:center;justify-content:center;font-size:40px;z-index:20;border-radius:20px;transition:opacity .2s}
+.player.playing .p-overlay{opacity:0;pointer-events:none}
+.beat-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:5}
 
-/* ── PLAYER ── */
-.player-wrap{text-align:center}
-.player-wrap h2{font-size:12px;color:#E53E2E;margin-bottom:3px;max-width:270px}
-.player-wrap p{font-size:10px;color:#555;margin-bottom:10px}
-.player{position:relative;width:270px;height:480px;background:#080808;border-radius:18px;overflow:hidden;border:1px solid #1a1a1a;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:border-color .2s}
-.player:hover{border-color:rgba(229,62,46,.3)}
-.accent-line{position:absolute;top:0;left:50%;transform:translateX(-50%);width:60px;height:2px;background:#E53E2E}
-.logo{position:absolute;top:16px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:2px;color:#E53E2E;white-space:nowrap;font-weight:700}
-.pov-tag{position:absolute;top:36px;left:50%;transform:translateX(-50%);font-size:10px;color:#888;letter-spacing:1px;white-space:nowrap;display:none}
+/* TEXT BEATS */
+.bt{font-size:22px;font-weight:800;color:#f5f5f5;text-align:center;padding:0 20px;line-height:1.3;opacity:0;transition:opacity .35s ease}
+.bt.red{color:#E53E2E}.bt.green{color:#4ADE80}.bt.visible{opacity:1}
 
-/* beat: text */
-.beat-text{font-size:22px;font-weight:800;color:#f5f5f5;text-align:center;padding:0 22px;line-height:1.35;opacity:0;transition:opacity .35s ease;position:absolute}
-.beat-text.red{color:#E53E2E}
-.beat-text.green{color:#4ADE80}
-.beat-text.visible{opacity:1}
+/* SCENE BEATS */
+.scene{width:100%;height:100%;opacity:0;transition:opacity .35s ease;display:flex;align-items:center;justify-content:center}
+.scene.visible{opacity:1}
 
-/* beat: list */
-.beat-list{position:absolute;display:flex;flex-direction:column;gap:10px;padding:0 24px;width:100%;opacity:0;transition:opacity .35s ease}
-.beat-list.visible{opacity:1}
-.list-item{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;color:#f5f5f5;opacity:0;transform:translateX(-12px);transition:opacity .3s ease,transform .3s ease}
-.list-item.show{opacity:1;transform:translateX(0)}
-.list-item .icon{font-size:20px;width:28px;text-align:center;flex-shrink:0}
-.list-item.fail{color:#888;text-decoration:line-through}
-.list-item.win{color:#4ADE80}
-.list-item .tag{font-size:10px;color:#555;margin-left:auto;flex-shrink:0}
-.list-item.win .tag{color:#4ADE80}
+/* LIST BEATS */
+.blist{display:flex;flex-direction:column;gap:9px;padding:0 22px;width:100%;opacity:0;transition:opacity .3s}
+.blist.visible{opacity:1}
+.bli{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:700;opacity:0;transform:translateX(-10px);transition:opacity .28s,transform .28s}
+.bli.show{opacity:1;transform:none}
+.bli .ic{font-size:20px;width:26px;text-align:center;flex-shrink:0}
+.bli .tg{font-size:10px;color:#555;margin-left:auto;flex-shrink:0}
+.bli.fail{color:#555}.bli.fail .tg{color:#E53E2E}
+.bli.win{color:#4ADE80}.bli.win .tg{color:#4ADE80}
 
-/* beat: vs */
-.beat-vs{position:absolute;display:flex;flex-direction:column;gap:12px;padding:0 20px;width:100%;opacity:0;transition:opacity .35s ease;align-items:center}
-.beat-vs.visible{opacity:1}
-.vs-row{display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;font-weight:700;width:100%}
-.vs-fail{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:7px 12px;color:#888;text-decoration:line-through;flex:1;text-align:center;font-size:13px}
-.vs-arrow{color:#444;font-size:12px}
-.vs-win{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:7px 12px;color:#4ADE80;flex:1;text-align:center;font-size:13px}
+/* BUTTONS */
+.pbtn{display:inline-block;margin-top:8px;padding:7px 20px;background:linear-gradient(135deg,#B52318,#E53E2E);border-radius:8px;color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer}
+.sbtn{background:none;border:1px solid #1e1e1e;border-radius:6px;color:#3a3a3a;font-size:10px;padding:4px 10px;cursor:pointer;margin-top:5px;display:block;margin-left:auto;margin-right:auto}
+.sbtn:hover{border-color:#444;color:#666}
+.sbox{margin-top:8px;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:8px;padding:10px 12px;max-width:270px;text-align:left;font-size:10px;color:#444;line-height:1.7;display:none}
+.sbox strong{color:#666;display:block;margin-bottom:4px;font-size:9px;letter-spacing:1px;text-transform:uppercase}
 
-/* bottom */
-.cta-bar{position:absolute;bottom:0;left:0;right:0;background:rgba(6,6,6,.95);padding:9px;text-align:center;border-top:1px solid #111}
-.site{font-size:10px;color:#E53E2E;letter-spacing:.5px;font-weight:700}
-.price{font-size:9px;color:#444;margin-top:1px}
-.progress{position:absolute;bottom:50px;left:12px;right:12px;height:2px;background:#111;border-radius:2px}
-.progress-fill{height:100%;background:#E53E2E;border-radius:2px;width:0%}
+/* ═══════ SVG ANIMATIONS ═══════ */
+@keyframes riseBar{from{transform:scaleY(0);transform-origin:bottom}to{transform:scaleY(1);transform-origin:bottom}}
+@keyframes fallBar{from{transform:scaleY(0);transform-origin:top}to{transform:scaleY(1);transform-origin:top}}
+@keyframes drawLine{from{stroke-dashoffset:350}to{stroke-dashoffset:0}}
+@keyframes xPop{0%{transform:scale(0) rotate(-20deg);opacity:0}70%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
+@keyframes checkPop{0%{transform:scale(0);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+@keyframes moneyUp{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-55px);opacity:0}}
+@keyframes shake{0%,100%{transform:rotate(0)}15%{transform:rotate(-8deg)}30%{transform:rotate(8deg)}45%{transform:rotate(-5deg)}60%{transform:rotate(5deg)}75%{transform:rotate(-2deg)}}
+@keyframes coinDrop{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(60px) rotate(-25deg);opacity:.2}}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 5px rgba(74,222,128,.3))}50%{filter:drop-shadow(0 0 18px rgba(74,222,128,.7))}}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes barGrow{from{height:0;y:180}to{}}
 
-.play-overlay{position:absolute;inset:0;background:rgba(6,6,6,.75);display:flex;align-items:center;justify-content:center;font-size:44px;transition:opacity .2s;border-radius:18px}
-.player.playing .play-overlay{opacity:0;pointer-events:none}
-.rec-btn{display:inline-block;margin-top:10px;padding:8px 22px;background:linear-gradient(135deg,#B52318,#E53E2E);border-radius:8px;color:#fff;font-size:11px;font-weight:700;letter-spacing:.5px;border:none;cursor:pointer}
-.script-box{margin-top:10px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:8px;padding:10px 12px;max-width:270px;text-align:left;font-size:10px;color:#555;line-height:1.6;display:none}
-.script-box strong{color:#888;display:block;margin-bottom:4px}
-.show-script{background:none;border:1px solid #222;border-radius:6px;color:#444;font-size:10px;padding:4px 10px;cursor:pointer;margin-top:6px}
-.show-script:hover{border-color:#444;color:#888}
-
-/* voice bar */
-.voice-bar{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
-.voice-toggle{background:#111;border:1px solid #333;border-radius:8px;color:#f5f5f5;font-size:12px;padding:8px 18px;cursor:pointer;display:flex;align-items:center;gap:7px;transition:all .2s}
-.voice-toggle.on{border-color:rgba(74,222,128,.4);color:#4ADE80;background:rgba(74,222,128,.06)}
-.voice-toggle.on::before{content:'🔊'}
-.voice-toggle:not(.on)::before{content:'🔇'}
-.voice-sel{background:#111;border:1px solid #333;border-radius:8px;color:#f5f5f5;font-size:11px;padding:7px 10px;cursor:pointer;max-width:220px}
-.voice-status{font-size:10px;color:#555}
+/* candle anims with delays */
+.c1{animation:fadeUp .3s ease .1s both}
+.c2{animation:fadeUp .3s ease .3s both}
+.c3{animation:fadeUp .3s ease .5s both}
+.c4r{animation:fadeUp .3s ease 1s both}
+.c5r{animation:fadeUp .3s ease 1.3s both}
+.c6r{animation:fadeUp .3s ease 1.6s both}
+.crash-ln{stroke-dasharray:350;stroke-dashoffset:350;animation:drawLine 1s ease 1.8s both}
+.x-pop{opacity:0;animation:xPop .4s ease 2.2s both}
+.chk-pop{opacity:0;animation:checkPop .5s ease .4s both}
+.money1{animation:moneyUp 1s ease .8s both}
+.money2{animation:moneyUp 1s ease 1.2s both}
+.money3{animation:moneyUp 1s ease 1.6s both}
+.rise-ln{stroke-dasharray:350;stroke-dashoffset:350;animation:drawLine 1.2s ease .3s both}
+.bar1{animation:riseBar .4s ease .2s both}
+.bar2{animation:riseBar .4s ease .5s both}
+.bar3{animation:riseBar .4s ease .8s both}
+.bar4{animation:riseBar .4s ease 1.1s both}
+.b-coin{animation:shake 1.2s ease .5s both}
+.coin-drop{animation:coinDrop .8s ease 1.5s both}
+.box-shake{animation:shake 1s ease .6s both}
+.ai-glow{animation:glow 2s ease infinite}
+.puls{animation:pulse 1.5s ease infinite}
 </style>
 </head>
 <body>
 
 <h1>⚡ Blueprint Studio — TikTok Videos</h1>
-<p class="sub">Click pe player → pornește animația + vocea → dai screen record</p>
+<p class="sub">Click player → pornește → screen record</p>
 
 <div class="voice-bar">
-  <button class="voice-toggle" id="voiceToggle" onclick="toggleVoice()"> Voce browser</button>
-  <select class="voice-sel" id="voiceSel" onchange="pickVoice()"></select>
-  <span class="voice-status" id="voiceStatus">Se încarcă vocile…</span>
+  <button class="voice-toggle" id="vbtn" onclick="tgVoice()">🔇 Voce OFF</button>
+  <select class="voice-sel" id="vsel" onchange="pickV()"></select>
+  <span class="vstat" id="vstat">Se încarcă…</span>
+</div>
+<div class="hint">
+  📱 iOS: Control Center → Screen Record &nbsp;·&nbsp; Android: Screen Record din notificări &nbsp;·&nbsp; PC: Win+G → Record<br>
+  🔊 Activează vocea → dai Play → screen record imediat &nbsp;·&nbsp; Voce masculină selectată automat
 </div>
 
-<div class="hint">📱 <strong>Screen record + voce:</strong> Pornești vocea → dai Play pe video → dai screen record imediat<br>
-💻 <strong>PC:</strong> Win+G → Record &nbsp;|&nbsp; Mac: Cmd+Shift+5 &nbsp;|&nbsp; Telefon: Screen Record din Control Center<br>
-⚠️ Vocea browser e gratuită. Pentru calitate profesională → <strong>elevenlabs.io</strong></div>
+<div class="sec">🔥 POV — Am încercat tot, nimic n-a mers până la AI Agency</div>
+<div class="grid" id="gpov"></div>
 
-<div class="section-title">🔥 POV — Am încercat tot, nimic n-a mers până la AI Agency</div>
-<div class="grid" id="grid-pov"></div>
-
-<div class="section-title">💰 Hook direct — fără comparații</div>
-<div class="grid" id="grid-hook"></div>
+<div class="sec">💰 Hook direct</div>
+<div class="grid" id="ghook"></div>
 
 <script>
-/* ─────────── VIDEO DATA ─────────── */
-const POV_VIDEOS=[
+/* ═══════ SVG SCENE TEMPLATES ═══════ */
+const SC={
+  trading:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
+    <rect width="240" height="340" fill="#080808"/>
+    <rect width="240" height="340" fill="url(#rg)"/>
+    <defs><radialGradient id="rg" cx="50%" cy="80%"><stop offset="0%" stop-color="#E53E2E" stop-opacity=".06"/><stop offset="100%" stop-color="transparent"/></radialGradient></defs>
+    <!-- grid -->
+    <line x1="22" y1="55" x2="218" y2="55" stroke="#151515" stroke-width="1"/>
+    <line x1="22" y1="95" x2="218" y2="95" stroke="#151515" stroke-width="1"/>
+    <line x1="22" y1="135" x2="218" y2="135" stroke="#151515" stroke-width="1"/>
+    <line x1="22" y1="175" x2="218" y2="175" stroke="#151515" stroke-width="1"/>
+    <!-- green candles -->
+    <g class="c1"><rect x="28" y="158" width="14" height="22" fill="#4ADE80" rx="2"/><line x1="35" y1="153" x2="35" y2="184" stroke="#4ADE80" stroke-width="1.5"/></g>
+    <g class="c2"><rect x="55" y="138" width="14" height="32" fill="#4ADE80" rx="2"/><line x1="62" y1="132" x2="62" y2="175" stroke="#4ADE80" stroke-width="1.5"/></g>
+    <g class="c3"><rect x="82" y="112" width="14" height="42" fill="#4ADE80" rx="2"/><line x1="89" y1="106" x2="89" y2="158" stroke="#4ADE80" stroke-width="1.5"/></g>
+    <!-- crash candles -->
+    <g class="c4r"><rect x="109" y="118" width="14" height="58" fill="#E53E2E" rx="2"/><line x1="116" y1="108" x2="116" y2="182" stroke="#E53E2E" stroke-width="1.5"/></g>
+    <g class="c5r"><rect x="136" y="135" width="14" height="48" fill="#E53E2E" rx="2"/><line x1="143" y1="125" x2="143" y2="188" stroke="#E53E2E" stroke-width="1.5"/></g>
+    <g class="c6r"><rect x="163" y="150" width="14" height="38" fill="#E53E2E" rx="2"/><line x1="170" y1="142" x2="170" y2="193" stroke="#E53E2E" stroke-width="1.5"/></g>
+    <!-- crash line -->
+    <polyline class="crash-ln" points="89,106 116,108 143,125 170,142 198,175" stroke="#E53E2E" stroke-width="2.5" fill="none" opacity=".7"/>
+    <!-- arrow down -->
+    <text x="198" y="195" fill="#E53E2E" font-size="18" class="c6r">↓</text>
+    <!-- big X -->
+    <text class="x-pop" x="120" y="248" text-anchor="middle" fill="#E53E2E" font-size="52" font-family="sans-serif">❌</text>
+    <text x="120" y="286" text-anchor="middle" fill="#E53E2E" font-size="24" font-weight="900" font-family="-apple-system,sans-serif">TRADING</text>
+    <text x="120" y="310" text-anchor="middle" fill="#666" font-size="14" font-family="-apple-system,sans-serif">Lost $2,400</text>
+  </svg>`,
+
+  drop:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
+    <rect width="240" height="340" fill="#080808"/>
+    <!-- boxes -->
+    <g class="c1">
+      <rect x="80" y="130" width="80" height="70" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1.5" rx="4"/>
+      <line x1="80" y1="155" x2="160" y2="155" stroke="#2a2a2a" stroke-width="1"/>
+      <line x1="120" y1="130" x2="120" y2="200" stroke="#2a2a2a" stroke-width="1"/>
+      <text x="120" y="172" text-anchor="middle" fill="#333" font-size="11" font-family="sans-serif">SHIPMENT</text>
+    </g>
+    <g class="c2">
+      <rect x="58" y="200" width="124" height="14" fill="#222" rx="3"/>
+    </g>
+    <!-- sad face on box -->
+    <g class="box-shake c3">
+      <circle cx="105" cy="163" r="3" fill="#444"/>
+      <circle cx="135" cy="163" r="3" fill="#444"/>
+      <path d="M 105 178 Q 120 172 135 178" stroke="#444" stroke-width="2" fill="none" stroke-linecap="round"/>
+    </g>
+    <!-- 0 orders -->
+    <text class="x-pop" x="120" y="250" text-anchor="middle" fill="#E53E2E" font-size="48">❌</text>
+    <text x="120" y="285" text-anchor="middle" fill="#E53E2E" font-size="22" font-weight="900" font-family="-apple-system,sans-serif">DROPSHIPPING</text>
+    <text x="120" y="308" text-anchor="middle" fill="#666" font-size="13" font-family="-apple-system,sans-serif">0 profit · 3 months wasted</text>
+  </svg>`,
+
+  crypto:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
+    <rect width="240" height="340" fill="#080808"/>
+    <!-- bitcoin symbol large -->
+    <g class="b-coin">
+      <circle cx="120" cy="120" r="52" fill="#1a1208" stroke="#f7931a" stroke-width="2.5"/>
+      <text x="120" y="134" text-anchor="middle" fill="#f7931a" font-size="52" font-weight="900" font-family="sans-serif">₿</text>
+    </g>
+    <!-- falling price line -->
+    <g class="coin-drop">
+      <polyline class="crash-ln" points="30,175 70,165 100,155 130,160 160,190 200,230" stroke="#E53E2E" stroke-width="2.5" fill="none"/>
+      <polygon points="200,225 205,238 195,238" fill="#E53E2E" class="c5r"/>
+    </g>
+    <text class="x-pop" x="120" y="268" text-anchor="middle" fill="#E53E2E" font-size="48">❌</text>
+    <text x="120" y="298" text-anchor="middle" fill="#E53E2E" font-size="22" font-weight="900" font-family="-apple-system,sans-serif">CRYPTO</text>
+    <text x="120" y="320" text-anchor="middle" fill="#666" font-size="13" font-family="-apple-system,sans-serif">Lost $800</text>
+  </svg>`,
+
+  smma:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
+    <rect width="240" height="340" fill="#080808"/>
+    <!-- phone outline -->
+    <rect class="c1" x="75" y="60" width="90" height="155" fill="#111" stroke="#222" stroke-width="1.5" rx="12"/>
+    <rect x="100" y="65" width="40" height="5" fill="#222" rx="2"/>
+    <!-- social icons row -->
+    <g class="c2">
+      <rect x="86" y="82" width="26" height="26" fill="#1a1a1a" rx="6"/>
+      <text x="99" y="101" text-anchor="middle" fill="#E1306C" font-size="14">IG</text>
+    </g>
+    <g class="c3">
+      <rect x="116" y="82" width="26" height="26" fill="#1a1a1a" rx="6"/>
+      <text x="129" y="101" text-anchor="middle" fill="#1877F2" font-size="14">f</text>
+    </g>
+    <!-- metrics all zero -->
+    <g class="c4r">
+      <text x="99" y="128" text-anchor="middle" fill="#333" font-size="10" font-family="sans-serif">Reach</text>
+      <text x="99" y="142" text-anchor="middle" fill="#E53E2E" font-size="16" font-weight="900" font-family="sans-serif">0</text>
+      <text x="141" y="128" text-anchor="middle" fill="#333" font-size="10" font-family="sans-serif">Clients</text>
+      <text x="141" y="142" text-anchor="middle" fill="#E53E2E" font-size="16" font-weight="900" font-family="sans-serif">0</text>
+    </g>
+    <g class="c5r">
+      <text x="120" y="175" text-anchor="middle" fill="#333" font-size="10" font-family="sans-serif">Revenue</text>
+      <text x="120" y="192" text-anchor="middle" fill="#E53E2E" font-size="16" font-weight="900" font-family="sans-serif">$0</text>
+    </g>
+    <text class="x-pop" x="120" y="262" text-anchor="middle" fill="#E53E2E" font-size="48">❌</text>
+    <text x="120" y="294" text-anchor="middle" fill="#E53E2E" font-size="20" font-weight="900" font-family="-apple-system,sans-serif">SMMA / AGENCY</text>
+    <text x="120" y="316" text-anchor="middle" fill="#666" font-size="13" font-family="-apple-system,sans-serif">$0 · 3 months · 0 clients</text>
+  </svg>`,
+
+  freelance:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
+    <rect width="240" height="340" fill="#080808"/>
+    <!-- laptop outline -->
+    <rect class="c1" x="50" y="100" width="140" height="95" fill="#111" stroke="#222" stroke-width="1.5" rx="6"/>
+    <rect x="55" y="105" width="130" height="85" fill="#0d0d0d" rx="3"/>
+    <rect x="30" y="195" width="180" height="8" fill="#1a1a1a" rx="2"/>
+    <!-- screen content: fiverr-like -->
+    <g class="c2">
+      <text x="120" y="130" text-anchor="middle" fill="#4ADE80" font-size="10" font-family="sans-serif">✓ Order received</text>
+    </g>
+    <g class="c3">
+      <rect x="70" y="140" width="100" height="24" fill="#1a1a1a" rx="4"/>
+      <text x="120" y="157" text-anchor="middle" fill="#E53E2E" font-size="13" font-weight="700" font-family="sans-serif">$5 earned</text>
+    </g>
+    <g class="c4r">
+      <text x="120" y="182" text-anchor="middle" fill="#333" font-size="9" font-family="sans-serif">48 hours of work</text>
+    </g>
+    <text class="x-pop" x="120" y="258" text-anchor="middle" fill="#E53E2E" font-size="48">❌</text>
+    <text x="120" y="291" text-anchor="middle" fill="#E53E2E" font-size="22" font-weight="900" font-family="-apple-system,sans-serif">FREELANCING</text>
+    <text x="120" y="314" text-anchor="middle" fill="#666" font-size="13" font-family="-apple-system,sans-serif">$5/hr · burned out</text>
+  </svg>`,
+
+  ai:()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
+    <rect width="240" height="340" fill="#080808"/>
+    <defs><radialGradient id="gg" cx="50%" cy="50%"><stop offset="0%" stop-color="#4ADE80" stop-opacity=".08"/><stop offset="100%" stop-color="transparent"/></radialGradient></defs>
+    <rect width="240" height="340" fill="url(#gg)"/>
+    <!-- rising chart bars -->
+    <g class="bar1"><rect x="30" y="152" width="22" height="28" fill="#1a4a2a" stroke="#4ADE80" stroke-width="1" rx="3"/></g>
+    <g class="bar2"><rect x="60" y="128" width="22" height="52" fill="#1a4a2a" stroke="#4ADE80" stroke-width="1" rx="3"/></g>
+    <g class="bar3"><rect x="90" y="100" width="22" height="80" fill="#1f5a32" stroke="#4ADE80" stroke-width="1.5" rx="3"/></g>
+    <g class="bar4"><rect x="120" y="70" width="22" height="110" fill="#245e38" stroke="#4ADE80" stroke-width="2" rx="3"/></g>
+    <!-- rising line -->
+    <polyline class="rise-ln" points="20,185 41,165 71,145 101,115 131,85 165,55" stroke="#4ADE80" stroke-width="2.5" fill="none" stroke-dasharray="350"/>
+    <!-- arrow up -->
+    <polygon class="chk-pop" points="165,45 172,62 158,62" fill="#4ADE80"/>
+    <!-- floating money -->
+    <text class="money1" x="170" y="120" fill="#4ADE80" font-size="16" font-family="sans-serif">+$900</text>
+    <text class="money2" x="155" y="155" fill="#4ADE80" font-size="13" font-family="sans-serif">+$1,100</text>
+    <text class="money3" x="162" y="185" fill="#4ADE80" font-size="11" font-family="sans-serif">+$800/mo</text>
+    <!-- checkmark -->
+    <text class="chk-pop" x="120" y="262" text-anchor="middle" fill="#4ADE80" font-size="52">✅</text>
+    <text x="120" y="293" text-anchor="middle" fill="#4ADE80" font-size="22" font-weight="900" font-family="-apple-system,sans-serif">AI AGENCY</text>
+    <text x="120" y="315" text-anchor="middle" fill="#4ADE80" font-size="13" font-family="-apple-system,sans-serif" class="puls">$900 · first client · 60 seconds</text>
+  </svg>`,
+};
+
+/* ═══════ VIDEO DATA ═══════ */
+const POV=[
   {
-    title:'POV 1 — "Am încercat tot" (lista completă)',
-    desc:'28s · Lista fail → AI win · cel mai viral format',
-    pov:true,
+    title:'POV 1 — Lista completă (cel mai viral)',
+    desc:'30s · Trading/Drop/Crypto/Free → AI win · SVG animat',
     beats:[
-      {type:'text',text:"POV: I've tried everything\nto make money online.",dur:3500,cl:''},
-      {type:'list',dur:7000,items:[
-        {icon:'❌',text:'Trading',tag:'lost $2,400',cl:'fail'},
-        {icon:'❌',text:'Dropshipping',tag:'lost 3 months',cl:'fail'},
-        {icon:'❌',text:'Crypto',tag:'lost $800',cl:'fail'},
-        {icon:'❌',text:'Freelancing',tag:'$8/hr',cl:'fail'},
-      ]},
-      {type:'text',text:"Then I found\nAI automation.",dur:3000,cl:'green'},
-      {type:'list',dur:5500,items:[
-        {icon:'✅',text:'AI Agency',tag:'$900 first client',cl:'win'},
-        {icon:'✅',text:'No coding',tag:'60 sec to build',cl:'win'},
-        {icon:'✅',text:'Real businesses pay',tag:'$800–$1,200',cl:'win'},
-      ]},
-      {type:'text',text:"Comment BLUEPRINT\nI'll send you the exact tool. 👇",dur:4000,cl:'red'},
+      {type:'bt',text:"POV: I tried everything\nto make money online.",dur:3200,cl:''},
+      {type:'scene',s:'trading',dur:3500},
+      {type:'scene',s:'drop',dur:3000},
+      {type:'scene',s:'crypto',dur:3000},
+      {type:'bt',text:"Then I found\nAI automation.",dur:2500,cl:'green'},
+      {type:'scene',s:'ai',dur:4500},
+      {type:'bt',text:"Comment BLUEPRINT\nI'll send you the tool. 👇",dur:3500,cl:'red'},
     ],
-    script:`POV: I've tried everything to make money online.
+    script:`POV: I tried everything to make money online.
 
 Trading — lost twenty four hundred dollars.
-Dropshipping — wasted three months.
-Crypto — gone.
-Freelancing — eight dollars an hour.
+Dropshipping — zero profit, three months wasted.
+Crypto — lost eight hundred.
+Freelancing — five dollars an hour, completely burned out.
 
 Then I found AI automation.
 
 First client paid me nine hundred dollars.
-I built their automation in sixty seconds.
-No coding. No experience.
+I built the automation in sixty seconds with AI. No coding.
 
-Comment BLUEPRINT and I'll send you the tool I used.`
+Comment BLUEPRINT and I'll send you the exact tool I used.`
   },
   {
-    title:'POV 2 — "Trading vs AI Agency"',
-    desc:'22s · Format comparație directă · simplu și rapid',
-    pov:true,
+    title:'POV 2 — Trading vs AI Agency',
+    desc:'22s · SVG chart crash → AI rise',
     beats:[
-      {type:'text',text:"POV: I stopped trading\nand started this instead.",dur:3500,cl:''},
-      {type:'vs',dur:6000,rows:[
-        {fail:'Trading 📈',win:'AI Agency 🤖'},
-        {fail:'High risk',win:'Zero risk'},
-        {fail:'Need $10k+ capital',win:'Need $97 course'},
-        {fail:'90% lose money',win:'First client in 7 days'},
-      ]},
-      {type:'text',text:"Average deal: $850.\nBuilt in 60 seconds with AI.",dur:3500,cl:'green'},
-      {type:'text',text:"Comment BLUEPRINT\nand I'll show you how. 👇",dur:3500,cl:'red'},
+      {type:'bt',text:"POV: I quit trading\nand started this instead.",dur:3200,cl:''},
+      {type:'scene',s:'trading',dur:4000},
+      {type:'bt',text:"Then switched to\nAI automation.",dur:2500,cl:''},
+      {type:'scene',s:'ai',dur:4500},
+      {type:'bt',text:"Comment BLUEPRINT 👇",dur:3000,cl:'red'},
     ],
-    script:`POV: I stopped trading and started this instead.
+    script:`POV: I quit trading and started this instead.
 
-Trading: high risk, need thousands of dollars of capital, ninety percent of people lose money.
+I was losing money every week trying to predict charts.
+High risk, need capital, ninety percent of traders lose money.
 
-AI Agency: zero risk, you only need a ninety seven dollar course, and you can close your first client in seven days.
+Then I switched to AI automation.
+First client, nine hundred dollars, sixty seconds to build.
 
-Average deal is eight hundred and fifty dollars. Built in sixty seconds with AI.
-
-Comment BLUEPRINT and I'll show you exactly how.`
+Comment BLUEPRINT.`
   },
   {
-    title:'POV 3 — "Ecom vs AI Agency"',
-    desc:'24s · Ecommerce fail → AI win',
-    pov:true,
+    title:'POV 3 — Ecom / Dropshipping fail',
+    desc:'24s · Dropshipping boxes → AI win',
     beats:[
-      {type:'text',text:"I ran an ecom store for 6 months.\nMade $0 profit.",dur:4000,cl:''},
-      {type:'list',dur:5500,items:[
-        {icon:'❌',text:'Ecommerce',tag:'$0 profit, 6 months',cl:'fail'},
-        {icon:'❌',text:'Print on demand',tag:'$3 per sale',cl:'fail'},
-        {icon:'❌',text:'Amazon FBA',tag:'too expensive',cl:'fail'},
-      ]},
-      {type:'text',text:"First week with\nAI automation:",dur:2500,cl:''},
-      {type:'list',dur:4500,items:[
-        {icon:'✅',text:'1 client',tag:'$900 setup fee',cl:'win'},
-        {icon:'✅',text:'Monthly retainer',tag:'+$200/month',cl:'win'},
-      ]},
-      {type:'text',text:"Comment BLUEPRINT 👇\nI'll send you the tool.",dur:3500,cl:'red'},
+      {type:'bt',text:"I ran a dropshipping store\nfor 3 months.",dur:3200,cl:''},
+      {type:'scene',s:'drop',dur:3500},
+      {type:'bt',text:"First week with\nAI automation:",dur:2500,cl:''},
+      {type:'scene',s:'ai',dur:4000},
+      {type:'bt',text:"Comment BLUEPRINT 👇",dur:3000,cl:'red'},
     ],
-    script:`I ran an ecommerce store for six months. Made zero profit.
+    script:`I ran a dropshipping store for three months. Zero profit.
 
-Tried print on demand — three dollars per sale.
-Tried Amazon FBA — too expensive to start.
+Shipping delays, refunds, ads that burned cash. Nothing worked.
 
-First week with AI automation: one client, nine hundred dollars setup fee, plus two hundred a month retainer.
+First week with AI automation: one client paid me nine hundred dollars.
+I built their WhatsApp bot in sixty seconds.
 
-Comment BLUEPRINT and I'll send you the tool I used.`
+Comment BLUEPRINT.`
   },
   {
-    title:'POV 4 — "SMMA / Agency" (fără client)',
-    desc:'22s · Social media agency fail → AI Agency win',
-    pov:true,
+    title:'POV 4 — SMMA / Social Media Agency fail',
+    desc:'24s · SMMA zero clients → AI win',
     beats:[
-      {type:'text',text:"I tried starting a social media agency.\nGot zero clients.",dur:4000,cl:''},
-      {type:'vs',dur:5500,rows:[
-        {fail:'SMMA',win:'AI Agency'},
-        {fail:'Hard to get clients',win:'Easy pitch — saves them $$$'},
-        {fail:'Monthly content grind',win:'Build once, they pay forever'},
-        {fail:'$0 my first 3 months',win:'$900 my first week'},
-      ]},
-      {type:'text',text:"The pitch writes itself:\n'I automate your replies with AI.'",dur:4000,cl:'green'},
-      {type:'text',text:"Comment BLUEPRINT 👇",dur:3000,cl:'red'},
+      {type:'bt',text:"I tried starting a\nsocial media agency.",dur:3200,cl:''},
+      {type:'scene',s:'smma',dur:3500},
+      {type:'bt',text:"Then I found\nAI automation.",dur:2500,cl:''},
+      {type:'scene',s:'ai',dur:4000},
+      {type:'bt',text:"Comment BLUEPRINT 👇",dur:3000,cl:'red'},
     ],
     script:`I tried starting a social media agency. Got zero clients in three months.
 
-With SMMA you fight for every client, you grind on content every month, and the competition is insane.
+Nobody wants to pay for content they can do themselves.
 
-With AI Agency, the pitch is simple: I automate your customer replies with AI. Businesses understand it immediately because it saves them money.
-
-Nine hundred dollars my first week.
+Then I found AI automation.
+Businesses actually need this. And they pay eight hundred to twelve hundred dollars for it.
+First client in seven days.
 
 Comment BLUEPRINT.`
   },
 ];
 
-const HOOK_VIDEOS=[
-  {title:'Hook 1 — "Nobody talks about this"',desc:'22s · Hook FOMO · CTA BLUEPRINT',beats:[
-    {type:'text',text:"Nobody talks about this side hustle\nbecause it sounds too easy.",dur:4000,cl:'red'},
-    {type:'text',text:"Local businesses pay $800–$1,200\nfor automations.",dur:3500,cl:''},
-    {type:'text',text:"WhatsApp bots.\nEmail follow-ups.\nInstagram auto-replies.",dur:4000,cl:''},
-    {type:'text',text:"AI generates the whole plan\nin 60 seconds.",dur:3500,cl:'green'},
-    {type:'text',text:"Comment BLUEPRINT\nand I'll send you the tool. 👇",dur:4000,cl:'red'},
-  ],script:`Nobody talks about this side hustle because it sounds too easy.
+const HOOK=[
+  {
+    title:'Hook 1 — "$1,000 for this?"',
+    desc:'20s · Income reveal · SVG ai scene',
+    beats:[
+      {type:'bt',text:"I had no idea you could\ncharge $1,000 for THIS.",dur:3500,cl:'red'},
+      {type:'scene',s:'ai',dur:4500},
+      {type:'bt',text:"A restaurant paid me $900.\nBuilt in 60 seconds. AI.",dur:3500,cl:''},
+      {type:'bt',text:"Comment BLUEPRINT 👇",dur:3000,cl:'red'},
+    ],
+    script:`I had no idea you could charge a thousand dollars for this.
 
-Local businesses pay eight hundred to twelve hundred dollars for automations.
-WhatsApp bots, email follow-ups, Instagram auto-replies.
+Look at what AI builds in sixty seconds — a full Make dot com automation plan, the exact price to charge, and a copy-paste message to send the client.
 
-AI generates the whole plan in sixty seconds. No coding. No experience.
+A restaurant paid me nine hundred dollars for their WhatsApp bot. Built in sixty seconds.
 
-Comment BLUEPRINT and I'll send you the tool.`},
-  {title:'Hook 2 — "$900 payment reveal"',desc:'18s · Income proof · urgency',beats:[
-    {type:'text',text:"I had no idea you could charge\n$1,000 for THIS.",dur:4000,cl:'red'},
-    {type:'text',text:"A restaurant owner paid me $900\nto automate their WhatsApp replies.",dur:4500,cl:''},
-    {type:'text',text:"I built it in 60 seconds\nwith AI.",dur:3000,cl:'green'},
-    {type:'text',text:"Comment BLUEPRINT\nand I'll send you the tool. 👇",dur:3500,cl:'red'},
-  ],script:`I had no idea you could charge a thousand dollars for this.
+Comment BLUEPRINT.`
+  },
+  {
+    title:'Hook 2 — "Nobody talks about this"',
+    desc:'22s · FOMO hook · business list',
+    beats:[
+      {type:'bt',text:"Nobody talks about this\nbecause it sounds too easy.",dur:3500,cl:'red'},
+      {type:'list',dur:6500,items:[
+        {ic:'🍕',text:'Restaurants',tg:'need WhatsApp bots',cl:''},
+        {ic:'🏋️',text:'Gyms',tg:'need DM automation',cl:''},
+        {ic:'🏥',text:'Clinics',tg:'need booking bots',cl:''},
+        {ic:'💈',text:'Salons',tg:'need reply automation',cl:''},
+      ]},
+      {type:'bt',text:"Each one pays $800–$1,200.\nAI builds it in 60 sec.",dur:3500,cl:'green'},
+      {type:'bt',text:"Comment BLUEPRINT 👇",dur:3000,cl:'red'},
+    ],
+    script:`Nobody talks about this side hustle because it sounds too easy.
 
-A restaurant owner paid me nine hundred dollars to automate their WhatsApp replies.
-I built it in sixty seconds with AI.
-They had no idea how easy it was.
+Every restaurant needs a WhatsApp bot.
+Every gym needs DM automation.
+Every clinic needs a booking bot.
+Every salon needs automated replies.
 
-Comment BLUEPRINT and I'll send you the tool.`},
-  {title:'Hook 3 — "I sent one DM"',desc:'22s · Story format · relatable',beats:[
-    {type:'text',text:"I sent one DM to a local gym.",dur:3000,cl:''},
-    {type:'text',text:"'Do you reply to every\nInstagram message manually?'",dur:4000,cl:''},
-    {type:'text',text:"They said yes.\nI said: I can automate that for $800.",dur:4000,cl:'green'},
-    {type:'text',text:"AI built the plan.\nMake.com ran it.\nThey paid.",dur:4000,cl:''},
-    {type:'text',text:"Comment BLUEPRINT\nand I'll send you the exact tool. 👇",dur:3500,cl:'red'},
-  ],script:`I sent one DM to a local gym.
+Each one pays eight hundred to twelve hundred dollars.
+AI builds the whole plan in sixty seconds.
 
-"Hey — do you reply to every Instagram message manually?"
+Comment BLUEPRINT.`
+  },
+  {
+    title:'Hook 3 — "I sent one DM"',
+    desc:'22s · Story format',
+    beats:[
+      {type:'bt',text:"I sent one DM\nto a local gym.",dur:3000,cl:''},
+      {type:'bt',text:"'Do you reply to every\nInstagram message manually?'",dur:3500,cl:''},
+      {type:'bt',text:"They said yes.\nI said: I can fix that for $800.",dur:3500,cl:'green'},
+      {type:'scene',s:'ai',dur:4000},
+      {type:'bt',text:"Comment BLUEPRINT\nI'll send you the tool. 👇",dur:3500,cl:'red'},
+    ],
+    script:`I sent one DM to a local gym.
+
+"Hey, do you reply to every Instagram message manually?"
 
 They said yes. I said I can automate that for eight hundred dollars.
 
-They asked how long it takes. I said: I'll have it live tomorrow.
+AI built the plan. Make dot com ran it. They paid in twenty four hours.
 
-AI built the plan. Make dot com ran it. They paid.
-
-Comment BLUEPRINT and I'll send you the exact tool.`},
+Comment BLUEPRINT and I'll send you the exact tool.`
+  },
 ];
 
-/* ─────────── RENDER ─────────── */
-function renderVideos(videos, containerId){
-  const grid=document.getElementById(containerId);
-  videos.forEach((v,i)=>{
-    const uid=containerId+i;
-    const w=document.createElement('div');
-    w.className='player-wrap';
-    w.innerHTML=`<h2>${v.title}</h2><p>${v.desc}</p>
-    <div class="player" id="p${uid}">
-      <div class="accent-line"></div>
-      <div class="logo">⚡ BLUEPRINT STUDIO</div>
-      ${v.pov?'<div class="pov-tag" id="povtag'+uid+'">POV ↓</div>':''}
-      <div id="btwrap${uid}" style="position:absolute;width:100%;display:flex;align-items:center;justify-content:center"></div>
-      <div class="progress"><div class="progress-fill" id="pf${uid}"></div></div>
-      <div class="cta-bar"><div class="site">aicashsystem.space/try</div><div class="price">Try FREE · Full access $97 · No coding</div></div>
-      <div class="play-overlay">▶</div>
+/* ═══════ RENDER ═══════ */
+function render(arr,cid){
+  const g=document.getElementById(cid);
+  arr.forEach((v,i)=>{
+    const uid=cid+'_'+i;
+    const d=document.createElement('div');
+    d.className='pw';
+    d.innerHTML=`<h2>${v.title}</h2><p>${v.desc}</p>
+    <div class="player" id="pl${uid}">
+      <div class="p-logo">⚡ BLUEPRINT STUDIO</div>
+      <div class="beat-wrap" id="bw${uid}"></div>
+      <div class="p-progress"><div class="p-bar" id="pb${uid}"></div></div>
+      <div class="p-cta"><div class="p-cta-site">aicashsystem.space/try</div><div class="p-cta-sub">Try FREE · Full access $97 · No coding</div></div>
+      <div class="p-overlay">▶</div>
     </div>
-    <br>
-    <button class="rec-btn" onclick="toggle('${uid}',${i},'${containerId}')">▶ Play / Restart</button>
-    ${v.script?`<br><button class="show-script" onclick="toggleScript('sc${uid}')">📋 Script ElevenLabs</button><div class="script-box" id="sc${uid}"><strong>🎙️ Copiază în ElevenLabs:</strong>${v.script.replace(/\n/g,'<br>')}</div>`:''}`;
-    grid.appendChild(w);
-    document.getElementById('p'+uid).addEventListener('click',()=>toggle(uid,i,containerId));
+    <br><button class="pbtn" onclick="tog('${uid}',${i},'${cid}')">▶ Play / Restart</button>
+    ${v.script?`<button class="sbtn" onclick="tgs('sbox${uid}')">📋 Script voce</button><div class="sbox" id="sbox${uid}"><strong>🎙 Copiază în ElevenLabs sau citește direct:</strong>${v.script.replace(/\n/g,'<br>')}</div>`:''}`;
+    g.appendChild(d);
+    document.getElementById('pl'+uid).addEventListener('click',()=>tog(uid,i,cid));
   });
 }
-renderVideos(POV_VIDEOS,'grid-pov');
-renderVideos(HOOK_VIDEOS,'grid-hook');
+render(POV,'gpov');
+render(HOOK,'ghook');
 
-function toggleScript(id){
-  const el=document.getElementById(id);
-  el.style.display=el.style.display==='block'?'none':'block';
-}
+function tgs(id){const e=document.getElementById(id);e.style.display=e.style.display==='block'?'none':'block';}
 
-/* ─────────── VOICE (Web Speech API) ─────────── */
-var _voiceOn=false, _selVoice=null, _voices=[];
-var _MALE_KEYWORDS=['male','man','david','mark','james','daniel','alex','google uk english male','microsoft david','microsoft mark','microsoft james','guy','luca','felix','jorge','diego','carlos'];
-
-function loadVoices(){
-  _voices=window.speechSynthesis.getVoices();
-  const sel=document.getElementById('voiceSel');
-  const enVoices=_voices.filter(v=>v.lang.startsWith('en'));
-  if(!enVoices.length){ document.getElementById('voiceStatus').textContent='Browser-ul nu suportă TTS'; return; }
-  sel.innerHTML='';
-  enVoices.forEach((v,i)=>{
-    const o=document.createElement('option');
-    o.value=_voices.indexOf(v);
-    o.textContent=v.name+' ('+v.lang+')';
-    sel.appendChild(o);
-  });
-  /* auto-select male */
-  const maleVoice=enVoices.find(v=>_MALE_KEYWORDS.some(k=>v.name.toLowerCase().includes(k)));
-  if(maleVoice){
-    sel.value=_voices.indexOf(maleVoice);
-    _selVoice=maleVoice;
-    document.getElementById('voiceStatus').textContent='Voce: '+maleVoice.name;
-  } else {
-    _selVoice=enVoices[0];
-    document.getElementById('voiceStatus').textContent='Voce: '+enVoices[0].name;
-  }
+/* ═══════ PLAYER ENGINE ═══════ */
+const ST={};
+function tog(uid,idx,cid){
+  if(ST[uid]&&ST[uid].on){stopV(uid);}else{startV(uid,idx,cid);}
 }
-window.speechSynthesis.onvoiceschanged=loadVoices;
-loadVoices();
-setTimeout(loadVoices,500);
-
-function pickVoice(){
-  const idx=parseInt(document.getElementById('voiceSel').value);
-  _selVoice=_voices[idx]||null;
-  if(_selVoice) document.getElementById('voiceStatus').textContent='Voce: '+_selVoice.name;
-}
-function toggleVoice(){
-  _voiceOn=!_voiceOn;
-  const btn=document.getElementById('voiceToggle');
-  btn.classList.toggle('on',_voiceOn);
-  btn.lastChild.textContent=_voiceOn?' Voce ON':' Voce OFF';
-  if(!_voiceOn) window.speechSynthesis.cancel();
-}
-function speakScript(script){
-  if(!_voiceOn||!script) return;
-  window.speechSynthesis.cancel();
-  const utt=new SpeechSynthesisUtterance(script);
-  utt.voice=_selVoice;
-  utt.rate=0.92;
-  utt.pitch=0.88;
-  utt.volume=1;
-  window.speechSynthesis.speak(utt);
-}
-function stopSpeech(){ window.speechSynthesis.cancel(); }
-
-/* ─────────── PLAYER STATE ─────────── */
-const STATE={};
-function toggle(uid,idx,src){
-  if(!STATE[uid]) STATE[uid]={on:false,t:[],b:0};
-  STATE[uid].on?pauseV(uid):playV(uid,idx,src);
-}
-function pauseV(uid){
-  STATE[uid].on=false;
-  STATE[uid].t.forEach(clearTimeout);
-  document.getElementById('p'+uid).classList.remove('playing');
+function stopV(uid){
+  if(!ST[uid]) return;
+  ST[uid].on=false;
+  ST[uid].timers.forEach(clearTimeout);
+  document.getElementById('pl'+uid).classList.remove('playing');
   stopSpeech();
 }
-function playV(uid,idx,src){
-  const arr=src==='grid-pov'?POV_VIDEOS:HOOK_VIDEOS;
-  STATE[uid]={on:true,t:[],b:0};
-  document.getElementById('p'+uid).classList.add('playing');
-  if(arr[idx].pov){ const pt=document.getElementById('povtag'+uid); if(pt) pt.style.display='block'; }
+function startV(uid,idx,cid){
+  const arr=cid==='gpov'?POV:HOOK;
+  ST[uid]={on:true,b:0,timers:[]};
+  document.getElementById('pl'+uid).classList.add('playing');
+  document.getElementById('pb'+uid).style.cssText='width:0%;transition:none';
   speakScript(arr[idx].script||null);
-  runBeat(uid,arr[idx]);
+  runB(uid,arr[idx]);
 }
 
-function runBeat(uid,v){
-  const s=STATE[uid];
-  if(!s.on) return;
-  const wrap=document.getElementById('btwrap'+uid);
+function runB(uid,v){
+  const s=ST[uid];
+  if(!s||!s.on) return;
+  const bw=document.getElementById('bw'+uid);
   if(s.b>=v.beats.length){
-    pauseV(uid); s.b=0; wrap.innerHTML='';
-    document.getElementById('pf'+uid).style.cssText='width:0%;transition:none';
+    stopV(uid);
+    s.b=0; bw.innerHTML='';
+    document.getElementById('pb'+uid).style.cssText='width:0%;transition:none';
     return;
   }
   const beat=v.beats[s.b];
   const tot=v.beats.reduce((a,b)=>a+b.dur,0);
-  const el=v.beats.slice(0,s.b).reduce((a,b)=>a+b.dur,0);
-  const pf=document.getElementById('pf'+uid);
-  pf.style.cssText=`width:${el/tot*100}%;transition:none`;
-  requestAnimationFrame(()=>{ pf.style.cssText=`width:${(el+beat.dur)/tot*100}%;transition:width ${beat.dur}ms linear`; });
+  const elapsed=v.beats.slice(0,s.b).reduce((a,b)=>a+b.dur,0);
+  const pb=document.getElementById('pb'+uid);
+  pb.style.cssText=`width:${elapsed/tot*100}%;transition:none`;
+  requestAnimationFrame(()=>{pb.style.cssText=`width:${(elapsed+beat.dur)/tot*100}%;transition:width ${beat.dur}ms linear`;});
 
-  if(beat.type==='text'){
-    wrap.innerHTML=`<div class="beat-text ${beat.cl||''}">${beat.text.replace(/\n/g,'<br>')}</div>`;
-    requestAnimationFrame(()=>wrap.querySelector('.beat-text').classList.add('visible'));
-    s.t.push(setTimeout(()=>{
-      const bt=wrap.querySelector('.beat-text');
-      if(bt) bt.classList.remove('visible');
-      s.t.push(setTimeout(()=>{ s.b++; if(s.on) runBeat(uid,v); },350));
-    },beat.dur-350));
+  if(beat.type==='bt'){
+    bw.innerHTML=`<div class="bt ${beat.cl||''}">${beat.text.replace(/\n/g,'<br>')}</div>`;
+    requestAnimationFrame(()=>{const e=bw.querySelector('.bt');if(e)e.classList.add('visible');});
+    s.timers.push(setTimeout(()=>{
+      const e=bw.querySelector('.bt');if(e)e.classList.remove('visible');
+      s.timers.push(setTimeout(()=>{s.b++;if(s.on)runB(uid,v);},300));
+    },beat.dur-300));
+  }
+  else if(beat.type==='scene'){
+    bw.innerHTML=`<div class="scene">${SC[beat.s]()}</div>`;
+    requestAnimationFrame(()=>{const e=bw.querySelector('.scene');if(e)e.classList.add('visible');});
+    s.timers.push(setTimeout(()=>{
+      const e=bw.querySelector('.scene');if(e)e.classList.remove('visible');
+      s.timers.push(setTimeout(()=>{s.b++;if(s.on)runB(uid,v);},300));
+    },beat.dur-300));
   }
   else if(beat.type==='list'){
-    const html=beat.items.map((it,ii)=>`<div class="list-item ${it.cl||''}" id="li${uid}_${s.b}_${ii}"><span class="icon">${it.icon}</span><span>${it.text}</span><span class="tag">${it.tag||''}</span></div>`).join('');
-    wrap.innerHTML=`<div class="beat-list">${html}</div>`;
-    requestAnimationFrame(()=>wrap.querySelector('.beat-list').classList.add('visible'));
-    const perItem=Math.min(900, beat.dur/beat.items.length);
+    const html=beat.items.map((it,ii)=>`<div class="bli ${it.cl||''}" id="li${uid}_${s.b}_${ii}"><span class="ic">${it.ic}</span><span>${it.text}</span><span class="tg">${it.tg||''}</span></div>`).join('');
+    bw.innerHTML=`<div class="blist">${html}</div>`;
+    requestAnimationFrame(()=>{const e=bw.querySelector('.blist');if(e)e.classList.add('visible');});
+    const step=Math.min(1100,beat.dur/beat.items.length);
     beat.items.forEach((_,ii)=>{
-      s.t.push(setTimeout(()=>{
-        const li=document.getElementById(`li${uid}_${s.b}_${ii}`);
-        if(li) li.classList.add('show');
-      }, ii*perItem));
+      s.timers.push(setTimeout(()=>{
+        const e=document.getElementById(`li${uid}_${s.b}_${ii}`);if(e)e.classList.add('show');
+      },ii*step));
     });
-    s.t.push(setTimeout(()=>{
-      const bl=wrap.querySelector('.beat-list');
-      if(bl) bl.classList.remove('visible');
-      s.t.push(setTimeout(()=>{ s.b++; if(s.on) runBeat(uid,v); },350));
-    },beat.dur-350));
-  }
-  else if(beat.type==='vs'){
-    const html=beat.rows.map(r=>`<div class="vs-row"><div class="vs-fail">${r.fail}</div><div class="vs-arrow">→</div><div class="vs-win">${r.win}</div></div>`).join('');
-    wrap.innerHTML=`<div class="beat-vs">${html}</div>`;
-    requestAnimationFrame(()=>wrap.querySelector('.beat-vs').classList.add('visible'));
-    s.t.push(setTimeout(()=>{
-      const bv=wrap.querySelector('.beat-vs');
-      if(bv) bv.classList.remove('visible');
-      s.t.push(setTimeout(()=>{ s.b++; if(s.on) runBeat(uid,v); },350));
-    },beat.dur-350));
+    s.timers.push(setTimeout(()=>{
+      const e=bw.querySelector('.blist');if(e)e.classList.remove('visible');
+      s.timers.push(setTimeout(()=>{s.b++;if(s.on)runB(uid,v);},300));
+    },beat.dur-300));
   }
 }
+
+/* ═══════ VOICE ═══════ */
+var _von=false,_vsel=null,_voices=[];
+const MALE=['male','man','david','mark','james','daniel','alex','google uk english male','microsoft david','microsoft mark','guy','felix','jorge','carlos','luca'];
+function loadV(){
+  _voices=window.speechSynthesis.getVoices();
+  const en=_voices.filter(v=>v.lang.startsWith('en'));
+  if(!en.length){document.getElementById('vstat').textContent='Browser fără TTS';return;}
+  const sel=document.getElementById('vsel');
+  sel.innerHTML='';
+  en.forEach(v=>{const o=document.createElement('option');o.value=_voices.indexOf(v);o.textContent=v.name+' ('+v.lang+')';sel.appendChild(o);});
+  const m=en.find(v=>MALE.some(k=>v.name.toLowerCase().includes(k)));
+  _vsel=m||en[0];
+  sel.value=_voices.indexOf(_vsel);
+  document.getElementById('vstat').textContent=_vsel.name;
+}
+window.speechSynthesis.onvoiceschanged=loadV;
+loadV(); setTimeout(loadV,600);
+function pickV(){const i=parseInt(document.getElementById('vsel').value);_vsel=_voices[i]||null;if(_vsel)document.getElementById('vstat').textContent=_vsel.name;}
+function tgVoice(){
+  _von=!_von;
+  const b=document.getElementById('vbtn');
+  b.textContent=_von?'🔊 Voce ON':'🔇 Voce OFF';
+  b.classList.toggle('on',_von);
+  if(!_von)stopSpeech();
+}
+function speakScript(txt){
+  if(!_von||!txt) return;
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(txt);
+  u.voice=_vsel; u.rate=0.91; u.pitch=0.86; u.volume=1;
+  window.speechSynthesis.speak(u);
+}
+function stopSpeech(){window.speechSynthesis.cancel();}
 </script>
 </body>
 </html>
