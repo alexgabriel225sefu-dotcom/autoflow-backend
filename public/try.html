@@ -565,25 +565,66 @@ setInterval(function(){
 
 /* ── activity popup ── */
 var _acts=[
-  {av:'🇷🇴',name:'Alex M.',txt:'just generated a WhatsApp bot',t:'2m ago'},
-  {av:'🇩🇪',name:'Daniel K.',txt:'just purchased Blueprint Studio',t:'4m ago'},
-  {av:'🇬🇧',name:'Emma L.',txt:'generated a cold email automation',t:'6m ago'},
-  {av:'🇪🇸',name:'Diego R.',txt:'just purchased Blueprint Studio',t:'9m ago'},
-  {av:'🇫🇷',name:'Sophie B.',txt:'generated a lead follow-up bot',t:'11m ago'},
-  {av:'🇳🇱',name:'Lucas V.',txt:'just purchased Blueprint Studio',t:'14m ago'},
-  {av:'🇮🇹',name:'Marco D.',txt:'generated an Instagram DM bot',t:'17m ago'},
-  {av:'🇵🇱',name:'Kasia W.',txt:'just purchased Blueprint Studio',t:'20m ago'},
+  {av:'🇷🇴',name:'Alex M.',txt:'just purchased Blueprint Studio',t:'just now'},
+  {av:'🇩🇪',name:'Daniel K.',txt:'just generated a WhatsApp bot',t:'1m ago'},
+  {av:'🇬🇧',name:'Emma L.',txt:'just purchased Blueprint Studio',t:'2m ago'},
+  {av:'🇪🇸',name:'Diego R.',txt:'generated a cold email automation',t:'3m ago'},
+  {av:'🇫🇷',name:'Sophie B.',txt:'just purchased Blueprint Studio',t:'4m ago'},
+  {av:'🇳🇱',name:'Lucas V.',txt:'generated a lead follow-up bot',t:'5m ago'},
+  {av:'🇮🇹',name:'Marco D.',txt:'just purchased Blueprint Studio',t:'6m ago'},
+  {av:'🇵🇱',name:'Kasia W.',txt:'generated an Instagram DM bot',t:'7m ago'},
+  {av:'🇧🇷',name:'Rafael S.',txt:'just purchased Blueprint Studio',t:'8m ago'},
+  {av:'🇲🇽',name:'Carlos H.',txt:'generated a WhatsApp AI bot',t:'9m ago'},
+  {av:'🇦🇺',name:'Jake T.',txt:'just purchased Blueprint Studio',t:'10m ago'},
+  {av:'🇺🇸',name:'Tyler B.',txt:'generated a cold outreach bot',t:'11m ago'},
+  {av:'🇨🇦',name:'Nathan F.',txt:'just purchased Blueprint Studio',t:'12m ago'},
+  {av:'🇯🇵',name:'Kenji A.',txt:'generated an email automation',t:'13m ago'},
+  {av:'🇰🇷',name:'Ji-ho P.',txt:'just purchased Blueprint Studio',t:'14m ago'},
+  {av:'🇿🇦',name:'Liam N.',txt:'generated a Stripe payment bot',t:'15m ago'},
+  {av:'🇸🇪',name:'Axel L.',txt:'just purchased Blueprint Studio',t:'16m ago'},
+  {av:'🇵🇹',name:'Miguel F.',txt:'generated a lead follow-up bot',t:'17m ago'},
+  {av:'🇦🇷',name:'Valentina G.',txt:'just purchased Blueprint Studio',t:'18m ago'},
+  {av:'🇨🇴',name:'Sebastian R.',txt:'generated a WhatsApp bot',t:'19m ago'},
+  {av:'🇮🇳',name:'Arjun P.',txt:'just purchased Blueprint Studio',t:'20m ago'},
+  {av:'🇹🇷',name:'Emre Y.',txt:'generated a cold email automation',t:'21m ago'},
+  {av:'🇨🇿',name:'Tomáš N.',txt:'just purchased Blueprint Studio',t:'22m ago'},
+  {av:'🇭🇺',name:'Bence K.',txt:'generated an Instagram DM bot',t:'23m ago'},
+  {av:'🇬🇷',name:'Nikos P.',txt:'just purchased Blueprint Studio',t:'24m ago'},
+  {av:'🇺🇦',name:'Dmytro S.',txt:'generated a lead follow-up bot',t:'25m ago'},
+  {av:'🇸🇰',name:'Martin H.',txt:'just purchased Blueprint Studio',t:'26m ago'},
+  {av:'🇷🇸',name:'Nikola J.',txt:'generated a WhatsApp AI bot',t:'27m ago'},
+  {av:'🇫🇮',name:'Mikko A.',txt:'just purchased Blueprint Studio',t:'28m ago'},
+  {av:'🇩🇰',name:'Oliver B.',txt:'generated a cold outreach bot',t:'29m ago'},
+  {av:'🇧🇪',name:'Louis D.',txt:'just purchased Blueprint Studio',t:'30m ago'},
+  {av:'🇨🇭',name:'Luca M.',txt:'generated an email automation',t:'31m ago'},
+  {av:'🇦🇹',name:'Florian W.',txt:'just purchased Blueprint Studio',t:'32m ago'},
+  {av:'🇳🇴',name:'Kristian O.',txt:'generated an Instagram DM bot',t:'33m ago'},
+  {av:'🇸🇦',name:'Omar A.',txt:'just purchased Blueprint Studio',t:'34m ago'},
+  {av:'🇦🇪',name:'Khalid R.',txt:'generated a WhatsApp bot',t:'35m ago'},
+  {av:'🇵🇭',name:'Paolo C.',txt:'just purchased Blueprint Studio',t:'36m ago'},
+  {av:'🇮🇩',name:'Budi S.',txt:'generated a lead follow-up bot',t:'37m ago'},
+  {av:'🇲🇾',name:'Haziq I.',txt:'just purchased Blueprint Studio',t:'38m ago'},
+  {av:'🇳🇬',name:'Emeka O.',txt:'generated a cold email automation',t:'39m ago'},
+  {av:'🇰🇪',name:'Brian M.',txt:'just purchased Blueprint Studio',t:'40m ago'},
+  {av:'🇷🇺',name:'Pavel Z.',txt:'generated a WhatsApp AI bot',t:'41m ago'},
+  {av:'🇮🇱',name:'Noa K.',txt:'just purchased Blueprint Studio',t:'42m ago'},
+  {av:'🇨🇱',name:'Matías V.',txt:'generated a Stripe payment bot',t:'43m ago'},
+  {av:'🇵🇪',name:'Rodrigo T.',txt:'just purchased Blueprint Studio',t:'44m ago'},
 ];
 var _actI=0;
 function showAct(){
-  var a=_acts[_actI%_acts.length]; _actI++;
+  /* pick random, avoid repeating last shown */
+  var idx;
+  do { idx=Math.floor(Math.random()*_acts.length); } while(idx===_actI && _acts.length>1);
+  _actI=idx;
+  var a=_acts[idx];
   var el=$('act');
   el.innerHTML='<div class="act-inner"><div class="act-avatar">'+a.av+'</div><div class="act-body"><div class="act-name">'+a.name+'</div><div class="act-txt">'+a.txt+'</div></div><div class="act-time">'+a.t+'</div></div>';
   el.style.display='block';
   setTimeout(function(){ el.style.display='none'; },5000);
 }
 setTimeout(showAct, 6000);
-setInterval(showAct, 30000 + Math.floor(Math.random()*20000));
+setInterval(showAct, 28000 + Math.floor(Math.random()*22000));
 </script>
 </body>
 </html>
