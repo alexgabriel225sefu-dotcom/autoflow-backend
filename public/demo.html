@@ -434,10 +434,8 @@ var scenes = ['s1','s2','s3'];
 var cur = 0;
 
 function activateScene(idx){
-  // hide all
-  scenes.forEach(function(id){ rem(el(id), 'active'); });
-  var id = scenes[idx];
-  add(id, 'active');
+  scenes.forEach(function(id){ el(id).classList.remove('active'); });
+  el(scenes[idx]).classList.add('active');
   if(idx === 0) runS1();
   if(idx === 1) runS2();
   if(idx === 2) runS3();
