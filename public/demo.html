@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Blueprint Studio — Demo</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#090909;--card:#111;--b1:#1e1e1e;--b2:#2a2a2a;--t1:#f5f5f5;--t2:#aaa;--t3:#555;--red:#E53E2E;--red2:#c93426;--green:#4ADE80}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+
+/* ── SCENES ── */
+.scene{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .5s ease}
+.scene.active{opacity:1;pointer-events:auto}
+
+/* ── PHONE FRAME ── */
+.phone{width:300px;height:580px;background:#0b0b0b;border:1.5px solid #222;border-radius:38px;overflow:hidden;position:relative;box-shadow:0 0 80px rgba(229,62,46,.12),0 0 0 1px #111,0 40px 80px rgba(0,0,0,.7)}
+.phone::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:70px;height:18px;background:#0b0b0b;border-radius:0 0 12px 12px;z-index:10}
+.phone-inner{position:absolute;inset:0;display:flex;flex-direction:column;font-size:10px;overflow:hidden}
+
+/* App inside phone */
+.ph-hdr{padding:18px 12px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);flex-shrink:0}
+.ph-logo{font-size:8px;font-weight:900;letter-spacing:2px;color:var(--red);text-transform:uppercase}
+.ph-signout{background:#111;border:1px solid var(--b2);color:var(--t3);border-radius:6px;padding:3px 7px;font-size:8px}
+
+.ph-hero{padding:14px 12px 8px;text-align:center;flex-shrink:0}
+.ph-badge{display:inline-block;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:var(--red);font-size:7px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:12px;margin-bottom:8px}
+.ph-title{font-size:17px;font-weight:800;line-height:1.25;margin-bottom:5px}
+.ph-title span{background:linear-gradient(135deg,#E53E2E,#ff6b5b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.ph-sub{font-size:8px;color:var(--t3);line-height:1.5}
+
+.ph-card{margin:0 10px 8px;background:var(--card);border:1px solid var(--b1);border-radius:12px;padding:12px;flex-shrink:0;position:relative}
+.ph-card::before{content:'';position:absolute;inset:0;border-radius:12px;padding:1px;background:linear-gradient(135deg,rgba(229,62,46,.35),transparent 55%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.ph-lbl{font-size:7px;color:var(--t2);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px}
+.ph-ta{width:100%;min-height:56px;background:#0d0d0d;border:1px solid var(--b2);border-radius:8px;padding:7px;color:var(--t1);font-size:9.5px;line-height:1.5;font-family:inherit;resize:none;outline:none;transition:border-color .3s}
+.ph-ta.focus{border-color:var(--red);box-shadow:0 0 0 2px rgba(229,62,46,.08)}
+.cursor{display:inline-block;width:1.5px;height:11px;background:var(--red);margin-left:1px;vertical-align:middle;animation:blink .7s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+.ph-chips{display:flex;flex-wrap:wrap;gap:4px;margin:7px 0}
+.ph-chip{background:#0d0d0d;border:1px solid var(--b2);border-radius:12px;padding:3px 8px;font-size:7.5px;color:var(--t3);transition:all .4s}
+.ph-chip.hi{border-color:var(--red);color:var(--red);background:rgba(229,62,46,.07)}
+
+.ph-gen{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:9px;padding:11px;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(229,62,46,.25);transition:all .2s;position:relative;overflow:hidden;margin-top:6px}
+.ph-gen.clicked{transform:scale(.97);box-shadow:0 2px 10px rgba(229,62,46,.15)}
+.ph-gen.clicked::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.12)}
+
+.ph-loading{display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:20px;flex-shrink:0}
+.ph-spinner{width:26px;height:26px;border:2px solid rgba(229,62,46,.2);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ph-loading-txt{font-size:9px;color:var(--t3)}
+
+.ph-out{display:none;padding:0 10px 10px;flex-direction:column;gap:5px;flex-shrink:0}
+.ph-oc{background:var(--card);border-radius:9px;padding:9px 11px;opacity:0;transform:translateY(8px);transition:opacity .4s ease,transform .4s ease}
+.ph-oc.show{opacity:1;transform:translateY(0)}
+
+.ph-ready{background:linear-gradient(135deg,#0a1a0a,#0d0d0d)!important;border:1px solid rgba(74,222,128,.3)!important;display:flex!important;align-items:center;gap:8px}
+.ph-ready svg{flex-shrink:0}
+.ph-ready-lbl{font-size:7px;color:var(--green);font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.ph-ready-name{font-size:9.5px;font-weight:600}
+.ph-cc{stroke-dasharray:75;stroke-dashoffset:75;transition:stroke-dashoffset .5s ease .1s}
+.ph-cm{stroke-dasharray:18;stroke-dashoffset:18;transition:stroke-dashoffset .4s ease .6s}
+.ph-oc.show .ph-cc{stroke-dashoffset:0}
+.ph-oc.show .ph-cm{stroke-dashoffset:0}
+
+.ph-price-lbl{font-size:7px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;border-bottom:1px solid var(--b1);padding-bottom:5px}
+.ph-price{font-size:20px;font-weight:800;color:var(--red);line-height:1}
+.ph-price-sub{font-size:7.5px;color:var(--t3);margin-top:2px}
+
+.ph-out-lbl{font-size:7px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;border-bottom:1px solid var(--b1);padding-bottom:5px}
+.ph-out-txt{font-size:8.5px;color:var(--t2);line-height:1.5}
+
+/* ── SCENE 2: MAKE.COM ── */
+#s2{flex-direction:row;gap:32px;align-items:center}
+.make-wrap{width:320px}
+.make-hdr{background:#111;border:1px solid var(--b1);border-radius:10px 10px 0 0;padding:10px 14px;display:flex;align-items:center;gap:8px}
+.make-m{width:22px;height:22px;background:var(--red);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0}
+.make-htxt{font-size:11px;font-weight:700}
+.make-hsub{font-size:8px;color:var(--t3)}
+.make-canvas{background:#080808;border:1px solid var(--b1);border-left:1px solid var(--b1);border-right:1px solid var(--b1);height:200px;position:relative;overflow:hidden}
+.make-dots{position:absolute;inset:0;background-image:radial-gradient(circle,#1e1e1e 1px,transparent 1px);background-size:18px 18px;opacity:.6}
+
+.make-file{position:absolute;top:18px;left:-60px;width:44px;height:50px;background:#141414;border:1px solid #2a2a2a;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:left .8s cubic-bezier(.34,1.4,.64,1)}
+.make-file.fly{left:16px}
+.make-file-icon{font-size:14px}
+.make-file-name{font-size:7px;color:var(--green);font-weight:700}
+
+.make-imp{position:absolute;top:18px;left:72px;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.4);color:var(--red);border-radius:7px;padding:6px 10px;font-size:9px;font-weight:700;opacity:0;transform:scale(.9);transition:all .4s ease .1s}
+.make-imp.show{opacity:1;transform:scale(1)}
+.make-imp.click{background:rgba(229,62,46,.2);transform:scale(.95)}
+
+.make-mods{position:absolute;bottom:24px;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:0;padding:0 20px}
+.make-mod{width:48px;height:48px;background:#141414;border:1px solid var(--b2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;opacity:0;transform:scale(.6);transition:opacity .35s ease,transform .35s cubic-bezier(.34,1.4,.64,1);flex-shrink:0}
+.make-mod.show{opacity:1;transform:scale(1)}
+.make-conn{width:24px;height:1px;background:transparent;flex-shrink:0;position:relative}
+.make-conn::after{content:'';position:absolute;top:0;left:0;width:0;height:1px;background:linear-gradient(90deg,var(--red),rgba(229,62,46,.2));transition:width .5s ease}
+.make-conn.show::after{width:100%}
+
+.make-ft{background:#111;border:1px solid var(--b1);border-top:none;border-radius:0 0 10px 10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
+.make-tgl-track{width:38px;height:20px;background:#222;border-radius:10px;position:relative;border:1px solid var(--b2);transition:background .4s ease;cursor:pointer}
+.make-tgl-track.on{background:var(--green)}
+.make-tgl-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;background:#fff;border-radius:50%;transition:left .35s cubic-bezier(.34,1.4,.64,1);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.make-tgl-track.on .make-tgl-thumb{left:20px}
+.make-tgl-lbl{font-size:9px;color:var(--t2);margin-left:8px}
+.make-live{display:flex;align-items:center;gap:5px;opacity:0;transition:opacity .5s ease}
+.make-live.show{opacity:1}
+.make-live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:lpulse 1.4s ease-in-out infinite}
+@keyframes lpulse{0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.5)}60%{box-shadow:0 0 0 5px rgba(74,222,128,0)}}
+.make-live-txt{font-size:10px;color:var(--green);font-weight:700}
+
+.make-steps{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.make-si{display:flex;align-items:center;gap:7px;opacity:0;transform:translateX(-8px);transition:all .4s ease}
+.make-si.show{opacity:1;transform:translateX(0)}
+.make-sn{width:17px;height:17px;border-radius:50%;background:rgba(229,62,46,.12);border:1px solid rgba(229,62,46,.35);color:var(--red);font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.make-sn.g{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.35);color:var(--green)}
+.make-st{font-size:9.5px;color:var(--t2)}.make-st strong{color:var(--t1)}
+
+/* ── SCENE 3: CTA ── */
+#s3{background:radial-gradient(ellipse at 50% 40%,#1e0500 0%,#090909 65%);flex-direction:column;gap:20px;text-align:center;padding:48px 32px}
+.cta-pill{display:inline-block;background:rgba(229,62,46,.12);border:1px solid rgba(229,62,46,.3);color:var(--red);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:5px 14px;border-radius:20px;opacity:0;transform:translateY(8px);transition:all .5s ease}
+.cta-h{font-size:clamp(26px,5vw,44px);font-weight:900;line-height:1.15;opacity:0;transform:translateY(12px);transition:all .55s ease .12s}
+.cta-h span{background:linear-gradient(135deg,#E53E2E,#ff6b5b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.cta-sub{font-size:14px;color:var(--t2);line-height:1.6;max-width:420px;opacity:0;transform:translateY(8px);transition:all .5s ease .25s}
+.cta-box{background:rgba(229,62,46,.07);border:1px solid rgba(229,62,46,.2);border-radius:14px;padding:14px 28px;opacity:0;transform:translateY(8px) scale(.97);transition:all .5s ease .38s}
+.cta-box-lbl{font-size:11px;color:var(--t3);margin-bottom:4px}
+.cta-box-word{font-size:24px;font-weight:900;color:var(--red);letter-spacing:3px}
+.cta-arrow{font-size:28px;opacity:0;transition:opacity .4s ease .5s}
+
+.cta-on .cta-pill,.cta-on .cta-h,.cta-on .cta-sub,.cta-on .cta-box,.cta-on .cta-arrow{opacity:1;transform:none}
+.cta-on .cta-box{transform:scale(1)}
+
+/* ── PROGRESS ── */
+#prog-bar{position:fixed;bottom:0;left:0;right:0;height:2px;background:rgba(229,62,46,.12)}
+#prog-fill{height:100%;background:var(--red);width:0%;transition:none}
+
+/* ── FADE OVERLAY ── */
+#fade{position:fixed;inset:0;background:#090909;opacity:0;pointer-events:none;z-index:50;transition:opacity .45s ease}
+#fade.dark{opacity:1}
+
+/* ── LABEL (scene indicator) ── */
+.scene-lbl{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.04);border:1px solid var(--b2);border-radius:20px;padding:4px 12px;font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;opacity:0;transition:opacity .4s ease;white-space:nowrap}
+.scene-lbl.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- SCENE 1: BLUEPRINT STUDIO -->
+<div class="scene" id="s1">
+  <div>
+    <div class="phone">
+      <div class="phone-inner">
+        <div class="ph-hdr">
+          <div class="ph-logo">⚡ Blueprint Studio</div>
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="background:#141414;border:1px solid var(--b2);border-radius:6px;padding:3px 8px;font-size:8px;display:flex;align-items:center;gap:3px"><span>🇬🇧</span><span style="color:var(--t2);font-weight:700">EN</span></div>
+            <div class="ph-signout">Sign out</div>
+          </div>
+        </div>
+        <div class="ph-hero">
+          <div class="ph-badge">⚡ Blueprint Studio</div>
+          <div class="ph-title">What do you want<br><span>to automate?</span></div>
+          <div class="ph-sub">Not a ChatGPT answer — a real Make.com .json blueprint<br>+ selling price + outreach message.</div>
+        </div>
+        <div class="ph-card" id="ph-card">
+          <div class="ph-lbl">Describe your automation</div>
+          <div class="ph-ta focus" id="ph-ta" style="min-height:52px"></div>
+          <div class="ph-chips">
+            <div class="ph-chip hi" id="chip-wa">WhatsApp AI Bot</div>
+            <div class="ph-chip">Lead Follow-Up</div>
+            <div class="ph-chip">Cold Email</div>
+          </div>
+          <button class="ph-gen" id="ph-gen">⚡ Generate My Automation</button>
+        </div>
+        <div class="ph-loading" id="ph-loading">
+          <div class="ph-spinner"></div>
+          <div class="ph-loading-txt">AI is building your blueprint…</div>
+        </div>
+        <div class="ph-out" id="ph-out">
+          <div class="ph-oc ph-ready" id="oc1">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+              <circle cx="13" cy="13" r="11" stroke="#4ADE80" stroke-width="1.5" class="ph-cc"/>
+              <path d="M7.5 13l3.5 3.5 7.5-7.5" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ph-cm"/>
+            </svg>
+            <div>
+              <div class="ph-ready-lbl">Blueprint Ready</div>
+              <div class="ph-ready-name">WhatsApp AI Bot — Ready</div>
+            </div>
+            <div style="margin-left:auto;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);color:var(--green);border-radius:6px;padding:3px 7px;font-size:7.5px;font-weight:700;flex-shrink:0">⬇ .json</div>
+          </div>
+          <div class="ph-oc" id="oc2" style="border:1px solid var(--b1)">
+            <div class="ph-price-lbl">Your price to client</div>
+            <div class="ph-price">$800–$1,200</div>
+            <div class="ph-price-sub">Setup · Retainer: $150/month</div>
+          </div>
+          <div class="ph-oc" id="oc3" style="border:1px solid var(--b1)">
+            <div class="ph-out-lbl">Outreach message <span style="float:right;background:var(--b1);border-radius:4px;padding:2px 6px;font-size:7px;color:var(--t3);font-weight:600">Copy</span></div>
+            <div class="ph-out-txt">"Hi! I noticed your restaurant gets tons of WhatsApp messages. I built an AI bot that replies 24/7. Want a free demo? — Alex"</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 2: MAKE.COM -->
+<div class="scene" id="s2">
+  <div class="make-wrap">
+    <div class="make-hdr">
+      <div class="make-m">M</div>
+      <div><div class="make-htxt">Make.com — Import Blueprint</div><div class="make-hsub">Paste the .json → connect apps → go LIVE</div></div>
+    </div>
+    <div class="make-canvas">
+      <div class="make-dots"></div>
+      <div class="make-file" id="mf">
+        <div class="make-file-icon">📄</div>
+        <div class="make-file-name">.json</div>
+      </div>
+      <div class="make-imp" id="mi">⬆ Import Blueprint</div>
+      <div class="make-mods">
+        <div class="make-mod" id="mm1">📱</div>
+        <div class="make-conn" id="mc1"></div>
+        <div class="make-mod" id="mm2">🤖</div>
+        <div class="make-conn" id="mc2"></div>
+        <div class="make-mod" id="mm3">✉️</div>
+        <div class="make-conn" id="mc3"></div>
+        <div class="make-mod" id="mm4">📊</div>
+      </div>
+    </div>
+    <div class="make-ft">
+      <div style="display:flex;align-items:center">
+        <div class="make-tgl-track" id="mt"><div class="make-tgl-thumb"></div></div>
+        <div class="make-tgl-lbl" id="mt-lbl">OFF</div>
+      </div>
+      <div class="make-live" id="mlive">
+        <div class="make-live-dot"></div>
+        <div class="make-live-txt">LIVE — Active</div>
+      </div>
+    </div>
+    <div class="make-steps">
+      <div class="make-si" id="ms1"><div class="make-sn">1</div><div class="make-st"><strong>Download</strong> .json from Blueprint Studio</div></div>
+      <div class="make-si" id="ms2"><div class="make-sn">2</div><div class="make-st">Make.com → <strong>Import Blueprint</strong> → upload file</div></div>
+      <div class="make-si" id="ms3"><div class="make-sn">3</div><div class="make-st"><strong>Connect</strong> WhatsApp, OpenAI, Google Sheets</div></div>
+      <div class="make-si" id="ms4"><div class="make-sn g">✓</div><div class="make-st" style="color:var(--green)"><strong>Toggle ON</strong> — automation is live in 60 seconds</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 3: CTA -->
+<div class="scene" id="s3">
+  <div class="cta-pill">Blueprint Studio</div>
+  <div class="cta-h">Want to sell automations<br>like this for <span>$800–$1,200?</span></div>
+  <div class="cta-sub">I'll send you 5 ready-to-sell Make.com blueprints + a copy-paste client script — completely free.</div>
+  <div class="cta-arrow">👇</div>
+  <div class="cta-box">
+    <div class="cta-box-lbl">DM me the word</div>
+    <div class="cta-box-word">"BLUEPRINT"</div>
+  </div>
+</div>
+
+<div id="prog-bar"><div id="prog-fill"></div></div>
+<div id="fade"></div>
+<div class="scene-lbl" id="slbl"></div>
+
+<script>
+// ── Timing (ms) ──
+var T = {
+  S1: 16000,   // scene 1 duration
+  S2: 13000,   // scene 2 duration
+  S3: 7000,    // scene 3 duration
+  FADE: 450    // crossfade
+};
+var TOTAL = T.S1 + T.S2 + T.S3;
+
+// ── Helpers ──
+function show(id){ document.getElementById(id).classList.add('show'); }
+function hide(id){ document.getElementById(id).classList.remove('show'); }
+function add(id, cls){ document.getElementById(id).classList.add(cls); }
+function rem(id, cls){ document.getElementById(id).classList.remove(cls); }
+function el(id){ return document.getElementById(id); }
+function q(sel){ return document.querySelector(sel); }
+
+// Typing animation
+var typingTimer = null;
+function typeText(target, text, speed, cb){
+  var i = 0;
+  target.innerHTML = '';
+  clearInterval(typingTimer);
+  typingTimer = setInterval(function(){
+    if(i <= text.length){
+      target.innerHTML = text.slice(0, i) + '<span class="cursor"></span>';
+      i++;
+    } else {
+      clearInterval(typingTimer);
+      if(cb) cb();
+    }
+  }, speed);
+}
+
+// Progress bar
+var progStart, progEnd, progRAF;
+function startProgress(duration){
+  progStart = performance.now();
+  progEnd = progStart + duration;
+  var fill = el('prog-fill');
+  fill.style.transition = 'none';
+  fill.style.width = '0%';
+  function frame(now){
+    var pct = Math.min(100, ((now - progStart) / (progEnd - progStart)) * 100);
+    fill.style.width = pct + '%';
+    if(pct < 100) progRAF = requestAnimationFrame(frame);
+  }
+  cancelAnimationFrame(progRAF);
+  progRAF = requestAnimationFrame(frame);
+}
+
+// Fade overlay
+function fadeOut(cb){
+  add('fade', 'dark');
+  setTimeout(cb, T.FADE);
+}
+function fadeIn(){
+  rem('fade', 'dark');
+}
+
+// Reset all animations to initial state
+function resetS1(){
+  var ta = el('ph-ta');
+  ta.innerHTML = '';
+  clearInterval(typingTimer);
+  rem('ph-gen', 'clicked');
+  el('ph-loading').style.display = 'none';
+  el('ph-out').style.display = 'none';
+  el('ph-card').style.display = '';
+  ['oc1','oc2','oc3'].forEach(function(id){ rem(id,'show'); });
+}
+function resetS2(){
+  rem('mf','fly'); rem('mi','show'); rem('mi','click');
+  ['mm1','mm2','mm3','mm4','mc1','mc2','mc3'].forEach(function(id){ rem(id,'show'); });
+  rem('mt','on'); el('mt-lbl').textContent = 'OFF';
+  rem('mlive','show');
+  ['ms1','ms2','ms3','ms4'].forEach(function(id){ rem(id,'show'); });
+}
+function resetS3(){
+  rem(el('s3'), 'cta-on');
+}
+
+// ── SCENE 1 ──
+var s1Timers = [];
+function runS1(){
+  resetS1();
+  el('slbl').textContent = 'Blueprint Studio';
+  show('slbl');
+  startProgress(T.S1);
+
+  var ta = el('ph-ta');
+  var txt = 'When someone messages on WhatsApp, use GPT-4 to reply automatically with info about our services, prices and booking.';
+
+  var t = [];
+  // Chip highlight already on
+  // Start typing at 600ms
+  t.push(setTimeout(function(){
+    typeText(ta, txt, 38, function(){
+      // done typing — small pause then click
+      t.push(setTimeout(function(){
+        add('ph-gen','clicked');
+        t.push(setTimeout(function(){
+          rem('ph-gen','clicked');
+          // show loading
+          el('ph-card').style.display = 'none';
+          el('ph-loading').style.display = 'flex';
+        }, 200));
+
+        // after 2.2s loading → show output
+        t.push(setTimeout(function(){
+          el('ph-loading').style.display = 'none';
+          el('ph-out').style.display = 'flex';
+          // card 1
+          t.push(setTimeout(function(){ add('oc1','show'); }, 100));
+          // card 2
+          t.push(setTimeout(function(){ add('oc2','show'); }, 900));
+          // card 3
+          t.push(setTimeout(function(){ add('oc3','show'); }, 1800));
+        }, 2200));
+      }, 600));
+    });
+  }, 600));
+
+  s1Timers = t;
+}
+
+// ── SCENE 2 ──
+var s2Timers = [];
+function runS2(){
+  resetS2();
+  el('slbl').textContent = 'Make.com Import';
+
+  var t = [];
+  // File flies in
+  t.push(setTimeout(function(){ add('mf','fly'); }, 400));
+  // Import button
+  t.push(setTimeout(function(){ add('mi','show'); }, 1400));
+  // Click import button
+  t.push(setTimeout(function(){ add('mi','click'); }, 2600));
+  t.push(setTimeout(function(){ rem('mi','click'); }, 2900));
+  // Modules appear
+  t.push(setTimeout(function(){ add('mm1','show'); }, 3200));
+  t.push(setTimeout(function(){ add('mc1','show'); add('mm2','show'); }, 3800));
+  t.push(setTimeout(function(){ add('mc2','show'); add('mm3','show'); }, 4400));
+  t.push(setTimeout(function(){ add('mc3','show'); add('mm4','show'); }, 5000));
+  // Step labels
+  t.push(setTimeout(function(){ add('ms1','show'); }, 5600));
+  t.push(setTimeout(function(){ add('ms2','show'); }, 6200));
+  t.push(setTimeout(function(){ add('ms3','show'); }, 6800));
+  // Toggle ON
+  t.push(setTimeout(function(){
+    add('mt','on');
+    el('mt-lbl').textContent = 'ON';
+  }, 8000));
+  // LIVE + step 4
+  t.push(setTimeout(function(){ add('mlive','show'); add('ms4','show'); }, 9000));
+
+  s2Timers = t;
+}
+
+// ── SCENE 3 ──
+function runS3(){
+  el('slbl').textContent = '→ DM "BLUEPRINT"';
+  el('s3').classList.remove('cta-on');
+  setTimeout(function(){ el('s3').classList.add('cta-on'); }, 100);
+}
+
+// ── SEQUENCER ──
+var scenes = ['s1','s2','s3'];
+var cur = 0;
+
+function activateScene(idx){
+  // hide all
+  scenes.forEach(function(id){ rem(el(id), 'active'); });
+  var id = scenes[idx];
+  add(id, 'active');
+  if(idx === 0) runS1();
+  if(idx === 1) runS2();
+  if(idx === 2) runS3();
+}
+
+function nextScene(){
+  fadeOut(function(){
+    cur = (cur + 1) % scenes.length;
+    // Reset previous
+    if(cur === 0){ resetS1(); resetS2(); resetS3(); }
+    activateScene(cur);
+    fadeIn();
+    // Schedule next transition
+    var dur = [T.S1, T.S2, T.S3][cur];
+    setTimeout(nextScene, dur - T.FADE);
+  });
+}
+
+// ── START ──
+window.addEventListener('load', function(){
+  activateScene(0);
+  fadeIn();
+  setTimeout(nextScene, T.S1 - T.FADE);
+});
+</script>
+</body>
+</html>
