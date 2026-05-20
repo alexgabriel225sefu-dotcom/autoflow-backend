@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Blueprint Studio — TikTok Demo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#000;
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  overflow:hidden;
+}
+
+/* ── PHONE FRAME ── */
+#phone{
+  width:390px;height:844px;
+  background:#060606;
+  border-radius:48px;
+  border:10px solid #1a1a1a;
+  box-shadow:0 0 0 2px #333,0 40px 80px rgba(0,0,0,.8),inset 0 0 60px rgba(229,62,46,.04);
+  position:relative;overflow:hidden;
+}
+/* notch */
+#phone::before{
+  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:120px;height:30px;background:#1a1a1a;border-radius:0 0 18px 18px;z-index:100;
+}
+/* status bar */
+.status-bar{
+  position:absolute;top:0;left:0;right:0;height:44px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 24px 0;font-size:12px;font-weight:700;color:#f0f0f0;z-index:99;
+}
+.status-time{font-size:15px;font-weight:700}
+.status-icons{display:flex;gap:6px;align-items:center}
+
+/* ── SCROLL CONTAINER ── */
+#scroll-inner{
+  position:absolute;top:44px;left:0;right:0;bottom:0;
+  overflow:hidden;
+}
+#page-content{
+  position:absolute;top:0;left:0;right:0;
+  transition:transform 0.8s cubic-bezier(0.4,0,0.2,1);
+  padding:0 16px 60px;
+  background:#060606;
+  color:#f0f0f0;
+}
+#page-content::before{
+  content:'';position:fixed;inset:0;
+  background:radial-gradient(ellipse 80% 40% at 50% 0%,rgba(229,62,46,.07) 0%,transparent 55%);
+  pointer-events:none;z-index:0;
+}
+
+/* ── HEADER ── */
+.hdr{padding:14px 0 0;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+.hdr-logo{font-size:10px;font-weight:900;letter-spacing:2.5px;color:#E53E2E;text-transform:uppercase}
+.hdr-buy{background:#E53E2E;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:10px;font-weight:700;min-height:30px}
+
+/* ── URGENCY BAR ── */
+.urgency-bar{background:linear-gradient(135deg,rgba(229,62,46,.12),rgba(229,62,46,.06));border:1px solid rgba(229,62,46,.25);border-radius:10px;padding:8px 14px;margin:12px 0 4px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+.urg-left{font-size:11px;color:#999}
+.urg-left strong{color:#f0f0f0}
+.urg-cd{display:flex;align-items:center;gap:5px;font-size:10px;color:#444}
+.urg-cd-val{background:#1a0a0a;border:1px solid rgba(229,62,46,.3);color:#E53E2E;font-weight:800;font-size:12px;padding:2px 6px;border-radius:5px;min-width:24px;text-align:center}
+
+/* ── HERO ── */
+.hero{text-align:center;padding:20px 0 16px;position:relative;z-index:1}
+.hero-pill{display:inline-block;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:#E53E2E;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 12px;border-radius:20px;margin-bottom:12px}
+.hero-h1{font-size:24px;font-weight:900;line-height:1.2;margin-bottom:8px}
+.hero-h1 span{background:linear-gradient(135deg,#E53E2E,#ff6b5b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:13px;color:#999;line-height:1.6}
+.hero-stats{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:12px}
+.hero-stat{text-align:center}
+.hero-stat-v{font-size:18px;font-weight:900;color:#f0f0f0}
+.hero-stat-l{font-size:9px;color:#444;letter-spacing:.5px;text-transform:uppercase;margin-top:1px}
+.hero-sep{width:1px;height:26px;background:#1c1c1c}
+
+/* ── INPUT CARD ── */
+.input-card{background:#0f0f0f;border:1px solid #1c1c1c;border-radius:14px;padding:18px;margin-bottom:16px;position:relative;z-index:1}
+.input-card::before{content:'';position:absolute;inset:0;border-radius:14px;padding:1px;background:linear-gradient(135deg,rgba(229,62,46,.35),transparent 55%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.input-lbl{font-size:10px;color:#999;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px}
+.input-ta{width:100%;min-height:88px;background:#0a0a0a;border:1.5px solid #272727;border-radius:10px;padding:10px 12px;color:#f0f0f0;font-size:13px;line-height:1.6;resize:none;outline:none;font-family:inherit;transition:border-color .2s}
+.input-ta.active{border-color:#E53E2E;box-shadow:0 0 0 3px rgba(229,62,46,.07)}
+.input-ta::placeholder{color:#444}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chip{background:#0a0a0a;border:1px solid #1c1c1c;border-radius:20px;padding:4px 10px;font-size:10px;color:#999;min-height:26px;display:flex;align-items:center}
+.gen-btn{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:10px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 24px rgba(229,62,46,.28);transition:all .2s;margin-top:4px;letter-spacing:.2px;min-height:46px}
+.gen-btn:disabled{opacity:.55}
+.gen-btn.clicking{transform:scale(0.97);opacity:.85}
+
+/* ── STEP LOADING ── */
+.loading{display:none;flex-direction:column;gap:12px;padding:20px 0;position:relative;z-index:1}
+.load-steps{display:flex;flex-direction:column;gap:8px}
+.load-step{display:flex;align-items:center;gap:10px;opacity:.3;transition:opacity .3s}
+.load-step.active{opacity:1}
+.load-step.done{opacity:.7}
+.step-icon{width:28px;height:28px;border-radius:8px;background:#1a1a1a;border:1px solid #272727;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;transition:all .3s}
+.load-step.active .step-icon{background:rgba(229,62,46,.12);border-color:rgba(229,62,46,.35)}
+.load-step.done .step-icon{background:rgba(74,222,128,.08);border-color:rgba(74,222,128,.25)}
+.step-txt{font-size:12px;color:#999}
+.load-step.active .step-txt{color:#f0f0f0}
+.step-spinner{width:13px;height:13px;border:2px solid rgba(229,62,46,.15);border-top-color:#E53E2E;border-radius:50%;animation:spin .7s linear infinite;margin-left:auto;flex-shrink:0}
+.load-step:not(.active) .step-spinner,.load-step.done .step-spinner{display:none}
+.step-check{margin-left:auto;color:#4ADE80;font-size:13px;display:none;flex-shrink:0}
+.load-step.done .step-check{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-bar-wrap{background:#111;border-radius:6px;height:3px;overflow:hidden}
+.load-bar{height:100%;background:linear-gradient(90deg,#E53E2E,#ff6b5b);border-radius:6px;transition:width .6s ease;width:0%}
+
+/* ── RESULTS ── */
+.results{display:none;flex-direction:column;gap:8px;margin-bottom:8px;position:relative;z-index:1}
+.res-card{border-radius:10px;padding:14px 16px;animation:fadeUp .4s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.res-what{background:#0f0f0f;border:1px solid #1c1c1c}
+.res-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#444;margin-bottom:6px}
+.res-txt{font-size:13px;color:#f0f0f0;line-height:1.6}
+.res-price{background:#0f0f0f;border:1px solid #1c1c1c}
+.res-price-val{font-size:30px;font-weight:900;background:linear-gradient(135deg,#E53E2E,#F5A623);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;margin-bottom:3px}
+.res-price-sub{font-size:11px;color:#444}
+.res-outreach{background:#0f0f0f;border:1px solid #1c1c1c}
+.res-outreach-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.copy-btn{background:#1c1c1c;border:1px solid #272727;color:#444;border-radius:5px;padding:3px 8px;font-size:10px;cursor:pointer}
+
+/* ── LOCKED CARD ── */
+.locked-card{background:#0f0f0f;border:1px solid #1c1c1c;border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;animation:fadeUp .4s ease .3s both;cursor:pointer}
+.locked-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.locked-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#444}
+.locked-badge{background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:#E53E2E;border-radius:6px;padding:2px 7px;font-size:9px;font-weight:700;display:flex;align-items:center;gap:4px;animation:locked-glow 2s ease-in-out infinite}
+@keyframes locked-glow{0%,100%{box-shadow:0 0 0 0 rgba(229,62,46,0)}50%{box-shadow:0 0 8px 2px rgba(229,62,46,.22)}}
+.locked-preview{filter:blur(4px);user-select:none;font-family:monospace;font-size:10px;color:#444;line-height:1.6;max-height:60px;overflow:hidden}
+.locked-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:rgba(6,6,6,.5);backdrop-filter:blur(2px)}
+.locked-icon{font-size:22px;animation:lock-shake 4s ease-in-out infinite}
+@keyframes lock-shake{0%,85%,100%{transform:rotate(0)}87%{transform:rotate(-8deg)}89%{transform:rotate(8deg)}91%{transform:rotate(-6deg)}93%{transform:rotate(0)}}
+.locked-msg{font-size:11px;color:#999;font-weight:600;text-align:center;line-height:1.5}
+
+/* ── FOMO ── */
+.fomo{display:none;margin-top:6px;animation:fadeUp .5s ease;position:relative;z-index:1}
+.fomo-card{background:linear-gradient(135deg,#0f0505,#080808);border:1px solid rgba(229,62,46,.25);border-radius:14px;padding:18px;position:relative;overflow:hidden}
+.fomo-card::before{content:'';position:absolute;inset:0;border-radius:14px;background:radial-gradient(ellipse at 50% 0%,rgba(229,62,46,.08) 0%,transparent 60%);pointer-events:none}
+.fomo-glow{position:absolute;top:-40px;left:50%;transform:translateX(-50%);width:180px;height:180px;background:radial-gradient(circle,rgba(229,62,46,.12) 0%,transparent 70%);pointer-events:none;animation:glow-pulse 2s ease-in-out infinite}
+@keyframes glow-pulse{0%,100%{opacity:.5;transform:translateX(-50%) scale(1)}50%{opacity:1;transform:translateX(-50%) scale(1.2)}}
+.fomo-top{text-align:center;margin-bottom:14px;position:relative;z-index:1}
+.fomo-tag{display:inline-block;background:rgba(229,62,46,.12);border:1px solid rgba(229,62,46,.35);color:#E53E2E;font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:10px}
+.fomo-h{font-size:18px;font-weight:900;line-height:1.25;margin-bottom:6px}
+.fomo-h span{background:linear-gradient(135deg,#E53E2E,#ff6b5b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.fomo-sub{font-size:12px;color:#999;line-height:1.5}
+.fomo-price-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px 0 12px;position:relative;z-index:1}
+.fomo-old{font-size:16px;color:#444;text-decoration:line-through}
+.fomo-new{font-size:34px;font-weight:900;color:#f0f0f0}
+.fomo-new sup{font-size:18px;vertical-align:top;margin-top:5px;color:#E53E2E}
+.fomo-save{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:#4ADE80;border-radius:8px;padding:3px 8px;font-size:10px;font-weight:700}
+.fomo-cta{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:10px;padding:15px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 30px rgba(229,62,46,.35);letter-spacing:.2px;position:relative;z-index:1;animation:cta-pulse 2.5s ease-in-out infinite;min-height:48px}
+@keyframes cta-pulse{0%,100%{box-shadow:0 4px 30px rgba(229,62,46,.35)}50%{box-shadow:0 4px 50px rgba(229,62,46,.55)}}
+.fomo-proof{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:10px;font-size:10px;color:#444;position:relative;z-index:1;flex-wrap:wrap}
+.fomo-proof-dot{width:5px;height:5px;background:#4ADE80;border-radius:50%;flex-shrink:0;animation:dot-pulse 1.5s ease-in-out infinite}
+@keyframes dot-pulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+/* ── ACTIVITY POPUP ── */
+#act{position:absolute;bottom:20px;left:12px;right:12px;z-index:998;display:none;pointer-events:none}
+.act-inner{background:#111;border:1px solid #272727;border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:9px;animation:fadeUp .35s ease;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.act-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#E53E2E,#c93426);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.act-body{flex:1;min-width:0}
+.act-name{font-size:11px;font-weight:700;color:#f0f0f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.act-txt{font-size:10px;color:#444;margin-top:1px}
+.act-time{font-size:9px;color:#444;margin-left:auto;flex-shrink:0}
+
+/* ── CURSOR ── */
+#cursor{
+  position:absolute;width:22px;height:22px;z-index:9999;pointer-events:none;
+  transform:translate(-50%,-50%);
+  transition:left .5s cubic-bezier(0.4,0,0.2,1),top .5s cubic-bezier(0.4,0,0.2,1);
+  display:none;
+}
+#cursor svg{filter:drop-shadow(0 2px 4px rgba(0,0,0,.8))}
+.cursor-tap{animation:tapAnim .25s ease}
+@keyframes tapAnim{0%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(0.75)}100%{transform:translate(-50%,-50%) scale(1)}}
+
+/* ── START OVERLAY ── */
+#start-overlay{
+  position:absolute;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10000;
+  border-radius:38px;gap:14px;
+}
+#start-btn{
+  background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;
+  border-radius:50px;padding:16px 40px;font-size:18px;font-weight:800;cursor:pointer;
+  box-shadow:0 6px 30px rgba(229,62,46,.5);transition:transform .15s;
+  letter-spacing:.5px;
+}
+#start-btn:hover{transform:scale(1.05)}
+#start-label{font-size:12px;color:#666;letter-spacing:1px;text-transform:uppercase}
+
+/* ── REPLAY ── */
+#replay-btn{
+  position:absolute;bottom:20px;right:16px;
+  background:rgba(229,62,46,.15);border:1px solid rgba(229,62,46,.35);color:#E53E2E;
+  border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;
+  display:none;z-index:500;letter-spacing:.5px;
+}
+</style>
+</head>
+<body>
+
+<div id="phone">
+  <!-- Status bar -->
+  <div class="status-bar">
+    <span class="status-time">9:41</span>
+    <div class="status-icons">
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="#f0f0f0"><rect x="0" y="3" width="3" height="9" rx="1"/><rect x="4.5" y="2" width="3" height="10" rx="1"/><rect x="9" y="0" width="3" height="12" rx="1"/><rect x="13.5" y="1" width="2.5" height="11" rx="1" opacity=".3"/></svg>
+      <svg width="15" height="12" viewBox="0 0 15 12" fill="#f0f0f0"><path d="M7.5 2.5C9.8 2.5 11.9 3.4 13.4 4.9L14.8 3.5C12.9 1.6 10.3 0.5 7.5 0.5C4.7 0.5 2.1 1.6 0.2 3.5L1.6 4.9C3.1 3.4 5.2 2.5 7.5 2.5Z" opacity=".4"/><path d="M7.5 5.5C9 5.5 10.4 6.1 11.4 7.1L12.8 5.7C11.4 4.3 9.6 3.5 7.5 3.5C5.4 3.5 3.6 4.3 2.2 5.7L3.6 7.1C4.6 6.1 6 5.5 7.5 5.5Z" opacity=".7"/><path d="M7.5 8.5C8.3 8.5 9 8.8 9.6 9.3L11 7.9C10 7 8.8 6.5 7.5 6.5C6.2 6.5 5 7 4 7.9L5.4 9.3C6 8.8 6.7 8.5 7.5 8.5Z"/><circle cx="7.5" cy="11.5" r="1.5"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3.5" stroke="#f0f0f0" stroke-opacity=".35"/><rect x="1.5" y="1.5" width="17" height="9" rx="2.5" fill="#f0f0f0"/><path d="M23 4.5V7.5C23.8 7.2 24.5 6.4 24.5 6C24.5 5.6 23.8 4.8 23 4.5Z" fill="#f0f0f0" opacity=".4"/></svg>
+    </div>
+  </div>
+
+  <!-- Scroll inner -->
+  <div id="scroll-inner">
+    <div id="page-content">
+
+      <!-- HEADER -->
+      <div class="hdr">
+        <div class="hdr-logo">BLUEPRINT STUDIO</div>
+        <button class="hdr-buy">Get Access — $97</button>
+      </div>
+
+      <!-- URGENCY BAR -->
+      <div class="urgency-bar">
+        <div class="urg-left">⚡ <strong id="buyers-count">247</strong> buyers today</div>
+        <div class="urg-cd">
+          <span>Offer ends in</span>
+          <span class="urg-cd-val" id="cd-m">28</span>:<span class="urg-cd-val" id="cd-s">14</span>
+        </div>
+      </div>
+
+      <!-- HERO -->
+      <div class="hero">
+        <div class="hero-pill">⚡ AI Automation Builder</div>
+        <h1 class="hero-h1">Build AI Automations.<br><span>Sell for $800–$1,200.</span></h1>
+        <p class="hero-sub">Describe any workflow in plain English.<br>Get a ready-to-sell blueprint in 60 seconds.</p>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-v">247</div>
+            <div class="hero-stat-l">Students</div>
+          </div>
+          <div class="hero-sep"></div>
+          <div class="hero-stat">
+            <div class="hero-stat-v">$850</div>
+            <div class="hero-stat-l">Avg Sale</div>
+          </div>
+          <div class="hero-sep"></div>
+          <div class="hero-stat">
+            <div class="hero-stat-v">60s</div>
+            <div class="hero-stat-l">To Build</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INPUT CARD -->
+      <div class="input-card">
+        <div class="input-lbl">Describe your automation →</div>
+        <textarea id="ta" class="input-ta" placeholder="e.g. When someone fills a contact form, send them a personalized email and add to CRM..." rows="4"></textarea>
+        <div class="chips">
+          <span class="chip">📱 WhatsApp AI Bot</span>
+          <span class="chip">📧 Email Follow-up</span>
+          <span class="chip">🛒 Order Notifications</span>
+        </div>
+        <button class="gen-btn" id="gen-btn">⚡ Generate Blueprint</button>
+      </div>
+
+      <!-- STEP LOADING -->
+      <div class="loading" id="loading">
+        <div class="load-bar-wrap"><div class="load-bar" id="load-bar"></div></div>
+        <div class="load-steps">
+          <div class="load-step" id="s1">
+            <div class="step-icon">🧠</div>
+            <span class="step-txt">Analyzing your use case...</span>
+            <div class="step-spinner"></div>
+            <span class="step-check">✓</span>
+          </div>
+          <div class="load-step" id="s2">
+            <div class="step-icon">⚙️</div>
+            <span class="step-txt">Building automation flow...</span>
+            <div class="step-spinner"></div>
+            <span class="step-check">✓</span>
+          </div>
+          <div class="load-step" id="s3">
+            <div class="step-icon">💰</div>
+            <span class="step-txt">Calculating market price...</span>
+            <div class="step-spinner"></div>
+            <span class="step-check">✓</span>
+          </div>
+          <div class="load-step" id="s4">
+            <div class="step-icon">✨</div>
+            <span class="step-txt">Generating client pitch...</span>
+            <div class="step-spinner"></div>
+            <span class="step-check">✓</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTS -->
+      <div class="results" id="results">
+        <!-- What card -->
+        <div class="res-card res-what">
+          <div class="res-lbl">🎯 What You're Building</div>
+          <div class="res-txt">WhatsApp AI Bot that automatically replies to customer messages 24/7 — answers FAQs, takes orders, books appointments. Zero human effort needed.</div>
+        </div>
+        <!-- Price card -->
+        <div class="res-card res-price">
+          <div class="res-lbl">💰 Sell This For</div>
+          <div class="res-price-val">$900 – $1,200</div>
+          <div class="res-price-sub">One-time project + $150/mo maintenance</div>
+        </div>
+        <!-- Outreach card -->
+        <div class="res-card res-outreach">
+          <div class="res-outreach-top">
+            <div class="res-lbl">📩 Client Pitch</div>
+            <button class="copy-btn">Copy</button>
+          </div>
+          <div class="res-txt" style="font-size:12px;color:#999;">"Hi [Name], I help restaurants like yours automate WhatsApp replies with AI — your team saves 3+ hours daily. Can I show you a 5-min demo?"</div>
+        </div>
+        <!-- Locked blueprint -->
+        <div class="locked-card">
+          <div class="locked-top">
+            <span class="locked-lbl">🔒 Full Blueprint</span>
+            <span class="locked-badge">🔒 LOCKED</span>
+          </div>
+          <div class="locked-preview">
+Step 1: Connect WhatsApp Business API via Twilio...<br>
+Step 2: Set up GPT-4 webhook on Make.com...<br>
+Step 3: Configure intent detection for menu queries...<br>
+Step 4: Add fallback to human agent after 3 fails...
+          </div>
+          <div class="locked-overlay">
+            <div class="locked-icon">🔒</div>
+            <div class="locked-msg">Unlock Full Blueprint<br><strong style="color:#E53E2E">Get Access — $97</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FOMO SECTION -->
+      <div class="fomo" id="fomo">
+        <div class="fomo-card">
+          <div class="fomo-glow"></div>
+          <div class="fomo-top">
+            <div class="fomo-tag">🔥 LIMITED TIME</div>
+            <div class="fomo-h">Don't let someone else<br><span>sell this to your client.</span></div>
+            <div class="fomo-sub">This blueprint is live. Someone in your city could find it first.</div>
+          </div>
+          <div class="fomo-price-row">
+            <span class="fomo-old">$297</span>
+            <span class="fomo-new"><sup>$</sup>97</span>
+            <span class="fomo-save">SAVE 67%</span>
+          </div>
+          <button class="fomo-cta">🔓 Unlock All Blueprints — $97</button>
+          <div class="fomo-proof">
+            <div class="fomo-proof-dot"></div>
+            <span>Instant access</span>
+            <span>·</span>
+            <span>30-day guarantee</span>
+            <span>·</span>
+            <span>247 active students</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </div><!-- /scroll-inner -->
+
+  <!-- Activity popup -->
+  <div id="act" style="display:none">
+    <div class="act-inner">
+      <div class="act-avatar">🇺🇸</div>
+      <div class="act-body">
+        <div class="act-name">James from Texas</div>
+        <div class="act-txt">just unlocked Blueprint</div>
+      </div>
+      <div class="act-time">2m ago</div>
+    </div>
+  </div>
+
+  <!-- Cursor -->
+  <div id="cursor">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M4 2L18 11L11 12.5L8 20L4 2Z" fill="white" stroke="#333" stroke-width="1.5"/>
+    </svg>
+  </div>
+
+  <!-- Replay button -->
+  <button id="replay-btn" onclick="location.reload()">↺ Replay</button>
+
+  <!-- Start overlay -->
+  <div id="start-overlay">
+    <div style="font-size:36px">⚡</div>
+    <div style="font-size:18px;font-weight:900;color:#f0f0f0;letter-spacing:.5px">Blueprint Studio</div>
+    <div style="font-size:13px;color:#666;margin-bottom:8px">Live Demo — Screen Record This</div>
+    <button id="start-btn" onclick="startDemo()">▶ Start Demo</button>
+    <div id="start-label">tap to begin</div>
+  </div>
+</div>
+
+<script>
+/* ══ CONFIG ══ */
+const DEMO_TEXT = 'When someone messages on WhatsApp, use GPT-4 to reply automatically with info about our restaurant menu and prices.';
+
+/* ══ HELPERS ══ */
+const $ = id => document.getElementById(id);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const page = $('page-content');
+const cursor = $('cursor');
+
+function scrollTo(y, duration=800){
+  return new Promise(r=>{
+    const start = parseInt(page.style.transform.replace('translateY(',''))||0;
+    const diff = -y - start;
+    const t0 = performance.now();
+    function frame(now){
+      const p = Math.min((now-t0)/duration,1);
+      const ease = p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+      page.style.transform = `translateY(${start+diff*ease}px)`;
+      if(p<1) requestAnimationFrame(frame); else r();
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+function moveCursor(x, y){
+  cursor.style.left = x+'px';
+  cursor.style.top = y+'px';
+  return wait(500);
+}
+
+async function tap(x, y){
+  await moveCursor(x, y);
+  cursor.classList.add('cursor-tap');
+  await wait(300);
+  cursor.classList.remove('cursor-tap');
+  await wait(200);
+}
+
+async function typeInto(el, text, speed=45){
+  el.classList.add('active');
+  el.value = '';
+  for(const ch of text){
+    el.value += ch;
+    await wait(speed + Math.random()*25);
+  }
+}
+
+/* ══ COUNTDOWN ══ */
+let cdSec = 1680;
+function updateCd(){
+  const m = Math.floor(cdSec/60);
+  const s = cdSec%60;
+  $('cd-m').textContent = String(m).padStart(2,'0');
+  $('cd-s').textContent = String(s).padStart(2,'0');
+  if(cdSec>0) cdSec--;
+}
+setInterval(updateCd, 1000);
+
+/* ══ ACTIVITY POPUPS ══ */
+const acts=[
+  {flag:'🇺🇸',name:'James from Texas'},
+  {flag:'🇬🇧',name:'Sophie from London'},
+  {flag:'🇩🇪',name:'Lukas from Berlin'},
+  {flag:'🇦🇺',name:'Jake from Sydney'},
+  {flag:'🇨🇦',name:'Emily from Toronto'},
+  {flag:'🇫🇷',name:'Lucas from Paris'},
+  {flag:'🇮🇹',name:'Marco from Milan'},
+  {flag:'🇧🇷',name:'Pedro from São Paulo'},
+];
+let actIdx=-1;
+function showAct(){
+  let idx;
+  do{ idx=Math.floor(Math.random()*acts.length) }while(idx===actIdx);
+  actIdx=idx;
+  const a=acts[idx];
+  const el=$('act');
+  el.innerHTML=`<div class="act-inner"><div class="act-avatar">${a.flag}</div><div class="act-body"><div class="act-name">${a.name}</div><div class="act-txt">just unlocked Blueprint</div></div><div class="act-time">just now</div></div>`;
+  el.style.display='block';
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>{ el.style.display='none'; },4000);
+}
+
+/* ══ LOADING ANIMATION ══ */
+async function runLoading(){
+  $('loading').style.display='flex';
+  const bar = $('load-bar');
+  const steps = ['s1','s2','s3','s4'];
+  const pcts = [20,45,70,100];
+
+  for(let i=0;i<steps.length;i++){
+    const el=$(steps[i]);
+    el.classList.add('active');
+    bar.style.width=pcts[i]+'%';
+    await wait(1400);
+    el.classList.remove('active');
+    el.classList.add('done');
+  }
+  await wait(400);
+}
+
+/* ══ MAIN DEMO ══ */
+async function startDemo(){
+  $('start-overlay').style.display='none';
+  cursor.style.display='block';
+
+  /* Step 1 — Show cursor, hover textarea */
+  await wait(600);
+  await moveCursor(195, 340);
+  await wait(400);
+
+  /* Step 2 — Tap textarea */
+  await tap(195, 340);
+  const ta = $('ta');
+
+  /* Step 3 — Type */
+  await typeInto(ta, DEMO_TEXT, 42);
+  await wait(800);
+
+  /* Step 4 — Move to button */
+  await moveCursor(195, 490);
+  await wait(500);
+
+  /* Step 5 — Tap Generate */
+  await tap(195, 490);
+  $('gen-btn').disabled = true;
+  $('gen-btn').textContent = '⏳ Generating...';
+  $('gen-btn').classList.add('clicking');
+  await wait(200);
+  $('gen-btn').classList.remove('clicking');
+
+  /* Step 6 — Hide cursor during loading */
+  cursor.style.display='none';
+
+  /* Step 7 — Loading steps */
+  await runLoading();
+
+  /* Step 8 — Show results */
+  $('loading').style.display='none';
+  $('gen-btn').style.display='none';
+  const results = $('results');
+  results.style.display='flex';
+  await wait(600);
+
+  /* Step 9 — Scroll to results */
+  await scrollTo(320);
+  await wait(1000);
+
+  /* Activity popup */
+  showAct();
+  await wait(1200);
+
+  /* Step 10 — Cursor back, hover locked card */
+  cursor.style.display='block';
+  await moveCursor(195, 580);
+  await wait(800);
+  await tap(195, 580);
+  await wait(800);
+
+  /* Step 11 — Scroll down to FOMO */
+  cursor.style.display='none';
+  $('fomo').style.display='block';
+  await scrollTo(700);
+  await wait(500);
+
+  /* Another popup */
+  await wait(1500);
+  showAct();
+  await wait(1000);
+
+  /* Step 12 — Cursor on CTA button */
+  cursor.style.display='block';
+  await moveCursor(195, 720);
+  await wait(600);
+  cursor.classList.add('cursor-tap');
+  await wait(200);
+  cursor.classList.remove('cursor-tap');
+
+  /* Done */
+  await wait(2000);
+  cursor.style.display='none';
+  $('replay-btn').style.display='block';
+}
+</script>
+</body>
+</html>
