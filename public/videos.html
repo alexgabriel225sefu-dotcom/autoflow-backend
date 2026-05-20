@@ -62,15 +62,31 @@ h1{font-size:20px;color:#E53E2E;margin-bottom:6px;text-align:center}
 .script-box strong{color:#888;display:block;margin-bottom:4px}
 .show-script{background:none;border:1px solid #222;border-radius:6px;color:#444;font-size:10px;padding:4px 10px;cursor:pointer;margin-top:6px}
 .show-script:hover{border-color:#444;color:#888}
+
+/* voice bar */
+.voice-bar{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.voice-toggle{background:#111;border:1px solid #333;border-radius:8px;color:#f5f5f5;font-size:12px;padding:8px 18px;cursor:pointer;display:flex;align-items:center;gap:7px;transition:all .2s}
+.voice-toggle.on{border-color:rgba(74,222,128,.4);color:#4ADE80;background:rgba(74,222,128,.06)}
+.voice-toggle.on::before{content:'🔊'}
+.voice-toggle:not(.on)::before{content:'🔇'}
+.voice-sel{background:#111;border:1px solid #333;border-radius:8px;color:#f5f5f5;font-size:11px;padding:7px 10px;cursor:pointer;max-width:220px}
+.voice-status{font-size:10px;color:#555}
 </style>
 </head>
 <body>
 
 <h1>⚡ Blueprint Studio — TikTok Videos</h1>
-<p class="sub">Click pe player → pornește animația → dai screen record</p>
-<div class="hint">📱 <strong>Screen record telefon:</strong> iOS → Control Center → Screen Record &nbsp;|&nbsp; Android → notification panel → Screen Record<br>
-💻 <strong>PC:</strong> Win+G → Record &nbsp;|&nbsp; Mac: Cmd+Shift+5<br>
-🎙️ <strong>Voce:</strong> copiază scriptul de sub fiecare video → paste în <strong>elevenlabs.io</strong> → descarcă MP3 → pune în CapCut peste video</div>
+<p class="sub">Click pe player → pornește animația + vocea → dai screen record</p>
+
+<div class="voice-bar">
+  <button class="voice-toggle" id="voiceToggle" onclick="toggleVoice()"> Voce browser</button>
+  <select class="voice-sel" id="voiceSel" onchange="pickVoice()"></select>
+  <span class="voice-status" id="voiceStatus">Se încarcă vocile…</span>
+</div>
+
+<div class="hint">📱 <strong>Screen record + voce:</strong> Pornești vocea → dai Play pe video → dai screen record imediat<br>
+💻 <strong>PC:</strong> Win+G → Record &nbsp;|&nbsp; Mac: Cmd+Shift+5 &nbsp;|&nbsp; Telefon: Screen Record din Control Center<br>
+⚠️ Vocea browser e gratuită. Pentru calitate profesională → <strong>elevenlabs.io</strong></div>
 
 <div class="section-title">🔥 POV — Am încercat tot, nimic n-a mers până la AI Agency</div>
 <div class="grid" id="grid-pov"></div>
@@ -273,6 +289,61 @@ function toggleScript(id){
   el.style.display=el.style.display==='block'?'none':'block';
 }
 
+/* ─────────── VOICE (Web Speech API) ─────────── */
+var _voiceOn=false, _selVoice=null, _voices=[];
+var _MALE_KEYWORDS=['male','man','david','mark','james','daniel','alex','google uk english male','microsoft david','microsoft mark','microsoft james','guy','luca','felix','jorge','diego','carlos'];
+
+function loadVoices(){
+  _voices=window.speechSynthesis.getVoices();
+  const sel=document.getElementById('voiceSel');
+  const enVoices=_voices.filter(v=>v.lang.startsWith('en'));
+  if(!enVoices.length){ document.getElementById('voiceStatus').textContent='Browser-ul nu suportă TTS'; return; }
+  sel.innerHTML='';
+  enVoices.forEach((v,i)=>{
+    const o=document.createElement('option');
+    o.value=_voices.indexOf(v);
+    o.textContent=v.name+' ('+v.lang+')';
+    sel.appendChild(o);
+  });
+  /* auto-select male */
+  const maleVoice=enVoices.find(v=>_MALE_KEYWORDS.some(k=>v.name.toLowerCase().includes(k)));
+  if(maleVoice){
+    sel.value=_voices.indexOf(maleVoice);
+    _selVoice=maleVoice;
+    document.getElementById('voiceStatus').textContent='Voce: '+maleVoice.name;
+  } else {
+    _selVoice=enVoices[0];
+    document.getElementById('voiceStatus').textContent='Voce: '+enVoices[0].name;
+  }
+}
+window.speechSynthesis.onvoiceschanged=loadVoices;
+loadVoices();
+setTimeout(loadVoices,500);
+
+function pickVoice(){
+  const idx=parseInt(document.getElementById('voiceSel').value);
+  _selVoice=_voices[idx]||null;
+  if(_selVoice) document.getElementById('voiceStatus').textContent='Voce: '+_selVoice.name;
+}
+function toggleVoice(){
+  _voiceOn=!_voiceOn;
+  const btn=document.getElementById('voiceToggle');
+  btn.classList.toggle('on',_voiceOn);
+  btn.lastChild.textContent=_voiceOn?' Voce ON':' Voce OFF';
+  if(!_voiceOn) window.speechSynthesis.cancel();
+}
+function speakScript(script){
+  if(!_voiceOn||!script) return;
+  window.speechSynthesis.cancel();
+  const utt=new SpeechSynthesisUtterance(script);
+  utt.voice=_selVoice;
+  utt.rate=0.92;
+  utt.pitch=0.88;
+  utt.volume=1;
+  window.speechSynthesis.speak(utt);
+}
+function stopSpeech(){ window.speechSynthesis.cancel(); }
+
 /* ─────────── PLAYER STATE ─────────── */
 const STATE={};
 function toggle(uid,idx,src){
@@ -283,12 +354,14 @@ function pauseV(uid){
   STATE[uid].on=false;
   STATE[uid].t.forEach(clearTimeout);
   document.getElementById('p'+uid).classList.remove('playing');
+  stopSpeech();
 }
 function playV(uid,idx,src){
   const arr=src==='grid-pov'?POV_VIDEOS:HOOK_VIDEOS;
   STATE[uid]={on:true,t:[],b:0};
   document.getElementById('p'+uid).classList.add('playing');
   if(arr[idx].pov){ const pt=document.getElementById('povtag'+uid); if(pt) pt.style.display='block'; }
+  speakScript(arr[idx].script||null);
   runBeat(uid,arr[idx]);
 }
 
