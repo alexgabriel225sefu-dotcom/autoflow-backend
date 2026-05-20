@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Screen Recording — Blueprint Studio</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#1a1a2e;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+
+/* ── PHONE FRAME ── */
+.phone{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:390px;height:844px;background:#000;border-radius:52px;box-shadow:0 40px 120px rgba(0,0,0,.8),inset 0 0 0 2px #333;overflow:hidden}
+.phone-notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:126px;height:34px;background:#000;border-radius:0 0 20px 20px;z-index:100}
+.phone-screen{position:absolute;top:0;left:0;right:0;bottom:0;background:#fff;border-radius:52px;overflow:hidden}
+
+/* ── STATUS BAR ── */
+.status{height:44px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:14px 22px 0;font-size:12px;font-weight:600;color:#000;flex-shrink:0}
+.status-icons{display:flex;align-items:center;gap:5px;font-size:11px}
+
+/* ── BROWSER BAR ── */
+.browser-bar{background:#f2f2f7;height:44px;display:flex;align-items:center;padding:0 12px;gap:8px;border-bottom:1px solid #ddd}
+.url-box{flex:1;background:#fff;border-radius:10px;height:30px;display:flex;align-items:center;padding:0 10px;font-size:12px;color:#444;border:1px solid #e0e0e0}
+.url-box span{color:#666;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.browser-btn{width:26px;height:26px;border-radius:6px;background:#e5e5ea;display:flex;align-items:center;justify-content:center;font-size:12px;color:#666;flex-shrink:0}
+
+/* ── CONTENT AREA ── */
+.content{height:calc(844px - 44px - 44px - 82px);overflow:hidden;position:relative}
+.scene{position:absolute;inset:0;opacity:0;transition:opacity .6s ease;overflow:hidden}
+.scene.active{opacity:1}
+
+/* ── GOOGLE SCENE ── */
+.google-wrap{background:#fff;height:100%;padding:12px}
+.google-logo{text-align:center;padding:30px 0 14px;font-size:38px;font-weight:700;letter-spacing:-1px}
+.g-blue{color:#4285f4}.g-red{color:#ea4335}.g-yellow{color:#fbbc05}.g-green{color:#34a853}
+.google-search-box{border:1px solid #dfe1e5;border-radius:24px;padding:10px 18px;display:flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);margin:0 8px 16px}
+.search-icon{color:#9aa0a6;font-size:16px}
+.search-input{flex:1;font-size:15px;color:#202124;border:none;outline:none;background:none}
+.search-cursor{display:inline-block;width:2px;height:18px;background:#1a73e8;vertical-align:middle;animation:blink .8s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.google-btns{display:flex;gap:10px;justify-content:center;padding:8px 0}
+.g-btn{background:#f8f9fa;border:1px solid #f8f9fa;color:#3c4043;padding:8px 20px;border-radius:4px;font-size:13px}
+.google-results{padding:8px 0}
+.g-result{padding:10px 0;border-bottom:1px solid #f0f0f0}
+.g-result-url{font-size:11px;color:#202124;margin-bottom:2px;display:flex;align-items:center;gap:5px}
+.g-result-url .favicon{width:16px;height:16px;border-radius:2px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:8px}
+.g-result-title{font-size:16px;color:#1a0dab;margin-bottom:3px;font-weight:400}
+.g-result-desc{font-size:12px;color:#4d5156;line-height:1.5}
+.g-result.highlighted .g-result-title{color:#1a0dab;font-weight:500}
+.g-result.highlighted{background:rgba(26,115,232,.04);margin:0 -12px;padding:10px 12px;border-radius:8px}
+.g-ad-badge{background:#fff;border:1px solid #bbb;color:#6b4226;font-size:9px;padding:1px 5px;border-radius:3px;margin-right:4px;font-weight:600}
+
+/* ── OUR SITE SCENE ── */
+.site-wrap{background:#060606;height:100%;overflow-y:auto;overflow-x:hidden}
+.site-hdr{padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between}
+.site-logo{font-size:10px;font-weight:900;letter-spacing:2px;color:#E53E2E;text-transform:uppercase}
+.site-btn{background:#E53E2E;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:10px;font-weight:700}
+.site-hero{text-align:center;padding:24px 20px 20px;color:#f0f0f0}
+.site-pill{display:inline-block;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:#E53E2E;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 12px;border-radius:20px;margin-bottom:12px}
+.site-h1{font-size:24px;font-weight:900;line-height:1.2;margin-bottom:8px}
+.site-h1 span{color:#E53E2E}
+.site-sub{font-size:12px;color:#999;line-height:1.6}
+.site-stats{display:flex;justify-content:center;gap:20px;margin-top:14px}
+.site-stat-v{font-size:18px;font-weight:900;color:#f0f0f0;text-align:center}
+.site-stat-l{font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.5px}
+
+/* ── APP SCENE ── */
+.app-wrap{background:#060606;height:100%;padding:0 16px;overflow-y:auto}
+.app-input-card{background:#0f0f0f;border:1px solid #1c1c1c;border-radius:12px;padding:16px;margin:12px 0}
+.app-lbl{font-size:9px;color:#555;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px}
+.app-ta{width:100%;min-height:72px;background:#0a0a0a;border:1px solid #272727;border-radius:8px;padding:10px;color:#f0f0f0;font-size:12px;line-height:1.5;resize:none;outline:none;font-family:inherit}
+.app-ta.focused{border-color:#E53E2E}
+.app-chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.app-chip{background:#0a0a0a;border:1px solid #272727;border-radius:16px;padding:4px 10px;font-size:10px;color:#555}
+.app-gen-btn{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:10px;padding:13px;font-size:13px;font-weight:700;margin-top:4px;cursor:pointer}
+
+/* ── LOADING ── */
+.load-steps{display:flex;flex-direction:column;gap:8px;padding:16px 0}
+.load-step{display:flex;align-items:center;gap:10px;opacity:.3;transition:opacity .4s}
+.load-step.active{opacity:1}
+.load-step.done{opacity:.6}
+.step-ic{width:26px;height:26px;border-radius:7px;background:#1a1a1a;border:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.load-step.active .step-ic{background:rgba(229,62,46,.12);border-color:rgba(229,62,46,.3)}
+.load-step.done .step-ic{background:rgba(74,222,128,.08);border-color:rgba(74,222,128,.2)}
+.step-txt{font-size:12px;color:#f0f0f0}
+.step-spin{width:12px;height:12px;border:1.5px solid rgba(229,62,46,.2);border-top-color:#E53E2E;border-radius:50%;animation:spin .6s linear infinite;margin-left:auto;flex-shrink:0}
+.load-step:not(.active) .step-spin,.load-step.done .step-spin{display:none}
+.step-ck{margin-left:auto;color:#4ADE80;font-size:12px;display:none}
+.load-step.done .step-ck{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-bar-wrap{background:#111;border-radius:4px;height:3px;margin:4px 0}
+.load-bar{height:100%;background:linear-gradient(90deg,#E53E2E,#ff6b5b);border-radius:4px;transition:width .7s ease;width:0%}
+
+/* ── RESULTS ── */
+.res-card{background:#0f0f0f;border:1px solid #1c1c1c;border-radius:10px;padding:14px;margin-bottom:10px;animation:fadeUp .4s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.res-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#444;margin-bottom:6px}
+.res-txt{font-size:12px;color:#f0f0f0;line-height:1.6}
+.res-price-val{font-size:28px;font-weight:900;background:linear-gradient(135deg,#E53E2E,#F5A623);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.res-price-sub{font-size:10px;color:#555;margin-top:2px}
+
+/* locked */
+.locked-card{background:#0f0f0f;border:1px solid #1c1c1c;border-radius:10px;padding:14px;position:relative;overflow:hidden;margin-bottom:10px;animation:fadeUp .4s ease .3s both}
+.locked-badge{background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:#E53E2E;border-radius:5px;padding:2px 7px;font-size:9px;font-weight:700;animation:lockedGlow 2s ease-in-out infinite}
+@keyframes lockedGlow{0%,100%{box-shadow:none}50%{box-shadow:0 0 10px rgba(229,62,46,.3)}}
+.locked-preview{filter:blur(4px);font-size:10px;color:#444;font-family:monospace;line-height:1.5;max-height:50px;overflow:hidden;margin:8px 0}
+.locked-over{position:absolute;inset:0;background:rgba(6,6,6,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.locked-over span{font-size:11px;color:#999;font-weight:600;text-align:center}
+
+/* fomo */
+.fomo-card{background:linear-gradient(135deg,#0f0505,#080808);border:1px solid rgba(229,62,46,.2);border-radius:12px;padding:18px;margin-bottom:10px;text-align:center}
+.fomo-tag{display:inline-block;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:#E53E2E;font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:3px 10px;border-radius:16px;margin-bottom:10px}
+.fomo-h{font-size:18px;font-weight:900;color:#f0f0f0;margin-bottom:6px;line-height:1.25}
+.fomo-h span{color:#E53E2E}
+.fomo-cta{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:10px;padding:14px;font-size:14px;font-weight:800;margin-top:12px;cursor:pointer;animation:ctaPulse 2.5s ease-in-out infinite}
+@keyframes ctaPulse{0%,100%{box-shadow:0 4px 20px rgba(229,62,46,.3)}50%{box-shadow:0 4px 40px rgba(229,62,46,.5)}}
+
+/* ── TAB BAR ── */
+.tab-bar{height:82px;background:#f9f9f9;border-top:1px solid #e0e0e0;display:flex;align-items:flex-start;justify-content:space-around;padding:10px 0 0}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;color:#8e8e93;width:60px}
+.tab.active{color:#007aff}
+.tab-icon{font-size:20px}
+
+/* ── CURSOR ── */
+.tap-cursor{position:fixed;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.6);pointer-events:none;transform:translate(-50%,-50%);transition:transform .15s ease,opacity .3s;z-index:9999;opacity:0}
+.tap-cursor.show{opacity:1}
+.tap-cursor.tap{transform:translate(-50%,-50%) scale(.7)}
+
+/* ── START OVERLAY ── */
+.start-overlay{position:absolute;inset:0;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:500;border-radius:52px}
+.start-btn{background:#E53E2E;color:#fff;border:none;border-radius:12px;padding:14px 40px;font-size:15px;font-weight:700;cursor:pointer}
+.start-txt{color:#888;font-size:12px;text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="phone-notch"></div>
+  <div class="phone-screen">
+
+    <!-- Status bar -->
+    <div class="status">
+      <span>15:47</span>
+      <div class="status-icons">
+        <span>▬▬▬</span>
+        <span>WiFi</span>
+        <span>🔋76</span>
+      </div>
+    </div>
+
+    <!-- Browser bar -->
+    <div class="browser-bar">
+      <div class="browser-btn">←</div>
+      <div class="url-box"><span id="url-display">google.com</span></div>
+      <div class="browser-btn">⋯</div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- Scene 1: Google -->
+      <div class="scene active" id="s-google">
+        <div class="google-wrap">
+          <div class="google-logo">
+            <span class="g-blue">G</span><span class="g-red">o</span><span class="g-yellow">o</span><span class="g-blue">g</span><span class="g-green">l</span><span class="g-red">e</span>
+          </div>
+          <div class="google-search-box">
+            <span class="search-icon">🔍</span>
+            <span class="search-input" id="search-text"></span><span class="search-cursor" id="search-cursor"></span>
+          </div>
+          <div class="google-btns">
+            <div class="g-btn">Google Search</div>
+            <div class="g-btn">I'm Feeling Lucky</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 2: Search results -->
+      <div class="scene" id="s-results">
+        <div class="google-wrap" style="padding-top:8px">
+          <div style="font-size:11px;color:#70757a;padding-bottom:8px;border-bottom:1px solid #ebebeb;margin-bottom:4px">About 1,240,000,000 results (0.48 seconds)</div>
+          <div class="g-result">
+            <div class="g-result-url"><div class="favicon">💹</div> trading101.com › blog</div>
+            <div class="g-result-title">Top 10 Ways to Make Money Online in 2025</div>
+            <div class="g-result-desc">Trading, crypto, dropshipping, freelancing... Our experts tested every method so you don't have to.</div>
+          </div>
+          <div class="g-result">
+            <div class="g-result-url"><div class="favicon">📦</div> shopify.com › blog</div>
+            <div class="g-result-title">Make Money Online: 30+ Real Ways to Earn...</div>
+            <div class="g-result-desc">From dropshipping to print-on-demand. Start earning from home with these proven strategies.</div>
+          </div>
+          <div class="g-result highlighted" id="our-result" style="opacity:0;transition:opacity .5s">
+            <div class="g-result-url"><div class="favicon" style="background:#E53E2E;color:white;font-size:9px">⚡</div> <span style="color:#006621">aicashsystem.space</span></div>
+            <div class="g-result-title">Build AI Automations. Sell for $800–$1,200 — Blueprint Studio</div>
+            <div class="g-result-desc">Generate a full Make.com automation plan in 60 seconds. No coding needed. 247 students avg $850/client. <strong>Try free →</strong></div>
+          </div>
+          <div class="g-result">
+            <div class="g-result-url"><div class="favicon">📱</div> nerdwallet.com</div>
+            <div class="g-result-title">How to Make Money Online (Legit Ways)</div>
+            <div class="g-result-desc">We researched over 50 methods. Here are the ones that actually work in 2025.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 3: Our landing page -->
+      <div class="scene" id="s-landing">
+        <div class="site-wrap" id="landing-scroll">
+          <div class="site-hdr">
+            <div class="site-logo">⚡ Blueprint Studio</div>
+            <button class="site-btn">Get Access — $97</button>
+          </div>
+          <div class="site-hero">
+            <div class="site-pill">🔴 247 students enrolled</div>
+            <div class="site-h1">Build AI automations.<br><span>Sell for $800–$1,200.</span></div>
+            <div class="site-sub">Real Make.com blueprints. Generated by AI in 60 seconds. No coding. No experience needed.</div>
+            <div class="site-stats">
+              <div><div class="site-stat-v">247</div><div class="site-stat-l">Students</div></div>
+              <div><div class="site-stat-v">$850</div><div class="site-stat-l">Avg/client</div></div>
+              <div><div class="site-stat-v">60s</div><div class="site-stat-l">To build</div></div>
+            </div>
+          </div>
+          <div style="padding:0 16px 30px">
+            <div style="background:#0f0f0f;border:1px solid #1c1c1c;border-radius:12px;padding:20px;margin-bottom:14px">
+              <div style="font-size:11px;font-weight:800;color:#f0f0f0;margin-bottom:6px">What Blueprint Studio students earn:</div>
+              <div style="font-size:28px;font-weight:900;background:linear-gradient(135deg,#E53E2E,#F5A623);-webkit-background-clip:text;-webkit-text-fill-color:transparent">$1,197</div>
+              <div style="font-size:11px;color:#555;margin-top:2px">Average per client deal · Generated in 60 seconds</div>
+            </div>
+            <div style="background:#E53E2E;border-radius:12px;padding:16px;text-align:center">
+              <div style="color:#fff;font-size:14px;font-weight:800">⚡ Try It Free — No Signup</div>
+              <div style="color:rgba(255,255,255,.7);font-size:11px;margin-top:3px">See exactly what it generates for your niche</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 4: /try page — input -->
+      <div class="scene" id="s-try">
+        <div class="app-wrap" id="try-scroll">
+          <div class="site-hdr" style="margin-bottom:0">
+            <div class="site-logo">⚡ Blueprint Studio</div>
+            <button class="site-btn">Get Access — $97</button>
+          </div>
+          <div style="text-align:center;padding:14px 0 10px">
+            <div class="site-pill">🔴 Live Demo — No Signup</div>
+            <div class="site-h1" style="font-size:20px;color:#f0f0f0;margin-top:8px">See exactly how you build<br><span style="color:#E53E2E">a $800–$1,200 automation</span></div>
+          </div>
+          <div class="app-input-card">
+            <div class="app-lbl">Describe your automation</div>
+            <textarea class="app-ta" id="app-ta" placeholder="e.g. When someone messages on WhatsApp..." readonly></textarea>
+            <div class="app-chips">
+              <div class="app-chip">WhatsApp AI Bot</div>
+              <div class="app-chip">Lead Follow-Up</div>
+              <div class="app-chip">Cold Email</div>
+            </div>
+            <button class="app-gen-btn" id="app-gen-btn">⚡ Generate My Automation — Free</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 5: Loading -->
+      <div class="scene" id="s-loading">
+        <div class="app-wrap">
+          <div style="color:#f0f0f0;font-size:13px;font-weight:700;padding:16px 0 4px">⚡ Blueprint Studio</div>
+          <div class="load-steps">
+            <div class="load-step" id="ls0"><div class="step-ic">🔍</div><div class="step-txt">Analyzing your automation idea…</div><div class="step-spin"></div><div class="step-ck">✓</div></div>
+            <div class="load-step" id="ls1"><div class="step-ic">💰</div><div class="step-txt">Calculating your selling price…</div><div class="step-spin"></div><div class="step-ck">✓</div></div>
+            <div class="load-step" id="ls2"><div class="step-ic">✉️</div><div class="step-txt">Writing personalized outreach…</div><div class="step-spin"></div><div class="step-ck">✓</div></div>
+            <div class="load-step" id="ls3"><div class="step-ic">📦</div><div class="step-txt">Building Make.com blueprint…</div><div class="step-spin"></div><div class="step-ck">✓</div></div>
+          </div>
+          <div class="load-bar-wrap"><div class="load-bar" id="load-bar"></div></div>
+        </div>
+      </div>
+
+      <!-- Scene 6: Results -->
+      <div class="scene" id="s-results2">
+        <div class="app-wrap" id="results-scroll">
+          <div style="color:#f0f0f0;font-size:12px;font-weight:700;padding:12px 0 8px">⚡ Blueprint Studio</div>
+          <div class="res-card">
+            <div class="res-lbl">What gets built</div>
+            <div class="res-txt">A WhatsApp AI bot that automatically replies to customer messages 24/7 — handles menu questions, bookings and pricing using GPT-4 via Make.com.</div>
+          </div>
+          <div class="res-card" style="animation-delay:.1s">
+            <div class="res-lbl">Your price to client</div>
+            <div class="res-price-val">$900–$1,200</div>
+            <div class="res-price-sub">Setup fee · Monthly retainer: $200/month</div>
+          </div>
+          <div class="res-card" style="animation-delay:.2s">
+            <div class="res-lbl">Outreach message — copy &amp; send</div>
+            <div class="res-txt">"Hey [Name], I noticed you're handling all your WhatsApp messages manually. I build AI bots that handle customer replies automatically — restaurants using this save 4+ hours a day. Would a quick demo be worth 10 minutes?"</div>
+          </div>
+          <div class="locked-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div class="res-lbl" style="margin:0">.json Blueprint for Make.com</div>
+              <div class="locked-badge">🔒 Locked</div>
+            </div>
+            <div class="locked-preview">{"name":"WhatsApp AI Bot","flow":[{"id":1,"module":"gateway:CustomWebHook","version":1,"parameters":{"hook":"YOUR_MAKE_WEBHOOK"}},{"id":2,"module":"openai-gpt-3:CreateChatCompletion","version":1}]}</div>
+            <div class="locked-over">
+              <div style="font-size:22px">🔒</div>
+              <span>Blueprint ready — unlock to import<br>directly into Make.com</span>
+            </div>
+          </div>
+          <div class="fomo-card">
+            <div class="fomo-tag">⚡ Your blueprint is ready</div>
+            <div class="fomo-h">Don't leave <span>$1,200</span><br>on the table</div>
+            <div style="font-size:12px;color:#999;line-height:1.6">You just saw how fast it works. Get everything you need to sell it — starting today.</div>
+            <button class="fomo-cta">⚡ Unlock Everything — $97</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <div class="tab active"><div class="tab-icon">🏠</div>Home</div>
+      <div class="tab"><div class="tab-icon">🔖</div>Bookmarks</div>
+      <div class="tab"><div class="tab-icon">📋</div>Tabs</div>
+      <div class="tab"><div class="tab-icon">⚙️</div>Settings</div>
+    </div>
+
+    <!-- Start overlay -->
+    <div class="start-overlay" id="start-overlay">
+      <div style="font-size:32px">📱</div>
+      <div style="color:#fff;font-size:18px;font-weight:800">Demo Recording</div>
+      <div class="start-txt">Pornești screen recording<br>apoi dai click pe buton</div>
+      <button class="start-btn" onclick="startDemo()">▶ Start Demo</button>
+    </div>
+
+  </div><!-- /phone-screen -->
+</div><!-- /phone -->
+
+<!-- Tap cursor -->
+<div class="tap-cursor" id="cursor"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+function showScene(id){
+  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+function setUrl(u){ $('url-display').textContent = u; }
+
+/* ── fake tap cursor ── */
+async function tap(x, y, hold=400){
+  const c = $('cursor');
+  c.style.left = x+'px'; c.style.top = y+'px';
+  c.classList.add('show');
+  await wait(150);
+  c.classList.add('tap');
+  await wait(hold);
+  c.classList.remove('tap');
+  await wait(200);
+  c.classList.remove('show');
+}
+
+/* ── type into element ── */
+async function typeInto(el, text, delay=60){
+  el.value = '';
+  for(const ch of text){
+    el.value += ch;
+    await wait(delay + Math.random()*30);
+  }
+}
+
+/* ── smooth scroll ── */
+async function scrollEl(el, to, steps=20){
+  const start = el.scrollTop;
+  const diff = to - start;
+  for(let i=1;i<=steps;i++){
+    el.scrollTop = start + diff*i/steps;
+    await wait(35);
+  }
+}
+
+/* ── type in Google search ── */
+async function typeSearch(text, delay=80){
+  const el = $('search-text');
+  el.textContent = '';
+  for(const ch of text){
+    el.textContent += ch;
+    await wait(delay + Math.random()*40);
+  }
+}
+
+/* ── loading steps ── */
+async function runLoading(){
+  const pcts=['20%','45%','70%','90%'];
+  for(let i=0;i<4;i++){
+    for(let j=0;j<4;j++){
+      $('ls'+j).classList.remove('active','done');
+      if(j<i) $('ls'+j).classList.add('done');
+      if(j===i) $('ls'+j).classList.add('active');
+    }
+    $('load-bar').style.width=pcts[i];
+    await wait(1400);
+  }
+  for(let j=0;j<4;j++){ $('ls'+j).classList.remove('active'); $('ls'+j).classList.add('done'); }
+  $('load-bar').style.width='100%';
+}
+
+/* ══════════ MAIN DEMO ══════════ */
+async function startDemo(){
+  $('start-overlay').style.display='none';
+
+  /* Scene 1: Google home */
+  showScene('s-google');
+  setUrl('google.com');
+  await wait(1200);
+
+  /* Tap search box */
+  await tap(195, 280, 300);
+  await wait(400);
+
+  /* Type query */
+  await typeSearch('how to make money online 2025', 75);
+  $('search-cursor').style.display='none';
+  await wait(900);
+
+  /* Scene 2: Results */
+  setUrl('google.com/search?q=how+to+make+money+online+2025');
+  showScene('s-results');
+  await wait(2000);
+
+  /* Reveal our result */
+  $('our-result').style.opacity='1';
+  await wait(1200);
+
+  /* Tap our result */
+  const rect = $('our-result').getBoundingClientRect();
+  await tap(rect.left+rect.width/2+40, rect.top+rect.height/2, 350);
+  await wait(400);
+
+  /* Scene 3: Landing page */
+  setUrl('aicashsystem.space');
+  showScene('s-landing');
+  await wait(1800);
+
+  /* Scroll landing */
+  await scrollEl($('landing-scroll'), 180);
+  await wait(1200);
+  await scrollEl($('landing-scroll'), 0);
+  await wait(600);
+
+  /* Tap "Try Free" button */
+  await tap(195, 540, 350);
+  await wait(500);
+
+  /* Scene 4: /try page */
+  setUrl('aicashsystem.space/try');
+  showScene('s-try');
+  await wait(1500);
+
+  /* Tap textarea */
+  await tap(195, 390, 300);
+  await wait(500);
+  $('app-ta').classList.add('focused');
+
+  /* Type in textarea */
+  await typeInto($('app-ta'), 'WhatsApp AI bot for my restaurant — auto-reply to customer questions about menu and prices 24/7', 42);
+  await wait(1000);
+
+  /* Tap Generate */
+  await tap(195, 490, 400);
+  await wait(300);
+
+  /* Scene 5: Loading */
+  showScene('s-loading');
+  await runLoading();
+  await wait(400);
+
+  /* Scene 6: Results */
+  showScene('s-results2');
+  await wait(2000);
+
+  /* Scroll through results */
+  await scrollEl($('results-scroll'), 200);
+  await wait(1200);
+  await scrollEl($('results-scroll'), 450);
+  await wait(1000);
+
+  /* Tap locked card */
+  await tap(195, 420, 500);
+  await wait(1500);
+
+  /* Scroll to FOMO */
+  await scrollEl($('results-scroll'), 800);
+  await wait(3000);
+
+  /* Tap CTA */
+  await tap(195, 720, 400);
+  await wait(2000);
+
+  console.log('✅ Demo finished');
+}
+</script>
+</body>
+</html>
