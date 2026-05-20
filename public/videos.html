@@ -483,7 +483,7 @@ function render(arr,cid){
       <div class="p-overlay">▶</div>
     </div>
     <br><button class="pbtn" onclick="tog('${uid}',${i},'${cid}')">▶ Play / Restart</button>
-    ${v.script?`<button class="hg-btn" onclick="openHG(${JSON.stringify(v.script)})">🎬 Generate HeyGen Video</button><button class="sbtn" onclick="tgs('sbox${uid}')">📋 Script text</button><div class="sbox" id="sbox${uid}"><strong>🎙 Script:</strong>${v.script.replace(/\n/g,'<br>')}</div>`:''}`;
+    ${v.script?`<button class="hg-btn" onclick="openHG('sc${uid}')">🎬 Generate HeyGen Video</button><button class="sbtn" onclick="tgs('sbox${uid}')">📋 Script text</button><div class="sbox" id="sbox${uid}"><strong>🎙 Script:</strong>${v.script.replace(/\n/g,'<br>')}</div><textarea id="hgsc${uid}" style="display:none">${v.script}</textarea>`:''}`;
     g.appendChild(d);
     document.getElementById('pl'+uid).addEventListener('click',()=>tog(uid,i,cid));
   });
@@ -617,8 +617,10 @@ async function hgInit(){
   }catch(e){console.warn('HeyGen init failed',e);}
 }
 
-function openHG(script){
-  document.getElementById('hg-script').value=script||'';
+function openHG(uid){
+  const src=document.getElementById('hgsc'+uid);
+  const script=src?src.value:'';
+  document.getElementById('hg-script').value=script;
   document.getElementById('hg-status').textContent='';
   document.getElementById('hg-status').className='hg-status';
   document.getElementById('hg-dl').style.display='none';
