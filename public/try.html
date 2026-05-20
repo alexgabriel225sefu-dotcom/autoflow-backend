@@ -9,24 +9,33 @@
 :root{--bg:#060606;--card:#0f0f0f;--b1:#1c1c1c;--b2:#272727;--t1:#f0f0f0;--t2:#999;--t3:#444;--red:#E53E2E;--red2:#ff6b5b;--green:#4ADE80}
 body{background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
 body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 40% at 50% 0%,rgba(229,62,46,.07) 0%,transparent 55%);pointer-events:none;z-index:0}
-
 a{color:inherit;text-decoration:none}
 .wrap{max-width:640px;margin:0 auto;padding:0 20px 80px;position:relative;z-index:1}
 
 /* ── HEADER ── */
 .hdr{padding:18px 0 0;display:flex;align-items:center;justify-content:space-between}
 .hdr-logo{font-size:11px;font-weight:900;letter-spacing:2.5px;color:var(--red);text-transform:uppercase}
-.hdr-buy{background:var(--red);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.3px}
+.hdr-buy{background:var(--red);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.3px;min-height:36px}
 .hdr-buy:hover{background:var(--red2)}
 
+/* ── URGENCY BAR ── */
+.urgency-bar{background:linear-gradient(135deg,rgba(229,62,46,.12),rgba(229,62,46,.06));border:1px solid rgba(229,62,46,.25);border-radius:10px;padding:10px 16px;margin:14px 0 4px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.urg-left{font-size:12px;color:var(--t2)}
+.urg-left strong{color:var(--t1)}
+.urg-cd{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t3)}
+.urg-cd-val{background:#1a0a0a;border:1px solid rgba(229,62,46,.3);color:var(--red);font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;padding:2px 7px;border-radius:5px;min-width:28px;text-align:center}
+
 /* ── HERO ── */
-.hero{text-align:center;padding:36px 0 28px}
+.hero{text-align:center;padding:28px 0 24px}
 .hero-pill{display:inline-block;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:var(--red);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:4px 14px;border-radius:20px;margin-bottom:16px}
-.hero-h1{font-size:clamp(26px,6vw,40px);font-weight:900;line-height:1.2;margin-bottom:10px}
+.hero-h1{font-size:clamp(24px,6vw,40px);font-weight:900;line-height:1.2;margin-bottom:10px}
 .hero-h1 span{background:linear-gradient(135deg,#E53E2E,#ff6b5b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .hero-sub{font-size:15px;color:var(--t2);line-height:1.6;max-width:480px;margin:0 auto}
-.hero-proof{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:14px;font-size:12px;color:var(--t3)}
-.hero-proof span{color:var(--green);font-weight:600}
+.hero-stats{display:flex;align-items:center;justify-content:center;gap:20px;margin-top:16px;flex-wrap:wrap}
+.hero-stat{text-align:center}
+.hero-stat-v{font-size:20px;font-weight:900;color:var(--t1)}
+.hero-stat-l{font-size:10px;color:var(--t3);letter-spacing:.5px;text-transform:uppercase;margin-top:1px}
+.hero-sep{width:1px;height:30px;background:var(--b2)}
 
 /* ── INPUT CARD ── */
 .input-card{background:var(--card);border:1px solid var(--b1);border-radius:16px;padding:22px;margin-bottom:20px;position:relative}
@@ -36,35 +45,42 @@ a{color:inherit;text-decoration:none}
 .input-ta:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(229,62,46,.07)}
 .input-ta::placeholder{color:var(--t3)}
 .chips{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}
-.chip{background:#0a0a0a;border:1px solid var(--b2);border-radius:20px;padding:5px 12px;font-size:11px;color:var(--t2);cursor:pointer;transition:all .15s}
+.chip{background:#0a0a0a;border:1px solid var(--b2);border-radius:20px;padding:5px 12px;font-size:11px;color:var(--t2);cursor:pointer;transition:all .15s;min-height:30px}
 .chip:hover{border-color:var(--red);color:var(--red);background:rgba(229,62,46,.05)}
-.gen-btn{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 24px rgba(229,62,46,.28);transition:all .2s;margin-top:4px;letter-spacing:.2px}
+.gen-btn{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 24px rgba(229,62,46,.28);transition:all .2s;margin-top:4px;letter-spacing:.2px;min-height:52px}
 .gen-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 30px rgba(229,62,46,.38)}
 .gen-btn:disabled{opacity:.55;cursor:default;transform:none}
 
-/* ── LOADING ── */
-.loading{display:none;flex-direction:column;align-items:center;gap:12px;padding:32px 0}
-.spinner{width:32px;height:32px;border:2px solid rgba(229,62,46,.15);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite}
+/* ── STEP LOADING ── */
+.loading{display:none;flex-direction:column;gap:14px;padding:28px 0}
+.load-steps{display:flex;flex-direction:column;gap:10px}
+.load-step{display:flex;align-items:center;gap:12px;opacity:.35;transition:opacity .3s}
+.load-step.active{opacity:1}
+.load-step.done{opacity:.7}
+.step-icon{width:30px;height:30px;border-radius:8px;background:#1a1a1a;border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;transition:all .3s}
+.load-step.active .step-icon{background:rgba(229,62,46,.12);border-color:rgba(229,62,46,.35)}
+.load-step.done .step-icon{background:rgba(74,222,128,.08);border-color:rgba(74,222,128,.25)}
+.step-txt{font-size:13px;color:var(--t2)}
+.load-step.active .step-txt{color:var(--t1)}
+.step-spinner{width:14px;height:14px;border:2px solid rgba(229,62,46,.15);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite;margin-left:auto;flex-shrink:0}
+.load-step:not(.active) .step-spinner{display:none}
+.load-step.done .step-spinner{display:none}
+.step-check{margin-left:auto;color:var(--green);font-size:14px;display:none;flex-shrink:0}
+.load-step.done .step-check{display:block}
 @keyframes spin{to{transform:rotate(360deg)}}
-.loading-txt{font-size:13px;color:var(--t3)}
+.load-bar-wrap{background:#111;border-radius:6px;height:4px;overflow:hidden}
+.load-bar{height:100%;background:linear-gradient(90deg,var(--red),var(--red2));border-radius:6px;transition:width .6s ease;width:0%}
 
 /* ── RESULTS ── */
 .results{display:none;flex-direction:column;gap:10px;margin-bottom:10px}
-
 .res-card{border-radius:12px;padding:18px 20px;animation:fadeUp .4s ease}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-
-/* What card */
 .res-what{background:var(--card);border:1px solid var(--b1)}
 .res-lbl{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:8px}
 .res-txt{font-size:14px;color:var(--t1);line-height:1.7}
-
-/* Price card */
 .res-price{background:var(--card);border:1px solid var(--b1)}
 .res-price-val{font-size:34px;font-weight:900;background:linear-gradient(135deg,#E53E2E,#F5A623);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;margin-bottom:4px}
 .res-price-sub{font-size:12px;color:var(--t3)}
-
-/* Outreach card */
 .res-outreach{background:var(--card);border:1px solid var(--b1)}
 .res-outreach-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .copy-btn{background:var(--b1);border:1px solid var(--b2);color:var(--t3);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;transition:all .15s}
@@ -72,14 +88,28 @@ a{color:inherit;text-decoration:none}
 .copy-btn.copied{border-color:var(--green);color:var(--green)}
 
 /* ── LOCKED CARD ── */
-.locked-card{background:var(--card);border:1px solid var(--b1);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;animation:fadeUp .4s ease .3s both}
+.locked-card{background:var(--card);border:1px solid var(--b1);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;animation:fadeUp .4s ease .3s both;cursor:pointer;transition:border-color .25s}
+.locked-card:hover{border-color:rgba(229,62,46,.4)}
+.locked-card::after{content:'→ Tap to unlock for $97';position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(229,62,46,.18),transparent);color:var(--red);font-size:11px;font-weight:700;letter-spacing:.5px;text-align:center;padding:10px;opacity:0;transition:opacity .25s}
+.locked-card:hover::after{opacity:1}
 .locked-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .locked-lbl{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3)}
-.locked-badge{background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:var(--red);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;display:flex;align-items:center;gap:4px}
+.locked-badge{background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:var(--red);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;display:flex;align-items:center;gap:4px;animation:locked-glow 2s ease-in-out infinite}
+@keyframes locked-glow{0%,100%{box-shadow:0 0 0 0 rgba(229,62,46,0)}50%{box-shadow:0 0 8px 2px rgba(229,62,46,.22)}}
 .locked-preview{filter:blur(5px);user-select:none;pointer-events:none;font-family:monospace;font-size:11px;color:var(--t3);line-height:1.6;max-height:80px;overflow:hidden}
 .locked-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgba(6,6,6,.5);backdrop-filter:blur(2px)}
-.locked-icon{font-size:24px}
+.locked-icon{font-size:24px;animation:lock-shake 4s ease-in-out infinite}
+@keyframes lock-shake{0%,85%,100%{transform:rotate(0)}87%{transform:rotate(-8deg)}89%{transform:rotate(8deg)}91%{transform:rotate(-6deg)}93%{transform:rotate(0)}}
 .locked-msg{font-size:12px;color:var(--t2);font-weight:600;text-align:center;line-height:1.5}
+
+/* ── ACTIVITY POPUP ── */
+#act{position:fixed;bottom:80px;left:20px;z-index:998;display:none;max-width:260px}
+.act-inner{background:#111;border:1px solid var(--b2);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;animation:fadeUp .35s ease;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.act-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#E53E2E,#c93426);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.act-body{flex:1;min-width:0}
+.act-name{font-size:12px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.act-txt{font-size:11px;color:var(--t3);margin-top:1px}
+.act-time{font-size:10px;color:var(--t3);margin-left:auto;flex-shrink:0}
 
 /* ── FOMO SECTION ── */
 .fomo{display:none;margin-top:6px;animation:fadeUp .5s ease}
@@ -87,13 +117,20 @@ a{color:inherit;text-decoration:none}
 .fomo-card::before{content:'';position:absolute;inset:0;border-radius:16px;background:radial-gradient(ellipse at 50% 0%,rgba(229,62,46,.08) 0%,transparent 60%);pointer-events:none}
 .fomo-glow{position:absolute;top:-40px;left:50%;transform:translateX(-50%);width:200px;height:200px;background:radial-gradient(circle,rgba(229,62,46,.12) 0%,transparent 70%);pointer-events:none;animation:glow-pulse 2s ease-in-out infinite}
 @keyframes glow-pulse{0%,100%{opacity:.5;transform:translateX(-50%) scale(1)}50%{opacity:1;transform:translateX(-50%) scale(1.2)}}
-
 .fomo-top{text-align:center;margin-bottom:20px;position:relative;z-index:1}
 .fomo-tag{display:inline-block;background:rgba(229,62,46,.12);border:1px solid rgba(229,62,46,.35);color:var(--red);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:20px;margin-bottom:12px}
 .fomo-h{font-size:22px;font-weight:900;line-height:1.25;margin-bottom:8px}
 .fomo-h span{background:linear-gradient(135deg,#E53E2E,#ff6b5b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .fomo-sub{font-size:13px;color:var(--t2);line-height:1.6}
-
+.fomo-cd-row{display:flex;align-items:center;justify-content:center;gap:8px;margin:14px 0;position:relative;z-index:1}
+.fomo-cd-box{text-align:center}
+.fomo-cd-num{background:#1a0a0a;border:1px solid rgba(229,62,46,.3);color:var(--red);font-size:22px;font-weight:900;width:52px;height:50px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-variant-numeric:tabular-nums}
+.fomo-cd-lbl{font-size:9px;color:var(--t3);letter-spacing:.5px;text-transform:uppercase;margin-top:4px}
+.fomo-cd-sep{font-size:22px;font-weight:900;color:rgba(229,62,46,.4);margin-bottom:14px}
+.fomo-cd-msg{text-align:center;font-size:12px;color:var(--t3);margin-bottom:14px;position:relative;z-index:1}
+.fomo-cd-msg strong{color:var(--red)}
+.fomo-buyers{text-align:center;font-size:12px;color:var(--t3);margin:0 0 14px;position:relative;z-index:1}
+.fomo-buyers strong{color:var(--t1)}
 .fomo-items{display:flex;flex-direction:column;gap:8px;margin:16px 0;position:relative;z-index:1}
 .fomo-item{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--t1)}
 .fomo-item-icon{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
@@ -102,31 +139,47 @@ a{color:inherit;text-decoration:none}
 .fomo-item-txt{line-height:1.4}
 .fomo-item-txt strong{color:var(--t1)}
 .fomo-item-txt span{color:var(--t3);font-size:12px}
-
 .fomo-price-row{display:flex;align-items:center;justify-content:center;gap:12px;margin:16px 0 14px;position:relative;z-index:1}
 .fomo-old{font-size:18px;color:var(--t3);text-decoration:line-through}
 .fomo-new{font-size:38px;font-weight:900;color:var(--t1)}
 .fomo-new sup{font-size:20px;vertical-align:top;margin-top:6px;color:var(--red)}
 .fomo-save{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:var(--green);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700}
-
-.fomo-cta{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:12px;padding:17px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 30px rgba(229,62,46,.35);transition:all .2s;letter-spacing:.2px;position:relative;z-index:1;animation:cta-pulse 2.5s ease-in-out infinite}
+.fomo-cta{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:12px;padding:17px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 30px rgba(229,62,46,.35);transition:all .2s;letter-spacing:.2px;position:relative;z-index:1;animation:cta-pulse 2.5s ease-in-out infinite;min-height:54px}
 @keyframes cta-pulse{0%,100%{box-shadow:0 4px 30px rgba(229,62,46,.35)}50%{box-shadow:0 4px 50px rgba(229,62,46,.55)}}
 .fomo-cta:hover{transform:translateY(-2px);filter:brightness(1.08)}
-
-.fomo-proof{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:12px;font-size:11px;color:var(--t3);position:relative;z-index:1}
+.fomo-proof{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:12px;font-size:11px;color:var(--t3);position:relative;z-index:1;flex-wrap:wrap}
 .fomo-proof-dot{width:6px;height:6px;background:var(--green);border-radius:50%;flex-shrink:0;animation:dot-pulse 1.5s ease-in-out infinite}
 @keyframes dot-pulse{0%,100%{opacity:.5}50%{opacity:1}}
 .fomo-gtee{text-align:center;margin-top:8px;font-size:11px;color:var(--t3);position:relative;z-index:1}
 
-/* ── NOTIF TOAST ── */
+/* ── TESTIMONIALS ── */
+.testi-section{margin-top:20px;position:relative;z-index:1}
+.testi-h{font-size:11px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;font-weight:700;text-align:center;margin-bottom:12px}
+.testi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.testi-card{background:#0c0c0c;border:1px solid var(--b1);border-radius:10px;padding:12px 14px}
+.testi-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.testi-av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#1a1a1a,#2a2a2a);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.testi-meta{flex:1;min-width:0}
+.testi-name{font-size:12px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.testi-loc{font-size:10px;color:var(--t3)}
+.testi-earn{font-size:18px;font-weight:900;background:linear-gradient(135deg,#4ADE80,#22c55e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
+.testi-desc{font-size:11px;color:var(--t3);line-height:1.5}
+
+/* ── TOAST ── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#111;border:1px solid var(--b2);color:var(--t1);padding:11px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:999;transition:transform .3s ease;white-space:nowrap;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,.5)}
 #toast.show{transform:translateX(-50%) translateY(0)}
 #toast.ok{border-color:var(--green);color:var(--green)}
 #toast.err{border-color:#f87171;color:#f87171}
 
-/* ── SOCIAL PROOF BAR ── */
+/* ── PROOF BAR ── */
 .proof-bar{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 0 24px;font-size:11px;color:var(--t3);text-align:center}
 .proof-live{width:6px;height:6px;background:var(--green);border-radius:50%;animation:dot-pulse 1.5s ease-in-out infinite;flex-shrink:0}
+
+@media(max-width:400px){
+  .testi-grid{grid-template-columns:1fr}
+  .fomo-cd-num{width:44px;height:44px;font-size:18px}
+  .urgency-bar{flex-direction:column;align-items:flex-start;gap:6px}
+}
 </style>
 </head>
 <body>
@@ -137,11 +190,26 @@ a{color:inherit;text-decoration:none}
     <button class="hdr-buy" onclick="location.href='/'">Get Full Access — $97</button>
   </div>
 
+  <!-- urgency bar -->
+  <div class="urgency-bar">
+    <div class="urg-left"><strong id="buyers-count">14</strong> people bought today · <strong id="spots-left">6</strong> spots left at $97</div>
+    <div class="urg-cd">
+      <span>Price goes up in</span>
+      <span class="urg-cd-val" id="urg-mm">09</span>:<span class="urg-cd-val" id="urg-ss">47</span>
+    </div>
+  </div>
+
   <div class="hero">
     <div class="hero-pill">🔴 Live Demo — No Signup</div>
     <h1 class="hero-h1">See exactly how you build<br><span>a $800–$1,200 automation</span></h1>
     <p class="hero-sub">Type what you want to automate. Watch Blueprint Studio generate a real Make.com plan, your selling price, and a copy-paste client message — in 60 seconds.</p>
-    <div class="hero-proof"><div class="proof-live"></div><span>247 students</span> enrolled · avg <span>$850 per client</span></div>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="hero-stat-v">247</div><div class="hero-stat-l">Students</div></div>
+      <div class="hero-sep"></div>
+      <div class="hero-stat"><div class="hero-stat-v">$850</div><div class="hero-stat-l">Avg/client</div></div>
+      <div class="hero-sep"></div>
+      <div class="hero-stat"><div class="hero-stat-v" id="live-users">3</div><div class="hero-stat-l">Live now</div></div>
+    </div>
   </div>
 
   <div class="input-card">
@@ -156,9 +224,35 @@ a{color:inherit;text-decoration:none}
     <button class="gen-btn" id="gen-btn" onclick="generate()">⚡ Generate My Automation — Free</button>
   </div>
 
+  <!-- step loading -->
   <div class="loading" id="loading">
-    <div class="spinner"></div>
-    <div class="loading-txt" id="loading-txt">AI is building your automation plan…</div>
+    <div class="load-steps">
+      <div class="load-step" id="s0">
+        <div class="step-icon">🔍</div>
+        <div class="step-txt">Analyzing your automation idea…</div>
+        <div class="step-spinner"></div>
+        <div class="step-check">✓</div>
+      </div>
+      <div class="load-step" id="s1">
+        <div class="step-icon">💰</div>
+        <div class="step-txt">Calculating your selling price…</div>
+        <div class="step-spinner"></div>
+        <div class="step-check">✓</div>
+      </div>
+      <div class="load-step" id="s2">
+        <div class="step-icon">✉️</div>
+        <div class="step-txt">Writing personalized outreach…</div>
+        <div class="step-spinner"></div>
+        <div class="step-check">✓</div>
+      </div>
+      <div class="load-step" id="s3">
+        <div class="step-icon">📦</div>
+        <div class="step-txt">Building Make.com blueprint…</div>
+        <div class="step-spinner"></div>
+        <div class="step-check">✓</div>
+      </div>
+    </div>
+    <div class="load-bar-wrap"><div class="load-bar" id="load-bar"></div></div>
   </div>
 
   <div class="results" id="results">
@@ -183,7 +277,7 @@ a{color:inherit;text-decoration:none}
     </div>
 
     <!-- LOCKED: Blueprint -->
-    <div class="locked-card" id="r-locked">
+    <div class="locked-card" id="r-locked" onclick="location.href='/'">
       <div class="locked-top">
         <div class="locked-lbl">.json Blueprint for Make.com</div>
         <div class="locked-badge">🔒 Locked</div>
@@ -196,7 +290,7 @@ a{color:inherit;text-decoration:none}
     </div>
 
     <!-- LOCKED: Setup Guide -->
-    <div class="locked-card" style="animation-delay:.45s">
+    <div class="locked-card" style="animation-delay:.45s" onclick="location.href='/'">
       <div class="locked-top">
         <div class="locked-lbl">Complete Setup Guide</div>
         <div class="locked-badge">🔒 Locked</div>
@@ -220,6 +314,21 @@ a{color:inherit;text-decoration:none}
         <div class="fomo-h">Don't leave <span>$1,200</span><br>on the table</div>
         <div class="fomo-sub">You just saw how fast it works. Now get everything you need to sell it to clients — starting today.</div>
       </div>
+
+      <!-- countdown -->
+      <div class="fomo-cd-row">
+        <div class="fomo-cd-box">
+          <div class="fomo-cd-num" id="cd-mm">09</div>
+          <div class="fomo-cd-lbl">Min</div>
+        </div>
+        <div class="fomo-cd-sep">:</div>
+        <div class="fomo-cd-box">
+          <div class="fomo-cd-num" id="cd-ss">47</div>
+          <div class="fomo-cd-lbl">Sec</div>
+        </div>
+      </div>
+      <div class="fomo-cd-msg" id="cd-msg">Price locks at <strong>$97</strong> for the next <strong id="cd-label">9 min 47 sec</strong></div>
+      <div class="fomo-buyers">🔥 <strong id="fomo-buyers-txt">14 people</strong> bought Blueprint Studio today</div>
 
       <div class="fomo-items">
         <div class="fomo-item">
@@ -250,11 +359,49 @@ a{color:inherit;text-decoration:none}
         <div class="fomo-save">Save $200</div>
       </div>
 
-      <button class="fomo-cta" onclick="location.href='/'">
-        ⚡ Unlock Everything — $97
-      </button>
+      <button class="fomo-cta" onclick="location.href='/'">⚡ Unlock Everything — $97</button>
 
-      <div class="fomo-proof">
+      <!-- testimonials -->
+      <div class="testi-section">
+        <div class="testi-h">Students already earning</div>
+        <div class="testi-grid">
+          <div class="testi-card">
+            <div class="testi-top">
+              <div class="testi-av">🇷🇴</div>
+              <div class="testi-meta">
+                <div class="testi-name">Alex M.</div>
+                <div class="testi-loc">Romania</div>
+              </div>
+            </div>
+            <div class="testi-earn">$900</div>
+            <div class="testi-desc">First client 3 days after watching the course. WhatsApp bot for a restaurant.</div>
+          </div>
+          <div class="testi-card">
+            <div class="testi-top">
+              <div class="testi-av">🇬🇧</div>
+              <div class="testi-meta">
+                <div class="testi-name">Sarah K.</div>
+                <div class="testi-loc">United Kingdom</div>
+              </div>
+            </div>
+            <div class="testi-earn">$1,100</div>
+            <div class="testi-desc">Sold a lead follow-up automation on the first cold DM I sent.</div>
+          </div>
+          <div class="testi-card">
+            <div class="testi-top">
+              <div class="testi-av">🇮🇹</div>
+              <div class="testi-meta">
+                <div class="testi-name">Marco D.</div>
+                <div class="testi-loc">Italy</div>
+              </div>
+            </div>
+            <div class="testi-earn">$3,400/mo</div>
+            <div class="testi-desc">3 retainer clients. $1,100 avg/month each. Best decision I made.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fomo-proof" style="margin-top:16px">
         <div class="fomo-proof-dot"></div>
         <span>247 students enrolled</span>
         <span>·</span>
@@ -268,52 +415,84 @@ a{color:inherit;text-decoration:none}
 
   <div class="proof-bar" id="proof-bar" style="display:none">
     <div class="proof-live"></div>
-    <span>3 people are looking at this right now</span>
+    <span id="proof-txt">3 people are looking at this right now</span>
   </div>
 
 </div><!-- /wrap -->
 
+<!-- activity popup -->
+<div id="act"></div>
 <div id="toast"></div>
 
 <script>
-function fill(v){ document.getElementById('ta').value=v; document.getElementById('ta').focus(); }
+/* ── helpers ── */
+function $(id){ return document.getElementById(id); }
+function pad(n){ return String(n).padStart(2,'0'); }
+
+/* ── fill textarea ── */
+function fill(v){ $('ta').value=v; $('ta').focus(); }
+
+/* ── copy outreach ── */
 function copyOutreach(){
-  var t=document.getElementById('out-outreach').textContent;
+  var t=$('out-outreach').textContent;
   if(!t) return;
   navigator.clipboard.writeText(t).then(function(){
-    var b=document.getElementById('copy-btn');
+    var b=$('copy-btn');
     b.textContent='Copied ✓'; b.classList.add('copied');
     setTimeout(function(){ b.textContent='Copy'; b.classList.remove('copied'); },2000);
     toast('Copied to clipboard ✓','ok');
   });
 }
 
+/* ── toast ── */
 var _toastT;
 function toast(msg,type){
-  var el=document.getElementById('toast');
+  var el=$('toast');
   el.textContent=msg; el.className='show '+(type||'');
   clearTimeout(_toastT);
   _toastT=setTimeout(function(){ el.className=''; },3000);
 }
 
-var _loadingMsgs=['AI is building your automation plan…','Calculating your selling price…','Writing your client outreach…','Almost ready…'];
-var _lmi=0,_lmT;
-function cycleTxt(){
-  _lmi=(_lmi+1)%_loadingMsgs.length;
-  document.getElementById('loading-txt').textContent=_loadingMsgs[_lmi];
-  _lmT=setTimeout(cycleTxt,1800);
+/* ── step loading ── */
+var _loadT=[];
+function startLoading(){
+  var steps=[0,1600,3200,4800];
+  var pcts=['18%','42%','68%','88%'];
+  steps.forEach(function(delay,i){
+    _loadT.push(setTimeout(function(){
+      for(var j=0;j<4;j++){
+        var el=$('s'+j);
+        el.classList.remove('active','done');
+        if(j<i) el.classList.add('done');
+        if(j===i) el.classList.add('active');
+      }
+      $('load-bar').style.width=pcts[i];
+    },delay));
+  });
+}
+function finishLoading(){
+  _loadT.forEach(clearTimeout); _loadT=[];
+  for(var j=0;j<4;j++){ var el=$('s'+j); el.classList.remove('active'); el.classList.add('done'); }
+  $('load-bar').style.width='100%';
+}
+function resetLoading(){
+  _loadT.forEach(clearTimeout); _loadT=[];
+  for(var j=0;j<4;j++){ var el=$('s'+j); el.classList.remove('active','done'); }
+  $('load-bar').style.width='0%';
 }
 
+/* ── generate ── */
 async function generate(){
-  var desc=document.getElementById('ta').value.trim();
+  var desc=$('ta').value.trim();
   if(desc.length<15){ toast('Describe your automation in a few words','err'); return; }
-  var btn=document.getElementById('gen-btn');
+  var btn=$('gen-btn');
   btn.disabled=true; btn.textContent='⏳ Generating…';
-  document.getElementById('loading').style.display='flex';
-  document.getElementById('results').style.display='none';
-  document.getElementById('fomo').style.display='none';
-  document.getElementById('proof-bar').style.display='none';
-  _lmi=0; clearTimeout(_lmT); cycleTxt();
+  $('loading').style.display='flex';
+  $('results').style.display='none';
+  $('fomo').style.display='none';
+  $('proof-bar').style.display='none';
+  resetLoading();
+  startLoading();
 
   try{
     var r=await fetch('/api/demo/generate',{
@@ -324,28 +503,87 @@ async function generate(){
     if(r.status===429){ toast('Demo limit reached — get full access below','err'); showFomo(); return; }
     var d=await r.json();
     if(d.error){ toast(d.error,'err'); return; }
-    showResults(d);
+    finishLoading();
+    setTimeout(function(){ showResults(d); },400);
   }catch(e){ toast('Connection error — try again','err'); }
   finally{
-    clearTimeout(_lmT);
-    document.getElementById('loading').style.display='none';
+    $('loading').style.display='none';
     btn.disabled=false; btn.textContent='⚡ Generate Again';
   }
 }
 
 function showResults(d){
-  if(d.what)  document.getElementById('out-what').textContent=d.what;
-  if(d.setupPrice){ document.getElementById('out-price').textContent=d.setupPrice; document.getElementById('out-price-sub').textContent='Setup fee · Monthly retainer: '+(d.monthlyPrice||''); }
-  if(d.outreach) document.getElementById('out-outreach').textContent=d.outreach;
-  document.getElementById('results').style.display='flex';
+  if(d.what)  $('out-what').textContent=d.what;
+  if(d.setupPrice){ $('out-price').textContent=d.setupPrice; $('out-price-sub').textContent='Setup fee · Monthly retainer: '+(d.monthlyPrice||''); }
+  if(d.outreach) $('out-outreach').textContent=d.outreach;
+  $('results').style.display='flex';
   setTimeout(showFomo, 800);
-  setTimeout(function(){ document.getElementById('proof-bar').style.display='flex'; }, 1400);
-  setTimeout(function(){ document.getElementById('fomo').scrollIntoView({behavior:'smooth',block:'start'}); }, 1200);
+  setTimeout(function(){ $('proof-bar').style.display='flex'; }, 1400);
+  setTimeout(function(){ $('fomo').scrollIntoView({behavior:'smooth',block:'start'}); }, 1200);
 }
 
 function showFomo(){
-  document.getElementById('fomo').style.display='block';
+  $('fomo').style.display='block';
+  toast('🔒 Your blueprint is locked — unlock everything for $97','');
 }
+
+/* ── countdown (shared between urgency bar + fomo) ── */
+var _cdSec = 587 + Math.floor(Math.random()*180);
+function tickCd(){
+  if(_cdSec<=0){ _cdSec=0; }
+  var m=Math.floor(_cdSec/60), s=_cdSec%60;
+  var mm=pad(m), ss=pad(s);
+  /* urgency bar */
+  $('urg-mm').textContent=mm; $('urg-ss').textContent=ss;
+  /* fomo section */
+  $('cd-mm').textContent=mm; $('cd-ss').textContent=ss;
+  $('cd-label').textContent=m+'m '+s+'s';
+  if(_cdSec>0){ _cdSec--; setTimeout(tickCd,1000); }
+}
+tickCd();
+
+/* ── live users counter (fluctuates realistically) ── */
+var _liveBase=3;
+setInterval(function(){
+  var delta=Math.random()<.5?1:-1;
+  _liveBase=Math.max(2,Math.min(8,_liveBase+delta));
+  $('live-users').textContent=_liveBase;
+  $('proof-txt').textContent=_liveBase+' people are looking at this right now';
+},18000);
+
+/* ── buyers counter (slowly ticks up) ── */
+var _buyersCount=14;
+setInterval(function(){
+  if(Math.random()<.25){
+    _buyersCount++;
+    $('buyers-count').textContent=_buyersCount;
+    $('fomo-buyers-txt').textContent=_buyersCount+' people';
+    var sl=Math.max(0, 20-_buyersCount);
+    $('spots-left').textContent=sl;
+  }
+},90000);
+
+/* ── activity popup ── */
+var _acts=[
+  {av:'🇷🇴',name:'Alex M.',txt:'just generated a WhatsApp bot',t:'2m ago'},
+  {av:'🇩🇪',name:'Daniel K.',txt:'just purchased Blueprint Studio',t:'4m ago'},
+  {av:'🇬🇧',name:'Emma L.',txt:'generated a cold email automation',t:'6m ago'},
+  {av:'🇪🇸',name:'Diego R.',txt:'just purchased Blueprint Studio',t:'9m ago'},
+  {av:'🇫🇷',name:'Sophie B.',txt:'generated a lead follow-up bot',t:'11m ago'},
+  {av:'🇳🇱',name:'Lucas V.',txt:'just purchased Blueprint Studio',t:'14m ago'},
+  {av:'🇮🇹',name:'Marco D.',txt:'generated an Instagram DM bot',t:'17m ago'},
+  {av:'🇵🇱',name:'Kasia W.',txt:'just purchased Blueprint Studio',t:'20m ago'},
+];
+var _actI=0;
+function showAct(){
+  var a=_acts[_actI%_acts.length]; _actI++;
+  var el=$('act');
+  el.innerHTML='<div class="act-inner"><div class="act-avatar">'+a.av+'</div><div class="act-body"><div class="act-name">'+a.name+'</div><div class="act-txt">'+a.txt+'</div></div><div class="act-time">'+a.t+'</div></div>';
+  el.style.display='block';
+  setTimeout(function(){ el.style.display='none'; },5000);
+}
+setTimeout(showAct, 6000);
+setInterval(showAct, 30000 + Math.floor(Math.random()*20000));
 </script>
 </body>
 </html>
