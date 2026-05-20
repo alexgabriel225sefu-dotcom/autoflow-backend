@@ -201,6 +201,120 @@ body{
   border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;
   display:none;z-index:500;letter-spacing:.5px;
 }
+
+/* ── MAKE.COM OVERLAY ── */
+#make-overlay{
+  position:absolute;inset:0;z-index:800;
+  background:#1a1a24;
+  transform:translateY(100%);
+  transition:transform .6s cubic-bezier(0.4,0,0.2,1);
+  display:flex;flex-direction:column;
+}
+#make-overlay.visible{ transform:translateY(0); }
+
+/* Make top bar */
+.make-topbar{
+  background:#13131d;border-bottom:1px solid #2a2a3a;
+  padding:10px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;
+}
+.make-logo{
+  background:linear-gradient(135deg,#6d28d9,#4c1d95);
+  color:#fff;font-size:10px;font-weight:900;letter-spacing:1px;
+  padding:4px 10px;border-radius:6px;text-transform:uppercase;
+}
+.make-scenario-name{font-size:12px;color:#a0a0c0;flex:1}
+.make-run-btn{
+  background:linear-gradient(135deg,#7c3aed,#5b21b6);
+  color:#fff;border:none;border-radius:8px;
+  padding:6px 14px;font-size:11px;font-weight:700;
+  display:flex;align-items:center;gap:5px;cursor:pointer;
+  animation:run-pulse 2s ease-in-out infinite;
+}
+@keyframes run-pulse{0%,100%{box-shadow:0 0 0 0 rgba(124,58,237,0)}50%{box-shadow:0 0 10px 3px rgba(124,58,237,.35)}}
+.make-status{
+  background:#13131d;border-bottom:1px solid #2a2a3a;
+  padding:6px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;
+}
+.make-status-dot{width:6px;height:6px;background:#4ADE80;border-radius:50%;animation:dot-pulse 1.5s ease-in-out infinite;flex-shrink:0}
+.make-status-txt{font-size:10px;color:#6b6b8a}
+.make-status-ops{margin-left:auto;font-size:10px;color:#4ADE80;font-weight:700}
+
+/* Make canvas */
+.make-canvas{flex:1;position:relative;overflow:hidden;padding:20px}
+
+/* Module nodes */
+.mk-node{
+  position:absolute;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  opacity:0;transition:opacity .4s;
+}
+.mk-node.show{opacity:1}
+.mk-icon{
+  width:54px;height:54px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  border:2px solid transparent;position:relative;cursor:pointer;
+  transition:transform .2s;
+}
+.mk-icon:hover{transform:scale(1.08)}
+.mk-icon.running{animation:node-running .6s ease-in-out infinite alternate}
+@keyframes node-running{from{box-shadow:0 0 0 0 rgba(124,58,237,0)}to{box-shadow:0 0 14px 4px rgba(124,58,237,.4)}}
+.mk-icon.success{animation:node-success .5s ease}
+@keyframes node-success{0%{transform:scale(1)}50%{transform:scale(1.18)}100%{transform:scale(1)}}
+.mk-label{font-size:9px;color:#8888aa;text-align:center;font-weight:600;max-width:70px;line-height:1.3}
+.mk-sublabel{font-size:8px;color:#55556a;text-align:center;max-width:70px}
+
+/* Node colors */
+.mk-whatsapp{background:#0a2a1a;border-color:#25D366}
+.mk-openai  {background:#0a1a2a;border-color:#10a37f}
+.mk-router  {background:#1a1a2a;border-color:#6d28d9}
+.mk-reply   {background:#0a2a1a;border-color:#25D366}
+
+/* check badge */
+.mk-check{
+  position:absolute;top:-5px;right:-5px;
+  width:18px;height:18px;background:#4ADE80;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;color:#000;font-weight:900;
+  opacity:0;transform:scale(0);transition:all .3s;
+}
+.mk-check.show{opacity:1;transform:scale(1)}
+
+/* SVG connector lines */
+.make-svg{position:absolute;inset:0;pointer-events:none}
+
+/* data flow dot */
+@keyframes flowDot{
+  0%{offset-distance:0%;opacity:0}
+  5%{opacity:1}
+  95%{opacity:1}
+  100%{offset-distance:100%;opacity:0}
+}
+.flow-dot{
+  position:absolute;width:8px;height:8px;background:#7c3aed;border-radius:50%;
+  box-shadow:0 0 6px rgba(124,58,237,.8);
+  animation:flowDot 1.2s ease-in-out forwards;
+  offset-path:path('M 0 0'); /* overridden in JS */
+}
+
+/* op count badge */
+.mk-ops-badge{
+  position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+  background:#1e1e30;border:1px solid #2a2a40;border-radius:10px;
+  padding:1px 6px;font-size:8px;color:#6b6b8a;white-space:nowrap;
+  opacity:0;transition:opacity .3s;
+}
+.mk-ops-badge.show{opacity:1}
+
+/* Make bottom "App used" bar */
+.make-apps-bar{
+  background:#13131d;border-top:1px solid #2a2a3a;
+  padding:10px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;
+}
+.make-app-chip{
+  background:#1e1e30;border:1px solid #2a2a3a;border-radius:20px;
+  padding:4px 10px;font-size:9px;color:#8888aa;display:flex;align-items:center;gap:5px;
+}
+.make-apps-title{font-size:9px;color:#55556a;margin-right:4px}
 </style>
 </head>
 <body>
@@ -382,6 +496,79 @@ Step 4: Add fallback to human agent after 3 fails...
     </div>
   </div>
 
+  <!-- ══ MAKE.COM OVERLAY ══ -->
+  <div id="make-overlay">
+    <!-- Top bar -->
+    <div class="make-topbar">
+      <div class="make-logo">make</div>
+      <div class="make-scenario-name">WhatsApp AI Bot — Restaurant</div>
+      <button class="make-run-btn" id="mk-run-btn">▶ Run</button>
+    </div>
+    <div class="make-status">
+      <div class="make-status-dot"></div>
+      <span class="make-status-txt" id="mk-status-txt">Ready to run</span>
+      <span class="make-status-ops" id="mk-ops-txt"></span>
+    </div>
+
+    <!-- Canvas -->
+    <div class="make-canvas" id="mk-canvas">
+      <!-- SVG lines -->
+      <svg class="make-svg" id="mk-svg"></svg>
+
+      <!-- Node 1: WhatsApp Watch -->
+      <div class="mk-node" id="n1" style="left:18px;top:90px">
+        <div class="mk-icon mk-whatsapp" id="n1-icon">
+          <span>💬</span>
+          <div class="mk-check" id="n1-check">✓</div>
+        </div>
+        <div class="mk-label">WhatsApp</div>
+        <div class="mk-sublabel">Watch Messages</div>
+        <div class="mk-ops-badge" id="n1-ops">1 msg received</div>
+      </div>
+
+      <!-- Node 2: Router -->
+      <div class="mk-node" id="n2" style="left:120px;top:58px">
+        <div class="mk-icon mk-router" id="n2-icon">
+          <span>🔀</span>
+          <div class="mk-check" id="n2-check">✓</div>
+        </div>
+        <div class="mk-label">Router</div>
+        <div class="mk-sublabel">Filter intent</div>
+        <div class="mk-ops-badge" id="n2-ops">1 routed</div>
+      </div>
+
+      <!-- Node 3: OpenAI -->
+      <div class="mk-node" id="n3" style="left:222px;top:30px">
+        <div class="mk-icon mk-openai" id="n3-icon">
+          <span>🤖</span>
+          <div class="mk-check" id="n3-check">✓</div>
+        </div>
+        <div class="mk-label">OpenAI</div>
+        <div class="mk-sublabel">GPT-4 Turbo</div>
+        <div class="mk-ops-badge" id="n3-ops">1 completion</div>
+      </div>
+
+      <!-- Node 4: WhatsApp Send -->
+      <div class="mk-node" id="n4" style="left:302px;top:90px">
+        <div class="mk-icon mk-reply" id="n4-icon">
+          <span>📤</span>
+          <div class="mk-check" id="n4-check">✓</div>
+        </div>
+        <div class="mk-label">WhatsApp</div>
+        <div class="mk-sublabel">Send Reply</div>
+        <div class="mk-ops-badge" id="n4-ops">1 sent ✓</div>
+      </div>
+    </div>
+
+    <!-- Apps bar -->
+    <div class="make-apps-bar">
+      <span class="make-apps-title">APPS USED</span>
+      <div class="make-app-chip">💬 WhatsApp Business</div>
+      <div class="make-app-chip">🤖 OpenAI</div>
+    </div>
+  </div>
+  <!-- /MAKE.COM OVERLAY -->
+
   <!-- Cursor -->
   <div id="cursor">
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
@@ -485,6 +672,121 @@ function showAct(){
   el._t=setTimeout(()=>{ el.style.display='none'; },4000);
 }
 
+/* ══ MAKE.COM ANIMATION ══ */
+function drawLine(id, x1,y1,x2,y2, nodeOffset=27){
+  const svg = $('mk-svg');
+  const cx = (x1+x2)/2;
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  const d = `M${x1+nodeOffset} ${y1+nodeOffset} C${cx+nodeOffset} ${y1+nodeOffset} ${cx+nodeOffset} ${y2+nodeOffset} ${x2+nodeOffset} ${y2+nodeOffset}`;
+  path.setAttribute('d', d);
+  path.setAttribute('stroke','#2a2a4a');
+  path.setAttribute('stroke-width','2');
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke-dasharray','5 4');
+  path.id = 'line-'+id;
+  svg.appendChild(path);
+  return d;
+}
+
+async function animateDot(pathD, color='#7c3aed'){
+  const canvas = $('mk-canvas');
+  const dot = document.createElement('div');
+  dot.style.cssText=`position:absolute;width:9px;height:9px;background:${color};border-radius:50%;box-shadow:0 0 8px ${color};pointer-events:none;transition:none;`;
+  canvas.appendChild(dot);
+
+  // Parse path points and animate manually along the cubic bezier
+  const pts = pathD.match(/[\d.]+/g).map(Number);
+  // M x1 y1 C cx1 cy1 cx2 cy2 x2 y2
+  const [x1,y1, cx1,cy1, cx2,cy2, x2,y2] = pts;
+  const steps = 30;
+  for(let i=0;i<=steps;i++){
+    const t = i/steps;
+    const mt = 1-t;
+    const bx = mt*mt*mt*x1 + 3*mt*mt*t*cx1 + 3*mt*t*t*cx2 + t*t*t*x2;
+    const by = mt*mt*mt*y1 + 3*mt*mt*t*cy1 + 3*mt*t*t*cy2 + t*t*t*y2;
+    dot.style.left = (bx-4)+'px';
+    dot.style.top  = (by-4)+'px';
+    dot.style.opacity = i<3?'0': i>steps-3?'0':'1';
+    await wait(28);
+  }
+  dot.remove();
+}
+
+let makePaths = {};
+
+async function showMake(){
+  const mo = $('make-overlay');
+  mo.classList.add('visible');
+  await wait(700);
+
+  // Show nodes one by one
+  const nodes=['n1','n2','n3','n4'];
+  for(const n of nodes){
+    $(n).classList.add('show');
+    await wait(280);
+  }
+  await wait(300);
+
+  // Draw connector lines
+  // positions: node left+27, top+27 (center of 54px icon)
+  // n1: 18,90  n2:120,58  n3:222,30  n4:302,90
+  const p1 = drawLine('1-2', 18,90, 120,58);
+  await wait(150);
+  const p2 = drawLine('2-3', 120,58, 222,30);
+  await wait(150);
+  const p3 = drawLine('3-4', 222,30, 302,90);
+  await wait(400);
+
+  // ── RUN BUTTON CLICK ──
+  $('mk-run-btn').textContent='⏳ Running';
+  $('mk-status-txt').textContent='Scenario running...';
+  await wait(400);
+
+  // Node 1 running → done
+  $('n1-icon').classList.add('running');
+  await wait(900);
+  $('n1-icon').classList.remove('running');
+  $('n1-icon').classList.add('success');
+  $('n1-check').classList.add('show');
+  $('n1-ops').classList.add('show');
+  await animateDot(p1);
+
+  // Node 2 running → done
+  $('n2-icon').classList.add('running');
+  await wait(700);
+  $('n2-icon').classList.remove('running');
+  $('n2-icon').classList.add('success');
+  $('n2-check').classList.add('show');
+  $('n2-ops').classList.add('show');
+  await animateDot(p2,'#6d28d9');
+
+  // Node 3 (GPT-4) running → done
+  $('n3-icon').classList.add('running');
+  $('mk-status-txt').textContent='GPT-4 generating reply...';
+  await wait(1300);
+  $('n3-icon').classList.remove('running');
+  $('n3-icon').classList.add('success');
+  $('n3-check').classList.add('show');
+  $('n3-ops').classList.add('show');
+  await animateDot(p3,'#10a37f');
+
+  // Node 4 running → done
+  $('n4-icon').classList.add('running');
+  await wait(600);
+  $('n4-icon').classList.remove('running');
+  $('n4-icon').classList.add('success');
+  $('n4-check').classList.add('show');
+  $('n4-ops').classList.add('show');
+
+  // Done
+  await wait(300);
+  $('mk-run-btn').textContent='✓ Done';
+  $('mk-run-btn').style.background='linear-gradient(135deg,#166534,#14532d)';
+  $('mk-status-txt').textContent='Scenario finished successfully';
+  $('mk-ops-txt').textContent='4 ops · 0 errors';
+  await wait(3500);
+}
+
 /* ══ LOADING ANIMATION ══ */
 async function runLoading(){
   $('loading').style.display='flex';
@@ -561,18 +863,22 @@ async function startDemo(){
   await tap(195, 580);
   await wait(800);
 
-  /* Step 11 — Scroll down to FOMO */
+  /* Step 11 — Show Make.com overlay */
   cursor.style.display='none';
+  await showMake();
+
+  /* Step 12 — After Make.com, slide it away and show FOMO */
+  $('make-overlay').style.transform='translateY(100%)';
+  await wait(700);
   $('fomo').style.display='block';
   await scrollTo(700);
-  await wait(500);
+  await wait(600);
 
-  /* Another popup */
-  await wait(1500);
+  /* Activity popup */
   showAct();
   await wait(1000);
 
-  /* Step 12 — Cursor on CTA button */
+  /* Step 13 — Cursor on CTA */
   cursor.style.display='block';
   await moveCursor(195, 720);
   await wait(600);
