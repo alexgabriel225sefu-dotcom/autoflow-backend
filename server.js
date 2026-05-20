@@ -82,6 +82,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
+const HEYGEN_KEY = process.env.HEYGEN_API_KEY;
 const JWT_SECRET = process.env.JWT_SECRET || (() => { console.warn('[WARN] JWT_SECRET not set — using insecure default. Set this env var in Render.'); return 'autoflow-secret-2024-change-me'; })();
 const COOKIE_SECRET = process.env.COOKIE_SECRET || JWT_SECRET + '-cookie';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
@@ -1184,6 +1185,59 @@ Return ONLY valid JSON, no markdown:
     }
     return res.status(500).json({ error: 'AI unavailable' });
   } catch(e) { return res.status(500).json({ error: 'Generation failed' }); }
+});
+
+// ── HEYGEN API ROUTES ──
+const _heyHeaders = () => ({ 'X-Api-Key': HEYGEN_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json' });
+
+app.get('/api/heygen/avatars', async (req, res) => {
+  if (!HEYGEN_KEY) return res.status(503).json({ error: 'HeyGen key not configured' });
+  try {
+    const r = await fetch('https://api.heygen.com/v2/avatars', { headers: _heyHeaders() });
+    const d = await r.json();
+    res.json(d);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/heygen/voices', async (req, res) => {
+  if (!HEYGEN_KEY) return res.status(503).json({ error: 'HeyGen key not configured' });
+  try {
+    const r = await fetch('https://api.heygen.com/v2/voices', { headers: _heyHeaders() });
+    const d = await r.json();
+    res.json(d);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/heygen/generate', async (req, res) => {
+  if (!HEYGEN_KEY) return res.status(503).json({ error: 'HeyGen key not configured' });
+  const { script, avatar_id, voice_id } = req.body;
+  if (!script || script.length < 10) return res.status(400).json({ error: 'Script too short' });
+  try {
+    const body = {
+      video_inputs: [{
+        character: { type: 'avatar', avatar_id: avatar_id || 'Eric_public_pro2_20230608', avatar_style: 'normal' },
+        voice: { type: 'text', input_text: script, voice_id: voice_id || '2d5b0e6cf36f460aa7fc47e3eee4ba54', speed: 0.95 },
+        background: { type: 'color', value: '#060606' }
+      }],
+      dimension: { width: 720, height: 1280 },
+      test: false
+    };
+    const r = await fetch('https://api.heygen.com/v2/video/generate', {
+      method: 'POST', headers: _heyHeaders(), body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.error) return res.status(400).json({ error: d.error });
+    res.json({ video_id: d.data?.video_id || d.video_id });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/heygen/status/:id', async (req, res) => {
+  if (!HEYGEN_KEY) return res.status(503).json({ error: 'HeyGen key not configured' });
+  try {
+    const r = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${req.params.id}`, { headers: _heyHeaders() });
+    const d = await r.json();
+    res.json(d.data || d);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // Explicit HTML page routes

@@ -96,6 +96,28 @@ h1{font-size:18px;color:#E53E2E;margin-bottom:4px;text-align:center;font-weight:
 .box-shake{animation:shake 1s ease .6s both}
 .ai-glow{animation:glow 2s ease infinite}
 .puls{animation:pulse 1.5s ease infinite}
+
+/* ── HEYGEN MODAL ── */
+.hg-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;align-items:center;justify-content:center}
+.hg-modal.open{display:flex}
+.hg-box{background:#0f0f0f;border:1px solid #222;border-radius:16px;padding:28px;width:92%;max-width:480px;position:relative}
+.hg-title{font-size:16px;font-weight:800;color:#f5f5f5;margin-bottom:4px}
+.hg-sub{font-size:11px;color:#555;margin-bottom:20px}
+.hg-field{margin-bottom:14px}
+.hg-field label{display:block;font-size:10px;color:#555;letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px}
+.hg-field select,.hg-field textarea{width:100%;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;color:#f5f5f5;font-size:12px;padding:9px 11px;outline:none;font-family:inherit}
+.hg-field textarea{min-height:120px;resize:vertical;line-height:1.5}
+.hg-field select:focus,.hg-field textarea:focus{border-color:rgba(229,62,46,.4)}
+.hg-generate{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:10px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;transition:opacity .2s}
+.hg-generate:disabled{opacity:.5;cursor:default}
+.hg-status{margin-top:14px;font-size:12px;color:#555;text-align:center;min-height:20px}
+.hg-status.ok{color:#4ADE80}
+.hg-status.err{color:#f87171}
+.hg-dl{display:none;margin-top:12px;width:100%;background:#4ADE80;color:#060606;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;text-decoration:none}
+.hg-close{position:absolute;top:14px;right:16px;background:none;border:none;color:#444;font-size:18px;cursor:pointer}
+.hg-close:hover{color:#f5f5f5}
+.hg-btn{display:inline-block;margin-top:8px;padding:7px 16px;background:#111;border:1px solid rgba(229,62,46,.3);border-radius:8px;color:#E53E2E;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s}
+.hg-btn:hover{background:rgba(229,62,46,.08)}
 </style>
 </head>
 <body>
@@ -461,7 +483,7 @@ function render(arr,cid){
       <div class="p-overlay">▶</div>
     </div>
     <br><button class="pbtn" onclick="tog('${uid}',${i},'${cid}')">▶ Play / Restart</button>
-    ${v.script?`<button class="sbtn" onclick="tgs('sbox${uid}')">📋 Script voce</button><div class="sbox" id="sbox${uid}"><strong>🎙 Copiază în ElevenLabs sau citește direct:</strong>${v.script.replace(/\n/g,'<br>')}</div>`:''}`;
+    ${v.script?`<button class="hg-btn" onclick="openHG(${JSON.stringify(v.script)})">🎬 Generate HeyGen Video</button><button class="sbtn" onclick="tgs('sbox${uid}')">📋 Script text</button><div class="sbox" id="sbox${uid}"><strong>🎙 Script:</strong>${v.script.replace(/\n/g,'<br>')}</div>`:''}`;
     g.appendChild(d);
     document.getElementById('pl'+uid).addEventListener('click',()=>tog(uid,i,cid));
   });
@@ -575,6 +597,104 @@ function speakScript(txt){
   window.speechSynthesis.speak(u);
 }
 function stopSpeech(){window.speechSynthesis.cancel();}
+
+/* ═══════ HEYGEN ═══════ */
+var _hgAvatars=[], _hgVoices=[], _hgPollT=null;
+
+async function hgInit(){
+  try{
+    const [ar,vr]=await Promise.all([
+      fetch('/api/heygen/avatars').then(r=>r.json()),
+      fetch('/api/heygen/voices').then(r=>r.json())
+    ]);
+    _hgAvatars=(ar.data?.avatars||ar.data||[]).filter(a=>a.avatar_id);
+    _hgVoices=(vr.data?.voices||vr.data||[]).filter(v=>v.voice_id&&v.language==='English');
+    const asel=document.getElementById('hg-asel');
+    const vsel=document.getElementById('hg-vsel');
+    _hgAvatars.forEach(a=>{const o=document.createElement('option');o.value=a.avatar_id;o.textContent=a.avatar_name||a.avatar_id;asel.appendChild(o);});
+    _hgVoices.filter(v=>(v.gender||'').toLowerCase()==='male').forEach(v=>{const o=document.createElement('option');o.value=v.voice_id;o.textContent=(v.name||v.voice_id)+' ('+v.language+')';vsel.appendChild(o);});
+    if(!vsel.options.length) _hgVoices.forEach(v=>{const o=document.createElement('option');o.value=v.voice_id;o.textContent=(v.name||v.voice_id);vsel.appendChild(o);});
+  }catch(e){console.warn('HeyGen init failed',e);}
+}
+
+function openHG(script){
+  document.getElementById('hg-script').value=script||'';
+  document.getElementById('hg-status').textContent='';
+  document.getElementById('hg-status').className='hg-status';
+  document.getElementById('hg-dl').style.display='none';
+  document.getElementById('hg-gen').disabled=false;
+  document.getElementById('hg-modal').classList.add('open');
+  if(!_hgAvatars.length) hgInit();
+}
+function closeHG(){document.getElementById('hg-modal').classList.remove('open');clearTimeout(_hgPollT);}
+
+async function hgGenerate(){
+  const script=document.getElementById('hg-script').value.trim();
+  const avatar_id=document.getElementById('hg-asel').value;
+  const voice_id=document.getElementById('hg-vsel').value;
+  if(!script){setHGStatus('Adaugă scriptul mai întâi','err');return;}
+  const btn=document.getElementById('hg-gen');
+  btn.disabled=true;
+  setHGStatus('⏳ Se trimite la HeyGen…');
+  try{
+    const r=await fetch('/api/heygen/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script,avatar_id,voice_id})});
+    const d=await r.json();
+    if(d.error){setHGStatus('❌ '+d.error,'err');btn.disabled=false;return;}
+    setHGStatus('🎬 Video generat! Se procesează (~2 min)…');
+    pollHG(d.video_id, btn);
+  }catch(e){setHGStatus('❌ Eroare: '+e.message,'err');btn.disabled=false;}
+}
+
+function pollHG(vid, btn){
+  _hgPollT=setTimeout(async()=>{
+    try{
+      const r=await fetch('/api/heygen/status/'+vid);
+      const d=await r.json();
+      if(d.status==='completed'&&d.video_url){
+        setHGStatus('✅ Gata! Descarcă MP4-ul.','ok');
+        const dl=document.getElementById('hg-dl');
+        dl.href=d.video_url; dl.download='blueprint-studio-video.mp4';
+        dl.style.display='block';
+        btn.disabled=false;
+      } else if(d.status==='failed'){
+        setHGStatus('❌ HeyGen a eșuat: '+(d.error||'unknown'),'err');
+        btn.disabled=false;
+      } else {
+        setHGStatus('⏳ Status: '+(d.status||'processing')+'… (verificare din 15s)');
+        pollHG(vid, btn);
+      }
+    }catch(e){setHGStatus('❌ Polling error','err');btn.disabled=false;}
+  }, 15000);
+}
+
+function setHGStatus(msg,cls){
+  const el=document.getElementById('hg-status');
+  el.textContent=msg; el.className='hg-status'+(cls?' '+cls:'');
+}
 </script>
+
+<!-- HeyGen Modal -->
+<div class="hg-modal" id="hg-modal" onclick="if(event.target===this)closeHG()">
+  <div class="hg-box">
+    <button class="hg-close" onclick="closeHG()">✕</button>
+    <div class="hg-title">🎬 Generează video HeyGen</div>
+    <div class="hg-sub">Avatar masculin AI · Format 9:16 TikTok · ~2 minute</div>
+    <div class="hg-field">
+      <label>Avatar</label>
+      <select id="hg-asel"><option value="Eric_public_pro2_20230608">Eric (default male)</option></select>
+    </div>
+    <div class="hg-field">
+      <label>Voce masculină</label>
+      <select id="hg-vsel"><option value="2d5b0e6cf36f460aa7fc47e3eee4ba54">American Male (default)</option></select>
+    </div>
+    <div class="hg-field">
+      <label>Script</label>
+      <textarea id="hg-script" placeholder="Scriptul pentru avatar…"></textarea>
+    </div>
+    <button class="hg-generate" id="hg-gen" onclick="hgGenerate()">🎬 Generează Video — HeyGen</button>
+    <div class="hg-status" id="hg-status"></div>
+    <a class="hg-dl" id="hg-dl" href="#" target="_blank">⬇️ Descarcă MP4</a>
+  </div>
+</div>
 </body>
 </html>
