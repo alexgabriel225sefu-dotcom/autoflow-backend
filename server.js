@@ -304,11 +304,15 @@ app.post('/api/ai/generate', auth, async (req, res) => {
 
     // Try Anthropic Claude
     if (anthropic) {
-      const msg = await anthropic.messages.create({
+      const anthropicTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Anthropic timeout')), 28000)
+      );
+      const anthropicCall = anthropic.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }]
       });
+      const msg = await Promise.race([anthropicCall, anthropicTimeout]);
       const output = msg.content[0].text;
       addLog('AI generation completed (Claude)', 'ai', 'success');
       return res.json({ output });

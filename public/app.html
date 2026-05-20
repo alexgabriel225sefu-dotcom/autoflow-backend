@@ -231,13 +231,13 @@ body{background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSyst
   <main class="studio-main">
 
     <div class="studio-hero">
-      <div class="studio-badge">⚡ Automation Studio</div>
+      <div class="studio-badge" id="studioBadge">⚡ Automation Studio</div>
       <div class="studio-title" id="studioTitle">What do you want<br><span>to automate?</span></div>
-      <div class="studio-sub">Describe it — we build the Make.com blueprint instantly</div>
+      <div class="studio-sub" id="studioSub">Describe it — we build the Make.com blueprint instantly</div>
     </div>
 
     <div class="studio-card">
-      <label class="studio-label">Describe your automation</label>
+      <label class="studio-label" id="descLbl">Describe your automation</label>
       <textarea class="studio-textarea" id="wDesc"
         placeholder="e.g. When a new lead fills my Google Form, use AI to write a personalized follow-up email and send it via Gmail automatically. Log everything in Google Sheets."></textarea>
 
@@ -755,7 +755,12 @@ function applyLang(){
   var lb=document.getElementById('loginBtn'); if(lb&&lb.textContent!==T.signingIn)lb.textContent=T.signIn;
   // Studio
   setTxt('logoutBtn',T.signOut);
+  setTxt('studioBadge',T.studioBadge);
   setHTML('studioTitle',T.studioTitle);
+  setTxt('studioSub',T.studioSub);
+  setTxt('descLbl',T.descLbl);
+  setAttr('wDesc','placeholder',T.descPh);
+  setTxt('genBtn', document.getElementById('genBtn').disabled ? T.generating : T.genBtn);
   // Guide strip title
   var gs=document.querySelector('.guide-title');
   if(gs)gs.textContent=T.guideStrip;
