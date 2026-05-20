@@ -8,112 +8,343 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#080808;color:#f5f5f5;font-family:sans-serif;padding:32px 20px}
 h1{font-size:20px;color:#E53E2E;margin-bottom:6px;text-align:center}
-.sub{font-size:12px;color:#999999;text-align:center;margin-bottom:8px}
-.hint{font-size:11px;color:#7A7060;text-align:center;margin-bottom:32px;background:#111;border:1px solid rgba(229,62,46,.1);border-radius:8px;padding:10px;max-width:600px;margin-left:auto;margin-right:auto}
-.grid{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+.sub{font-size:12px;color:#999;text-align:center;margin-bottom:8px}
+.hint{font-size:11px;color:#666;text-align:center;margin-bottom:32px;background:#111;border:1px solid rgba(229,62,46,.1);border-radius:8px;padding:10px;max-width:700px;margin-left:auto;margin-right:auto}
+.section-title{font-size:13px;color:#666;letter-spacing:2px;text-transform:uppercase;text-align:center;margin:32px 0 16px;border-top:1px solid #1a1a1a;padding-top:24px}
+.grid{display:flex;gap:24px;flex-wrap:wrap;justify-content:center}
+
+/* ── PLAYER ── */
 .player-wrap{text-align:center}
-.player-wrap h2{font-size:13px;color:#E53E2E;margin-bottom:4px}
-.player-wrap p{font-size:11px;color:#666;margin-bottom:10px}
-.player{position:relative;width:270px;height:480px;background:#080808;border-radius:16px;overflow:hidden;border:1px solid rgba(229,62,46,.2);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.player-wrap h2{font-size:12px;color:#E53E2E;margin-bottom:3px;max-width:270px}
+.player-wrap p{font-size:10px;color:#555;margin-bottom:10px}
+.player{position:relative;width:270px;height:480px;background:#080808;border-radius:18px;overflow:hidden;border:1px solid #1a1a1a;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:border-color .2s}
+.player:hover{border-color:rgba(229,62,46,.3)}
 .accent-line{position:absolute;top:0;left:50%;transform:translateX(-50%);width:60px;height:2px;background:#E53E2E}
-.logo{position:absolute;top:16px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:2px;color:#E53E2E;white-space:nowrap}
-.beat-text{font-size:22px;font-weight:700;color:#f5f5f5;text-align:center;padding:0 20px;line-height:1.35;opacity:0;transition:opacity .4s ease}
-.beat-text.gold{color:#E53E2E}
+.logo{position:absolute;top:16px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:2px;color:#E53E2E;white-space:nowrap;font-weight:700}
+.pov-tag{position:absolute;top:36px;left:50%;transform:translateX(-50%);font-size:10px;color:#888;letter-spacing:1px;white-space:nowrap;display:none}
+
+/* beat: text */
+.beat-text{font-size:22px;font-weight:800;color:#f5f5f5;text-align:center;padding:0 22px;line-height:1.35;opacity:0;transition:opacity .35s ease;position:absolute}
+.beat-text.red{color:#E53E2E}
+.beat-text.green{color:#4ADE80}
 .beat-text.visible{opacity:1}
-.cta-bar{position:absolute;bottom:0;left:0;right:0;background:#0a0a06;padding:10px;text-align:center}
-.site{font-size:11px;color:#E53E2E;letter-spacing:.5px}
-.price{font-size:9px;color:#7A7060;margin-top:2px}
-.play-overlay{position:absolute;inset:0;background:rgba(8,8,8,.7);display:flex;align-items:center;justify-content:center;font-size:48px;transition:opacity .2s}
-.player.playing .play-overlay{opacity:0;pointer-events:none}
-.progress{position:absolute;bottom:56px;left:12px;right:12px;height:2px;background:rgba(229,62,46,.15);border-radius:2px}
+
+/* beat: list */
+.beat-list{position:absolute;display:flex;flex-direction:column;gap:10px;padding:0 24px;width:100%;opacity:0;transition:opacity .35s ease}
+.beat-list.visible{opacity:1}
+.list-item{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;color:#f5f5f5;opacity:0;transform:translateX(-12px);transition:opacity .3s ease,transform .3s ease}
+.list-item.show{opacity:1;transform:translateX(0)}
+.list-item .icon{font-size:20px;width:28px;text-align:center;flex-shrink:0}
+.list-item.fail{color:#888;text-decoration:line-through}
+.list-item.win{color:#4ADE80}
+.list-item .tag{font-size:10px;color:#555;margin-left:auto;flex-shrink:0}
+.list-item.win .tag{color:#4ADE80}
+
+/* beat: vs */
+.beat-vs{position:absolute;display:flex;flex-direction:column;gap:12px;padding:0 20px;width:100%;opacity:0;transition:opacity .35s ease;align-items:center}
+.beat-vs.visible{opacity:1}
+.vs-row{display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;font-weight:700;width:100%}
+.vs-fail{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:7px 12px;color:#888;text-decoration:line-through;flex:1;text-align:center;font-size:13px}
+.vs-arrow{color:#444;font-size:12px}
+.vs-win{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:7px 12px;color:#4ADE80;flex:1;text-align:center;font-size:13px}
+
+/* bottom */
+.cta-bar{position:absolute;bottom:0;left:0;right:0;background:rgba(6,6,6,.95);padding:9px;text-align:center;border-top:1px solid #111}
+.site{font-size:10px;color:#E53E2E;letter-spacing:.5px;font-weight:700}
+.price{font-size:9px;color:#444;margin-top:1px}
+.progress{position:absolute;bottom:50px;left:12px;right:12px;height:2px;background:#111;border-radius:2px}
 .progress-fill{height:100%;background:#E53E2E;border-radius:2px;width:0%}
-.rec-btn{display:inline-block;margin-top:10px;padding:8px 20px;background:linear-gradient(135deg,#B52318,#FF5544);border-radius:8px;color:#080808;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border:none;cursor:pointer}
+
+.play-overlay{position:absolute;inset:0;background:rgba(6,6,6,.75);display:flex;align-items:center;justify-content:center;font-size:44px;transition:opacity .2s;border-radius:18px}
+.player.playing .play-overlay{opacity:0;pointer-events:none}
+.rec-btn{display:inline-block;margin-top:10px;padding:8px 22px;background:linear-gradient(135deg,#B52318,#E53E2E);border-radius:8px;color:#fff;font-size:11px;font-weight:700;letter-spacing:.5px;border:none;cursor:pointer}
+.script-box{margin-top:10px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:8px;padding:10px 12px;max-width:270px;text-align:left;font-size:10px;color:#555;line-height:1.6;display:none}
+.script-box strong{color:#888;display:block;margin-bottom:4px}
+.show-script{background:none;border:1px solid #222;border-radius:6px;color:#444;font-size:10px;padding:4px 10px;cursor:pointer;margin-top:6px}
+.show-script:hover{border-color:#444;color:#888}
 </style>
 </head>
 <body>
-<h1>TikTok Videos — Blueprint Studio</h1>
-<p class="sub">Click pe video pentru a-l reda · 9:16 · Dark/Red branding</p>
-<div class="hint">💡 <strong>Cum faci screen record:</strong> Windows: Win+G → Record · Mac: Cmd+Shift+5 · Telefon: butonul de screen record din meniu rapid</div>
-<div class="grid" id="grid"></div>
+
+<h1>⚡ Blueprint Studio — TikTok Videos</h1>
+<p class="sub">Click pe player → pornește animația → dai screen record</p>
+<div class="hint">📱 <strong>Screen record telefon:</strong> iOS → Control Center → Screen Record &nbsp;|&nbsp; Android → notification panel → Screen Record<br>
+💻 <strong>PC:</strong> Win+G → Record &nbsp;|&nbsp; Mac: Cmd+Shift+5<br>
+🎙️ <strong>Voce:</strong> copiază scriptul de sub fiecare video → paste în <strong>elevenlabs.io</strong> → descarcă MP3 → pune în CapCut peste video</div>
+
+<div class="section-title">🔥 POV — Am încercat tot, nimic n-a mers până la AI Agency</div>
+<div class="grid" id="grid-pov"></div>
+
+<div class="section-title">💰 Hook direct — fără comparații</div>
+<div class="grid" id="grid-hook"></div>
+
 <script>
-const VIDEOS=[
-  {title:'Video 1 — "Nobody talks about this"',desc:'22s · Hook FOMO · CTA BLUEPRINT',beats:[
-    {text:"Nobody talks about this side hustle\nbecause it sounds too easy.",dur:4000,gold:true},
-    {text:"Local businesses pay $800–$1,200\nfor automations.",dur:3500,gold:false},
-    {text:"WhatsApp bots.\nEmail follow-ups.\nInstagram auto-replies.",dur:4000,gold:false},
-    {text:"AI generates the whole plan\nin 60 seconds.",dur:3500,gold:true},
-    {text:"No coding.\nNo experience needed.",dur:3000,gold:false},
-    {text:"Comment BLUEPRINT\nand I'll send you the tool. 👇",dur:4000,gold:true}
-  ]},
-  {title:'Video 2 — "POV: First $800 client"',desc:'20s · POV format · screen demo',beats:[
-    {text:"POV: You just closed your first\n$800 client.",dur:4000,gold:true},
-    {text:"And you didn't write\na single line of code.",dur:3500,gold:false},
-    {text:"I typed what I wanted to build.\nAI generated the whole plan.",dur:4000,gold:false},
-    {text:"What to build. What to charge.\nThe exact message to send the client.",dur:4000,gold:false},
-    {text:"They replied in 3 hours.\nPaid in 24.",dur:3500,gold:true},
-    {text:"Comment BLUEPRINT\nI'll show you exactly how. 👇",dur:3500,gold:true}
-  ]},
-  {title:'Video 3 — "$900 payment reveal"',desc:'18s · Income proof · urgency',beats:[
-    {text:"I had no idea you could charge\n$1,000 for THIS.",dur:4000,gold:true},
-    {text:"A restaurant owner paid me $900\nto automate their WhatsApp replies.",dur:4500,gold:false},
-    {text:"I built it in 60 seconds\nwith AI.",dur:3000,gold:false},
-    {text:"They had no idea.\nI had no idea either.",dur:3000,gold:true},
-    {text:"Comment BLUEPRINT\nand I'll send you the tool. 👇",dur:3500,gold:true}
-  ]},
-  {title:'Video 4 — "Most people don\'t know"',desc:'20s · Educativ · curiosity hook',beats:[
-    {text:"Most people don't know\nyou can sell this to any business.",dur:4000,gold:false},
-    {text:"Every restaurant, gym, clinic\nneeds automated replies.",dur:3500,gold:false},
-    {text:"You build it once.\nThey pay you every month.",dur:3500,gold:true},
-    {text:"Average deal: $850.\nAverage setup time: 60 minutes.",dur:4000,gold:false},
-    {text:"247 people are already doing this.",dur:3000,gold:true},
-    {text:"Comment BLUEPRINT\nI'm only sending to the first 20. 👇",dur:3500,gold:true}
-  ]},
-  {title:'Video 5 — "I sent one DM"',desc:'22s · Story format · relatable',beats:[
-    {text:"I sent one DM to a local gym.",dur:3000,gold:false},
-    {text:"'Hey — do you reply to every\nInstagram message manually?'",dur:4000,gold:false},
-    {text:"They said yes.\nI said I can automate that for $800.",dur:4000,gold:true},
-    {text:"They asked how long it takes.\nI said: I'll have it live tomorrow.",dur:4000,gold:false},
-    {text:"AI built the plan.\nMake.com ran it.\nThey paid.",dur:4000,gold:true},
-    {text:"Comment BLUEPRINT\nand I'll send you the exact tool. 👇",dur:3500,gold:true}
-  ]}
+/* ─────────── VIDEO DATA ─────────── */
+const POV_VIDEOS=[
+  {
+    title:'POV 1 — "Am încercat tot" (lista completă)',
+    desc:'28s · Lista fail → AI win · cel mai viral format',
+    pov:true,
+    beats:[
+      {type:'text',text:"POV: I've tried everything\nto make money online.",dur:3500,cl:''},
+      {type:'list',dur:7000,items:[
+        {icon:'❌',text:'Trading',tag:'lost $2,400',cl:'fail'},
+        {icon:'❌',text:'Dropshipping',tag:'lost 3 months',cl:'fail'},
+        {icon:'❌',text:'Crypto',tag:'lost $800',cl:'fail'},
+        {icon:'❌',text:'Freelancing',tag:'$8/hr',cl:'fail'},
+      ]},
+      {type:'text',text:"Then I found\nAI automation.",dur:3000,cl:'green'},
+      {type:'list',dur:5500,items:[
+        {icon:'✅',text:'AI Agency',tag:'$900 first client',cl:'win'},
+        {icon:'✅',text:'No coding',tag:'60 sec to build',cl:'win'},
+        {icon:'✅',text:'Real businesses pay',tag:'$800–$1,200',cl:'win'},
+      ]},
+      {type:'text',text:"Comment BLUEPRINT\nI'll send you the exact tool. 👇",dur:4000,cl:'red'},
+    ],
+    script:`POV: I've tried everything to make money online.
+
+Trading — lost twenty four hundred dollars.
+Dropshipping — wasted three months.
+Crypto — gone.
+Freelancing — eight dollars an hour.
+
+Then I found AI automation.
+
+First client paid me nine hundred dollars.
+I built their automation in sixty seconds.
+No coding. No experience.
+
+Comment BLUEPRINT and I'll send you the tool I used.`
+  },
+  {
+    title:'POV 2 — "Trading vs AI Agency"',
+    desc:'22s · Format comparație directă · simplu și rapid',
+    pov:true,
+    beats:[
+      {type:'text',text:"POV: I stopped trading\nand started this instead.",dur:3500,cl:''},
+      {type:'vs',dur:6000,rows:[
+        {fail:'Trading 📈',win:'AI Agency 🤖'},
+        {fail:'High risk',win:'Zero risk'},
+        {fail:'Need $10k+ capital',win:'Need $97 course'},
+        {fail:'90% lose money',win:'First client in 7 days'},
+      ]},
+      {type:'text',text:"Average deal: $850.\nBuilt in 60 seconds with AI.",dur:3500,cl:'green'},
+      {type:'text',text:"Comment BLUEPRINT\nand I'll show you how. 👇",dur:3500,cl:'red'},
+    ],
+    script:`POV: I stopped trading and started this instead.
+
+Trading: high risk, need thousands of dollars of capital, ninety percent of people lose money.
+
+AI Agency: zero risk, you only need a ninety seven dollar course, and you can close your first client in seven days.
+
+Average deal is eight hundred and fifty dollars. Built in sixty seconds with AI.
+
+Comment BLUEPRINT and I'll show you exactly how.`
+  },
+  {
+    title:'POV 3 — "Ecom vs AI Agency"',
+    desc:'24s · Ecommerce fail → AI win',
+    pov:true,
+    beats:[
+      {type:'text',text:"I ran an ecom store for 6 months.\nMade $0 profit.",dur:4000,cl:''},
+      {type:'list',dur:5500,items:[
+        {icon:'❌',text:'Ecommerce',tag:'$0 profit, 6 months',cl:'fail'},
+        {icon:'❌',text:'Print on demand',tag:'$3 per sale',cl:'fail'},
+        {icon:'❌',text:'Amazon FBA',tag:'too expensive',cl:'fail'},
+      ]},
+      {type:'text',text:"First week with\nAI automation:",dur:2500,cl:''},
+      {type:'list',dur:4500,items:[
+        {icon:'✅',text:'1 client',tag:'$900 setup fee',cl:'win'},
+        {icon:'✅',text:'Monthly retainer',tag:'+$200/month',cl:'win'},
+      ]},
+      {type:'text',text:"Comment BLUEPRINT 👇\nI'll send you the tool.",dur:3500,cl:'red'},
+    ],
+    script:`I ran an ecommerce store for six months. Made zero profit.
+
+Tried print on demand — three dollars per sale.
+Tried Amazon FBA — too expensive to start.
+
+First week with AI automation: one client, nine hundred dollars setup fee, plus two hundred a month retainer.
+
+Comment BLUEPRINT and I'll send you the tool I used.`
+  },
+  {
+    title:'POV 4 — "SMMA / Agency" (fără client)',
+    desc:'22s · Social media agency fail → AI Agency win',
+    pov:true,
+    beats:[
+      {type:'text',text:"I tried starting a social media agency.\nGot zero clients.",dur:4000,cl:''},
+      {type:'vs',dur:5500,rows:[
+        {fail:'SMMA',win:'AI Agency'},
+        {fail:'Hard to get clients',win:'Easy pitch — saves them $$$'},
+        {fail:'Monthly content grind',win:'Build once, they pay forever'},
+        {fail:'$0 my first 3 months',win:'$900 my first week'},
+      ]},
+      {type:'text',text:"The pitch writes itself:\n'I automate your replies with AI.'",dur:4000,cl:'green'},
+      {type:'text',text:"Comment BLUEPRINT 👇",dur:3000,cl:'red'},
+    ],
+    script:`I tried starting a social media agency. Got zero clients in three months.
+
+With SMMA you fight for every client, you grind on content every month, and the competition is insane.
+
+With AI Agency, the pitch is simple: I automate your customer replies with AI. Businesses understand it immediately because it saves them money.
+
+Nine hundred dollars my first week.
+
+Comment BLUEPRINT.`
+  },
 ];
-const grid=document.getElementById('grid');
-VIDEOS.forEach((v,i)=>{
-  const w=document.createElement('div');
-  w.className='player-wrap';
-  w.innerHTML=`<h2>${v.title}</h2><p>${v.desc}</p>
-  <div class="player" id="p${i}">
-    <div class="accent-line"></div>
-    <div class="logo">⚡ BLUEPRINT STUDIO</div>
-    <div class="beat-text" id="bt${i}"></div>
-    <div class="progress"><div class="progress-fill" id="pf${i}"></div></div>
-    <div class="cta-bar"><div class="site">aicashsystem.space/try</div><div class="price">Try FREE · Full access $97 · No coding required</div></div>
-    <div class="play-overlay">▶</div>
-  </div>
-  <br><button class="rec-btn" onclick="toggle(${i})">▶ Play / Pause</button>`;
-  grid.appendChild(w);
-  document.getElementById('p'+i).addEventListener('click',()=>toggle(i));
-});
-const S=VIDEOS.map(()=>({on:false,t:null,b:0}));
-function toggle(i){S[i].on?pause(i):play(i)}
-function play(i){S[i].on=true;document.getElementById('p'+i).classList.add('playing');runBeat(i)}
-function pause(i){S[i].on=false;clearTimeout(S[i].t);document.getElementById('p'+i).classList.remove('playing')}
-function runBeat(i){
-  const s=S[i],v=VIDEOS[i];
-  if(s.b>=v.beats.length){pause(i);s.b=0;document.getElementById('bt'+i).className='beat-text';document.getElementById('pf'+i).style.cssText='width:0%;transition:none';return}
+
+const HOOK_VIDEOS=[
+  {title:'Hook 1 — "Nobody talks about this"',desc:'22s · Hook FOMO · CTA BLUEPRINT',beats:[
+    {type:'text',text:"Nobody talks about this side hustle\nbecause it sounds too easy.",dur:4000,cl:'red'},
+    {type:'text',text:"Local businesses pay $800–$1,200\nfor automations.",dur:3500,cl:''},
+    {type:'text',text:"WhatsApp bots.\nEmail follow-ups.\nInstagram auto-replies.",dur:4000,cl:''},
+    {type:'text',text:"AI generates the whole plan\nin 60 seconds.",dur:3500,cl:'green'},
+    {type:'text',text:"Comment BLUEPRINT\nand I'll send you the tool. 👇",dur:4000,cl:'red'},
+  ],script:`Nobody talks about this side hustle because it sounds too easy.
+
+Local businesses pay eight hundred to twelve hundred dollars for automations.
+WhatsApp bots, email follow-ups, Instagram auto-replies.
+
+AI generates the whole plan in sixty seconds. No coding. No experience.
+
+Comment BLUEPRINT and I'll send you the tool.`},
+  {title:'Hook 2 — "$900 payment reveal"',desc:'18s · Income proof · urgency',beats:[
+    {type:'text',text:"I had no idea you could charge\n$1,000 for THIS.",dur:4000,cl:'red'},
+    {type:'text',text:"A restaurant owner paid me $900\nto automate their WhatsApp replies.",dur:4500,cl:''},
+    {type:'text',text:"I built it in 60 seconds\nwith AI.",dur:3000,cl:'green'},
+    {type:'text',text:"Comment BLUEPRINT\nand I'll send you the tool. 👇",dur:3500,cl:'red'},
+  ],script:`I had no idea you could charge a thousand dollars for this.
+
+A restaurant owner paid me nine hundred dollars to automate their WhatsApp replies.
+I built it in sixty seconds with AI.
+They had no idea how easy it was.
+
+Comment BLUEPRINT and I'll send you the tool.`},
+  {title:'Hook 3 — "I sent one DM"',desc:'22s · Story format · relatable',beats:[
+    {type:'text',text:"I sent one DM to a local gym.",dur:3000,cl:''},
+    {type:'text',text:"'Do you reply to every\nInstagram message manually?'",dur:4000,cl:''},
+    {type:'text',text:"They said yes.\nI said: I can automate that for $800.",dur:4000,cl:'green'},
+    {type:'text',text:"AI built the plan.\nMake.com ran it.\nThey paid.",dur:4000,cl:''},
+    {type:'text',text:"Comment BLUEPRINT\nand I'll send you the exact tool. 👇",dur:3500,cl:'red'},
+  ],script:`I sent one DM to a local gym.
+
+"Hey — do you reply to every Instagram message manually?"
+
+They said yes. I said I can automate that for eight hundred dollars.
+
+They asked how long it takes. I said: I'll have it live tomorrow.
+
+AI built the plan. Make dot com ran it. They paid.
+
+Comment BLUEPRINT and I'll send you the exact tool.`},
+];
+
+/* ─────────── RENDER ─────────── */
+function renderVideos(videos, containerId){
+  const grid=document.getElementById(containerId);
+  videos.forEach((v,i)=>{
+    const uid=containerId+i;
+    const w=document.createElement('div');
+    w.className='player-wrap';
+    w.innerHTML=`<h2>${v.title}</h2><p>${v.desc}</p>
+    <div class="player" id="p${uid}">
+      <div class="accent-line"></div>
+      <div class="logo">⚡ BLUEPRINT STUDIO</div>
+      ${v.pov?'<div class="pov-tag" id="povtag'+uid+'">POV ↓</div>':''}
+      <div id="btwrap${uid}" style="position:absolute;width:100%;display:flex;align-items:center;justify-content:center"></div>
+      <div class="progress"><div class="progress-fill" id="pf${uid}"></div></div>
+      <div class="cta-bar"><div class="site">aicashsystem.space/try</div><div class="price">Try FREE · Full access $97 · No coding</div></div>
+      <div class="play-overlay">▶</div>
+    </div>
+    <br>
+    <button class="rec-btn" onclick="toggle('${uid}',${i},'${containerId}')">▶ Play / Restart</button>
+    ${v.script?`<br><button class="show-script" onclick="toggleScript('sc${uid}')">📋 Script ElevenLabs</button><div class="script-box" id="sc${uid}"><strong>🎙️ Copiază în ElevenLabs:</strong>${v.script.replace(/\n/g,'<br>')}</div>`:''}`;
+    grid.appendChild(w);
+    document.getElementById('p'+uid).addEventListener('click',()=>toggle(uid,i,containerId));
+  });
+}
+renderVideos(POV_VIDEOS,'grid-pov');
+renderVideos(HOOK_VIDEOS,'grid-hook');
+
+function toggleScript(id){
+  const el=document.getElementById(id);
+  el.style.display=el.style.display==='block'?'none':'block';
+}
+
+/* ─────────── PLAYER STATE ─────────── */
+const STATE={};
+function toggle(uid,idx,src){
+  if(!STATE[uid]) STATE[uid]={on:false,t:[],b:0};
+  STATE[uid].on?pauseV(uid):playV(uid,idx,src);
+}
+function pauseV(uid){
+  STATE[uid].on=false;
+  STATE[uid].t.forEach(clearTimeout);
+  document.getElementById('p'+uid).classList.remove('playing');
+}
+function playV(uid,idx,src){
+  const arr=src==='grid-pov'?POV_VIDEOS:HOOK_VIDEOS;
+  STATE[uid]={on:true,t:[],b:0};
+  document.getElementById('p'+uid).classList.add('playing');
+  if(arr[idx].pov){ const pt=document.getElementById('povtag'+uid); if(pt) pt.style.display='block'; }
+  runBeat(uid,arr[idx]);
+}
+
+function runBeat(uid,v){
+  const s=STATE[uid];
+  if(!s.on) return;
+  const wrap=document.getElementById('btwrap'+uid);
+  if(s.b>=v.beats.length){
+    pauseV(uid); s.b=0; wrap.innerHTML='';
+    document.getElementById('pf'+uid).style.cssText='width:0%;transition:none';
+    return;
+  }
   const beat=v.beats[s.b];
-  const bt=document.getElementById('bt'+i);
-  bt.className='beat-text'+(beat.gold?' gold':'');
-  bt.innerHTML=beat.text.replace(/\n/g,'<br>');
-  requestAnimationFrame(()=>bt.classList.add('visible'));
   const tot=v.beats.reduce((a,b)=>a+b.dur,0);
   const el=v.beats.slice(0,s.b).reduce((a,b)=>a+b.dur,0);
-  const pf=document.getElementById('pf'+i);
+  const pf=document.getElementById('pf'+uid);
   pf.style.cssText=`width:${el/tot*100}%;transition:none`;
-  requestAnimationFrame(()=>{pf.style.cssText=`width:${(el+beat.dur)/tot*100}%;transition:width ${beat.dur}ms linear`});
-  s.t=setTimeout(()=>{bt.classList.remove('visible');setTimeout(()=>{s.b++;if(s.on)runBeat(i)},350)},beat.dur-350);
+  requestAnimationFrame(()=>{ pf.style.cssText=`width:${(el+beat.dur)/tot*100}%;transition:width ${beat.dur}ms linear`; });
+
+  if(beat.type==='text'){
+    wrap.innerHTML=`<div class="beat-text ${beat.cl||''}">${beat.text.replace(/\n/g,'<br>')}</div>`;
+    requestAnimationFrame(()=>wrap.querySelector('.beat-text').classList.add('visible'));
+    s.t.push(setTimeout(()=>{
+      const bt=wrap.querySelector('.beat-text');
+      if(bt) bt.classList.remove('visible');
+      s.t.push(setTimeout(()=>{ s.b++; if(s.on) runBeat(uid,v); },350));
+    },beat.dur-350));
+  }
+  else if(beat.type==='list'){
+    const html=beat.items.map((it,ii)=>`<div class="list-item ${it.cl||''}" id="li${uid}_${s.b}_${ii}"><span class="icon">${it.icon}</span><span>${it.text}</span><span class="tag">${it.tag||''}</span></div>`).join('');
+    wrap.innerHTML=`<div class="beat-list">${html}</div>`;
+    requestAnimationFrame(()=>wrap.querySelector('.beat-list').classList.add('visible'));
+    const perItem=Math.min(900, beat.dur/beat.items.length);
+    beat.items.forEach((_,ii)=>{
+      s.t.push(setTimeout(()=>{
+        const li=document.getElementById(`li${uid}_${s.b}_${ii}`);
+        if(li) li.classList.add('show');
+      }, ii*perItem));
+    });
+    s.t.push(setTimeout(()=>{
+      const bl=wrap.querySelector('.beat-list');
+      if(bl) bl.classList.remove('visible');
+      s.t.push(setTimeout(()=>{ s.b++; if(s.on) runBeat(uid,v); },350));
+    },beat.dur-350));
+  }
+  else if(beat.type==='vs'){
+    const html=beat.rows.map(r=>`<div class="vs-row"><div class="vs-fail">${r.fail}</div><div class="vs-arrow">→</div><div class="vs-win">${r.win}</div></div>`).join('');
+    wrap.innerHTML=`<div class="beat-vs">${html}</div>`;
+    requestAnimationFrame(()=>wrap.querySelector('.beat-vs').classList.add('visible'));
+    s.t.push(setTimeout(()=>{
+      const bv=wrap.querySelector('.beat-vs');
+      if(bv) bv.classList.remove('visible');
+      s.t.push(setTimeout(()=>{ s.b++; if(s.on) runBeat(uid,v); },350));
+    },beat.dur-350));
+  }
 }
 </script>
-<script src="/lang.js"></script>
 </body>
 </html>
