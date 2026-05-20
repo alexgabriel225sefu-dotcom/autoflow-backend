@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>TikTok Videos — AI Cash Systems</title>
+<title>TikTok Videos — Blueprint Studio</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#080808;color:#f5f5f5;font-family:sans-serif;padding:32px 20px}
@@ -31,32 +31,50 @@ h1{font-size:20px;color:#E53E2E;margin-bottom:6px;text-align:center}
 </style>
 </head>
 <body>
-<h1>TikTok Videos — AI Cash Systems</h1>
-<p class="sub">Click pe video pentru a-l reda · 9:16 · Dark/Gold branding</p>
+<h1>TikTok Videos — Blueprint Studio</h1>
+<p class="sub">Click pe video pentru a-l reda · 9:16 · Dark/Red branding</p>
 <div class="hint">💡 <strong>Cum faci screen record:</strong> Windows: Win+G → Record · Mac: Cmd+Shift+5 · Telefon: butonul de screen record din meniu rapid</div>
 <div class="grid" id="grid"></div>
 <script>
 const VIDEOS=[
-  {title:'Video 1 — "$300 selling AI bots"',desc:'20s · Hook direct · CTA',beats:[
-    {text:"I made $300 selling AI bots.\nI don't even know how to code.",dur:4500,gold:true},
-    {text:"I found a course called\nAI Cash Systems.",dur:3500,gold:false},
-    {text:"2 hours to build a bot\na business paid $400 for.",dur:4000,gold:false},
-    {text:"The course is $37.\nI made that back in week one.",dur:4000,gold:false},
-    {text:"Link in bio if you actually\nwant to learn this.",dur:3500,gold:true}
+  {title:'Video 1 — "Nobody talks about this"',desc:'22s · Hook FOMO · CTA BLUEPRINT',beats:[
+    {text:"Nobody talks about this side hustle\nbecause it sounds too easy.",dur:4000,gold:true},
+    {text:"Local businesses pay $800–$1,200\nfor automations.",dur:3500,gold:false},
+    {text:"WhatsApp bots.\nEmail follow-ups.\nInstagram auto-replies.",dur:4000,gold:false},
+    {text:"AI generates the whole plan\nin 60 seconds.",dur:3500,gold:true},
+    {text:"No coding.\nNo experience needed.",dur:3000,gold:false},
+    {text:"Comment BLUEPRINT\nand I'll send you the tool. 👇",dur:4000,gold:true}
   ]},
-  {title:'Video 2 — "One skill changes everything"',desc:'22s · Empatie · Motivational',beats:[
-    {text:"Nobody talks about how exhausting it is\nto work hard and still not have enough.",dur:5000,gold:false},
-    {text:"I started asking\na different question.",dur:3000,gold:true},
-    {text:"Not 'how do I work harder' —\nbut 'what skill pays me differently?'",dur:4500,gold:false},
-    {text:"AI automation was my answer.\nFirst client in 30 days.",dur:4000,gold:true},
-    {text:"You don't need to quit tomorrow.\nYou need one skill that gives you options.",dur:5000,gold:false}
+  {title:'Video 2 — "POV: First $800 client"',desc:'20s · POV format · screen demo',beats:[
+    {text:"POV: You just closed your first\n$800 client.",dur:4000,gold:true},
+    {text:"And you didn't write\na single line of code.",dur:3500,gold:false},
+    {text:"I typed what I wanted to build.\nAI generated the whole plan.",dur:4000,gold:false},
+    {text:"What to build. What to charge.\nThe exact message to send the client.",dur:4000,gold:false},
+    {text:"They replied in 3 hours.\nPaid in 24.",dur:3500,gold:true},
+    {text:"Comment BLUEPRINT\nI'll show you exactly how. 👇",dur:3500,gold:true}
   ]},
-  {title:'Video 3 — "Businesses lose thousands"',desc:'20s · Problem/Solution · Urgency',beats:[
-    {text:"Businesses are losing thousands every month\nto problems a $37 course can fix.",dur:5000,gold:true},
-    {text:"They need someone to build\nWhatsApp bots, DM bots,\nlead follow-up systems.",dur:5000,gold:false},
-    {text:"You learn it once.\nThey pay you every month.",dur:3500,gold:true},
-    {text:"AI Cash Systems — $37 Starter.\nFirst client in 30 days.",dur:3500,gold:false},
-    {text:"Link in bio.",dur:2500,gold:true}
+  {title:'Video 3 — "$900 payment reveal"',desc:'18s · Income proof · urgency',beats:[
+    {text:"I had no idea you could charge\n$1,000 for THIS.",dur:4000,gold:true},
+    {text:"A restaurant owner paid me $900\nto automate their WhatsApp replies.",dur:4500,gold:false},
+    {text:"I built it in 60 seconds\nwith AI.",dur:3000,gold:false},
+    {text:"They had no idea.\nI had no idea either.",dur:3000,gold:true},
+    {text:"Comment BLUEPRINT\nand I'll send you the tool. 👇",dur:3500,gold:true}
+  ]},
+  {title:'Video 4 — "Most people don\'t know"',desc:'20s · Educativ · curiosity hook',beats:[
+    {text:"Most people don't know\nyou can sell this to any business.",dur:4000,gold:false},
+    {text:"Every restaurant, gym, clinic\nneeds automated replies.",dur:3500,gold:false},
+    {text:"You build it once.\nThey pay you every month.",dur:3500,gold:true},
+    {text:"Average deal: $850.\nAverage setup time: 60 minutes.",dur:4000,gold:false},
+    {text:"247 people are already doing this.",dur:3000,gold:true},
+    {text:"Comment BLUEPRINT\nI'm only sending to the first 20. 👇",dur:3500,gold:true}
+  ]},
+  {title:'Video 5 — "I sent one DM"',desc:'22s · Story format · relatable',beats:[
+    {text:"I sent one DM to a local gym.",dur:3000,gold:false},
+    {text:"'Hey — do you reply to every\nInstagram message manually?'",dur:4000,gold:false},
+    {text:"They said yes.\nI said I can automate that for $800.",dur:4000,gold:true},
+    {text:"They asked how long it takes.\nI said: I'll have it live tomorrow.",dur:4000,gold:false},
+    {text:"AI built the plan.\nMake.com ran it.\nThey paid.",dur:4000,gold:true},
+    {text:"Comment BLUEPRINT\nand I'll send you the exact tool. 👇",dur:3500,gold:true}
   ]}
 ];
 const grid=document.getElementById('grid');
@@ -66,10 +84,10 @@ VIDEOS.forEach((v,i)=>{
   w.innerHTML=`<h2>${v.title}</h2><p>${v.desc}</p>
   <div class="player" id="p${i}">
     <div class="accent-line"></div>
-    <div class="logo">AI CASH SYSTEMS</div>
+    <div class="logo">⚡ BLUEPRINT STUDIO</div>
     <div class="beat-text" id="bt${i}"></div>
     <div class="progress"><div class="progress-fill" id="pf${i}"></div></div>
-    <div class="cta-bar"><div class="site">aicashsystem.space</div><div class="price">Starter $37 · PRO $97 · No coding required</div></div>
+    <div class="cta-bar"><div class="site">aicashsystem.space/try</div><div class="price">Try FREE · Full access $97 · No coding required</div></div>
     <div class="play-overlay">▶</div>
   </div>
   <br><button class="rec-btn" onclick="toggle(${i})">▶ Play / Pause</button>`;
