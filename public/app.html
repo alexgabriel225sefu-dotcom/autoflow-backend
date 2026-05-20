@@ -126,6 +126,30 @@ body{background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSyst
 .modal-btn-secondary{background:transparent;border:1px solid var(--border2);color:var(--t2)}
 .modal-btn-secondary:hover{border-color:var(--t2);color:var(--t1)}
 
+/* SETUP GUIDE */
+.setup-guide{margin-top:32px;padding-top:28px;border-top:1px solid var(--border)}
+.sguide-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.sguide-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3)}
+.platform-section{margin-bottom:20px}
+.platform-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:12px}
+.badge-make{background:rgba(229,62,46,.12);border:1px solid rgba(229,62,46,.35);color:var(--red)}
+.badge-360{background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa}
+.sguide-steps{display:flex;flex-direction:column;gap:10px}
+.sguide-step{background:#0d0d0d;border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;transition:border-color .2s}
+.sguide-step:hover{border-color:var(--border2)}
+.snum{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px}
+.snum-make{background:rgba(229,62,46,.15);color:var(--red);border:1px solid rgba(229,62,46,.3)}
+.snum-360{background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.25)}
+.snum-live{background:rgba(74,222,128,.1);color:var(--green);border:1px solid rgba(74,222,128,.25)}
+.sstep-body{flex:1;min-width:0}
+.sstep-title{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:3px}
+.sstep-desc{font-size:12px;color:var(--t3);line-height:1.6}
+.sstep-desc strong{color:var(--t2)}
+.sstep-desc code{background:#1a1a1a;border:1px solid var(--border2);border-radius:4px;padding:1px 6px;font-size:11px;color:var(--red);font-family:monospace}
+.sstep-tip{background:#141414;border:1px solid var(--border2);border-radius:6px;padding:7px 10px;font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5}
+.sstep-tip strong{color:var(--t2)}
+.sicon{width:36px;height:36px;background:#141414;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+
 /* TOAST */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1a1a;border:1px solid var(--border2);color:var(--t1);padding:12px 20px;border-radius:10px;font-size:14px;font-weight:500;z-index:9999;transition:transform .3s ease;white-space:nowrap;pointer-events:none}
 #toast.show{transform:translateX(-50%) translateY(0)}
@@ -319,6 +343,175 @@ body{background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSyst
         📄 Generate Client Proposal
       </button>
 
+      <!-- SETUP GUIDE -->
+      <div class="setup-guide" id="setupGuide" style="display:none">
+        <div class="sguide-header">
+          <div class="sguide-title">Complete Setup Guide</div>
+        </div>
+
+        <!-- MAKE.COM -->
+        <div class="platform-section">
+          <div class="platform-badge badge-make">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+            Make.com
+          </div>
+          <div class="sguide-steps">
+
+            <div class="sguide-step">
+              <div class="snum snum-make">1</div>
+              <div class="sicon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 16l-5-5h3V4h4v7h3l-5 5z" fill="#E53E2E"/>
+                  <path d="M5 20h14" stroke="#E53E2E" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="sstep-body">
+                <div class="sstep-title">Download blueprint + deschide Make.com</div>
+                <div class="sstep-desc">Apasă <strong>⬇ Download .json</strong> de sus. Mergi la <strong>make.com</strong> → Sign up (gratuit) sau Sign in.</div>
+              </div>
+            </div>
+
+            <div class="sguide-step">
+              <div class="snum snum-make">2</div>
+              <div class="sicon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="18" height="18" rx="4" stroke="#E53E2E" stroke-width="1.5"/>
+                  <path d="M12 8v8M8 12h8" stroke="#E53E2E" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="sstep-body">
+                <div class="sstep-title">Creează un scenariu nou</div>
+                <div class="sstep-desc">Click pe <strong>Scenarios</strong> în meniu stânga → butonul <strong>+ Create a new scenario</strong> (dreapta sus).</div>
+              </div>
+            </div>
+
+            <div class="sguide-step">
+              <div class="snum snum-make">3</div>
+              <div class="sicon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 4h9l7 7v9H4V4z" stroke="#E53E2E" stroke-width="1.5" stroke-linejoin="round"/>
+                  <path d="M13 4v7h7" stroke="#E53E2E" stroke-width="1.5" stroke-linecap="round"/>
+                  <path d="M9 15l2 2 4-4" stroke="#4ADE80" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="sstep-body">
+                <div class="sstep-title">Importă blueprint-ul</div>
+                <div class="sstep-desc">Pe ecranul gol al scenariului: <strong>stânga-jos</strong> găsești bara de instrumente → click pe <code>···</code> (trei puncte) → <strong style="color:#E53E2E">Import Blueprint</strong> → selectezi fișierul <code>.json</code> descărcat.</div>
+                <div class="sstep-tip">⚠️ Dacă nu găsești <strong>···</strong>, click-dreapta pe canvas sau caută butonul cu trei liniuțe în bara de jos.</div>
+              </div>
+            </div>
+
+            <div class="sguide-step">
+              <div class="snum snum-make">4</div>
+              <div class="sicon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="#E53E2E" stroke-width="1.5" stroke-linecap="round"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="#E53E2E" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="sstep-body">
+                <div class="sstep-title">Configurează modulul Webhook</div>
+                <div class="sstep-desc">Click pe modulul <strong>Webhook</strong> (primul modul, cu iconița de fulger) → <strong>Add</strong> → dă-i un nume → <strong>Save</strong>. <br><br>Make.com generează automat URL-ul webhook — <strong>copiază-l</strong>, îl vei folosi la 360dialog.</div>
+                <div class="sstep-tip">💡 URL-ul arată ca: <code>https://hook.eu1.make.com/xxxxx</code></div>
+              </div>
+            </div>
+
+            <div class="sguide-step">
+              <div class="snum snum-make">5</div>
+              <div class="sicon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="9" stroke="#E53E2E" stroke-width="1.5"/>
+                  <path d="M9 9h.01M15 9h.01" stroke="#E53E2E" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="#E53E2E" stroke-width="1.5" stroke-linecap="round"/>
+                  <circle cx="12" cy="7" r="1.5" fill="#E53E2E"/>
+                </svg>
+              </div>
+              <div class="sstep-body">
+                <div class="sstep-title">Configurează modulul AI</div>
+                <div class="sstep-desc">Click pe modulul <strong>AI / OpenAI</strong> → <strong>Add</strong> la Connection → introdu <strong>API key OpenAI</strong> → <strong>Save</strong>. <br><br>Promptul sistemului este deja completat de AutoFlow — îl poți edita după nevoie.</div>
+                <div class="sstep-tip">🔑 API key OpenAI de la: <strong>platform.openai.com → API Keys</strong></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 360DIALOG (WhatsApp only) -->
+        <div class="platform-section" id="guide360section" style="display:none">
+          <div class="platform-badge badge-360">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.173.576 4.213 1.581 5.973L0 24l6.225-1.547A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.898 0-3.687-.487-5.247-1.343l-.374-.223-3.694.918.979-3.582-.244-.386A9.96 9.96 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+            360dialog — WhatsApp
+          </div>
+          <div class="sguide-steps">
+
+            <div class="sguide-step">
+              <div class="snum snum-360">6</div>
+              <div class="sicon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/>
+                  <circle cx="12" cy="7" r="4" stroke="#60a5fa" stroke-width="1.5"/>
+                </svg>
+              </div>
+              <div class="sstep-body">
+                <div class="sstep-title">Creează cont 360dialog</div>
+                <div class="sstep-desc">Mergi la <strong>app.360dialog.com</strong> → Sign up → alege <strong>"Direct API Access for Developers"</strong>.</div>
+              </div>
+            </div>
+
+            <div class="sguide-step">
+              <div class="snum snum-360">7</div>
+              <div class="sicon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="5" y="2" width="14" height="20" rx="3" stroke="#60a5fa" stroke-width="1.5"/>
+                  <path d="M9 7h6M9 11h6M9 15h4" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="sstep-body">
+                <div class="sstep-title">Conectează numărul WhatsApp Business</div>
+                <div class="sstep-desc">Click <strong>Add Number</strong> → introdu numărul tău de <strong>WhatsApp Business</strong> (nu cel personal) → urmează pașii de verificare prin SMS.</div>
+                <div class="sstep-tip">📱 Ai nevoie de un număr dedicat pentru business — nu poate fi folosit simultan în aplicația WhatsApp normală.</div>
+              </div>
+            </div>
+
+            <div class="sguide-step">
+              <div class="snum snum-360">8</div>
+              <div class="sicon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="sstep-body">
+                <div class="sstep-title">Setează Webhook URL</div>
+                <div class="sstep-desc">În dashboard 360dialog → click pe <strong>numărul tău</strong> → tab <strong>Configuration</strong> → câmpul <strong>Webhook URL</strong> → lipești URL-ul copiat din Make.com (pasul 4).</div>
+                <div class="sstep-tip">💡 URL-ul webhook din Make.com (de la pasul 4): <code>https://hook.eu1.make.com/...</code></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- GO LIVE -->
+        <div class="sguide-steps">
+          <div class="sguide-step" style="border-color:rgba(74,222,128,.25);background:rgba(74,222,128,.04)">
+            <div class="snum snum-live" id="liveStepNum">9</div>
+            <div class="sicon" style="border-color:rgba(74,222,128,.25)">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="9" width="16" height="8" rx="4" stroke="#4ADE80" stroke-width="1.5"/>
+                <circle cx="15" cy="13" r="3" fill="#4ADE80"/>
+                <path d="M20 8l2 2-2 2" stroke="#4ADE80" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="sstep-body">
+              <div class="sstep-title" style="color:var(--green)">Pornește scenariul — LIVE!</div>
+              <div class="sstep-desc">În Make.com, în colțul <strong>stânga-jos</strong> al scenariului, dai toggle-ul pe <strong style="color:var(--green)">ON</strong>. Botul tău este activ!</div>
+              <div class="sstep-tip">🎉 Testează imediat: trimite un mesaj pe WhatsApp la numărul conectat și ar trebui să primești răspuns în câteva secunde.</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /setup-guide -->
+
     </div><!-- /output-wrap -->
   </main>
 </div>
@@ -473,6 +666,22 @@ function showOutput(data){
   if(data.setupPrice){ document.getElementById('outPrice').textContent=data.setupPrice; document.getElementById('outPriceSub').textContent='Setup · Retainer: '+(data.monthlyPrice||''); document.getElementById('secPrice').style.display='block'; }
   if(data.outreach){ document.getElementById('outOutreach').textContent=data.outreach; document.getElementById('secOutreach').style.display='block'; }
   document.getElementById('proposalBtn').style.display='block';
+  showSetupGuide();
+}
+
+function showSetupGuide(){
+  var desc=(document.getElementById('wDesc').value||'').toLowerCase();
+  var isWhatsapp=desc.includes('whatsapp')||desc.includes('whats app');
+  var sec360=document.getElementById('guide360section');
+  var liveNum=document.getElementById('liveStepNum');
+  if(isWhatsapp){
+    sec360.style.display='block';
+    liveNum.textContent='9';
+  }else{
+    sec360.style.display='none';
+    liveNum.textContent='6';
+  }
+  document.getElementById('setupGuide').style.display='block';
 }
 
 function detectType(desc){
