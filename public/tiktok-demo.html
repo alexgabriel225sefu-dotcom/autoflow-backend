@@ -179,20 +179,8 @@ body{
 .cursor-tap{animation:tapAnim .25s ease}
 @keyframes tapAnim{0%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(0.75)}100%{transform:translate(-50%,-50%) scale(1)}}
 
-/* ── START OVERLAY ── */
-#start-overlay{
-  position:absolute;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10000;
-  border-radius:38px;gap:14px;
-}
-#start-btn{
-  background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;
-  border-radius:50px;padding:16px 40px;font-size:18px;font-weight:800;cursor:pointer;
-  box-shadow:0 6px 30px rgba(229,62,46,.5);transition:transform .15s;
-  letter-spacing:.5px;
-}
-#start-btn:hover{transform:scale(1.05)}
-#start-label{font-size:12px;color:#666;letter-spacing:1px;text-transform:uppercase}
+/* Start overlay hidden */
+#start-overlay{display:none}
 
 /* ── REPLAY ── */
 #replay-btn{
@@ -576,17 +564,8 @@ Step 4: Add fallback to human agent after 3 fails...
     </svg>
   </div>
 
-  <!-- Replay button -->
-  <button id="replay-btn" onclick="location.reload()">↺ Replay</button>
-
-  <!-- Start overlay -->
-  <div id="start-overlay">
-    <div style="font-size:36px">⚡</div>
-    <div style="font-size:18px;font-weight:900;color:#f0f0f0;letter-spacing:.5px">Blueprint Studio</div>
-    <div style="font-size:13px;color:#666;margin-bottom:8px">Live Demo — Screen Record This</div>
-    <button id="start-btn" onclick="startDemo()">▶ Start Demo</button>
-    <div id="start-label">tap to begin</div>
-  </div>
+  <!-- hidden replay — double-click phone border to restart -->
+  <button id="replay-btn" onclick="location.reload()" style="display:none;position:absolute;bottom:10px;right:10px;opacity:0.01;z-index:500;padding:10px;">↺</button>
 </div>
 
 <script>
@@ -805,9 +784,8 @@ async function runLoading(){
   await wait(400);
 }
 
-/* ══ MAIN DEMO ══ */
+/* ══ MAIN DEMO — auto-start after 1.5s ══ */
 async function startDemo(){
-  $('start-overlay').style.display='none';
   cursor.style.display='block';
 
   /* Step 1 — Show cursor, hover textarea */
@@ -886,11 +864,17 @@ async function startDemo(){
   await wait(200);
   cursor.classList.remove('cursor-tap');
 
-  /* Done */
+  /* Done — loop back after 4s */
   await wait(2000);
   cursor.style.display='none';
-  $('replay-btn').style.display='block';
+  await wait(4000);
+  location.reload();
 }
+
+/* Auto-start after 1.5 seconds */
+window.addEventListener('load', () => {
+  setTimeout(startDemo, 1500);
+});
 </script>
 </body>
 </html>
