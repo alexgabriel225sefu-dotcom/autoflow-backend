@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoFlow — Automation Studio</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -205,7 +205,7 @@ body{background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSyst
     </div>
     <div class="field">
       <label id="codeLbl">Access Code</label>
-      <input type="password" id="loginCode" placeholder="Enter your code" autocomplete="off"
+      <input type="password" id="loginCode" placeholder="Enter your code" autocomplete="current-password"
              onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <button class="login-btn" id="loginBtn" onclick="doLogin()">Sign In</button>
@@ -427,7 +427,7 @@ let currentBlob=null;
 // Blueprint templates
 var BP_TYPES=[
   {keys:['whatsapp'],file:'whatsapp-bot.json',label:'WhatsApp AI Bot'},
-  {keys:['instagram',' dm'],file:'instagram-dm-bot.json',label:'Instagram DM Bot'},
+  {keys:['instagram','dm'],file:'instagram-dm-bot.json',label:'Instagram DM Bot'},
   {keys:['cold email','outreach','cold'],file:'cold-email-pipeline.json',label:'Cold Email Pipeline'},
   {keys:['lead','form','follow-up','followup','contact form'],file:'lead-followup-system.json',label:'Lead Follow-Up System'},
   {keys:['stripe','invoice','payment','billing'],file:'stripe-billing-automation.json',label:'Billing Automation'},
@@ -443,19 +443,6 @@ var BP_DATA={
 "ai-proposal-generator.json":{"name":"AI Proposal Generator","flow":[{"id":1,"module":"google-forms:watchResponses","version":1,"parameters":{"formId":"YOUR_POST_CALL_FORM_ID"},"mapper":{},"metadata":{"designer":{"x":0,"y":0,"name":"Google Form — Post-Call Notes"}}},{"id":2,"module":"openai-gpt-3:CreateChatCompletion","version":1,"parameters":{"model":"gpt-4o","temperature":0.5,"max_tokens":1200},"mapper":{"messages":[{"role":"system","content":"Write professional, high-converting business proposals for an AI automation agency. Structure: Executive Summary, Proposed Solution, Investment, Timeline, Next Steps. Under 400 words."},{"role":"user","content":"Client: {{1.responses.clientName}}\nBusiness: {{1.responses.businessName}}\nProblem: {{1.responses.mainProblem}}\nAutomation: {{1.responses.automationRequested}}\nSetup fee: {{1.responses.setupFee}}\nMonthly: {{1.responses.monthlyFee}}\nEmail: {{1.responses.clientEmail}}\n\nWrite the proposal."}]},"metadata":{"designer":{"x":300,"y":0,"name":"GPT-4o — Proposal"}}},{"id":3,"module":"gmail:ActionSendEmail","version":1,"parameters":{},"mapper":{"to":"{{1.responses.clientEmail}}","subject":"Your AI Automation Proposal — {{1.responses.businessName}}","content":"Hi {{1.responses.clientName}},\n\nAs discussed, here's your proposal:\n\n{{2.choices[].message.content}}\n\nBest,\n[YOUR NAME]","contentType":"text"},"metadata":{"designer":{"x":600,"y":0,"name":"Gmail — Send Proposal"}}},{"id":4,"module":"google-sheets:addRow","version":1,"parameters":{"spreadsheetId":"YOUR_PROPOSALS_SPREADSHEET_ID","sheetId":"Proposals"},"mapper":{"values":{"A":"{{formatDate(now; 'DD/MM/YYYY')}}","B":"{{1.responses.clientName}}","C":"{{1.responses.clientEmail}}","D":"{{1.responses.automationRequested}}","E":"Sent"}},"metadata":{"designer":{"x":900,"y":0,"name":"Sheets — Log"}}}],"metadata":{"instant":true,"version":1,"zone":"eu2.make.com","notes":"SETUP: 1) Create Google Form with: clientName, businessName, mainProblem, automationRequested, setupFee, monthlyFee, clientEmail 2) Fill after every discovery call — proposal emails automatically"}}
 };
 
-// Init
-(function(){
-  try{
-    token=localStorage.getItem('af_token')||'';
-    lang=localStorage.getItem('af_lang')||'en';
-    if(token)showStudio();
-    var savedLang=LANGUAGES.find(function(x){return x.c===lang;})||LANGUAGES[0];
-    document.getElementById('langFlag').textContent=savedLang.f;
-    document.getElementById('langCode').textContent=savedLang.c.toUpperCase().slice(0,2);
-    document.documentElement.lang=lang;
-    applyLang();
-  }catch(e){ token=''; }
-})();
 
 function authHeaders(){ return{'Content-Type':'application/json','Authorization':'Bearer '+token}; }
 
@@ -492,7 +479,7 @@ async function generateAutomation(){
   const desc=document.getElementById('wDesc').value.trim();
   if(desc.length<20){ notify(T.minChars,'error'); return; }
   const btn=document.getElementById('genBtn');
-  btn.disabled=true; btn.textContent='⏳ '+T.generating.replace('⏳ ','');
+  btn.disabled=true; btn.textContent=T.generating;
   const resetBtn=function(){ btn.disabled=false; btn.textContent=T.genBtn; };
   const controller=new AbortController();
   // Wake up server first (Render free tier sleeps), then generate
@@ -504,7 +491,7 @@ async function generateAutomation(){
     // Quick ping to wake server before heavy AI call
     try{ await fetch(API+'/ping',{signal:controller.signal,method:'GET'}); }catch(_){}
     clearTimeout(pingTimer);
-    btn.textContent='⏳ '+T.generating.replace('⏳ ','');
+    btn.textContent=T.generating;
     const r=await fetch(API+'/api/ai/generate',{
       method:'POST',
       headers:authHeaders(),
@@ -561,6 +548,11 @@ Return ONLY valid JSON, no markdown:
 }
 
 function showOutput(data){
+  // Reset all sections before populating to avoid stale content from previous generation
+  document.getElementById('secWhat').style.display='none';
+  document.getElementById('secPrice').style.display='none';
+  document.getElementById('secOutreach').style.display='none';
+  document.getElementById('proposalBtn').style.display='none';
   document.getElementById('outputWrap').style.display='block';
   setTimeout(()=>document.getElementById('outputWrap').scrollIntoView({behavior:'smooth',block:'start'}),100);
   if(data.what){ document.getElementById('outWhat').textContent=data.what; document.getElementById('secWhat').style.display='block'; }
@@ -843,6 +835,20 @@ var LANGUAGES=[
   {c:'doi',f:'🇮🇳',n:'डोगरी'},{c:'sat',f:'🇮🇳',n:'ᱥᱟᱱᱛᱟᱲᱤ'},{c:'mni',f:'🇮🇳',n:'মৈতৈ'}
 ];
 
+// Init — runs after all var declarations so LANGUAGES.find() works correctly
+(function(){
+  try{
+    token=localStorage.getItem('af_token')||'';
+    lang=localStorage.getItem('af_lang')||'en';
+    if(token)showStudio();
+    var savedLang=LANGUAGES.find(function(x){return x.c===lang;})||LANGUAGES[0];
+    document.getElementById('langFlag').textContent=savedLang.f;
+    document.getElementById('langCode').textContent=savedLang.c.toUpperCase().slice(0,2);
+    document.documentElement.lang=lang;
+    applyLang();
+  }catch(e){ token=''; }
+})();
+
 function openLangModal(){
   document.getElementById('langModalOverlay').classList.add('open');
   document.getElementById('langSearch').value='';
@@ -911,6 +917,7 @@ function buildBlueprint(desc,systemPrompt){
         }
       }
     }
+    if(currentBlob) URL.revokeObjectURL(currentBlob);
     var url=URL.createObjectURL(new Blob([JSON.stringify(bp,null,2)],{type:'application/json'}));
     currentBlob=url;
     var fname=type.label.replace(/[^a-z0-9]/gi,'-').toLowerCase()+'.json';
@@ -920,11 +927,11 @@ function buildBlueprint(desc,systemPrompt){
   }catch(e){ document.getElementById('bpName').textContent='Blueprint generated — download above'; }
 }
 
-function copyText(id){ navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>notify('Copied ✓','success')); }
+function copyText(id){ navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>notify('Copied ✓','success')).catch(()=>notify('Copy failed','error')); }
 
 function openProposal(){ document.getElementById('propOutput').style.display='none'; document.getElementById('propCopyBtns').style.display='none'; document.getElementById('proposalModal').classList.add('open'); }
 function closeProposal(){ document.getElementById('proposalModal').classList.remove('open'); }
-function copyProposal(){ navigator.clipboard.writeText(document.getElementById('propOutput').textContent).then(()=>notify('Copied ✓','success')); }
+function copyProposal(){ navigator.clipboard.writeText(document.getElementById('propOutput').textContent).then(()=>notify('Copied ✓','success')).catch(()=>notify('Copy failed','error')); }
 
 async function generateProposal(){
   var client=document.getElementById('propClient').value.trim()||'Client';

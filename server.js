@@ -16,7 +16,11 @@ app.use(cors({
   origin: ['https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'],
   credentials: true
 }));
-app.use(express.json());
+// Skip JSON body parsing for Stripe webhook — it needs the raw Buffer for signature verification
+app.use((req, res, next) => {
+  if (req.path === '/stripe-webhook') return next();
+  express.json()(req, res, next);
+});
 // Serve static assets (JS, CSS, images) but NOT HTML — HTML goes through route handlers
 const _serveStatic = express.static(path.join(__dirname, 'public'), { index: false });
 app.use((req, res, next) => {
@@ -67,7 +71,7 @@ app.get('/api/email-config', auth, (req, res) => res.json({
   brevo_api_key:  !!process.env.BREVO_API_KEY,
   brevo_smtp_user: !!process.env.BREVO_SMTP_USER,
   brevo_smtp_pass: !!process.env.BREVO_SMTP_PASS,
-  sender_email:   process.env.SENDER_EMAIL || 'supportaicashsystem@gmail.com (default)',
+  sender_email:   !!process.env.SENDER_EMAIL,
   supabase:       !!process.env.SUPABASE_URL,
   stripe:         !!process.env.STRIPE_SECRET_KEY,
   email_will_send: !!(process.env.BREVO_API_KEY || (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_PASS)),
@@ -173,12 +177,16 @@ function auth(req, res, next) {
 }
 
 // ── RATE LIMITERS ──
-const _authLimiter = rateLimit({ windowMs: 15*60*1000, max: 50, standardHeaders: true, legacyHeaders: false,
+const _authLimiter    = rateLimit({ windowMs: 15*60*1000, max: 10, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many attempts. Try again in 15 minutes.' } });
-const _codeLimiter = rateLimit({ windowMs: 15*60*1000, max: 30, standardHeaders: true, legacyHeaders: false,
+const _codeLimiter    = rateLimit({ windowMs: 15*60*1000, max: 30, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many code attempts. Try again in 15 minutes.' } });
-const _aiLimiter   = rateLimit({ windowMs: 60*1000, max: 5, standardHeaders: true, legacyHeaders: false,
+const _aiLimiter      = rateLimit({ windowMs: 60*1000, max: 5, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many AI requests. Slow down.' } });
+const _emailLimiter   = rateLimit({ windowMs: 15*60*1000, max: 10, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Too many email requests. Try again later.' } });
+const _webhookLimiter = rateLimit({ windowMs: 60*1000, max: 30, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Too many webhook requests.' } });
 
 // ════════════════════════════════════════
 // AUTH ROUTES
@@ -265,7 +273,7 @@ app.post('/api/auth/create-user', auth, _authLimiter, async (req, res) => {
 // ════════════════════════════════════════
 
 // POST /api/ai/generate — single prompt generation
-app.post('/api/ai/generate', auth, async (req, res) => {
+app.post('/api/ai/generate', auth, _aiLimiter, async (req, res) => {
   const { prompt, jsonMode } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
@@ -347,10 +355,11 @@ function loadStore() {
 }
 
 function saveStore() {
-  try {
-    if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
-    fs.writeFileSync(STORE_FILE, JSON.stringify([...automationStore.values()]), 'utf8');
-  } catch(e) { console.error('Store save error:', e.message); }
+  if (!fs.existsSync(path.join(__dirname, 'data'))) {
+    try { fs.mkdirSync(path.join(__dirname, 'data')); } catch(e) {}
+  }
+  fs.promises.writeFile(STORE_FILE, JSON.stringify([...automationStore.values()]), 'utf8')
+    .catch(e => console.error('Store save error:', e.message));
 }
 
 loadStore();
@@ -359,18 +368,30 @@ async function callAI(systemPrompt, userMessage) {
   const today = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   const fullSystem = `${systemPrompt}\n\nToday's date is: ${today}.`;
   if (OPENAI_KEY) {
-    const r = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
-      body: JSON.stringify({ model: 'gpt-4o', max_tokens: 600,
-        messages: [{ role: 'system', content: fullSystem }, { role: 'user', content: userMessage }] })
-    });
-    const d = await r.json();
-    if (d.choices && d.choices[0]) return d.choices[0].message.content;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 28000);
+    try {
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
+        body: JSON.stringify({ model: 'gpt-4o', max_tokens: 600,
+          messages: [{ role: 'system', content: fullSystem }, { role: 'user', content: userMessage }] }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      const d = await r.json();
+      if (d.choices && d.choices[0]) return d.choices[0].message.content;
+    } catch(e) {
+      clearTimeout(timeoutId);
+      throw e;
+    }
   }
   if (anthropic) {
-    const msg = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 600,
-      system: fullSystem, messages: [{ role: 'user', content: userMessage }] });
+    const msg = await Promise.race([
+      anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 600,
+        system: fullSystem, messages: [{ role: 'user', content: userMessage }] }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Anthropic timeout')), 28000))
+    ]);
     return msg.content[0].text;
   }
   throw new Error('No AI provider configured');
@@ -500,7 +521,8 @@ app.post('/api/automations', auth, async (req, res) => {
     active: true, messages_count: 0,
     created_at: new Date().toISOString()
   };
-  const webhookUrl = `${req.protocol}://${req.get('host')}/webhook/${webhook_id}`;
+  const proto = (process.env.NODE_ENV === 'production' || process.env.RENDER) ? 'https' : req.protocol;
+  const webhookUrl = `${proto}://${req.get('host')}/webhook/${webhook_id}`;
   if (supabase) {
     try {
       const { data, error } = await supabase.from('automations').insert([automation]).select().single();
@@ -566,7 +588,7 @@ app.patch('/api/automations/:id/toggle', auth, async (req, res) => {
 });
 
 // POST /webhook/:webhookId — PUBLIC execution endpoint
-app.post('/webhook/:webhookId', async (req, res) => {
+app.post('/webhook/:webhookId', _webhookLimiter, async (req, res) => {
   const { webhookId } = req.params;
   try {
     const automation = await getAutomation(webhookId);
@@ -662,7 +684,7 @@ app.get('/chat/:webhookId', (req, res) => {
 // POST /api/test-email — send a real test email and return result
 app.post('/api/test-email', auth, async (req, res) => {
   const to = req.body.to || req.user.email;
-  const result = { to, brevo_api_key: !!BREVO_API_KEY, smtp: !!transporter, brevo_user: BREVO_USER || null };
+  const result = { to, brevo_api_key: !!BREVO_API_KEY, smtp: !!transporter, brevo_user: !!BREVO_USER };
 
   if (BREVO_API_KEY) {
     try {
@@ -715,7 +737,7 @@ app.get('/api/test', auth, (req, res) => {
 });
 
 // POST /api/ai/chat — multi-turn conversation
-app.post('/api/ai/chat', auth, async (req, res) => {
+app.post('/api/ai/chat', auth, _aiLimiter, async (req, res) => {
   const { messages } = req.body;
   if (!messages || !messages.length) return res.status(400).json({ error: 'Messages required' });
 
@@ -823,8 +845,12 @@ app.post('/api/make/create', auth, async (req, res) => {
 
   const host = (zone || 'eu1.make.com').replace(/^https?:\/\//, '');
   const fs = require('fs');
+  const BLUEPRINTS_DIR = path.join(__dirname, 'public', 'blueprints');
   const safeName = path.basename(blueprintFile).replace(/[^a-zA-Z0-9._-]/g, '');
-  const bpPath = path.join(__dirname, 'public', 'blueprints', safeName);
+  const bpPath = path.join(BLUEPRINTS_DIR, safeName);
+  if (!bpPath.startsWith(BLUEPRINTS_DIR + path.sep) && bpPath !== BLUEPRINTS_DIR) {
+    return res.status(400).json({ error: 'Invalid blueprint path' });
+  }
 
   let blueprint;
   try {
@@ -866,7 +892,7 @@ app.post('/api/make/create', auth, async (req, res) => {
 // ════════════════════════════════════════
 
 // POST /api/email/send
-app.post('/api/email/send', auth, _authLimiter, async (req, res) => {
+app.post('/api/email/send', auth, _emailLimiter, async (req, res) => {
   const { to, subject, body, fromName } = req.body;
   if (!to || !subject || !body) return res.status(400).json({ error: 'To, subject and body are required' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: 'Invalid recipient email' });
@@ -911,7 +937,8 @@ app.get('/api/webhooks', auth, (req, res) => {
 app.post('/api/webhooks/create', auth, (req, res) => {
   const { name } = req.body;
   const id = crypto.randomBytes(8).toString('hex');
-  const url = `${req.protocol}://${req.get('host')}/webhook/${id}`;
+  const proto = (process.env.NODE_ENV === 'production' || process.env.RENDER) ? 'https' : req.protocol;
+  const url = `${proto}://${req.get('host')}/webhook/${id}`;
   const webhook = { id, name: name || 'Webhook', url, hits: 0, lastHit: null, createdAt: new Date().toISOString() };
   webhooks.push(webhook);
   addLog(`Webhook created: ${name}`, 'webhook', 'success');
@@ -1278,7 +1305,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`AutoFlow server running on port ${PORT} (0.0.0.0)`);
   addLog('Server started', 'system', 'success');
   // Self-test so we can see in Render logs if routes work
-  fetch(`http://127.0.0.1:${PORT}/ping`)
+  fetch(`http://localhost:${PORT}/ping`)
     .then(r => r.json())
     .then(d => console.log('SELF-TEST OK:', JSON.stringify(d)))
     .catch(e => console.error('SELF-TEST FAIL:', e.message));
