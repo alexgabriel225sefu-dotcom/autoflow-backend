@@ -1158,9 +1158,37 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'intro-epic.html'));
 });
 
+// POST /api/demo/generate — public, rate-limited (3 req/IP/day)
+const _demoLimiter = rateLimit({ windowMs: 24*60*60*1000, max: 5, standardHeaders: true, legacyHeaders: false,
+  handler: (req,res) => res.status(429).json({ error: 'Demo limit reached. Get full access at aicashsystem.space' }) });
+app.post('/api/demo/generate', _demoLimiter, async (req, res) => {
+  const { desc } = req.body;
+  if (!desc || desc.length < 10) return res.status(400).json({ error: 'Describe your automation' });
+  const prompt = `You are an expert Make.com automation consultant. Analyze this request and return a plan.
+AUTOMATION REQUEST: "${desc.slice(0,300)}"
+RULES: Setup price $300-$1500. Monthly retainer min $100/month. Outreach: human, 2-3 sentences, specific.
+Return ONLY valid JSON, no markdown:
+{"what":"2-3 sentences what this automation does","setupPrice":"$XXX–$XXX","monthlyPrice":"$XXX/month","outreach":"Personalized cold outreach, 2-3 sentences, human tone, mention their specific business"}`;
+  try {
+    if (OPENAI_KEY) {
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+OPENAI_KEY},
+        body: JSON.stringify({ model:'gpt-4o-mini', max_tokens:400, response_format:{type:'json_object'}, messages:[{role:'user',content:prompt}] })
+      });
+      const d = await r.json();
+      if (d.choices?.[0]) { try { return res.json(JSON.parse(d.choices[0].message.content)); } catch(e){} }
+    }
+    if (anthropic) {
+      const msg = await anthropic.messages.create({ model:'claude-haiku-4-5-20251001', max_tokens:400, messages:[{role:'user',content:prompt}] });
+      try { return res.json(JSON.parse(msg.content[0].text)); } catch(e){}
+    }
+    return res.status(500).json({ error: 'AI unavailable' });
+  } catch(e) { return res.status(500).json({ error: 'Generation failed' }); }
+});
+
 // Explicit HTML page routes
 // Public pages — no auth required
-const publicPages = ['index','access','privacy','terms','intro-epic','app','demo'];
+const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
