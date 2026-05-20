@@ -403,7 +403,7 @@ async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
   const subject = `New message — ${_he(automationName)}`;
   const html = `<div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:24px">
     <h2 style="color:#E53E2E;margin-bottom:4px">💬 New customer message</h2>
-    <p style="color:#888;font-size:13px;margin-bottom:20px">${_he(automationName)} · AutoFlow</p>
+    <p style="color:#888;font-size:13px;margin-bottom:20px">${_he(automationName)} · Blueprint Studio</p>
     <div style="background:#f5f5f5;border-radius:10px;padding:16px;margin-bottom:14px">
       <p style="font-size:11px;text-transform:uppercase;color:#999;margin-bottom:6px">Customer</p>
       <p style="font-size:14px;color:#222;line-height:1.6;margin:0">${_he(userMsg).replace(/\n/g,'<br>')}</p>
@@ -695,8 +695,8 @@ app.post('/api/test-email', auth, async (req, res) => {
         body: JSON.stringify({
           sender: { name: SENDER_NAME, email: SENDER_EMAIL },
           to: [{ email: to }],
-          subject: 'AutoFlow — Test Email',
-          htmlContent: '<p>Test email from AutoFlow. If you see this, email notifications work!</p>'
+          subject: 'Blueprint Studio — Test Email',
+          htmlContent: '<p>Test email from Blueprint Studio. If you see this, email notifications work!</p>'
         })
       });
       const body = await r.text();
@@ -712,8 +712,8 @@ app.post('/api/test-email', auth, async (req, res) => {
       await transporter.sendMail({
         from: SENDER_EMAIL,
         to,
-        subject: 'AutoFlow — Test Email',
-        html: '<p>Test email from AutoFlow. If you see this, email notifications work!</p>'
+        subject: 'Blueprint Studio — Test Email',
+        html: '<p>Test email from Blueprint Studio. If you see this, email notifications work!</p>'
       });
       return res.json({ ...result, method: 'smtp', success: true });
     } catch(e) {
@@ -947,7 +947,7 @@ app.post('/api/webhooks/create', auth, (req, res) => {
 
 // GET /webhook/:id — friendly info page (POST is handled by automation engine above)
 app.get('/webhook/:id', (req, res) => {
-  res.json({ info: 'This is an AutoFlow automation webhook. Send a POST request with {"message":"your text"} to trigger it.', id: req.params.id });
+  res.json({ info: 'This is a Blueprint Studio automation webhook. Send a POST request with {"message":"your text"} to trigger it.', id: req.params.id });
 });
 
 // ════════════════════════════════════════
@@ -1302,7 +1302,7 @@ app.use((err, req, res, next) => {
 // ════════════════════════════════════════
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`AutoFlow server running on port ${PORT} (0.0.0.0)`);
+  console.log(`Blueprint Studio server running on port ${PORT} (0.0.0.0)`);
   addLog('Server started', 'system', 'success');
   // Self-test so we can see in Render logs if routes work
   fetch(`http://localhost:${PORT}/ping`)
