@@ -135,6 +135,9 @@ h1{font-size:18px;color:#E53E2E;margin-bottom:4px;text-align:center;font-weight:
   🔊 Activează vocea → dai Play → screen record imediat &nbsp;·&nbsp; Voce masculină selectată automat
 </div>
 
+<div class="sec">🎬 UGC Ads — Blueprint Studio (Higgsfield format)</div>
+<div class="grid" id="gugc"></div>
+
 <div class="sec">🔥 POV — Am încercat tot, nimic n-a mers până la AI Agency</div>
 <div class="grid" id="gpov"></div>
 
@@ -312,6 +315,167 @@ const SC={
   </svg>`,
 };
 
+/* ═══════ BLUEPRINT STUDIO SVG SCENES ═══════ */
+SC.bptype=()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
+  <rect width="240" height="340" fill="#060606"/>
+  <rect x="0" y="0" width="240" height="38" fill="#0d0d0d" stroke="#111" stroke-width="0"/>
+  <text x="14" y="15" fill="#E53E2E" font-size="8" font-weight="800" font-family="sans-serif" letter-spacing="1">⚡ BLUEPRINT STUDIO</text>
+  <text x="14" y="28" fill="#333" font-size="7" font-family="sans-serif">aicashsystem.space/try</text>
+  <rect x="12" y="48" width="216" height="78" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1" rx="8"/>
+  <text x="20" y="66" fill="#2a2a2a" font-size="8" font-family="sans-serif" font-style="italic">Describe the business automation...</text>
+  <text class="c1" x="20" y="84" fill="#ccc" font-size="9" font-family="sans-serif">Coffee shop needs WhatsApp</text>
+  <text class="c2" x="20" y="97" fill="#ccc" font-size="9" font-family="sans-serif">bot for order confirmations</text>
+  <text class="c3" x="20" y="110" fill="#E53E2E" font-size="10" font-family="sans-serif" font-weight="900">|</text>
+  <rect class="c3" x="12" y="136" width="216" height="32" fill="url(#rbg)" rx="8"/>
+  <defs><linearGradient id="rbg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#B52318"/><stop offset="100%" stop-color="#E53E2E"/></linearGradient></defs>
+  <text class="c3" x="120" y="157" text-anchor="middle" fill="white" font-size="12" font-weight="800" font-family="sans-serif">⚡ Generate Blueprint</text>
+  <circle class="puls c4r" cx="96" cy="196" r="5" fill="#E53E2E"/>
+  <circle class="puls c4r" cx="120" cy="196" r="5" fill="#E53E2E" style="animation-delay:.25s"/>
+  <circle class="puls c4r" cx="144" cy="196" r="5" fill="#E53E2E" style="animation-delay:.5s"/>
+  <text class="c5r" x="120" y="220" text-anchor="middle" fill="#2a2a2a" font-size="8" font-family="sans-serif">Generating blueprint…</text>
+  <text class="c6r" x="120" y="260" text-anchor="middle" fill="#E53E2E" font-size="28">⚡</text>
+  <text class="c6r" x="120" y="285" text-anchor="middle" fill="#f5f5f5" font-size="11" font-weight="800" font-family="sans-serif">Ready in 60 seconds</text>
+  <text class="c6r" x="120" y="302" text-anchor="middle" fill="#333" font-size="9" font-family="sans-serif">No coding · No experience</text>
+</svg>`;
+
+SC.bpresult=()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
+  <rect width="240" height="340" fill="#060606"/>
+  <rect x="0" y="0" width="240" height="38" fill="#0d0d0d"/>
+  <text x="14" y="15" fill="#E53E2E" font-size="8" font-weight="800" font-family="sans-serif" letter-spacing="1">⚡ BLUEPRINT GENERATED</text>
+  <text x="14" y="28" fill="#4ADE80" font-size="7" font-family="sans-serif">✓ Done in 58 seconds</text>
+  <rect class="c1" x="12" y="46" width="216" height="52" fill="#0a0a0a" stroke="rgba(74,222,128,.2)" stroke-width="1" rx="8"/>
+  <text class="c1" x="20" y="62" fill="#555" font-size="7" font-family="sans-serif" letter-spacing=".5">AUTOMATION STACK</text>
+  <text class="c1" x="20" y="76" fill="#f5f5f5" font-size="10" font-weight="700" font-family="sans-serif">WhatsApp Order Bot</text>
+  <text class="c2" x="20" y="89" fill="#4ADE80" font-size="8" font-family="sans-serif">Make.com + GPT-4o + Twilio</text>
+  <rect class="c2" x="12" y="106" width="216" height="52" fill="#0a0a0a" stroke="rgba(229,62,46,.15)" stroke-width="1" rx="8"/>
+  <text class="c2" x="20" y="122" fill="#555" font-size="7" font-family="sans-serif" letter-spacing=".5">CLIENT PITCH PRICE</text>
+  <text class="c3" x="20" y="140" fill="#E53E2E" font-size="20" font-weight="900" font-family="sans-serif">$900</text>
+  <text class="c3" x="76" y="140" fill="#333" font-size="9" font-family="sans-serif">one-time setup</text>
+  <text class="c4r" x="20" y="154" fill="#333" font-size="8" font-family="sans-serif">+ $200/mo maintenance</text>
+  <rect class="c4r" x="12" y="166" width="216" height="62" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1" rx="8"/>
+  <text class="c4r" x="20" y="182" fill="#555" font-size="7" font-family="sans-serif" letter-spacing=".5">COPY-PASTE CLIENT MESSAGE</text>
+  <text class="c5r" x="20" y="196" fill="#aaa" font-size="8" font-family="sans-serif">"Hey [name], I noticed your</text>
+  <text class="c5r" x="20" y="208" fill="#aaa" font-size="8" font-family="sans-serif">coffee shop doesn't have auto</text>
+  <text class="c5r" x="20" y="220" fill="#aaa" font-size="8" font-family="sans-serif">order confirmations. I can fix</text>
+  <text class="c5r" x="20" y="232" fill="#E53E2E" font-size="8" font-family="sans-serif">that for $900. Interested?"</text>
+  <rect class="chk-pop" x="12" y="242" width="216" height="32" fill="#E53E2E" rx="8"/>
+  <text class="chk-pop" x="120" y="263" text-anchor="middle" fill="white" font-size="11" font-weight="800" font-family="sans-serif">Try Free → aicashsystem.space</text>
+  <text class="money1" x="190" y="108" fill="#4ADE80" font-size="13" font-weight="700" font-family="sans-serif">+$900</text>
+  <text class="money2" x="185" y="126" fill="#4ADE80" font-size="10" font-family="sans-serif">+$200/mo</text>
+</svg>`;
+
+SC.localbiz=()=>`<svg viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg" width="240" height="340">
+  <rect width="240" height="340" fill="#060606"/>
+  <text x="120" y="28" text-anchor="middle" fill="#E53E2E" font-size="10" font-weight="800" font-family="sans-serif" letter-spacing=".5">LOCAL BUSINESSES NEED THIS</text>
+  <rect class="c1" x="12" y="42" width="216" height="44" fill="#0a0a0a" stroke="rgba(74,222,128,.15)" stroke-width="1" rx="8"/>
+  <text class="c1" x="28" y="60" fill="#f5f5f5" font-size="13">☕</text>
+  <text class="c1" x="52" y="60" fill="#f5f5f5" font-size="11" font-weight="700" font-family="sans-serif">Restaurants</text>
+  <text class="c1" x="52" y="74" fill="#555" font-size="8" font-family="sans-serif">WhatsApp order bot</text>
+  <text class="c1" x="196" y="68" text-anchor="end" fill="#4ADE80" font-size="13" font-weight="900" font-family="sans-serif">$800</text>
+  <rect class="c2" x="12" y="94" width="216" height="44" fill="#0a0a0a" stroke="rgba(74,222,128,.15)" stroke-width="1" rx="8"/>
+  <text class="c2" x="28" y="112" fill="#f5f5f5" font-size="13">🏋️</text>
+  <text class="c2" x="52" y="112" fill="#f5f5f5" font-size="11" font-weight="700" font-family="sans-serif">Gyms</text>
+  <text class="c2" x="52" y="126" fill="#555" font-size="8" font-family="sans-serif">Instagram DM automation</text>
+  <text class="c2" x="196" y="120" text-anchor="end" fill="#4ADE80" font-size="13" font-weight="900" font-family="sans-serif">$1,000</text>
+  <rect class="c3" x="12" y="146" width="216" height="44" fill="#0a0a0a" stroke="rgba(74,222,128,.15)" stroke-width="1" rx="8"/>
+  <text class="c3" x="28" y="164" fill="#f5f5f5" font-size="13">💈</text>
+  <text class="c3" x="52" y="164" fill="#f5f5f5" font-size="11" font-weight="700" font-family="sans-serif">Salons</text>
+  <text class="c3" x="52" y="178" fill="#555" font-size="8" font-family="sans-serif">Booking + reply bot</text>
+  <text class="c3" x="196" y="172" text-anchor="end" fill="#4ADE80" font-size="13" font-weight="900" font-family="sans-serif">$900</text>
+  <rect class="c4r" x="12" y="198" width="216" height="44" fill="#0a0a0a" stroke="rgba(74,222,128,.15)" stroke-width="1" rx="8"/>
+  <text class="c4r" x="28" y="216" fill="#f5f5f5" font-size="13">🏥</text>
+  <text class="c4r" x="52" y="216" fill="#f5f5f5" font-size="11" font-weight="700" font-family="sans-serif">Clinics</text>
+  <text class="c4r" x="52" y="230" fill="#555" font-size="8" font-family="sans-serif">Appointment reminder bot</text>
+  <text class="c4r" x="196" y="224" text-anchor="end" fill="#4ADE80" font-size="13" font-weight="900" font-family="sans-serif">$1,200</text>
+  <rect class="chk-pop" x="12" y="256" width="216" height="28" fill="rgba(74,222,128,.06)" stroke="rgba(74,222,128,.2)" stroke-width="1" rx="8"/>
+  <text class="chk-pop" x="120" y="275" text-anchor="middle" fill="#4ADE80" font-size="10" font-weight="800" font-family="sans-serif">AI builds the plan in 60 seconds</text>
+  <rect class="chk-pop" x="12" y="294" width="216" height="30" fill="#E53E2E" rx="8"/>
+  <text class="chk-pop" x="120" y="314" text-anchor="middle" fill="white" font-size="11" font-weight="800" font-family="sans-serif">aicashsystem.space/try</text>
+</svg>`;
+
+/* ═══════ UGC VIDEO DATA (Higgsfield format) ═══════ */
+const UGC=[
+  {
+    title:'UGC 1 — "Tried Everything" (main hook)',
+    desc:"30s · Higgsfield format · Blueprint Studio interface",
+    beats:[
+      {type:'bt',text:"I couldn't figure out\nhow to make money with AI.",dur:3200,cl:''},
+      {type:'list',dur:5000,items:[
+        {ic:'📝',text:'Selling prompts',tg:'zero buyers',cl:'fail'},
+        {ic:'📚',text:'Selling courses',tg:'nobody signed up',cl:'fail'},
+        {ic:'🎥',text:'Making content',tg:'no conversions',cl:'fail'},
+      ]},
+      {type:'scene',s:'bptype',dur:4500},
+      {type:'bt',text:"First sale:\n$900. Restaurant owner.",dur:3000,cl:'green'},
+      {type:'scene',s:'bpresult',dur:4000},
+      {type:'bt',text:"I'll link it below 👇",dur:2800,cl:'red'},
+    ],
+    script:`I couldn't figure out how to make actual money with AI.
+
+I tried selling prompts. Nobody was buying.
+I tried selling courses. Nobody signed up.
+I tried making content. Zero conversions.
+
+Then I found Blueprint Studio.
+You type in any business automation — it gives you the full plan, the exact price to charge, and the message to send the client.
+
+First blueprint I sold to a restaurant owner. Nine hundred dollars. One DM.
+
+I'll link it below.`
+  },
+  {
+    title:'UGC 2 — "Local Business Secret"',
+    desc:"28s · Local biz list → Blueprint result",
+    beats:[
+      {type:'bt',text:"Nobody's talking about\nAI + local businesses.",dur:3000,cl:'red'},
+      {type:'bt',text:"They have money.\nThey need automation.\nThey don't know how.",dur:3500,cl:''},
+      {type:'scene',s:'localbiz',dur:5000},
+      {type:'scene',s:'bptype',dur:4000},
+      {type:'bt',text:"Blueprint Studio builds the\nentire plan in 60 seconds.",dur:3200,cl:'green'},
+      {type:'bt',text:"Worth trying if you want\nyour first online income 👇",dur:3200,cl:'red'},
+    ],
+    script:`Nobody's talking about selling AI to local businesses. And it's the easiest sale I've ever made.
+
+Restaurants need WhatsApp bots.
+Gyms need DM automation.
+Salons need booking bots.
+Clinics need appointment reminders.
+
+They have the budget. They just need someone to show them what's possible.
+
+Blueprint Studio generates the full automation plan, the price, and the client message in sixty seconds. No coding.
+
+Worth trying if you want your first online income. I'll link it below.`
+  },
+  {
+    title:'UGC 3 — "Every AI Method Failed"',
+    desc:"32s · Saturated angle → Blueprint win",
+    beats:[
+      {type:'bt',text:"Every AI money method\nwas saturated.",dur:3000,cl:''},
+      {type:'bt',text:"Or needed skills\nI didn't have.",dur:2800,cl:''},
+      {type:'bt',text:"Then I found\nBlueprint Studio.",dur:2500,cl:'green'},
+      {type:'scene',s:'bptype',dur:4500},
+      {type:'bt',text:"Type any business.\nGet the full plan.",dur:3000,cl:''},
+      {type:'scene',s:'bpresult',dur:4000},
+      {type:'bt',text:"Gym owner. $1,200.\nMy first AI sale.",dur:3000,cl:'green'},
+      {type:'bt',text:"I'll link it below 👇",dur:2500,cl:'red'},
+    ],
+    script:`Every AI money method I tried was either saturated or needed skills I didn't have.
+
+Content creation — too much competition.
+Prompt selling — market's dead.
+AI tools — needed coding.
+
+Then I found Blueprint Studio.
+
+You describe any business automation in plain English. It gives you the full technical plan, the exact price to charge, and the pitch message — in sixty seconds.
+
+Gym owner. Twelve hundred dollars. My first AI sale.
+
+I'll link it below.`
+  },
+];
+
 /* ═══════ VIDEO DATA ═══════ */
 const POV=[
   {
@@ -488,6 +652,7 @@ function render(arr,cid){
     document.getElementById('pl'+uid).addEventListener('click',()=>tog(uid,i,cid));
   });
 }
+render(UGC,'gugc');
 render(POV,'gpov');
 render(HOOK,'ghook');
 
@@ -506,7 +671,7 @@ function stopV(uid){
   stopSpeech();
 }
 function startV(uid,idx,cid){
-  const arr=cid==='gpov'?POV:HOOK;
+  const arr=cid==='gpov'?POV:cid==='gugc'?UGC:HOOK;
   ST[uid]={on:true,b:0,timers:[]};
   document.getElementById('pl'+uid).classList.add('playing');
   document.getElementById('pb'+uid).style.cssText='width:0%;transition:none';
