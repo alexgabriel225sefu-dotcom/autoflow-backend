@@ -474,22 +474,149 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
     <div class="dash-inner">
       <div class="dash-top-bar">
         <div class="dtb-dot"></div><div class="dtb-dot"></div><div class="dtb-dot"></div>
-        <div class="dtb-title">Blueprint Studio Dashboard — aicashsystem.space</div>
+        <div class="dtb-title">Blueprint Studio — aicashsystem.space</div>
         <div class="dtb-live">LIVE</div>
       </div>
       <div class="dash-cols">
         <div class="dash-sidebar">
-          <div class="ds-section">Main</div>
+          <div class="ds-section">Platform</div>
           <div class="ds-item active">📊 Dashboard</div>
-          <div class="ds-item">⚡ Flows</div>
-          <div class="ds-item">👥 Leads</div>
-          <div class="ds-item">🤖 AI Agents</div>
-          <div class="ds-section">Reports</div>
-          <div class="ds-item">📈 Analytics</div>
-          <div class="ds-item">💳 Billing</div>
-          <div class="ds-section">Settings</div>
-          <div class="ds-item">⚙️ Integrations</div>
+          <div class="ds-item">⚡ Blueprint Builder</div>
+          <div class="ds-item">🤖 AI Automations</div>
+          <div class="ds-item">👥 Client Outreach</div>
+          <div class="ds-section">Earnings</div>
+          <div class="ds-item">💳 Stripe Payments</div>
+          <div class="ds-item">📈 Revenue</div>
+          <div class="ds-section">Tools</div>
+          <div class="ds-item">⚙️ Make.com</div>
+          <div class="ds-item">🔗 Integrations</div>
         </div>
+        <div class="dash-main">
+          <!-- KPI Row -->
+          <div class="dash-kpis">
+            <div class="kpi">
+              <div class="kpi-label">Stripe Revenue · 30 days</div>
+              <div class="kpi-value" id="kpi-rev">$0</div>
+              <div class="kpi-change up">↑ +34% vs last month</div>
+              <div class="kpi-bar"><div class="kpi-fill" style="width:76%"></div></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Blueprints Sold</div>
+              <div class="kpi-value" id="kpi-sold">0</div>
+              <div class="kpi-change up">↑ 12 this week</div>
+              <div class="kpi-bar"><div class="kpi-fill" style="width:60%"></div></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Avg Sale Value</div>
+              <div class="kpi-value">$97</div>
+              <div class="kpi-change red">⚡ 247 students</div>
+              <div class="kpi-bar"><div class="kpi-fill" style="width:88%"></div></div>
+            </div>
+          </div>
+          <!-- Stripe payment feed -->
+          <div class="dash-chart" style="padding:14px 16px">
+            <div class="chart-header">
+              <div class="chart-title">💳 Recent Stripe Payments</div>
+              <div class="chart-period" style="color:#4ADE80;border-color:rgba(74,222,128,.2);background:rgba(74,222,128,.06)">● Live</div>
+            </div>
+            <div id="stripe-feed" style="display:flex;flex-direction:column;gap:7px">
+              <div class="stripe-row" style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.05)">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="width:28px;height:28px;background:rgba(74,222,128,.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px">✓</div>
+                  <div><div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:600">Blueprint Access</div><div style="font-size:10px;color:rgba(255,255,255,.25)">James W. · United States</div></div>
+                </div>
+                <div style="text-align:right"><div style="font-size:13px;font-weight:800;color:#4ADE80">+$97.00</div><div style="font-size:9px;color:rgba(255,255,255,.2)">2 min ago</div></div>
+              </div>
+              <div class="stripe-row" style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.05)">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="width:28px;height:28px;background:rgba(74,222,128,.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px">✓</div>
+                  <div><div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:600">Blueprint Access</div><div style="font-size:10px;color:rgba(255,255,255,.25)">Sophie M. · United Kingdom</div></div>
+                </div>
+                <div style="text-align:right"><div style="font-size:13px;font-weight:800;color:#4ADE80">+$97.00</div><div style="font-size:9px;color:rgba(255,255,255,.2)">18 min ago</div></div>
+              </div>
+              <div class="stripe-row" style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.05)">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="width:28px;height:28px;background:rgba(74,222,128,.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px">✓</div>
+                  <div><div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:600">Blueprint Access</div><div style="font-size:10px;color:rgba(255,255,255,.25)">Lukas B. · Germany</div></div>
+                </div>
+                <div style="text-align:right"><div style="font-size:13px;font-weight:800;color:#4ADE80">+$97.00</div><div style="font-size:9px;color:rgba(255,255,255,.2)">41 min ago</div></div>
+              </div>
+            </div>
+          </div>
+          <!-- Revenue chart + site pages -->
+          <div class="dash-feeds">
+            <div class="feed">
+              <div class="feed-icon">⚡</div>
+              <div><div class="feed-title">Blueprint Builder</div><div class="feed-sub">aicashsystem.space/try</div></div>
+              <div class="feed-badge green">Live</div>
+            </div>
+            <div class="feed">
+              <div class="feed-icon">🤖</div>
+              <div><div class="feed-title">AI Demo Videos</div><div class="feed-sub">aicashsystem.space/videos</div></div>
+              <div class="feed-badge green">Live</div>
+            </div>
+            <div class="feed">
+              <div class="feed-icon">📱</div>
+              <div><div class="feed-title">TikTok Demo</div><div class="feed-sub">aicashsystem.space/tiktok-demo</div></div>
+              <div class="feed-badge red">Record</div>
+            </div>
+            <div class="feed">
+              <div class="feed-icon">💳</div>
+              <div><div class="feed-title">Stripe Checkout</div><div class="feed-sub">Instant access on payment</div></div>
+              <div class="feed-badge green">Active</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+/* Animated KPI counters */
+(function(){
+  function countUp(el, target, prefix, dur){
+    const t0=performance.now();
+    (function fr(now){
+      const p=Math.min((now-t0)/dur,1);
+      const e=1-Math.pow(1-p,3);
+      el.textContent=prefix+Math.round(target*e).toLocaleString();
+      p<1?requestAnimationFrame(fr):null;
+    })(performance.now());
+  }
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        countUp(document.getElementById('kpi-rev'),24540,'$',2000);
+        countUp(document.getElementById('kpi-sold'),253,'',1800);
+        obs.disconnect();
+      }
+    });
+  },{threshold:0.3});
+  const el=document.getElementById('kpi-rev');
+  if(el) obs.observe(el);
+  /* Live payment ticker */
+  const buyers=[
+    {name:'Marco R.',country:'Italy'},{name:'Jake T.',country:'Australia'},
+    {name:'Emily C.',country:'Canada'},{name:'Daan V.',country:'Netherlands'},
+    {name:'Ana P.',country:'Brazil'},{name:'Erik S.',country:'Sweden'},
+    {name:'Priya K.',country:'India'},{name:'Tom H.',country:'United States'},
+  ];
+  let bi=0;
+  setInterval(()=>{
+    const feed=document.getElementById('stripe-feed');
+    if(!feed) return;
+    const b=buyers[bi%buyers.length]; bi++;
+    const mins=Math.floor(Math.random()*5)+1;
+    const row=document.createElement('div');
+    row.className='stripe-row';
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:rgba(74,222,128,.04);border-radius:8px;border:1px solid rgba(74,222,128,.15);animation:fadeUp .4s ease;opacity:0;transition:opacity .3s';
+    row.innerHTML=`<div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:rgba(74,222,128,.1);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px">✓</div><div><div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:600">Blueprint Access</div><div style="font-size:10px;color:rgba(255,255,255,.25)">${b.name} · ${b.country}</div></div></div><div style="text-align:right"><div style="font-size:13px;font-weight:800;color:#4ADE80">+$97.00</div><div style="font-size:9px;color:rgba(255,255,255,.2)">just now</div></div>`;
+    feed.insertBefore(row, feed.firstChild);
+    setTimeout(()=>row.style.opacity='1',50);
+    if(feed.children.length>4) feed.removeChild(feed.lastChild);
+  }, 8000);
+})();
+</script>
         <div class="dash-main">
           <div class="dash-kpis">
             <div class="kpi">
@@ -511,49 +638,6 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
               <div class="kpi-bar"><div class="kpi-fill" style="width:88%"></div></div>
             </div>
           </div>
-          <div class="dash-chart">
-            <div class="chart-header">
-              <div class="chart-title">Revenue Over Time</div>
-              <div class="chart-period">Last 30 days</div>
-            </div>
-            <svg class="chart-svg" viewBox="0 0 600 60" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#E53E2E" stop-opacity=".2"/>
-                  <stop offset="100%" stop-color="#E53E2E" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-              <path d="M0,55 C30,52 60,50 90,45 C120,40 150,48 180,38 C210,28 240,35 270,22 C300,9 330,18 360,12 C390,6 420,14 450,8 C480,2 520,5 550,3 L600,1" stroke="#E53E2E" stroke-width="2" fill="none"/>
-              <path d="M0,55 C30,52 60,50 90,45 C120,40 150,48 180,38 C210,28 240,35 270,22 C300,9 330,18 360,12 C390,6 420,14 450,8 C480,2 520,5 550,3 L600,1 L600,60 L0,60Z" fill="url(#cg)"/>
-            </svg>
-          </div>
-          <div class="dash-feeds">
-            <div class="feed">
-              <div class="feed-icon">⚡</div>
-              <div><div class="feed-title">New Lead Captured</div><div class="feed-sub">WhatsApp Bot · 2 min ago</div></div>
-              <div class="feed-badge green">Live</div>
-            </div>
-            <div class="feed">
-              <div class="feed-icon">🤖</div>
-              <div><div class="feed-title">AI Agent Running</div><div class="feed-sub">Client: Gatherstone</div></div>
-              <div class="feed-badge green">OK</div>
-            </div>
-            <div class="feed">
-              <div class="feed-icon">📧</div>
-              <div><div class="feed-title">Email Sequence Sent</div><div class="feed-sub">Cold Outreach · 47 sent</div></div>
-              <div class="feed-badge red">Auto</div>
-            </div>
-            <div class="feed">
-              <div class="feed-icon">💬</div>
-              <div><div class="feed-title">DM Bot Replied</div><div class="feed-sub">Instagram · @brand</div></div>
-              <div class="feed-badge green">Live</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- STATS -->
 <div class="stats">
