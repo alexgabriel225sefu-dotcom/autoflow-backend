@@ -492,80 +492,11 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
           <div class="ds-item">🔗 Integrations</div>
         </div>
         <div class="dash-main">
-          <!-- KPI Row -->
-          <div class="dash-kpis">
-            <div class="kpi">
-              <div class="kpi-label">Revenue Goal · 30 days</div>
-              <div class="kpi-value" id="kpi-rev">$0</div>
-              <div class="kpi-change up">↑ +34% projected growth</div>
-              <div class="kpi-bar"><div class="kpi-fill" style="width:76%"></div></div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Blueprints Target</div>
-              <div class="kpi-value" id="kpi-sold">0</div>
-              <div class="kpi-change up">↑ 12 this week</div>
-              <div class="kpi-bar"><div class="kpi-fill" style="width:60%"></div></div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Price Per Blueprint</div>
-              <div class="kpi-value">$97</div>
-              <div class="kpi-change red">⚡ Early access open</div>
-              <div class="kpi-bar"><div class="kpi-fill" style="width:88%"></div></div>
-            </div>
-          </div>
-          <!-- Site pages -->
-          <div class="dash-feeds">
-            <div class="feed">
-              <div class="feed-icon">⚡</div>
-              <div><div class="feed-title">Blueprint Builder</div><div class="feed-sub">aicashsystem.space/try</div></div>
-              <div class="feed-badge green">Live</div>
-            </div>
-            <div class="feed">
-              <div class="feed-icon">🤖</div>
-              <div><div class="feed-title">AI Demo Videos</div><div class="feed-sub">aicashsystem.space/videos</div></div>
-              <div class="feed-badge green">Live</div>
-            </div>
-            <div class="feed">
-              <div class="feed-icon">📱</div>
-              <div><div class="feed-title">TikTok Demo</div><div class="feed-sub">aicashsystem.space/tiktok-demo</div></div>
-              <div class="feed-badge red">Record</div>
-            </div>
-            <div class="feed">
-              <div class="feed-icon">💳</div>
-              <div><div class="feed-title">Stripe Checkout</div><div class="feed-sub">Instant access on payment</div></div>
-              <div class="feed-badge green">Active</div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
-<script>
-/* Animated KPI counters */
-(function(){
-  function countUp(el, target, prefix, dur){
-    const t0=performance.now();
-    (function fr(now){
-      const p=Math.min((now-t0)/dur,1);
-      const e=1-Math.pow(1-p,3);
-      el.textContent=prefix+Math.round(target*e).toLocaleString();
-      p<1?requestAnimationFrame(fr):null;
-    })(performance.now());
-  }
-  const obs=new IntersectionObserver(entries=>{
-    entries.forEach(e=>{
-      if(e.isIntersecting){
-        countUp(document.getElementById('kpi-rev'),24540,'$',2000);
-        countUp(document.getElementById('kpi-sold'),253,'',1800);
-        obs.disconnect();
-      }
-    });
-  },{threshold:0.3});
-  const el=document.getElementById('kpi-rev');
-  if(el) obs.observe(el);
-})();
-</script>
         <div class="dash-main">
           <div class="dash-kpis">
             <div class="kpi">
