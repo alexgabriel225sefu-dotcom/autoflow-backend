@@ -495,29 +495,29 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
           <!-- KPI Row -->
           <div class="dash-kpis">
             <div class="kpi">
-              <div class="kpi-label">Stripe Revenue · 30 days</div>
+              <div class="kpi-label">Revenue Goal · 30 days</div>
               <div class="kpi-value" id="kpi-rev">$0</div>
-              <div class="kpi-change up">↑ +34% vs last month</div>
+              <div class="kpi-change up">↑ +34% projected growth</div>
               <div class="kpi-bar"><div class="kpi-fill" style="width:76%"></div></div>
             </div>
             <div class="kpi">
-              <div class="kpi-label">Blueprints Sold</div>
+              <div class="kpi-label">Blueprints Target</div>
               <div class="kpi-value" id="kpi-sold">0</div>
               <div class="kpi-change up">↑ 12 this week</div>
               <div class="kpi-bar"><div class="kpi-fill" style="width:60%"></div></div>
             </div>
             <div class="kpi">
-              <div class="kpi-label">Avg Sale Value</div>
+              <div class="kpi-label">Price Per Blueprint</div>
               <div class="kpi-value">$97</div>
-              <div class="kpi-change red">⚡ 247 students</div>
+              <div class="kpi-change red">⚡ Early access open</div>
               <div class="kpi-bar"><div class="kpi-fill" style="width:88%"></div></div>
             </div>
           </div>
-          <!-- Stripe payment feed -->
+          <!-- Sales feed (illustrative) -->
           <div class="dash-chart" style="padding:14px 16px">
             <div class="chart-header">
-              <div class="chart-title">💳 Recent Stripe Payments</div>
-              <div class="chart-period" style="color:#4ADE80;border-color:rgba(74,222,128,.2);background:rgba(74,222,128,.06)">● Live</div>
+              <div class="chart-title">🧾 Recent Blueprint Sales <span style="font-size:9px;color:rgba(255,255,255,.3);font-weight:400;margin-left:6px">(illustrative example)</span></div>
+              <div class="chart-period" style="color:#4ADE80;border-color:rgba(74,222,128,.2);background:rgba(74,222,128,.06)">● Demo</div>
             </div>
             <div id="stripe-feed" style="display:flex;flex-direction:column;gap:7px">
               <div class="stripe-row" style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.05)">
@@ -542,9 +542,33 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
                 <div style="text-align:right"><div style="font-size:13px;font-weight:800;color:#4ADE80">+$97.00</div><div style="font-size:9px;color:rgba(255,255,255,.2)">41 min ago</div></div>
               </div>
             </div>
+            <div style="margin-top:8px;padding:6px 8px;background:rgba(255,255,255,.02);border-radius:6px;border:1px solid rgba(255,255,255,.04)">
+              <p style="font-size:9px;color:rgba(255,255,255,.2);margin:0;line-height:1.4">⚠️ The sales feed above is a <strong style="color:rgba(255,255,255,.3)">fictional illustrative example</strong> showing how Blueprint Studio could be used to sell automation blueprints. Actual results depend on your effort and market. This is not financial advice.</p>
+            </div>
           </div>
-          <!-- Revenue chart + site pages -->
-          <div class="dash-feeds">
+          <!-- UGC Ad Video Placeholder -->
+          <div class="dash-chart" style="padding:14px 16px;margin-top:12px">
+            <div class="chart-header">
+              <div class="chart-title">🎬 UGC Ad — Blueprint Studio</div>
+              <div class="chart-period" style="color:#ef4444;border-color:rgba(239,68,68,.2);background:rgba(239,68,68,.06)">● In Production</div>
+            </div>
+            <div style="background:rgba(0,0,0,.4);border-radius:10px;border:1px solid rgba(255,255,255,.06);aspect-ratio:9/16;max-height:320px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;position:relative;overflow:hidden">
+              <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(239,68,68,.04),rgba(0,0,0,0))"></div>
+              <div style="font-size:32px">🎥</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.5);text-align:center;padding:0 20px;line-height:1.5">
+                <strong style="color:rgba(255,255,255,.8);font-size:13px">UGC Ad Script Ready</strong><br>
+                <span style="font-size:10px">Hook: "I couldn't figure out how to make actual money with AI..."</span>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:0 16px">
+                <span style="font-size:9px;padding:3px 8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:20px;color:rgba(255,255,255,.5)">Higgsfield AI</span>
+                <span style="font-size:9px;padding:3px 8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:20px;color:rgba(255,255,255,.5)">60s Short-form</span>
+                <span style="font-size:9px;padding:3px 8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:20px;color:rgba(255,255,255,.5)">TikTok / Reels</span>
+              </div>
+              <a href="/tiktok-demo" style="margin-top:4px;padding:7px 18px;background:linear-gradient(135deg,#ef4444,#dc2626);border-radius:8px;font-size:11px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:.3px">▶ Preview Animation</a>
+            </div>
+          </div>
+          <!-- Site pages -->
+          <div class="dash-feeds" style="margin-top:12px">
             <div class="feed">
               <div class="feed-icon">⚡</div>
               <div><div class="feed-title">Blueprint Builder</div><div class="feed-sub">aicashsystem.space/try</div></div>
