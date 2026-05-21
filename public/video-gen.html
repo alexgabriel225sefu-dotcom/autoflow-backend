@@ -6,160 +6,181 @@
 <title>Video Generator — Blueprint Studio</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#060606;color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px 16px 80px;max-width:600px;margin:0 auto}
-h1{font-size:19px;font-weight:900;color:#E53E2E;margin-bottom:4px}
+body{background:#060606;color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px 16px 80px;max-width:560px;margin:0 auto}
+h1{font-size:20px;font-weight:900;color:#E53E2E;margin-bottom:3px}
 .sub{font-size:11px;color:#444;margin-bottom:24px}
-.sec-lbl{font-size:10px;color:#444;letter-spacing:2px;text-transform:uppercase;margin:22px 0 10px}
+.lbl{font-size:10px;color:#444;letter-spacing:2px;text-transform:uppercase;margin:22px 0 10px}
+
+/* CREDENTIALS SETUP */
+#creds-panel{background:#0d0d0d;border:1.5px solid #1f1f1f;border-radius:14px;padding:18px 16px;margin-bottom:20px}
+#creds-panel h2{font-size:13px;font-weight:800;margin-bottom:4px}
+#creds-panel p{font-size:11px;color:#555;line-height:1.6;margin-bottom:12px}
+.creds-row{display:flex;flex-direction:column;gap:8px}
+.creds-input{background:#080808;border:1.5px solid #1a1a1a;border-radius:10px;padding:11px 14px;color:#e0e0e0;font-size:12px;outline:none;width:100%;font-family:monospace}
+.creds-input:focus{border-color:rgba(229,62,46,.35)}
+.creds-input::placeholder{color:#333}
+.creds-save{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:10px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;margin-top:4px}
+.creds-saved{text-align:center;font-size:11px;color:#4ADE80;margin-top:6px;display:none}
+.creds-link{font-size:10px;color:#E53E2E;display:block;text-align:center;margin-top:8px;text-decoration:none;opacity:.7}
 
 /* SCRIPTS */
-.script-card{background:#0d0d0d;border:1px solid #1a1a1a;border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .2s}
-.script-card.selected{border-color:rgba(229,62,46,.5);background:#0f0808}
-.sc-title{font-size:13px;font-weight:700;color:#f0f0f0;margin-bottom:4px}
-.sc-hook{font-size:11px;color:#555;line-height:1.5}
+.sc-card{background:#0d0d0d;border:1px solid #1a1a1a;border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .2s}
+.sc-card.sel{border-color:rgba(229,62,46,.5);background:#0f0808}
 .sc-badge{display:inline-block;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.2);color:#E53E2E;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;margin-bottom:6px}
-
-/* AVATARS */
-.av-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.av-card{background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color .2s;position:relative}
-.av-card.selected{border-color:rgba(229,62,46,.6)}
-.av-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#111}
-.av-name{font-size:9px;color:#555;text-align:center;padding:5px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.av-chk{position:absolute;top:4px;right:4px;background:#E53E2E;border-radius:50%;width:18px;height:18px;display:none;align-items:center;justify-content:center;font-size:10px}
-.av-card.selected .av-chk{display:flex}
-.av-loading{grid-column:1/-1;text-align:center;font-size:12px;color:#333;padding:20px}
-
-/* VOICE */
-.voice-row{display:flex;gap:8px;flex-wrap:wrap}
-.voice-pill{background:#0d0d0d;border:1px solid #1a1a1a;border-radius:8px;padding:7px 12px;font-size:11px;color:#555;cursor:pointer;transition:all .2s}
-.voice-pill.selected{border-color:rgba(229,62,46,.4);color:#E53E2E;background:rgba(229,62,46,.06)}
+.sc-title{font-size:13px;font-weight:700;color:#f0f0f0;margin-bottom:3px}
+.sc-hook{font-size:11px;color:#555;line-height:1.5}
 
 /* SCRIPT EDITOR */
-.script-ta{width:100%;background:#080808;border:1.5px solid #1a1a1a;border-radius:10px;padding:12px 14px;color:#e0e0e0;font-size:12px;line-height:1.7;resize:vertical;min-height:120px;outline:none;font-family:inherit}
+.script-ta{width:100%;background:#080808;border:1.5px solid #1a1a1a;border-radius:10px;padding:12px 14px;color:#e0e0e0;font-size:12px;line-height:1.7;resize:vertical;min-height:110px;outline:none;font-family:inherit}
 .script-ta:focus{border-color:rgba(229,62,46,.35)}
-.word-count{font-size:10px;color:#333;text-align:right;margin-top:4px}
+.wc{font-size:10px;color:#333;text-align:right;margin-top:4px}
 
-/* GENERATE BTN */
-.gen-btn{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:800;cursor:pointer;margin-top:20px;box-shadow:0 4px 24px rgba(229,62,46,.3);letter-spacing:.3px}
-.gen-btn:disabled{opacity:.4;cursor:default}
+/* PERSONAS */
+.av-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.av-card{background:#0d0d0d;border:1.5px solid #1a1a1a;border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color .2s;position:relative}
+.av-card.sel{border-color:rgba(229,62,46,.7);box-shadow:0 0 12px rgba(229,62,46,.15)}
+.av-card img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;background:#111}
+.av-name{font-size:9px;color:#555;text-align:center;padding:5px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.av-chk{position:absolute;top:4px;right:4px;background:#E53E2E;border-radius:50%;width:18px;height:18px;display:none;align-items:center;justify-content:center;font-size:10px}
+.av-card.sel .av-chk{display:flex}
+.av-ph{grid-column:1/-1;text-align:center;font-size:12px;color:#333;padding:20px}
+
+/* GENERATE */
+.gen-btn{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:13px;padding:17px;font-size:15px;font-weight:900;cursor:pointer;margin-top:22px;box-shadow:0 4px 28px rgba(229,62,46,.3);letter-spacing:.3px;transition:opacity .2s}
+.gen-btn:disabled{opacity:.35;cursor:default}
 
 /* STATUS */
-.status-box{margin-top:16px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;padding:14px 16px;display:none}
-.status-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;animation:pulse 1.5s ease infinite}
-.status-dot.processing{background:#F59E0B}
-.status-dot.done{background:#4ADE80;animation:none}
-.status-dot.error{background:#f87171;animation:none}
-@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
-.status-txt{font-size:13px;font-weight:600}
-.status-sub{font-size:11px;color:#444;margin-top:2px}
-.progress-bar-bg{height:3px;background:#111;border-radius:3px;overflow:hidden;margin-top:8px}
-.progress-bar{height:100%;background:linear-gradient(90deg,#E53E2E,#ff7f6e);border-radius:3px;width:5%;transition:width 2s ease}
+.status-box{margin-top:16px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:12px;padding:16px;display:none}
+.s-row{display:flex;align-items:center;gap:12px}
+.s-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.s-dot.proc{background:#F59E0B;animation:blink 1.2s ease infinite}
+.s-dot.done{background:#4ADE80}
+.s-dot.err{background:#f87171}
+@keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+.s-txt{font-size:13px;font-weight:700}
+.s-sub{font-size:11px;color:#444;margin-top:2px}
+.prog-bg{height:3px;background:#111;border-radius:3px;overflow:hidden;margin-top:10px}
+.prog{height:100%;background:linear-gradient(90deg,#E53E2E,#ff7f6e);border-radius:3px;transition:width 3s ease}
 
 /* RESULT */
 .result-box{margin-top:16px;display:none}
 .result-box video{width:100%;border-radius:12px;border:1px solid #1a1a1a;background:#000}
 .dl-row{display:flex;gap:8px;margin-top:10px}
-.dl-btn{flex:1;padding:12px;background:#4ADE80;color:#000;border:none;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;text-align:center;text-decoration:none}
-.share-btn{padding:12px 16px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;font-size:13px;color:#555;cursor:pointer}
+.dl-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:13px;background:#4ADE80;color:#000;border:none;border-radius:11px;font-size:13px;font-weight:900;cursor:pointer;text-decoration:none}
+.cp-btn{padding:13px 16px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:11px;font-size:12px;color:#555;cursor:pointer;white-space:nowrap}
 
-/* TIPS */
-.tips{background:#080808;border:1px solid #111;border-radius:10px;padding:12px 14px;margin-top:16px}
-.tips-title{font-size:10px;color:#333;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
-.tip{font-size:11px;color:#3a3a3a;line-height:1.7;padding:2px 0}
-.tip strong{color:#555}
+/* INFO */
+.info-box{background:#0a0a0a;border:1px solid #111;border-radius:10px;padding:12px 14px;margin-top:20px}
+.info-title{font-size:9px;color:#2a2a2a;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px}
+.info-item{font-size:11px;color:#333;line-height:1.7;padding:1px 0}
+.info-item strong{color:#484848}
 </style>
 </head>
 <body>
 
 <h1>🎬 Video Generator</h1>
-<p class="sub">Generează video real cu avatar AI — HeyGen API</p>
+<p class="sub">Creatify AI — videouri UGC reale cu oameni reali</p>
 
-<!-- STEP 1: SCRIPT -->
-<div class="sec-lbl">Pas 1 — Alege scriptul UGC</div>
+<!-- ── STEP 0: CREDENTIALS ── -->
+<div id="creds-panel">
+  <h2>🔑 Conectează Creatify</h2>
+  <p>Creează cont gratuit pe <strong>creatify.ai</strong> → Settings → API Keys → copiază <em>API ID</em> + <em>API Key</em></p>
+  <div class="creds-row">
+    <input class="creds-input" id="ci-id"  type="text"     placeholder="API ID (ex: abc123...)">
+    <input class="creds-input" id="ci-key" type="password" placeholder="API Key (ex: sk-...)">
+    <button class="creds-save" onclick="saveCreds()">Salvează &amp; Continuă →</button>
+  </div>
+  <div id="creds-saved" class="creds-saved">✅ Credențiale salvate!</div>
+  <a class="creds-link" href="https://creatify.ai" target="_blank" rel="noopener">→ Creează cont gratuit pe creatify.ai (20 video gratis)</a>
+</div>
 
-<div class="script-card selected" id="sc0" onclick="selectScript(0)">
-  <div class="sc-badge">UGC #1 — BEST</div>
-  <div class="sc-title">"Couldn't figure out how to make money with AI"</div>
-  <div class="sc-hook">Tried prompts, courses, content — then Blueprint Studio → $900 first sale</div>
+<!-- ── STEP 1: SCRIPT ── -->
+<div id="main-content" style="display:none">
+
+<div class="lbl">Pas 1 — Alege scriptul UGC</div>
+
+<div class="sc-card sel" id="sc0" onclick="pickScript(0)">
+  <div class="sc-badge">⭐ UGC #1 — Best performer</div>
+  <div class="sc-title">"Nu reușeam să fac bani cu AI"</div>
+  <div class="sc-hook">Blueprint Studio → $900 prima vânzare — cea mai directă abordare</div>
 </div>
-<div class="script-card" id="sc1" onclick="selectScript(1)">
-  <div class="sc-badge">UGC #2</div>
-  <div class="sc-title">"Nobody's talking about AI + local businesses"</div>
-  <div class="sc-hook">Restaurants, gyms, salons need automation — $800–$1,200 per client</div>
+<div class="sc-card" id="sc1" onclick="pickScript(1)">
+  <div class="sc-badge">UGC #2 — Local biz angle</div>
+  <div class="sc-title">"Nimeni nu vorbește despre AI + business local"</div>
+  <div class="sc-hook">Restaurant, gym, salon — $800–$1,200 per client, zero coding</div>
 </div>
-<div class="script-card" id="sc2" onclick="selectScript(2)">
-  <div class="sc-badge">UGC #3</div>
-  <div class="sc-title">"Every AI money method was saturated"</div>
-  <div class="sc-hook">Fresh angle — gym owner, $1,200, first AI sale</div>
+<div class="sc-card" id="sc2" onclick="pickScript(2)">
+  <div class="sc-badge">UGC #3 — Saturation angle</div>
+  <div class="sc-title">"Orice metodă AI era saturată"</div>
+  <div class="sc-hook">Proprietar de gym → $1,200. Primul client AI.</div>
 </div>
 
 <!-- SCRIPT EDITOR -->
-<div class="sec-lbl">Script (editabil)</div>
-<textarea class="script-ta" id="script-ta" oninput="updateWC()"></textarea>
-<div class="word-count" id="wc">0 / 90 cuvinte</div>
+<div class="lbl">Script (editabil)</div>
+<textarea class="script-ta" id="script-ta" oninput="updateWC()" spellcheck="false"></textarea>
+<div class="wc" id="wc">0 / 90 cuvinte</div>
 
-<!-- STEP 2: AVATAR -->
-<div class="sec-lbl">Pas 2 — Alege avatarul</div>
+<!-- ── STEP 2: PERSONA ── -->
+<div class="lbl">Pas 2 — Alege actorul UGC</div>
 <div class="av-grid" id="av-grid">
-  <div class="av-loading">Se încarcă avatarele…</div>
+  <div class="av-ph" id="av-ph">
+    <button onclick="loadPersonas()" style="background:rgba(229,62,46,.15);border:1px solid rgba(229,62,46,.25);color:#E53E2E;padding:10px 20px;border-radius:8px;font-size:12px;cursor:pointer">
+      Încarcă actori →
+    </button>
+  </div>
 </div>
 
-<!-- STEP 3: VOICE -->
-<div class="sec-lbl">Pas 3 — Voce</div>
-<div class="voice-row" id="voice-row">
-  <div class="voice-loading" style="font-size:12px;color:#333">Se încarcă vocile…</div>
-</div>
-
-<!-- GENERATE -->
-<button class="gen-btn" id="gen-btn" onclick="generate()">⚡ Generează Video</button>
+<!-- ── GENERATE ── -->
+<button class="gen-btn" id="gen-btn" onclick="generate()">⚡ Generează Video UGC</button>
 
 <!-- STATUS -->
 <div class="status-box" id="status-box">
-  <div class="status-row">
-    <div class="status-dot processing" id="status-dot"></div>
+  <div class="s-row">
+    <div class="s-dot proc" id="s-dot"></div>
     <div>
-      <div class="status-txt" id="status-txt">Se procesează…</div>
-      <div class="status-sub" id="status-sub">HeyGen generează video-ul (2–5 minute)</div>
+      <div class="s-txt" id="s-txt">Se procesează…</div>
+      <div class="s-sub" id="s-sub">Creatify randează (1–3 minute)</div>
     </div>
   </div>
-  <div class="progress-bar-bg"><div class="progress-bar" id="prog-bar"></div></div>
+  <div class="prog-bg"><div class="prog" id="prog" style="width:5%"></div></div>
 </div>
 
 <!-- RESULT -->
 <div class="result-box" id="result-box">
-  <video id="result-vid" controls playsinline></video>
+  <video id="rv" controls playsinline></video>
   <div class="dl-row">
-    <a class="dl-btn" id="dl-btn" download="blueprint-studio-video.mp4">⬇️ Descarcă MP4</a>
-    <button class="share-btn" onclick="copyLink()">🔗 Link</button>
+    <a class="dl-btn" id="dl-btn" download="blueprint-ugc.mp4">⬇️ Descarcă</a>
+    <button class="cp-btn" onclick="copyVidLink()">🔗 Copiază link</button>
   </div>
 </div>
 
-<!-- TIPS -->
-<div class="tips">
-  <div class="tips-title">💡 Tips pentru rezultate mai bune</div>
-  <div class="tip"><strong>Script:</strong> Max 90 cuvinte. Vorbire naturală, nu scris.</div>
-  <div class="tip"><strong>Avatar:</strong> Alege unul tânăr, aspect casual, nu formal.</div>
-  <div class="tip"><strong>Durată:</strong> Video-ul se generează în 2–5 minute.</div>
-  <div class="tip"><strong>Calitate:</strong> 720×1280 (9:16) — direct pentru TikTok.</div>
+<!-- INFO -->
+<div class="info-box">
+  <div class="info-title">💡 Tips</div>
+  <div class="info-item"><strong>Script:</strong> Max 90 cuvinte. Vorbire naturală, nu text formal.</div>
+  <div class="info-item"><strong>Actor:</strong> Alege tânăr, aspect casual — nu corporate.</div>
+  <div class="info-item"><strong>Format:</strong> 9:16 vertical — direct pe TikTok / Reels.</div>
+  <div class="info-item"><strong>Durată:</strong> Video gata în 1–3 minute după generare.</div>
 </div>
+
+</div><!-- end main-content -->
 
 <script>
 /* ── SCRIPTS ── */
 const SCRIPTS = [
-  `I couldn't figure out how to make actual money with AI.
+`I couldn't figure out how to make actual money with AI.
 
-I tried selling prompts. Nobody was buying.
-I tried selling courses. Nobody signed up.
-I tried content creation. Zero conversions.
+Tried selling prompts. Nobody bought.
+Tried courses. Nobody signed up.
+Tried content. Zero conversions.
 
-Then I found Blueprint Studio.
-You type in any business automation — it gives you the full plan, the price to charge, and the message to send the client. In sixty seconds.
+Then I found Blueprint Studio — you type any business automation and it gives you the full plan, the price to charge, and the message to send the client. Sixty seconds.
 
 First blueprint I sold to a restaurant owner. Nine hundred dollars. One DM.
 
-I'll link it below if you've been dealing with the same thing.`,
+Link's below if you're dealing with the same thing.`,
 
-  `Nobody's talking about selling AI to local businesses. And it's the easiest sale I've ever made.
+`Nobody talks about selling AI to local businesses. It's the easiest sale I've ever made.
 
 Restaurants need WhatsApp bots.
 Gyms need DM automation.
@@ -167,210 +188,240 @@ Salons need booking systems.
 
 They have the budget. They just need someone to show them what's possible.
 
-Blueprint Studio generates the full automation plan, the price, and the client pitch in sixty seconds. No coding.
+Blueprint Studio generates the full plan, the price, and the client pitch in sixty seconds. No coding needed.
 
-Worth trying if you want your first online income. I'll link it below.`,
+Link's below if you want your first online income.`,
 
-  `Every AI money method I tried was either saturated or needed skills I didn't have.
+`Every AI money method I tried was saturated or needed skills I didn't have.
 
 Content creation — too much competition.
 Prompt selling — market's dead.
-Building AI tools — needed coding.
+Building tools — needed coding.
 
 Then I found Blueprint Studio.
 
-You describe any business automation. It gives you the full technical plan, the price, and the pitch message — sixty seconds.
+You describe any automation. It gives you the full technical plan, the price, and the pitch. Sixty seconds.
 
 Gym owner. Twelve hundred dollars. My first AI sale.
 
-I'll link it below.`
+Link's below.`
 ];
 
-let selectedScript = 0;
-let selectedAvatar = null;
-let selectedVoice = null;
-let pollTimer = null;
+let selScript = 0;
+let selPersona = null;
+let pollTimer  = null;
+let apiId  = '';
+let apiKey = '';
 
-function selectScript(idx){
-  document.querySelectorAll('.script-card').forEach((c,i)=>c.classList.toggle('selected',i===idx));
-  selectedScript = idx;
-  document.getElementById('script-ta').value = SCRIPTS[idx];
-  updateWC();
-}
-selectScript(0); // default
-
-function updateWC(){
-  const txt = document.getElementById('script-ta').value.trim();
-  const words = txt ? txt.split(/\s+/).length : 0;
-  const el = document.getElementById('wc');
-  el.textContent = `${words} / 90 cuvinte`;
-  el.style.color = words > 90 ? '#f87171' : '#333';
-}
-
-/* ── LOAD AVATARS ── */
-async function loadAvatars(){
-  try{
-    const r = await fetch('/api/heygen/avatars');
-    const d = await r.json();
-    const avatars = (d.data?.avatars || d.data || d.avatars || []).filter(a => a.avatar_id);
-
-    if(!avatars.length){ document.getElementById('av-grid').innerHTML='<div class="av-loading">Nu s-au găsit avatare. Verifică API key-ul HeyGen.</div>'; return; }
-
-    const grid = document.getElementById('av-grid');
-    grid.innerHTML = '';
-
-    /* Prioritize public/male avatars */
-    const sorted = avatars.sort((a,b)=>{
-      const nameA = (a.avatar_name||'').toLowerCase();
-      const nameB = (b.avatar_name||'').toLowerCase();
-      const maleKw = ['male','man','guy','josh','ryan','adam','eric','mark','james','daniel','tyler','alex','noah','ethan'];
-      const aScore = maleKw.some(k=>nameA.includes(k)) ? 1 : 0;
-      const bScore = maleKw.some(k=>nameB.includes(k)) ? 1 : 0;
-      return bScore - aScore;
-    });
-
-    sorted.slice(0, 12).forEach((av, i) => {
-      const div = document.createElement('div');
-      div.className = 'av-card' + (i===0?' selected':'');
-      div.onclick = () => {
-        document.querySelectorAll('.av-card').forEach(c=>c.classList.remove('selected'));
-        div.classList.add('selected');
-        selectedAvatar = av.avatar_id;
-      };
-      const preview = av.preview_image_url || av.preview_video_url || '';
-      div.innerHTML = `
-        <img src="${preview}" onerror="this.style.background='#111';this.style.minHeight='80px'" loading="lazy">
-        <div class="av-name">${av.avatar_name||av.avatar_id}</div>
-        <div class="av-chk">✓</div>`;
-      grid.appendChild(div);
-      if(i===0) selectedAvatar = av.avatar_id;
-    });
-  }catch(e){
-    document.getElementById('av-grid').innerHTML='<div class="av-loading" style="color:#f87171">Eroare: '+e.message+'</div>';
+/* ── CREDENTIALS ── */
+function loadStoredCreds(){
+  apiId  = localStorage.getItem('creatify_id')  || '';
+  apiKey = localStorage.getItem('creatify_key') || '';
+  if(apiId && apiKey){
+    document.getElementById('ci-id').value  = apiId;
+    document.getElementById('ci-key').value = '••••••••';
+    showMain();
   }
 }
 
-/* ── LOAD VOICES ── */
-async function loadVoices(){
+function saveCreds(){
+  const id  = document.getElementById('ci-id').value.trim();
+  const key = document.getElementById('ci-key').value.trim();
+  if(!id || !key || key === '••••••••'){
+    alert('Introdu API ID și API Key din contul Creatify.');
+    return;
+  }
+  localStorage.setItem('creatify_id', id);
+  localStorage.setItem('creatify_key', key);
+  apiId = id; apiKey = key;
+  document.getElementById('creds-saved').style.display = 'block';
+  setTimeout(showMain, 600);
+}
+
+function showMain(){
+  document.getElementById('creds-panel').style.opacity = '.4';
+  document.getElementById('main-content').style.display = 'block';
+  pickScript(0);
+}
+
+/* ── SCRIPT SELECTION ── */
+function pickScript(idx){
+  document.querySelectorAll('.sc-card').forEach((c,i) => c.classList.toggle('sel', i===idx));
+  selScript = idx;
+  document.getElementById('script-ta').value = SCRIPTS[idx];
+  updateWC();
+}
+
+function updateWC(){
+  const txt = document.getElementById('script-ta').value.trim();
+  const w   = txt ? txt.split(/\s+/).length : 0;
+  const el  = document.getElementById('wc');
+  el.textContent = `${w} / 90 cuvinte`;
+  el.style.color = w > 90 ? '#f87171' : '#333';
+}
+
+/* ── PERSONAS ── */
+async function loadPersonas(){
+  document.getElementById('av-ph').innerHTML = '<span style="color:#333;font-size:12px">Se încarcă actorii…</span>';
   try{
-    const r = await fetch('/api/heygen/voices');
+    const r = await fetch('/api/creatify/avatars', { headers: _hdrs() });
+    if(r.status === 503){ showCredsError(); return; }
     const d = await r.json();
-    const voices = (d.data?.voices || d.data || d.voices || []).filter(v=>v.voice_id&&(v.language||'').toLowerCase().includes('en'));
+    const personas = Array.isArray(d) ? d : (d.results || d.data || d.avatars || []);
+    if(!personas.length){
+      document.getElementById('av-ph').innerHTML = '<span style="color:#555;font-size:12px">Niciun actor găsit. Verifică API key-ul.</span>';
+      return;
+    }
+    renderPersonas(personas);
+  }catch(e){
+    document.getElementById('av-ph').innerHTML = `<span style="color:#f87171;font-size:12px">Eroare: ${e.message}</span>`;
+  }
+}
 
-    if(!voices.length){ document.getElementById('voice-row').innerHTML='<span style="font-size:12px;color:#333">Nu s-au găsit voci.</span>'; return; }
+function renderPersonas(list){
+  const grid = document.getElementById('av-grid');
+  grid.innerHTML = '';
+  list.slice(0,12).forEach((p, i) => {
+    const id   = p.id || p.persona_id || p.avatar_id;
+    const name = p.name || p.avatar_name || ('Actor '+(i+1));
+    const img  = p.preview_image_url || p.image_url || p.thumbnail || p.preview || '';
+    const card = document.createElement('div');
+    card.className = 'av-card' + (i===0 ? ' sel' : '');
+    card.innerHTML = `
+      <img src="${img}" loading="lazy" onerror="this.style.background='#111';this.style.minHeight='90px'">
+      <div class="av-name">${name}</div>
+      <div class="av-chk">✓</div>`;
+    card.onclick = () => {
+      document.querySelectorAll('.av-card').forEach(c=>c.classList.remove('sel'));
+      card.classList.add('sel');
+      selPersona = id;
+    };
+    grid.appendChild(card);
+    if(i===0) selPersona = id;
+  });
+}
 
-    const maleVoices = voices.filter(v=>(v.gender||'').toLowerCase()==='male').slice(0,5);
-    const show = maleVoices.length ? maleVoices : voices.slice(0,5);
+function showCredsError(){
+  document.getElementById('creds-panel').style.opacity = '1';
+  document.getElementById('main-content').style.display = 'none';
+  alert('Credențialele Creatify sunt invalide sau expirate. Re-introdu API ID + Key.');
+  localStorage.removeItem('creatify_id');
+  localStorage.removeItem('creatify_key');
+}
 
-    const row = document.getElementById('voice-row');
-    row.innerHTML = '';
-    show.forEach((v,i)=>{
-      const pill = document.createElement('div');
-      pill.className = 'voice-pill'+(i===0?' selected':'');
-      pill.textContent = v.name || v.voice_id;
-      pill.onclick = () => {
-        document.querySelectorAll('.voice-pill').forEach(p=>p.classList.remove('selected'));
-        pill.classList.add('selected');
-        selectedVoice = v.voice_id;
-      };
-      row.appendChild(pill);
-      if(i===0) selectedVoice = v.voice_id;
-    });
-  }catch(e){ console.warn('voices error', e); }
+/* ── HEADERS ── */
+function _hdrs(){
+  return { 'Content-Type': 'application/json', 'X-Creatify-Id': apiId, 'X-Creatify-Key': apiKey };
 }
 
 /* ── GENERATE ── */
 async function generate(){
   const script = document.getElementById('script-ta').value.trim();
   if(script.length < 20){ alert('Scriptul e prea scurt!'); return; }
-  if(!selectedAvatar){ alert('Alege un avatar!'); return; }
 
   const btn = document.getElementById('gen-btn');
   btn.disabled = true;
-  document.getElementById('status-box').style.display = 'block';
   document.getElementById('result-box').style.display = 'none';
-  setStatus('processing','Se trimite la HeyGen…','Video-ul se generează (2–5 min)…',10);
+  setStatus('proc', 'Se creează video…', 'Creatify procesează scriptul…', 10);
+  document.getElementById('status-box').style.display = 'block';
 
   try{
-    const r = await fetch('/api/heygen/generate',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ script, avatar_id: selectedAvatar, voice_id: selectedVoice })
+    /* Step 1: create the ad */
+    const cr = await fetch('/api/creatify/create', {
+      method: 'POST',
+      headers: _hdrs(),
+      body: JSON.stringify({ script, persona_id: selPersona, aspect_ratio: '9:16' })
     });
-    const d = await r.json();
-    if(d.error){ setStatus('error','Eroare: '+d.error,'Verifică API key-ul HeyGen',''); btn.disabled=false; return; }
-    const vid_id = d.video_id;
-    setStatus('processing','Video în procesare…','HeyGen randează (2–5 minute)',20);
-    pollStatus(vid_id, btn);
+    const cd = await cr.json();
+    if(!cr.ok || cd.error) {
+      setStatus('err', 'Eroare creare: ' + (cd.error || cd.detail || JSON.stringify(cd)), '', '');
+      btn.disabled = false; return;
+    }
+    const adId = cd.id;
+    setStatus('proc', 'Se trimite la randare…', 'Creatify pregătește video-ul…', 25);
+
+    /* Step 2: trigger render */
+    await fetch('/api/creatify/render/'+adId, { method:'POST', headers: _hdrs() });
+    setStatus('proc', 'Se randează…', 'Creatify generează (1–3 min). Nu închide pagina.', 35);
+
+    /* Step 3: poll */
+    pollStatus(adId, btn);
+
   }catch(e){
-    setStatus('error','Eroare de rețea',''+e.message,'');
+    setStatus('err', 'Eroare rețea', e.message, '');
     btn.disabled = false;
   }
 }
 
-function pollStatus(vid_id, btn){
+/* ── POLL ── */
+function pollStatus(adId, btn){
   let attempts = 0;
-  const maxAttempts = 80; /* 80 × 4s = ~5 min */
-  const pcts = [20,30,40,50,60,70,80,88,93,96,98];
+  const maxAt  = 90; /* 90×4s = 6 min max */
+  const pcts   = [35,42,50,58,65,72,78,83,88,92,95,97,99];
 
   pollTimer = setInterval(async()=>{
     attempts++;
     try{
-      const r = await fetch('/api/heygen/status/'+vid_id);
+      const r = await fetch('/api/creatify/status/'+adId, { headers: _hdrs() });
       const d = await r.json();
-      const status = d.status || d.video_status;
+      const status = (d.status||'').toLowerCase();
       const pct = pcts[Math.min(attempts-1, pcts.length-1)];
 
-      if(status === 'completed' || status === 'done'){
+      if(status === 'done' || status === 'completed' || status === 'success'){
         clearInterval(pollTimer);
-        const url = d.video_url || d.url;
-        if(!url){ setStatus('error','Video generat dar fără URL','Verifică HeyGen dashboard',''); btn.disabled=false; return; }
-        setStatus('done','✅ Video gata!','Descarcă-l mai jos',100);
-        showResult(url, vid_id);
+        const url = d.video_output || d.output?.video_url || d.video_url || d.url || '';
+        if(!url){
+          setStatus('err','Video gata dar fără URL','Verifică dashboard-ul Creatify','');
+          btn.disabled = false; return;
+        }
+        setStatus('done','✅ Video gata!','Descarcă și postează pe TikTok!', 100);
+        showResult(url);
         btn.disabled = false;
+
       } else if(status === 'failed' || status === 'error'){
         clearInterval(pollTimer);
-        setStatus('error','HeyGen: generare eșuată','Încearcă alt avatar sau script mai scurt','');
+        setStatus('err','Creatify: generare eșuată. Încearcă alt script sau actor.','','');
         btn.disabled = false;
+
       } else {
-        setStatus('processing','Randare HeyGen…',`Status: ${status} (${attempts*4}s)`, pct);
+        setStatus('proc', `Randare… ${attempts*4}s`, `Status: ${status||'processing'}`, pct);
       }
 
-      if(attempts >= maxAttempts){
+      if(attempts >= maxAt){
         clearInterval(pollTimer);
-        setStatus('error','Timeout','Verifică HeyGen dashboard manual','');
+        setStatus('err','Timeout (6 min)','Verifică dashboard-ul Creatify manual','');
         btn.disabled = false;
       }
-    }catch(e){ console.warn('poll error',e); }
+    }catch(e){ console.warn('poll err',e); }
   }, 4000);
 }
 
-function showResult(url, vid_id){
-  const vid = document.getElementById('result-vid');
+/* ── RESULT ── */
+function showResult(url){
+  const vid = document.getElementById('rv');
   vid.src = url;
   const dl = document.getElementById('dl-btn');
   dl.href = url;
-  dl._vidId = vid_id;
   document.getElementById('result-box').style.display = 'block';
+  vid.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function copyLink(){
-  const url = document.getElementById('result-vid').src;
-  if(!url){ alert('Generează video-ul mai întâi'); return; }
+function copyVidLink(){
+  const url = document.getElementById('rv').src;
+  if(!url){ alert('Generează video mai întâi'); return; }
   navigator.clipboard.writeText(url).then(()=>alert('Link copiat!')).catch(()=>prompt('Copiază linkul:',url));
 }
 
+/* ── STATUS ── */
 function setStatus(type, txt, sub, pct){
-  const dot = document.getElementById('status-dot');
-  dot.className = 'status-dot '+type;
-  document.getElementById('status-txt').textContent = txt;
-  document.getElementById('status-sub').textContent = sub;
-  if(pct!=='') document.getElementById('prog-bar').style.width = pct+'%';
+  document.getElementById('s-dot').className = 's-dot ' + type;
+  document.getElementById('s-txt').textContent = txt;
+  document.getElementById('s-sub').textContent = sub;
+  if(pct !== '') document.getElementById('prog').style.width = pct + '%';
 }
 
 /* ── INIT ── */
-loadAvatars();
-loadVoices();
+loadStoredCreds();
 </script>
 </body>
 </html>
