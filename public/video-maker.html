@@ -198,114 +198,92 @@ async function generate(){
   btn.disabled = true;
   document.getElementById('prog-wrap').style.display = 'block';
   document.getElementById('prev-wrap').style.display = 'none';
-  setProgress(0, 'Se încarcă imaginile…');
+  setProgress(5, 'Se încarcă imaginile…');
 
-  /* Load all images */
   const imgs = await Promise.all(activeSlots.map(s => loadImg(s.url)));
 
-  /* Canvas setup — 1080x1920 (9:16) */
+  /* Canvas — 720x1280 pentru mobile (mai rapid) */
   const canvas = document.getElementById('canvas');
-  const W = 1080, H = 1920;
+  const W = 720, H = 1280;
   canvas.width = W; canvas.height = H;
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:.01;z-index:-1;display:block';
   const ctx = canvas.getContext('2d');
 
-  /* MediaRecorder */
-  const stream = canvas.captureStream(30);
+  /* Pick mimeType — iOS Safari suportă mp4 */
+  const mimeType =
+    MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' :
+    MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' :
+    MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : null;
 
-  /* Add audio track if music selected */
-  if(musicFile){
-    try{
-      const audioCtx = new AudioContext();
-      const buf = await musicFile.arrayBuffer();
-      const audioBuffer = await audioCtx.decodeAudioData(buf);
-      const dest = audioCtx.createMediaStreamDestination();
-      const src = audioCtx.createBufferSource();
-      src.buffer = audioBuffer;
-      src.loop = true;
-      // Fade in/out with gain
-      const gain = audioCtx.createGain();
-      gain.gain.value = 0.6;
-      src.connect(gain); gain.connect(dest);
-      src.start(0);
-      dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
-    }catch(err){ console.warn('Audio error:', err); }
-  }
+  if(!mimeType){ alert('Browserul tău nu suportă înregistrare video. Încearcă Chrome pe desktop sau CapCut pe telefon.'); btn.disabled=false; return; }
 
-  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-    ? 'video/webm;codecs=vp9'
-    : MediaRecorder.isTypeSupported('video/webm')
-    ? 'video/webm'
-    : 'video/mp4';
-
-  const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+  const stream = canvas.captureStream(25);
+  const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
   const chunks = [];
-  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  rec.ondataavailable = e => { if(e.data && e.data.size > 0) chunks.push(e.data); };
+  rec.start(100); /* collect every 100ms */
 
-  const FPS = 30;
-  const totalDur = activeSlots.reduce((a,s)=>a+s.dur,0);
-  let frame = 0;
-  const totalFrames = totalDur * FPS;
-
-  rec.start();
-
+  const totalDur = activeSlots.reduce((a,s)=>a+s.dur, 0);
   let elapsed = 0;
+
   for(let si = 0; si < activeSlots.length; si++){
     const s = activeSlots[si];
-    const frames = Math.round(s.dur * FPS);
-    const nextImg = si + 1 < activeSlots.length ? imgs[si+1] : null;
+    const durMs = s.dur * 1000;
+    const startTs = performance.now();
 
-    for(let f = 0; f < frames; f++){
-      const t = f / frames; // 0..1 within this clip
-      const progress = (elapsed + f) / totalFrames;
+    /* Animate this slide in real-time using RAF */
+    await new Promise(resolve => {
+      function frame(){
+        const now = performance.now();
+        const dt = now - startTs;
+        const t = Math.min(dt / durMs, 1); /* 0..1 */
 
-      /* Draw current image (cover fit) */
-      drawImgCover(ctx, imgs[si], W, H);
-
-      /* Dark overlay for readability */
-      ctx.fillStyle = 'rgba(0,0,0,0.25)';
-      ctx.fillRect(0,0,W,H);
-
-      /* Caption */
-      if(s.cap && s.cap.trim()){
-        drawCaption(ctx, s.cap.trim(), W, H, t);
-      }
-
-      /* Fade in at start */
-      if(t < 0.08){
-        ctx.fillStyle = `rgba(0,0,0,${1 - t/0.08})`;
+        drawImgCover(ctx, imgs[si], W, H);
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
         ctx.fillRect(0,0,W,H);
-      }
-      /* Fade out at end */
-      if(t > 0.9){
-        ctx.fillStyle = `rgba(0,0,0,${(t-0.9)/0.1})`;
-        ctx.fillRect(0,0,W,H);
-      }
 
-      setProgress(progress * 100, `Imagine ${si+1}/${activeSlots.length} — frame ${f+1}/${frames}`);
-      await nextFrame();
-      frame++;
-    }
-    elapsed += frames;
+        if(s.cap && s.cap.trim()) drawCaption(ctx, s.cap.trim(), W, H, t);
+
+        /* fade in */
+        if(t < 0.1){ ctx.fillStyle=`rgba(0,0,0,${1-t/0.1})`; ctx.fillRect(0,0,W,H); }
+        /* fade out */
+        if(t > 0.88){ ctx.fillStyle=`rgba(0,0,0,${(t-0.88)/0.12})`; ctx.fillRect(0,0,W,H); }
+
+        const pct = ((elapsed + dt/1000) / totalDur) * 100;
+        setProgress(Math.min(pct, 98), `Imagine ${si+1}/${activeSlots.length} — ${Math.round(t*100)}%`);
+
+        if(t < 1) requestAnimationFrame(frame);
+        else resolve();
+      }
+      requestAnimationFrame(frame);
+    });
+
+    elapsed += s.dur;
   }
 
-  /* Final black frame */
-  ctx.fillStyle = '#000'; ctx.fillRect(0,0,W,H);
-  await nextFrame();
+  /* Black tail */
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+  await sleep(300);
 
+  setProgress(99, 'Se finalizează…');
   rec.stop();
-  setProgress(100, '✅ Video gata! Se procesează…');
+  await new Promise(r => { rec.onstop = r; });
 
-  await new Promise(r => rec.onstop = r);
   const blob = new Blob(chunks, { type: mimeType });
   const url = URL.createObjectURL(blob);
+  const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
 
-  const vid = document.getElementById('preview-vid');
-  vid.src = url;
-  document.getElementById('dl-btn').href = url;
+  document.getElementById('preview-vid').src = url;
+  const dlBtn = document.getElementById('dl-btn');
+  dlBtn.href = url;
+  dlBtn.download = `blueprint-tiktok.${ext}`;
   document.getElementById('prev-wrap').style.display = 'block';
+  canvas.style.cssText = 'display:none';
   btn.disabled = false;
   setProgress(100, '✅ Video gata! Descarcă mai jos.');
 }
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
 function drawImgCover(ctx, img, W, H){
   const imgAR = img.naturalWidth / img.naturalHeight;
@@ -370,10 +348,6 @@ function loadImg(src){
     i.crossOrigin = 'anonymous';
     i.src = src;
   });
-}
-
-function nextFrame(){
-  return new Promise(r => requestAnimationFrame(r));
 }
 
 function setProgress(pct, txt){
