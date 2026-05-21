@@ -3,162 +3,127 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Blueprint Studio — TikTok</title>
+<title>AutoFlow TikTok Demo</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{
-  background:#000;
-  display:flex;align-items:center;justify-content:center;
-  min-height:100vh;
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  overflow:hidden;
-}
+body{background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden}
 
 /* ══ PHONE ══ */
-#phone{
-  width:390px;height:844px;
-  background:#000;
-  border-radius:50px;
-  border:10px solid #1c1c1e;
-  box-shadow:0 0 0 1px #333,0 40px 100px rgba(0,0,0,.9);
-  position:relative;overflow:hidden;
-}
-/* dynamic island */
-#phone::before{
-  content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);
-  width:120px;height:34px;background:#000;border-radius:20px;z-index:200;
-}
-/* status bar */
-.sb{
-  position:absolute;top:0;left:0;right:0;height:52px;
-  display:flex;align-items:flex-end;justify-content:space-between;
-  padding:0 28px 8px;z-index:150;color:#fff;font-size:12px;font-weight:600;
-}
+#phone{width:390px;height:844px;background:#000;border-radius:50px;border:10px solid #1c1c1e;box-shadow:0 0 0 1px #333,0 40px 100px rgba(0,0,0,.9);position:relative;overflow:hidden}
+#phone::before{content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:120px;height:34px;background:#000;border-radius:20px;z-index:200}
+.sb{position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 8px;z-index:150;color:#fff;font-size:12px;font-weight:600}
 .sb-time{font-size:16px;font-weight:700}
 .sb-icons{display:flex;gap:5px;align-items:center}
 
-/* ══ SCENES ══ */
-.scene{
-  position:absolute;inset:0;
-  display:flex;flex-direction:column;
-  opacity:0;transition:opacity .5s ease;
-  pointer-events:none;
-}
+.scene{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;transition:opacity .5s ease;pointer-events:none}
 .scene.active{opacity:1;pointer-events:all}
 
-/* ══════════════════════════════════════
-   SCENE 1 — Lock screen payment notif
-══════════════════════════════════════ */
-#s-lock{
-  background:linear-gradient(160deg,#1a1a2e 0%,#0d0d1a 60%,#000 100%);
-  align-items:center;justify-content:center;
-}
-.lock-time{font-size:72px;font-weight:200;color:#fff;letter-spacing:-2px;margin-top:-60px;text-align:center}
-.lock-date{font-size:16px;color:rgba(255,255,255,.55);text-align:center;margin-bottom:40px}
-
-/* Notification card */
-.notif{
-  position:absolute;top:130px;left:16px;right:16px;
-  background:rgba(30,30,30,.92);backdrop-filter:blur(20px);
-  border-radius:16px;padding:14px 16px;
-  display:flex;gap:12px;align-items:flex-start;
-  opacity:0;transform:translateY(-30px) scale(0.96);
-  transition:all .5s cubic-bezier(0.34,1.56,0.64,1);
-  border:1px solid rgba(255,255,255,.08);
-}
+/* ══ SCENE 1: LOCK SCREEN ══ */
+#s-lock{background:linear-gradient(160deg,#0d0d1a 0%,#000 100%);align-items:center;justify-content:center}
+.lock-time{font-size:72px;font-weight:200;color:#fff;letter-spacing:-2px;margin-top:-80px;text-align:center}
+.lock-date{font-size:16px;color:rgba(255,255,255,.45);text-align:center;margin-bottom:30px}
+.notif{position:absolute;left:16px;right:16px;background:rgba(28,28,28,.95);backdrop-filter:blur(20px);border-radius:16px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;opacity:0;transform:translateY(-28px) scale(.96);transition:all .5s cubic-bezier(0.34,1.5,0.64,1);border:1px solid rgba(255,255,255,.07)}
 .notif.show{opacity:1;transform:translateY(0) scale(1)}
-.notif-icon{width:36px;height:36px;border-radius:9px;background:#1a7f4b;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.notif-body{flex:1}
-.notif-app{font-size:11px;color:rgba(255,255,255,.45);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px}
+.notif-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.notif-app{font-size:10px;color:rgba(255,255,255,.4);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px}
 .notif-title{font-size:14px;color:#fff;font-weight:700;margin-bottom:2px}
-.notif-msg{font-size:13px;color:rgba(255,255,255,.6);line-height:1.4}
-.notif-time{font-size:11px;color:rgba(255,255,255,.35);margin-left:auto;flex-shrink:0}
-
-/* Big money text */
-.money-reveal{
-  position:absolute;bottom:180px;left:0;right:0;text-align:center;
-  opacity:0;transform:scale(.85);
-  transition:all .6s cubic-bezier(0.34,1.3,0.64,1);
-}
-.money-reveal.show{opacity:1;transform:scale(1)}
-.money-amount{font-size:72px;font-weight:900;color:#fff;letter-spacing:-3px;line-height:1}
-.money-sub{font-size:15px;color:rgba(255,255,255,.45);margin-top:8px;letter-spacing:.5px}
-
-/* Caption text bottom */
-.caption{
-  position:absolute;bottom:80px;left:0;right:0;text-align:center;
-  font-size:22px;font-weight:800;color:#fff;
-  text-shadow:0 2px 12px rgba(0,0,0,.8);
-  opacity:0;transition:opacity .4s;
-  letter-spacing:-.3px;
-  padding:0 30px;
-  line-height:1.3;
-}
+.notif-msg{font-size:13px;color:rgba(255,255,255,.55);line-height:1.4}
+.notif-time{font-size:11px;color:rgba(255,255,255,.3);margin-left:auto;flex-shrink:0;white-space:nowrap}
+.money-big{position:absolute;bottom:200px;left:0;right:0;text-align:center;opacity:0;transform:scale(.8);transition:all .6s cubic-bezier(0.34,1.3,0.64,1)}
+.money-big.show{opacity:1;transform:scale(1)}
+.money-num{font-size:78px;font-weight:900;color:#fff;letter-spacing:-3px;line-height:1}
+.money-lbl{font-size:14px;color:rgba(255,255,255,.4);margin-top:6px;letter-spacing:.5px}
+.caption{position:absolute;bottom:90px;left:0;right:0;text-align:center;font-size:21px;font-weight:800;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.9);opacity:0;transition:opacity .4s;padding:0 28px;line-height:1.3}
 .caption.show{opacity:1}
-.caption .red{color:#ff4444}
-.caption .green{color:#4ADE80}
 
-/* ══════════════════════════════════════
-   SCENE 2 — "Here's how" — Blueprint UI
-══════════════════════════════════════ */
-#s-app{
-  background:#060606;
-  flex-direction:column;
-}
-#s-app::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 35% at 50% 0%,rgba(229,62,46,.08),transparent 55%);pointer-events:none}
+/* ══ SCENE 2: AUTOFLOW DASHBOARD ══ */
+#s-dash{background:#0a0a0a;flex-direction:column}
+.dash-header{padding:56px 20px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;border-bottom:1px solid #1a1a1a}
+.dash-logo{width:36px;height:36px;background:linear-gradient(135deg,#E53E2E,#ff6b5b);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.dash-title{font-size:17px;font-weight:800;color:#fff}
+.dash-sub{font-size:11px;color:#555;margin-top:1px}
+.dash-body{flex:1;padding:20px;overflow:hidden;display:flex;flex-direction:column;gap:16px}
+.dash-section-lbl{font-size:10px;color:#444;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
 
-.app-bar{
-  padding:56px 18px 12px;display:flex;align-items:center;justify-content:space-between;
-  position:relative;z-index:1;flex-shrink:0;
-}
+/* Automation cards */
+.auto-card{background:#111;border:1px solid #1e1e1e;border-radius:14px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;opacity:0;transform:translateY(12px);transition:all .5s ease}
+.auto-card.show{opacity:1;transform:translateY(0)}
+.auto-left{display:flex;align-items:center;gap:12px}
+.auto-emoji{font-size:22px}
+.auto-name{font-size:14px;font-weight:700;color:#f0f0f0;margin-bottom:3px}
+.auto-stat{font-size:12px;color:#555}
+.auto-stat strong{color:#4ADE80}
+.auto-badge{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#4ADE80}
+.auto-dot{width:7px;height:7px;background:#4ADE80;border-radius:50%;animation:pulse-dot 1.5s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.2)}}
+
+/* Stat boxes */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;opacity:0;transition:opacity .5s ease}
+.stat-row.show{opacity:1}
+.stat-box{background:#111;border:1px solid #1e1e1e;border-radius:12px;padding:14px 10px;text-align:center}
+.stat-val{font-size:22px;font-weight:900;margin-bottom:4px}
+.stat-lbl{font-size:9px;color:#444;letter-spacing:.5px;text-transform:uppercase}
+.sv-red{color:#E53E2E}
+.sv-green{color:#4ADE80}
+.sv-white{color:#f0f0f0}
+
+/* Earnings ticker */
+.earn-ticker{background:#0f0f0f;border:1px solid #1e1e1e;border-radius:12px;padding:14px 16px;opacity:0;transition:opacity .5s ease;overflow:hidden;position:relative}
+.earn-ticker.show{opacity:1}
+.earn-lbl{font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px}
+.earn-val{font-size:32px;font-weight:900;color:#4ADE80;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.earn-sub{font-size:11px;color:#444;margin-top:3px}
+.earn-bar{position:absolute;bottom:0;left:0;height:2px;background:linear-gradient(90deg,#4ADE80,#22c55e);border-radius:2px;width:0;transition:width 3s ease}
+.earn-bar.animate{width:75%}
+
+/* Notification stream */
+.notif-stream{display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.ns-item{background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:10px;opacity:0;transform:translateX(-20px);transition:all .4s ease}
+.ns-item.show{opacity:1;transform:translateX(0)}
+.ns-ico{font-size:16px;flex-shrink:0}
+.ns-txt{font-size:11px;color:#888;flex:1}
+.ns-txt strong{color:#f0f0f0}
+.ns-time{font-size:10px;color:#333;flex-shrink:0}
+
+/* ══ SCENE 3: BLUEPRINT STUDIO ══ */
+#s-app{background:#060606;flex-direction:column}
+#s-app::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 35% at 50% 0%,rgba(229,62,46,.07),transparent 55%);pointer-events:none}
+.app-bar{padding:56px 18px 12px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;flex-shrink:0}
 .app-logo{font-size:10px;font-weight:900;letter-spacing:2.5px;color:#E53E2E;text-transform:uppercase}
-.app-btn{background:#E53E2E;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:10px;font-weight:700}
-
-.app-scroll{flex:1;overflow:hidden;position:relative;padding:0 18px 20px}
-
-.app-hero{text-align:center;padding:10px 0 16px;position:relative;z-index:1}
+.app-buy{background:#E53E2E;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:10px;font-weight:700}
+#app-scroll{flex:1;overflow:hidden;position:relative}
+#app-inner{position:absolute;top:0;left:0;right:0;padding:0 18px 40px;transition:transform .7s cubic-bezier(0.4,0,0.2,1)}
+.app-hero{text-align:center;padding:10px 0 14px}
 .app-pill{display:inline-block;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:#E53E2E;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 12px;border-radius:20px;margin-bottom:10px}
 .app-h1{font-size:22px;font-weight:900;line-height:1.2;color:#f0f0f0;margin-bottom:6px}
 .app-h1 span{background:linear-gradient(135deg,#E53E2E,#ff6b5b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.app-sub{font-size:12px;color:#666;line-height:1.5}
-
-/* Input card */
-.icard{background:#0f0f0f;border:1px solid #1c1c1c;border-radius:14px;padding:16px;margin-bottom:14px;position:relative;z-index:1}
+.icard{background:#0f0f0f;border:1px solid #1c1c1c;border-radius:14px;padding:16px;margin-bottom:12px;position:relative}
 .icard::before{content:'';position:absolute;inset:0;border-radius:14px;padding:1px;background:linear-gradient(135deg,rgba(229,62,46,.4),transparent 55%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
 .ilbl{font-size:9px;color:#555;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px}
-.ita{width:100%;min-height:80px;background:#0a0a0a;border:1.5px solid #1c1c1c;border-radius:10px;padding:10px 12px;color:#f0f0f0;font-size:12px;line-height:1.6;resize:none;outline:none;font-family:inherit;transition:border-color .2s}
+.ita{width:100%;min-height:78px;background:#0a0a0a;border:1.5px solid #1c1c1c;border-radius:10px;padding:10px 12px;color:#f0f0f0;font-size:12px;line-height:1.6;resize:none;outline:none;font-family:inherit;transition:border-color .2s}
 .ita.focus{border-color:#E53E2E;box-shadow:0 0 0 3px rgba(229,62,46,.06)}
-.gbtn{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:10px;padding:13px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(229,62,46,.3);margin-top:10px;transition:all .15s}
+.gbtn{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:10px;padding:13px;font-size:13px;font-weight:700;box-shadow:0 4px 20px rgba(229,62,46,.3);margin-top:10px;transition:all .15s}
 .gbtn.press{transform:scale(0.97);opacity:.85}
-
-/* Loading */
-.lsec{display:none;padding:16px 0;position:relative;z-index:1}
+.lsec{display:none;padding:14px 0}
 .lbar-w{background:#111;border-radius:4px;height:3px;overflow:hidden;margin-bottom:12px}
 .lbar{height:100%;background:linear-gradient(90deg,#E53E2E,#ff6b5b);border-radius:4px;transition:width .7s ease;width:0}
-.lstep{display:flex;align-items:center;gap:10px;padding:7px 0;opacity:.25;transition:opacity .3s}
-.lstep.on{opacity:1}
-.lstep.ok{opacity:.65}
+.lstep{display:flex;align-items:center;gap:10px;padding:6px 0;opacity:.25;transition:opacity .3s}
+.lstep.on{opacity:1}.lstep.ok{opacity:.6}
 .lstep-ico{width:26px;height:26px;border-radius:7px;background:#111;border:1px solid #222;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;transition:all .3s}
 .lstep.on .lstep-ico{background:rgba(229,62,46,.1);border-color:rgba(229,62,46,.3)}
 .lstep.ok .lstep-ico{background:rgba(74,222,128,.06);border-color:rgba(74,222,128,.2)}
-.lstep-txt{font-size:12px;color:#666}
-.lstep.on .lstep-txt{color:#f0f0f0}
+.lstep-txt{font-size:12px;color:#666}.lstep.on .lstep-txt{color:#f0f0f0}
 .lspin{width:12px;height:12px;border:2px solid rgba(229,62,46,.15);border-top-color:#E53E2E;border-radius:50%;animation:spin .7s linear infinite;margin-left:auto}
 .lstep:not(.on) .lspin,.lstep.ok .lspin{display:none}
-.lchk{margin-left:auto;color:#4ADE80;font-size:12px;display:none}
-.lstep.ok .lchk{display:block}
+.lchk{margin-left:auto;color:#4ADE80;font-size:12px;display:none}.lstep.ok .lchk{display:block}
 @keyframes spin{to{transform:rotate(360deg)}}
-
-/* Results */
-.rsec{display:none;flex-direction:column;gap:8px;position:relative;z-index:1}
+.rsec{display:none;flex-direction:column;gap:8px}
 .rcard{background:#0f0f0f;border:1px solid #1c1c1c;border-radius:10px;padding:13px 15px;animation:up .35s ease}
 @keyframes up{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 .rlbl{font-size:9px;color:#444;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
 .rtxt{font-size:12px;color:#ccc;line-height:1.6}
-.rprice{font-size:28px;font-weight:900;background:linear-gradient(135deg,#E53E2E,#F5A623);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:3px}
+.rprice{font-size:28px;font-weight:900;background:linear-gradient(135deg,#E53E2E,#F5A623);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .rprice-s{font-size:10px;color:#444}
-
-/* Locked */
 .lkcard{background:#0f0f0f;border:1px solid #1c1c1c;border-radius:10px;padding:13px 15px;position:relative;overflow:hidden;animation:up .35s ease .2s both}
 .lktop{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
 .lklbl{font-size:9px;color:#444;font-weight:700;letter-spacing:1px;text-transform:uppercase}
@@ -170,8 +135,6 @@ body{
 @keyframes shk{0%,85%,100%{transform:rotate(0)}87%{transform:rotate(-8deg)}89%{transform:rotate(8deg)}91%{transform:rotate(-4deg)}93%{transform:rotate(0)}}
 .lkmsg{font-size:11px;color:#999;font-weight:600;text-align:center;line-height:1.5}
 .lkmsg strong{color:#E53E2E}
-
-/* FOMO */
 .fcard{background:linear-gradient(135deg,#100505,#080808);border:1px solid rgba(229,62,46,.22);border-radius:12px;padding:16px;animation:up .4s ease;position:relative;overflow:hidden}
 .fcard::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(229,62,46,.07),transparent 55%);pointer-events:none}
 .ftag{display:inline-block;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:#E53E2E;font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:10px}
@@ -185,43 +148,9 @@ body{
 .fsave{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:#4ADE80;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700}
 .fcta{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:10px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 25px rgba(229,62,46,.35);animation:ctap 2.5s ease-in-out infinite;position:relative;z-index:1}
 @keyframes ctap{0%,100%{box-shadow:0 4px 25px rgba(229,62,46,.35)}50%{box-shadow:0 4px 45px rgba(229,62,46,.55)}}
-.fproof{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px;font-size:9px;color:#444;flex-wrap:wrap;position:relative;z-index:1}
+.fproof{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px;font-size:9px;color:#444;flex-wrap:wrap}
 .fdot{width:5px;height:5px;background:#4ADE80;border-radius:50%;animation:dp 1.5s ease-in-out infinite}
 @keyframes dp{0%,100%{opacity:.4}50%{opacity:1}}
-
-/* ══ SCENE 3 — Make.com ══ */
-#s-make{background:#13131d;flex-direction:column}
-.mk-bar{background:#0d0d17;border-bottom:1px solid #1e1e2e;padding:52px 14px 12px;display:flex;align-items:center;gap:10px;flex-shrink:0}
-.mk-logo{background:linear-gradient(135deg,#6d28d9,#4c1d95);color:#fff;font-size:10px;font-weight:900;letter-spacing:1px;padding:4px 10px;border-radius:6px;text-transform:uppercase}
-.mk-name{font-size:12px;color:#7070a0;flex:1}
-.mk-run{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:11px;font-weight:700;animation:rp 2s ease-in-out infinite}
-@keyframes rp{0%,100%{box-shadow:0 0 0 0 rgba(124,58,237,0)}50%{box-shadow:0 0 10px 3px rgba(124,58,237,.35)}}
-.mk-status{background:#0d0d17;border-bottom:1px solid #1e1e2e;padding:6px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0}
-.mk-sdot{width:6px;height:6px;background:#4ADE80;border-radius:50%;animation:dp 1.5s ease-in-out infinite}
-.mk-stxt{font-size:10px;color:#5050708}
-.mk-ops{margin-left:auto;font-size:10px;color:#4ADE80;font-weight:700}
-
-.mk-canvas{flex:1;position:relative;overflow:hidden;padding:16px}
-.mk-svg{position:absolute;inset:0;pointer-events:none}
-.mkn{position:absolute;display:flex;flex-direction:column;align-items:center;gap:5px;opacity:0;transition:opacity .4s}
-.mkn.show{opacity:1}
-.mkico{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid transparent;position:relative;transition:transform .2s}
-.mkico.run{animation:nr .6s ease-in-out infinite alternate}
-@keyframes nr{from{box-shadow:none}to{box-shadow:0 0 14px 4px rgba(124,58,237,.4)}}
-.mkico.done{animation:ns .4s ease}
-@keyframes ns{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
-.mklbl{font-size:9px;color:#7070a0;text-align:center;font-weight:600;max-width:65px;line-height:1.3}
-.mksub{font-size:8px;color:#44445a;text-align:center;max-width:65px}
-.mkchk{position:absolute;top:-5px;right:-5px;width:17px;height:17px;background:#4ADE80;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#000;font-weight:900;opacity:0;transform:scale(0);transition:all .25s}
-.mkchk.show{opacity:1;transform:scale(1)}
-.mkops{position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);background:#1a1a28;border:1px solid #2a2a3a;border-radius:8px;padding:1px 6px;font-size:8px;color:#5050708;white-space:nowrap;opacity:0;transition:opacity .3s}
-.mkops.show{opacity:1}
-.mk-wa{background:#0a2018;border-color:#25D366}
-.mk-ai{background:#071520;border-color:#10a37f}
-.mk-rt{background:#160f28;border-color:#6d28d9}
-.mk-bottom{background:#0d0d17;border-top:1px solid #1e1e2e;padding:10px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0}
-.mk-chip{background:#1a1a28;border:1px solid #2a2a3a;border-radius:20px;padding:4px 10px;font-size:9px;color:#7070a0;display:flex;align-items:center;gap:4px}
-.mk-chip-lbl{font-size:9px;color:#44445a;margin-right:4px}
 
 /* ══ CURSOR ══ */
 #cursor{position:absolute;width:20px;height:20px;z-index:9999;pointer-events:none;transform:translate(-50%,-50%);display:none;transition:left .45s cubic-bezier(0.4,0,0.2,1),top .45s cubic-bezier(0.4,0,0.2,1)}
@@ -229,23 +158,19 @@ body{
 .tap-anim{animation:tap .22s ease}
 @keyframes tap{0%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(.72)}100%{transform:translate(-50%,-50%) scale(1)}}
 
-/* ══ ACTIVITY POPUP ══ */
+/* ══ ACTIVITY ══ */
 #act{position:absolute;bottom:18px;left:12px;right:12px;z-index:800;display:none;pointer-events:none}
 .act-in{background:rgba(17,17,17,.95);border:1px solid #2a2a2a;border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:9px;animation:up .3s ease;box-shadow:0 4px 20px rgba(0,0,0,.6);backdrop-filter:blur(10px)}
 .act-av{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#E53E2E,#c93426);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
 .act-nm{font-size:11px;font-weight:700;color:#f0f0f0}
 .act-tx{font-size:10px;color:#444}
 .act-tm{font-size:9px;color:#333;margin-left:auto}
-
-/* ══ SCROLL ══ */
-#app-inner{position:absolute;top:0;left:0;right:0;transition:transform .7s cubic-bezier(0.4,0,0.2,1)}
 </style>
 </head>
 <body>
 <div id="phone">
-  <!-- Status bar -->
   <div class="sb">
-    <span class="sb-time" id="sb-time">9:41</span>
+    <span class="sb-time">9:41</span>
     <div class="sb-icons">
       <svg width="16" height="11" viewBox="0 0 16 11" fill="#fff"><rect x="0" y="2.5" width="3" height="8.5" rx="1"/><rect x="4.5" y="1.5" width="3" height="9.5" rx="1"/><rect x="9" y="0" width="3" height="11" rx="1"/><rect x="13.5" y="1" width="2.5" height="10" rx="1" opacity=".3"/></svg>
       <svg width="15" height="11" viewBox="0 0 15 11" fill="#fff"><path d="M7.5 2.3C9.7 2.3 11.7 3.2 13.1 4.6L14.5 3.2C12.7 1.5 10.2.5 7.5.5 4.8.5 2.3 1.5.5 3.2l1.4 1.4C3.3 3.2 5.3 2.3 7.5 2.3Z" opacity=".4"/><path d="M7.5 5.2c1.4 0 2.7.5 3.7 1.4l1.4-1.4C11.2 3.9 9.4 3.2 7.5 3.2S3.8 3.9 2.4 5.2l1.4 1.4C4.8 5.7 6.1 5.2 7.5 5.2Z" opacity=".7"/><path d="M7.5 8c.8 0 1.5.3 2 .8l1.4-1.4C9.9 6.6 8.8 6 7.5 6S5.1 6.6 4.1 7.4l1.4 1.4C6 8.3 6.7 8 7.5 8Z"/><circle cx="7.5" cy="10.5" r="1.5"/></svg>
@@ -253,66 +178,111 @@ body{
     </div>
   </div>
 
-  <!-- ══ SCENE 1: LOCK SCREEN ══ -->
+  <!-- ══ SCENE 1: LOCK + PAYMENT HOOK ══ -->
   <div class="scene active" id="s-lock">
     <div class="lock-time">9:41</div>
     <div class="lock-date">Wednesday, May 21</div>
-
-    <!-- Payment notification -->
-    <div class="notif" id="notif1">
-      <div class="notif-icon">💸</div>
-      <div class="notif-body">
+    <div class="notif" id="n1" style="top:130px">
+      <div class="notif-icon" style="background:#1a7f4b">💸</div>
+      <div style="flex:1">
         <div class="notif-app">PayPal</div>
         <div class="notif-title">Payment received</div>
-        <div class="notif-msg">Marco's Restaurant sent you <strong style="color:#4ADE80">$900.00</strong></div>
+        <div class="notif-msg">Marco's Restaurant sent you <strong style="color:#4ADE80">€840.00</strong></div>
       </div>
       <div class="notif-time">now</div>
     </div>
-
-    <!-- Second notification -->
-    <div class="notif" id="notif2" style="top:230px">
+    <div class="notif" id="n2" style="top:232px">
       <div class="notif-icon" style="background:#0a84ff">📩</div>
-      <div class="notif-body">
+      <div style="flex:1">
         <div class="notif-app">Messages</div>
-        <div class="notif-title">Marco — Restaurant Owner</div>
-        <div class="notif-msg">"The AI bot is incredible, already saving us 4hrs/day 🙏"</div>
+        <div class="notif-title">Marco — Restaurant</div>
+        <div class="notif-msg">"Bot saved us 4hrs today. Incredible 🙏"</div>
       </div>
-      <div class="notif-time">1m ago</div>
+      <div class="notif-time">2m ago</div>
     </div>
-
-    <!-- Money amount -->
-    <div class="money-reveal" id="money-reveal">
-      <div class="money-amount">$900</div>
-      <div class="money-sub">earned in 60 seconds of work</div>
+    <div class="money-big" id="money-big">
+      <div class="money-num">€840</div>
+      <div class="money-lbl">one client · one week · zero code</div>
     </div>
-
-    <!-- Caption -->
-    <div class="caption" id="cap1">This is what I sold him 👇</div>
+    <div class="caption" id="cap1">Here's the system that did it 👇</div>
   </div>
 
-  <!-- ══ SCENE 2: APP ══ -->
+  <!-- ══ SCENE 2: AUTOFLOW DASHBOARD ══ -->
+  <div class="scene" id="s-dash">
+    <div class="dash-header">
+      <div class="dash-logo">▲</div>
+      <div>
+        <div class="dash-title">AutoFlow</div>
+        <div class="dash-sub">AI Automation Platform</div>
+      </div>
+    </div>
+    <div class="dash-body">
+      <div>
+        <div class="dash-section-lbl">Active Automations</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="auto-card" id="ac1">
+            <div class="auto-left">
+              <div class="auto-emoji">☕</div>
+              <div>
+                <div class="auto-name">Coffee Shop Bot</div>
+                <div class="auto-stat"><strong id="msg-count">142</strong> msgs today</div>
+              </div>
+            </div>
+            <div class="auto-badge"><div class="auto-dot"></div> ACTIVE</div>
+          </div>
+          <div class="auto-card" id="ac2">
+            <div class="auto-left">
+              <div class="auto-emoji">🏠</div>
+              <div>
+                <div class="auto-name">Real Estate Leads</div>
+                <div class="auto-stat"><strong style="color:#4ADE80">€840</strong> generated this week</div>
+              </div>
+            </div>
+            <div class="auto-badge"><div class="auto-dot"></div> ACTIVE</div>
+          </div>
+          <div class="auto-card" id="ac3">
+            <div class="auto-left">
+              <div class="auto-emoji">🛒</div>
+              <div>
+                <div class="auto-name">Shopify Order Bot</div>
+                <div class="auto-stat"><strong style="color:#4ADE80">$1,200</strong> generated this week</div>
+              </div>
+            </div>
+            <div class="auto-badge"><div class="auto-dot"></div> ACTIVE</div>
+          </div>
+        </div>
+      </div>
+      <div class="stat-row" id="stat-row">
+        <div class="stat-box"><div class="stat-val sv-red">3</div><div class="stat-lbl">Bots Running</div></div>
+        <div class="stat-box"><div class="stat-val sv-green">24/7</div><div class="stat-lbl">Uptime</div></div>
+        <div class="stat-box"><div class="stat-val sv-white">€0</div><div class="stat-lbl">Code Needed</div></div>
+      </div>
+      <div class="earn-ticker" id="earn-ticker">
+        <div class="earn-lbl">Total Earned This Week</div>
+        <div class="earn-val" id="earn-val">€0</div>
+        <div class="earn-sub">3 automations running 24/7</div>
+        <div class="earn-bar" id="earn-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SCENE 3: BLUEPRINT STUDIO ══ -->
   <div class="scene" id="s-app">
     <div class="app-bar">
       <div class="app-logo">BLUEPRINT STUDIO</div>
-      <button class="app-btn">Get Access — $97</button>
+      <button class="app-buy">Get Access — $97</button>
     </div>
-    <div style="position:relative;flex:1;overflow:hidden">
-      <div id="app-inner" style="padding:0 0 40px">
-        <!-- Hero -->
+    <div id="app-scroll">
+      <div id="app-inner">
         <div class="app-hero">
-          <div class="app-pill">⚡ AI Automation Builder</div>
-          <h1 class="app-h1">Build AI Automations.<br><span>Sell for $800–$1,200.</span></h1>
-          <p class="app-sub">Describe any workflow in plain English.<br>Get a ready-to-sell blueprint in 60 seconds.</p>
+          <div class="app-pill">⚡ Build automations like these</div>
+          <h1 class="app-h1">Describe it.<br><span>Sell it for $800–$1,200.</span></h1>
         </div>
-
-        <!-- Input -->
-        <div class="icard" style="margin:0 0 12px">
+        <div class="icard">
           <div class="ilbl">Describe your automation →</div>
           <textarea id="ta" class="ita" rows="4" placeholder="e.g. When someone messages on WhatsApp..."></textarea>
           <button class="gbtn" id="gbtn">⚡ Generate Blueprint</button>
         </div>
-
-        <!-- Loading -->
         <div class="lsec" id="lsec">
           <div class="lbar-w"><div class="lbar" id="lbar"></div></div>
           <div id="ls1" class="lstep"><div class="lstep-ico">🧠</div><span class="lstep-txt">Analyzing use case...</span><div class="lspin"></div><span class="lchk">✓</span></div>
@@ -320,105 +290,36 @@ body{
           <div id="ls3" class="lstep"><div class="lstep-ico">💰</div><span class="lstep-txt">Calculating market price...</span><div class="lspin"></div><span class="lchk">✓</span></div>
           <div id="ls4" class="lstep"><div class="lstep-ico">✨</div><span class="lstep-txt">Generating client pitch...</span><div class="lspin"></div><span class="lchk">✓</span></div>
         </div>
-
-        <!-- Results -->
         <div class="rsec" id="rsec">
-          <div class="rcard">
-            <div class="rlbl">🎯 What You're Building</div>
-            <div class="rtxt">WhatsApp AI Bot that replies to customers 24/7 — answers FAQs, takes orders, books appointments. Zero human effort.</div>
+          <div class="rcard"><div class="rlbl">🎯 What You're Building</div><div class="rtxt">WhatsApp AI Bot — replies to customers 24/7, answers FAQs, takes orders. Zero human effort.</div></div>
+          <div class="rcard"><div class="rlbl">💰 Sell This For</div><div class="rprice">€840 – €1,200</div><div class="rprice-s">One-time + €150/mo maintenance</div></div>
+          <div class="rcard"><div class="rlbl">📩 Client Pitch</div><div class="rtxt" style="font-size:11px;color:#666">"Hi Marco, I help restaurants automate WhatsApp with AI — saves 4hrs/day. Quick 5-min demo?"</div></div>
+          <div class="lkcard">
+            <div class="lktop"><span class="lklbl">🔒 Full Blueprint</span><span class="lkbadge">🔒 LOCKED</span></div>
+            <div class="lkblur">Step 1: Connect WhatsApp Business API...<br>Step 2: GPT-4 webhook on Make.com...<br>Step 3: Intent detection for orders...<br>Step 4: Fallback to human agent...</div>
+            <div class="lkover"><div class="lkico">🔒</div><div class="lkmsg">Unlock Full Blueprint<br><strong>Get Access — $97</strong></div></div>
           </div>
-          <div class="rcard">
-            <div class="rlbl">💰 Sell This For</div>
-            <div class="rprice">$900 – $1,200</div>
-            <div class="rprice-s">One-time + $150/mo maintenance</div>
-          </div>
-          <div class="rcard">
-            <div class="rlbl">📩 Client Pitch</div>
-            <div class="rtxt" style="font-size:11px;color:#666">"Hi Marco, I help restaurants automate WhatsApp replies with AI — saves 4hrs/day. Can I show you a 5-min demo?"</div>
-          </div>
-          <!-- Locked -->
-          <div class="lkcard" id="lkcard">
-            <div class="lktop">
-              <span class="lklbl">🔒 Full Blueprint</span>
-              <span class="lkbadge">🔒 LOCKED</span>
-            </div>
-            <div class="lkblur">
-Step 1: Connect WhatsApp Business API via Twilio...<br>
-Step 2: Set up GPT-4 webhook on Make.com...<br>
-Step 3: Configure intent detection for orders...<br>
-Step 4: Add fallback to human agent...
-            </div>
-            <div class="lkover">
-              <div class="lkico">🔒</div>
-              <div class="lkmsg">Unlock Full Blueprint<br><strong>Get Access — $97</strong></div>
-            </div>
-          </div>
-          <!-- FOMO -->
           <div class="fcard" id="fcard" style="display:none">
             <div class="ftag">🔥 LIMITED TIME</div>
-            <div class="fh">Don't let someone else<br><span>sell this to your client.</span></div>
-            <div class="fsub">This blueprint is live. Someone in your city could find it first.</div>
-            <div class="fpr">
-              <span class="fold">$297</span>
-              <span class="fnew"><sup>$</sup>97</span>
-              <span class="fsave">SAVE 67%</span>
-            </div>
+            <div class="fh">Don't let someone else<br><span>sell this first.</span></div>
+            <div class="fsub">Blueprint is live. Someone in your city could find it first.</div>
+            <div class="fpr"><span class="fold">$297</span><span class="fnew"><sup>$</sup>97</span><span class="fsave">SAVE 67%</span></div>
             <button class="fcta">🔓 Unlock All Blueprints — $97</button>
-            <div class="fproof"><div class="fdot"></div><span>Instant access</span><span>·</span><span>30-day guarantee</span><span>·</span><span>247 students</span></div>
+            <div class="fproof"><div class="fdot"></div><span>Instant access</span><span>·</span><span>30-day guarantee</span></div>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ══ SCENE 3: MAKE.COM ══ -->
-  <div class="scene" id="s-make">
-    <div class="mk-bar">
-      <div class="mk-logo">make</div>
-      <div class="mk-name">WhatsApp AI Bot — Restaurant</div>
-      <button class="mk-run" id="mk-run">▶ Run</button>
-    </div>
-    <div class="mk-status">
-      <div class="mk-sdot"></div>
-      <span class="mk-stxt" id="mk-stxt" style="font-size:10px;color:#5a5a7a">Ready</span>
-      <span class="mk-ops" id="mk-ops"></span>
-    </div>
-    <div class="mk-canvas" id="mk-canvas">
-      <svg class="mk-svg" id="mk-svg"></svg>
-      <div class="mkn" id="mn1" style="left:16px;top:80px">
-        <div class="mkico mk-wa" id="mn1i"><span>💬</span><div class="mkchk" id="mn1c">✓</div></div>
-        <div class="mklbl">WhatsApp</div><div class="mksub">Watch Messages</div>
-        <div class="mkops" id="mn1o">1 msg</div>
-      </div>
-      <div class="mkn" id="mn2" style="left:118px;top:48px">
-        <div class="mkico mk-rt" id="mn2i"><span>🔀</span><div class="mkchk" id="mn2c">✓</div></div>
-        <div class="mklbl">Router</div><div class="mksub">Filter intent</div>
-        <div class="mkops" id="mn2o">1 routed</div>
-      </div>
-      <div class="mkn" id="mn3" style="left:220px;top:20px">
-        <div class="mkico mk-ai" id="mn3i"><span>🤖</span><div class="mkchk" id="mn3c">✓</div></div>
-        <div class="mklbl">OpenAI</div><div class="mksub">GPT-4 Turbo</div>
-        <div class="mkops" id="mn3o">1 reply</div>
-      </div>
-      <div class="mkn" id="mn4" style="left:298px;top:80px">
-        <div class="mkico mk-wa" id="mn4i"><span>📤</span><div class="mkchk" id="mn4c">✓</div></div>
-        <div class="mklbl">WhatsApp</div><div class="mksub">Send Reply</div>
-        <div class="mkops" id="mn4o">1 sent ✓</div>
-      </div>
-    </div>
-    <div class="mk-bottom">
-      <span class="mk-chip-lbl">APPS</span>
-      <div class="mk-chip">💬 WhatsApp Business</div>
-      <div class="mk-chip">🤖 OpenAI</div>
+  <!-- Activity -->
+  <div id="act">
+    <div class="act-in">
+      <div class="act-av" id="act-av">🇺🇸</div>
+      <div><div class="act-nm" id="act-nm">James from Texas</div><div class="act-tx">just unlocked Blueprint</div></div>
+      <div class="act-tm">now</div>
     </div>
   </div>
-
-  <!-- Activity popup -->
-  <div id="act"><div class="act-in" id="act-in">
-    <div class="act-av" id="act-av">🇺🇸</div>
-    <div><div class="act-nm" id="act-nm">James from Texas</div><div class="act-tx">just unlocked Blueprint</div></div>
-    <div class="act-tm">now</div>
-  </div></div>
 
   <!-- Cursor -->
   <div id="cursor">
@@ -429,211 +330,98 @@ Step 4: Add fallback to human agent...
 </div>
 
 <script>
-const $ = id => document.getElementById(id);
-const wait = ms => new Promise(r => setTimeout(r, ms));
-const cur = $('cursor');
+const $=id=>document.getElementById(id);
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const cur=$('cursor');
 
-/* ── scene switch ── */
-function showScene(id){
-  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
-  $(id).classList.add('active');
+function showScene(id){document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));$(id).classList.add('active')}
+function moveCur(x,y){cur.style.left=x+'px';cur.style.top=y+'px';return wait(460)}
+async function tap(x,y){await moveCur(x,y);cur.classList.add('tap-anim');await wait(240);cur.classList.remove('tap-anim');await wait(160)}
+async function typeIn(el,txt,spd=42){el.classList.add('focus');el.value='';for(const c of txt){el.value+=c;await wait(spd+Math.random()*20)}}
+function appScroll(y,dur=700){return new Promise(r=>{const el=$('app-inner');const s=parseInt(el.style.transform.replace('translateY(',''))||0;const d=-y-s;const t0=performance.now();(function fr(now){const p=Math.min((now-t0)/dur,1);const e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;el.style.transform=`translateY(${s+d*e}px)`;p<1?requestAnimationFrame(fr):r()})(performance.now())})}
+
+const ACTS=[{f:'🇺🇸',n:'James from Texas'},{f:'🇬🇧',n:'Sophie from London'},{f:'🇩🇪',n:'Lukas from Berlin'},{f:'🇦🇺',n:'Jake from Sydney'},{f:'🇨🇦',n:'Emily from Toronto'},{f:'🇫🇷',n:'Lucas from Paris'},{f:'🇮🇹',n:'Marco from Milan'},{f:'🇧🇷',n:'Pedro from São Paulo'},{f:'🇳🇱',n:'Daan from Amsterdam'}];
+let lastAct=-1;
+function showAct(){let i;do{i=Math.floor(Math.random()*ACTS.length)}while(i===lastAct);lastAct=i;const a=ACTS[i];$('act-av').textContent=a.f;$('act-nm').textContent=a.n;$('act').style.display='block';clearTimeout($('act')._t);$('act')._t=setTimeout(()=>$('act').style.display='none',4000)}
+
+async function runLoad(){
+  $('lsec').style.display='block';const bar=$('lbar');
+  for(const [id,pct] of [['ls1',20],['ls2',45],['ls3',70],['ls4',100]]){
+    const el=$(id);el.classList.add('on');bar.style.width=pct+'%';
+    await wait(1300);el.classList.remove('on');el.classList.add('ok');
+  }
+  await wait(300);
 }
 
-/* ── cursor ── */
-function moveCur(x,y){ cur.style.left=x+'px'; cur.style.top=y+'px'; return wait(480); }
-async function tap(x,y){
-  await moveCur(x,y);
-  cur.classList.add('tap-anim');
-  await wait(260); cur.classList.remove('tap-anim'); await wait(180);
-}
-
-/* ── type ── */
-async function typeIn(el,txt,spd=44){
-  el.classList.add('focus'); el.value='';
-  for(const c of txt){ el.value+=c; await wait(spd+Math.random()*22); }
-}
-
-/* ── app scroll ── */
-function appScroll(y,dur=700){
+/* count-up animation */
+async function countUp(el, target, dur=2000, prefix='€'){
+  const start=performance.now();
   return new Promise(r=>{
-    const el=$('app-inner');
-    const s=parseInt(el.style.transform.replace('translateY(',''))||0;
-    const d=-y-s; const t0=performance.now();
     (function fr(now){
-      const p=Math.min((now-t0)/dur,1);
-      const e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
-      el.style.transform=`translateY(${s+d*e}px)`;
+      const p=Math.min((now-start)/dur,1);
+      const ease=1-Math.pow(1-p,3);
+      el.textContent=prefix+Math.round(target*ease).toLocaleString();
       p<1?requestAnimationFrame(fr):r();
     })(performance.now());
   });
 }
 
-/* ── activity popup ── */
-const ACTS=[
-  {f:'🇺🇸',n:'James from Texas'},{f:'🇬🇧',n:'Sophie from London'},
-  {f:'🇩🇪',n:'Lukas from Berlin'},{f:'🇦🇺',n:'Jake from Sydney'},
-  {f:'🇨🇦',n:'Emily from Toronto'},{f:'🇫🇷',n:'Lucas from Paris'},
-  {f:'🇮🇹',n:'Marco from Milan'},{f:'🇧🇷',n:'Pedro from São Paulo'},
-  {f:'🇳🇱',n:'Daan from Amsterdam'},{f:'🇸🇪',n:'Erik from Stockholm'},
-];
-let lastAct=-1;
-function showAct(){
-  let i; do{i=Math.floor(Math.random()*ACTS.length)}while(i===lastAct); lastAct=i;
-  const a=ACTS[i];
-  $('act-av').textContent=a.f; $('act-nm').textContent=a.n;
-  $('act').style.display='block';
-  clearTimeout($('act')._t);
-  $('act')._t=setTimeout(()=>$('act').style.display='none',4000);
-}
-
-/* ── loading ── */
-async function runLoad(){
-  $('lsec').style.display='block';
-  const bar=$('lbar');
-  const steps=[['ls1',20],['ls2',45],['ls3',70],['ls4',100]];
-  for(const [id,pct] of steps){
-    const el=$(id); el.classList.add('on'); bar.style.width=pct+'%';
-    await wait(1350); el.classList.remove('on'); el.classList.add('ok');
-  }
-  await wait(350);
-}
-
-/* ── make.com lines ── */
-function mkLine(id,x1,y1,x2,y2,off=26){
-  const svg=$('mk-svg');
-  const cx=(x1+x2)/2;
-  const d=`M${x1+off} ${y1+off} C${cx+off} ${y1+off} ${cx+off} ${y2+off} ${x2+off} ${y2+off}`;
-  const p=document.createElementNS('http://www.w3.org/2000/svg','path');
-  p.setAttribute('d',d); p.setAttribute('stroke','#252535');
-  p.setAttribute('stroke-width','2'); p.setAttribute('fill','none');
-  p.setAttribute('stroke-dasharray','5 4'); svg.appendChild(p);
-  return d;
-}
-
-async function mkDot(pathD,color='#7c3aed'){
-  const c=$('mk-canvas'), dot=document.createElement('div');
-  dot.style.cssText=`position:absolute;width:8px;height:8px;background:${color};border-radius:50%;box-shadow:0 0 7px ${color};pointer-events:none;`;
-  c.appendChild(dot);
-  const pts=pathD.match(/[\d.]+/g).map(Number);
-  const [x1,y1,cx1,cy1,cx2,cy2,x2,y2]=pts;
-  for(let i=0;i<=32;i++){
-    const t=i/32, mt=1-t;
-    const bx=mt*mt*mt*x1+3*mt*mt*t*cx1+3*mt*t*t*cx2+t*t*t*x2;
-    const by=mt*mt*mt*y1+3*mt*mt*t*cy1+3*mt*t*t*cy2+t*t*t*y2;
-    dot.style.left=(bx-4)+'px'; dot.style.top=(by-4)+'px';
-    dot.style.opacity=i<3?'0':i>29?'0':'1';
-    await wait(25);
-  }
-  dot.remove();
-}
-
-async function runMake(){
-  showScene('s-make');
-  await wait(500);
-  for(const id of ['mn1','mn2','mn3','mn4']){ $(id).classList.add('show'); await wait(260); }
-  await wait(300);
-  const p1=mkLine('1',16,80,118,48), p2=mkLine('2',118,48,220,20), p3=mkLine('3',220,20,298,80);
-  await wait(400);
-  $('mk-run').textContent='⏳ Running';
-  $('mk-stxt').textContent='Scenario running...';
-  await wait(350);
-  $('mn1i').classList.add('run'); await wait(900);
-  $('mn1i').classList.remove('run'); $('mn1i').classList.add('done');
-  $('mn1c').classList.add('show'); $('mn1o').classList.add('show');
-  await mkDot(p1);
-  $('mn2i').classList.add('run'); await wait(700);
-  $('mn2i').classList.remove('run'); $('mn2i').classList.add('done');
-  $('mn2c').classList.add('show'); $('mn2o').classList.add('show');
-  await mkDot(p2,'#6d28d9');
-  $('mn3i').classList.add('run'); $('mk-stxt').textContent='GPT-4 generating reply...'; await wait(1300);
-  $('mn3i').classList.remove('run'); $('mn3i').classList.add('done');
-  $('mn3c').classList.add('show'); $('mn3o').classList.add('show');
-  await mkDot(p3,'#10a37f');
-  $('mn4i').classList.add('run'); await wait(600);
-  $('mn4i').classList.remove('run'); $('mn4i').classList.add('done');
-  $('mn4c').classList.add('show'); $('mn4o').classList.add('show');
-  $('mk-run').textContent='✓ Done'; $('mk-run').style.background='linear-gradient(135deg,#166534,#14532d)';
-  $('mk-run').style.animation='none';
-  $('mk-stxt').textContent='Finished successfully';
-  $('mk-ops').textContent='4 ops · 0 errors';
-  await wait(3500);
-}
-
-/* ══════════════════════════
-   MAIN SEQUENCE
-══════════════════════════ */
+/* ══ MAIN ══ */
 async function run(){
-  /* ── SCENE 1: Lock screen ── */
-  showScene('s-lock');
-  await wait(800);
+  /* SCENE 1 — Lock screen hook */
+  showScene('s-lock'); await wait(700);
+  $('n1').classList.add('show'); await wait(1800);
+  $('n2').classList.add('show'); await wait(1400);
+  $('money-big').classList.add('show'); await wait(1200);
+  $('cap1').classList.add('show'); await wait(2200);
 
-  // Payment notif drops in
-  $('notif1').classList.add('show');
-  await wait(1800);
+  /* SCENE 2 — AutoFlow dashboard */
+  showScene('s-dash'); await wait(400);
+  $('ac1').classList.add('show'); await wait(280);
+  $('ac2').classList.add('show'); await wait(280);
+  $('ac3').classList.add('show'); await wait(400);
+  $('stat-row').classList.add('show'); await wait(500);
+  $('earn-ticker').classList.add('show'); await wait(300);
+  $('earn-bar').classList.add('animate');
+  countUp($('earn-val'), 2040, 2500);
+  await wait(2800);
 
-  // Message notif
-  $('notif2').classList.add('show');
-  await wait(1400);
-
-  // Big money
-  $('money-reveal').classList.add('show');
-  await wait(1200);
-
-  // Caption
-  $('cap1').classList.add('show');
+  /* msg counter ticking live */
+  let msgs=142;
+  const ticker=setInterval(()=>{
+    msgs+=Math.floor(Math.random()*3)+1;
+    $('msg-count').textContent=msgs;
+  },800);
   await wait(2000);
+  clearInterval(ticker);
 
-  /* ── SCENE 2: App ── */
+  /* SCENE 3 — Blueprint Studio */
   showScene('s-app');
-  cur.style.display='block';
+  cur.style.display='block'; await wait(600);
+  await tap(195, 295);
+  await typeIn($('ta'),'When someone messages on WhatsApp, use GPT-4 to reply automatically with info about our restaurant menu and prices.',40);
   await wait(700);
-
-  // Tap textarea
-  await tap(195, 310);
-  await typeIn($('ta'), 'When someone messages on WhatsApp, use GPT-4 to reply automatically with info about our restaurant menu and prices.', 40);
-  await wait(700);
-
-  // Tap Generate
-  await tap(195, 440);
-  $('gbtn').disabled=true; $('gbtn').textContent='⏳ Generating...';
-  $('gbtn').classList.add('press'); await wait(180); $('gbtn').classList.remove('press');
+  await tap(195, 420);
+  $('gbtn').disabled=true;$('gbtn').textContent='⏳ Generating...';
+  $('gbtn').classList.add('press');await wait(160);$('gbtn').classList.remove('press');
   cur.style.display='none';
-
-  // Loading
   await runLoad();
-  $('lsec').style.display='none'; $('gbtn').style.display='none';
-
-  // Show results
-  $('rsec').style.display='flex';
-  await wait(500); await appScroll(200); await wait(800);
-
-  // Activity popup
+  $('lsec').style.display='none';$('gbtn').style.display='none';
+  $('rsec').style.display='flex'; await wait(500);
+  await appScroll(180); await wait(800);
   showAct(); await wait(1200);
-
-  // Cursor → tap locked card
   cur.style.display='block';
-  await tap(195, 530);
-  cur.style.display='none'; await wait(500);
-
-  // Scroll to FOMO
+  await tap(195, 510); cur.style.display='none'; await wait(400);
   $('fcard').style.display='block';
-  await appScroll(600); await wait(600);
+  await appScroll(560); await wait(600);
   showAct(); await wait(1000);
-
-  // Cursor → CTA
   cur.style.display='block';
-  await tap(195, 680);
-  cur.style.display='none'; await wait(1000);
-
-  /* ── SCENE 3: Make.com ── */
-  await runMake();
-
-  /* loop */
-  await wait(2000);
+  await tap(195, 660); cur.style.display='none';
+  await wait(2500);
   location.reload();
 }
 
-window.addEventListener('load', () => setTimeout(run, 1200));
+window.addEventListener('load',()=>setTimeout(run,1200));
 </script>
 </body>
 </html>
