@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Video Generator — Blueprint Studio</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#060606;color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px 16px 80px;max-width:600px;margin:0 auto}
+h1{font-size:19px;font-weight:900;color:#E53E2E;margin-bottom:4px}
+.sub{font-size:11px;color:#444;margin-bottom:24px}
+.sec-lbl{font-size:10px;color:#444;letter-spacing:2px;text-transform:uppercase;margin:22px 0 10px}
+
+/* SCRIPTS */
+.script-card{background:#0d0d0d;border:1px solid #1a1a1a;border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .2s}
+.script-card.selected{border-color:rgba(229,62,46,.5);background:#0f0808}
+.sc-title{font-size:13px;font-weight:700;color:#f0f0f0;margin-bottom:4px}
+.sc-hook{font-size:11px;color:#555;line-height:1.5}
+.sc-badge{display:inline-block;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.2);color:#E53E2E;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;margin-bottom:6px}
+
+/* AVATARS */
+.av-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.av-card{background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color .2s;position:relative}
+.av-card.selected{border-color:rgba(229,62,46,.6)}
+.av-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#111}
+.av-name{font-size:9px;color:#555;text-align:center;padding:5px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.av-chk{position:absolute;top:4px;right:4px;background:#E53E2E;border-radius:50%;width:18px;height:18px;display:none;align-items:center;justify-content:center;font-size:10px}
+.av-card.selected .av-chk{display:flex}
+.av-loading{grid-column:1/-1;text-align:center;font-size:12px;color:#333;padding:20px}
+
+/* VOICE */
+.voice-row{display:flex;gap:8px;flex-wrap:wrap}
+.voice-pill{background:#0d0d0d;border:1px solid #1a1a1a;border-radius:8px;padding:7px 12px;font-size:11px;color:#555;cursor:pointer;transition:all .2s}
+.voice-pill.selected{border-color:rgba(229,62,46,.4);color:#E53E2E;background:rgba(229,62,46,.06)}
+
+/* SCRIPT EDITOR */
+.script-ta{width:100%;background:#080808;border:1.5px solid #1a1a1a;border-radius:10px;padding:12px 14px;color:#e0e0e0;font-size:12px;line-height:1.7;resize:vertical;min-height:120px;outline:none;font-family:inherit}
+.script-ta:focus{border-color:rgba(229,62,46,.35)}
+.word-count{font-size:10px;color:#333;text-align:right;margin-top:4px}
+
+/* GENERATE BTN */
+.gen-btn{width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:800;cursor:pointer;margin-top:20px;box-shadow:0 4px 24px rgba(229,62,46,.3);letter-spacing:.3px}
+.gen-btn:disabled{opacity:.4;cursor:default}
+
+/* STATUS */
+.status-box{margin-top:16px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;padding:14px 16px;display:none}
+.status-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;animation:pulse 1.5s ease infinite}
+.status-dot.processing{background:#F59E0B}
+.status-dot.done{background:#4ADE80;animation:none}
+.status-dot.error{background:#f87171;animation:none}
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+.status-txt{font-size:13px;font-weight:600}
+.status-sub{font-size:11px;color:#444;margin-top:2px}
+.progress-bar-bg{height:3px;background:#111;border-radius:3px;overflow:hidden;margin-top:8px}
+.progress-bar{height:100%;background:linear-gradient(90deg,#E53E2E,#ff7f6e);border-radius:3px;width:5%;transition:width 2s ease}
+
+/* RESULT */
+.result-box{margin-top:16px;display:none}
+.result-box video{width:100%;border-radius:12px;border:1px solid #1a1a1a;background:#000}
+.dl-row{display:flex;gap:8px;margin-top:10px}
+.dl-btn{flex:1;padding:12px;background:#4ADE80;color:#000;border:none;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;text-align:center;text-decoration:none}
+.share-btn{padding:12px 16px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;font-size:13px;color:#555;cursor:pointer}
+
+/* TIPS */
+.tips{background:#080808;border:1px solid #111;border-radius:10px;padding:12px 14px;margin-top:16px}
+.tips-title{font-size:10px;color:#333;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+.tip{font-size:11px;color:#3a3a3a;line-height:1.7;padding:2px 0}
+.tip strong{color:#555}
+</style>
+</head>
+<body>
+
+<h1>🎬 Video Generator</h1>
+<p class="sub">Generează video real cu avatar AI — HeyGen API</p>
+
+<!-- STEP 1: SCRIPT -->
+<div class="sec-lbl">Pas 1 — Alege scriptul UGC</div>
+
+<div class="script-card selected" id="sc0" onclick="selectScript(0)">
+  <div class="sc-badge">UGC #1 — BEST</div>
+  <div class="sc-title">"Couldn't figure out how to make money with AI"</div>
+  <div class="sc-hook">Tried prompts, courses, content — then Blueprint Studio → $900 first sale</div>
+</div>
+<div class="script-card" id="sc1" onclick="selectScript(1)">
+  <div class="sc-badge">UGC #2</div>
+  <div class="sc-title">"Nobody's talking about AI + local businesses"</div>
+  <div class="sc-hook">Restaurants, gyms, salons need automation — $800–$1,200 per client</div>
+</div>
+<div class="script-card" id="sc2" onclick="selectScript(2)">
+  <div class="sc-badge">UGC #3</div>
+  <div class="sc-title">"Every AI money method was saturated"</div>
+  <div class="sc-hook">Fresh angle — gym owner, $1,200, first AI sale</div>
+</div>
+
+<!-- SCRIPT EDITOR -->
+<div class="sec-lbl">Script (editabil)</div>
+<textarea class="script-ta" id="script-ta" oninput="updateWC()"></textarea>
+<div class="word-count" id="wc">0 / 90 cuvinte</div>
+
+<!-- STEP 2: AVATAR -->
+<div class="sec-lbl">Pas 2 — Alege avatarul</div>
+<div class="av-grid" id="av-grid">
+  <div class="av-loading">Se încarcă avatarele…</div>
+</div>
+
+<!-- STEP 3: VOICE -->
+<div class="sec-lbl">Pas 3 — Voce</div>
+<div class="voice-row" id="voice-row">
+  <div class="voice-loading" style="font-size:12px;color:#333">Se încarcă vocile…</div>
+</div>
+
+<!-- GENERATE -->
+<button class="gen-btn" id="gen-btn" onclick="generate()">⚡ Generează Video</button>
+
+<!-- STATUS -->
+<div class="status-box" id="status-box">
+  <div class="status-row">
+    <div class="status-dot processing" id="status-dot"></div>
+    <div>
+      <div class="status-txt" id="status-txt">Se procesează…</div>
+      <div class="status-sub" id="status-sub">HeyGen generează video-ul (2–5 minute)</div>
+    </div>
+  </div>
+  <div class="progress-bar-bg"><div class="progress-bar" id="prog-bar"></div></div>
+</div>
+
+<!-- RESULT -->
+<div class="result-box" id="result-box">
+  <video id="result-vid" controls playsinline></video>
+  <div class="dl-row">
+    <a class="dl-btn" id="dl-btn" download="blueprint-studio-video.mp4">⬇️ Descarcă MP4</a>
+    <button class="share-btn" onclick="copyLink()">🔗 Link</button>
+  </div>
+</div>
+
+<!-- TIPS -->
+<div class="tips">
+  <div class="tips-title">💡 Tips pentru rezultate mai bune</div>
+  <div class="tip"><strong>Script:</strong> Max 90 cuvinte. Vorbire naturală, nu scris.</div>
+  <div class="tip"><strong>Avatar:</strong> Alege unul tânăr, aspect casual, nu formal.</div>
+  <div class="tip"><strong>Durată:</strong> Video-ul se generează în 2–5 minute.</div>
+  <div class="tip"><strong>Calitate:</strong> 720×1280 (9:16) — direct pentru TikTok.</div>
+</div>
+
+<script>
+/* ── SCRIPTS ── */
+const SCRIPTS = [
+  `I couldn't figure out how to make actual money with AI.
+
+I tried selling prompts. Nobody was buying.
+I tried selling courses. Nobody signed up.
+I tried content creation. Zero conversions.
+
+Then I found Blueprint Studio.
+You type in any business automation — it gives you the full plan, the price to charge, and the message to send the client. In sixty seconds.
+
+First blueprint I sold to a restaurant owner. Nine hundred dollars. One DM.
+
+I'll link it below if you've been dealing with the same thing.`,
+
+  `Nobody's talking about selling AI to local businesses. And it's the easiest sale I've ever made.
+
+Restaurants need WhatsApp bots.
+Gyms need DM automation.
+Salons need booking systems.
+
+They have the budget. They just need someone to show them what's possible.
+
+Blueprint Studio generates the full automation plan, the price, and the client pitch in sixty seconds. No coding.
+
+Worth trying if you want your first online income. I'll link it below.`,
+
+  `Every AI money method I tried was either saturated or needed skills I didn't have.
+
+Content creation — too much competition.
+Prompt selling — market's dead.
+Building AI tools — needed coding.
+
+Then I found Blueprint Studio.
+
+You describe any business automation. It gives you the full technical plan, the price, and the pitch message — sixty seconds.
+
+Gym owner. Twelve hundred dollars. My first AI sale.
+
+I'll link it below.`
+];
+
+let selectedScript = 0;
+let selectedAvatar = null;
+let selectedVoice = null;
+let pollTimer = null;
+
+function selectScript(idx){
+  document.querySelectorAll('.script-card').forEach((c,i)=>c.classList.toggle('selected',i===idx));
+  selectedScript = idx;
+  document.getElementById('script-ta').value = SCRIPTS[idx];
+  updateWC();
+}
+selectScript(0); // default
+
+function updateWC(){
+  const txt = document.getElementById('script-ta').value.trim();
+  const words = txt ? txt.split(/\s+/).length : 0;
+  const el = document.getElementById('wc');
+  el.textContent = `${words} / 90 cuvinte`;
+  el.style.color = words > 90 ? '#f87171' : '#333';
+}
+
+/* ── LOAD AVATARS ── */
+async function loadAvatars(){
+  try{
+    const r = await fetch('/api/heygen/avatars');
+    const d = await r.json();
+    const avatars = (d.data?.avatars || d.data || d.avatars || []).filter(a => a.avatar_id);
+
+    if(!avatars.length){ document.getElementById('av-grid').innerHTML='<div class="av-loading">Nu s-au găsit avatare. Verifică API key-ul HeyGen.</div>'; return; }
+
+    const grid = document.getElementById('av-grid');
+    grid.innerHTML = '';
+
+    /* Prioritize public/male avatars */
+    const sorted = avatars.sort((a,b)=>{
+      const nameA = (a.avatar_name||'').toLowerCase();
+      const nameB = (b.avatar_name||'').toLowerCase();
+      const maleKw = ['male','man','guy','josh','ryan','adam','eric','mark','james','daniel','tyler','alex','noah','ethan'];
+      const aScore = maleKw.some(k=>nameA.includes(k)) ? 1 : 0;
+      const bScore = maleKw.some(k=>nameB.includes(k)) ? 1 : 0;
+      return bScore - aScore;
+    });
+
+    sorted.slice(0, 12).forEach((av, i) => {
+      const div = document.createElement('div');
+      div.className = 'av-card' + (i===0?' selected':'');
+      div.onclick = () => {
+        document.querySelectorAll('.av-card').forEach(c=>c.classList.remove('selected'));
+        div.classList.add('selected');
+        selectedAvatar = av.avatar_id;
+      };
+      const preview = av.preview_image_url || av.preview_video_url || '';
+      div.innerHTML = `
+        <img src="${preview}" onerror="this.style.background='#111';this.style.minHeight='80px'" loading="lazy">
+        <div class="av-name">${av.avatar_name||av.avatar_id}</div>
+        <div class="av-chk">✓</div>`;
+      grid.appendChild(div);
+      if(i===0) selectedAvatar = av.avatar_id;
+    });
+  }catch(e){
+    document.getElementById('av-grid').innerHTML='<div class="av-loading" style="color:#f87171">Eroare: '+e.message+'</div>';
+  }
+}
+
+/* ── LOAD VOICES ── */
+async function loadVoices(){
+  try{
+    const r = await fetch('/api/heygen/voices');
+    const d = await r.json();
+    const voices = (d.data?.voices || d.data || d.voices || []).filter(v=>v.voice_id&&(v.language||'').toLowerCase().includes('en'));
+
+    if(!voices.length){ document.getElementById('voice-row').innerHTML='<span style="font-size:12px;color:#333">Nu s-au găsit voci.</span>'; return; }
+
+    const maleVoices = voices.filter(v=>(v.gender||'').toLowerCase()==='male').slice(0,5);
+    const show = maleVoices.length ? maleVoices : voices.slice(0,5);
+
+    const row = document.getElementById('voice-row');
+    row.innerHTML = '';
+    show.forEach((v,i)=>{
+      const pill = document.createElement('div');
+      pill.className = 'voice-pill'+(i===0?' selected':'');
+      pill.textContent = v.name || v.voice_id;
+      pill.onclick = () => {
+        document.querySelectorAll('.voice-pill').forEach(p=>p.classList.remove('selected'));
+        pill.classList.add('selected');
+        selectedVoice = v.voice_id;
+      };
+      row.appendChild(pill);
+      if(i===0) selectedVoice = v.voice_id;
+    });
+  }catch(e){ console.warn('voices error', e); }
+}
+
+/* ── GENERATE ── */
+async function generate(){
+  const script = document.getElementById('script-ta').value.trim();
+  if(script.length < 20){ alert('Scriptul e prea scurt!'); return; }
+  if(!selectedAvatar){ alert('Alege un avatar!'); return; }
+
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  document.getElementById('status-box').style.display = 'block';
+  document.getElementById('result-box').style.display = 'none';
+  setStatus('processing','Se trimite la HeyGen…','Video-ul se generează (2–5 min)…',10);
+
+  try{
+    const r = await fetch('/api/heygen/generate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ script, avatar_id: selectedAvatar, voice_id: selectedVoice })
+    });
+    const d = await r.json();
+    if(d.error){ setStatus('error','Eroare: '+d.error,'Verifică API key-ul HeyGen',''); btn.disabled=false; return; }
+    const vid_id = d.video_id;
+    setStatus('processing','Video în procesare…','HeyGen randează (2–5 minute)',20);
+    pollStatus(vid_id, btn);
+  }catch(e){
+    setStatus('error','Eroare de rețea',''+e.message,'');
+    btn.disabled = false;
+  }
+}
+
+function pollStatus(vid_id, btn){
+  let attempts = 0;
+  const maxAttempts = 80; /* 80 × 4s = ~5 min */
+  const pcts = [20,30,40,50,60,70,80,88,93,96,98];
+
+  pollTimer = setInterval(async()=>{
+    attempts++;
+    try{
+      const r = await fetch('/api/heygen/status/'+vid_id);
+      const d = await r.json();
+      const status = d.status || d.video_status;
+      const pct = pcts[Math.min(attempts-1, pcts.length-1)];
+
+      if(status === 'completed' || status === 'done'){
+        clearInterval(pollTimer);
+        const url = d.video_url || d.url;
+        if(!url){ setStatus('error','Video generat dar fără URL','Verifică HeyGen dashboard',''); btn.disabled=false; return; }
+        setStatus('done','✅ Video gata!','Descarcă-l mai jos',100);
+        showResult(url, vid_id);
+        btn.disabled = false;
+      } else if(status === 'failed' || status === 'error'){
+        clearInterval(pollTimer);
+        setStatus('error','HeyGen: generare eșuată','Încearcă alt avatar sau script mai scurt','');
+        btn.disabled = false;
+      } else {
+        setStatus('processing','Randare HeyGen…',`Status: ${status} (${attempts*4}s)`, pct);
+      }
+
+      if(attempts >= maxAttempts){
+        clearInterval(pollTimer);
+        setStatus('error','Timeout','Verifică HeyGen dashboard manual','');
+        btn.disabled = false;
+      }
+    }catch(e){ console.warn('poll error',e); }
+  }, 4000);
+}
+
+function showResult(url, vid_id){
+  const vid = document.getElementById('result-vid');
+  vid.src = url;
+  const dl = document.getElementById('dl-btn');
+  dl.href = url;
+  dl._vidId = vid_id;
+  document.getElementById('result-box').style.display = 'block';
+}
+
+function copyLink(){
+  const url = document.getElementById('result-vid').src;
+  if(!url){ alert('Generează video-ul mai întâi'); return; }
+  navigator.clipboard.writeText(url).then(()=>alert('Link copiat!')).catch(()=>prompt('Copiază linkul:',url));
+}
+
+function setStatus(type, txt, sub, pct){
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot '+type;
+  document.getElementById('status-txt').textContent = txt;
+  document.getElementById('status-sub').textContent = sub;
+  if(pct!=='') document.getElementById('prog-bar').style.width = pct+'%';
+}
+
+/* ── INIT ── */
+loadAvatars();
+loadVoices();
+</script>
+</body>
+</html>
