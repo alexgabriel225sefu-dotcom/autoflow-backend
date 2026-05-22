@@ -67,22 +67,32 @@ Răspunde DOAR cu JSON valid:
   "criteriaScore": <număr 0-5 criterii de intrare îndeplinite>
 }`;
 
-  try {
-    const msg = await getClient().messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      temperature: 0,  // determinist pentru trading
-      messages: [{ role: 'user', content: prompt }],
-    });
+  // Modele în ordine de preferință (cel nou → fallback la cel vechi)
+  const MODELS = [
+    'claude-haiku-4-5-20251001',
+    'claude-3-5-haiku-20241022',
+    'claude-3-haiku-20240307',
+  ];
 
-    const text  = msg.content[0].text.trim();
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('No JSON in response');
-    return JSON.parse(match[0]);
-  } catch (err) {
-    console.error('[AI] Error:', err.message);
-    return { action: 'HOLD', confidence: 0, reasoning: 'Eroare AI — HOLD implicit', riskLevel: 'HIGH', keyFactors: [], criteriaScore: 0 };
+  for (const model of MODELS) {
+    try {
+      const msg = await getClient().messages.create({
+        model,
+        max_tokens: 400,
+        temperature: 0,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      const text  = msg.content[0].text.trim();
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('No JSON in response');
+      const result = JSON.parse(match[0]);
+      if (model !== MODELS[0]) console.log(`[AI] Folosesc model fallback: ${model}`);
+      return result;
+    } catch (err) {
+      console.error(`[AI] Model ${model} failed: ${err.message}`);
+    }
   }
+  return { action: 'HOLD', confidence: 0, reasoning: 'Eroare AI — HOLD implicit', riskLevel: 'HIGH', keyFactors: [], criteriaScore: 0 };
 }
 
 module.exports = { getSignal };
