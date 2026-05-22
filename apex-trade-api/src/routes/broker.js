@@ -3,10 +3,16 @@ const { createClient } = require('@supabase/supabase-js');
 
 const router = express.Router();
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+let _supabase = null;
+function supabase() {
+  if (!_supabase) {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY env vars are required');
+    }
+    _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+  }
+  return _supabase;
+}
 
 // POST /broker/connect
 router.post('/connect', async (req, res) => {
@@ -25,7 +31,7 @@ router.post('/connect', async (req, res) => {
   try {
     // Validate API keys (simplified — în producție faci request real)
     // For now, just store encrypted
-    const { error } = await supabase.from('broker_connections').upsert({
+    const { error } = await supabase().from('broker_connections').upsert({
       user_id: userId,
       broker,
       api_key_encrypted: Buffer.from(apiKey).toString('base64'),
@@ -38,7 +44,7 @@ router.post('/connect', async (req, res) => {
     if (error) throw error;
 
     // Update user broker status
-    await supabase.from('users').update({ broker_connected: true }).eq('id', userId);
+    await supabase().from('users').update({ broker_connected: true }).eq('id', userId);
 
     return res.json({
       message: `${broker} conectat cu succes${sandbox ? ' (mod testare)' : ''}`,
@@ -55,8 +61,8 @@ router.post('/connect', async (req, res) => {
 router.delete('/disconnect', async (req, res) => {
   const userId = req.user.id;
   try {
-    await supabase.from('broker_connections').delete().eq('user_id', userId);
-    await supabase.from('users').update({ broker_connected: false }).eq('id', userId);
+    await supabase().from('broker_connections').delete().eq('user_id', userId);
+    await supabase().from('users').update({ broker_connected: false }).eq('id', userId);
     return res.json({ message: 'Broker deconectat' });
   } catch (err) {
     return res.status(500).json({ error: 'Eroare la deconectare' });

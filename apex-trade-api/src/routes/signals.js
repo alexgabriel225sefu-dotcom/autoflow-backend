@@ -3,7 +3,14 @@ const Anthropic = require('@anthropic-ai/sdk');
 const axios = require('axios');
 
 const router = express.Router();
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+let _anthropic = null;
+function getAnthropic() {
+  if (!_anthropic) {
+    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || 'placeholder' });
+  }
+  return _anthropic;
+}
 
 const BINANCE_BASE = 'https://api.binance.com/api/v3';
 
@@ -139,7 +146,7 @@ Generează un semnal JSON cu următoarele câmpuri:
 
 Răspunde DOAR cu JSON valid, fără text suplimentar.`;
 
-    const message = await anthropic.messages.create({
+    const message = await getAnthropic().messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
