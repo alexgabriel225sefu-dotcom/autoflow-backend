@@ -55,6 +55,18 @@ app.use((err, req, res, next) => {
   });
 });
 
+// ─── Startup Validation ───────────────────────────────────
+const REQUIRED_VARS = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'JWT_SECRET'];
+const missing = REQUIRED_VARS.filter((v) => !process.env[v]);
+if (missing.length > 0) {
+  console.warn(`⚠️  Missing env vars: ${missing.join(', ')} — some features will not work`);
+} else {
+  console.log('✅ All required env vars present');
+}
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.warn('⚠️  ANTHROPIC_API_KEY not set — AI signals will use fallback');
+}
+
 // ─── Start ────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, '0.0.0.0', () => {

@@ -5,10 +5,18 @@ const { generateToken, authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+function getSupabase() {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY env vars are required');
+  }
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+}
+
+let _supabase = null;
+function supabase() {
+  if (!_supabase) _supabase = getSupabase();
+  return _supabase;
+}
 
 // POST /auth/register
 router.post('/register', async (req, res) => {
@@ -22,7 +30,7 @@ router.post('/register', async (req, res) => {
 
   try {
     // Check existing user
-    const { data: existing } = await supabase
+    const { data: existing } = await supabase()
       .from('users')
       .select('id')
       .eq('email', email.toLowerCase())
@@ -34,7 +42,7 @@ router.post('/register', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const { data: user, error } = await supabase
+    const { data: user, error } = await supabase()
       .from('users')
       .insert({
         email: email.toLowerCase().trim(),
@@ -73,7 +81,7 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    const { data: user } = await supabase
+    const { data: user } = await supabase()
       .from('users')
       .select('*')
       .eq('email', email.toLowerCase())
@@ -108,7 +116,7 @@ router.post('/login', async (req, res) => {
 // GET /auth/me
 router.get('/me', authenticate, async (req, res) => {
   try {
-    const { data: user } = await supabase
+    const { data: user } = await supabase()
       .from('users')
       .select('id, email, name, plan, broker_connected')
       .eq('id', req.user.id)
