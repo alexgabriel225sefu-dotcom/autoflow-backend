@@ -5,3 +5,6 @@ logs/
 *.log
 public/videos/*.mp4
 data/
+mrquant-api/.env
+mrquant-ml/.env
+mrquant-mobile/.env
