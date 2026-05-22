@@ -58,7 +58,7 @@ app.use((err, req, res, next) => {
 // ─── Start ────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
-  console.log(`🚀 MrQuant API running on port ${PORT}`);
+  console.log(`🚀 Apex Trade API running on port ${PORT}`);
 });
 
 module.exports = { app, io };

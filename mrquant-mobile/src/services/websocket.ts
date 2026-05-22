@@ -1,14 +1,14 @@
 import { io, Socket } from 'socket.io-client';
 import * as SecureStore from 'expo-secure-store';
 
-const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'wss://mrquant-api.railway.app';
+const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'wss://apextrade-api.railway.app';
 
 class WebSocketService {
   private socket: Socket | null = null;
   private listeners: Map<string, Set<Function>> = new Map();
 
   async connect() {
-    const token = await SecureStore.getItemAsync('mrquant_token');
+    const token = await SecureStore.getItemAsync('apextrade_token');
     this.socket = io(WS_URL, {
       auth: { token },
       transports: ['websocket'],

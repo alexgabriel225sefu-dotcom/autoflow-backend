@@ -29,7 +29,7 @@ export const loginThunk = createAsyncThunk(
   async ({ email, password }: { email: string; password: string }, { rejectWithValue }) => {
     try {
       const res = await authAPI.login(email, password);
-      await SecureStore.setItemAsync('mrquant_token', res.data.token);
+      await SecureStore.setItemAsync('apextrade_token', res.data.token);
       return res.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Eroare la autentificare');
@@ -45,7 +45,7 @@ export const registerThunk = createAsyncThunk(
   ) => {
     try {
       const res = await authAPI.register(email, password, name);
-      await SecureStore.setItemAsync('mrquant_token', res.data.token);
+      await SecureStore.setItemAsync('apextrade_token', res.data.token);
       return res.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Eroare la înregistrare');
@@ -54,18 +54,18 @@ export const registerThunk = createAsyncThunk(
 );
 
 export const logoutThunk = createAsyncThunk('auth/logout', async () => {
-  await SecureStore.deleteItemAsync('mrquant_token');
+  await SecureStore.deleteItemAsync('apextrade_token');
   await authAPI.logout().catch(() => {});
 });
 
 export const loadUserThunk = createAsyncThunk('auth/loadUser', async (_, { rejectWithValue }) => {
   try {
-    const token = await SecureStore.getItemAsync('mrquant_token');
+    const token = await SecureStore.getItemAsync('apextrade_token');
     if (!token) return rejectWithValue('No token');
     const res = await authAPI.me();
     return { user: res.data, token };
   } catch {
-    await SecureStore.deleteItemAsync('mrquant_token');
+    await SecureStore.deleteItemAsync('apextrade_token');
     return rejectWithValue('Session expired');
   }
 });

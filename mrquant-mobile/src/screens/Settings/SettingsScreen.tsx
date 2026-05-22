@@ -169,7 +169,7 @@ export default function SettingsScreen() {
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutText}>Deconectare</Text>
         </TouchableOpacity>
-        <Text style={styles.version}>MrQuant v1.0.0</Text>
+        <Text style={styles.version}>Apex Trade v1.0.0</Text>
       </ScrollView>
 
       {/* Broker Modal */}

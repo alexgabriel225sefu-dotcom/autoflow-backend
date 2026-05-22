@@ -53,14 +53,14 @@ export default function SplashScreen({ onComplete }: Props) {
             colors={['#1A1A2E', '#16213E', '#0F3460']}
             style={styles.logoContainer}
           >
-            <Text style={styles.logoText}>MQ</Text>
+            <Text style={styles.logoText}>AT</Text>
           </LinearGradient>
         </Animated.View>
 
         {/* Content */}
         <Animated.View style={[styles.content, { opacity: contentOpacity }]}>
           <Text style={styles.launchText}>
-            MrQuant se lansează la începutul lunii viitoare.
+            Apex Trade se lansează la începutul lunii viitoare.
           </Text>
 
           <Text style={styles.descriptionText}>
@@ -69,7 +69,7 @@ export default function SplashScreen({ onComplete }: Props) {
           </Text>
 
           <Text style={styles.descriptionText}>
-            MrQuant poate executa milioane de backtesting-uri și analiza simultan milioane de
+            Apex Trade poate executa milioane de backtesting-uri și analiza simultan milioane de
             strategii pentru a identifica cele mai eficiente modele de execuție în funcție de
             condițiile actuale din piață.
           </Text>
@@ -80,7 +80,7 @@ export default function SplashScreen({ onComplete }: Props) {
           </Text>
 
           <Text style={styles.descriptionText}>
-            De la validarea unei strategii până la execuția și managementul acesteia, MrQuant este
+            De la validarea unei strategii până la execuția și managementul acesteia, Apex Trade este
             construit pentru o nouă eră a tradingului.
           </Text>
 

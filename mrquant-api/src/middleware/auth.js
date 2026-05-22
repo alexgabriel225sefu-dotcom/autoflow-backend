@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'mrquant-super-secret-key-change-in-prod';
+const JWT_SECRET = process.env.JWT_SECRET || 'apextrade-super-secret-key-change-in-prod';
 
 function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
