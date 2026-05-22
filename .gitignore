@@ -5,6 +5,6 @@ logs/
 *.log
 public/videos/*.mp4
 data/
-mrquant-api/.env
-mrquant-ml/.env
-mrquant-mobile/.env
+apex-trade-api/.env
+apex-trade-ml/.env
+apex-trade-mobile/.env
