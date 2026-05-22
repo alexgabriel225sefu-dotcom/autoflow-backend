@@ -1,10 +1,68 @@
 const Anthropic = require('@anthropic-ai/sdk');
-const cfg = require('./config');
+const axios     = require('axios');
+const cfg       = require('./config');
 
-let client = null;
-function getClient() {
-  if (!client) client = new Anthropic({ apiKey: cfg.ANTHROPIC_API_KEY });
-  return client;
+// ─── Anthropic client (lazy) ──────────────────────────────
+let anthropicClient = null;
+function getAnthropic() {
+  if (!anthropicClient) anthropicClient = new Anthropic({ apiKey: cfg.ANTHROPIC_API_KEY });
+  return anthropicClient;
+}
+
+// ─── Groq (gratuit — fallback) ────────────────────────────
+async function callGroq(prompt) {
+  const key = process.env.GROQ_API_KEY || '';
+  if (!key) throw new Error('GROQ_API_KEY lipsă');
+
+  const { data } = await axios.post(
+    'https://api.groq.com/openai/v1/chat/completions',
+    {
+      model: 'llama-3.3-70b-versatile',  // model gratuit puternic
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 400,
+      temperature: 0,
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    }
+  );
+  const text  = data.choices[0].message.content.trim();
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('No JSON in Groq response');
+  console.log('[AI] ✅ Groq (gratuit) — semnal generat');
+  return JSON.parse(match[0]);
+}
+
+// ─── Anthropic (plătit) ───────────────────────────────────
+async function callAnthropic(prompt) {
+  const MODELS = [
+    'claude-haiku-4-5-20251001',
+    'claude-3-5-haiku-20241022',
+    'claude-3-haiku-20240307',
+  ];
+  for (const model of MODELS) {
+    try {
+      const msg = await getAnthropic().messages.create({
+        model, max_tokens: 400, temperature: 0,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      const text  = msg.content[0].text.trim();
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('No JSON in response');
+      console.log(`[AI] ✅ Anthropic ${model}`);
+      return JSON.parse(match[0]);
+    } catch (err) {
+      const status = err.status || err.response?.status || 'N/A';
+      console.error(`[AI ❌] Anthropic ${model} | Status: ${status} | ${err.message}`);
+      // Credit insuficient sau key invalid — nu mai încearca alte modele
+      if (status === 400 || status === 401) break;
+    }
+  }
+  throw new Error('Anthropic unavailable');
 }
 
 async function getSignal(indicators, balance, openPosition) {
@@ -27,15 +85,13 @@ async function getSignal(indicators, balance, openPosition) {
 ### Momentum
 - RSI (14): ${indicators.rsi} ${rsi < 30 ? '⚡ OVERSOLD EXTREM' : rsi < 40 ? '📉 Oversold' : rsi > 70 ? '🔥 OVERBOUGHT EXTREM' : rsi > 60 ? '📈 Overbought' : '⚖️ Neutru'}
 - Stoch RSI K: ${indicators.stochRsiK} | D: ${indicators.stochRsiD} ${srsiK < 20 ? '⚡ Oversold' : srsiK > 80 ? '🔥 Overbought' : ''}
-- MACD: ${indicators.macd} | Signal: ${indicators.macdSignal}
 - MACD Histogram: ${indicators.macdHist} ${macdH > 0 ? '▲ Bullish' : '▼ Bearish'}
 - Divergență RSI: ${indicators.divergence} ${indicators.divergence !== 'NONE' ? '⚡ SEMNAL PUTERNIC!' : ''}
 
 ### Volatilitate & Volum
-- ATR: ${indicators.atr} (${indicators.atrPct}% din preț)
-- Bollinger Bands: Upper=${indicators.bb_upper} | Mid=${indicators.bb_mid} | Lower=${indicators.bb_lower}
-- BB Bandwidth: ${indicators.bb_bandwidth}% | Poziție în BB: ${indicators.bb_position}% ${bbPos < 15 ? '📉 Aproape de lower' : bbPos > 85 ? '📈 Aproape de upper' : ''}
-- Volum curent: ${indicators.volume} | Avg 20: ${indicators.volumeAvg} | Ratio: ${indicators.volumeRatio}× ${volR > 1.5 ? '⚡ VOLUM MARE (confirmare)' : volR < 0.7 ? '⚠️ Volum mic' : ''}
+- ATR: ${indicators.atrPct}% din preț
+- BB Bandwidth: ${indicators.bb_bandwidth}% | Poziție în BB: ${indicators.bb_position}% ${bbPos < 15 ? '📉 La lower band' : bbPos > 85 ? '📈 La upper band' : ''}
+- Volum ratio: ${indicators.volumeRatio}× ${volR > 1.5 ? '⚡ VOLUM MARE' : volR < 0.7 ? '⚠️ Volum mic' : ''}
 - High 24h: ${indicators.high24h} | Low 24h: ${indicators.low24h}
 
 ### Ultimele 5 lumânări
@@ -43,60 +99,25 @@ ${indicators.recentCandles.map((c, i) => `${i+1}. ${c.direction} O:${c.open} H:$
 
 ## CONT
 - Balanță: $${balance.toFixed(2)} USDT
-- Poziție deschisă: ${openPosition ? `${openPosition.side} @ $${openPosition.entryPrice} | SL: $${openPosition.stopLoss?.toFixed(5)} | TP: $${openPosition.takeProfit?.toFixed(5)} | PnL: ${openPosition.pnlPct?.toFixed(2)}% | Trail high: $${openPosition.trailHigh?.toFixed(5) ?? 'N/A'}` : 'NICIUNA'}
+- Poziție deschisă: ${openPosition ? `${openPosition.side} @ $${openPosition.entryPrice} | PnL: ${openPosition.pnlPct?.toFixed(2)}%` : 'NICIUNA'}
 
-## REGULI STRICTE
-- Stop Loss: ${cfg.STOP_LOSS_PCT * 100}% | Take Profit: ${cfg.TAKE_PROFIT_PCT * 100}% | Risc: ${cfg.RISK_PER_TRADE * 100}% din balanță
-- NU deschide dacă există deja o poziție (folosește CLOSE/HOLD)
-- CLOSE = închide acum dacă poziția e în pericol sau a atins obiectivul
-- Minimum confidence pentru execuție: ${cfg.MIN_CONFIDENCE}%
-- Preferă BUY în uptrend, SELL în downtrend — nu tranzacționa contra trendului major
+## REGULI
+- SL: ${cfg.STOP_LOSS_PCT * 100}% | TP: ${cfg.TAKE_PROFIT_PCT * 100}% | Risc: ${cfg.RISK_PER_TRADE * 100}%
+- Minimum confidence: ${cfg.MIN_CONFIDENCE}%
+- CRITERII BUY (min 3/5): trend bullish, RSI<50 sau div.bullish, MACD▲, volum>1.2×, preț sub EMA20
+- CRITERII SELL (min 3/5): trend bearish, RSI>50 sau div.bearish, MACD▼, volum>1.2×, preț peste EMA20
 
-## CRITERII INTRARE (cel puțin 3 din 5 trebuie îndeplinite)
-**BUY**: ema20>ema50, RSI<50 sau divergență bullish, MACD hist în creștere, volum>1.2×, preț la/sub EMA20 sau BB lower
-**SELL**: ema20<ema50, RSI>50 sau divergență bearish, MACD hist în scădere, volum>1.2×, preț la/peste EMA20 sau BB upper
-
-## TASK
 Răspunde DOAR cu JSON valid:
-{
-  "action": "BUY" | "SELL" | "HOLD" | "CLOSE",
-  "confidence": <0-100>,
-  "reasoning": "<max 2 propoziții în română — explică DE CE>",
-  "riskLevel": "LOW" | "MEDIUM" | "HIGH",
-  "keyFactors": ["<factor1>", "<factor2>", "<factor3>"],
-  "criteriaScore": <număr 0-5 criterii de intrare îndeplinite>
-}`;
+{"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 prop română>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}`;
 
-  // Modele în ordine de preferință (cel nou → fallback la cel vechi)
-  const MODELS = [
-    'claude-haiku-4-5-20251001',
-    'claude-3-5-haiku-20241022',
-    'claude-3-haiku-20240307',
-  ];
-
-  for (const model of MODELS) {
-    try {
-      const msg = await getClient().messages.create({
-        model,
-        max_tokens: 400,
-        temperature: 0,
-        messages: [{ role: 'user', content: prompt }],
-      });
-      const text  = msg.content[0].text.trim();
-      const match = text.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('No JSON in response');
-      const result = JSON.parse(match[0]);
-      if (model !== MODELS[0]) console.log(`[AI] Folosesc model fallback: ${model}`);
-      return result;
-    } catch (err) {
-      const status = err.status || err.response?.status || 'N/A';
-      console.error(`[AI ❌] Model ${model} | Status: ${status} | ${err.message}`);
-      if (status === 401) { console.error('[AI ❌] ANTHROPIC_API_KEY invalid sau expirat!'); break; }
-      if (status === 429) { console.error('[AI ❌] Rate limit — prea multe cereri!'); break; }
-    }
+  // Încearcă Anthropic, dacă nu merge → Groq (gratuit)
+  try { return await callAnthropic(prompt); } catch {}
+  try { return await callGroq(prompt); } catch (err) {
+    console.error('[AI ❌] Groq failed:', err.message);
   }
-  console.error('[AI ❌] Toate modelele au eșuat — bot-ul rulează în HOLD');
-  return { action: 'HOLD', confidence: 0, reasoning: 'Eroare AI — HOLD implicit', riskLevel: 'HIGH', keyFactors: [], criteriaScore: 0 };
+
+  console.error('[AI ❌] Toate sursele AI au eșuat — HOLD');
+  return { action: 'HOLD', confidence: 0, reasoning: 'Eroare AI', riskLevel: 'HIGH', keyFactors: [], criteriaScore: 0 };
 }
 
 module.exports = { getSignal };
