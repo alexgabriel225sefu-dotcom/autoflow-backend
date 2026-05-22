@@ -18,7 +18,7 @@ app.use(cors({
 }));
 // Skip JSON body parsing for Stripe webhook — it needs the raw Buffer for signature verification
 app.use((req, res, next) => {
-  if (req.path === '/stripe-webhook') return next();
+  if (req.path === '/stripe-webhook' || req.path === '/webhook') return next();
   express.json()(req, res, next);
 });
 // Serve static assets (JS, CSS, images) but NOT HTML — HTML goes through route handlers
@@ -1028,7 +1028,9 @@ app.post('/create-payment-intent', async (req, res) => {
 // ════════════════════════════════════════
 // STRIPE WEBHOOK
 // ════════════════════════════════════════
-app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+// Stripe webhook handler — responds to both /stripe-webhook AND /webhook
+// (Stripe Dashboard configured with /webhook; /stripe-webhook kept for backward compat)
+async function handleStripeWebhook(req, res) {
   const sig = req.headers['stripe-signature'];
   try {
     if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
@@ -1088,7 +1090,9 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
     console.error('Webhook error:', e);
     res.status(400).json({ error: e.message });
   }
-});
+}
+app.post('/stripe-webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
+app.post('/webhook',        express.raw({ type: 'application/json' }), handleStripeWebhook);
 
 // ════════════════════════════════════════
 // VIDEO DOWNLOAD ROUTES (Veo 3 generated)
