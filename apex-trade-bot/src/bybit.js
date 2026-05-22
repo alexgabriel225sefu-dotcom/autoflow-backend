@@ -24,24 +24,23 @@ function authHeaders(params) {
   };
 }
 
-// Preț curent (public)
+// Preț curent — folosim Binance public API (accesibil din orice IP)
 async function getPrice(symbol = cfg.SYMBOL) {
-  const { data } = await axios.get(`${BASE}/v5/market/tickers`, {
-    params: { category: 'spot', symbol },
+  const { data } = await axios.get('https://api.binance.com/api/v3/ticker/price', {
+    params: { symbol },
   });
-  return parseFloat(data.result.list[0].lastPrice);
+  return parseFloat(data.price);
 }
 
-// Lumânări OHLCV (public)
-async function getCandles(symbol = cfg.SYMBOL, interval = '60', limit = 100) {
-  // Bybit intervals: 1,3,5,15,30,60,120,240,360,720,D,W,M
-  const intervalMap = { '15m': '15', '1h': '60', '4h': '240', '1d': 'D' };
-  const bybitInterval = intervalMap[cfg.TIMEFRAME] || '60';
-  const { data } = await axios.get(`${BASE}/v5/market/kline`, {
-    params: { category: 'spot', symbol, interval: bybitInterval, limit },
+// Lumânări OHLCV — Binance public API
+async function getCandles(symbol = cfg.SYMBOL, interval = '1h', limit = 100) {
+  const intervalMap = { '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d' };
+  const binanceInterval = intervalMap[cfg.TIMEFRAME] || '1h';
+  const { data } = await axios.get('https://api.binance.com/api/v3/klines', {
+    params: { symbol, interval: binanceInterval, limit },
   });
-  return data.result.list.reverse().map(k => ({
-    time:   parseInt(k[0]),
+  return data.map(k => ({
+    time:   k[0],
     open:   parseFloat(k[1]),
     high:   parseFloat(k[2]),
     low:    parseFloat(k[3]),
