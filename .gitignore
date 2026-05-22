@@ -8,3 +8,7 @@ data/
 apex-trade-api/.env
 apex-trade-ml/.env
 apex-trade-mobile/.env
+apex-trade-web/.env
+apex-trade-web/.env.local
+apex-trade-web/.next/
+apex-trade-web/node_modules/
