@@ -1,5 +1,5 @@
 """
-MrQuant ML Engine - FastAPI
+Apex Trade ML Engine - FastAPI
 Handles advanced backtesting, ML signals, and strategy optimization
 """
 import os
@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import requests
 
-app = FastAPI(title="MrQuant ML Engine", version="1.0.0")
+app = FastAPI(title="Apex Trade ML Engine", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,7 +48,7 @@ class OptimizeRequest(BaseModel):
 # ─── Health ──────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok", "engine": "mrquant-ml", "version": "1.0.0"}
+    return {"status": "ok", "engine": "apextrade-ml", "version": "1.0.0"}
 
 # ─── Advanced Backtest ────────────────────────────────────
 @app.post("/backtest/advanced")

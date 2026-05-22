@@ -45,10 +45,10 @@ export default function LoginScreen({ onNavigateRegister, onSuccess }: Props) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.logoMini}>
-          <Text style={styles.logoMiniText}>MQ</Text>
+          <Text style={styles.logoMiniText}>AT</Text>
         </View>
         <Text style={styles.title}>Bun venit înapoi</Text>
-        <Text style={styles.subtitle}>Autentifică-te în contul tău MrQuant</Text>
+        <Text style={styles.subtitle}>Autentifică-te în contul tău Apex Trade</Text>
       </View>
 
       {/* Form */}

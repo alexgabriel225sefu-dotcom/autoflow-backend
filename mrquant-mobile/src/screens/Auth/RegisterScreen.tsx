@@ -50,7 +50,7 @@ export default function RegisterScreen({ onNavigateLogin, onSuccess }: Props) {
       >
         <View style={styles.header}>
           <View style={styles.logoMini}>
-            <Text style={styles.logoMiniText}>MQ</Text>
+            <Text style={styles.logoMiniText}>AT</Text>
           </View>
           <Text style={styles.title}>Creează cont</Text>
           <Text style={styles.subtitle}>14 zile gratuit • Fără card</Text>

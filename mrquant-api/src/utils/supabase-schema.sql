@@ -1,4 +1,4 @@
--- MrQuant Database Schema
+-- Apex Trade Database Schema
 -- Rulează în Supabase SQL Editor
 
 -- Users

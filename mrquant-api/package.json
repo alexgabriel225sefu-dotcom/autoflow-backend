@@ -1,7 +1,7 @@
 {
-  "name": "mrquant-api",
+  "name": "apextrade-api",
   "version": "1.0.0",
-  "description": "MrQuant Trading Platform API",
+  "description": "Apex Trade Trading Platform API",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

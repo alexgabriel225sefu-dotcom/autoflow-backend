@@ -1,7 +1,7 @@
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'mrquant-super-secret-key-change-in-prod';
+const JWT_SECRET = process.env.JWT_SECRET || 'apextrade-super-secret-key-change-in-prod';
 const BINANCE_WS = 'wss://stream.binance.com:9443/ws';
 
 let binanceWs = null;
