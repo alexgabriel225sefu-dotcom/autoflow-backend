@@ -93,9 +93,11 @@ function connectBinanceStream(io) {
       console.error('[WS Binance] Error:', err.message);
     });
 
+    let reconnectDelay = 10000;
     binanceWs.on('close', () => {
-      console.log('[WS Binance] Disconnected, reconnecting in 5s...');
-      setTimeout(() => connectBinanceStream(io), 5000);
+      console.log(`[WS Binance] Disconnected, reconnecting in ${reconnectDelay / 1000}s...`);
+      setTimeout(() => connectBinanceStream(io), reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, 120000); // max 2 min backoff
     });
   } catch (err) {
     console.error('[WS Binance] Connect failed:', err.message);
