@@ -19,14 +19,11 @@ function validate() {
     console.error('❌ ANTHROPIC_API_KEY lipsă în Variables!');
     process.exit(1);
   }
-  if (!cfg.PAPER_TRADING) {
-    const hasKey = cfg.EXCHANGE === 'binance'
-      ? cfg.BINANCE_API_KEY
-      : cfg.BYBIT_API_KEY;
-    if (!hasKey) {
-      console.error(`❌ ${cfg.EXCHANGE.toUpperCase()}_API_KEY lipsă. Adaugă PAPER_TRADING=true pentru test fără bani reali.`);
-      process.exit(1);
-    }
+  // Dacă nu sunt chei exchange → forțează paper trading automat
+  const hasKey = cfg.EXCHANGE === 'binance' ? cfg.BINANCE_API_KEY : cfg.BYBIT_API_KEY;
+  if (!hasKey && !cfg.PAPER_TRADING) {
+    console.warn('⚠️  Nicio cheie exchange — pornesc automat în PAPER TRADING (simulare)');
+    cfg.PAPER_TRADING = true;
   }
 }
 
