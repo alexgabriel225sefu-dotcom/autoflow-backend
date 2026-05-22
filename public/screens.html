@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ad Screens — Blueprint Studio</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#090909;--card:#111;--border:#1e1e1e;--border2:#2a2a2a;--t1:#f5f5f5;--t2:#aaa;--t3:#666;--red:#E53E2E;--red2:#c93426;--green:#4ADE80}
+
+/* ── NAVIGATION UI (hidden when screenshotting) ── */
+.nav-ui{position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(0,0,0,.9);backdrop-filter:blur(10px);border-bottom:1px solid #1a1a1a;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.nav-ui.hide{display:none}
+.nav-label{font-size:11px;color:#555;font-family:-apple-system,sans-serif;letter-spacing:1px;text-transform:uppercase;flex:1}
+.nav-btn{background:#1a1a1a;border:1px solid #2a2a2a;color:#aaa;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:-apple-system,sans-serif;white-space:nowrap}
+.nav-btn.active{background:rgba(229,62,46,.15);border-color:rgba(229,62,46,.4);color:#E53E2E}
+.frame-dots{display:flex;gap:6px;justify-content:center}
+.frame-dot{width:7px;height:7px;border-radius:50%;background:#2a2a2a;cursor:pointer;transition:background .2s}
+.frame-dot.cur{background:#E53E2E}
+
+.hide-hint{position:fixed;bottom:20px;right:16px;z-index:9999;background:rgba(0,0,0,.85);border:1px solid #2a2a2a;border-radius:10px;padding:8px 14px;font-size:11px;color:#555;font-family:-apple-system,sans-serif}
+.hide-hint span{color:#E53E2E;font-weight:700}
+
+/* ── FRAME CONTAINER ── */
+body{background:#000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.frame{display:none;min-height:100vh;background:var(--bg);overflow-y:auto}
+.frame.show{display:block}
+
+/* ── APP HEADER ── */
+.app-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(9,9,9,.98)}
+.app-logo{font-size:11px;font-weight:800;letter-spacing:2.5px;color:var(--red);text-transform:uppercase}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.lang-btn{background:#141414;border:1px solid var(--border2);border-radius:7px;padding:5px 10px;font-size:11px;color:var(--t2);display:flex;align-items:center;gap:4px}
+.sign-btn{background:transparent;border:1px solid var(--border2);color:var(--t3);border-radius:7px;padding:5px 12px;font-size:11px}
+
+/* ── STUDIO CONTENT ── */
+.studio-main{padding:28px 20px 60px;max-width:600px;margin:0 auto}
+.studio-badge{display:inline-block;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:var(--red);font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 14px;border-radius:20px;margin-bottom:16px}
+.studio-title{font-size:clamp(26px,7vw,34px);font-weight:800;line-height:1.2;margin-bottom:10px}
+.studio-title span{background:linear-gradient(135deg,#E53E2E 0%,#ff6b5b 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.studio-sub{font-size:14px;color:var(--t3);line-height:1.6;margin-bottom:24px}
+
+/* OUTPUT PILLS */
+.outputs-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:24px}
+.out-pill{background:#111;border:1px solid var(--border2);border-radius:12px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.out-pill-icon{width:36px;height:36px;background:#0d0d0d;border:1px solid var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.out-pill-label{font-size:9px;font-weight:700;color:var(--t2);letter-spacing:.3px;line-height:1.4}
+.out-pill-sub{font-size:9px;color:var(--t3);line-height:1.3}
+
+/* INPUT CARD */
+.studio-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:20px;position:relative}
+.studio-card::before{content:'';position:absolute;inset:0;border-radius:16px;padding:1px;background:linear-gradient(135deg,rgba(229,62,46,.4),transparent 60%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.studio-label{display:block;font-size:11px;color:var(--t2);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px}
+.studio-textarea{width:100%;min-height:100px;background:#0d0d0d;border:1px solid var(--border2);border-radius:10px;padding:12px 14px;color:var(--t1);font-size:14px;line-height:1.6;resize:none;outline:none;font-family:inherit}
+.studio-textarea.active{border-color:var(--red);box-shadow:0 0 0 3px rgba(229,62,46,.08)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{background:#111;border:1px solid var(--border2);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--t2);white-space:nowrap}
+.gen-btn{width:100%;background:linear-gradient(135deg,#E53E2E 0%,#c93426 100%);color:#fff;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.3px;box-shadow:0 4px 28px rgba(229,62,46,.3);margin-top:16px}
+
+/* ── LOADING STATE ── */
+.loading-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:20px}
+.loading-step{display:flex;align-items:flex-start;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)}
+.loading-step:last-child{border-bottom:none;padding-bottom:0}
+.l-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px}
+.l-done{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3)}
+.l-active{background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3)}
+.l-wait{background:#141414;border:1px solid var(--border2)}
+.l-txt{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:2px}
+.l-sub{font-size:11px;color:var(--t3)}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(229,62,46,.3);border-top-color:#E53E2E;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── RESULT STATE ── */
+.ready-card{background:linear-gradient(135deg,#0d1f0d,#0d0d0d);border:1px solid rgba(74,222,128,.3);border-radius:16px;padding:18px 20px;display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.ready-check{width:42px;height:42px;flex-shrink:0;color:var(--green)}
+.ready-label{font-size:11px;color:var(--green);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+.ready-name{font-size:14px;font-weight:600;color:var(--t1)}
+.ready-btns{display:flex;gap:8px;margin-top:10px}
+.ready-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:10px;font-size:12px;font-weight:600;text-decoration:none;cursor:pointer;white-space:nowrap}
+.ready-btn-dl{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);color:var(--green)}
+.ready-btn-make{background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none}
+.out-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:10px}
+.out-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.out-value{font-size:13px;color:var(--t1);line-height:1.7;white-space:pre-wrap}
+.out-price-val{font-size:30px;font-weight:800;color:var(--red)}
+.out-price-sub{font-size:12px;color:var(--t3);margin-top:2px}
+.copy-btn-sm{background:transparent;border:1px solid var(--border2);color:var(--t3);border-radius:6px;padding:3px 9px;font-size:10px;cursor:pointer}
+
+/* ── GUIDE STEPS ── */
+.guide-title{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;margin-top:24px}
+.sguide-step{background:#0d0d0d;border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;margin-bottom:8px}
+.snum{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px;background:rgba(229,62,46,.15);color:var(--red);border:1px solid rgba(229,62,46,.3)}
+.sstep-title{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:2px}
+.sstep-desc{font-size:11px;color:var(--t3);line-height:1.5}
+.sstep-desc code{background:#1a1a1a;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;font-size:10px;color:var(--red);font-family:monospace}
+.proposal-btn{width:100%;background:transparent;border:1px solid var(--border2);color:var(--t2);border-radius:12px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:8px}
+
+/* WHAT GETS BUILT section */
+.wgb-header{font-size:11px;font-weight:800;letter-spacing:2px;color:var(--red);text-transform:uppercase;margin-bottom:14px;padding:0 0 10px;border-bottom:1px solid var(--border)}
+.wgb-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.wgb-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.wgb-label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--red);margin-bottom:6px}
+.wgb-val{font-size:24px;font-weight:900;color:var(--red);margin-bottom:2px}
+.wgb-sub{font-size:11px;color:var(--t3);line-height:1.4}
+.wgb-outreach{font-size:13px;color:var(--t2);line-height:1.6}
+.wgb-copy{background:transparent;border:1px solid var(--border2);color:var(--t3);border-radius:6px;padding:6px 14px;font-size:11px;width:100%;margin-top:10px;cursor:pointer;font-family:inherit}
+.wgb-cta{width:100%;background:transparent;border:1px solid rgba(229,62,46,.35);color:var(--red);border-radius:12px;padding:13px;font-size:13px;font-weight:700;cursor:pointer;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:6px}
+</style>
+</head>
+<body>
+
+<!-- NAV UI -->
+<div class="nav-ui" id="nav">
+  <div class="frame-dots" id="dots"></div>
+  <div class="nav-label" id="frame-name">Frame 1 / 5</div>
+  <button class="nav-btn" id="prev-btn" onclick="prevFrame()">← Înapoi</button>
+  <button class="nav-btn active" id="next-btn" onclick="nextFrame()">Înainte →</button>
+  <button class="nav-btn" onclick="toggleNav()">👁 Hide</button>
+</div>
+<div class="hide-hint" id="hint">Apasă <span>Hide</span> apoi fă screenshot</div>
+
+<!-- ════════════════════════════════
+     FRAME 1 — Studio empty / input
+     ════════════════════════════════ -->
+<div class="frame show" id="f0">
+  <div class="app-header">
+    <div class="app-logo">⚡ Blueprint<br>Studio</div>
+    <div class="hdr-right">
+      <div class="lang-btn">🇬🇧 EN ▾</div>
+      <div class="sign-btn">Sign out</div>
+    </div>
+  </div>
+  <div class="studio-main">
+    <div class="studio-badge">⚡ Blueprint Studio</div>
+    <h1 class="studio-title">What do you want<br><span>to automate?</span></h1>
+    <p class="studio-sub">Not a ChatGPT answer — a real Make.com .json blueprint + selling price + outreach message.</p>
+
+    <div class="outputs-strip">
+      <div class="out-pill">
+        <div class="out-pill-icon">📄</div>
+        <div class="out-pill-label">.json Blueprint</div>
+        <div class="out-pill-sub">Import to Make.com instantly</div>
+      </div>
+      <div class="out-pill">
+        <div class="out-pill-icon">💰</div>
+        <div class="out-pill-label">Selling Price</div>
+        <div class="out-pill-sub">$300–$1,000 calculated</div>
+      </div>
+      <div class="out-pill">
+        <div class="out-pill-icon">✉️</div>
+        <div class="out-pill-label">Outreach Message</div>
+        <div class="out-pill-sub">Copy-paste to prospect</div>
+      </div>
+      <div class="out-pill">
+        <div class="out-pill-icon">⚙️</div>
+        <div class="out-pill-label">Setup Guide</div>
+        <div class="out-pill-sub">Step-by-step per platform</div>
+      </div>
+    </div>
+
+    <div class="studio-card">
+      <span class="studio-label">Describe your automation</span>
+      <textarea class="studio-textarea" readonly placeholder="e.g. When a new lead fills my form, AI writes a follow-up email and logs it in Google Sheets"></textarea>
+      <div class="chips">
+        <span class="chip">WhatsApp AI Bot</span>
+        <span class="chip">Lead Follow-Up</span>
+        <span class="chip">Cold Email Pipeline</span>
+        <span class="chip">Instagram DM Bot</span>
+      </div>
+      <button class="gen-btn">⚡ Generate Blueprint — Free</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     FRAME 2 — Studio with text typed
+     ════════════════════════════════ -->
+<div class="frame" id="f1">
+  <div class="app-header">
+    <div class="app-logo">⚡ Blueprint<br>Studio</div>
+    <div class="hdr-right">
+      <div class="lang-btn">🇬🇧 EN ▾</div>
+      <div class="sign-btn">Sign out</div>
+    </div>
+  </div>
+  <div class="studio-main">
+    <div class="studio-badge">⚡ Blueprint Studio</div>
+    <h1 class="studio-title">What do you want<br><span>to automate?</span></h1>
+    <p class="studio-sub">Not a ChatGPT answer — a real Make.com .json blueprint + selling price + outreach message.</p>
+
+    <div class="outputs-strip">
+      <div class="out-pill">
+        <div class="out-pill-icon">📄</div>
+        <div class="out-pill-label">.json Blueprint</div>
+        <div class="out-pill-sub">Import to Make.com instantly</div>
+      </div>
+      <div class="out-pill">
+        <div class="out-pill-icon">💰</div>
+        <div class="out-pill-label">Selling Price</div>
+        <div class="out-pill-sub">$300–$1,000 calculated</div>
+      </div>
+      <div class="out-pill">
+        <div class="out-pill-icon">✉️</div>
+        <div class="out-pill-label">Outreach Message</div>
+        <div class="out-pill-sub">Copy-paste to prospect</div>
+      </div>
+      <div class="out-pill">
+        <div class="out-pill-icon">⚙️</div>
+        <div class="out-pill-label">Setup Guide</div>
+        <div class="out-pill-sub">Step-by-step per platform</div>
+      </div>
+    </div>
+
+    <div class="studio-card">
+      <span class="studio-label">Describe your automation</span>
+      <textarea class="studio-textarea active" readonly>When a new lead fills my contact form, AI writes a personalized follow-up email and sends it via Gmail. Log everything in Google Sheets.</textarea>
+      <div class="chips">
+        <span class="chip">WhatsApp AI Bot</span>
+        <span class="chip">Lead Follow-Up</span>
+        <span class="chip">Cold Email Pipeline</span>
+        <span class="chip">Instagram DM Bot</span>
+      </div>
+      <button class="gen-btn">⚡ Generate Blueprint — Free</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     FRAME 3 — Loading / generating
+     ════════════════════════════════ -->
+<div class="frame" id="f2">
+  <div class="app-header">
+    <div class="app-logo">⚡ Blueprint<br>Studio</div>
+    <div class="hdr-right">
+      <div class="lang-btn">🇬🇧 EN ▾</div>
+      <div class="sign-btn">Sign out</div>
+    </div>
+  </div>
+  <div class="studio-main">
+    <div class="loading-card">
+      <div class="loading-step">
+        <div class="l-icon l-done">✅</div>
+        <div>
+          <div class="l-txt">Analyzing automation request</div>
+          <div class="l-sub">Identifying platforms, triggers and actions</div>
+        </div>
+      </div>
+      <div class="loading-step">
+        <div class="l-icon l-active">🔴</div>
+        <div>
+          <div class="l-txt"><span class="spin"></span>Building Make.com blueprint</div>
+          <div class="l-sub">Generating .json with all modules configured</div>
+        </div>
+      </div>
+      <div class="loading-step">
+        <div class="l-icon l-wait">💰</div>
+        <div>
+          <div class="l-txt" style="color:var(--t3)">Calculating selling price</div>
+          <div class="l-sub">Market rate for this automation type</div>
+        </div>
+      </div>
+      <div class="loading-step">
+        <div class="l-icon l-wait">✉️</div>
+        <div>
+          <div class="l-txt" style="color:var(--t3)">Writing outreach message</div>
+          <div class="l-sub">Personalized DM to send to prospects</div>
+        </div>
+      </div>
+      <div class="loading-step">
+        <div class="l-icon l-wait">⚙️</div>
+        <div>
+          <div class="l-txt" style="color:var(--t3)">Generating setup guide</div>
+          <div class="l-sub">Step-by-step deployment instructions</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     FRAME 4 — Result: price + outreach
+     ════════════════════════════════ -->
+<div class="frame" id="f3">
+  <div class="app-header">
+    <div class="app-logo">⚡ Blueprint<br>Studio</div>
+    <div class="hdr-right">
+      <div class="lang-btn">🇬🇧 EN ▾</div>
+      <div class="sign-btn">Sign out</div>
+    </div>
+  </div>
+  <div class="studio-main" style="padding-top:20px">
+    <div class="ready-card">
+      <svg class="ready-check" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="20" stroke="#4ADE80" stroke-width="2" fill="rgba(74,222,128,.08)"/>
+        <path d="M15 24l6 6 12-12" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div style="flex:1">
+        <div class="ready-label">✓ Blueprint ready</div>
+        <div class="ready-name">Lead Follow-Up AI Automation</div>
+        <div class="ready-btns">
+          <button class="ready-btn ready-btn-dl">⬇ Download .json</button>
+          <button class="ready-btn ready-btn-make">Open in Make.com →</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="out-section">
+        <div class="out-label">Your price to client</div>
+        <div class="out-price-val">$900</div>
+        <div class="out-price-sub">Setup fee · Retainer: $200/month<br>Build time: 3–6h</div>
+      </div>
+      <div class="out-section">
+        <div class="out-label">Outreach message <button class="copy-btn-sm">COPY</button></div>
+        <div class="out-value" style="font-size:12px;color:var(--t2)">Hey [Name], noticed you're still doing manual follow-ups after form fills — I built an AI system that does this automatically for $900 one-time. Happy to show you in 10 min?</div>
+      </div>
+    </div>
+
+    <div class="wgb-header">WHAT GETS BUILT</div>
+
+    <div class="out-section">
+      <div class="out-label">Setup guide <span style="color:var(--t3);font-size:9px;font-weight:400;text-transform:none;letter-spacing:0">Make.com + Gmail + Google Sheets</span></div>
+      <div class="out-value" style="font-size:12px;color:var(--t2)">Step 1: Download .json → open Make.com → Import Blueprint
+Step 2: Connect Gmail account
+Step 3: Connect Google Sheets
+Step 4: Configure webhook trigger
+Step 5: Toggle ON → live in 60 seconds</div>
+    </div>
+
+    <button class="proposal-btn">📄 GENERATE CLIENT PROPOSAL</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     FRAME 5 — Scrolled down result
+     ════════════════════════════════ -->
+<div class="frame" id="f4">
+  <div class="app-header">
+    <div class="app-logo">⚡ Blueprint<br>Studio</div>
+    <div class="hdr-right">
+      <div class="lang-btn">🇬🇧 EN ▾</div>
+    </div>
+  </div>
+  <div class="studio-main" style="padding-top:20px">
+    <div class="guide-title">HOW TO DEPLOY</div>
+
+    <div class="sguide-step">
+      <div class="snum">1</div>
+      <div>
+        <div class="sstep-title">Download the blueprint</div>
+        <div class="sstep-desc">Click "Download .json" → save to your phone or computer</div>
+      </div>
+    </div>
+    <div class="sguide-step">
+      <div class="snum">2</div>
+      <div>
+        <div class="sstep-title">Open Make.com → New scenario</div>
+        <div class="sstep-desc">Bottom toolbar → <code>···</code> → <strong>Import Blueprint</strong> → upload the file</div>
+      </div>
+    </div>
+    <div class="sguide-step">
+      <div class="snum">3</div>
+      <div>
+        <div class="sstep-title">Connect your accounts</div>
+        <div class="sstep-desc">The blueprint shows which ones you need (Gmail, Google Sheets, etc.)</div>
+      </div>
+    </div>
+    <div class="sguide-step">
+      <div class="snum">4</div>
+      <div>
+        <div class="sstep-title">Connect your accounts <span style="background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:var(--red);border-radius:12px;padding:1px 8px;font-size:9px;margin-left:4px">step 4</span></div>
+        <div class="sstep-desc">The blueprint shows which ones you need</div>
+      </div>
+    </div>
+    <div class="sguide-step">
+      <div class="snum" style="background:rgba(74,222,128,.1);color:var(--green);border-color:rgba(74,222,128,.3)">5</div>
+      <div>
+        <div class="sstep-title">Click the <span style="color:var(--green)">ON/OFF toggle</span> → your automation is <span style="color:var(--green)">live!</span></div>
+        <div class="sstep-desc">Done. Your client's automation is running.</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px">
+      <div class="wgb-card">
+        <div class="wgb-label">Your price to client</div>
+        <div class="wgb-val">$900</div>
+        <div class="wgb-sub">Setup fee · Retainer: $200/month<br>Build time: 3–6h</div>
+      </div>
+      <div class="wgb-card">
+        <div class="wgb-label">Outreach message</div>
+        <div class="wgb-outreach" style="font-size:12px">See output above</div>
+        <button class="wgb-copy">COPY</button>
+      </div>
+    </div>
+
+    <button class="wgb-cta">📄 GENERATE CLIENT PROPOSAL</button>
+  </div>
+</div>
+
+<script>
+const FRAMES = ['f0','f1','f2','f3','f4'];
+const LABELS = [
+  '1/5 — Studio empty (frame 1)',
+  '2/5 — Text typed (frame 2)',
+  '3/5 — Loading (frame 3)',
+  '4/5 — Result: Price + Outreach (frame 4)',
+  '5/5 — Setup steps + price cards (frame 5)'
+];
+let cur = 0;
+let navHidden = false;
+
+function buildDots(){
+  const d = document.getElementById('dots');
+  d.innerHTML = '';
+  FRAMES.forEach((_,i)=>{
+    const dot = document.createElement('div');
+    dot.className = 'frame-dot' + (i===cur?' cur':'');
+    dot.onclick = ()=>goTo(i);
+    d.appendChild(dot);
+  });
+}
+
+function goTo(n){
+  document.getElementById(FRAMES[cur]).classList.remove('show');
+  cur = Math.max(0, Math.min(FRAMES.length-1, n));
+  document.getElementById(FRAMES[cur]).classList.add('show');
+  document.getElementById('frame-name').textContent = LABELS[cur];
+  document.getElementById('prev-btn').style.opacity = cur===0?'.3':'1';
+  document.getElementById('next-btn').style.opacity = cur===FRAMES.length-1?'.3':'1';
+  buildDots();
+  window.scrollTo(0,0);
+}
+
+function nextFrame(){ goTo(cur+1); }
+function prevFrame(){ goTo(cur-1); }
+
+function toggleNav(){
+  navHidden = !navHidden;
+  document.getElementById('nav').classList.toggle('hide', navHidden);
+  document.getElementById('hint').style.display = navHidden ? 'none' : 'block';
+}
+
+// Swipe support for mobile
+let startX=0;
+document.addEventListener('touchstart', e=>{ startX=e.touches[0].clientX; }, {passive:true});
+document.addEventListener('touchend', e=>{
+  const dx = e.changedTouches[0].clientX - startX;
+  if(Math.abs(dx)>60){ dx<0 ? nextFrame() : prevFrame(); }
+}, {passive:true});
+
+buildDots();
+</script>
+</body>
+</html>
