@@ -16,10 +16,20 @@ let tickCount    = 0;
 
 // ─── Validare startup ─────────────────────────────────────
 function validate() {
-  if (!cfg.ANTHROPIC_API_KEY) {
-    console.error('❌ ANTHROPIC_API_KEY lipsă în Variables!');
+  const hasAnthropic = !!cfg.ANTHROPIC_API_KEY;
+  const hasGroq      = !!process.env.GROQ_API_KEY;
+
+  if (!hasAnthropic && !hasGroq) {
+    console.error('❌ Nicio cheie AI găsită! Adaugă ANTHROPIC_API_KEY sau GROQ_API_KEY în Variables.');
     process.exit(1);
   }
+  if (!hasAnthropic && hasGroq) {
+    console.log('ℹ️  ANTHROPIC_API_KEY lipsă — folosesc Groq (gratuit) ca AI provider.');
+  }
+  if (hasAnthropic && hasGroq) {
+    console.log('ℹ️  Anthropic + Groq configurate — Anthropic primar, Groq fallback.');
+  }
+
   const hasKey = cfg.EXCHANGE === 'binance' ? cfg.BINANCE_API_KEY : cfg.BYBIT_API_KEY;
   if (!hasKey && !cfg.PAPER_TRADING) {
     console.warn('⚠️  Nicio cheie exchange — pornesc automat în PAPER TRADING');
