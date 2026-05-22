@@ -89,9 +89,13 @@ Răspunde DOAR cu JSON valid:
       if (model !== MODELS[0]) console.log(`[AI] Folosesc model fallback: ${model}`);
       return result;
     } catch (err) {
-      console.error(`[AI] Model ${model} failed: ${err.message}`);
+      const status = err.status || err.response?.status || 'N/A';
+      console.error(`[AI ❌] Model ${model} | Status: ${status} | ${err.message}`);
+      if (status === 401) { console.error('[AI ❌] ANTHROPIC_API_KEY invalid sau expirat!'); break; }
+      if (status === 429) { console.error('[AI ❌] Rate limit — prea multe cereri!'); break; }
     }
   }
+  console.error('[AI ❌] Toate modelele au eșuat — bot-ul rulează în HOLD');
   return { action: 'HOLD', confidence: 0, reasoning: 'Eroare AI — HOLD implicit', riskLevel: 'HIGH', keyFactors: [], criteriaScore: 0 };
 }
 
