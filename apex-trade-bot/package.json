@@ -1,0 +1,18 @@
+{
+  "name": "apex-trade-bot",
+  "version": "1.0.0",
+  "description": "Apex Trade AI Bot — Auto-trading cu Claude AI + Binance",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "testnet": "BINANCE_TESTNET=true node src/index.js",
+    "paper": "PAPER_TRADING=true node src/index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.20.0",
+    "axios": "^1.7.2",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.5"
+  },
+  "engines": { "node": ">=18.0.0" }
+}
