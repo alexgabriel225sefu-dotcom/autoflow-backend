@@ -1,40 +1,61 @@
 require('dotenv').config();
 const cfg        = require('./config');
-const binance    = require('./binance');
 const indicators = require('./indicators');
 const ai         = require('./ai');
 const logger     = require('./logger');
 
+// ─── Alege exchange-ul ────────────────────────────────────
+const exchange = cfg.EXCHANGE === 'binance'
+  ? require('./binance')
+  : require('./bybit');
+
 // ─── State ────────────────────────────────────────────────
-let openPosition = null;
-// { side, entryPrice, quantity, stopLoss, takeProfit, openedAt, pnlPct }
+let openPosition  = null;
+let paperBalance  = cfg.PAPER_BALANCE;
+
+// ─── Validare startup ─────────────────────────────────────
+function validate() {
+  if (!cfg.ANTHROPIC_API_KEY) {
+    console.error('❌ ANTHROPIC_API_KEY lipsă în Variables!');
+    process.exit(1);
+  }
+  if (!cfg.PAPER_TRADING) {
+    const hasKey = cfg.EXCHANGE === 'binance'
+      ? cfg.BINANCE_API_KEY
+      : cfg.BYBIT_API_KEY;
+    if (!hasKey) {
+      console.error(`❌ ${cfg.EXCHANGE.toUpperCase()}_API_KEY lipsă. Adaugă PAPER_TRADING=true pentru test fără bani reali.`);
+      process.exit(1);
+    }
+  }
+}
+
+// ─── Balanță ─────────────────────────────────────────────
+async function getBalance() {
+  if (cfg.PAPER_TRADING) return paperBalance;
+  try { return await exchange.getBalance(); }
+  catch { return 0; }
+}
 
 // ─── Calcul cantitate ─────────────────────────────────────
 async function calcQuantity(price, balance) {
   const riskAmount = balance * cfg.RISK_PER_TRADE;
-  const quantity   = riskAmount / price;
-  // DOGE/SHIB = întregi, BTC/ETH = zecimale
-  const isWhole = ['DOGEUSDT', 'SHIBUSDT', 'XRPUSDT', 'ADAUSDT'].includes(cfg.SYMBOL);
-  return isWhole ? Math.floor(quantity) : parseFloat(quantity.toFixed(6));
+  const qty = riskAmount / price;
+  const isWhole = ['DOGEUSDT','SHIBUSDT','XRPUSDT','ADAUSDT','MATICUSDT'].includes(cfg.SYMBOL);
+  return isWhole ? Math.floor(qty) : parseFloat(qty.toFixed(6));
 }
 
-// ─── Verifică stop loss / take profit ─────────────────────
+// ─── Verifică SL/TP ──────────────────────────────────────
 function checkPosition(price) {
   if (!openPosition) return null;
   const { entryPrice, side, stopLoss, takeProfit } = openPosition;
   const pnlPct = side === 'BUY'
     ? (price - entryPrice) / entryPrice * 100
     : (entryPrice - price) / entryPrice * 100;
-
   openPosition.pnlPct = pnlPct;
 
-  if (side === 'BUY') {
-    if (price <= stopLoss)   return 'STOP_LOSS';
-    if (price >= takeProfit) return 'TAKE_PROFIT';
-  } else {
-    if (price >= stopLoss)   return 'STOP_LOSS';
-    if (price <= takeProfit) return 'TAKE_PROFIT';
-  }
+  if (side === 'BUY')  { if (price <= stopLoss) return 'STOP_LOSS'; if (price >= takeProfit) return 'TAKE_PROFIT'; }
+  if (side === 'SELL') { if (price >= stopLoss) return 'STOP_LOSS'; if (price <= takeProfit) return 'TAKE_PROFIT'; }
   return null;
 }
 
@@ -43,19 +64,18 @@ async function openTrade(side, price, balance) {
   const quantity = await calcQuantity(price, balance);
   if (quantity <= 0) { logger.warn('Cantitate prea mică — skip'); return; }
 
-  const result = await binance.placeOrder(side, quantity);
+  await exchange.placeOrder(side, quantity);
 
-  const sl = side === 'BUY'
-    ? price * (1 - cfg.STOP_LOSS_PCT)
-    : price * (1 + cfg.STOP_LOSS_PCT);
-  const tp = side === 'BUY'
-    ? price * (1 + cfg.TAKE_PROFIT_PCT)
-    : price * (1 - cfg.TAKE_PROFIT_PCT);
+  if (cfg.PAPER_TRADING) {
+    paperBalance -= (side === 'BUY' ? price * quantity : 0);
+  }
+
+  const sl = side === 'BUY' ? price * (1 - cfg.STOP_LOSS_PCT)   : price * (1 + cfg.STOP_LOSS_PCT);
+  const tp = side === 'BUY' ? price * (1 + cfg.TAKE_PROFIT_PCT) : price * (1 - cfg.TAKE_PROFIT_PCT);
 
   openPosition = { side, entryPrice: price, quantity, stopLoss: sl, takeProfit: tp, openedAt: new Date().toISOString(), pnlPct: 0 };
-
   logger.printTrade(side, cfg.SYMBOL, price, quantity);
-  logger.info(`Stop Loss: $${sl.toFixed(4)} | Take Profit: $${tp.toFixed(4)}`);
+  logger.info(`SL: $${sl.toFixed(5)} | TP: $${tp.toFixed(5)}`);
 }
 
 // ─── Închide poziție ──────────────────────────────────────
@@ -64,11 +84,13 @@ async function closeTrade(price, reason) {
   const { side, entryPrice, quantity } = openPosition;
   const closeSide = side === 'BUY' ? 'SELL' : 'BUY';
 
-  await binance.placeOrder(closeSide, quantity);
+  await exchange.placeOrder(closeSide, quantity);
 
   const pnl = side === 'BUY'
     ? (price - entryPrice) * quantity
     : (entryPrice - price) * quantity;
+
+  if (cfg.PAPER_TRADING) paperBalance += price * quantity + pnl;
 
   logger.printTrade(closeSide, cfg.SYMBOL, price, quantity, pnl);
   logger.info(`Motivul închiderii: ${reason}`);
@@ -78,53 +100,43 @@ async function closeTrade(price, reason) {
 // ─── Loop principal ───────────────────────────────────────
 async function tick() {
   try {
-    logger.info(`Analizez ${cfg.SYMBOL}...`);
+    logger.info(`Analizez ${cfg.SYMBOL} (${cfg.EXCHANGE})...`);
 
-    // 1. Date piață
-    const [candles, balance, price] = await Promise.all([
-      binance.getCandles(),
-      binance.getBalance(),
-      binance.getPrice(),
+    const [candles, price] = await Promise.all([
+      exchange.getCandles(),
+      exchange.getPrice(),
     ]);
-
+    const balance = await getBalance();
     logger.updateBalance(balance);
 
-    // 2. Verifică SL/TP cu prețul curent
+    // Verifică SL/TP
     const trigger = checkPosition(price);
     if (trigger) {
       logger.warn(`${trigger} atins la $${price}`);
       await closeTrade(price, trigger);
-      logger.printStats(await binance.getBalance());
+      logger.printStats(await getBalance());
       return;
     }
 
-    // 3. Indicatori tehnici
-    const ind = indicators.analyze(candles);
-
-    // 4. AI Signal
+    // Indicatori + AI
+    const ind    = indicators.analyze(candles);
     const signal = await ai.getSignal(ind, balance, openPosition);
     logger.printSignal(signal, ind);
 
-    // 5. Execuție
+    // Execuție
     if (signal.action === 'HOLD' || signal.confidence < cfg.MIN_CONFIDENCE) {
       logger.info(`HOLD — confidence ${signal.confidence}% < minim ${cfg.MIN_CONFIDENCE}%`);
-      return;
-    }
-
-    if (signal.action === 'CLOSE' && openPosition) {
-      await closeTrade(price, 'AI_SIGNAL_CLOSE');
+    } else if (signal.action === 'CLOSE' && openPosition) {
+      await closeTrade(price, 'AI_CLOSE');
     } else if (signal.action === 'BUY' && !openPosition) {
-      if (balance < 1) { logger.warn('Balanță insuficientă'); return; }
       await openTrade('BUY', price, balance);
     } else if (signal.action === 'SELL' && !openPosition) {
-      if (balance < 1) { logger.warn('Balanță insuficientă'); return; }
       await openTrade('SELL', price, balance);
     } else {
-      logger.info(`Poziție deja ${openPosition ? 'deschisă' : 'închisă'} — skip`);
+      logger.info(`Poziție ${openPosition ? 'deja deschisă' : 'deja închisă'} — skip`);
     }
 
     logger.printStats(balance);
-
   } catch (err) {
     logger.error(`Tick error: ${err.message}`);
   }
@@ -132,21 +144,11 @@ async function tick() {
 
 // ─── Start ────────────────────────────────────────────────
 async function main() {
-  // Validare
-  if (!cfg.ANTHROPIC_API_KEY) { console.error('❌ ANTHROPIC_API_KEY lipsă în .env'); process.exit(1); }
-  if (!cfg.PAPER_TRADING && !cfg.BINANCE_API_KEY) {
-    console.error('❌ BINANCE_API_KEY lipsă. Pornește cu: npm run paper');
-    process.exit(1);
-  }
-
-  const balance = await binance.getBalance().catch(() => cfg.PAPER_TRADING ? 10 : 0);
+  validate();
+  const balance = await getBalance();
   logger.setStartBalance(balance);
   logger.printBanner(balance);
-
-  // Primul tick imediat
   await tick();
-
-  // Loop la interval
   setInterval(tick, cfg.LOOP_INTERVAL_MS);
 }
 
