@@ -36,13 +36,27 @@ function printTrade(type, symbol, price, quantity, pnl = null) {
   }
 }
 
-function printStats(balance) {
-  const pnlPct = stats.startBalance > 0 ? ((balance - stats.startBalance) / stats.startBalance * 100).toFixed(2) : 0;
+// openPosition passat din index.js pentru a calcula valoarea totală corect
+function printStats(balance, openPosition = null, currentPrice = null) {
+  // Valoarea totală = USDT liber + valoarea DOGE deținut
+  let totalValue = balance;
+  let positionNote = '';
+  if (openPosition && currentPrice) {
+    const posValue = openPosition.quantity * currentPrice;
+    totalValue = balance + posValue;
+    const unrealizedPnl = openPosition.side === 'BUY'
+      ? (currentPrice - openPosition.entryPrice) * openPosition.quantity
+      : (openPosition.entryPrice - currentPrice) * openPosition.quantity;
+    positionNote = ` | Poziție: ${openPosition.side} ${openPosition.quantity} @ $${openPosition.entryPrice} | PnL nerealizat: ${unrealizedPnl >= 0 ? '+' : ''}$${unrealizedPnl.toFixed(4)}`;
+  }
+
+  const pnlPct = stats.startBalance > 0 ? ((totalValue - stats.startBalance) / stats.startBalance * 100).toFixed(2) : 0;
   const winRate = stats.trades > 0 ? (stats.wins / stats.trades * 100).toFixed(0) : 0;
   console.log('\n📊 STATISTICI:');
-  console.log(`   Balanță: $${balance.toFixed(4)} (${pnlPct >= 0 ? '+' : ''}${pnlPct}% total)`);
-  console.log(`   Tranzacții: ${stats.trades} | Câștigate: ${stats.wins} | Pierdute: ${stats.losses} | Win Rate: ${winRate}%`);
-  console.log(`   Profit total: ${stats.totalPnL >= 0 ? '+' : ''}$${stats.totalPnL.toFixed(4)}`);
+  console.log(`   Portofoliu total: $${totalValue.toFixed(4)} (${pnlPct >= 0 ? '+' : ''}${pnlPct}%)${positionNote}`);
+  console.log(`   USDT liber: $${balance.toFixed(4)}${openPosition ? ' (restul e în poziție deschisă)' : ''}`);
+  console.log(`   Tranzacții închise: ${stats.trades} | ✅ ${stats.wins} | ❌ ${stats.losses} | Win Rate: ${winRate}%`);
+  console.log(`   Profit realizat: ${stats.totalPnL >= 0 ? '+' : ''}$${stats.totalPnL.toFixed(4)}`);
   console.log(`   Mod: ${cfg.PAPER_TRADING ? '📝 PAPER TRADING' : cfg.TESTNET ? '🧪 TESTNET' : '🔴 LIVE'}\n`);
 }
 

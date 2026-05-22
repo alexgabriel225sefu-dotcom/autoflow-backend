@@ -186,7 +186,7 @@ async function tick() {
   tickCount++;
   try {
     // La fiecare 5 tick-uri, afișează stats
-    if (tickCount % 5 === 0) logger.printStats(await getBalance());
+    if (tickCount % 5 === 0) logger.printStats(await getBalance(), openPosition, await exchange.getPrice(cfg.SYMBOL).catch(() => null));
 
     const symbol = await bestSymbol();
     logger.info(`[${tickCount}] Analizez ${symbol} (${cfg.EXCHANGE})...`);
@@ -203,7 +203,7 @@ async function tick() {
     if (trigger) {
       logger.warn(`${trigger} atins la $${price} (SL curent: $${openPosition?.stopLoss?.toFixed(5)})`);
       await closeTrade(price, trigger);
-      logger.printStats(await getBalance());
+      logger.printStats(await getBalance(), null, null);
       return;
     }
 
@@ -234,7 +234,7 @@ async function tick() {
       logger.info(`Skip — poziție ${openPosition ? 'deja deschisă' : 'deja închisă'}`);
     }
 
-    logger.printStats(balance);
+    logger.printStats(balance, openPosition, price);
   } catch (err) {
     logger.error(`Tick error: ${err.message}`);
   }
