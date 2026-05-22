@@ -57,8 +57,9 @@ app.use((err, req, res, next) => {
 
 // ─── Start ────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Apex Trade API running on port ${PORT}`);
+  console.log(`🌐 Listening on 0.0.0.0:${PORT}`);
 });
 
 module.exports = { app, io };
