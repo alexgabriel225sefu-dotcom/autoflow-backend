@@ -4,6 +4,7 @@ const indicators = require('./indicators');
 const ai         = require('./ai');
 const logger     = require('./logger');
 const strategies = require('./strategies');
+const tg         = require('./telegram');
 
 // ─── Exchange ─────────────────────────────────────────────
 const exchange = cfg.EXCHANGE === 'binance'
@@ -136,6 +137,7 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL
 
   logger.printTrade(side, symbol, price, quantity);
   logger.info(`SL: $${stopLoss.toFixed(5)} | TP: $${takeProfit.toFixed(5)} | R:R = 1:${rrRatio.toFixed(2)}`);
+  tg.alertOpen(side, symbol, price, quantity, stopLoss, takeProfit, druckMult);
 }
 
 // ─── Închide poziție ──────────────────────────────────────
@@ -161,6 +163,7 @@ async function closeTrade(price, reason) {
   logger.printTrade(closeSide, symbol, price, quantity, pnl);
   logger.info(`Motivul: ${reason} | PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}`);
   strategies.recordTrade(pnl > 0, pnl, startBalance || cfg.PAPER_BALANCE);
+  tg.alertClose(reason, symbol, side, entryPrice, price, pnl, await getBalance());
   openPosition = null;
 }
 
@@ -227,6 +230,7 @@ async function tick() {
       if (openPosition) {
         logger.warn('Poziție deschisă — o păstrăm până la SL/TP natural.');
       }
+      tg.alertStop(stopCheck.reasons);
       logger.printStats(await getBalance(), openPosition, price);
       return;
     }
@@ -268,11 +272,13 @@ async function tick() {
     if (!openPosition && signal.action === 'BUY' &&
         stratData.livermore.trend === 'BEARISH' && liveSTR >= 0.8 && turtleSig === 'SELL') {
       logger.warn(`⚡ Signal filtrat: BUY contra Livermore BEARISH ${(liveSTR*100).toFixed(0)}% + Turtle STRONG SELL — HOLD forțat (PTJ: play defense)`);
+      tg.alertFiltered('BUY', 'BEARISH 85%', 'STRONG SELL');
       signal.action = 'HOLD';
     }
     if (!openPosition && signal.action === 'SELL' &&
         stratData.livermore.trend === 'BULLISH' && liveSTR >= 0.8 && turtleSig === 'BUY') {
       logger.warn(`⚡ Signal filtrat: SELL contra Livermore BULLISH ${(liveSTR*100).toFixed(0)}% + Turtle STRONG BUY — HOLD forțat (PTJ: play defense)`);
+      tg.alertFiltered('SELL', 'BULLISH 85%', 'STRONG BUY');
       signal.action = 'HOLD';
     }
 
@@ -303,6 +309,8 @@ async function main() {
   logger.setStartBalance(balance);
   logger.printBanner(balance);
 
+  const mode = cfg.PAPER_TRADING ? '📝 PAPER TRADING' : cfg.TESTNET ? '🧪 TESTNET' : '🔴 LIVE';
+  tg.alertStart(cfg.SYMBOL, cfg.TIMEFRAME, balance, mode);
   logger.info('🚀 Prima analiză...');
   await tick();
   setInterval(tick, cfg.LOOP_INTERVAL_MS);

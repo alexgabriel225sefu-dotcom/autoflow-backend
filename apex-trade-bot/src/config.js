@@ -24,6 +24,10 @@ module.exports = {
   // ─── Anthropic ──────────────────────────────────────────
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
 
+  // ─── Telegram alerts (opțional) ─────────────────────────
+  TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
+  TELEGRAM_CHAT_ID:   process.env.TELEGRAM_CHAT_ID   || '',
+
   // ─── Trading ────────────────────────────────────────────
   SYMBOL:      process.env.TRADE_SYMBOL || 'SOLUSDT',
   QUOTE_ASSET: process.env.QUOTE_ASSET  || 'USDT',
