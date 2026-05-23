@@ -45,10 +45,11 @@ async function getBalance() {
 }
 
 // ─── Calcul cantitate ─────────────────────────────────────
-async function calcQuantity(price, balance) {
+async function calcQuantity(price, balance, symbol = cfg.SYMBOL) {
   const riskAmount = balance * cfg.RISK_PER_TRADE;
   const qty        = riskAmount / price;
-  const isWhole    = ['DOGEUSDT','SHIBUSDT','XRPUSDT','ADAUSDT','MATICUSDT','TRXUSDT'].includes(cfg.SYMBOL);
+  // Coins under $1 → whole units; expensive coins (SOL, BNB etc.) → 6 decimals
+  const isWhole    = ['DOGEUSDT','SHIBUSDT','XRPUSDT','ADAUSDT','MATICUSDT','TRXUSDT'].includes(symbol);
   const result     = isWhole ? Math.floor(qty) : parseFloat(qty.toFixed(6));
   return result;
 }
@@ -108,9 +109,9 @@ function checkPosition(price) {
 }
 
 // ─── Deschide poziție ─────────────────────────────────────
-async function openTrade(side, price, balance, atrValue = 0) {
-  const quantity = await calcQuantity(price, balance);
-  if (quantity <= 0) { logger.warn('Cantitate prea mică — skip'); return; }
+async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL) {
+  const quantity = await calcQuantity(price, balance, symbol);
+  if (quantity <= 0) { logger.warn(`Cantitate prea mică pentru ${symbol} @ $${price} — skip`); return; }
 
   await exchange.placeOrder(side, quantity);
 
@@ -122,20 +123,21 @@ async function openTrade(side, price, balance, atrValue = 0) {
   const rrRatio = Math.abs(takeProfit - price) / Math.abs(price - stopLoss);
 
   openPosition = {
+    symbol,  // ← stocăm simbolul real al poziției
     side, entryPrice: price, quantity, stopLoss, takeProfit,
     openedAt: new Date().toISOString(), pnlPct: 0,
     trailHigh: side === 'BUY' ? price : null,
     trailLow:  side === 'SELL' ? price : null,
   };
 
-  logger.printTrade(side, cfg.SYMBOL, price, quantity);
+  logger.printTrade(side, symbol, price, quantity);
   logger.info(`SL: $${stopLoss.toFixed(5)} | TP: $${takeProfit.toFixed(5)} | R:R = 1:${rrRatio.toFixed(2)}`);
 }
 
 // ─── Închide poziție ──────────────────────────────────────
 async function closeTrade(price, reason) {
   if (!openPosition) return;
-  const { side, entryPrice, quantity } = openPosition;
+  const { side, entryPrice, quantity, symbol = cfg.SYMBOL } = openPosition;
   const closeSide = side === 'BUY' ? 'SELL' : 'BUY';
 
   await exchange.placeOrder(closeSide, quantity);
@@ -185,11 +187,14 @@ async function bestSymbol() {
 async function tick() {
   tickCount++;
   try {
-    // La fiecare 5 tick-uri, afișează stats
-    if (tickCount % 5 === 0) logger.printStats(await getBalance(), openPosition, await exchange.getPrice(cfg.SYMBOL).catch(() => null));
+    // Dacă e poziție deschisă → monitorizăm ACELAȘI simbol, nu lăsăm scannerul să schimbe
+    const activeSymbol = openPosition?.symbol ?? null;
+    const symbol = activeSymbol || await bestSymbol();
 
-    const symbol = await bestSymbol();
-    logger.info(`[${tickCount}] Analizez ${symbol} (${cfg.EXCHANGE})...`);
+    // La fiecare 5 tick-uri, afișează stats
+    if (tickCount % 5 === 0) logger.printStats(await getBalance(), openPosition, await exchange.getPrice(symbol).catch(() => null));
+
+    logger.info(`[${tickCount}] Analizez ${symbol} (${cfg.EXCHANGE})${activeSymbol ? ' 🔒 poziție activă' : ''}...`);
 
     const [candles, price] = await Promise.all([
       exchange.getCandles(symbol, cfg.TIMEFRAME, cfg.CANDLES),
@@ -213,7 +218,7 @@ async function tick() {
     logger.printSignal(signal, ind);
 
     // Filtre de calitate
-    const tooLowBalance = balance < 1; // Sub $1 nu mai putem tranzacționa
+    const tooLowBalance = balance < 1;
     const criteriaOk    = (signal.criteriaScore ?? 3) >= 3;
 
     if (tooLowBalance) {
@@ -227,9 +232,9 @@ async function tick() {
     } else if (signal.action === 'CLOSE' && openPosition) {
       await closeTrade(price, 'AI_CLOSE');
     } else if (signal.action === 'BUY' && !openPosition) {
-      await openTrade('BUY', price, balance, parseFloat(ind.atr));
+      await openTrade('BUY', price, balance, parseFloat(ind.atr), symbol);
     } else if (signal.action === 'SELL' && !openPosition) {
-      await openTrade('SELL', price, balance, parseFloat(ind.atr));
+      await openTrade('SELL', price, balance, parseFloat(ind.atr), symbol);
     } else {
       logger.info(`Skip — poziție ${openPosition ? 'deja deschisă' : 'deja închisă'}`);
     }
