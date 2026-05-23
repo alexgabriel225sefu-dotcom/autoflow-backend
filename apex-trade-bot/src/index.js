@@ -13,10 +13,11 @@ const exchange = cfg.EXCHANGE === 'binance'
   : require('./bybit');
 
 // ─── State ────────────────────────────────────────────────
-let openPosition = null;
-let paperBalance = cfg.PAPER_BALANCE;
-let tickCount    = 0;
-let startBalance = 0; // set in main(), used by strategies
+let openPosition      = null;
+let paperBalance      = cfg.PAPER_BALANCE;
+let tickCount         = 0;
+let startBalance      = 0; // set in main(), used by strategies
+let stopAlertedAt     = 0; // previne spam Strategy Stop pe Telegram
 
 // ─── Validare startup ─────────────────────────────────────
 function validate() {
@@ -234,13 +235,25 @@ async function tick() {
     const stratData = strategies.analyze(candles);
 
     // Paul Tudor Jones / Seykota: verifică dacă trebuie să ne oprim
-    const stopCheck = strategies.shouldStop(balance, startBalance || cfg.PAPER_BALANCE);
+    // Folosim valoarea totală a portofoliului (USDT + poziție deschisă) nu doar USDT liber
+    let portfolioValue = balance;
+    if (openPosition && price) {
+      portfolioValue = openPosition.side === 'BUY'
+        ? balance + openPosition.quantity * price
+        : balance - openPosition.quantity * price;
+    }
+    const stopCheck = strategies.shouldStop(portfolioValue, startBalance || cfg.PAPER_BALANCE);
     if (stopCheck.stop) {
       logger.warn(`🛑 STRATEGY STOP: ${stopCheck.reasons.join(' | ')}`);
       if (openPosition) {
         logger.warn('Poziție deschisă — o păstrăm până la SL/TP natural.');
       }
-      tg.alertStop(stopCheck.reasons);
+      // Trimite alertă Telegram maxim o dată la 30 minute (nu la fiecare tick)
+      const now = Date.now();
+      if (now - stopAlertedAt > 30 * 60 * 1000) {
+        tg.alertStop(stopCheck.reasons);
+        stopAlertedAt = now;
+      }
       logger.printStats(await getBalance(), openPosition, price);
       return;
     }
