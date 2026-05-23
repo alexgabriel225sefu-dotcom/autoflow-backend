@@ -91,6 +91,9 @@ const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const SENDER_EMAIL = process.env.SENDER_EMAIL || process.env.BREVO_SMTP_USER || 'supportaicashsystem@gmail.com';
 const SENDER_NAME  = process.env.SENDER_NAME  || 'AI Cash Systems';
 
+// ── GLOBAL HTML ESCAPE HELPER ──
+const _he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
 // ── COURSE ACCESS COOKIE HELPERS ──
 function _parseCookies(req) {
   const out = {};
@@ -400,7 +403,7 @@ async function callAI(systemPrompt, userMessage) {
   throw new Error('No AI provider configured');
 }
 
-function _he(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 
 async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
   const subject = `New message — ${_he(automationName)}`;
@@ -1053,43 +1056,7 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
       // ── APEX BOT DELIVERY ──
       if (product === 'apex-bot') {
         if (email) {
-          const botEmailHtml = `<div style="font-family:'Inter',sans-serif;max-width:560px;margin:0 auto;padding:40px 32px;background:#050508;color:#e2e2ec;border-radius:12px">
-            <div style="font-size:13px;font-weight:800;color:#00ff88;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px">APEX.BOT — DELIVERY</div>
-            <h2 style="font-size:26px;font-weight:900;color:#fff;margin-bottom:8px;letter-spacing:-1px">You're in, ${_he(buyerName.split(' ')[0])}.</h2>
-            <p style="color:rgba(255,255,255,.55);font-size:14px;margin-bottom:32px">Your Apex Trade Bot is ready. Everything you need is below.</p>
-            <div style="background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:10px;padding:20px 24px;margin-bottom:24px">
-              <div style="font-size:11px;color:#00ff88;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">📦 Source Code</div>
-              <a href="https://aicashsystem.space/bot-access" style="display:inline-block;background:#00ff88;color:#000;font-size:14px;font-weight:800;padding:12px 24px;border-radius:8px;text-decoration:none">Access Bot Repository →</a>
-              <p style="color:rgba(255,255,255,.35);font-size:12px;margin-top:10px;margin-bottom:0">Click the button above to access your bot's source code.</p>
-            </div>
-            <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px 24px;margin-bottom:16px">
-              <div style="font-size:11px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">🚀 Quick Setup</div>
-              <ol style="color:rgba(255,255,255,.65);font-size:13px;padding-left:18px;margin:0;line-height:2">
-                <li>Fork/clone the <strong>apex-trade-bot</strong> folder from the repo</li>
-                <li>Create a free account at <a href="https://railway.app" style="color:#00ff88">railway.app</a></li>
-                <li>Deploy from GitHub — select the apex-trade-bot directory</li>
-                <li>Add environment variables: GROQ_API_KEY (free at groq.com) + BYBIT_API_KEY</li>
-                <li>Set PAPER_TRADING=true first to test, then switch to live</li>
-              </ol>
-            </div>
-            <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px 24px;margin-bottom:24px">
-              <div style="font-size:11px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">📋 Key Variables</div>
-              <table style="width:100%;font-size:12px;font-family:'Courier New',monospace;border-collapse:collapse">
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">GROQ_API_KEY</td><td style="color:rgba(255,255,255,.5)">Get free at console.groq.com</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">BYBIT_API_KEY</td><td style="color:rgba(255,255,255,.5)">Bybit → API Management</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">BYBIT_API_SECRET</td><td style="color:rgba(255,255,255,.5)">From same API key</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">PAPER_TRADING</td><td style="color:rgba(255,255,255,.5)">true (safe start) → false (live)</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TRADE_SYMBOL</td><td style="color:rgba(255,255,255,.5)">DOGEUSDT (default)</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TELEGRAM_BOT_TOKEN</td><td style="color:rgba(255,255,255,.5)">Optional — alerts on Telegram</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TELEGRAM_CHAT_ID</td><td style="color:rgba(255,255,255,.5)">Optional — your Telegram chat ID</td></tr>
-              </table>
-            </div>
-            <div style="background:rgba(229,62,46,.06);border:1px solid rgba(229,62,46,.2);border-radius:10px;padding:16px 24px;margin-bottom:28px">
-              <p style="color:rgba(255,255,255,.5);font-size:12px;margin:0;line-height:1.7">⚠ <strong style="color:rgba(255,255,255,.75)">Risk reminder:</strong> Always start with paper trading mode. Crypto trading involves significant risk. Never trade more than you can afford to lose. The bot is a tool — not financial advice.</p>
-            </div>
-            <p style="color:rgba(255,255,255,.3);font-size:12px">Questions? Reply to this email or contact <a href="mailto:contact@aicashsystem.space" style="color:#00ff88">contact@aicashsystem.space</a>. We'll respond within 24h.</p>
-          </div>`;
-
+          const botEmailHtml = _buildBotEmailHtml(_he(buyerName), _he(email));
           let emailSent = false;
           if (BREVO_API_KEY) {
             try {
@@ -1474,7 +1441,6 @@ async function _sendBotEmailHandler(req, res) {
   const name  = req.body.name || 'there';
   if (!email) return res.status(400).json({ error: 'email required' });
 
-  const _he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const botEmailHtml = _buildBotEmailHtml(_he(name), _he(email));
 
   let emailSent = false;
