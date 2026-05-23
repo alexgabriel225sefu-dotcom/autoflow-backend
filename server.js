@@ -1356,115 +1356,221 @@ publicPages.forEach(p => {
 // ── BOT EMAIL HTML — funcție separată reutilizabilă ──────────────────────────
 function _buildBotEmailHtml(safeName, safeEmail) {
   const firstName = safeName.split(' ')[0];
-  const step = (n, title, body) =>
-    `<div style="display:flex;gap:14px;margin-bottom:18px;align-items:flex-start">
-      <div style="min-width:28px;height:28px;border-radius:50%;background:#00ff88;color:#000;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${n}</div>
-      <div><div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:3px">${title}</div><div style="color:rgba(255,255,255,.5);font-size:12px;line-height:1.7">${body}</div></div>
+  const cg = t => `<code style="background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.25);border-radius:4px;padding:2px 7px;color:#00ff88;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.3px">${t}</code>`;
+  const cy = t => `<code style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25);border-radius:4px;padding:2px 7px;color:#f59e0b;font-family:'Courier New',monospace;font-size:11px">${t}</code>`;
+  const cb = t => `<code style="background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);border-radius:4px;padding:2px 7px;color:#818cf8;font-family:'Courier New',monospace;font-size:11px">${t}</code>`;
+  const step = (n, emoji, title, body, color='#00ff88') =>
+    `<div style="display:flex;gap:16px;margin-bottom:0;align-items:flex-start;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+      <div style="min-width:36px;height:36px;border-radius:50%;background:${color};color:#000;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 16px ${color}55">${n}</div>
+      <div style="flex:1"><div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:7px"><span>${emoji}</span><span>${title}</span></div><div style="color:rgba(255,255,255,.48);font-size:12px;line-height:1.85">${body}</div></div>
     </div>`;
-  const cg = t => `<code style="background:rgba(0,255,136,.1);border-radius:3px;padding:1px 5px;color:#00ff88;font-family:'Courier New',monospace;font-size:11px">${t}</code>`;
-  const cb = t => `<code style="background:rgba(36,161,222,.1);border-radius:3px;padding:1px 5px;color:#29b6f6;font-family:'Courier New',monospace;font-size:11px">${t}</code>`;
-  const cy = t => `<code style="background:rgba(245,158,11,.1);border-radius:3px;padding:1px 5px;color:#f59e0b;font-family:'Courier New',monospace;font-size:11px">${t}</code>`;
-  // Pre-compute snippets that mix quotes
-  const rootDir    = cg('apex-trade-bot');
-  const paperTrue  = cy('PAPER_TRADING') + ' = ' + cy('true');
-  const paperFalse = cy('PAPER_TRADING') + ' = ' + cy('false');
-  const botfather  = cb('/newbot');
-  const getUpdates = cb('https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates');
-  const tgBotToken = cb('TELEGRAM_BOT_TOKEN');
-  const tgChatId   = cb('TELEGRAM_CHAT_ID');
 
-  return `<div style="font-family:'Inter',Arial,sans-serif;max-width:580px;margin:0 auto;background:#060609;color:#e2e2ec">
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+@keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+@keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,.4)}70%{box-shadow:0 0 0 10px rgba(0,255,136,0)}}
+@keyframes glow{0%,100%{opacity:.7}50%{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes borderPulse{0%,100%{border-color:rgba(0,255,136,.2)}50%{border-color:rgba(0,255,136,.6)}}
+@keyframes spin-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.email-wrap{font-family:'Inter',Arial,sans-serif;max-width:600px;margin:0 auto;background:#05050a;color:#e2e2ec;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}
+.header{background:linear-gradient(135deg,#080f0a 0%,#050508 60%,#060410 100%);padding:40px 40px 36px;position:relative;overflow:hidden;border-bottom:1px solid rgba(0,255,136,.12);animation:fadeUp .6s ease both}
+.header::before{content:'';position:absolute;top:-60px;right:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,136,.08) 0%,transparent 70%);pointer-events:none}
+.header::after{content:'';position:absolute;bottom:-40px;left:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.06) 0%,transparent 70%);pointer-events:none}
+.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:100px;padding:6px 14px;margin-bottom:20px;animation:borderPulse 3s ease infinite}
+.badge-dot{width:7px;height:7px;border-radius:50%;background:#00ff88;animation:pulse-green 2s infinite}
+.badge-txt{font-size:10px;font-weight:800;color:#00ff88;letter-spacing:2.5px;text-transform:uppercase}
+.header h1{font-size:30px;font-weight:900;color:#fff;margin:0 0 12px;letter-spacing:-1.2px;line-height:1.1}
+.header h1 span{background:linear-gradient(90deg,#00ff88,#00d4ff,#00ff88);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 3s linear infinite}
+.header p{color:rgba(255,255,255,.45);font-size:14px;margin:0;line-height:1.7}
+.body{padding:32px 40px}
+.cta-box{background:linear-gradient(135deg,rgba(0,255,136,.06),rgba(0,212,255,.04));border:1px solid rgba(0,255,136,.2);border-radius:14px;padding:28px;margin-bottom:28px;text-align:center;position:relative;overflow:hidden;animation:fadeUp .6s ease .1s both}
+.cta-box::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,255,136,.03),transparent);pointer-events:none}
+.cta-label{font-size:10px;font-weight:800;color:#00ff88;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:16px}
+.cta-btn{display:inline-block;background:#00ff88;color:#000;font-size:15px;font-weight:900;padding:16px 36px;border-radius:10px;text-decoration:none;letter-spacing:-.3px;position:relative;overflow:hidden;box-shadow:0 0 32px rgba(0,255,136,.35),0 4px 16px rgba(0,0,0,.4);transition:all .2s}
+.cta-btn::after{content:'';position:absolute;top:-50%;left:-60%;width:40%;height:200%;background:rgba(255,255,255,.25);transform:skewX(-20deg);animation:shimmer 2.5s ease infinite}
+.cta-hint{color:rgba(255,255,255,.28);font-size:11px;margin:14px 0 0;line-height:1.6}
+.cta-hint strong{color:rgba(255,255,255,.5)}
+.section{border-radius:14px;padding:24px;margin-bottom:16px;animation:fadeUp .6s ease .2s both}
+.section-green{background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.1)}
+.section-dark{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07)}
+.section-blue{background:rgba(99,102,241,.04);border:1px solid rgba(99,102,241,.15)}
+.section-yellow{background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.15)}
+.section-red{background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.12)}
+.section-title{font-size:10px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.section-title-green{color:#00ff88}.section-title-blue{color:#818cf8}.section-title-yellow{color:#f59e0b}.section-title-red{color:#f87171}
+.step-row{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.step-row:last-child{border-bottom:none;padding-bottom:0}
+.step-num{min-width:32px;height:32px;border-radius:50%;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-num-green{background:#00ff88;color:#000;box-shadow:0 0 12px rgba(0,255,136,.4)}
+.step-num-blue{background:#818cf8;color:#fff;box-shadow:0 0 12px rgba(129,140,248,.4)}
+.step-num-yellow{background:#f59e0b;color:#000;box-shadow:0 0 12px rgba(245,158,11,.4)}
+.step-title{color:#fff;font-size:13px;font-weight:700;margin-bottom:5px}
+.step-body{color:rgba(255,255,255,.45);font-size:12px;line-height:1.85}
+.var-table{width:100%;border-collapse:collapse}
+.var-table tr{border-bottom:1px solid rgba(255,255,255,.05)}
+.var-table tr:last-child{border:none}
+.var-table td{padding:10px 0;vertical-align:top}
+.var-key{color:#00ff88;font-family:'Courier New',monospace;font-size:11px;font-weight:700;white-space:nowrap;padding-right:16px;padding-top:12px}
+.var-val{color:rgba(255,255,255,.42);font-size:12px;line-height:1.7}
+.var-val strong{color:rgba(255,255,255,.65)}
+.chip{display:inline-block;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);border-radius:4px;padding:2px 7px;color:#00ff88;font-family:'Courier New',monospace;font-size:11px;font-weight:700}
+.chip-b{display:inline-block;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);border-radius:4px;padding:2px 7px;color:#818cf8;font-family:'Courier New',monospace;font-size:11px}
+.chip-y{display:inline-block;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:4px;padding:2px 7px;color:#f59e0b;font-family:'Courier New',monospace;font-size:11px}
+.divider{height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,136,.15),transparent);margin:8px 0 24px}
+.footer{border-top:1px solid rgba(255,255,255,.05);padding:24px 40px;text-align:center;background:rgba(0,0,0,.2)}
+.footer p{color:rgba(255,255,255,.2);font-size:11px;margin:0 0 8px}
+.footer a{color:#00ff88;font-size:13px;font-weight:700;text-decoration:none}
+</style></head><body style="margin:0;padding:24px 16px;background:#0a0a12">
 
-  <!-- HEADER -->
-  <div style="background:linear-gradient(135deg,#0a1a0f 0%,#060609 100%);border-bottom:1px solid rgba(0,255,136,.15);padding:32px 36px 28px">
-    <div style="font-size:11px;font-weight:800;color:#00ff88;letter-spacing:3px;text-transform:uppercase;margin-bottom:14px">APEX.BOT — DELIVERY CONFIRMED</div>
-    <h1 style="font-size:28px;font-weight:900;color:#fff;margin:0 0 10px;letter-spacing:-1px;line-height:1.1">You're in, ${firstName}. 🤖</h1>
-    <p style="color:rgba(255,255,255,.5);font-size:14px;margin:0;line-height:1.6">Your AI trading bot is ready to deploy. Follow the steps below — takes about 10 minutes.</p>
+<div class="email-wrap">
+
+<!-- ═══ HEADER ═══ -->
+<div class="header">
+  <div class="badge"><span class="badge-dot"></span><span class="badge-txt">Delivery Confirmed</span></div>
+  <h1>You're in,<br><span>${firstName}.</span> 🤖</h1>
+  <p>Your Apex Trade Bot is ready. Follow the steps below to deploy it in ~10 minutes and start trading with real AI signals.</p>
+</div>
+
+<div class="body">
+
+<!-- ═══ CTA ═══ -->
+<div class="cta-box">
+  <div class="cta-label">📦 Step 1 — Get the Source Code</div>
+  <a href="https://aicashsystem.space/bot-access" class="cta-btn">Open Bot Repository →</a>
+  <p class="cta-hint">On GitHub → click <strong>Code → Download ZIP</strong> → extract the <strong>apex-trade-bot</strong> folder to your computer</p>
+</div>
+
+<!-- ═══ BYBIT API ═══ -->
+<div class="section section-green">
+  <div class="section-title section-title-green">🔑 Step 2 — Create Your Bybit API Key</div>
+  <div class="step-row">
+    <div class="step-num step-num-green">1</div>
+    <div><div class="step-title">Create a Bybit account</div>
+    <div class="step-body">Go to <a href="https://bybit.com" style="color:#00ff88">bybit.com</a> → Sign up (takes 2 min). Complete identity verification to enable trading.</div></div>
   </div>
-
-  <div style="padding:32px 36px">
-
-  <!-- CTA PRINCIPAL -->
-  <div style="background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.25);border-radius:12px;padding:22px 24px;margin-bottom:32px;text-align:center">
-    <div style="font-size:11px;color:#00ff88;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px">📦 Step 1 — Get the source code</div>
-    <a href="https://aicashsystem.space/bot-access" style="display:inline-block;background:#00ff88;color:#000;font-size:15px;font-weight:900;padding:14px 32px;border-radius:9px;text-decoration:none;letter-spacing:-.3px">Open Bot Repository →</a>
-    <p style="color:rgba(255,255,255,.3);font-size:11px;margin:12px 0 0">On GitHub: click <strong style="color:rgba(255,255,255,.5)">Code → Download ZIP</strong> and extract the <strong style="color:rgba(255,255,255,.5)">apex-trade-bot</strong> folder</p>
+  <div class="step-row">
+    <div class="step-num step-num-green">2</div>
+    <div><div class="step-title">Open API Management</div>
+    <div class="step-body">Click your profile icon (top right) → <strong style="color:rgba(255,255,255,.7)">API Management</strong> → <strong style="color:rgba(255,255,255,.7)">Create New Key</strong></div></div>
   </div>
-
-  <!-- DEPLOY RAILWAY -->
-  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:22px 24px;margin-bottom:20px">
-    <div style="font-size:11px;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:18px">🚀 Deploy pe Railway (gratuit)</div>
-    ${step(2,'Creează cont Railway','Mergi la <a href="https://railway.app" style="color:#00ff88">railway.app</a> → <strong style="color:rgba(255,255,255,.7)">Sign in with GitHub</strong> (necesită cont GitHub)')}
-    ${step(3,'Creează un nou proiect','Click <strong style="color:rgba(255,255,255,.7)">New Project → Deploy from GitHub repo</strong> → selectează repo-ul tău (sau upload ZIP)')}
-    ${step(4,'Setează directorul corect',`În setările Railway → <strong style="color:rgba(255,255,255,.7)">Root Directory</strong> → scrie: <br>${rootDir}`)}
-    ${step(5,'Adaugă variabilele de mediu','În Railway → tab-ul <strong style="color:rgba(255,255,255,.7)">Variables</strong> → adaugă cheile de mai jos')}
+  <div class="step-row">
+    <div class="step-num step-num-green">3</div>
+    <div><div class="step-title">Configure the key permissions</div>
+    <div class="step-body">Select <strong style="color:rgba(255,255,255,.7)">System-generated API Keys</strong>. Enable only:<br>
+    ✅ <strong style="color:rgba(255,255,255,.6)">Read-Write</strong> (required)<br>
+    ✅ <strong style="color:rgba(255,255,255,.6)">Spot Trading</strong> (required)<br>
+    ❌ Leave everything else unchecked. IP restriction: leave blank (Railway uses dynamic IPs).</div></div>
   </div>
-
-  <!-- ENV VARS TABLE -->
-  <div style="background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:22px 24px;margin-bottom:20px">
-    <div style="font-size:11px;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">📋 Variabile Railway (Variables tab)</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
-        <td style="padding:8px 12px 8px 0;color:#00ff88;font-family:'Courier New',monospace;white-space:nowrap">GROQ_API_KEY</td>
-        <td style="padding:8px 0;color:rgba(255,255,255,.45);line-height:1.5">Cheie AI <strong style="color:rgba(255,255,255,.6)">gratuită</strong> — mergi la <a href="https://console.groq.com" style="color:#00ff88">console.groq.com</a> → API Keys → Create</td>
-      </tr>
-      <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
-        <td style="padding:8px 12px 8px 0;color:#00ff88;font-family:'Courier New',monospace;white-space:nowrap">BYBIT_API_KEY</td>
-        <td style="padding:8px 0;color:rgba(255,255,255,.45)">Bybit → profil → <strong style="color:rgba(255,255,255,.6)">API Management</strong> → Create New Key → bifează Spot Trading</td>
-      </tr>
-      <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
-        <td style="padding:8px 12px 8px 0;color:#00ff88;font-family:'Courier New',monospace;white-space:nowrap">BYBIT_API_SECRET</td>
-        <td style="padding:8px 0;color:rgba(255,255,255,.45)">Secretul generat odată cu API Key-ul de mai sus</td>
-      </tr>
-      <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
-        <td style="padding:8px 12px 8px 0;color:#00ff88;font-family:'Courier New',monospace;white-space:nowrap">PAPER_TRADING</td>
-        <td style="padding:8px 0;color:rgba(255,255,255,.45)">Setează <code style="background:rgba(0,255,136,.1);border-radius:3px;padding:1px 5px;color:#00ff88">true</code> la început pentru test fără bani reali</td>
-      </tr>
-      <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
-        <td style="padding:8px 12px 8px 0;color:#00ff88;font-family:'Courier New',monospace;white-space:nowrap">TRADE_SYMBOL</td>
-        <td style="padding:8px 0;color:rgba(255,255,255,.45)">ex. <code style="background:rgba(0,255,136,.1);border-radius:3px;padding:1px 5px;color:#00ff88">DOGEUSDT</code> sau <code style="background:rgba(0,255,136,.1);border-radius:3px;padding:1px 5px;color:#00ff88">SOLUSDT</code> (default: auto-scanner)</td>
-      </tr>
-      <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
-        <td style="padding:8px 12px 8px 0;color:#00ff88;font-family:'Courier New',monospace;white-space:nowrap">TELEGRAM_BOT_TOKEN</td>
-        <td style="padding:8px 0;color:rgba(255,255,255,.45)">Opțional — vezi instrucțiuni Telegram mai jos</td>
-      </tr>
-      <tr>
-        <td style="padding:8px 12px 8px 0;color:#00ff88;font-family:'Courier New',monospace;white-space:nowrap">TELEGRAM_CHAT_ID</td>
-        <td style="padding:8px 0;color:rgba(255,255,255,.45)">Opțional — ID-ul chat-ului tău Telegram</td>
-      </tr>
-    </table>
+  <div class="step-row">
+    <div class="step-num step-num-green">4</div>
+    <div><div class="step-title">Copy and save your keys</div>
+    <div class="step-body">Complete 2FA verification. You'll see your <strong style="color:rgba(255,255,255,.7)">API Key</strong> and <strong style="color:rgba(255,255,255,.7)">API Secret</strong>.
+    <span style="color:#f59e0b;font-weight:600">⚠ The Secret is shown only once — copy it immediately and save it somewhere safe.</span></div></div>
   </div>
+</div>
 
-  <!-- TELEGRAM SETUP -->
-  <div style="background:rgba(36,161,222,.06);border:1px solid rgba(36,161,222,.2);border-radius:12px;padding:22px 24px;margin-bottom:20px">
-    <div style="font-size:11px;color:#29b6f6;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">📱 Setare Telegram Alerts (recomandat)</div>
-    ${step(1,'Creează botul Telegram',`Deschide Telegram → caută <strong style="color:rgba(255,255,255,.7)">@BotFather</strong> → trimite ${botfather} → alege un nume → copiază token-ul primit`)}
-    ${step(2,'Găsește Chat ID-ul tău',`Trimite un mesaj botului tău nou creat, apoi deschide în browser:<br>${getUpdates}<br>Caută <strong style="color:rgba(255,255,255,.6)">"chat":{"id":XXXXXX}</strong> — acel număr e Chat ID-ul`)}
-    ${step(3,'Adaugă în Railway',`Pune token-ul la ${tgBotToken} și ID-ul la ${tgChatId} în Variables`)}
+<!-- ═══ DEPLOY RAILWAY ═══ -->
+<div class="section section-dark">
+  <div class="section-title" style="color:rgba(255,255,255,.5)">🚀 Step 3 — Deploy on Railway (Free)</div>
+  <div class="step-row">
+    <div class="step-num step-num-green">1</div>
+    <div><div class="step-title">Create a Railway account</div>
+    <div class="step-body">Go to <a href="https://railway.app" style="color:#00ff88">railway.app</a> → <strong style="color:rgba(255,255,255,.7)">Login with GitHub</strong> (requires a GitHub account)</div></div>
   </div>
+  <div class="step-row">
+    <div class="step-num step-num-green">2</div>
+    <div><div class="step-title">Create a new project</div>
+    <div class="step-body">Click <strong style="color:rgba(255,255,255,.7)">New Project → Deploy from GitHub repo</strong> → fork/select the repository from your account</div></div>
+  </div>
+  <div class="step-row">
+    <div class="step-num step-num-green">3</div>
+    <div><div class="step-title">Set the root directory</div>
+    <div class="step-body">In Railway project settings → <strong style="color:rgba(255,255,255,.7)">Root Directory</strong> → type exactly: <span class="chip">apex-trade-bot</span><br>This tells Railway to run the bot folder, not the entire repo.</div></div>
+  </div>
+  <div class="step-row">
+    <div class="step-num step-num-green">4</div>
+    <div><div class="step-title">Add environment variables</div>
+    <div class="step-body">Go to <strong style="color:rgba(255,255,255,.7)">Variables tab</strong> → add each key from the table below</div></div>
+  </div>
+</div>
 
-  <!-- LIVE TRADING -->
-  <div style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:12px;padding:22px 24px;margin-bottom:20px">
-    <div style="font-size:11px;color:#f59e0b;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">💰 Trecere la Live Trading</div>
-    ${step(1,'Testează cu Paper Trading',`Lasă botul să ruleze 24-48h cu ${paperTrue}. Urmărește alertele pe Telegram — dacă totul arată bine, treci la live.`)}
-    ${step(2,'Pune bani pe Bybit','Depune minim $10 pe contul Bybit Spot (recomandat $20-50 pentru început). <strong style="color:rgba(255,255,255,.6)">Nu pune mai mult decât îți permiți să pierzi.</strong>')}
-    ${step(3,'Activează Live',`În Railway → Variables → schimbă ${paperFalse} → apasă Save → Railway redeploy automat → botul pornește în modul real`)}
-  </div>
+<!-- ═══ ENV VARS ═══ -->
+<div class="section section-dark">
+  <div class="section-title" style="color:rgba(255,255,255,.4)">📋 Railway Variables — Copy These Exactly</div>
+  <table class="var-table">
+    <tr><td class="var-key">GROQ_API_KEY</td><td class="var-val">Free AI key — go to <a href="https://console.groq.com" style="color:#00ff88">console.groq.com</a> → API Keys → <strong>Create API Key</strong> (no credit card needed)</td></tr>
+    <tr><td class="var-key">BYBIT_API_KEY</td><td class="var-val">The API Key you copied from Bybit in Step 2</td></tr>
+    <tr><td class="var-key">BYBIT_API_SECRET</td><td class="var-val">The API Secret from Bybit — <strong>only shown once at creation</strong></td></tr>
+    <tr><td class="var-key">PAPER_TRADING</td><td class="var-val">Set to <span class="chip">true</span> to start safely with simulated money. Change to <span class="chip-y">false</span> when ready for live trading.</td></tr>
+    <tr><td class="var-key">PAPER_BALANCE</td><td class="var-val">Simulated starting balance. Default: <span class="chip">10</span> (= $10)</td></tr>
+    <tr><td class="var-key">TRADE_SYMBOL</td><td class="var-val">Crypto pair to trade. Default auto-scanner. Override with e.g. <span class="chip">DOGEUSDT</span> or <span class="chip">SOLUSDT</span></td></tr>
+    <tr><td class="var-key">TELEGRAM_BOT_TOKEN</td><td class="var-val">Optional — get real-time alerts on your phone (see Telegram setup below)</td></tr>
+    <tr><td class="var-key">TELEGRAM_CHAT_ID</td><td class="var-val">Optional — your personal Telegram chat ID</td></tr>
+  </table>
+</div>
 
-  <!-- RISK -->
-  <div style="background:rgba(229,62,46,.05);border:1px solid rgba(229,62,46,.15);border-radius:10px;padding:16px 20px;margin-bottom:28px">
-    <p style="color:rgba(255,255,255,.4);font-size:12px;margin:0;line-height:1.8">⚠ <strong style="color:rgba(255,255,255,.6)">Risk disclosure:</strong> Crypto trading involves substantial risk of loss. Start with paper trading. Only use funds you can afford to lose entirely. Past performance does not guarantee future results. Apex Bot is an automation tool — not financial advice.</p>
+<!-- ═══ TELEGRAM ═══ -->
+<div class="section section-blue">
+  <div class="section-title section-title-blue">📱 Step 4 — Telegram Alerts (Highly Recommended)</div>
+  <div class="step-row">
+    <div class="step-num step-num-blue">1</div>
+    <div><div class="step-title">Create your Telegram bot</div>
+    <div class="step-body">Open Telegram → search <strong style="color:rgba(255,255,255,.7)">@BotFather</strong> → send <span class="chip-b">/newbot</span> → choose a name (e.g. "MyApexBot") → BotFather sends you a token like <span class="chip-b">7123456789:AAFxxx...</span> — copy it.</div></div>
   </div>
+  <div class="step-row">
+    <div class="step-num step-num-blue">2</div>
+    <div><div class="step-title">Find your Chat ID</div>
+    <div class="step-body">Send any message to your new bot, then open this URL in your browser (replace TOKEN):<br>
+    <span class="chip-b" style="word-break:break-all;font-size:10px">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span><br>
+    Look for <strong style="color:rgba(255,255,255,.65)">"chat":{"id": 123456789}</strong> — that number is your Chat ID.</div></div>
+  </div>
+  <div class="step-row">
+    <div class="step-num step-num-blue">3</div>
+    <div><div class="step-title">Add to Railway Variables</div>
+    <div class="step-body">Paste the token as <span class="chip-b">TELEGRAM_BOT_TOKEN</span> and the number as <span class="chip-b">TELEGRAM_CHAT_ID</span>. You'll instantly receive trade alerts, heartbeats every 30min, and stop signals.</div></div>
+  </div>
+</div>
 
-  <!-- FOOTER -->
-  <div style="border-top:1px solid rgba(255,255,255,.06);padding-top:20px;text-align:center">
-    <p style="color:rgba(255,255,255,.25);font-size:12px;margin:0 0 6px">Questions? We respond within 24h.</p>
-    <a href="mailto:supportaicashsystem@gmail.com" style="color:#00ff88;font-size:13px;font-weight:600;text-decoration:none">supportaicashsystem@gmail.com</a>
-    <p style="color:rgba(255,255,255,.12);font-size:11px;margin:16px 0 0">© 2025 AI Cash Systems · <a href="https://aicashsystem.space" style="color:rgba(255,255,255,.2);text-decoration:none">aicashsystem.space</a></p>
+<!-- ═══ GO LIVE ═══ -->
+<div class="section section-yellow">
+  <div class="section-title section-title-yellow">💰 Step 5 — Go Live When Ready</div>
+  <div class="step-row">
+    <div class="step-num step-num-yellow">1</div>
+    <div><div class="step-title">Run on Paper Trading first</div>
+    <div class="step-body">With <span class="chip-y">PAPER_TRADING=true</span>, the bot trades with simulated $10 — no real money at risk. Watch it for 24-48h and check the Telegram alerts look correct.</div></div>
   </div>
+  <div class="step-row">
+    <div class="step-num step-num-yellow">2</div>
+    <div><div class="step-title">Fund your Bybit Spot account</div>
+    <div class="step-body">Deposit a minimum of $10 USDT to your Bybit Spot wallet (recommended: $20–50 to start). <strong style="color:rgba(255,255,255,.6)">Never risk more than you can afford to lose entirely.</strong></div></div>
+  </div>
+  <div class="step-row">
+    <div class="step-num step-num-yellow">3</div>
+    <div><div class="step-title">Activate live trading</div>
+    <div class="step-body">In Railway → Variables → change <span class="chip-y">PAPER_TRADING</span> from <span class="chip-y">true</span> → <span class="chip-y">false</span> → click Save. Railway redeploys automatically. Your bot is now live and trading with real funds. 🚀</div></div>
+  </div>
+</div>
 
-  </div>
-</div>`;
+<!-- ═══ RISK ═══ -->
+<div class="section section-red">
+  <p style="color:rgba(255,255,255,.38);font-size:12px;margin:0;line-height:1.9">
+    <strong style="color:rgba(239,68,68,.8)">⚠ Risk Disclosure:</strong> Cryptocurrency trading involves substantial risk of loss and is not suitable for all investors. Always start with paper trading mode. Only invest funds you can afford to lose completely. Past performance is not indicative of future results. Apex Bot is an automation tool — not financial advice. You are fully responsible for your own trading decisions.
+  </p>
+</div>
+
+</div><!-- /body -->
+
+<!-- ═══ FOOTER ═══ -->
+<div class="footer">
+  <p>Questions? We respond within 24 hours.</p>
+  <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a>
+  <p style="margin-top:16px;color:rgba(255,255,255,.12);font-size:10px">© 2025 AI Cash Systems &nbsp;·&nbsp; <a href="https://aicashsystem.space" style="color:rgba(255,255,255,.18);text-decoration:none">aicashsystem.space</a></p>
+</div>
+
+</div><!-- /email-wrap -->
+</body></html>`;
 }
 
 // ── BOT ACCESS REDIRECT — clienții văd aicashsystem.space/bot-access, nu GitHub
