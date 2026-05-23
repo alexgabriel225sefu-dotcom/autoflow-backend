@@ -259,11 +259,15 @@ async function tick() {
 
     // Filtre de calitate
     const tooLowBalance = balance < 1;
-    const criteriaOk    = (signal.criteriaScore ?? 3) >= 3;
+    const criteriaOk    = (signal.criteriaScore ?? 0) >= 4;        // minim 4/5 — evită intrări marginale
+    const volumeOk      = parseFloat(ind.volumeRatio) >= 1.0;      // volum minim mediu — evită mișcări false
 
     if (tooLowBalance) {
       logger.warn('Balanță prea mică ($' + balance.toFixed(2) + ') — stop trading');
       return;
+    }
+    if (!volumeOk && !openPosition) {
+      logger.info(`⚠️ Volum insuficient (${ind.volumeRatio}× < 1.0×) — HOLD, așteptăm confirmare volum`);
     }
 
     // Stan Druckenmiller: calculează multiplicatorul de poziție
@@ -290,8 +294,8 @@ async function tick() {
     }
 
     // Execuție
-    if (signal.action === 'HOLD' || signal.confidence < cfg.MIN_CONFIDENCE || !criteriaOk) {
-      logger.info(`HOLD — confidence: ${signal.confidence}% | criterii: ${signal.criteriaScore ?? '?'}/5`);
+    if (signal.action === 'HOLD' || signal.confidence < cfg.MIN_CONFIDENCE || !criteriaOk || (!volumeOk && !openPosition)) {
+      logger.info(`HOLD — confidence: ${signal.confidence}% | criterii: ${signal.criteriaScore ?? '?'}/5 | volum: ${ind.volumeRatio}×`);
     } else if (signal.action === 'CLOSE' && openPosition) {
       await closeTrade(price, 'AI_CLOSE');
     } else if (signal.action === 'BUY' && !openPosition) {
