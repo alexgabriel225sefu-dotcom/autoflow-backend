@@ -1305,7 +1305,7 @@ app.get('/api/heygen/status/:id', async (req, res) => {
 });
 // Explicit HTML page routes
 // Public pages — no auth required
-const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','screen','tiktok-demo','video-maker','video-gen'];
+const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','screen','tiktok-demo','video-maker','video-gen','apex-bot'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
