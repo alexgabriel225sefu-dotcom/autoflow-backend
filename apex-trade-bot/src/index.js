@@ -279,15 +279,17 @@ async function tick() {
 
     // Filtre de calitate
     const tooLowBalance = balance < 1;
-    const criteriaOk    = (signal.criteriaScore ?? 0) >= 4;        // minim 4/5 — evită intrări marginale
-    const volumeOk      = parseFloat(ind.volumeRatio) >= 1.0;      // volum minim mediu — evită mișcări false
+    const minCriteria   = parseInt(process.env.MIN_CRITERIA   || '3');   // 3/5 default (era 4)
+    const minVolume     = parseFloat(process.env.MIN_VOLUME_RATIO || '0.7'); // 0.7× default (era 1.0)
+    const criteriaOk    = (signal.criteriaScore ?? 0) >= minCriteria;
+    const volumeOk      = parseFloat(ind.volumeRatio) >= minVolume;
 
     if (tooLowBalance) {
       logger.warn('Balanță prea mică ($' + balance.toFixed(2) + ') — stop trading');
       return;
     }
     if (!volumeOk && !openPosition) {
-      logger.info(`⚠️ Volum insuficient (${ind.volumeRatio}× < 1.0×) — HOLD, așteptăm confirmare volum`);
+      logger.info(`⚠️ Volum insuficient (${ind.volumeRatio}× < ${minVolume}×) — HOLD, așteptăm confirmare volum`);
     }
 
     // Stan Druckenmiller: calculează multiplicatorul de poziție

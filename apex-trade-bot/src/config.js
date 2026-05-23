@@ -44,7 +44,7 @@ module.exports = {
   RISK_PER_TRADE:  parseFloat(process.env.RISK_PER_TRADE  || '0.20'),  // 20% → mai mulți bani/trade
   STOP_LOSS_PCT:   parseFloat(process.env.STOP_LOSS_PCT   || '0.008'), // 0.8% (potrivit pt 5m)
   TAKE_PROFIT_PCT: parseFloat(process.env.TAKE_PROFIT_PCT || '0.016'), // 1.6% → R:R = 2:1
-  MIN_CONFIDENCE:  parseInt(process.env.MIN_CONFIDENCE    || '72'),    // puțin mai strict
+  MIN_CONFIDENCE:  parseInt(process.env.MIN_CONFIDENCE    || '62'),    // 62% — permite mai multe intrări
 
   // ─── Trailing Stop ──────────────────────────────────────
   TRAILING_STOP:        process.env.TRAILING_STOP !== 'false', // activat implicit
