@@ -25,21 +25,22 @@ module.exports = {
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
 
   // ─── Trading ────────────────────────────────────────────
-  SYMBOL:      process.env.TRADE_SYMBOL || 'DOGEUSDT',
+  SYMBOL:      process.env.TRADE_SYMBOL || 'SOLUSDT',
   QUOTE_ASSET: process.env.QUOTE_ASSET  || 'USDT',
-  TIMEFRAME:   process.env.TIMEFRAME    || '15m',  // 15m = mai multe semnale
-  CANDLES:     150,
+  TIMEFRAME:   process.env.TIMEFRAME    || '5m',
+  CANDLES:     200,
 
   // ─── Scanner multi-simbol ───────────────────────────────
-  SCAN_SYMBOLS: (process.env.SCAN_SYMBOLS || 'DOGEUSDT,XRPUSDT,ADAUSDT,TRXUSDT,SHIBUSDT').split(','),
-  MULTI_SYMBOL: process.env.MULTI_SYMBOL === 'true',
+  // Ordonate după volatilitate + lichiditate + potențial profit pe capital mic
+  SCAN_SYMBOLS: (process.env.SCAN_SYMBOLS || 'SOLUSDT,XRPUSDT,DOGEUSDT,TRXUSDT,ADAUSDT').split(','),
+  MULTI_SYMBOL: process.env.MULTI_SYMBOL !== 'false', // activat implicit
 
-  // ─── Risc (optimizat pt capital mic $5-10) ───────────────
-  // Cu $10 și 15% risc → $1.50/trade (suficient pt min order)
-  RISK_PER_TRADE:  parseFloat(process.env.RISK_PER_TRADE  || '0.15'),  // 15%
-  STOP_LOSS_PCT:   parseFloat(process.env.STOP_LOSS_PCT   || '0.015'), // 1.5%
-  TAKE_PROFIT_PCT: parseFloat(process.env.TAKE_PROFIT_PCT || '0.03'),  // 3% → R:R = 2:1
-  MIN_CONFIDENCE:  parseInt(process.env.MIN_CONFIDENCE    || '70'),
+  // ─── Risc (optimizat pt 5m + capital mic $10-50) ────────────
+  // Pe 5m: mișcări tipice 0.5-1.5% → SL 0.8%, TP 1.6% → R:R 2:1
+  RISK_PER_TRADE:  parseFloat(process.env.RISK_PER_TRADE  || '0.20'),  // 20% → mai mulți bani/trade
+  STOP_LOSS_PCT:   parseFloat(process.env.STOP_LOSS_PCT   || '0.008'), // 0.8% (potrivit pt 5m)
+  TAKE_PROFIT_PCT: parseFloat(process.env.TAKE_PROFIT_PCT || '0.016'), // 1.6% → R:R = 2:1
+  MIN_CONFIDENCE:  parseInt(process.env.MIN_CONFIDENCE    || '72'),    // puțin mai strict
 
   // ─── Trailing Stop ──────────────────────────────────────
   TRAILING_STOP:        process.env.TRAILING_STOP !== 'false', // activat implicit
@@ -54,7 +55,7 @@ module.exports = {
   COMPOUND:      process.env.COMPOUND !== 'false', // reinvestește profiturile
 
   // ─── Intervale ──────────────────────────────────────────
-  LOOP_INTERVAL_MS: parseInt(process.env.LOOP_INTERVAL_MS || String(15 * 60 * 1000)),
+  LOOP_INTERVAL_MS: parseInt(process.env.LOOP_INTERVAL_MS || String(5 * 60 * 1000)),
 
   // ─── Paper Trading ──────────────────────────────────────
   PAPER_TRADING: PAPER,
