@@ -234,7 +234,7 @@ async function tick() {
       logger.info(`Skip — poziție ${openPosition ? 'deja deschisă' : 'deja închisă'}`);
     }
 
-    logger.printStats(balance, openPosition, price);
+    logger.printStats(await getBalance(), openPosition, price);
   } catch (err) {
     logger.error(`Tick error: ${err.message}`);
   }
