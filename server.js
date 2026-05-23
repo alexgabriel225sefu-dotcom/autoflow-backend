@@ -1059,7 +1059,7 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
             <p style="color:rgba(255,255,255,.55);font-size:14px;margin-bottom:32px">Your Apex Trade Bot is ready. Everything you need is below.</p>
             <div style="background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:10px;padding:20px 24px;margin-bottom:24px">
               <div style="font-size:11px;color:#00ff88;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">📦 Source Code</div>
-              <a href="https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/tree/release/apex-bot/apex-trade-bot" style="display:inline-block;background:#00ff88;color:#000;font-size:14px;font-weight:800;padding:12px 24px;border-radius:8px;text-decoration:none">Access GitHub Repository →</a>
+              <a href="https://aicashsystem.space/bot-access" style="display:inline-block;background:#00ff88;color:#000;font-size:14px;font-weight:800;padding:12px 24px;border-radius:8px;text-decoration:none">Access Bot Repository →</a>
               <p style="color:rgba(255,255,255,.35);font-size:12px;margin-top:10px;margin-bottom:0">Click the button above to access your bot's source code.</p>
             </div>
             <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px 24px;margin-bottom:16px">
@@ -1384,6 +1384,85 @@ const publicPages = ['index','access','privacy','terms','intro-epic','app','demo
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
+});
+
+// ── BOT ACCESS REDIRECT — clienții văd aicashsystem.space/bot-access, nu GitHub
+app.get('/bot-access', (req, res) => {
+  res.redirect(301, 'https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/tree/release/apex-bot/apex-trade-bot');
+});
+
+// ── TEST DELIVERY EMAIL — protejat cu secret key, fără plată
+// Usage: POST /api/send-bot-email?secret=VALOARE_DIN_ENV cu body { "email": "test@example.com", "name": "Test" }
+app.post('/api/send-bot-email', async (req, res) => {
+  const secret = req.query.secret || req.body.secret;
+  const adminSecret = process.env.BOT_EMAIL_SECRET || '';
+  if (!adminSecret || secret !== adminSecret) {
+    return res.status(403).json({ error: 'Invalid secret' });
+  }
+  const email = req.body.email;
+  const name  = req.body.name || 'there';
+  if (!email) return res.status(400).json({ error: 'email required' });
+
+  const _he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const botEmailHtml = `<div style="font-family:'Inter',sans-serif;max-width:560px;margin:0 auto;padding:40px 32px;background:#050508;color:#e2e2ec;border-radius:12px">
+    <div style="font-size:13px;font-weight:800;color:#00ff88;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px">APEX.BOT — DELIVERY</div>
+    <h2 style="font-size:26px;font-weight:900;color:#fff;margin-bottom:8px;letter-spacing:-1px">You're in, ${_he(name.split(' ')[0])}.</h2>
+    <p style="color:rgba(255,255,255,.55);font-size:14px;margin-bottom:32px">Your Apex Trade Bot is ready. Everything you need is below.</p>
+    <div style="background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:10px;padding:20px 24px;margin-bottom:24px">
+      <div style="font-size:11px;color:#00ff88;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">📦 Source Code</div>
+      <a href="https://aicashsystem.space/bot-access" style="display:inline-block;background:#00ff88;color:#000;font-size:14px;font-weight:800;padding:12px 24px;border-radius:8px;text-decoration:none">Access Bot Repository →</a>
+      <p style="color:rgba(255,255,255,.35);font-size:12px;margin-top:10px;margin-bottom:0">Click the button above to access your bot's source code.</p>
+    </div>
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px 24px;margin-bottom:16px">
+      <div style="font-size:11px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">🚀 Quick Setup</div>
+      <ol style="color:rgba(255,255,255,.65);font-size:13px;padding-left:18px;margin:0;line-height:2">
+        <li>Open the repo and download the <strong>apex-trade-bot</strong> folder</li>
+        <li>Create a free account at <a href="https://railway.app" style="color:#00ff88">railway.app</a></li>
+        <li>Deploy from GitHub — select the apex-trade-bot directory</li>
+        <li>Add environment variables: GROQ_API_KEY (free at groq.com) + BYBIT_API_KEY</li>
+        <li>Set PAPER_TRADING=true first to test, then switch to live</li>
+      </ol>
+    </div>
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px 24px;margin-bottom:24px">
+      <div style="font-size:11px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">📋 Key Variables</div>
+      <table style="width:100%;font-size:12px;font-family:'Courier New',monospace;border-collapse:collapse">
+        <tr><td style="color:#00ff88;padding:3px 12px 3px 0">GROQ_API_KEY</td><td style="color:rgba(255,255,255,.5)">Get free at console.groq.com</td></tr>
+        <tr><td style="color:#00ff88;padding:3px 12px 3px 0">BYBIT_API_KEY</td><td style="color:rgba(255,255,255,.5)">Bybit → API Management</td></tr>
+        <tr><td style="color:#00ff88;padding:3px 12px 3px 0">BYBIT_API_SECRET</td><td style="color:rgba(255,255,255,.5)">From same API key</td></tr>
+        <tr><td style="color:#00ff88;padding:3px 12px 3px 0">PAPER_TRADING</td><td style="color:rgba(255,255,255,.5)">true (safe start) → false (live)</td></tr>
+        <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TRADE_SYMBOL</td><td style="color:rgba(255,255,255,.5)">DOGEUSDT (default)</td></tr>
+        <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TELEGRAM_BOT_TOKEN</td><td style="color:rgba(255,255,255,.5)">Optional — alerts on Telegram</td></tr>
+        <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TELEGRAM_CHAT_ID</td><td style="color:rgba(255,255,255,.5)">Optional — your Telegram chat ID</td></tr>
+      </table>
+    </div>
+    <div style="background:rgba(229,62,46,.06);border:1px solid rgba(229,62,46,.2);border-radius:10px;padding:16px 24px;margin-bottom:28px">
+      <p style="color:rgba(255,255,255,.5);font-size:12px;margin:0;line-height:1.7">⚠ <strong style="color:rgba(255,255,255,.75)">Risk reminder:</strong> Always start with paper trading mode. Crypto trading involves significant risk. Never trade more than you can afford to lose. The bot is a tool — not financial advice.</p>
+    </div>
+    <p style="color:rgba(255,255,255,.3);font-size:12px">Questions? Reply to this email or contact <a href="mailto:contact@aicashsystem.space" style="color:#00ff88">contact@aicashsystem.space</a>. We'll respond within 24h.</p>
+  </div>`;
+
+  let emailSent = false;
+  if (BREVO_API_KEY) {
+    try {
+      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: { name: 'Apex.Bot', email: SENDER_EMAIL }, to: [{ email }],
+          subject: '🤖 Your Apex Trade Bot is ready — access inside', htmlContent: botEmailHtml })
+      });
+      if (r.ok) emailSent = true;
+      else { const t = await r.text(); return res.json({ success: false, method: 'brevo', error: t }); }
+    } catch(e) { return res.json({ success: false, method: 'brevo', error: e.message }); }
+  } else if (transporter) {
+    try {
+      await transporter.sendMail({ from: `"Apex.Bot" <${SENDER_EMAIL}>`, to: email,
+        subject: '🤖 Your Apex Trade Bot is ready — access inside', html: botEmailHtml });
+      emailSent = true;
+    } catch(e) { return res.json({ success: false, method: 'smtp', error: e.message }); }
+  } else {
+    return res.json({ success: false, error: 'No email provider configured (BREVO_API_KEY missing)' });
+  }
+  return res.json({ success: emailSent, to: email, method: BREVO_API_KEY ? 'brevo' : 'smtp' });
 });
 
 // Protected pages — require any valid course purchase
