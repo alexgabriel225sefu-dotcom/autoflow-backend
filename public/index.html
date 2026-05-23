@@ -829,55 +829,73 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
   </div>
 </footer>
 
-<!-- SECRET BUTTON -->
+<!-- APEX BOT TRIGGER -->
 <style>
-#secret-btn{
-  position:fixed;bottom:28px;left:28px;z-index:9999;
-  background:transparent;border:none;cursor:pointer;padding:0;
-  opacity:0;transition:opacity .4s;
+#apex-trigger{
+  position:fixed;bottom:32px;right:32px;z-index:9999;
+  opacity:0;transform:translateY(8px);
+  transition:opacity .5s ease,transform .5s ease;
+  pointer-events:none;
 }
-#secret-btn:hover{opacity:1!important}
-#secret-btn .secret-inner{
-  display:flex;align-items:center;gap:8px;
-  background:#050508dd;border:1px solid #00ff8833;
-  border-radius:100px;padding:8px 16px 8px 10px;
-  backdrop-filter:blur(12px);
-  animation:secret-glow 3s ease-in-out infinite;
-  transition:border-color .3s,box-shadow .3s;
+#apex-trigger.visible{opacity:1;transform:translateY(0);pointer-events:auto}
+#apex-trigger a{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(8,8,12,.92);
+  border:1px solid rgba(229,62,46,.18);
+  border-radius:14px;
+  padding:12px 18px 12px 14px;
+  backdrop-filter:blur(20px);
+  text-decoration:none;
+  cursor:pointer;
+  transition:border-color .25s,box-shadow .25s,transform .2s;
+  box-shadow:0 4px 24px rgba(0,0,0,.5);
 }
-#secret-btn:hover .secret-inner{
-  border-color:#00ff8888;
-  box-shadow:0 0 20px #00ff8830;
+#apex-trigger a:hover{
+  border-color:rgba(229,62,46,.5);
+  box-shadow:0 8px 40px rgba(229,62,46,.15),0 4px 24px rgba(0,0,0,.5);
+  transform:translateY(-2px);
 }
-.secret-dot{
+.atr-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:rgba(229,62,46,.12);
+  border:1px solid rgba(229,62,46,.2);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  position:relative;
+}
+.atr-icon svg{width:16px;height:16px}
+.atr-pip{
+  position:absolute;top:-3px;right:-3px;
   width:8px;height:8px;border-radius:50%;
-  background:#00ff88;
-  animation:secret-pulse 2s ease-in-out infinite;
+  background:#E53E2E;
+  box-shadow:0 0 0 0 rgba(229,62,46,.5);
+  animation:atr-ping 2.5s ease-in-out infinite;
 }
-.secret-text{
-  font-size:11px;font-weight:700;letter-spacing:2px;
-  text-transform:uppercase;color:#00ff8899;
-  font-family:-apple-system,sans-serif;
+@keyframes atr-ping{
+  0%{box-shadow:0 0 0 0 rgba(229,62,46,.5)}
+  70%{box-shadow:0 0 0 6px rgba(229,62,46,0)}
+  100%{box-shadow:0 0 0 0 rgba(229,62,46,0)}
 }
-@keyframes secret-glow{
-  0%,100%{opacity:.25}
-  50%{opacity:.7}
-}
-@keyframes secret-pulse{
-  0%,100%{box-shadow:0 0 0 0 #00ff8844}
-  50%{box-shadow:0 0 0 5px #00ff8800}
-}
-/* Apare după 5 secunde de stat pe pagină */
-#secret-btn.visible{opacity:.25}
+.atr-copy{display:flex;flex-direction:column;gap:1px}
+.atr-title{font-size:12px;font-weight:700;color:#fff;letter-spacing:.1px;line-height:1.2;font-family:'Inter',sans-serif}
+.atr-sub{font-size:10px;font-weight:500;color:rgba(255,255,255,.35);letter-spacing:.2px;font-family:'Inter',sans-serif}
 </style>
-<a id="secret-btn" href="/apex-bot" title="">
-  <div class="secret-inner">
-    <div class="secret-dot"></div>
-    <span class="secret-text">secret</span>
-  </div>
-</a>
+<div id="apex-trigger">
+  <a href="/apex-bot">
+    <div class="atr-icon">
+      <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polyline points="1,12 4,8 7,10 10,5 13,7 15,4" stroke="#E53E2E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="atr-pip"></div>
+    </div>
+    <div class="atr-copy">
+      <span class="atr-title">Apex.Bot</span>
+      <span class="atr-sub">AI Trading · Live</span>
+    </div>
+  </a>
+</div>
 <script>
-setTimeout(()=>document.getElementById('secret-btn').classList.add('visible'), 5000);
+setTimeout(()=>document.getElementById('apex-trigger').classList.add('visible'), 6000);
 </script>
 
 <script>

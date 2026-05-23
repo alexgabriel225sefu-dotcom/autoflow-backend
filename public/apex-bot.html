@@ -1,397 +1,341 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Apex Trade Bot — AI Trading 24/7</title>
+<title>Apex Trade Bot — AI-Powered Crypto Trading</title>
+<meta name="description" content="Automated crypto trading bot powered by AI. Runs 24/7 on Bybit. Start with $10.">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--r:#00ff88;--red:#ff3b5c;--bg:#050508;--card:#0a0a0f;--border:#111118;--text:#e8e8f0;--muted:#4a4a6a}
-body{background:var(--bg);color:var(--text);font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif;overflow-x:hidden}
-
-/* CANVAS BG */
-#bg-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;opacity:.4}
-.content{position:relative;z-index:1}
+:root{--g:#00d97e;--r:#ff4d6d;--bg:#08080c;--s:#0e0e14;--b:#16161f;--t:#e2e2ec;--m:#6b6b88}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t);font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{text-decoration:none;color:inherit}
 
 /* TICKER */
-.ticker{background:#050508;border-bottom:1px solid #111;padding:8px 0;overflow:hidden;white-space:nowrap}
-.ticker-inner{display:inline-flex;gap:48px;animation:ticker 25s linear infinite}
-.ticker-item{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
-.ticker-item .sym{color:#888}
-.ticker-item .price{color:#fff}
-.ticker-item .chg.up{color:#00ff88}
-.ticker-item .chg.dn{color:#ff3b5c}
-@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.ticker{background:var(--s);border-bottom:1px solid #1a1a24;padding:7px 0;overflow:hidden}
+.tk-inner{display:inline-flex;gap:40px;animation:tk 30s linear infinite;white-space:nowrap}
+.tk-item{display:flex;align-items:center;gap:10px;font-size:12px}
+.tk-sym{color:var(--m);font-weight:600}
+.tk-p{color:#fff;font-weight:700;font-variant-numeric:tabular-nums}
+.tk-c{font-weight:600}
+.up{color:var(--g)}.dn{color:var(--r)}
+@keyframes tk{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 
 /* NAV */
-nav{display:flex;align-items:center;justify-content:space-between;padding:20px 40px;max-width:1200px;margin:0 auto}
-.logo{font-size:20px;font-weight:800;letter-spacing:-0.5px}
-.logo span{color:var(--r)}
-.nav-cta{background:var(--r);color:#000;font-weight:700;font-size:14px;padding:10px 24px;border-radius:8px;text-decoration:none;transition:opacity .2s}
-.nav-cta:hover{opacity:.85}
+.nav{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:24px 32px}
+.nav-logo{font-size:17px;font-weight:800;letter-spacing:-.5px}
+.nav-logo b{color:var(--g)}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:14px;color:var(--m);transition:color .2s}
+.nav-links a:hover{color:#fff}
+.nav-btn{background:var(--g);color:#000;font-weight:700;font-size:14px;padding:10px 22px;border-radius:9px;transition:opacity .2s}
+.nav-btn:hover{opacity:.88}
 
 /* HERO */
-.hero{text-align:center;padding:80px 20px 40px;max-width:900px;margin:0 auto}
-.hero-badge{display:inline-flex;align-items:center;gap:8px;background:#0a1a0f;border:1px solid #00ff8844;color:var(--r);font-size:12px;font-weight:700;letter-spacing:1.5px;padding:8px 20px;border-radius:100px;margin-bottom:32px;text-transform:uppercase}
-.pulse{width:8px;height:8px;border-radius:50%;background:var(--r);animation:pulse 1.5s ease-in-out infinite}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 #00ff8866}50%{box-shadow:0 0 0 6px #00ff8800}}
-.hero h1{font-size:clamp(40px,7vw,80px);font-weight:900;line-height:1.05;letter-spacing:-2px;margin-bottom:24px}
-.hero h1 em{font-style:normal;color:var(--r)}
-.hero h1 .red{color:var(--red)}
-.hero p{font-size:18px;color:#888;max-width:540px;margin:0 auto 48px;line-height:1.7}
+.hero{max-width:760px;margin:0 auto;padding:96px 32px 64px;text-align:center}
+.hero-label{display:inline-flex;align-items:center;gap:8px;background:var(--s);border:1px solid #1e1e2a;color:var(--m);font-size:12px;font-weight:600;letter-spacing:.5px;padding:7px 16px;border-radius:100px;margin-bottom:36px}
+.hero-dot{width:7px;height:7px;border-radius:50%;background:var(--g);animation:dot 2s ease-in-out infinite}
+@keyframes dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+.hero h1{font-size:clamp(38px,6vw,68px);font-weight:800;line-height:1.08;letter-spacing:-2px;margin-bottom:24px}
+.hero h1 i{font-style:normal;color:var(--g)}
+.hero p{font-size:17px;color:var(--m);max-width:480px;margin:0 auto 44px;line-height:1.75}
+.hero-cta{display:inline-flex;align-items:center;gap:10px;background:var(--g);color:#000;font-size:16px;font-weight:800;padding:16px 36px;border-radius:12px;transition:transform .15s,box-shadow .15s}
+.hero-cta:hover{transform:translateY(-2px);box-shadow:0 16px 48px rgba(0,217,126,.25)}
+.hero-note{margin-top:14px;font-size:13px;color:#333}
 
-/* LIVE DASHBOARD */
-.dashboard{background:#07070d;border:1px solid #111118;border-radius:24px;padding:0;overflow:hidden;max-width:860px;margin:0 auto 80px;box-shadow:0 40px 120px #00ff8808}
-.dash-header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid #0f0f1a;background:#060610}
-.dash-tabs{display:flex;gap:4px}
-.dash-tab{font-size:13px;padding:6px 16px;border-radius:6px;color:#555;cursor:pointer;font-weight:600}
-.dash-tab.active{background:#0a1a0f;color:var(--r)}
-.live-badge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--r);font-weight:700}
-.live-dot{width:6px;height:6px;border-radius:50%;background:var(--r);animation:pulse 1.5s infinite}
+/* METRICS ROW */
+.metrics{max-width:900px;margin:0 auto;padding:0 32px 64px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:#1a1a24;border:1px solid #1a1a24;border-radius:16px;overflow:hidden}
+.metric{background:var(--bg);padding:28px 24px;text-align:center}
+.metric-val{font-size:28px;font-weight:800;letter-spacing:-1px;color:#fff}
+.metric-val.g{color:var(--g)}
+.metric-label{font-size:12px;color:var(--m);margin-top:4px}
 
-/* CHART AREA */
-.chart-area{height:220px;position:relative;padding:16px}
-#trade-chart{width:100%;height:100%}
-.chart-overlay{position:absolute;top:24px;left:32px}
-.chart-price{font-size:28px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums}
-.chart-change{font-size:14px;color:var(--r);font-weight:700}
+/* DASHBOARD */
+.dash-wrap{max-width:860px;margin:0 auto;padding:0 24px 80px}
+.dash{background:var(--s);border:1px solid #1a1a24;border-radius:20px;overflow:hidden}
+.dash-top{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #14141c}
+.dash-symbol{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700}
+.dash-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g);font-weight:600}
+.d-dot{width:6px;height:6px;border-radius:50%;background:var(--g);animation:dot 2s infinite}
+.chart-wrap{height:200px;padding:16px 20px 8px;position:relative}
+#chart{width:100%;height:100%}
+.price-overlay{position:absolute;top:24px;left:28px}
+.p-val{font-size:26px;font-weight:800;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.p-chg{font-size:13px;font-weight:700;margin-top:2px}
+.signals{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #14141c;background:#0b0b10}
+.sig{padding:18px;text-align:center;border-right:1px solid #14141c}
+.sig:last-child{border-right:none}
+.sig-l{font-size:11px;color:#444;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
+.sig-v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.sig-v.g{color:var(--g)}.sig-v.r{color:var(--r)}.sig-v.w{color:#fff}
+.terminal{border-top:1px solid #14141c;background:#070710}
+.term-hd{padding:10px 20px;font-size:11px;color:#333;text-transform:uppercase;letter-spacing:1px;font-weight:700;border-bottom:1px solid #0f0f18}
+.term-bd{padding:12px 20px 16px;font-family:'SF Mono','Fira Code',Menlo,monospace;font-size:12px;min-height:100px}
+.tl{display:flex;gap:10px;padding:1.5px 0}
+.tl .ts{color:#2a2a3a;min-width:42px}
+.tl.g .m{color:var(--g)}.tl.r .m{color:var(--r)}.tl.b .m{color:#5b8fff}.tl.y .m{color:#f5a623}.tl.w .m{color:#bbb}.tl.dim .m{color:#2d2d3a}
 
-/* SIGNALS PANEL */
-.signals-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#0f0f1a;border-top:1px solid #0f0f1a}
-.sig-box{background:#070710;padding:20px;text-align:center}
-.sig-label{font-size:11px;color:#444;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
-.sig-val{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
-.sig-val.green{color:var(--r)}
-.sig-val.red{color:var(--red)}
-.sig-val.white{color:#fff}
-.sig-sub{font-size:11px;color:#333;margin-top:2px}
+/* FEATURES */
+.features-section{max-width:900px;margin:0 auto;padding:0 32px 80px}
+.sec-label{font-size:12px;color:var(--m);text-transform:uppercase;letter-spacing:1.5px;font-weight:600;margin-bottom:12px}
+.sec-title{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-1px;margin-bottom:40px}
+.feat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.feat{background:var(--s);border:1px solid #1a1a24;border-radius:14px;padding:24px}
+.feat-icon{font-size:22px;margin-bottom:14px}
+.feat h3{font-size:15px;font-weight:700;margin-bottom:6px}
+.feat p{font-size:13px;color:var(--m);line-height:1.6}
 
-/* TERMINAL LOG */
-.terminal-row{border-top:1px solid #0f0f1a}
-.term-head{padding:12px 24px;font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#333;font-weight:700}
-.term-body{padding:0 24px 16px;font-family:'SF Mono','Fira Code',monospace;font-size:12.5px;min-height:120px}
-.tl{padding:2px 0;display:flex;gap:12px}
-.tl .ts{color:#333;min-width:50px}
-.tl .msg{flex:1}
-.tl.g .msg{color:var(--r)}
-.tl.r .msg{color:var(--red)}
-.tl.b .msg{color:#58a6ff}
-.tl.y .msg{color:#ffc107}
-.tl.w .msg{color:#ccc}
-.tl.dim .msg{color:#444}
+/* STEPS */
+.steps-section{max-width:900px;margin:0 auto;padding:0 32px 80px}
+.steps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.step{background:var(--s);border:1px solid #1a1a24;border-radius:14px;padding:24px}
+.step-n{font-size:36px;font-weight:900;color:#1e1e28;letter-spacing:-1px;margin-bottom:12px}
+.step h3{font-size:14px;font-weight:700;margin-bottom:6px}
+.step p{font-size:13px;color:var(--m)}
 
-/* STATS */
-.stats-section{padding:60px 20px;max-width:1000px;margin:0 auto}
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
-.stat-card{background:#07070d;border:1px solid #111118;border-radius:16px;padding:28px 24px;position:relative;overflow:hidden}
-.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--r),transparent)}
-.stat-label{font-size:12px;color:#444;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
-.stat-val{font-size:32px;font-weight:900;color:#fff;letter-spacing:-1px}
-.stat-val.g{color:var(--r)}
-.stat-desc{font-size:13px;color:#333;margin-top:4px}
-
-/* HOW */
-.how-section{padding:60px 20px;max-width:900px;margin:0 auto}
-.how-title{text-align:center;font-size:clamp(28px,4vw,42px);font-weight:900;letter-spacing:-1px;margin-bottom:8px}
-.how-sub{text-align:center;color:#555;margin-bottom:48px}
-.how-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
-.how-card{background:#07070d;border:1px solid #111118;border-radius:16px;padding:28px}
-.how-num{font-size:40px;font-weight:900;color:#111118;margin-bottom:12px;font-variant-numeric:tabular-nums}
-.how-card h3{font-size:15px;font-weight:700;margin-bottom:6px}
-.how-card p{font-size:13px;color:#444;line-height:1.6}
-
-/* PRICE */
-.price-section{padding:60px 20px;text-align:center}
-.price-card{background:#07070d;border:1px solid #1a2a1a;border-radius:28px;padding:52px 40px;max-width:460px;margin:0 auto;box-shadow:0 40px 100px #00ff8808;position:relative;overflow:hidden}
-.price-card::before{content:'';position:absolute;inset:0;border-radius:28px;background:radial-gradient(ellipse at 50% -20%,#00ff8808,transparent 60%);pointer-events:none}
-.price-eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:2px;color:var(--r);font-weight:700;margin-bottom:12px}
-.price-main{font-size:72px;font-weight:900;letter-spacing:-3px;color:#fff;line-height:1}
-.price-main sup{font-size:28px;vertical-align:top;margin-top:14px;letter-spacing:0}
-.price-old{font-size:18px;color:#333;text-decoration:line-through;margin:8px 0}
-.price-badge{display:inline-block;background:#0a1a0f;border:1px solid #1a3a1a;color:var(--r);border-radius:100px;font-size:13px;font-weight:700;padding:6px 20px;margin-bottom:28px}
-.price-list{text-align:left;margin:28px 0;display:flex;flex-direction:column;gap:12px}
-.price-item{display:flex;align-items:center;gap:12px;font-size:14px}
-.price-item .ic{color:var(--r);font-size:16px;width:20px;text-align:center}
-.buy-btn{display:block;background:var(--r);color:#000;font-size:17px;font-weight:800;padding:20px;border-radius:14px;text-decoration:none;transition:transform .15s,box-shadow .15s;letter-spacing:-.3px}
-.buy-btn:hover{transform:translateY(-2px);box-shadow:0 12px 40px #00ff8840}
-.price-note{margin-top:16px;font-size:12px;color:#333}
+/* PRICING */
+.pricing{text-align:center;padding:0 24px 80px}
+.price-card{background:var(--s);border:1px solid #1e2e20;border-radius:24px;padding:48px 36px;max-width:420px;margin:0 auto;position:relative;overflow:hidden}
+.price-card::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% -10%,rgba(0,217,126,.06),transparent 60%);pointer-events:none}
+.pr-label{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--g);font-weight:700;margin-bottom:16px}
+.pr-amount{font-size:64px;font-weight:900;letter-spacing:-3px;line-height:1;color:#fff}
+.pr-amount sup{font-size:26px;vertical-align:top;margin-top:14px;letter-spacing:0}
+.pr-was{font-size:16px;color:#333;text-decoration:line-through;margin:8px 0 4px}
+.pr-save{display:inline-block;background:#0a1f14;border:1px solid #1a3a22;color:var(--g);border-radius:100px;font-size:12px;font-weight:700;padding:5px 16px;margin-bottom:28px}
+.pr-items{text-align:left;display:flex;flex-direction:column;gap:10px;margin-bottom:28px}
+.pr-item{display:flex;align-items:center;gap:10px;font-size:14px}
+.pr-item .ic{color:var(--g);width:18px;flex-shrink:0}
+.buy-btn{display:block;background:var(--g);color:#000;font-size:16px;font-weight:800;padding:18px;border-radius:12px;transition:transform .15s,box-shadow .15s}
+.buy-btn:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,217,126,.3)}
+.pr-note{margin-top:14px;font-size:12px;color:#333}
 
 /* FAQ */
-.faq-section{max-width:640px;margin:0 auto;padding:40px 20px 80px}
-.faq-title{text-align:center;font-size:30px;font-weight:900;margin-bottom:36px;letter-spacing:-1px}
-.faq-item{border-bottom:1px solid #0f0f1a;padding:20px 0;cursor:pointer}
-.faq-q{font-size:15px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:16px}
-.faq-q .arr{color:var(--r);transition:transform .2s;font-size:20px;flex-shrink:0}
-.faq-a{font-size:14px;color:#555;margin-top:14px;display:none;line-height:1.7}
+.faq-section{max-width:600px;margin:0 auto;padding:0 24px 80px}
+.faq-item{border-bottom:1px solid #1a1a24}
+.faq-q{padding:18px 0;font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:16px}
+.faq-q .ico{color:var(--g);font-size:18px;transition:transform .2s;flex-shrink:0}
+.faq-a{font-size:13px;color:var(--m);padding-bottom:18px;display:none;line-height:1.7}
 .faq-item.open .faq-a{display:block}
-.faq-item.open .arr{transform:rotate(45deg)}
+.faq-item.open .ico{transform:rotate(45deg)}
+
+/* FOOTER */
+.foot{border-top:1px solid #1a1a24;padding:32px;text-align:center;font-size:12px;color:#2a2a3a}
+.foot a{color:#333}
 
 /* STICKY */
-.sticky{position:fixed;bottom:0;left:0;right:0;background:#070710ee;backdrop-filter:blur(20px);border-top:1px solid #111118;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;z-index:100}
-.sticky-price{font-size:24px;font-weight:900;color:#fff}
-.sticky-price span{font-size:14px;font-weight:400;color:#333;text-decoration:line-through;margin-left:8px}
-.sticky-btn{background:var(--r);color:#000;font-weight:800;font-size:15px;padding:14px 32px;border-radius:10px;text-decoration:none}
-
-/* DISCLAIMER */
-.disc{padding:24px 20px 100px;text-align:center;font-size:11px;color:#222;max-width:600px;margin:0 auto;line-height:1.6}
+.sticky{position:fixed;bottom:0;left:0;right:0;background:#09090dee;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid #1a1a24;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;z-index:99}
+.st-price{font-size:22px;font-weight:800}
+.st-was{font-size:13px;color:#333;text-decoration:line-through;font-weight:400;margin-left:8px}
+.st-btn{background:var(--g);color:#000;font-weight:800;font-size:14px;padding:12px 28px;border-radius:10px}
 
 @media(max-width:600px){
-  nav{padding:16px 20px}
-  .signals-row{grid-template-columns:1fr 1fr}
-  .price-main{font-size:56px}
-  .price-card{padding:36px 24px}
+  .nav-links a{display:none}
+  .hero{padding:72px 20px 48px}
+  .metrics{margin:0 20px 48px}
+  .pr-amount{font-size:52px}
 }
 </style>
 </head>
 <body>
-<canvas id="bg-canvas"></canvas>
 
-<div class="content">
 <!-- TICKER -->
 <div class="ticker">
-  <div class="ticker-inner" id="ticker"></div>
+  <div class="tk-inner" id="tkr"></div>
 </div>
 
 <!-- NAV -->
-<nav>
-  <div class="logo">APEX<span>.</span>BOT</div>
-  <a href="#buy" class="nav-cta">Cumpără — $197</a>
+<nav class="nav">
+  <div class="nav-logo">Apex<b>.</b>Bot</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+  </div>
+  <a href="#pricing" class="nav-btn">Get Bot — $197</a>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-badge"><div class="pulse"></div>Bot activ acum • 24/7</div>
-  <h1>Crypto trading<br><em>automat</em> cu AI.<br>Tu <span class="red">dormi.</span></h1>
-  <p>Botul analizează piața la fiecare 15 minute cu Claude AI, cumpără și vinde automat pe Bybit. Pornești cu $10.</p>
+  <div class="hero-label"><span class="hero-dot"></span>Live on Railway • 24/7</div>
+  <h1>AI that trades crypto.<br><i>While you sleep.</i></h1>
+  <p>Apex Bot analyzes the market every 15 minutes using Claude AI, then buys and sells automatically on Bybit. Start with as little as $10.</p>
+  <a href="#pricing" class="hero-cta">Get Apex Bot — $197</a>
+  <p class="hero-note">Instant delivery after payment</p>
 </section>
 
-<!-- LIVE DASHBOARD -->
-<div style="padding:0 20px;max-width:900px;margin:0 auto">
-<div class="dashboard">
-  <div class="dash-header">
-    <div class="dash-tabs">
-      <div class="dash-tab active">DOGE/USDT</div>
-      <div class="dash-tab">XRP/USDT</div>
-      <div class="dash-tab">TRX/USDT</div>
-    </div>
-    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
-  </div>
-
-  <div class="chart-area">
-    <canvas id="trade-chart"></canvas>
-    <div class="chart-overlay">
-      <div class="chart-price" id="live-price">$0.1063</div>
-      <div class="chart-change" id="live-change">▲ +2.34%</div>
-    </div>
-  </div>
-
-  <div class="signals-row">
-    <div class="sig-box">
-      <div class="sig-label">RSI (14)</div>
-      <div class="sig-val green" id="s-rsi">38.5</div>
-      <div class="sig-sub">Oversold ⚡</div>
-    </div>
-    <div class="sig-box">
-      <div class="sig-label">AI Signal</div>
-      <div class="sig-val green" id="s-sig">BUY</div>
-      <div class="sig-sub">80% confidence</div>
-    </div>
-    <div class="sig-box">
-      <div class="sig-label">Portfolio</div>
-      <div class="sig-val white" id="s-pf">+4.18%</div>
-      <div class="sig-sub">Paper trading</div>
-    </div>
-  </div>
-
-  <div class="terminal-row">
-    <div class="term-head">Bot Output</div>
-    <div class="term-body" id="term-body"></div>
-  </div>
-</div>
+<!-- METRICS -->
+<div class="metrics">
+  <div class="metric"><div class="metric-val g">$10</div><div class="metric-label">Minimum capital</div></div>
+  <div class="metric"><div class="metric-val">24/7</div><div class="metric-label">Runs non-stop</div></div>
+  <div class="metric"><div class="metric-val g">6</div><div class="metric-label">Technical indicators</div></div>
+  <div class="metric"><div class="metric-val">1:2</div><div class="metric-label">Risk/reward ratio</div></div>
+  <div class="metric"><div class="metric-val g">2</div><div class="metric-label">AI models</div></div>
 </div>
 
-<!-- STATS -->
-<section class="stats-section">
-  <div class="stats-grid">
-    <div class="stat-card"><div class="stat-label">Capital minim</div><div class="stat-val g">$10</div><div class="stat-desc">Pornești cu oricât</div></div>
-    <div class="stat-card"><div class="stat-label">Indicatori tehnici</div><div class="stat-val">6</div><div class="stat-desc">RSI, MACD, EMA, BB, ATR, StochRSI</div></div>
-    <div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-val g">24/7</div><div class="stat-desc">Railway cloud hosting</div></div>
-    <div class="stat-card"><div class="stat-label">R:R Ratio</div><div class="stat-val g">1:2</div><div class="stat-desc">Câștig 2× față de risc</div></div>
-    <div class="stat-card"><div class="stat-label">Surse de date</div><div class="stat-val">3</div><div class="stat-desc">Bybit → Binance → OKX</div></div>
-    <div class="stat-card"><div class="stat-label">AI Models</div><div class="stat-val g">2</div><div class="stat-desc">Claude + Llama 3.3 70B</div></div>
+<!-- DASHBOARD -->
+<div class="dash-wrap">
+  <div class="dash">
+    <div class="dash-top">
+      <div class="dash-symbol">DOGE/USDT <span style="color:#444;font-weight:400;font-size:12px">Bybit Spot</span></div>
+      <div class="dash-status"><span class="d-dot"></span>Bot Active</div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart"></canvas>
+      <div class="price-overlay">
+        <div class="p-val" id="pval">$0.1063</div>
+        <div class="p-chg" id="pchg">▲ +2.34%</div>
+      </div>
+    </div>
+    <div class="signals">
+      <div class="sig"><div class="sig-l">RSI (14)</div><div class="sig-v g" id="s1">33.9</div></div>
+      <div class="sig"><div class="sig-l">AI Signal</div><div class="sig-v g" id="s2">BUY</div></div>
+      <div class="sig"><div class="sig-l">Portfolio</div><div class="sig-v w" id="s3">+4.2%</div></div>
+    </div>
+    <div class="terminal">
+      <div class="term-hd">Bot Log</div>
+      <div class="term-bd" id="termbd"></div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="features-section" id="features">
+  <p class="sec-label">What's inside</p>
+  <h2 class="sec-title">Everything included</h2>
+  <div class="feat-grid">
+    <div class="feat"><div class="feat-icon">🧠</div><h3>Dual AI Engine</h3><p>Claude Haiku + Llama 3.3 70B. If one fails, the other takes over automatically.</p></div>
+    <div class="feat"><div class="feat-icon">📊</div><h3>6 Indicators</h3><p>RSI, Stoch RSI, MACD, EMA 20/50/200, Bollinger Bands, ATR — all calculated live.</p></div>
+    <div class="feat"><div class="feat-icon">🛡️</div><h3>Trailing Stop Loss</h3><p>Stop loss follows price up automatically. Locks in profit if market reverses.</p></div>
+    <div class="feat"><div class="feat-icon">🔄</div><h3>Triple Data Fallback</h3><p>Bybit → Binance → OKX. Always gets market data, never fails silently.</p></div>
+    <div class="feat"><div class="feat-icon">📈</div><h3>Compound Growth</h3><p>Profits auto-reinvested. $10 grows exponentially over time.</p></div>
+    <div class="feat"><div class="feat-icon">🔬</div><h3>Backtest Engine</h3><p>Test strategy on 500 historical candles before risking real money.</p></div>
+    <div class="feat"><div class="feat-icon">📝</div><h3>Paper Trading</h3><p>Simulate with virtual $10 first. Zero risk until you're confident.</p></div>
+    <div class="feat"><div class="feat-icon">⚙️</div><h3>Full Source Code</h3><p>Node.js, clean files, commented. Modify anything you want.</p></div>
   </div>
 </section>
 
-<!-- HOW -->
-<section class="how-section">
-  <h2 class="how-title">Setup în 10 minute</h2>
-  <p class="how-sub">De la zero la bot live pe Bybit</p>
-  <div class="how-grid">
-    <div class="how-card"><div class="how-num">01</div><h3>Cumperi botul</h3><p>Primești codul + ghid video instant pe email</p></div>
-    <div class="how-card"><div class="how-num">02</div><h3>Deploy Railway</h3><p>Copiezi pe Railway (gratuit), adaugi variabilele</p></div>
-    <div class="how-card"><div class="how-num">03</div><h3>API Bybit</h3><p>Generezi cheile API pe Bybit — 2 minute</p></div>
-    <div class="how-card"><div class="how-num">04</div><h3>Gata</h3><p>Botul rulează 24/7. Tu nu faci nimic.</p></div>
+<!-- STEPS -->
+<section class="steps-section">
+  <p class="sec-label">Setup</p>
+  <h2 class="sec-title">Live in 10 minutes</h2>
+  <div class="steps-grid">
+    <div class="step"><div class="step-n">01</div><h3>Buy the bot</h3><p>Get source code + video guide instantly via email</p></div>
+    <div class="step"><div class="step-n">02</div><h3>Deploy Railway</h3><p>Copy to Railway (free tier), add your variables</p></div>
+    <div class="step"><div class="step-n">03</div><h3>Connect Bybit</h3><p>Generate API key on Bybit — takes 2 minutes</p></div>
+    <div class="step"><div class="step-n">04</div><h3>Done</h3><p>Bot runs 24/7. You do nothing.</p></div>
   </div>
 </section>
 
-<!-- PRICE -->
-<section class="price-section" id="buy">
+<!-- PRICING -->
+<section class="pricing" id="pricing">
   <div class="price-card">
-    <div class="price-eyebrow">🔥 Ofertă limitată</div>
-    <div class="price-main"><sup>$</sup>197</div>
-    <div class="price-old">$397</div>
-    <div class="price-badge">✓ Economisești $200 azi</div>
-    <div class="price-list">
-      <div class="price-item"><span class="ic">✓</span>Cod sursă complet (Node.js)</div>
-      <div class="price-item"><span class="ic">✓</span>AI dublu: Claude + Llama 3.3 70B</div>
-      <div class="price-item"><span class="ic">✓</span>Trailing Stop Loss automat</div>
-      <div class="price-item"><span class="ic">✓</span>Backtest pe 500 lumânări istorice</div>
-      <div class="price-item"><span class="ic">✓</span>Paper trading inclus (test fără risc)</div>
-      <div class="price-item"><span class="ic">✓</span>Ghid setup video + PDF</div>
-      <div class="price-item"><span class="ic">✓</span>Updates gratuite 6 luni</div>
-      <div class="price-item"><span class="ic">✓</span>Suport email</div>
+    <p class="pr-label">One-time payment</p>
+    <div class="pr-amount"><sup>$</sup>197</div>
+    <p class="pr-was">$397</p>
+    <div class="pr-save">Save $200 today</div>
+    <div class="pr-items">
+      <div class="pr-item"><span class="ic">✓</span>Full source code (Node.js)</div>
+      <div class="pr-item"><span class="ic">✓</span>Dual AI: Claude + Llama 3.3 70B</div>
+      <div class="pr-item"><span class="ic">✓</span>Trailing stop loss + ATR sizing</div>
+      <div class="pr-item"><span class="ic">✓</span>Backtest on historical data</div>
+      <div class="pr-item"><span class="ic">✓</span>Paper trading mode (risk-free test)</div>
+      <div class="pr-item"><span class="ic">✓</span>Video setup guide + PDF docs</div>
+      <div class="pr-item"><span class="ic">✓</span>Free updates for 6 months</div>
+      <div class="pr-item"><span class="ic">✓</span>Email support</div>
     </div>
-    <a href="mailto:contact@aicashsystem.space?subject=Cumpărare Apex Trade Bot" class="buy-btn">
-      ⚡ Cumpără Acum — $197
-    </a>
-    <p class="price-note">Livrare instant pe email • Plată securizată</p>
+    <a href="mailto:contact@aicashsystem.space?subject=Buy Apex Trade Bot $197" class="buy-btn">Get Apex Bot — $197</a>
+    <p class="pr-note">Instant delivery to email · Secure payment</p>
   </div>
 </section>
 
 <!-- FAQ -->
-<div class="faq-section">
-  <h2 class="faq-title">Întrebări</h2>
-  <div class="faq-item"><div class="faq-q">Am nevoie de programare?<span class="arr">+</span></div><div class="faq-a">Nu. Ghidul video arată fiecare pas. Dacă poți copia-paste, poți instala botul în 10 minute.</div></div>
-  <div class="faq-item"><div class="faq-q">Garantezi profit?<span class="arr">+</span></div><div class="faq-a">Nu. Niciun bot nu poate garanta profit. Trading-ul implică risc. Botul folosește strategie tehnică testată, dar piața e imprevizibilă. Testează în paper trading înainte.</div></div>
-  <div class="faq-item"><div class="faq-q">Cât costă să ruleze lunar?<span class="arr">+</span></div><div class="faq-a">Railway: gratis sau ~$5/lună pentru uptime complet. Groq AI: 100% gratuit. Bybit: 0.1% comision per tranzacție.</div></div>
-  <div class="faq-item"><div class="faq-q">Cum primesc botul?<span class="arr">+</span></div><div class="faq-a">Instant pe email: link GitHub privat + ghid PDF + video setup.</div></div>
-  <div class="faq-item"><div class="faq-q">Funcționează pe Binance?<span class="arr">+</span></div><div class="faq-a">Da, suportă Bybit și Binance. Schimbi o linie în setări.</div></div>
+<div class="faq-section" id="faq">
+  <h2 class="sec-title" style="margin-bottom:28px">FAQ</h2>
+  <div class="faq-item"><div class="faq-q">Do I need coding skills?<span class="ico">+</span></div><div class="faq-a">No. The video guide shows every step. If you can copy-paste, you can set it up in 10 minutes.</div></div>
+  <div class="faq-item"><div class="faq-q">Is profit guaranteed?<span class="ico">+</span></div><div class="faq-a">No. No trading bot can guarantee profit. Crypto trading involves risk of loss. Always test in paper trading mode first.</div></div>
+  <div class="faq-item"><div class="faq-q">What are the monthly running costs?<span class="ico">+</span></div><div class="faq-a">Railway: free or ~$5/month for full 24/7 uptime. Groq AI: 100% free. Bybit: 0.1% fee per trade.</div></div>
+  <div class="faq-item"><div class="faq-q">How do I receive the bot?<span class="ico">+</span></div><div class="faq-a">Instantly via email: private GitHub link + PDF guide + video walkthrough.</div></div>
+  <div class="faq-item"><div class="faq-q">Does it work on Binance?<span class="ico">+</span></div><div class="faq-a">Yes, supports both Bybit and Binance. Switch with one environment variable.</div></div>
 </div>
 
-<div class="disc">⚠️ Disclaimer: Trading-ul crypto implică risc semnificativ de pierdere. Apex Trade Bot este un instrument de automatizare, nu consultanță financiară. Investiți doar ce vă permiteți să pierdeți.</div>
+<div class="foot">
+  <p style="margin-bottom:8px">⚠️ Trading crypto involves significant risk of loss. Apex Bot is an automation tool, not financial advice. Only invest what you can afford to lose.</p>
+  <p>© 2026 Apex Trade Bot · <a href="mailto:contact@aicashsystem.space">contact@aicashsystem.space</a></p>
+</div>
 
 <!-- STICKY -->
 <div class="sticky">
-  <div class="sticky-price">$197<span>$397</span></div>
-  <a href="#buy" class="sticky-btn">Cumpără ⚡</a>
-</div>
+  <div class="st-price">$197<span class="st-was">$397</span></div>
+  <a href="#pricing" class="st-btn">Get Bot ↗</a>
 </div>
 
 <script>
-// ── Candlestick background canvas ──
-const bgC = document.getElementById('bg-canvas');
-const bgX = bgC.getContext('2d');
-function resizeBg(){bgC.width=innerWidth;bgC.height=innerHeight}
-resizeBg();window.addEventListener('resize',resizeBg);
-let bgCandles=[];
-for(let i=0;i<80;i++){const p=0.05+Math.random()*0.9;bgCandles.push({x:i*16,o:p,c:p+(Math.random()-.48)*.08,h:p+Math.random()*.06,l:p-Math.random()*.06})}
-function drawBg(){
-  bgX.clearRect(0,0,bgC.width,bgC.height);
-  const w=bgC.width,h=bgC.height;
-  bgCandles.forEach((c,i)=>{
-    const x=w*.05+i*(w*.9/80);
-    const sc=h*.7;const off=h*.15;
-    const cy=v=>off+sc*(1-v);
-    const up=c.c>=c.o;
-    bgX.strokeStyle=up?'#00ff8820':'#ff3b5c20';
-    bgX.lineWidth=1;
-    bgX.beginPath();bgX.moveTo(x,cy(c.h));bgX.lineTo(x,cy(c.l));bgX.stroke();
-    bgX.fillStyle=up?'#00ff8818':'#ff3b5c18';
-    const top=cy(Math.max(c.o,c.c)),bot=cy(Math.min(c.o,c.c));
-    bgX.fillRect(x-3,top,6,Math.max(bot-top,1));
-    // drift
-    const d=(Math.random()-.5)*.003;
-    c.o+=d;c.c+=d+(Math.random()-.49)*.004;c.h=Math.max(c.o,c.c)+Math.random()*.02;c.l=Math.min(c.o,c.c)-Math.random()*.02;
-    c.o=Math.max(.01,Math.min(.99,c.o));c.c=Math.max(.01,Math.min(.99,c.c));
-  });
-}
-setInterval(drawBg,200);drawBg();
+// Ticker
+const pairs=[['BTC/USDT','104,238',1.24],['ETH/USDT','2,541',2.11],['DOGE/USDT','0.1063',3.42],['XRP/USDT','2.34',1.87],['SOL/USDT','172.4',-0.54],['ADA/USDT','0.652',2.93],['TRX/USDT','0.231',1.12],['BNB/USDT','642',0.88]];
+const tkr=document.getElementById('tkr');
+[...pairs,...pairs].forEach(([s,p,c])=>{
+  const d=document.createElement('div');d.className='tk-item';
+  d.innerHTML=`<span class="tk-sym">${s}</span><span class="tk-p">$${p}</span><span class="tk-c ${c>=0?'up':'dn'}">${c>=0?'▲':'▼'} ${Math.abs(c).toFixed(2)}%</span>`;
+  tkr.appendChild(d);
+});
 
-// ── Ticker ──
-const pairs=[
-  {s:'BTC/USDT',p:'104,238',c:'+1.24'},
-  {s:'ETH/USDT',p:'2,541',c:'+2.11'},
-  {s:'DOGE/USDT',p:'0.1063',c:'+3.42'},
-  {s:'XRP/USDT',p:'2.34',c:'+1.87'},
-  {s:'SOL/USDT',p:'172.4',c:'-0.54'},
-  {s:'ADA/USDT',p:'0.652',c:'+2.93'},
-  {s:'TRX/USDT',p:'0.231',c:'+1.12'},
-  {s:'BNB/USDT',p:'642',c:'+0.88'},
-];
-function buildTicker(){
-  const t=document.getElementById('ticker');
-  const all=[...pairs,...pairs];
-  t.innerHTML=all.map(p=>`<div class="ticker-item"><span class="sym">${p.s}</span><span class="price">$${p.p}</span><span class="chg ${parseFloat(p.c)>=0?'up':'dn'}">${parseFloat(p.c)>=0?'▲':'▼'} ${p.c}%</span></div>`).join('');
-}
-buildTicker();
-
-// ── Mini chart ──
-const chartC=document.getElementById('trade-chart');
-const chartX=chartC.getContext('2d');
-function resizeChart(){chartC.width=chartC.offsetWidth;chartC.height=chartC.offsetHeight}
-resizeChart();window.addEventListener('resize',resizeChart);
-let chartData=[];
-for(let i=0;i<60;i++)chartData.push(0.1+Math.random()*.02-.01);
-let base=chartData[chartData.length-1];
+// Chart
+const cv=document.getElementById('chart'),cx=cv.getContext('2d');
+function rsz(){cv.width=cv.offsetWidth;cv.height=cv.offsetHeight}rsz();
+window.addEventListener('resize',rsz);
+let data=Array.from({length:60},(_,i)=>0.1+Math.sin(i*.15)*.008+Math.random()*.004);
+let base=data.at(-1);
 function drawChart(){
-  resizeChart();
-  const w=chartC.width,h=chartC.height,pad=16;
-  const vals=chartData;
-  const mn=Math.min(...vals),mx=Math.max(...vals);
-  const sc=v=>pad+(1-(v-mn)/(mx-mn||.001))*(h-pad*2);
-  const sx=(_,i)=>i/(vals.length-1)*(w);
-  chartX.clearRect(0,0,w,h);
-  // gradient fill
-  const grad=chartX.createLinearGradient(0,0,0,h);
-  grad.addColorStop(0,'#00ff8820');grad.addColorStop(1,'transparent');
-  chartX.beginPath();chartX.moveTo(sx(vals[0],0),sc(vals[0]));
-  vals.forEach((v,i)=>{if(i>0)chartX.lineTo(sx(v,i),sc(v))});
-  chartX.lineTo(w,h);chartX.lineTo(0,h);chartX.closePath();
-  chartX.fillStyle=grad;chartX.fill();
-  // line
-  chartX.beginPath();chartX.moveTo(sx(vals[0],0),sc(vals[0]));
-  vals.forEach((v,i)=>{if(i>0)chartX.lineTo(sx(v,i),sc(v))});
-  chartX.strokeStyle='#00ff88';chartX.lineWidth=2;chartX.stroke();
-  // update price display
-  base+=( Math.random()-.492)*.0008;
-  chartData.push(base);if(chartData.length>80)chartData.shift();
-  const chg=((base-0.1013)/0.1013*100);
-  document.getElementById('live-price').textContent='$'+base.toFixed(4);
-  document.getElementById('live-change').textContent=(chg>=0?'▲ +':'▼ ')+chg.toFixed(2)+'%';
-  document.getElementById('live-change').style.color=chg>=0?'#00ff88':'#ff3b5c';
-  // RSI sim
-  const r=30+Math.random()*20;
-  document.getElementById('s-rsi').textContent=r.toFixed(1);
-  document.getElementById('s-rsi').style.color=r<40?'#00ff88':r>60?'#ff3b5c':'#fff';
+  rsz();const W=cv.width,H=cv.height,P=12;
+  const mn=Math.min(...data),mx=Math.max(...data),r=mx-mn||.001;
+  const sy=v=>P+(1-(v-mn)/r)*(H-P*2);
+  const sx=(_,i)=>i/(data.length-1)*W;
+  cx.clearRect(0,0,W,H);
+  const g=cx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'rgba(0,217,126,.15)');g.addColorStop(1,'transparent');
+  cx.beginPath();cx.moveTo(sx(0,0),sy(data[0]));
+  data.forEach((v,i)=>{if(i)cx.lineTo(sx(v,i),sy(v))});
+  cx.lineTo(W,H);cx.lineTo(0,H);cx.closePath();cx.fillStyle=g;cx.fill();
+  cx.beginPath();cx.moveTo(sx(0,0),sy(data[0]));
+  data.forEach((v,i)=>{if(i)cx.lineTo(sx(v,i),sy(v))});
+  cx.strokeStyle='#00d97e';cx.lineWidth=1.5;cx.stroke();
+  base+=(Math.random()-.492)*.0006;
+  data.push(base);if(data.length>80)data.shift();
+  const chg=(base-.1013)/.1013*100;
+  document.getElementById('pval').textContent='$'+base.toFixed(4);
+  document.getElementById('pchg').textContent=(chg>=0?'▲ +':'▼ ')+chg.toFixed(2)+'%';
+  document.getElementById('pchg').style.color=chg>=0?'#00d97e':'#ff4d6d';
+  const rsi=28+Math.random()*24;
+  document.getElementById('s1').textContent=rsi.toFixed(1);
+  document.getElementById('s1').style.color=rsi<40?'#00d97e':rsi>60?'#ff4d6d':'#fff';
 }
-setInterval(drawChart,400);drawChart();
+setInterval(drawChart,500);drawChart();
 
-// ── Terminal log ──
+// Terminal
 const logs=[
-  {c:'b',m:'[INFO]  Analizez DOGEUSDT (bybit)...'},
-  {c:'dim',m:'[DATA]  Bybit 403 → Binance 451 → OKX ✅'},
-  {c:'g',m:'[AI] ✅ Groq — semnal generat'},
-  {c:'g',m:'📈 AI SIGNAL: BUY  (80% confidence | 4/5)'},
-  {c:'w',m:'💭 RSI oversold + divergență bullish MACD'},
-  {c:'w',m:'📊 RSI: 33.9 | StochRSI K: 24.3 | ATR: 0.25%'},
-  {c:'g',m:'[PAPER] BUY 14 DOGEUSDT @ $0.10128'},
-  {c:'b',m:'[INFO]  SL: $0.09976 | TP: $0.10432 | R:R=1:2'},
-  {c:'w',m:'   Portofoliu: $10.42 (+4.2%) 📈'},
-  {c:'dim',m:'⏱  Urmăroarea analiză în 15 minute...'},
+  {c:'b',m:'[INFO] Analyzing DOGEUSDT...'},
+  {c:'dim',m:'[DATA] Bybit 403 → Binance 451 → OKX ✓'},
+  {c:'g',m:'[AI] ✓ Groq — signal generated'},
+  {c:'g',m:'📈 BUY signal (80% confidence | 4/5)'},
+  {c:'w',m:'RSI oversold + bullish divergence + MACD ▲'},
+  {c:'g',m:'[ORDER] BUY 14 DOGEUSDT @ $0.10128'},
+  {c:'b',m:'SL: $0.09976 | TP: $0.10432 | R:R 1:2'},
+  {c:'w',m:'Portfolio: $10.42 (+4.2%)'},
+  {c:'dim',m:'Next analysis in 15 min...'},
 ];
-const termBody=document.getElementById('term-body');
-let li=0;
-function addLog(){
-  if(li>=logs.length){setTimeout(()=>{termBody.innerHTML='';li=0;addLog();},2500);return;}
+const bd=document.getElementById('termbd');let li=0;
+function addLine(){
+  if(li>=logs.length){setTimeout(()=>{bd.innerHTML='';li=0;addLine();},2000);return;}
   const d=document.createElement('div');d.className=`tl ${logs[li].c}`;
-  const now=new Date();const ts=now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
-  d.innerHTML=`<span class="ts">${ts}</span><span class="msg">${logs[li].m}</span>`;
-  termBody.appendChild(d);termBody.scrollTop=termBody.scrollHeight;
-  li++;setTimeout(addLog,350);
+  const t=new Date();const ts=t.getHours()+':'+String(t.getMinutes()).padStart(2,'0');
+  d.innerHTML=`<span class="ts">${ts}</span><span class="m">${logs[li].m}</span>`;
+  bd.appendChild(d);bd.scrollTop=bd.scrollHeight;li++;
+  setTimeout(addLine,320);
 }
-addLog();
+addLine();
 
-// ── FAQ ──
+// FAQ
 document.querySelectorAll('.faq-item').forEach(el=>{
   el.querySelector('.faq-q').addEventListener('click',()=>el.classList.toggle('open'));
 });
