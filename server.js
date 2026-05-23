@@ -1402,7 +1402,8 @@ app.post('/api/send-bot-email', async (req, res) => {
 async function _sendBotEmailHandler(req, res) {
   const secret = req.body.secret;
   const adminSecret = process.env.BOT_EMAIL_SECRET || '';
-  if (!adminSecret || secret !== adminSecret) return res.status(403).json({ error: 'Invalid secret' });
+  if (!adminSecret) return res.status(403).json({ error: 'BOT_EMAIL_SECRET not configured on Render' });
+  if (secret !== adminSecret) return res.status(403).json({ error: 'Wrong secret', hint: `Expected ${adminSecret.length} chars, got ${(secret||'').length} chars` });
   const email = req.body.email;
   const name  = req.body.name || 'there';
   if (!email) return res.status(400).json({ error: 'email required' });
