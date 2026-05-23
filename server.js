@@ -1356,222 +1356,256 @@ publicPages.forEach(p => {
 // ── BOT EMAIL HTML — funcție separată reutilizabilă ──────────────────────────
 function _buildBotEmailHtml(safeName, safeEmail) {
   const firstName = safeName.split(' ')[0];
-  const cg = t => `<code style="background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.25);border-radius:4px;padding:2px 7px;color:#00ff88;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.3px">${t}</code>`;
-  const cy = t => `<code style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25);border-radius:4px;padding:2px 7px;color:#f59e0b;font-family:'Courier New',monospace;font-size:11px">${t}</code>`;
-  const cb = t => `<code style="background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);border-radius:4px;padding:2px 7px;color:#818cf8;font-family:'Courier New',monospace;font-size:11px">${t}</code>`;
-  const step = (n, emoji, title, body, color='#00ff88') =>
-    `<div style="display:flex;gap:16px;margin-bottom:0;align-items:flex-start;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.05)">
-      <div style="min-width:36px;height:36px;border-radius:50%;background:${color};color:#000;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 16px ${color}55">${n}</div>
-      <div style="flex:1"><div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:7px"><span>${emoji}</span><span>${title}</span></div><div style="color:rgba(255,255,255,.48);font-size:12px;line-height:1.85">${body}</div></div>
-    </div>`;
+  const chip = (t,c='#00ff88') => `<span style="display:inline-block;background:${c}18;border:1px solid ${c}44;border-radius:5px;padding:2px 8px;color:${c};font-family:'Courier New',monospace;font-size:11px;font-weight:700;letter-spacing:.3px">${t}</span>`;
 
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-@keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
-@keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,.4)}70%{box-shadow:0 0 0 10px rgba(0,255,136,0)}}
-@keyframes glow{0%,100%{opacity:.7}50%{opacity:1}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-@keyframes borderPulse{0%,100%{border-color:rgba(0,255,136,.2)}50%{border-color:rgba(0,255,136,.6)}}
-@keyframes spin-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-.email-wrap{font-family:'Inter',Arial,sans-serif;max-width:600px;margin:0 auto;background:#05050a;color:#e2e2ec;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}
-.header{background:linear-gradient(135deg,#080f0a 0%,#050508 60%,#060410 100%);padding:40px 40px 36px;position:relative;overflow:hidden;border-bottom:1px solid rgba(0,255,136,.12);animation:fadeUp .6s ease both}
-.header::before{content:'';position:absolute;top:-60px;right:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,136,.08) 0%,transparent 70%);pointer-events:none}
-.header::after{content:'';position:absolute;bottom:-40px;left:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.06) 0%,transparent 70%);pointer-events:none}
-.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:100px;padding:6px 14px;margin-bottom:20px;animation:borderPulse 3s ease infinite}
-.badge-dot{width:7px;height:7px;border-radius:50%;background:#00ff88;animation:pulse-green 2s infinite}
-.badge-txt{font-size:10px;font-weight:800;color:#00ff88;letter-spacing:2.5px;text-transform:uppercase}
-.header h1{font-size:30px;font-weight:900;color:#fff;margin:0 0 12px;letter-spacing:-1.2px;line-height:1.1}
-.header h1 span{background:linear-gradient(90deg,#00ff88,#00d4ff,#00ff88);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 3s linear infinite}
-.header p{color:rgba(255,255,255,.45);font-size:14px;margin:0;line-height:1.7}
-.body{padding:32px 40px}
-.cta-box{background:linear-gradient(135deg,rgba(0,255,136,.06),rgba(0,212,255,.04));border:1px solid rgba(0,255,136,.2);border-radius:14px;padding:28px;margin-bottom:28px;text-align:center;position:relative;overflow:hidden;animation:fadeUp .6s ease .1s both}
-.cta-box::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,255,136,.03),transparent);pointer-events:none}
-.cta-label{font-size:10px;font-weight:800;color:#00ff88;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:16px}
-.cta-btn{display:inline-block;background:#00ff88;color:#000;font-size:15px;font-weight:900;padding:16px 36px;border-radius:10px;text-decoration:none;letter-spacing:-.3px;position:relative;overflow:hidden;box-shadow:0 0 32px rgba(0,255,136,.35),0 4px 16px rgba(0,0,0,.4);transition:all .2s}
-.cta-btn::after{content:'';position:absolute;top:-50%;left:-60%;width:40%;height:200%;background:rgba(255,255,255,.25);transform:skewX(-20deg);animation:shimmer 2.5s ease infinite}
-.cta-hint{color:rgba(255,255,255,.28);font-size:11px;margin:14px 0 0;line-height:1.6}
-.cta-hint strong{color:rgba(255,255,255,.5)}
-.section{border-radius:14px;padding:24px;margin-bottom:16px;animation:fadeUp .6s ease .2s both}
-.section-green{background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.1)}
-.section-dark{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07)}
-.section-blue{background:rgba(99,102,241,.04);border:1px solid rgba(99,102,241,.15)}
-.section-yellow{background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.15)}
-.section-red{background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.12)}
-.section-title{font-size:10px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:20px;display:flex;align-items:center;gap:8px}
-.section-title-green{color:#00ff88}.section-title-blue{color:#818cf8}.section-title-yellow{color:#f59e0b}.section-title-red{color:#f87171}
-.step-row{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.04)}
-.step-row:last-child{border-bottom:none;padding-bottom:0}
-.step-num{min-width:32px;height:32px;border-radius:50%;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.step-num-green{background:#00ff88;color:#000;box-shadow:0 0 12px rgba(0,255,136,.4)}
-.step-num-blue{background:#818cf8;color:#fff;box-shadow:0 0 12px rgba(129,140,248,.4)}
-.step-num-yellow{background:#f59e0b;color:#000;box-shadow:0 0 12px rgba(245,158,11,.4)}
-.step-title{color:#fff;font-size:13px;font-weight:700;margin-bottom:5px}
-.step-body{color:rgba(255,255,255,.45);font-size:12px;line-height:1.85}
-.var-table{width:100%;border-collapse:collapse}
-.var-table tr{border-bottom:1px solid rgba(255,255,255,.05)}
-.var-table tr:last-child{border:none}
-.var-table td{padding:10px 0;vertical-align:top}
-.var-key{color:#00ff88;font-family:'Courier New',monospace;font-size:11px;font-weight:700;white-space:nowrap;padding-right:16px;padding-top:12px}
-.var-val{color:rgba(255,255,255,.42);font-size:12px;line-height:1.7}
-.var-val strong{color:rgba(255,255,255,.65)}
-.chip{display:inline-block;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);border-radius:4px;padding:2px 7px;color:#00ff88;font-family:'Courier New',monospace;font-size:11px;font-weight:700}
-.chip-b{display:inline-block;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);border-radius:4px;padding:2px 7px;color:#818cf8;font-family:'Courier New',monospace;font-size:11px}
-.chip-y{display:inline-block;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:4px;padding:2px 7px;color:#f59e0b;font-family:'Courier New',monospace;font-size:11px}
-.divider{height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,136,.15),transparent);margin:8px 0 24px}
-.footer{border-top:1px solid rgba(255,255,255,.05);padding:24px 40px;text-align:center;background:rgba(0,0,0,.2)}
-.footer p{color:rgba(255,255,255,.2);font-size:11px;margin:0 0 8px}
-.footer a{color:#00ff88;font-size:13px;font-weight:700;text-decoration:none}
-</style></head><body style="margin:0;padding:24px 16px;background:#0a0a12">
+*{margin:0;padding:0;box-sizing:border-box}
+@keyframes glow-pulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
+@keyframes shimmer{0%{background-position:-400% center}100%{background-position:400% center}}
+@keyframes dot-pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,.6)}70%{box-shadow:0 0 0 12px rgba(0,255,136,0)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes fade-up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes border-shine{0%,100%{border-color:rgba(0,255,136,.15)}50%{border-color:rgba(0,255,136,.5)}}
+@keyframes scan{0%{top:-10%}100%{top:110%}}
+body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:#e2e8f0;-webkit-font-smoothing:antialiased}
+.wrap{max-width:620px;margin:0 auto;background:#08080f}
 
-<div class="email-wrap">
+/* ─ HERO ─ */
+.hero{position:relative;overflow:hidden;padding:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(0,255,136,.07) 0%,transparent 70%),linear-gradient(180deg,#080f0b 0%,#08080f 100%);border-bottom:1px solid rgba(0,255,136,.1)}
+.hero-scan{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(0,255,136,.4),transparent);animation:scan 4s linear infinite;pointer-events:none}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(0,255,136,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.hero-inner{position:relative;z-index:2;padding:52px 44px 48px;text-align:center}
+.status-badge{display:inline-flex;align-items:center;gap:10px;background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:100px;padding:8px 20px;margin-bottom:32px;animation:border-shine 3s ease infinite}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#00ff88;flex-shrink:0;animation:dot-pulse 2s infinite}
+.status-text{font-size:11px;font-weight:800;color:#00ff88;letter-spacing:3px;text-transform:uppercase}
+.hero-icon{font-size:56px;margin-bottom:24px;display:block;animation:float 4s ease-in-out infinite}
+.hero-title{font-size:13px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:4px;text-transform:uppercase;margin-bottom:12px}
+.hero-name{font-size:42px;font-weight:900;line-height:1.05;letter-spacing:-2px;margin-bottom:18px;background:linear-gradient(135deg,#fff 30%,rgba(255,255,255,.55) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:38px;font-weight:900;line-height:1.05;letter-spacing:-1.5px;margin-bottom:24px;background:linear-gradient(90deg,#00ff88,#00d4aa,#00ff88);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 4s linear infinite}
+.hero-desc{font-size:15px;color:rgba(255,255,255,.4);line-height:1.7;max-width:420px;margin:0 auto}
 
-<!-- ═══ HEADER ═══ -->
-<div class="header">
-  <div class="badge"><span class="badge-dot"></span><span class="badge-txt">Delivery Confirmed</span></div>
-  <h1>You're in,<br><span>${firstName}.</span> 🤖</h1>
-  <p>Your Apex Trade Bot is ready. Follow the steps below to deploy it in ~10 minutes and start trading with real AI signals.</p>
+/* ─ CTA ─ */
+.cta-wrap{padding:0 44px;margin-top:-1px;background:linear-gradient(180deg,rgba(0,255,136,.03) 0%,transparent 100%);border-bottom:1px solid rgba(255,255,255,.05)}
+.cta-inner{padding:36px 0;text-align:center}
+.cta-label{font-size:10px;font-weight:800;color:rgba(255,255,255,.3);letter-spacing:3px;text-transform:uppercase;margin-bottom:20px}
+.cta-btn{display:inline-block;position:relative;overflow:hidden;background:#00ff88;color:#000;font-size:16px;font-weight:900;padding:18px 48px;border-radius:12px;text-decoration:none;letter-spacing:-.3px;box-shadow:0 0 40px rgba(0,255,136,.3),0 8px 32px rgba(0,0,0,.5);transition:all .3s}
+.cta-btn-shine{position:absolute;top:-50%;left:-70%;width:50%;height:200%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-20deg);animation:shimmer 2.5s ease-in-out infinite}
+.cta-hint{margin-top:16px;font-size:12px;color:rgba(255,255,255,.22);line-height:1.7}
+.cta-hint b{color:rgba(255,255,255,.4)}
+
+/* ─ BODY ─ */
+.body{padding:12px 44px 44px}
+
+/* ─ SECTION CARD ─ */
+.card{border-radius:16px;padding:28px;margin-bottom:14px;position:relative;overflow:hidden}
+.card-green{background:linear-gradient(135deg,rgba(0,255,136,.05) 0%,rgba(0,255,136,.02) 100%);border:1px solid rgba(0,255,136,.12)}
+.card-dark{background:linear-gradient(135deg,rgba(255,255,255,.03) 0%,rgba(255,255,255,.01) 100%);border:1px solid rgba(255,255,255,.07)}
+.card-blue{background:linear-gradient(135deg,rgba(129,140,248,.05) 0%,rgba(99,102,241,.02) 100%);border:1px solid rgba(129,140,248,.15)}
+.card-yellow{background:linear-gradient(135deg,rgba(245,158,11,.05) 0%,rgba(245,158,11,.02) 100%);border:1px solid rgba(245,158,11,.15)}
+.card-red{background:rgba(239,68,68,.03);border:1px solid rgba(239,68,68,.1)}
+.card-corner{position:absolute;top:0;right:0;width:80px;height:80px;border-radius:0 16px 0 100%;opacity:.06}
+.card-corner-green{background:#00ff88}.card-corner-blue{background:#818cf8}.card-corner-yellow{background:#f59e0b}
+.card-tag{font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;margin-bottom:22px;display:flex;align-items:center;gap:10px}
+.card-tag-green{color:#00ff88}.card-tag-blue{color:#818cf8}.card-tag-yellow{color:#f59e0b}.card-tag-dim{color:rgba(255,255,255,.3)}
+.card-tag-line{flex:1;height:1px;background:currentColor;opacity:.15}
+
+/* ─ STEPS ─ */
+.step{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:flex-start}
+.step:last-child{border:none;padding-bottom:0}
+.step-n{min-width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0}
+.step-n-g{background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.3);color:#00ff88}
+.step-n-b{background:rgba(129,140,248,.12);border:1px solid rgba(129,140,248,.3);color:#818cf8}
+.step-n-y{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#f59e0b}
+.step-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;line-height:1.3}
+.step-body{font-size:12px;color:rgba(255,255,255,.4);line-height:1.9}
+.step-body a{color:#00ff88;text-decoration:none}
+.step-body b,.step-body strong{color:rgba(255,255,255,.65);font-weight:600}
+
+/* ─ VAR TABLE ─ */
+.vt{width:100%;border-collapse:collapse}
+.vt tr{border-bottom:1px solid rgba(255,255,255,.04)}
+.vt tr:last-child{border:none}
+.vt td{padding:11px 0;vertical-align:top}
+.vt-k{color:#00ff88;font-family:'Courier New',monospace;font-size:11px;font-weight:700;white-space:nowrap;padding-right:18px;padding-top:14px;min-width:160px}
+.vt-v{font-size:12px;color:rgba(255,255,255,.38);line-height:1.75}
+.vt-v b,.vt-v strong{color:rgba(255,255,255,.6)}
+.vt-v a{color:#00ff88;text-decoration:none}
+
+/* ─ FOOTER ─ */
+.footer{border-top:1px solid rgba(255,255,255,.05);padding:28px 44px;text-align:center;background:rgba(0,0,0,.3)}
+.footer-q{font-size:12px;color:rgba(255,255,255,.2);margin-bottom:8px}
+.footer-email{color:#00ff88;font-size:14px;font-weight:700;text-decoration:none}
+.footer-copy{font-size:10px;color:rgba(255,255,255,.1);margin-top:16px}
+</style></head>
+<body>
+<div class="wrap">
+
+<!-- ══════ HERO ══════ -->
+<div class="hero">
+  <div class="hero-scan"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div class="status-badge">
+      <span class="status-dot"></span>
+      <span class="status-text">Access Granted</span>
+    </div>
+    <span class="hero-icon">🤖</span>
+    <div class="hero-title">Welcome,&nbsp; ${firstName}</div>
+    <div class="hero-name">Apex Trade Bot</div>
+    <div class="hero-sub">is yours.</div>
+    <p class="hero-desc">Your AI-powered crypto trading bot is ready to deploy. Follow the steps below and you'll be live in under 10 minutes.</p>
+  </div>
 </div>
 
+<!-- ══════ CTA ══════ -->
+<div class="cta-wrap">
+  <div class="cta-inner">
+    <div class="cta-label">Step 1 — Get the source code</div>
+    <a href="https://aicashsystem.space/bot-access" class="cta-btn">
+      <span class="cta-btn-shine"></span>
+      Open Bot Repository →
+    </a>
+    <p class="cta-hint">On GitHub → click <b>Code → Download ZIP</b> → extract the <b>apex-trade-bot</b> folder</p>
+  </div>
+</div>
+
+<!-- ══════ BODY ══════ -->
 <div class="body">
 
-<!-- ═══ CTA ═══ -->
-<div class="cta-box">
-  <div class="cta-label">📦 Step 1 — Get the Source Code</div>
-  <a href="https://aicashsystem.space/bot-access" class="cta-btn">Open Bot Repository →</a>
-  <p class="cta-hint">On GitHub → click <strong>Code → Download ZIP</strong> → extract the <strong>apex-trade-bot</strong> folder to your computer</p>
-</div>
-
-<!-- ═══ BYBIT API ═══ -->
-<div class="section section-green">
-  <div class="section-title section-title-green">🔑 Step 2 — Create Your Bybit API Key</div>
-  <div class="step-row">
-    <div class="step-num step-num-green">1</div>
+<!-- ─ BYBIT API ─ -->
+<div class="card card-green">
+  <div class="card-corner card-corner-green"></div>
+  <div class="card-tag card-tag-green">🔑 Step 2 — Bybit API Key <span class="card-tag-line"></span></div>
+  <div class="step">
+    <div class="step-n step-n-g">1</div>
     <div><div class="step-title">Create a Bybit account</div>
-    <div class="step-body">Go to <a href="https://bybit.com" style="color:#00ff88">bybit.com</a> → Sign up (takes 2 min). Complete identity verification to enable trading.</div></div>
+    <div class="step-body">Go to <a href="https://bybit.com">bybit.com</a> → Sign up. Complete identity verification to unlock spot trading.</div></div>
   </div>
-  <div class="step-row">
-    <div class="step-num step-num-green">2</div>
+  <div class="step">
+    <div class="step-n step-n-g">2</div>
     <div><div class="step-title">Open API Management</div>
-    <div class="step-body">Click your profile icon (top right) → <strong style="color:rgba(255,255,255,.7)">API Management</strong> → <strong style="color:rgba(255,255,255,.7)">Create New Key</strong></div></div>
+    <div class="step-body">Click your profile icon (top right) → <b>API Management</b> → <b>Create New Key</b> → choose <b>System-generated API Keys</b></div></div>
   </div>
-  <div class="step-row">
-    <div class="step-num step-num-green">3</div>
-    <div><div class="step-title">Configure the key permissions</div>
-    <div class="step-body">Select <strong style="color:rgba(255,255,255,.7)">System-generated API Keys</strong>. Enable only:<br>
-    ✅ <strong style="color:rgba(255,255,255,.6)">Read-Write</strong> (required)<br>
-    ✅ <strong style="color:rgba(255,255,255,.6)">Spot Trading</strong> (required)<br>
-    ❌ Leave everything else unchecked. IP restriction: leave blank (Railway uses dynamic IPs).</div></div>
+  <div class="step">
+    <div class="step-n step-n-g">3</div>
+    <div><div class="step-title">Set the correct permissions</div>
+    <div class="step-body">
+      ✅ <b>Read-Write</b><br>
+      ✅ <b>Spot Trading</b><br>
+      ❌ Leave everything else <b>unchecked</b><br>
+      IP restriction: leave <b>blank</b> (Railway uses dynamic IPs)
+    </div></div>
   </div>
-  <div class="step-row">
-    <div class="step-num step-num-green">4</div>
-    <div><div class="step-title">Copy and save your keys</div>
-    <div class="step-body">Complete 2FA verification. You'll see your <strong style="color:rgba(255,255,255,.7)">API Key</strong> and <strong style="color:rgba(255,255,255,.7)">API Secret</strong>.
-    <span style="color:#f59e0b;font-weight:600">⚠ The Secret is shown only once — copy it immediately and save it somewhere safe.</span></div></div>
+  <div class="step">
+    <div class="step-n step-n-g">4</div>
+    <div><div class="step-title">Save your keys — Secret shown only once!</div>
+    <div class="step-body">Complete 2FA. Copy both your <b>API Key</b> and <b>API Secret</b> immediately and store them somewhere safe. <span style="color:#f87171;font-weight:600">The Secret disappears after you close the page.</span></div></div>
   </div>
 </div>
 
-<!-- ═══ DEPLOY RAILWAY ═══ -->
-<div class="section section-dark">
-  <div class="section-title" style="color:rgba(255,255,255,.5)">🚀 Step 3 — Deploy on Railway (Free)</div>
-  <div class="step-row">
-    <div class="step-num step-num-green">1</div>
+<!-- ─ RAILWAY DEPLOY ─ -->
+<div class="card card-dark">
+  <div class="card-tag card-tag-dim">🚀 Step 3 — Deploy on Railway (Free) <span class="card-tag-line"></span></div>
+  <div class="step">
+    <div class="step-n step-n-g">1</div>
     <div><div class="step-title">Create a Railway account</div>
-    <div class="step-body">Go to <a href="https://railway.app" style="color:#00ff88">railway.app</a> → <strong style="color:rgba(255,255,255,.7)">Login with GitHub</strong> (requires a GitHub account)</div></div>
+    <div class="step-body">Go to <a href="https://railway.app">railway.app</a> → <b>Login with GitHub</b></div></div>
   </div>
-  <div class="step-row">
-    <div class="step-num step-num-green">2</div>
+  <div class="step">
+    <div class="step-n step-n-g">2</div>
     <div><div class="step-title">Create a new project</div>
-    <div class="step-body">Click <strong style="color:rgba(255,255,255,.7)">New Project → Deploy from GitHub repo</strong> → fork/select the repository from your account</div></div>
+    <div class="step-body">Click <b>New Project → Deploy from GitHub repo</b> → select the repository you downloaded</div></div>
   </div>
-  <div class="step-row">
-    <div class="step-num step-num-green">3</div>
-    <div><div class="step-title">Set the root directory</div>
-    <div class="step-body">In Railway project settings → <strong style="color:rgba(255,255,255,.7)">Root Directory</strong> → type exactly: <span class="chip">apex-trade-bot</span><br>This tells Railway to run the bot folder, not the entire repo.</div></div>
+  <div class="step">
+    <div class="step-n step-n-g">3</div>
+    <div><div class="step-title">Set Root Directory</div>
+    <div class="step-body">Go to project <b>Settings</b> → <b>Root Directory</b> → type exactly: ${chip('apex-trade-bot')}<br>This tells Railway to run only the bot, not the whole repo.</div></div>
   </div>
-  <div class="step-row">
-    <div class="step-num step-num-green">4</div>
+  <div class="step">
+    <div class="step-n step-n-g">4</div>
     <div><div class="step-title">Add environment variables</div>
-    <div class="step-body">Go to <strong style="color:rgba(255,255,255,.7)">Variables tab</strong> → add each key from the table below</div></div>
+    <div class="step-body">Go to the <b>Variables</b> tab → add all keys from the table below → Railway redeploys automatically.</div></div>
   </div>
 </div>
 
-<!-- ═══ ENV VARS ═══ -->
-<div class="section section-dark">
-  <div class="section-title" style="color:rgba(255,255,255,.4)">📋 Railway Variables — Copy These Exactly</div>
-  <table class="var-table">
-    <tr><td class="var-key">GROQ_API_KEY</td><td class="var-val">Free AI key — go to <a href="https://console.groq.com" style="color:#00ff88">console.groq.com</a> → API Keys → <strong>Create API Key</strong> (no credit card needed)</td></tr>
-    <tr><td class="var-key">BYBIT_API_KEY</td><td class="var-val">The API Key you copied from Bybit in Step 2</td></tr>
-    <tr><td class="var-key">BYBIT_API_SECRET</td><td class="var-val">The API Secret from Bybit — <strong>only shown once at creation</strong></td></tr>
-    <tr><td class="var-key">PAPER_TRADING</td><td class="var-val">Set to <span class="chip">true</span> to start safely with simulated money. Change to <span class="chip-y">false</span> when ready for live trading.</td></tr>
-    <tr><td class="var-key">PAPER_BALANCE</td><td class="var-val">Simulated starting balance. Default: <span class="chip">10</span> (= $10)</td></tr>
-    <tr><td class="var-key">TRADE_SYMBOL</td><td class="var-val">Crypto pair to trade. Default auto-scanner. Override with e.g. <span class="chip">DOGEUSDT</span> or <span class="chip">SOLUSDT</span></td></tr>
-    <tr><td class="var-key">TELEGRAM_BOT_TOKEN</td><td class="var-val">Optional — get real-time alerts on your phone (see Telegram setup below)</td></tr>
-    <tr><td class="var-key">TELEGRAM_CHAT_ID</td><td class="var-val">Optional — your personal Telegram chat ID</td></tr>
+<!-- ─ ENV VARS ─ -->
+<div class="card card-dark">
+  <div class="card-tag card-tag-dim">📋 Railway Variables — Add These <span class="card-tag-line"></span></div>
+  <table class="vt">
+    <tr><td class="vt-k">GROQ_API_KEY</td><td class="vt-v">Free AI key — go to <a href="https://console.groq.com">console.groq.com</a> → API Keys → <b>Create API Key</b> (no card needed)</td></tr>
+    <tr><td class="vt-k">BYBIT_API_KEY</td><td class="vt-v">The API Key from Step 2 above</td></tr>
+    <tr><td class="vt-k">BYBIT_API_SECRET</td><td class="vt-v">The API Secret from Step 2 — <b>only shown once at creation</b></td></tr>
+    <tr><td class="vt-k">PAPER_TRADING</td><td class="vt-v">Set to ${chip('true')} to start safely with simulated money. Change to ${chip('false','#f59e0b')} when ready to go live.</td></tr>
+    <tr><td class="vt-k">PAPER_BALANCE</td><td class="vt-v">Simulated balance. Default: ${chip('10')} (= $10 USDT)</td></tr>
+    <tr><td class="vt-k">TRADE_SYMBOL</td><td class="vt-v">Optional. Override with ${chip('DOGEUSDT')} or ${chip('SOLUSDT')}. Default: auto-scanner picks best coin.</td></tr>
+    <tr><td class="vt-k">TELEGRAM_BOT_TOKEN</td><td class="vt-v">Optional — real-time alerts on your phone (setup below)</td></tr>
+    <tr><td class="vt-k">TELEGRAM_CHAT_ID</td><td class="vt-v">Optional — your Telegram chat ID (setup below)</td></tr>
   </table>
 </div>
 
-<!-- ═══ TELEGRAM ═══ -->
-<div class="section section-blue">
-  <div class="section-title section-title-blue">📱 Step 4 — Telegram Alerts (Highly Recommended)</div>
-  <div class="step-row">
-    <div class="step-num step-num-blue">1</div>
+<!-- ─ TELEGRAM ─ -->
+<div class="card card-blue">
+  <div class="card-corner card-corner-blue"></div>
+  <div class="card-tag card-tag-blue">📱 Step 4 — Telegram Alerts <span class="card-tag-line"></span></div>
+  <div class="step">
+    <div class="step-n step-n-b">1</div>
     <div><div class="step-title">Create your Telegram bot</div>
-    <div class="step-body">Open Telegram → search <strong style="color:rgba(255,255,255,.7)">@BotFather</strong> → send <span class="chip-b">/newbot</span> → choose a name (e.g. "MyApexBot") → BotFather sends you a token like <span class="chip-b">7123456789:AAFxxx...</span> — copy it.</div></div>
+    <div class="step-body">Open Telegram → search <b>@BotFather</b> → send ${chip('/newbot','#818cf8')} → pick any name → BotFather gives you a token like ${chip('7123456:AAFxxx...','#818cf8')} — copy it.</div></div>
   </div>
-  <div class="step-row">
-    <div class="step-num step-num-blue">2</div>
-    <div><div class="step-title">Find your Chat ID</div>
-    <div class="step-body">Send any message to your new bot, then open this URL in your browser (replace TOKEN):<br>
-    <span class="chip-b" style="word-break:break-all;font-size:10px">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span><br>
-    Look for <strong style="color:rgba(255,255,255,.65)">"chat":{"id": 123456789}</strong> — that number is your Chat ID.</div></div>
+  <div class="step">
+    <div class="step-n step-n-b">2</div>
+    <div><div class="step-title">Get your Chat ID</div>
+    <div class="step-body">Send any message to your new bot. Then open in browser:<br>
+    ${chip('https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates','#818cf8')}<br>
+    Find <b>"chat":{"id":123456789}</b> — that number is your Chat ID.</div></div>
   </div>
-  <div class="step-row">
-    <div class="step-num step-num-blue">3</div>
+  <div class="step">
+    <div class="step-n step-n-b">3</div>
     <div><div class="step-title">Add to Railway Variables</div>
-    <div class="step-body">Paste the token as <span class="chip-b">TELEGRAM_BOT_TOKEN</span> and the number as <span class="chip-b">TELEGRAM_CHAT_ID</span>. You'll instantly receive trade alerts, heartbeats every 30min, and stop signals.</div></div>
+    <div class="step-body">Paste the token as ${chip('TELEGRAM_BOT_TOKEN','#818cf8')} and the number as ${chip('TELEGRAM_CHAT_ID','#818cf8')}.<br>You'll get live trade alerts, 30-min heartbeats, and risk-stop notifications instantly on your phone.</div></div>
   </div>
 </div>
 
-<!-- ═══ GO LIVE ═══ -->
-<div class="section section-yellow">
-  <div class="section-title section-title-yellow">💰 Step 5 — Go Live When Ready</div>
-  <div class="step-row">
-    <div class="step-num step-num-yellow">1</div>
-    <div><div class="step-title">Run on Paper Trading first</div>
-    <div class="step-body">With <span class="chip-y">PAPER_TRADING=true</span>, the bot trades with simulated $10 — no real money at risk. Watch it for 24-48h and check the Telegram alerts look correct.</div></div>
+<!-- ─ GO LIVE ─ -->
+<div class="card card-yellow">
+  <div class="card-corner card-corner-yellow"></div>
+  <div class="card-tag card-tag-yellow">💰 Step 5 — Go Live <span class="card-tag-line"></span></div>
+  <div class="step">
+    <div class="step-n step-n-y">1</div>
+    <div><div class="step-title">Test with Paper Trading first</div>
+    <div class="step-body">With ${chip('PAPER_TRADING=true','#f59e0b')}, the bot trades simulated money — zero risk. Run it for 24–48h and check your Telegram alerts look correct before going live.</div></div>
   </div>
-  <div class="step-row">
-    <div class="step-num step-num-yellow">2</div>
-    <div><div class="step-title">Fund your Bybit Spot account</div>
-    <div class="step-body">Deposit a minimum of $10 USDT to your Bybit Spot wallet (recommended: $20–50 to start). <strong style="color:rgba(255,255,255,.6)">Never risk more than you can afford to lose entirely.</strong></div></div>
+  <div class="step">
+    <div class="step-n step-n-y">2</div>
+    <div><div class="step-title">Deposit USDT on Bybit Spot</div>
+    <div class="step-body">Fund your <b>Bybit Spot</b> wallet with at least $10 USDT (recommended: $20–50 to start). <span style="color:#fbbf24;font-weight:600">Never risk more than you can afford to lose entirely.</span></div></div>
   </div>
-  <div class="step-row">
-    <div class="step-num step-num-yellow">3</div>
-    <div><div class="step-title">Activate live trading</div>
-    <div class="step-body">In Railway → Variables → change <span class="chip-y">PAPER_TRADING</span> from <span class="chip-y">true</span> → <span class="chip-y">false</span> → click Save. Railway redeploys automatically. Your bot is now live and trading with real funds. 🚀</div></div>
+  <div class="step">
+    <div class="step-n step-n-y">3</div>
+    <div><div class="step-title">Flip the switch to Live</div>
+    <div class="step-body">In Railway → <b>Variables</b> → change ${chip('PAPER_TRADING','#f59e0b')} from ${chip('true','#f59e0b')} → ${chip('false','#f59e0b')} → click <b>Save</b>. Railway redeploys in seconds. Your bot is now live and trading with real funds. 🚀</div></div>
   </div>
 </div>
 
-<!-- ═══ RISK ═══ -->
-<div class="section section-red">
-  <p style="color:rgba(255,255,255,.38);font-size:12px;margin:0;line-height:1.9">
-    <strong style="color:rgba(239,68,68,.8)">⚠ Risk Disclosure:</strong> Cryptocurrency trading involves substantial risk of loss and is not suitable for all investors. Always start with paper trading mode. Only invest funds you can afford to lose completely. Past performance is not indicative of future results. Apex Bot is an automation tool — not financial advice. You are fully responsible for your own trading decisions.
+<!-- ─ RISK ─ -->
+<div class="card card-red">
+  <p style="font-size:11px;color:rgba(255,255,255,.3);line-height:1.9;margin:0">
+    <span style="color:rgba(248,113,113,.7);font-weight:700">⚠ Risk Disclosure</span> — Cryptocurrency trading involves substantial risk of loss and is not suitable for all investors. Always start with paper trading. Only invest funds you can afford to lose completely. Past performance is not indicative of future results. Apex Trade Bot is an automation tool — not financial advice. You are solely responsible for your trading decisions.
   </p>
 </div>
 
 </div><!-- /body -->
 
-<!-- ═══ FOOTER ═══ -->
+<!-- ══════ FOOTER ══════ -->
 <div class="footer">
-  <p>Questions? We respond within 24 hours.</p>
-  <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a>
-  <p style="margin-top:16px;color:rgba(255,255,255,.12);font-size:10px">© 2025 AI Cash Systems &nbsp;·&nbsp; <a href="https://aicashsystem.space" style="color:rgba(255,255,255,.18);text-decoration:none">aicashsystem.space</a></p>
+  <p class="footer-q">Questions? We respond within 24 hours.</p>
+  <a href="mailto:supportaicashsystem@gmail.com" class="footer-email">supportaicashsystem@gmail.com</a>
+  <p class="footer-copy">© 2025 AI Cash Systems &nbsp;·&nbsp; <a href="https://aicashsystem.space" style="color:rgba(255,255,255,.15);text-decoration:none">aicashsystem.space</a></p>
 </div>
 
-</div><!-- /email-wrap -->
-</body></html>`;
-}
+</div></body></html>`;}
 
 // ── BOT ACCESS REDIRECT — clienții văd aicashsystem.space/bot-access, nu GitHub
 app.get('/bot-access', (req, res) => {
