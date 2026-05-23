@@ -1080,6 +1080,8 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
                 <tr><td style="color:#00ff88;padding:3px 12px 3px 0">BYBIT_API_SECRET</td><td style="color:rgba(255,255,255,.5)">From same API key</td></tr>
                 <tr><td style="color:#00ff88;padding:3px 12px 3px 0">PAPER_TRADING</td><td style="color:rgba(255,255,255,.5)">true (safe start) → false (live)</td></tr>
                 <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TRADE_SYMBOL</td><td style="color:rgba(255,255,255,.5)">DOGEUSDT (default)</td></tr>
+                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TELEGRAM_BOT_TOKEN</td><td style="color:rgba(255,255,255,.5)">Optional — alerts on Telegram</td></tr>
+                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TELEGRAM_CHAT_ID</td><td style="color:rgba(255,255,255,.5)">Optional — your Telegram chat ID</td></tr>
               </table>
             </div>
             <div style="background:rgba(229,62,46,.06);border:1px solid rgba(229,62,46,.2);border-radius:10px;padding:16px 24px;margin-bottom:28px">
