@@ -14,6 +14,12 @@ module.exports = {
   // ─── Binance ────────────────────────────────────────────
   BINANCE_API_KEY:    process.env.BINANCE_API_KEY    || '',
   BINANCE_API_SECRET: process.env.BINANCE_API_SECRET || '',
+  BINANCE_TESTNET:    process.env.BINANCE_TESTNET    === 'true',
+  get BINANCE_BASE() {
+    return this.BINANCE_TESTNET
+      ? 'https://testnet.binance.vision/api/v3'
+      : 'https://api.binance.com/api/v3';
+  },
 
   // ─── Anthropic ──────────────────────────────────────────
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
