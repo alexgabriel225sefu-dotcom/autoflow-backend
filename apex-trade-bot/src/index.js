@@ -113,7 +113,7 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL
   const quantity = await calcQuantity(price, balance, symbol);
   if (quantity <= 0) { logger.warn(`Cantitate prea mică pentru ${symbol} @ $${price} — skip`); return; }
 
-  await exchange.placeOrder(side, quantity);
+  await exchange.placeOrder(side, quantity, symbol);
 
   if (cfg.PAPER_TRADING) {
     if (side === 'BUY') paperBalance -= price * quantity;

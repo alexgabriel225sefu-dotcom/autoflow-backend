@@ -128,13 +128,13 @@ async function getBalance(coin = 'USDT') {
 }
 
 // ─── Plasare ordin MARKET (privat Bybit) ─────────────────
-async function placeOrder(side, quantity) {
+async function placeOrder(side, quantity, symbol = cfg.SYMBOL) {
   if (cfg.PAPER_TRADING) {
-    console.log(`[PAPER] ${side} ${quantity} ${cfg.SYMBOL}`);
+    console.log(`[PAPER] ${side} ${quantity} ${symbol}`);
     return { orderId: 'PAPER_' + Date.now(), orderStatus: 'Filled' };
   }
   const params = {
-    category: 'spot', symbol: cfg.SYMBOL,
+    category: 'spot', symbol,
     side: side === 'BUY' ? 'Buy' : 'Sell',
     orderType: 'Market', qty: String(quantity),
   };
