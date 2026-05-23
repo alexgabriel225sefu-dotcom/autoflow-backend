@@ -6,6 +6,7 @@
 <title>Apex Trade Bot — AI Crypto Trading System</title>
 <meta name="description" content="The AI trading system that executes trades 24/7. Start with $10. No experience needed.">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://js.stripe.com/v3/"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -245,10 +246,10 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);-webkit-backdro
     <h1>The AI that doesn't<br>need you to<br><em>make money.</em></h1>
     <p class="hero-sub">Apex Bot scans crypto markets every 15 minutes, reads 6 indicators, asks AI for the signal — and executes trades on autopilot. Day and night. Starting from $10.</p>
     <div class="hero-actions">
-      <a href="#pricing" class="btn-main">
+      <button onclick="openApexModal()" class="btn-main" style="border:none;cursor:pointer">
         <svg viewBox="0 0 16 16" fill="none"><path d="M8 2L14 8L8 14M2 8H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Get Apex Bot — $197
-      </a>
+      </button>
       <div class="hero-urgency">
         <span class="urg-dot"></span>
         <span><b id="recentBuyers">47</b> traders purchased this week · Last purchase <b id="lastBuy">4 min ago</b></span>
@@ -449,7 +450,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);-webkit-backdro
       <div class="pr-item"><span class="pr-ic">✓</span>PDF documentation</div>
       <div class="pr-item"><span class="pr-ic">✓</span>Free updates · Email support</div>
     </div>
-    <a href="mailto:contact@aicashsystem.space?subject=Buy Apex Trade Bot $197" class="buy-btn">Get Apex Bot — $197 →</a>
+    <button onclick="openApexModal()" class="buy-btn">Get Apex Bot — $197 →</button>
     <p class="pr-guarantee">🔒 Secure email delivery · Instant access · One-time payment</p>
   </div>
 </section>
@@ -477,7 +478,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);-webkit-backdro
     <div class="st-price">$197<span class="st-was">$297</span></div>
     <div class="st-urgency">⚡ <span id="stSpots">11 spots left</span> at launch price</div>
   </div>
-  <a href="#pricing" class="st-btn">Get Access →</a>
+  <button onclick="openApexModal()" class="st-btn" style="border:none;cursor:pointer">Get Access →</button>
 </div>
 
 <!-- PURCHASE NOTIFICATION TOAST -->
@@ -706,6 +707,187 @@ document.querySelectorAll('.faq-item').forEach(el=>{
     el.textContent=mins<60?mins+' min ago':Math.floor(mins/60)+'h ago';
   },60000);
 })();
+</script>
+
+<!-- STRIPE PAYMENT MODAL -->
+<style>
+#apexModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.85);backdrop-filter:blur(12px)}
+#apexModal.open{display:flex}
+.am-card{background:#07070b;border:1px solid rgba(0,255,136,.15);border-radius:20px;width:100%;max-width:440px;position:relative;overflow:hidden;box-shadow:0 40px 120px rgba(0,0,0,.9)}
+.am-close{position:absolute;top:16px;right:18px;background:none;border:none;color:rgba(255,255,255,.3);font-size:22px;cursor:pointer;line-height:1;transition:color .2s;z-index:2}
+.am-close:hover{color:#fff}
+.am-head{padding:28px 28px 20px;border-bottom:1px solid rgba(255,255,255,.05)}
+.am-tag{font-size:10px;font-weight:700;color:var(--g);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.am-title{font-size:22px;font-weight:900;letter-spacing:-.5px}
+.am-price{display:flex;align-items:baseline;gap:8px;margin-top:6px}
+.am-amount{font-size:32px;font-weight:900;color:#fff}
+.am-was{font-size:14px;color:rgba(255,255,255,.2);text-decoration:line-through}
+.am-body{padding:24px 28px}
+
+/* fields */
+.am-field{margin-bottom:14px}
+.am-label{font-size:11px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block}
+.am-input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:12px 14px;font-size:14px;color:#fff;font-family:'Inter',sans-serif;transition:border-color .2s;outline:none}
+.am-input:focus{border-color:rgba(0,255,136,.3)}
+#am-card-element{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:13px 14px;transition:border-color .2s}
+#am-card-element.StripeElement--focus{border-color:rgba(0,255,136,.3)}
+#am-card-error{font-size:12px;color:#ff4d6d;margin-top:6px;min-height:16px}
+
+/* checkboxes */
+.am-checks{display:flex;flex-direction:column;gap:10px;margin:18px 0}
+.am-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+.am-check input[type=checkbox]{width:16px;height:16px;flex-shrink:0;margin-top:2px;accent-color:var(--g);cursor:pointer}
+.am-check-txt{font-size:12px;color:rgba(255,255,255,.5);line-height:1.55}
+.am-check-txt a{color:var(--g);text-decoration:underline}
+
+/* submit */
+.am-submit{width:100%;background:var(--g);color:#000;font-size:15px;font-weight:900;padding:16px;border-radius:12px;border:none;cursor:pointer;letter-spacing:.2px;transition:opacity .2s,transform .15s;display:flex;align-items:center;justify-content:center;gap:10px;margin-top:18px}
+.am-submit:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
+.am-submit:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.am-spinner{width:16px;height:16px;border:2px solid rgba(0,0,0,.25);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.am-note{font-size:11px;color:rgba(255,255,255,.2);text-align:center;margin-top:12px}
+
+/* success */
+.am-success{padding:40px 28px;text-align:center;display:none}
+.am-success-icon{font-size:48px;margin-bottom:16px}
+.am-success h3{font-size:22px;font-weight:900;margin-bottom:8px}
+.am-success p{font-size:14px;color:rgba(255,255,255,.5);line-height:1.7}
+</style>
+
+<div id="apexModal">
+  <div class="am-card">
+    <button class="am-close" onclick="closeApexModal()">×</button>
+
+    <!-- FORM VIEW -->
+    <div id="amForm">
+      <div class="am-head">
+        <div class="am-tag">One-time payment</div>
+        <div class="am-title">Apex Trade Bot</div>
+        <div class="am-price">
+          <span class="am-amount">$197</span>
+          <span class="am-was">$297</span>
+        </div>
+      </div>
+      <div class="am-body">
+        <div class="am-field">
+          <label class="am-label">Full name</label>
+          <input id="amName" class="am-input" type="text" placeholder="Alex Johnson" autocomplete="name">
+        </div>
+        <div class="am-field">
+          <label class="am-label">Email — bot delivered here</label>
+          <input id="amEmail" class="am-input" type="email" placeholder="you@email.com" autocomplete="email">
+        </div>
+        <div class="am-field">
+          <label class="am-label">Card details</label>
+          <div id="am-card-element"></div>
+          <div id="am-card-error"></div>
+        </div>
+
+        <!-- MANDATORY CHECKBOXES -->
+        <div class="am-checks">
+          <label class="am-check">
+            <input type="checkbox" id="ck1" onchange="updateBtn()">
+            <span class="am-check-txt">I understand that crypto trading involves <strong>significant risk of loss</strong>, including total loss of capital. I will only trade with funds I can afford to lose.</span>
+          </label>
+          <label class="am-check">
+            <input type="checkbox" id="ck2" onchange="updateBtn()">
+            <span class="am-check-txt">I confirm this software is <strong>NOT financial advice</strong>. AI Cash Systems is not responsible for any trading losses from using Apex Bot.</span>
+          </label>
+          <label class="am-check">
+            <input type="checkbox" id="ck3" onchange="updateBtn()">
+            <span class="am-check-txt">I consent to <strong>immediate digital delivery</strong> and waive my 14-day right of withdrawal (EU Art. 16m Directive 2011/83/EU). <strong>All sales are final.</strong></span>
+          </label>
+          <label class="am-check">
+            <input type="checkbox" id="ck4" onchange="updateBtn()">
+            <span class="am-check-txt">I have read and agree to the <a href="/terms" target="_blank">Terms of Service</a>, including the Apex Trade Bot trading risk disclosure (Section 7).</span>
+          </label>
+        </div>
+
+        <button id="amBtn" class="am-submit" disabled onclick="submitApexPayment()">
+          <span id="amSpinner" class="am-spinner"></span>
+          <span id="amBtnTxt">Check all boxes to continue</span>
+        </button>
+        <p class="am-note">🔒 Secured by Stripe · Instant email delivery</p>
+      </div>
+    </div>
+
+    <!-- SUCCESS VIEW -->
+    <div class="am-success" id="amSuccess">
+      <div class="am-success-icon">🤖</div>
+      <h3>You're in!</h3>
+      <p>Your Apex Trade Bot is on its way.<br>Check your email — GitHub link + setup guide sent within minutes.<br><br><strong style="color:rgba(255,255,255,.75)">Start with paper trading mode before going live.</strong></p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── APEX STRIPE MODAL ──
+var STRIPE_PK='pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS';
+var apexStripe,apexCard,apexCardReady=false;
+
+function openApexModal(){
+  document.getElementById('apexModal').classList.add('open');
+  document.body.style.overflow='hidden';
+  if(!apexStripe){
+    apexStripe=Stripe(STRIPE_PK);
+    var els=apexStripe.elements({appearance:{theme:'night',variables:{colorPrimary:'#00ff88',colorBackground:'#070710',colorText:'#fff',borderRadius:'9px',fontFamily:'Inter,sans-serif'}}});
+    apexCard=els.create('card',{hidePostalCode:true});
+    apexCard.mount('#am-card-element');
+    apexCard.on('change',function(e){
+      document.getElementById('am-card-error').textContent=e.error?e.error.message:'';
+    });
+    apexCardReady=true;
+  }
+}
+
+function closeApexModal(){
+  document.getElementById('apexModal').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+document.getElementById('apexModal').addEventListener('click',function(e){
+  if(e.target===this) closeApexModal();
+});
+
+function updateBtn(){
+  var all=['ck1','ck2','ck3','ck4'].every(function(id){return document.getElementById(id).checked;});
+  var btn=document.getElementById('amBtn');
+  var txt=document.getElementById('amBtnTxt');
+  btn.disabled=!all;
+  txt.textContent=all?'Pay $197 — Get Apex Bot →':'Check all boxes to continue';
+}
+
+async function submitApexPayment(){
+  var name=document.getElementById('amName').value.trim();
+  var email=document.getElementById('amEmail').value.trim();
+  var errEl=document.getElementById('am-card-error');
+  if(!name){errEl.textContent='Please enter your name.';return;}
+  if(!email||!email.includes('@')){errEl.textContent='Please enter a valid email.';return;}
+  var btn=document.getElementById('amBtn');
+  var spin=document.getElementById('amSpinner');
+  var txt=document.getElementById('amBtnTxt');
+  btn.disabled=true;spin.style.display='block';txt.textContent='Processing...';
+  try{
+    var r=await fetch('/create-payment-intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:19700,currency:'usd',email:email,name:name,product:'apex-bot'})});
+    var d=await r.json();
+    if(d.error){errEl.textContent=d.error;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';return;}
+    var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCard,billing_details:{name:name,email:email}}});
+    if(result.error){
+      errEl.textContent=result.error.message;
+      btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
+    } else if(result.paymentIntent.status==='succeeded'){
+      document.getElementById('amForm').style.display='none';
+      document.getElementById('amSuccess').style.display='block';
+      // decrement spot counter
+      var s=parseInt(localStorage.getItem('apex_spots')||'11');
+      if(s>1){localStorage.setItem('apex_spots',s-1);}
+    }
+  } catch(err){
+    errEl.textContent='Error: '+err.message;
+    btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
+  }
+}
 </script>
 </body>
 </html>
