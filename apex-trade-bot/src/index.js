@@ -260,6 +260,22 @@ async function tick() {
       ? strategies.druckenmillerMultiplier(signal.confidence, signal.criteriaScore, stratData.livermore, stratData.turtle)
       : 1.0;
 
+    // ─── Hard filter: Jesse Livermore anti-contra-trend rule ──
+    // "Never fight the tape." — dacă Livermore + Turtle sunt unanimi,
+    // blocăm AI-ul să intre contra trendului (indiferent de RSI/MACD)
+    const liveSTR   = stratData.livermore.strength ?? 0;
+    const turtleSig = stratData.turtle.signal;
+    if (!openPosition && signal.action === 'BUY' &&
+        stratData.livermore.trend === 'BEARISH' && liveSTR >= 0.8 && turtleSig === 'SELL') {
+      logger.warn(`⚡ Signal filtrat: BUY contra Livermore BEARISH ${(liveSTR*100).toFixed(0)}% + Turtle STRONG SELL — HOLD forțat (PTJ: play defense)`);
+      signal.action = 'HOLD';
+    }
+    if (!openPosition && signal.action === 'SELL' &&
+        stratData.livermore.trend === 'BULLISH' && liveSTR >= 0.8 && turtleSig === 'BUY') {
+      logger.warn(`⚡ Signal filtrat: SELL contra Livermore BULLISH ${(liveSTR*100).toFixed(0)}% + Turtle STRONG BUY — HOLD forțat (PTJ: play defense)`);
+      signal.action = 'HOLD';
+    }
+
     // Execuție
     if (signal.action === 'HOLD' || signal.confidence < cfg.MIN_CONFIDENCE || !criteriaOk) {
       logger.info(`HOLD — confidence: ${signal.confidence}% | criterii: ${signal.criteriaScore ?? '?'}/5`);
