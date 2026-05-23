@@ -116,7 +116,8 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL
   await exchange.placeOrder(side, quantity, symbol);
 
   if (cfg.PAPER_TRADING) {
-    if (side === 'BUY') paperBalance -= price * quantity;
+    if (side === 'BUY') paperBalance -= price * quantity; // cumpărăm: scade balanța
+    else                paperBalance += price * quantity; // short: primim încasarea
   }
 
   const { stopLoss, takeProfit } = calcSLTP(side, price, atrValue);
@@ -140,22 +141,21 @@ async function closeTrade(price, reason) {
   const { side, entryPrice, quantity, symbol = cfg.SYMBOL } = openPosition;
   const closeSide = side === 'BUY' ? 'SELL' : 'BUY';
 
-  await exchange.placeOrder(closeSide, quantity);
+  await exchange.placeOrder(closeSide, quantity, symbol);
 
   const pnl = side === 'BUY'
     ? (price - entryPrice) * quantity
     : (entryPrice - price) * quantity;
 
   if (cfg.PAPER_TRADING) {
-    const proceeds = price * quantity + pnl;
-    if (cfg.COMPOUND) {
-      paperBalance += proceeds; // reinvestește tot
-    } else {
-      paperBalance += entryPrice * quantity + pnl; // recuperează investiția + profit
-    }
+    // BUY close → vindem coinul, primim price*qty
+    // SELL close → cumpărăm coinul înapoi, plătim price*qty
+    // Compound sau nu: balanța reflectă automat profitul/pierderea
+    if (side === 'BUY') paperBalance += price * quantity;
+    else                paperBalance -= price * quantity;
   }
 
-  logger.printTrade(closeSide, cfg.SYMBOL, price, quantity, pnl);
+  logger.printTrade(closeSide, symbol, price, quantity, pnl);
   logger.info(`Motivul: ${reason} | PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}`);
   openPosition = null;
 }

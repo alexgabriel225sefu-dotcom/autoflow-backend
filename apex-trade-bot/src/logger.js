@@ -38,23 +38,36 @@ function printTrade(type, symbol, price, quantity, pnl = null) {
 
 // openPosition passat din index.js pentru a calcula valoarea totală corect
 function printStats(balance, openPosition = null, currentPrice = null) {
-  // Valoarea totală = USDT liber + valoarea DOGE deținut
   let totalValue = balance;
   let positionNote = '';
+  let freeUSDT = balance;
+
   if (openPosition && currentPrice) {
     const posValue = openPosition.quantity * currentPrice;
-    totalValue = balance + posValue;
     const unrealizedPnl = openPosition.side === 'BUY'
       ? (currentPrice - openPosition.entryPrice) * openPosition.quantity
       : (openPosition.entryPrice - currentPrice) * openPosition.quantity;
-    positionNote = ` | Poziție: ${openPosition.side} ${openPosition.quantity} @ $${openPosition.entryPrice} | PnL nerealizat: ${unrealizedPnl >= 0 ? '+' : ''}$${unrealizedPnl.toFixed(4)}`;
+
+    if (openPosition.side === 'BUY') {
+      // LONG: balanța = USDT liber, totalValue = USDT + valoarea coinului deținut
+      totalValue = balance + posValue;
+      freeUSDT = balance;
+    } else {
+      // SHORT: balanța include încasarea short-ului, datorăm coinul înapoi
+      // totalValue = balance (incl. proceeds) - obligația curentă
+      totalValue = balance - posValue;
+      freeUSDT = totalValue; // suma netă disponibilă
+    }
+
+    const side = openPosition.side === 'BUY' ? 'LONG' : 'SHORT';
+    positionNote = ` | ${side} ${openPosition.quantity} ${openPosition.symbol || ''} @ $${openPosition.entryPrice} | PnL: ${unrealizedPnl >= 0 ? '+' : ''}$${unrealizedPnl.toFixed(4)}`;
   }
 
   const pnlPct = stats.startBalance > 0 ? ((totalValue - stats.startBalance) / stats.startBalance * 100).toFixed(2) : 0;
   const winRate = stats.trades > 0 ? (stats.wins / stats.trades * 100).toFixed(0) : 0;
   console.log('\n📊 STATISTICI:');
   console.log(`   Portofoliu total: $${totalValue.toFixed(4)} (${pnlPct >= 0 ? '+' : ''}${pnlPct}%)${positionNote}`);
-  console.log(`   USDT liber: $${balance.toFixed(4)}${openPosition ? ' (restul e în poziție deschisă)' : ''}`);
+  console.log(`   USDT liber: $${freeUSDT.toFixed(4)}${openPosition ? ' (restul e în poziție deschisă)' : ''}`);
   console.log(`   Tranzacții închise: ${stats.trades} | ✅ ${stats.wins} | ❌ ${stats.losses} | Win Rate: ${winRate}%`);
   console.log(`   Profit realizat: ${stats.totalPnL >= 0 ? '+' : ''}$${stats.totalPnL.toFixed(4)}`);
   console.log(`   Mod: ${cfg.PAPER_TRADING ? '📝 PAPER TRADING' : cfg.TESTNET ? '🧪 TESTNET' : '🔴 LIVE'}\n`);
