@@ -829,6 +829,57 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
   </div>
 </footer>
 
+<!-- SECRET BUTTON -->
+<style>
+#secret-btn{
+  position:fixed;bottom:28px;left:28px;z-index:9999;
+  background:transparent;border:none;cursor:pointer;padding:0;
+  opacity:0;transition:opacity .4s;
+}
+#secret-btn:hover{opacity:1!important}
+#secret-btn .secret-inner{
+  display:flex;align-items:center;gap:8px;
+  background:#050508dd;border:1px solid #00ff8833;
+  border-radius:100px;padding:8px 16px 8px 10px;
+  backdrop-filter:blur(12px);
+  animation:secret-glow 3s ease-in-out infinite;
+  transition:border-color .3s,box-shadow .3s;
+}
+#secret-btn:hover .secret-inner{
+  border-color:#00ff8888;
+  box-shadow:0 0 20px #00ff8830;
+}
+.secret-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:#00ff88;
+  animation:secret-pulse 2s ease-in-out infinite;
+}
+.secret-text{
+  font-size:11px;font-weight:700;letter-spacing:2px;
+  text-transform:uppercase;color:#00ff8899;
+  font-family:-apple-system,sans-serif;
+}
+@keyframes secret-glow{
+  0%,100%{opacity:.25}
+  50%{opacity:.7}
+}
+@keyframes secret-pulse{
+  0%,100%{box-shadow:0 0 0 0 #00ff8844}
+  50%{box-shadow:0 0 0 5px #00ff8800}
+}
+/* Apare după 5 secunde de stat pe pagină */
+#secret-btn.visible{opacity:.25}
+</style>
+<a id="secret-btn" href="/apex-bot" title="">
+  <div class="secret-inner">
+    <div class="secret-dot"></div>
+    <span class="secret-text">secret</span>
+  </div>
+</a>
+<script>
+setTimeout(()=>document.getElementById('secret-btn').classList.add('visible'), 5000);
+</script>
+
 <script>
 // ── INTRO ──
 (function(){
