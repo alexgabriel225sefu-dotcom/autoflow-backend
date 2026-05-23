@@ -65,14 +65,42 @@ async function callAnthropic(prompt) {
   throw new Error('Anthropic unavailable');
 }
 
-async function getSignal(indicators, balance, openPosition) {
+async function getSignal(indicators, balance, openPosition, strategyData = null) {
   const rsi   = parseFloat(indicators.rsi);
   const srsiK = parseFloat(indicators.stochRsiK);
   const macdH = parseFloat(indicators.macdHist);
   const volR  = parseFloat(indicators.volumeRatio);
   const bbPos = parseFloat(indicators.bb_position);
 
-  const prompt = `Ești un trader profesionist cu 20 ani experiență în crypto spot trading. Analizează TOATE datele și dă un semnal precis.
+  // ─── Legendary Traders section (only if data provided) ───
+  let legendarySection = '';
+  if (strategyData) {
+    const { turtle, livermore, soros, session } = strategyData;
+    legendarySection = `
+## LEGENDARY TRADERS ANALYSIS
+### 🐢 Turtle Trading (Richard Dennis / Eckhardt)
+- Breakout signal: ${turtle.signal ?? 'NONE'} | Putere: ${turtle.breakoutStr}
+- High 20 perioade: ${turtle.high20} | Low 20 perioade: ${turtle.low20}
+- Near breakout: ${turtle.nearSignal ?? 'NO'}
+
+### 📐 Jesse Livermore (Pivot Structure)
+- Trend structură: ${livermore.trend} (${livermore.reason ?? 'N/A'})
+- Putere semnal: ${livermore.strength !== undefined ? (livermore.strength * 100).toFixed(0) + '%' : 'N/A'}
+- Regula: dacă trend=BULLISH → confirmă BUY; dacă BEARISH → confirmă SELL; NEUTRAL → prudent
+
+### 💡 George Soros (Reflexivity / Momentum)
+- Direcție momentum: ${soros.direction}
+- Bullish candles: ${soros.momentum !== undefined ? (soros.momentum * 100).toFixed(0) + '%' : 'N/A'} din ultimele 8
+- Velocity preț: ${soros.velocity !== undefined ? soros.velocity.toFixed(3) + '%' : 'N/A'}
+
+### 📊 Sesiune curentă (Ed Seykota rules)
+- Pierderi consecutive: ${session.consecutiveLosses} (stop la 3)
+- Câștiguri consecutive: ${session.consecutiveWins}
+- Tranzacții azi: ${session.dailyTrades}/10
+- PnL zilnic: ${session.dailyPnL >= 0 ? '+' : ''}$${session.dailyPnL.toFixed(4)}`;
+  }
+
+  const prompt = `Ești un trader profesionist cu 20 ani experiență. Aplici regulile marilor traideri: Turtle breakout, Livermore structure, Soros momentum, PTJ defense. Analizează TOATE datele și dă un semnal precis.
 
 ## MARKET DATA — ${cfg.SYMBOL} (${cfg.TIMEFRAME})
 ### Preț & Trend
@@ -96,16 +124,18 @@ async function getSignal(indicators, balance, openPosition) {
 
 ### Ultimele 5 lumânări
 ${indicators.recentCandles.map((c, i) => `${i+1}. ${c.direction} O:${c.open} H:${c.high} L:${c.low} C:${c.close} (body: ${c.bodyPct}%)`).join('\n')}
-
+${legendarySection}
 ## CONT
 - Balanță: $${balance.toFixed(2)} USDT
 - Poziție deschisă: ${openPosition ? `${openPosition.side} @ $${openPosition.entryPrice} | PnL: ${openPosition.pnlPct?.toFixed(2)}%` : 'NICIUNA'}
 
-## REGULI
+## REGULI DE INTRARE
 - SL: ${cfg.STOP_LOSS_PCT * 100}% | TP: ${cfg.TAKE_PROFIT_PCT * 100}% | Risc: ${cfg.RISK_PER_TRADE * 100}%
 - Minimum confidence: ${cfg.MIN_CONFIDENCE}%
 - CRITERII BUY (min 3/5): trend bullish, RSI<50 sau div.bullish, MACD▲, volum>1.2×, preț sub EMA20
 - CRITERII SELL (min 3/5): trend bearish, RSI>50 sau div.bearish, MACD▼, volum>1.2×, preț peste EMA20
+- BONUS +1 criteriu dacă Turtle=STRONG BUY/SELL SAU Livermore confirmă direcția SAU Soros momentum alininat
+- Nu tranzacționa contra trendului Livermore cu putere >0.8
 
 Răspunde DOAR cu JSON valid:
 {"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 prop română>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}`;

@@ -3,6 +3,7 @@ const cfg        = require('./config');
 const indicators = require('./indicators');
 const ai         = require('./ai');
 const logger     = require('./logger');
+const strategies = require('./strategies');
 
 // ─── Exchange ─────────────────────────────────────────────
 const exchange = cfg.EXCHANGE === 'binance'
@@ -13,6 +14,7 @@ const exchange = cfg.EXCHANGE === 'binance'
 let openPosition = null;
 let paperBalance = cfg.PAPER_BALANCE;
 let tickCount    = 0;
+let startBalance = 0; // set in main(), used by strategies
 
 // ─── Validare startup ─────────────────────────────────────
 function validate() {
@@ -45,8 +47,8 @@ async function getBalance() {
 }
 
 // ─── Calcul cantitate ─────────────────────────────────────
-async function calcQuantity(price, balance, symbol = cfg.SYMBOL) {
-  const riskAmount = balance * cfg.RISK_PER_TRADE;
+async function calcQuantity(price, balance, symbol = cfg.SYMBOL, druckMult = 1.0) {
+  const riskAmount = balance * cfg.RISK_PER_TRADE * druckMult;
   const qty        = riskAmount / price;
   // Coins under $1 → whole units; expensive coins (SOL, BNB etc.) → 6 decimals
   const isWhole    = ['DOGEUSDT','SHIBUSDT','XRPUSDT','ADAUSDT','MATICUSDT','TRXUSDT'].includes(symbol);
@@ -109,9 +111,10 @@ function checkPosition(price) {
 }
 
 // ─── Deschide poziție ─────────────────────────────────────
-async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL) {
-  const quantity = await calcQuantity(price, balance, symbol);
+async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL, druckMult = 1.0) {
+  const quantity = await calcQuantity(price, balance, symbol, druckMult);
   if (quantity <= 0) { logger.warn(`Cantitate prea mică pentru ${symbol} @ $${price} — skip`); return; }
+  if (druckMult !== 1.0) logger.info(`🎯 Druckenmiller: mărime poziție ×${druckMult.toFixed(2)}`);
 
   await exchange.placeOrder(side, quantity, symbol);
 
@@ -157,6 +160,7 @@ async function closeTrade(price, reason) {
 
   logger.printTrade(closeSide, symbol, price, quantity, pnl);
   logger.info(`Motivul: ${reason} | PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}`);
+  strategies.recordTrade(pnl > 0, pnl, startBalance || cfg.PAPER_BALANCE);
   openPosition = null;
 }
 
@@ -212,9 +216,34 @@ async function tick() {
       return;
     }
 
-    // Indicatori + AI signal
-    const ind    = indicators.analyze(candles);
-    const signal = await ai.getSignal(ind, balance, openPosition);
+    // Indicatori + strategii legendare
+    const ind      = indicators.analyze(candles);
+    const stratData = strategies.analyze(candles);
+
+    // Paul Tudor Jones / Seykota: verifică dacă trebuie să ne oprim
+    const stopCheck = strategies.shouldStop(balance, startBalance || cfg.PAPER_BALANCE);
+    if (stopCheck.stop) {
+      logger.warn(`🛑 STRATEGY STOP: ${stopCheck.reasons.join(' | ')}`);
+      if (openPosition) {
+        logger.warn('Poziție deschisă — o păstrăm până la SL/TP natural.');
+      }
+      logger.printStats(await getBalance(), openPosition, price);
+      return;
+    }
+
+    // Logare structură de piață detectată
+    if (stratData.livermore.trend !== 'NEUTRAL') {
+      logger.info(`📊 Livermore: ${stratData.livermore.trend} (${stratData.livermore.reason}) | Putere: ${(stratData.livermore.strength * 100).toFixed(0)}%`);
+    }
+    if (stratData.turtle.signal) {
+      logger.info(`🐢 Turtle: ${stratData.turtle.breakoutStr} breakout ${stratData.turtle.signal} | H20: ${stratData.turtle.high20} | L20: ${stratData.turtle.low20}`);
+    }
+    if (stratData.soros.direction !== 'NEUTRAL') {
+      logger.info(`💡 Soros: momentum ${stratData.soros.direction} (${(stratData.soros.momentum * 100).toFixed(0)}% bullish, velocity ${stratData.soros.velocity?.toFixed(2)}%)`);
+    }
+
+    // AI signal (cu context strategie)
+    const signal = await ai.getSignal(ind, balance, openPosition, stratData);
     logger.printSignal(signal, ind);
 
     // Filtre de calitate
@@ -226,15 +255,20 @@ async function tick() {
       return;
     }
 
+    // Stan Druckenmiller: calculează multiplicatorul de poziție
+    const druckMult = !openPosition
+      ? strategies.druckenmillerMultiplier(signal.confidence, signal.criteriaScore, stratData.livermore, stratData.turtle)
+      : 1.0;
+
     // Execuție
     if (signal.action === 'HOLD' || signal.confidence < cfg.MIN_CONFIDENCE || !criteriaOk) {
       logger.info(`HOLD — confidence: ${signal.confidence}% | criterii: ${signal.criteriaScore ?? '?'}/5`);
     } else if (signal.action === 'CLOSE' && openPosition) {
       await closeTrade(price, 'AI_CLOSE');
     } else if (signal.action === 'BUY' && !openPosition) {
-      await openTrade('BUY', price, balance, parseFloat(ind.atr), symbol);
+      await openTrade('BUY', price, balance, parseFloat(ind.atr), symbol, druckMult);
     } else if (signal.action === 'SELL' && !openPosition) {
-      await openTrade('SELL', price, balance, parseFloat(ind.atr), symbol);
+      await openTrade('SELL', price, balance, parseFloat(ind.atr), symbol, druckMult);
     } else {
       logger.info(`Skip — poziție ${openPosition ? 'deja deschisă' : 'deja închisă'}`);
     }
@@ -249,6 +283,7 @@ async function tick() {
 async function main() {
   validate();
   const balance = await getBalance();
+  startBalance  = balance; // pentru shouldStop + recordTrade
   logger.setStartBalance(balance);
   logger.printBanner(balance);
 
