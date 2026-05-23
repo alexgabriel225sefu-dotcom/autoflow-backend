@@ -80,4 +80,27 @@ function alertStart(symbol, timeframe, balance, mode) {
   );
 }
 
-module.exports = { alertOpen, alertClose, alertStop, alertFiltered, alertStart };
+// ─── Heartbeat la fiecare 30 min ─────────────────────────
+function alertHeartbeat(tickCount, balance, openPosition, currentPrice) {
+  let posLine = '📭 Nicio poziție deschisă';
+  if (openPosition && currentPrice) {
+    const dir = openPosition.side === 'BUY' ? 'LONG' : 'SHORT';
+    const pnl = openPosition.side === 'BUY'
+      ? (currentPrice - openPosition.entryPrice) * openPosition.quantity
+      : (openPosition.entryPrice - currentPrice) * openPosition.quantity;
+    const pnlPct = openPosition.side === 'BUY'
+      ? (currentPrice - openPosition.entryPrice) / openPosition.entryPrice * 100
+      : (openPosition.entryPrice - currentPrice) / openPosition.entryPrice * 100;
+    posLine =
+      `📊 ${dir} <b>${openPosition.symbol}</b> @ $${openPosition.entryPrice}\n` +
+      `💹 Preț curent: $${currentPrice} | PnL: <b>${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)} (${pnlPct.toFixed(2)}%)</b>\n` +
+      `🛡 SL: $${openPosition.stopLoss.toFixed(5)} | 🎯 TP: $${openPosition.takeProfit.toFixed(5)}`;
+  }
+  send(
+    `💓 <b>APEX BOT — ACTIV</b> (tick #${tickCount})\n` +
+    `💼 Balanță: $${balance.toFixed(4)}\n` +
+    posLine
+  );
+}
+
+module.exports = { alertOpen, alertClose, alertStop, alertFiltered, alertStart, alertHeartbeat };

@@ -198,8 +198,15 @@ async function tick() {
     const activeSymbol = openPosition?.symbol ?? null;
     const symbol = activeSymbol || await bestSymbol();
 
-    // La fiecare 5 tick-uri, afișează stats
+    // La fiecare 5 tick-uri, afișează stats în consolă
     if (tickCount % 5 === 0) logger.printStats(await getBalance(), openPosition, await exchange.getPrice(symbol).catch(() => null));
+
+    // La fiecare 6 tick-uri (30 min), trimite heartbeat pe Telegram
+    if (tickCount % 6 === 0) {
+      const hbBalance = await getBalance();
+      const hbPrice   = await exchange.getPrice(symbol).catch(() => null);
+      tg.alertHeartbeat(tickCount, hbBalance, openPosition, hbPrice);
+    }
 
     logger.info(`[${tickCount}] Analizez ${symbol} (${cfg.EXCHANGE})${activeSymbol ? ' 🔒 poziție activă' : ''}...`);
 
