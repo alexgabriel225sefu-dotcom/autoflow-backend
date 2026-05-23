@@ -1386,40 +1386,12 @@ publicPages.forEach(p => {
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
 });
 
-// ── BOT ACCESS REDIRECT — clienții văd aicashsystem.space/bot-access, nu GitHub
-app.get('/bot-access', (req, res) => {
-  res.redirect(301, 'https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/tree/release/apex-bot/apex-trade-bot');
-});
-
-// ── TEST DELIVERY EMAIL — protejat cu secret key, fără plată
-// GET  (browser): /api/send-bot-email?secret=X&email=you@gmail.com&name=Alex
-// POST (curl):    /api/send-bot-email?secret=X  body: { email, name }
-app.get('/api/send-bot-email', async (req, res) => {
-  req.body = { email: req.query.email, name: req.query.name, secret: req.query.secret };
-  // fall through to shared handler below
-  return _sendBotEmailHandler(req, res);
-});
-app.post('/api/send-bot-email', async (req, res) => {
-  req.body.secret = req.body.secret || req.query.secret;
-  return _sendBotEmailHandler(req, res);
-});
-async function _sendBotEmailHandler(req, res) {
-  const secret = req.query.secret || req.body.secret;
-  const adminSecret = process.env.BOT_EMAIL_SECRET || '';
-  if (!adminSecret) {
-    return res.status(403).json({ error: 'BOT_EMAIL_SECRET not set in env — add it on Render' });
-  }
-  if (secret !== adminSecret) {
-    return res.status(403).json({ error: 'Wrong secret', hint: `Expected length: ${adminSecret.length} chars, got: ${(secret||'').length} chars` });
-  }
-  const email = req.body.email;
-  const name  = req.body.name || 'there';
-  if (!email) return res.status(400).json({ error: 'email required' });
-
-  const _he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const botEmailHtml = `<div style="font-family:'Inter',sans-serif;max-width:560px;margin:0 auto;padding:40px 32px;background:#050508;color:#e2e2ec;border-radius:12px">
+// ── BOT EMAIL HTML — funcție separată reutilizabilă ──────────────────────────
+function _buildBotEmailHtml(safeName, safeEmail) {
+  const firstName = safeName.split(' ')[0];
+  return `<div style="font-family:'Inter',sans-serif;max-width:560px;margin:0 auto;padding:40px 32px;background:#050508;color:#e2e2ec;border-radius:12px">
     <div style="font-size:13px;font-weight:800;color:#00ff88;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px">APEX.BOT — DELIVERY</div>
-    <h2 style="font-size:26px;font-weight:900;color:#fff;margin-bottom:8px;letter-spacing:-1px">You're in, ${_he(name.split(' ')[0])}.</h2>
+    <h2 style="font-size:26px;font-weight:900;color:#fff;margin-bottom:8px;letter-spacing:-1px">You're in, ${firstName}.</h2>
     <p style="color:rgba(255,255,255,.55);font-size:14px;margin-bottom:32px">Your Apex Trade Bot is ready. Everything you need is below.</p>
     <div style="background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:10px;padding:20px 24px;margin-bottom:24px">
       <div style="font-size:11px;color:#00ff88;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">📦 Source Code</div>
@@ -1453,6 +1425,57 @@ async function _sendBotEmailHandler(req, res) {
     </div>
     <p style="color:rgba(255,255,255,.3);font-size:12px">Questions? Reply to this email or contact <a href="mailto:contact@aicashsystem.space" style="color:#00ff88">contact@aicashsystem.space</a>. We'll respond within 24h.</p>
   </div>`;
+}
+
+// ── BOT ACCESS REDIRECT — clienții văd aicashsystem.space/bot-access, nu GitHub
+app.get('/bot-access', (req, res) => {
+  res.redirect(301, 'https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/tree/release/apex-bot/apex-trade-bot');
+});
+
+// ── TEST DELIVERY EMAIL — protejat cu secret key, fără plată
+// GET  (browser): /api/send-bot-email?secret=X&email=you@gmail.com&name=Alex
+// POST (curl):    /api/send-bot-email?secret=X  body: { email, name }
+app.get('/api/send-bot-email', async (req, res) => {
+  req.body = { email: req.query.email, name: req.query.name, secret: req.query.secret };
+  // fall through to shared handler below
+  return _sendBotEmailHandler(req, res);
+});
+app.post('/api/send-bot-email', async (req, res) => {
+  req.body.secret = req.body.secret || req.query.secret;
+  return _sendBotEmailHandler(req, res);
+});
+async function _sendBotEmailHandler(req, res) {
+  const secret = req.query.secret || req.body.secret;
+  const adminSecret = process.env.BOT_EMAIL_SECRET || '';
+  const isPreview = req.query.preview === '1';
+
+  // Preview mode — afișează emailul direct în browser fără auth/email
+  if (isPreview) {
+    const name  = req.query.name || req.body.name || 'Alex';
+    const email = req.query.email || req.body.email || 'preview@example.com';
+    const _he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const previewHtml = _buildBotEmailHtml(_he(name), _he(email));
+    return res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview: Bot Delivery Email</title>
+      <style>body{margin:0;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:40px 20px;font-family:sans-serif}
+      .bar{background:#2d2d44;border:1px solid #444;border-radius:8px;padding:10px 20px;margin-bottom:24px;color:#aaa;font-size:13px;text-align:center;max-width:600px;width:100%}
+      .bar strong{color:#00ff88}</style></head><body>
+      <div class="bar">📧 <strong>PREVIEW</strong> — Asta e emailul pe care îl primește clientul după cumpărare.<br>
+      <span style="font-size:11px;color:#666">Towards: ${_he(email)} · Name: ${_he(name)}</span></div>
+      ${previewHtml}</body></html>`);
+  }
+
+  if (!adminSecret) {
+    return res.status(403).json({ error: 'BOT_EMAIL_SECRET not set in env — add it on Render' });
+  }
+  if (secret !== adminSecret) {
+    return res.status(403).json({ error: 'Wrong secret', hint: `Expected length: ${adminSecret.length} chars, got: ${(secret||'').length} chars` });
+  }
+  const email = req.body.email;
+  const name  = req.body.name || 'there';
+  if (!email) return res.status(400).json({ error: 'email required' });
+
+  const _he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const botEmailHtml = _buildBotEmailHtml(_he(name), _he(email));
 
   let emailSent = false;
   if (BREVO_API_KEY) {
