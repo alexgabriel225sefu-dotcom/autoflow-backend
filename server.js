@@ -1392,8 +1392,18 @@ app.get('/bot-access', (req, res) => {
 });
 
 // ── TEST DELIVERY EMAIL — protejat cu secret key, fără plată
-// Usage: POST /api/send-bot-email?secret=VALOARE_DIN_ENV cu body { "email": "test@example.com", "name": "Test" }
+// GET  (browser): /api/send-bot-email?secret=X&email=you@gmail.com&name=Alex
+// POST (curl):    /api/send-bot-email?secret=X  body: { email, name }
+app.get('/api/send-bot-email', async (req, res) => {
+  req.body = { email: req.query.email, name: req.query.name, secret: req.query.secret };
+  // fall through to shared handler below
+  return _sendBotEmailHandler(req, res);
+});
 app.post('/api/send-bot-email', async (req, res) => {
+  req.body.secret = req.body.secret || req.query.secret;
+  return _sendBotEmailHandler(req, res);
+});
+async function _sendBotEmailHandler(req, res) {
   const secret = req.query.secret || req.body.secret;
   const adminSecret = process.env.BOT_EMAIL_SECRET || '';
   if (!adminSecret || secret !== adminSecret) {
@@ -1463,7 +1473,7 @@ app.post('/api/send-bot-email', async (req, res) => {
     return res.json({ success: false, error: 'No email provider configured (BREVO_API_KEY missing)' });
   }
   return res.json({ success: emailSent, to: email, method: BREVO_API_KEY ? 'brevo' : 'smtp' });
-});
+}
 
 // Protected pages — require any valid course purchase
 const protectedPages = ['videos','blueprints','ai-builder','course-starter',
