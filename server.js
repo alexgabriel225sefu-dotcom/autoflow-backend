@@ -1059,8 +1059,8 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
             <p style="color:rgba(255,255,255,.55);font-size:14px;margin-bottom:32px">Your Apex Trade Bot is ready. Everything you need is below.</p>
             <div style="background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:10px;padding:20px 24px;margin-bottom:24px">
               <div style="font-size:11px;color:#00ff88;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">📦 Source Code</div>
-              <a href="https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/tree/claude/arcads-external-api-gExX7/apex-trade-bot" style="display:inline-block;background:#00ff88;color:#000;font-size:14px;font-weight:800;padding:12px 24px;border-radius:8px;text-decoration:none">Access GitHub Repository →</a>
-              <p style="color:rgba(255,255,255,.35);font-size:12px;margin-top:10px;margin-bottom:0">Private link — do not share. Your personal access only.</p>
+              <a href="https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/tree/release/apex-bot/apex-trade-bot" style="display:inline-block;background:#00ff88;color:#000;font-size:14px;font-weight:800;padding:12px 24px;border-radius:8px;text-decoration:none">Access GitHub Repository →</a>
+              <p style="color:rgba(255,255,255,.35);font-size:12px;margin-top:10px;margin-bottom:0">Click the button above to access your bot's source code.</p>
             </div>
             <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px 24px;margin-bottom:16px">
               <div style="font-size:11px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">🚀 Quick Setup</div>
