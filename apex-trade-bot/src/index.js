@@ -250,7 +250,11 @@ async function tick() {
       logger.info(`🐢 Turtle: ${stratData.turtle.breakoutStr} breakout ${stratData.turtle.signal} | H20: ${stratData.turtle.high20} | L20: ${stratData.turtle.low20}`);
     }
     if (stratData.soros.direction !== 'NEUTRAL') {
-      logger.info(`💡 Soros: momentum ${stratData.soros.direction} (${(stratData.soros.momentum * 100).toFixed(0)}% bullish, velocity ${stratData.soros.velocity?.toFixed(2)}%)`);
+      const sorosDir  = stratData.soros.direction;
+      const sorosPct  = stratData.soros.direction === 'BEARISH'
+        ? ((1 - stratData.soros.momentum) * 100).toFixed(0) + '% bearish'
+        : (stratData.soros.momentum * 100).toFixed(0) + '% bullish';
+      logger.info(`💡 Soros: momentum ${sorosDir} (${sorosPct}, velocity ${stratData.soros.velocity?.toFixed(2)}%)`);
     }
 
     // AI signal (cu context strategie)
