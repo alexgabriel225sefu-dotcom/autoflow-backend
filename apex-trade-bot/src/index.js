@@ -5,6 +5,7 @@ const ai         = require('./ai');
 const logger     = require('./logger');
 const strategies = require('./strategies');
 const tg         = require('./telegram');
+const state      = require('./state');
 
 // ─── Exchange ─────────────────────────────────────────────
 const exchange = cfg.EXCHANGE === 'binance'
@@ -138,6 +139,7 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL
   logger.printTrade(side, symbol, price, quantity);
   logger.info(`SL: $${stopLoss.toFixed(5)} | TP: $${takeProfit.toFixed(5)} | R:R = 1:${rrRatio.toFixed(2)}`);
   tg.alertOpen(side, symbol, price, quantity, stopLoss, takeProfit, druckMult);
+  state.save(paperBalance, openPosition);
 }
 
 // ─── Închide poziție ──────────────────────────────────────
@@ -165,6 +167,7 @@ async function closeTrade(price, reason) {
   strategies.recordTrade(pnl > 0, pnl, startBalance || cfg.PAPER_BALANCE);
   tg.alertClose(reason, symbol, side, entryPrice, price, pnl, await getBalance());
   openPosition = null;
+  state.save(paperBalance, null);
 }
 
 // ─── Selectează cel mai bun simbol (scanner) ──────────────
@@ -319,6 +322,16 @@ async function tick() {
 // ─── Start ────────────────────────────────────────────────
 async function main() {
   validate();
+
+  // Restaurează starea după restart
+  if (cfg.PAPER_TRADING) {
+    const saved = state.load(cfg.PAPER_BALANCE);
+    if (saved) {
+      paperBalance = saved.paperBalance;
+      openPosition = saved.openPosition;
+    }
+  }
+
   const balance = await getBalance();
   startBalance  = balance; // pentru shouldStop + recordTrade
   logger.setStartBalance(balance);
