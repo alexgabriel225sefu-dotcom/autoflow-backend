@@ -244,7 +244,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);-webkit-backdro
   <div class="hero-copy">
     <div class="hero-live"><span class="live-dot"></span>Live · Trading Now</div>
     <h1>The AI that doesn't<br>need you to<br><em>make money.</em></h1>
-    <p class="hero-sub">Apex Bot scans crypto markets every 15 minutes, reads 6 indicators, asks AI for the signal — and executes trades on autopilot. Day and night. Starting from $10.</p>
+    <p class="hero-sub">Apex Bot scans 5 coins every 5 minutes using strategies from the world's best traders — Turtle, Livermore, Soros, PTJ. AI picks the signal. Telegram alerts you instantly. Starting from $10.</p>
     <div class="hero-actions">
       <button onclick="openApexModal()" class="btn-main" style="border:none;cursor:pointer">
         <svg viewBox="0 0 16 16" fill="none"><path d="M8 2L14 8L8 14M2 8H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -297,7 +297,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);-webkit-backdro
   <div class="stat"><div class="stat-val am">24/7</div><div class="stat-lbl">Runs non-stop</div></div>
   <div class="stat"><div class="stat-val gr">68%</div><div class="stat-lbl">Win rate</div></div>
   <div class="stat"><div class="stat-val">1:2</div><div class="stat-lbl">Risk/reward</div></div>
-  <div class="stat"><div class="stat-val gr">15m</div><div class="stat-lbl">Cycle time</div></div>
+  <div class="stat"><div class="stat-val gr">5m</div><div class="stat-lbl">Cycle time</div></div>
 </div>
 
 <!-- GROWTH SIM -->
@@ -328,34 +328,34 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);-webkit-backdro
   <h2 class="section-title">What's inside</h2>
   <div class="feat-grid">
     <div class="feat">
+      <div class="feat-icon-wrap">🏆</div>
+      <h3>Legendary Traders Engine</h3>
+      <p>Rules from Paul Tudor Jones, Jesse Livermore, Turtle Trading, Ed Seykota, Druckenmiller & Soros — all coded in. The bot trades like the greats.</p>
+    </div>
+    <div class="feat">
       <div class="feat-icon-wrap">🧠</div>
       <h3>Dual AI Engine</h3>
       <p>Claude Haiku + Llama 3.3 70B (Groq). Primary + fallback. If one fails, the other takes over instantly. Zero downtime.</p>
     </div>
     <div class="feat">
-      <div class="feat-icon-wrap">📊</div>
-      <h3>6-Indicator Analysis</h3>
-      <p>RSI, Stochastic RSI, MACD, EMA 20/50/200, Bollinger Bands, ATR — all calculated every 15 minutes on live data.</p>
+      <div class="feat-icon-wrap">📡</div>
+      <h3>Multi-Symbol Scanner</h3>
+      <p>Scans SOL, XRP, DOGE, TRX, ADA every 5 minutes. Picks the coin with the best momentum + volume. Always in the right market.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon-wrap">📱</div>
+      <h3>Telegram Alerts</h3>
+      <p>Instant notification on your phone when a trade opens or closes — with entry price, SL, TP and live PnL. Know what's happening 24/7.</p>
     </div>
     <div class="feat">
       <div class="feat-icon-wrap">🛡️</div>
-      <h3>Trailing Stop Loss</h3>
-      <p>SL moves up with the price. When the market reverses, profits are locked. Automatic, no human intervention.</p>
+      <h3>Defense-First Risk System</h3>
+      <p>Stops after 3 consecutive losses (Seykota). Halts if daily loss exceeds 3% (PTJ). Blocks trades against strong trends (Livermore). Capital protected automatically.</p>
     </div>
     <div class="feat">
       <div class="feat-icon-wrap">🔄</div>
       <h3>Triple Data Fallback</h3>
-      <p>Bybit → Binance → OKX. Even if two exchanges block the request, the bot always gets data.</p>
-    </div>
-    <div class="feat">
-      <div class="feat-icon-wrap">📈</div>
-      <h3>Compound Growth</h3>
-      <p>Every profit is auto-reinvested. $10 grows faster each week. The bot scales up as your balance increases.</p>
-    </div>
-    <div class="feat">
-      <div class="feat-icon-wrap">🔬</div>
-      <h3>Backtest Engine</h3>
-      <p>Test the full strategy on 500 historical candles before going live. See the real win rate before risking anything.</p>
+      <p>Bybit → Binance → OKX. Even if two exchanges block the request, the bot always gets live data. Never misses a signal.</p>
     </div>
   </div>
 </section>
@@ -571,20 +571,21 @@ setTimeout(()=>{showToast();setInterval(showToast,18000);},7000);
 
 // ── TERMINAL ──
 const logs=[
-  {c:'d',m:'[APEX] v2.0 starting...'},
-  {c:'d',m:'[CFG] Exchange: bybit | Symbol: DOGEUSDT | TF: 15m'},
-  {c:'b',m:'[DATA] Fetching 150 candles from OKX...'},
-  {c:'w',m:'[IND] RSI: 34.2 | MACD: +0.00008 | EMA: bullish'},
-  {c:'w',m:'[IND] StochRSI: 18.4 | ATR: 0.0021 | Vol: 2.1x'},
-  {c:'b',m:'[AI] Sending signal request to Groq...'},
-  {c:'g',m:'[AI] ✓ Signal received in 0.8s'},
-  {c:'g',m:'━━━ BUY signal (confidence: 82% | score: 4/5) ━━━'},
-  {c:'w',m:'RSI oversold + StochRSI K/D cross + volume surge'},
-  {c:'g',m:'[ORDER] BUY 14 DOGEUSDT @ $0.10128'},
-  {c:'b',m:'SL: $0.09976 | TP: $0.10432 | R:R = 1:2'},
-  {c:'w',m:'Trailing stop: active (1% distance)'},
-  {c:'g',m:'Portfolio: $10.84 (+8.4%) · Position: +4.2%'},
-  {c:'d',m:'Next analysis in 14:32...'},
+  {c:'d',m:'[APEX] v3.0 — Legendary Traders Engine'},
+  {c:'b',m:'[SCAN] Checking SOL, XRP, DOGE, TRX, ADA...'},
+  {c:'g',m:'[SCAN] Best opportunity → XRPUSDT (score: 0.71)'},
+  {c:'b',m:'[DATA] 200 candles via OKX fallback ✓'},
+  {c:'w',m:'[LIVERMORE] BULLISH structure — HH+HL (85%)'},
+  {c:'w',m:'[TURTLE] STRONG breakout BUY | H20: $1.342'},
+  {c:'g',m:'[SOROS] Momentum BULLISH — velocity +1.24%'},
+  {c:'b',m:'[AI] Groq Llama 3.3 — signal in 0.9s'},
+  {c:'g',m:'━━━ BUY (confidence: 85% | criteria: 4/5) ━━━'},
+  {c:'w',m:'RSI oversold + Bullish divergence + Volume 1.8x'},
+  {c:'y',m:'[DRUCKENMILLER] Position size ×1.56 (high conviction)'},
+  {c:'g',m:'[PAPER] BUY 2 XRPUSDT @ $1.3157'},
+  {c:'b',m:'SL: $1.3052 | TP: $1.3368 | R:R = 1:2.00'},
+  {c:'g',m:'[TELEGRAM] ✓ Alert sent to phone'},
+  {c:'d',m:'Next analysis in 5:00...'},
 ];
 const tb=document.getElementById('termBody');let tli=0;
 function addLog(){
