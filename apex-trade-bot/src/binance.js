@@ -2,7 +2,16 @@ const axios = require('axios');
 const crypto = require('crypto');
 const cfg = require('./config');
 
-const client = axios.create({ baseURL: cfg.BINANCE_BASE, timeout: 10000 });
+// Read BINANCE_TESTNET directly from env to avoid any config parsing issues
+const TESTNET = ['true','1','yes','on'].includes((process.env.BINANCE_TESTNET || '').toLowerCase().trim());
+const BASE_URL = TESTNET
+  ? 'https://testnet.binance.vision/api/v3'
+  : 'https://api.binance.com/api/v3';
+
+console.log(`[BINANCE] Mode: ${TESTNET ? '🧪 TESTNET (testnet.binance.vision)' : '🔴 LIVE (api.binance.com)'}`);
+console.log(`[BINANCE] BINANCE_TESTNET env = "${process.env.BINANCE_TESTNET}"`);
+
+const client = axios.create({ baseURL: BASE_URL, timeout: 10000 });
 
 function sign(params) {
   const qs = new URLSearchParams(params).toString();
