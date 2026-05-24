@@ -1867,6 +1867,114 @@ app.post('/api/builder/logo', auth, _aiLimiter, async (req, res) => {
 
 
 // ════════════════════════════════════════
+// ADMIN: SYNC BOT FILES → apex-trade-bot repo
+// Usage: GET /admin/sync-bot-repo?secret=BOT_EMAIL_SECRET&token=ghp_xxx
+// ════════════════════════════════════════
+app.get('/admin/sync-bot-repo', async (req, res) => {
+  const secret = req.query.secret || '';
+  const ghToken = req.query.token || '';
+  const adminSecret = process.env.BOT_EMAIL_SECRET || '';
+
+  if (!adminSecret) return res.status(500).json({ error: 'BOT_EMAIL_SECRET not set' });
+  if (secret !== adminSecret) return res.status(403).json({ error: 'Wrong secret' });
+  if (!ghToken) return res.status(400).json({ error: 'GitHub token required (?token=ghp_...)' });
+
+  const OWNER = 'alexgabriel225sefu-dotcom';
+  const REPO  = 'apex-trade-bot';
+  const botDir = path.join(__dirname, 'apex-trade-bot');
+
+  const filesToPush = [
+    'src/ai.js', 'src/backtest.js', 'src/binance.js', 'src/bybit.js',
+    'src/config.js', 'src/index.js', 'src/indicators.js', 'src/logger.js',
+    'src/state.js', 'src/strategies.js', 'src/telegram.js',
+    'package.json', 'railway.json', '.env.example',
+  ];
+
+  const readmeContent = `# Apex Trade Bot 🤖
+
+AI-powered crypto trading bot. Deploy with one click on Railway.
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/${OWNER}/${REPO})
+
+## Setup
+After deploying, add these variables in Railway → Variables:
+
+| Variable | Value |
+|----------|-------|
+| \`LICENSE_KEY\` | Your key from purchase email |
+| \`EXCHANGE\` | \`binance\` |
+| \`BINANCE_API_KEY\` | Your Binance API key |
+| \`BINANCE_API_SECRET\` | Your Binance API secret |
+| \`GROQ_API_KEY\` | Free key from console.groq.com |
+| \`PAPER_TRADING\` | \`true\` (start safe) |
+| \`PAPER_BALANCE\` | \`100\` |
+
+## License
+Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsystem.space).
+`;
+
+  const results = [];
+  let errors = 0;
+
+  // Helper: get current SHA of a file (needed for updates)
+  async function getFileSha(filePath) {
+    try {
+      const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${filePath}`, {
+        headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+      });
+      if (r.ok) { const d = await r.json(); return d.sha || null; }
+    } catch(_) {}
+    return null;
+  }
+
+  // Helper: push one file
+  async function pushFile(filePath, content) {
+    const sha = await getFileSha(filePath);
+    const body = {
+      message: sha ? `Update ${filePath}` : `Add ${filePath}`,
+      content: Buffer.from(content).toString('base64'),
+      ...(sha ? { sha } : {}),
+    };
+    const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${filePath}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' },
+      body: JSON.stringify(body),
+    });
+    return r.ok;
+  }
+
+  // Push README.md
+  try {
+    const ok = await pushFile('README.md', readmeContent);
+    results.push({ file: 'README.md', ok });
+    if (!ok) errors++;
+  } catch(e) { results.push({ file: 'README.md', ok: false, err: e.message }); errors++; }
+
+  // Push all bot files
+  for (const rel of filesToPush) {
+    try {
+      const content = require('fs').readFileSync(path.join(botDir, rel), 'utf8');
+      const ok = await pushFile(rel, content);
+      results.push({ file: rel, ok });
+      if (!ok) errors++;
+    } catch(e) {
+      results.push({ file: rel, ok: false, err: e.message });
+      errors++;
+    }
+  }
+
+  const allOk = errors === 0;
+  res.json({
+    success: allOk,
+    pushed: results.filter(r => r.ok).length,
+    failed: errors,
+    results,
+    repoUrl: `https://github.com/${OWNER}/${REPO}`,
+    railwayButton: `https://railway.app/new/template?template=https://github.com/${OWNER}/${REPO}`,
+  });
+});
+
+// ════════════════════════════════════════
 // CATCH-ALL 404
 // ════════════════════════════════════════
 app.use((req, res) => {
