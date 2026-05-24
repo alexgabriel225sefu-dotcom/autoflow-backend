@@ -6,21 +6,43 @@ const BASE = cfg.BYBIT_TESTNET
   ? 'https://api-testnet.bybit.com'
   : 'https://api.bybit.com';
 
-function sign(params) {
+const RECV_WINDOW = '5000';
+
+// ─── Bybit v5 sign: GET uses queryString, POST uses raw JSON body ──────────
+function signGet(params) {
   const ts = Date.now().toString();
   const query = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join('&');
-  const payload = ts + cfg.BYBIT_API_KEY + '5000' + query;
+  const payload = ts + cfg.BYBIT_API_KEY + RECV_WINDOW + query;
   const sig = crypto.createHmac('sha256', cfg.BYBIT_API_SECRET).update(payload).digest('hex');
   return { sig, ts };
 }
 
-function authHeaders(params) {
-  const { sig, ts } = sign(params);
+function signPost(body) {
+  const ts = Date.now().toString();
+  // POST: sign the raw JSON string, NOT a query string
+  const payload = ts + cfg.BYBIT_API_KEY + RECV_WINDOW + JSON.stringify(body);
+  const sig = crypto.createHmac('sha256', cfg.BYBIT_API_SECRET).update(payload).digest('hex');
+  return { sig, ts };
+}
+
+function authHeadersGet(params) {
+  const { sig, ts } = signGet(params);
   return {
-    'X-BAPI-API-KEY': cfg.BYBIT_API_KEY,
-    'X-BAPI-TIMESTAMP': ts,
-    'X-BAPI-SIGN': sig,
-    'X-BAPI-RECV-WINDOW': '5000',
+    'X-BAPI-API-KEY':     cfg.BYBIT_API_KEY,
+    'X-BAPI-TIMESTAMP':   ts,
+    'X-BAPI-SIGN':        sig,
+    'X-BAPI-RECV-WINDOW': RECV_WINDOW,
+  };
+}
+
+function authHeadersPost(body) {
+  const { sig, ts } = signPost(body);
+  return {
+    'X-BAPI-API-KEY':     cfg.BYBIT_API_KEY,
+    'X-BAPI-TIMESTAMP':   ts,
+    'X-BAPI-SIGN':        sig,
+    'X-BAPI-RECV-WINDOW': RECV_WINDOW,
+    'Content-Type':       'application/json',
   };
 }
 
@@ -57,11 +79,9 @@ async function candlesBinance(symbol, interval, limit) {
 
 // Sursa 3: OKX public candles (fallback final)
 async function candlesOKX(symbol, interval, limit) {
-  // OKX format: DOGE-USDT, interval: 15m
   const okxSym = symbol.replace('USDT', '-USDT');
-  const okxBar = interval; // 1m, 5m, 15m, 1H, 4H, 1D
   const { data } = await axios.get('https://www.okx.com/api/v5/market/candles', {
-    params: { instId: okxSym, bar: okxBar, limit },
+    params: { instId: okxSym, bar: interval, limit },
     headers: { 'User-Agent': 'ApexTradeBot/2.0' },
     timeout: 8000,
   });
@@ -74,7 +94,6 @@ async function candlesOKX(symbol, interval, limit) {
 
 // Preț curent — încearcă Bybit → Binance → OKX
 async function getPrice(symbol = cfg.SYMBOL) {
-  // Bybit
   try {
     const { data } = await axios.get(`${BASE}/v5/market/tickers`, {
       params: { category: 'spot', symbol },
@@ -85,7 +104,6 @@ async function getPrice(symbol = cfg.SYMBOL) {
     if (price) return parseFloat(price);
   } catch {}
 
-  // Binance fallback
   try {
     const { data } = await axios.get('https://api.binance.com/api/v3/ticker/price', {
       params: { symbol },
@@ -95,7 +113,6 @@ async function getPrice(symbol = cfg.SYMBOL) {
     return parseFloat(data.price);
   } catch {}
 
-  // OKX fallback
   const okxSym = symbol.replace('USDT', '-USDT');
   const { data } = await axios.get('https://www.okx.com/api/v5/market/ticker', {
     params: { instId: okxSym },
@@ -116,31 +133,44 @@ async function getCandles(symbol = cfg.SYMBOL, interval = cfg.TIMEFRAME, limit =
   return await candlesOKX(symbol, interval, limit);
 }
 
-// ─── Balanță (privat Bybit) ───────────────────────────────
+// ─── Balanță (privat Bybit) — GET ────────────────────────
 async function getBalance(coin = 'USDT') {
   if (cfg.PAPER_TRADING) return cfg.PAPER_BALANCE;
   const params = { accountType: 'UNIFIED', coin };
   const { data } = await axios.get(`${BASE}/v5/account/wallet-balance`, {
-    params, headers: authHeaders(params),
+    params, headers: authHeadersGet(params),
+    timeout: 8000,
   });
+  if (data.retCode !== 0) throw new Error('Bybit balance: ' + data.retMsg);
   const bal = data.result.list[0]?.coin?.find(c => c.coin === coin);
   return bal ? parseFloat(bal.availableToWithdraw) : 0;
 }
 
-// ─── Plasare ordin MARKET (privat Bybit) ─────────────────
+// ─── Plasare ordin MARKET (privat Bybit) — POST ──────────
 async function placeOrder(side, quantity, symbol = cfg.SYMBOL) {
   if (cfg.PAPER_TRADING) {
     console.log(`[PAPER] ${side} ${quantity} ${symbol}`);
     return { orderId: 'PAPER_' + Date.now(), orderStatus: 'Filled' };
   }
-  const params = {
-    category: 'spot', symbol,
-    side: side === 'BUY' ? 'Buy' : 'Sell',
-    orderType: 'Market', qty: String(quantity),
+
+  const body = {
+    category:  'spot',
+    symbol,
+    side:      side === 'BUY' ? 'Buy' : 'Sell',
+    orderType: 'Market',
+    qty:       String(quantity),
   };
-  const { data } = await axios.post(`${BASE}/v5/order/create`, params, {
-    headers: { ...authHeaders(params), 'Content-Type': 'application/json' },
-  });
+
+  const { data } = await axios.post(
+    `${BASE}/v5/order/create`,
+    body,
+    { headers: authHeadersPost(body), timeout: 10000 }
+  );
+
+  if (data.retCode !== 0) {
+    throw new Error(`Bybit order failed (${data.retCode}): ${data.retMsg}`);
+  }
+  console.log(`[LIVE] Order placed: ${side} ${quantity} ${symbol} → orderId: ${data.result?.orderId}`);
   return data.result;
 }
 
