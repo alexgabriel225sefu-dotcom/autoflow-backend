@@ -6,6 +6,7 @@ const logger     = require('./logger');
 const strategies = require('./strategies');
 const tg         = require('./telegram');
 const state      = require('./state');
+const http       = require('http');
 
 // ─── Exchange ─────────────────────────────────────────────
 const exchange = cfg.EXCHANGE === 'binance'
@@ -18,6 +19,19 @@ let paperBalance      = cfg.PAPER_BALANCE;
 let tickCount         = 0;
 let startBalance      = 0; // set in main(), used by strategies
 let stopAlertedAt     = 0; // previne spam Strategy Stop pe Telegram
+
+// ─── Dashboard Data ───────────────────────────────────────
+const dash = {
+  balance:       0,
+  startBalance:  0,
+  currentSymbol: cfg.SYMBOL,
+  currentPrice:  0,
+  openPosition:  null,
+  trades:        [], // max 50 trades history
+  lastTick:      null,
+  mode:          cfg.PAPER_TRADING ? 'PAPER' : cfg.BYBIT_TESTNET || cfg.BINANCE_TESTNET ? 'TESTNET' : 'LIVE',
+  exchange:      cfg.EXCHANGE.toUpperCase(),
+};
 
 // ─── Validare startup ─────────────────────────────────────
 function validate() {
@@ -136,6 +150,7 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL
     trailHigh: side === 'BUY' ? price : null,
     trailLow:  side === 'SELL' ? price : null,
   };
+  dash.openPosition = openPosition;
 
   logger.printTrade(side, symbol, price, quantity);
   logger.info(`SL: $${stopLoss.toFixed(5)} | TP: $${takeProfit.toFixed(5)} | R:R = 1:${rrRatio.toFixed(2)}`);
@@ -166,7 +181,26 @@ async function closeTrade(price, reason) {
   logger.printTrade(closeSide, symbol, price, quantity, pnl);
   logger.info(`Motivul: ${reason} | PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}`);
   strategies.recordTrade(pnl > 0, pnl, startBalance || cfg.PAPER_BALANCE);
-  tg.alertClose(reason, symbol, side, entryPrice, price, pnl, await getBalance());
+  const bal = await getBalance();
+  tg.alertClose(reason, symbol, side, entryPrice, price, pnl, bal);
+
+  // ─── Dashboard: înregistrează trade încheiat ──────────────
+  dash.trades.unshift({
+    time:       new Date().toLocaleString('ro-RO'),
+    symbol,
+    side,
+    entry:      entryPrice,
+    exit:       price,
+    qty:        quantity,
+    pnl:        parseFloat(pnl.toFixed(4)),
+    pnlPct:     parseFloat(((pnl / (entryPrice * quantity)) * 100).toFixed(2)),
+    reason,
+    win:        pnl > 0,
+  });
+  if (dash.trades.length > 50) dash.trades.pop();
+  dash.openPosition = null;
+  dash.balance      = bal;
+
   openPosition = null;
   state.save(paperBalance, null);
 }
@@ -220,6 +254,18 @@ async function tick() {
     ]);
     const balance = await getBalance();
     logger.updateBalance(balance);
+
+    // ─── Actualizează dashboard ───────────────────────────────
+    dash.balance       = balance;
+    dash.currentSymbol = symbol;
+    dash.currentPrice  = price;
+    dash.lastTick      = new Date().toLocaleString('ro-RO');
+    if (openPosition) {
+      const posPnl = openPosition.side === 'BUY'
+        ? (price - openPosition.entryPrice) * openPosition.quantity
+        : (openPosition.entryPrice - price) * openPosition.quantity;
+      dash.openPosition = { ...openPosition, currentPnl: parseFloat(posPnl.toFixed(4)) };
+    }
 
     // Verifică SL/TP/Trailing
     const trigger = checkPosition(price);
@@ -348,12 +394,110 @@ async function main() {
   }
 
   const balance = await getBalance();
-  startBalance  = balance; // pentru shouldStop + recordTrade
+  startBalance       = balance;
+  dash.balance       = balance;
+  dash.startBalance  = balance;
   logger.setStartBalance(balance);
   logger.printBanner(balance);
 
   const mode = cfg.PAPER_TRADING ? '📝 PAPER TRADING' : cfg.TESTNET ? '🧪 TESTNET' : '🔴 LIVE';
+  dash.mode = mode.replace(/[📝🧪🔴]/g, '').trim();
   tg.alertStart(cfg.SYMBOL, cfg.TIMEFRAME, balance, mode);
+
+  // ─── Dashboard HTTP server ────────────────────────────────
+  const PORT = parseInt(process.env.PORT || process.env.DASHBOARD_PORT || '3000');
+  http.createServer((req, res) => {
+    if (req.url === '/api/status') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify(dash));
+      return;
+    }
+    // Dashboard HTML
+    const sym = (dash.currentSymbol || cfg.SYMBOL).replace('USDT', '_USDT');
+    const tvSym = `${dash.exchange === 'BINANCE' ? 'BINANCE' : 'BYBIT'}:${sym}`;
+    const pnlTotal  = dash.startBalance > 0 ? ((dash.balance - dash.startBalance) / dash.startBalance * 100).toFixed(2) : '0.00';
+    const pnlColor  = parseFloat(pnlTotal) >= 0 ? '#00ff88' : '#ff4466';
+    const wins      = dash.trades.filter(t => t.win).length;
+    const losses    = dash.trades.filter(t => !t.win).length;
+    const winRate   = dash.trades.length > 0 ? ((wins / dash.trades.length) * 100).toFixed(0) : '—';
+    const posHtml   = dash.openPosition
+      ? `<div class="pos-box ${dash.openPosition.side === 'BUY' ? 'long' : 'short'}">
+           <span class="pos-label">${dash.openPosition.side === 'BUY' ? '🟢 LONG' : '🔴 SHORT'} ${dash.openPosition.symbol}</span>
+           <span>Entry: <b>$${dash.openPosition.entryPrice?.toFixed(5)}</b></span>
+           <span>Qty: <b>${dash.openPosition.quantity}</b></span>
+           <span>SL: <b>$${dash.openPosition.stopLoss?.toFixed(5)}</b></span>
+           <span>TP: <b>$${dash.openPosition.takeProfit?.toFixed(5)}</b></span>
+           <span class="${(dash.openPosition.currentPnl ?? 0) >= 0 ? 'green' : 'red'}">PnL: <b>${(dash.openPosition.currentPnl ?? 0) >= 0 ? '+' : ''}$${(dash.openPosition.currentPnl ?? 0).toFixed(4)}</b></span>
+         </div>`
+      : `<div class="pos-box neutral">⏳ Fără poziție deschisă — așteptăm semnal...</div>`;
+    const tradesHtml = dash.trades.length === 0
+      ? '<tr><td colspan="7" style="text-align:center;color:#666">Niciun trade încă</td></tr>'
+      : dash.trades.map(t => `<tr class="${t.win ? 'win' : 'loss'}">
+           <td>${t.time}</td><td>${t.symbol}</td>
+           <td>${t.side === 'BUY' ? '🟢 LONG' : '🔴 SHORT'}</td>
+           <td>$${t.entry?.toFixed(5)}</td><td>$${t.exit?.toFixed(5)}</td>
+           <td>${t.win ? '+' : ''}$${t.pnl} (${t.pnlPct}%)</td>
+           <td>${t.reason}</td>
+         </tr>`).join('');
+    const html = `<!DOCTYPE html><html lang="ro"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apex Trade Bot Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0f;color:#e0e0e0;font-family:'Segoe UI',sans-serif;min-height:100vh}
+header{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #222}
+header h1{font-size:1.2rem;background:linear-gradient(90deg,#00ff88,#00cfff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.badge{font-size:.75rem;padding:3px 10px;border-radius:20px;background:#00ff8820;color:#00ff88;border:1px solid #00ff8840}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;padding:16px}
+.card{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:14px;text-align:center}
+.card .val{font-size:1.4rem;font-weight:700;margin:4px 0}
+.card .lbl{font-size:.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}
+.green{color:#00ff88}.red{color:#ff4466}.blue{color:#60a5fa}.yellow{color:#fbbf24}
+.chart-wrap{margin:0 16px;border-radius:12px;overflow:hidden;border:1px solid #1f2937}
+.section{padding:16px}
+.section h2{font-size:.9rem;color:#6b7280;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+.pos-box{padding:14px;border-radius:10px;display:flex;flex-wrap:wrap;gap:10px;font-size:.88rem;margin-bottom:4px}
+.pos-box.long{background:#00ff8812;border:1px solid #00ff8840}
+.pos-box.short{background:#ff446612;border:1px solid #ff446640}
+.pos-box.neutral{background:#1f293780;border:1px solid #374151;color:#6b7280}
+.pos-label{font-weight:700;font-size:1rem;width:100%}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+th{color:#6b7280;font-weight:600;padding:8px 6px;border-bottom:1px solid #1f2937;text-align:left;text-transform:uppercase;letter-spacing:.05em}
+td{padding:7px 6px;border-bottom:1px solid #111827}
+tr.win td{color:#d1fae5}tr.loss td{color:#fee2e2}
+.refresh{font-size:.7rem;color:#374151;padding:8px 16px}
+@media(max-width:600px){.grid{grid-template-columns:repeat(2,1fr)}.chart-wrap{margin:0 8px}.section{padding:10px}}
+</style>
+<script>setTimeout(()=>location.reload(),30000)</script>
+</head><body>
+<header>
+  <h1>⚡ Apex Trade Bot</h1>
+  <span class="badge">${dash.mode} · ${dash.exchange}</span>
+</header>
+<div class="grid">
+  <div class="card"><div class="lbl">Balanță</div><div class="val green">$${dash.balance.toFixed(2)}</div></div>
+  <div class="card"><div class="lbl">PnL Total</div><div class="val" style="color:${pnlColor}">${parseFloat(pnlTotal) >= 0 ? '+' : ''}${pnlTotal}%</div></div>
+  <div class="card"><div class="lbl">Trades</div><div class="val blue">${dash.trades.length}</div></div>
+  <div class="card"><div class="lbl">Win Rate</div><div class="val yellow">${winRate}${winRate !== '—' ? '%' : ''}</div></div>
+  <div class="card"><div class="lbl">Tick #</div><div class="val">${tickCount}</div></div>
+  <div class="card"><div class="lbl">Preț Curent</div><div class="val">$${dash.currentPrice?.toFixed(4) || '—'}</div></div>
+</div>
+<div class="chart-wrap">
+  <iframe src="https://www.tradingview.com/widgetembed/?frameElementId=tv&symbol=${tvSym}&interval=5&hidesidetoolbar=1&hidetoptoolbar=0&theme=dark&style=1&timezone=Europe%2FBucharest&withdateranges=1&hide_side_toolbar=0&allow_symbol_change=0&save_image=0&studies=RSI%401%2CMASimple%401&calendar=0&support_host=https%3A%2F%2Fwww.tradingview.com" width="100%" height="400" frameborder="0" allowtransparency="true" scrolling="no"></iframe>
+</div>
+<div class="section"><h2>📊 Poziție Activă</h2>${posHtml}</div>
+<div class="section"><h2>📋 Istoric Tranzacții</h2>
+  <div style="overflow-x:auto"><table>
+    <thead><tr><th>Timp</th><th>Simbol</th><th>Tip</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Motiv</th></tr></thead>
+    <tbody>${tradesHtml}</tbody>
+  </table></div>
+</div>
+<div class="refresh">Actualizare automată la 30s · Ultimul tick: ${dash.lastTick || '—'}</div>
+</body></html>`;
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(html);
+  }).listen(PORT, () => logger.info(`📊 Dashboard: http://localhost:${PORT}`));
+
   logger.info('🚀 Prima analiză...');
   await tick();
   setInterval(tick, cfg.LOOP_INTERVAL_MS);
