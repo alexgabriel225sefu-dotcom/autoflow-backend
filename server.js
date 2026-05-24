@@ -1709,6 +1709,30 @@ app.get('/api/email-status', (req, res) => {
   res.json({ resend: !!RESEND_API_KEY, brevo: !!BREVO_API_KEY, smtp: !!transporter, sender: SENDER_EMAIL || 'not set' });
 });
 
+// ── RESEND DNS RECORDS — afișează valorile complete pentru Namecheap
+app.get('/api/resend-dns', async (req, res) => {
+  if (!RESEND_API_KEY) return res.json({ error: 'RESEND_API_KEY not set' });
+  try {
+    const r = await fetch('https://api.resend.com/domains', {
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}` },
+    });
+    const data = await r.json();
+    const domain = (data.data || []).find(d => d.name === 'aicashsystem.space');
+    if (!domain) return res.json({ error: 'Domain not found in Resend', domains: (data.data||[]).map(d=>d.name) });
+    // Get full domain details
+    const r2 = await fetch(`https://api.resend.com/domains/${domain.id}`, {
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}` },
+    });
+    const details = await r2.json();
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(`=== DNS Records pentru Namecheap ===\n\n` +
+      (details.records || []).map(rec =>
+        `Type: ${rec.type}\nHost: ${rec.name}\nValue: ${rec.value}\nPriority: ${rec.priority || 'N/A'}\n`
+      ).join('\n---\n\n')
+    );
+  } catch(e) { res.json({ error: e.message }); }
+});
+
 // ── DEBUG: test Resend directly
 app.get('/api/test-resend', async (req, res) => {
   if (!RESEND_API_KEY) return res.json({ error: 'RESEND_API_KEY not set' });
