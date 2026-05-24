@@ -30,7 +30,7 @@ app.use((req, res, next) => {
 
 // Health check — first route, no deps, always responds
 app.get('/health', (req, res) => res.json({ ok: true, node: process.version, time: new Date().toISOString() }));
-app.get('/ping', (req, res) => res.json({ ok: true, version: 'v5-stable', time: new Date().toISOString() }));
+app.get('/ping', (req, res) => res.json({ ok: true, version: 'v6-email-fix', time: new Date().toISOString() }));
 app.get('/api/stripe-config', auth, async (req, res) => {
   const key = process.env.STRIPE_SECRET_KEY || '';
   const isLive = key.startsWith('sk_live_');
