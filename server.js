@@ -1474,34 +1474,34 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
 <!-- ══════ BODY ══════ -->
 <div class="body">
 
-<!-- ─ BYBIT API ─ -->
+<!-- ─ BINANCE API ─ -->
 <div class="card card-green">
   <div class="card-corner card-corner-green"></div>
-  <div class="card-tag card-tag-green">🔑 Step 2 — Bybit API Key <span class="card-tag-line"></span></div>
+  <div class="card-tag card-tag-green">🔑 Step 2 — Binance API Key <span class="card-tag-line"></span></div>
   <div class="step">
     <div class="step-n step-n-g">1</div>
-    <div><div class="step-title">Create a Bybit account</div>
-    <div class="step-body">Go to <a href="https://bybit.com">bybit.com</a> → Sign up. Complete identity verification to unlock spot trading.</div></div>
+    <div><div class="step-title">Create a Binance account</div>
+    <div class="step-body">Go to <a href="https://binance.com">binance.com</a> → Sign up. Complete identity verification (ID required) to unlock spot trading. Binance works globally including EU.</div></div>
   </div>
   <div class="step">
     <div class="step-n step-n-g">2</div>
     <div><div class="step-title">Open API Management</div>
-    <div class="step-body">Click your profile icon (top right) → <b>API Management</b> → <b>Create New Key</b> → choose <b>System-generated API Keys</b></div></div>
+    <div class="step-body">Click your profile icon (top right) → <b>API Management</b> → <b>Create API</b> → choose <b>System-generated</b></div></div>
   </div>
   <div class="step">
     <div class="step-n step-n-g">3</div>
     <div><div class="step-title">Set the correct permissions</div>
     <div class="step-body">
-      ✅ <b>Read-Write</b><br>
-      ✅ <b>Spot Trading</b><br>
-      ❌ Leave everything else <b>unchecked</b><br>
-      IP restriction: leave <b>blank</b> (Railway uses dynamic IPs)
+      ✅ <b>Enable Reading</b><br>
+      ✅ <b>Enable Spot &amp; Margin Trading</b><br>
+      ❌ Leave <b>Withdrawals</b> unchecked — never needed<br>
+      IP restriction: leave <b>unrestricted</b> (Railway uses dynamic IPs)
     </div></div>
   </div>
   <div class="step">
     <div class="step-n step-n-g">4</div>
     <div><div class="step-title">Save your keys — Secret shown only once!</div>
-    <div class="step-body">Complete 2FA. Copy both your <b>API Key</b> and <b>API Secret</b> immediately and store them somewhere safe. <span style="color:#f87171;font-weight:600">The Secret disappears after you close the page.</span></div></div>
+    <div class="step-body">Complete 2FA. Copy both your <b>API Key</b> and <b>Secret Key</b> immediately and store them safely. <span style="color:#f87171;font-weight:600">The Secret disappears after you close the page.</span></div></div>
   </div>
 </div>
 
@@ -1534,9 +1534,10 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
 <div class="card card-dark">
   <div class="card-tag card-tag-dim">📋 Railway Variables — Add These <span class="card-tag-line"></span></div>
   <table class="vt">
+    <tr><td class="vt-k">EXCHANGE</td><td class="vt-v">Set to ${chip('binance')} — works globally including EU</td></tr>
+    <tr><td class="vt-k">BINANCE_API_KEY</td><td class="vt-v">The API Key from Step 2 above</td></tr>
+    <tr><td class="vt-k">BINANCE_API_SECRET</td><td class="vt-v">The Secret Key from Step 2 — <b>only shown once at creation</b></td></tr>
     <tr><td class="vt-k">GROQ_API_KEY</td><td class="vt-v">Free AI key — go to <a href="https://console.groq.com">console.groq.com</a> → API Keys → <b>Create API Key</b> (no card needed)</td></tr>
-    <tr><td class="vt-k">BYBIT_API_KEY</td><td class="vt-v">The API Key from Step 2 above</td></tr>
-    <tr><td class="vt-k">BYBIT_API_SECRET</td><td class="vt-v">The API Secret from Step 2 — <b>only shown once at creation</b></td></tr>
     <tr><td class="vt-k">PAPER_TRADING</td><td class="vt-v">Set to ${chip('true')} to start safely with simulated money. Change to ${chip('false','#f59e0b')} when ready to go live.</td></tr>
     <tr><td class="vt-k">PAPER_BALANCE</td><td class="vt-v">Simulated balance. Default: ${chip('10')} (= $10 USDT)</td></tr>
     <tr><td class="vt-k">TRADE_SYMBOL</td><td class="vt-v">Optional. Override with ${chip('DOGEUSDT')} or ${chip('SOLUSDT')}. Default: auto-scanner picks best coin.</td></tr>
@@ -1579,8 +1580,8 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
   </div>
   <div class="step">
     <div class="step-n step-n-y">2</div>
-    <div><div class="step-title">Deposit USDT on Bybit Spot</div>
-    <div class="step-body">Fund your <b>Bybit Spot</b> wallet with at least $10 USDT (recommended: $20–50 to start). <span style="color:#fbbf24;font-weight:600">Never risk more than you can afford to lose entirely.</span></div></div>
+    <div><div class="step-title">Deposit USDT on Binance Spot</div>
+    <div class="step-body">Fund your <b>Binance Spot</b> wallet with at least $20 USDT (recommended: $20–50 to start). <span style="color:#fbbf24;font-weight:600">Never risk more than you can afford to lose entirely.</span></div></div>
   </div>
   <div class="step">
     <div class="step-n step-n-y">3</div>

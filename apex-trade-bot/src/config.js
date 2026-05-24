@@ -7,7 +7,7 @@ const PAPER = isTruthy(process.env.PAPER_TRADING);
 
 module.exports = {
   // ─── Exchange ────────────────────────────────────────────
-  EXCHANGE: process.env.EXCHANGE || 'bybit', // 'bybit' sau 'binance'
+  EXCHANGE: process.env.EXCHANGE || 'binance', // 'binance' (global) or 'bybit' (non-EU only)
 
   // ─── Bybit ──────────────────────────────────────────────
   BYBIT_API_KEY:    process.env.BYBIT_API_KEY    || '',
