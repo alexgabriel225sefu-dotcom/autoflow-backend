@@ -1,68 +1,153 @@
 const Anthropic = require('@anthropic-ai/sdk');
-const cfg = require('./config');
+const axios     = require('axios');
+const cfg       = require('./config');
 
-let client = null;
-function getClient() {
-  if (!client) client = new Anthropic({ apiKey: cfg.ANTHROPIC_API_KEY });
-  return client;
+// ─── Anthropic client (lazy) ──────────────────────────────
+let anthropicClient = null;
+function getAnthropic() {
+  if (!anthropicClient) anthropicClient = new Anthropic({ apiKey: cfg.ANTHROPIC_API_KEY });
+  return anthropicClient;
 }
 
-async function getSignal(indicators, balance, openPosition) {
-  const prompt = `Ești un trader quant expert cu 20 ani experiență. Analizează datele și decide dacă să tranzacționezi.
+// ─── Groq (gratuit — fallback) ────────────────────────────
+async function callGroq(prompt) {
+  const key = process.env.GROQ_API_KEY || '';
+  if (!key) throw new Error('GROQ_API_KEY lipsă');
 
-## Date piață — ${cfg.SYMBOL} (${cfg.TIMEFRAME})
+  const { data } = await axios.post(
+    'https://api.groq.com/openai/v1/chat/completions',
+    {
+      model: 'llama-3.3-70b-versatile',  // model gratuit puternic
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 400,
+      temperature: 0,
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    }
+  );
+  const text  = data.choices[0].message.content.trim();
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('No JSON in Groq response');
+  console.log('[AI] ✅ Groq (gratuit) — semnal generat');
+  return JSON.parse(match[0]);
+}
+
+// ─── Anthropic (plătit) ───────────────────────────────────
+async function callAnthropic(prompt) {
+  const MODELS = [
+    'claude-haiku-4-5-20251001',
+    'claude-3-5-haiku-20241022',
+    'claude-3-haiku-20240307',
+  ];
+  for (const model of MODELS) {
+    try {
+      const msg = await getAnthropic().messages.create({
+        model, max_tokens: 400, temperature: 0,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      const text  = msg.content[0].text.trim();
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('No JSON in response');
+      console.log(`[AI] ✅ Anthropic ${model}`);
+      return JSON.parse(match[0]);
+    } catch (err) {
+      const status = err.status || err.response?.status || 'N/A';
+      console.error(`[AI ❌] Anthropic ${model} | Status: ${status} | ${err.message}`);
+      // Credit insuficient sau key invalid — nu mai încearca alte modele
+      if (status === 400 || status === 401) break;
+    }
+  }
+  throw new Error('Anthropic unavailable');
+}
+
+async function getSignal(indicators, balance, openPosition, strategyData = null) {
+  const rsi   = parseFloat(indicators.rsi);
+  const srsiK = parseFloat(indicators.stochRsiK);
+  const macdH = parseFloat(indicators.macdHist);
+  const volR  = parseFloat(indicators.volumeRatio);
+  const bbPos = parseFloat(indicators.bb_position);
+
+  // ─── Legendary Traders section (only if data provided) ───
+  let legendarySection = '';
+  if (strategyData) {
+    const { turtle, livermore, soros, session } = strategyData;
+    legendarySection = `
+## LEGENDARY TRADERS ANALYSIS
+### 🐢 Turtle Trading (Richard Dennis / Eckhardt)
+- Breakout signal: ${turtle.signal ?? 'NONE'} | Putere: ${turtle.breakoutStr}
+- High 20 perioade: ${turtle.high20} | Low 20 perioade: ${turtle.low20}
+- Near breakout: ${turtle.nearSignal ?? 'NO'}
+
+### 📐 Jesse Livermore (Pivot Structure)
+- Trend structură: ${livermore.trend} (${livermore.reason ?? 'N/A'})
+- Putere semnal: ${livermore.strength !== undefined ? (livermore.strength * 100).toFixed(0) + '%' : 'N/A'}
+- Regula: dacă trend=BULLISH → confirmă BUY; dacă BEARISH → confirmă SELL; NEUTRAL → prudent
+
+### 💡 George Soros (Reflexivity / Momentum)
+- Direcție momentum: ${soros.direction}
+- Bullish candles: ${soros.momentum !== undefined ? (soros.momentum * 100).toFixed(0) + '%' : 'N/A'} din ultimele 8
+- Velocity preț: ${soros.velocity !== undefined ? soros.velocity.toFixed(3) + '%' : 'N/A'}
+
+### 📊 Sesiune curentă (Ed Seykota rules)
+- Pierderi consecutive: ${session.consecutiveLosses} (stop la 3)
+- Câștiguri consecutive: ${session.consecutiveWins}
+- Tranzacții azi: ${session.dailyTrades}/10
+- PnL zilnic: ${session.dailyPnL >= 0 ? '+' : ''}$${session.dailyPnL.toFixed(4)}`;
+  }
+
+  const prompt = `Ești un trader profesionist cu 20 ani experiență. Aplici regulile marilor traideri: Turtle breakout, Livermore structure, Soros momentum, PTJ defense. Analizează TOATE datele și dă un semnal precis.
+
+## MARKET DATA — ${cfg.SYMBOL} (${cfg.TIMEFRAME})
+### Preț & Trend
 - Preț curent: $${indicators.price}
-- RSI (14): ${indicators.rsi} ${parseFloat(indicators.rsi) < 30 ? '← OVERSOLD' : parseFloat(indicators.rsi) > 70 ? '← OVERBOUGHT' : ''}
-- MACD: ${indicators.macd} | Signal: ${indicators.macdSignal} | Histogram: ${indicators.macdHist}
-- EMA 20: ${indicators.ema20} | EMA 50: ${indicators.ema50} | Trend: ${indicators.emaTrend}
+- EMA 20: ${indicators.ema20} | EMA 50: ${indicators.ema50} | EMA 200: ${indicators.ema200}
+- Trend EMA20/50: ${indicators.emaTrend} | Trend EMA50/200: ${indicators.ema200Trend}
 - Preț vs EMA20: ${indicators.priceVsEma20}
-- Bollinger Bands: Upper=${indicators.bb_upper} | Mid=${indicators.bb_mid} | Lower=${indicators.bb_lower}
-- Volum curent: ${indicators.volume} | Medie 20: ${indicators.volumeAvg}
+- Structura pieței: ${indicators.marketStructure}
+
+### Momentum
+- RSI (14): ${indicators.rsi} ${rsi < 30 ? '⚡ OVERSOLD EXTREM' : rsi < 40 ? '📉 Oversold' : rsi > 70 ? '🔥 OVERBOUGHT EXTREM' : rsi > 60 ? '📈 Overbought' : '⚖️ Neutru'}
+- Stoch RSI K: ${indicators.stochRsiK} | D: ${indicators.stochRsiD} ${srsiK < 20 ? '⚡ Oversold' : srsiK > 80 ? '🔥 Overbought' : ''}
+- MACD Histogram: ${indicators.macdHist} ${macdH > 0 ? '▲ Bullish' : '▼ Bearish'}
+- Divergență RSI: ${indicators.divergence} ${indicators.divergence !== 'NONE' ? '⚡ SEMNAL PUTERNIC!' : ''}
+
+### Volatilitate & Volum
+- ATR: ${indicators.atrPct}% din preț
+- BB Bandwidth: ${indicators.bb_bandwidth}% | Poziție în BB: ${indicators.bb_position}% ${bbPos < 15 ? '📉 La lower band' : bbPos > 85 ? '📈 La upper band' : ''}
+- Volum ratio: ${indicators.volumeRatio}× ${volR > 1.5 ? '⚡ VOLUM MARE' : volR < 0.7 ? '⚠️ Volum mic' : ''}
 - High 24h: ${indicators.high24h} | Low 24h: ${indicators.low24h}
 
-## Ultimele 5 lumânări
-${indicators.recentCandles.map((c, i) => `${i+1}. ${c.direction} O:${c.open} H:${c.high} L:${c.low} C:${c.close}`).join('\n')}
+### Ultimele 5 lumânări
+${indicators.recentCandles.map((c, i) => `${i+1}. ${c.direction} O:${c.open} H:${c.high} L:${c.low} C:${c.close} (body: ${c.bodyPct}%)`).join('\n')}
+${legendarySection}
+## CONT
+- Balanță: $${balance.toFixed(2)} USDT
+- Poziție deschisă: ${openPosition ? `${openPosition.side} @ $${openPosition.entryPrice} | PnL: ${openPosition.pnlPct?.toFixed(2)}%` : 'NICIUNA'}
 
-## Context cont
-- Balanță disponibilă: $${balance.toFixed(2)} USDT
-- Poziție deschisă: ${openPosition ? `${openPosition.side} @ $${openPosition.entryPrice} (PnL: ${openPosition.pnlPct?.toFixed(2)}%)` : 'NICIUNA'}
+## REGULI DE INTRARE
+- SL: ${cfg.STOP_LOSS_PCT * 100}% | TP: ${cfg.TAKE_PROFIT_PCT * 100}% | Risc: ${cfg.RISK_PER_TRADE * 100}%
+- Minimum confidence: ${cfg.MIN_CONFIDENCE}%
+- CRITERII BUY (min 3/5): trend bullish, RSI<50 sau div.bullish, MACD▲, volum>1.2×, preț sub EMA20
+- CRITERII SELL (min 3/5): trend bearish, RSI>50 sau div.bearish, MACD▼, volum>1.2×, preț peste EMA20
+- BONUS +1 criteriu dacă Turtle=STRONG BUY/SELL SAU Livermore confirmă direcția SAU Soros momentum alininat
+- Nu tranzacționa contra trendului Livermore cu putere >0.8
 
-## Reguli obligatorii
-- Stop Loss: -${cfg.STOP_LOSS_PCT * 100}% | Take Profit: +${cfg.TAKE_PROFIT_PCT * 100}%
-- Risc per tranzacție: max ${cfg.RISK_PER_TRADE * 100}% din balanță
-- NU deschide poziție dacă există deja una deschisă (închide-o dacă e cazul)
-- Minimum confidence pentru execuție: ${cfg.MIN_CONFIDENCE}%
+Răspunde DOAR cu JSON valid:
+{"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 prop română>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}`;
 
-## Task
-Răspunde DOAR cu JSON valid, fără alt text:
-{
-  "action": "BUY" | "SELL" | "HOLD" | "CLOSE",
-  "confidence": <număr 0-100>,
-  "reasoning": "<explicație scurtă în română, max 2 propoziții>",
-  "riskLevel": "LOW" | "MEDIUM" | "HIGH",
-  "keyFactors": ["<factor1>", "<factor2>", "<factor3>"]
-}
-
-CLOSE = închide poziția curentă dacă există.
-BUY/SELL = deschide poziție nouă (nu dacă există deja una).
-HOLD = nu face nimic.`;
-
-  try {
-    const msg = await getClient().messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const text = msg.content[0].text.trim();
-    // Extract JSON even if surrounded by markdown
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('No JSON in response');
-    return JSON.parse(match[0]);
-  } catch (err) {
-    console.error('[AI] Error:', err.message);
-    return { action: 'HOLD', confidence: 0, reasoning: 'Eroare AI — HOLD implicit', riskLevel: 'HIGH', keyFactors: [] };
+  // Încearcă Anthropic, dacă nu merge → Groq (gratuit)
+  try { return await callAnthropic(prompt); } catch {}
+  try { return await callGroq(prompt); } catch (err) {
+    console.error('[AI ❌] Groq failed:', err.message);
   }
+
+  console.error('[AI ❌] Toate sursele AI au eșuat — HOLD');
+  return { action: 'HOLD', confidence: 0, reasoning: 'Eroare AI', riskLevel: 'HIGH', keyFactors: [], criteriaScore: 0 };
 }
 
 module.exports = { getSignal };

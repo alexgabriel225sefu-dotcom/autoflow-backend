@@ -91,6 +91,9 @@ const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const SENDER_EMAIL = process.env.SENDER_EMAIL || process.env.BREVO_SMTP_USER || 'supportaicashsystem@gmail.com';
 const SENDER_NAME  = process.env.SENDER_NAME  || 'AI Cash Systems';
 
+// ── GLOBAL HTML ESCAPE HELPER ──
+const _he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
 // ── COURSE ACCESS COOKIE HELPERS ──
 function _parseCookies(req) {
   const out = {};
@@ -400,7 +403,7 @@ async function callAI(systemPrompt, userMessage) {
   throw new Error('No AI provider configured');
 }
 
-function _he(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 
 async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
   const subject = `New message — ${_he(automationName)}`;
@@ -1055,42 +1058,7 @@ async function handleStripeWebhook(req, res) {
       // ── APEX BOT DELIVERY ──
       if (product === 'apex-bot') {
         if (email) {
-          const botEmailHtml = `<div style="font-family:'Inter',sans-serif;max-width:560px;margin:0 auto;padding:40px 32px;background:#050508;color:#e2e2ec;border-radius:12px">
-            <div style="font-size:13px;font-weight:800;color:#00ff88;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px">APEX.BOT — DELIVERY</div>
-            <h2 style="font-size:26px;font-weight:900;color:#fff;margin-bottom:8px;letter-spacing:-1px">You're in, ${_he(buyerName.split(' ')[0])}.</h2>
-            <p style="color:rgba(255,255,255,.55);font-size:14px;margin-bottom:32px">Your Apex Trade Bot is ready. Everything you need is below.</p>
-            <div style="background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:10px;padding:20px 24px;margin-bottom:24px">
-              <div style="font-size:11px;color:#00ff88;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">📦 Source Code</div>
-              <a href="https://aicashsystem.space/bot-access" style="display:inline-block;background:#00ff88;color:#000;font-size:14px;font-weight:800;padding:12px 24px;border-radius:8px;text-decoration:none">Access Bot Repository →</a>
-              <p style="color:rgba(255,255,255,.35);font-size:12px;margin-top:10px;margin-bottom:0">Click the button above to access your bot's source code.</p>
-            </div>
-            <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px 24px;margin-bottom:16px">
-              <div style="font-size:11px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">🚀 Quick Setup</div>
-              <ol style="color:rgba(255,255,255,.65);font-size:13px;padding-left:18px;margin:0;line-height:2">
-                <li>Open the repo and download the <strong>apex-trade-bot</strong> folder</li>
-                <li>Create a free account at <a href="https://railway.app" style="color:#00ff88">railway.app</a></li>
-                <li>Deploy from GitHub — select the apex-trade-bot directory</li>
-                <li>Add environment variables: GROQ_API_KEY (free at groq.com) + BYBIT_API_KEY</li>
-                <li>Set PAPER_TRADING=true first to test, then switch to live</li>
-              </ol>
-            </div>
-            <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px 24px;margin-bottom:24px">
-              <div style="font-size:11px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">📋 Key Variables</div>
-              <table style="width:100%;font-size:12px;font-family:'Courier New',monospace;border-collapse:collapse">
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">GROQ_API_KEY</td><td style="color:rgba(255,255,255,.5)">Get free at console.groq.com</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">BYBIT_API_KEY</td><td style="color:rgba(255,255,255,.5)">Bybit → API Management</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">BYBIT_API_SECRET</td><td style="color:rgba(255,255,255,.5)">From same API key</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">PAPER_TRADING</td><td style="color:rgba(255,255,255,.5)">true (safe start) → false (live)</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TRADE_SYMBOL</td><td style="color:rgba(255,255,255,.5)">DOGEUSDT (default)</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TELEGRAM_BOT_TOKEN</td><td style="color:rgba(255,255,255,.5)">Optional — alerts on Telegram</td></tr>
-                <tr><td style="color:#00ff88;padding:3px 12px 3px 0">TELEGRAM_CHAT_ID</td><td style="color:rgba(255,255,255,.5)">Optional — your Telegram chat ID</td></tr>
-              </table>
-            </div>
-            <div style="background:rgba(229,62,46,.06);border:1px solid rgba(229,62,46,.2);border-radius:10px;padding:16px 24px;margin-bottom:28px">
-              <p style="color:rgba(255,255,255,.5);font-size:12px;margin:0;line-height:1.7">⚠ <strong style="color:rgba(255,255,255,.75)">Risk reminder:</strong> Always start with paper trading mode. Crypto trading involves significant risk. Never trade more than you can afford to lose. The bot is a tool — not financial advice.</p>
-            </div>
-            <p style="color:rgba(255,255,255,.3);font-size:12px">Questions? Reply to this email or contact <a href="mailto:contact@aicashsystem.space" style="color:#00ff88">contact@aicashsystem.space</a>. We'll respond within 24h.</p>
-          </div>`;
+          const botEmailHtml = _buildBotEmailHtml(_he(buyerName), _he(email));
           let emailSent = false;
           if (BREVO_API_KEY) {
             try {
@@ -1116,7 +1084,7 @@ async function handleStripeWebhook(req, res) {
         return res.json({ received: true });
       }
 
-      // ── COURSE DELIVERY ──
+      // ── COURSE DELIVERY (existing) ──
       const plan = pi.amount >= 9700 ? 'pro' : 'starter';
       const code = crypto.randomBytes(4).toString('hex').toUpperCase();
 
@@ -1458,6 +1426,334 @@ publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
 });
+
+// ── BOT EMAIL HTML — funcție separată reutilizabilă ──────────────────────────
+function _buildBotEmailHtml(safeName, safeEmail) {
+  const firstName = safeName.split(' ')[0];
+  const chip = (t,c='#00ff88') => `<span style="display:inline-block;background:${c}18;border:1px solid ${c}44;border-radius:5px;padding:2px 8px;color:${c};font-family:'Courier New',monospace;font-size:11px;font-weight:700;letter-spacing:.3px">${t}</span>`;
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+@keyframes glow-pulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
+@keyframes shimmer{0%{background-position:-400% center}100%{background-position:400% center}}
+@keyframes dot-pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,.6)}70%{box-shadow:0 0 0 12px rgba(0,255,136,0)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes fade-up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes border-shine{0%,100%{border-color:rgba(0,255,136,.15)}50%{border-color:rgba(0,255,136,.5)}}
+@keyframes scan{0%{top:-10%}100%{top:110%}}
+body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:#e2e8f0;-webkit-font-smoothing:antialiased}
+.wrap{max-width:620px;margin:0 auto;background:#08080f}
+
+/* ─ HERO ─ */
+.hero{position:relative;overflow:hidden;padding:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(0,255,136,.07) 0%,transparent 70%),linear-gradient(180deg,#080f0b 0%,#08080f 100%);border-bottom:1px solid rgba(0,255,136,.1)}
+.hero-scan{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(0,255,136,.4),transparent);animation:scan 4s linear infinite;pointer-events:none}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(0,255,136,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.hero-inner{position:relative;z-index:2;padding:52px 44px 48px;text-align:center}
+.status-badge{display:inline-flex;align-items:center;gap:10px;background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:100px;padding:8px 20px;margin-bottom:32px;animation:border-shine 3s ease infinite}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#00ff88;flex-shrink:0;animation:dot-pulse 2s infinite}
+.status-text{font-size:11px;font-weight:800;color:#00ff88;letter-spacing:3px;text-transform:uppercase}
+.hero-icon{font-size:56px;margin-bottom:24px;display:block;animation:float 4s ease-in-out infinite}
+.hero-title{font-size:13px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:4px;text-transform:uppercase;margin-bottom:12px}
+.hero-name{font-size:42px;font-weight:900;line-height:1.05;letter-spacing:-2px;margin-bottom:18px;background:linear-gradient(135deg,#fff 30%,rgba(255,255,255,.55) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:38px;font-weight:900;line-height:1.05;letter-spacing:-1.5px;margin-bottom:24px;background:linear-gradient(90deg,#00ff88,#00d4aa,#00ff88);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 4s linear infinite}
+.hero-desc{font-size:15px;color:rgba(255,255,255,.4);line-height:1.7;max-width:420px;margin:0 auto}
+
+/* ─ CTA ─ */
+.cta-wrap{padding:0 44px;margin-top:-1px;background:linear-gradient(180deg,rgba(0,255,136,.03) 0%,transparent 100%);border-bottom:1px solid rgba(255,255,255,.05)}
+.cta-inner{padding:36px 0;text-align:center}
+.cta-label{font-size:10px;font-weight:800;color:rgba(255,255,255,.3);letter-spacing:3px;text-transform:uppercase;margin-bottom:20px}
+.cta-btn{display:inline-block;position:relative;overflow:hidden;background:#00ff88;color:#000;font-size:16px;font-weight:900;padding:18px 48px;border-radius:12px;text-decoration:none;letter-spacing:-.3px;box-shadow:0 0 40px rgba(0,255,136,.3),0 8px 32px rgba(0,0,0,.5);transition:all .3s}
+.cta-btn-shine{position:absolute;top:-50%;left:-70%;width:50%;height:200%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-20deg);animation:shimmer 2.5s ease-in-out infinite}
+.cta-hint{margin-top:16px;font-size:12px;color:rgba(255,255,255,.22);line-height:1.7}
+.cta-hint b{color:rgba(255,255,255,.4)}
+
+/* ─ BODY ─ */
+.body{padding:12px 44px 44px}
+
+/* ─ SECTION CARD ─ */
+.card{border-radius:16px;padding:28px;margin-bottom:14px;position:relative;overflow:hidden}
+.card-green{background:linear-gradient(135deg,rgba(0,255,136,.05) 0%,rgba(0,255,136,.02) 100%);border:1px solid rgba(0,255,136,.12)}
+.card-dark{background:linear-gradient(135deg,rgba(255,255,255,.03) 0%,rgba(255,255,255,.01) 100%);border:1px solid rgba(255,255,255,.07)}
+.card-blue{background:linear-gradient(135deg,rgba(129,140,248,.05) 0%,rgba(99,102,241,.02) 100%);border:1px solid rgba(129,140,248,.15)}
+.card-yellow{background:linear-gradient(135deg,rgba(245,158,11,.05) 0%,rgba(245,158,11,.02) 100%);border:1px solid rgba(245,158,11,.15)}
+.card-red{background:rgba(239,68,68,.03);border:1px solid rgba(239,68,68,.1)}
+.card-corner{position:absolute;top:0;right:0;width:80px;height:80px;border-radius:0 16px 0 100%;opacity:.06}
+.card-corner-green{background:#00ff88}.card-corner-blue{background:#818cf8}.card-corner-yellow{background:#f59e0b}
+.card-tag{font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;margin-bottom:22px;display:flex;align-items:center;gap:10px}
+.card-tag-green{color:#00ff88}.card-tag-blue{color:#818cf8}.card-tag-yellow{color:#f59e0b}.card-tag-dim{color:rgba(255,255,255,.3)}
+.card-tag-line{flex:1;height:1px;background:currentColor;opacity:.15}
+
+/* ─ STEPS ─ */
+.step{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:flex-start}
+.step:last-child{border:none;padding-bottom:0}
+.step-n{min-width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0}
+.step-n-g{background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.3);color:#00ff88}
+.step-n-b{background:rgba(129,140,248,.12);border:1px solid rgba(129,140,248,.3);color:#818cf8}
+.step-n-y{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#f59e0b}
+.step-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;line-height:1.3}
+.step-body{font-size:12px;color:rgba(255,255,255,.4);line-height:1.9}
+.step-body a{color:#00ff88;text-decoration:none}
+.step-body b,.step-body strong{color:rgba(255,255,255,.65);font-weight:600}
+
+/* ─ VAR TABLE ─ */
+.vt{width:100%;border-collapse:collapse}
+.vt tr{border-bottom:1px solid rgba(255,255,255,.04)}
+.vt tr:last-child{border:none}
+.vt td{padding:11px 0;vertical-align:top}
+.vt-k{color:#00ff88;font-family:'Courier New',monospace;font-size:11px;font-weight:700;white-space:nowrap;padding-right:18px;padding-top:14px;min-width:160px}
+.vt-v{font-size:12px;color:rgba(255,255,255,.38);line-height:1.75}
+.vt-v b,.vt-v strong{color:rgba(255,255,255,.6)}
+.vt-v a{color:#00ff88;text-decoration:none}
+
+/* ─ FOOTER ─ */
+.footer{border-top:1px solid rgba(255,255,255,.05);padding:28px 44px;text-align:center;background:rgba(0,0,0,.3)}
+.footer-q{font-size:12px;color:rgba(255,255,255,.2);margin-bottom:8px}
+.footer-email{color:#00ff88;font-size:14px;font-weight:700;text-decoration:none}
+.footer-copy{font-size:10px;color:rgba(255,255,255,.1);margin-top:16px}
+</style></head>
+<body>
+<div class="wrap">
+
+<!-- ══════ HERO ══════ -->
+<div class="hero">
+  <div class="hero-scan"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div class="status-badge">
+      <span class="status-dot"></span>
+      <span class="status-text">Access Granted</span>
+    </div>
+    <span class="hero-icon">🤖</span>
+    <div class="hero-title">Welcome,&nbsp; ${firstName}</div>
+    <div class="hero-name">Apex Trade Bot</div>
+    <div class="hero-sub">is yours.</div>
+    <p class="hero-desc">Your AI-powered crypto trading bot is ready to deploy. Follow the steps below and you'll be live in under 10 minutes.</p>
+  </div>
+</div>
+
+<!-- ══════ CTA ══════ -->
+<div class="cta-wrap">
+  <div class="cta-inner">
+    <div class="cta-label">Step 1 — Get the source code</div>
+    <a href="https://aicashsystem.space/bot-access" class="cta-btn">
+      <span class="cta-btn-shine"></span>
+      Open Bot Repository →
+    </a>
+    <p class="cta-hint">On GitHub → click <b>Code → Download ZIP</b> → extract the <b>apex-trade-bot</b> folder</p>
+  </div>
+</div>
+
+<!-- ══════ BODY ══════ -->
+<div class="body">
+
+<!-- ─ BINANCE API ─ -->
+<div class="card card-green">
+  <div class="card-corner card-corner-green"></div>
+  <div class="card-tag card-tag-green">🔑 Step 2 — Binance API Key <span class="card-tag-line"></span></div>
+  <div class="step">
+    <div class="step-n step-n-g">1</div>
+    <div><div class="step-title">Create a Binance account</div>
+    <div class="step-body">Go to <a href="https://binance.com">binance.com</a> → Sign up. Complete identity verification (ID required) to unlock spot trading. Binance works globally including EU.</div></div>
+  </div>
+  <div class="step">
+    <div class="step-n step-n-g">2</div>
+    <div><div class="step-title">Open API Management</div>
+    <div class="step-body">Click your profile icon (top right) → <b>API Management</b> → <b>Create API</b> → choose <b>System-generated</b></div></div>
+  </div>
+  <div class="step">
+    <div class="step-n step-n-g">3</div>
+    <div><div class="step-title">Set the correct permissions</div>
+    <div class="step-body">
+      ✅ <b>Enable Reading</b><br>
+      ✅ <b>Enable Spot &amp; Margin Trading</b><br>
+      ❌ Leave <b>Withdrawals</b> unchecked — never needed<br>
+      IP restriction: leave <b>unrestricted</b> (Railway uses dynamic IPs)
+    </div></div>
+  </div>
+  <div class="step">
+    <div class="step-n step-n-g">4</div>
+    <div><div class="step-title">Save your keys — Secret shown only once!</div>
+    <div class="step-body">Complete 2FA. Copy both your <b>API Key</b> and <b>Secret Key</b> immediately and store them safely. <span style="color:#f87171;font-weight:600">The Secret disappears after you close the page.</span></div></div>
+  </div>
+</div>
+
+<!-- ─ RAILWAY DEPLOY ─ -->
+<div class="card card-dark">
+  <div class="card-tag card-tag-dim">🚀 Step 3 — Deploy on Railway (Free) <span class="card-tag-line"></span></div>
+  <div class="step">
+    <div class="step-n step-n-g">1</div>
+    <div><div class="step-title">Create a Railway account</div>
+    <div class="step-body">Go to <a href="https://railway.app">railway.app</a> → <b>Login with GitHub</b></div></div>
+  </div>
+  <div class="step">
+    <div class="step-n step-n-g">2</div>
+    <div><div class="step-title">Create a new project</div>
+    <div class="step-body">Click <b>New Project → Deploy from GitHub repo</b> → select the repository you downloaded</div></div>
+  </div>
+  <div class="step">
+    <div class="step-n step-n-g">3</div>
+    <div><div class="step-title">Set Root Directory</div>
+    <div class="step-body">Go to project <b>Settings</b> → <b>Root Directory</b> → type exactly: ${chip('apex-trade-bot')}<br>This tells Railway to run only the bot, not the whole repo.</div></div>
+  </div>
+  <div class="step">
+    <div class="step-n step-n-g">4</div>
+    <div><div class="step-title">Add environment variables</div>
+    <div class="step-body">Go to the <b>Variables</b> tab → add all keys from the table below → Railway redeploys automatically.</div></div>
+  </div>
+</div>
+
+<!-- ─ ENV VARS ─ -->
+<div class="card card-dark">
+  <div class="card-tag card-tag-dim">📋 Railway Variables — Add These <span class="card-tag-line"></span></div>
+  <table class="vt">
+    <tr><td class="vt-k">EXCHANGE</td><td class="vt-v">Set to ${chip('binance')} — works globally including EU</td></tr>
+    <tr><td class="vt-k">BINANCE_API_KEY</td><td class="vt-v">The API Key from Step 2 above</td></tr>
+    <tr><td class="vt-k">BINANCE_API_SECRET</td><td class="vt-v">The Secret Key from Step 2 — <b>only shown once at creation</b></td></tr>
+    <tr><td class="vt-k">GROQ_API_KEY</td><td class="vt-v">Free AI key — go to <a href="https://console.groq.com">console.groq.com</a> → API Keys → <b>Create API Key</b> (no card needed)</td></tr>
+    <tr><td class="vt-k">PAPER_TRADING</td><td class="vt-v">Set to ${chip('true')} to start safely with simulated money. Change to ${chip('false','#f59e0b')} when ready to go live.</td></tr>
+    <tr><td class="vt-k">PAPER_BALANCE</td><td class="vt-v">Simulated balance. Default: ${chip('10')} (= $10 USDT)</td></tr>
+    <tr><td class="vt-k">TRADE_SYMBOL</td><td class="vt-v">Optional. Override with ${chip('DOGEUSDT')} or ${chip('SOLUSDT')}. Default: auto-scanner picks best coin.</td></tr>
+    <tr><td class="vt-k">TELEGRAM_BOT_TOKEN</td><td class="vt-v">Optional — real-time alerts on your phone (setup below)</td></tr>
+    <tr><td class="vt-k">TELEGRAM_CHAT_ID</td><td class="vt-v">Optional — your Telegram chat ID (setup below)</td></tr>
+  </table>
+</div>
+
+<!-- ─ TELEGRAM ─ -->
+<div class="card card-blue">
+  <div class="card-corner card-corner-blue"></div>
+  <div class="card-tag card-tag-blue">📱 Step 4 — Telegram Alerts <span class="card-tag-line"></span></div>
+  <div class="step">
+    <div class="step-n step-n-b">1</div>
+    <div><div class="step-title">Create your Telegram bot</div>
+    <div class="step-body">Open Telegram → search <b>@BotFather</b> → send ${chip('/newbot','#818cf8')} → pick any name → BotFather gives you a token like ${chip('7123456:AAFxxx...','#818cf8')} — copy it.</div></div>
+  </div>
+  <div class="step">
+    <div class="step-n step-n-b">2</div>
+    <div><div class="step-title">Get your Chat ID</div>
+    <div class="step-body">Send any message to your new bot. Then open in browser:<br>
+    ${chip('https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates','#818cf8')}<br>
+    Find <b>"chat":{"id":123456789}</b> — that number is your Chat ID.</div></div>
+  </div>
+  <div class="step">
+    <div class="step-n step-n-b">3</div>
+    <div><div class="step-title">Add to Railway Variables</div>
+    <div class="step-body">Paste the token as ${chip('TELEGRAM_BOT_TOKEN','#818cf8')} and the number as ${chip('TELEGRAM_CHAT_ID','#818cf8')}.<br>You'll get live trade alerts, 30-min heartbeats, and risk-stop notifications instantly on your phone.</div></div>
+  </div>
+</div>
+
+<!-- ─ GO LIVE ─ -->
+<div class="card card-yellow">
+  <div class="card-corner card-corner-yellow"></div>
+  <div class="card-tag card-tag-yellow">💰 Step 5 — Go Live <span class="card-tag-line"></span></div>
+  <div class="step">
+    <div class="step-n step-n-y">1</div>
+    <div><div class="step-title">Test with Paper Trading first</div>
+    <div class="step-body">With ${chip('PAPER_TRADING=true','#f59e0b')}, the bot trades simulated money — zero risk. Run it for 24–48h and check your Telegram alerts look correct before going live.</div></div>
+  </div>
+  <div class="step">
+    <div class="step-n step-n-y">2</div>
+    <div><div class="step-title">Deposit USDT on Binance Spot</div>
+    <div class="step-body">Fund your <b>Binance Spot</b> wallet with at least $20 USDT (recommended: $20–50 to start). <span style="color:#fbbf24;font-weight:600">Never risk more than you can afford to lose entirely.</span></div></div>
+  </div>
+  <div class="step">
+    <div class="step-n step-n-y">3</div>
+    <div><div class="step-title">Flip the switch to Live</div>
+    <div class="step-body">In Railway → <b>Variables</b> → change ${chip('PAPER_TRADING','#f59e0b')} from ${chip('true','#f59e0b')} → ${chip('false','#f59e0b')} → click <b>Save</b>. Railway redeploys in seconds. Your bot is now live and trading with real funds. 🚀</div></div>
+  </div>
+</div>
+
+<!-- ─ RISK ─ -->
+<div class="card card-red">
+  <p style="font-size:11px;color:rgba(255,255,255,.3);line-height:1.9;margin:0">
+    <span style="color:rgba(248,113,113,.7);font-weight:700">⚠ Risk Disclosure</span> — Cryptocurrency trading involves substantial risk of loss and is not suitable for all investors. Always start with paper trading. Only invest funds you can afford to lose completely. Past performance is not indicative of future results. Apex Trade Bot is an automation tool — not financial advice. You are solely responsible for your trading decisions.
+  </p>
+</div>
+
+</div><!-- /body -->
+
+<!-- ══════ FOOTER ══════ -->
+<div class="footer">
+  <p class="footer-q">Questions? We respond within 24 hours.</p>
+  <a href="mailto:supportaicashsystem@gmail.com" class="footer-email">supportaicashsystem@gmail.com</a>
+  <p class="footer-copy">© 2025 AI Cash Systems &nbsp;·&nbsp; <a href="https://aicashsystem.space" style="color:rgba(255,255,255,.15);text-decoration:none">aicashsystem.space</a></p>
+</div>
+
+</div></body></html>`;}
+
+// ── BOT ACCESS REDIRECT — clienții văd aicashsystem.space/bot-access, nu GitHub
+app.get('/bot-access', (req, res) => {
+  res.redirect(301, 'https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/tree/release/apex-bot/apex-trade-bot');
+});
+
+// ── TEST DELIVERY EMAIL — protejat cu secret key, fără plată
+// GET  (browser): /api/send-bot-email?secret=X&email=you@gmail.com&name=Alex
+// POST (curl):    /api/send-bot-email?secret=X  body: { email, name }
+app.get('/api/send-bot-email', async (req, res) => {
+  req.body = { email: req.query.email, name: req.query.name, secret: req.query.secret };
+  // fall through to shared handler below
+  return _sendBotEmailHandler(req, res);
+});
+app.post('/api/send-bot-email', async (req, res) => {
+  req.body.secret = req.body.secret || req.query.secret;
+  return _sendBotEmailHandler(req, res);
+});
+async function _sendBotEmailHandler(req, res) {
+  const secret = req.query.secret || req.body.secret;
+  const adminSecret = process.env.BOT_EMAIL_SECRET || '';
+  const isPreview = req.query.preview === '1';
+
+  // Preview mode — afișează emailul direct în browser fără auth/email
+  if (isPreview) {
+    const name  = req.query.name || req.body.name || 'Alex';
+    const email = req.query.email || req.body.email || 'preview@example.com';
+    const _he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const previewHtml = _buildBotEmailHtml(_he(name), _he(email));
+    return res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview: Bot Delivery Email</title>
+      <style>body{margin:0;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:40px 20px;font-family:sans-serif}
+      .bar{background:#2d2d44;border:1px solid #444;border-radius:8px;padding:10px 20px;margin-bottom:24px;color:#aaa;font-size:13px;text-align:center;max-width:600px;width:100%}
+      .bar strong{color:#00ff88}</style></head><body>
+      <div class="bar">📧 <strong>PREVIEW</strong> — Asta e emailul pe care îl primește clientul după cumpărare.<br>
+      <span style="font-size:11px;color:#666">Towards: ${_he(email)} · Name: ${_he(name)}</span></div>
+      ${previewHtml}</body></html>`);
+  }
+
+  if (!adminSecret) {
+    return res.status(403).json({ error: 'BOT_EMAIL_SECRET not set in env — add it on Render' });
+  }
+  if (secret !== adminSecret) {
+    return res.status(403).json({ error: 'Wrong secret', hint: `Expected length: ${adminSecret.length} chars, got: ${(secret||'').length} chars` });
+  }
+  const email = req.body.email;
+  const name  = req.body.name || 'there';
+  if (!email) return res.status(400).json({ error: 'email required' });
+
+  const botEmailHtml = _buildBotEmailHtml(_he(name), _he(email));
+
+  let emailSent = false;
+  if (BREVO_API_KEY) {
+    try {
+      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: { name: 'Apex.Bot', email: SENDER_EMAIL }, to: [{ email }],
+          subject: '🤖 Your Apex Trade Bot is ready — access inside', htmlContent: botEmailHtml })
+      });
+      if (r.ok) emailSent = true;
+      else { const t = await r.text(); return res.json({ success: false, method: 'brevo', error: t }); }
+    } catch(e) { return res.json({ success: false, method: 'brevo', error: e.message }); }
+  } else if (transporter) {
+    try {
+      await transporter.sendMail({ from: `"Apex.Bot" <${SENDER_EMAIL}>`, to: email,
+        subject: '🤖 Your Apex Trade Bot is ready — access inside', html: botEmailHtml });
+      emailSent = true;
+    } catch(e) { return res.json({ success: false, method: 'smtp', error: e.message }); }
+  } else {
+    return res.json({ success: false, error: 'No email provider configured (BREVO_API_KEY missing)' });
+  }
+  return res.json({ success: emailSent, to: email, method: BREVO_API_KEY ? 'brevo' : 'smtp' });
+}
 
 // Protected pages — require any valid course purchase
 const protectedPages = ['videos','blueprints','ai-builder','course-starter',

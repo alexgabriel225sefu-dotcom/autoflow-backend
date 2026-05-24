@@ -943,6 +943,107 @@ footer{background:#000;border-top:1px solid var(--border);padding:60px 24px 32px
   </div>
 </footer>
 
+<!-- APEX BOT MODULE -->
+<style>
+#sw{position:fixed;bottom:28px;right:28px;z-index:9999;width:214px;opacity:0;transform:translateY(20px) scale(.96);transition:opacity .55s,transform .65s cubic-bezier(.34,1.2,.64,1);pointer-events:none}
+#sw.on{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+#sw.boot{animation:sw-boot .55s steps(2) forwards}
+@keyframes sw-boot{0%,100%{opacity:1}16%,50%{opacity:.05}33%,66%{opacity:.7}}
+.sw-card{
+  background:rgba(2,2,4,.97);
+  border:1px solid rgba(229,62,46,.22);
+  border-radius:14px;padding:14px;
+  backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);
+  box-shadow:0 24px 80px rgba(0,0,0,.85),inset 0 0 0 1px rgba(255,255,255,.03);
+  position:relative;overflow:hidden;display:block;text-decoration:none;
+  transition:border-color .3s,box-shadow .3s,transform .2s;
+}
+.sw-card:hover{
+  border-color:rgba(229,62,46,.6);
+  box-shadow:0 24px 80px rgba(0,0,0,.85),0 0 48px rgba(229,62,46,.1),inset 0 0 0 1px rgba(255,255,255,.05);
+  transform:translateY(-3px);
+}
+/* scanline sweep */
+.sw-card::before{
+  content:'';position:absolute;top:0;left:-70%;width:55%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(229,62,46,.06),transparent);
+  animation:sw-scan 3.8s ease-in-out infinite;pointer-events:none;
+}
+@keyframes sw-scan{0%{left:-70%}100%{left:140%}}
+/* subtle noise grain */
+.sw-card::after{
+  content:'';position:absolute;inset:0;border-radius:14px;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  opacity:.5;pointer-events:none;
+}
+.sw-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;position:relative;z-index:1}
+.sw-tag{font-size:8px;font-weight:800;letter-spacing:2.5px;color:rgba(229,62,46,.55);font-family:'SF Mono','Fira Code',monospace;text-transform:uppercase}
+.sw-live{display:flex;align-items:center;gap:4px}
+.sw-livtxt{font-size:8px;color:rgba(255,255,255,.22);font-weight:700;letter-spacing:1.8px;font-family:'SF Mono',monospace}
+.sw-livdot{width:5px;height:5px;border-radius:50%;background:#E53E2E;box-shadow:0 0 6px rgba(229,62,46,.6);animation:sw-blink 1.3s ease-in-out infinite}
+@keyframes sw-blink{0%,100%{opacity:1;box-shadow:0 0 6px rgba(229,62,46,.6)}50%{opacity:.15;box-shadow:none}}
+.sw-name{font-size:16px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1;margin-bottom:3px;font-family:'Inter',sans-serif;position:relative;z-index:1}
+.sw-sub{font-size:10px;color:rgba(255,255,255,.28);font-weight:500;letter-spacing:.3px;margin-bottom:12px;font-family:'Inter',sans-serif;position:relative;z-index:1}
+.sw-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;position:relative;z-index:1}
+.sw-cell{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.055);border-radius:8px;padding:8px 9px}
+.sw-cl{font-size:8px;color:rgba(255,255,255,.22);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:3px;font-family:'SF Mono',monospace;font-weight:600}
+.sw-cv{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;font-family:'SF Mono',monospace;line-height:1}
+.sw-cta{
+  background:rgba(229,62,46,.09);border:1px solid rgba(229,62,46,.18);
+  border-radius:8px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;
+  position:relative;z-index:1;
+  transition:background .2s,border-color .2s;
+}
+.sw-card:hover .sw-cta{background:rgba(229,62,46,.18);border-color:rgba(229,62,46,.42)}
+.sw-ctxt{font-size:11px;font-weight:700;color:rgba(255,255,255,.88);letter-spacing:.2px;font-family:'Inter',sans-serif}
+.sw-arr{color:rgba(229,62,46,.75);font-size:15px;line-height:1;transition:transform .2s}
+.sw-card:hover .sw-arr{transform:translateX(4px)}
+</style>
+<div id="sw">
+  <a href="/apex-bot" class="sw-card">
+    <div class="sw-head">
+      <span class="sw-tag">// restricted</span>
+      <div class="sw-live"><span class="sw-livdot"></span><span class="sw-livtxt">LIVE</span></div>
+    </div>
+    <div class="sw-name">Apex.Bot</div>
+    <div class="sw-sub">AI crypto automation module</div>
+    <div class="sw-grid">
+      <div class="sw-cell">
+        <div class="sw-cl">Live P&amp;L</div>
+        <div class="sw-cv" id="swPnl" style="color:#E53E2E">+4.2%</div>
+      </div>
+      <div class="sw-cell">
+        <div class="sw-cl">Trades / 24h</div>
+        <div class="sw-cv" id="swTrades" style="color:rgba(255,255,255,.7)">7</div>
+      </div>
+    </div>
+    <div class="sw-cta">
+      <span class="sw-ctxt">Unlock access</span>
+      <span class="sw-arr">→</span>
+    </div>
+  </a>
+</div>
+<script>
+(function(){
+  var el=document.getElementById('sw');
+  setTimeout(function(){
+    el.classList.add('boot');
+    setTimeout(function(){el.classList.add('on');},260);
+  },8000);
+  // Live P&L
+  var v=4.2,pnlEl=document.getElementById('swPnl');
+  setInterval(function(){
+    v+=(Math.random()-.465)*.13;
+    v=Math.max(-1.8,Math.min(12,v));
+    pnlEl.textContent=(v>=0?'+':'')+v.toFixed(1)+'%';
+    pnlEl.style.color=v>=0?'#E53E2E':'rgba(255,255,255,.3)';
+  },1800);
+  // Trade counter (slow drift up)
+  var t=7,trEl=document.getElementById('swTrades');
+  setInterval(function(){if(Math.random()>.7){t++;trEl.textContent=t;}},45000);
+})();
+</script>
+
 <script>
 // ── INTRO ──
 (function(){

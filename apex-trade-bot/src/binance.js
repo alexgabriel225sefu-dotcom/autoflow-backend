@@ -2,7 +2,18 @@ const axios = require('axios');
 const crypto = require('crypto');
 const cfg = require('./config');
 
-const client = axios.create({ baseURL: cfg.BINANCE_BASE, timeout: 10000 });
+// Default to TESTNET unless BINANCE_TESTNET is explicitly set to 'false'
+// (live api.binance.com is geo-blocked from cloud servers in EU)
+const _bnTest = (process.env.BINANCE_TESTNET || '').toLowerCase().trim();
+const TESTNET = _bnTest !== 'false'; // default: true (testnet)
+const BASE_URL = TESTNET
+  ? 'https://testnet.binance.vision/api/v3'
+  : 'https://api.binance.com/api/v3';
+
+console.log(`[BINANCE] Mode: ${TESTNET ? '🧪 TESTNET (testnet.binance.vision)' : '🔴 LIVE (api.binance.com)'} | BINANCE_TESTNET="${process.env.BINANCE_TESTNET || '(not set — defaulting to testnet)'}"`);
+
+
+const client = axios.create({ baseURL: BASE_URL, timeout: 10000 });
 
 function sign(params) {
   const qs = new URLSearchParams(params).toString();
