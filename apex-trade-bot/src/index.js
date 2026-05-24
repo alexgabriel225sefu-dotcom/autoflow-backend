@@ -39,19 +39,19 @@ function validate() {
   const hasGroq      = !!process.env.GROQ_API_KEY;
 
   if (!hasAnthropic && !hasGroq) {
-    console.error('❌ Nicio cheie AI găsită! Adaugă ANTHROPIC_API_KEY sau GROQ_API_KEY în Variables.');
+    console.error('❌ No AI key found! Add ANTHROPIC_API_KEY or GROQ_API_KEY to Variables.');
     process.exit(1);
   }
   if (!hasAnthropic && hasGroq) {
-    console.log('ℹ️  ANTHROPIC_API_KEY lipsă — folosesc Groq (gratuit) ca AI provider.');
+    console.log('ℹ️  ANTHROPIC_API_KEY missing — using Groq (free) as AI provider.');
   }
   if (hasAnthropic && hasGroq) {
-    console.log('ℹ️  Anthropic + Groq configurate — Anthropic primar, Groq fallback.');
+    console.log('ℹ️  Anthropic + Groq configured — Anthropic primary, Groq fallback.');
   }
 
   const hasKey = cfg.EXCHANGE === 'binance' ? cfg.BINANCE_API_KEY : cfg.BYBIT_API_KEY;
   if (!hasKey && !cfg.PAPER_TRADING) {
-    console.warn('⚠️  Nicio cheie exchange — pornesc automat în PAPER TRADING');
+    console.warn('⚠️  No exchange API key found — falling back to PAPER TRADING automatically');
     cfg.PAPER_TRADING = true;
   }
 }
@@ -400,7 +400,8 @@ async function main() {
   logger.setStartBalance(balance);
   logger.printBanner(balance);
 
-  const mode = cfg.PAPER_TRADING ? '📝 PAPER TRADING' : cfg.TESTNET ? '🧪 TESTNET' : '🔴 LIVE';
+  const isTestnet = cfg.BYBIT_TESTNET || cfg.BINANCE_TESTNET;
+  const mode = cfg.PAPER_TRADING ? '📝 PAPER TRADING' : isTestnet ? '🧪 TESTNET' : '🔴 LIVE';
   dash.mode = mode.replace(/[📝🧪🔴]/g, '').trim();
   tg.alertStart(cfg.SYMBOL, cfg.TIMEFRAME, balance, mode);
 
