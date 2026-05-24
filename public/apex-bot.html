@@ -5,14 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Apex Trade Bot — AI Crypto Trading System</title>
 <meta name="description" content="AI-powered crypto trading bot. Runs 24/7 on Bybit & Binance. Deploy in 10 minutes. Start with $10.">
+<meta property="og:title" content="Apex Trade Bot — AI Crypto Trading System">
+<meta property="og:description" content="Runs 24/7. 5 pairs. 6 indicators. Telegram alerts. Deploy in 10 minutes. One-time $197.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aicashsystem.space/apex-bot">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Apex Trade Bot — AI Crypto Trading System">
+<meta name="twitter:description" content="AI trading bot. Runs 24/7. Deploy in 10 minutes. One-time $197.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://js.stripe.com/v3/"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --c:#00e5ff;--c2:rgba(0,229,255,.08);--c3:rgba(0,229,255,.15);
+  --c:#00e5ff;--c2:rgba(0,229,255,.08);
   --warn:#ff9500;--green:#00ff88;--danger:#ff3d3d;
-  --bg:#000a14;--bg2:#00101f;--bg3:#001428;
+  --bg:#000a14;--bg2:#00101f;
   --bd:rgba(0,229,255,.1);--bd2:rgba(0,229,255,.22);
   --t1:#fff;--t2:rgba(255,255,255,.6);--t3:rgba(255,255,255,.3);
   --mono:'JetBrains Mono','SF Mono',Menlo,monospace;
@@ -266,6 +275,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
   .flash{flex-direction:column;gap:4px;text-align:center}
   .stats{grid-template-columns:repeat(2,1fr)}
   .feat-grid{grid-template-columns:1fr}
+  .steps{grid-template-columns:1fr!important;gap:24px!important}
   .price-amount{font-size:60px}
   .price-head{padding:24px}
   .price-body{padding:24px}
@@ -303,7 +313,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
     <div class="hero-copy">
       <div class="hero-label">● SYSTEM ONLINE · AI ACTIVE</div>
       <h1>The machine that<br>trades while<br><em>you sleep.</em></h1>
-      <p class="hero-sub">Apex Bot runs 24/7 on Bybit and Binance, analyzing 5 crypto pairs every 5 minutes. Strategies from Turtle Trading, Livermore, Soros and Paul Tudor Jones. AI validates every signal. You get Telegram alerts. You don't need to watch it.</p>
+      <p class="hero-sub">Apex Bot runs 24/7 on Bybit and Binance, scanning 5 crypto pairs every 5 minutes with strategies from Turtle Trading, Livermore, Soros and PTJ. AI validates every signal. Telegram sends the alerts. You just watch the notifications.</p>
       <button onclick="openApexModal()" class="btn-main">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3L4 14h7v7l9-11h-7V3z"/></svg>
         Deploy Apex Bot — $197
@@ -336,11 +346,11 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
 <!-- STATS -->
 <div class="stats-wrap">
   <div class="stats">
-    <div class="stat"><div class="stat-val c">5</div><div class="stat-lbl">Pairs Scanned</div></div>
+    <div class="stat"><div class="stat-val c">5</div><div class="stat-lbl">Top Pairs</div></div>
     <div class="stat"><div class="stat-val c">6</div><div class="stat-lbl">Indicators</div></div>
-    <div class="stat"><div class="stat-val w">5m</div><div class="stat-lbl">Cycle Time</div></div>
+    <div class="stat"><div class="stat-val w">5m</div><div class="stat-lbl">Every Scan</div></div>
     <div class="stat"><div class="stat-val w">$10</div><div class="stat-lbl">Min Start</div></div>
-    <div class="stat"><div class="stat-val c">24/7</div><div class="stat-lbl">Always On</div></div>
+    <div class="stat"><div class="stat-val c">24/7</div><div class="stat-lbl">Never Stops</div></div>
   </div>
 </div>
 
@@ -416,11 +426,12 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
       <div class="chart-title-block">
         <p class="ey">// PRICE ACTION + SIGNALS</p>
         <h2 class="chart-title-block">Real signals. Real entries.</h2>
+        <p style="font-size:11px;color:rgba(255,149,0,.6);font-family:var(--mono);margin-top:6px">⚠ Simulated paper trading demo — not real performance data</p>
       </div>
       <div class="chart-metrics">
-        <div class="cm"><div class="cm-val g" id="cmPnl">+2.4%</div><div class="cm-lbl">Session PnL</div></div>
-        <div class="cm"><div class="cm-val c" id="cmTrades">7</div><div class="cm-lbl">Trades Today</div></div>
-        <div class="cm"><div class="cm-val g" id="cmWr">71%</div><div class="cm-lbl">Win Rate</div></div>
+        <div class="cm"><div class="cm-val g" id="cmPnl">+2.4%</div><div class="cm-lbl">Demo PnL</div></div>
+        <div class="cm"><div class="cm-val c">PAPER</div><div class="cm-lbl">Mode</div></div>
+        <div class="cm"><div class="cm-val g">LIVE</div><div class="cm-lbl">Chart Feed</div></div>
       </div>
     </div>
     <div class="chart-canvas-wrap">
@@ -430,7 +441,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
       </div>
       <canvas id="liveChart" height="220"></canvas>
       <div class="chart-legend">
-        <div class="cl-item"><div class="cl-dot" style="background:#00e5ff"></div>Price</div>
+        <div class="cl-item"><div class="cl-dot" style="background:#00ff88"></div>Price (up) / <div class="cl-dot" style="background:#ff4444;margin-left:4px"></div>Price (down)</div>
         <div class="cl-item"><div class="cl-dot" style="background:#00ff88"></div>BUY signal</div>
         <div class="cl-item"><div class="cl-dot" style="background:#ff4444"></div>SHORT signal</div>
         <div class="cl-item"><div class="cl-dot" style="background:rgba(255,170,0,.6);height:1px"></div>Stop Loss</div>
@@ -540,8 +551,8 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
     </div>
     <div class="step">
       <div class="step-n">04</div>
-      <h3>Watch it trade</h3>
-      <p>Bot starts in paper mode. Watch it analyze and trade with simulated money before going live.</p>
+      <h3>It runs. You relax.</h3>
+      <p>Bot starts in paper mode — zero risk. Switch one variable to go live when ready. After that, you don't touch anything.</p>
     </div>
   </div>
 </section>
@@ -557,6 +568,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
         <div class="price-badge">⚡ LAUNCH PRICE · ONE-TIME PAYMENT</div>
         <div class="price-amount"><sup>$</sup>197</div>
         <div class="price-was">Regular price $297 after launch</div>
+        <div style="margin-top:12px;font-size:12px;color:rgba(0,229,255,.6);font-family:var(--mono)">Less than most copy-trading services charge per month — and this is yours forever.</div>
       </div>
       <div class="price-body">
         <div class="price-list">
@@ -569,6 +581,10 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
           <div class="pi"><span class="pi-ico">→</span>Telegram real-time alerts</div>
           <div class="pi"><span class="pi-ico">→</span>Railway one-click deploy</div>
           <div class="pi"><span class="pi-ico">→</span>Email support · Lifetime updates</div>
+        </div>
+        <div style="background:rgba(255,149,0,.06);border:1px solid rgba(255,149,0,.2);border-radius:6px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <span style="font-size:11px;color:var(--warn);font-weight:700;text-transform:uppercase;letter-spacing:.5px">⚡ Launch price ends in</span>
+          <span style="font-size:15px;font-weight:900;color:#fff;font-family:var(--mono)" id="countdown2">--:--:--</span>
         </div>
         <button onclick="openApexModal()" class="buy-btn">⚡ Get Apex Bot — $197 →</button>
         <div class="buy-meta">🔒 Stripe encrypted · Instant access · One-time · No subscription</div>
@@ -605,6 +621,10 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
     <div class="faq-item">
       <div class="faq-q">Can I modify the strategy?<span class="faq-ico">+</span></div>
       <div class="faq-a"><div class="faq-ans">Yes. You receive the full source code. Every parameter — risk per trade, stop loss, take profit, timeframe, indicators, min criteria — is configurable via environment variables or by editing the code directly.</div></div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What happens to my bot if you shut down?<span class="faq-ico">+</span></div>
+      <div class="faq-a"><div class="faq-ans">Nothing. Your bot keeps running. You receive the full source code and it deploys on YOUR Railway account — completely independent from our servers. If we disappeared tomorrow, your bot would not notice. It has zero dependency on us after setup.</div></div>
     </div>
   </div>
 </section>
@@ -694,8 +714,12 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
   if(!end||end<Date.now()){end=Date.now()+24*3600*1000;localStorage.setItem(K,end);}
   function tick(){
     const d=Math.max(0,end-Date.now());
-    const h=Math.floor(d/3600000),m=Math.floor(d%3600000/60000),s=Math.floor(d%60000/1000);
-    document.getElementById('countdown').textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    const h=String(Math.floor(d/3600000)).padStart(2,'0');
+    const m=String(Math.floor(d%3600000/60000)).padStart(2,'0');
+    const s=String(Math.floor(d%60000/1000)).padStart(2,'0');
+    const txt=h+':'+m+':'+s;
+    document.getElementById('countdown').textContent=txt;
+    const c2=document.getElementById('countdown2');if(c2)c2.textContent=txt;
     if(d===0){end=Date.now()+24*3600*1000;localStorage.setItem(K,end);}
   }
   setInterval(tick,1000);tick();
@@ -797,23 +821,24 @@ setInterval(drawMini,600);setTimeout(drawMini,300);
     const mn=Math.min(...pts)*0.998,mx=Math.max(...pts)*1.002,rng=mx-mn;
     const sy=v=>PAD+(1-(v-mn)/rng)*(H-PAD*2);
     const sx=(_,i)=>LPAD+i/(pts.length-1)*(W-LPAD-PAD);
+    // determine trend color: green if rising, red if falling
+    const rising=pts.at(-1)>=pts[0];
+    const lineColor=rising?'#00ff88':'#ff4444';
+    const fillColor=rising?'rgba(0,255,136,':'rgba(255,68,68,';
     ctx.clearRect(0,0,W,H);
 
     // grid lines
-    ctx.strokeStyle='rgba(0,229,255,.04)';ctx.lineWidth=1;
+    ctx.strokeStyle='rgba(255,255,255,.04)';ctx.lineWidth=1;
     for(let i=0;i<=5;i++){const y=PAD+i/5*(H-PAD*2);ctx.beginPath();ctx.moveTo(LPAD,y);ctx.lineTo(W-PAD,y);ctx.stroke();}
 
     // SL/TP bands for active signals
     signals.forEach(s=>{
       if(s.idx>=pts.length-20){
-        // TP band
         ctx.fillStyle='rgba(0,255,136,.04)';
         ctx.fillRect(sx(null,s.idx),sy(s.tp),W-PAD-sx(null,s.idx),sy(s.type==='buy'?s.sl:s.tp)-sy(s.type==='buy'?s.tp:s.sl));
-        // SL line
-        ctx.strokeStyle='rgba(255,70,70,.5)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+        ctx.strokeStyle='rgba(255,70,70,.6)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
         ctx.beginPath();ctx.moveTo(sx(null,s.idx),sy(s.sl));ctx.lineTo(W-PAD,sy(s.sl));ctx.stroke();
-        // TP line
-        ctx.strokeStyle='rgba(0,255,136,.4)';
+        ctx.strokeStyle='rgba(0,255,136,.5)';
         ctx.beginPath();ctx.moveTo(sx(null,s.idx),sy(s.tp));ctx.lineTo(W-PAD,sy(s.tp));ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -821,7 +846,7 @@ setInterval(drawMini,600);setTimeout(drawMini,300);
 
     // price fill
     const grd=ctx.createLinearGradient(0,0,0,H);
-    grd.addColorStop(0,'rgba(0,229,255,.1)');grd.addColorStop(1,'rgba(0,229,255,.0)');
+    grd.addColorStop(0,fillColor+'.12)');grd.addColorStop(1,fillColor+'0)');
     ctx.beginPath();ctx.moveTo(sx(pts[0],0),sy(pts[0]));
     pts.forEach((v,i)=>{if(i)ctx.lineTo(sx(v,i),sy(v))});
     ctx.lineTo(sx(pts.at(-1),pts.length-1),H);ctx.lineTo(sx(pts[0],0),H);ctx.closePath();ctx.fillStyle=grd;ctx.fill();
@@ -829,7 +854,7 @@ setInterval(drawMini,600);setTimeout(drawMini,300);
     // price line
     ctx.beginPath();ctx.moveTo(sx(pts[0],0),sy(pts[0]));
     pts.forEach((v,i)=>{if(i)ctx.lineTo(sx(v,i),sy(v))});
-    ctx.strokeStyle='#00e5ff';ctx.lineWidth=2;ctx.stroke();
+    ctx.strokeStyle=lineColor;ctx.lineWidth=2;ctx.stroke();
 
     // signal markers
     signals.forEach(s=>{
@@ -849,9 +874,9 @@ setInterval(drawMini,600);setTimeout(drawMini,300);
       ctx.fillText('$'+v.toFixed(4),LPAD-4,sy(v)+3);
     }
 
-    // current price tag
+    // current price tag — green or red
     const cy=sy(pts.at(-1));
-    ctx.fillStyle='#00e5ff';ctx.fillRect(LPAD,cy-9,W-LPAD-PAD,18);
+    ctx.fillStyle=lineColor;ctx.fillRect(LPAD,cy-9,W-LPAD-PAD,18);
     ctx.fillStyle='#000';ctx.font='bold 10px JetBrains Mono,monospace';ctx.textAlign='left';
     ctx.fillText('$'+pts.at(-1).toFixed(4),LPAD+4,cy+4);
   }
