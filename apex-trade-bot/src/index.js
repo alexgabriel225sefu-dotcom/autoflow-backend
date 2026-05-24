@@ -60,7 +60,10 @@ function validate() {
 async function getBalance() {
   if (cfg.PAPER_TRADING) return paperBalance;
   try { return await exchange.getBalance(); }
-  catch { return 0; }
+  catch (e) {
+    logger.warn(`[BALANCE] API error: ${e.message} — check API keys & BINANCE_TESTNET flag`);
+    return 0;
+  }
 }
 
 // ─── Calcul cantitate ─────────────────────────────────────

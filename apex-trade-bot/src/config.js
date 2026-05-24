@@ -1,6 +1,9 @@
 require('dotenv').config();
 
-const PAPER = process.env.PAPER_TRADING === 'true' || process.env.PAPER_TRADING === '1';
+// Accepts: 'true', '1', 'yes', 'on' (case-insensitive)
+const isTruthy = v => ['true','1','yes','on'].includes((v || '').toLowerCase().trim());
+
+const PAPER = isTruthy(process.env.PAPER_TRADING);
 
 module.exports = {
   // ─── Exchange ────────────────────────────────────────────
@@ -9,12 +12,12 @@ module.exports = {
   // ─── Bybit ──────────────────────────────────────────────
   BYBIT_API_KEY:    process.env.BYBIT_API_KEY    || '',
   BYBIT_API_SECRET: process.env.BYBIT_API_SECRET || '',
-  BYBIT_TESTNET:    process.env.BYBIT_TESTNET    === 'true',
+  BYBIT_TESTNET:    isTruthy(process.env.BYBIT_TESTNET),
 
   // ─── Binance ────────────────────────────────────────────
   BINANCE_API_KEY:    process.env.BINANCE_API_KEY    || '',
   BINANCE_API_SECRET: process.env.BINANCE_API_SECRET || '',
-  BINANCE_TESTNET:    process.env.BINANCE_TESTNET    === 'true',
+  BINANCE_TESTNET:    isTruthy(process.env.BINANCE_TESTNET),
   get BINANCE_BASE() {
     return this.BINANCE_TESTNET
       ? 'https://testnet.binance.vision/api/v3'
