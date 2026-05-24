@@ -878,11 +878,11 @@ async function submitApexPayment(){
       errEl.textContent=result.error.message;
       btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
     } else if(result.paymentIntent.status==='succeeded'){
-      document.getElementById('amForm').style.display='none';
-      document.getElementById('amSuccess').style.display='block';
       // decrement spot counter
       var s=parseInt(localStorage.getItem('apex_spots')||'11');
       if(s>1){localStorage.setItem('apex_spots',s-1);}
+      // redirect to setup guide page
+      window.location.href='/bot-setup';
     }
   } catch(err){
     errEl.textContent='Error: '+err.message;

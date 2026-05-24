@@ -1347,7 +1347,7 @@ app.get('/api/heygen/status/:id', async (req, res) => {
 });
 // Explicit HTML page routes
 // Public pages — no auth required
-const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','screen','tiktok-demo','video-maker','video-gen','apex-bot'];
+const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','screen','tiktok-demo','video-maker','video-gen','apex-bot','bot-setup'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
@@ -1462,12 +1462,12 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
 <!-- ══════ CTA ══════ -->
 <div class="cta-wrap">
   <div class="cta-inner">
-    <div class="cta-label">Step 1 — Get the source code</div>
-    <a href="https://aicashsystem.space/bot-access" class="cta-btn">
+    <div class="cta-label">Complete Setup Guide — all steps inside</div>
+    <a href="https://aicashsystem.space/bot-setup" class="cta-btn">
       <span class="cta-btn-shine"></span>
-      Open Bot Repository →
+      Open Setup Guide →
     </a>
-    <p class="cta-hint">Click the button above → ZIP downloads automatically → extract the <b>apex-trade-bot</b> folder</p>
+    <p class="cta-hint">Click the button above → step-by-step guide with download link, Railway deploy &amp; env vars</p>
   </div>
 </div>
 

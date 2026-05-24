@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apex Trade Bot — Setup Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#08080f;color:#e2e8f0;font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 80px}
+
+/* ── HEADER ── */
+.header{background:linear-gradient(180deg,#080f0b 0%,#08080f 100%);border-bottom:1px solid rgba(0,255,136,.1);padding:28px 20px;text-align:center;position:relative;overflow:hidden}
+.header::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(0,255,136,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.25);border-radius:100px;padding:6px 16px;margin-bottom:20px}
+.badge-dot{width:7px;height:7px;border-radius:50%;background:#00ff88;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,.5)}70%{box-shadow:0 0 0 8px rgba(0,255,136,0)}}
+.badge-text{font-size:11px;font-weight:800;color:#00ff88;letter-spacing:2px;text-transform:uppercase}
+.header h1{font-size:32px;font-weight:900;letter-spacing:-1.5px;margin-bottom:8px}
+.header h1 span{background:linear-gradient(90deg,#00ff88,#00d4aa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.header p{color:rgba(255,255,255,.4);font-size:15px}
+
+/* ── CONTAINER ── */
+.wrap{max-width:680px;margin:0 auto;padding:0 16px}
+
+/* ── STEP CARD ── */
+.step-card{background:#0f1117;border:1px solid #1f2937;border-radius:16px;padding:24px;margin-top:16px;position:relative}
+.step-card.done{border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.03)}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);font-size:14px;font-weight:800;color:rgba(255,255,255,.5);margin-bottom:14px}
+.step-card.done .step-num{background:rgba(0,255,136,.15);border-color:rgba(0,255,136,.4);color:#00ff88}
+.step-title{font-size:18px;font-weight:800;margin-bottom:6px;letter-spacing:-.4px}
+.step-desc{font-size:13px;color:rgba(255,255,255,.45);line-height:1.7;margin-bottom:18px}
+.checkmark{position:absolute;top:24px;right:24px;width:28px;height:28px;border-radius:50%;background:rgba(0,255,136,.15);border:1px solid rgba(0,255,136,.4);display:none;align-items:center;justify-content:center;color:#00ff88;font-size:14px}
+.step-card.done .checkmark{display:flex}
+
+/* ── BUTTONS ── */
+.btn-primary{display:block;width:100%;background:#00ff88;color:#000;font-size:16px;font-weight:900;padding:16px;border-radius:12px;border:none;cursor:pointer;text-align:center;text-decoration:none;letter-spacing:-.3px;transition:all .2s}
+.btn-primary:hover{background:#00e87a;transform:translateY(-1px)}
+.btn-secondary{display:block;width:100%;background:rgba(255,255,255,.05);color:#e2e8f0;font-size:15px;font-weight:700;padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,.1);cursor:pointer;text-align:center;text-decoration:none;transition:all .2s}
+.btn-secondary:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)}
+.btn-railway{display:block;width:100%;background:#7c3aed;color:#fff;font-size:15px;font-weight:800;padding:15px;border-radius:12px;border:none;cursor:pointer;text-align:center;text-decoration:none;transition:all .2s}
+.btn-railway:hover{background:#6d28d9;transform:translateY(-1px)}
+
+/* ── ENV VARS ── */
+.env-list{display:flex;flex-direction:column;gap:10px}
+.env-row{background:#0a0a14;border:1px solid #1f2937;border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px;position:relative}
+.env-key{font-family:'Courier New',monospace;font-size:12px;font-weight:700;color:#00ff88;min-width:160px;flex-shrink:0;padding-top:2px}
+.env-val{font-size:12px;color:rgba(255,255,255,.45);line-height:1.6;flex:1}
+.env-val a{color:#60a5fa;text-decoration:none}
+.copy-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:rgba(255,255,255,.4);font-size:11px;font-weight:600;padding:4px 10px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s}
+.copy-btn:hover{background:rgba(0,255,136,.1);border-color:rgba(0,255,136,.3);color:#00ff88}
+.copy-btn.copied{background:rgba(0,255,136,.15);border-color:rgba(0,255,136,.4);color:#00ff88}
+
+/* ── INFO BOX ── */
+.info-box{background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:14px 16px;font-size:13px;color:rgba(255,255,255,.55);line-height:1.7;margin-top:14px}
+.info-box strong{color:#fbbf24}
+.danger-box{background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);border-radius:10px;padding:14px 16px;font-size:12px;color:rgba(255,255,255,.4);line-height:1.7;margin-top:14px}
+
+/* ── SECTION LABEL ── */
+.label{font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.label::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.06)}
+
+/* ── PROGRESS BAR ── */
+.progress{display:flex;gap:6px;padding:20px 16px 0;max-width:680px;margin:0 auto}
+.prog-step{flex:1;height:3px;border-radius:2px;background:#1f2937;transition:background .3s}
+.prog-step.active{background:#00ff88}
+
+/* ── SUPPORT ── */
+.support{text-align:center;padding:32px 20px 0;font-size:13px;color:rgba(255,255,255,.25)}
+.support a{color:#00ff88;text-decoration:none}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="position:relative;z-index:2">
+    <div class="badge"><span class="badge-dot"></span><span class="badge-text">Purchase confirmed</span></div>
+    <h1>Setup your <span>Apex Trade Bot</span></h1>
+    <p>Follow the steps below — you'll be live in under 10 minutes.</p>
+  </div>
+</div>
+
+<div class="progress" id="progress">
+  <div class="prog-step" id="p1"></div>
+  <div class="prog-step" id="p2"></div>
+  <div class="prog-step" id="p3"></div>
+  <div class="prog-step" id="p4"></div>
+  <div class="prog-step" id="p5"></div>
+</div>
+
+<div class="wrap">
+
+<!-- STEP 1 -->
+<div class="step-card" id="step1">
+  <div class="checkmark">✓</div>
+  <div class="step-num">1</div>
+  <div class="step-title">Download the bot</div>
+  <div class="step-desc">Click below to download the bot as a ZIP file. Then extract it — you'll get an <b>apex-trade-bot</b> folder.</div>
+  <a href="https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/archive/refs/heads/release%2Fapex-bot.zip"
+     class="btn-primary" onclick="markDone('step1','p1')">⬇️ Download Apex Trade Bot ZIP</a>
+</div>
+
+<!-- STEP 2 -->
+<div class="step-card" id="step2">
+  <div class="checkmark">✓</div>
+  <div class="step-num">2</div>
+  <div class="step-title">Upload to GitHub</div>
+  <div class="step-desc">Create a free GitHub account if you don't have one. Then create a new repository and upload the <b>apex-trade-bot</b> folder.</div>
+  <div class="label">Quick steps</div>
+  <div style="font-size:13px;color:rgba(255,255,255,.5);line-height:2.2;margin-bottom:16px">
+    1. Go to <a href="https://github.com/new" target="_blank" style="color:#60a5fa">github.com/new</a> → Create a new repository<br>
+    2. Name it <code style="background:#1f2937;padding:2px 6px;border-radius:4px;color:#00ff88">apex-trade-bot</code>, set it to <b>Private</b><br>
+    3. Click <b>uploading an existing file</b> → drag your <b>apex-trade-bot</b> folder contents → Commit
+  </div>
+  <button class="btn-secondary" onclick="markDone('step2','p2')">✅ Done — I uploaded to GitHub</button>
+</div>
+
+<!-- STEP 3 -->
+<div class="step-card" id="step3">
+  <div class="checkmark">✓</div>
+  <div class="step-num">3</div>
+  <div class="step-title">Deploy on Railway</div>
+  <div class="step-desc">Railway runs the bot 24/7 for free. Connect your GitHub repo and deploy.</div>
+  <div class="label">Quick steps</div>
+  <div style="font-size:13px;color:rgba(255,255,255,.5);line-height:2.2;margin-bottom:16px">
+    1. Go to <a href="https://railway.app" target="_blank" style="color:#60a5fa">railway.app</a> → <b>Login with GitHub</b><br>
+    2. Click <b>New Project → Deploy from GitHub repo</b><br>
+    3. Select your <code style="background:#1f2937;padding:2px 6px;border-radius:4px;color:#00ff88">apex-trade-bot</code> repository<br>
+    4. Railway deploys automatically ✅
+  </div>
+  <a href="https://railway.app" target="_blank" class="btn-railway" onclick="markDone('step3','p3')">🚀 Open Railway →</a>
+</div>
+
+<!-- STEP 4 -->
+<div class="step-card" id="step4">
+  <div class="checkmark">✓</div>
+  <div class="step-num">4</div>
+  <div class="step-title">Add Environment Variables</div>
+  <div class="step-desc">In Railway → your project → <b>Variables</b> tab → add each variable below. Click any value to copy it.</div>
+
+  <div class="env-list">
+    <div class="env-row">
+      <span class="env-key">EXCHANGE</span>
+      <span class="env-val">Use Binance (works globally)</span>
+      <button class="copy-btn" onclick="copyVal(this,'binance')">Copy</button>
+    </div>
+    <div class="env-row">
+      <span class="env-key">BINANCE_API_KEY</span>
+      <span class="env-val">Your key from <a href="https://binance.com" target="_blank">binance.com</a> → API Management</span>
+      <button class="copy-btn" style="opacity:.4;cursor:default">yours</button>
+    </div>
+    <div class="env-row">
+      <span class="env-key">BINANCE_API_SECRET</span>
+      <span class="env-val">Your secret — shown only once at creation!</span>
+      <button class="copy-btn" style="opacity:.4;cursor:default">yours</button>
+    </div>
+    <div class="env-row">
+      <span class="env-key">GROQ_API_KEY</span>
+      <span class="env-val">Free AI key from <a href="https://console.groq.com" target="_blank">console.groq.com</a> → API Keys → Create</span>
+      <button class="copy-btn" style="opacity:.4;cursor:default">yours</button>
+    </div>
+    <div class="env-row">
+      <span class="env-key">PAPER_TRADING</span>
+      <span class="env-val">Start with simulated money — zero risk</span>
+      <button class="copy-btn" onclick="copyVal(this,'true')">Copy</button>
+    </div>
+    <div class="env-row">
+      <span class="env-key">PAPER_BALANCE</span>
+      <span class="env-val">Simulated starting balance in USD</span>
+      <button class="copy-btn" onclick="copyVal(this,'10')">Copy</button>
+    </div>
+    <div class="env-row">
+      <span class="env-key">TELEGRAM_BOT_TOKEN</span>
+      <span class="env-val">Optional — get from <a href="https://t.me/BotFather" target="_blank">@BotFather</a> on Telegram for live alerts</span>
+      <button class="copy-btn" style="opacity:.4;cursor:default">yours</button>
+    </div>
+    <div class="env-row">
+      <span class="env-key">TELEGRAM_CHAT_ID</span>
+      <span class="env-val">Optional — your Telegram chat ID (from <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a>)</span>
+      <button class="copy-btn" style="opacity:.4;cursor:default">yours</button>
+    </div>
+  </div>
+
+  <div style="margin-top:14px">
+    <button class="btn-secondary" onclick="markDone('step4','p4')">✅ Done — Variables added</button>
+  </div>
+</div>
+
+<!-- STEP 5 -->
+<div class="step-card" id="step5">
+  <div class="checkmark">✓</div>
+  <div class="step-num">5</div>
+  <div class="step-title">Go Live 🚀</div>
+  <div class="step-desc">Run on paper trading for 24–48h first and watch the Telegram alerts. When you're confident, flip to live.</div>
+
+  <div class="info-box">
+    <strong>Paper Trading first (recommended)</strong><br>
+    The bot trades with simulated money. Zero risk. Watch it perform for 24–48h before going live.
+  </div>
+
+  <div style="margin-top:14px;font-size:13px;color:rgba(255,255,255,.45);line-height:1.9">
+    When ready to go live:<br>
+    1. Deposit <b>$20–50 USDT</b> on your Binance Spot wallet<br>
+    2. Go to Railway → Variables → change <code style="background:#1f2937;padding:2px 6px;border-radius:4px;color:#fbbf24">PAPER_TRADING</code> from <code style="background:#1f2937;padding:2px 6px;border-radius:4px;color:#00ff88">true</code> → <code style="background:#1f2937;padding:2px 6px;border-radius:4px;color:#f87171">false</code><br>
+    3. Save → Railway redeploys in seconds → bot is live ✅
+  </div>
+
+  <div class="danger-box">
+    ⚠ <strong style="color:rgba(248,113,113,.7)">Risk Disclosure</strong> — Crypto trading involves substantial risk of loss. Always start with paper trading. Only invest funds you can afford to lose completely. Past performance is not indicative of future results. Apex Trade Bot is a tool, not financial advice.
+  </div>
+
+  <div style="margin-top:14px">
+    <button class="btn-primary" onclick="markDone('step5','p5');showDone()">🎉 All done — Bot is running!</button>
+  </div>
+</div>
+
+<!-- DONE MESSAGE -->
+<div id="done-msg" style="display:none;text-align:center;padding:40px 20px">
+  <div style="font-size:48px;margin-bottom:16px">🤖</div>
+  <div style="font-size:24px;font-weight:900;margin-bottom:8px;background:linear-gradient(90deg,#00ff88,#00d4aa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Your bot is live!</div>
+  <div style="font-size:14px;color:rgba(255,255,255,.4);line-height:1.7">Check your Telegram for the first trade alerts.<br>Good luck! 🚀</div>
+</div>
+
+</div><!-- /wrap -->
+
+<div class="support">
+  Questions? <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a> — we reply within 24h
+</div>
+
+<script>
+function markDone(stepId, progId) {
+  document.getElementById(stepId).classList.add('done');
+  document.getElementById(progId).classList.add('active');
+}
+function copyVal(btn, val) {
+  navigator.clipboard.writeText(val).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+function showDone() {
+  setTimeout(() => {
+    document.getElementById('done-msg').style.display = 'block';
+    document.getElementById('done-msg').scrollIntoView({ behavior: 'smooth' });
+  }, 400);
+}
+</script>
+</body>
+</html>
