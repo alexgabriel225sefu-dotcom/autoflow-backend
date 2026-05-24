@@ -348,11 +348,112 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 
     <div class="inst" style="margin-top:14px">
       <div class="inst-dot">3</div>
-      <div class="inst-text">After adding all variables, Railway redeploys automatically. Wait ~1 minute then check the <b>Logs</b> tab — you should see <code>✅ License verified</code> and <code>Bot started</code>.</div>
+      <div class="inst-text">After adding all variables, Railway redeploys automatically. Wait ~1 minute then check the <b>Logs</b> tab — you should see <code>✅ License verified</code> and <code>Bot started in PAPER mode</code>.</div>
+    </div>
+    <div class="ok-box">🎉 <b>Bot is now running in Paper Trading mode!</b><br>It's simulating real trades with fake money — zero risk. Watch it work for a few days before going live.</div>
+  </div>
+</div>
+
+<!-- ── PHASE 1 COMPLETE ── -->
+<div style="margin:28px 0 10px;text-align:center">
+  <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.2);border-radius:10px;padding:10px 18px">
+    <span style="font-size:18px">🧪</span>
+    <div style="text-align:left">
+      <div style="font-size:13px;font-weight:800;color:#00ff88">Phase 1 complete — Paper Trading is running</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px">Watch the bot for 3–7 days, then switch to real money below</div>
+    </div>
+  </div>
+</div>
+
+<div class="section-lbl">Phase 2 — Switch to Real Trading</div>
+
+<!-- ── GO LIVE CARD ── -->
+<div class="step-card" id="sLive">
+  <div class="step-head" onclick="toggleLive()">
+    <div class="step-num" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#fbbf24">💰</div>
+    <div class="step-title-wrap">
+      <div class="step-title">Go Live — trade with real money</div>
+      <div class="step-sub">Only do this after watching paper results for a few days</div>
+    </div>
+    <div id="liveArrow" style="color:rgba(255,255,255,.2);font-size:12px">▼</div>
+  </div>
+  <div class="step-body hidden" id="sbLive">
+
+    <div class="warn-box">⚠ <b>Before going live, make sure:</b><br>
+    • You watched the bot trade in Paper mode for at least 3 days<br>
+    • You're comfortable with how it picks coins and enters trades<br>
+    • You deposit only money you can afford to lose<br>
+    • Crypto markets are volatile — the bot doesn't guarantee profits</div>
+
+    <div style="height:1px;background:rgba(255,255,255,.05);margin:16px 0"></div>
+
+    <div class="inst">
+      <div class="inst-dot">1</div>
+      <div class="inst-text"><b>Deposit USDT on Bybit.</b> Go to bybit.com → <b>Assets</b> → <b>Deposit</b> → select <b>USDT</b> → choose a network (TRC20 is cheapest) → send from your exchange or wallet. Start small — $50–200 is enough to test.</div>
+    </div>
+    <div class="inst">
+      <div class="inst-dot">2</div>
+      <div class="inst-text"><b>In Railway, go to your project → Variables tab.</b> Find <b>PAPER_TRADING</b> and change the value from <code>true</code> to <code>false</code>. Click Save.</div>
+    </div>
+    <div class="inst">
+      <div class="inst-dot">3</div>
+      <div class="inst-text">Optionally set <b>PAPER_BALANCE</b> to how much USDT you deposited (e.g. <code>100</code> for $100). This helps the bot size positions correctly.</div>
+    </div>
+    <div class="inst">
+      <div class="inst-dot">4</div>
+      <div class="inst-text">Railway redeploys automatically. Check the <b>Logs</b> tab — you should see <code>Bot started in LIVE mode</code>. The bot will now execute real trades on Bybit using your balance.</div>
+    </div>
+    <div class="inst">
+      <div class="inst-dot">5</div>
+      <div class="inst-text">Monitor the first few trades in your Bybit account under <b>Orders → Order History</b>. Everything normal? Leave it running — it works 24/7 automatically.</div>
     </div>
 
-    <div class="ok-box">🎉 <b>Once you see "Bot started" in logs — you're live!</b><br>The bot is now running 24/7, scanning markets and trading automatically.</div>
-    <div class="warn-box" style="margin-top:8px">🔒 When you're happy with paper results, change <b>PAPER_TRADING</b> to <code>false</code> to trade with real money. Only do this when you're confident.</div>
+    <div class="ok-box" style="margin-top:4px">✅ <b>That's it.</b> The bot runs fully automatically — no daily action needed from you. It scans markets every 5 minutes, picks the best opportunity, and executes trades.</div>
+  </div>
+</div>
+
+<!-- ── TELEGRAM CARD ── -->
+<div class="section-lbl">Optional — Telegram Alerts</div>
+<div class="step-card" id="sTg">
+  <div class="step-head" onclick="toggleTg()">
+    <div class="step-num" style="background:rgba(96,165,250,.08);border-color:rgba(96,165,250,.25);color:#60a5fa">📱</div>
+    <div class="step-title-wrap">
+      <div class="step-title">Get live trade alerts on your phone</div>
+      <div class="step-sub">Free — every trade, every signal, instantly on Telegram</div>
+    </div>
+    <div id="tgArrow" style="color:rgba(255,255,255,.2);font-size:12px">▼</div>
+  </div>
+  <div class="step-body hidden" id="sbTg">
+    <div class="inst">
+      <div class="inst-dot">1</div>
+      <div class="inst-text">Open the <b>Telegram</b> app on your phone (download free from App Store / Google Play if you don't have it).</div>
+    </div>
+    <div class="inst">
+      <div class="inst-dot">2</div>
+      <div class="inst-text">In the search bar type <b>@BotFather</b> → open it → send the message <code>/newbot</code> → it asks for a name (e.g. <code>My Apex Bot</code>) → then a username ending in <code>bot</code> (e.g. <code>myapex_bot</code>).</div>
+    </div>
+    <div class="inst">
+      <div class="inst-dot">3</div>
+      <div class="inst-text">BotFather gives you a token like <code>7123456789:AAFxxxxxxx</code> — copy it. This is your <b>TELEGRAM_BOT_TOKEN</b>.</div>
+    </div>
+    <div class="inst">
+      <div class="inst-dot">4</div>
+      <div class="inst-text">Search for your new bot by its username → open it → press <b>Start</b> → send any message (e.g. <code>hello</code>).</div>
+    </div>
+    <div class="inst">
+      <div class="inst-dot">5</div>
+      <div class="inst-text">Open this link in your browser (replace TOKEN with your actual token):<br>
+      <code>https://api.telegram.org/botTOKEN/getUpdates</code><br>
+      Look for <code>"chat":{"id":123456789}</code> — that number is your <b>TELEGRAM_CHAT_ID</b>.</div>
+    </div>
+    <div class="inst">
+      <div class="inst-dot">6</div>
+      <div class="inst-text">In Railway → Variables tab, add:<br>
+      <code>TELEGRAM_BOT_TOKEN</code> = your token<br>
+      <code>TELEGRAM_CHAT_ID</code> = your chat ID number<br>
+      Railway redeploys and from now on you get a message for every trade.</div>
+    </div>
+    <div class="ok-box">📲 You'll get alerts like: <b>"✅ BUY SOLUSDT — $42.30 | Signal: AI bullish 87%"</b> — live, as soon as the bot trades.</div>
   </div>
 </div>
 
@@ -360,10 +461,10 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <div class="done-card" style="margin-top:20px">
   <div style="font-size:36px;margin-bottom:8px">🚀</div>
   <div class="done-title">Bot is running!</div>
-  <div class="done-sub">It scans markets every 5 minutes, picks the best coin, and trades automatically — 24/7, no manual work needed.</div>
+  <div class="done-sub">Start in Paper Trading mode → watch results for a few days → switch to real money when you're ready.</div>
 </div>
 
-<div class="risk">⚠ Crypto trading involves real risk of loss. Always start with Paper Trading (PAPER_TRADING=true).<br>Only switch to live trading money you can afford to lose.</div>
+<div class="risk">⚠ Crypto trading involves real risk of loss. Always start with Paper Trading.<br>Only invest money you can afford to lose. Past performance doesn't guarantee future results.</div>
 
 </div><!-- /page -->
 
@@ -413,6 +514,28 @@ function cp(btn, val){
     btn.classList.add('ok');
     setTimeout(() => { btn.textContent = prev; btn.classList.remove('ok'); }, 1800);
   }).catch(() => { btn.textContent = val.slice(0, 10); });
+}
+
+/* ── TELEGRAM TOGGLE ── */
+var tgOpen = false;
+function toggleTg(){
+  var body = document.getElementById('sbTg');
+  var arrow = document.getElementById('tgArrow');
+  tgOpen = !tgOpen;
+  body.classList.toggle('hidden', !tgOpen);
+  arrow.textContent = tgOpen ? '▲' : '▼';
+  if (tgOpen) document.getElementById('sTg').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ── LIVE TOGGLE ── */
+var liveOpen = false;
+function toggleLive(){
+  var body = document.getElementById('sbLive');
+  var arrow = document.getElementById('liveArrow');
+  liveOpen = !liveOpen;
+  body.classList.toggle('hidden', !liveOpen);
+  arrow.textContent = liveOpen ? '▲' : '▼';
+  if (liveOpen) document.getElementById('sLive').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* ── STEPS ── */
