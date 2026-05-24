@@ -1082,16 +1082,15 @@ app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
     let pendingKey = null;
     if (isApexBot) {
       pendingKey = generateLicenseKey();
-      // Store in memory map keyed by payment intent ID (cleared after 2h)
+      // Store in memory map (fast path) AND in Supabase (survives server restart)
       _pendingLicenses.set(paymentIntent.id, { key: pendingKey, email: email || '', name: name || '' });
       setTimeout(() => _pendingLicenses.delete(paymentIntent.id), 2 * 3600 * 1000);
-      // Pre-insert as inactive — webhook will activate it on confirmed payment
       if (supabase) {
-        try {
-          await supabase.from('licenses').insert([{
-            key: pendingKey, email: email || '', name: name || '', active: false
-          }]);
-        } catch(e) { console.error('Pending license insert error:', e.message); }
+        const { error: insErr } = await supabase.from('licenses').insert([{
+          key: pendingKey, email: email || '', name: name || '',
+          active: false, payment_intent_id: paymentIntent.id
+        }]);
+        if (insErr) console.error('Pending license insert error:', insErr.message);
       }
       addLog(`Pending license generated for ${email} — ${pendingKey}`, 'license', 'success');
     }
@@ -1121,7 +1120,9 @@ function _hmacMac4(data, secret) {
 
 function generateLicenseKey() {
   const secret = _licSecrets()[0];
-  const rnd8 = Array.from({ length: 8 }, () => _KEY_CHARS[Math.floor(Math.random() * _KEY_CHARS.length)]).join('');
+  // Use CSPRNG (crypto.randomBytes) not Math.random for key entropy
+  const buf = crypto.randomBytes(8);
+  const rnd8 = Array.from(buf).map(b => _KEY_CHARS[b % 32]).join('');
   const mac4 = _hmacMac4(rnd8, secret);
   const full = rnd8 + mac4;
   return `APEX-${full.slice(0, 4)}-${full.slice(4, 8)}-${full.slice(8, 12)}`;
@@ -1207,27 +1208,29 @@ async function handleStripeWebhook(req, res) {
         let licenseKey;
 
         if (pending?.key) {
-          // Activate the pre-generated key
           licenseKey = pending.key;
           _pendingLicenses.delete(pi.id);
-          if (supabase) {
-            try {
-              await supabase.from('licenses')
-                .update({ active: true, activated_at: new Date().toISOString(), name: buyerName })
-                .eq('key', licenseKey);
-            } catch(e) { addLog(`License activate failed: ${e.message}`, 'license', 'error'); }
+        } else if (supabase) {
+          // Server restarted — recover key from Supabase by payment_intent_id
+          const { data: dbRow } = await supabase.from('licenses')
+            .select('key').eq('payment_intent_id', pi.id).single();
+          if (dbRow?.key) {
+            licenseKey = dbRow.key;
+            addLog(`License recovered from DB for ${email} — ${licenseKey}`, 'license', 'info');
           }
-          addLog(`License activated: ${licenseKey} for ${email}`, 'license', 'success');
-        } else {
-          // Fallback: generate a fresh key (e.g. server restarted between intent + webhook)
-          licenseKey = generateLicenseKey();
-          if (supabase) {
-            try {
-              await supabase.from('licenses').insert([{ key: licenseKey, email: email || '', name: buyerName, active: true }]);
-            } catch(e) { addLog(`License store failed: ${e.message}`, 'license', 'error'); }
-          }
-          addLog(`License generated (fallback): ${licenseKey} for ${email}`, 'license', 'success');
         }
+        if (!licenseKey) {
+          // Last resort: generate fresh key
+          licenseKey = generateLicenseKey();
+          addLog(`License generated (last-resort): ${licenseKey} for ${email}`, 'license', 'warn');
+        }
+        if (supabase) {
+          const { error } = await supabase.from('licenses')
+            .update({ active: true, activated_at: new Date().toISOString(), email: email || '', name: buyerName })
+            .eq('key', licenseKey);
+          if (error) addLog(`License activate DB error: ${error.message}`, 'license', 'error');
+        }
+        addLog(`License activated: ${licenseKey} for ${email}`, 'license', 'success');
 
         // Send email as backup (key was already delivered via redirect URL)
         if (email) {
