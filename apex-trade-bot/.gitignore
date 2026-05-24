@@ -1,0 +1,5 @@
+node_modules/
+.env
+*.log
+/tmp/apex-state.json
+.claude-flow/
