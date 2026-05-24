@@ -403,7 +403,12 @@ async function main() {
   logger.setStartBalance(balance);
   logger.printBanner(balance);
 
-  const isTestnet = cfg.BYBIT_TESTNET || cfg.BINANCE_TESTNET;
+  // For Binance: default is testnet (live api.binance.com is geo-blocked from EU cloud servers)
+  // BINANCE_TESTNET=false only when explicitly going live
+  const isBinanceTestnet = cfg.EXCHANGE === 'binance'
+    ? (process.env.BINANCE_TESTNET || '').toLowerCase().trim() !== 'false'
+    : false;
+  const isTestnet = cfg.BYBIT_TESTNET || isBinanceTestnet;
   const mode = cfg.PAPER_TRADING ? '📝 PAPER TRADING' : isTestnet ? '🧪 TESTNET' : '🔴 LIVE';
   dash.mode = mode.replace(/[📝🧪🔴]/g, '').trim();
   tg.alertStart(cfg.SYMBOL, cfg.TIMEFRAME, balance, mode);
