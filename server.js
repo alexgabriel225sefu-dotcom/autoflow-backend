@@ -88,8 +88,58 @@ const CREATIFY_API_KEY = process.env.CREATIFY_API_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || (() => { console.warn('[WARN] JWT_SECRET not set — using insecure default. Set this env var in Render.'); return 'autoflow-secret-2024-change-me'; })();
 const COOKIE_SECRET = process.env.COOKIE_SECRET || JWT_SECRET + '-cookie';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const SENDER_EMAIL = process.env.SENDER_EMAIL || process.env.BREVO_SMTP_USER || 'supportaicashsystem@gmail.com';
 const SENDER_NAME  = process.env.SENDER_NAME  || 'AI Cash Systems';
+
+// ── UNIVERSAL EMAIL SENDER ──────────────────────────────────
+// Priority: Resend → Brevo API → SMTP transporter
+async function _sendEmail({ to, subject, html, fromName }) {
+  const from = fromName || SENDER_NAME;
+  const sender = SENDER_EMAIL;
+
+  // 1. Resend (fastest, works immediately)
+  if (RESEND_API_KEY) {
+    try {
+      const r = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: `${from} <${sender}>`, to: [to], subject, html }),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (r.ok) { addLog(`Email sent via Resend to ${to}`, 'email', 'success'); return { ok: true, method: 'resend' }; }
+      const err = await r.text(); throw new Error(err);
+    } catch(e) { console.error('Resend error:', e.message); }
+  }
+
+  // 2. Brevo API
+  if (BREVO_API_KEY) {
+    try {
+      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: { name: from, email: sender }, to: [{ email: to }], subject, htmlContent: html }),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (r.ok) { addLog(`Email sent via Brevo to ${to}`, 'email', 'success'); return { ok: true, method: 'brevo' }; }
+      const err = await r.text(); throw new Error(err);
+    } catch(e) { console.error('Brevo API error:', e.message); }
+  }
+
+  // 3. SMTP fallback
+  if (transporter) {
+    try {
+      await Promise.race([
+        transporter.sendMail({ from: `"${from}" <${sender}>`, to, subject, html }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('SMTP timeout')), 12000)),
+      ]);
+      addLog(`Email sent via SMTP to ${to}`, 'email', 'success');
+      return { ok: true, method: 'smtp' };
+    } catch(e) { console.error('SMTP error:', e.message); return { ok: false, error: e.message }; }
+  }
+
+  return { ok: false, error: 'No email provider configured' };
+}
 
 // ── GLOBAL HTML ESCAPE HELPER ──
 const _he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -420,36 +470,7 @@ async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
     </div>
     <p style="color:#ccc;font-size:11px;margin-top:18px;text-align:center">AutoFlow · aicashsystem.space</p>
   </div>`;
-
-  // Try Brevo API first (no SMTP setup needed)
-  if (BREVO_API_KEY) {
-    try {
-      const senderEmail = SENDER_EMAIL;
-      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sender: { name: SENDER_NAME, email: SENDER_EMAIL },
-          to: [{ email: to }],
-          subject, htmlContent: html
-        })
-      });
-      if (!r.ok) { const e = await r.text(); throw new Error(e); }
-      addLog(`Notify email sent to ${to}`, 'email', 'success');
-      return;
-    } catch(e) { console.error('Brevo API email error:', e.message); }
-  }
-
-  // Fallback: SMTP transporter
-  if (transporter) {
-    transporter.sendMail({ from: SENDER_EMAIL, to, subject, html })
-      .then(() => addLog(`Notify email sent (SMTP) to ${to}`, 'email', 'success'))
-      .catch(e => console.error('SMTP email error:', e.message));
-    return;
-  }
-
-  console.warn('No email provider configured. Set BREVO_API_KEY in Render environment variables.');
-  addLog('Email not sent — no email provider configured', 'email', 'error');
+  await _sendEmail({ to, subject, html });
 }
 
 async function getAutomation(webhookId) {
@@ -1738,32 +1759,8 @@ async function _sendBotEmailHandler(req, res) {
     catch(e) { /* non-fatal */ }
   }
 
-  let emailSent = false;
-  if (BREVO_API_KEY) {
-    try {
-      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sender: { name: 'Apex.Bot', email: SENDER_EMAIL }, to: [{ email }],
-          subject: '🤖 Your Apex Trade Bot is ready — access inside', htmlContent: botEmailHtml }),
-        signal: AbortSignal.timeout(12000),
-      });
-      if (r.ok) emailSent = true;
-      else { const t = await r.text(); return res.json({ success: false, method: 'brevo', error: t }); }
-    } catch(e) { return res.json({ success: false, method: 'brevo', error: e.message }); }
-  } else if (transporter) {
-    try {
-      await Promise.race([
-        transporter.sendMail({ from: `"Apex.Bot" <${SENDER_EMAIL}>`, to: email,
-          subject: '🤖 Your Apex Trade Bot is ready — access inside', html: botEmailHtml }),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('SMTP timeout after 12s')), 12000)),
-      ]);
-      emailSent = true;
-    } catch(e) { return res.json({ success: false, method: 'smtp', error: e.message }); }
-  } else {
-    return res.json({ success: false, error: 'No email provider configured (BREVO_API_KEY missing)' });
-  }
-  return res.json({ success: emailSent, to: email, licenseKey: testKey, method: BREVO_API_KEY ? 'brevo' : 'smtp' });
+  const result = await _sendEmail({ to: email, subject: '🤖 Your Apex Trade Bot is ready — access inside', html: botEmailHtml, fromName: 'Apex.Bot' });
+  return res.json({ success: result.ok, to: email, licenseKey: testKey, method: result.method, error: result.error });
 }
 
 // Protected pages — require any valid course purchase
