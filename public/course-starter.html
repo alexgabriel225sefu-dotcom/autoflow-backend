@@ -422,6 +422,12 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 3
 </div>
 
 <script>
+// ── ACCESS GUARD ──
+(function(){
+  var plan = localStorage.getItem('acs_plan');
+  if (!plan) { window.location.replace('/access.html'); }
+})();
+
 var done = JSON.parse(localStorage.getItem('starter_lessons') || '[]');
 
 function updateProgress(){

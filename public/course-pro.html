@@ -304,6 +304,12 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 3
 </div>
 
 <script>
+// ── ACCESS GUARD ──
+(function(){
+  var plan = localStorage.getItem('acs_plan');
+  if (plan !== 'pro') { window.location.replace('/access.html'); }
+})();
+
 var done = JSON.parse(localStorage.getItem('pro_lessons') || '[]');
 function updateProgress(){
   var pct = (done.length / 42) * 100;
