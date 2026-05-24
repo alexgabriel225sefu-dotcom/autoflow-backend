@@ -1064,6 +1064,18 @@ function generateLicenseKey() {
   return `APEX-${seg()}-${seg()}-${seg()}`;
 }
 
+// GET /api/owner-license — generate a license key for the owner (no secret needed, rate-limited)
+app.get('/api/owner-license', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const key = generateLicenseKey();
+  try {
+    await supabase.from('licenses').insert([{ key, email: 'owner@aicashsystem.space', name: 'Owner' }]);
+    res.json({ key, message: 'Add this as LICENSE_KEY in Railway Variables' });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/verify-license — called by the bot on every startup
 app.post('/api/verify-license', async (req, res) => {
   const { key } = req.body || {};
