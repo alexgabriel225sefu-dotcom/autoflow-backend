@@ -1612,10 +1612,27 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
 
 </div></body></html>`;}
 
-// ── BOT ACCESS REDIRECT — clienții văd aicashsystem.space/bot-access, nu GitHub
+// ── BOT ACCESS — streams a clean ZIP of ONLY the bot folder (no server.js, no other files)
 app.get('/bot-access', (req, res) => {
-  // Direct ZIP download — works on mobile and desktop without needing to find the Code button
-  res.redirect(302, 'https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/archive/refs/heads/release%2Fapex-bot.zip');
+  const { execFile } = require('child_process');
+  const os = require('os');
+  const fs = require('fs');
+  const botDir = path.join(__dirname, 'apex-trade-bot');
+  const tmpZip = path.join(os.tmpdir(), `apex-trade-bot-${Date.now()}.zip`);
+
+  // Build zip: src/ + package.json + railway.json — no node_modules
+  execFile('zip', ['-r', tmpZip, 'src', 'package.json', 'railway.json'], { cwd: botDir }, (err) => {
+    if (err) {
+      console.error('[BOT-ACCESS] zip error:', err.message);
+      return res.status(500).send('Could not generate bot package. Please contact support.');
+    }
+    res.setHeader('Content-Disposition', 'attachment; filename="apex-trade-bot.zip"');
+    res.setHeader('Content-Type', 'application/zip');
+    const stream = fs.createReadStream(tmpZip);
+    stream.pipe(res);
+    stream.on('end', () => fs.unlink(tmpZip, () => {}));
+    stream.on('error', () => res.status(500).end());
+  });
 });
 
 // ── TEST DELIVERY EMAIL — protejat cu secret key, fără plată
