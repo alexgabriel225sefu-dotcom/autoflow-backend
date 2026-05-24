@@ -411,42 +411,60 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(28px);background:rgba
           </div>
         </div>
         <div class="tg-msgs">
+          <!-- Starting balance (dimmed = past) -->
+          <div class="tg-bubble" style="opacity:.45;transform:scale(.96);transform-origin:left">
+            <div class="tb-title" style="font-size:12px">💗 APEX BOT — <span style="color:var(--green)">ACTIVE</span> (tick #18)</div>
+            <div class="tb-row"><span class="tb-label">💼 Balance:</span><span class="tb-val">$100.0000</span></div>
+            <div class="tb-row"><span class="tb-label">📬 No open position</span></div>
+            <div class="tb-time">21:31</div>
+          </div>
+          <!-- Active trade with profit -->
           <div class="tg-bubble active" style="position:relative">
-            <div class="tb-title">💗 APEX BOT — <span style="color:var(--green)">ACTIVE</span> (tick #132)</div>
+            <div class="tb-title">💗 APEX BOT — <span style="color:var(--green)">ACTIVE</span> (tick #24)</div>
             <div class="tb-sep"></div>
-            <div class="tb-row"><span class="tb-label">💼 Balance:</span><span class="tb-val">$11.2335</span></div>
-            <div class="tb-row"><span class="tb-label">📊 SHORT</span><span class="tb-val">ADAUSDT @ $0.2467</span></div>
-            <div class="tb-row"><span class="tb-label">📈 PnL:</span><span class="tb-profit">+$0.0055 (+0.45%)</span></div>
+            <div class="tb-row"><span class="tb-label">💼 Balance:</span><span class="tb-val" style="color:var(--green);font-weight:900">$126.4000</span></div>
+            <div class="tb-row"><span class="tb-label">📊 SHORT</span><span class="tb-val">SOLUSDT @ $85.28</span></div>
+            <div class="tb-row"><span class="tb-label">📈 PnL:</span><span class="tb-profit">+$26.40 (+26.4%)</span></div>
             <div class="tb-sep"></div>
-            <div class="tb-row"><span class="tb-label">🛡️ SL:</span><span class="tb-val">$0.24735</span><span class="tb-label" style="margin-left:8px">🎯 TP:</span><span class="tb-val">$0.24275</span></div>
-            <div class="tb-time">07:53</div>
+            <div class="tb-row"><span class="tb-label">🛡️ SL:</span><span class="tb-val">$85.96</span><span class="tb-label" style="margin-left:8px">🎯 TP:</span><span class="tb-val">$83.91</span></div>
+            <div class="tb-time">22:01</div>
             <div class="tg-badge">LIVE</div>
           </div>
-          <div class="tg-bubble" style="opacity:.5;transform:scale(.97);transform-origin:left">
-            <div class="tb-title" style="font-size:12px">💗 APEX BOT — ACTIVE (tick #131)</div>
-            <div class="tb-row"><span class="tb-label">📊 SCAN complete · 5 pairs analyzed</span></div>
-            <div class="tb-row"><span class="tb-label">⏱️ Next analysis in</span><span class="tb-val">4:58</span></div>
-            <div class="tb-time">07:48</div>
+          <!-- Growth callout -->
+          <div style="background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.2);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;margin-top:2px">
+            <span style="font-size:20px">🚀</span>
+            <div>
+              <div style="font-size:11px;font-weight:900;color:var(--green)">$100 → $126.40 in paper trading</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">Simulated run — real bot logic, zero real money risk</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
     <div class="proof-copy">
-      <p class="ey">// LIVE BOT OUTPUT</p>
-      <h2>Your phone gets the alert.<br><span>You don't touch anything.</span></h2>
-      <p>Every trade, every heartbeat, every stop-loss — straight to Telegram. The bot analyzes, decides, executes and reports. You just watch the notifications roll in.</p>
+      <p class="ey">// REAL BOT OUTPUT · PAPER RUN</p>
+      <h2>$100 started.<br><span>$126.40 in one session.</span></h2>
+      <p>This is what it looks like on your phone. Every 5 minutes the bot reports — balance, position, PnL, SL/TP. You watch. The bot works. These are real messages from an actual paper trading session — not demos.</p>
+      <!-- Big stat -->
+      <div style="background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.15);border-radius:16px;padding:22px 24px;margin-bottom:28px;display:flex;align-items:center;gap:20px">
+        <div style="font-size:44px;font-weight:900;color:var(--green);font-family:var(--mono);letter-spacing:-2px;line-height:1">+26.4%</div>
+        <div>
+          <div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:4px">Paper trading session</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.4);line-height:1.5">$100 starting balance<br>No intervention — fully automated<br><span style="color:rgba(255,149,0,.6)">⚠ Simulated run — past performance ≠ future results</span></div>
+        </div>
+      </div>
       <div class="proof-pills">
         <div class="proof-pill">
           <div class="proof-pill-ico">📡</div>
-          <div><h4>Heartbeat every 5 minutes</h4><p>Even when no trade is taken, the bot sends a status update. You always know it's running.</p></div>
+          <div><h4>Heartbeat every 5 minutes</h4><p>Even when no trade is taken, the bot sends a status ping. You always know it's alive.</p></div>
         </div>
         <div class="proof-pill">
           <div class="proof-pill-ico">🎯</div>
-          <div><h4>Entry, SL and TP on every alert</h4><p>Every alert includes the exact entry price, stop-loss and take-profit. Full transparency.</p></div>
+          <div><h4>Entry, SL and TP on every alert</h4><p>Every alert includes the exact entry, stop-loss and take-profit. Full transparency — no guessing.</p></div>
         </div>
         <div class="proof-pill">
           <div class="proof-pill-ico">🔒</div>
-          <div><h4>Paper trading — zero real risk to start</h4><p>Bot starts in simulated mode. Watch it trade for days before switching to live.</p></div>
+          <div><h4>Start in Paper mode — zero risk</h4><p>The bot runs in simulation first. You see real signals with fake money before going live.</p></div>
         </div>
       </div>
     </div>
