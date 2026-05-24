@@ -102,18 +102,37 @@ body{background:#08080f;color:#e2e8f0;font-family:'Inter',sans-serif;min-height:
 <div class="step-card" id="step1">
   <div class="checkmark">✓</div>
   <div class="step-num">1</div>
-  <div class="step-title">Deploy on Railway — one click</div>
-  <div class="step-desc">Click the button below → login with GitHub → select the <b>apex-trade-bot</b> repo → Deploy. No download, no upload needed.</div>
-  <a href="https://railway.app/new/github-repo?url=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot"
-     target="_blank" class="btn-railway" onclick="markDone('step1','p1')">🚀 Deploy on Railway →</a>
-  <div style="margin-top:12px;font-size:12px;color:rgba(255,255,255,.3);text-align:center">
-    Railway is free · No card required · Deploys in ~30 seconds
+  <div class="step-title">Deploy on Railway — 2 quick steps</div>
+  <div class="step-desc">First copy the bot to your GitHub, then deploy it on Railway. Both are one click — no coding needed.</div>
+
+  <!-- Sub-step A: Fork -->
+  <div style="margin-bottom:14px">
+    <div style="font-size:11px;font-weight:800;color:#a78bfa;letter-spacing:.08em;margin-bottom:8px">STEP 1A — Copy the bot to your GitHub</div>
+    <a href="https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot/fork"
+       target="_blank"
+       style="display:block;width:100%;padding:14px;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.4);border-radius:12px;color:#a78bfa;font-weight:700;font-size:15px;text-align:center;text-decoration:none;box-sizing:border-box"
+       onclick="this.style.background='rgba(167,139,250,.3)'">
+      🍴 Fork the Bot on GitHub →
+    </a>
+    <div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.3);text-align:center">Login with GitHub if asked → click <b style="color:rgba(255,255,255,.5)">Create fork</b></div>
   </div>
-  <div style="margin-top:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px 16px;font-size:12px;color:rgba(255,255,255,.5);line-height:1.7">
-    <b style="color:rgba(255,255,255,.7)">Steps after clicking:</b><br>
-    1. Click <b style="color:#a78bfa">Login with GitHub</b> (if asked)<br>
-    2. Railway shows the <b style="color:#a78bfa">apex-trade-bot</b> repo — click <b style="color:#a78bfa">Deploy</b><br>
-    3. Add Variables from Step 2 below → Railway deploys in ~30s
+
+  <!-- Sub-step B: Railway -->
+  <div style="margin-bottom:4px">
+    <div style="font-size:11px;font-weight:800;color:#a78bfa;letter-spacing:.08em;margin-bottom:8px">STEP 1B — Deploy your copy on Railway</div>
+    <a href="https://railway.app/new"
+       target="_blank" class="btn-railway" onclick="markDone('step1','p1')">🚀 Open Railway → Deploy →</a>
+    <div style="margin-top:12px;font-size:12px;color:rgba(255,255,255,.3);text-align:center">
+      Railway is free · No card required · Deploys in ~30 seconds
+    </div>
+  </div>
+
+  <div style="margin-top:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px 16px;font-size:12px;color:rgba(255,255,255,.5);line-height:1.9">
+    <b style="color:rgba(255,255,255,.7)">In Railway after clicking:</b><br>
+    1. Click <b style="color:#a78bfa">Deploy from GitHub repo</b><br>
+    2. Connect GitHub if asked<br>
+    3. Find <b style="color:#a78bfa">apex-trade-bot</b> in your repos → click <b style="color:#a78bfa">Deploy</b><br>
+    4. Add Variables from Step 2 → Railway deploys in ~30s
   </div>
 </div>
 
