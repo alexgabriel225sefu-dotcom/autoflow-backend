@@ -1731,25 +1731,21 @@ app.get('/bot-access', async (req, res) => {
       if (!data?.active) return res.status(403).send('Invalid or inactive license key.');
     } catch { return res.status(403).send('Could not verify license. Contact support.'); }
   }
-  const { execFile } = require('child_process');
-  const os = require('os');
-  const fs = require('fs');
+  const archiver = require('archiver');
   const botDir = path.join(__dirname, 'apex-trade-bot');
-  const tmpZip = path.join(os.tmpdir(), `apex-trade-bot-${Date.now()}.zip`);
-
-  // Build zip: src/ + package.json + railway.json — no node_modules
-  execFile('zip', ['-r', tmpZip, 'src', 'package.json', 'railway.json'], { cwd: botDir }, (err) => {
-    if (err) {
-      console.error('[BOT-ACCESS] zip error:', err.message);
-      return res.status(500).send('Could not generate bot package. Please contact support.');
-    }
-    res.setHeader('Content-Disposition', 'attachment; filename="apex-trade-bot.zip"');
-    res.setHeader('Content-Type', 'application/zip');
-    const stream = fs.createReadStream(tmpZip);
-    stream.pipe(res);
-    stream.on('end', () => fs.unlink(tmpZip, () => {}));
-    stream.on('error', () => res.status(500).end());
+  res.setHeader('Content-Disposition', 'attachment; filename="apex-trade-bot.zip"');
+  res.setHeader('Content-Type', 'application/zip');
+  const archive = archiver('zip', { zlib: { level: 6 } });
+  archive.on('error', (err) => {
+    console.error('[BOT-ACCESS] archive error:', err.message);
+    if (!res.headersSent) res.status(500).send('Could not generate bot package. Contact support.');
   });
+  archive.pipe(res);
+  // Include src/, package.json, railway.json — no node_modules
+  archive.directory(path.join(botDir, 'src'), 'src');
+  archive.file(path.join(botDir, 'package.json'), { name: 'package.json' });
+  archive.file(path.join(botDir, 'railway.json'), { name: 'railway.json' });
+  archive.finalize();
 });
 
 // ── EMAIL STATUS — requires owner secret
