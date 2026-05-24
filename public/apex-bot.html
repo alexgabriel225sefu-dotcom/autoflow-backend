@@ -287,7 +287,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
 <!-- FLASH BAR -->
 <div class="flash">
   <span class="flash-txt">⚡ Launch price ends in</span>
-  <span class="flash-cd" id="countdown">23:47:12</span>
+  <span class="flash-cd" id="countdown">--:--:--</span>
   <span class="flash-sep">·</span>
   <span class="flash-tag">Increases to $297 after launch</span>
 </div>
@@ -523,7 +523,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
       <span class="feat-tag">DEPLOY</span>
       <span class="feat-ico">🚀</span>
       <h3>One-Click Railway Deploy</h3>
-      <p>Full Node.js source code. Railway one-click deploy button included. No server knowledge required. Start on Railway free tier, scale when ready.</p>
+      <p>Full Node.js source code. Railway deploy button included. No server knowledge required. Railway Hobby plan ~$5/month for 24/7 uptime — no free tier for persistent services.</p>
     </div>
   </div>
 </section>
@@ -616,7 +616,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
     </div>
     <div class="faq-item">
       <div class="faq-q">What are the ongoing costs?<span class="faq-ico">+</span></div>
-      <div class="faq-a"><div class="faq-ans">Railway Hobby plan ~$5/month for 24/7 uptime (free tier available with limits). Groq AI: completely free. Exchange trading fees: 0.1% per trade on Bybit/Binance. No other costs.</div></div>
+      <div class="faq-a"><div class="faq-ans">Railway Hobby plan ~$5/month for 24/7 uptime (no free tier for persistent services). Groq AI: completely free. Exchange trading fees: 0.1% per trade on Bybit/Binance. No other costs.</div></div>
     </div>
     <div class="faq-item">
       <div class="faq-q">Can I modify the strategy?<span class="faq-ico">+</span></div>
@@ -707,20 +707,19 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(24px);background:rgba
 </div>
 
 <script>
-// COUNTDOWN
+// COUNTDOWN — one-time 72h from first visit, does not reset
 (function(){
   const K='apex_cd2';
   let end=parseInt(localStorage.getItem(K)||'0');
-  if(!end||end<Date.now()){end=Date.now()+24*3600*1000;localStorage.setItem(K,end);}
+  if(!end||end<Date.now()){end=Date.now()+72*3600*1000;localStorage.setItem(K,end);}
   function tick(){
     const d=Math.max(0,end-Date.now());
     const h=String(Math.floor(d/3600000)).padStart(2,'0');
     const m=String(Math.floor(d%3600000/60000)).padStart(2,'0');
     const s=String(Math.floor(d%60000/1000)).padStart(2,'0');
     const txt=h+':'+m+':'+s;
-    document.getElementById('countdown').textContent=txt;
-    const c2=document.getElementById('countdown2');if(c2)c2.textContent=txt;
-    if(d===0){end=Date.now()+24*3600*1000;localStorage.setItem(K,end);}
+    document.getElementById('countdown').textContent=d>0?txt:'Offer ended';
+    const c2=document.getElementById('countdown2');if(c2)c2.textContent=d>0?txt:'Offer ended';
   }
   setInterval(tick,1000);tick();
 })();

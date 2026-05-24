@@ -30,24 +30,7 @@ app.use((req, res, next) => {
 
 // Health check — first route, no deps, always responds
 app.get('/health', (req, res) => res.json({ ok: true, node: process.version, time: new Date().toISOString() }));
-app.get('/ping', (req, res) => res.json({ ok: true, version: 'v7-hmac-license', time: new Date().toISOString() }));
-// Debug: verbose key verification
-app.get('/api/check-key', (req, res) => {
-  const key = (req.query.key || '').trim();
-  const up = key.toUpperCase();
-  const m = up.match(/^APEX-([A-Z0-9]{4})-([A-Z0-9]{4})-([A-Z0-9]{4})$/);
-  if (!m) return res.json({ key: key.slice(0,9)+'…', valid: false, step: 'regex_fail', regex_input: up });
-  const full = m[1]+m[2]+m[3];
-  const data = full.slice(0,8);
-  const given = full.slice(8,12);
-  const secrets = _licSecrets();
-  const results = secrets.map((s,i) => {
-    const computed = _hmacMac4(data, s);
-    return { secret_index: i, match: computed === given, computed, given };
-  });
-  const valid = results.some(r => r.match);
-  res.json({ key: key.slice(0,9)+'…', valid, data, given, results });
-});
+app.get('/ping', (req, res) => res.json({ ok: true, version: 'v8-audit-fixes', time: new Date().toISOString() }));
 app.get('/api/stripe-config', auth, async (req, res) => {
   const key = process.env.STRIPE_SECRET_KEY || '';
   const isLive = key.startsWith('sk_live_');
@@ -102,7 +85,11 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const HEYGEN_KEY = process.env.HEYGEN_API_KEY;
 const CREATIFY_API_ID  = process.env.CREATIFY_API_ID  || '';
 const CREATIFY_API_KEY = process.env.CREATIFY_API_KEY || '';
-const JWT_SECRET = process.env.JWT_SECRET || (() => { console.warn('[WARN] JWT_SECRET not set — using insecure default. Set this env var in Render.'); return 'autoflow-secret-2024-change-me'; })();
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') { console.error('FATAL: JWT_SECRET not set in production'); process.exit(1); }
+  console.warn('[WARN] JWT_SECRET not set — using insecure default (dev only).');
+  return 'autoflow-secret-dev-only';
+})();
 const COOKIE_SECRET = process.env.COOKIE_SECRET || JWT_SECRET + '-cookie';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
@@ -117,8 +104,10 @@ async function _sendEmail({ to, subject, html, fromName }) {
 
   // 1. Resend (fastest, works immediately)
   if (RESEND_API_KEY) {
-    // Use verified Resend domain if custom domain not verified yet
-    const resendFrom = process.env.RESEND_FROM || `${from} <onboarding@resend.dev>`;
+    // RESEND_FROM must be set to a verified Resend sender, e.g. "Apex Bot <bot@aicashsystem.space>"
+    // Without it, emails may be blocked. Set RESEND_FROM in Render env vars.
+    const resendFrom = process.env.RESEND_FROM;
+    if (!resendFrom) { console.warn('[WARN] RESEND_FROM not set — Resend will likely reject the send. Set it to a verified sender.'); }
     try {
       const r = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -1061,6 +1050,11 @@ const VALID_AMOUNTS = [3700, 9700, 19700]; // $37 starter, $97 pro, $197 apex-bo
 app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
   const { amount, currency, email, name, product } = req.body;
   const safeAmount = VALID_AMOUNTS.includes(Number(amount)) ? Number(amount) : 3700;
+  // Enforce: apex-bot MUST be $197 — reject mismatched product/amount combos
+  if (product === 'apex-bot' && safeAmount !== 19700) return res.status(400).json({ error: 'Invalid amount for apex-bot' });
+  if (safeAmount === 19700 && product && product !== 'apex-bot') return res.status(400).json({ error: 'Invalid product for this amount' });
+  // Server-side email format validation
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
   const isApexBot = (product === 'apex-bot') || safeAmount === 19700;
   try {
     if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe not configured' });
@@ -1641,16 +1635,16 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
 <!-- ─ BINANCE API ─ -->
 <div class="card card-green">
   <div class="card-corner card-corner-green"></div>
-  <div class="card-tag card-tag-green">🔑 Step 2 — Binance API Key <span class="card-tag-line"></span></div>
+  <div class="card-tag card-tag-green">🔑 Step 2 — Bybit API Key <span class="card-tag-line"></span></div>
   <div class="step">
     <div class="step-n step-n-g">1</div>
-    <div><div class="step-title">Create a Binance account</div>
-    <div class="step-body">Go to <a href="https://binance.com">binance.com</a> → Sign up. Complete identity verification (ID required) to unlock spot trading. Binance works globally including EU.</div></div>
+    <div><div class="step-title">Create a Bybit account</div>
+    <div class="step-body">Go to <a href="https://bybit.com">bybit.com</a> → Sign up. Complete identity verification (ID required) to unlock spot trading. Bybit works globally.</div></div>
   </div>
   <div class="step">
     <div class="step-n step-n-g">2</div>
     <div><div class="step-title">Open API Management</div>
-    <div class="step-body">Click your profile icon (top right) → <b>API Management</b> → <b>Create API</b> → choose <b>System-generated</b></div></div>
+    <div class="step-body">Click your profile icon (top right) → <b>API</b> → <b>Create New Key</b> → choose <b>System-generated</b></div></div>
   </div>
   <div class="step">
     <div class="step-n step-n-g">3</div>
@@ -1699,9 +1693,9 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
   <div class="card-tag card-tag-dim">📋 Railway Variables — Add These <span class="card-tag-line"></span></div>
   <table class="vt">
     <tr><td class="vt-k">LICENSE_KEY</td><td class="vt-v">Your key from above — ${chip(licenseKey,'#a78bfa')}</td></tr>
-    <tr><td class="vt-k">EXCHANGE</td><td class="vt-v">Set to ${chip('binance')} — works globally including EU</td></tr>
-    <tr><td class="vt-k">BINANCE_API_KEY</td><td class="vt-v">The API Key from Step 2 above</td></tr>
-    <tr><td class="vt-k">BINANCE_API_SECRET</td><td class="vt-v">The Secret Key from Step 2 — <b>only shown once at creation</b></td></tr>
+    <tr><td class="vt-k">EXCHANGE</td><td class="vt-v">Set to ${chip('bybit')} — works globally including EU</td></tr>
+    <tr><td class="vt-k">BYBIT_API_KEY</td><td class="vt-v">The API Key from Step 2 above</td></tr>
+    <tr><td class="vt-k">BYBIT_API_SECRET</td><td class="vt-v">The Secret Key from Step 2 — <b>only shown once at creation</b></td></tr>
     <tr><td class="vt-k">GROQ_API_KEY</td><td class="vt-v">Free AI key — go to <a href="https://console.groq.com">console.groq.com</a> → API Keys → <b>Create API Key</b> (no card needed)</td></tr>
     <tr><td class="vt-k">PAPER_TRADING</td><td class="vt-v">Set to ${chip('true')} to start safely with simulated money. Change to ${chip('false','#f59e0b')} when ready to go live.</td></tr>
     <tr><td class="vt-k">PAPER_BALANCE</td><td class="vt-v">Simulated balance. Default: ${chip('10')} (= $10 USDT)</td></tr>
@@ -1773,13 +1767,13 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
 
 </div></body></html>`;}
 
-// ── BOT ACCESS — streams a clean ZIP; key format check only (runtime enforcement via /api/verify-license)
+// ── BOT ACCESS — streams a clean ZIP; requires valid HMAC-signed license key
 app.get('/bot-access', async (req, res) => {
   const key = req.query.key || req.headers['x-license-key'];
   if (!key) return res.status(403).send('License key required. Add ?key=APEX-XXXX-XXXX-XXXX');
-  // Validate key format: APEX-XXXX-XXXX-XXXX (alphanumeric segments)
-  if (!/^APEX-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(key)) {
-    return res.status(403).send('Invalid license key format.');
+  // Validate HMAC signature — not just format
+  if (!verifyLicenseKeyHmac(key)) {
+    return res.status(403).send('Invalid license key.');
   }
   console.log('[BOT-ACCESS] download with key:', key.slice(0, 9) + '…');
   const archiver = require('archiver');
@@ -1895,27 +1889,27 @@ async function _sendBotEmailHandler(req, res) {
   const adminSecret = process.env.BOT_EMAIL_SECRET || '';
   const isPreview = req.query.preview === '1';
 
-  // Preview mode — afișează emailul direct în browser fără auth/email
-  if (isPreview) {
-    const name  = req.query.name || req.body.name || 'Alex';
-    const email = req.query.email || req.body.email || 'preview@example.com';
-    const _he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    const previewHtml = _buildBotEmailHtml(_he(name), _he(email), 'APEX-DEMO-PREW-2025');
-    return res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview: Bot Delivery Email</title>
-      <style>body{margin:0;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:40px 20px;font-family:sans-serif}
-      .bar{background:#2d2d44;border:1px solid #444;border-radius:8px;padding:10px 20px;margin-bottom:24px;color:#aaa;font-size:13px;text-align:center;max-width:600px;width:100%}
-      .bar strong{color:#00ff88}</style></head><body>
-      <div class="bar">📧 <strong>PREVIEW</strong> — Asta e emailul pe care îl primește clientul după cumpărare.<br>
-      <span style="font-size:11px;color:#666">Towards: ${_he(email)} · Name: ${_he(name)} · Key: APEX-DEMO-PREW-2025</span></div>
-      ${previewHtml}</body></html>`);
-  }
-
   if (!adminSecret) {
     return res.status(403).json({ error: 'BOT_EMAIL_SECRET not set in env — add it on Render' });
   }
   if (secret !== adminSecret) {
     return res.status(403).json({ error: 'Wrong secret', hint: `Expected length: ${adminSecret.length} chars, got: ${(secret||'').length} chars` });
   }
+
+  // Preview mode — shows email in browser without actually sending (requires valid secret)
+  if (isPreview) {
+    const name  = req.query.name || req.body.name || 'Alex';
+    const email = req.query.email || req.body.email || 'preview@example.com';
+    const previewHtml = _buildBotEmailHtml(_he(name), _he(email), 'APEX-DEMO-PREW-2025');
+    return res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview: Bot Delivery Email</title>
+      <style>body{margin:0;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:40px 20px;font-family:sans-serif}
+      .bar{background:#2d2d44;border:1px solid #444;border-radius:8px;padding:10px 20px;margin-bottom:24px;color:#aaa;font-size:13px;text-align:center;max-width:600px;width:100%}
+      .bar strong{color:#00ff88}</style></head><body>
+      <div class="bar">📧 <strong>PREVIEW</strong> — Email received by buyer after purchase.<br>
+      <span style="font-size:11px;color:#666">To: ${_he(email)} · Name: ${_he(name)} · Key: APEX-DEMO-PREW-2025</span></div>
+      ${previewHtml}</body></html>`);
+  }
+
   const email = req.body.email;
   const name  = req.body.name || 'there';
   if (!email) return res.status(400).json({ error: 'email required' });
