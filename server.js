@@ -1723,7 +1723,15 @@ async function _sendBotEmailHandler(req, res) {
   const name  = req.body.name || 'there';
   if (!email) return res.status(400).json({ error: 'email required' });
 
-  const botEmailHtml = _buildBotEmailHtml(_he(name), _he(email));
+  // Generate a real license key for test sends
+  const testKey = generateLicenseKey();
+  const botEmailHtml = _buildBotEmailHtml(_he(name), _he(email), testKey);
+
+  // Save test license to Supabase
+  if (supabase) {
+    try { await supabase.from('licenses').insert([{ key: testKey, email: email || '', name }]); }
+    catch(e) { /* non-fatal */ }
+  }
 
   let emailSent = false;
   if (BREVO_API_KEY) {
@@ -1732,21 +1740,25 @@ async function _sendBotEmailHandler(req, res) {
         method: 'POST',
         headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({ sender: { name: 'Apex.Bot', email: SENDER_EMAIL }, to: [{ email }],
-          subject: '🤖 Your Apex Trade Bot is ready — access inside', htmlContent: botEmailHtml })
+          subject: '🤖 Your Apex Trade Bot is ready — access inside', htmlContent: botEmailHtml }),
+        signal: AbortSignal.timeout(12000),
       });
       if (r.ok) emailSent = true;
       else { const t = await r.text(); return res.json({ success: false, method: 'brevo', error: t }); }
     } catch(e) { return res.json({ success: false, method: 'brevo', error: e.message }); }
   } else if (transporter) {
     try {
-      await transporter.sendMail({ from: `"Apex.Bot" <${SENDER_EMAIL}>`, to: email,
-        subject: '🤖 Your Apex Trade Bot is ready — access inside', html: botEmailHtml });
+      await Promise.race([
+        transporter.sendMail({ from: `"Apex.Bot" <${SENDER_EMAIL}>`, to: email,
+          subject: '🤖 Your Apex Trade Bot is ready — access inside', html: botEmailHtml }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('SMTP timeout after 12s')), 12000)),
+      ]);
       emailSent = true;
     } catch(e) { return res.json({ success: false, method: 'smtp', error: e.message }); }
   } else {
     return res.json({ success: false, error: 'No email provider configured (BREVO_API_KEY missing)' });
   }
-  return res.json({ success: emailSent, to: email, method: BREVO_API_KEY ? 'brevo' : 'smtp' });
+  return res.json({ success: emailSent, to: email, licenseKey: testKey, method: BREVO_API_KEY ? 'brevo' : 'smtp' });
 }
 
 // Protected pages — require any valid course purchase
