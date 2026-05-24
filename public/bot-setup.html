@@ -100,6 +100,14 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .done-title{font-size:22px;font-weight:900;margin-bottom:8px}
 .done-sub{font-size:13px;color:rgba(255,255,255,.4);line-height:1.6}
 
+/* COIN OPTIONS */
+.coin-opt{display:flex;align-items:center;gap:10px;background:#0a0a14;border:1px solid #1c1f2e;border-radius:8px;padding:10px 12px;cursor:pointer;transition:all .15s}
+.coin-opt:hover{border-color:rgba(0,255,136,.25);background:rgba(0,255,136,.04)}
+.coin-opt.selected{border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.07)}
+.coin-icon{font-size:18px;width:28px;text-align:center;flex-shrink:0;color:rgba(255,255,255,.5)}
+.coin-name{font-family:'Courier New',monospace;font-size:12px;font-weight:700;color:#e2e8f0}
+.coin-desc{font-size:10px;color:rgba(255,255,255,.3);margin-top:1px}
+
 /* RISK / SUPPORT */
 .risk{font-size:11px;color:rgba(255,255,255,.22);text-align:center;line-height:1.7;padding:0 10px;margin-top:8px}
 .support{font-size:12px;color:rgba(255,255,255,.2);text-align:center;margin-top:24px}
@@ -340,9 +348,53 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <button class="cpb" onclick="cp(this,'100')">Copy</button>
       </div>
       <div class="env-row">
-        <span class="ekey">TELEGRAM_BOT_TOKEN</span>
-        <span class="eval">Optional — get alerts on your phone</span>
+        <span class="ekey">TRADE_SYMBOL</span>
+        <span class="eval">Optional — leave empty for AI auto-pick, or set a specific coin (see below)</span>
         <button class="cpb dim">optional</button>
+      </div>
+      <div class="env-row">
+        <span class="ekey">TELEGRAM_BOT_TOKEN</span>
+        <span class="eval">Optional — get alerts on your phone (setup below)</span>
+        <button class="cpb dim">optional</button>
+      </div>
+    </div>
+
+    <!-- COIN SELECTOR -->
+    <div style="margin-top:16px;background:#07070e;border:1px solid #1a1f2e;border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,.3);text-transform:uppercase;margin-bottom:10px">🪙 TRADE_SYMBOL — Which coin to trade</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.7;margin-bottom:12px">
+        <b style="color:#00ff88">Leave empty (recommended)</b> — the AI scanner checks 50+ coins every 5 minutes and picks the one with the best signal automatically. Best for most users.<br><br>
+        <b style="color:#e2e8f0">Or set a specific coin</b> — the bot trades only that pair. Use this if you prefer full control over which market you're in.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div class="coin-opt" onclick="pickCoin(this,'BTCUSDT')">
+          <span class="coin-icon">₿</span>
+          <div><div class="coin-name">BTCUSDT</div><div class="coin-desc">Bitcoin — safest, most stable</div></div>
+        </div>
+        <div class="coin-opt" onclick="pickCoin(this,'ETHUSDT')">
+          <span class="coin-icon">Ξ</span>
+          <div><div class="coin-name">ETHUSDT</div><div class="coin-desc">Ethereum — solid, liquid</div></div>
+        </div>
+        <div class="coin-opt" onclick="pickCoin(this,'SOLUSDT')">
+          <span class="coin-icon">◎</span>
+          <div><div class="coin-name">SOLUSDT</div><div class="coin-desc">Solana — high movement</div></div>
+        </div>
+        <div class="coin-opt" onclick="pickCoin(this,'DOGEUSDT')">
+          <span class="coin-icon">Ð</span>
+          <div><div class="coin-name">DOGEUSDT</div><div class="coin-desc">Doge — volatile, high reward/risk</div></div>
+        </div>
+        <div class="coin-opt" onclick="pickCoin(this,'BNBUSDT')">
+          <span class="coin-icon">◈</span>
+          <div><div class="coin-name">BNBUSDT</div><div class="coin-desc">BNB — steady, mid volatility</div></div>
+        </div>
+        <div class="coin-opt" onclick="pickCoin(this,'XRPUSDT')">
+          <span class="coin-icon">✕</span>
+          <div><div class="coin-name">XRPUSDT</div><div class="coin-desc">XRP — fast, news-sensitive</div></div>
+        </div>
+      </div>
+      <div id="coinSelected" style="display:none;margin-top:10px;background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;color:rgba(255,255,255,.5)">Selected: <b id="coinSelectedVal" style="color:#00ff88;font-family:'Courier New',monospace"></b></span>
+        <button id="coinCopyBtn" onclick="copyCoin()" style="background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25);border-radius:5px;color:#00ff88;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer">Copy value</button>
       </div>
     </div>
 
@@ -514,6 +566,26 @@ function cp(btn, val){
     btn.classList.add('ok');
     setTimeout(() => { btn.textContent = prev; btn.classList.remove('ok'); }, 1800);
   }).catch(() => { btn.textContent = val.slice(0, 10); });
+}
+
+/* ── COIN PICKER ── */
+var _selectedCoin = '';
+function pickCoin(el, val){
+  document.querySelectorAll('.coin-opt').forEach(function(o){ o.classList.remove('selected'); });
+  el.classList.add('selected');
+  _selectedCoin = val;
+  var box = document.getElementById('coinSelected');
+  var lbl = document.getElementById('coinSelectedVal');
+  box.style.display = 'flex';
+  lbl.textContent = val;
+}
+function copyCoin(){
+  if (!_selectedCoin) return;
+  navigator.clipboard.writeText(_selectedCoin).then(function(){
+    var b = document.getElementById('coinCopyBtn');
+    b.textContent = '✓ Copied!';
+    setTimeout(function(){ b.textContent = 'Copy value'; }, 1800);
+  }).catch(function(){ alert('Value: ' + _selectedCoin); });
 }
 
 /* ── TELEGRAM TOGGLE ── */
