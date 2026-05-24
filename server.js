@@ -195,6 +195,9 @@ try {
   if (BREVO_USER && BREVO_PASS) transporter = nodemailer.createTransport({ host: 'smtp-relay.brevo.com', port: 587, secure: false, auth: { user: BREVO_USER, pass: BREVO_PASS } });
 } catch(e) { console.error('Nodemailer init error:', e.message); }
 
+// ── PENDING LICENSES (payment_intent_id → key) — cleared after 2h ──
+const _pendingLicenses = new Map();
+
 // ── IN-MEMORY LOGS ──
 const logs = [];
 function addLog(msg, type = 'info', status = 'success') {
@@ -1037,6 +1040,7 @@ const VALID_AMOUNTS = [3700, 9700, 19700]; // $37 starter, $97 pro, $197 apex-bo
 app.post('/create-payment-intent', async (req, res) => {
   const { amount, currency, email, name, product } = req.body;
   const safeAmount = VALID_AMOUNTS.includes(Number(amount)) ? Number(amount) : 3700;
+  const isApexBot = (product === 'apex-bot') || safeAmount === 19700;
   try {
     if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe not configured' });
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -1051,8 +1055,29 @@ app.post('/create-payment-intent', async (req, res) => {
         name: name || ''
       }
     });
-    res.json({ clientSecret: paymentIntent.client_secret });
+
+    // Pre-generate license key for apex-bot so buyer gets it immediately on success
+    // (no email dependency — key is passed directly via redirect URL)
+    let pendingKey = null;
+    if (isApexBot) {
+      pendingKey = generateLicenseKey();
+      // Store in memory map keyed by payment intent ID (cleared after 2h)
+      _pendingLicenses.set(paymentIntent.id, { key: pendingKey, email: email || '', name: name || '' });
+      setTimeout(() => _pendingLicenses.delete(paymentIntent.id), 2 * 3600 * 1000);
+      // Pre-insert as inactive — webhook will activate it on confirmed payment
+      if (supabase) {
+        try {
+          await supabase.from('licenses').insert([{
+            key: pendingKey, email: email || '', name: name || '', active: false
+          }]);
+        } catch(e) { console.error('Pending license insert error:', e.message); }
+      }
+      addLog(`Pending license generated for ${email} — ${pendingKey}`, 'license', 'success');
+    }
+
+    res.json({ clientSecret: paymentIntent.client_secret, pendingKey });
   } catch (e) {
+    console.error('create-payment-intent error:', e.message);
     res.status(500).json({ error: 'Payment processing failed' });
   }
 });
@@ -1121,25 +1146,46 @@ async function handleStripeWebhook(req, res) {
 
       // ── APEX BOT DELIVERY ──
       if (product === 'apex-bot') {
-        // Generate unique license key
-        const licenseKey = generateLicenseKey();
-        if (supabase) {
-          try {
-            await supabase.from('licenses').insert([{ key: licenseKey, email: email || '', name: buyerName }]);
-          } catch(e) { addLog(`License store failed: ${e.message}`, 'license', 'error'); }
+        // Try to use pre-generated pending key (created at payment intent time)
+        const pending = _pendingLicenses.get(pi.id);
+        let licenseKey;
+
+        if (pending?.key) {
+          // Activate the pre-generated key
+          licenseKey = pending.key;
+          _pendingLicenses.delete(pi.id);
+          if (supabase) {
+            try {
+              await supabase.from('licenses')
+                .update({ active: true, activated_at: new Date().toISOString(), name: buyerName })
+                .eq('key', licenseKey);
+            } catch(e) { addLog(`License activate failed: ${e.message}`, 'license', 'error'); }
+          }
+          addLog(`License activated: ${licenseKey} for ${email}`, 'license', 'success');
+        } else {
+          // Fallback: generate a fresh key (e.g. server restarted between intent + webhook)
+          licenseKey = generateLicenseKey();
+          if (supabase) {
+            try {
+              await supabase.from('licenses').insert([{ key: licenseKey, email: email || '', name: buyerName, active: true }]);
+            } catch(e) { addLog(`License store failed: ${e.message}`, 'license', 'error'); }
+          }
+          addLog(`License generated (fallback): ${licenseKey} for ${email}`, 'license', 'success');
         }
+
+        // Send email as backup (key was already delivered via redirect URL)
         if (email) {
           const botEmailHtml = _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey);
           const result = await _sendEmail({
             to: email,
-            subject: '🤖 Your Apex Trade Bot is ready — access inside',
+            subject: '🤖 Your Apex Trade Bot — License Key inside',
             html: botEmailHtml,
             fromName: 'Apex.Bot',
           });
           if (!result.ok) addLog(`Apex Bot email NOT sent for ${email} — ${result.error}`, 'email', 'error');
           else addLog(`Apex Bot email sent via ${result.method} to ${email}`, 'email', 'success');
         }
-        addLog(`Apex Bot sold: ${email} — $197`, 'payment', 'success');
+        addLog(`Apex Bot sold: ${email} — $197 — key: ${licenseKey}`, 'payment', 'success');
         return res.json({ received: true });
       }
 

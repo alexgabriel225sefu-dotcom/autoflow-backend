@@ -90,6 +90,14 @@ body{background:#08080f;color:#e2e8f0;font-family:'Inter',sans-serif;min-height:
 
 <div class="wrap">
 
+<!-- LICENSE KEY BANNER — shown when ?key= is in URL -->
+<div id="keyBanner" style="display:none;background:#0a1a0f;border:1px solid rgba(0,255,136,.35);border-radius:14px;padding:22px 20px;margin-top:16px;text-align:center">
+  <div style="font-size:10px;font-weight:800;color:#00ff88;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">✓ Payment confirmed — Your License Key</div>
+  <div id="keyDisplay" style="font-family:'Courier New',monospace;font-size:20px;font-weight:900;color:#fff;letter-spacing:3px;background:#000;border:1px solid rgba(0,255,136,.25);border-radius:8px;padding:12px 20px;display:inline-block;cursor:pointer;transition:background .2s" onclick="copyKey(this)">—</div>
+  <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:10px">Tap to copy · Paste as <code style="color:#a78bfa">LICENSE_KEY</code> in Railway Variables (Step 2)</div>
+  <div style="font-size:11px;color:rgba(255,255,255,.2);margin-top:6px">⚠ Save this key — also sent to your email as backup</div>
+</div>
+
 <!-- STEP 1 -->
 <div class="step-card" id="step1">
   <div class="checkmark">✓</div>
@@ -120,8 +128,8 @@ body{background:#08080f;color:#e2e8f0;font-family:'Inter',sans-serif;min-height:
   <div class="env-list">
     <div class="env-row highlight">
       <span class="env-key">LICENSE_KEY</span>
-      <span class="env-val">Your key from the purchase email (format: APEX-XXXX-XXXX-XXXX)</span>
-      <button class="copy-btn" style="opacity:.35;cursor:default">from email</button>
+      <span class="env-val" id="licenseValDisplay">Your key shown at the top of this page (format: APEX-XXXX-XXXX-XXXX)</span>
+      <button class="copy-btn" id="licenseKeyBtn" style="opacity:.35;cursor:default">from above</button>
     </div>
     <div class="env-row">
       <span class="env-key">EXCHANGE</span>
@@ -219,9 +227,47 @@ function copyVal(btn, val) {
     btn.textContent = 'Copied!';
     btn.classList.add('copied');
     setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
-  }).catch(() => {
-    btn.textContent = val; // show the value if clipboard fails
-  });
+  }).catch(() => { btn.textContent = val; });
+}
+
+// Show license key from URL param or localStorage
+(function(){
+  var params = new URLSearchParams(window.location.search);
+  var key = params.get('key') || localStorage.getItem('apex_license_key');
+  if (key && key.startsWith('APEX-')) {
+    // Persist in localStorage so refresh doesn't lose it
+    localStorage.setItem('apex_license_key', key);
+    // Show banner
+    document.getElementById('keyBanner').style.display = 'block';
+    document.getElementById('keyDisplay').textContent = key;
+    // Update LICENSE_KEY row in Step 2
+    var valEl = document.getElementById('licenseValDisplay');
+    if (valEl) valEl.textContent = key;
+    var btn = document.getElementById('licenseKeyBtn');
+    if (btn) {
+      btn.textContent = 'Copy';
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      btn.onclick = function(){ copyKey(btn, key); };
+    }
+    // Clean URL (remove ?key= from address bar for privacy)
+    if (params.get('key')) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }
+})();
+
+function copyKey(el, keyOverride) {
+  var key = keyOverride || document.getElementById('keyDisplay').textContent;
+  navigator.clipboard.writeText(key).then(() => {
+    var prev = el.textContent;
+    el.textContent = '✓ Copied!';
+    if (el.style) { el.style.background = 'rgba(0,255,136,.15)'; }
+    setTimeout(() => {
+      el.textContent = prev;
+      if (el.style) el.style.background = '';
+    }, 2000);
+  }).catch(() => { alert('Your key: ' + key); });
 }
 </script>
 </body>

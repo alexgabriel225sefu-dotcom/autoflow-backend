@@ -946,13 +946,16 @@ async function submitApexPayment(){
     var r=await fetch('/create-payment-intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:19700,currency:'usd',email,name,product:'apex-bot'})});
     var d=await r.json();
     if(d.error){err.textContent=d.error;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';return;}
+    var _pendingKey=d.pendingKey||'';
     var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCard,billing_details:{name,email}}});
     if(result.error){
       err.textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
     } else if(result.paymentIntent.status==='succeeded'){
       document.getElementById('amForm').style.display='none';
       document.getElementById('amSuccess').style.display='block';
-      setTimeout(()=>window.location.href='/bot-setup',2000);
+      // Pass license key directly in URL — buyer sees it immediately on setup page
+      var redirect='/bot-setup'+(_pendingKey?'?key='+encodeURIComponent(_pendingKey):'');
+      setTimeout(()=>window.location.href=redirect,2000);
     }
   } catch(e){err.textContent='Error: '+e.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';}
 }
