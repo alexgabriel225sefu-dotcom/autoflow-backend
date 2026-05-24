@@ -1718,7 +1718,7 @@ app.get('/api/resend-dns', async (req, res) => {
     });
     const data = await r.json();
     const domain = (data.data || []).find(d => d.name === 'aicashsystem.space');
-    if (!domain) return res.json({ error: 'Domain not found in Resend', domains: (data.data||[]).map(d=>d.name) });
+    if (!domain) return res.json({ error: 'Domain not found in Resend', allDomains: data.data || [], rawResponse: data });
     // Get full domain details
     const r2 = await fetch(`https://api.resend.com/domains/${domain.id}`, {
       headers: { 'Authorization': `Bearer ${RESEND_API_KEY}` },
