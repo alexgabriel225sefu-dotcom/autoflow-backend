@@ -1725,6 +1725,27 @@ app.get('/api/test-resend', async (req, res) => {
   } catch(e) { res.json({ error: e.message }); }
 });
 
+// GET /api/test-brevo?email=X — debug: shows exact Brevo API response
+app.get('/api/test-brevo', async (req, res) => {
+  const to = req.query.email || SENDER_EMAIL;
+  if (!BREVO_API_KEY) return res.json({ error: 'BREVO_API_KEY not set' });
+  try {
+    const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+        to: [{ email: to }],
+        subject: 'Brevo Test',
+        htmlContent: '<p>Brevo test email</p>',
+      }),
+      signal: AbortSignal.timeout(12000),
+    });
+    const body = await r.text();
+    res.json({ status: r.status, ok: r.ok, body, sender: SENDER_EMAIL });
+  } catch(e) { res.json({ error: e.message, sender: SENDER_EMAIL }); }
+});
+
 // ── TEST DELIVERY EMAIL — protejat cu secret key, fără plată
 // GET  (browser): /api/send-bot-email?secret=X&email=you@gmail.com&name=Alex
 // POST (curl):    /api/send-bot-email?secret=X  body: { email, name }
