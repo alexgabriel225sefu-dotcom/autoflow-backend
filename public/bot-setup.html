@@ -7,47 +7,54 @@
 <link rel="stylesheet" href="/fonts/fonts.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#07070d;color:#e2e8f0;font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 16px 80px}
-body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,136,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+:root{--c:#00e5ff;--p:#7c5cff;--bg:#050816}
+body{background:var(--bg);color:#e2e8f0;font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 16px 80px;overflow-x:hidden}
+
+/* BACKGROUND */
+.bg-grid{position:fixed;inset:0;background-image:linear-gradient(rgba(124,92,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(124,92,255,.04) 1px,transparent 1px);background-size:50px 50px;-webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 40%,#000 40%,transparent 100%);mask-image:radial-gradient(ellipse 80% 60% at 50% 40%,#000 40%,transparent 100%);pointer-events:none;z-index:0}
+.blur-orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0}
+.orb1{width:500px;height:500px;background:radial-gradient(circle,rgba(0,229,255,.1),transparent 70%);top:-120px;left:-180px}
+.orb2{width:400px;height:400px;background:radial-gradient(circle,rgba(124,92,255,.14),transparent 70%);bottom:-80px;right:-130px}
+
 .page{position:relative;z-index:1;width:100%;max-width:560px;padding-top:48px}
 
 /* BADGE */
-.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.22);border-radius:100px;padding:6px 16px;margin-bottom:24px}
-.bdot{width:7px;height:7px;border-radius:50%;background:#00ff88;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,.55)}70%{box-shadow:0 0 0 8px rgba(0,255,136,0)}}
-.btxt{font-size:11px;font-weight:800;color:#00ff88;letter-spacing:2px;text-transform:uppercase}
+.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.22);border-radius:100px;padding:6px 16px;margin-bottom:24px}
+.bdot{width:7px;height:7px;border-radius:50%;background:#00e5ff;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,229,255,.55)}70%{box-shadow:0 0 0 8px rgba(0,229,255,0)}}
+.btxt{font-size:11px;font-weight:800;color:#00e5ff;letter-spacing:2px;text-transform:uppercase}
 
 /* HERO */
 .hero{text-align:center;margin-bottom:32px}
 .hero h1{font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1.2;margin-bottom:8px}
-.hero h1 span{background:linear-gradient(90deg,#00ff88,#00d4aa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero h1 span{background:linear-gradient(90deg,#00e5ff,#7c5cff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .hero p{font-size:14px;color:rgba(255,255,255,.4);line-height:1.6}
 
 /* TIME ESTIMATE */
-.eta{display:inline-flex;align-items:center;gap:6px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.25);border-radius:8px;padding:8px 14px;font-size:12px;color:#c4b5fd;margin-bottom:28px;font-weight:600}
+.eta{display:inline-flex;align-items:center;gap:6px;background:rgba(124,92,255,.1);border:1px solid rgba(124,92,255,.25);border-radius:8px;padding:8px 14px;font-size:12px;color:#c4b5fd;margin-bottom:28px;font-weight:600}
 
 /* LICENSE KEY CARD */
-.key-card{width:100%;background:linear-gradient(135deg,#08140d 0%,#0a0a16 100%);border:1px solid rgba(0,255,136,.28);border-radius:20px;padding:24px;text-align:center;margin-bottom:12px;position:relative;overflow:hidden}
-.key-card::before{content:'';position:absolute;top:-40px;left:50%;transform:translateX(-50%);width:200px;height:100px;background:radial-gradient(ellipse,rgba(0,255,136,.12),transparent 70%);pointer-events:none}
-.key-lbl{font-size:10px;font-weight:800;letter-spacing:2.5px;color:rgba(0,255,136,.7);text-transform:uppercase;margin-bottom:12px}
-.key-val{font-family:'Courier New',monospace;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;background:rgba(0,0,0,.45);border:1px solid rgba(0,255,136,.18);border-radius:10px;padding:14px 16px;display:block;cursor:pointer;transition:all .2s;user-select:all;word-break:break-all}
-.key-val:hover{background:rgba(0,255,136,.07);border-color:rgba(0,255,136,.4)}
-.key-hint{font-size:11px;color:rgba(255,255,255,.3);margin-top:10px;line-height:1.6}
+.key-card{width:100%;background:rgba(255,255,255,.03);border:1px solid rgba(124,92,255,.3);border-radius:20px;padding:24px;text-align:center;margin-bottom:12px;position:relative;overflow:hidden;backdrop-filter:blur(12px)}
+.key-card::before{content:'';position:absolute;top:-50px;left:50%;transform:translateX(-50%);width:280px;height:140px;background:radial-gradient(ellipse,rgba(124,92,255,.2),transparent 70%);pointer-events:none}
+.key-lbl{font-size:10px;font-weight:800;letter-spacing:2.5px;color:rgba(0,229,255,.8);text-transform:uppercase;margin-bottom:12px;position:relative}
+.key-val{font-family:'JetBrains Mono','Courier New',monospace;font-size:18px;font-weight:900;letter-spacing:3px;color:#fff;background:rgba(0,0,0,.35);border:1px solid rgba(124,92,255,.25);border-radius:10px;padding:14px 16px;display:block;cursor:pointer;transition:all .2s;user-select:all;word-break:break-all;position:relative}
+.key-val:hover{background:rgba(124,92,255,.1);border-color:rgba(124,92,255,.5)}
+.key-hint{font-size:11px;color:rgba(255,255,255,.3);margin-top:10px;line-height:1.6;position:relative}
 .key-hint b{color:rgba(255,255,255,.5)}
-.btn-copy{width:100%;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);border-radius:10px;color:#00ff88;font-weight:800;font-size:14px;padding:11px;cursor:pointer;transition:all .2s;margin-top:12px}
-.btn-copy:hover{background:rgba(0,255,136,.18)}
-.btn-copy.ok{background:rgba(0,255,136,.18);border-color:rgba(0,255,136,.5)}
+.btn-copy{width:100%;background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:10px;color:#c4b5fd;font-weight:800;font-size:14px;padding:11px;cursor:pointer;transition:all .2s;margin-top:12px;position:relative}
+.btn-copy:hover{background:rgba(124,92,255,.25);border-color:rgba(124,92,255,.5)}
+.btn-copy.ok{background:rgba(0,229,255,.1);border-color:rgba(0,229,255,.35);color:#00e5ff}
 
 /* SECTION LABEL */
 .section-lbl{font-size:11px;font-weight:800;letter-spacing:2px;color:rgba(255,255,255,.25);text-transform:uppercase;margin:28px 0 10px}
 
 /* STEP CARD */
-.step-card{width:100%;background:#0d0d14;border:1px solid #1c1f2e;border-radius:16px;padding:20px;margin-bottom:8px}
-.step-card.active{border-color:rgba(0,255,136,.2);background:#0b1210}
+.step-card{width:100%;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:20px;margin-bottom:8px;backdrop-filter:blur(8px);transition:border-color .25s,background .25s}
+.step-card.active{border-color:rgba(124,92,255,.4);background:rgba(124,92,255,.05)}
 .step-head{display:flex;align-items:center;gap:12px;margin-bottom:0;cursor:pointer}
-.step-num{width:32px;height:32px;border-radius:50%;background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:#a78bfa;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.step-card.active .step-num{background:rgba(0,255,136,.12);border-color:rgba(0,255,136,.3);color:#00ff88}
-.step-card.done .step-num{background:rgba(0,255,136,.15);border-color:rgba(0,255,136,.4);color:#00ff88}
+.step-num{width:32px;height:32px;border-radius:50%;background:rgba(124,92,255,.12);border:1px solid rgba(124,92,255,.3);color:#a78bfa;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .25s}
+.step-card.active .step-num{background:rgba(124,92,255,.22);border-color:rgba(124,92,255,.6);color:#c4b5fd;box-shadow:0 0 14px rgba(124,92,255,.35)}
+.step-card.done .step-num{background:rgba(0,229,255,.12);border-color:rgba(0,229,255,.4);color:#00e5ff}
 .step-title-wrap{flex:1}
 .step-title{font-size:14px;font-weight:800;line-height:1.3}
 .step-sub{font-size:11px;color:rgba(255,255,255,.32);margin-top:2px}
@@ -59,62 +66,66 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 /* INSTRUCTION ROWS */
 .inst{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px}
 .inst:last-child{margin-bottom:0}
-.inst-dot{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.35);font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.inst-dot{width:20px;height:20px;border-radius:50%;background:rgba(124,92,255,.08);border:1px solid rgba(124,92,255,.2);color:rgba(196,181,253,.6);font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 .inst-text{font-size:13px;color:rgba(255,255,255,.6);line-height:1.6}
 .inst-text b{color:#e2e8f0}
-.inst-text a{color:#60a5fa;text-decoration:none}
+.inst-text a{color:#00e5ff;text-decoration:none}
 .inst-text a:hover{text-decoration:underline}
-.inst-text code{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:1px 6px;font-family:'Courier New',monospace;font-size:12px;color:#a5f3fc}
+.inst-text code{background:rgba(124,92,255,.1);border:1px solid rgba(124,92,255,.22);border-radius:4px;padding:1px 6px;font-family:'JetBrains Mono','Courier New',monospace;font-size:12px;color:#c4b5fd}
 
 /* WARNING BOX */
-.warn-box{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(245,158,11,.8);line-height:1.6;margin-top:12px}
+.warn-box{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(245,158,11,.85);line-height:1.6;margin-top:12px}
 .warn-box b{color:#fbbf24}
 
 /* INFO BOX */
-.info-box{background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.18);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(96,165,250,.8);line-height:1.6;margin-top:12px}
+.info-box{background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(0,229,255,.75);line-height:1.6;margin-top:12px}
 
 /* SUCCESS BOX */
-.ok-box{background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.18);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(0,255,136,.8);line-height:1.6;margin-top:12px}
+.ok-box{background:rgba(124,92,255,.07);border:1px solid rgba(124,92,255,.22);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(196,181,253,.85);line-height:1.6;margin-top:12px}
 
 /* ENV TABLE */
 .env-list{display:flex;flex-direction:column;gap:6px;margin-top:14px}
-.env-row{background:#07070e;border:1px solid #1a1f2e;border-radius:8px;padding:9px 11px;display:flex;align-items:center;gap:8px}
-.env-row.required{border-color:rgba(0,255,136,.15);background:rgba(0,255,136,.02)}
-.ekey{font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#00ff88;min-width:145px;flex-shrink:0}
-.ekey.purple{color:#a78bfa}
+.env-row{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:9px 11px;display:flex;align-items:center;gap:8px}
+.env-row.required{border-color:rgba(124,92,255,.2);background:rgba(124,92,255,.04)}
+.ekey{font-family:'JetBrains Mono','Courier New',monospace;font-size:11px;font-weight:700;color:#00e5ff;min-width:145px;flex-shrink:0}
+.ekey.purple{color:#c4b5fd}
 .eval{font-size:11px;color:rgba(255,255,255,.38);flex:1;line-height:1.4}
-.eval a{color:#60a5fa;text-decoration:none}
+.eval a{color:#00e5ff;text-decoration:none}
 .cpb{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:4px;color:rgba(255,255,255,.3);font-size:10px;font-weight:700;padding:3px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s}
-.cpb:hover{background:rgba(0,255,136,.1);border-color:rgba(0,255,136,.3);color:#00ff88}
-.cpb.ok{color:#00ff88;border-color:rgba(0,255,136,.35);background:rgba(0,255,136,.1)}
+.cpb:hover{background:rgba(124,92,255,.15);border-color:rgba(124,92,255,.35);color:#c4b5fd}
+.cpb.ok{color:#00e5ff;border-color:rgba(0,229,255,.35);background:rgba(0,229,255,.08)}
 .cpb.dim{opacity:.2;cursor:default;pointer-events:none}
 
 /* BIG BUTTON */
-.btn-primary{display:block;width:100%;background:#00ff88;color:#000;font-size:15px;font-weight:900;padding:14px;border-radius:12px;border:none;cursor:pointer;text-decoration:none;letter-spacing:-.2px;transition:all .2s;text-align:center;margin-top:14px}
-.btn-primary:hover{background:#00e87a;transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,255,136,.2)}
-.btn-secondary{display:block;width:100%;background:rgba(255,255,255,.05);color:rgba(255,255,255,.6);font-size:13px;font-weight:700;padding:11px;border-radius:10px;border:1px solid rgba(255,255,255,.1);text-decoration:none;transition:all .2s;text-align:center;margin-top:8px}
-.btn-secondary:hover{background:rgba(255,255,255,.08)}
+.btn-primary{display:block;width:100%;background:linear-gradient(135deg,#7c5cff,#5b3fdb);color:#fff;font-size:15px;font-weight:900;padding:14px;border-radius:12px;border:none;cursor:pointer;text-decoration:none;letter-spacing:-.2px;transition:all .2s;text-align:center;margin-top:14px;box-shadow:0 4px 24px rgba(124,92,255,.25)}
+.btn-primary:hover{background:linear-gradient(135deg,#8e6fff,#6e4fee);transform:translateY(-1px);box-shadow:0 8px 32px rgba(124,92,255,.35)}
+.btn-secondary{display:block;width:100%;background:rgba(255,255,255,.04);color:rgba(255,255,255,.5);font-size:13px;font-weight:700;padding:11px;border-radius:10px;border:1px solid rgba(255,255,255,.09);text-decoration:none;transition:all .2s;text-align:center;margin-top:8px}
+.btn-secondary:hover{background:rgba(255,255,255,.07)}
 
 /* DONE CTA */
-.done-card{background:linear-gradient(135deg,#08140d,#0a0a16);border:1px solid rgba(0,255,136,.25);border-radius:20px;padding:28px 24px;text-align:center;margin-bottom:12px}
-.done-title{font-size:22px;font-weight:900;margin-bottom:8px}
-.done-sub{font-size:13px;color:rgba(255,255,255,.4);line-height:1.6}
+.done-card{background:rgba(255,255,255,.03);border:1px solid rgba(124,92,255,.28);border-radius:20px;padding:28px 24px;text-align:center;margin-bottom:12px;backdrop-filter:blur(12px);position:relative;overflow:hidden}
+.done-card::before{content:'';position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:320px;height:160px;background:radial-gradient(ellipse,rgba(124,92,255,.18),transparent 70%);pointer-events:none}
+.done-title{font-size:22px;font-weight:900;margin-bottom:8px;position:relative}
+.done-sub{font-size:13px;color:rgba(255,255,255,.4);line-height:1.6;position:relative}
 
 /* COIN OPTIONS */
-.coin-opt{display:flex;align-items:center;gap:10px;background:#0a0a14;border:1px solid #1c1f2e;border-radius:8px;padding:10px 12px;cursor:pointer;transition:all .15s}
-.coin-opt:hover{border-color:rgba(0,255,136,.25);background:rgba(0,255,136,.04)}
-.coin-opt.selected{border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.07)}
+.coin-opt{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:10px 12px;cursor:pointer;transition:all .15s}
+.coin-opt:hover{border-color:rgba(124,92,255,.3);background:rgba(124,92,255,.06)}
+.coin-opt.selected{border-color:rgba(0,229,255,.45);background:rgba(0,229,255,.06)}
 .coin-icon{font-size:18px;width:28px;text-align:center;flex-shrink:0;color:rgba(255,255,255,.5)}
-.coin-name{font-family:'Courier New',monospace;font-size:12px;font-weight:700;color:#e2e8f0}
+.coin-name{font-family:'JetBrains Mono','Courier New',monospace;font-size:12px;font-weight:700;color:#e2e8f0}
 .coin-desc{font-size:10px;color:rgba(255,255,255,.3);margin-top:1px}
 
 /* RISK / SUPPORT */
 .risk{font-size:11px;color:rgba(255,255,255,.22);text-align:center;line-height:1.7;padding:0 10px;margin-top:8px}
 .support{font-size:12px;color:rgba(255,255,255,.2);text-align:center;margin-top:24px}
-.support a{color:#00ff88;text-decoration:none}
+.support a{color:#00e5ff;text-decoration:none}
 </style>
 </head>
 <body>
+<div class="bg-grid"></div>
+<div class="blur-orb orb1"></div>
+<div class="blur-orb orb2"></div>
 <div class="page">
 
 <div class="hero">
@@ -160,7 +171,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <a href="https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot/archive/refs/heads/main.zip" class="btn-secondary">⬇ Skip GitHub — download ZIP instead</a>
     <div class="info-box">💡 "Forking" just copies the bot code to your own GitHub account. You'll own your copy — it's free and takes 10 seconds.</div>
     <div style="margin-top:12px;text-align:center">
-      <button onclick="markDone(1)" style="background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25);border-radius:8px;color:#00ff88;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer">✓ Done — go to Step 2</button>
+      <button onclick="markDone(1)" style="background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:8px;color:#c4b5fd;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(124,92,255,.25)'" onmouseout="this.style.background='rgba(124,92,255,.15)'">✓ Done — go to Step 2</button>
     </div>
   </div>
 </div>
@@ -198,7 +209,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     </div>
     <div class="warn-box">⚠ <b>Never enable "Withdrawal" permission</b> on the API key — the bot only needs Read + Trade. This keeps your funds safe even if the key is ever leaked.</div>
     <div style="margin-top:12px;text-align:center">
-      <button onclick="markDone(2)" style="background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25);border-radius:8px;color:#00ff88;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer">✓ Done — go to Step 3</button>
+      <button onclick="markDone(2)" style="background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:8px;color:#c4b5fd;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(124,92,255,.25)'" onmouseout="this.style.background='rgba(124,92,255,.15)'">✓ Done — go to Step 3</button>
     </div>
   </div>
 </div>
@@ -228,7 +239,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     </div>
     <div class="ok-box">✅ Groq is completely free for the volume the bot uses — no billing needed.</div>
     <div style="margin-top:12px;text-align:center">
-      <button onclick="markDone(3)" style="background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25);border-radius:8px;color:#00ff88;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer">✓ Done — go to Step 4</button>
+      <button onclick="markDone(3)" style="background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:8px;color:#c4b5fd;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(124,92,255,.25)'" onmouseout="this.style.background='rgba(124,92,255,.15)'">✓ Done — go to Step 4</button>
     </div>
   </div>
 </div>
@@ -257,7 +268,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <div class="inst-text">Add a payment method (card) — you won't be charged until your $5 free credit runs out, which takes several months at bot usage levels.</div>
     </div>
     <div style="margin-top:12px;text-align:center">
-      <button onclick="markDone(4)" style="background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25);border-radius:8px;color:#00ff88;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer">✓ Done — go to Step 5</button>
+      <button onclick="markDone(4)" style="background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:8px;color:#c4b5fd;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(124,92,255,.25)'" onmouseout="this.style.background='rgba(124,92,255,.15)'">✓ Done — go to Step 5</button>
     </div>
   </div>
 </div>
@@ -286,7 +297,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <div class="inst-text">Railway starts deploying. You'll see a build log — it'll fail at first because variables are missing. That's normal — continue to Step 6.</div>
     </div>
     <div style="margin-top:12px;text-align:center">
-      <button onclick="markDone(5)" style="background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25);border-radius:8px;color:#00ff88;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer">✓ Done — go to Step 6</button>
+      <button onclick="markDone(5)" style="background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:8px;color:#c4b5fd;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(124,92,255,.25)'" onmouseout="this.style.background='rgba(124,92,255,.15)'">✓ Done — go to Step 6</button>
     </div>
   </div>
 </div>
@@ -360,10 +371,10 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     </div>
 
     <!-- COIN SELECTOR -->
-    <div style="margin-top:16px;background:#07070e;border:1px solid #1a1f2e;border-radius:10px;padding:14px">
+    <div style="margin-top:16px;background:rgba(0,0,0,.2);border:1px solid rgba(124,92,255,.15);border-radius:10px;padding:14px;backdrop-filter:blur(8px)">
       <div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,.3);text-transform:uppercase;margin-bottom:10px">🪙 TRADE_SYMBOL — Which coin to trade</div>
       <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.7;margin-bottom:12px">
-        <b style="color:#00ff88">Leave empty (recommended)</b> — the AI scanner checks 50+ coins every 5 minutes and picks the one with the best signal automatically. Best for most users.<br><br>
+        <b style="color:#00e5ff">Leave empty (recommended)</b> — the AI scanner checks 50+ coins every 5 minutes and picks the one with the best signal automatically. Best for most users.<br><br>
         <b style="color:#e2e8f0">Or set a specific coin</b> — the bot trades only that pair. Use this if you prefer full control over which market you're in.
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
@@ -392,9 +403,9 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
           <div><div class="coin-name">XRPUSDT</div><div class="coin-desc">XRP — fast, news-sensitive</div></div>
         </div>
       </div>
-      <div id="coinSelected" style="display:none;margin-top:10px;background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:12px;color:rgba(255,255,255,.5)">Selected: <b id="coinSelectedVal" style="color:#00ff88;font-family:'Courier New',monospace"></b></span>
-        <button id="coinCopyBtn" onclick="copyCoin()" style="background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25);border-radius:5px;color:#00ff88;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer">Copy value</button>
+      <div id="coinSelected" style="display:none;margin-top:10px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;color:rgba(255,255,255,.5)">Selected: <b id="coinSelectedVal" style="color:#00e5ff;font-family:'JetBrains Mono','Courier New',monospace"></b></span>
+        <button id="coinCopyBtn" onclick="copyCoin()" style="background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.25);border-radius:5px;color:#00e5ff;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer">Copy value</button>
       </div>
     </div>
 
@@ -408,10 +419,10 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 
 <!-- ── PHASE 1 COMPLETE ── -->
 <div style="margin:28px 0 10px;text-align:center">
-  <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.2);border-radius:10px;padding:10px 18px">
+  <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(124,92,255,.08);border:1px solid rgba(124,92,255,.25);border-radius:10px;padding:10px 18px">
     <span style="font-size:18px">🧪</span>
     <div style="text-align:left">
-      <div style="font-size:13px;font-weight:800;color:#00ff88">Phase 1 complete — Paper Trading is running</div>
+      <div style="font-size:13px;font-weight:800;color:#c4b5fd">Phase 1 complete — Paper Trading is running</div>
       <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px">Watch the bot for 3–7 days, then switch to real money below</div>
     </div>
   </div>
@@ -422,7 +433,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <!-- ── GO LIVE CARD ── -->
 <div class="step-card" id="sLive">
   <div class="step-head" onclick="toggleLive()">
-    <div class="step-num" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#fbbf24">💰</div>
+    <div class="step-num" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.28);color:#fbbf24;font-size:16px">💰</div>
     <div class="step-title-wrap">
       <div class="step-title">Go Live — trade with real money</div>
       <div class="step-sub">Only do this after watching paper results for a few days</div>
@@ -468,7 +479,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <div class="section-lbl">Optional — Telegram Alerts</div>
 <div class="step-card" id="sTg">
   <div class="step-head" onclick="toggleTg()">
-    <div class="step-num" style="background:rgba(96,165,250,.08);border-color:rgba(96,165,250,.25);color:#60a5fa">📱</div>
+    <div class="step-num" style="background:rgba(0,229,255,.07);border-color:rgba(0,229,255,.22);color:#00e5ff;font-size:16px">📱</div>
     <div class="step-title-wrap">
       <div class="step-title">Get live trade alerts on your phone</div>
       <div class="step-sub">Free — every trade, every signal, instantly on Telegram</div>
