@@ -39,6 +39,10 @@ async function verifyLicense() {
   const server = cfg.LICENSE_SERVER;
 
   if (!key) {
+    if (process.env.BYPASS_LICENSE === 'true') {
+      console.warn('⚠️  LICENSE_KEY not set — running in owner/dev mode (BYPASS_LICENSE=true).');
+      return;
+    }
     console.error('\n❌  LICENSE_KEY is not set.');
     console.error('    Add your license key from your purchase email to Railway Variables.');
     console.error('    Purchase at: https://aicashsystem.space\n');
