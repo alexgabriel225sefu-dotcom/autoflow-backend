@@ -31,11 +31,22 @@ app.use((req, res, next) => {
 // Health check — first route, no deps, always responds
 app.get('/health', (req, res) => res.json({ ok: true, node: process.version, time: new Date().toISOString() }));
 app.get('/ping', (req, res) => res.json({ ok: true, version: 'v7-hmac-license', time: new Date().toISOString() }));
-// Debug: test license key without bot — public endpoint
+// Debug: verbose key verification
 app.get('/api/check-key', (req, res) => {
-  const key = req.query.key || '';
-  const valid = verifyLicenseKeyHmac(key);
-  res.json({ key: key.slice(0,9)+'…', valid, secrets_count: _licSecrets().length });
+  const key = (req.query.key || '').trim();
+  const up = key.toUpperCase();
+  const m = up.match(/^APEX-([A-Z0-9]{4})-([A-Z0-9]{4})-([A-Z0-9]{4})$/);
+  if (!m) return res.json({ key: key.slice(0,9)+'…', valid: false, step: 'regex_fail', regex_input: up });
+  const full = m[1]+m[2]+m[3];
+  const data = full.slice(0,8);
+  const given = full.slice(8,12);
+  const secrets = _licSecrets();
+  const results = secrets.map((s,i) => {
+    const computed = _hmacMac4(data, s);
+    return { secret_index: i, match: computed === given, computed, given };
+  });
+  const valid = results.some(r => r.match);
+  res.json({ key: key.slice(0,9)+'…', valid, data, given, results });
 });
 app.get('/api/stripe-config', auth, async (req, res) => {
   const key = process.env.STRIPE_SECRET_KEY || '';
