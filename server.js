@@ -86,9 +86,9 @@ const HEYGEN_KEY = process.env.HEYGEN_API_KEY;
 const CREATIFY_API_ID  = process.env.CREATIFY_API_ID  || '';
 const CREATIFY_API_KEY = process.env.CREATIFY_API_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
-  if (process.env.NODE_ENV === 'production') { console.error('FATAL: JWT_SECRET not set in production'); process.exit(1); }
-  console.warn('[WARN] JWT_SECRET not set — using insecure default (dev only).');
-  return 'autoflow-secret-dev-only';
+  const fallback = require('crypto').randomBytes(32).toString('hex');
+  console.warn('[WARN] JWT_SECRET not set — generated random secret for this session. Sessions will reset on restart. Set JWT_SECRET in Render env vars.');
+  return fallback;
 })();
 const COOKIE_SECRET = process.env.COOKIE_SECRET || JWT_SECRET + '-cookie';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
