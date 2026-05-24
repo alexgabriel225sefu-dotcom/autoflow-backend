@@ -1100,12 +1100,9 @@ app.get('/api/owner-license', async (req, res) => {
   if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden — secret required' });
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
   const key = generateLicenseKey();
-  try {
-    await supabase.from('licenses').insert([{ key, email: 'owner@aicashsystem.space', name: 'Owner', active: true }]);
-    res.json({ key, message: 'Add this as LICENSE_KEY in Railway Variables' });
-  } catch(e) {
-    res.status(500).json({ error: e.message });
-  }
+  const { error } = await supabase.from('licenses').insert([{ key, email: 'owner@aicashsystem.space', name: 'Owner', active: true }]);
+  if (error) return res.status(500).json({ error: error.message, hint: error.hint });
+  res.json({ key, message: 'Add this as LICENSE_KEY in Railway Variables', supabase: 'inserted ok' });
 });
 
 // POST /api/verify-license — called by the bot on every startup
@@ -1721,16 +1718,15 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
 
 </div></body></html>`;}
 
-// ── BOT ACCESS — streams a clean ZIP; requires a valid activated license key
+// ── BOT ACCESS — streams a clean ZIP; key format check only (runtime enforcement via /api/verify-license)
 app.get('/bot-access', async (req, res) => {
   const key = req.query.key || req.headers['x-license-key'];
   if (!key) return res.status(403).send('License key required. Add ?key=APEX-XXXX-XXXX-XXXX');
-  if (supabase) {
-    try {
-      const { data } = await supabase.from('licenses').select('active').eq('key', key).single();
-      if (!data?.active) return res.status(403).send('Invalid or inactive license key.');
-    } catch { return res.status(403).send('Could not verify license. Contact support.'); }
+  // Validate key format: APEX-XXXX-XXXX-XXXX (alphanumeric segments)
+  if (!/^APEX-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(key)) {
+    return res.status(403).send('Invalid license key format.');
   }
+  console.log('[BOT-ACCESS] download with key:', key.slice(0, 9) + '…');
   const archiver = require('archiver');
   const botDir = path.join(__dirname, 'apex-trade-bot');
   res.setHeader('Content-Disposition', 'attachment; filename="apex-trade-bot.zip"');
