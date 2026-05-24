@@ -1087,10 +1087,33 @@ app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
 });
 
 // ── LICENSE KEY HELPERS ──────────────────────────────────────────────────────
+// Keys are HMAC-signed: APEX-[8 random chars][4 HMAC chars]
+// Verification is cryptographic — no database required.
+const _KEY_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 chars, no 0/O/1/I
+
 function generateLicenseKey() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I confusion
-  const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  return `APEX-${seg()}-${seg()}-${seg()}`;
+  const secret = process.env.BOT_EMAIL_SECRET || 'apex-license-default';
+  // 8 random chars from key charset (5 bits each → 40 bits entropy)
+  const rnd8 = Array.from({ length: 8 }, () => _KEY_CHARS[Math.floor(Math.random() * _KEY_CHARS.length)]).join('');
+  // 4 HMAC bytes → 4 chars (each byte mod 32 → index into charset)
+  const mac = crypto.createHmac('sha256', secret).update(rnd8).digest();
+  const mac4 = [0, 1, 2, 3].map(i => _KEY_CHARS[mac[i] % 32]).join('');
+  const full = rnd8 + mac4; // 12 chars total
+  return `APEX-${full.slice(0, 4)}-${full.slice(4, 8)}-${full.slice(8, 12)}`;
+}
+
+// Returns true if the key has a valid HMAC signature (no DB needed)
+function verifyLicenseKeyHmac(key) {
+  if (!key) return false;
+  const m = key.toUpperCase().match(/^APEX-([A-Z2-9]{4})-([A-Z2-9]{4})-([A-Z2-9]{4})$/);
+  if (!m) return false;
+  const full = m[1] + m[2] + m[3];
+  const data = full.slice(0, 8);
+  const given = full.slice(8, 12);
+  const secret = process.env.BOT_EMAIL_SECRET || 'apex-license-default';
+  const mac = crypto.createHmac('sha256', secret).update(data).digest();
+  const expected = [0, 1, 2, 3].map(i => _KEY_CHARS[mac[i] % 32]).join('');
+  return given === expected;
 }
 
 // GET /api/owner-license — generate a license key for the owner (requires BOT_EMAIL_SECRET)
@@ -1106,25 +1129,32 @@ app.get('/api/owner-license', async (req, res) => {
 });
 
 // POST /api/verify-license — called by the bot on every startup
+// Primary: HMAC signature check (no DB). Fallback: Supabase for legacy keys.
 app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
   const { key } = req.body || {};
   if (!key) return res.json({ valid: false, message: 'No license key provided' });
-  if (!supabase) return res.json({ valid: false, message: 'License server not configured — contact support' });
-  try {
-    const { data, error } = await supabase
-      .from('licenses')
-      .select('id, email, active, activated_at')
-      .eq('key', key)
-      .eq('active', true)
-      .single();
-    if (error || !data) return res.json({ valid: false, message: 'Invalid license key. Purchase at aicashsystem.space' });
-    if (!data.activated_at) {
-      await supabase.from('licenses').update({ activated_at: new Date().toISOString() }).eq('key', key);
+
+  // 1. HMAC check — works without any database
+  if (verifyLicenseKeyHmac(key)) {
+    // Best-effort: log activation timestamp in Supabase (non-blocking, ignore errors)
+    if (supabase) {
+      supabase.from('licenses')
+        .upsert([{ key, active: true, activated_at: new Date().toISOString() }], { onConflict: 'key' })
+        .then(() => {}).catch(() => {});
     }
-    return res.json({ valid: true, email: data.email });
-  } catch (e) {
-    return res.json({ valid: false, message: 'Verification error — try again or contact support' });
+    return res.json({ valid: true, message: 'License valid' });
   }
+
+  // 2. Supabase fallback — for legacy keys generated before HMAC scheme
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('licenses').select('active').eq('key', key).eq('active', true).single();
+      if (data?.active) return res.json({ valid: true, message: 'License valid (legacy)' });
+    } catch (_) {}
+  }
+
+  return res.json({ valid: false, message: 'Invalid license key. Purchase at aicashsystem.space' });
 });
 
 // ════════════════════════════════════════

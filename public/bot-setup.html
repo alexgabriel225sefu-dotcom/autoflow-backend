@@ -101,10 +101,10 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <!-- DOWNLOAD -->
 <div class="download-card">
   <div class="download-icon">📦</div>
-  <div class="download-title">Download Your Bot</div>
-  <div class="download-sub">Get the full bot source code — then deploy it on Railway with your license key to start trading.</div>
-  <a href="#" id="dlBtn" class="btn-dl" onclick="dlBot(event)">⬇ Download Bot (ZIP)</a>
-  <a href="https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot/fork" target="_blank" class="btn-fork">🍴 Or fork on GitHub →</a>
+  <div class="download-title">Get Your Bot</div>
+  <div class="download-sub">Copy the bot code to your GitHub account — then deploy it on Railway with your license key.</div>
+  <a href="https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot/fork" target="_blank" class="btn-dl">🍴 Fork Bot on GitHub →</a>
+  <a href="https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot/archive/refs/heads/main.zip" class="btn-fork">⬇ Or download ZIP directly</a>
 </div>
 
 <!-- RAILWAY STEPS -->
@@ -207,9 +207,6 @@ var _key = '';
     document.getElementById('keyDisplay').style.opacity = '.3';
     document.getElementById('keyDisplay').style.cursor = 'default';
   }
-  // Wire download button with key
-  var dl = document.getElementById('dlBtn');
-  if (dl && _key) dl.href = '/bot-access?key=' + encodeURIComponent(_key);
 })();
 
 function copyKey(){
@@ -234,14 +231,7 @@ function cp(btn, val){
   }).catch(() => { btn.textContent = val.slice(0, 12); });
 }
 
-function dlBot(e){
-  if (!_key) {
-    e.preventDefault();
-    alert('No license key found. Please complete payment first.');
-    return;
-  }
-  // href already set, let it follow
-}
+
 </script>
 </body>
 </html>
