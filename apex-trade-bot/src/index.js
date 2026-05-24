@@ -33,6 +33,38 @@ const dash = {
   exchange:      cfg.EXCHANGE.toUpperCase(),
 };
 
+// ─── License verification ─────────────────────────────────
+async function verifyLicense() {
+  const key    = cfg.LICENSE_KEY;
+  const server = cfg.LICENSE_SERVER;
+
+  if (!key) {
+    console.error('\n❌  LICENSE_KEY is not set.');
+    console.error('    Add your license key from your purchase email to Railway Variables.');
+    console.error('    Purchase at: https://aicashsystem.space\n');
+    process.exit(1);
+  }
+
+  try {
+    const res  = await fetch(`${server}/api/verify-license`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ key }),
+      signal:  AbortSignal.timeout(10000),
+    });
+    const data = await res.json();
+    if (!data.valid) {
+      console.error(`\n❌  License invalid: ${data.message}`);
+      console.error('    Make sure LICENSE_KEY in Variables matches the key from your email.\n');
+      process.exit(1);
+    }
+    console.log(`✅  License verified — welcome, ${data.email || 'trader'}!`);
+  } catch (e) {
+    // Network error → allow startup with warning (don't block on transient issues)
+    console.warn(`⚠️   License server unreachable (${e.message}) — starting in grace mode.`);
+  }
+}
+
 // ─── Validare startup ─────────────────────────────────────
 function validate() {
   const hasAnthropic = !!cfg.ANTHROPIC_API_KEY;
@@ -507,6 +539,7 @@ tr.win td{color:#d1fae5}tr.loss td{color:#fee2e2}
     res.end(html);
   }).listen(PORT, () => logger.info(`📊 Dashboard: http://localhost:${PORT}`));
 
+  await verifyLicense();
   logger.info('🚀 Prima analiză...');
   await tick();
   setInterval(tick, cfg.LOOP_INTERVAL_MS);

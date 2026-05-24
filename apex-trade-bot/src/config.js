@@ -70,4 +70,8 @@ module.exports = {
 
   // ─── Testnet flag (legacy) ──────────────────────────────
   get TESTNET() { return this.BYBIT_TESTNET; },
+
+  // ─── License ─────────────────────────────────────────────
+  LICENSE_KEY:    process.env.LICENSE_KEY    || '',
+  LICENSE_SERVER: process.env.LICENSE_SERVER || 'https://aicashsystem.space',
 };

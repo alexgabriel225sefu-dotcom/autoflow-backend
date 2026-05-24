@@ -1034,6 +1034,35 @@ app.post('/create-payment-intent', async (req, res) => {
   }
 });
 
+// ── LICENSE KEY HELPERS ──────────────────────────────────────────────────────
+function generateLicenseKey() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I confusion
+  const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  return `APEX-${seg()}-${seg()}-${seg()}`;
+}
+
+// POST /api/verify-license — called by the bot on every startup
+app.post('/api/verify-license', async (req, res) => {
+  const { key } = req.body || {};
+  if (!key) return res.json({ valid: false, message: 'No license key provided' });
+  if (!supabase) return res.json({ valid: false, message: 'License server not configured — contact support' });
+  try {
+    const { data, error } = await supabase
+      .from('licenses')
+      .select('id, email, active, activated_at')
+      .eq('key', key)
+      .eq('active', true)
+      .single();
+    if (error || !data) return res.json({ valid: false, message: 'Invalid license key. Purchase at aicashsystem.space' });
+    if (!data.activated_at) {
+      await supabase.from('licenses').update({ activated_at: new Date().toISOString() }).eq('key', key);
+    }
+    return res.json({ valid: true, email: data.email });
+  } catch (e) {
+    return res.json({ valid: false, message: 'Verification error — try again or contact support' });
+  }
+});
+
 // ════════════════════════════════════════
 // STRIPE WEBHOOK
 // ════════════════════════════════════════
@@ -1057,8 +1086,15 @@ async function handleStripeWebhook(req, res) {
 
       // ── APEX BOT DELIVERY ──
       if (product === 'apex-bot') {
+        // Generate unique license key
+        const licenseKey = generateLicenseKey();
+        if (supabase) {
+          try {
+            await supabase.from('licenses').insert([{ key: licenseKey, email: email || '', name: buyerName }]);
+          } catch(e) { addLog(`License store failed: ${e.message}`, 'license', 'error'); }
+        }
         if (email) {
-          const botEmailHtml = _buildBotEmailHtml(_he(buyerName), _he(email));
+          const botEmailHtml = _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey);
           let emailSent = false;
           if (BREVO_API_KEY) {
             try {
@@ -1358,7 +1394,7 @@ publicPages.forEach(p => {
 });
 
 // ── BOT EMAIL HTML — funcție separată reutilizabilă ──────────────────────────
-function _buildBotEmailHtml(safeName, safeEmail) {
+function _buildBotEmailHtml(safeName, safeEmail, licenseKey = 'APEX-XXXX-XXXX-XXXX') {
   const firstName = safeName.split(' ')[0];
   const chip = (t,c='#00ff88') => `<span style="display:inline-block;background:${c}18;border:1px solid ${c}44;border-radius:5px;padding:2px 8px;color:${c};font-family:'Courier New',monospace;font-size:11px;font-weight:700;letter-spacing:.3px">${t}</span>`;
 
@@ -1463,15 +1499,24 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
   </div>
 </div>
 
+<!-- ══════ LICENSE KEY ══════ -->
+<div style="max-width:580px;margin:0 auto;padding:0 20px">
+  <div style="background:rgba(0,255,136,.06);border:2px solid rgba(0,255,136,.35);border-radius:16px;padding:24px 28px;margin-bottom:0">
+    <div style="font-size:11px;font-weight:800;color:#00ff88;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:10px">🔐 Your License Key</div>
+    <div style="font-family:'Courier New',monospace;font-size:22px;font-weight:900;color:#fff;letter-spacing:3px;background:#000;border:1px solid rgba(0,255,136,.25);border-radius:10px;padding:14px 20px;text-align:center;margin-bottom:10px">${licenseKey}</div>
+    <p style="font-size:12px;color:rgba(255,255,255,.45);margin:0;text-align:center">Copy this key — you'll add it to Railway Variables as <span style="color:#00ff88;font-family:'Courier New',monospace">LICENSE_KEY</span></p>
+  </div>
+</div>
+
 <!-- ══════ CTA ══════ -->
 <div class="cta-wrap">
   <div class="cta-inner">
-    <div class="cta-label">Complete Setup Guide — all steps inside</div>
+    <div class="cta-label">One-click deploy — bot live in 2 minutes</div>
     <a href="https://aicashsystem.space/bot-setup" class="cta-btn">
       <span class="cta-btn-shine"></span>
       Open Setup Guide →
     </a>
-    <p class="cta-hint">Click the button above → step-by-step guide with download link, Railway deploy &amp; env vars</p>
+    <p class="cta-hint">Click above → Railway deploy button → add your License Key + API keys → done</p>
   </div>
 </div>
 
@@ -1538,6 +1583,7 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
 <div class="card card-dark">
   <div class="card-tag card-tag-dim">📋 Railway Variables — Add These <span class="card-tag-line"></span></div>
   <table class="vt">
+    <tr><td class="vt-k">LICENSE_KEY</td><td class="vt-v">Your key from above — ${chip(licenseKey,'#a78bfa')}</td></tr>
     <tr><td class="vt-k">EXCHANGE</td><td class="vt-v">Set to ${chip('binance')} — works globally including EU</td></tr>
     <tr><td class="vt-k">BINANCE_API_KEY</td><td class="vt-v">The API Key from Step 2 above</td></tr>
     <tr><td class="vt-k">BINANCE_API_SECRET</td><td class="vt-v">The Secret Key from Step 2 — <b>only shown once at creation</b></td></tr>
@@ -1657,13 +1703,13 @@ async function _sendBotEmailHandler(req, res) {
     const name  = req.query.name || req.body.name || 'Alex';
     const email = req.query.email || req.body.email || 'preview@example.com';
     const _he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    const previewHtml = _buildBotEmailHtml(_he(name), _he(email));
+    const previewHtml = _buildBotEmailHtml(_he(name), _he(email), 'APEX-DEMO-PREW-2025');
     return res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview: Bot Delivery Email</title>
       <style>body{margin:0;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:40px 20px;font-family:sans-serif}
       .bar{background:#2d2d44;border:1px solid #444;border-radius:8px;padding:10px 20px;margin-bottom:24px;color:#aaa;font-size:13px;text-align:center;max-width:600px;width:100%}
       .bar strong{color:#00ff88}</style></head><body>
       <div class="bar">📧 <strong>PREVIEW</strong> — Asta e emailul pe care îl primește clientul după cumpărare.<br>
-      <span style="font-size:11px;color:#666">Towards: ${_he(email)} · Name: ${_he(name)}</span></div>
+      <span style="font-size:11px;color:#666">Towards: ${_he(email)} · Name: ${_he(name)} · Key: APEX-DEMO-PREW-2025</span></div>
       ${previewHtml}</body></html>`);
   }
 
