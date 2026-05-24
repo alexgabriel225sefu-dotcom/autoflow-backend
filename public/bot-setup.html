@@ -188,6 +188,11 @@ body{background:#08080f;color:#e2e8f0;font-family:'Inter',sans-serif;min-height:
       <span class="env-val">Simulated starting balance in USD</span>
       <button class="copy-btn" onclick="copyVal(this,'100')">Copy</button>
     </div>
+    <div class="env-row highlight" style="border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.04)">
+      <span class="env-key" style="color:#fbbf24">BINANCE_TESTNET</span>
+      <span class="env-val">Set to <code style="color:#f87171">false</code> when switching to <b>real Binance trading</b>. Leave unset in paper mode.</span>
+      <button class="copy-btn" onclick="copyVal(this,'false')">Copy</button>
+    </div>
     <div class="env-row">
       <span class="env-key">TELEGRAM_BOT_TOKEN</span>
       <span class="env-val">Optional — get from <a href="https://t.me/BotFather" target="_blank">@BotFather</a> on Telegram for live trade alerts on your phone</span>

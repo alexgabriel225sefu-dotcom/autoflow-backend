@@ -248,6 +248,10 @@ const _emailLimiter   = rateLimit({ windowMs: 15*60*1000, max: 10, standardHeade
   message: { error: 'Too many email requests. Try again later.' } });
 const _webhookLimiter = rateLimit({ windowMs: 60*1000, max: 30, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many webhook requests.' } });
+const _paymentLimiter = rateLimit({ windowMs: 15*60*1000, max: 8, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Too many payment requests — please wait a few minutes.' } });
+const _licenseLimiter = rateLimit({ windowMs: 60*1000, max: 10, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Too many license checks — please slow down.' } });
 
 // ════════════════════════════════════════
 // AUTH ROUTES
@@ -1037,7 +1041,7 @@ app.get('/api/logout', (req, res) => {
 
 // POST /create-payment-intent — Stripe
 const VALID_AMOUNTS = [3700, 9700, 19700]; // $37 starter, $97 pro, $197 apex-bot (in cents)
-app.post('/create-payment-intent', async (req, res) => {
+app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
   const { amount, currency, email, name, product } = req.body;
   const safeAmount = VALID_AMOUNTS.includes(Number(amount)) ? Number(amount) : 3700;
   const isApexBot = (product === 'apex-bot') || safeAmount === 19700;
@@ -1089,12 +1093,15 @@ function generateLicenseKey() {
   return `APEX-${seg()}-${seg()}-${seg()}`;
 }
 
-// GET /api/owner-license — generate a license key for the owner (no secret needed, rate-limited)
+// GET /api/owner-license — generate a license key for the owner (requires BOT_EMAIL_SECRET)
 app.get('/api/owner-license', async (req, res) => {
+  const secret = req.query.secret || req.headers['x-owner-secret'];
+  const expected = process.env.BOT_EMAIL_SECRET;
+  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden — secret required' });
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
   const key = generateLicenseKey();
   try {
-    await supabase.from('licenses').insert([{ key, email: 'owner@aicashsystem.space', name: 'Owner' }]);
+    await supabase.from('licenses').insert([{ key, email: 'owner@aicashsystem.space', name: 'Owner', active: true }]);
     res.json({ key, message: 'Add this as LICENSE_KEY in Railway Variables' });
   } catch(e) {
     res.status(500).json({ error: e.message });
@@ -1102,7 +1109,7 @@ app.get('/api/owner-license', async (req, res) => {
 });
 
 // POST /api/verify-license — called by the bot on every startup
-app.post('/api/verify-license', async (req, res) => {
+app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
   const { key } = req.body || {};
   if (!key) return res.json({ valid: false, message: 'No license key provided' });
   if (!supabase) return res.json({ valid: false, message: 'License server not configured — contact support' });
@@ -1714,8 +1721,16 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
 
 </div></body></html>`;}
 
-// ── BOT ACCESS — streams a clean ZIP of ONLY the bot folder (no server.js, no other files)
-app.get('/bot-access', (req, res) => {
+// ── BOT ACCESS — streams a clean ZIP; requires a valid activated license key
+app.get('/bot-access', async (req, res) => {
+  const key = req.query.key || req.headers['x-license-key'];
+  if (!key) return res.status(403).send('License key required. Add ?key=APEX-XXXX-XXXX-XXXX');
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('licenses').select('active').eq('key', key).single();
+      if (!data?.active) return res.status(403).send('Invalid or inactive license key.');
+    } catch { return res.status(403).send('Could not verify license. Contact support.'); }
+  }
   const { execFile } = require('child_process');
   const os = require('os');
   const fs = require('fs');
@@ -1737,13 +1752,19 @@ app.get('/bot-access', (req, res) => {
   });
 });
 
-// ── EMAIL STATUS (no auth needed) — check config instantly
+// ── EMAIL STATUS — requires owner secret
 app.get('/api/email-status', (req, res) => {
+  const secret = req.query.secret;
+  const expected = process.env.BOT_EMAIL_SECRET;
+  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
   res.json({ resend: !!RESEND_API_KEY, brevo: !!BREVO_API_KEY, smtp: !!transporter, sender: SENDER_EMAIL || 'not set' });
 });
 
-// ── RESEND DNS RECORDS — afișează valorile complete pentru Namecheap
+// ── RESEND DNS RECORDS — requires owner secret
 app.get('/api/resend-dns', async (req, res) => {
+  const secret = req.query.secret;
+  const expected = process.env.BOT_EMAIL_SECRET;
+  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
   if (!RESEND_API_KEY) return res.json({ error: 'RESEND_API_KEY not set' });
   try {
     const r = await fetch('https://api.resend.com/domains', {
@@ -1766,8 +1787,11 @@ app.get('/api/resend-dns', async (req, res) => {
   } catch(e) { res.json({ error: e.message }); }
 });
 
-// ── DEBUG: test Resend directly
+// ── DEBUG: test Resend directly — requires owner secret
 app.get('/api/test-resend', async (req, res) => {
+  const secret = req.query.secret;
+  const expected = process.env.BOT_EMAIL_SECRET;
+  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
   if (!RESEND_API_KEY) return res.json({ error: 'RESEND_API_KEY not set' });
   const to = req.query.email || 'test@example.com';
   const resendFrom = process.env.RESEND_FROM || 'onboarding@resend.dev';
@@ -1783,8 +1807,11 @@ app.get('/api/test-resend', async (req, res) => {
   } catch(e) { res.json({ error: e.message }); }
 });
 
-// GET /api/test-brevo?email=X — debug: shows exact Brevo API response
+// GET /api/test-brevo?email=X — requires owner secret
 app.get('/api/test-brevo', async (req, res) => {
+  const secret = req.query.secret;
+  const expected = process.env.BOT_EMAIL_SECRET;
+  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
   const to = req.query.email || SENDER_EMAIL;
   if (!BREVO_API_KEY) return res.json({ error: 'BREVO_API_KEY not set' });
   try {
