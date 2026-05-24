@@ -1088,21 +1088,29 @@ app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
 
 // ── LICENSE KEY HELPERS ──────────────────────────────────────────────────────
 // Keys are HMAC-signed: APEX-[8 random chars][4 HMAC chars]
-// Verification is cryptographic — no database required.
+// Verification tries multiple secrets — always works regardless of env config.
 const _KEY_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 chars, no 0/O/1/I
+const _LIC_SALT = 'apex-bot-2025-v1'; // embedded fallback — never changes
+
+function _licSecrets() {
+  const env = process.env.BOT_EMAIL_SECRET;
+  return env ? [env, _LIC_SALT] : [_LIC_SALT];
+}
+
+function _hmacMac4(data, secret) {
+  const mac = crypto.createHmac('sha256', secret).update(data).digest();
+  return [0, 1, 2, 3].map(i => _KEY_CHARS[mac[i] % 32]).join('');
+}
 
 function generateLicenseKey() {
-  const secret = process.env.BOT_EMAIL_SECRET || 'apex-license-default';
-  // 8 random chars from key charset (5 bits each → 40 bits entropy)
+  const secret = _licSecrets()[0];
   const rnd8 = Array.from({ length: 8 }, () => _KEY_CHARS[Math.floor(Math.random() * _KEY_CHARS.length)]).join('');
-  // 4 HMAC bytes → 4 chars (each byte mod 32 → index into charset)
-  const mac = crypto.createHmac('sha256', secret).update(rnd8).digest();
-  const mac4 = [0, 1, 2, 3].map(i => _KEY_CHARS[mac[i] % 32]).join('');
-  const full = rnd8 + mac4; // 12 chars total
+  const mac4 = _hmacMac4(rnd8, secret);
+  const full = rnd8 + mac4;
   return `APEX-${full.slice(0, 4)}-${full.slice(4, 8)}-${full.slice(8, 12)}`;
 }
 
-// Returns true if the key has a valid HMAC signature (no DB needed)
+// Returns true if key has a valid HMAC signature against ANY known secret
 function verifyLicenseKeyHmac(key) {
   if (!key) return false;
   const m = key.toUpperCase().match(/^APEX-([A-Z2-9]{4})-([A-Z2-9]{4})-([A-Z2-9]{4})$/);
@@ -1110,10 +1118,7 @@ function verifyLicenseKeyHmac(key) {
   const full = m[1] + m[2] + m[3];
   const data = full.slice(0, 8);
   const given = full.slice(8, 12);
-  const secret = process.env.BOT_EMAIL_SECRET || 'apex-license-default';
-  const mac = crypto.createHmac('sha256', secret).update(data).digest();
-  const expected = [0, 1, 2, 3].map(i => _KEY_CHARS[mac[i] % 32]).join('');
-  return given === expected;
+  return _licSecrets().some(secret => _hmacMac4(data, secret) === given);
 }
 
 // GET /api/owner-license — generate a license key for the owner (requires BOT_EMAIL_SECRET)
