@@ -1681,6 +1681,11 @@ app.get('/bot-access', (req, res) => {
   });
 });
 
+// ── EMAIL STATUS (no auth needed) — check config instantly
+app.get('/api/email-status', (req, res) => {
+  res.json({ brevo: !!BREVO_API_KEY, smtp: !!transporter, sender: SENDER_EMAIL || 'not set' });
+});
+
 // ── TEST DELIVERY EMAIL — protejat cu secret key, fără plată
 // GET  (browser): /api/send-bot-email?secret=X&email=you@gmail.com&name=Alex
 // POST (curl):    /api/send-bot-email?secret=X  body: { email, name }
