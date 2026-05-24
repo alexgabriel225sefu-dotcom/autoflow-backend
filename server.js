@@ -1541,7 +1541,7 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
       <span class="cta-btn-shine"></span>
       Open Bot Repository →
     </a>
-    <p class="cta-hint">On GitHub → click <b>Code → Download ZIP</b> → extract the <b>apex-trade-bot</b> folder</p>
+    <p class="cta-hint">Click the button above → ZIP downloads automatically → extract the <b>apex-trade-bot</b> folder</p>
   </div>
 </div>
 
@@ -1684,7 +1684,8 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
 
 // ── BOT ACCESS REDIRECT — clienții văd aicashsystem.space/bot-access, nu GitHub
 app.get('/bot-access', (req, res) => {
-  res.redirect(301, 'https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/tree/release/apex-bot/apex-trade-bot');
+  // Direct ZIP download — works on mobile and desktop without needing to find the Code button
+  res.redirect(302, 'https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/archive/refs/heads/release%2Fapex-bot.zip');
 });
 
 // ── TEST DELIVERY EMAIL — protejat cu secret key, fără plată
