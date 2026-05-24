@@ -1351,77 +1351,7 @@ app.get('/api/heygen/status/:id', async (req, res) => {
 
 // Explicit HTML page routes
 // Public pages — no auth required
-// ── BOT ACCESS REDIRECT — clienții văd aicashsystem.space/bot-access, nu GitHub
-app.get('/bot-access', (req, res) => {
-  res.redirect(301, 'https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/tree/release/apex-bot/apex-trade-bot');
-});
-
-// ── TEST DELIVERY EMAIL — GET din browser sau POST cu curl
-// GET  (browser): /api/send-bot-email?secret=X&email=Y&name=Z
-// POST (curl):    /api/send-bot-email?secret=X  body: { email, name }
-app.get('/api/send-bot-email', async (req, res) => {
-  req.body = { email: req.query.email, name: req.query.name, secret: req.query.secret };
-  return _sendBotEmailHandler(req, res);
-});
-app.post('/api/send-bot-email', async (req, res) => {
-  req.body.secret = req.body.secret || req.query.secret;
-  return _sendBotEmailHandler(req, res);
-});
-async function _sendBotEmailHandler(req, res) {
-  const secret = req.body.secret;
-  const adminSecret = process.env.BOT_EMAIL_SECRET || '';
-  if (!adminSecret) return res.status(403).json({ error: 'BOT_EMAIL_SECRET not configured on Render' });
-  if (secret !== adminSecret) return res.status(403).json({ error: 'Wrong secret', hint: `Expected ${adminSecret.length} chars, got ${(secret||'').length} chars` });
-  const email = req.body.email;
-  const name  = req.body.name || 'there';
-  if (!email) return res.status(400).json({ error: 'email required' });
-  const botHtml = `<div style="font-family:'Inter',sans-serif;max-width:560px;margin:0 auto;padding:40px 32px;background:#050508;color:#e2e2ec;border-radius:12px">
-    <div style="font-size:13px;font-weight:800;color:#00ff88;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px">APEX.BOT — DELIVERY</div>
-    <h2 style="font-size:26px;font-weight:900;color:#fff;margin-bottom:8px;letter-spacing:-1px">You're in, ${_he(name.split(' ')[0])}.</h2>
-    <p style="color:rgba(255,255,255,.55);font-size:14px;margin-bottom:32px">Your Apex Trade Bot is ready. Everything you need is below.</p>
-    <div style="background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:10px;padding:20px 24px;margin-bottom:24px">
-      <div style="font-size:11px;color:#00ff88;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">📦 Source Code</div>
-      <a href="https://aicashsystem.space/bot-access" style="display:inline-block;background:#00ff88;color:#000;font-size:14px;font-weight:800;padding:12px 24px;border-radius:8px;text-decoration:none">Access Bot Repository →</a>
-    </div>
-    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:18px 24px;margin-bottom:16px">
-      <ol style="color:rgba(255,255,255,.65);font-size:13px;padding-left:18px;margin:0;line-height:2">
-        <li>Open the repo and download the <strong>apex-trade-bot</strong> folder</li>
-        <li>Create a free account at <a href="https://railway.app" style="color:#00ff88">railway.app</a></li>
-        <li>Deploy from GitHub — select the apex-trade-bot directory</li>
-        <li>Add: GROQ_API_KEY (free at groq.com) + BYBIT_API_KEY + BYBIT_API_SECRET</li>
-        <li>Set PAPER_TRADING=true first, then switch to live</li>
-      </ol>
-    </div>
-    <div style="background:rgba(229,62,46,.06);border:1px solid rgba(229,62,46,.2);border-radius:10px;padding:16px 24px;margin-bottom:28px">
-      <p style="color:rgba(255,255,255,.5);font-size:12px;margin:0;line-height:1.7">⚠ <strong style="color:rgba(255,255,255,.75)">Risk reminder:</strong> Always start with paper trading mode. Crypto involves significant risk. Never trade more than you can afford to lose.</p>
-    </div>
-    <p style="color:rgba(255,255,255,.3);font-size:12px">Questions? <a href="mailto:contact@aicashsystem.space" style="color:#00ff88">contact@aicashsystem.space</a></p>
-  </div>`;
-  let emailSent = false;
-  if (BREVO_API_KEY) {
-    try {
-      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sender: { name: 'Apex.Bot', email: SENDER_EMAIL }, to: [{ email }],
-          subject: '🤖 Your Apex Trade Bot is ready — access inside', htmlContent: botHtml })
-      });
-      if (r.ok) emailSent = true;
-      else { const t = await r.text(); return res.json({ success: false, method: 'brevo', error: t }); }
-    } catch(e) { return res.json({ success: false, method: 'brevo', error: e.message }); }
-  } else if (transporter) {
-    try {
-      await transporter.sendMail({ from: `"Apex.Bot" <${SENDER_EMAIL}>`, to: email,
-        subject: '🤖 Your Apex Trade Bot is ready — access inside', html: botHtml });
-      emailSent = true;
-    } catch(e) { return res.json({ success: false, method: 'smtp', error: e.message }); }
-  } else {
-    return res.json({ success: false, error: 'No email provider configured (BREVO_API_KEY missing)' });
-  }
-  return res.json({ success: emailSent, to: email, method: BREVO_API_KEY ? 'brevo' : 'smtp' });
-}
-
-const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','apex-bot'];
+const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','apex-bot','bot-setup'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
@@ -1536,12 +1466,12 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
 <!-- ══════ CTA ══════ -->
 <div class="cta-wrap">
   <div class="cta-inner">
-    <div class="cta-label">Step 1 — Get the source code</div>
-    <a href="https://aicashsystem.space/bot-access" class="cta-btn">
+    <div class="cta-label">Complete Setup Guide — all steps inside</div>
+    <a href="https://aicashsystem.space/bot-setup" class="cta-btn">
       <span class="cta-btn-shine"></span>
-      Open Bot Repository →
+      Open Setup Guide →
     </a>
-    <p class="cta-hint">Click the button above → ZIP downloads automatically → extract the <b>apex-trade-bot</b> folder</p>
+    <p class="cta-hint">Click the button above → step-by-step guide with download link, Railway deploy &amp; env vars</p>
   </div>
 </div>
 
