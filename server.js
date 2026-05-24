@@ -100,11 +100,13 @@ async function _sendEmail({ to, subject, html, fromName }) {
 
   // 1. Resend (fastest, works immediately)
   if (RESEND_API_KEY) {
+    // Use verified Resend domain if custom domain not verified yet
+    const resendFrom = process.env.RESEND_FROM || `${from} <onboarding@resend.dev>`;
     try {
       const r = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: `${from} <${sender}>`, to: [to], subject, html }),
+        body: JSON.stringify({ from: resendFrom, to: [to], subject, html }),
         signal: AbortSignal.timeout(12000),
       });
       if (r.ok) { addLog(`Email sent via Resend to ${to}`, 'email', 'success'); return { ok: true, method: 'resend' }; }
