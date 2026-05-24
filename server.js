@@ -1709,6 +1709,23 @@ app.get('/api/email-status', (req, res) => {
   res.json({ resend: !!RESEND_API_KEY, brevo: !!BREVO_API_KEY, smtp: !!transporter, sender: SENDER_EMAIL || 'not set' });
 });
 
+// ── DEBUG: test Resend directly
+app.get('/api/test-resend', async (req, res) => {
+  if (!RESEND_API_KEY) return res.json({ error: 'RESEND_API_KEY not set' });
+  const to = req.query.email || 'test@example.com';
+  const resendFrom = process.env.RESEND_FROM || 'onboarding@resend.dev';
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: resendFrom, to: [to], subject: 'Test', html: '<p>Test email</p>' }),
+      signal: AbortSignal.timeout(12000),
+    });
+    const body = await r.json();
+    res.json({ status: r.status, ok: r.ok, body, from: resendFrom });
+  } catch(e) { res.json({ error: e.message }); }
+});
+
 // ── TEST DELIVERY EMAIL — protejat cu secret key, fără plată
 // GET  (browser): /api/send-bot-email?secret=X&email=you@gmail.com&name=Alex
 // POST (curl):    /api/send-bot-email?secret=X  body: { email, name }
