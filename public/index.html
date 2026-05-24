@@ -1132,7 +1132,10 @@ document.getElementById('paymentForm').addEventListener('submit',async function(
     var d=await r.json();
     var result=await stripe.confirmCardPayment(d.clientSecret,{payment_method:{card:cardEl,billing_details:{name:document.getElementById('customerName').value,email:document.getElementById('customerEmail').value}}});
     if(result.error){document.getElementById('card-errors').textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try Again';}
-    else if(result.paymentIntent.status==='succeeded'){document.getElementById('formView').style.display='none';document.getElementById('successView').style.display='block';}
+    else if(result.paymentIntent.status==='succeeded'){
+      localStorage.setItem('acs_plan', curProd);
+      window.location.href = curProd === 'pro' ? '/course-pro.html' : '/course-starter.html';
+    }
   }catch(err){document.getElementById('card-errors').textContent='Error: '+err.message;btn.disabled=false;spin.style.display='none';txt.textContent='Pay Now';}
 });
 

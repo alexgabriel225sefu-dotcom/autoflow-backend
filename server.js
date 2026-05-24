@@ -1118,26 +1118,14 @@ async function handleStripeWebhook(req, res) {
         }
         if (email) {
           const botEmailHtml = _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey);
-          let emailSent = false;
-          if (BREVO_API_KEY) {
-            try {
-              const r = await fetch('https://api.brevo.com/v3/smtp/email', {
-                method: 'POST',
-                headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sender: { name: 'Apex.Bot', email: SENDER_EMAIL }, to: [{ email }],
-                  subject: '🤖 Your Apex Trade Bot is ready — access inside', htmlContent: botEmailHtml })
-              });
-              if (r.ok) emailSent = true;
-            } catch(e) {}
-          }
-          if (!emailSent && transporter) {
-            try {
-              await transporter.sendMail({ from: `"Apex.Bot" <${SENDER_EMAIL}>`, to: email,
-                subject: '🤖 Your Apex Trade Bot is ready — access inside', html: botEmailHtml });
-              emailSent = true;
-            } catch(e) {}
-          }
-          if (!emailSent) addLog(`Apex Bot email NOT sent for ${email} — no provider`, 'email', 'error');
+          const result = await _sendEmail({
+            to: email,
+            subject: '🤖 Your Apex Trade Bot is ready — access inside',
+            html: botEmailHtml,
+            fromName: 'Apex.Bot',
+          });
+          if (!result.ok) addLog(`Apex Bot email NOT sent for ${email} — ${result.error}`, 'email', 'error');
+          else addLog(`Apex Bot email sent via ${result.method} to ${email}`, 'email', 'success');
         }
         addLog(`Apex Bot sold: ${email} — $197`, 'payment', 'success');
         return res.json({ received: true });
@@ -1151,37 +1139,24 @@ async function handleStripeWebhook(req, res) {
         await supabase.from('purchases').insert([{ email, code, plan, amount: pi.amount, created_at: new Date().toISOString() }]);
       }
 
-      // Send access email — try Brevo API first, then SMTP
+      // Send access email — use unified _sendEmail() (Resend → Brevo → SMTP)
       if (email) {
+        const courseUrl = plan === 'pro' ? 'https://aicashsystem.space/course-pro.html' : 'https://aicashsystem.space/course-starter.html';
         const emailHtml = `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:32px;background:#0a0a0a;color:#F5F0E8">
             <h2 style="color:#C8A96E;font-family:Georgia,serif">Welcome to AI Cash Systems!</h2>
             <p>Your ${_he(plan.toUpperCase())} course access is ready.</p>
-            <p><strong>Your Access Code:</strong></p>
-            <div style="background:#161616;border:1px solid #C8A96E;border-radius:8px;padding:16px;font-size:24px;font-weight:bold;color:#C8A96E;text-align:center;letter-spacing:4px">${_he(code)}</div>
-            <p style="margin-top:20px">Access your course here:</p>
-            <a href="https://aicashsystem.space/access.html" style="background:#C8A96E;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:bold">Access Course →</a>
-            <p style="color:#7A7060;font-size:12px;margin-top:24px">Enter the code above to access your course.</p>
+            <p style="margin-top:20px">Click below to access your course anytime:</p>
+            <a href="${_he(courseUrl)}" style="background:#C8A96E;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:bold">Access My Course →</a>
+            <p style="margin-top:24px">Need the access code to log in manually? Use: <strong style="letter-spacing:3px;color:#C8A96E">${_he(code)}</strong></p>
+            <p style="color:#7A7060;font-size:12px;margin-top:12px">Enter the code at <a href="https://aicashsystem.space/access.html" style="color:#7A7060">aicashsystem.space/access.html</a> if prompted.</p>
           </div>`;
-        let emailSent = false;
-        if (BREVO_API_KEY) {
-          try {
-            const r = await fetch('https://api.brevo.com/v3/smtp/email', {
-              method: 'POST',
-              headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sender: { name: SENDER_NAME, email: SENDER_EMAIL }, to: [{ email }],
-                subject: '🎉 Your AI Cash Systems Access Code', htmlContent: emailHtml })
-            });
-            if (r.ok) emailSent = true;
-          } catch(e) {}
-        }
-        if (!emailSent && transporter) {
-          try {
-            await transporter.sendMail({ from: `"${SENDER_NAME}" <${SENDER_EMAIL}>`, to: email,
-              subject: '🎉 Your AI Cash Systems Access Code', html: emailHtml });
-            emailSent = true;
-          } catch(e) {}
-        }
-        if (!emailSent) addLog(`Email NOT sent for ${email} — no provider`, 'email', 'error');
+        const result = await _sendEmail({
+          to: email,
+          subject: '🎉 Your AI Cash Systems Course Access',
+          html: emailHtml,
+        });
+        if (!result.ok) addLog(`Course email NOT sent for ${email} — ${result.error}`, 'email', 'error');
+        else addLog(`Course email sent via ${result.method} to ${email}`, 'email', 'success');
       }
 
       addLog(`Payment succeeded: ${email} — ${plan} plan — Code: ${code}`, 'payment', 'success');
