@@ -7,7 +7,7 @@ const PAPER = isTruthy(process.env.PAPER_TRADING);
 
 module.exports = {
   // ─── Exchange ────────────────────────────────────────────
-  EXCHANGE: process.env.EXCHANGE || 'binance', // 'binance' (global) or 'bybit' (non-EU only)
+  EXCHANGE: process.env.EXCHANGE || 'bybit', // 'bybit' (default) or 'binance'
 
   // ─── Bybit ──────────────────────────────────────────────
   BYBIT_API_KEY:    process.env.BYBIT_API_KEY    || '',
@@ -66,7 +66,7 @@ module.exports = {
 
   // ─── Paper Trading ──────────────────────────────────────
   PAPER_TRADING: PAPER,
-  PAPER_BALANCE: parseFloat(process.env.PAPER_BALANCE || '10'), // $10 simulat
+  PAPER_BALANCE: parseFloat(process.env.PAPER_BALANCE || '100'), // $100 simulat implicit
 
   // ─── Testnet flag (legacy) ──────────────────────────────
   get TESTNET() { return this.BYBIT_TESTNET; },
