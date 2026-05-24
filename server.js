@@ -30,7 +30,13 @@ app.use((req, res, next) => {
 
 // Health check — first route, no deps, always responds
 app.get('/health', (req, res) => res.json({ ok: true, node: process.version, time: new Date().toISOString() }));
-app.get('/ping', (req, res) => res.json({ ok: true, version: 'v6-email-fix', time: new Date().toISOString() }));
+app.get('/ping', (req, res) => res.json({ ok: true, version: 'v7-hmac-license', time: new Date().toISOString() }));
+// Debug: test license key without bot — public endpoint
+app.get('/api/check-key', (req, res) => {
+  const key = req.query.key || '';
+  const valid = verifyLicenseKeyHmac(key);
+  res.json({ key: key.slice(0,9)+'…', valid, secrets_count: _licSecrets().length });
+});
 app.get('/api/stripe-config', auth, async (req, res) => {
   const key = process.env.STRIPE_SECRET_KEY || '';
   const isLive = key.startsWith('sk_live_');
