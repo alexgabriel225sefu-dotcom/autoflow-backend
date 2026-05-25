@@ -134,12 +134,13 @@ async function _sendEmail({ to, subject, html, fromName }) {
     } catch(e) { console.error('Brevo API error:', e.message); }
   }
 
-  // 3. SMTP fallback
+  // 3. SMTP fallback (Brevo SMTP or Gmail)
   if (transporter) {
     try {
+      const smtpFrom = (GMAIL_USER && GMAIL_PASS) ? `"${from}" <${GMAIL_USER}>` : `"${from}" <${sender}>`;
       await Promise.race([
-        transporter.sendMail({ from: `"${from}" <${sender}>`, to, subject, html }),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('SMTP timeout')), 12000)),
+        transporter.sendMail({ from: smtpFrom, to, subject, html }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('SMTP timeout')), 15000)),
       ]);
       addLog(`Email sent via SMTP to ${to}`, 'email', 'success');
       return { ok: true, method: 'smtp' };
@@ -193,12 +194,19 @@ try { if (SUPABASE_URL && SUPABASE_KEY) supabase = createClient(SUPABASE_URL, SU
 let anthropic = null;
 try { if (ANTHROPIC_KEY) anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY }); } catch(e) { console.error('Anthropic init error:', e.message); }
 
-// ── BREVO SMTP TRANSPORTER ──
+// ── SMTP TRANSPORTER (Brevo → Gmail fallback) ──
 const BREVO_USER = process.env.BREVO_SMTP_USER;
 const BREVO_PASS = process.env.BREVO_SMTP_PASS;
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD;
 let transporter = null;
 try {
-  if (BREVO_USER && BREVO_PASS) transporter = nodemailer.createTransport({ host: 'smtp-relay.brevo.com', port: 587, secure: false, auth: { user: BREVO_USER, pass: BREVO_PASS } });
+  if (BREVO_USER && BREVO_PASS) {
+    transporter = nodemailer.createTransport({ host: 'smtp-relay.brevo.com', port: 587, secure: false, auth: { user: BREVO_USER, pass: BREVO_PASS } });
+  } else if (GMAIL_USER && GMAIL_PASS) {
+    transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: GMAIL_USER, pass: GMAIL_PASS } });
+    console.log('[EMAIL] Gmail SMTP transporter initialized');
+  }
 } catch(e) { console.error('Nodemailer init error:', e.message); }
 
 // ── PENDING LICENSES (payment_intent_id → key) — cleared after 2h ──
