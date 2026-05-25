@@ -1872,6 +1872,28 @@ app.get('/api/test-brevo', async (req, res) => {
   } catch(e) { res.json({ error: e.message, sender: SENDER_EMAIL }); }
 });
 
+// GET /api/test-resend?secret=X&email=Y — debug Resend
+app.get('/api/test-resend', async (req, res) => {
+  const secret = req.query.secret;
+  const expected = process.env.BOT_EMAIL_SECRET;
+  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
+  const to = req.query.email || SENDER_EMAIL;
+  const resendKey = process.env.RESEND_API_KEY;
+  const resendFrom = process.env.RESEND_FROM;
+  if (!resendKey) return res.json({ error: 'RESEND_API_KEY not set', resendFrom });
+  if (!resendFrom) return res.json({ error: 'RESEND_FROM not set', resendKey: resendKey ? 'set' : 'missing' });
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: resendFrom, to: [to], subject: 'Resend Test', html: '<p>Resend test email</p>' }),
+      signal: AbortSignal.timeout(12000),
+    });
+    const body = await r.text();
+    res.json({ status: r.status, ok: r.ok, body, from: resendFrom, to });
+  } catch(e) { res.json({ error: e.message, from: resendFrom, to }); }
+});
+
 // ── TEST DELIVERY EMAIL — protejat cu secret key, fără plată
 // GET  (browser): /api/send-bot-email?secret=X&email=you@gmail.com&name=Alex
 // POST (curl):    /api/send-bot-email?secret=X  body: { email, name }
