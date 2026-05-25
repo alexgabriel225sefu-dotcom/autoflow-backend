@@ -225,7 +225,7 @@ async function closeTrade(price, reason) {
 
   // ─── Dashboard: înregistrează trade încheiat ──────────────
   dash.trades.unshift({
-    time:       new Date().toLocaleString('ro-RO'),
+    time:       new Date().toLocaleString('en-US'),
     symbol,
     side,
     entry:      entryPrice,
@@ -458,7 +458,7 @@ async function main() {
       return;
     }
     // Dashboard HTML
-    const sym = (dash.currentSymbol || cfg.SYMBOL).replace('USDT', '_USDT');
+    const sym = (dash.currentSymbol || cfg.SYMBOL); // keep XRPUSDT format — no underscore
     const tvSym = `${dash.exchange === 'BINANCE' ? 'BINANCE' : 'BYBIT'}:${sym}`;
     const pnlTotal  = dash.startBalance > 0 ? ((dash.balance - dash.startBalance) / dash.startBalance * 100).toFixed(2) : '0.00';
     const pnlColor  = parseFloat(pnlTotal) >= 0 ? '#00ff88' : '#ff4466';
@@ -474,9 +474,9 @@ async function main() {
            <span>TP: <b>$${dash.openPosition.takeProfit?.toFixed(5)}</b></span>
            <span class="${(dash.openPosition.currentPnl ?? 0) >= 0 ? 'green' : 'red'}">PnL: <b>${(dash.openPosition.currentPnl ?? 0) >= 0 ? '+' : ''}$${(dash.openPosition.currentPnl ?? 0).toFixed(4)}</b></span>
          </div>`
-      : `<div class="pos-box neutral">⏳ Fără poziție deschisă — așteptăm semnal...</div>`;
+      : `<div class="pos-box neutral">⏳ No open position — waiting for signal...</div>`;
     const tradesHtml = dash.trades.length === 0
-      ? '<tr><td colspan="7" style="text-align:center;color:#666">Niciun trade încă</td></tr>'
+      ? '<tr><td colspan="7" style="text-align:center;color:#666">No trades yet</td></tr>'
       : dash.trades.map(t => `<tr class="${t.win ? 'win' : 'loss'}">
            <td>${t.time}</td><td>${t.symbol}</td>
            <td>${t.side === 'BUY' ? '🟢 LONG' : '🔴 SHORT'}</td>
@@ -484,7 +484,7 @@ async function main() {
            <td>${t.win ? '+' : ''}$${t.pnl} (${t.pnlPct}%)</td>
            <td>${t.reason}</td>
          </tr>`).join('');
-    const html = `<!DOCTYPE html><html lang="ro"><head><meta charset="UTF-8">
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Apex Trade Bot Dashboard</title>
 <style>
@@ -520,24 +520,24 @@ tr.win td{color:#d1fae5}tr.loss td{color:#fee2e2}
   <span class="badge">${dash.mode} · ${dash.exchange}</span>
 </header>
 <div class="grid">
-  <div class="card"><div class="lbl">Balanță</div><div class="val green">$${dash.balance.toFixed(2)}</div></div>
-  <div class="card"><div class="lbl">PnL Total</div><div class="val" style="color:${pnlColor}">${parseFloat(pnlTotal) >= 0 ? '+' : ''}${pnlTotal}%</div></div>
+  <div class="card"><div class="lbl">Balance</div><div class="val green">$${dash.balance.toFixed(2)}</div></div>
+  <div class="card"><div class="lbl">Total PnL</div><div class="val" style="color:${pnlColor}">${parseFloat(pnlTotal) >= 0 ? '+' : ''}${pnlTotal}%</div></div>
   <div class="card"><div class="lbl">Trades</div><div class="val blue">${dash.trades.length}</div></div>
   <div class="card"><div class="lbl">Win Rate</div><div class="val yellow">${winRate}${winRate !== '—' ? '%' : ''}</div></div>
   <div class="card"><div class="lbl">Tick #</div><div class="val">${tickCount}</div></div>
-  <div class="card"><div class="lbl">Preț Curent</div><div class="val">$${dash.currentPrice?.toFixed(4) || '—'}</div></div>
+  <div class="card"><div class="lbl">Current Price</div><div class="val">$${dash.currentPrice?.toFixed(4) || '—'}</div></div>
 </div>
 <div class="chart-wrap">
   <iframe src="https://www.tradingview.com/widgetembed/?frameElementId=tv&symbol=${tvSym}&interval=5&hidesidetoolbar=1&hidetoptoolbar=0&theme=dark&style=1&timezone=Europe%2FBucharest&withdateranges=1&hide_side_toolbar=0&allow_symbol_change=0&save_image=0&studies=RSI%401%2CMASimple%401&calendar=0&support_host=https%3A%2F%2Fwww.tradingview.com" width="100%" height="400" frameborder="0" allowtransparency="true" scrolling="no"></iframe>
 </div>
-<div class="section"><h2>📊 Poziție Activă</h2>${posHtml}</div>
-<div class="section"><h2>📋 Istoric Tranzacții</h2>
+<div class="section"><h2>📊 Active Position</h2>${posHtml}</div>
+<div class="section"><h2>📋 Trade History</h2>
   <div style="overflow-x:auto"><table>
-    <thead><tr><th>Timp</th><th>Simbol</th><th>Tip</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Motiv</th></tr></thead>
+    <thead><tr><th>Time</th><th>Symbol</th><th>Type</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Reason</th></tr></thead>
     <tbody>${tradesHtml}</tbody>
   </table></div>
 </div>
-<div class="refresh">Actualizare automată la 30s · Ultimul tick: ${dash.lastTick || '—'}</div>
+<div class="refresh">Auto-refresh every 30s · Last tick: ${dash.lastTick || '—'}</div>
 </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(html);
