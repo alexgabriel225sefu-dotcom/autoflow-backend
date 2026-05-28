@@ -6,9 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, TrendingUp, TrendingDown, Zap, BarChart3, Settings, Bell } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLocation } from 'wouter';
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState('overview');
 
   // Fetch trading data
@@ -59,11 +61,21 @@ export default function Dashboard() {
                 <p className="text-slate-400 mt-1">Cinematic Algorithmic Trading Dashboard</p>
               </div>
               <div className="flex items-center gap-4">
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button
+                  onClick={() => setLocation('/alerts')}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
                   <Bell className="w-4 h-4" />
                   Alerts
                 </Button>
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button
+                  onClick={() => setLocation('/settings')}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
                   <Settings className="w-4 h-4" />
                   Config
                 </Button>
