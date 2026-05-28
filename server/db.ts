@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, trades, alerts, botConfigs, dailySnapshots, paperTradingStates } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import type { InsertTrade, InsertAlert, InsertBotConfig, InsertDailySnapshot, InsertPaperTradingState } from '../drizzle/schema';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -89,4 +90,154 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ─── Trade queries ──────────────────────────────────────────
+export async function createTrade(userId: number, trade: InsertTrade) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db.insert(trades).values({
+    ...trade,
+    userId,
+  });
+  return result;
+}
+
+export async function getTradeHistory(userId: number, limit = 50) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db
+    .select()
+    .from(trades)
+    .where(eq(trades.userId, userId))
+    .orderBy(desc(trades.openedAt))
+    .limit(limit);
+  return result;
+}
+
+export async function updateTrade(tradeId: number, updates: Partial<InsertTrade>) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  await db.update(trades).set(updates).where(eq(trades.id, tradeId));
+}
+
+// ─── Alert queries ──────────────────────────────────────────
+export async function createAlert(userId: number, alert: InsertAlert) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db.insert(alerts).values({
+    ...alert,
+    userId,
+  });
+  return result;
+}
+
+export async function getAlertHistory(userId: number, limit = 20) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db
+    .select()
+    .from(alerts)
+    .where(eq(alerts.userId, userId))
+    .orderBy(desc(alerts.sentAt))
+    .limit(limit);
+  return result;
+}
+
+// ─── Bot config queries ──────────────────────────────────────
+export async function getBotConfig(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db
+    .select()
+    .from(botConfigs)
+    .where(eq(botConfigs.userId, userId))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function upsertBotConfig(userId: number, config: Partial<InsertBotConfig>) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const existing = await getBotConfig(userId);
+  if (existing) {
+    await db.update(botConfigs).set(config).where(eq(botConfigs.userId, userId));
+  } else {
+    await db.insert(botConfigs).values({
+      userId,
+      ...config,
+    } as InsertBotConfig);
+  }
+}
+
+// ─── Daily snapshot queries ──────────────────────────────────
+export async function getDailySnapshot(userId: number, date: string) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db
+    .select()
+    .from(dailySnapshots)
+    .where(eq(dailySnapshots.userId, userId) && eq(dailySnapshots.date, date))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function createDailySnapshot(userId: number, snapshot: InsertDailySnapshot) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db.insert(dailySnapshots).values({
+    ...snapshot,
+    userId,
+  });
+  return result;
+}
+
+export async function getDailySnapshots(userId: number, days = 30) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db
+    .select()
+    .from(dailySnapshots)
+    .where(eq(dailySnapshots.userId, userId))
+    .orderBy(desc(dailySnapshots.date))
+    .limit(days);
+  return result;
+}
+
+// ─── Paper trading state queries ────────────────────────────
+export async function getPaperTradingState(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db
+    .select()
+    .from(paperTradingStates)
+    .where(eq(paperTradingStates.userId, userId))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function upsertPaperTradingState(userId: number, state: Partial<InsertPaperTradingState>) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const existing = await getPaperTradingState(userId);
+  if (existing) {
+    await db.update(paperTradingStates).set(state).where(eq(paperTradingStates.userId, userId));
+  } else {
+    await db.insert(paperTradingStates).values({
+      userId,
+      ...state,
+    } as InsertPaperTradingState);
+  }
+}
+
+
