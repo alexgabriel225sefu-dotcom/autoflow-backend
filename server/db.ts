@@ -1,8 +1,8 @@
 import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, trades, alerts, botConfigs, dailySnapshots, paperTradingStates } from "../drizzle/schema";
+import { InsertUser, users, trades, alerts, botConfigs, dailySnapshots, paperTradingStates, subscriptions, tools, toolUsage, affiliates, referrals, courses, courseProgress, communityPosts, communityReplies } from "../drizzle/schema";
 import { ENV } from './_core/env';
-import type { InsertTrade, InsertAlert, InsertBotConfig, InsertDailySnapshot, InsertPaperTradingState } from '../drizzle/schema';
+import type { InsertTrade, InsertAlert, InsertBotConfig, InsertDailySnapshot, InsertPaperTradingState, InsertSubscription, InsertTool, InsertToolUsage, InsertAffiliate, InsertReferral, InsertCourse, InsertCourseProgress, InsertCommunityPost, InsertCommunityReply } from '../drizzle/schema';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -240,4 +240,244 @@ export async function upsertPaperTradingState(userId: number, state: Partial<Ins
   }
 }
 
+// ─── AICashSystem Subscription queries ──────────────────────
+export async function getSubscription(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.userId, userId))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function upsertSubscription(userId: number, sub: Partial<InsertSubscription>) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const existing = await getSubscription(userId);
+  if (existing) {
+    await db.update(subscriptions).set(sub).where(eq(subscriptions.userId, userId));
+  } else {
+    await db.insert(subscriptions).values({
+      userId,
+      ...sub,
+    } as InsertSubscription);
+  }
+}
+
+// ─── AICashSystem Tool queries ──────────────────────────────
+export async function getAllTools() {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  return await db.select().from(tools);
+}
+
+export async function getToolBySlug(slug: string) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db.select().from(tools).where(eq(tools.slug, slug)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function createTool(tool: InsertTool) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  return await db.insert(tools).values(tool);
+}
+
+// ─── AICashSystem Tool Usage queries ────────────────────────
+export async function getToolUsage(userId: number, toolId: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db
+    .select()
+    .from(toolUsage)
+    .where(eq(toolUsage.userId, userId) && eq(toolUsage.toolId, toolId))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function incrementToolUsage(userId: number, toolId: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const existing = await getToolUsage(userId, toolId);
+  if (existing) {
+    await db.update(toolUsage)
+      .set({ usageCount: existing.usageCount + 1 })
+      .where(eq(toolUsage.id, existing.id));
+  } else {
+    await db.insert(toolUsage).values({
+      userId,
+      toolId,
+      usageCount: 1,
+      resetDate: new Date(),
+    } as InsertToolUsage);
+  }
+}
+
+// ─── AICashSystem Affiliate queries ─────────────────────────
+export async function getAffiliateByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db
+    .select()
+    .from(affiliates)
+    .where(eq(affiliates.userId, userId))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function getAffiliateByCode(code: string) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db
+    .select()
+    .from(affiliates)
+    .where(eq(affiliates.referralCode, code))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function createAffiliate(userId: number, referralCode: string) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  return await db.insert(affiliates).values({
+    userId,
+    referralCode,
+  } as InsertAffiliate);
+}
+
+// ─── AICashSystem Referral queries ─────────────────────────
+export async function createReferral(affiliateId: number, customerId: number, tier: string, commissionAmount: string) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  return await db.insert(referrals).values({
+    affiliateId,
+    customerId,
+    tier: tier as any,
+    commissionAmount,
+  } as InsertReferral);
+}
+
+export async function getReferralsByAffiliate(affiliateId: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  return await db
+    .select()
+    .from(referrals)
+    .where(eq(referrals.affiliateId, affiliateId))
+    .orderBy(desc(referrals.createdAt));
+}
+
+// ─── AICashSystem Course queries ────────────────────────────
+export async function getAllCourses() {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  return await db.select().from(courses).orderBy(courses.order);
+}
+
+export async function getCourseBySlug(slug: string) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db.select().from(courses).where(eq(courses.slug, slug)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function createCourse(course: InsertCourse) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  return await db.insert(courses).values(course);
+}
+
+// ─── AICashSystem Course Progress queries ──────────────────
+export async function getCourseProgress(userId: number, courseId: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const result = await db
+    .select()
+    .from(courseProgress)
+    .where(eq(courseProgress.userId, userId) && eq(courseProgress.courseId, courseId))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function markCourseComplete(userId: number, courseId: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const existing = await getCourseProgress(userId, courseId);
+  if (existing) {
+    await db.update(courseProgress)
+      .set({ completed: 1, completedAt: new Date() })
+      .where(eq(courseProgress.id, existing.id));
+  } else {
+    await db.insert(courseProgress).values({
+      userId,
+      courseId,
+      completed: 1,
+      completedAt: new Date(),
+    } as InsertCourseProgress);
+  }
+}
+
+// ─── AICashSystem Community queries ─────────────────────────
+export async function createCommunityPost(userId: number, post: Omit<InsertCommunityPost, 'userId'>) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  return await db.insert(communityPosts).values({
+    ...post,
+    userId,
+  } as InsertCommunityPost);
+}
+
+export async function getCommunityPosts(limit = 20) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  return await db
+    .select()
+    .from(communityPosts)
+    .orderBy(desc(communityPosts.createdAt))
+    .limit(limit);
+}
+
+export async function createCommunityReply(postId: number, userId: number, content: string) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  return await db.insert(communityReplies).values({
+    postId,
+    userId,
+    content,
+  } as InsertCommunityReply);
+}
+
+export async function getCommunityReplies(postId: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  return await db
+    .select()
+    .from(communityReplies)
+    .where(eq(communityReplies.postId, postId))
+    .orderBy(desc(communityReplies.createdAt));
+}
 

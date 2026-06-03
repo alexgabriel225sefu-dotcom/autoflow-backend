@@ -125,3 +125,83 @@
 [2026-06-03T09:56:03.959Z] 9:56:03 AM [vite] (client) hmr update /src/pages/Home.tsx, /src/index.css
 [2026-06-03T09:56:10.957Z] [Auth] Missing session cookie
 [2026-06-03T09:56:33.732Z] 9:56:33 AM [vite] (client) hmr update /src/index.css
+[2026-06-03T09:56:58.378Z] [Auth] Missing session cookie
+[2026-06-03T09:57:21.078Z] [Auth] Missing session cookie
+[2026-06-03T09:57:47.289Z] [Auth] Missing session cookie
+[2026-06-03T09:58:34.841Z] [Auth] Missing session cookie
+[2026-06-03T09:58:45.880Z] 9:58:45 AM [vite] (client) hmr update /src/pages/BotBuilder.tsx, /src/index.css
+[2026-06-03T10:00:49.704Z] [Auth] Missing session cookie
+[2026-06-03T10:00:52.875Z] [Auth] Missing session cookie
+[2026-06-03T10:00:54.336Z] [Auth] Missing session cookie
+[2026-06-03T10:01:12.560Z] [Auth] Missing session cookie
+[2026-06-03T10:01:17.016Z] [Auth] Missing session cookie
+[2026-06-03T10:02:02.358Z] 10:02:02 AM [vite] (client) hmr update /src/pages/BotBuilder.tsx, /src/index.css
+[2026-06-03T10:02:08.197Z] [Auth] Missing session cookie
+[2026-06-03T10:04:39.373Z] [Auth] Missing session cookie
+[2026-06-03T10:04:40.976Z] [Auth] Missing session cookie
+[2026-06-03T10:04:42.205Z] [Auth] Missing session cookie
+[2026-06-03T10:05:35.251Z] 10:05:35 AM [vite] (client) hmr update /src/index.css
+[2026-06-03T10:05:44.830Z] [Auth] Missing session cookie
+[2026-06-03T10:06:02.570Z] [Auth] Missing session cookie
+[2026-06-03T10:06:06.077Z] [Auth] Missing session cookie
+[2026-06-03T10:06:07.300Z] [Auth] Missing session cookie
+[2026-06-03T11:23:26.360Z] 11:23:26 AM [tsx] change in ./drizzle/schema.ts Restarting...
+[2026-06-03T11:23:26.383Z] c
+[2026-06-03T11:23:28.066Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T11:23:28.295Z] Server running on http://localhost:3000/
+[2026-06-03T11:24:55.957Z] 11:24:55 AM [tsx] change in ./server/db.ts Restarting...
+[2026-06-03T11:24:55.989Z] c
+[2026-06-03T11:24:57.601Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T11:24:57.849Z] Server running on http://localhost:3000/
+[2026-06-03T11:25:30.812Z] 11:25:30 AM [tsx] change in ./server/routers.ts Restarting...
+[2026-06-03T11:25:30.840Z] c
+[2026-06-03T11:25:31.147Z] node:internal/modules/run_main:122
+[2026-06-03T11:25:31.147Z] triggerUncaughtException(
+[2026-06-03T11:25:31.147Z] ^
+[2026-06-03T11:25:31.148Z] Error [TransformError]: Transform failed with 1 error:
+[2026-06-03T11:25:31.148Z] /home/ubuntu/apex-trade-bot-v2/server/routers.ts:277:7: ERROR: Expected ";" but found ":"
+[2026-06-03T11:25:31.148Z] at failureErrorWithLog (/home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/esbuild@0.25.10/node_modules/esbuild/lib/main.js:1467:15)
+[2026-06-03T11:25:31.148Z] at /home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/esbuild@0.25.10/node_modules/esbuild/lib/main.js:736:50
+[2026-06-03T11:25:31.148Z] at responseCallbacks.<computed> (/home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/esbuild@0.25.10/node_modules/esbuild/lib/main.js:603:9)
+[2026-06-03T11:25:31.148Z] at handleIncomingPacket (/home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/esbuild@0.25.10/node_modules/esbuild/lib/main.js:658:12)
+[2026-06-03T11:25:31.148Z] at Socket.readFromStdout (/home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/esbuild@0.25.10/node_modules/esbuild/lib/main.js:581:7)
+[2026-06-03T11:25:31.148Z] at Socket.emit (node:events:524:28)
+[2026-06-03T11:25:31.148Z] at addChunk (node:internal/streams/readable:561:12)
+[2026-06-03T11:25:31.148Z] at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+[2026-06-03T11:25:31.148Z] at Readable.push (node:internal/streams/readable:392:5)
+[2026-06-03T11:25:31.148Z] at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2026-06-03T11:25:31.148Z] Node.js v22.13.0
+[2026-06-03T11:25:39.789Z] 11:25:39 AM [tsx] change in ./server/routers.ts Rerunning...
+[2026-06-03T11:25:39.789Z] c
+[2026-06-03T11:25:40.137Z] node:internal/modules/run_main:122
+[2026-06-03T11:25:40.137Z] triggerUncaughtException(
+[2026-06-03T11:25:40.137Z] ^
+[2026-06-03T11:25:40.137Z] Error [TransformError]: Transform failed with 1 error:
+[2026-06-03T11:25:40.137Z] /home/ubuntu/apex-trade-bot-v2/server/routers.ts:277:7: ERROR: Expected ";" but found ":"
+[2026-06-03T11:25:40.138Z] at failureErrorWithLog (/home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/esbuild@0.25.10/node_modules/esbuild/lib/main.js:1467:15)
+[2026-06-03T11:25:40.138Z] at /home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/esbuild@0.25.10/node_modules/esbuild/lib/main.js:736:50
+[2026-06-03T11:25:40.138Z] at responseCallbacks.<computed> (/home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/esbuild@0.25.10/node_modules/esbuild/lib/main.js:603:9)
+[2026-06-03T11:25:40.138Z] at handleIncomingPacket (/home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/esbuild@0.25.10/node_modules/esbuild/lib/main.js:658:12)
+[2026-06-03T11:25:40.138Z] at Socket.readFromStdout (/home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/esbuild@0.25.10/node_modules/esbuild/lib/main.js:581:7)
+[2026-06-03T11:25:40.138Z] at Socket.emit (node:events:524:28)
+[2026-06-03T11:25:40.138Z] at addChunk (node:internal/streams/readable:561:12)
+[2026-06-03T11:25:40.138Z] at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+[2026-06-03T11:25:40.138Z] at Readable.push (node:internal/streams/readable:392:5)
+[2026-06-03T11:25:40.138Z] at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2026-06-03T11:25:40.138Z] Node.js v22.13.0
+[2026-06-03T11:25:49.771Z] 11:25:49 AM [tsx] change in ./server/routers.ts Rerunning...
+[2026-06-03T11:25:49.771Z] c
+[2026-06-03T11:25:51.326Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T11:25:51.566Z] Server running on http://localhost:3000/
+[2026-06-03T11:25:56.990Z] 11:25:56 AM [tsx] change in ./server/routers.ts Restarting...
+[2026-06-03T11:25:57.045Z] c
+[2026-06-03T11:25:58.563Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T11:25:58.806Z] Server running on http://localhost:3000/
+[2026-06-03T11:28:52.439Z] ELIFECYCLE  Command failed.
+[2026-06-03T11:28:52.484Z] Dev server exited with code -1
+[2026-06-03T11:28:53.539Z] Starting dev server with command: pnpm run dev
+[2026-06-03T11:28:54.281Z] > apex-trade-bot-v2@1.0.0 dev /home/ubuntu/apex-trade-bot-v2
+[2026-06-03T11:28:54.281Z] > NODE_ENV=development tsx watch server/_core/index.ts
+[2026-06-03T11:28:55.960Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T11:28:56.204Z] 11:28:56 AM [vite] (client) Re-optimizing dependencies because lockfile has changed
+[2026-06-03T11:28:56.254Z] Server running on http://localhost:3000/

@@ -240,6 +240,174 @@ export const appRouter = router({
         }
       }),
   }),
+
+  // ─── AICashSystem Subscription Routers ──────────────────────
+  subscriptions: router({
+    me: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        return await db.getSubscription(ctx.user.id);
+      } catch (err) {
+        console.error('[tRPC] subscriptions.me error:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch subscription' });
+      }
+    }),
+    update: protectedProcedure
+      .input(z.object({
+        tier: z.enum(['free', 'starter', 'professional', 'enterprise']).optional(),
+        stripeCustomerId: z.string().optional(),
+        stripeSubscriptionId: z.string().optional(),
+        stripePaymentIntentId: z.string().optional(),
+        status: z.enum(['active', 'cancelled', 'past_due', 'expired']).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          await db.upsertSubscription(ctx.user.id, input);
+          return { success: true };
+        } catch (err) {
+          console.error('[tRPC] subscriptions.update error:', err);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to update subscription' });
+        }
+      }),
+  }),
+
+  // ─── AICashSystem Tools Routers ────────────────────────────
+  tools: router({
+    list: publicProcedure.query(async () => {
+      try {
+        return await db.getAllTools();
+      } catch (err) {
+        console.error('[tRPC] tools.list error:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch tools' });
+      }
+    }),
+    getBySlug: publicProcedure
+      .input(z.object({ slug: z.string() }))
+      .query(async ({ input }) => {
+        try {
+          return await db.getToolBySlug(input.slug);
+        } catch (err) {
+          console.error('[tRPC] tools.getBySlug error:', err);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch tool' });
+        }
+      }),
+    incrementUsage: protectedProcedure
+      .input(z.object({ toolId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          await db.incrementToolUsage(ctx.user.id, input.toolId);
+          return { success: true };
+        } catch (err) {
+          console.error('[tRPC] tools.incrementUsage error:', err);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to increment tool usage' });
+        }
+      }),
+  }),
+
+  // ─── AICashSystem Courses Routers ──────────────────────────
+  courses: router({
+    list: protectedProcedure.query(async () => {
+      try {
+        return await db.getAllCourses();
+      } catch (err) {
+        console.error('[tRPC] courses.list error:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch courses' });
+      }
+    }),
+    getBySlug: protectedProcedure
+      .input(z.object({ slug: z.string() }))
+      .query(async ({ input }) => {
+        try {
+          return await db.getCourseBySlug(input.slug);
+        } catch (err) {
+          console.error('[tRPC] courses.getBySlug error:', err);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch course' });
+        }
+      }),
+    markComplete: protectedProcedure
+      .input(z.object({ courseId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          await db.markCourseComplete(ctx.user.id, input.courseId);
+          return { success: true };
+        } catch (err) {
+          console.error('[tRPC] courses.markComplete error:', err);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to mark course complete' });
+        }
+      }),
+  }),
+
+  // ─── AICashSystem Affiliate Routers ────────────────────────
+  affiliates: router({
+    me: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        return await db.getAffiliateByUserId(ctx.user.id);
+      } catch (err) {
+        console.error('[tRPC] affiliates.me error:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch affiliate info' });
+      }
+    }),
+    getReferrals: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        const affiliate = await db.getAffiliateByUserId(ctx.user.id);
+        if (!affiliate) return [];
+        return await db.getReferralsByAffiliate(affiliate.id);
+      } catch (err) {
+        console.error('[tRPC] affiliates.getReferrals error:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch referrals' });
+      }
+    }),
+  }),
+
+  // ─── AICashSystem Community Routers ────────────────────────
+  community: router({
+    posts: publicProcedure
+      .input(z.object({ limit: z.number().int().positive().default(20) }).optional())
+      .query(async ({ input }) => {
+        try {
+          return await db.getCommunityPosts(input?.limit || 20);
+        } catch (err) {
+          console.error('[tRPC] community.posts error:', err);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch community posts' });
+        }
+      }),
+    createPost: protectedProcedure
+      .input(z.object({
+        title: z.string(),
+        content: z.string(),
+        category: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.createCommunityPost(ctx.user.id, input);
+        } catch (err) {
+          console.error('[tRPC] community.createPost error:', err);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create post' });
+        }
+      }),
+    getReplies: publicProcedure
+      .input(z.object({ postId: z.number() }))
+      .query(async ({ input }) => {
+        try {
+          return await db.getCommunityReplies(input.postId);
+        } catch (err) {
+          console.error('[tRPC] community.getReplies error:', err);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch replies' });
+        }
+      }),
+    createReply: protectedProcedure
+      .input(z.object({
+        postId: z.number(),
+        content: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.createCommunityReply(input.postId, ctx.user.id, input.content);
+        } catch (err) {
+          console.error('[tRPC] community.createReply error:', err);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create reply' });
+        }
+            }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

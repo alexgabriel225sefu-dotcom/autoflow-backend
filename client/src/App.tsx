@@ -1,4 +1,4 @@
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
@@ -9,16 +9,38 @@ import BotBuilder from "./pages/BotBuilder";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Alerts from "./pages/Alerts";
+import { LandingPage } from "./pages/LandingPage";
+import { SocialMediaScheduler } from "./pages/tools/SocialMediaScheduler";
+import { EmailMarketing } from "./pages/tools/EmailMarketing";
+import { ContentCreation } from "./pages/tools/ContentCreation";
+import { AIAutomation, LeadGeneration } from "./pages/tools/AIAutomation";
+import { Community, Courses } from "./pages/Community";
+import { Affiliate } from "./pages/Affiliate";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path="" component={Home} />
+      <Route path="" component={LandingPage} />
+      <Route path="/home" component={Home} />
       <Route path="/builder" component={BotBuilder} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/settings" component={Settings} />
       <Route path="/alerts" component={Alerts} />
+      
+      {/* AICashSystem Tools */}
+      <Route path="/tools/social-media" component={SocialMediaScheduler} />
+      <Route path="/tools/email" component={EmailMarketing} />
+      <Route path="/tools/content" component={ContentCreation} />
+      <Route path="/tools/automation" component={AIAutomation} />
+      <Route path="/tools/leads" component={LeadGeneration} />
+      
+      {/* Community & Education */}
+      <Route path="/community" component={Community} />
+      <Route path="/courses" component={Courses} />
+      
+      {/* Affiliate */}
+      <Route path="/affiliate" component={Affiliate} />
+      
       <Route path="/404" component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -26,17 +48,11 @@ function Router() {
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider
         defaultTheme="dark"
-        // switchable
       >
         <TooltipProvider>
           <Toaster />

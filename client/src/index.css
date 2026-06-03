@@ -183,6 +183,7 @@
   overflow: hidden;
   background: linear-gradient(135deg, #0d1b2a 0%, #1a0f2e 50%, #2d1810 100%);
   backdrop-filter: blur(10px);
+  pointer-events: none;
 }
 
 .dashboard-bg::before {

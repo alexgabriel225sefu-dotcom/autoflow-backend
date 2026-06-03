@@ -134,3 +134,160 @@ export const paperTradingStates = mysqlTable('paperTradingStates', {
 
 export type PaperTradingState = typeof paperTradingStates.$inferSelect;
 export type InsertPaperTradingState = typeof paperTradingStates.$inferInsert;
+
+/**
+ * AICashSystem Subscriptions — tracks user tier and payment status
+ */
+export const subscriptions = mysqlTable('subscriptions', {
+  id: int('id').autoincrement().primaryKey(),
+  userId: int('userId').notNull().references(() => users.id).unique(),
+  tier: mysqlEnum('tier', ['free', 'starter', 'professional', 'enterprise']).notNull().default('free'),
+  stripeCustomerId: varchar('stripeCustomerId', { length: 255 }),
+  stripeSubscriptionId: varchar('stripeSubscriptionId', { length: 255 }),
+  stripePaymentIntentId: varchar('stripePaymentIntentId', { length: 255 }),
+  status: mysqlEnum('status', ['active', 'cancelled', 'past_due', 'expired']).notNull().default('active'),
+  currentPeriodStart: timestamp('currentPeriodStart'),
+  currentPeriodEnd: timestamp('currentPeriodEnd'),
+  cancelledAt: timestamp('cancelledAt'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().onUpdateNow().notNull(),
+});
+
+export type Subscription = typeof subscriptions.$inferSelect;
+export type InsertSubscription = typeof subscriptions.$inferInsert;
+
+/**
+ * AICashSystem Tools — defines available tools and their limits
+ */
+export const tools = mysqlTable('tools', {
+  id: int('id').autoincrement().primaryKey(),
+  name: varchar('name', { length: 100 }).notNull().unique(),
+  slug: varchar('slug', { length: 100 }).notNull().unique(),
+  description: text('description'),
+  minTierRequired: mysqlEnum('minTierRequired', ['free', 'starter', 'professional', 'enterprise']).notNull().default('starter'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+});
+
+export type Tool = typeof tools.$inferSelect;
+export type InsertTool = typeof tools.$inferInsert;
+
+/**
+ * AICashSystem Usage Tracking — tracks tool usage per user
+ */
+export const toolUsage = mysqlTable('toolUsage', {
+  id: int('id').autoincrement().primaryKey(),
+  userId: int('userId').notNull().references(() => users.id),
+  toolId: int('toolId').notNull().references(() => tools.id),
+  usageCount: int('usageCount').notNull().default(0),
+  monthlyLimit: int('monthlyLimit').notNull().default(0), // 0 = unlimited
+  resetDate: timestamp('resetDate').notNull(),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().onUpdateNow().notNull(),
+});
+
+export type ToolUsage = typeof toolUsage.$inferSelect;
+export type InsertToolUsage = typeof toolUsage.$inferInsert;
+
+/**
+ * AICashSystem Affiliates — tracks affiliate program participation
+ */
+export const affiliates = mysqlTable('affiliates', {
+  id: int('id').autoincrement().primaryKey(),
+  userId: int('userId').notNull().references(() => users.id).unique(),
+  referralCode: varchar('referralCode', { length: 50 }).notNull().unique(),
+  commissionRate: varchar('commissionRate', { length: 16 }).notNull().default('0.20'), // 20% default
+  totalEarned: varchar('totalEarned', { length: 32 }).notNull().default('0'),
+  totalReferrals: int('totalReferrals').notNull().default(0),
+  status: mysqlEnum('status', ['active', 'suspended', 'inactive']).notNull().default('active'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().onUpdateNow().notNull(),
+});
+
+export type Affiliate = typeof affiliates.$inferSelect;
+export type InsertAffiliate = typeof affiliates.$inferInsert;
+
+/**
+ * AICashSystem Referrals — tracks affiliate referrals and commissions
+ */
+export const referrals = mysqlTable('referrals', {
+  id: int('id').autoincrement().primaryKey(),
+  affiliateId: int('affiliateId').notNull().references(() => affiliates.id),
+  customerId: int('customerId').notNull().references(() => users.id),
+  tier: mysqlEnum('tier', ['starter', 'professional', 'enterprise']).notNull(),
+  commissionAmount: varchar('commissionAmount', { length: 32 }).notNull(),
+  status: mysqlEnum('status', ['pending', 'earned', 'paid']).notNull().default('pending'),
+  paidAt: timestamp('paidAt'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+});
+
+export type Referral = typeof referrals.$inferSelect;
+export type InsertReferral = typeof referrals.$inferInsert;
+
+/**
+ * AICashSystem Courses — educational content modules
+ */
+export const courses = mysqlTable('courses', {
+  id: int('id').autoincrement().primaryKey(),
+  title: varchar('title', { length: 255 }).notNull(),
+  slug: varchar('slug', { length: 255 }).notNull().unique(),
+  description: text('description'),
+  minTierRequired: mysqlEnum('minTierRequired', ['free', 'starter', 'professional', 'enterprise']).notNull().default('starter'),
+  videoUrl: varchar('videoUrl', { length: 500 }),
+  duration: int('duration'), // in minutes
+  order: int('order').notNull().default(0),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().onUpdateNow().notNull(),
+});
+
+export type Course = typeof courses.$inferSelect;
+export type InsertCourse = typeof courses.$inferInsert;
+
+/**
+ * AICashSystem Course Progress — tracks user progress through courses
+ */
+export const courseProgress = mysqlTable('courseProgress', {
+  id: int('id').autoincrement().primaryKey(),
+  userId: int('userId').notNull().references(() => users.id),
+  courseId: int('courseId').notNull().references(() => courses.id),
+  completed: int('completed').notNull().default(0),
+  completedAt: timestamp('completedAt'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().onUpdateNow().notNull(),
+});
+
+export type CourseProgress = typeof courseProgress.$inferSelect;
+export type InsertCourseProgress = typeof courseProgress.$inferInsert;
+
+/**
+ * AICashSystem Community Posts — user-generated content in community
+ */
+export const communityPosts = mysqlTable('communityPosts', {
+  id: int('id').autoincrement().primaryKey(),
+  userId: int('userId').notNull().references(() => users.id),
+  title: varchar('title', { length: 255 }).notNull(),
+  content: text('content').notNull(),
+  category: varchar('category', { length: 50 }).notNull(), // general, wins, questions, resources
+  likes: int('likes').notNull().default(0),
+  replies: int('replies').notNull().default(0),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().onUpdateNow().notNull(),
+});
+
+export type CommunityPost = typeof communityPosts.$inferSelect;
+export type InsertCommunityPost = typeof communityPosts.$inferInsert;
+
+/**
+ * AICashSystem Community Replies — replies to community posts
+ */
+export const communityReplies = mysqlTable('communityReplies', {
+  id: int('id').autoincrement().primaryKey(),
+  postId: int('postId').notNull().references(() => communityPosts.id),
+  userId: int('userId').notNull().references(() => users.id),
+  content: text('content').notNull(),
+  likes: int('likes').notNull().default(0),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().onUpdateNow().notNull(),
+});
+
+export type CommunityReply = typeof communityReplies.$inferSelect;
+export type InsertCommunityReply = typeof communityReplies.$inferInsert;
