@@ -1,20 +1,18 @@
 import { useEffect } from 'react';
-import { useLocation, useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CheckCircle, Download, Mail } from 'lucide-react';
 
 export function CheckoutSuccess() {
   const [, navigate] = useLocation();
-  const goto = useNavigate();
 
   useEffect(() => {
-    // Auto-redirect after 5 seconds
     const timer = setTimeout(() => {
-      goto('/dashboard');
+      navigate('/dashboard');
     }, 5000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-950 flex items-center justify-center px-4">
@@ -47,13 +45,13 @@ export function CheckoutSuccess() {
 
         <div className="space-y-3">
           <Button
-            onClick={() => goto('/dashboard')}
+            onClick={() => navigate('/dashboard')}
             className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold"
           >
             Go to Dashboard
           </Button>
           <Button
-            onClick={() => goto('/courses')}
+            onClick={() => navigate('/courses')}
             variant="outline"
             className="w-full"
           >
@@ -70,7 +68,7 @@ export function CheckoutSuccess() {
 }
 
 export function CheckoutCancel() {
-  const goto = useNavigate();
+  const [, navigate] = useLocation();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-950 flex items-center justify-center px-4">
@@ -88,13 +86,13 @@ export function CheckoutCancel() {
 
         <div className="space-y-3">
           <Button
-            onClick={() => goto('/')}
+            onClick={() => navigate('/')}
             className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold"
           >
             Return to Home
           </Button>
           <Button
-            onClick={() => goto('/')}
+            onClick={() => navigate('/')}
             variant="outline"
             className="w-full"
           >
