@@ -1,0 +1,96 @@
+[2026-05-28T05:44:59.627Z] Starting dev server with command: pnpm run dev
+[2026-05-28T05:45:01.868Z] > apex-trade-bot-v2@1.0.0 dev /home/ubuntu/apex-trade-bot-v2
+[2026-05-28T05:45:01.868Z] > NODE_ENV=development tsx watch server/_core/index.ts
+[2026-05-28T05:45:03.653Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-05-28T05:45:03.911Z] Server running on http://localhost:3000/
+[2026-05-28T05:47:36.942Z] 5:47:36 AM [tsx] change in ./drizzle/schema.ts Restarting...
+[2026-05-28T05:47:36.959Z] c
+[2026-05-28T05:47:38.746Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-05-28T05:47:39.003Z] Server running on http://localhost:3000/
+[2026-05-28T05:48:15.270Z] 5:48:15 AM [tsx] change in ./server/db.ts Restarting...
+[2026-05-28T05:48:15.322Z] c
+[2026-05-28T05:48:16.927Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-05-28T05:48:17.173Z] Server running on http://localhost:3000/
+[2026-05-28T05:48:55.586Z] 5:48:55 AM [tsx] change in ./server/routers.ts Restarting...
+[2026-05-28T05:48:55.633Z] c
+[2026-05-28T05:48:57.260Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-05-28T05:48:57.482Z] Server running on http://localhost:3000/
+[2026-05-28T05:49:10.436Z] 5:49:10 AM [tsx] change in ./server/routers.ts Restarting...
+[2026-05-28T05:49:10.493Z] c
+[2026-05-28T05:49:11.995Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-05-28T05:49:12.255Z] Server running on http://localhost:3000/
+[2026-05-28T05:49:18.622Z] 5:49:18 AM [tsx] change in ./server/routers.ts Restarting...
+[2026-05-28T05:49:18.669Z] c
+[2026-05-28T05:49:20.143Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-05-28T05:49:20.374Z] Server running on http://localhost:3000/
+[2026-05-28T05:51:35.230Z] [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2026-05-28T05:51:37.788Z] 5:51:37 AM [vite] (client) ✨ new dependencies optimized: @radix-ui/react-tabs
+[2026-05-28T05:51:37.788Z] 5:51:37 AM [vite] (client) ✨ optimized dependencies changed. reloading
+[2026-05-28T05:51:38.631Z] [Auth] Missing session cookie
+[2026-05-28T05:52:15.599Z] [Auth] Missing session cookie
+[2026-05-28T05:52:17.008Z] [Auth] Missing session cookie
+[2026-05-28T05:52:18.081Z] [Auth] Missing session cookie
+[2026-05-28T05:53:00.068Z] [Auth] Missing session cookie
+[2026-05-28T05:53:01.545Z] [Auth] Missing session cookie
+[2026-05-28T05:53:02.558Z] [Auth] Missing session cookie
+[2026-05-28T05:53:54.290Z] 5:53:54 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+[2026-05-28T05:55:58.547Z] 5:55:58 AM [vite] (client) ✨ new dependencies optimized: @radix-ui/react-label, @radix-ui/react-dialog, @radix-ui/react-switch
+[2026-05-28T05:55:58.547Z] 5:55:58 AM [vite] (client) ✨ optimized dependencies changed. reloading
+[2026-05-28T05:55:59.505Z] [Auth] Missing session cookie
+[2026-05-28T05:56:49.400Z] 5:56:49 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+[2026-05-28T05:56:56.912Z] 5:56:56 AM [vite] (client) hmr update /src/pages/Dashboard.tsx, /src/index.css
+[2026-05-28T05:57:40.790Z] [Auth] Missing session cookie
+[2026-05-28T05:59:25.909Z] [Auth] Missing session cookie
+[2026-05-28T06:00:43.293Z] [Auth] Missing session cookie
+[2026-05-28T06:01:41.977Z] [Auth] Missing session cookie
+[2026-05-28T06:01:45.561Z] [Auth] Missing session cookie
+[2026-05-28T06:01:46.842Z] [Auth] Missing session cookie
+[2026-06-03T09:20:27.612Z] Starting dev server with command: pnpm run dev
+[2026-06-03T09:20:28.419Z] > apex-trade-bot-v2@1.0.0 dev /home/ubuntu/apex-trade-bot-v2
+[2026-06-03T09:20:28.419Z] > NODE_ENV=development tsx watch server/_core/index.ts
+[2026-06-03T09:20:30.853Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T09:20:31.152Z] Server running on http://localhost:3000/
+[2026-06-03T09:21:10.682Z] [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2026-06-03T09:21:12.367Z] [Auth] Missing session cookie
+[2026-06-03T09:21:30.549Z] ELIFECYCLE  Command failed.
+[2026-06-03T09:21:30.583Z] Dev server exited with code -1
+[2026-06-03T09:21:31.665Z] Starting dev server with command: pnpm run dev
+[2026-06-03T09:21:32.466Z] > apex-trade-bot-v2@1.0.0 dev /home/ubuntu/apex-trade-bot-v2
+[2026-06-03T09:21:32.466Z] > NODE_ENV=development tsx watch server/_core/index.ts
+[2026-06-03T09:21:33.975Z] ELIFECYCLE  Command failed.
+[2026-06-03T09:21:34.023Z] Dev server exited with code -1
+[2026-06-03T09:21:35.089Z] Starting dev server with command: pnpm run dev
+[2026-06-03T09:21:35.919Z] > apex-trade-bot-v2@1.0.0 dev /home/ubuntu/apex-trade-bot-v2
+[2026-06-03T09:21:35.919Z] > NODE_ENV=development tsx watch server/_core/index.ts
+[2026-06-03T09:21:37.799Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T09:21:38.050Z] Server running on http://localhost:3000/
+[2026-06-03T09:21:59.853Z] 9:21:59 AM [tsx] change in ./drizzle/schema.ts Restarting...
+[2026-06-03T09:21:59.917Z] c
+[2026-06-03T09:22:01.473Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T09:22:01.703Z] Server running on http://localhost:3000/
+[2026-06-03T09:22:12.711Z] ELIFECYCLE  Command failed.
+[2026-06-03T09:22:12.800Z] Dev server exited with code -1
+[2026-06-03T09:22:13.825Z] Starting dev server with command: pnpm run dev
+[2026-06-03T09:22:14.673Z] > apex-trade-bot-v2@1.0.0 dev /home/ubuntu/apex-trade-bot-v2
+[2026-06-03T09:22:14.674Z] > NODE_ENV=development tsx watch server/_core/index.ts
+[2026-06-03T09:22:16.502Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T09:22:16.751Z] Server running on http://localhost:3000/
+[2026-06-03T09:22:28.219Z] [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2026-06-03T09:22:38.339Z] [Auth] Missing session cookie
+[2026-06-03T09:23:57.882Z] 9:23:57 AM [vite] (client) hmr update /src/pages/Home.tsx, /src/index.css
+[2026-06-03T09:24:04.647Z] [Auth] Missing session cookie
+[2026-06-03T09:24:16.400Z] 9:24:16 AM [vite] (client) hmr update /src/pages/Home.tsx, /src/index.css
+[2026-06-03T09:24:16.520Z] 9:24:16 AM [tsx] change in ./drizzle/schema.ts Restarting...
+[2026-06-03T09:24:16.553Z] c
+[2026-06-03T09:24:18.102Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T09:24:18.304Z] /home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/enhanced-resolve@5.18.3/node_modules/enhanced-resolve/lib/ResolverFactory.js:264
+[2026-06-03T09:24:18.304Z] ? new SyncAsyncFileSystemDecorator(
+[2026-06-03T09:24:18.304Z] ^
+[2026-06-03T09:24:18.304Z] TypeError: SyncAsyncFileSystemDecorator is not a constructor
+[2026-06-03T09:24:18.305Z] at createOptions (/home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/enhanced-resolve@5.18.3/node_modules/enhanced-resolve/lib/ResolverFactory.js:264:6)
+[2026-06-03T09:24:18.305Z] at Object.createResolver (/home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/enhanced-resolve@5.18.3/node_modules/enhanced-resolve/lib/ResolverFactory.js:305:28)
+[2026-06-03T09:24:18.305Z] at <anonymous> (/home/ubuntu/apex-trade-bot-v2/node_modules/.pnpm/@tailwindcss+node@4.1.14/node_modules/@tailwindcss/node/dist/index.mjs:10:4732)
+[2026-06-03T09:24:18.305Z] at ModuleJob.run (node:internal/modules/esm/module_job:271:25)
+[2026-06-03T09:24:18.305Z] at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:547:26)
+[2026-06-03T09:24:18.305Z] at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
+[2026-06-03T09:24:18.305Z] Node.js v22.13.0

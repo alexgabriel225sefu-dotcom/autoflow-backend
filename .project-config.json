@@ -1,0 +1,47 @@
+{
+  "build_command": "pnpm run build",
+  "capabilities": [
+    "server",
+    "db",
+    "user"
+  ],
+  "dev_command": "pnpm run dev",
+  "env_vars": {
+    "DATABASE_URL": "mysql://3Zt7ZXKMi7KeRRN.root:X5c1lKx5BVG50bgDXi2o@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/dzZSw7XKkZRJrA2CPZVUEW?ssl={\"rejectUnauthorized\":true}",
+    "DRIZZLE_DATABASE_URL": "mysql://3Zt7ZXKMi7KeRRN.root:X5c1lKx5BVG50bgDXi2o@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/dzZSw7XKkZRJrA2CPZVUEW?ssl={\"rejectUnauthorized\":true}"
+  },
+  "experiments": [
+    "no_db_push"
+  ],
+  "git_remote": {
+    "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663698068947/dzZSw7XKkZRJrA2CPZVUEW",
+    "access_key_id": "ASIAZV3A2ECZNIGXBNSJ",
+    "secret_access_key": "QlmSyiaxq6ndqRzjleGzcHUW8132d/1r0qjslrlr",
+    "session_token": "IQoJb3JpZ2luX2VjEHIaCXVzLWVhc3QtMSJHMEUCIQDjdAZNAU479NfXS4u8hJVZXJNKLPRip/ujenQ9GK39pgIgFi2+PjyGTRLxe2jIj7xoGdyyKJhh0/enrcZqyE8nfT0q9gMIOhAEGgw2NjUzODYwOTg4NjYiDDS+NsFkzjsk1n02lSrTAxGJZ0X6sJklkOklkk/LuI75cecvHLk6UjzUzFGTubdiXdoql5A+gi/utgL4rj7rzMJQeOqKxF1cW0lEutJ/Gimw55A6ecVoNzxHbqyRaLme7vU2pcF2WUzSxDRdp8E98xYGDOHYmbUCok2TadnQF4s+4kktP526zyt9ajsdoVRultYeoctQY/aZuUFNxr8bWpM89xJ0OKUE/1hqKHviIiKSJbQXupcuw+QwJpU5zfJHTmvGDxWQExW+PcF9XtKAYo2R/ZxFDMi8HjFiuludkoj+P4nbauJj1Zma2vVuC1eSu007B1OHw1o5H4NW7veKvRSAsYlz/NlKRHD5SXeYGT9SubGQgSgWiIe7CPkU4PRIxyLohF4K+uxMcsTcoOdwF00zpqv6KvvcqmYayt7invJqs0acbShBrdcrQWZiqGcF8EQcQ678XsN59sCjLWKVu+Xh90+dHyIImw7EdMTyCaw3HtGworXcP/QwFn9qIfcWyFQjhh46plPruii6rpcJVa/uzj068lmqNz8T+ZfWUu6xuPqvDVcH1uDBwWxMzvKbh687+2yUay3I5kmU/MhWcuArrwfR9UMDHWgjvsjgsJ0bVgaSASXvJ0G1mrzH3LqDBfkeMJjk/9AGOp0B6ytll/B9WSYy7r+til/q4keVXoOzQCfcnVBJ0OGVqnTAw2UHvj7VvTX33jSKn/s1dOGYATAXr5dqAv7zHY6CdgdMiCVY/syDeHZZb3wXywJj/6oT/o56WIS5d2Ckhl/Q6lLrlJ2cMgE3WZTOH2nvLtY1fsU6XBXOyBnbGqBsoN6OcJd0ewIN4DLl5FXNwx9banXqnW9wD74OnGeoKA==",
+    "expiration": "2026-06-03T21:21:28.000Z"
+  },
+  "name": "apex-trade-bot-v2",
+  "path": "/home/ubuntu/apex-trade-bot-v2",
+  "port": 3000,
+  "secrets": {
+    "BUILT_IN_FORGE_API_KEY": "bXqSHFVcbJ2W5f3LaRWCy5",
+    "BUILT_IN_FORGE_API_URL": "https://forge.manus.ai",
+    "JWT_SECRET": "Wmc6pDW2nZfiJ7TaHfQpwQ",
+    "OAUTH_SERVER_URL": "https://api.manus.im",
+    "OWNER_NAME": "support Aicashsystem",
+    "OWNER_OPEN_ID": "3j6ZsoBd2BGRmUFHWCUJ2T",
+    "STRIPE_SECRET_KEY": "sk_test_51Tdw8iCtLGj5enu6lp0K9jXzt2RixF7n3TloycLbgoFhwFoMVKs6SdfDQrnfaosGhn0JxXQjo3WIn49Edql3f7vw00hl5UFQJj",
+    "STRIPE_WEBHOOK_SECRET": "whsec_udgkhFBIbeWcfB60tDWRO2na1cpxLFKM",
+    "VITE_ANALYTICS_ENDPOINT": "https://manus-analytics.com",
+    "VITE_ANALYTICS_WEBSITE_ID": "8181c133-11dd-49b4-ac53-abc39688e852",
+    "VITE_APP_ID": "dzZSw7XKkZRJrA2CPZVUEW",
+    "VITE_APP_LOGO": "https://files.manuscdn.com/user_upload_by_module/web_dev_logo/310519663698068947/JWwBAQXLKGZityAF.png",
+    "VITE_APP_TITLE": "Apex Trade Bot V2",
+    "VITE_FRONTEND_FORGE_API_KEY": "RvD2U4dMgkUNzJ6YY5xQvD",
+    "VITE_FRONTEND_FORGE_API_URL": "https://forge.manus.ai",
+    "VITE_OAUTH_PORTAL_URL": "https://manus.im",
+    "VITE_STRIPE_PUBLISHABLE_KEY": "pk_test_51Tdw8iCtLGj5enu6Mqhlp9cxdPoZfEcbccurefB9fQai7z14viOoEkglUOy6Q4vwzVjSIGUaQNnuxdUjm72WbcPI00Q5GUUbA3"
+  },
+  "template_id": "web-db-user",
+  "test_command": "pnpm test"
+}
