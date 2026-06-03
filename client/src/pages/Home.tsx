@@ -1,74 +1,117 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Check, ChevronDown, Zap, TrendingUp, Shield, Rocket, Play } from "lucide-react";
+import { Check, ChevronDown, Zap, TrendingUp, Shield, Rocket, Play, Star, Users, DollarSign, BarChart3 } from "lucide-react";
 import { getLoginUrl } from "@/const";
+import { useLocation } from "wouter";
 import { useState } from "react";
 
 export default function Home() {
   const { user, isAuthenticated, logout } = useAuth();
+  const [, setLocation] = useLocation();
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
-  const [showDemo, setShowDemo] = useState(false);
+
+  const testimonials = [
+    {
+      name: "Alex M.",
+      role: "Crypto Trader",
+      text: "Generată strategia în 5 minute. Backtest arată +45% în 3 luni. Worth every penny!",
+      rating: 5
+    },
+    {
+      name: "Maria T.",
+      role: "Forex Trader",
+      text: "Nu am experiență în coding. Botul merge perfect. Profit consistent.",
+      rating: 5
+    },
+    {
+      name: "John D.",
+      role: "Day Trader",
+      text: "Best $297 I spent. Bot execută trades mai bine decât eu manual.",
+      rating: 5
+    }
+  ];
+
+  const stats = [
+    { label: "Active Bots", value: "2,847", icon: Rocket },
+    { label: "Avg Profit", value: "+34%", icon: TrendingUp },
+    { label: "Users", value: "1,200+", icon: Users },
+    { label: "Total Traded", value: "$12.3M", icon: DollarSign }
+  ];
 
   const faqItems = [
     {
-      question: "How long does the setup take?",
-      answer: "The complete setup takes about 30 minutes. You'll learn to configure the bot, connect to Binance, and deploy it on Railway in this tutorial."
+      question: "Cum generez strategia?",
+      answer: "Simplu: intri în chat, spui ce vrei (BTC, 3 trades/zi, 2% risk), AI-ul generează strategie, faci backtest, și asta e!"
     },
     {
-      question: "Do I need coding experience?",
-      answer: "No! The setup is completely no-code. We provide step-by-step instructions and a pre-configured bot ready to deploy."
+      question: "Ce se întâmplă dacă nu e profitabil?",
+      answer: "Faci paper trading 7 zile. Dacă nu merge, nu plătești. Doar dacă e profitabil în simulare, mergi live."
     },
     {
-      question: "Can I use this with real money?",
-      answer: "Yes, but we recommend testing with paper trading first. Start with small amounts and scale gradually as you gain confidence."
+      question: "Pot folosi pe Binance?",
+      answer: "Da! Binance, Bybit, Kraken - orice exchange cu API. Conectezi cheile și gata."
     },
     {
-      question: "What exchanges are supported?",
-      answer: "The bot supports Binance (crypto and forex pairs). Support for other exchanges can be added."
+      question: "E sigur?",
+      answer: "Botul are strict risk management: 2% per trade, 5% daily loss limit, stop loss automat."
     },
     {
-      question: "Is there a money-back guarantee?",
-      answer: "Yes! 30-day money-back guarantee if you're not satisfied. No questions asked."
+      question: "Pot modifica strategia?",
+      answer: "Da! Oricând. Generezi altă strategie, faci backtest, și switch-uiești botul."
     },
     {
-      question: "How often do I need to monitor the bot?",
-      answer: "The bot runs 24/7 automatically. We recommend checking in daily to review trades and performance metrics."
+      question: "Suport?",
+      answer: "Email support + documentație completă. Răspund în 24h."
     }
   ];
 
   const features = [
     {
       icon: Zap,
-      title: "AI-Powered Signals",
-      description: "Multi-indicator strategy (RSI, MACD, Bollinger Bands) for accurate entry/exit signals"
+      title: "AI Strategy Builder",
+      description: "Conversație naturală → Strategie profesională în minute"
+    },
+    {
+      icon: BarChart3,
+      title: "Backtest Instant",
+      description: "Vezi cum ar fi funcționat pe date istorice (2+ ani)"
     },
     {
       icon: Shield,
-      title: "Strict Risk Management",
-      description: "2% risk per trade, 5% daily loss limit, and dynamic stop losses protect your capital"
+      title: "Risk Management",
+      description: "2% per trade, daily limits, stop loss automat"
     },
     {
       icon: TrendingUp,
-      title: "Proven Strategy",
-      description: "Backtested on 2+ years of data with 60%+ win rate in various market conditions"
+      title: "Paper Trading",
+      description: "Test 7 zile pe bani fake - fără risc"
     },
     {
       icon: Rocket,
-      title: "Easy Deployment",
-      description: "Deploy on Railway in minutes. No server setup required, runs 24/7 automatically"
+      title: "One-Click Deploy",
+      description: "Bot merge 24/7 pe exchange-ul tău"
+    },
+    {
+      icon: Users,
+      title: "Live Monitoring",
+      description: "Dashboard cu toate tranzacțiile și profit/loss"
     }
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-black">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-slate-900/80 backdrop-blur-md border-b border-slate-700 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="text-2xl font-bold text-white">
-            Apex <span className="text-blue-500">Bot</span>
+      <nav className="fixed top-0 w-full bg-black/80 backdrop-blur-md border-b border-slate-800 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="text-2xl font-bold">
+            <span className="text-white">Apex</span>
+            <span className="text-blue-500 ml-2">Bot</span>
           </div>
           <div className="flex gap-4 items-center">
+            <Button variant="ghost" size="sm" onClick={() => setLocation("/builder")}>
+              Builder
+            </Button>
             {isAuthenticated ? (
               <>
                 <span className="text-slate-300">{user?.name}</span>
@@ -77,7 +120,7 @@ export default function Home() {
                 </Button>
               </>
             ) : (
-              <Button asChild size="sm">
+              <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
                 <a href={getLoginUrl()}>Login</a>
               </Button>
             )}
@@ -86,41 +129,42 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-block mb-6 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full">
-            <span className="text-blue-400 text-sm font-semibold">🚀 AI Trading Automation</span>
+      <section className="pt-40 pb-20 px-4 bg-gradient-to-b from-slate-950 to-black">
+        <div className="max-w-5xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-full">
+            <Star className="w-4 h-4 text-blue-400" />
+            <span className="text-blue-400 text-sm font-semibold">Trusted by 1,200+ Traders</span>
           </div>
           
-          <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
-            Build Your AI Trading Bot in <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">30 Minutes</span>
+          <h1 className="text-6xl md:text-7xl font-bold text-white mb-6 leading-tight">
+            Generează-ți botul în <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500">5 minute</span>
           </h1>
           
-          <p className="text-xl text-slate-300 mb-8 leading-relaxed">
-            Automate your crypto & forex trading with a professional AI-powered bot. 
-            Multi-indicator strategy, strict risk management, and 24/7 trading. 
-            No coding required.
+          <p className="text-xl text-slate-300 mb-8 max-w-2xl mx-auto leading-relaxed">
+            Conversație AI → Strategie → Backtest → Paper Trading → Deploy Live
+            <br />
+            <span className="text-sm text-slate-400 mt-2 block">Fără o linie de cod. Fără experiență necesară.</span>
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
             <Button 
               size="lg" 
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-              onClick={() => setShowDemo(true)}
+              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-8 text-lg"
+              onClick={() => setLocation("/builder")}
             >
-              <Play className="w-4 h-4 mr-2" />
-              Watch Demo
+              <Play className="w-5 h-5 mr-2" />
+              Încearcă Gratuit
             </Button>
-            <Button size="lg" variant="outline" className="border-slate-600 text-white hover:bg-slate-800">
-              Learn More
+            <Button size="lg" variant="outline" className="border-slate-600 text-white hover:bg-slate-900 px-8 text-lg">
+              Vezi Demo
             </Button>
           </div>
 
           {/* Trust Badges */}
-          <div className="flex flex-wrap justify-center gap-6 text-sm text-slate-400">
+          <div className="flex flex-wrap justify-center gap-8 text-sm text-slate-400 mb-12">
             <div className="flex items-center gap-2">
               <Check className="w-4 h-4 text-green-500" />
-              <span>30-Day Money Back</span>
+              <span>Paper Trading Gratuit</span>
             </div>
             <div className="flex items-center gap-2">
               <Check className="w-4 h-4 text-green-500" />
@@ -131,104 +175,65 @@ export default function Home() {
               <span>24/7 Support</span>
             </div>
           </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12">
+            {stats.map((stat, idx) => {
+              const Icon = stat.icon;
+              return (
+                <div key={idx} className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
+                  <Icon className="w-6 h-6 text-blue-500 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-white">{stat.value}</div>
+                  <div className="text-xs text-slate-400">{stat.label}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      {/* Demo Modal */}
-      {showDemo && (
-        <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-lg max-w-2xl w-full">
-            <div className="flex justify-between items-center p-6 border-b border-slate-700">
-              <h3 className="text-xl font-bold text-white">Trading Bot Demo - How It Works</h3>
-              <button 
-                onClick={() => setShowDemo(false)}
-                className="text-slate-400 hover:text-white text-2xl"
-              >
-                ×
-              </button>
-            </div>
-            <div className="p-6">
-              <div className="bg-slate-800 rounded-lg p-8 mb-6">
-                <div className="space-y-4">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">1</div>
-                    <div>
-                      <h4 className="text-white font-semibold">Bot Configuration</h4>
-                      <p className="text-slate-400 text-sm">Set API keys, indicators (RSI, MACD, Bollinger Bands), and risk rules</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">2</div>
-                    <div>
-                      <h4 className="text-white font-semibold">Market Analysis</h4>
-                      <p className="text-slate-400 text-sm">Bot analyzes price charts with multiple technical indicators in real-time</p>
-                    </div>
-                  </div>
+      {/* How It Works */}
+      <section className="py-20 px-4 bg-black">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-4xl font-bold text-white text-center mb-4">Cum Funcționează</h2>
+          <p className="text-slate-400 text-center mb-12">5 pași simpli la botul tău profesional</p>
 
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">3</div>
-                    <div>
-                      <h4 className="text-white font-semibold">Trade Signals</h4>
-                      <p className="text-slate-400 text-sm">When conditions align, bot generates BUY or SELL signals automatically</p>
-                    </div>
+          <div className="grid md:grid-cols-5 gap-4">
+            {[
+              { step: 1, title: "Chat", desc: "Spui ce vrei" },
+              { step: 2, title: "Strategie", desc: "AI generează" },
+              { step: 3, title: "Backtest", desc: "Vezi rezultate" },
+              { step: 4, title: "Paper Trade", desc: "Test 7 zile" },
+              { step: 5, title: "Deploy", desc: "Bot live" }
+            ].map((item, idx) => (
+              <div key={idx} className="relative">
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 text-center">
+                  <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold mx-auto mb-4">
+                    {item.step}
                   </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">4</div>
-                    <div>
-                      <h4 className="text-white font-semibold">Trade Execution</h4>
-                      <p className="text-slate-400 text-sm">Bot enters position with calculated size based on risk management rules</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">5</div>
-                    <div>
-                      <h4 className="text-white font-semibold">Risk Management</h4>
-                      <p className="text-slate-400 text-sm">Stop loss and take profit levels protect capital and lock in gains</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">✓</div>
-                    <div>
-                      <h4 className="text-white font-semibold">24/7 Automation</h4>
-                      <p className="text-slate-400 text-sm">Bot runs continuously, executing trades while you sleep or work</p>
-                    </div>
-                  </div>
+                  <h3 className="text-white font-semibold mb-2">{item.title}</h3>
+                  <p className="text-slate-400 text-sm">{item.desc}</p>
                 </div>
+                {idx < 4 && (
+                  <div className="hidden md:block absolute top-1/2 -right-2 w-4 h-0.5 bg-gradient-to-r from-blue-600 to-transparent"></div>
+                )}
               </div>
-
-              <div className="bg-slate-800/50 rounded-lg p-4">
-                <h4 className="text-white font-semibold mb-3">Key Features:</h4>
-                <ul className="text-slate-300 text-sm space-y-2">
-                  <li>✓ Multi-indicator strategy (RSI, MACD, Bollinger Bands, EMA)</li>
-                  <li>✓ Paper trading mode for risk-free testing</li>
-                  <li>✓ Real money mode with strict risk management (2% per trade)</li>
-                  <li>✓ 62% historical win rate on backtested data</li>
-                  <li>✓ Deploy on Railway - runs 24/7 automatically</li>
-                  <li>✓ Monitor all trades and performance in real-time</li>
-                </ul>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
-      )}
+      </section>
 
-      {/* Features Section */}
-      <section className="py-20 px-4 bg-slate-800/50">
+      {/* Features */}
+      <section className="py-20 px-4 bg-slate-950">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl font-bold text-white text-center mb-4">What You Get</h2>
-          <p className="text-slate-400 text-center mb-12 max-w-2xl mx-auto">
-            Everything you need to start automated trading in minutes
-          </p>
+          <h2 className="text-4xl font-bold text-white text-center mb-4">Features Profesionale</h2>
+          <p className="text-slate-400 text-center mb-12">Tot ce ai nevoie pentru trading automat</p>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, idx) => {
               const Icon = feature.icon;
               return (
-                <Card key={idx} className="bg-slate-900 border-slate-700 p-6">
+                <Card key={idx} className="bg-slate-900 border-slate-800 p-6 hover:border-blue-500/50 transition-colors">
                   <Icon className="w-8 h-8 text-blue-500 mb-4" />
                   <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
                   <p className="text-slate-400 text-sm">{feature.description}</p>
@@ -239,107 +244,99 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-20 px-4">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-4xl font-bold text-white text-center mb-12">How It Works</h2>
+      {/* Testimonials */}
+      <section className="py-20 px-4 bg-black">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-4xl font-bold text-white text-center mb-12">Ce Spun Utilizatorii</h2>
 
-          <div className="space-y-8">
-            {[
-              {
-                step: 1,
-                title: "Purchase & Access",
-                description: "Get instant access to the complete trading bot code, setup guide, and 30-minute video tutorial"
-              },
-              {
-                step: 2,
-                title: "Follow Setup Tutorial",
-                description: "Watch the step-by-step video showing how to configure the bot, connect to Binance, and deploy on Railway"
-              },
-              {
-                step: 3,
-                title: "Deploy & Trade",
-                description: "Launch your bot with one click. It runs 24/7 automatically, executing trades based on AI signals"
-              }
-            ].map((item) => (
-              <div key={item.step} className="flex gap-6">
-                <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-blue-600 text-white font-bold">
-                    {item.step}
-                  </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {testimonials.map((testimonial, idx) => (
+              <Card key={idx} className="bg-slate-900 border-slate-800 p-6">
+                <div className="flex gap-1 mb-4">
+                  {[...Array(testimonial.rating)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+                  ))}
                 </div>
+                <p className="text-slate-300 mb-4 italic">"{testimonial.text}"</p>
                 <div>
-                  <h3 className="text-xl font-semibold text-white mb-2">{item.title}</h3>
-                  <p className="text-slate-400">{item.description}</p>
+                  <p className="text-white font-semibold">{testimonial.name}</p>
+                  <p className="text-slate-400 text-sm">{testimonial.role}</p>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section className="py-20 px-4 bg-slate-800/50">
+      {/* Pricing */}
+      <section className="py-20 px-4 bg-slate-950">
         <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-white mb-4">Simple Pricing</h2>
-          <p className="text-slate-400 mb-12">One-time payment, lifetime access</p>
+          <h2 className="text-4xl font-bold text-white mb-4">Pricing Simplu</h2>
+          <p className="text-slate-400 mb-12">One-time payment. Lifetime access.</p>
 
-          <Card className="bg-slate-900 border-blue-500/30 p-12">
-            <div className="text-5xl font-bold text-white mb-2">$197</div>
-            <p className="text-slate-400 mb-8">One-time payment</p>
+          <Card className="bg-gradient-to-br from-slate-900 to-slate-800 border-blue-500/30 p-12">
+            <div className="text-6xl font-bold text-white mb-2">$297</div>
+            <p className="text-slate-400 mb-8">One-time. Fără subscripție.</p>
 
             <ul className="space-y-4 mb-8 text-left">
               <li className="flex items-center gap-3 text-white">
-                <Check className="w-5 h-5 text-green-500" />
-                Complete trading bot source code
+                <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                <span>AI Strategy Builder (unlimited)</span>
               </li>
               <li className="flex items-center gap-3 text-white">
-                <Check className="w-5 h-5 text-green-500" />
-                30-minute setup video tutorial
+                <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                <span>Backtest Engine (2+ ani date)</span>
               </li>
               <li className="flex items-center gap-3 text-white">
-                <Check className="w-5 h-5 text-green-500" />
-                Lifetime updates & improvements
+                <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                <span>Paper Trading (7 zile gratuit)</span>
               </li>
               <li className="flex items-center gap-3 text-white">
-                <Check className="w-5 h-5 text-green-500" />
-                Email support & documentation
+                <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                <span>Deploy pe Binance/Bybit/Kraken</span>
               </li>
               <li className="flex items-center gap-3 text-white">
-                <Check className="w-5 h-5 text-green-500" />
-                30-day money-back guarantee
+                <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                <span>Live Monitoring Dashboard</span>
+              </li>
+              <li className="flex items-center gap-3 text-white">
+                <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                <span>Lifetime Updates & Support</span>
               </li>
             </ul>
 
-            <Button size="lg" className="w-full bg-blue-600 hover:bg-blue-700 text-white mb-4" disabled>
-              Coming Soon - Payment Integration
+            <Button size="lg" className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white text-lg">
+              Cumpără Acum
             </Button>
-            <p className="text-slate-500 text-sm">Stripe integration coming soon</p>
+
+            <p className="text-slate-500 text-sm mt-4">
+              30 zile money-back guarantee dacă nu ești mulțumit
+            </p>
           </Card>
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-20 px-4">
+      {/* FAQ */}
+      <section className="py-20 px-4 bg-black">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-4xl font-bold text-white text-center mb-12">Frequently Asked Questions</h2>
+          <h2 className="text-4xl font-bold text-white text-center mb-12">Întrebări Frecvente</h2>
 
           <div className="space-y-4">
             {faqItems.map((item, idx) => (
-              <div key={idx} className="border border-slate-700 rounded-lg overflow-hidden">
+              <div key={idx} className="border border-slate-800 rounded-lg overflow-hidden hover:border-slate-700 transition-colors">
                 <button
                   onClick={() => setExpandedFaq(expandedFaq === idx ? null : idx)}
-                  className="w-full px-6 py-4 flex justify-between items-center hover:bg-slate-800/50 transition-colors"
+                  className="w-full px-6 py-4 flex justify-between items-center hover:bg-slate-900/50 transition-colors"
                 >
                   <span className="text-lg font-semibold text-white text-left">{item.question}</span>
                   <ChevronDown
-                    className={`w-5 h-5 text-slate-400 transition-transform ${
+                    className={`w-5 h-5 text-slate-400 transition-transform flex-shrink-0 ${
                       expandedFaq === idx ? "rotate-180" : ""
                     }`}
                   />
                 </button>
                 {expandedFaq === idx && (
-                  <div className="px-6 py-4 bg-slate-800/30 border-t border-slate-700">
+                  <div className="px-6 py-4 bg-slate-900/30 border-t border-slate-800">
                     <p className="text-slate-300">{item.answer}</p>
                   </div>
                 )}
@@ -349,42 +346,41 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border-y border-slate-700">
+      {/* CTA Final */}
+      <section className="py-20 px-4 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border-y border-slate-800">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-white mb-6">Ready to Automate Your Trading?</h2>
+          <h2 className="text-4xl font-bold text-white mb-6">Gata să Automatizezi Trading-ul?</h2>
           <p className="text-xl text-slate-300 mb-8">
-            Join traders using Apex Bot to automate their strategies and trade 24/7
+            Generează strategie în 5 minute. Paper trade 7 zile. Deploy live.
           </p>
-          <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-12" disabled>
-            Get Started - Coming Soon
+          <Button size="lg" className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-12 text-lg">
+            Încearcă Gratuit Acum
           </Button>
-          <p className="text-slate-400 text-sm mt-4">30-day money-back guarantee • No questions asked</p>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 border-t border-slate-700 py-12 px-4">
+      <footer className="bg-slate-950 border-t border-slate-800 py-12 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <h3 className="text-white font-bold mb-4">Apex Bot</h3>
-              <p className="text-slate-400 text-sm">AI-powered trading automation for crypto & forex</p>
+              <p className="text-slate-400 text-sm">AI-powered trading automation platform</p>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-slate-400 text-sm">
                 <li><a href="#" className="hover:text-white">Features</a></li>
                 <li><a href="#" className="hover:text-white">Pricing</a></li>
-                <li><a href="#" className="hover:text-white">Documentation</a></li>
+                <li><a href="#" className="hover:text-white">Docs</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">Support</h4>
+              <h4 className="text-white font-semibold mb-4">Company</h4>
               <ul className="space-y-2 text-slate-400 text-sm">
-                <li><a href="#" className="hover:text-white">Help Center</a></li>
+                <li><a href="#" className="hover:text-white">About</a></li>
+                <li><a href="#" className="hover:text-white">Blog</a></li>
                 <li><a href="#" className="hover:text-white">Contact</a></li>
-                <li><a href="#" className="hover:text-white">Status</a></li>
               </ul>
             </div>
             <div>
@@ -397,9 +393,9 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="border-t border-slate-700 pt-8">
+          <div className="border-t border-slate-800 pt-8">
             <p className="text-slate-400 text-sm text-center">
-              © 2026 Apex Bot. All rights reserved. | Disclaimer: Trading involves risk. Past performance is not indicative of future results.
+              © 2026 Apex Bot. All rights reserved. | Disclaimer: Trading involves risk.
             </p>
           </div>
         </div>
