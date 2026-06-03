@@ -94,3 +94,21 @@
 [2026-06-03T09:24:18.305Z] at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:547:26)
 [2026-06-03T09:24:18.305Z] at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
 [2026-06-03T09:24:18.305Z] Node.js v22.13.0
+[2026-06-03T09:32:40.761Z] Starting dev server with command: pnpm run dev
+[2026-06-03T09:32:41.574Z] > apex-trade-bot-v2@1.0.0 dev /home/ubuntu/apex-trade-bot-v2
+[2026-06-03T09:32:41.574Z] > NODE_ENV=development tsx watch server/_core/index.ts
+[2026-06-03T09:32:43.289Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T09:32:43.533Z] Server running on http://localhost:3000/
+[2026-06-03T09:33:04.661Z] [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2026-06-03T09:33:06.107Z] [Auth] Missing session cookie
+[2026-06-03T09:33:38.833Z] 9:33:38 AM [vite] (client) hmr update /src/index.css, /src/pages/Home.tsx
+[2026-06-03T09:33:48.461Z] ELIFECYCLE  Command failed.
+[2026-06-03T09:33:48.516Z] Dev server exited with code -1
+[2026-06-03T09:33:49.575Z] Starting dev server with command: pnpm run dev
+[2026-06-03T09:33:50.384Z] > apex-trade-bot-v2@1.0.0 dev /home/ubuntu/apex-trade-bot-v2
+[2026-06-03T09:33:50.384Z] > NODE_ENV=development tsx watch server/_core/index.ts
+[2026-06-03T09:33:52.177Z] [OAuth] Initialized with baseURL: https://api.manus.im
+[2026-06-03T09:33:52.431Z] Server running on http://localhost:3000/
+[2026-06-03T09:33:56.499Z] [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2026-06-03T09:33:57.776Z] [Auth] Missing session cookie
+[2026-06-03T09:34:06.240Z] 9:34:06 AM [vite] (client) hmr update /src/index.css
