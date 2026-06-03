@@ -9,18 +9,23 @@ import BotBuilder from "./pages/BotBuilder";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Alerts from "./pages/Alerts";
-import { LandingPage } from "./pages/LandingPage";
+import { PremiumLanding } from "./pages/PremiumLanding";
 import { SocialMediaScheduler } from "./pages/tools/SocialMediaScheduler";
 import { EmailMarketing } from "./pages/tools/EmailMarketing";
 import { ContentCreation } from "./pages/tools/ContentCreation";
 import { AIAutomation, LeadGeneration } from "./pages/tools/AIAutomation";
 import { Community, Courses } from "./pages/Community";
 import { Affiliate } from "./pages/Affiliate";
+import { PrivacyPolicy } from "./pages/PrivacyPolicy";
+import { TermsOfService } from "./pages/TermsOfService";
+import { CheckoutSuccess, CheckoutCancel } from "./pages/CheckoutSuccess";
+import { CourseDetail } from "./pages/CourseDetail";
+import { EmailCapture } from "./pages/EmailCapture";
 
 function Router() {
   return (
     <Switch>
-      <Route path="" component={LandingPage} />
+      <Route path="" component={PremiumLanding} />
       <Route path="/home" component={Home} />
       <Route path="/builder" component={BotBuilder} />
       <Route path="/dashboard" component={Dashboard} />
@@ -40,6 +45,20 @@ function Router() {
       
       {/* Affiliate */}
       <Route path="/affiliate" component={Affiliate} />
+      
+      {/* Legal */}
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/terms" component={TermsOfService} />
+      
+      {/* Checkout */}
+      <Route path="/checkout/success" component={CheckoutSuccess} />
+      <Route path="/checkout/cancel" component={CheckoutCancel} />
+      
+      {/* Course */}
+      <Route path="/course/:id" component={CourseDetail} />
+      
+      {/* Email */}
+      <Route path="/email-capture" component={EmailCapture} />
       
       <Route path="/404" component={NotFound} />
       {/* Final fallback route */}
