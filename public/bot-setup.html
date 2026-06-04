@@ -131,11 +131,11 @@ body{background:var(--bg);color:#e2e8f0;font-family:'Inter',sans-serif;min-heigh
 <div class="hero">
   <div class="badge"><div class="bdot"></div><span class="btxt">Purchase confirmed</span></div>
   <h1>Your <span>Apex Trade Bot</span><br>is ready 🤖</h1>
-  <p>Follow the 6 steps below — the bot will be live and trading automatically.</p>
+  <p>Follow the steps below — bot live in under 10 minutes, no coding required.</p>
 </div>
 
 <div style="text-align:center">
-  <div class="eta">⏱ Setup takes about 15–20 minutes</div>
+  <div class="eta">⏱ Setup takes about 5–10 minutes</div>
 </div>
 
 <!-- LICENSE KEY -->
@@ -153,8 +153,8 @@ body{background:var(--bg);color:#e2e8f0;font-family:'Inter',sans-serif;min-heigh
   <div class="step-head" onclick="toggleStep(1)">
     <div class="step-num">1</div>
     <div class="step-title-wrap">
-      <div class="step-title">Create a GitHub account &amp; get the bot</div>
-      <div class="step-sub">Free — takes 2 minutes</div>
+      <div class="step-title">Create a GitHub account</div>
+      <div class="step-sub">Free — takes 2 minutes (optional if using Deploy button)</div>
     </div>
     <div class="step-check">✅</div>
   </div>
@@ -286,15 +286,18 @@ body{background:var(--bg);color:#e2e8f0;font-family:'Inter',sans-serif;min-heigh
   <div class="step-body hidden" id="sb5">
     <div class="inst">
       <div class="inst-dot">1</div>
-      <div class="inst-text">In Railway, click <b>New Project</b> → <b>Deploy from GitHub repo</b>.</div>
+      <div class="inst-text">Click the button below — Railway opens automatically and sets everything up for you.</div>
+    </div>
+    <div style="margin:18px 0;text-align:center">
+      <a href="https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" target="_blank" style="display:inline-block;background:linear-gradient(135deg,#7c5cff,#00e5ff);border-radius:12px;padding:14px 28px;color:#fff;font-weight:800;font-size:15px;text-decoration:none;letter-spacing:.5px;box-shadow:0 4px 24px rgba(124,92,255,.4);transition:transform .2s" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">🚀 Deploy on Railway — One Click</a>
     </div>
     <div class="inst">
       <div class="inst-dot">2</div>
-      <div class="inst-text">Find and select <b>apex-trade-bot</b> (the repo you forked in Step 1) → click <b>Deploy Now</b>.</div>
+      <div class="inst-text">Railway will show a form with fields for your API keys. Fill them in (see Step 6 below for what to enter) → click <b>Deploy</b>.</div>
     </div>
     <div class="inst">
       <div class="inst-dot">3</div>
-      <div class="inst-text">Railway starts deploying. You'll see a build log — it'll fail at first because variables are missing. That's normal — continue to Step 6.</div>
+      <div class="inst-text">Railway builds and starts your bot automatically. In ~2 minutes you'll see it running. ✅</div>
     </div>
     <div style="margin-top:12px;text-align:center">
       <button onclick="markDone(5)" style="background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:8px;color:#c4b5fd;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(124,92,255,.25)'" onmouseout="this.style.background='rgba(124,92,255,.15)'">✓ Done — go to Step 6</button>
