@@ -6,20 +6,39 @@
 <title>Apex Trade Bot — AI Crypto Trading Bot Source Code · $297 One-Time</title>
 <meta name="description" content="Buy the source code once for $297. Deploy on Railway in 10 minutes. Your AI crypto trading bot trades XRP, DOGE, ADA 24/7 — you own it forever."/>
 <script src="https://js.stripe.com/v3/"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#050814;--amber:#f59e0b;--blue:#3b82f6;--green:#10b981;--text:#f1f5f9;--text2:rgba(241,245,249,.6);--text3:rgba(241,245,249,.3);--card:rgba(255,255,255,.04);--border:rgba(255,255,255,.08);--font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--mono:'SF Mono','Fira Code',monospace}
+:root{
+  --bg:#0f172a;
+  --bg2:#080f1e;
+  --amber:#f59e0b;
+  --amber2:#fbbf24;
+  --purple:#8b5cf6;
+  --purple2:rgba(139,92,246,.15);
+  --green:#10b981;
+  --blue:#3b82f6;
+  --text:#f8fafc;
+  --text2:rgba(248,250,252,.6);
+  --text3:rgba(248,250,252,.3);
+  --card:rgba(255,255,255,.04);
+  --border:rgba(255,255,255,.08);
+  --font:'Exo 2',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --heading:'Orbitron','Exo 2',sans-serif;
+  --mono:'SF Mono','Fira Code',monospace;
+}
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+body{background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:hidden;-webkit-font-smoothing:antialiased;font-size:16px;line-height:1.6}
 
 /* NAV */
 nav{position:fixed;top:0;left:0;right:0;z-index:200;height:66px;display:flex;align-items:center;padding:0 32px;justify-content:space-between;border-bottom:1px solid var(--border);backdrop-filter:blur(24px) saturate(160%);background:rgba(5,8,20,.85);transition:background .3s}
-.nav-logo{font-size:16px;font-weight:800;color:#fff;text-decoration:none;letter-spacing:-.3px;display:flex;align-items:center;gap:6px}
+.nav-logo{font-size:14px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:.5px;display:flex;align-items:center;gap:8px;font-family:var(--heading);text-transform:uppercase}
 .nav-links{display:flex;gap:28px}
 .nav-links a{font-size:13px;color:var(--text2);text-decoration:none;font-weight:500;transition:color .2s}
 .nav-links a:hover{color:#fff}
-.nav-cta{padding:10px 20px;background:var(--amber);border:none;border-radius:8px;color:#000;font-family:var(--font);font-size:13px;font-weight:800;cursor:pointer;letter-spacing:.2px;transition:all .2s;text-decoration:none;display:flex;align-items:center;gap:4px}
-.nav-cta:hover{background:#fbbf24;transform:translateY(-1px)}
+.nav-cta{padding:10px 20px;background:var(--amber);border:none;border-radius:8px;color:#000;font-family:var(--heading);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;transition:all .2s;text-decoration:none;display:flex;align-items:center;gap:6px;min-height:40px}
+.nav-cta:hover{background:#fbbf24;transform:translateY(-1px);box-shadow:0 0 20px rgba(245,158,11,.4)}
 @media(max-width:768px){.nav-links{display:none}.nav-cta{padding:9px 14px;font-size:12px}}
 @media(max-width:480px){nav{padding:0 16px}}
 
@@ -27,19 +46,19 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:66px;display:flex;ali
 .hero{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:48px;padding:100px 40px 80px;max-width:1200px;margin:0 auto;position:relative}
 .hero::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 70% 50% at 30% 50%,rgba(245,158,11,.06),transparent),radial-gradient(ellipse 50% 40% at 70% 60%,rgba(59,130,246,.07),transparent);pointer-events:none;z-index:0}
 .hero-left{position:relative;z-index:1}
-.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border:1px solid rgba(16,185,129,.3);border-radius:100px;font-size:12px;font-weight:600;color:var(--green);letter-spacing:.5px;background:rgba(16,185,129,.08);margin-bottom:28px}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border:1px solid rgba(16,185,129,.3);border-radius:100px;font-size:10px;font-weight:700;color:var(--green);letter-spacing:2px;background:rgba(16,185,129,.08);margin-bottom:28px;font-family:var(--heading);text-transform:uppercase}
 .badge-dot{width:6px;height:6px;border-radius:50%;background:#ef4444;animation:blink 1.4s infinite;box-shadow:0 0 6px #ef4444}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-.hero h1{font-size:clamp(40px,5.5vw,72px);font-weight:900;line-height:1;letter-spacing:-3px;margin-bottom:22px}
+.hero h1{font-size:clamp(32px,4.5vw,64px);font-weight:900;line-height:1.05;letter-spacing:1px;margin-bottom:22px;font-family:var(--heading);text-transform:uppercase}
 .hero h1 .amber{background:linear-gradient(135deg,#f59e0b,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .hero-sub{font-size:clamp(15px,1.8vw,17px);color:var(--text2);line-height:1.75;max-width:480px;margin-bottom:36px;font-weight:400}
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:32px}
-.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:16px 32px;background:var(--amber);border:none;border-radius:10px;color:#000;font-family:var(--font);font-size:15px;font-weight:800;cursor:pointer;letter-spacing:.1px;transition:all .25s;text-decoration:none;box-shadow:0 0 40px rgba(245,158,11,.25)}
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:16px 32px;background:var(--amber);border:none;border-radius:10px;color:#000;font-family:var(--heading);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:all .2s;text-decoration:none;box-shadow:0 0 40px rgba(245,158,11,.25);min-height:44px}
 .btn-primary:hover{background:#fbbf24;transform:translateY(-2px);box-shadow:0 0 60px rgba(245,158,11,.4)}
-.btn-ghost{display:inline-flex;align-items:center;gap:8px;padding:16px 28px;background:transparent;border:1px solid var(--border);border-radius:10px;color:var(--text2);font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;transition:all .25s;text-decoration:none}
+.btn-ghost{display:inline-flex;align-items:center;gap:8px;padding:16px 28px;background:transparent;border:1px solid var(--border);border-radius:10px;color:var(--text2);font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;text-decoration:none;min-height:44px}
 .btn-ghost:hover{border-color:rgba(255,255,255,.2);color:#fff;background:rgba(255,255,255,.04)}
-.trust-pills{display:flex;gap:10px;flex-wrap:wrap}
-.trust-pill{padding:8px 14px;border:1px solid var(--border);border-radius:100px;background:var(--card);font-size:11px;font-weight:600;color:var(--text2);backdrop-filter:blur(8px)}
+.trust-pills{display:flex;gap:8px;flex-wrap:wrap}
+.trust-pill{padding:8px 14px;border:1px solid var(--border);border-radius:100px;background:var(--card);font-size:11px;font-weight:600;color:var(--text2);backdrop-filter:blur(8px);display:inline-flex;align-items:center;gap:6px;min-height:32px;font-family:var(--mono);letter-spacing:.5px}
 
 /* HERO MOCKUP */
 .hero-right{position:relative;z-index:1}
@@ -79,9 +98,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:66px;display:flex;ali
 /* SECTIONS */
 .section{padding:100px 40px;position:relative}
 .section-inner{max-width:1100px;margin:0 auto}
-.s-tag{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:14px;color:var(--amber)}
-.s-tag::before{content:'';width:18px;height:1px;background:currentColor}
-.s-h{font-size:clamp(28px,4vw,48px);font-weight:900;letter-spacing:-2px;line-height:1.05;margin-bottom:14px}
+.s-tag{display:inline-flex;align-items:center;gap:8px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:14px;color:var(--amber);font-family:var(--mono)}
+.s-tag::before{content:'//';opacity:.5;margin-right:2px}
+.s-h{font-size:clamp(24px,3.5vw,44px);font-weight:800;letter-spacing:1px;line-height:1.1;margin-bottom:14px;font-family:var(--heading);text-transform:uppercase}
 .s-sub{font-size:16px;color:var(--text2);line-height:1.75;max-width:500px}
 @media(max-width:480px){.section{padding:72px 20px}}
 
@@ -91,10 +110,14 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:66px;display:flex;ali
 .steps::before{content:'';position:absolute;top:36px;left:calc(16.67% + 16px);right:calc(16.67% + 16px);height:1px;background:linear-gradient(90deg,var(--amber),var(--blue));opacity:.3;pointer-events:none}
 .step{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;transition:border-color .3s,transform .3s;position:relative}
 .step:hover{transform:translateY(-5px);border-color:rgba(245,158,11,.25)}
-.step-num{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--amber);opacity:.7;margin-bottom:18px;display:block}
-.step-icon{font-size:32px;display:block;margin-bottom:14px;line-height:1}
-.step-title{font-size:18px;font-weight:800;color:#fff;margin-bottom:8px;letter-spacing:-.4px}
-.step-desc{font-size:13px;color:var(--text2);line-height:1.75}
+.step-num{font-family:var(--heading);font-size:10px;font-weight:700;letter-spacing:3px;color:var(--amber);opacity:.7;margin-bottom:18px;display:block;text-transform:uppercase}
+.step-icon{width:44px;height:44px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;border-radius:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2)}
+.step-icon svg{width:22px;height:22px;stroke:var(--amber);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.step.ai .step-icon{background:var(--purple2);border-color:rgba(139,92,246,.3)}
+.step.ai .step-icon svg{stroke:var(--purple)}
+.step.ai .step-num{color:var(--purple)}
+.step-title{font-size:17px;font-weight:700;color:#fff;margin-bottom:8px;letter-spacing:.3px;font-family:var(--heading);text-transform:uppercase;font-size:14px}
+.step-desc{font-size:14px;color:var(--text2);line-height:1.75}
 .step-detail{margin-top:14px;padding:12px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:8px;font-size:11px;color:var(--text3);font-family:var(--mono)}
 @media(max-width:768px){.steps{grid-template-columns:1fr;gap:14px}.steps::before{display:none}}
 
@@ -104,7 +127,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:66px;display:flex;ali
 .check-item{display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:1px solid var(--border);font-size:15px;color:var(--text2);line-height:1.5}
 .check-item:last-child{border-bottom:none}
 .check-item strong{color:#fff;font-weight:600}
-.check-mark{font-size:16px;flex-shrink:0}
+.check-mark{flex-shrink:0;display:flex;align-items:center}
 
 /* TERMINAL */
 .terminal-wrap{margin-top:72px;background:#0a0d1a;border:1px solid rgba(59,130,246,.2);border-radius:16px;overflow:hidden;box-shadow:0 0 80px rgba(59,130,246,.06)}
@@ -127,7 +150,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:66px;display:flex;ali
 .pc-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--amber);margin-bottom:10px}
 .pc-tag-red{display:inline-block;font-size:10px;font-weight:700;background:#ef4444;color:#fff;padding:3px 10px;border-radius:4px;letter-spacing:1px;text-transform:uppercase;margin-left:10px;vertical-align:middle}
 .pc-row{display:flex;align-items:baseline;gap:8px;justify-content:center;margin-bottom:6px}
-.pc-price{font-size:72px;font-weight:900;color:var(--amber);letter-spacing:-4px;line-height:1}
+.pc-price{font-size:72px;font-weight:900;color:var(--amber);letter-spacing:-2px;line-height:1;font-family:var(--heading)}
 .pc-was{font-size:22px;color:var(--text3);text-decoration:line-through;font-weight:700}
 .pc-once{font-size:13px;color:var(--text3);margin-bottom:28px}
 .pc-divider{height:1px;background:var(--border);margin-bottom:24px}
@@ -135,7 +158,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:66px;display:flex;ali
 .pc-features li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--text2);line-height:1.5}
 .pc-features li .ck{flex-shrink:0;font-size:14px}
 .pc-features li strong{color:#fff;font-weight:600}
-.pc-cta{display:block;width:100%;padding:18px;background:var(--amber);border:none;border-radius:12px;color:#000;font-family:var(--font);font-size:16px;font-weight:900;cursor:pointer;transition:all .25s;text-align:center;box-shadow:0 0 48px rgba(245,158,11,.3);text-decoration:none;letter-spacing:.2px}
+.pc-cta{display:block;width:100%;padding:18px;background:var(--amber);border:none;border-radius:12px;color:#000;font-family:var(--heading);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;text-align:center;box-shadow:0 0 48px rgba(245,158,11,.3);text-decoration:none;letter-spacing:2px;text-transform:uppercase;min-height:56px;display:flex;align-items:center;justify-content:center;gap:10px}
 .pc-cta:hover{background:#fbbf24;transform:translateY(-2px);box-shadow:0 0 64px rgba(245,158,11,.5)}
 .pc-note{font-size:12px;color:var(--text3);margin-top:12px;text-align:center}
 
@@ -144,7 +167,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:66px;display:flex;ali
 .faq-inner{max-width:680px;margin:0 auto}
 .faq-list{margin-top:48px}
 .faq-item{border-bottom:1px solid var(--border)}
-.faq-q{display:flex;align-items:center;justify-content:space-between;padding:20px 0;cursor:pointer;font-size:15px;font-weight:600;color:var(--text2);gap:16px;transition:color .2s;list-style:none}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:20px 0;cursor:pointer;font-size:15px;font-weight:600;color:var(--text2);gap:16px;transition:color .2s;list-style:none;min-height:44px;user-select:none}
 .faq-q:hover{color:#fff}
 .faq-icon{width:26px;height:26px;border-radius:7px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:16px;font-weight:700;flex-shrink:0;transition:all .25s}
 .faq-item.open .faq-icon{transform:rotate(45deg);background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3)}
@@ -198,7 +221,7 @@ footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px
 <div id="heroPaths"></div>
 <div class="hero">
   <div class="hero-left">
-    <div class="hero-badge"><span class="badge-dot"></span>🔴 LIVE &nbsp;·&nbsp; AI Trading Bot</div>
+    <div class="hero-badge"><span class="badge-dot"></span>LIVE &nbsp;·&nbsp; AI TRADING BOT</div>
     <h1>Your Personal AI<br><span class="amber">Trading Bot.</span></h1>
     <p class="hero-sub">Deploy in 10 minutes. Trades XRP, DOGE, ADA 24/7. Full source code — you own it forever.</p>
     <div class="hero-actions">
@@ -206,10 +229,10 @@ footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px
       <a href="#how" class="btn-ghost">See How It Works ↓</a>
     </div>
     <div class="trust-pills">
-      <span class="trust-pill">🔒 Stripe Secure</span>
-      <span class="trust-pill">📦 Full Source Code</span>
-      <span class="trust-pill">🚀 1-Click Deploy</span>
-      <span class="trust-pill">⚡ Groq AI</span>
+      <span class="trust-pill"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Stripe Secure</span>
+      <span class="trust-pill"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Full Source Code</span>
+      <span class="trust-pill"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>1-Click Deploy</span>
+      <span class="trust-pill"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>Groq AI</span>
     </div>
   </div>
   <div class="hero-right">
@@ -288,21 +311,21 @@ footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px
     <div class="steps">
       <div class="step reveal">
         <span class="step-num">STEP 01</span>
-        <span class="step-icon">💳</span>
+        <div class="step-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>
         <div class="step-title">Buy Once</div>
         <div class="step-desc">Pay $297 one-time and receive your license key instantly by email. No subscriptions, no recurring fees — ever.</div>
         <div class="step-detail">$297 · License key · Instant delivery</div>
       </div>
-      <div class="step reveal reveal-d1">
+      <div class="step ai reveal reveal-d1">
         <span class="step-num">STEP 02</span>
-        <span class="step-icon">⚙️</span>
+        <div class="step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg></div>
         <div class="step-title">Configure Your Bot</div>
         <div class="step-desc">Choose your coin, risk level, and strategy. Everything is controlled via simple environment variables — no coding required.</div>
         <div class="step-detail">Coin · Risk · Strategy (Turtle, Livermore, Soros)</div>
       </div>
       <div class="step reveal reveal-d2">
         <span class="step-num">STEP 03</span>
-        <span class="step-icon">🚀</span>
+        <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
         <div class="step-title">Deploy &amp; Earn</div>
         <div class="step-desc">Click Deploy on Railway. The bot goes live in seconds and runs 24/7 — scanning markets, executing trades, sending Telegram alerts.</div>
         <div class="step-detail">Railway deploy · Telegram alerts · TradingView dashboard</div>
@@ -318,15 +341,15 @@ footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px
     <h2 class="s-h reveal">Everything included for $297.</h2>
     <p class="s-sub reveal">Full source code. Zero black box. Deploy it, modify it, own it forever.</p>
     <div class="checklist reveal">
-      <div class="check-item"><span class="check-mark">✅</span><span><strong>Full source code (Node.js)</strong> — you own it, forever</span></div>
-      <div class="check-item"><span class="check-mark">✅</span><span><strong>AI signal engine</strong> — Groq + Claude for deep market analysis</span></div>
-      <div class="check-item"><span class="check-mark">✅</span><span><strong>8 coins supported</strong> — XRP, DOGE, ADA, BTC, ETH, SOL, BNB, TRX</span></div>
-      <div class="check-item"><span class="check-mark">✅</span><span><strong>Legendary strategies</strong> — Turtle Trading, Livermore, Soros breakout</span></div>
-      <div class="check-item"><span class="check-mark">✅</span><span><strong>Live dashboard</strong> — TradingView charts, real-time P&amp;L</span></div>
-      <div class="check-item"><span class="check-mark">✅</span><span><strong>Telegram alerts</strong> — instant push notification on every trade</span></div>
-      <div class="check-item"><span class="check-mark">✅</span><span><strong>1-click Railway deployment</strong> — live in under 10 minutes</span></div>
-      <div class="check-item"><span class="check-mark">✅</span><span><strong>License key system</strong> — your bot, your API keys, your control</span></div>
-      <div class="check-item"><span class="check-mark">✅</span><span><strong>Paper trading mode</strong> — practice safely before going live</span></div>
+      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Full source code (Node.js)</strong> — you own it, forever</span></div>
+      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>AI signal engine</strong> — Groq + Claude for deep market analysis</span></div>
+      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>8 coins supported</strong> — XRP, DOGE, ADA, BTC, ETH, SOL, BNB, TRX</span></div>
+      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Legendary strategies</strong> — Turtle Trading, Livermore, Soros breakout</span></div>
+      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Live dashboard</strong> — TradingView charts, real-time P&amp;L</span></div>
+      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Telegram alerts</strong> — instant push notification on every trade</span></div>
+      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>1-click Railway deployment</strong> — live in under 10 minutes</span></div>
+      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>License key system</strong> — your bot, your API keys, your control</span></div>
+      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Paper trading mode</strong> — practice safely before going live</span></div>
     </div>
 
     <!-- TERMINAL -->
@@ -348,7 +371,7 @@ footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px
     <h2 class="s-h reveal" style="text-align:center">One payment. Own it forever.</h2>
     <p class="s-sub reveal" style="margin:0 auto;text-align:center">No monthly fees. No SaaS trap. The source code is yours — forever.</p>
     <div class="price-card reveal">
-      <div class="pc-tag">⚡ ONE-TIME PAYMENT <span class="pc-tag-red">LIMITED TIME</span></div>
+      <div class="pc-tag">ONE-TIME PAYMENT <span class="pc-tag-red">LIMITED TIME</span></div>
       <div class="pc-row">
         <span class="pc-price">$297</span>
         <span class="pc-was">$497</span>
@@ -356,15 +379,15 @@ footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px
       <div class="pc-once">one-time payment · no subscription · lifetime access</div>
       <div class="pc-divider"></div>
       <ul class="pc-features">
-        <li><span class="ck">✅</span><span><strong>Full source code (Node.js)</strong> — you own it</span></li>
-        <li><span class="ck">✅</span><span><strong>AI signal engine</strong> — Groq + Claude</span></li>
-        <li><span class="ck">✅</span><span><strong>8 coins</strong> — XRP, DOGE, ADA, BTC, ETH, SOL, BNB, TRX</span></li>
-        <li><span class="ck">✅</span><span><strong>Legendary strategies</strong> — Turtle, Livermore, Soros</span></li>
-        <li><span class="ck">✅</span><span><strong>Live TradingView dashboard</strong></span></li>
-        <li><span class="ck">✅</span><span><strong>Telegram alerts</strong> — every trade, instantly</span></li>
-        <li><span class="ck">✅</span><span><strong>1-click Railway deploy</strong></span></li>
-        <li><span class="ck">✅</span><span><strong>License key system</strong> — your keys, your control</span></li>
-        <li><span class="ck">✅</span><span><strong>Paper trading mode</strong> — safe testing first</span></li>
+        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Full source code (Node.js)</strong> — you own it</span></li>
+        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>AI signal engine</strong> — Groq + Claude</span></li>
+        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>8 coins</strong> — XRP, DOGE, ADA, BTC, ETH, SOL, BNB, TRX</span></li>
+        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Legendary strategies</strong> — Turtle, Livermore, Soros</span></li>
+        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Live TradingView dashboard</strong></span></li>
+        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Telegram alerts</strong> — every trade, instantly</span></li>
+        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>1-click Railway deploy</strong></span></li>
+        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>License key system</strong> — your keys, your control</span></li>
+        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Paper trading mode</strong> — safe testing first</span></li>
       </ul>
       <a href="#" onclick="openApexModal();return false;" class="pc-cta">Get Instant Access Now →</a>
       <p class="pc-note">🔒 Stripe encrypted · Instant delivery · 30-day money back</p>
@@ -540,14 +563,14 @@ function toggleFaq(el){var item=el.parentElement,was=item.classList.contains('op
 <style>
 #apexModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(5,8,22,.92);backdrop-filter:blur(24px)}
 #apexModal.open{display:flex}
-.am-card{background:rgba(0,8,22,.97);border:1px solid rgba(0,207,255,.2);border-radius:20px;width:100%;max-width:450px;position:relative;overflow:hidden;overflow-y:auto;max-height:90vh;box-shadow:0 0 100px rgba(0,207,255,.12),0 40px 120px rgba(0,0,0,.9)}
-.am-close{position:absolute;top:14px;right:18px;background:none;border:none;color:rgba(224,224,224,.4);font-size:24px;cursor:pointer;z-index:2;transition:color .2s}
+.am-card{background:rgba(5,10,25,.98);border:1px solid rgba(245,158,11,.2);border-radius:20px;width:100%;max-width:450px;position:relative;overflow:hidden;overflow-y:auto;max-height:90vh;box-shadow:0 0 100px rgba(245,158,11,.08),0 40px 120px rgba(0,0,0,.9)}
+.am-close{position:absolute;top:14px;right:18px;background:none;border:none;color:rgba(248,250,252,.4);font-size:24px;cursor:pointer;z-index:2;transition:color .2s}
 .am-close:hover{color:#fff}
 .am-head{padding:28px 30px 22px;border-bottom:1px solid rgba(255,255,255,.06)}
-.am-tag{font-size:9px;font-weight:700;color:#10b981;letter-spacing:2.5px;text-transform:uppercase;font-family:'SF Mono','Fira Code',monospace;margin-bottom:8px;display:block}
-.am-title{font-size:22px;font-weight:900;letter-spacing:-.5px;color:#fff}
+.am-tag{font-size:9px;font-weight:700;color:var(--green);letter-spacing:2.5px;text-transform:uppercase;font-family:var(--heading);margin-bottom:8px;display:block}
+.am-title{font-size:20px;font-weight:800;letter-spacing:1px;color:#fff;font-family:var(--heading);text-transform:uppercase}
 .am-price{display:flex;align-items:baseline;gap:10px;margin-top:6px}
-.am-amount{font-size:32px;font-weight:900;background:linear-gradient(135deg,#f59e0b,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-family:'SF Mono','Fira Code',monospace}
+.am-amount{font-size:32px;font-weight:900;color:var(--amber);font-family:var(--heading)}
 .am-was{font-size:14px;color:rgba(224,224,224,.3);text-decoration:line-through}
 .am-body{padding:22px 30px}
 .am-field{margin-bottom:14px}
@@ -562,15 +585,15 @@ function toggleFaq(el){var item=el.parentElement,was=item.classList.contains('op
 .am-check input[type=checkbox]{width:15px;height:15px;flex-shrink:0;margin-top:2px;accent-color:#f59e0b;cursor:pointer}
 .am-check-txt{font-size:11px;color:rgba(224,224,224,.6);line-height:1.6}
 .am-check-txt a{color:#3b82f6;text-decoration:underline}
-.am-submit{width:100%;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#000;font-size:13px;font-weight:900;padding:16px;border-radius:12px;border:none;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;box-shadow:0 4px 24px rgba(245,158,11,.3)}
+.am-submit{width:100%;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#000;font-size:11px;font-weight:700;padding:16px;border-radius:12px;border:none;cursor:pointer;letter-spacing:2px;text-transform:uppercase;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;box-shadow:0 4px 24px rgba(245,158,11,.3);font-family:var(--heading);min-height:52px}
 .am-submit:hover:not(:disabled){box-shadow:0 4px 40px rgba(245,158,11,.5)}
 .am-submit:disabled{opacity:.35;cursor:not-allowed}
 .am-spinner{width:14px;height:14px;border:2px solid rgba(0,0,0,.25);border-top-color:#000;border-radius:50%;animation:am-spin .7s linear infinite;display:none}
 @keyframes am-spin{to{transform:rotate(360deg)}}
 .am-note{font-size:10px;color:rgba(224,224,224,.3);text-align:center;margin-top:12px;font-family:'SF Mono','Fira Code',monospace}
 .am-success{padding:48px 30px;text-align:center;display:none}
-.am-success-icon{font-size:56px;margin-bottom:18px}
-.am-success h3{font-size:24px;font-weight:900;margin-bottom:10px;background:linear-gradient(135deg,#f59e0b,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.am-success-icon{font-size:48px;margin-bottom:18px}
+.am-success h3{font-size:20px;font-weight:800;margin-bottom:10px;color:var(--amber);font-family:var(--heading);letter-spacing:2px;text-transform:uppercase}
 .am-success p{font-size:13px;color:rgba(224,224,224,.6);line-height:1.8}
 </style>
 
