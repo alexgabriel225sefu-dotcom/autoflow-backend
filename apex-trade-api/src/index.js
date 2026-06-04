@@ -11,8 +11,10 @@ const signalsRoutes = require('./routes/signals');
 const backtestRoutes = require('./routes/backtest');
 const portfolioRoutes = require('./routes/portfolio');
 const brokerRoutes = require('./routes/broker');
+const botControlRoutes = require('./routes/bot-control');
 const { authenticate } = require('./middleware/auth');
 const { setupWebSocket } = require('./services/websocket');
+const { initEngine } = require('./services/trading-engine');
 
 const app = express();
 const httpServer = createServer(app);
@@ -43,6 +45,7 @@ app.use('/signals', authenticate, signalsRoutes);
 app.use('/backtest', authenticate, backtestRoutes);
 app.use('/portfolio', authenticate, portfolioRoutes);
 app.use('/broker', authenticate, brokerRoutes);
+app.use('/bot', botControlRoutes);
 
 // ─── WebSocket ────────────────────────────────────────────
 setupWebSocket(io);
@@ -71,7 +74,34 @@ if (!process.env.ANTHROPIC_API_KEY) {
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Apex Trade API running on port ${PORT}`);
-  console.log(`🌐 Listening on 0.0.0.0:${PORT}`);
+
+  // Auto-start trading engine if API keys are configured
+  const { BINANCE_API_KEY, BINANCE_API_SECRET, STRATEGY } = process.env;
+  if (BINANCE_API_KEY && BINANCE_API_SECRET && STRATEGY) {
+    const engine = initEngine({
+      apiKey: BINANCE_API_KEY,
+      apiSecret: BINANCE_API_SECRET,
+      testnet: process.env.TESTNET,
+      strategy: STRATEGY,
+      symbol: process.env.TRADING_SYMBOL || 'BTCUSDT',
+      orderAmount: process.env.ORDER_AMOUNT_USDT || '20',
+      takeProfitPct: process.env.TAKE_PROFIT_PCT || '3',
+      stopLossPct: process.env.STOP_LOSS_PCT || '2',
+      dcaIntervalHours: process.env.DCA_INTERVAL_HOURS || '4',
+      dcaMaxOrders: process.env.DCA_MAX_ORDERS || '10',
+      gridLevels: process.env.GRID_LEVELS || '10',
+      gridLower: process.env.GRID_LOWER_PRICE,
+      gridUpper: process.env.GRID_UPPER_PRICE,
+      investmentUSDT: process.env.INVESTMENT_USDT || '100',
+      timeframe: process.env.TIMEFRAME || '1h',
+      telegramToken: process.env.TELEGRAM_BOT_TOKEN,
+      telegramChatId: process.env.TELEGRAM_CHAT_ID,
+    });
+    engine.start().catch((err) => console.error('[Engine] Start failed:', err.message));
+    console.log(`🤖 Trading engine starting — ${STRATEGY} on ${process.env.TRADING_SYMBOL || 'BTCUSDT'}`);
+  } else {
+    console.log('ℹ️  No BINANCE_API_KEY/STRATEGY set — trading engine not started');
+  }
 });
 
 module.exports = { app, io };

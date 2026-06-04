@@ -1,441 +1,152 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ro">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>APEX Trade Bot — Configuration Wizard</title>
+  <title>APEX Trade Bot — Setup Wizard</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #0a0a0f;
-      --green: #00ff88;
-      --cyan: #00cfff;
-      --purple: #7c5cff;
-      --card: #111827;
-      --border: #1f2937;
-      --text: #e5e7eb;
-      --muted: #6b7280;
-      --danger: #ff4d6d;
-      --warn: #f59e0b;
+      --bg: #050814; --card: #0d1225; --border: #1e2a45;
+      --text: #e5e7eb; --muted: #6b7280;
+      --amber: #f59e0b; --green: #00e87a; --danger: #ff4d6d;
     }
+    html, body { min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 16px; line-height: 1.5; }
 
-    html, body {
-      min-height: 100vh;
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      font-size: 16px;
-      line-height: 1.5;
-    }
+    .header { text-align: center; padding: 2.5rem 1rem 1.5rem; }
+    .header .logo { font-size: 0.75rem; letter-spacing: 0.25em; color: var(--amber); text-transform: uppercase; font-weight: 700; margin-bottom: 0.75rem; }
+    .header h1 { font-size: clamp(1.5rem, 4vw, 2.2rem); font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
+    .header p { color: var(--muted); font-size: 0.9rem; }
 
-    /* ── Header ── */
-    .header {
-      text-align: center;
-      padding: 2.5rem 1rem 1.5rem;
-    }
-    .header .logo {
-      font-size: 1rem;
-      letter-spacing: 0.2em;
-      color: var(--cyan);
-      text-transform: uppercase;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-    }
-    .header h1 {
-      font-size: clamp(1.5rem, 4vw, 2.4rem);
-      font-weight: 800;
-      background: linear-gradient(135deg, var(--green) 0%, var(--cyan) 50%, var(--purple) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 0.5rem;
-    }
-    .header p {
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
+    .progress-wrap { max-width: 680px; margin: 0 auto 2rem; padding: 0 1rem; }
+    .progress-labels { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
+    .progress-label { font-size: 0.68rem; color: var(--muted); text-align: center; flex: 1; transition: color 0.3s; }
+    .progress-label.active { color: var(--amber); font-weight: 700; }
+    .progress-label.done   { color: var(--green); }
+    .progress-track { height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; }
+    .progress-fill  { height: 100%; background: linear-gradient(90deg, var(--amber), var(--green)); border-radius: 99px; transition: width 0.4s ease; }
 
-    /* ── Progress ── */
-    .progress-wrap {
-      max-width: 680px;
-      margin: 0 auto 2rem;
-      padding: 0 1rem;
-    }
-    .progress-labels {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 0.5rem;
-    }
-    .progress-label {
-      font-size: 0.72rem;
-      color: var(--muted);
-      text-align: center;
-      flex: 1;
-      transition: color 0.3s;
-    }
-    .progress-label.active { color: var(--green); font-weight: 700; }
-    .progress-label.done   { color: var(--cyan); }
-    .progress-track {
-      height: 4px;
-      background: var(--border);
-      border-radius: 99px;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--green), var(--cyan));
-      border-radius: 99px;
-      transition: width 0.4s ease;
-    }
-
-    /* ── Wizard container ── */
-    .wizard {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 0 1rem 4rem;
-    }
-
-    .step {
-      display: none;
-      animation: fadeIn 0.35s ease;
-    }
+    .wizard { max-width: 680px; margin: 0 auto; padding: 0 1rem 4rem; }
+    .step { display: none; animation: fadeIn 0.3s ease; }
     .step.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
+    .step-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 0.4rem; color: #fff; }
+    .step-sub   { color: var(--muted); font-size: 0.87rem; margin-bottom: 1.5rem; }
 
-    .step-title {
-      font-size: 1.35rem;
-      font-weight: 700;
-      margin-bottom: 0.4rem;
-      color: #fff;
+    /* Strategy cards */
+    .strategy-cards { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem; }
+    .strategy-card {
+      background: var(--card); border: 1.5px solid var(--border); border-radius: 14px;
+      padding: 1.1rem 1.25rem; cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: flex-start; gap: 1rem;
     }
-    .step-sub {
-      color: var(--muted);
-      font-size: 0.9rem;
-      margin-bottom: 1.5rem;
-    }
+    .strategy-card:hover { border-color: var(--amber); background: #111a2e; }
+    .strategy-card.selected { border-color: var(--amber); background: rgba(245,158,11,0.06); box-shadow: 0 0 20px rgba(245,158,11,0.1); }
+    .strategy-card.selected .sc-radio { border-color: var(--amber); background: var(--amber); box-shadow: 0 0 8px rgba(245,158,11,0.5); }
+    .sc-radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); margin-top: 2px; flex-shrink: 0; transition: all 0.15s; }
+    .sc-body { flex: 1; }
+    .sc-name { font-weight: 700; color: #fff; font-size: 0.95rem; margin-bottom: 0.25rem; }
+    .sc-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+    .sc-badge { font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-top: 6px; display: inline-block; }
+    .sc-badge.low    { background: rgba(0,232,122,0.12); color: var(--green); }
+    .sc-badge.medium { background: rgba(245,158,11,0.12); color: var(--amber); }
+    .sc-badge.high   { background: rgba(255,77,109,0.12); color: var(--danger); }
 
-    /* ── Coin grid ── */
-    .coin-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 0.75rem;
-      margin-bottom: 2rem;
-    }
-    .coin-btn {
-      background: var(--card);
-      border: 1.5px solid var(--border);
-      border-radius: 12px;
-      padding: 1rem 0.75rem;
-      cursor: pointer;
-      text-align: center;
-      transition: all 0.2s;
-      position: relative;
-      overflow: hidden;
-    }
-    .coin-btn:hover {
-      border-color: var(--green);
-      background: #0f2a1e;
-    }
-    .coin-btn.selected {
-      border-color: var(--green);
-      background: #0d2319;
-      box-shadow: 0 0 16px rgba(0,255,136,0.15);
-    }
-    .coin-btn.selected::after {
-      content: '✓';
-      position: absolute;
-      top: 6px; right: 8px;
-      font-size: 0.75rem;
-      color: var(--green);
-      font-weight: 800;
-    }
-    .coin-emoji { font-size: 1.8rem; display: block; margin-bottom: 0.3rem; }
-    .coin-name  { font-size: 1rem; font-weight: 700; color: #fff; }
-    .coin-sym   { font-size: 0.72rem; color: var(--cyan); font-weight: 600; letter-spacing: 0.04em; margin-bottom: 0.15rem; }
-    .coin-tag   { font-size: 0.68rem; color: var(--muted); }
+    /* Coin grid */
+    .coin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .coin-btn { background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 0.9rem 0.75rem; cursor: pointer; text-align: center; transition: all 0.2s; position: relative; }
+    .coin-btn:hover { border-color: var(--amber); }
+    .coin-btn.selected { border-color: var(--amber); background: rgba(245,158,11,0.05); }
+    .coin-btn.selected::after { content: '✓'; position: absolute; top: 6px; right: 8px; font-size: 0.7rem; color: var(--amber); font-weight: 800; }
+    .coin-icon { font-size: 1.5rem; display: block; margin-bottom: 0.3rem; color: var(--amber); font-weight: 800; font-family: monospace; }
+    .coin-name { font-size: 0.9rem; font-weight: 700; color: #fff; }
+    .coin-sym  { font-size: 0.68rem; color: var(--amber); font-weight: 600; letter-spacing: 0.04em; margin-bottom: 0.1rem; }
+    .coin-tag  { font-size: 0.63rem; color: var(--muted); }
 
-    /* ── Risk cards ── */
-    .risk-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 0.75rem;
-      margin-bottom: 2rem;
-    }
-    .risk-card {
-      background: var(--card);
-      border: 1.5px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem 1rem;
-      cursor: pointer;
-      transition: all 0.2s;
-      position: relative;
-    }
-    .risk-card:hover { border-color: var(--cyan); background: #0c1a2a; }
-    .risk-card.selected {
-      border-color: var(--green);
-      background: #0d2319;
-      box-shadow: 0 0 16px rgba(0,255,136,0.15);
-    }
-    .risk-card.selected::after {
-      content: '✓';
-      position: absolute;
-      top: 8px; right: 10px;
-      font-size: 0.8rem;
-      color: var(--green);
-      font-weight: 800;
-    }
-    .risk-icon  { font-size: 1.6rem; margin-bottom: 0.5rem; display: block; }
-    .risk-name  { font-weight: 700; color: #fff; margin-bottom: 0.3rem; font-size: 1rem; }
-    .risk-desc  { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+    /* Risk cards */
+    .risk-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .risk-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 1.2rem 1rem; cursor: pointer; transition: all 0.2s; position: relative; text-align: center; }
+    .risk-card:hover { border-color: var(--amber); }
+    .risk-card.selected { border-color: var(--amber); background: rgba(245,158,11,0.05); }
+    .risk-card.selected::after { content: '✓'; position: absolute; top: 7px; right: 9px; font-size: 0.72rem; color: var(--amber); font-weight: 800; }
+    .risk-icon { font-size: 1.5rem; display: block; margin-bottom: 0.4rem; }
+    .risk-name { font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.25rem; }
+    .risk-desc { font-size: 0.7rem; color: var(--muted); line-height: 1.35; }
 
-    /* ── Strategy toggles ── */
-    .strategy-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      margin-bottom: 2rem;
-    }
-    .strategy-row {
-      background: var(--card);
-      border: 1.5px solid var(--border);
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      cursor: pointer;
-      transition: border-color 0.2s;
-    }
-    .strategy-row:hover { border-color: var(--purple); }
-    .strategy-row.on    { border-color: var(--green); }
-    .strategy-info { flex: 1; }
-    .strategy-name { font-weight: 700; font-size: 0.95rem; color: #fff; margin-bottom: 0.15rem; }
-    .strategy-desc { font-size: 0.78rem; color: var(--muted); }
+    /* Input fields */
+    .input-group { margin-bottom: 1.25rem; }
+    .input-label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text); margin-bottom: 0.4rem; }
+    .input-label .opt { color: var(--muted); font-weight: 400; margin-left: 4px; }
+    .input-field { width: 100%; background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem; font-size: 0.88rem; color: var(--text); font-family: 'Cascadia Code', 'Courier New', monospace; transition: border-color 0.2s; }
+    .input-field:focus { outline: none; border-color: var(--amber); }
+    .input-hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; }
+    .input-hint a { color: var(--amber); }
 
-    /* Toggle switch */
-    .toggle {
-      position: relative;
-      width: 48px;
-      height: 26px;
-      flex-shrink: 0;
-    }
-    .toggle input { opacity: 0; width: 0; height: 0; }
-    .toggle-track {
-      position: absolute;
-      inset: 0;
-      background: var(--border);
-      border-radius: 99px;
-      transition: background 0.25s;
-      cursor: pointer;
-    }
-    .toggle-track::before {
-      content: '';
-      position: absolute;
-      width: 18px; height: 18px;
-      left: 4px; top: 4px;
-      border-radius: 50%;
-      background: #fff;
-      transition: transform 0.25s;
-    }
-    .toggle input:checked + .toggle-track { background: var(--green); }
-    .toggle input:checked + .toggle-track::before { transform: translateX(22px); }
+    /* Telegram box */
+    .telegram-box { background: rgba(245,158,11,0.04); border: 1.5px solid rgba(245,158,11,0.18); border-radius: 12px; padding: 1.1rem 1.25rem; margin-bottom: 1.5rem; }
+    .tb-title { font-weight: 700; font-size: 0.88rem; color: var(--amber); margin-bottom: 0.25rem; }
+    .tb-desc  { font-size: 0.77rem; color: var(--muted); margin-bottom: 1rem; line-height: 1.45; }
 
-    /* ── Timeframe buttons ── */
-    .tf-row {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-      margin-bottom: 1rem;
-    }
-    .tf-btn {
-      background: var(--card);
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      padding: 0.75rem 1.5rem;
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--text);
-      cursor: pointer;
-      transition: all 0.2s;
-      letter-spacing: 0.03em;
-    }
-    .tf-btn:hover { border-color: var(--cyan); color: var(--cyan); }
-    .tf-btn.selected {
-      border-color: var(--green);
-      background: #0d2319;
-      color: var(--green);
-      box-shadow: 0 0 12px rgba(0,255,136,0.15);
-    }
-    .tf-hint {
-      font-size: 0.8rem;
-      color: var(--muted);
-      margin-bottom: 2rem;
-      line-height: 1.6;
-    }
+    /* Code box */
+    .config-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .config-header span { font-size: 0.72rem; color: var(--muted); font-weight: 600; letter-spacing: 0.03em; }
+    .copy-btn { background: rgba(124,92,255,0.15); border: 1px solid rgba(124,92,255,0.35); border-radius: 7px; color: #a78bfa; padding: 0.3rem 0.85rem; font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+    .copy-btn:hover { background: rgba(124,92,255,0.28); }
+    .copy-btn.copied { background: rgba(0,232,122,0.12); border-color: var(--green); color: var(--green); }
 
-    /* ── Config output ── */
-    .config-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 0.5rem;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    .config-header span { font-size: 0.82rem; color: var(--muted); }
-    .copy-btn {
-      background: var(--purple);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      padding: 0.45rem 1rem;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-      white-space: nowrap;
-    }
-    .copy-btn:hover  { background: #6248e0; }
-    .copy-btn:active { transform: scale(0.97); }
-    .copy-btn.copied { background: var(--green); color: #0a0a0f; }
-
-    .code-box {
-      background: #080c14;
-      border: 1.5px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem 1.5rem;
-      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-      font-size: 0.82rem;
-      line-height: 1.8;
-      color: #e5e7eb;
-      white-space: pre;
-      overflow-x: auto;
-      margin-bottom: 1rem;
-    }
-    .code-box .k { color: var(--cyan); }
+    .code-box { background: #05080f; border: 1.5px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; font-size: 0.8rem; line-height: 1.85; color: #e5e7eb; white-space: pre; overflow-x: auto; margin-bottom: 1rem; }
+    .code-box .k { color: #93c5fd; }
     .code-box .v { color: var(--green); }
-    .code-box .c { color: #4b5563; }
+    .code-box .c { color: #374151; }
 
-    .warn-box {
-      background: #1a1200;
-      border: 1.5px solid #78450a;
-      border-radius: 10px;
-      padding: 0.9rem 1.1rem;
-      font-size: 0.85rem;
-      color: var(--warn);
-      margin-bottom: 1.5rem;
-      line-height: 1.5;
-    }
+    .warn-box { background: rgba(245,158,11,0.06); border: 1.5px solid rgba(245,158,11,0.22); border-radius: 10px; padding: 0.9rem 1.1rem; font-size: 0.82rem; color: var(--amber); margin-bottom: 1.5rem; line-height: 1.5; }
 
-    .deploy-btn {
-      display: block;
-      width: 100%;
-      background: linear-gradient(135deg, var(--green) 0%, var(--cyan) 100%);
-      color: #0a0a0f;
-      font-weight: 800;
-      font-size: 1.1rem;
-      border: none;
-      border-radius: 12px;
-      padding: 1rem 1.5rem;
-      cursor: pointer;
-      text-align: center;
-      text-decoration: none;
-      letter-spacing: 0.03em;
-      transition: opacity 0.2s, transform 0.1s;
-      box-shadow: 0 4px 24px rgba(0,255,136,0.2);
-    }
-    .deploy-btn:hover  { opacity: 0.9; }
-    .deploy-btn:active { transform: scale(0.99); }
+    .deploy-btn { display: block; width: 100%; background: linear-gradient(135deg, var(--amber), #f97316); color: #040810; font-weight: 800; font-size: 1rem; border: none; border-radius: 12px; padding: 1rem 1.5rem; cursor: pointer; text-align: center; letter-spacing: 0.02em; transition: opacity 0.2s; box-shadow: 0 4px 24px rgba(245,158,11,0.2); font-family: inherit; }
+    .deploy-btn:hover { opacity: 0.88; }
+    .deploy-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-    /* ── Nav buttons ── */
-    .nav-row {
-      display: flex;
-      gap: 0.75rem;
-      margin-top: 1.5rem;
-    }
-    .btn-back {
-      background: transparent;
-      border: 1.5px solid var(--border);
-      color: var(--muted);
-      border-radius: 10px;
-      padding: 0.7rem 1.4rem;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
+    .stop-btn { display: block; width: 100%; background: rgba(255,77,109,0.08); border: 1.5px solid rgba(255,77,109,0.3); color: var(--danger); font-weight: 700; font-size: 0.9rem; border-radius: 12px; padding: 0.85rem; cursor: pointer; text-align: center; font-family: inherit; transition: background 0.2s; margin-top: 0.75rem; }
+    .stop-btn:hover { background: rgba(255,77,109,0.16); }
+
+    .nav-row { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+    .btn-back { background: transparent; border: 1.5px solid var(--border); color: var(--muted); border-radius: 10px; padding: 0.7rem 1.4rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
     .btn-back:hover { border-color: var(--muted); color: var(--text); }
-    .btn-next {
-      flex: 1;
-      background: var(--green);
-      color: #0a0a0f;
-      border: none;
-      border-radius: 10px;
-      padding: 0.75rem 1.5rem;
-      font-size: 0.95rem;
-      font-weight: 800;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-      letter-spacing: 0.03em;
-    }
-    .btn-next:hover  { background: #00e67a; }
-    .btn-next:active { transform: scale(0.98); }
-    .btn-next:disabled {
-      background: var(--border);
-      color: var(--muted);
-      cursor: not-allowed;
-    }
+    .btn-next { flex: 1; background: var(--amber); color: #040810; border: none; border-radius: 10px; padding: 0.75rem 1.5rem; font-size: 0.9rem; font-weight: 800; cursor: pointer; transition: opacity 0.2s; letter-spacing: 0.02em; font-family: inherit; }
+    .btn-next:hover { opacity: 0.88; }
+    .btn-next:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; opacity: 1; }
 
-    /* ── Selection summary chips ── */
-    .summary-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
-    }
-    .chip {
-      background: #1a2235;
-      border: 1px solid var(--border);
-      border-radius: 99px;
-      padding: 0.25rem 0.8rem;
-      font-size: 0.75rem;
-      color: var(--cyan);
-      font-weight: 600;
-    }
+    .summary-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .chip { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); border-radius: 99px; padding: 0.25rem 0.75rem; font-size: 0.72rem; color: var(--amber); font-weight: 600; }
 
-    /* ── Mobile ── */
-    @media (max-width: 480px) {
-      .coin-grid { grid-template-columns: repeat(2, 1fr); }
+    .deploy-steps { background: rgba(255,255,255,.025); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; font-size: 0.82rem; line-height: 2.1; color: rgba(255,255,255,.4); margin-top: 1rem; }
+    .deploy-steps .ds-title { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,.2); margin-bottom: 12px; }
+    .deploy-steps .num { color: var(--amber); font-weight: 700; margin-right: 8px; }
+    .deploy-steps a { color: var(--amber); }
+    .deploy-steps strong { color: rgba(255,255,255,.6); }
+
+    @media (max-width: 520px) {
+      .coin-grid { grid-template-columns: repeat(2,1fr); }
       .risk-cards { grid-template-columns: 1fr; }
-      .tf-row { gap: 0.5rem; }
-      .tf-btn { padding: 0.65rem 1.1rem; font-size: 1rem; }
-      .code-box { font-size: 0.73rem; padding: 1rem; }
-      .header h1 { font-size: 1.5rem; }
+      .code-box { font-size: 0.72rem; padding: 1rem; }
+      .header h1 { font-size: 1.4rem; }
     }
   </style>
 </head>
 <body>
 
-<!-- Header -->
 <div class="header">
-  <div class="logo">⚡ APEX Trade Bot</div>
-  <h1>Bot Configuration Wizard</h1>
-  <p>Set up your trading bot in 5 easy steps — no code required.</p>
+  <div class="logo">APEX Trade Bot</div>
+  <h1>Setup Wizard</h1>
+  <p>Configurează-ți botul în 5 pași — fără cod necesar.</p>
 </div>
 
-<!-- Progress -->
 <div class="progress-wrap">
   <div class="progress-labels">
-    <div class="progress-label active" id="lbl-1">1. Coin</div>
-    <div class="progress-label" id="lbl-2">2. Risk</div>
-    <div class="progress-label" id="lbl-3">3. Strategy</div>
-    <div class="progress-label" id="lbl-4">4. Timeframe</div>
+    <div class="progress-label active" id="lbl-1">1. Strategie</div>
+    <div class="progress-label" id="lbl-2">2. Monedă</div>
+    <div class="progress-label" id="lbl-3">3. Risc</div>
+    <div class="progress-label" id="lbl-4">4. API Keys</div>
     <div class="progress-label" id="lbl-5">5. Config</div>
   </div>
   <div class="progress-track">
@@ -443,428 +154,402 @@
   </div>
 </div>
 
-<!-- Wizard -->
 <div class="wizard">
 
-  <!-- ── Step 1: Coin ── -->
+  <!-- Step 1: Strategy -->
   <div class="step active" id="step-1">
-    <div class="step-title">Choose Your Trading Coin</div>
-    <div class="step-sub">Select the cryptocurrency your bot will trade. You can change this later.</div>
-    <div class="coin-grid" id="coin-grid">
-      <!-- rendered by JS -->
-    </div>
+    <div class="step-title">Alege Strategia de Trading</div>
+    <div class="step-sub">Fiecare strategie are un comportament diferit. Alege una potrivită stilului tău de trading.</div>
+    <div class="strategy-cards" id="strategy-cards"></div>
     <div class="nav-row">
-      <button class="btn-next" id="next-1" onclick="goTo(2)" disabled>Next →</button>
+      <button class="btn-next" id="next-1" onclick="goTo(2)" disabled>Continuă →</button>
     </div>
   </div>
 
-  <!-- ── Step 2: Risk ── -->
+  <!-- Step 2: Coin -->
   <div class="step" id="step-2">
-    <div class="step-title">Choose Your Risk Level</div>
-    <div class="step-sub">This controls how much of your balance is risked per trade.</div>
-    <div class="risk-cards" id="risk-cards">
-      <!-- rendered by JS -->
-    </div>
+    <div class="step-title">Alege Moneda de Tranzacționat</div>
+    <div class="step-sub">Botul tău va tranzacționa exclusiv această pereche cu USDT pe Binance Spot.</div>
+    <div class="coin-grid" id="coin-grid"></div>
     <div class="nav-row">
-      <button class="btn-back" onclick="goTo(1)">← Back</button>
-      <button class="btn-next" id="next-2" onclick="goTo(3)" disabled>Next →</button>
+      <button class="btn-back" onclick="goTo(1)">← Înapoi</button>
+      <button class="btn-next" id="next-2" onclick="goTo(3)" disabled>Continuă →</button>
     </div>
   </div>
 
-  <!-- ── Step 3: Strategy ── -->
+  <!-- Step 3: Risk -->
   <div class="step" id="step-3">
-    <div class="step-title">Choose Your Strategies</div>
-    <div class="step-sub">All three strategies work together. Disable any you don't want active.</div>
-    <div class="strategy-list" id="strategy-list">
-      <!-- rendered by JS -->
-    </div>
+    <div class="step-title">Nivelul de Risc</div>
+    <div class="step-sub">Controlează câți USDT investești per tranzacție. Poți schimba oricând din variabile.</div>
+    <div class="risk-cards" id="risk-cards"></div>
     <div class="nav-row">
-      <button class="btn-back" onclick="goTo(2)">← Back</button>
-      <button class="btn-next" onclick="goTo(4)">Next →</button>
+      <button class="btn-back" onclick="goTo(2)">← Înapoi</button>
+      <button class="btn-next" id="next-3" onclick="goTo(4)" disabled>Continuă →</button>
     </div>
   </div>
 
-  <!-- ── Step 4: Timeframe ── -->
+  <!-- Step 4: API Keys + Telegram -->
   <div class="step" id="step-4">
-    <div class="step-title">Choose Your Timeframe</div>
-    <div class="step-sub">Controls how frequently your bot checks for trade signals.</div>
-    <div class="tf-row" id="tf-row">
-      <!-- rendered by JS -->
+    <div class="step-title">Chei API Binance</div>
+    <div class="step-sub">Botul are nevoie de cheile tale pentru a plasa ordine pe contul tău Binance.</div>
+
+    <div class="input-group">
+      <label class="input-label">Binance API Key <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
+      <input class="input-field" id="api-key" type="text" placeholder="Lipeste API Key-ul de pe Binance" autocomplete="off" oninput="onApiKeyInput()" />
+      <div class="input-hint">
+        Du-te la <a href="https://www.binance.com/en/my/settings/api-management" target="_blank">Binance → API Management</a> → Create API → copiază API Key
+      </div>
     </div>
-    <div class="tf-hint">
-      <strong style="color:var(--text)">5m</strong> = more trades, more risk &nbsp;|&nbsp;
-      <strong style="color:var(--green)">15m</strong> = balanced (recommended) &nbsp;|&nbsp;
-      <strong style="color:var(--text)">1h</strong> = fewer, calmer trades &nbsp;|&nbsp;
-      <strong style="color:var(--text)">4h</strong> = swing trading, very selective
+
+    <div class="input-group">
+      <label class="input-label">Binance Secret Key <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
+      <input class="input-field" id="api-secret" type="password" placeholder="Lipeste Secret Key-ul de pe Binance" autocomplete="off" oninput="onApiKeyInput()" />
+      <div class="input-hint">
+        Secretul apare <strong>o singură dată</strong> la creare. Activează permisiunea <strong>Spot &amp; Margin Trading</strong>. NU activa Withdrawals.
+      </div>
     </div>
+
+    <div class="telegram-box">
+      <div class="tb-title">Telegram — Notificări + Buton /stop</div>
+      <div class="tb-desc">
+        Opțional dar recomandat: primești un mesaj la fiecare tranzacție și poți opri botul din orice loc cu <code>/stop</code>.
+        Fără Telegram, poți opri botul din Railway Dashboard → Variables → schimbi STRATEGY la invalid.
+      </div>
+      <div class="input-group" style="margin-bottom:.75rem">
+        <label class="input-label">Telegram Bot Token <span class="opt">(opțional)</span></label>
+        <input class="input-field" id="tg-token" type="text" placeholder="123456:ABCdef..." />
+        <div class="input-hint">Deschide <a href="https://t.me/BotFather" target="_blank">@BotFather</a> → /newbot → copiază token-ul</div>
+      </div>
+      <div class="input-group" style="margin-bottom:0">
+        <label class="input-label">Telegram Chat ID <span class="opt">(opțional)</span></label>
+        <input class="input-field" id="tg-chat-id" type="text" placeholder="Ex: 123456789" />
+        <div class="input-hint">Trimite /start la <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> → copiază ID-ul</div>
+      </div>
+    </div>
+
     <div class="nav-row">
-      <button class="btn-back" onclick="goTo(3)">← Back</button>
-      <button class="btn-next" id="next-4" onclick="goTo(5)" disabled>Next →</button>
+      <button class="btn-back" onclick="goTo(3)">← Înapoi</button>
+      <button class="btn-next" id="next-4" onclick="goTo(5)" disabled>Generează Config →</button>
     </div>
   </div>
 
-  <!-- ── Step 5: Config ── -->
+  <!-- Step 5: Config + Download -->
   <div class="step" id="step-5">
-    <div class="step-title">Your Configuration</div>
-    <div class="step-sub">Download your bot and copy the environment variables below.</div>
+    <div class="step-title">Configurația Ta</div>
+    <div class="step-sub">Descarcă codul botului și copiază variabilele pe Railway.</div>
 
-    <!-- Summary chips -->
     <div class="summary-row" id="summary-chips"></div>
 
-    <!-- Download ZIP button -->
-    <button class="deploy-btn" id="download-btn" onclick="downloadBot()" style="background:linear-gradient(135deg,#f59e0b,#f97316);border:none;cursor:pointer;width:100%;font-family:inherit;margin-bottom:8px">
-      ⬇ Download Bot Code (ZIP)
+    <button class="deploy-btn" id="download-btn" onclick="downloadBot()">
+      Descarcă Bot Code (ZIP)
     </button>
-    <div style="font-size:11px;color:rgba(255,255,255,.3);text-align:center;margin-bottom:20px">Requires your license key · Source code + Railway config included</div>
+    <div style="font-size:11px;color:rgba(255,255,255,.22);text-align:center;margin-top:6px;margin-bottom:20px">
+      Cod sursă complet + railway.json · Licență: <span id="key-display">—</span>
+    </div>
 
-    <!-- Code box -->
     <div class="config-header">
-      <span>Environment Variables — add these to Railway</span>
-      <button class="copy-btn" id="copy-btn" onclick="copyVars()">📋 Copy All</button>
+      <span>ENVIRONMENT VARIABLES — ADAUGĂ ÎN RAILWAY</span>
+      <button class="copy-btn" id="copy-btn" onclick="copyVars()">Copiază Tot</button>
     </div>
     <div class="code-box" id="config-output"></div>
 
     <div class="warn-box">
-      ⚠️ <strong>Start with <code>PAPER_TRADING=true</code></strong> to test without real money first! Only set it to <code>false</code> once you're confident the bot is working correctly.
+      Setează <strong>TESTNET=true</strong> prima dată să testezi fără bani reali. Schimbă în <strong>false</strong> abia după ce verifici că funcționează.
     </div>
 
-    <!-- Deploy steps -->
-    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;margin-top:4px;font-size:13px;line-height:2.1;color:rgba(255,255,255,.5)">
-      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:14px">How to deploy on Railway (free)</div>
-      <div><span style="color:#f59e0b;font-weight:700;margin-right:8px">1.</span>Download the ZIP above and extract it</div>
-      <div><span style="color:#f59e0b;font-weight:700;margin-right:8px">2.</span>Go to <a href="https://railway.app" target="_blank" style="color:#f59e0b">railway.app</a> → New Project → <strong style="color:rgba(255,255,255,.7)">Deploy from local folder</strong></div>
-      <div><span style="color:#f59e0b;font-weight:700;margin-right:8px">3.</span>Upload the extracted folder</div>
-      <div><span style="color:#f59e0b;font-weight:700;margin-right:8px">4.</span>Go to <strong style="color:rgba(255,255,255,.7)">Variables</strong> tab → paste env vars from above</div>
-      <div><span style="color:#f59e0b;font-weight:700;margin-right:8px">5.</span>Railway deploys automatically → bot is live ✓</div>
+    <div class="deploy-steps">
+      <div class="ds-title">Cum Deployezi pe Railway — Gratuit</div>
+      <div><span class="num">1.</span>Click butonul portocaliu de mai sus → descarci ZIP-ul</div>
+      <div><span class="num">2.</span>Dezarhivezi pe calculator</div>
+      <div><span class="num">3.</span>Du-te la <a href="https://railway.app" target="_blank">railway.app</a> → New Project → <strong>Deploy from local folder</strong></div>
+      <div><span class="num">4.</span>Selectezi folderul dezarhivat și uploadezi</div>
+      <div><span class="num">5.</span>Tab-ul <strong>Variables</strong> → lipești variabilele de mai sus</div>
+      <div><span class="num">6.</span>Deploy automat → botul pornește și îți trimite mesaj pe Telegram</div>
     </div>
 
-    <div class="nav-row" style="margin-top:1.25rem;">
-      <button class="btn-back" onclick="goTo(4)">← Back</button>
+    <div id="stop-section" style="display:none;margin-top:1.5rem">
+      <button class="stop-btn" onclick="emergencyStop()">
+        Opreste Botul de Urgenta (HTTP)
+      </button>
+      <div style="font-size:11px;color:rgba(255,77,109,.35);text-align:center;margin-top:6px">
+        Sau trimite /stop în chat-ul cu botul tău Telegram
+      </div>
+    </div>
+
+    <div class="nav-row" style="margin-top:1.25rem">
+      <button class="btn-back" onclick="goTo(4)">← Înapoi</button>
     </div>
   </div>
 
-</div><!-- /wizard -->
+</div>
 
 <script>
-/* ─────────────────── Data ─────────────────── */
+const STRATEGIES = [
+  {
+    id: 'dca', name: 'DCA — Dollar Cost Averaging',
+    desc: 'Cumperi o sumă fixă la fiecare X ore, indiferent de preț. Vinzi când atingi profit target.',
+    risk: 'low', riskLabel: 'Risc scăzut', detail: 'Recomandat pentru începători',
+    tp: 3, sl: 2, interval: '4h',
+  },
+  {
+    id: 'grid', name: 'Grid Trading',
+    desc: 'Plasezi ordine de cumpărare și vânzare la intervale de preț fixe. Câștigi din fiecare oscilație.',
+    risk: 'medium', riskLabel: 'Risc mediu', detail: 'Ideal pentru piețe laterale (sideways)',
+    tp: 2, sl: 3, interval: '15m',
+  },
+  {
+    id: 'scalping', name: 'Scalping — RSI + EMA',
+    desc: 'Tranzacții rapide pe candele de 5 minute. Intri la RSI oversold + EMA crossover.',
+    risk: 'high', riskLabel: 'Risc ridicat', detail: 'Mai multe tranzacții zilnic, necesită monitorizare',
+    tp: 1.5, sl: 1, interval: '5m',
+  },
+  {
+    id: 'trend', name: 'Trend Following — EMA 20/50',
+    desc: 'Urmărești trendul major pe 1 oră. Cumperi la golden cross, vinzi la death cross + RSI.',
+    risk: 'medium', riskLabel: 'Risc mediu', detail: 'Puține tranzacții, profit mai mare per trade',
+    tp: 6, sl: 2.5, interval: '1h',
+  },
+];
+
 const COINS = [
-  { sym: 'XRPUSDT',  name: 'XRP',  emoji: '🔵', tag: 'High Velocity' },
-  { sym: 'DOGEUSDT', name: 'DOGE', emoji: '🐕', tag: 'Volatile'      },
-  { sym: 'ADAUSDT',  name: 'ADA',  emoji: '💙', tag: 'Stable'        },
-  { sym: 'BTCUSDT',  name: 'BTC',  emoji: '🟡', tag: 'Market Leader' },
-  { sym: 'ETHUSDT',  name: 'ETH',  emoji: '🔷', tag: 'DeFi Leader'   },
-  { sym: 'SOLUSDT',  name: 'SOL',  emoji: '🟣', tag: 'High Growth'   },
-  { sym: 'BNBUSDT',  name: 'BNB',  emoji: '🟡', tag: 'Exchange Coin' },
-  { sym: 'TRXUSDT',  name: 'TRX',  emoji: '🔴', tag: 'Stable'        },
+  { sym: 'BTCUSDT',  name: 'Bitcoin',  icon: '₿',  tag: 'Cel mai lichid'  },
+  { sym: 'ETHUSDT',  name: 'Ethereum', icon: 'Ξ',  tag: 'DeFi Leader'     },
+  { sym: 'SOLUSDT',  name: 'Solana',   icon: '◎',  tag: 'High Growth'     },
+  { sym: 'XRPUSDT',  name: 'XRP',      icon: '✕',  tag: 'High Velocity'   },
+  { sym: 'ADAUSDT',  name: 'Cardano',  icon: '₳',  tag: 'Stable'          },
+  { sym: 'BNBUSDT',  name: 'BNB',      icon: 'B',  tag: 'Exchange Coin'   },
+  { sym: 'DOGEUSDT', name: 'DOGE',     icon: 'Ð',  tag: 'Meme Coin'       },
+  { sym: 'TRXUSDT',  name: 'TRON',     icon: '⟡', tag: 'Low Fee'         },
 ];
 
 const RISKS = [
-  {
-    id: 'conservative',
-    icon: '🛡️',
-    name: 'Conservative',
-    desc: '1% per trade, tight stop-loss. Best for beginners.',
-    risk: 0.01, sl: 0.010, tp: 0.02,
-  },
-  {
-    id: 'balanced',
-    icon: '⚖️',
-    name: 'Balanced',
-    desc: '2% per trade, moderate risk. Most popular.',
-    risk: 0.02, sl: 0.015, tp: 0.03,
-  },
-  {
-    id: 'aggressive',
-    icon: '🔥',
-    name: 'Aggressive',
-    desc: '5% per trade, wide stops. For experienced traders only.',
-    risk: 0.05, sl: 0.025, tp: 0.05,
-  },
+  { id: 'conservative', icon: '🛡', name: 'Conservator', desc: '$20 per tranzacție. Ideal pentru start cu risc mic.', orderAmt: 20  },
+  { id: 'balanced',     icon: '⚖', name: 'Echilibrat',  desc: '$50 per tranzacție. Cel mai popular.', orderAmt: 50 },
+  { id: 'aggressive',   icon: '🔥', name: 'Agresiv',     desc: '$100+ per tranzacție. Risc ridicat, profit potențial mai mare.', orderAmt: 100 },
 ];
 
-const STRATEGIES = [
-  { id: 'turtle',   emoji: '🐢', name: 'Turtle Trading',    desc: 'Breakout-based entries',         key: 'USE_TURTLE'   },
-  { id: 'livermore',emoji: '📐', name: 'Jesse Livermore',   desc: 'Trend structure analysis',       key: 'USE_LIVERMORE'},
-  { id: 'soros',    emoji: '💡', name: 'George Soros',      desc: 'Momentum / reflexivity trading', key: 'USE_SOROS'    },
-];
-
-const TIMEFRAMES = ['5m', '15m', '1h', '4h'];
-
-/* ─────────────────── State ─────────────────── */
 const state = {
   licenseKey: 'APEX-XXXX-XXXX-XXXX',
-  coin: null,
-  risk: null,
-  strategies: { turtle: true, livermore: true, soros: true },
-  timeframe: '15m',
+  strategy: null, coin: null, risk: null,
+  apiKey: '', apiSecret: '', telegramToken: '', telegramChatId: '',
   currentStep: 1,
 };
 
-/* ─────────────────── Init ─────────────────── */
 (function init() {
-  // Read license key from URL
-  const params = new URLSearchParams(window.location.search);
-  const key = params.get('key');
-  if (key && /^APEX-/i.test(key)) {
-    state.licenseKey = key.toUpperCase();
-  }
-
+  const key = new URLSearchParams(window.location.search).get('key');
+  if (key && /^APEX-/i.test(key)) state.licenseKey = key.toUpperCase();
+  renderStrategies();
   renderCoins();
   renderRisks();
-  renderStrategies();
-  renderTimeframes();
 })();
 
-/* ─────────────────── Renderers ─────────────────── */
+function renderStrategies() {
+  document.getElementById('strategy-cards').innerHTML = STRATEGIES.map(s => `
+    <div class="strategy-card" data-id="${s.id}" onclick="selectStrategy('${s.id}')">
+      <div class="sc-radio" id="radio-${s.id}"></div>
+      <div class="sc-body">
+        <div class="sc-name">${s.name}</div>
+        <div class="sc-desc">${s.desc}</div>
+        <span class="sc-badge ${s.risk}">${s.riskLabel} &nbsp;·&nbsp; ${s.detail}</span>
+      </div>
+    </div>`).join('');
+}
+
 function renderCoins() {
-  const grid = document.getElementById('coin-grid');
-  grid.innerHTML = COINS.map(c => `
+  document.getElementById('coin-grid').innerHTML = COINS.map(c => `
     <button class="coin-btn" data-sym="${c.sym}" onclick="selectCoin('${c.sym}')">
-      <span class="coin-emoji">${c.emoji}</span>
+      <span class="coin-icon">${c.icon}</span>
       <div class="coin-name">${c.name}</div>
       <div class="coin-sym">${c.sym}</div>
       <div class="coin-tag">${c.tag}</div>
-    </button>
-  `).join('');
+    </button>`).join('');
 }
 
 function renderRisks() {
-  const wrap = document.getElementById('risk-cards');
-  wrap.innerHTML = RISKS.map(r => `
+  document.getElementById('risk-cards').innerHTML = RISKS.map(r => `
     <div class="risk-card" data-id="${r.id}" onclick="selectRisk('${r.id}')">
       <span class="risk-icon">${r.icon}</span>
       <div class="risk-name">${r.name}</div>
       <div class="risk-desc">${r.desc}</div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-function renderStrategies() {
-  const list = document.getElementById('strategy-list');
-  list.innerHTML = STRATEGIES.map(s => `
-    <div class="strategy-row on" id="strat-row-${s.id}" onclick="toggleStrategy('${s.id}')">
-      <div class="strategy-info">
-        <div class="strategy-name">${s.emoji} ${s.name}</div>
-        <div class="strategy-desc">${s.desc}</div>
-      </div>
-      <label class="toggle" onclick="event.stopPropagation()">
-        <input type="checkbox" id="toggle-${s.id}" checked onchange="toggleStrategy('${s.id}')">
-        <span class="toggle-track"></span>
-      </label>
-    </div>
-  `).join('');
-}
-
-function renderTimeframes() {
-  const row = document.getElementById('tf-row');
-  row.innerHTML = TIMEFRAMES.map(tf => `
-    <button class="tf-btn${tf === state.timeframe ? ' selected' : ''}"
-            data-tf="${tf}" onclick="selectTF('${tf}')">${tf}</button>
-  `).join('');
-  // default is already 15m, enable next
-  document.getElementById('next-4').disabled = false;
-}
-
-/* ─────────────────── Selection handlers ─────────────────── */
-function selectCoin(sym) {
-  state.coin = sym;
-  document.querySelectorAll('.coin-btn').forEach(b => {
-    b.classList.toggle('selected', b.dataset.sym === sym);
-  });
+function selectStrategy(id) {
+  state.strategy = id;
+  document.querySelectorAll('.strategy-card').forEach(c => c.classList.toggle('selected', c.dataset.id === id));
   document.getElementById('next-1').disabled = false;
 }
-
-function selectRisk(id) {
-  state.risk = id;
-  document.querySelectorAll('.risk-card').forEach(c => {
-    c.classList.toggle('selected', c.dataset.id === id);
-  });
+function selectCoin(sym) {
+  state.coin = sym;
+  document.querySelectorAll('.coin-btn').forEach(b => b.classList.toggle('selected', b.dataset.sym === sym));
   document.getElementById('next-2').disabled = false;
 }
-
-function toggleStrategy(id) {
-  state.strategies[id] = !state.strategies[id];
-  const cb  = document.getElementById('toggle-' + id);
-  const row = document.getElementById('strat-row-' + id);
-  cb.checked = state.strategies[id];
-  row.classList.toggle('on', state.strategies[id]);
+function selectRisk(id) {
+  state.risk = id;
+  document.querySelectorAll('.risk-card').forEach(c => c.classList.toggle('selected', c.dataset.id === id));
+  document.getElementById('next-3').disabled = false;
+}
+function onApiKeyInput() {
+  state.apiKey    = document.getElementById('api-key').value.trim();
+  state.apiSecret = document.getElementById('api-secret').value.trim();
+  document.getElementById('next-4').disabled = !(state.apiKey && state.apiSecret);
 }
 
-function selectTF(tf) {
-  state.timeframe = tf;
-  document.querySelectorAll('.tf-btn').forEach(b => {
-    b.classList.toggle('selected', b.dataset.tf === tf);
-  });
-  document.getElementById('next-4').disabled = false;
-}
-
-/* ─────────────────── Navigation ─────────────────── */
 function goTo(n) {
   document.getElementById('step-' + state.currentStep).classList.remove('active');
   state.currentStep = n;
   document.getElementById('step-' + n).classList.add('active');
-  updateProgress(n);
+  document.getElementById('progress-fill').style.width = (n / 5 * 100) + '%';
+  for (let i = 1; i <= 5; i++) {
+    document.getElementById('lbl-' + i).className = 'progress-label' + (i === n ? ' active' : i < n ? ' done' : '');
+  }
   if (n === 5) buildConfig();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function updateProgress(step) {
-  const pct = (step / 5) * 100;
-  document.getElementById('progress-fill').style.width = pct + '%';
-  for (let i = 1; i <= 5; i++) {
-    const lbl = document.getElementById('lbl-' + i);
-    lbl.className = 'progress-label' +
-      (i === step ? ' active' : i < step ? ' done' : '');
-  }
-}
-
-/* ─────────────────── Config builder ─────────────────── */
 function buildConfig() {
-  const riskData = RISKS.find(r => r.id === state.risk) || RISKS[1];
-  const coin     = state.coin || 'XRPUSDT';
-  const tf       = state.timeframe;
+  state.telegramToken  = document.getElementById('tg-token').value.trim();
+  state.telegramChatId = document.getElementById('tg-chat-id').value.trim();
 
-  // Summary chips
-  const coinInfo = COINS.find(c => c.sym === coin) || COINS[0];
-  const chips = document.getElementById('summary-chips');
-  chips.innerHTML = `
-    <span class="chip">${coinInfo.emoji} ${coinInfo.name}</span>
-    <span class="chip">${RISKS.find(r=>r.id===state.risk)?.icon || '⚖️'} ${state.risk ? state.risk.charAt(0).toUpperCase()+state.risk.slice(1) : 'Balanced'}</span>
-    <span class="chip">⏱ ${tf}</span>
-    ${Object.entries(state.strategies).filter(([,v])=>v).map(([k])=>{
-      const s = STRATEGIES.find(s=>s.id===k);
-      return `<span class="chip">${s.emoji} ${s.name.split(' ')[0]}</span>`;
-    }).join('')}
-  `;
+  const strat  = STRATEGIES.find(s => s.id === state.strategy) || STRATEGIES[0];
+  const risk   = RISKS.find(r => r.id === state.risk) || RISKS[1];
+  const symbol = state.coin || 'BTCUSDT';
 
-  // Build env var text (plain, for copy)
-  const vars = buildVarsPlain(riskData, coin, tf);
-  window._configPlain = vars;
+  document.getElementById('summary-chips').innerHTML = [
+    `<span class="chip">${strat.name.split('—')[0].trim()}</span>`,
+    `<span class="chip">${symbol}</span>`,
+    `<span class="chip">${risk.name} ($${risk.orderAmt})</span>`,
+    state.telegramToken ? `<span class="chip">Telegram activ</span>` : '',
+  ].join('');
 
-  // Build highlighted HTML
-  document.getElementById('config-output').innerHTML = buildVarsHTML(riskData, coin, tf);
+  document.getElementById('key-display').textContent = state.licenseKey.slice(0, 11) + '...';
+
+  window._configPlain = buildVarsPlain(strat, risk, symbol);
+  document.getElementById('config-output').innerHTML = buildVarsHTML(strat, risk, symbol);
+  document.getElementById('stop-section').style.display = state.apiKey ? 'block' : 'none';
 }
 
-function buildVarsPlain(riskData, coin, tf) {
-  const lines = [
-    `LICENSE_KEY=${state.licenseKey}`,
-    `SYMBOL=${coin}`,
-    `RISK_PER_TRADE=${riskData.risk}`,
-    `STOP_LOSS_PCT=${riskData.sl}`,
-    `TAKE_PROFIT_PCT=${riskData.tp}`,
-    `TIMEFRAME=${tf}`,
-    `PAPER_TRADING=true`,
-    `EXCHANGE=bybit`,
-    ``,
-    `# Strategy flags`,
-    `USE_TURTLE=${state.strategies.turtle ? 'true' : 'false'}`,
-    `USE_LIVERMORE=${state.strategies.livermore ? 'true' : 'false'}`,
-    `USE_SOROS=${state.strategies.soros ? 'true' : 'false'}`,
-    ``,
-    `# API Keys — fill these in`,
-    `GROQ_API_KEY=get-free-at-console.groq.com`,
-    `BYBIT_API_KEY=your-bybit-api-key`,
-    `BYBIT_API_SECRET=your-bybit-api-secret`,
-    ``,
-    `# Optional Telegram alerts`,
-    `TELEGRAM_BOT_TOKEN=optional`,
-    `TELEGRAM_CHAT_ID=optional`,
-  ];
-  return lines.join('\n');
-}
-
-function buildVarsHTML(riskData, coin, tf) {
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const kv  = (k, v) => `<span class="k">${esc(k)}</span>=<span class="v">${esc(v)}</span>`;
-  const cm  = t => `<span class="c">${esc(t)}</span>`;
-
+function buildVarsPlain(strat, risk, symbol) {
+  const t  = state.telegramToken  || 'optional';
+  const tc = state.telegramChatId || 'optional';
   return [
-    kv('LICENSE_KEY', state.licenseKey),
-    kv('SYMBOL', coin),
-    kv('RISK_PER_TRADE', String(riskData.risk)),
-    kv('STOP_LOSS_PCT', String(riskData.sl)),
-    kv('TAKE_PROFIT_PCT', String(riskData.tp)),
-    kv('TIMEFRAME', tf),
-    kv('PAPER_TRADING', 'true'),
-    kv('EXCHANGE', 'bybit'),
-    '',
-    cm('# Strategy flags'),
-    kv('USE_TURTLE', state.strategies.turtle ? 'true' : 'false'),
-    kv('USE_LIVERMORE', state.strategies.livermore ? 'true' : 'false'),
-    kv('USE_SOROS', state.strategies.soros ? 'true' : 'false'),
-    '',
-    cm('# API Keys — fill these in'),
-    kv('GROQ_API_KEY', 'get-free-at-console.groq.com'),
-    kv('BYBIT_API_KEY', 'your-bybit-api-key'),
-    kv('BYBIT_API_SECRET', 'your-bybit-api-secret'),
-    '',
-    cm('# Optional Telegram alerts'),
-    kv('TELEGRAM_BOT_TOKEN', 'optional'),
-    kv('TELEGRAM_CHAT_ID', 'optional'),
+    `# Bot Configuration`,
+    `STRATEGY=${strat.id}`,
+    `TRADING_SYMBOL=${symbol}`,
+    `ORDER_AMOUNT_USDT=${risk.orderAmt}`,
+    `TAKE_PROFIT_PCT=${strat.tp}`,
+    `STOP_LOSS_PCT=${strat.sl}`,
+    `TIMEFRAME=${strat.interval}`,
+    ``,
+    `# DCA Strategy`,
+    `DCA_INTERVAL_HOURS=4`,
+    `DCA_MAX_ORDERS=10`,
+    ``,
+    `# Grid Strategy`,
+    `GRID_LEVELS=10`,
+    `INVESTMENT_USDT=${risk.orderAmt * 2}`,
+    `# GRID_LOWER_PRICE=`,
+    `# GRID_UPPER_PRICE=`,
+    ``,
+    `# Binance API`,
+    `BINANCE_API_KEY=${state.apiKey || 'YOUR_API_KEY'}`,
+    `BINANCE_API_SECRET=${state.apiSecret || 'YOUR_API_SECRET'}`,
+    `TESTNET=true`,
+    ``,
+    `# Telegram`,
+    `TELEGRAM_BOT_TOKEN=${t}`,
+    `TELEGRAM_CHAT_ID=${tc}`,
+    ``,
+    `# License`,
+    `LICENSE_KEY=${state.licenseKey}`,
   ].join('\n');
 }
 
-/* ─────────────────── Copy ─────────────────── */
+function buildVarsHTML(strat, risk, symbol) {
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const kv  = (k, v) => `<span class="k">${esc(k)}</span>=<span class="v">${esc(v)}</span>`;
+  const cm  = t => `<span class="c">${esc(t)}</span>`;
+  const t   = state.telegramToken  || 'optional';
+  const tc  = state.telegramChatId || 'optional';
+  const secretDisplay = state.apiSecret ? '•'.repeat(Math.min(state.apiSecret.length, 20)) : 'YOUR_API_SECRET';
+
+  return [
+    cm('# Bot Configuration'),
+    kv('STRATEGY', strat.id),
+    kv('TRADING_SYMBOL', symbol),
+    kv('ORDER_AMOUNT_USDT', String(risk.orderAmt)),
+    kv('TAKE_PROFIT_PCT', String(strat.tp)),
+    kv('STOP_LOSS_PCT', String(strat.sl)),
+    kv('TIMEFRAME', strat.interval),
+    '',
+    cm('# DCA Strategy'),
+    kv('DCA_INTERVAL_HOURS', '4'),
+    kv('DCA_MAX_ORDERS', '10'),
+    '',
+    cm('# Grid Strategy'),
+    kv('GRID_LEVELS', '10'),
+    kv('INVESTMENT_USDT', String(risk.orderAmt * 2)),
+    cm('# GRID_LOWER_PRICE=  ← auto-calculat dacă lipsește'),
+    cm('# GRID_UPPER_PRICE=  ← auto-calculat dacă lipsește'),
+    '',
+    cm('# Binance API'),
+    kv('BINANCE_API_KEY', state.apiKey || 'YOUR_API_KEY'),
+    kv('BINANCE_API_SECRET', secretDisplay),
+    kv('TESTNET', 'true'),
+    '',
+    cm('# Telegram'),
+    kv('TELEGRAM_BOT_TOKEN', t),
+    kv('TELEGRAM_CHAT_ID', tc),
+    '',
+    cm('# License'),
+    kv('LICENSE_KEY', state.licenseKey),
+  ].join('\n');
+}
+
 function downloadBot() {
   const key = state.licenseKey;
-  if (!key || key === 'APEX-XXXX-XXXX-XXXX') {
-    alert('No license key found. Please restart from the beginning.');
-    return;
-  }
+  if (!key || key === 'APEX-XXXX-XXXX-XXXX') { alert('Cheie de licență lipsă. Revino de la start.'); return; }
   const btn = document.getElementById('download-btn');
-  btn.textContent = '⏳ Preparing download...';
+  btn.textContent = 'Se pregătește descărcarea...';
   btn.disabled = true;
-  const url = '/bot-access?key=' + encodeURIComponent(key);
-  fetch(url)
-    .then(r => {
-      if (!r.ok) return r.text().then(t => { throw new Error(t); });
-      return r.blob();
-    })
+  fetch('/bot-access?key=' + encodeURIComponent(key))
+    .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t); }); return r.blob(); })
     .then(blob => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'apex-trade-bot.zip';
       a.click();
-      btn.textContent = '✅ Downloaded!';
-      setTimeout(() => {
-        btn.textContent = '⬇ Download Bot Code (ZIP)';
-        btn.disabled = false;
-      }, 3000);
+      btn.textContent = 'Descărcat cu succes!';
+      setTimeout(() => { btn.textContent = 'Descarcă Bot Code (ZIP)'; btn.disabled = false; }, 3000);
     })
     .catch(err => {
-      btn.textContent = '⬇ Download Bot Code (ZIP)';
+      btn.textContent = 'Descarcă Bot Code (ZIP)';
       btn.disabled = false;
-      alert('Download failed: ' + err.message + '\n\nMake sure your license key is valid.');
+      alert('Eroare la descărcare: ' + err.message);
     });
 }
 
 function copyVars() {
   const text = window._configPlain || '';
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.getElementById('copy-btn');
-    btn.textContent = '✅ Copied!';
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.textContent = '📋 Copy All Variables';
-      btn.classList.remove('copied');
-    }, 2000);
-  }).catch(() => {
-    // fallback
+  const btn = document.getElementById('copy-btn');
+  const done = () => { btn.textContent = 'Copiat!'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = 'Copiază Tot'; btn.classList.remove('copied'); }, 2000); };
+  navigator.clipboard.writeText(text).then(done).catch(() => {
     const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;opacity:0;';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    const btn = document.getElementById('copy-btn');
-    btn.textContent = '✅ Copied!';
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.textContent = '📋 Copy All Variables';
-      btn.classList.remove('copied');
-    }, 2000);
+    ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); done();
   });
+}
+
+async function emergencyStop() {
+  if (!confirm('Oprești botul? Toate ordinele deschise vor fi anulate.')) return;
+  try {
+    const res = await fetch('/bot/stop', { method: 'POST' });
+    const data = await res.json();
+    alert(data.message || 'Bot oprit.');
+  } catch {
+    alert('Nu s-a putut contacta serverul. Trimite /stop în Telegram sau oprește Railway din dashboard.');
+  }
 }
 </script>
 </body>
