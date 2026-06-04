@@ -81,44 +81,45 @@ nav.on{background:rgba(5,8,20,.97);border-color:var(--br);backdrop-filter:blur(2
 @media(max-width:900px){.hero{grid-template-columns:1fr;text-align:center;padding:100px 24px 60px}.hr{display:none}.hbtns,.pills{justify-content:center}}
 
 /* PROOF BAR */
-.proof{border-top:1px solid var(--br);border-bottom:1px solid var(--br);padding:22px 40px;background:rgba(255,255,255,.02);position:relative;z-index:1}
-.proof-in{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:48px;flex-wrap:wrap}
-.pi{display:flex;flex-direction:column;align-items:center;gap:3px}
-.pn{font-size:22px;font-weight:700;color:var(--t);letter-spacing:-.5px;line-height:1}
-.ps{font-size:11px;color:var(--t3);font-weight:500;letter-spacing:.5px}
-.psep{width:1px;height:32px;background:var(--br)}
-@media(max-width:600px){.psep{display:none}.proof-in{gap:24px}}
+.proof{border-top:1px solid var(--br);border-bottom:1px solid var(--br);padding:20px 24px;background:rgba(255,255,255,.02);position:relative;z-index:1}
+.proof-in{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);align-items:center}
+.pi{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 8px}
+.pi+.pi{border-left:1px solid var(--br)}
+.pn{font-size:18px;font-weight:700;color:var(--t);letter-spacing:-.5px;line-height:1}
+.ps{font-size:10px;color:var(--t3);font-weight:500;letter-spacing:.5px}
+.psep{display:none}
+@media(max-width:600px){.proof-in{grid-template-columns:repeat(3,1fr)}.proof-in .pi:nth-child(4),.proof-in .pi:nth-child(5){display:none}}
 
 /* SECTIONS */
-.sec{padding:96px 40px;position:relative;z-index:1}
+.sec{padding:88px 40px;position:relative;z-index:1}
 .si{max-width:1100px;margin:0 auto}
 .stag{font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--a);margin-bottom:14px;display:block}
-.sh{font-size:clamp(24px,3vw,40px);font-weight:700;letter-spacing:-.5px;line-height:1.15;margin-bottom:14px}
+.sh{font-size:clamp(24px,3vw,40px);font-weight:700;letter-spacing:-.5px;line-height:1.15;margin-bottom:12px}
 .sub{font-size:16px;color:var(--t2);line-height:1.8;max-width:460px;font-weight:300}
-@media(max-width:480px){.sec{padding:72px 20px}}
+@media(max-width:480px){.sec{padding:64px 20px}}
 
 /* STEPS */
 #how{background:linear-gradient(180deg,var(--bg),var(--bg2))}
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:52px}
-.step{background:var(--card);border:1px solid var(--br);border-radius:14px;padding:28px 24px;transition:border-color .25s,transform .25s;cursor:default}
-.step:hover{border-color:rgba(245,158,11,.22);transform:translateY(-4px)}
-.snum{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--a);opacity:.7;margin-bottom:16px;display:block;text-transform:uppercase}
-.sico{width:40px;height:40px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;border-radius:10px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.18)}
-.sico svg{width:20px;height:20px;stroke:var(--a);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.stit{font-size:16px;font-weight:600;color:var(--t);margin-bottom:8px;letter-spacing:-.2px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:40px;background:var(--br);border:1px solid var(--br);border-radius:12px;overflow:hidden}
+.step{background:var(--bg);padding:32px 28px;transition:background .2s;cursor:default}
+.step:hover{background:var(--card)}
+.snum{font-size:42px;font-weight:700;color:var(--a);opacity:.18;display:block;line-height:1;margin-bottom:20px;letter-spacing:-2px}
+.stit{font-size:16px;font-weight:600;color:var(--t);margin-bottom:10px;letter-spacing:-.2px}
 .sdesc{font-size:14px;color:var(--t2);line-height:1.75}
-@media(max-width:768px){.steps{grid-template-columns:1fr;gap:10px}}
+@media(max-width:768px){.steps{grid-template-columns:1fr}.step{border-bottom:1px solid var(--br)}.step:last-child{border-bottom:none}}
+.sico{display:none}
 
 /* FEATURES */
-.chk{margin-top:44px;max-width:700px;display:flex;flex-direction:column}
-.ci{display:flex;align-items:flex-start;gap:14px;padding:16px 0;border-bottom:1px solid var(--br);font-size:15px;color:var(--t2);line-height:1.5}
-.ci:last-child{border-bottom:none}
-.ci strong{color:var(--t);font-weight:600}
+.chk{margin-top:36px;display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--br);border-radius:12px;overflow:hidden;background:var(--br)}
+.ci{display:flex;align-items:center;gap:12px;padding:18px 20px;background:var(--bg);font-size:14px;color:var(--t2);transition:background .2s}
+.ci:hover{background:var(--card)}
+.ci strong{color:var(--t);font-weight:600;white-space:nowrap}
 .ck{flex-shrink:0}
+@media(max-width:600px){.chk{grid-template-columns:1fr}}
 
 /* PRICING */
 #pricing{background:var(--bg2);text-align:center}
-.pcw{max-width:500px;margin:52px auto 0;background:var(--card);border:1px solid var(--br2);border-radius:20px;overflow:hidden;box-shadow:0 0 80px rgba(245,158,11,.07),0 40px 100px rgba(0,0,0,.5)}
+.pcw{max-width:500px;margin:28px auto 0;background:var(--card);border:1px solid var(--br2);border-radius:20px;overflow:hidden;box-shadow:0 0 80px rgba(245,158,11,.07),0 40px 100px rgba(0,0,0,.5)}
 .pct{border-top:2px solid var(--a);padding:36px 36px 28px;background:rgba(245,158,11,.03)}
 .pcl{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--a);margin-bottom:10px}
 .pctag{display:inline-block;background:#ef4444;color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:3px;letter-spacing:1px;text-transform:uppercase;margin-left:8px;vertical-align:middle}
@@ -138,7 +139,7 @@ nav.on{background:rgba(5,8,20,.97);border-color:var(--br);backdrop-filter:blur(2
 /* FAQ */
 #faq{border-top:1px solid var(--br)}
 .faqi{max-width:680px}
-.fqlist{margin-top:44px}
+.fqlist{margin-top:24px}
 .fqi{border-bottom:1px solid var(--br)}
 .fqq{display:flex;align-items:center;justify-content:space-between;padding:20px 0;cursor:pointer;font-size:15px;font-weight:500;color:var(--t2);gap:16px;transition:color .2s;user-select:none;min-height:44px}
 .fqq:hover,.fqi.open .fqq{color:var(--t)}
@@ -192,9 +193,8 @@ footer{border-top:1px solid var(--br);padding:32px 40px}
     </div>
     <div class="pills">
       <span class="pill"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Stripe Secure</span>
-      <span class="pill"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Full Source Code</span>
-      <span class="pill"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>1-Click Deploy</span>
       <span class="pill"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>No Monthly Fees</span>
+      <span class="pill"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Full Source Code</span>
     </div>
   </div>
   <div class="hr">
@@ -243,22 +243,19 @@ footer{border-top:1px solid var(--br);padding:32px 40px}
     <p class="sub rev">No trading experience needed. No monthly subscription. You own everything.</p>
     <div class="steps">
       <div class="step rev">
-        <span class="snum">Step 01</span>
-        <div class="sico"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>
+        <span class="snum">01</span>
         <div class="stit">Buy Once</div>
-        <div class="sdesc">Pay $297 one-time and receive your license key instantly by email. No subscriptions, no recurring fees — ever.</div>
+        <div class="sdesc">Pay $297 once. Receive your license key by email instantly. No subscriptions, no recurring fees — ever.</div>
       </div>
       <div class="step rev d1">
-        <span class="snum">Step 02</span>
-        <div class="sico" style="background:rgba(96,165,250,.1);border-color:rgba(96,165,250,.2)"><svg viewBox="0 0 24 24" style="stroke:var(--b)"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg></div>
-        <div class="stit">Configure Your Bot</div>
-        <div class="sdesc">Choose your coin, risk level, and strategy via simple env variables — no coding required. Turtle, Livermore, or Soros.</div>
+        <span class="snum">02</span>
+        <div class="stit">Configure</div>
+        <div class="sdesc">Choose your coin and strategy in Railway env variables. Turtle, Livermore, or Soros — no coding needed.</div>
       </div>
       <div class="step rev d2">
-        <span class="snum">Step 03</span>
-        <div class="sico" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.2)"><svg viewBox="0 0 24 24" style="stroke:var(--g)"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+        <span class="snum">03</span>
         <div class="stit">Deploy &amp; Earn</div>
-        <div class="sdesc">Click Deploy on Railway. The bot goes live in seconds and runs 24/7 — scanning markets, executing trades, sending Telegram alerts.</div>
+        <div class="sdesc">One click on Railway. Live in seconds. Trades 24/7, sends Telegram alerts, runs while you sleep.</div>
       </div>
     </div>
   </div>
@@ -270,14 +267,14 @@ footer{border-top:1px solid var(--br);padding:32px 40px}
     <h2 class="sh rev">Everything included for $297.</h2>
     <p class="sub rev">Full source code. Zero black box. Deploy it, modify it, own it forever.</p>
     <div class="chk rev">
-      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Full source code (Node.js)</strong> — own it, fork it, deploy it anywhere, forever</span></div>
-      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>AI signal engine</strong> — Groq + Claude for deep market analysis in real-time</span></div>
-      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>8 coins supported</strong> — XRP, DOGE, ADA, BTC, ETH, SOL, BNB, TRX</span></div>
-      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Legendary strategies</strong> — Turtle Trading, Livermore, Soros breakout methods</span></div>
-      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Live TradingView dashboard</strong> — real-time charts and P&amp;L tracking</span></div>
-      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Telegram alerts</strong> — instant push on every trade entry and exit</span></div>
-      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>1-click Railway deployment</strong> — live in under 10 minutes from purchase</span></div>
-      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Paper trading mode</strong> — practice safely with fake money before going live</span></div>
+      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><strong>Full Source Code (Node.js)</strong></div>
+      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><strong>AI Signal Engine — Groq + Claude</strong></div>
+      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><strong>8 Coins — XRP, DOGE, ADA, BTC &amp; more</strong></div>
+      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><strong>Turtle, Livermore &amp; Soros Strategies</strong></div>
+      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><strong>Live TradingView Dashboard</strong></div>
+      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><strong>Telegram Alerts — Every Trade</strong></div>
+      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><strong>1-Click Railway Deploy</strong></div>
+      <div class="ci"><span class="ck"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><strong>Paper Trading Mode</strong></div>
     </div>
   </div>
 </section>
