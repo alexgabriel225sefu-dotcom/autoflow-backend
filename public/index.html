@@ -397,7 +397,7 @@ footer{
     <a href="#features">Features</a>
     <a href="#pricing">Pricing</a>
     <a href="#faq">FAQ</a>
-    <a href="http://grateful-commitment-production-b29a.up.railway.app" target="_blank" rel="noopener">Demo</a>
+    <a href="#how">Demo</a>
   </div>
   <a href="#" onclick="openApexModal();return false;" class="nav-cta">Get the Bot →</a>
 </nav>
@@ -423,7 +423,7 @@ footer{
 
   <div class="hero-actions">
     <a href="#" onclick="openApexModal();return false;" class="btn-primary">Get the Bot — $297</a>
-    <a href="http://grateful-commitment-production-b29a.up.railway.app" target="_blank" rel="noopener" class="btn-outline">See Live Demo →</a>
+    <a href="#how" class="btn-outline">See How It Works ↓</a>
   </div>
 
   <div class="hero-stats">
@@ -624,7 +624,7 @@ footer{
         <a href="#features">Features</a>
         <a href="#pricing">Pricing</a>
         <a href="#faq">FAQ</a>
-        <a href="http://grateful-commitment-production-b29a.up.railway.app" target="_blank" rel="noopener">Live Demo</a>
+        <a href="#how" target="_blank" rel="noopener">Live Demo</a>
         <a href="#" onclick="openApexModal();return false;">Get the Bot</a>
       </div>
     </div>
@@ -657,6 +657,63 @@ function toggleFaq(el){
   document.querySelectorAll('.faq-item').forEach(function(i){ i.classList.remove('open'); });
   if(!wasOpen) item.classList.add('open');
 }
+
+// ── Auto-typing terminal ──
+(function(){
+  var lines = [
+    '<span class="dl-time">[' + new Date().toTimeString().slice(0,8) + ']</span> <span class="dl-info">INFO</span>  <span class="dl-value">Bot started — strategy: TURTLE · pair: XRPUSDT</span>',
+    '<span class="dl-time">[' + new Date().toTimeString().slice(0,8) + ']</span> <span class="dl-info">INFO</span>  <span class="dl-value">Connecting to Bybit API… <span class="dl-success">✓ OK</span></span>',
+    '<span class="dl-time">[' + new Date().toTimeString().slice(0,8) + ']</span> <span class="dl-label">AI</span>    <span class="dl-value">Groq signal engine ready · model: llama-3</span>',
+    '<span class="dl-time">[' + new Date().toTimeString().slice(0,8) + ']</span> <span class="dl-label">AI</span>    <span class="dl-value">Analyzing 15m candles… RSI: 38 · MACD: ▲ bullish</span>',
+    '<span class="dl-time">[' + new Date().toTimeString().slice(0,8) + ']</span> <span class="dl-label">AI</span>    <span class="dl-value">Livermore: BULLISH 82% · Turtle: STRONG BUY</span>',
+    '<span class="dl-time">[' + new Date().toTimeString().slice(0,8) + ']</span> <span class="dl-success">TRADE</span> <span class="dl-value">🟢 LONG XRPUSDT · qty: 150 · entry: $2.3847</span>',
+    '<span class="dl-time">[' + new Date().toTimeString().slice(0,8) + ']</span> <span class="dl-info">INFO</span>  <span class="dl-value">SL: $2.3490 · TP: $2.4565 · R:R = 1:2.1</span>',
+    '<span class="dl-time">[' + new Date().toTimeString().slice(0,8) + ']</span> <span class="dl-info">INFO</span>  <span class="dl-value">📲 Telegram alert sent ✓</span>',
+    '<span class="dl-time">[' + new Date().toTimeString().slice(0,8) + ']</span> <span class="dl-success">CLOSE</span> <span class="dl-value">🎯 TP HIT · P&L: <span class="dl-success">+$10.77 (+2.2%)</span></span>',
+    '<span class="dl-time">[' + new Date().toTimeString().slice(0,8) + ']</span> <span class="dl-info">INFO</span>  <span class="dl-value">Balance: $110.77 · Next scan in 10 min…</span>',
+  ];
+  var body = document.querySelector('.demo-body');
+  if(!body) return;
+  body.innerHTML = '';
+  var i = 0;
+  function addLine(){
+    if(i >= lines.length){ i = 0; body.innerHTML = ''; }
+    var div = document.createElement('div');
+    div.className = 'demo-line';
+    div.style.opacity = '0';
+    div.style.transform = 'translateX(-8px)';
+    div.style.transition = 'all .35s ease';
+    div.innerHTML = lines[i++];
+    body.appendChild(div);
+    requestAnimationFrame(function(){ div.style.opacity='1'; div.style.transform='translateX(0)'; });
+    if(body.children.length > 10) body.removeChild(body.children[0]);
+    setTimeout(addLine, 900);
+  }
+  setTimeout(addLine, 800);
+})();
+
+// ── Animated price counter in hero ──
+(function(){
+  var done = false;
+  var priceEl = document.querySelector('.price-amount');
+  if(!priceEl) return;
+  var io = new IntersectionObserver(function(entries){
+    if(entries[0].isIntersecting && !done){
+      done = true;
+      var start = 0, end = 297, dur = 1200, startTime = null;
+      function step(ts){
+        if(!startTime) startTime = ts;
+        var progress = Math.min((ts - startTime) / dur, 1);
+        var ease = 1 - Math.pow(1 - progress, 3);
+        priceEl.textContent = Math.floor(ease * end);
+        if(progress < 1) requestAnimationFrame(step);
+        else priceEl.textContent = end;
+      }
+      requestAnimationFrame(step);
+    }
+  }, {threshold: 0.5});
+  io.observe(priceEl);
+})();
 </script>
 
 <!-- PAYMENT MODAL -->
@@ -705,8 +762,8 @@ function toggleFaq(el){
         <span class="am-tag">// One-Time Payment</span>
         <div class="am-title">Apex Trade Bot</div>
         <div class="am-price">
-          <span class="am-amount">$197</span>
-          <span class="am-was">$297</span>
+          <span class="am-amount">$297</span>
+          <span class="am-was">$497</span>
         </div>
       </div>
       <div class="am-body">
@@ -766,7 +823,7 @@ document.getElementById('apexModal').addEventListener('click',function(e){if(e.t
 function updateBtn(){
   var all=['ck1','ck2','ck3','ck4'].every(function(id){return document.getElementById(id).checked;});
   document.getElementById('amBtn').disabled=!all;
-  document.getElementById('amBtnTxt').textContent=all?'Pay $197 — Get Apex Bot →':'Check all boxes to continue';
+  document.getElementById('amBtnTxt').textContent=all?'Pay $297 — Get Apex Bot →':'Check all boxes to continue';
 }
 async function submitApexPayment(){
   var name=document.getElementById('amName').value.trim();
@@ -777,7 +834,7 @@ async function submitApexPayment(){
   var btn=document.getElementById('amBtn'),spin=document.getElementById('amSpinner'),txt=document.getElementById('amBtnTxt');
   btn.disabled=true;spin.style.display='block';txt.textContent='Processing...';
   try{
-    var r=await fetch('/create-payment-intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:19700,currency:'usd',email,name,product:'apex-bot'})});
+    var r=await fetch('/create-payment-intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:29700,currency:'usd',email,name,product:'apex-bot'})});
     var d=await r.json();
     if(d.error){err.textContent=d.error;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';return;}
     var _pendingKey=d.pendingKey||'';

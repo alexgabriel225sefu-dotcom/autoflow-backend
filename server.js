@@ -1054,13 +1054,13 @@ app.get('/api/logout', (req, res) => {
 });
 
 // POST /create-payment-intent — Stripe
-const VALID_AMOUNTS = [3700, 9700, 19700]; // $37 starter, $97 pro, $197 apex-bot (in cents)
+const VALID_AMOUNTS = [3700, 9700, 19700, 29700]; // $37 starter, $97 pro, $197 legacy, $297 apex-bot (in cents)
 app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
   const { amount, currency, email, name, product } = req.body;
   const safeAmount = VALID_AMOUNTS.includes(Number(amount)) ? Number(amount) : 3700;
-  // Enforce: apex-bot MUST be $197 — reject mismatched product/amount combos
-  if (product === 'apex-bot' && safeAmount !== 19700) return res.status(400).json({ error: 'Invalid amount for apex-bot' });
-  if (safeAmount === 19700 && product && product !== 'apex-bot') return res.status(400).json({ error: 'Invalid product for this amount' });
+  // Enforce: apex-bot MUST be $297 — reject mismatched product/amount combos
+  if (product === 'apex-bot' && safeAmount !== 29700) return res.status(400).json({ error: 'Invalid amount for apex-bot' });
+  if (safeAmount === 29700 && product && product !== 'apex-bot') return res.status(400).json({ error: 'Invalid product for this amount' });
   // Server-side email format validation
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
   const isApexBot = (product === 'apex-bot') || safeAmount === 19700;
