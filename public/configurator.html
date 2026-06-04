@@ -506,15 +506,21 @@
   <!-- ── Step 5: Config ── -->
   <div class="step" id="step-5">
     <div class="step-title">Your Configuration</div>
-    <div class="step-sub">Copy these environment variables into your Railway project.</div>
+    <div class="step-sub">Download your bot and copy the environment variables below.</div>
 
     <!-- Summary chips -->
     <div class="summary-row" id="summary-chips"></div>
 
+    <!-- Download ZIP button -->
+    <button class="deploy-btn" id="download-btn" onclick="downloadBot()" style="background:linear-gradient(135deg,#f59e0b,#f97316);border:none;cursor:pointer;width:100%;font-family:inherit;margin-bottom:8px">
+      ⬇ Download Bot Code (ZIP)
+    </button>
+    <div style="font-size:11px;color:rgba(255,255,255,.3);text-align:center;margin-bottom:20px">Requires your license key · Source code + Railway config included</div>
+
     <!-- Code box -->
     <div class="config-header">
-      <span>Railway Environment Variables</span>
-      <button class="copy-btn" id="copy-btn" onclick="copyVars()">📋 Copy All Variables</button>
+      <span>Environment Variables — add these to Railway</span>
+      <button class="copy-btn" id="copy-btn" onclick="copyVars()">📋 Copy All</button>
     </div>
     <div class="code-box" id="config-output"></div>
 
@@ -522,19 +528,14 @@
       ⚠️ <strong>Start with <code>PAPER_TRADING=true</code></strong> to test without real money first! Only set it to <code>false</code> once you're confident the bot is working correctly.
     </div>
 
-    <a class="deploy-btn" id="deploy-btn"
-       href="https://railway.app/new/github"
-       target="_blank" rel="noopener noreferrer">
-      🚀 Open Railway → Deploy
-    </a>
-
-    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px 20px;margin-top:16px;font-size:13px;line-height:2;color:rgba(255,255,255,.55)">
-      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:12px">After clicking the button above:</div>
-      <div><span style="color:#f59e0b;font-weight:700">1.</span> Click <strong style="color:rgba(255,255,255,.8)">Deploy from GitHub repo</strong></div>
-      <div><span style="color:#f59e0b;font-weight:700">2.</span> Connect GitHub if asked → search <strong style="color:rgba(255,255,255,.8)">apex-trade-bot</strong></div>
-      <div><span style="color:#f59e0b;font-weight:700">3.</span> Select the repo → Railway creates the project</div>
-      <div><span style="color:#f59e0b;font-weight:700">4.</span> Go to <strong style="color:rgba(255,255,255,.8)">Variables</strong> tab → paste the env vars from above</div>
-      <div><span style="color:#f59e0b;font-weight:700">5.</span> Railway redeploys automatically → bot is live ✓</div>
+    <!-- Deploy steps -->
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;margin-top:4px;font-size:13px;line-height:2.1;color:rgba(255,255,255,.5)">
+      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:14px">How to deploy on Railway (free)</div>
+      <div><span style="color:#f59e0b;font-weight:700;margin-right:8px">1.</span>Download the ZIP above and extract it</div>
+      <div><span style="color:#f59e0b;font-weight:700;margin-right:8px">2.</span>Go to <a href="https://railway.app" target="_blank" style="color:#f59e0b">railway.app</a> → New Project → <strong style="color:rgba(255,255,255,.7)">Deploy from local folder</strong></div>
+      <div><span style="color:#f59e0b;font-weight:700;margin-right:8px">3.</span>Upload the extracted folder</div>
+      <div><span style="color:#f59e0b;font-weight:700;margin-right:8px">4.</span>Go to <strong style="color:rgba(255,255,255,.7)">Variables</strong> tab → paste env vars from above</div>
+      <div><span style="color:#f59e0b;font-weight:700;margin-right:8px">5.</span>Railway deploys automatically → bot is live ✓</div>
     </div>
 
     <div class="nav-row" style="margin-top:1.25rem;">
@@ -804,6 +805,39 @@ function buildVarsHTML(riskData, coin, tf) {
 }
 
 /* ─────────────────── Copy ─────────────────── */
+function downloadBot() {
+  const key = state.licenseKey;
+  if (!key || key === 'APEX-XXXX-XXXX-XXXX') {
+    alert('No license key found. Please restart from the beginning.');
+    return;
+  }
+  const btn = document.getElementById('download-btn');
+  btn.textContent = '⏳ Preparing download...';
+  btn.disabled = true;
+  const url = '/bot-access?key=' + encodeURIComponent(key);
+  fetch(url)
+    .then(r => {
+      if (!r.ok) return r.text().then(t => { throw new Error(t); });
+      return r.blob();
+    })
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'apex-trade-bot.zip';
+      a.click();
+      btn.textContent = '✅ Downloaded!';
+      setTimeout(() => {
+        btn.textContent = '⬇ Download Bot Code (ZIP)';
+        btn.disabled = false;
+      }, 3000);
+    })
+    .catch(err => {
+      btn.textContent = '⬇ Download Bot Code (ZIP)';
+      btn.disabled = false;
+      alert('Download failed: ' + err.message + '\n\nMake sure your license key is valid.');
+    });
+}
+
 function copyVars() {
   const text = window._configPlain || '';
   navigator.clipboard.writeText(text).then(() => {
