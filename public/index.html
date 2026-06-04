@@ -3,691 +3,388 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Apex Trade Bot — AI Crypto Trading Bot Source Code · $297 One-Time</title>
-<meta name="description" content="Buy the source code once for $297. Deploy on Railway in 10 minutes. Your AI crypto trading bot trades XRP, DOGE, ADA 24/7 — you own it forever."/>
+<title>Apex Trade Bot — AI Crypto Trading Source Code · $297</title>
+<meta name="description" content="Own the source code once for $297. Deploy your AI crypto trading bot in 10 minutes. Trades XRP, DOGE, ADA 24/7 — no monthly fees, ever."/>
 <script src="https://js.stripe.com/v3/"></script>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#0f172a;
-  --bg2:#080f1e;
-  --amber:#f59e0b;
-  --amber2:#fbbf24;
-  --purple:#8b5cf6;
-  --purple2:rgba(139,92,246,.15);
-  --green:#10b981;
-  --blue:#3b82f6;
-  --text:#f8fafc;
-  --text2:rgba(248,250,252,.6);
-  --text3:rgba(248,250,252,.3);
-  --card:rgba(255,255,255,.04);
-  --border:rgba(255,255,255,.08);
-  --font:'Exo 2',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --heading:'Orbitron','Exo 2',sans-serif;
+  --bg:#050814;--s1:#090d1b;--s2:#0d1121;
+  --g:#c9a55a;--g2:#e0bc78;
+  --t:#f0f2f7;--tm:rgba(240,242,247,.55);--td:rgba(240,242,247,.22);
+  --b:rgba(255,255,255,.07);--b2:rgba(255,255,255,.13);
+  --serif:'Playfair Display',Georgia,serif;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
   --mono:'SF Mono','Fira Code',monospace;
 }
 html{scroll-behavior:smooth}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
-body{background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:hidden;-webkit-font-smoothing:antialiased;font-size:16px;line-height:1.6}
+body{background:var(--bg);color:var(--t);font-family:var(--sans);overflow-x:hidden;-webkit-font-smoothing:antialiased;font-size:16px;line-height:1.6}
 
 /* NAV */
-nav{position:fixed;top:0;left:0;right:0;z-index:200;height:66px;display:flex;align-items:center;padding:0 32px;justify-content:space-between;border-bottom:1px solid var(--border);backdrop-filter:blur(24px) saturate(160%);background:rgba(5,8,20,.85);transition:background .3s}
-.nav-logo{font-size:14px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:.5px;display:flex;align-items:center;gap:8px;font-family:var(--heading);text-transform:uppercase}
-.nav-links{display:flex;gap:28px}
-.nav-links a{font-size:13px;color:var(--text2);text-decoration:none;font-weight:500;transition:color .2s}
-.nav-links a:hover{color:#fff}
-.nav-cta{padding:10px 20px;background:var(--amber);border:none;border-radius:8px;color:#000;font-family:var(--heading);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;transition:all .2s;text-decoration:none;display:flex;align-items:center;gap:6px;min-height:40px}
-.nav-cta:hover{background:#fbbf24;transform:translateY(-1px);box-shadow:0 0 20px rgba(245,158,11,.4)}
-@media(max-width:768px){.nav-links{display:none}.nav-cta{padding:9px 14px;font-size:12px}}
-@media(max-width:480px){nav{padding:0 16px}}
-
-/* RAYCAST BACKGROUND */
-.raycast-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
-.orb{position:absolute;border-radius:50%;filter:blur(100px);will-change:transform}
-.orb-1{width:700px;height:700px;background:radial-gradient(circle,rgba(245,158,11,.18) 0%,transparent 70%);top:-200px;left:-150px;animation:orb1 18s ease-in-out infinite}
-.orb-2{width:600px;height:600px;background:radial-gradient(circle,rgba(139,92,246,.15) 0%,transparent 70%);top:-100px;right:-100px;animation:orb2 22s ease-in-out infinite}
-.orb-3{width:500px;height:500px;background:radial-gradient(circle,rgba(59,130,246,.12) 0%,transparent 70%);bottom:10%;left:20%;animation:orb3 26s ease-in-out infinite}
-.orb-4{width:400px;height:400px;background:radial-gradient(circle,rgba(16,185,129,.1) 0%,transparent 70%);bottom:-100px;right:15%;animation:orb4 20s ease-in-out infinite}
-@keyframes orb1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,-40px) scale(1.08)}66%{transform:translate(-30px,50px) scale(.95)}}
-@keyframes orb2{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-50px,60px) scale(1.05)}66%{transform:translate(40px,-30px) scale(1.1)}}
-@keyframes orb3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-60px) scale(1.12)}}
-@keyframes orb4{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-60px,30px) scale(1.06)}}
+nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;align-items:center;padding:0 48px;justify-content:space-between;transition:background .3s,border-color .3s;border-bottom:1px solid transparent}
+nav.scrolled{background:rgba(5,8,20,.97);border-color:var(--b);backdrop-filter:blur(20px)}
+.nl{font-size:12px;font-weight:700;color:var(--t);text-decoration:none;letter-spacing:3px;text-transform:uppercase}
+.nm{display:flex;gap:32px}
+.nm a{font-size:13px;color:var(--tm);text-decoration:none;transition:color .2s;font-weight:400}
+.nm a:hover{color:var(--t)}
+.nc{padding:8px 22px;border:1px solid rgba(201,165,90,.5);border-radius:4px;color:var(--g);font-size:11px;font-weight:600;cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;transition:all .2s;text-decoration:none;min-height:38px;display:flex;align-items:center}
+.nc:hover{background:var(--g);color:#000;border-color:var(--g)}
+@media(max-width:768px){.nm{display:none}}
+@media(max-width:480px){nav{padding:0 20px}}
 
 /* HERO */
-.hero{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:48px;padding:100px 40px 80px;max-width:1200px;margin:0 auto;position:relative}
-.hero-left{position:relative;z-index:1}
-.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border:1px solid rgba(16,185,129,.3);border-radius:100px;font-size:10px;font-weight:700;color:var(--green);letter-spacing:2px;background:rgba(16,185,129,.08);margin-bottom:28px;font-family:var(--heading);text-transform:uppercase}
-.badge-dot{width:6px;height:6px;border-radius:50%;background:#ef4444;animation:blink 1.4s infinite;box-shadow:0 0 6px #ef4444}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-.hero h1{font-size:clamp(32px,4.5vw,64px);font-weight:900;line-height:1.05;letter-spacing:1px;margin-bottom:22px;font-family:var(--heading);text-transform:uppercase}
-.hero h1 .amber{background:linear-gradient(135deg,#f59e0b,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hero-sub{font-size:clamp(15px,1.8vw,17px);color:var(--text2);line-height:1.75;max-width:480px;margin-bottom:36px;font-weight:400}
-.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:32px}
-.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:16px 32px;background:var(--amber);border:none;border-radius:10px;color:#000;font-family:var(--heading);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:all .2s;text-decoration:none;box-shadow:0 0 40px rgba(245,158,11,.25);min-height:44px}
-.btn-primary:hover{background:#fbbf24;transform:translateY(-2px);box-shadow:0 0 60px rgba(245,158,11,.4)}
-.btn-ghost{display:inline-flex;align-items:center;gap:8px;padding:16px 28px;background:transparent;border:1px solid var(--border);border-radius:10px;color:var(--text2);font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;text-decoration:none;min-height:44px}
-.btn-ghost:hover{border-color:rgba(255,255,255,.2);color:#fff;background:rgba(255,255,255,.04)}
-.trust-pills{display:flex;gap:8px;flex-wrap:wrap}
-.trust-pill{padding:8px 14px;border:1px solid var(--border);border-radius:100px;background:var(--card);font-size:11px;font-weight:600;color:var(--text2);backdrop-filter:blur(8px);display:inline-flex;align-items:center;gap:6px;min-height:32px;font-family:var(--mono);letter-spacing:.5px}
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:100px 24px 80px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 50% at 50% 25%,rgba(201,165,90,.06) 0%,transparent 65%);pointer-events:none}
+.h-label{font-size:11px;font-weight:600;letter-spacing:5px;text-transform:uppercase;color:var(--g);margin-bottom:32px;opacity:0;animation:fi .8s .15s forwards}
+@keyframes fi{to{opacity:1}}
+.hero h1{font-family:var(--serif);font-size:clamp(38px,5.5vw,82px);font-weight:900;line-height:1.06;max-width:820px;margin:0 auto 28px;opacity:0;animation:fi .8s .35s forwards;letter-spacing:-.5px}
+.h-em{font-style:italic;color:var(--g)}
+.hero p{font-size:clamp(16px,1.7vw,18px);color:var(--tm);line-height:1.9;max-width:520px;margin:0 auto 52px;font-weight:300;opacity:0;animation:fi .8s .55s forwards}
+.ha{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;opacity:0;animation:fi .8s .75s forwards}
+.btn-g{display:inline-flex;align-items:center;gap:8px;padding:16px 38px;background:var(--g);border:none;border-radius:4px;color:#000;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:2px;text-transform:uppercase;transition:all .2s;text-decoration:none;min-height:52px}
+.btn-g:hover{background:var(--g2);transform:translateY(-1px)}
+.btn-o{display:inline-flex;align-items:center;gap:8px;padding:16px 28px;background:transparent;border:1px solid var(--b2);border-radius:4px;color:var(--tm);font-size:13px;font-weight:400;cursor:pointer;transition:all .2s;text-decoration:none;min-height:52px}
+.btn-o:hover{border-color:rgba(255,255,255,.28);color:var(--t)}
+.h-trust{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;margin-top:40px;opacity:0;animation:fi .8s .95s forwards}
+.ht{font-size:11px;color:var(--td);letter-spacing:.8px;display:flex;align-items:center;gap:7px}
+.ht svg{width:12px;height:12px;stroke:var(--g);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 
-/* HERO MOCKUP */
-.hero-right{position:relative;z-index:1}
-.mock-card{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:20px;padding:24px;backdrop-filter:blur(20px);box-shadow:0 24px 80px rgba(0,0,0,.5)}
-.mock-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-.mock-label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3);font-family:var(--mono)}
-.mock-live{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--green);font-family:var(--mono)}
-.mock-live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.2s infinite;box-shadow:0 0 6px var(--green)}
-.mock-balance{font-size:36px;font-weight:900;letter-spacing:-2px;color:#fff;margin-bottom:4px}
-.mock-change{font-size:14px;font-weight:700;color:var(--green)}
-.mock-divider{height:1px;background:var(--border);margin:18px 0}
-.mock-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13px}
-.mock-key{color:var(--text3);font-family:var(--mono);font-size:11px}
-.mock-val{color:#fff;font-weight:600}
-.mock-position{display:flex;align-items:center;gap:8px;padding:12px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;margin-bottom:16px;font-size:12px}
-.mock-pos-badge{background:var(--green);color:#000;font-size:9px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:.5px}
-.mock-pos-text{font-family:var(--mono);color:var(--text2)}
-.mock-pos-text strong{color:#fff}
-.mock-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
-.mock-stat{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px}
-.mock-stat-label{font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px}
-.mock-stat-val{font-size:18px;font-weight:800;color:#fff}
-.mock-stat-val.green{color:var(--green)}
-.mock-stat-val.amber{color:var(--amber)}
-@media(max-width:900px){.hero{grid-template-columns:1fr;text-align:center;padding:100px 24px 60px}.hero-right{display:none}.trust-pills,.hero-actions{justify-content:center}}
-
-/* SOCIAL PROOF */
-.proof-bar{border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:24px 40px;background:rgba(255,255,255,.02)}
-.proof-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:48px;flex-wrap:wrap}
-.proof-item{display:flex;flex-direction:column;align-items:center;gap:4px}
-.proof-num{font-size:22px;font-weight:900;color:#fff}
-.proof-sub{font-size:12px;color:var(--text3);font-weight:500}
-.proof-stars{color:var(--amber);font-size:16px;letter-spacing:2px}
-.proof-sep{width:1px;height:36px;background:var(--border)}
-@media(max-width:600px){.proof-sep{display:none}.proof-inner{gap:24px}}
+/* PROOF */
+.proof{border-top:1px solid var(--b);border-bottom:1px solid var(--b);padding:28px 48px;background:var(--s1)}
+.proof-in{max-width:840px;margin:0 auto;display:flex;align-items:stretch;justify-content:center}
+.pi{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:8px 20px}
+.pi+.pi{border-left:1px solid var(--b)}
+.pn{font-size:24px;font-weight:700;color:var(--t);letter-spacing:-1px;line-height:1}
+.pl{font-size:10px;color:var(--td);letter-spacing:3px;text-transform:uppercase;font-weight:500}
+@media(max-width:600px){.proof{padding:20px 16px}.pn{font-size:18px}.pi{padding:6px 10px}}
 
 /* SECTIONS */
-.section{padding:100px 40px;position:relative}
-.section-inner{max-width:1100px;margin:0 auto}
-.s-tag{display:inline-flex;align-items:center;gap:8px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:14px;color:var(--amber);font-family:var(--mono)}
-.s-tag::before{content:'//';opacity:.5;margin-right:2px}
-.s-h{font-size:clamp(24px,3.5vw,44px);font-weight:800;letter-spacing:1px;line-height:1.1;margin-bottom:14px;font-family:var(--heading);text-transform:uppercase}
-.s-sub{font-size:16px;color:var(--text2);line-height:1.75;max-width:500px}
-@media(max-width:480px){.section{padding:72px 20px}}
+.sec{padding:96px 48px}
+.sec-in{max-width:1080px;margin:0 auto}
+.slb{font-size:11px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:var(--g);margin-bottom:18px;display:block}
+.sh{font-family:var(--serif);font-size:clamp(26px,3vw,46px);font-weight:800;line-height:1.12;margin-bottom:16px;letter-spacing:-.3px}
+.ss{font-size:16px;color:var(--tm);line-height:1.85;max-width:480px;font-weight:300}
+@media(max-width:480px){.sec{padding:72px 20px}}
 
-/* HOW IT WORKS */
-#how{background:linear-gradient(180deg,var(--bg),rgba(5,8,20,1))}
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:56px;position:relative}
-.steps::before{content:'';position:absolute;top:36px;left:calc(16.67% + 16px);right:calc(16.67% + 16px);height:1px;background:linear-gradient(90deg,var(--amber),var(--blue));opacity:.3;pointer-events:none}
-.step{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;transition:border-color .3s,transform .3s;position:relative}
-.step:hover{transform:translateY(-5px);border-color:rgba(245,158,11,.25)}
-.step-num{font-family:var(--heading);font-size:10px;font-weight:700;letter-spacing:3px;color:var(--amber);opacity:.7;margin-bottom:18px;display:block;text-transform:uppercase}
-.step-icon{width:44px;height:44px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;border-radius:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2)}
-.step-icon svg{width:22px;height:22px;stroke:var(--amber);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.step.ai .step-icon{background:var(--purple2);border-color:rgba(139,92,246,.3)}
-.step.ai .step-icon svg{stroke:var(--purple)}
-.step.ai .step-num{color:var(--purple)}
-.step-title{font-size:17px;font-weight:700;color:#fff;margin-bottom:8px;letter-spacing:.3px;font-family:var(--heading);text-transform:uppercase;font-size:14px}
-.step-desc{font-size:14px;color:var(--text2);line-height:1.75}
-.step-detail{margin-top:14px;padding:12px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:8px;font-size:11px;color:var(--text3);font-family:var(--mono)}
-@media(max-width:768px){.steps{grid-template-columns:1fr;gap:14px}.steps::before{display:none}}
+/* STEPS */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:64px;border:1px solid var(--b);border-radius:8px;overflow:hidden}
+.step{padding:40px 32px;border-right:1px solid var(--b);transition:background .25s;cursor:default}
+.step:last-child{border-right:none}
+.step:hover{background:var(--s1)}
+.sn{font-size:10px;font-weight:600;letter-spacing:4px;color:var(--td);display:block;margin-bottom:28px;text-transform:uppercase}
+.st{font-size:17px;font-weight:600;color:var(--t);margin-bottom:12px;letter-spacing:-.2px}
+.sd{font-size:14px;color:var(--tm);line-height:1.8}
+@media(max-width:768px){.steps{grid-template-columns:1fr;border-radius:6px}.step{border-right:none;border-bottom:1px solid var(--b)}.step:last-child{border-bottom:none}}
 
-/* WHAT YOU GET */
-#features{background:var(--bg)}
-.checklist{margin-top:48px;max-width:680px;display:flex;flex-direction:column;gap:0}
-.check-item{display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:1px solid var(--border);font-size:15px;color:var(--text2);line-height:1.5}
-.check-item:last-child{border-bottom:none}
-.check-item strong{color:#fff;font-weight:600}
-.check-mark{flex-shrink:0;display:flex;align-items:center}
-
-/* TERMINAL */
-.terminal-wrap{margin-top:72px;background:#0a0d1a;border:1px solid rgba(59,130,246,.2);border-radius:16px;overflow:hidden;box-shadow:0 0 80px rgba(59,130,246,.06)}
-.terminal-bar{display:flex;align-items:center;gap:8px;padding:13px 18px;background:#0d1224;border-bottom:1px solid rgba(255,255,255,.06)}
-.tdot{width:11px;height:11px;border-radius:50%}
-.tdot:nth-child(1){background:#ff5f57}
-.tdot:nth-child(2){background:#febc2e}
-.tdot:nth-child(3){background:#28c840}
-.t-title{flex:1;text-align:center;font-family:var(--mono);font-size:11px;color:var(--text3)}
-.t-live{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--green);font-family:var(--mono);letter-spacing:1px}
-.t-live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.2s infinite;box-shadow:0 0 6px var(--green)}
-.terminal-body{padding:22px;font-family:var(--mono);font-size:13px;line-height:1.85;min-height:240px}
-.tl{margin-bottom:2px}.tl-t{color:var(--text3)}.tl-info{color:var(--blue)}.tl-ai{color:#a78bfa}.tl-ok{color:var(--green)}.tl-trade{color:var(--amber)}.tl-close{color:var(--green)}
-@media(max-width:560px){.terminal-body{font-size:11px;padding:14px}}
+/* FEATURES */
+.feat{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin-top:56px;background:var(--b);border:1px solid var(--b);border-radius:8px;overflow:hidden}
+.feat-i{background:var(--bg);display:flex;align-items:flex-start;gap:16px;padding:24px 26px;transition:background .2s;cursor:default}
+.feat-i:hover{background:var(--s2)}
+.feat-d{width:5px;height:5px;border-radius:50%;background:var(--g);flex-shrink:0;margin-top:9px}
+.feat-t strong{font-size:14px;font-weight:600;color:var(--t);display:block;margin-bottom:3px;letter-spacing:-.1px}
+.feat-t span{font-size:13px;color:var(--tm);line-height:1.65}
+@media(max-width:680px){.feat{grid-template-columns:1fr}}
 
 /* PRICING */
-#pricing{background:linear-gradient(180deg,rgba(5,8,20,1),var(--bg));text-align:center}
-.price-card-wrap{max-width:520px;margin:56px auto 0;position:relative;border-radius:26px;padding:2px;background:conic-gradient(from var(--angle,0deg),#f59e0b 0%,#8b5cf6 25%,#3b82f6 50%,#10b981 75%,#f59e0b 100%);animation:spin-border 6s linear infinite}
-@property --angle{syntax:'<angle>';initial-value:0deg;inherits:false}
-@keyframes spin-border{to{--angle:360deg}}
-.price-card{background:#0b1120;border-radius:24px;padding:40px;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(245,158,11,.1),0 40px 120px rgba(0,0,0,.6)}
-.pc-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--amber);margin-bottom:10px}
-.pc-tag-red{display:inline-block;font-size:10px;font-weight:700;background:#ef4444;color:#fff;padding:3px 10px;border-radius:4px;letter-spacing:1px;text-transform:uppercase;margin-left:10px;vertical-align:middle}
-.pc-row{display:flex;align-items:baseline;gap:8px;justify-content:center;margin-bottom:6px}
-.pc-price{font-size:72px;font-weight:900;color:var(--amber);letter-spacing:-2px;line-height:1;font-family:var(--heading)}
-.pc-was{font-size:22px;color:var(--text3);text-decoration:line-through;font-weight:700}
-.pc-once{font-size:13px;color:var(--text3);margin-bottom:28px}
-.pc-divider{height:1px;background:var(--border);margin-bottom:24px}
-.pc-features{list-style:none;display:flex;flex-direction:column;gap:11px;margin-bottom:30px;text-align:left}
-.pc-features li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--text2);line-height:1.5}
-.pc-features li .ck{flex-shrink:0;font-size:14px}
-.pc-features li strong{color:#fff;font-weight:600}
-.pc-cta{display:block;width:100%;padding:18px;background:var(--amber);border:none;border-radius:12px;color:#000;font-family:var(--heading);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;text-align:center;box-shadow:0 0 48px rgba(245,158,11,.3);text-decoration:none;letter-spacing:2px;text-transform:uppercase;min-height:56px;display:flex;align-items:center;justify-content:center;gap:10px}
-.pc-cta:hover{background:#fbbf24;transform:translateY(-2px);box-shadow:0 0 64px rgba(245,158,11,.5)}
-.pc-note{font-size:12px;color:var(--text3);margin-top:12px;text-align:center}
+#pricing{background:var(--s1)}
+.pc-wrap{max-width:460px;margin:56px auto 0;border:1px solid var(--b2);border-radius:8px;overflow:hidden;box-shadow:0 0 0 1px rgba(201,165,90,.09),0 32px 80px rgba(0,0,0,.45)}
+.pc-head{padding:40px 40px 28px;text-align:center;border-bottom:1px solid var(--b)}
+.pc-label{font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--g);margin-bottom:20px;display:block}
+.pc-row{display:flex;align-items:baseline;gap:10px;justify-content:center;margin-bottom:8px}
+.pc-p{font-family:var(--serif);font-size:72px;font-weight:900;color:var(--t);line-height:1;letter-spacing:-3px}
+.pc-was{font-size:20px;color:var(--td);text-decoration:line-through;font-weight:400}
+.pc-sub{font-size:11px;color:var(--td);letter-spacing:2px;text-transform:uppercase}
+.pc-body{padding:32px 40px}
+.pc-list{list-style:none;display:flex;flex-direction:column;gap:13px;margin-bottom:28px}
+.pc-list li{display:flex;align-items:flex-start;gap:12px;font-size:14px;color:var(--tm);line-height:1.5}
+.pc-list li strong{color:var(--t);font-weight:600}
+.pc-list li svg{width:14px;height:14px;stroke:var(--g);fill:none;stroke-width:2.5;flex-shrink:0;margin-top:3px;stroke-linecap:round;stroke-linejoin:round}
+.pc-cta{display:flex;width:100%;padding:17px;background:var(--g);border:none;border-radius:4px;color:#000;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:2px;text-transform:uppercase;transition:background .2s;align-items:center;justify-content:center;text-decoration:none;min-height:52px}
+.pc-cta:hover{background:var(--g2)}
+.pc-note{font-size:11px;color:var(--td);text-align:center;margin-top:12px;letter-spacing:.4px}
+@media(max-width:480px){.pc-head{padding:28px 24px 20px}.pc-body{padding:24px}.pc-p{font-size:60px}}
 
 /* FAQ */
-#faq{background:var(--bg);border-top:1px solid var(--border)}
-.faq-inner{max-width:680px;margin:0 auto}
+#faq{border-top:1px solid var(--b)}
+.faq-in{max-width:660px}
 .faq-list{margin-top:48px}
-.faq-item{border-bottom:1px solid var(--border)}
-.faq-q{display:flex;align-items:center;justify-content:space-between;padding:20px 0;cursor:pointer;font-size:15px;font-weight:600;color:var(--text2);gap:16px;transition:color .2s;list-style:none;min-height:44px;user-select:none}
-.faq-q:hover{color:#fff}
-.faq-icon{width:26px;height:26px;border-radius:7px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:16px;font-weight:700;flex-shrink:0;transition:all .25s}
-.faq-item.open .faq-icon{transform:rotate(45deg);background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3)}
-.faq-item.open .faq-q{color:#fff}
-.faq-body{max-height:0;overflow:hidden;transition:max-height .35s ease}
-.faq-item.open .faq-body{max-height:260px}
-.faq-ans{padding:0 0 20px;font-size:14px;color:var(--text2);line-height:1.85}
-.faq-ans strong{color:#fff}
-.faq-ans code{font-family:var(--mono);background:rgba(255,255,255,.07);padding:1px 6px;border-radius:4px;font-size:12px}
+.faq-item{border-bottom:1px solid var(--b)}
+.fq{display:flex;align-items:center;justify-content:space-between;padding:20px 0;cursor:pointer;font-size:15px;font-weight:500;color:var(--tm);gap:16px;transition:color .2s;user-select:none;min-height:44px}
+.fq:hover,.faq-item.open .fq{color:var(--t)}
+.fi-x{width:18px;height:18px;flex-shrink:0;position:relative;opacity:.4;transition:all .25s}
+.fi-x::before,.fi-x::after{content:'';position:absolute;background:currentColor;border-radius:1px;left:50%;top:50%}
+.fi-x::before{width:10px;height:1px;transform:translate(-50%,-50%)}
+.fi-x::after{width:1px;height:10px;transform:translate(-50%,-50%);transition:transform .25s}
+.faq-item.open .fi-x{opacity:1;color:var(--g)}
+.faq-item.open .fi-x::after{transform:translate(-50%,-50%) rotate(90deg)}
+.fb{max-height:0;overflow:hidden;transition:max-height .35s ease}
+.faq-item.open .fb{max-height:280px}
+.fa{padding:0 0 20px;font-size:14px;color:var(--tm);line-height:1.85}
+.fa strong{color:var(--t)}
+.fa code{font-family:var(--mono);background:var(--s2);padding:2px 7px;border-radius:4px;font-size:12px;color:var(--g)}
 
 /* FOOTER */
-footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px 40px 24px}
-.foot-inner{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
-.foot-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
-.foot-logo{font-size:15px;font-weight:800;color:#fff;text-decoration:none}
-.foot-tagline{font-size:12px;color:var(--text3);margin-top:3px}
-.foot-links{display:flex;gap:22px;flex-wrap:wrap}
-.foot-links a{font-size:13px;color:var(--text2);text-decoration:none;transition:color .2s}
-.foot-links a:hover{color:#fff}
-.foot-bot{border-top:1px solid var(--border);padding-top:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
-.foot-copy{font-size:12px;color:var(--text3)}
-.foot-email{font-size:12px;color:var(--text2)}
-.foot-email a{color:var(--amber);text-decoration:none}
-@media(max-width:480px){footer{padding:28px 20px 20px}}
+footer{border-top:1px solid var(--b);padding:36px 48px}
+.foot-in{max-width:1080px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.foot-l{font-size:11px;font-weight:700;color:var(--td);text-decoration:none;letter-spacing:3px;text-transform:uppercase}
+.foot-links{display:flex;gap:24px}
+.foot-links a{font-size:12px;color:var(--td);text-decoration:none;letter-spacing:.5px;transition:color .2s}
+.foot-links a:hover{color:var(--tm)}
+.foot-c{font-size:11px;color:var(--td);letter-spacing:.3px}
+@media(max-width:600px){footer{padding:28px 20px}.foot-in{flex-direction:column;text-align:center;gap:14px}}
 
 /* REVEAL */
-.reveal{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
-.reveal.visible{opacity:1;transform:none}
-.reveal-d1{transition-delay:.08s}.reveal-d2{transition-delay:.16s}.reveal-d3{transition-delay:.24s}.reveal-d4{transition-delay:.32s}
-
-/* FLOATING PATHS */
-#heroPaths{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
-#heroPaths svg{position:absolute;inset:0;width:100%;height:100%}
+.reveal{opacity:0;transition:opacity .7s ease}
+.reveal.visible{opacity:1}
+.d1{transition-delay:.1s}.d2{transition-delay:.2s}.d3{transition-delay:.3s}
 </style>
 </head>
 <body>
 
-<!-- NAV -->
-<nav id="navbar">
-  <a href="#" class="nav-logo">⚡ APEX BOT</a>
-  <div class="nav-links">
+<nav id="nav">
+  <a href="#" class="nl">Apex Trade Bot</a>
+  <div class="nm">
     <a href="#features">Features</a>
     <a href="#how">How It Works</a>
     <a href="#pricing">Pricing</a>
   </div>
-  <a href="#" onclick="openApexModal();return false;" class="nav-cta">Get Instant Access →</a>
+  <a href="#" onclick="openApexModal();return false;" class="nc">Get Access</a>
 </nav>
 
-<!-- RAYCAST ANIMATED BACKGROUND -->
-<div class="raycast-bg">
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
-  <div class="orb orb-4"></div>
-</div>
-
-<!-- HERO -->
-<section style="padding-top:66px;position:relative;overflow:hidden">
-<div id="heroPaths"></div>
-<div class="hero">
-  <div class="hero-left">
-    <div class="hero-badge"><span class="badge-dot"></span>LIVE &nbsp;·&nbsp; AI TRADING BOT</div>
-    <h1>Your Personal AI<br><span class="amber">Trading Bot.</span></h1>
-    <p class="hero-sub">Deploy in 10 minutes. Trades XRP, DOGE, ADA 24/7. Full source code — you own it forever.</p>
-    <div class="hero-actions">
-      <a href="#" onclick="openApexModal();return false;" class="btn-primary">Get the Bot — $297</a>
-      <a href="#how" class="btn-ghost">See How It Works ↓</a>
-    </div>
-    <div class="trust-pills">
-      <span class="trust-pill"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Stripe Secure</span>
-      <span class="trust-pill"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Full Source Code</span>
-      <span class="trust-pill"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>1-Click Deploy</span>
-      <span class="trust-pill"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>Groq AI</span>
-    </div>
+<section class="hero">
+  <div class="h-label">AI Trading System &nbsp;·&nbsp; Source Code</div>
+  <h1>The Bot That Trades<br><span class="h-em">While You Sleep.</span></h1>
+  <p>One-time payment. Full source code. Deploy on Railway in under 10 minutes. Your bot trades XRP, DOGE, ADA 24/7 — no monthly fees, ever.</p>
+  <div class="ha">
+    <a href="#" onclick="openApexModal();return false;" class="btn-g">Get Apex Bot — $297</a>
+    <a href="#how" class="btn-o">See How It Works ↓</a>
   </div>
-  <div class="hero-right">
-    <div class="mock-card">
-      <div class="mock-top">
-        <span class="mock-label">Portfolio · Bybit</span>
-        <span class="mock-live"><span class="mock-live-dot"></span>LIVE</span>
-      </div>
-      <div class="mock-balance">$847.32</div>
-      <div class="mock-change">▲ +12.4% this month</div>
-      <div class="mock-divider"></div>
-      <div class="mock-position">
-        <span class="mock-pos-badge">LONG</span>
-        <span class="mock-pos-text"><strong>XRP/USDT</strong> @ $2.384</span>
-      </div>
-      <div class="mock-row">
-        <span class="mock-key">Open P&amp;L</span>
-        <span class="mock-val" style="color:var(--green)" id="mockPnl">+$18.44 (+0.8%)</span>
-      </div>
-      <div class="mock-row" style="margin-bottom:0">
-        <span class="mock-key">Strategy</span>
-        <span class="mock-val">TURTLE + LIVERMORE</span>
-      </div>
-      <div class="mock-divider"></div>
-      <div class="mock-stats">
-        <div class="mock-stat">
-          <div class="mock-stat-label">Win Rate</div>
-          <div class="mock-stat-val amber">68%</div>
-        </div>
-        <div class="mock-stat">
-          <div class="mock-stat-label">Uptime</div>
-          <div class="mock-stat-val green">24/7</div>
-        </div>
-      </div>
-    </div>
+  <div class="h-trust">
+    <span class="ht"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Stripe Secure</span>
+    <span class="ht"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Full Source Code</span>
+    <span class="ht"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Deploy in 10 min</span>
+    <span class="ht"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>No Monthly Fees</span>
   </div>
-</div>
 </section>
 
-<!-- SOCIAL PROOF -->
-<div class="proof-bar">
-  <div class="proof-inner">
-    <div class="proof-item">
-      <div class="proof-stars">★★★★★</div>
-      <div class="proof-sub">Trusted by traders</div>
-    </div>
-    <div class="proof-sep"></div>
-    <div class="proof-item">
-      <div class="proof-num">12+</div>
-      <div class="proof-sub">Countries</div>
-    </div>
-    <div class="proof-sep"></div>
-    <div class="proof-item">
-      <div class="proof-num">500+</div>
-      <div class="proof-sub">Bots deployed</div>
-    </div>
-    <div class="proof-sep"></div>
-    <div class="proof-item">
-      <div class="proof-num">24/7</div>
-      <div class="proof-sub">Uptime</div>
-    </div>
-    <div class="proof-sep"></div>
-    <div class="proof-item">
-      <div class="proof-num">$0/mo</div>
-      <div class="proof-sub">Running cost</div>
-    </div>
+<div class="proof">
+  <div class="proof-in">
+    <div class="pi"><div class="pn">500+</div><div class="pl">Bots Deployed</div></div>
+    <div class="pi"><div class="pn">12+</div><div class="pl">Countries</div></div>
+    <div class="pi"><div class="pn">24/7</div><div class="pl">Uptime</div></div>
+    <div class="pi"><div class="pn">$0/mo</div><div class="pl">Running Cost</div></div>
+    <div class="pi"><div class="pn">★★★★★</div><div class="pl">Trusted</div></div>
   </div>
 </div>
 
-<!-- HOW IT WORKS -->
-<section class="section" id="how">
-  <div class="section-inner">
-    <div class="s-tag reveal">How It Works</div>
-    <h2 class="s-h reveal">Three steps to a live bot.</h2>
-    <p class="s-sub reveal">No trading experience needed. No monthly subscription. You own everything.</p>
+<section class="sec" id="how">
+  <div class="sec-in">
+    <span class="slb reveal">How It Works</span>
+    <h2 class="sh reveal">Three steps to a live trading bot.</h2>
+    <p class="ss reveal">No trading experience. No coding required. No monthly fees — ever.</p>
     <div class="steps">
       <div class="step reveal">
-        <span class="step-num">STEP 01</span>
-        <div class="step-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>
-        <div class="step-title">Buy Once</div>
-        <div class="step-desc">Pay $297 one-time and receive your license key instantly by email. No subscriptions, no recurring fees — ever.</div>
-        <div class="step-detail">$297 · License key · Instant delivery</div>
+        <span class="sn">01 &mdash; Buy</span>
+        <div class="st">Pay Once, Own Forever</div>
+        <div class="sd">Pay $297 one-time and receive your license key instantly by email. No subscriptions, no SaaS trap. The code is yours to keep, modify, and deploy anywhere.</div>
       </div>
-      <div class="step ai reveal reveal-d1">
-        <span class="step-num">STEP 02</span>
-        <div class="step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg></div>
-        <div class="step-title">Configure Your Bot</div>
-        <div class="step-desc">Choose your coin, risk level, and strategy. Everything is controlled via simple environment variables — no coding required.</div>
-        <div class="step-detail">Coin · Risk · Strategy (Turtle, Livermore, Soros)</div>
+      <div class="step reveal d1">
+        <span class="sn">02 &mdash; Configure</span>
+        <div class="st">Set Your Strategy</div>
+        <div class="sd">Choose your coin, risk level, and strategy using simple environment variables. Pick from Turtle, Livermore, or Soros breakout — no coding needed at all.</div>
       </div>
-      <div class="step reveal reveal-d2">
-        <span class="step-num">STEP 03</span>
-        <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
-        <div class="step-title">Deploy &amp; Earn</div>
-        <div class="step-desc">Click Deploy on Railway. The bot goes live in seconds and runs 24/7 — scanning markets, executing trades, sending Telegram alerts.</div>
-        <div class="step-detail">Railway deploy · Telegram alerts · TradingView dashboard</div>
+      <div class="step reveal d2">
+        <span class="sn">03 &mdash; Deploy</span>
+        <div class="st">Click Deploy &amp; Earn</div>
+        <div class="sd">One click on Railway. Your bot goes live in seconds — scanning markets, executing trades, and sending you Telegram alerts around the clock.</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- WHAT YOU GET -->
-<section class="section" id="features">
-  <div class="section-inner">
-    <div class="s-tag reveal" style="color:var(--blue)">What's Included</div>
-    <h2 class="s-h reveal">Everything included for $297.</h2>
-    <p class="s-sub reveal">Full source code. Zero black box. Deploy it, modify it, own it forever.</p>
-    <div class="checklist reveal">
-      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Full source code (Node.js)</strong> — you own it, forever</span></div>
-      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>AI signal engine</strong> — Groq + Claude for deep market analysis</span></div>
-      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>8 coins supported</strong> — XRP, DOGE, ADA, BTC, ETH, SOL, BNB, TRX</span></div>
-      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Legendary strategies</strong> — Turtle Trading, Livermore, Soros breakout</span></div>
-      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Live dashboard</strong> — TradingView charts, real-time P&amp;L</span></div>
-      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Telegram alerts</strong> — instant push notification on every trade</span></div>
-      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>1-click Railway deployment</strong> — live in under 10 minutes</span></div>
-      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>License key system</strong> — your bot, your API keys, your control</span></div>
-      <div class="check-item"><span class="check-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Paper trading mode</strong> — practice safely before going live</span></div>
-    </div>
-
-    <!-- TERMINAL -->
-    <div class="terminal-wrap reveal" style="margin-top:72px">
-      <div class="terminal-bar">
-        <div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>
-        <div class="t-title">apex-trade-bot · Railway · Production</div>
-        <div class="t-live"><span class="t-live-dot"></span>LIVE</div>
-      </div>
-      <div class="terminal-body" id="termBody"></div>
+<section class="sec" id="features" style="background:var(--s1)">
+  <div class="sec-in">
+    <span class="slb reveal">What's Included</span>
+    <h2 class="sh reveal">Everything you need for $297.</h2>
+    <p class="ss reveal">No black box. Full source code — modify it, own it, deploy it anywhere, forever.</p>
+    <div class="feat reveal">
+      <div class="feat-i"><div class="feat-d"></div><div class="feat-t"><strong>Full Source Code (Node.js)</strong><span>You own it. No SaaS license. Deploy anywhere, modify freely, fork it.</span></div></div>
+      <div class="feat-i"><div class="feat-d"></div><div class="feat-t"><strong>AI Signal Engine</strong><span>Groq + Claude analyze RSI, MACD, volume, and sentiment in real-time.</span></div></div>
+      <div class="feat-i"><div class="feat-d"></div><div class="feat-t"><strong>8 Coins Supported</strong><span>XRP, DOGE, ADA, BTC, ETH, SOL, BNB, TRX — switch with one env variable.</span></div></div>
+      <div class="feat-i"><div class="feat-d"></div><div class="feat-t"><strong>Legendary Strategies</strong><span>Turtle Trading, Livermore breakout, Soros macro — proven methods, automated.</span></div></div>
+      <div class="feat-i"><div class="feat-d"></div><div class="feat-t"><strong>Live TradingView Dashboard</strong><span>Real-time charts and P&amp;L tracking. Watch your bot trade live.</span></div></div>
+      <div class="feat-i"><div class="feat-d"></div><div class="feat-t"><strong>Telegram Instant Alerts</strong><span>Push notification on every trade entry, exit, and P&amp;L update.</span></div></div>
+      <div class="feat-i"><div class="feat-d"></div><div class="feat-t"><strong>1-Click Railway Deploy</strong><span>Zero server management. Live in under 10 minutes from purchase.</span></div></div>
+      <div class="feat-i"><div class="feat-d"></div><div class="feat-t"><strong>Paper Trading Mode</strong><span>Test safely with simulated money before risking real capital.</span></div></div>
     </div>
   </div>
 </section>
 
-<!-- PRICING -->
-<section class="section" id="pricing">
-  <div class="section-inner">
-    <div class="s-tag reveal" style="justify-content:center;color:var(--amber)">Pricing</div>
-    <h2 class="s-h reveal" style="text-align:center">One payment. Own it forever.</h2>
-    <p class="s-sub reveal" style="margin:0 auto;text-align:center">No monthly fees. No SaaS trap. The source code is yours — forever.</p>
-    <div class="price-card-wrap reveal">
-    <div class="price-card">
-      <div class="pc-tag">ONE-TIME PAYMENT <span class="pc-tag-red">LIMITED TIME</span></div>
-      <div class="pc-row">
-        <span class="pc-price">$297</span>
-        <span class="pc-was">$497</span>
+<section class="sec" id="pricing">
+  <div class="sec-in" style="text-align:center">
+    <span class="slb reveal">Pricing</span>
+    <h2 class="sh reveal">One payment. Yours forever.</h2>
+    <p class="ss reveal" style="margin:0 auto">No monthly fees. No subscriptions. The source code is yours — permanently.</p>
+    <div class="pc-wrap reveal">
+      <div class="pc-head">
+        <span class="pc-label">One-Time Purchase &nbsp;·&nbsp; Lifetime Access</span>
+        <div class="pc-row"><span class="pc-p">$297</span><span class="pc-was">$497</span></div>
+        <div class="pc-sub">One-time payment &nbsp;·&nbsp; No subscription</div>
       </div>
-      <div class="pc-once">one-time payment · no subscription · lifetime access</div>
-      <div class="pc-divider"></div>
-      <ul class="pc-features">
-        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Full source code (Node.js)</strong> — you own it</span></li>
-        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>AI signal engine</strong> — Groq + Claude</span></li>
-        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>8 coins</strong> — XRP, DOGE, ADA, BTC, ETH, SOL, BNB, TRX</span></li>
-        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Legendary strategies</strong> — Turtle, Livermore, Soros</span></li>
-        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Live TradingView dashboard</strong></span></li>
-        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Telegram alerts</strong> — every trade, instantly</span></li>
-        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>1-click Railway deploy</strong></span></li>
-        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>License key system</strong> — your keys, your control</span></li>
-        <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Paper trading mode</strong> — safe testing first</span></li>
-      </ul>
-      <a href="#" onclick="openApexModal();return false;" class="pc-cta">Get Instant Access Now →</a>
-      <p class="pc-note">Stripe encrypted · Instant delivery · 30-day money back</p>
-    </div>
-    </div>
-  </div>
-</section>
-
-<!-- FAQ -->
-<section class="section" id="faq">
-  <div class="faq-inner">
-    <div class="s-tag reveal" style="color:var(--blue)">FAQ</div>
-    <h2 class="s-h reveal">Common questions.</h2>
-    <div class="faq-list">
-      <div class="faq-item reveal">
-        <div class="faq-q" onclick="toggleFaq(this)">Do I need coding experience?<div class="faq-icon">+</div></div>
-        <div class="faq-body"><div class="faq-ans">No. You copy-paste your Bybit API keys into Railway's environment variables and click deploy. The setup guide walks you through every step with screenshots. If you can follow instructions, you can run this bot.</div></div>
-      </div>
-      <div class="faq-item reveal reveal-d1">
-        <div class="faq-q" onclick="toggleFaq(this)">What exchange does it use?<div class="faq-icon">+</div></div>
-        <div class="faq-body"><div class="faq-ans"><strong>Bybit.</strong> Bybit has a full paper trading mode built in so you can test with zero real money at risk. We strongly recommend starting with <code>PAPER_TRADING=true</code> until you're comfortable with the bot's behavior.</div></div>
-      </div>
-      <div class="faq-item reveal reveal-d2">
-        <div class="faq-q" onclick="toggleFaq(this)">Can I lose money?<div class="faq-icon">+</div></div>
-        <div class="faq-body"><div class="faq-ans"><strong>Yes. Always start with <code>PAPER_TRADING=true</code>.</strong> Crypto trading carries real financial risk. The bot automates a strategy, but no strategy wins 100% of the time. We sell technology, not a guarantee of profit. Never trade with money you cannot afford to lose.</div></div>
-      </div>
-      <div class="faq-item reveal reveal-d3">
-        <div class="faq-q" onclick="toggleFaq(this)">What AI does it use?<div class="faq-icon">+</div></div>
-        <div class="faq-body"><div class="faq-ans">The primary engine is <strong>Groq</strong> — which has a generous free tier, so signals cost you nothing extra. Claude (Anthropic) is used as a fallback for deeper analysis. Both are optional and fully configurable via environment variables.</div></div>
-      </div>
-      <div class="faq-item reveal reveal-d4">
-        <div class="faq-q" onclick="toggleFaq(this)">Can I change the strategy?<div class="faq-icon">+</div></div>
-        <div class="faq-body"><div class="faq-ans">Yes. Every setting — coin pair, strategy, risk percentage, stop-loss, take-profit ratio — is an environment variable. No code changes needed. Switch between Turtle, Livermore, and Soros strategies in seconds.</div></div>
+      <div class="pc-body">
+        <ul class="pc-list">
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span><strong>Full source code (Node.js)</strong> — own it forever</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span><strong>AI signal engine</strong> — Groq + Claude analysis</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span><strong>8 supported coins</strong> — XRP, DOGE, ADA, BTC &amp; more</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span><strong>Legendary strategies</strong> — Turtle, Livermore, Soros</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span><strong>Live TradingView dashboard</strong></span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span><strong>Telegram alerts</strong> — every trade, instantly</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span><strong>1-click Railway deploy</strong> — live in under 10 min</span></li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span><strong>Paper trading mode</strong> — test safely first</span></li>
+        </ul>
+        <a href="#" onclick="openApexModal();return false;" class="pc-cta">Get Instant Access — $297</a>
+        <p class="pc-note">Stripe encrypted &nbsp;·&nbsp; Instant delivery &nbsp;·&nbsp; 30-day money back</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- FOOTER -->
+<section class="sec" id="faq">
+  <div class="sec-in">
+    <div class="faq-in">
+      <span class="slb reveal">FAQ</span>
+      <h2 class="sh reveal">Common questions.</h2>
+      <div class="faq-list">
+        <div class="faq-item reveal">
+          <div class="fq" onclick="toggleFaq(this)">Do I need coding experience?<div class="fi-x"></div></div>
+          <div class="fb"><div class="fa">No. You copy-paste your Bybit API keys into Railway's environment variables and click deploy. The setup guide walks you through every step with screenshots. If you can follow instructions, you can run this bot.</div></div>
+        </div>
+        <div class="faq-item reveal d1">
+          <div class="fq" onclick="toggleFaq(this)">What exchange does it use?<div class="fi-x"></div></div>
+          <div class="fb"><div class="fa"><strong>Bybit.</strong> Bybit has full paper trading built in — test with zero real money at risk. We strongly recommend starting with <code>PAPER_TRADING=true</code> until you're confident with the bot's behavior.</div></div>
+        </div>
+        <div class="faq-item reveal d2">
+          <div class="fq" onclick="toggleFaq(this)">Can I lose money?<div class="fi-x"></div></div>
+          <div class="fb"><div class="fa"><strong>Yes. Always start with <code>PAPER_TRADING=true</code>.</strong> Crypto trading carries real financial risk. The bot automates a strategy but no strategy wins 100% of the time. Never trade with money you cannot afford to lose.</div></div>
+        </div>
+        <div class="faq-item reveal">
+          <div class="fq" onclick="toggleFaq(this)">What AI does it use?<div class="fi-x"></div></div>
+          <div class="fb"><div class="fa">The primary engine is <strong>Groq</strong> — which has a generous free tier, so AI signals cost you nothing extra. Claude (Anthropic) is used as a fallback for deeper analysis. Both are optional and configurable via environment variables.</div></div>
+        </div>
+        <div class="faq-item reveal d1">
+          <div class="fq" onclick="toggleFaq(this)">Can I change the strategy?<div class="fi-x"></div></div>
+          <div class="fb"><div class="fa">Yes. Every setting — coin pair, strategy, risk %, stop-loss, take-profit — is an environment variable. Switch between Turtle, Livermore, and Soros strategies in seconds without touching any code.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <footer>
-  <div class="foot-inner">
-    <div class="foot-top">
-      <div>
-        <a href="#" class="foot-logo">⚡ Apex Trade Bot</a>
-        <div class="foot-tagline">AI-powered trading for everyone</div>
-      </div>
-      <div class="foot-links">
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
-        <a href="mailto:support@aicashsystem.space">Support</a>
-      </div>
+  <div class="foot-in">
+    <a href="#" class="foot-l">Apex Trade Bot</a>
+    <div class="foot-links">
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+      <a href="mailto:support@aicashsystem.space">Support</a>
     </div>
-    <div class="foot-bot">
-      <div class="foot-copy">© 2025 AICashSystem · aicashsystem.space</div>
-      <div class="foot-email">Support: <a href="mailto:support@aicashsystem.space">support@aicashsystem.space</a></div>
-    </div>
+    <div class="foot-c">&copy; 2025 AICashSystem &nbsp;·&nbsp; aicashsystem.space</div>
   </div>
 </footer>
 
 <script>
-// NAV
-window.addEventListener('scroll',function(){
-  document.getElementById('navbar').style.background=window.scrollY>40?'rgba(5,8,20,.98)':'rgba(5,8,20,.85)';
-});
-
-// REVEAL
-var rObs=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');rObs.unobserve(e.target);}});},{threshold:.06,rootMargin:'0px 0px -20px 0px'});
-document.querySelectorAll('.reveal').forEach(function(el){rObs.observe(el);});
-
-// FAQ
+window.addEventListener('scroll',function(){document.getElementById('nav').classList.toggle('scrolled',window.scrollY>30);});
+var rO=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');rO.unobserve(e.target);}});},{threshold:.06,rootMargin:'0px 0px -20px 0px'});
+document.querySelectorAll('.reveal').forEach(function(el){rO.observe(el);});
 function toggleFaq(el){var item=el.parentElement,was=item.classList.contains('open');document.querySelectorAll('.faq-item').forEach(function(i){i.classList.remove('open');});if(!was)item.classList.add('open');}
-
-// TERMINAL auto-type
-(function(){
-  function ts(){return new Date().toTimeString().slice(0,8);}
-  var lines=[
-    function(){return '<span class="tl-t">['+ts()+']</span> <span class="tl-info">INFO </span> Bot started — pair: XRPUSDT · strategy: TURTLE+LIVERMORE';},
-    function(){return '<span class="tl-t">['+ts()+']</span> <span class="tl-info">INFO </span> Bybit API connected <span class="tl-ok">✓</span>';},
-    function(){return '<span class="tl-t">['+ts()+']</span> <span class="tl-ai">AI   </span> Groq initialized · model: llama-3.3-70b';},
-    function(){return '<span class="tl-t">['+ts()+']</span> <span class="tl-ai">AI   </span> RSI: 34 · MACD: ▲ · Volume: 2.1× · Livermore: <span class="tl-ok">BULLISH 78%</span>';},
-    function(){return '<span class="tl-t">['+ts()+']</span> <span class="tl-trade">TRADE</span> 🟢 LONG XRPUSDT · qty: 150 · entry: $2.3847';},
-    function(){return '<span class="tl-t">['+ts()+']</span> <span class="tl-info">INFO </span> SL: $2.3490 · TP: $2.4565 · R:R = 1:2.1';},
-    function(){return '<span class="tl-t">['+ts()+']</span> <span class="tl-info">INFO </span> 📲 Telegram alert sent';},
-    function(){return '<span class="tl-t">['+ts()+']</span> <span class="tl-close">CLOSE</span> 🎯 TP HIT → P&L: <span class="tl-ok">+$10.77 (+2.2%)</span>';},
-    function(){return '<span class="tl-t">['+ts()+']</span> <span class="tl-info">INFO </span> Balance: $110.77 ↑ · Next scan in 10 min';}
-  ];
-  var body=document.getElementById('termBody');
-  if(!body)return;
-  var i=0;
-  function addLine(){
-    if(i>=lines.length){i=0;body.innerHTML='';}
-    var div=document.createElement('div');
-    div.className='tl';div.style.cssText='opacity:0;transform:translateX(-6px);transition:all .3s ease';
-    div.innerHTML=lines[i++]();
-    body.appendChild(div);
-    requestAnimationFrame(function(){div.style.opacity='1';div.style.transform='translateX(0)';});
-    if(body.children.length>10)body.removeChild(body.children[0]);
-    setTimeout(addLine,1000);
-  }
-  setTimeout(addLine,600);
-})();
-
-// FLOATING PATHS BACKGROUND (ported from Framer Motion BackgroundPaths)
-(function(){
-  var ns='http://www.w3.org/2000/svg';
-  var container=document.getElementById('heroPaths');
-  if(!container)return;
-
-  function buildSVG(position){
-    var svg=document.createElementNS(ns,'svg');
-    svg.setAttribute('viewBox','0 0 696 316');
-    svg.setAttribute('fill','none');
-    svg.setAttribute('preserveAspectRatio','xMidYMid slice');
-    svg.style.cssText='position:absolute;inset:0;width:100%;height:100%';
-
-    for(var i=0;i<36;i++){
-      var x0=-(380-i*5*position),y0=-(189+i*6);
-      var x1=-(312-i*5*position),y1=(216-i*6);
-      var x2=(152-i*5*position), y2=(343-i*6);
-      var x3=(616-i*5*position), y3=(470-i*6);
-      var x4=(684-i*5*position), y4=(875-i*6);
-      var d='M'+x0+' '+y0+'C'+x0+' '+y0+' '+x1+' '+y1+' '+x2+' '+y2+'C'+x3+' '+y3+' '+x4+' '+y4+' '+x4+' '+y4;
-
-      var path=document.createElementNS(ns,'path');
-      path.setAttribute('d',d);
-      // White base with amber tint on later paths for brand warmth
-      var r=255,g=255,b=255;
-      if(i>18){r=255;g=230+Math.floor((i-18)*1.2);b=180+Math.floor((i-18)*2)}
-      var opacity=(0.04+i*0.012).toFixed(3);
-      path.setAttribute('stroke','rgba('+r+','+g+','+b+','+opacity+')');
-      path.setAttribute('stroke-width',(0.5+i*0.03).toFixed(2));
-      path.setAttribute('fill','none');
-      svg.appendChild(path);
-
-      // Animate after appending so getTotalLength works
-      (function(p,idx){
-        requestAnimationFrame(function(){
-          var len=p.getTotalLength()||1200;
-          var segLen=len*0.3;
-          p.setAttribute('stroke-dasharray',segLen+' '+(len-segLen));
-          var dur=(20000+Math.random()*12000);
-          var delay=-(Math.random()*dur); // start mid-animation for immediate visibility
-          p.animate(
-            [{strokeDashoffset:len,opacity:0.3+idx*0.01},
-             {strokeDashoffset:len*0.5,opacity:0.6+idx*0.01},
-             {strokeDashoffset:0,opacity:0.3+idx*0.01}],
-            {duration:dur,delay:delay,iterations:Infinity,easing:'linear'}
-          );
-        });
-      })(path,i);
-    }
-    return svg;
-  }
-
-  container.appendChild(buildSVG(1));
-  container.appendChild(buildSVG(-1));
-})();
-
-// ANIMATED PNL in hero mockup
-(function(){
-  var el=document.getElementById('mockPnl');
-  if(!el)return;
-  var base=18.44,cents=0;
-  setInterval(function(){
-    cents+=Math.random()*0.03;
-    var val=(base+cents);
-    var pct=(0.8+(cents/base)*100*0.8).toFixed(1);
-    el.textContent='+$'+val.toFixed(2)+' (+'+pct+'%)';
-  },2000);
-})();
 </script>
 
 <!-- PAYMENT MODAL -->
 <style>
-#apexModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(5,8,22,.92);backdrop-filter:blur(24px)}
+#apexModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(3,5,14,.96);backdrop-filter:blur(24px)}
 #apexModal.open{display:flex}
-/* Modal card — easemize sign-in style with rotating gradient border */
-.am-border-wrap{position:relative;width:100%;max-width:480px;border-radius:26px;padding:1.5px;background:conic-gradient(from var(--ma,0deg),#f59e0b 0%,#8b5cf6 30%,#3b82f6 60%,#f59e0b 100%);animation:spin-modal 8s linear infinite}
-@property --ma{syntax:'<angle>';initial-value:0deg;inherits:false}
-@keyframes spin-modal{to{--ma:360deg}}
-.am-card{background:#080e1e;border-radius:25px;width:100%;position:relative;overflow-y:auto;max-height:88vh}
-.am-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(248,250,252,.5);font-size:18px;cursor:pointer;z-index:2;transition:all .2s;display:flex;align-items:center;justify-content:center}
-.am-close:hover{color:#fff;background:rgba(255,255,255,.1)}
-/* Brand header */
-.am-brand{padding:32px 32px 0;text-align:center}
-.am-logo{display:inline-flex;align-items:center;gap:8px;font-family:var(--heading);font-size:13px;font-weight:700;color:var(--amber);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px}
-.am-logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:10px;display:flex;align-items:center;justify-content:center}
-.am-logo-icon svg{width:20px;height:20px;stroke:#000;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-.am-brand h2{font-family:var(--heading);font-size:18px;font-weight:800;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
-.am-brand-sub{font-size:13px;color:var(--text2);margin-bottom:0}
-/* Price badge */
-.am-price-badge{display:inline-flex;align-items:baseline;gap:6px;margin:16px 0;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:12px;padding:10px 20px}
-.am-amount{font-size:36px;font-weight:900;color:var(--amber);font-family:var(--heading);line-height:1}
-.am-was{font-size:15px;color:rgba(248,250,252,.3);text-decoration:line-through;font-family:var(--mono)}
-.am-once{font-size:10px;color:var(--text3);letter-spacing:1px;font-family:var(--mono);text-transform:uppercase;margin-left:4px}
-/* Divider */
-.am-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.08) 30%,rgba(255,255,255,.08) 70%,transparent);margin:0 32px}
-/* Form */
-.am-body{padding:20px 32px 28px}
-.am-field{margin-bottom:14px}
-.am-label{font-size:10px;font-weight:700;color:rgba(248,250,252,.35);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;display:block;font-family:var(--mono)}
-.am-input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 16px;font-size:14px;color:#fff;font-family:var(--font);transition:border-color .2s,background .2s;outline:none;line-height:1}
-.am-input:focus{border-color:var(--amber);background:rgba(245,158,11,.04)}
-.am-input::placeholder{color:rgba(248,250,252,.25)}
-#am-card-element{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 16px;transition:border-color .2s}
-#am-card-element.StripeElement--focus{border-color:var(--amber);background:rgba(245,158,11,.04)}
-#am-card-error{font-size:11px;color:#f87171;margin-top:6px;min-height:14px;font-family:var(--mono)}
-.am-checks{display:flex;flex-direction:column;gap:8px;margin:14px 0}
-.am-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:2px 0}
-.am-check input[type=checkbox]{width:16px;height:16px;flex-shrink:0;margin-top:1px;accent-color:var(--amber);cursor:pointer;border-radius:4px}
-.am-check-txt{font-size:11px;color:rgba(248,250,252,.5);line-height:1.65}
-.am-check-txt strong{color:rgba(248,250,252,.8)}
-.am-check-txt a{color:var(--blue);text-decoration:none}
-.am-check-txt a:hover{text-decoration:underline}
-.am-submit{width:100%;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-size:11px;font-weight:700;padding:17px;border-radius:12px;border:none;cursor:pointer;letter-spacing:2px;text-transform:uppercase;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px;box-shadow:0 4px 24px rgba(245,158,11,.3),0 0 0 0 rgba(245,158,11,0);font-family:var(--heading);min-height:54px}
-.am-submit:hover:not(:disabled){box-shadow:0 4px 40px rgba(245,158,11,.5);background:linear-gradient(135deg,#fbbf24,#f59e0b)}
-.am-submit:disabled{opacity:.3;cursor:not-allowed}
-.am-spinner{width:14px;height:14px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:am-spin .7s linear infinite;display:none}
-@keyframes am-spin{to{transform:rotate(360deg)}}
-.am-note{font-size:10px;color:rgba(248,250,252,.25);text-align:center;margin-top:12px;font-family:var(--mono);letter-spacing:.3px}
-.am-success{padding:52px 32px;text-align:center;display:none}
-.am-success-icon{width:64px;height:64px;background:rgba(245,158,11,.1);border:2px solid rgba(245,158,11,.3);border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:32px}
-.am-success h3{font-size:18px;font-weight:800;margin-bottom:10px;color:var(--amber);font-family:var(--heading);letter-spacing:2px;text-transform:uppercase}
-.am-success p{font-size:13px;color:var(--text2);line-height:1.8}
+.am-card{background:#09101f;border:1px solid var(--b2);border-radius:10px;width:100%;max-width:460px;position:relative;overflow-y:auto;max-height:90vh;box-shadow:0 0 0 1px rgba(201,165,90,.08),0 40px 100px rgba(0,0,0,.7)}
+.am-close{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--b);color:var(--tm);font-size:18px;cursor:pointer;z-index:2;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.am-close:hover{color:var(--t);background:rgba(255,255,255,.1)}
+.am-top{padding:28px 28px 0;text-align:center}
+.am-title{font-family:var(--serif);font-size:22px;font-weight:700;margin-bottom:6px;letter-spacing:-.2px}
+.am-sub{font-size:13px;color:var(--tm);margin-bottom:16px;font-weight:300}
+.am-badge{display:inline-flex;align-items:baseline;gap:8px;background:rgba(201,165,90,.07);border:1px solid rgba(201,165,90,.18);border-radius:6px;padding:9px 20px}
+.am-amt{font-size:32px;font-weight:700;color:var(--g);line-height:1;font-family:var(--serif)}
+.am-was{font-size:14px;color:var(--td);text-decoration:line-through;font-weight:400}
+.am-once{font-size:10px;color:var(--td);letter-spacing:1px;text-transform:uppercase;align-self:center}
+.am-div{height:1px;background:var(--b);margin:20px 28px 0}
+.am-body{padding:20px 28px 24px}
+.am-label{font-size:10px;font-weight:700;color:var(--td);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;display:block}
+.am-input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--b);border-radius:7px;padding:13px 15px;font-size:14px;color:var(--t);font-family:var(--sans);transition:border-color .2s;outline:none;margin-bottom:14px;line-height:1}
+.am-input:focus{border-color:var(--g)}
+.am-input::placeholder{color:var(--td)}
+#am-card-element{background:rgba(255,255,255,.04);border:1px solid var(--b);border-radius:7px;padding:13px 15px;margin-bottom:6px;transition:border-color .2s}
+#am-card-element.StripeElement--focus{border-color:var(--g)}
+#am-card-error{font-size:11px;color:#f87171;margin-bottom:12px;min-height:14px;font-family:var(--mono)}
+.am-checks{display:flex;flex-direction:column;gap:9px;margin-bottom:16px}
+.am-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+.am-check input{width:15px;height:15px;flex-shrink:0;margin-top:2px;accent-color:var(--g);cursor:pointer}
+.am-check span{font-size:11px;color:var(--td);line-height:1.65}
+.am-check span strong{color:var(--tm)}
+.am-check span a{color:var(--g);text-decoration:none}
+.am-check span a:hover{text-decoration:underline}
+.am-btn{width:100%;background:var(--g);color:#000;font-size:11px;font-weight:700;padding:16px;border-radius:6px;border:none;cursor:pointer;letter-spacing:2px;text-transform:uppercase;transition:background .2s;display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--sans);min-height:52px}
+.am-btn:hover:not(:disabled){background:var(--g2)}
+.am-btn:disabled{opacity:.3;cursor:not-allowed}
+.am-spin{width:13px;height:13px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.am-note{font-size:10px;color:var(--td);text-align:center;margin-top:10px;letter-spacing:.3px}
+.am-success{padding:48px 28px;text-align:center;display:none}
+.am-si{width:56px;height:56px;background:rgba(201,165,90,.09);border:1px solid rgba(201,165,90,.22);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+.am-si svg{width:24px;height:24px;stroke:var(--g);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.am-success h3{font-family:var(--serif);font-size:22px;font-weight:700;margin-bottom:10px}
+.am-success p{font-size:14px;color:var(--tm);line-height:1.8;font-weight:300}
 </style>
 
 <div id="apexModal">
-  <div class="am-border-wrap">
   <div class="am-card">
-    <button class="am-close" aria-label="Close" onclick="closeApexModal()">×</button>
+    <button class="am-close" aria-label="Close" onclick="closeApexModal()">&#215;</button>
     <div id="amForm">
-      <div class="am-brand">
-        <div class="am-logo">
-          <div class="am-logo-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
-          APEX BOT
-        </div>
-        <h2>Complete Your Order</h2>
-        <p class="am-brand-sub">One-time purchase — full source code, yours forever</p>
-        <div class="am-price-badge">
-          <span class="am-amount">$297</span>
+      <div class="am-top">
+        <h2 class="am-title">Complete Your Order</h2>
+        <p class="am-sub">One-time purchase &nbsp;·&nbsp; Full source code &nbsp;·&nbsp; Instant delivery</p>
+        <div class="am-badge">
+          <span class="am-amt">$297</span>
           <span class="am-was">$497</span>
           <span class="am-once">one-time</span>
         </div>
       </div>
-      <div class="am-divider"></div>
+      <div class="am-div"></div>
       <div class="am-body">
-        <div class="am-field">
-          <label class="am-label">Full name</label>
-          <input id="amName" class="am-input" type="text" placeholder="Your name" autocomplete="name">
-        </div>
-        <div class="am-field">
-          <label class="am-label">Email — license key delivery</label>
-          <input id="amEmail" class="am-input" type="email" placeholder="you@email.com" autocomplete="email">
-        </div>
-        <div class="am-field">
-          <label class="am-label">Card details</label>
-          <div id="am-card-element"></div>
-          <div id="am-card-error"></div>
-        </div>
+        <label class="am-label" for="amName">Full name</label>
+        <input id="amName" class="am-input" type="text" placeholder="Your name" autocomplete="name"/>
+        <label class="am-label" for="amEmail">Email &mdash; license key delivery</label>
+        <input id="amEmail" class="am-input" type="email" placeholder="you@email.com" autocomplete="email"/>
+        <label class="am-label">Card details</label>
+        <div id="am-card-element"></div>
+        <div id="am-card-error"></div>
         <div class="am-checks">
-          <label class="am-check"><input type="checkbox" id="ck1" onchange="updateBtn()"><span class="am-check-txt">I understand crypto trading involves <strong>significant risk of loss</strong>, including total loss of capital.</span></label>
-          <label class="am-check"><input type="checkbox" id="ck2" onchange="updateBtn()"><span class="am-check-txt">I confirm this software is <strong>NOT financial advice</strong>. AI Cash Systems is not responsible for trading losses.</span></label>
-          <label class="am-check"><input type="checkbox" id="ck3" onchange="updateBtn()"><span class="am-check-txt">I consent to <strong>immediate digital delivery</strong> and waive my 14-day withdrawal right. Sales are final.</span></label>
-          <label class="am-check"><input type="checkbox" id="ck4" onchange="updateBtn()"><span class="am-check-txt">I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
+          <label class="am-check"><input type="checkbox" id="ck1" onchange="updateBtn()"/><span>I understand crypto trading involves <strong>significant risk of loss</strong>, including total loss of capital.</span></label>
+          <label class="am-check"><input type="checkbox" id="ck2" onchange="updateBtn()"/><span>I confirm this software is <strong>NOT financial advice</strong>. AI Cash Systems is not responsible for trading losses.</span></label>
+          <label class="am-check"><input type="checkbox" id="ck3" onchange="updateBtn()"/><span>I consent to <strong>immediate digital delivery</strong> and waive my 14-day withdrawal right. Sales are final.</span></label>
+          <label class="am-check"><input type="checkbox" id="ck4" onchange="updateBtn()"/><span>I agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
         </div>
-        <button id="amBtn" class="am-submit" disabled onclick="submitApexPayment()">
-          <span id="amSpinner" class="am-spinner"></span>
+        <button id="amBtn" class="am-btn" disabled onclick="submitApexPayment()">
+          <span id="amSpinner" class="am-spin"></span>
           <span id="amBtnTxt">Check all boxes to continue</span>
         </button>
-        <p class="am-note">Stripe encrypted · Instant delivery · No subscription</p>
+        <p class="am-note">Stripe encrypted &nbsp;·&nbsp; Instant delivery &nbsp;·&nbsp; No subscription</p>
       </div>
     </div>
     <div class="am-success" id="amSuccess">
-      <div class="am-success-icon">⚡</div>
+      <div class="am-si"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
       <h3>Access Granted</h3>
-      <p>Redirecting to your setup page...<br><br>Your License Key and bot configurator are ready.</p>
+      <p>Redirecting to your setup page...<br/><br/>Your license key and bot configurator are ready.</p>
     </div>
-  </div>
   </div>
 </div>
 
@@ -699,7 +396,7 @@ function openApexModal(){
   document.body.style.overflow='hidden';
   if(!apexStripe){
     apexStripe=Stripe(STRIPE_PK);
-    var els=apexStripe.elements({appearance:{theme:'night',variables:{colorPrimary:'#f59e0b',colorBackground:'#050814',colorText:'#f1f5f9',borderRadius:'10px'}}});
+    var els=apexStripe.elements({appearance:{theme:'night',variables:{colorPrimary:'#c9a55a',colorBackground:'#050814',colorText:'#f0f2f7',borderRadius:'7px'}}});
     apexCard=els.create('card',{hidePostalCode:true});
     apexCard.mount('#am-card-element');
     apexCard.on('change',function(e){document.getElementById('am-card-error').textContent=e.error?e.error.message:'';});
