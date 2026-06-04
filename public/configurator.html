@@ -131,9 +131,50 @@
       .code-box { font-size: 0.72rem; padding: 1rem; }
       .header h1 { font-size: 1.4rem; }
     }
+
+    /* License key overlay */
+    .key-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 999;
+      background: rgba(5,8,20,0.92);
+      backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+      padding: 1rem;
+    }
+    .key-overlay-box {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 18px;
+      padding: 2rem 1.75rem;
+      max-width: 440px; width: 100%;
+      text-align: center;
+    }
+    .key-overlay-box h2 { font-size: 1.2rem; font-weight: 800; color: #fff; margin-bottom: 0.4rem; }
+    .key-overlay-box p  { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.5; }
+    .key-overlay-box .input-field { text-align: center; letter-spacing: 0.08em; font-size: 1rem; margin-bottom: 0.5rem; }
+    .key-overlay-box .err { font-size: 0.75rem; color: var(--danger); min-height: 1.2em; margin-bottom: 0.75rem; }
+    .key-overlay-box .btn-next { display: block; width: 100%; }
   </style>
 </head>
 <body>
+
+<!-- License Key Overlay -->
+<div class="key-overlay" id="key-overlay">
+  <div class="key-overlay-box">
+    <h2>Introdu Cheia de Licență</h2>
+    <p>Ai primit cheia APEX prin email după cumpărare.<br>Format: <code style="color:var(--amber)">APEX-XXXX-XXXX-XXXX</code></p>
+    <input class="input-field" id="manual-key-input" type="text"
+           placeholder="APEX-XXXX-XXXX-XXXX"
+           maxlength="19"
+           oninput="this.value=this.value.toUpperCase()"
+           onkeydown="if(event.key==='Enter')submitManualKey()" />
+    <div class="err" id="key-overlay-err"></div>
+    <button class="btn-next" onclick="submitManualKey()">Activează →</button>
+    <div style="margin-top:1rem;font-size:0.75rem;color:var(--muted)">
+      Nu ai cheie? <a href="/" style="color:var(--amber)">Cumpără botul</a>
+    </div>
+  </div>
+</div>
 
 <div class="header">
   <div class="logo">APEX Trade Bot</div>
@@ -336,12 +377,41 @@ const state = {
 };
 
 (function init() {
-  const key = new URLSearchParams(window.location.search).get('key');
-  if (key && /^APEX-/i.test(key)) state.licenseKey = key.toUpperCase();
+  // 1. URL param takes priority
+  const urlKey = new URLSearchParams(window.location.search).get('key');
+  if (urlKey && /^APEX-/i.test(urlKey)) {
+    state.licenseKey = urlKey.toUpperCase();
+    try { localStorage.setItem('apex_license', state.licenseKey); } catch {}
+  } else {
+    // 2. Fallback to localStorage (user re-opened page without URL)
+    try {
+      const saved = localStorage.getItem('apex_license');
+      if (saved && /^APEX-/i.test(saved)) state.licenseKey = saved;
+    } catch {}
+  }
+
   renderStrategies();
   renderCoins();
   renderRisks();
+
+  // 3. If still no valid key, show the key entry overlay
+  if (state.licenseKey === 'APEX-XXXX-XXXX-XXXX') showKeyOverlay();
 })();
+
+function showKeyOverlay() {
+  document.getElementById('key-overlay').style.display = 'flex';
+}
+
+function submitManualKey() {
+  const val = document.getElementById('manual-key-input').value.trim().toUpperCase();
+  if (!/^APEX-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(val)) {
+    document.getElementById('key-overlay-err').textContent = 'Format invalid. Exemplu: APEX-AB12-CD34-EF56';
+    return;
+  }
+  state.licenseKey = val;
+  try { localStorage.setItem('apex_license', val); } catch {}
+  document.getElementById('key-overlay').style.display = 'none';
+}
 
 function renderStrategies() {
   document.getElementById('strategy-cards').innerHTML = STRATEGIES.map(s => `
