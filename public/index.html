@@ -174,6 +174,10 @@ footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px
 .reveal{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
 .reveal.visible{opacity:1;transform:none}
 .reveal-d1{transition-delay:.08s}.reveal-d2{transition-delay:.16s}.reveal-d3{transition-delay:.24s}.reveal-d4{transition-delay:.32s}
+
+/* FLOATING PATHS */
+#heroPaths{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+#heroPaths svg{position:absolute;inset:0;width:100%;height:100%}
 </style>
 </head>
 <body>
@@ -190,7 +194,8 @@ footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px
 </nav>
 
 <!-- HERO -->
-<section style="padding-top:66px">
+<section style="padding-top:66px;position:relative;overflow:hidden">
+<div id="heroPaths"></div>
 <div class="hero">
   <div class="hero-left">
     <div class="hero-badge"><span class="badge-dot"></span>🔴 LIVE &nbsp;·&nbsp; AI Trading Bot</div>
@@ -459,6 +464,62 @@ function toggleFaq(el){var item=el.parentElement,was=item.classList.contains('op
     setTimeout(addLine,1000);
   }
   setTimeout(addLine,600);
+})();
+
+// FLOATING PATHS BACKGROUND (ported from Framer Motion BackgroundPaths)
+(function(){
+  var ns='http://www.w3.org/2000/svg';
+  var container=document.getElementById('heroPaths');
+  if(!container)return;
+
+  function buildSVG(position){
+    var svg=document.createElementNS(ns,'svg');
+    svg.setAttribute('viewBox','0 0 696 316');
+    svg.setAttribute('fill','none');
+    svg.setAttribute('preserveAspectRatio','xMidYMid slice');
+    svg.style.cssText='position:absolute;inset:0;width:100%;height:100%';
+
+    for(var i=0;i<36;i++){
+      var x0=-(380-i*5*position),y0=-(189+i*6);
+      var x1=-(312-i*5*position),y1=(216-i*6);
+      var x2=(152-i*5*position), y2=(343-i*6);
+      var x3=(616-i*5*position), y3=(470-i*6);
+      var x4=(684-i*5*position), y4=(875-i*6);
+      var d='M'+x0+' '+y0+'C'+x0+' '+y0+' '+x1+' '+y1+' '+x2+' '+y2+'C'+x3+' '+y3+' '+x4+' '+y4+' '+x4+' '+y4;
+
+      var path=document.createElementNS(ns,'path');
+      path.setAttribute('d',d);
+      // White base with amber tint on later paths for brand warmth
+      var r=255,g=255,b=255;
+      if(i>18){r=255;g=230+Math.floor((i-18)*1.2);b=180+Math.floor((i-18)*2)}
+      var opacity=(0.04+i*0.012).toFixed(3);
+      path.setAttribute('stroke','rgba('+r+','+g+','+b+','+opacity+')');
+      path.setAttribute('stroke-width',(0.5+i*0.03).toFixed(2));
+      path.setAttribute('fill','none');
+      svg.appendChild(path);
+
+      // Animate after appending so getTotalLength works
+      (function(p,idx){
+        requestAnimationFrame(function(){
+          var len=p.getTotalLength()||1200;
+          var segLen=len*0.3;
+          p.setAttribute('stroke-dasharray',segLen+' '+(len-segLen));
+          var dur=(20000+Math.random()*12000);
+          var delay=-(Math.random()*dur); // start mid-animation for immediate visibility
+          p.animate(
+            [{strokeDashoffset:len,opacity:0.3+idx*0.01},
+             {strokeDashoffset:len*0.5,opacity:0.6+idx*0.01},
+             {strokeDashoffset:0,opacity:0.3+idx*0.01}],
+            {duration:dur,delay:delay,iterations:Infinity,easing:'linear'}
+          );
+        });
+      })(path,i);
+    }
+    return svg;
+  }
+
+  container.appendChild(buildSVG(1));
+  container.appendChild(buildSVG(-1));
 })();
 
 // ANIMATED PNL in hero mockup
