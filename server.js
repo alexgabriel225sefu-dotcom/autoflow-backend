@@ -1355,9 +1355,9 @@ app.get('/debug', auth, (req, res) => {
   res.json({ ok: true, env: process.env.NODE_ENV, port: process.env.PORT });
 });
 
-// Root redirect — cinematic intro first
+// Root — serve new landing page
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'intro-epic.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // POST /api/demo/generate — public, rate-limited (3 req/IP/day)
