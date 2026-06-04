@@ -995,7 +995,7 @@ async function submitApexPayment(){
     } else if(result.paymentIntent.status==='succeeded'){
       document.getElementById('amForm').style.display='none';
       document.getElementById('amSuccess').style.display='block';
-      var redirect='/bot-setup'+(_pendingKey?'?key='+encodeURIComponent(_pendingKey):'');
+      var redirect='/configurator'+(_pendingKey?'?key='+encodeURIComponent(_pendingKey):'');
       setTimeout(()=>window.location.href=redirect,2000);
     }
   } catch(e){err.textContent='Error: '+e.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';}
