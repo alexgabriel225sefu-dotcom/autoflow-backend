@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>APEX Trade Bot — Configuration Wizard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --green: #00ff88;
+      --cyan: #00cfff;
+      --purple: #7c5cff;
+      --card: #111827;
+      --border: #1f2937;
+      --text: #e5e7eb;
+      --muted: #6b7280;
+      --danger: #ff4d6d;
+      --warn: #f59e0b;
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      padding: 2.5rem 1rem 1.5rem;
+    }
+    .header .logo {
+      font-size: 1rem;
+      letter-spacing: 0.2em;
+      color: var(--cyan);
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .header h1 {
+      font-size: clamp(1.5rem, 4vw, 2.4rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--green) 0%, var(--cyan) 50%, var(--purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+    .header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    /* ── Progress ── */
+    .progress-wrap {
+      max-width: 680px;
+      margin: 0 auto 2rem;
+      padding: 0 1rem;
+    }
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .progress-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-align: center;
+      flex: 1;
+      transition: color 0.3s;
+    }
+    .progress-label.active { color: var(--green); font-weight: 700; }
+    .progress-label.done   { color: var(--cyan); }
+    .progress-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--green), var(--cyan));
+      border-radius: 99px;
+      transition: width 0.4s ease;
+    }
+
+    /* ── Wizard container ── */
+    .wizard {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 0 1rem 4rem;
+    }
+
+    .step {
+      display: none;
+      animation: fadeIn 0.35s ease;
+    }
+    .step.active { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .step-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      color: #fff;
+    }
+    .step-sub {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Coin grid ── */
+    .coin-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+    .coin-btn {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 0.75rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .coin-btn:hover {
+      border-color: var(--green);
+      background: #0f2a1e;
+    }
+    .coin-btn.selected {
+      border-color: var(--green);
+      background: #0d2319;
+      box-shadow: 0 0 16px rgba(0,255,136,0.15);
+    }
+    .coin-btn.selected::after {
+      content: '✓';
+      position: absolute;
+      top: 6px; right: 8px;
+      font-size: 0.75rem;
+      color: var(--green);
+      font-weight: 800;
+    }
+    .coin-emoji { font-size: 1.8rem; display: block; margin-bottom: 0.3rem; }
+    .coin-name  { font-size: 1rem; font-weight: 700; color: #fff; }
+    .coin-sym   { font-size: 0.72rem; color: var(--cyan); font-weight: 600; letter-spacing: 0.04em; margin-bottom: 0.15rem; }
+    .coin-tag   { font-size: 0.68rem; color: var(--muted); }
+
+    /* ── Risk cards ── */
+    .risk-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+    .risk-card {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .risk-card:hover { border-color: var(--cyan); background: #0c1a2a; }
+    .risk-card.selected {
+      border-color: var(--green);
+      background: #0d2319;
+      box-shadow: 0 0 16px rgba(0,255,136,0.15);
+    }
+    .risk-card.selected::after {
+      content: '✓';
+      position: absolute;
+      top: 8px; right: 10px;
+      font-size: 0.8rem;
+      color: var(--green);
+      font-weight: 800;
+    }
+    .risk-icon  { font-size: 1.6rem; margin-bottom: 0.5rem; display: block; }
+    .risk-name  { font-weight: 700; color: #fff; margin-bottom: 0.3rem; font-size: 1rem; }
+    .risk-desc  { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+
+    /* ── Strategy toggles ── */
+    .strategy-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+    .strategy-row {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .strategy-row:hover { border-color: var(--purple); }
+    .strategy-row.on    { border-color: var(--green); }
+    .strategy-info { flex: 1; }
+    .strategy-name { font-weight: 700; font-size: 0.95rem; color: #fff; margin-bottom: 0.15rem; }
+    .strategy-desc { font-size: 0.78rem; color: var(--muted); }
+
+    /* Toggle switch */
+    .toggle {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 99px;
+      transition: background 0.25s;
+      cursor: pointer;
+    }
+    .toggle-track::before {
+      content: '';
+      position: absolute;
+      width: 18px; height: 18px;
+      left: 4px; top: 4px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.25s;
+    }
+    .toggle input:checked + .toggle-track { background: var(--green); }
+    .toggle input:checked + .toggle-track::before { transform: translateX(22px); }
+
+    /* ── Timeframe buttons ── */
+    .tf-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .tf-btn {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem 1.5rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.03em;
+    }
+    .tf-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+    .tf-btn.selected {
+      border-color: var(--green);
+      background: #0d2319;
+      color: var(--green);
+      box-shadow: 0 0 12px rgba(0,255,136,0.15);
+    }
+    .tf-hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    /* ── Config output ── */
+    .config-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .config-header span { font-size: 0.82rem; color: var(--muted); }
+    .copy-btn {
+      background: var(--purple);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.45rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .copy-btn:hover  { background: #6248e0; }
+    .copy-btn:active { transform: scale(0.97); }
+    .copy-btn.copied { background: var(--green); color: #0a0a0f; }
+
+    .code-box {
+      background: #080c14;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.82rem;
+      line-height: 1.8;
+      color: #e5e7eb;
+      white-space: pre;
+      overflow-x: auto;
+      margin-bottom: 1rem;
+    }
+    .code-box .k { color: var(--cyan); }
+    .code-box .v { color: var(--green); }
+    .code-box .c { color: #4b5563; }
+
+    .warn-box {
+      background: #1a1200;
+      border: 1.5px solid #78450a;
+      border-radius: 10px;
+      padding: 0.9rem 1.1rem;
+      font-size: 0.85rem;
+      color: var(--warn);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .deploy-btn {
+      display: block;
+      width: 100%;
+      background: linear-gradient(135deg, var(--green) 0%, var(--cyan) 100%);
+      color: #0a0a0f;
+      font-weight: 800;
+      font-size: 1.1rem;
+      border: none;
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      letter-spacing: 0.03em;
+      transition: opacity 0.2s, transform 0.1s;
+      box-shadow: 0 4px 24px rgba(0,255,136,0.2);
+    }
+    .deploy-btn:hover  { opacity: 0.9; }
+    .deploy-btn:active { transform: scale(0.99); }
+
+    /* ── Nav buttons ── */
+    .nav-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    .btn-back {
+      background: transparent;
+      border: 1.5px solid var(--border);
+      color: var(--muted);
+      border-radius: 10px;
+      padding: 0.7rem 1.4rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-back:hover { border-color: var(--muted); color: var(--text); }
+    .btn-next {
+      flex: 1;
+      background: var(--green);
+      color: #0a0a0f;
+      border: none;
+      border-radius: 10px;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      letter-spacing: 0.03em;
+    }
+    .btn-next:hover  { background: #00e67a; }
+    .btn-next:active { transform: scale(0.98); }
+    .btn-next:disabled {
+      background: var(--border);
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+
+    /* ── Selection summary chips ── */
+    .summary-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .chip {
+      background: #1a2235;
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 0.25rem 0.8rem;
+      font-size: 0.75rem;
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 480px) {
+      .coin-grid { grid-template-columns: repeat(2, 1fr); }
+      .risk-cards { grid-template-columns: 1fr; }
+      .tf-row { gap: 0.5rem; }
+      .tf-btn { padding: 0.65rem 1.1rem; font-size: 1rem; }
+      .code-box { font-size: 0.73rem; padding: 1rem; }
+      .header h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">⚡ APEX Trade Bot</div>
+  <h1>Bot Configuration Wizard</h1>
+  <p>Set up your trading bot in 5 easy steps — no code required.</p>
+</div>
+
+<!-- Progress -->
+<div class="progress-wrap">
+  <div class="progress-labels">
+    <div class="progress-label active" id="lbl-1">1. Coin</div>
+    <div class="progress-label" id="lbl-2">2. Risk</div>
+    <div class="progress-label" id="lbl-3">3. Strategy</div>
+    <div class="progress-label" id="lbl-4">4. Timeframe</div>
+    <div class="progress-label" id="lbl-5">5. Config</div>
+  </div>
+  <div class="progress-track">
+    <div class="progress-fill" id="progress-fill" style="width:20%"></div>
+  </div>
+</div>
+
+<!-- Wizard -->
+<div class="wizard">
+
+  <!-- ── Step 1: Coin ── -->
+  <div class="step active" id="step-1">
+    <div class="step-title">Choose Your Trading Coin</div>
+    <div class="step-sub">Select the cryptocurrency your bot will trade. You can change this later.</div>
+    <div class="coin-grid" id="coin-grid">
+      <!-- rendered by JS -->
+    </div>
+    <div class="nav-row">
+      <button class="btn-next" id="next-1" onclick="goTo(2)" disabled>Next →</button>
+    </div>
+  </div>
+
+  <!-- ── Step 2: Risk ── -->
+  <div class="step" id="step-2">
+    <div class="step-title">Choose Your Risk Level</div>
+    <div class="step-sub">This controls how much of your balance is risked per trade.</div>
+    <div class="risk-cards" id="risk-cards">
+      <!-- rendered by JS -->
+    </div>
+    <div class="nav-row">
+      <button class="btn-back" onclick="goTo(1)">← Back</button>
+      <button class="btn-next" id="next-2" onclick="goTo(3)" disabled>Next →</button>
+    </div>
+  </div>
+
+  <!-- ── Step 3: Strategy ── -->
+  <div class="step" id="step-3">
+    <div class="step-title">Choose Your Strategies</div>
+    <div class="step-sub">All three strategies work together. Disable any you don't want active.</div>
+    <div class="strategy-list" id="strategy-list">
+      <!-- rendered by JS -->
+    </div>
+    <div class="nav-row">
+      <button class="btn-back" onclick="goTo(2)">← Back</button>
+      <button class="btn-next" onclick="goTo(4)">Next →</button>
+    </div>
+  </div>
+
+  <!-- ── Step 4: Timeframe ── -->
+  <div class="step" id="step-4">
+    <div class="step-title">Choose Your Timeframe</div>
+    <div class="step-sub">Controls how frequently your bot checks for trade signals.</div>
+    <div class="tf-row" id="tf-row">
+      <!-- rendered by JS -->
+    </div>
+    <div class="tf-hint">
+      <strong style="color:var(--text)">5m</strong> = more trades, more risk &nbsp;|&nbsp;
+      <strong style="color:var(--green)">15m</strong> = balanced (recommended) &nbsp;|&nbsp;
+      <strong style="color:var(--text)">1h</strong> = fewer, calmer trades &nbsp;|&nbsp;
+      <strong style="color:var(--text)">4h</strong> = swing trading, very selective
+    </div>
+    <div class="nav-row">
+      <button class="btn-back" onclick="goTo(3)">← Back</button>
+      <button class="btn-next" id="next-4" onclick="goTo(5)" disabled>Next →</button>
+    </div>
+  </div>
+
+  <!-- ── Step 5: Config ── -->
+  <div class="step" id="step-5">
+    <div class="step-title">Your Configuration</div>
+    <div class="step-sub">Copy these environment variables into your Railway project.</div>
+
+    <!-- Summary chips -->
+    <div class="summary-row" id="summary-chips"></div>
+
+    <!-- Code box -->
+    <div class="config-header">
+      <span>Railway Environment Variables</span>
+      <button class="copy-btn" id="copy-btn" onclick="copyVars()">📋 Copy All Variables</button>
+    </div>
+    <div class="code-box" id="config-output"></div>
+
+    <div class="warn-box">
+      ⚠️ <strong>Start with <code>PAPER_TRADING=true</code></strong> to test without real money first! Only set it to <code>false</code> once you're confident the bot is working correctly.
+    </div>
+
+    <a class="deploy-btn" id="deploy-btn"
+       href="https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot"
+       target="_blank" rel="noopener noreferrer">
+      🚀 Deploy on Railway
+    </a>
+
+    <div class="nav-row" style="margin-top:1.25rem;">
+      <button class="btn-back" onclick="goTo(4)">← Back</button>
+    </div>
+  </div>
+
+</div><!-- /wizard -->
+
+<script>
+/* ─────────────────── Data ─────────────────── */
+const COINS = [
+  { sym: 'XRPUSDT',  name: 'XRP',  emoji: '🔵', tag: 'High Velocity' },
+  { sym: 'DOGEUSDT', name: 'DOGE', emoji: '🐕', tag: 'Volatile'      },
+  { sym: 'ADAUSDT',  name: 'ADA',  emoji: '💙', tag: 'Stable'        },
+  { sym: 'BTCUSDT',  name: 'BTC',  emoji: '🟡', tag: 'Market Leader' },
+  { sym: 'ETHUSDT',  name: 'ETH',  emoji: '🔷', tag: 'DeFi Leader'   },
+  { sym: 'SOLUSDT',  name: 'SOL',  emoji: '🟣', tag: 'High Growth'   },
+  { sym: 'BNBUSDT',  name: 'BNB',  emoji: '🟡', tag: 'Exchange Coin' },
+  { sym: 'TRXUSDT',  name: 'TRX',  emoji: '🔴', tag: 'Stable'        },
+];
+
+const RISKS = [
+  {
+    id: 'conservative',
+    icon: '🛡️',
+    name: 'Conservative',
+    desc: '1% per trade, tight stop-loss. Best for beginners.',
+    risk: 0.01, sl: 0.010, tp: 0.02,
+  },
+  {
+    id: 'balanced',
+    icon: '⚖️',
+    name: 'Balanced',
+    desc: '2% per trade, moderate risk. Most popular.',
+    risk: 0.02, sl: 0.015, tp: 0.03,
+  },
+  {
+    id: 'aggressive',
+    icon: '🔥',
+    name: 'Aggressive',
+    desc: '5% per trade, wide stops. For experienced traders only.',
+    risk: 0.05, sl: 0.025, tp: 0.05,
+  },
+];
+
+const STRATEGIES = [
+  { id: 'turtle',   emoji: '🐢', name: 'Turtle Trading',    desc: 'Breakout-based entries',         key: 'USE_TURTLE'   },
+  { id: 'livermore',emoji: '📐', name: 'Jesse Livermore',   desc: 'Trend structure analysis',       key: 'USE_LIVERMORE'},
+  { id: 'soros',    emoji: '💡', name: 'George Soros',      desc: 'Momentum / reflexivity trading', key: 'USE_SOROS'    },
+];
+
+const TIMEFRAMES = ['5m', '15m', '1h', '4h'];
+
+/* ─────────────────── State ─────────────────── */
+const state = {
+  licenseKey: 'APEX-XXXX-XXXX-XXXX',
+  coin: null,
+  risk: null,
+  strategies: { turtle: true, livermore: true, soros: true },
+  timeframe: '15m',
+  currentStep: 1,
+};
+
+/* ─────────────────── Init ─────────────────── */
+(function init() {
+  // Read license key from URL
+  const params = new URLSearchParams(window.location.search);
+  const key = params.get('key');
+  if (key && /^APEX-/i.test(key)) {
+    state.licenseKey = key.toUpperCase();
+  }
+
+  renderCoins();
+  renderRisks();
+  renderStrategies();
+  renderTimeframes();
+})();
+
+/* ─────────────────── Renderers ─────────────────── */
+function renderCoins() {
+  const grid = document.getElementById('coin-grid');
+  grid.innerHTML = COINS.map(c => `
+    <button class="coin-btn" data-sym="${c.sym}" onclick="selectCoin('${c.sym}')">
+      <span class="coin-emoji">${c.emoji}</span>
+      <div class="coin-name">${c.name}</div>
+      <div class="coin-sym">${c.sym}</div>
+      <div class="coin-tag">${c.tag}</div>
+    </button>
+  `).join('');
+}
+
+function renderRisks() {
+  const wrap = document.getElementById('risk-cards');
+  wrap.innerHTML = RISKS.map(r => `
+    <div class="risk-card" data-id="${r.id}" onclick="selectRisk('${r.id}')">
+      <span class="risk-icon">${r.icon}</span>
+      <div class="risk-name">${r.name}</div>
+      <div class="risk-desc">${r.desc}</div>
+    </div>
+  `).join('');
+}
+
+function renderStrategies() {
+  const list = document.getElementById('strategy-list');
+  list.innerHTML = STRATEGIES.map(s => `
+    <div class="strategy-row on" id="strat-row-${s.id}" onclick="toggleStrategy('${s.id}')">
+      <div class="strategy-info">
+        <div class="strategy-name">${s.emoji} ${s.name}</div>
+        <div class="strategy-desc">${s.desc}</div>
+      </div>
+      <label class="toggle" onclick="event.stopPropagation()">
+        <input type="checkbox" id="toggle-${s.id}" checked onchange="toggleStrategy('${s.id}')">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+  `).join('');
+}
+
+function renderTimeframes() {
+  const row = document.getElementById('tf-row');
+  row.innerHTML = TIMEFRAMES.map(tf => `
+    <button class="tf-btn${tf === state.timeframe ? ' selected' : ''}"
+            data-tf="${tf}" onclick="selectTF('${tf}')">${tf}</button>
+  `).join('');
+  // default is already 15m, enable next
+  document.getElementById('next-4').disabled = false;
+}
+
+/* ─────────────────── Selection handlers ─────────────────── */
+function selectCoin(sym) {
+  state.coin = sym;
+  document.querySelectorAll('.coin-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.sym === sym);
+  });
+  document.getElementById('next-1').disabled = false;
+}
+
+function selectRisk(id) {
+  state.risk = id;
+  document.querySelectorAll('.risk-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.id === id);
+  });
+  document.getElementById('next-2').disabled = false;
+}
+
+function toggleStrategy(id) {
+  state.strategies[id] = !state.strategies[id];
+  const cb  = document.getElementById('toggle-' + id);
+  const row = document.getElementById('strat-row-' + id);
+  cb.checked = state.strategies[id];
+  row.classList.toggle('on', state.strategies[id]);
+}
+
+function selectTF(tf) {
+  state.timeframe = tf;
+  document.querySelectorAll('.tf-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.tf === tf);
+  });
+  document.getElementById('next-4').disabled = false;
+}
+
+/* ─────────────────── Navigation ─────────────────── */
+function goTo(n) {
+  document.getElementById('step-' + state.currentStep).classList.remove('active');
+  state.currentStep = n;
+  document.getElementById('step-' + n).classList.add('active');
+  updateProgress(n);
+  if (n === 5) buildConfig();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateProgress(step) {
+  const pct = (step / 5) * 100;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  for (let i = 1; i <= 5; i++) {
+    const lbl = document.getElementById('lbl-' + i);
+    lbl.className = 'progress-label' +
+      (i === step ? ' active' : i < step ? ' done' : '');
+  }
+}
+
+/* ─────────────────── Config builder ─────────────────── */
+function buildConfig() {
+  const riskData = RISKS.find(r => r.id === state.risk) || RISKS[1];
+  const coin     = state.coin || 'XRPUSDT';
+  const tf       = state.timeframe;
+
+  // Summary chips
+  const coinInfo = COINS.find(c => c.sym === coin) || COINS[0];
+  const chips = document.getElementById('summary-chips');
+  chips.innerHTML = `
+    <span class="chip">${coinInfo.emoji} ${coinInfo.name}</span>
+    <span class="chip">${RISKS.find(r=>r.id===state.risk)?.icon || '⚖️'} ${state.risk ? state.risk.charAt(0).toUpperCase()+state.risk.slice(1) : 'Balanced'}</span>
+    <span class="chip">⏱ ${tf}</span>
+    ${Object.entries(state.strategies).filter(([,v])=>v).map(([k])=>{
+      const s = STRATEGIES.find(s=>s.id===k);
+      return `<span class="chip">${s.emoji} ${s.name.split(' ')[0]}</span>`;
+    }).join('')}
+  `;
+
+  // Build env var text (plain, for copy)
+  const vars = buildVarsPlain(riskData, coin, tf);
+  window._configPlain = vars;
+
+  // Build highlighted HTML
+  document.getElementById('config-output').innerHTML = buildVarsHTML(riskData, coin, tf);
+}
+
+function buildVarsPlain(riskData, coin, tf) {
+  const lines = [
+    `LICENSE_KEY=${state.licenseKey}`,
+    `SYMBOL=${coin}`,
+    `RISK_PER_TRADE=${riskData.risk}`,
+    `STOP_LOSS_PCT=${riskData.sl}`,
+    `TAKE_PROFIT_PCT=${riskData.tp}`,
+    `TIMEFRAME=${tf}`,
+    `PAPER_TRADING=true`,
+    `EXCHANGE=bybit`,
+    ``,
+    `# Strategy flags`,
+    `USE_TURTLE=${state.strategies.turtle ? 'true' : 'false'}`,
+    `USE_LIVERMORE=${state.strategies.livermore ? 'true' : 'false'}`,
+    `USE_SOROS=${state.strategies.soros ? 'true' : 'false'}`,
+    ``,
+    `# API Keys — fill these in`,
+    `GROQ_API_KEY=get-free-at-console.groq.com`,
+    `BYBIT_API_KEY=your-bybit-api-key`,
+    `BYBIT_API_SECRET=your-bybit-api-secret`,
+    ``,
+    `# Optional Telegram alerts`,
+    `TELEGRAM_BOT_TOKEN=optional`,
+    `TELEGRAM_CHAT_ID=optional`,
+  ];
+  return lines.join('\n');
+}
+
+function buildVarsHTML(riskData, coin, tf) {
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const kv  = (k, v) => `<span class="k">${esc(k)}</span>=<span class="v">${esc(v)}</span>`;
+  const cm  = t => `<span class="c">${esc(t)}</span>`;
+
+  return [
+    kv('LICENSE_KEY', state.licenseKey),
+    kv('SYMBOL', coin),
+    kv('RISK_PER_TRADE', String(riskData.risk)),
+    kv('STOP_LOSS_PCT', String(riskData.sl)),
+    kv('TAKE_PROFIT_PCT', String(riskData.tp)),
+    kv('TIMEFRAME', tf),
+    kv('PAPER_TRADING', 'true'),
+    kv('EXCHANGE', 'bybit'),
+    '',
+    cm('# Strategy flags'),
+    kv('USE_TURTLE', state.strategies.turtle ? 'true' : 'false'),
+    kv('USE_LIVERMORE', state.strategies.livermore ? 'true' : 'false'),
+    kv('USE_SOROS', state.strategies.soros ? 'true' : 'false'),
+    '',
+    cm('# API Keys — fill these in'),
+    kv('GROQ_API_KEY', 'get-free-at-console.groq.com'),
+    kv('BYBIT_API_KEY', 'your-bybit-api-key'),
+    kv('BYBIT_API_SECRET', 'your-bybit-api-secret'),
+    '',
+    cm('# Optional Telegram alerts'),
+    kv('TELEGRAM_BOT_TOKEN', 'optional'),
+    kv('TELEGRAM_CHAT_ID', 'optional'),
+  ].join('\n');
+}
+
+/* ─────────────────── Copy ─────────────────── */
+function copyVars() {
+  const text = window._configPlain || '';
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✅ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋 Copy All Variables';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✅ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋 Copy All Variables';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+</script>
+</body>
+</html>
