@@ -42,9 +42,20 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:66px;display:flex;ali
 @media(max-width:768px){.nav-links{display:none}.nav-cta{padding:9px 14px;font-size:12px}}
 @media(max-width:480px){nav{padding:0 16px}}
 
+/* RAYCAST BACKGROUND */
+.raycast-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.orb{position:absolute;border-radius:50%;filter:blur(100px);will-change:transform}
+.orb-1{width:700px;height:700px;background:radial-gradient(circle,rgba(245,158,11,.18) 0%,transparent 70%);top:-200px;left:-150px;animation:orb1 18s ease-in-out infinite}
+.orb-2{width:600px;height:600px;background:radial-gradient(circle,rgba(139,92,246,.15) 0%,transparent 70%);top:-100px;right:-100px;animation:orb2 22s ease-in-out infinite}
+.orb-3{width:500px;height:500px;background:radial-gradient(circle,rgba(59,130,246,.12) 0%,transparent 70%);bottom:10%;left:20%;animation:orb3 26s ease-in-out infinite}
+.orb-4{width:400px;height:400px;background:radial-gradient(circle,rgba(16,185,129,.1) 0%,transparent 70%);bottom:-100px;right:15%;animation:orb4 20s ease-in-out infinite}
+@keyframes orb1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,-40px) scale(1.08)}66%{transform:translate(-30px,50px) scale(.95)}}
+@keyframes orb2{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-50px,60px) scale(1.05)}66%{transform:translate(40px,-30px) scale(1.1)}}
+@keyframes orb3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-60px) scale(1.12)}}
+@keyframes orb4{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-60px,30px) scale(1.06)}}
+
 /* HERO */
 .hero{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:48px;padding:100px 40px 80px;max-width:1200px;margin:0 auto;position:relative}
-.hero::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 70% 50% at 30% 50%,rgba(245,158,11,.06),transparent),radial-gradient(ellipse 50% 40% at 70% 60%,rgba(59,130,246,.07),transparent);pointer-events:none;z-index:0}
 .hero-left{position:relative;z-index:1}
 .hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border:1px solid rgba(16,185,129,.3);border-radius:100px;font-size:10px;font-weight:700;color:var(--green);letter-spacing:2px;background:rgba(16,185,129,.08);margin-bottom:28px;font-family:var(--heading);text-transform:uppercase}
 .badge-dot{width:6px;height:6px;border-radius:50%;background:#ef4444;animation:blink 1.4s infinite;box-shadow:0 0 6px #ef4444}
@@ -145,8 +156,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:66px;display:flex;ali
 
 /* PRICING */
 #pricing{background:linear-gradient(180deg,rgba(5,8,20,1),var(--bg));text-align:center}
-.price-card{max-width:520px;margin:56px auto 0;background:var(--card);border:1px solid rgba(245,158,11,.2);border-radius:24px;padding:40px;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(245,158,11,.06)}
-.price-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--amber) 40%,#fbbf24 60%,transparent)}
+.price-card-wrap{max-width:520px;margin:56px auto 0;position:relative;border-radius:26px;padding:2px;background:conic-gradient(from var(--angle,0deg),#f59e0b 0%,#8b5cf6 25%,#3b82f6 50%,#10b981 75%,#f59e0b 100%);animation:spin-border 6s linear infinite}
+@property --angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes spin-border{to{--angle:360deg}}
+.price-card{background:#0b1120;border-radius:24px;padding:40px;position:relative;overflow:hidden;box-shadow:0 0 80px rgba(245,158,11,.1),0 40px 120px rgba(0,0,0,.6)}
 .pc-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--amber);margin-bottom:10px}
 .pc-tag-red{display:inline-block;font-size:10px;font-weight:700;background:#ef4444;color:#fff;padding:3px 10px;border-radius:4px;letter-spacing:1px;text-transform:uppercase;margin-left:10px;vertical-align:middle}
 .pc-row{display:flex;align-items:baseline;gap:8px;justify-content:center;margin-bottom:6px}
@@ -215,6 +228,14 @@ footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px
   </div>
   <a href="#" onclick="openApexModal();return false;" class="nav-cta">Get Instant Access →</a>
 </nav>
+
+<!-- RAYCAST ANIMATED BACKGROUND -->
+<div class="raycast-bg">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="orb orb-4"></div>
+</div>
 
 <!-- HERO -->
 <section style="padding-top:66px;position:relative;overflow:hidden">
@@ -370,7 +391,8 @@ footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px
     <div class="s-tag reveal" style="justify-content:center;color:var(--amber)">Pricing</div>
     <h2 class="s-h reveal" style="text-align:center">One payment. Own it forever.</h2>
     <p class="s-sub reveal" style="margin:0 auto;text-align:center">No monthly fees. No SaaS trap. The source code is yours — forever.</p>
-    <div class="price-card reveal">
+    <div class="price-card-wrap reveal">
+    <div class="price-card">
       <div class="pc-tag">ONE-TIME PAYMENT <span class="pc-tag-red">LIMITED TIME</span></div>
       <div class="pc-row">
         <span class="pc-price">$297</span>
@@ -390,7 +412,8 @@ footer{background:rgba(3,5,14,1);border-top:1px solid var(--border);padding:36px
         <li><span class="ck"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><strong>Paper trading mode</strong> — safe testing first</span></li>
       </ul>
       <a href="#" onclick="openApexModal();return false;" class="pc-cta">Get Instant Access Now →</a>
-      <p class="pc-note">🔒 Stripe encrypted · Instant delivery · 30-day money back</p>
+      <p class="pc-note">Stripe encrypted · Instant delivery · 30-day money back</p>
+    </div>
     </div>
   </div>
 </section>
@@ -563,52 +586,75 @@ function toggleFaq(el){var item=el.parentElement,was=item.classList.contains('op
 <style>
 #apexModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(5,8,22,.92);backdrop-filter:blur(24px)}
 #apexModal.open{display:flex}
-.am-card{background:rgba(5,10,25,.98);border:1px solid rgba(245,158,11,.2);border-radius:20px;width:100%;max-width:450px;position:relative;overflow:hidden;overflow-y:auto;max-height:90vh;box-shadow:0 0 100px rgba(245,158,11,.08),0 40px 120px rgba(0,0,0,.9)}
-.am-close{position:absolute;top:14px;right:18px;background:none;border:none;color:rgba(248,250,252,.4);font-size:24px;cursor:pointer;z-index:2;transition:color .2s}
-.am-close:hover{color:#fff}
-.am-head{padding:28px 30px 22px;border-bottom:1px solid rgba(255,255,255,.06)}
-.am-tag{font-size:9px;font-weight:700;color:var(--green);letter-spacing:2.5px;text-transform:uppercase;font-family:var(--heading);margin-bottom:8px;display:block}
-.am-title{font-size:20px;font-weight:800;letter-spacing:1px;color:#fff;font-family:var(--heading);text-transform:uppercase}
-.am-price{display:flex;align-items:baseline;gap:10px;margin-top:6px}
-.am-amount{font-size:32px;font-weight:900;color:var(--amber);font-family:var(--heading)}
-.am-was{font-size:14px;color:rgba(224,224,224,.3);text-decoration:line-through}
-.am-body{padding:22px 30px}
+/* Modal card — easemize sign-in style with rotating gradient border */
+.am-border-wrap{position:relative;width:100%;max-width:480px;border-radius:26px;padding:1.5px;background:conic-gradient(from var(--ma,0deg),#f59e0b 0%,#8b5cf6 30%,#3b82f6 60%,#f59e0b 100%);animation:spin-modal 8s linear infinite}
+@property --ma{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes spin-modal{to{--ma:360deg}}
+.am-card{background:#080e1e;border-radius:25px;width:100%;position:relative;overflow-y:auto;max-height:88vh}
+.am-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(248,250,252,.5);font-size:18px;cursor:pointer;z-index:2;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.am-close:hover{color:#fff;background:rgba(255,255,255,.1)}
+/* Brand header */
+.am-brand{padding:32px 32px 0;text-align:center}
+.am-logo{display:inline-flex;align-items:center;gap:8px;font-family:var(--heading);font-size:13px;font-weight:700;color:var(--amber);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px}
+.am-logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:10px;display:flex;align-items:center;justify-content:center}
+.am-logo-icon svg{width:20px;height:20px;stroke:#000;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.am-brand h2{font-family:var(--heading);font-size:18px;font-weight:800;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+.am-brand-sub{font-size:13px;color:var(--text2);margin-bottom:0}
+/* Price badge */
+.am-price-badge{display:inline-flex;align-items:baseline;gap:6px;margin:16px 0;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:12px;padding:10px 20px}
+.am-amount{font-size:36px;font-weight:900;color:var(--amber);font-family:var(--heading);line-height:1}
+.am-was{font-size:15px;color:rgba(248,250,252,.3);text-decoration:line-through;font-family:var(--mono)}
+.am-once{font-size:10px;color:var(--text3);letter-spacing:1px;font-family:var(--mono);text-transform:uppercase;margin-left:4px}
+/* Divider */
+.am-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.08) 30%,rgba(255,255,255,.08) 70%,transparent);margin:0 32px}
+/* Form */
+.am-body{padding:20px 32px 28px}
 .am-field{margin-bottom:14px}
-.am-label{font-size:10px;font-weight:700;color:rgba(224,224,224,.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;font-family:'SF Mono','Fira Code',monospace}
-.am-input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:13px 16px;font-size:14px;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:border-color .2s;outline:none}
-.am-input:focus{border-color:#3b82f6}
-#am-card-element{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:13px 16px;transition:border-color .2s}
-#am-card-element.StripeElement--focus{border-color:#3b82f6}
-#am-card-error{font-size:11px;color:#ff4d6d;margin-top:5px;min-height:14px;font-family:'SF Mono','Fira Code',monospace}
-.am-checks{display:flex;flex-direction:column;gap:10px;margin:16px 0}
-.am-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
-.am-check input[type=checkbox]{width:15px;height:15px;flex-shrink:0;margin-top:2px;accent-color:#f59e0b;cursor:pointer}
-.am-check-txt{font-size:11px;color:rgba(224,224,224,.6);line-height:1.6}
-.am-check-txt a{color:#3b82f6;text-decoration:underline}
-.am-submit{width:100%;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#000;font-size:11px;font-weight:700;padding:16px;border-radius:12px;border:none;cursor:pointer;letter-spacing:2px;text-transform:uppercase;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;box-shadow:0 4px 24px rgba(245,158,11,.3);font-family:var(--heading);min-height:52px}
-.am-submit:hover:not(:disabled){box-shadow:0 4px 40px rgba(245,158,11,.5)}
-.am-submit:disabled{opacity:.35;cursor:not-allowed}
-.am-spinner{width:14px;height:14px;border:2px solid rgba(0,0,0,.25);border-top-color:#000;border-radius:50%;animation:am-spin .7s linear infinite;display:none}
+.am-label{font-size:10px;font-weight:700;color:rgba(248,250,252,.35);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;display:block;font-family:var(--mono)}
+.am-input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 16px;font-size:14px;color:#fff;font-family:var(--font);transition:border-color .2s,background .2s;outline:none;line-height:1}
+.am-input:focus{border-color:var(--amber);background:rgba(245,158,11,.04)}
+.am-input::placeholder{color:rgba(248,250,252,.25)}
+#am-card-element{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 16px;transition:border-color .2s}
+#am-card-element.StripeElement--focus{border-color:var(--amber);background:rgba(245,158,11,.04)}
+#am-card-error{font-size:11px;color:#f87171;margin-top:6px;min-height:14px;font-family:var(--mono)}
+.am-checks{display:flex;flex-direction:column;gap:8px;margin:14px 0}
+.am-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:2px 0}
+.am-check input[type=checkbox]{width:16px;height:16px;flex-shrink:0;margin-top:1px;accent-color:var(--amber);cursor:pointer;border-radius:4px}
+.am-check-txt{font-size:11px;color:rgba(248,250,252,.5);line-height:1.65}
+.am-check-txt strong{color:rgba(248,250,252,.8)}
+.am-check-txt a{color:var(--blue);text-decoration:none}
+.am-check-txt a:hover{text-decoration:underline}
+.am-submit{width:100%;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-size:11px;font-weight:700;padding:17px;border-radius:12px;border:none;cursor:pointer;letter-spacing:2px;text-transform:uppercase;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px;box-shadow:0 4px 24px rgba(245,158,11,.3),0 0 0 0 rgba(245,158,11,0);font-family:var(--heading);min-height:54px}
+.am-submit:hover:not(:disabled){box-shadow:0 4px 40px rgba(245,158,11,.5);background:linear-gradient(135deg,#fbbf24,#f59e0b)}
+.am-submit:disabled{opacity:.3;cursor:not-allowed}
+.am-spinner{width:14px;height:14px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:am-spin .7s linear infinite;display:none}
 @keyframes am-spin{to{transform:rotate(360deg)}}
-.am-note{font-size:10px;color:rgba(224,224,224,.3);text-align:center;margin-top:12px;font-family:'SF Mono','Fira Code',monospace}
-.am-success{padding:48px 30px;text-align:center;display:none}
-.am-success-icon{font-size:48px;margin-bottom:18px}
-.am-success h3{font-size:20px;font-weight:800;margin-bottom:10px;color:var(--amber);font-family:var(--heading);letter-spacing:2px;text-transform:uppercase}
-.am-success p{font-size:13px;color:rgba(224,224,224,.6);line-height:1.8}
+.am-note{font-size:10px;color:rgba(248,250,252,.25);text-align:center;margin-top:12px;font-family:var(--mono);letter-spacing:.3px}
+.am-success{padding:52px 32px;text-align:center;display:none}
+.am-success-icon{width:64px;height:64px;background:rgba(245,158,11,.1);border:2px solid rgba(245,158,11,.3);border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:32px}
+.am-success h3{font-size:18px;font-weight:800;margin-bottom:10px;color:var(--amber);font-family:var(--heading);letter-spacing:2px;text-transform:uppercase}
+.am-success p{font-size:13px;color:var(--text2);line-height:1.8}
 </style>
 
 <div id="apexModal">
+  <div class="am-border-wrap">
   <div class="am-card">
-    <button class="am-close" onclick="closeApexModal()">×</button>
+    <button class="am-close" aria-label="Close" onclick="closeApexModal()">×</button>
     <div id="amForm">
-      <div class="am-head">
-        <span class="am-tag">// One-Time Payment</span>
-        <div class="am-title">Apex Trade Bot</div>
-        <div class="am-price">
+      <div class="am-brand">
+        <div class="am-logo">
+          <div class="am-logo-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+          APEX BOT
+        </div>
+        <h2>Complete Your Order</h2>
+        <p class="am-brand-sub">One-time purchase — full source code, yours forever</p>
+        <div class="am-price-badge">
           <span class="am-amount">$297</span>
           <span class="am-was">$497</span>
+          <span class="am-once">one-time</span>
         </div>
       </div>
+      <div class="am-divider"></div>
       <div class="am-body">
         <div class="am-field">
           <label class="am-label">Full name</label>
@@ -633,14 +679,15 @@ function toggleFaq(el){var item=el.parentElement,was=item.classList.contains('op
           <span id="amSpinner" class="am-spinner"></span>
           <span id="amBtnTxt">Check all boxes to continue</span>
         </button>
-        <p class="am-note">🔒 Stripe encrypted · One-time payment · No subscription</p>
+        <p class="am-note">Stripe encrypted · Instant delivery · No subscription</p>
       </div>
     </div>
     <div class="am-success" id="amSuccess">
       <div class="am-success-icon">⚡</div>
-      <h3>Access granted.</h3>
+      <h3>Access Granted</h3>
       <p>Redirecting to your setup page...<br><br>Your License Key and bot configurator are ready.</p>
     </div>
+  </div>
   </div>
 </div>
 
@@ -662,7 +709,7 @@ function closeApexModal(){
   document.getElementById('apexModal').classList.remove('open');
   document.body.style.overflow='';
 }
-document.getElementById('apexModal').addEventListener('click',function(e){if(e.target===this)closeApexModal();});
+document.getElementById('apexModal').addEventListener('click',function(e){if(e.target===this||e.target.id==='apexModal')closeApexModal();});
 function updateBtn(){
   var all=['ck1','ck2','ck3','ck4'].every(function(id){return document.getElementById(id).checked;});
   document.getElementById('amBtn').disabled=!all;
