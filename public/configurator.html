@@ -314,13 +314,12 @@
       font-size: 0.82rem;
       line-height: 1.8;
       color: #e5e7eb;
-      white-space: pre;
       overflow-x: auto;
       margin-bottom: 1rem;
     }
     .code-box .k { color: var(--cyan); }
     .code-box .v { color: var(--green); }
-    .code-box .c { color: #4b5563; }
+    .code-box .c { color: #64748b; }
 
     .warn-box {
       background: #1a1200;
@@ -710,88 +709,91 @@ function updateProgress(step) {
 
 /* ─────────────────── Config builder ─────────────────── */
 function buildConfig() {
-  const riskData = RISKS.find(r => r.id === state.risk) || RISKS[1];
-  const coin     = state.coin || 'XRPUSDT';
-  const tf       = state.timeframe;
+  try {
+    const riskData = RISKS.find(r => r.id === state.risk) || RISKS[1];
+    const coin     = state.coin || 'SOLUSDT';
+    const tf       = state.timeframe;
 
-  // Summary chips
-  const coinInfo = COINS.find(c => c.sym === coin) || COINS[0];
-  const chips = document.getElementById('summary-chips');
-  chips.innerHTML = `
-    <span class="chip">${coinInfo.emoji} ${coinInfo.name}</span>
-    <span class="chip">${RISKS.find(r=>r.id===state.risk)?.icon || '⚖️'} ${state.risk ? state.risk.charAt(0).toUpperCase()+state.risk.slice(1) : 'Balanced'}</span>
-    <span class="chip">⏱ ${tf}</span>
-    ${Object.entries(state.strategies).filter(([,v])=>v).map(([k])=>{
-      const s = STRATEGIES.find(s=>s.id===k);
-      return `<span class="chip">${s.emoji} ${s.name.split(' ')[0]}</span>`;
-    }).join('')}
-  `;
+    const coinInfo = COINS.find(c => c.sym === coin) || COINS[0];
+    document.getElementById('summary-chips').innerHTML = `
+      <span class="chip">${coinInfo.emoji} ${coinInfo.name}</span>
+      <span class="chip">${RISKS.find(r=>r.id===state.risk)?.icon || '⚖️'} ${state.risk ? state.risk.charAt(0).toUpperCase()+state.risk.slice(1) : 'Balanced'}</span>
+      <span class="chip">⏱ ${tf}</span>
+    `;
 
-  // Build env var text (plain, for copy)
-  const vars = buildVarsPlain(riskData, coin, tf);
-  window._configPlain = vars;
-
-  // Build highlighted HTML
-  document.getElementById('config-output').innerHTML = buildVarsHTML(riskData, coin, tf);
+    window._configPlain = buildVarsPlain(riskData, coin, tf);
+    document.getElementById('config-output').innerHTML = buildVarsHTML(riskData, coin, tf);
+  } catch(e) {
+    document.getElementById('config-output').textContent = 'Error: ' + e.message;
+  }
 }
 
 function buildVarsPlain(riskData, coin, tf) {
   const lines = [
-    `LICENSE_KEY=${state.licenseKey}`,
-    `SYMBOL=${coin}`,
+    `# Exchange`,
+    `EXCHANGE=binance`,
+    `BINANCE_API_KEY=your-binance-api-key`,
+    `BINANCE_API_SECRET=your-binance-api-secret`,
+    `BINANCE_TESTNET=false`,
+    ``,
+    `# Trading`,
+    `TRADE_SYMBOL=${coin}`,
+    `TIMEFRAME=${tf}`,
     `RISK_PER_TRADE=${riskData.risk}`,
     `STOP_LOSS_PCT=${riskData.sl}`,
     `TAKE_PROFIT_PCT=${riskData.tp}`,
-    `TIMEFRAME=${tf}`,
+    `MIN_CONFIDENCE=62`,
+    `TRAILING_STOP=true`,
+    ``,
+    `# Paper Trading — leave true to start`,
     `PAPER_TRADING=true`,
-    `EXCHANGE=bybit`,
-    ``,
-    `# Strategy flags`,
-    `USE_TURTLE=${state.strategies.turtle ? 'true' : 'false'}`,
-    `USE_LIVERMORE=${state.strategies.livermore ? 'true' : 'false'}`,
-    `USE_SOROS=${state.strategies.soros ? 'true' : 'false'}`,
-    ``,
-    `# API Keys — fill these in`,
-    `GROQ_API_KEY=get-free-at-console.groq.com`,
-    `BYBIT_API_KEY=your-bybit-api-key`,
-    `BYBIT_API_SECRET=your-bybit-api-secret`,
+    `PAPER_BALANCE=100`,
     ``,
     `# Optional Telegram alerts`,
-    `TELEGRAM_BOT_TOKEN=optional`,
-    `TELEGRAM_CHAT_ID=optional`,
+    `TELEGRAM_BOT_TOKEN=`,
+    `TELEGRAM_CHAT_ID=`,
+    ``,
+    `# License`,
+    `LICENSE_KEY=${state.licenseKey}`,
+    `LICENSE_SERVER=https://aicashsystem.space`,
   ];
   return lines.join('\n');
 }
 
 function buildVarsHTML(riskData, coin, tf) {
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const kv  = (k, v) => `<span class="k">${esc(k)}</span>=<span class="v">${esc(v)}</span>`;
-  const cm  = t => `<span class="c">${esc(t)}</span>`;
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const kv  = (k, v) => `<span class="k">${esc(k)}</span>=<span class="v">${esc(v)}</span><br>`;
+  const cm  = t => `<span class="c">${esc(t)}</span><br>`;
+  const br  = () => `<br>`;
 
   return [
-    kv('LICENSE_KEY', state.licenseKey),
-    kv('SYMBOL', coin),
+    cm('# Exchange'),
+    kv('EXCHANGE', 'binance'),
+    kv('BINANCE_API_KEY', 'your-binance-api-key'),
+    kv('BINANCE_API_SECRET', 'your-binance-api-secret'),
+    kv('BINANCE_TESTNET', 'false'),
+    br(),
+    cm('# Trading'),
+    kv('TRADE_SYMBOL', coin),
+    kv('TIMEFRAME', tf),
     kv('RISK_PER_TRADE', String(riskData.risk)),
     kv('STOP_LOSS_PCT', String(riskData.sl)),
     kv('TAKE_PROFIT_PCT', String(riskData.tp)),
-    kv('TIMEFRAME', tf),
+    kv('MIN_CONFIDENCE', '62'),
+    kv('TRAILING_STOP', 'true'),
+    br(),
+    cm('# Paper Trading — leave true to start'),
     kv('PAPER_TRADING', 'true'),
-    kv('EXCHANGE', 'bybit'),
-    '',
-    cm('# Strategy flags'),
-    kv('USE_TURTLE', state.strategies.turtle ? 'true' : 'false'),
-    kv('USE_LIVERMORE', state.strategies.livermore ? 'true' : 'false'),
-    kv('USE_SOROS', state.strategies.soros ? 'true' : 'false'),
-    '',
-    cm('# API Keys — fill these in'),
-    kv('GROQ_API_KEY', 'get-free-at-console.groq.com'),
-    kv('BYBIT_API_KEY', 'your-bybit-api-key'),
-    kv('BYBIT_API_SECRET', 'your-bybit-api-secret'),
-    '',
+    kv('PAPER_BALANCE', '100'),
+    br(),
     cm('# Optional Telegram alerts'),
-    kv('TELEGRAM_BOT_TOKEN', 'optional'),
-    kv('TELEGRAM_CHAT_ID', 'optional'),
-  ].join('\n');
+    kv('TELEGRAM_BOT_TOKEN', ''),
+    kv('TELEGRAM_CHAT_ID', ''),
+    br(),
+    cm('# License'),
+    kv('LICENSE_KEY', state.licenseKey),
+    kv('LICENSE_SERVER', 'https://aicashsystem.space'),
+  ].join('');
 }
 
 /* ─────────────────── Copy ─────────────────── */
