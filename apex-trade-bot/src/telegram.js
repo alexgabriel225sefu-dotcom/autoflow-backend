@@ -41,12 +41,12 @@ function miniChart(closes) {
   return sl.map(c => blocks[Math.min(7, Math.floor(((c - min) / range) * 8))]).join('');
 }
 
-// ─── Dashboard button keyboard ────────────────────────────
+// ─── Dashboard button keyboard (Telegram Web App — opens inside Telegram) ───
 function dashboardKeyboard() {
   if (!DASHBOARD_URL) return {};
   return {
     reply_markup: JSON.stringify({
-      inline_keyboard: [[{ text: '🌐 Live Dashboard', url: DASHBOARD_URL }]],
+      inline_keyboard: [[{ text: '📊 Live Dashboard', web_app: { url: DASHBOARD_URL } }]],
     }),
   };
 }
