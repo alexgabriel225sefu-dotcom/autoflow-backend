@@ -95,10 +95,10 @@
     .copy-btn:hover { background: rgba(124,92,255,0.28); }
     .copy-btn.copied { background: rgba(0,232,122,0.12); border-color: var(--green); color: var(--green); }
 
-    .code-box { background: #05080f; border: 1.5px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; font-size: 0.8rem; line-height: 1.85; color: #e5e7eb; white-space: pre; overflow-x: auto; margin-bottom: 1rem; }
+    .code-box { background: #05080f; border: 1.5px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; font-size: 0.8rem; line-height: 1.85; color: #e5e7eb; overflow-x: auto; margin-bottom: 1rem; }
     .code-box .k { color: #93c5fd; }
     .code-box .v { color: var(--green); }
-    .code-box .c { color: #374151; }
+    .code-box .c { color: #64748b; }
 
     .warn-box { background: rgba(245,158,11,0.06); border: 1.5px solid rgba(245,158,11,0.22); border-radius: 10px; padding: 0.9rem 1.1rem; font-size: 0.82rem; color: var(--amber); margin-bottom: 1.5rem; line-height: 1.5; }
 
@@ -494,61 +494,57 @@ function goTo(n) {
 }
 
 function buildConfig() {
-  state.telegramToken  = document.getElementById('tg-token').value.trim();
-  state.telegramChatId = document.getElementById('tg-chat-id').value.trim();
+  try {
+    state.telegramToken  = document.getElementById('tg-token').value.trim();
+    state.telegramChatId = document.getElementById('tg-chat-id').value.trim();
 
-  const strat    = STRATEGIES.find(s => s.id === state.strategy) || STRATEGIES[1];
-  const symbol   = state.coin || 'SOLUSDT';
-  const exchange = state.exchange || 'binance';
+    const strat    = STRATEGIES.find(s => s.id === state.strategy) || STRATEGIES[1];
+    const symbol   = state.coin || 'SOLUSDT';
+    const exchange = 'binance';
 
-  document.getElementById('summary-chips').innerHTML = [
-    `<span class="chip">${strat.name.split('—')[0].trim()}</span>`,
-    `<span class="chip">${symbol}</span>`,
-    `<span class="chip">Binance</span>`,
-    state.telegramToken ? `<span class="chip">Telegram activ</span>` : '',
-  ].join('');
+    document.getElementById('summary-chips').innerHTML = [
+      `<span class="chip">${strat.name.split('—')[0].trim()}</span>`,
+      `<span class="chip">${symbol}</span>`,
+      `<span class="chip">Binance</span>`,
+      state.telegramToken ? `<span class="chip">Telegram activ</span>` : '',
+    ].join('');
 
-  window._configPlain = buildVarsPlain(strat, symbol, exchange);
-  document.getElementById('config-output').innerHTML = buildVarsHTML(strat, symbol, exchange);
-  document.getElementById('stop-section').style.display = state.apiKey ? 'block' : 'none';
+    window._configPlain = buildVarsPlain(strat, symbol);
+    document.getElementById('config-output').innerHTML = buildVarsHTML(strat, symbol, exchange);
+    document.getElementById('stop-section').style.display = state.apiKey ? 'block' : 'none';
+  } catch(e) {
+    document.getElementById('config-output').textContent = 'Eroare la generare: ' + e.message;
+  }
 }
 
-function buildVarsPlain(strat, symbol, exchange) {
+function buildVarsPlain(strat, symbol) {
   const t  = state.telegramToken  || '';
   const tc = state.telegramChatId || '';
-  const isBybit = exchange !== 'binance';
   const lines = [
     `# ── Apex Trade Bot — Environment Variables ──`,
     ``,
     `# Exchange`,
-    `EXCHANGE=${exchange}`,
+    `EXCHANGE=binance`,
+    ``,
+    `# Binance API`,
+    `BINANCE_API_KEY=${state.apiKey || 'YOUR_BINANCE_API_KEY'}`,
+    `BINANCE_API_SECRET=${state.apiSecret || 'YOUR_BINANCE_SECRET'}`,
+    `BINANCE_TESTNET=false`,
+    ``,
+    `# Trading`,
+    `TRADE_SYMBOL=${symbol}`,
+    `TIMEFRAME=${strat.timeframe}`,
+    `RISK_PER_TRADE=${strat.riskPct}`,
+    `STOP_LOSS_PCT=${strat.sl}`,
+    `TAKE_PROFIT_PCT=${strat.tp}`,
+    `MIN_CONFIDENCE=62`,
+    `TRAILING_STOP=true`,
+    ``,
+    `# Paper Trading (LASĂ true prima dată)`,
+    `PAPER_TRADING=true`,
+    `PAPER_BALANCE=100`,
     ``,
   ];
-  if (isBybit) {
-    lines.push(`# Bybit API`);
-    lines.push(`BYBIT_API_KEY=${state.apiKey || 'YOUR_BYBIT_API_KEY'}`);
-    lines.push(`BYBIT_API_SECRET=${state.apiSecret || 'YOUR_BYBIT_SECRET'}`);
-    lines.push(`BYBIT_TESTNET=false`);
-  } else {
-    lines.push(`# Binance API`);
-    lines.push(`BINANCE_API_KEY=${state.apiKey || 'YOUR_BINANCE_API_KEY'}`);
-    lines.push(`BINANCE_API_SECRET=${state.apiSecret || 'YOUR_BINANCE_SECRET'}`);
-    lines.push(`BINANCE_TESTNET=false`);
-  }
-  lines.push(``);
-  lines.push(`# Trading`);
-  lines.push(`TRADE_SYMBOL=${symbol}`);
-  lines.push(`TIMEFRAME=${strat.timeframe}`);
-  lines.push(`RISK_PER_TRADE=${strat.riskPct}`);
-  lines.push(`STOP_LOSS_PCT=${strat.sl}`);
-  lines.push(`TAKE_PROFIT_PCT=${strat.tp}`);
-  lines.push(`MIN_CONFIDENCE=62`);
-  lines.push(`TRAILING_STOP=true`);
-  lines.push(``);
-  lines.push(`# Paper Trading (SEMPRE true prima dată)`);
-  lines.push(`PAPER_TRADING=true`);
-  lines.push(`PAPER_BALANCE=100`);
-  lines.push(``);
   if (t) {
     lines.push(`# Telegram`);
     lines.push(`TELEGRAM_BOT_TOKEN=${t}`);
@@ -565,52 +561,44 @@ function buildVarsHTML(strat, symbol, exchange) {
   const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const kv  = (k, v) => `<span class="k">${esc(k)}</span>=<span class="v">${esc(v)}</span>`;
   const cm  = t => `<span class="c">${esc(t)}</span>`;
-  const t   = state.telegramToken  || '';
+  const tg  = state.telegramToken  || '';
   const tc  = state.telegramChatId || '';
-  const secretDisplay = state.apiSecret ? '•'.repeat(Math.min(state.apiSecret.length, 20)) : (exchange === 'bybit' ? 'YOUR_BYBIT_SECRET' : 'YOUR_BINANCE_SECRET');
-  const isBybit = exchange !== 'binance';
+  const secretDisplay = state.apiSecret ? '•'.repeat(Math.min(state.apiSecret.length, 20)) : 'YOUR_BINANCE_SECRET';
   const rows = [
     cm('# ── Apex Trade Bot — Environment Variables ──'),
     '',
     cm('# Exchange'),
-    kv('EXCHANGE', exchange),
+    kv('EXCHANGE', 'binance'),
     '',
+    cm('# Binance API'),
+    kv('BINANCE_API_KEY', state.apiKey || 'YOUR_BINANCE_API_KEY'),
+    kv('BINANCE_API_SECRET', secretDisplay),
+    kv('BINANCE_TESTNET', 'false'),
+    '',
+    cm('# Trading'),
+    kv('TRADE_SYMBOL', symbol),
+    kv('TIMEFRAME', strat.timeframe),
+    kv('RISK_PER_TRADE', String(strat.riskPct)),
+    kv('STOP_LOSS_PCT', String(strat.sl)),
+    kv('TAKE_PROFIT_PCT', String(strat.tp)),
+    kv('MIN_CONFIDENCE', '62'),
+    kv('TRAILING_STOP', 'true'),
+    '',
+    cm('# Paper Trading — LASĂ true prima dată'),
+    kv('PAPER_TRADING', 'true'),
+    kv('PAPER_BALANCE', '100'),
   ];
-  if (isBybit) {
-    rows.push(cm('# Bybit API'));
-    rows.push(kv('BYBIT_API_KEY', state.apiKey || 'YOUR_BYBIT_API_KEY'));
-    rows.push(kv('BYBIT_API_SECRET', secretDisplay));
-    rows.push(kv('BYBIT_TESTNET', 'false'));
-  } else {
-    rows.push(cm('# Binance API'));
-    rows.push(kv('BINANCE_API_KEY', state.apiKey || 'YOUR_BINANCE_API_KEY'));
-    rows.push(kv('BINANCE_API_SECRET', secretDisplay));
-    rows.push(kv('BINANCE_TESTNET', 'false'));
-  }
-  rows.push('');
-  rows.push(cm('# Trading'));
-  rows.push(kv('TRADE_SYMBOL', symbol));
-  rows.push(kv('TIMEFRAME', strat.timeframe));
-  rows.push(kv('RISK_PER_TRADE', String(strat.riskPct)));
-  rows.push(kv('STOP_LOSS_PCT', String(strat.sl)));
-  rows.push(kv('TAKE_PROFIT_PCT', String(strat.tp)));
-  rows.push(kv('MIN_CONFIDENCE', '62'));
-  rows.push(kv('TRAILING_STOP', 'true'));
-  rows.push('');
-  rows.push(cm('# Paper Trading — LASĂ true prima dată'));
-  rows.push(kv('PAPER_TRADING', 'true'));
-  rows.push(kv('PAPER_BALANCE', '100'));
-  if (t) {
+  if (tg) {
     rows.push('');
     rows.push(cm('# Telegram'));
-    rows.push(kv('TELEGRAM_BOT_TOKEN', t));
+    rows.push(kv('TELEGRAM_BOT_TOKEN', tg));
     rows.push(kv('TELEGRAM_CHAT_ID', tc));
   }
   rows.push('');
   rows.push(cm('# License'));
   rows.push(kv('LICENSE_KEY', state.licenseKey));
   rows.push(kv('LICENSE_SERVER', 'https://aicashsystem.space'));
-  return rows.join('\n');
+  return rows.map(r => r === '' ? '<br>' : r + '<br>').join('');
 }
 
 function dlMsg(text, color) {
