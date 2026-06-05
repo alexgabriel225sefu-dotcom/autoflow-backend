@@ -1566,23 +1566,23 @@ a{text-decoration:none}
   </tr></table>
 </td></tr>
 
-<!-- ── STEP 1: BYBIT API ── -->
+<!-- ── STEP 1: BINANCE API ── -->
 <tr><td style="background:#070b1c;border-left:1px solid rgba(245,158,11,0.15);border-right:1px solid rgba(245,158,11,0.15);padding:0 40px 16px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.12);border-radius:12px">
     <tr><td style="padding:22px 24px">
-      <p style="margin:0 0 16px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#f59e0b;font-family:Arial,sans-serif">STEP 1 &mdash; GET YOUR BYBIT API KEYS</p>
+      <p style="margin:0 0 16px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#f59e0b;font-family:Arial,sans-serif">STEP 1 &mdash; GET YOUR BINANCE API KEYS</p>
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr><td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
-          <p style="margin:0;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">1. Create a Bybit account</p>
-          <p style="margin:4px 0 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;line-height:1.7">Go to bybit.com &rarr; Sign up &rarr; Complete ID verification to unlock spot trading</p>
+          <p style="margin:0;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">1. Create a Binance account</p>
+          <p style="margin:4px 0 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;line-height:1.7">Go to binance.com &rarr; Sign up &rarr; Complete ID verification to unlock spot trading</p>
         </td></tr>
         <tr><td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
           <p style="margin:0;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">2. Open API Management</p>
-          <p style="margin:4px 0 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;line-height:1.7">Profile icon &rarr; <strong style="color:#d1d5db">API</strong> &rarr; <strong style="color:#d1d5db">Create New Key</strong> &rarr; System-generated</p>
+          <p style="margin:4px 0 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;line-height:1.7">Profile icon &rarr; <strong style="color:#d1d5db">API Management</strong> &rarr; <strong style="color:#d1d5db">Create API</strong> &rarr; System generated</p>
         </td></tr>
         <tr><td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
           <p style="margin:0;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">3. Set permissions</p>
-          <p style="margin:4px 0 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;line-height:1.7">Enable: <strong style="color:#d1d5db">Reading</strong> + <strong style="color:#d1d5db">Spot &amp; Margin Trading</strong> &mdash; leave Withdrawals OFF. IP restriction: unrestricted.</p>
+          <p style="margin:4px 0 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;line-height:1.7">Enable: <strong style="color:#d1d5db">Enable Reading</strong> + <strong style="color:#d1d5db">Enable Spot &amp; Margin Trading</strong> &mdash; leave Withdrawals OFF. IP restriction: unrestricted.</p>
         </td></tr>
         <tr><td style="padding:10px 0;vertical-align:top">
           <p style="margin:0;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">4. Save keys immediately</p>
@@ -1605,19 +1605,15 @@ a{text-decoration:none}
         </tr>
         <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
           <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">EXCHANGE</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">Set to <span style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 6px;color:#f59e0b;font-family:'Courier New',monospace;font-weight:700">bybit</span></td>
+          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">Set to <span style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 6px;color:#f59e0b;font-family:'Courier New',monospace;font-weight:700">binance</span></td>
         </tr>
         <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">BYBIT_API_KEY</td>
+          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">BINANCE_API_KEY</td>
           <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">The API Key from Step 1</td>
         </tr>
         <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">BYBIT_API_SECRET</td>
+          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">BINANCE_API_SECRET</td>
           <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">The Secret Key from Step 1 &mdash; <strong style="color:#d1d5db">shown only once</strong></td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">GROQ_API_KEY</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">Free at console.groq.com &rarr; API Keys &rarr; Create (no card needed)</td>
         </tr>
         <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
           <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">PAPER_TRADING</td>
