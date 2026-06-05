@@ -488,25 +488,9 @@ function goTo(n) {
 }
 
 function buildRailwayUrl(strat, symbol) {
-  const repo = 'https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot';
-  const nonSensitive = {
-    EXCHANGE:       'binance',
-    TRADE_SYMBOL:   symbol,
-    TIMEFRAME:      strat.timeframe,
-    RISK_PER_TRADE: String(strat.riskPct),
-    STOP_LOSS_PCT:  String(strat.sl),
-    TAKE_PROFIT_PCT:String(strat.tp),
-    MIN_CONFIDENCE: '62',
-    TRAILING_STOP:  'true',
-    PAPER_TRADING:  'true',
-    PAPER_BALANCE:  '100',
-    LICENSE_SERVER: 'https://aicashsystem.space',
-  };
-  if (state.telegramToken)  nonSensitive.TELEGRAM_BOT_TOKEN = state.telegramToken;
-  if (state.telegramChatId) nonSensitive.TELEGRAM_CHAT_ID   = state.telegramChatId;
-  const envKeys = Object.keys(nonSensitive).join(',');
-  const envVals = Object.entries(nonSensitive).map(([k,v]) => `${k}=${encodeURIComponent(v)}`).join('&');
-  return `https://railway.app/new/template?template=${encodeURIComponent(repo)}&envs=${envKeys}&${envVals}`;
+  // Use github-repo URL — works for any public repo, no template config needed
+  const repoUrl = 'https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot';
+  return 'https://railway.com/new/github-repo?repoUrl=' + encodeURIComponent(repoUrl);
 }
 
 function buildSensitiveVarsHTML(symbol) {
