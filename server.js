@@ -1616,6 +1616,10 @@ a{text-decoration:none}
           <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">The Secret Key from Step 1 &mdash; <strong style="color:#d1d5db">shown only once</strong></td>
         </tr>
         <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">GROQ_API_KEY</td>
+          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top"><strong style="color:#d1d5db">Required</strong> &mdash; Free AI key. Go to <a href="https://console.groq.com" style="color:#f59e0b">console.groq.com</a> &rarr; API Keys &rarr; Create API Key (no card needed)</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
           <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">PAPER_TRADING</td>
           <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">Start with <span style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);border-radius:4px;padding:1px 6px;color:#22c55e;font-family:'Courier New',monospace;font-weight:700">true</span> (simulated money). Change to <span style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 6px;color:#f59e0b;font-family:'Courier New',monospace;font-weight:700">false</span> to go live.</td>
         </tr>
