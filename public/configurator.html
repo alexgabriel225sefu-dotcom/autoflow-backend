@@ -193,7 +193,7 @@
   <div class="progress-labels">
     <div class="progress-label active" id="lbl-1">1. Profil</div>
     <div class="progress-label" id="lbl-2">2. Monedă</div>
-    <div class="progress-label" id="lbl-3">3. Exchange</div>
+    <div class="progress-label" id="lbl-3">3. Binance</div>
     <div class="progress-label" id="lbl-4">4. API Keys</div>
     <div class="progress-label" id="lbl-5">5. Config</div>
   </div>
@@ -225,32 +225,32 @@
     </div>
   </div>
 
-  <!-- Step 3: Exchange -->
+  <!-- Step 3: Exchange (Binance only) -->
   <div class="step" id="step-3">
-    <div class="step-title">Alege Exchange-ul</div>
-    <div class="step-sub">Botul suportă Bybit (recomandat — are paper trading nativ) și Binance. Vei introduce cheile în pasul următor.</div>
+    <div class="step-title">Exchange — Binance</div>
+    <div class="step-sub">Botul funcționează cu Binance — disponibil în toate țările, lichiditate maximă. Vei introduce cheile API în pasul următor.</div>
     <div class="risk-cards" id="exchange-cards"></div>
     <div class="nav-row">
       <button class="btn-back" onclick="goTo(2)">← Înapoi</button>
-      <button class="btn-next" id="next-3" onclick="goTo(4)" disabled>Continuă →</button>
+      <button class="btn-next" id="next-3" onclick="goTo(4)">Continuă →</button>
     </div>
   </div>
 
   <!-- Step 4: API Keys + Telegram -->
   <div class="step" id="step-4">
-    <div class="step-title" id="api-step-title">Chei API Exchange</div>
-    <div class="step-sub" id="api-step-sub">Botul are nevoie de cheile tale pentru a plasa ordine pe contul tău.</div>
+    <div class="step-title" id="api-step-title">Chei API Binance</div>
+    <div class="step-sub" id="api-step-sub">Botul are nevoie de cheile tale pentru a plasa ordine pe contul tău Binance.</div>
 
     <div class="input-group">
-      <label class="input-label"><span id="api-key-label">API Key</span> <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
+      <label class="input-label">Binance API Key <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
       <input class="input-field" id="api-key" type="text" placeholder="Lipeste API Key-ul" autocomplete="off" oninput="onApiKeyInput()" />
       <div class="input-hint" id="api-key-hint">
-        Du-te la <a id="api-link" href="https://www.bybit.com/app/user/api-management" target="_blank">Bybit → API Management</a> → Create Key → copiază API Key
+        Du-te la <a id="api-link" href="https://www.binance.com/en/my/settings/api-management" target="_blank">Binance → API Management</a> → Create API → activează permisiunea <strong>Spot &amp; Margin Trading</strong>
       </div>
     </div>
 
     <div class="input-group">
-      <label class="input-label"><span id="api-secret-label">Secret Key</span> <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
+      <label class="input-label">Binance Secret Key <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
       <input class="input-field" id="api-secret" type="password" placeholder="Lipeste Secret Key-ul" autocomplete="off" oninput="onApiKeyInput()" />
       <div class="input-hint">
         Secretul apare <strong>o singură dată</strong> la creare. Activează permisiunea <strong>Spot Trading</strong>. NU activa Withdrawals.
@@ -392,8 +392,7 @@ const COINS = [
 ];
 
 const EXCHANGES = [
-  { id: 'bybit',   name: 'Bybit', detail: 'Recomandat — paper trading nativ, API simplu', risk: 'low' },
-  { id: 'binance', name: 'Binance', detail: 'Alternativă — lichiditate maximă', risk: 'medium' },
+  { id: 'binance', name: 'Binance', detail: 'Disponibil în toate țările — lichiditate maximă, paper trading inclus în bot', risk: 'low' },
 ];
 
 const state = {
@@ -420,6 +419,9 @@ const state = {
   renderStrategies();
   renderCoins();
   renderExchanges();
+
+  // Auto-select Binance (only exchange supported)
+  state.exchange = 'binance';
 
   // 3. If still no valid key, show the key entry overlay
   if (state.licenseKey === 'APEX-XXXX-XXXX-XXXX') showKeyOverlay();
@@ -483,24 +485,6 @@ function selectCoin(sym) {
 function selectExchange(id) {
   state.exchange = id;
   document.querySelectorAll('#exchange-cards .risk-card').forEach(c => c.classList.toggle('selected', c.dataset.id === id));
-  document.getElementById('next-3').disabled = false;
-  const isBybit = id === 'bybit';
-  document.getElementById('api-step-title').textContent = isBybit ? 'Chei API Bybit' : 'Chei API Binance';
-  document.getElementById('api-step-sub').textContent = isBybit
-    ? 'Botul are nevoie de cheile tale pentru a plasa ordine pe contul tău Bybit.'
-    : 'Botul are nevoie de cheile tale pentru a plasa ordine pe contul tău Binance.';
-  document.getElementById('api-key-label').textContent = isBybit ? 'Bybit API Key' : 'Binance API Key';
-  document.getElementById('api-secret-label').textContent = isBybit ? 'Bybit Secret Key' : 'Binance Secret Key';
-  const link = document.getElementById('api-link');
-  if (isBybit) {
-    link.href = 'https://www.bybit.com/app/user/api-management';
-    link.textContent = 'Bybit → API Management';
-    document.getElementById('api-key-hint').innerHTML = `Du-te la <a id="api-link" href="https://www.bybit.com/app/user/api-management" target="_blank">Bybit → API Management</a> → Create Key → activează permisiunea <strong>Unified Trading</strong>`;
-  } else {
-    link.href = 'https://www.binance.com/en/my/settings/api-management';
-    link.textContent = 'Binance → API Management';
-    document.getElementById('api-key-hint').innerHTML = `Du-te la <a id="api-link" href="https://www.binance.com/en/my/settings/api-management" target="_blank">Binance → API Management</a> → Create API → activează permisiunea <strong>Spot &amp; Margin Trading</strong>`;
-  }
 }
 function onApiKeyInput() {
   state.apiKey    = document.getElementById('api-key').value.trim();
@@ -526,7 +510,7 @@ function buildConfig() {
 
   const strat    = STRATEGIES.find(s => s.id === state.strategy) || STRATEGIES[1];
   const symbol   = state.coin || 'SOLUSDT';
-  const exchange = state.exchange || 'bybit';
+  const exchange = state.exchange || 'binance';
 
   document.getElementById('summary-chips').innerHTML = [
     `<span class="chip">${strat.name.split('—')[0].trim()}</span>`,
