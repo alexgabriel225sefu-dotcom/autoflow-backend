@@ -281,74 +281,57 @@
     </div>
   </div>
 
-  <!-- Step 5: Config + Download -->
+  <!-- Step 5: Config + Deploy -->
   <div class="step" id="step-5">
     <div class="step-title">Configurația Ta</div>
-    <div class="step-sub">Urmează pașii de mai jos în ordine.</div>
+    <div class="step-sub">Totul e gata — apasă butonul și Railway îți deployează botul direct.</div>
 
     <div class="summary-row" id="summary-chips"></div>
 
-    <!-- STEP A: Download -->
+    <!-- DEPLOY BUTTON -->
     <div class="deploy-phase">
       <div class="phase-num">Pasul 1</div>
-      <div class="phase-title">Descarcă Codul Botului</div>
-    </div>
-    <button class="deploy-btn" id="download-btn" onclick="downloadBot()">
-      Descarcă apex-trade-bot.zip
-    </button>
-    <div id="download-msg" style="font-size:12px;text-align:center;margin-top:8px;min-height:18px;color:rgba(255,255,255,.35)">
-      Licență: <span id="key-display">—</span>
+      <div class="phase-title">Deployează pe Railway — 1 click</div>
     </div>
 
-    <!-- STEP B: Deploy -->
+    <a id="railway-btn" href="#" target="_blank" class="deploy-btn" style="display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      Deploy pe Railway →
+    </a>
+    <div style="font-size:12px;text-align:center;color:rgba(255,255,255,.3);margin-top:8px">
+      Deschide Railway cu setările tale pre-completate · Gratuit
+    </div>
+
+    <!-- MANUAL VARS: only the 3 sensitive ones -->
     <div class="deploy-phase" style="margin-top:1.75rem">
       <div class="phase-num">Pasul 2</div>
-      <div class="phase-title">Deployează pe Railway</div>
+      <div class="phase-title">Adaugă cele 3 variabile sensibile în Railway → Variables</div>
     </div>
 
-    <div class="deploy-phases">
-      <div class="phase-section">
-        <div class="phase-section-title">A — Urcă codul pe GitHub (gratis, o dată)</div>
-        <div class="phase-step"><span class="num">1.</span>Du-te la <a href="https://github.com" target="_blank">github.com</a> → cont nou dacă nu ai → confirmi email</div>
-        <div class="phase-step"><span class="num">2.</span>Click butonul verde <strong>New</strong> (sau <strong>+</strong> din dreapta sus → New repository)</div>
-        <div class="phase-step"><span class="num">3.</span>Numești repo-ul <strong>apex-trade-bot</strong> → dai click <strong>Create repository</strong></div>
-        <div class="phase-step"><span class="num">4.</span>Pe pagina repo-ului apăsat click pe <strong>"uploading an existing file"</strong></div>
-        <div class="phase-step"><span class="num">5.</span>Dezarhivezi ZIP-ul descărcat → <strong>selectezi toate fișierele din interior</strong> → le tragi în browser → <strong>Commit changes</strong></div>
-      </div>
-
-      <div class="phase-section" style="margin-top:1rem">
-        <div class="phase-section-title">B — Deployează pe Railway (gratis)</div>
-        <div class="phase-step"><span class="num">1.</span>Du-te la <a href="https://railway.app" target="_blank">railway.app</a> → Sign up cu contul GitHub</div>
-        <div class="phase-step"><span class="num">2.</span>Click <strong>New Project</strong> → <strong>Deploy from GitHub repo</strong></div>
-        <div class="phase-step"><span class="num">3.</span>Alegi repo-ul <strong>apex-trade-bot</strong> pe care l-ai creat</div>
-        <div class="phase-step"><span class="num">4.</span>Railway creează proiectul → mergi la tab-ul <strong>Variables</strong></div>
-        <div class="phase-step"><span class="num">5.</span>Click <strong>Raw Editor</strong> → lipești variabilele de mai jos → <strong>Update</strong></div>
-        <div class="phase-step"><span class="num">6.</span>Railway redeploys automat → botul pornește → primești mesaj pe Telegram</div>
-      </div>
+    <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:12px">
+      Pe Railway, după ce se deschide proiectul, mergi la <strong style="color:#f59e0b">Variables → Raw Editor</strong> și adaugă:
     </div>
 
-    <!-- STEP C: Env Vars -->
-    <div class="deploy-phase" style="margin-top:1.75rem">
-      <div class="phase-num">Pasul 3</div>
-      <div class="phase-title">Copiază Variabilele în Railway → Variables</div>
+    <div id="sensitive-vars" style="display:flex;flex-direction:column;gap:8px;margin-bottom:1.5rem"></div>
+
+    <!-- ALL VARS (collapsible) -->
+    <div class="deploy-phase" style="margin-top:1.5rem">
+      <div class="phase-num" style="background:rgba(255,255,255,.06)">Opțional</div>
+      <div class="phase-title" style="color:rgba(255,255,255,.5)">Sau copiază toate variabilele odată</div>
     </div>
     <div class="config-header">
-      <span>RAW EDITOR → lipești tot ce urmează</span>
+      <span>RAW EDITOR — lipești tot în Railway</span>
       <button class="copy-btn" id="copy-btn" onclick="copyVars()">Copiază Tot</button>
     </div>
     <div class="code-box" id="config-output"></div>
 
     <div class="warn-box">
-      <strong>PAPER_TRADING=true</strong> înseamnă că botul simulează tranzacții fără bani reali. Testează minimum o zi, verifică că funcționează corect, apoi schimbă în <strong>PAPER_TRADING=false</strong> pentru real.
+      <strong>PAPER_TRADING=true</strong> înseamnă simulare fără bani reali. Testează o zi, verifică că primești mesaje Telegram, apoi schimbă în <strong>PAPER_TRADING=false</strong>.
     </div>
 
     <div id="stop-section" style="display:none;margin-top:1.5rem">
-      <button class="stop-btn" onclick="emergencyStop()">
-        Opreste Botul Acum (Urgenta)
-      </button>
-      <div style="font-size:11px;color:rgba(255,77,109,.35);text-align:center;margin-top:6px">
-        Sau trimite /stop în Telegram
-      </div>
+      <button class="stop-btn" onclick="emergencyStop()">Opreste Botul Acum (Urgenta)</button>
+      <div style="font-size:11px;color:rgba(255,77,109,.35);text-align:center;margin-top:6px">Sau trimite /stop în Telegram</div>
     </div>
 
     <div class="nav-row" style="margin-top:1.25rem">
@@ -504,6 +487,49 @@ function goTo(n) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function buildRailwayUrl(strat, symbol) {
+  const repo = 'https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot';
+  const nonSensitive = {
+    EXCHANGE:       'binance',
+    TRADE_SYMBOL:   symbol,
+    TIMEFRAME:      strat.timeframe,
+    RISK_PER_TRADE: String(strat.riskPct),
+    STOP_LOSS_PCT:  String(strat.sl),
+    TAKE_PROFIT_PCT:String(strat.tp),
+    MIN_CONFIDENCE: '62',
+    TRAILING_STOP:  'true',
+    PAPER_TRADING:  'true',
+    PAPER_BALANCE:  '100',
+    LICENSE_SERVER: 'https://aicashsystem.space',
+  };
+  if (state.telegramToken)  nonSensitive.TELEGRAM_BOT_TOKEN = state.telegramToken;
+  if (state.telegramChatId) nonSensitive.TELEGRAM_CHAT_ID   = state.telegramChatId;
+  const envKeys = Object.keys(nonSensitive).join(',');
+  const envVals = Object.entries(nonSensitive).map(([k,v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  return `https://railway.app/new/template?template=${encodeURIComponent(repo)}&envs=${envKeys}&${envVals}`;
+}
+
+function buildSensitiveVarsHTML(symbol) {
+  const lic = state.licenseKey !== 'APEX-XXXX-XXXX-XXXX' ? state.licenseKey : 'CHEIA_TA_APEX-XXXX-XXXX-XXXX';
+  const apiKey    = state.apiKey    || 'BINANCE_API_KEY_TAU';
+  const apiSecret = state.apiSecret || 'BINANCE_SECRET_TAU';
+  const vars = [
+    { k: 'BINANCE_API_KEY',    v: apiKey,    hint: 'de pe Binance → API Management' },
+    { k: 'BINANCE_API_SECRET', v: apiSecret, hint: 'apare o singură dată la creare' },
+    { k: 'LICENSE_KEY',        v: lic,       hint: 'cheia primită pe email' },
+  ];
+  return vars.map(({k, v, hint}) => `
+    <div style="background:#0d1225;border:1px solid #1e2a45;border-radius:10px;padding:12px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#f59e0b;font-family:monospace;margin-bottom:2px">${k}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.3)">${hint}</div>
+        </div>
+        <button onclick="navigator.clipboard.writeText('${k}=${v.replace(/'/g,"\\'")}')" style="background:#1e2a45;border:1px solid #2d3f5e;border-radius:7px;color:#e5e7eb;font-size:11px;padding:5px 12px;cursor:pointer;white-space:nowrap">Copiază</button>
+      </div>
+    </div>`).join('');
+}
+
 function buildConfig() {
   state.telegramToken  = document.getElementById('tg-token').value.trim();
   state.telegramChatId = document.getElementById('tg-chat-id').value.trim();
@@ -515,11 +541,15 @@ function buildConfig() {
   document.getElementById('summary-chips').innerHTML = [
     `<span class="chip">${strat.name.split('—')[0].trim()}</span>`,
     `<span class="chip">${symbol}</span>`,
-    `<span class="chip">${exchange.charAt(0).toUpperCase() + exchange.slice(1)}</span>`,
+    `<span class="chip">Binance</span>`,
     state.telegramToken ? `<span class="chip">Telegram activ</span>` : '',
   ].join('');
 
-  document.getElementById('key-display').textContent = state.licenseKey.slice(0, 11) + '...';
+  // Railway deploy button URL
+  document.getElementById('railway-btn').href = buildRailwayUrl(strat, symbol);
+
+  // Sensitive vars cards
+  document.getElementById('sensitive-vars').innerHTML = buildSensitiveVarsHTML(symbol);
 
   window._configPlain = buildVarsPlain(strat, symbol, exchange);
   document.getElementById('config-output').innerHTML = buildVarsHTML(strat, symbol, exchange);
