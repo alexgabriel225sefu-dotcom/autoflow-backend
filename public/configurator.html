@@ -191,9 +191,9 @@
 
 <div class="progress-wrap">
   <div class="progress-labels">
-    <div class="progress-label active" id="lbl-1">1. Strategie</div>
+    <div class="progress-label active" id="lbl-1">1. Profil</div>
     <div class="progress-label" id="lbl-2">2. Monedă</div>
-    <div class="progress-label" id="lbl-3">3. Risc</div>
+    <div class="progress-label" id="lbl-3">3. Exchange</div>
     <div class="progress-label" id="lbl-4">4. API Keys</div>
     <div class="progress-label" id="lbl-5">5. Config</div>
   </div>
@@ -204,10 +204,10 @@
 
 <div class="wizard">
 
-  <!-- Step 1: Strategy -->
+  <!-- Step 1: Profile -->
   <div class="step active" id="step-1">
-    <div class="step-title">Alege Strategia de Trading</div>
-    <div class="step-sub">Fiecare strategie are un comportament diferit. Alege una potrivită stilului tău de trading.</div>
+    <div class="step-title">Alege Profilul de Trading</div>
+    <div class="step-sub">Toate profilurile folosesc același motor AI bazat pe 6 traderi legendari. Diferența este cât de des tranzacționează și câți bani riscă per trade.</div>
     <div class="strategy-cards" id="strategy-cards"></div>
     <div class="nav-row">
       <button class="btn-next" id="next-1" onclick="goTo(2)" disabled>Continuă →</button>
@@ -216,8 +216,8 @@
 
   <!-- Step 2: Coin -->
   <div class="step" id="step-2">
-    <div class="step-title">Alege Moneda de Tranzacționat</div>
-    <div class="step-sub">Botul tău va tranzacționa exclusiv această pereche cu USDT pe Binance Spot.</div>
+    <div class="step-title">Alege Moneda Principală</div>
+    <div class="step-sub">Botul scanează automat mai multe monede — asta o setezi ca principală. Poți activa multi-simbol din env vars.</div>
     <div class="coin-grid" id="coin-grid"></div>
     <div class="nav-row">
       <button class="btn-back" onclick="goTo(1)">← Înapoi</button>
@@ -225,11 +225,11 @@
     </div>
   </div>
 
-  <!-- Step 3: Risk -->
+  <!-- Step 3: Exchange -->
   <div class="step" id="step-3">
-    <div class="step-title">Nivelul de Risc</div>
-    <div class="step-sub">Controlează câți USDT investești per tranzacție. Poți schimba oricând din variabile.</div>
-    <div class="risk-cards" id="risk-cards"></div>
+    <div class="step-title">Alege Exchange-ul</div>
+    <div class="step-sub">Botul suportă Bybit (recomandat — are paper trading nativ) și Binance. Vei introduce cheile în pasul următor.</div>
+    <div class="risk-cards" id="exchange-cards"></div>
     <div class="nav-row">
       <button class="btn-back" onclick="goTo(2)">← Înapoi</button>
       <button class="btn-next" id="next-3" onclick="goTo(4)" disabled>Continuă →</button>
@@ -238,22 +238,22 @@
 
   <!-- Step 4: API Keys + Telegram -->
   <div class="step" id="step-4">
-    <div class="step-title">Chei API Binance</div>
-    <div class="step-sub">Botul are nevoie de cheile tale pentru a plasa ordine pe contul tău Binance.</div>
+    <div class="step-title" id="api-step-title">Chei API Exchange</div>
+    <div class="step-sub" id="api-step-sub">Botul are nevoie de cheile tale pentru a plasa ordine pe contul tău.</div>
 
     <div class="input-group">
-      <label class="input-label">Binance API Key <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
-      <input class="input-field" id="api-key" type="text" placeholder="Lipeste API Key-ul de pe Binance" autocomplete="off" oninput="onApiKeyInput()" />
-      <div class="input-hint">
-        Du-te la <a href="https://www.binance.com/en/my/settings/api-management" target="_blank">Binance → API Management</a> → Create API → copiază API Key
+      <label class="input-label"><span id="api-key-label">API Key</span> <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
+      <input class="input-field" id="api-key" type="text" placeholder="Lipeste API Key-ul" autocomplete="off" oninput="onApiKeyInput()" />
+      <div class="input-hint" id="api-key-hint">
+        Du-te la <a id="api-link" href="https://www.bybit.com/app/user/api-management" target="_blank">Bybit → API Management</a> → Create Key → copiază API Key
       </div>
     </div>
 
     <div class="input-group">
-      <label class="input-label">Binance Secret Key <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
-      <input class="input-field" id="api-secret" type="password" placeholder="Lipeste Secret Key-ul de pe Binance" autocomplete="off" oninput="onApiKeyInput()" />
+      <label class="input-label"><span id="api-secret-label">Secret Key</span> <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
+      <input class="input-field" id="api-secret" type="password" placeholder="Lipeste Secret Key-ul" autocomplete="off" oninput="onApiKeyInput()" />
       <div class="input-hint">
-        Secretul apare <strong>o singură dată</strong> la creare. Activează permisiunea <strong>Spot &amp; Margin Trading</strong>. NU activa Withdrawals.
+        Secretul apare <strong>o singură dată</strong> la creare. Activează permisiunea <strong>Spot Trading</strong>. NU activa Withdrawals.
       </div>
     </div>
 
@@ -261,7 +261,7 @@
       <div class="tb-title">Telegram — Notificări + Buton /stop</div>
       <div class="tb-desc">
         Opțional dar recomandat: primești un mesaj la fiecare tranzacție și poți opri botul din orice loc cu <code>/stop</code>.
-        Fără Telegram, poți opri botul din Railway Dashboard → Variables → schimbi STRATEGY la invalid.
+        Fără Telegram, poți opri botul din Railway Dashboard → serviciul tău → Deploy → Stop.
       </div>
       <div class="input-group" style="margin-bottom:.75rem">
         <label class="input-label">Telegram Bot Token <span class="opt">(opțional)</span></label>
@@ -339,7 +339,7 @@
     <div class="code-box" id="config-output"></div>
 
     <div class="warn-box">
-      <strong>TESTNET=true</strong> înseamnă că botul rulează fără bani reali (simulare). Testează o zi, verifică că trimite mesaje Telegram, apoi schimbă în <strong>false</strong>.
+      <strong>PAPER_TRADING=true</strong> înseamnă că botul simulează tranzacții fără bani reali. Testează minimum o zi, verifică că funcționează corect, apoi schimbă în <strong>PAPER_TRADING=false</strong> pentru real.
     </div>
 
     <div id="stop-section" style="display:none;margin-top:1.5rem">
@@ -361,51 +361,44 @@
 <script>
 const STRATEGIES = [
   {
-    id: 'dca', name: 'DCA — Dollar Cost Averaging',
-    desc: 'Cumperi o sumă fixă la fiecare X ore, indiferent de preț. Vinzi când atingi profit target.',
-    risk: 'low', riskLabel: 'Risc scăzut', detail: 'Recomandat pentru începători',
-    tp: 3, sl: 2, interval: '4h',
+    id: 'conservator', name: 'Conservator — Lent și Sigur',
+    desc: 'Verifică semnale la fiecare 15 minute. Riscă 10% din sold per trade. Ideal pentru capital mic sau începători.',
+    risk: 'low', riskLabel: 'Risc scăzut', detail: 'Recomandat pentru cei care încep',
+    timeframe: '15m', riskPct: 0.10, sl: 0.010, tp: 0.020,
   },
   {
-    id: 'grid', name: 'Grid Trading',
-    desc: 'Plasezi ordine de cumpărare și vânzare la intervale de preț fixe. Câștigi din fiecare oscilație.',
-    risk: 'medium', riskLabel: 'Risc mediu', detail: 'Ideal pentru piețe laterale (sideways)',
-    tp: 2, sl: 3, interval: '15m',
+    id: 'echilibrat', name: 'Echilibrat — Configurat Implicit',
+    desc: 'Verifică semnale la fiecare 5 minute. Riscă 20% din sold. Raport risc/recompensă 1:2 — cel mai testat.',
+    risk: 'medium', riskLabel: 'Risc mediu', detail: 'Cel mai popular — setările implicite ale botului',
+    timeframe: '5m', riskPct: 0.20, sl: 0.008, tp: 0.016,
   },
   {
-    id: 'scalping', name: 'Scalping — RSI + EMA',
-    desc: 'Tranzacții rapide pe candele de 5 minute. Intri la RSI oversold + EMA crossover.',
-    risk: 'high', riskLabel: 'Risc ridicat', detail: 'Mai multe tranzacții zilnic, necesită monitorizare',
-    tp: 1.5, sl: 1, interval: '5m',
-  },
-  {
-    id: 'trend', name: 'Trend Following — EMA 20/50',
-    desc: 'Urmărești trendul major pe 1 oră. Cumperi la golden cross, vinzi la death cross + RSI.',
-    risk: 'medium', riskLabel: 'Risc mediu', detail: 'Puține tranzacții, profit mai mare per trade',
-    tp: 6, sl: 2.5, interval: '1h',
+    id: 'agresiv', name: 'Agresiv — Scalping Rapid',
+    desc: 'Semnale dese pe 5 minute. Riscă 30% din sold. Mai multe tranzacții, volatilitate mai mare în ambele direcții.',
+    risk: 'high', riskLabel: 'Risc ridicat', detail: 'Necesită monitorizare activă',
+    timeframe: '5m', riskPct: 0.30, sl: 0.012, tp: 0.024,
   },
 ];
 
 const COINS = [
-  { sym: 'BTCUSDT',  name: 'Bitcoin',  icon: '₿',  tag: 'Cel mai lichid'  },
-  { sym: 'ETHUSDT',  name: 'Ethereum', icon: 'Ξ',  tag: 'DeFi Leader'     },
-  { sym: 'SOLUSDT',  name: 'Solana',   icon: '◎',  tag: 'High Growth'     },
-  { sym: 'XRPUSDT',  name: 'XRP',      icon: '✕',  tag: 'High Velocity'   },
-  { sym: 'ADAUSDT',  name: 'Cardano',  icon: '₳',  tag: 'Stable'          },
-  { sym: 'BNBUSDT',  name: 'BNB',      icon: 'B',  tag: 'Exchange Coin'   },
-  { sym: 'DOGEUSDT', name: 'DOGE',     icon: 'Ð',  tag: 'Meme Coin'       },
-  { sym: 'TRXUSDT',  name: 'TRON',     icon: '⟡', tag: 'Low Fee'         },
+  { sym: 'SOLUSDT',  name: 'Solana',   icon: '◎',  tag: 'Default bot'    },
+  { sym: 'XRPUSDT',  name: 'XRP',      icon: '✕',  tag: 'High Velocity'  },
+  { sym: 'DOGEUSDT', name: 'DOGE',     icon: 'Ð',  tag: 'Meme Coin'      },
+  { sym: 'ADAUSDT',  name: 'Cardano',  icon: '₳',  tag: 'Stable'         },
+  { sym: 'BTCUSDT',  name: 'Bitcoin',  icon: '₿',  tag: 'Cel mai lichid' },
+  { sym: 'ETHUSDT',  name: 'Ethereum', icon: 'Ξ',  tag: 'DeFi Leader'    },
+  { sym: 'BNBUSDT',  name: 'BNB',      icon: 'B',  tag: 'Exchange Coin'  },
+  { sym: 'TRXUSDT',  name: 'TRON',     icon: '⟡', tag: 'Low Fee'        },
 ];
 
-const RISKS = [
-  { id: 'conservative', icon: '🛡', name: 'Conservator', desc: '$20 per tranzacție. Ideal pentru start cu risc mic.', orderAmt: 20  },
-  { id: 'balanced',     icon: '⚖', name: 'Echilibrat',  desc: '$50 per tranzacție. Cel mai popular.', orderAmt: 50 },
-  { id: 'aggressive',   icon: '🔥', name: 'Agresiv',     desc: '$100+ per tranzacție. Risc ridicat, profit potențial mai mare.', orderAmt: 100 },
+const EXCHANGES = [
+  { id: 'bybit',   name: 'Bybit', detail: 'Recomandat — paper trading nativ, API simplu', risk: 'low' },
+  { id: 'binance', name: 'Binance', detail: 'Alternativă — lichiditate maximă', risk: 'medium' },
 ];
 
 const state = {
   licenseKey: 'APEX-XXXX-XXXX-XXXX',
-  strategy: null, coin: null, risk: null,
+  strategy: null, coin: null, exchange: null,
   apiKey: '', apiSecret: '', telegramToken: '', telegramChatId: '',
   currentStep: 1,
 };
@@ -426,7 +419,7 @@ const state = {
 
   renderStrategies();
   renderCoins();
-  renderRisks();
+  renderExchanges();
 
   // 3. If still no valid key, show the key entry overlay
   if (state.licenseKey === 'APEX-XXXX-XXXX-XXXX') showKeyOverlay();
@@ -469,12 +462,11 @@ function renderCoins() {
     </button>`).join('');
 }
 
-function renderRisks() {
-  document.getElementById('risk-cards').innerHTML = RISKS.map(r => `
-    <div class="risk-card" data-id="${r.id}" onclick="selectRisk('${r.id}')">
-      <span class="risk-icon">${r.icon}</span>
-      <div class="risk-name">${r.name}</div>
-      <div class="risk-desc">${r.desc}</div>
+function renderExchanges() {
+  document.getElementById('exchange-cards').innerHTML = EXCHANGES.map(e => `
+    <div class="risk-card" data-id="${e.id}" onclick="selectExchange('${e.id}')">
+      <div class="risk-name">${e.name}</div>
+      <div class="risk-desc">${e.detail}</div>
     </div>`).join('');
 }
 
@@ -488,10 +480,27 @@ function selectCoin(sym) {
   document.querySelectorAll('.coin-btn').forEach(b => b.classList.toggle('selected', b.dataset.sym === sym));
   document.getElementById('next-2').disabled = false;
 }
-function selectRisk(id) {
-  state.risk = id;
-  document.querySelectorAll('.risk-card').forEach(c => c.classList.toggle('selected', c.dataset.id === id));
+function selectExchange(id) {
+  state.exchange = id;
+  document.querySelectorAll('#exchange-cards .risk-card').forEach(c => c.classList.toggle('selected', c.dataset.id === id));
   document.getElementById('next-3').disabled = false;
+  const isBybit = id === 'bybit';
+  document.getElementById('api-step-title').textContent = isBybit ? 'Chei API Bybit' : 'Chei API Binance';
+  document.getElementById('api-step-sub').textContent = isBybit
+    ? 'Botul are nevoie de cheile tale pentru a plasa ordine pe contul tău Bybit.'
+    : 'Botul are nevoie de cheile tale pentru a plasa ordine pe contul tău Binance.';
+  document.getElementById('api-key-label').textContent = isBybit ? 'Bybit API Key' : 'Binance API Key';
+  document.getElementById('api-secret-label').textContent = isBybit ? 'Bybit Secret Key' : 'Binance Secret Key';
+  const link = document.getElementById('api-link');
+  if (isBybit) {
+    link.href = 'https://www.bybit.com/app/user/api-management';
+    link.textContent = 'Bybit → API Management';
+    document.getElementById('api-key-hint').innerHTML = `Du-te la <a id="api-link" href="https://www.bybit.com/app/user/api-management" target="_blank">Bybit → API Management</a> → Create Key → activează permisiunea <strong>Unified Trading</strong>`;
+  } else {
+    link.href = 'https://www.binance.com/en/my/settings/api-management';
+    link.textContent = 'Binance → API Management';
+    document.getElementById('api-key-hint').innerHTML = `Du-te la <a id="api-link" href="https://www.binance.com/en/my/settings/api-management" target="_blank">Binance → API Management</a> → Create API → activează permisiunea <strong>Spot &amp; Margin Trading</strong>`;
+  }
 }
 function onApiKeyInput() {
   state.apiKey    = document.getElementById('api-key').value.trim();
@@ -515,99 +524,122 @@ function buildConfig() {
   state.telegramToken  = document.getElementById('tg-token').value.trim();
   state.telegramChatId = document.getElementById('tg-chat-id').value.trim();
 
-  const strat  = STRATEGIES.find(s => s.id === state.strategy) || STRATEGIES[0];
-  const risk   = RISKS.find(r => r.id === state.risk) || RISKS[1];
-  const symbol = state.coin || 'BTCUSDT';
+  const strat    = STRATEGIES.find(s => s.id === state.strategy) || STRATEGIES[1];
+  const symbol   = state.coin || 'SOLUSDT';
+  const exchange = state.exchange || 'bybit';
 
   document.getElementById('summary-chips').innerHTML = [
     `<span class="chip">${strat.name.split('—')[0].trim()}</span>`,
     `<span class="chip">${symbol}</span>`,
-    `<span class="chip">${risk.name} ($${risk.orderAmt})</span>`,
+    `<span class="chip">${exchange.charAt(0).toUpperCase() + exchange.slice(1)}</span>`,
     state.telegramToken ? `<span class="chip">Telegram activ</span>` : '',
   ].join('');
 
   document.getElementById('key-display').textContent = state.licenseKey.slice(0, 11) + '...';
 
-  window._configPlain = buildVarsPlain(strat, risk, symbol);
-  document.getElementById('config-output').innerHTML = buildVarsHTML(strat, risk, symbol);
+  window._configPlain = buildVarsPlain(strat, symbol, exchange);
+  document.getElementById('config-output').innerHTML = buildVarsHTML(strat, symbol, exchange);
   document.getElementById('stop-section').style.display = state.apiKey ? 'block' : 'none';
 }
 
-function buildVarsPlain(strat, risk, symbol) {
-  const t  = state.telegramToken  || 'optional';
-  const tc = state.telegramChatId || 'optional';
-  return [
-    `# Bot Configuration`,
-    `STRATEGY=${strat.id}`,
-    `TRADING_SYMBOL=${symbol}`,
-    `ORDER_AMOUNT_USDT=${risk.orderAmt}`,
-    `TAKE_PROFIT_PCT=${strat.tp}`,
-    `STOP_LOSS_PCT=${strat.sl}`,
-    `TIMEFRAME=${strat.interval}`,
+function buildVarsPlain(strat, symbol, exchange) {
+  const t  = state.telegramToken  || '';
+  const tc = state.telegramChatId || '';
+  const isBybit = exchange !== 'binance';
+  const lines = [
+    `# ── Apex Trade Bot — Environment Variables ──`,
     ``,
-    `# DCA Strategy`,
-    `DCA_INTERVAL_HOURS=4`,
-    `DCA_MAX_ORDERS=10`,
+    `# Exchange`,
+    `EXCHANGE=${exchange}`,
     ``,
-    `# Grid Strategy`,
-    `GRID_LEVELS=10`,
-    `INVESTMENT_USDT=${risk.orderAmt * 2}`,
-    `# GRID_LOWER_PRICE=`,
-    `# GRID_UPPER_PRICE=`,
-    ``,
-    `# Binance API`,
-    `BINANCE_API_KEY=${state.apiKey || 'YOUR_API_KEY'}`,
-    `BINANCE_API_SECRET=${state.apiSecret || 'YOUR_API_SECRET'}`,
-    `TESTNET=true`,
-    ``,
-    `# Telegram`,
-    `TELEGRAM_BOT_TOKEN=${t}`,
-    `TELEGRAM_CHAT_ID=${tc}`,
-    ``,
-    `# License`,
-    `LICENSE_KEY=${state.licenseKey}`,
-  ].join('\n');
+  ];
+  if (isBybit) {
+    lines.push(`# Bybit API`);
+    lines.push(`BYBIT_API_KEY=${state.apiKey || 'YOUR_BYBIT_API_KEY'}`);
+    lines.push(`BYBIT_API_SECRET=${state.apiSecret || 'YOUR_BYBIT_SECRET'}`);
+    lines.push(`BYBIT_TESTNET=false`);
+  } else {
+    lines.push(`# Binance API`);
+    lines.push(`BINANCE_API_KEY=${state.apiKey || 'YOUR_BINANCE_API_KEY'}`);
+    lines.push(`BINANCE_API_SECRET=${state.apiSecret || 'YOUR_BINANCE_SECRET'}`);
+    lines.push(`BINANCE_TESTNET=false`);
+  }
+  lines.push(``);
+  lines.push(`# Trading`);
+  lines.push(`TRADE_SYMBOL=${symbol}`);
+  lines.push(`TIMEFRAME=${strat.timeframe}`);
+  lines.push(`RISK_PER_TRADE=${strat.riskPct}`);
+  lines.push(`STOP_LOSS_PCT=${strat.sl}`);
+  lines.push(`TAKE_PROFIT_PCT=${strat.tp}`);
+  lines.push(`MIN_CONFIDENCE=62`);
+  lines.push(`TRAILING_STOP=true`);
+  lines.push(``);
+  lines.push(`# Paper Trading (SEMPRE true prima dată)`);
+  lines.push(`PAPER_TRADING=true`);
+  lines.push(`PAPER_BALANCE=100`);
+  lines.push(``);
+  if (t) {
+    lines.push(`# Telegram`);
+    lines.push(`TELEGRAM_BOT_TOKEN=${t}`);
+    lines.push(`TELEGRAM_CHAT_ID=${tc}`);
+    lines.push(``);
+  }
+  lines.push(`# License`);
+  lines.push(`LICENSE_KEY=${state.licenseKey}`);
+  lines.push(`LICENSE_SERVER=https://aicashsystem.space`);
+  return lines.join('\n');
 }
 
-function buildVarsHTML(strat, risk, symbol) {
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function buildVarsHTML(strat, symbol, exchange) {
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const kv  = (k, v) => `<span class="k">${esc(k)}</span>=<span class="v">${esc(v)}</span>`;
   const cm  = t => `<span class="c">${esc(t)}</span>`;
-  const t   = state.telegramToken  || 'optional';
-  const tc  = state.telegramChatId || 'optional';
-  const secretDisplay = state.apiSecret ? '•'.repeat(Math.min(state.apiSecret.length, 20)) : 'YOUR_API_SECRET';
-
-  return [
-    cm('# Bot Configuration'),
-    kv('STRATEGY', strat.id),
-    kv('TRADING_SYMBOL', symbol),
-    kv('ORDER_AMOUNT_USDT', String(risk.orderAmt)),
-    kv('TAKE_PROFIT_PCT', String(strat.tp)),
-    kv('STOP_LOSS_PCT', String(strat.sl)),
-    kv('TIMEFRAME', strat.interval),
+  const t   = state.telegramToken  || '';
+  const tc  = state.telegramChatId || '';
+  const secretDisplay = state.apiSecret ? '•'.repeat(Math.min(state.apiSecret.length, 20)) : (exchange === 'bybit' ? 'YOUR_BYBIT_SECRET' : 'YOUR_BINANCE_SECRET');
+  const isBybit = exchange !== 'binance';
+  const rows = [
+    cm('# ── Apex Trade Bot — Environment Variables ──'),
     '',
-    cm('# DCA Strategy'),
-    kv('DCA_INTERVAL_HOURS', '4'),
-    kv('DCA_MAX_ORDERS', '10'),
+    cm('# Exchange'),
+    kv('EXCHANGE', exchange),
     '',
-    cm('# Grid Strategy'),
-    kv('GRID_LEVELS', '10'),
-    kv('INVESTMENT_USDT', String(risk.orderAmt * 2)),
-    cm('# GRID_LOWER_PRICE=  ← auto-calculat dacă lipsește'),
-    cm('# GRID_UPPER_PRICE=  ← auto-calculat dacă lipsește'),
-    '',
-    cm('# Binance API'),
-    kv('BINANCE_API_KEY', state.apiKey || 'YOUR_API_KEY'),
-    kv('BINANCE_API_SECRET', secretDisplay),
-    kv('TESTNET', 'true'),
-    '',
-    cm('# Telegram'),
-    kv('TELEGRAM_BOT_TOKEN', t),
-    kv('TELEGRAM_CHAT_ID', tc),
-    '',
-    cm('# License'),
-    kv('LICENSE_KEY', state.licenseKey),
-  ].join('\n');
+  ];
+  if (isBybit) {
+    rows.push(cm('# Bybit API'));
+    rows.push(kv('BYBIT_API_KEY', state.apiKey || 'YOUR_BYBIT_API_KEY'));
+    rows.push(kv('BYBIT_API_SECRET', secretDisplay));
+    rows.push(kv('BYBIT_TESTNET', 'false'));
+  } else {
+    rows.push(cm('# Binance API'));
+    rows.push(kv('BINANCE_API_KEY', state.apiKey || 'YOUR_BINANCE_API_KEY'));
+    rows.push(kv('BINANCE_API_SECRET', secretDisplay));
+    rows.push(kv('BINANCE_TESTNET', 'false'));
+  }
+  rows.push('');
+  rows.push(cm('# Trading'));
+  rows.push(kv('TRADE_SYMBOL', symbol));
+  rows.push(kv('TIMEFRAME', strat.timeframe));
+  rows.push(kv('RISK_PER_TRADE', String(strat.riskPct)));
+  rows.push(kv('STOP_LOSS_PCT', String(strat.sl)));
+  rows.push(kv('TAKE_PROFIT_PCT', String(strat.tp)));
+  rows.push(kv('MIN_CONFIDENCE', '62'));
+  rows.push(kv('TRAILING_STOP', 'true'));
+  rows.push('');
+  rows.push(cm('# Paper Trading — LASĂ true prima dată'));
+  rows.push(kv('PAPER_TRADING', 'true'));
+  rows.push(kv('PAPER_BALANCE', '100'));
+  if (t) {
+    rows.push('');
+    rows.push(cm('# Telegram'));
+    rows.push(kv('TELEGRAM_BOT_TOKEN', t));
+    rows.push(kv('TELEGRAM_CHAT_ID', tc));
+  }
+  rows.push('');
+  rows.push(cm('# License'));
+  rows.push(kv('LICENSE_KEY', state.licenseKey));
+  rows.push(kv('LICENSE_SERVER', 'https://aicashsystem.space'));
+  return rows.join('\n');
 }
 
 function dlMsg(text, color) {
