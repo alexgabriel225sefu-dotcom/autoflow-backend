@@ -1705,6 +1705,8 @@ body{background:#08080f;font-family:'Inter',sans-serif;padding:0;margin:0;color:
     <tr><td class="vt-k">BINANCE_API_KEY</td><td class="vt-v">The API Key from Step 2 above</td></tr>
     <tr><td class="vt-k">BINANCE_API_SECRET</td><td class="vt-v">The Secret Key from Step 2 — <b>only shown once at creation</b></td></tr>
     <tr><td class="vt-k">BINANCE_TESTNET</td><td class="vt-v">Set to ${chip('false')} for live trading</td></tr>
+    <tr><td class="vt-k">GROQ_API_KEY</td><td class="vt-v">Free AI key — go to <a href="https://console.groq.com">console.groq.com</a> → API Keys → <b>Create API Key</b> (no card needed)</td></tr>
+    <tr><td class="vt-k">ANTHROPIC_API_KEY</td><td class="vt-v">Optional — upgrade to Claude AI for stronger signals (paid at anthropic.com)</td></tr>
     <tr><td class="vt-k">PAPER_TRADING</td><td class="vt-v">Set to ${chip('true')} to start safely with simulated money. Change to ${chip('false','#f59e0b')} when ready to go live.</td></tr>
     <tr><td class="vt-k">PAPER_BALANCE</td><td class="vt-v">Simulated balance. Default: ${chip('10')} (= $10 USDT)</td></tr>
     <tr><td class="vt-k">TRADE_SYMBOL</td><td class="vt-v">Optional. Override with ${chip('DOGEUSDT')} or ${chip('SOLUSDT')}. Default: auto-scanner picks best coin.</td></tr>
