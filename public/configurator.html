@@ -637,18 +637,31 @@ function downloadBot() {
     dlMsg('Cheie lipsă — introdu-o în overlay-ul de la start.', '#ff4d6d');
     return;
   }
+
+  // iOS Safari & mobile: blob download doesn't work — open URL directly
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    dlMsg('Se deschide descărcarea...', 'rgba(245,158,11,.6)');
+    window.location.href = '/bot-access?key=' + encodeURIComponent(key);
+    return;
+  }
+
   const btn = document.getElementById('download-btn');
   btn.textContent = 'Se pregătește... asteaptă';
   btn.disabled = true;
   dlMsg('Se generează arhiva, poate dura 5-10 secunde...', 'rgba(245,158,11,.6)');
 
-  fetch('/bot-access?key=' + encodeURIComponent(key))
+  // 30s timeout — if server hangs, reset the button
+  const controller = new AbortController();
+  const timeout = setTimeout(() => { controller.abort(); }, 30000);
+
+  fetch('/bot-access?key=' + encodeURIComponent(key), { signal: controller.signal })
     .then(r => {
+      clearTimeout(timeout);
       if (!r.ok) return r.text().then(t => { throw new Error(t || 'Licență invalidă sau server indisponibil'); });
       return r.blob();
     })
     .then(blob => {
-      // Attach to DOM so all browsers trigger the download
       const url = URL.createObjectURL(blob);
       const a   = document.createElement('a');
       a.href     = url;
@@ -669,9 +682,11 @@ function downloadBot() {
       }, 5000);
     })
     .catch(err => {
+      clearTimeout(timeout);
       btn.textContent = 'Descarcă apex-trade-bot.zip';
       btn.disabled = false;
-      dlMsg('Eroare: ' + err.message, '#ff4d6d');
+      const msg = err.name === 'AbortError' ? 'Timeout — serverul nu a răspuns în 30s. Încearcă din nou.' : 'Eroare: ' + err.message;
+      dlMsg(msg, '#ff4d6d');
     });
 }
 
