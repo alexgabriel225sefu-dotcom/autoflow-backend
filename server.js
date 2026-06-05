@@ -1360,6 +1360,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Configurator (linked from bot delivery email)
+app.get('/configurator', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'configurator.html'));
+});
+
 // POST /api/demo/generate — public, rate-limited (3 req/IP/day)
 const _demoLimiter = rateLimit({ windowMs: 24*60*60*1000, max: 5, standardHeaders: true, legacyHeaders: false,
   handler: (req,res) => res.status(429).json({ error: 'Demo limit reached. Get full access at aicashsystem.space' }) });
