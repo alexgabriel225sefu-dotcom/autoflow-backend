@@ -25,23 +25,53 @@ function headers() {
   return { 'X-MBX-APIKEY': cfg.BINANCE_API_KEY };
 }
 
-// Preț curent
-async function getPrice(symbol = cfg.SYMBOL) {
-  const { data } = await client.get('/ticker/price', { params: { symbol } });
-  return parseFloat(data.price);
+// OKX fallback (geo-unrestricted public API)
+async function _priceOKX(symbol) {
+  const { data } = await axios.get('https://www.okx.com/api/v5/market/ticker', {
+    params: { instId: symbol.replace('USDT', '-USDT') },
+    headers: { 'User-Agent': 'ApexTradeBot/2.0' }, timeout: 6000,
+  });
+  return parseFloat(data.data[0].last);
+}
+async function _candlesOKX(symbol, interval, limit) {
+  const { data } = await axios.get('https://www.okx.com/api/v5/market/candles', {
+    params: { instId: symbol.replace('USDT', '-USDT'), bar: interval, limit },
+    headers: { 'User-Agent': 'ApexTradeBot/2.0' }, timeout: 8000,
+  });
+  if (data.code !== '0') throw new Error('OKX: ' + data.msg);
+  return data.data.reverse().map(k => ({
+    time: parseInt(k[0]), open: parseFloat(k[1]), high: parseFloat(k[2]),
+    low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5]),
+  }));
 }
 
-// Lumânări (OHLCV)
+// Preț curent — Binance → OKX fallback
+async function getPrice(symbol = cfg.SYMBOL) {
+  try {
+    const { data } = await client.get('/ticker/price', { params: { symbol } });
+    return parseFloat(data.price);
+  } catch (e) {
+    console.warn('[DATA] Binance price blocked (' + e.message + ') → OKX');
+    return _priceOKX(symbol);
+  }
+}
+
+// Lumânări (OHLCV) — Binance → OKX fallback
 async function getCandles(symbol = cfg.SYMBOL, interval = cfg.TIMEFRAME, limit = cfg.CANDLES) {
-  const { data } = await client.get('/klines', { params: { symbol, interval, limit } });
-  return data.map(k => ({
-    open:   parseFloat(k[1]),
-    high:   parseFloat(k[2]),
-    low:    parseFloat(k[3]),
-    close:  parseFloat(k[4]),
-    volume: parseFloat(k[5]),
-    time:   k[0],
-  }));
+  try {
+    const { data } = await client.get('/klines', { params: { symbol, interval, limit } });
+    return data.map(k => ({
+      open:   parseFloat(k[1]),
+      high:   parseFloat(k[2]),
+      low:    parseFloat(k[3]),
+      close:  parseFloat(k[4]),
+      volume: parseFloat(k[5]),
+      time:   k[0],
+    }));
+  } catch (e) {
+    console.warn('[DATA] Binance klines blocked (' + e.message + ') → OKX');
+    return _candlesOKX(symbol, interval, limit);
+  }
 }
 
 // Balanță USDT
