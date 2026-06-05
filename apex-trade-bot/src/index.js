@@ -544,6 +544,8 @@ tr.win td{color:#d1fae5}tr.loss td{color:#fee2e2}
     res.end(html);
   }).listen(PORT, () => logger.info(`📊 Dashboard: http://localhost:${PORT}`));
 
+  tg.startPolling(() => dash, exchange);
+
   await verifyLicense();
   logger.info('🚀 Prima analiză...');
   await tick();

@@ -1,72 +1,187 @@
 /**
- * APEX TRADE BOT — Telegram Alerts
- * Sends notifications on every important event.
- * If TELEGRAM_BOT_TOKEN is missing → silent (bot runs normally).
+ * APEX TRADE BOT — Telegram Alerts + Interactive Dashboard
+ * Send /status for live snapshot. Set DASHBOARD_URL for web link.
  */
 const axios = require('axios');
 
-const TOKEN   = process.env.TELEGRAM_BOT_TOKEN || '';
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID   || '';
+const TOKEN        = process.env.TELEGRAM_BOT_TOKEN || '';
+const CHAT_ID      = process.env.TELEGRAM_CHAT_ID   || '';
+const DASHBOARD_URL = process.env.DASHBOARD_URL      || '';
 
-async function send(text) {
-  if (!TOKEN || !CHAT_ID) return; // Telegram not configured — skip
+// ─── Send helpers ─────────────────────────────────────────
+async function send(text, extra = {}) {
+  if (!TOKEN || !CHAT_ID) return;
   try {
     await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-      chat_id:    CHAT_ID,
-      text,
-      parse_mode: 'HTML',
+      chat_id: CHAT_ID, text, parse_mode: 'HTML', ...extra,
     }, { timeout: 6000 });
   } catch (err) {
     console.warn('[TELEGRAM] Send error:', err.message);
   }
 }
 
-// ─── Alert: Position opened ──────────────────────────────
+async function sendTo(chatId, text, extra = {}) {
+  if (!TOKEN) return;
+  try {
+    await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+      chat_id: chatId, text, parse_mode: 'HTML', ...extra,
+    }, { timeout: 6000 });
+  } catch (err) {
+    console.warn('[TELEGRAM] Send error:', err.message);
+  }
+}
+
+// ─── Mini price chart (Unicode blocks) ───────────────────
+function miniChart(closes) {
+  const n = Math.min(closes.length, 24);
+  const sl = closes.slice(-n);
+  const min = Math.min(...sl), max = Math.max(...sl);
+  const range = max - min || 1;
+  const blocks = '▁▂▃▄▅▆▇█';
+  return sl.map(c => blocks[Math.min(7, Math.floor(((c - min) / range) * 8))]).join('');
+}
+
+// ─── Dashboard button keyboard ────────────────────────────
+function dashboardKeyboard() {
+  if (!DASHBOARD_URL) return {};
+  return {
+    reply_markup: JSON.stringify({
+      inline_keyboard: [[{ text: '🌐 Live Dashboard', url: DASHBOARD_URL }]],
+    }),
+  };
+}
+
+// ─── Rich status message builder ─────────────────────────
+function buildStatus(dash, chart = '') {
+  const pnlPct  = dash.startBalance > 0
+    ? ((dash.balance - dash.startBalance) / dash.startBalance * 100).toFixed(2) : '0.00';
+  const pnlSign = parseFloat(pnlPct) >= 0 ? '+' : '';
+  const wins    = (dash.trades || []).filter(t => t.win).length;
+  const total   = (dash.trades || []).length;
+  const winRate = total > 0 ? ((wins / total) * 100).toFixed(0) + '%' : '—';
+  const chartLine = chart
+    ? `\n<code>${chart}</code>  <b>$${dash.currentPrice?.toFixed(4) || '—'}</b>`
+    : '';
+
+  let posLine = '📭 Nicio poziție deschisă';
+  if (dash.openPosition) {
+    const dir  = dash.openPosition.side === 'BUY' ? '🟢 LONG' : '🔴 SHORT';
+    const pnl  = dash.openPosition.currentPnl || 0;
+    const sign = pnl >= 0 ? '+' : '';
+    posLine =
+      `${dir} <b>${dash.openPosition.symbol}</b>\n` +
+      `  Entry: $${dash.openPosition.entryPrice}  ` +
+      `SL: $${dash.openPosition.stopLoss?.toFixed(4)}\n` +
+      `  PnL: <b>${sign}$${pnl.toFixed(4)}</b>`;
+  }
+
+  return (
+    `⚡ <b>APEX TRADE BOT</b>  ${dash.mode || ''} · ${dash.exchange || ''}\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `💰 Balance: <b>$${(dash.balance || 0).toFixed(2)}</b>  (${pnlSign}${pnlPct}%)${chartLine}\n\n` +
+    `${posLine}\n\n` +
+    `📈 ${total} trades · ${wins}W/${total - wins}L · Win: ${winRate}\n` +
+    `⏱️ Last tick: ${dash.lastTick || '—'}`
+  );
+}
+
+// ─── Command polling (runs in background) ────────────────
+let _getDash   = () => null;
+let _exchange  = null;
+let _updateId  = 0;
+
+async function _fetchUpdates() {
+  const { data } = await axios.get(
+    `https://api.telegram.org/bot${TOKEN}/getUpdates`,
+    { params: { offset: _updateId, timeout: 10, allowed_updates: ['message'] }, timeout: 15000 }
+  );
+  return data.result || [];
+}
+
+async function _handleStatus(chatId) {
+  const dash = _getDash();
+  if (!dash || !dash.exchange) {
+    return sendTo(chatId, '⏳ Bot pornește, mai așteaptă...');
+  }
+  let chart = '';
+  if (_exchange) {
+    try {
+      const candles = await _exchange.getCandles(dash.currentSymbol, '5m', 24);
+      chart = miniChart(candles.map(c => c.close));
+    } catch {}
+  }
+  await sendTo(chatId, buildStatus(dash, chart), dashboardKeyboard());
+}
+
+async function _pollLoop() {
+  while (true) {
+    try {
+      const updates = await _fetchUpdates();
+      for (const u of updates) {
+        _updateId = u.update_id + 1;
+        const text   = (u.message?.text || '').trim().toLowerCase();
+        const chatId = u.message?.chat?.id;
+        if (!text || !chatId) continue;
+        if (chatId.toString() !== CHAT_ID) continue; // authorized only
+        if (text === '/status' || text === '/s')
+          await _handleStatus(chatId);
+        else if (text === '/help')
+          await sendTo(chatId,
+            '📋 <b>Comenzi disponibile:</b>\n' +
+            '/status — snapshot live\n' +
+            '/help — această listă'
+          );
+      }
+    } catch {}
+    await new Promise(r => setTimeout(r, 2000));
+  }
+}
+
+function startPolling(getDash, exchange) {
+  if (!TOKEN || !CHAT_ID) return;
+  _getDash  = getDash;
+  _exchange = exchange;
+  _pollLoop();
+  console.log('[TELEGRAM] Command polling started. Try /status in your chat.');
+}
+
+// ─── Alert: Position opened ───────────────────────────────
 function alertOpen(side, symbol, price, quantity, stopLoss, takeProfit, druckMult) {
-  const emoji = side === 'BUY' ? '🟢' : '🔴';
-  const dir   = side === 'BUY' ? 'LONG' : 'SHORT';
-  const mult  = druckMult !== 1.0 ? `\n📐 <b>Druckenmiller:</b> ×${druckMult.toFixed(2)}` : '';
+  const dir  = side === 'BUY' ? '🟢 LONG' : '🔴 SHORT';
+  const mult = druckMult !== 1.0 ? `\n📐 <b>Druckenmiller:</b> ×${druckMult.toFixed(2)}` : '';
   send(
-    `${emoji} <b>APEX BOT — ${dir} OPENED</b>\n` +
-    `💰 <b>${symbol}</b> @ $${price}\n` +
-    `📦 Quantity: ${quantity}\n` +
+    `${dir} <b>OPENED — ${symbol}</b>\n` +
+    `💰 @ $${price}  Qty: ${quantity}\n` +
     `🛡 SL: $${stopLoss.toFixed(5)}\n` +
-    `🎯 TP: $${takeProfit.toFixed(5)}` +
-    mult
+    `🎯 TP: $${takeProfit.toFixed(5)}` + mult,
+    dashboardKeyboard()
   );
 }
 
-// ─── Alert: Position closed ──────────────────────────────
+// ─── Alert: Position closed ───────────────────────────────
 function alertClose(reason, symbol, side, entryPrice, closePrice, pnl, balance) {
-  const won   = pnl > 0;
-  const emoji = won ? '✅' : '❌';
   const icons = { TAKE_PROFIT: '🎯 TAKE PROFIT', STOP_LOSS: '🛑 STOP LOSS', AI_CLOSE: '🤖 AI CLOSE' };
-  const label = icons[reason] || reason;
   const dir   = side === 'BUY' ? 'LONG' : 'SHORT';
   send(
-    `${emoji} <b>APEX BOT — ${label}</b>\n` +
-    `📊 <b>${symbol}</b> ${dir}\n` +
-    `📈 Entry: $${entryPrice} → Exit: $${closePrice}\n` +
+    `${pnl > 0 ? '✅' : '❌'} <b>${icons[reason] || reason} — ${symbol}</b>\n` +
+    `📊 ${dir}  $${entryPrice} → $${closePrice}\n` +
     `💵 PnL: <b>${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}</b>\n` +
-    `💼 Balance: $${balance.toFixed(4)}`
+    `💼 Balance: $${balance.toFixed(4)}`,
+    dashboardKeyboard()
   );
 }
 
-// ─── Alert: Strategy Stop (PTJ / Seykota) ───────────────
+// ─── Alert: Strategy Stop ────────────────────────────────
 function alertStop(reasons) {
-  send(
-    `🚨 <b>APEX BOT — STRATEGY STOP</b>\n` +
-    `Trading paused:\n` +
-    reasons.map(r => `• ${r}`).join('\n')
-  );
+  send(`🚨 <b>STRATEGY STOP</b>\n` + reasons.map(r => `• ${r}`).join('\n'));
 }
 
-// ─── Alert: Signal filtered (Livermore counter-trend) ───
+// ─── Alert: Signal filtered ──────────────────────────────
 function alertFiltered(action, livermore, turtle) {
   send(
-    `⚡ <b>APEX BOT — SIGNAL FILTERED</b>\n` +
+    `⚡ <b>SIGNAL FILTERED</b>\n` +
     `AI: ${action} | Livermore: ${livermore} | Turtle: ${turtle}\n` +
-    `<i>PTJ: Play defense — no counter-trend entries</i>`
+    `<i>PTJ: Play defense</i>`
   );
 }
 
@@ -74,33 +189,35 @@ function alertFiltered(action, livermore, turtle) {
 function alertStart(symbol, timeframe, balance, mode) {
   send(
     `🚀 <b>APEX TRADE BOT STARTED</b>\n` +
-    `📊 ${symbol} | ${timeframe}\n` +
-    `💰 Starting balance: $${balance.toFixed(4)}\n` +
-    `⚙️ Mode: ${mode}`
+    `📊 ${symbol} | ${timeframe} | $${balance.toFixed(2)}\n` +
+    `⚙️ ${mode}\n` +
+    (DASHBOARD_URL ? `🌐 Dashboard: ${DASHBOARD_URL}\n` : '') +
+    `<i>Scrie /status pentru snapshot live</i>`,
+    dashboardKeyboard()
   );
 }
 
-// ─── Heartbeat every 30 min ──────────────────────────────
+// ─── Heartbeat (every 30 min) ────────────────────────────
 function alertHeartbeat(tickCount, balance, openPosition, currentPrice) {
-  let posLine = '📭 No open position';
+  let posLine = '📭 Nicio poziție';
   if (openPosition && currentPrice) {
     const dir = openPosition.side === 'BUY' ? 'LONG' : 'SHORT';
     const pnl = openPosition.side === 'BUY'
       ? (currentPrice - openPosition.entryPrice) * openPosition.quantity
       : (openPosition.entryPrice - currentPrice) * openPosition.quantity;
-    const pnlPct = openPosition.side === 'BUY'
-      ? (currentPrice - openPosition.entryPrice) / openPosition.entryPrice * 100
-      : (openPosition.entryPrice - currentPrice) / openPosition.entryPrice * 100;
     posLine =
-      `📊 ${dir} <b>${openPosition.symbol}</b> @ $${openPosition.entryPrice}\n` +
-      `💹 Current: $${currentPrice} | PnL: <b>${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)} (${pnlPct.toFixed(2)}%)</b>\n` +
-      `🛡 SL: $${openPosition.stopLoss.toFixed(5)} | 🎯 TP: $${openPosition.takeProfit.toFixed(5)}`;
+      `${openPosition.side === 'BUY' ? '🟢' : '🔴'} ${dir} <b>${openPosition.symbol}</b> @ $${openPosition.entryPrice}\n` +
+      `PnL: <b>${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}</b>`;
   }
   send(
-    `💓 <b>APEX BOT — ACTIVE</b> (tick #${tickCount})\n` +
+    `💓 <b>ACTIVE</b>  tick #${tickCount}\n` +
     `💼 Balance: $${balance.toFixed(4)}\n` +
-    posLine
+    `${posLine}\n<i>/status pentru detalii</i>`,
+    dashboardKeyboard()
   );
 }
 
-module.exports = { alertOpen, alertClose, alertStop, alertFiltered, alertStart, alertHeartbeat };
+module.exports = {
+  alertOpen, alertClose, alertStop, alertFiltered, alertStart, alertHeartbeat,
+  startPolling, miniChart,
+};
