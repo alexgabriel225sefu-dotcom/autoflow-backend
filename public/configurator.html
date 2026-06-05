@@ -119,11 +119,18 @@
     .summary-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
     .chip { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); border-radius: 99px; padding: 0.25rem 0.75rem; font-size: 0.72rem; color: var(--amber); font-weight: 600; }
 
-    .deploy-steps { background: rgba(255,255,255,.025); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; font-size: 0.82rem; line-height: 2.1; color: rgba(255,255,255,.4); margin-top: 1rem; }
-    .deploy-steps .ds-title { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,.2); margin-bottom: 12px; }
-    .deploy-steps .num { color: var(--amber); font-weight: 700; margin-right: 8px; }
-    .deploy-steps a { color: var(--amber); }
-    .deploy-steps strong { color: rgba(255,255,255,.6); }
+    .deploy-phase { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+    .phase-num { background: var(--amber); color: #040810; font-weight: 800; font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.05em; flex-shrink: 0; }
+    .phase-title { font-weight: 700; color: #fff; font-size: 1rem; }
+
+    .deploy-phases { background: rgba(255,255,255,.02); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; }
+    .phase-section { }
+    .phase-section-title { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); margin-bottom: 0.75rem; }
+    .phase-step { font-size: 0.82rem; color: rgba(255,255,255,.5); line-height: 1.5; padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,.04); display: flex; gap: 0.5rem; }
+    .phase-step:last-child { border-bottom: none; }
+    .phase-step .num { color: var(--amber); font-weight: 800; flex-shrink: 0; }
+    .phase-step a { color: var(--amber); }
+    .phase-step strong { color: rgba(255,255,255,.75); }
 
     @media (max-width: 520px) {
       .coin-grid { grid-template-columns: repeat(2,1fr); }
@@ -277,43 +284,70 @@
   <!-- Step 5: Config + Download -->
   <div class="step" id="step-5">
     <div class="step-title">Configurația Ta</div>
-    <div class="step-sub">Descarcă codul botului și copiază variabilele pe Railway.</div>
+    <div class="step-sub">Urmează pașii de mai jos în ordine.</div>
 
     <div class="summary-row" id="summary-chips"></div>
 
+    <!-- STEP A: Download -->
+    <div class="deploy-phase">
+      <div class="phase-num">Pasul 1</div>
+      <div class="phase-title">Descarcă Codul Botului</div>
+    </div>
     <button class="deploy-btn" id="download-btn" onclick="downloadBot()">
-      Descarcă Bot Code (ZIP)
+      Descarcă apex-trade-bot.zip
     </button>
-    <div style="font-size:11px;color:rgba(255,255,255,.22);text-align:center;margin-top:6px;margin-bottom:20px">
-      Cod sursă complet + railway.json · Licență: <span id="key-display">—</span>
+    <div id="download-msg" style="font-size:12px;text-align:center;margin-top:8px;min-height:18px;color:rgba(255,255,255,.35)">
+      Licență: <span id="key-display">—</span>
     </div>
 
+    <!-- STEP B: Deploy -->
+    <div class="deploy-phase" style="margin-top:1.75rem">
+      <div class="phase-num">Pasul 2</div>
+      <div class="phase-title">Deployează pe Railway</div>
+    </div>
+
+    <div class="deploy-phases">
+      <div class="phase-section">
+        <div class="phase-section-title">A — Urcă codul pe GitHub (gratis, o dată)</div>
+        <div class="phase-step"><span class="num">1.</span>Du-te la <a href="https://github.com" target="_blank">github.com</a> → cont nou dacă nu ai → confirmi email</div>
+        <div class="phase-step"><span class="num">2.</span>Click butonul verde <strong>New</strong> (sau <strong>+</strong> din dreapta sus → New repository)</div>
+        <div class="phase-step"><span class="num">3.</span>Numești repo-ul <strong>apex-trade-bot</strong> → dai click <strong>Create repository</strong></div>
+        <div class="phase-step"><span class="num">4.</span>Pe pagina repo-ului apăsat click pe <strong>"uploading an existing file"</strong></div>
+        <div class="phase-step"><span class="num">5.</span>Dezarhivezi ZIP-ul descărcat → <strong>selectezi toate fișierele din interior</strong> → le tragi în browser → <strong>Commit changes</strong></div>
+      </div>
+
+      <div class="phase-section" style="margin-top:1rem">
+        <div class="phase-section-title">B — Deployează pe Railway (gratis)</div>
+        <div class="phase-step"><span class="num">1.</span>Du-te la <a href="https://railway.app" target="_blank">railway.app</a> → Sign up cu contul GitHub</div>
+        <div class="phase-step"><span class="num">2.</span>Click <strong>New Project</strong> → <strong>Deploy from GitHub repo</strong></div>
+        <div class="phase-step"><span class="num">3.</span>Alegi repo-ul <strong>apex-trade-bot</strong> pe care l-ai creat</div>
+        <div class="phase-step"><span class="num">4.</span>Railway creează proiectul → mergi la tab-ul <strong>Variables</strong></div>
+        <div class="phase-step"><span class="num">5.</span>Click <strong>Raw Editor</strong> → lipești variabilele de mai jos → <strong>Update</strong></div>
+        <div class="phase-step"><span class="num">6.</span>Railway redeploys automat → botul pornește → primești mesaj pe Telegram</div>
+      </div>
+    </div>
+
+    <!-- STEP C: Env Vars -->
+    <div class="deploy-phase" style="margin-top:1.75rem">
+      <div class="phase-num">Pasul 3</div>
+      <div class="phase-title">Copiază Variabilele în Railway → Variables</div>
+    </div>
     <div class="config-header">
-      <span>ENVIRONMENT VARIABLES — ADAUGĂ ÎN RAILWAY</span>
+      <span>RAW EDITOR → lipești tot ce urmează</span>
       <button class="copy-btn" id="copy-btn" onclick="copyVars()">Copiază Tot</button>
     </div>
     <div class="code-box" id="config-output"></div>
 
     <div class="warn-box">
-      Setează <strong>TESTNET=true</strong> prima dată să testezi fără bani reali. Schimbă în <strong>false</strong> abia după ce verifici că funcționează.
-    </div>
-
-    <div class="deploy-steps">
-      <div class="ds-title">Cum Deployezi pe Railway — Gratuit</div>
-      <div><span class="num">1.</span>Click butonul portocaliu de mai sus → descarci ZIP-ul</div>
-      <div><span class="num">2.</span>Dezarhivezi pe calculator</div>
-      <div><span class="num">3.</span>Du-te la <a href="https://railway.app" target="_blank">railway.app</a> → New Project → <strong>Deploy from local folder</strong></div>
-      <div><span class="num">4.</span>Selectezi folderul dezarhivat și uploadezi</div>
-      <div><span class="num">5.</span>Tab-ul <strong>Variables</strong> → lipești variabilele de mai sus</div>
-      <div><span class="num">6.</span>Deploy automat → botul pornește și îți trimite mesaj pe Telegram</div>
+      <strong>TESTNET=true</strong> înseamnă că botul rulează fără bani reali (simulare). Testează o zi, verifică că trimite mesaje Telegram, apoi schimbă în <strong>false</strong>.
     </div>
 
     <div id="stop-section" style="display:none;margin-top:1.5rem">
       <button class="stop-btn" onclick="emergencyStop()">
-        Opreste Botul de Urgenta (HTTP)
+        Opreste Botul Acum (Urgenta)
       </button>
       <div style="font-size:11px;color:rgba(255,77,109,.35);text-align:center;margin-top:6px">
-        Sau trimite /stop în chat-ul cu botul tău Telegram
+        Sau trimite /stop în Telegram
       </div>
     </div>
 
@@ -576,26 +610,52 @@ function buildVarsHTML(strat, risk, symbol) {
   ].join('\n');
 }
 
+function dlMsg(text, color) {
+  const el = document.getElementById('download-msg');
+  if (el) { el.textContent = text; el.style.color = color || 'rgba(255,255,255,.35)'; }
+}
+
 function downloadBot() {
   const key = state.licenseKey;
-  if (!key || key === 'APEX-XXXX-XXXX-XXXX') { alert('Cheie de licență lipsă. Revino de la start.'); return; }
+  if (!key || key === 'APEX-XXXX-XXXX-XXXX') {
+    dlMsg('Cheie lipsă — introdu-o în overlay-ul de la start.', '#ff4d6d');
+    return;
+  }
   const btn = document.getElementById('download-btn');
-  btn.textContent = 'Se pregătește descărcarea...';
+  btn.textContent = 'Se pregătește... asteaptă';
   btn.disabled = true;
+  dlMsg('Se generează arhiva, poate dura 5-10 secunde...', 'rgba(245,158,11,.6)');
+
   fetch('/bot-access?key=' + encodeURIComponent(key))
-    .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t); }); return r.blob(); })
+    .then(r => {
+      if (!r.ok) return r.text().then(t => { throw new Error(t || 'Licență invalidă sau server indisponibil'); });
+      return r.blob();
+    })
     .then(blob => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      // Attach to DOM so all browsers trigger the download
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement('a');
+      a.href     = url;
       a.download = 'apex-trade-bot.zip';
+      a.style.display = 'none';
+      document.body.appendChild(a);
       a.click();
-      btn.textContent = 'Descărcat cu succes!';
-      setTimeout(() => { btn.textContent = 'Descarcă Bot Code (ZIP)'; btn.disabled = false; }, 3000);
+      setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 2000);
+
+      btn.textContent = 'Descărcat! Verifică folderul Downloads';
+      btn.style.background = 'linear-gradient(135deg,#00e87a,#16a34a)';
+      dlMsg('ZIP descărcat cu succes. Urmează Pasul 2 de mai jos.', '#00e87a');
+      setTimeout(() => {
+        btn.textContent = 'Descarcă apex-trade-bot.zip';
+        btn.style.background = '';
+        btn.disabled = false;
+        dlMsg('Licență: ' + state.licenseKey.slice(0, 11) + '...', 'rgba(255,255,255,.35)');
+      }, 5000);
     })
     .catch(err => {
-      btn.textContent = 'Descarcă Bot Code (ZIP)';
+      btn.textContent = 'Descarcă apex-trade-bot.zip';
       btn.disabled = false;
-      alert('Eroare la descărcare: ' + err.message);
+      dlMsg('Eroare: ' + err.message, '#ff4d6d');
     });
 }
 
