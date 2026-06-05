@@ -1,3 +1,4 @@
+process.stdout.write(`[APEX BOT] Starting... Node ${process.version}\n`);
 require('dotenv').config();
 const cfg        = require('./config');
 const indicators = require('./indicators');
