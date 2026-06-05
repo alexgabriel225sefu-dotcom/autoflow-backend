@@ -2035,23 +2035,27 @@ Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsys
       headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' },
       body: JSON.stringify(body),
     });
-    return r.ok;
+    if (!r.ok) {
+      const errBody = await r.json().catch(() => ({}));
+      return { ok: false, status: r.status, ghError: errBody.message || JSON.stringify(errBody) };
+    }
+    return { ok: true };
   }
 
   // Push README.md
   try {
-    const ok = await pushFile('README.md', readmeContent);
-    results.push({ file: 'README.md', ok });
-    if (!ok) errors++;
+    const res2 = await pushFile('README.md', readmeContent);
+    results.push({ file: 'README.md', ...res2 });
+    if (!res2.ok) errors++;
   } catch(e) { results.push({ file: 'README.md', ok: false, err: e.message }); errors++; }
 
   // Push all bot files
   for (const rel of filesToPush) {
     try {
       const content = require('fs').readFileSync(path.join(botDir, rel), 'utf8');
-      const ok = await pushFile(rel, content);
-      results.push({ file: rel, ok });
-      if (!ok) errors++;
+      const res2 = await pushFile(rel, content);
+      results.push({ file: rel, ...res2 });
+      if (!res2.ok) errors++;
     } catch(e) {
       results.push({ file: rel, ok: false, err: e.message });
       errors++;
