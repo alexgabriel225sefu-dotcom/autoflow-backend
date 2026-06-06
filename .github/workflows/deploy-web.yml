@@ -2,8 +2,9 @@ name: Deploy Web to Vercel
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/arcads-external-api-gExX7]
     paths: [web/**]
+  workflow_dispatch:
 
 jobs:
   deploy:
