@@ -21,41 +21,33 @@ jobs:
         working-directory: html
         run: npm install
 
-      - name: Find project with aicashsystem.space and deploy
+      - name: Deploy to web project (aicashsystem.space)
         working-directory: html
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PK }}
         run: |
-          # Find which Vercel project serves aicashsystem.space
-          PROJECTS=$(curl -s \
+          # Get the ID of the 'web' project (which has aicashsystem.space)
+          WEB_PROJECT=$(curl -s \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v9/projects?limit=100")
+            "https://api.vercel.com/v9/projects/web")
 
-          PROJECT_ID=$(echo "$PROJECTS" | node -e "
+          PROJECT_ID=$(echo "$WEB_PROJECT" | node -e "
             let d='';
             process.stdin.on('data',c=>d+=c);
             process.stdin.on('end',()=>{
               try {
                 const r=JSON.parse(d);
-                const target='aicashsystem.space';
-                const p=(r.projects||[]).find(p=>{
-                  const aliases=p.alias||[];
-                  return aliases.some(a=>
-                    (typeof a==='string' && a.includes('aicashsystem')) ||
-                    (a&&a.domain&&a.domain.includes('aicashsystem'))
-                  );
-                });
-                console.log(p?p.id:'');
+                console.log(r.id||'');
               } catch(e){ console.log(''); }
             });")
 
           if [ -n "$PROJECT_ID" ]; then
-            echo "Deploying to project with aicashsystem.space: $PROJECT_ID"
+            echo "Found web project: $PROJECT_ID"
             export VERCEL_PROJECT_ID="$PROJECT_ID"
           else
-            echo "Domain not found in projects list, deploying to linked project"
+            echo "Could not find web project, deploying to default"
           fi
 
           npx vercel deploy --prod --yes \
