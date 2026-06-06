@@ -2,6 +2,6 @@
   "name": "aicash-system-landing",
   "version": "1.0.0",
   "scripts": {
-    "start": "node server.js"
+    "build": "mkdir -p html && cp *.html html/ && cp -r api html/ 2>/dev/null; exit 0"
   }
 }
