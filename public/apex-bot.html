@@ -257,6 +257,14 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(28px);background:rgba
 .am-success-icon{margin-bottom:18px;color:var(--c);display:flex;justify-content:center}
 .am-success h3{font-size:24px;font-weight:900;margin-bottom:10px;color:var(--c)}
 .am-success p{font-size:13px;color:var(--t2);line-height:1.8}
+.am-wallets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.am-wallet-btn{background:#1a1a1a;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px 8px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:all .2s;font-size:12px;font-weight:700;color:#fff}
+.am-wallet-btn:hover{background:#222;border-color:rgba(255,255,255,.2);transform:translateY(-1px)}
+.am-separator{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--t3);font-size:11px}
+.am-separator::before,.am-separator::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07)}
+.am-card-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stripe-el{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:12px 14px;transition:border-color .2s}
+.stripe-el.focused{border-color:rgba(245,158,11,.38)}
 
 @media(max-width:1000px){
   .hero{grid-template-columns:1fr;gap:40px;padding-top:100px}
@@ -630,30 +638,52 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(28px);background:rgba
         <div class="am-price"><span class="am-amount">$197</span><span class="am-was">$297</span></div>
       </div>
       <div class="am-body">
-        <div class="am-field">
-          <label class="am-label">Full name</label>
-          <input id="amName" class="am-input" type="text" placeholder="Your name" autocomplete="name">
+        <div id="am-pr-container">
+          <div class="am-wallets" style="grid-template-columns:1fr 1fr">
+            <button class="am-wallet-btn" onclick="handleWalletPay('apple')">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              Apple Pay
+            </button>
+            <button class="am-wallet-btn" onclick="handleWalletPay('google')">
+              <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Google Pay
+            </button>
+          </div>
+          <div class="am-separator">or pay using credit card</div>
         </div>
         <div class="am-field">
-          <label class="am-label">Email — setup page access</label>
+          <label class="am-label">Card holder full name</label>
+          <input id="amName" class="am-input" type="text" placeholder="Enter your full name" autocomplete="name">
+        </div>
+        <div class="am-field">
+          <label class="am-label">Email</label>
           <input id="amEmail" class="am-input" type="email" placeholder="you@email.com" autocomplete="email">
         </div>
         <div class="am-field">
-          <label class="am-label">Card details</label>
-          <div id="am-card-element"></div>
-          <div id="am-card-error"></div>
+          <label class="am-label">Card Number</label>
+          <div id="am-cardnumber" class="stripe-el"></div>
         </div>
-        <div class="am-checks">
-          <label class="am-check"><input type="checkbox" id="ck1" onchange="updateBtn()"><span class="am-check-txt">I understand crypto trading involves <strong>significant risk of loss</strong>, including total loss of capital. I will only trade with funds I can afford to lose.</span></label>
-          <label class="am-check"><input type="checkbox" id="ck2" onchange="updateBtn()"><span class="am-check-txt">I confirm this software is <strong>NOT financial advice</strong>. AI Cash Systems is not responsible for trading losses from using Apex Bot.</span></label>
-          <label class="am-check"><input type="checkbox" id="ck3" onchange="updateBtn()"><span class="am-check-txt">I consent to <strong>immediate digital delivery</strong> and waive my 14-day withdrawal right (EU Art. 16m Directive 2011/83/EU). Sales are final once bot is accessed.</span></label>
-          <label class="am-check"><input type="checkbox" id="ck4" onchange="updateBtn()"><span class="am-check-txt">I have read and agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>, including the trading risk disclosure.</span></label>
+        <div class="am-card-row">
+          <div class="am-field">
+            <label class="am-label">Expiry Date</label>
+            <div id="am-cardexpiry" class="stripe-el"></div>
+          </div>
+          <div class="am-field">
+            <label class="am-label">CVV</label>
+            <div id="am-cardcvc" class="stripe-el"></div>
+          </div>
+        </div>
+        <div id="am-card-error"></div>
+        <div class="am-checks" style="margin-top:12px">
+          <label class="am-check"><input type="checkbox" id="ck1" onchange="updateBtn()"><span class="am-check-txt">I accept the <strong>risk of loss</strong> — crypto trading involves significant financial risk.</span></label>
+          <label class="am-check"><input type="checkbox" id="ck2" onchange="updateBtn()"><span class="am-check-txt">This is NOT financial advice. Sales are final after digital delivery.</span></label>
+          <label class="am-check"><input type="checkbox" id="ck3" onchange="updateBtn()"><span class="am-check-txt">I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
         </div>
         <button id="amBtn" class="am-submit" disabled onclick="submitApexPayment()">
           <span id="amSpinner" class="am-spinner"></span>
-          <span id="amBtnTxt">Check all boxes to continue</span>
+          <span id="amBtnTxt">Accept terms to continue</span>
         </button>
-        <p class="am-note">Stripe encrypted · One-time payment · No subscription</p>
+        <p class="am-note">Stripe encrypted · One-time · No subscription</p>
       </div>
     </div>
     <div class="am-success" id="amSuccess">
@@ -845,16 +875,31 @@ document.querySelectorAll('.faq-item').forEach(el=>{
 });
 
 var STRIPE_PK='pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS';
-var apexStripe,apexCard;
+var apexStripe,apexCardNum,apexCardExp,apexCardCvc;
+var elStyle={base:{color:'#fff',fontFamily:'"Inter",-apple-system,sans-serif',fontSize:'14px','::placeholder':{color:'rgba(255,255,255,0.25)'},iconColor:'rgba(245,158,11,.7)'},invalid:{color:'#ef4444'}};
+
+function handleWalletPay(type){
+  document.getElementById('am-card-error').textContent='Use '+( type==='apple'?'Apple':'Google')+' Pay via your browser if available, or complete the card form below.';
+}
+
 function openApexModal(){
   document.getElementById('apexModal').classList.add('open');
   document.body.style.overflow='hidden';
   if(!apexStripe){
     apexStripe=Stripe(STRIPE_PK);
-    var els=apexStripe.elements({appearance:{theme:'night',variables:{colorPrimary:'#f59e0b',colorBackground:'#080d18',colorText:'#fff',borderRadius:'10px',fontFamily:'Inter,sans-serif'}}});
-    apexCard=els.create('card',{hidePostalCode:true});
-    apexCard.mount('#am-card-element');
-    apexCard.on('change',function(e){document.getElementById('am-card-error').textContent=e.error?e.error.message:'';});
+    var els=apexStripe.elements({fonts:[{cssSrc:'https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap'}]});
+    apexCardNum=els.create('cardNumber',{style:elStyle,showIcon:true,placeholder:'0000 0000 0000 0000'});
+    apexCardExp=els.create('cardExpiry',{style:elStyle,placeholder:'MM / YY'});
+    apexCardCvc=els.create('cardCvc',{style:elStyle,placeholder:'CVV'});
+    apexCardNum.mount('#am-cardnumber');
+    apexCardExp.mount('#am-cardexpiry');
+    apexCardCvc.mount('#am-cardcvc');
+    [apexCardNum,apexCardExp,apexCardCvc].forEach(function(el,i){
+      var ids=['am-cardnumber','am-cardexpiry','am-cardcvc'];
+      el.on('focus',function(){document.getElementById(ids[i]).classList.add('focused');});
+      el.on('blur',function(){document.getElementById(ids[i]).classList.remove('focused');});
+      el.on('change',function(e){document.getElementById('am-card-error').textContent=e.error?e.error.message:'';});
+    });
   }
 }
 function closeApexModal(){
@@ -863,9 +908,9 @@ function closeApexModal(){
 }
 document.getElementById('apexModal').addEventListener('click',function(e){if(e.target===this)closeApexModal();});
 function updateBtn(){
-  var all=['ck1','ck2','ck3','ck4'].every(id=>document.getElementById(id).checked);
+  var all=['ck1','ck2','ck3'].every(id=>document.getElementById(id).checked);
   document.getElementById('amBtn').disabled=!all;
-  document.getElementById('amBtnTxt').textContent=all?'Pay $197 — Get Apex Bot':'Check all boxes to continue';
+  document.getElementById('amBtnTxt').textContent=all?'Checkout — $197':'Accept terms to continue';
 }
 async function submitApexPayment(){
   var name=document.getElementById('amName').value.trim();
@@ -880,7 +925,7 @@ async function submitApexPayment(){
     var d=await r.json();
     if(d.error){err.textContent=d.error;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';return;}
     var _pendingKey=d.pendingKey||'';
-    var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCard,billing_details:{name,email}}});
+    var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCardNum,billing_details:{name,email}}});
     if(result.error){
       err.textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
     }else if(result.paymentIntent.status==='succeeded'){
