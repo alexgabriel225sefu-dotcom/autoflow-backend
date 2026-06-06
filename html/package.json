@@ -2,9 +2,10 @@
   "name": "apex-trade-bot-landing",
   "version": "1.0.0",
   "scripts": {
-    "start": "node server.js"
+    "start": "serve . -l ${PORT:-3000}"
   },
   "dependencies": {
+    "serve": "^14.0.0",
     "stripe": "^16.0.0"
   }
 }
