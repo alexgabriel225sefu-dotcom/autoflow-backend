@@ -1,0 +1,12 @@
+{
+  "id": "session-1780728593276",
+  "startedAt": "2026-06-06T06:49:53.276Z",
+  "cwd": "/home/user/autoflow-backend/web",
+  "context": {},
+  "metrics": {
+    "edits": 9,
+    "commands": 0,
+    "tasks": 0,
+    "errors": 0
+  }
+}
