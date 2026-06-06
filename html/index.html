@@ -455,9 +455,10 @@ footer{border-top:1px solid var(--border);padding:20px 24px}
 .modal-fine svg{width:10px;height:10px;stroke:var(--dim);fill:none;stroke-width:2}
 
 /* ── REVEAL ── */
-.reveal{opacity:0;transform:translateY(16px);transition:opacity .5s ease,transform .5s ease}
-.reveal.visible{opacity:1;transform:none}
-@media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+.reveal{opacity:1;transform:none;transition:opacity .5s ease,transform .5s ease}
+.js-ready .reveal{opacity:0;transform:translateY(16px)}
+.js-ready .reveal.visible{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.js-ready .reveal{opacity:1;transform:none;transition:none}}
 </style>
 </head>
 <body>
@@ -785,6 +786,7 @@ footer{border-top:1px solid var(--border);padding:20px 24px}
 </div>
 
 <script>
+document.body.classList.add('js-ready');
 var PAYMENT_LINK = 'https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00';
 
 function goCheckout(){ window.location.href = PAYMENT_LINK; }
