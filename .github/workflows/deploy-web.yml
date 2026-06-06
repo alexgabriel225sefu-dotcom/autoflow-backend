@@ -1,40 +1,10 @@
 name: Deploy Web to Vercel
 
 on:
-  push:
-    branches: [main, claude/arcads-external-api-gExX7]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: claude/arcads-external-api-gExX7
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        working-directory: web
-        run: npm ci
-
-      - name: Build
-        working-directory: web
-        env:
-          NEXT_PUBLIC_STRIPE_PK: ${{ secrets.NEXT_PUBLIC_STRIPE_PK }}
-        run: npm run build
-
-      - name: Deploy to Vercel
-        working-directory: web
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          NEXT_PUBLIC_STRIPE_PK: ${{ secrets.NEXT_PUBLIC_STRIPE_PK }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-        run: |
-          npx vercel deploy --prod --yes \
-            --token "$VERCEL_TOKEN" \
-            --env STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
-            --build-env NEXT_PUBLIC_STRIPE_PK="$NEXT_PUBLIC_STRIPE_PK"
+      - run: echo "Deployment handled by Render. Run manually if needed."
