@@ -1,56 +1,10 @@
 name: Deploy Web to Vercel
 
 on:
-  push:
-    branches: [main, claude/arcads-external-api-gExX7]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: claude/arcads-external-api-gExX7
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        working-directory: html
-        run: npm install
-
-      - name: Deploy to web project (aicashsystem.space)
-        working-directory: html
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PK }}
-        run: |
-          # Get the ID of the 'web' project (which has aicashsystem.space)
-          WEB_PROJECT=$(curl -s \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v9/projects/web")
-
-          PROJECT_ID=$(echo "$WEB_PROJECT" | node -e "
-            let d='';
-            process.stdin.on('data',c=>d+=c);
-            process.stdin.on('end',()=>{
-              try {
-                const r=JSON.parse(d);
-                console.log(r.id||'');
-              } catch(e){ console.log(''); }
-            });")
-
-          if [ -n "$PROJECT_ID" ]; then
-            echo "Found web project: $PROJECT_ID"
-            export VERCEL_PROJECT_ID="$PROJECT_ID"
-          else
-            echo "Could not find web project, deploying to default"
-          fi
-
-          npx vercel deploy --prod --yes \
-            --token "$VERCEL_TOKEN" \
-            --env STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
-            --env STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY"
+      - run: echo "Deployment handled by Render. Run manually if needed."
