@@ -10,3 +10,5 @@ outputs/
 dist/
 build/
 .next/
+public/
+web/
