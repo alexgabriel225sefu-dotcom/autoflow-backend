@@ -21,90 +21,44 @@ jobs:
         working-directory: html
         run: npm install
 
-      - name: Deploy to Vercel
+      - name: Find project with aicashsystem.space and deploy
         working-directory: html
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PK }}
         run: |
+          # Find which Vercel project serves aicashsystem.space
+          PROJECTS=$(curl -s \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects?limit=100")
+
+          PROJECT_ID=$(echo "$PROJECTS" | node -e "
+            let d='';
+            process.stdin.on('data',c=>d+=c);
+            process.stdin.on('end',()=>{
+              try {
+                const r=JSON.parse(d);
+                const target='aicashsystem.space';
+                const p=(r.projects||[]).find(p=>{
+                  const aliases=p.alias||[];
+                  return aliases.some(a=>
+                    (typeof a==='string' && a.includes('aicashsystem')) ||
+                    (a&&a.domain&&a.domain.includes('aicashsystem'))
+                  );
+                });
+                console.log(p?p.id:'');
+              } catch(e){ console.log(''); }
+            });")
+
+          if [ -n "$PROJECT_ID" ]; then
+            echo "Deploying to project with aicashsystem.space: $PROJECT_ID"
+            export VERCEL_PROJECT_ID="$PROJECT_ID"
+          else
+            echo "Domain not found in projects list, deploying to linked project"
+          fi
+
           npx vercel deploy --prod --yes \
             --token "$VERCEL_TOKEN" \
             --env STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
             --env STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY"
-
-      - name: Assign aicashsystem.space to this project
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          set -e
-
-          DOMAIN="aicashsystem.space"
-          PROJECT="html"
-          TEAM_SLUG="apex-trade-s-projects"
-
-          # Get team ID
-          TEAM_ID=$(curl -s \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v2/teams" \
-            | node -e "
-              let d='';
-              process.stdin.on('data',c=>d+=c);
-              process.stdin.on('end',()=>{
-                try {
-                  const r=JSON.parse(d);
-                  const t=(r.teams||[]).find(t=>t.slug==='$TEAM_SLUG');
-                  console.log(t?t.id:'');
-                } catch(e) { console.log(''); }
-              });")
-
-          if [ -z "\$TEAM_ID" ]; then
-            echo "Could not find team \$TEAM_SLUG — skipping domain step"
-            exit 0
-          fi
-          echo "Team ID: \$TEAM_ID"
-
-          # Try adding domain to html project
-          HTTP_CODE=$(curl -s -o /tmp/domain_resp.json -w "%{http_code}" \
-            -X POST \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"name\":\"$DOMAIN\"}" \
-            "https://api.vercel.com/v9/projects/$PROJECT/domains?teamId=\$TEAM_ID")
-
-          BODY=$(cat /tmp/domain_resp.json)
-          echo "Add domain response ($HTTP_CODE): $BODY"
-
-          if [ "\$HTTP_CODE" = "200" ] || [ "\$HTTP_CODE" = "201" ]; then
-            echo "Domain \$DOMAIN assigned to \$PROJECT"
-          elif [ "\$HTTP_CODE" = "409" ]; then
-            # Domain is on another project — find and remove it
-            CONFLICT_ID=$(echo "\$BODY" | node -e "
-              let d='';
-              process.stdin.on('data',c=>d+=c);
-              process.stdin.on('end',()=>{
-                try {
-                  const r=JSON.parse(d);
-                  console.log(r.error&&r.error.projectId?r.error.projectId:'');
-                } catch(e) { console.log(''); }
-              });")
-
-            if [ -n "\$CONFLICT_ID" ]; then
-              echo "Removing \$DOMAIN from conflicting project \$CONFLICT_ID..."
-              curl -s -X DELETE \
-                -H "Authorization: Bearer $VERCEL_TOKEN" \
-                "https://api.vercel.com/v9/projects/\$CONFLICT_ID/domains/\$DOMAIN?teamId=\$TEAM_ID"
-
-              # Re-add to html project
-              curl -s -X POST \
-                -H "Authorization: Bearer $VERCEL_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d "{\"name\":\"$DOMAIN\"}" \
-                "https://api.vercel.com/v9/projects/$PROJECT/domains?teamId=\$TEAM_ID"
-              echo "Domain \$DOMAIN successfully moved to \$PROJECT"
-            else
-              echo "409 but no conflicting project ID found. Check manually."
-            fi
-          else
-            echo "Unexpected response \$HTTP_CODE — domain step skipped"
-          fi
