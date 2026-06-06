@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.local
+.env*.local
+logs/
+outputs/
+.claude/
+.claude-flow/
+*.log
+dist/
+build/
+.next/
