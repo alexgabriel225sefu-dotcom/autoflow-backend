@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Setup Your Bot — Apex Trade Bot</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #03050c; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      max-width: 480px; width: 100%; text-align: center;
+      display: flex; flex-direction: column; align-items: center; gap: 20px;
+    }
+    .icon {
+      width: 64px; height: 64px; border-radius: 16px;
+      background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.2);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .icon svg { width: 32px; height: 32px; stroke: #f59e0b; fill: none; stroke-width: 2; }
+    h1 { font-size: 28px; font-weight: 900; letter-spacing: -1px; }
+    p { font-size: 14px; color: rgba(255,255,255,.5); line-height: 1.8; max-width: 360px; }
+    .key-box {
+      width: 100%; border-radius: 12px;
+      border: 1px solid rgba(245,158,11,.2); background: rgba(245,158,11,.05);
+      padding: 16px; text-align: left;
+    }
+    .key-label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 2px;
+      color: rgba(255,255,255,.4); font-weight: 600; margin-bottom: 6px;
+    }
+    .key-val { font-family: monospace; font-size: 13px; color: #f59e0b; word-break: break-all; }
+    .fine { font-size: 11px; color: rgba(255,255,255,.25); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <polyline points="9 12 11 14 15 10"/>
+      </svg>
+    </div>
+    <h1>Setup Your Bot</h1>
+    <p>Your purchase was successful. Follow the instructions below to configure and deploy your Apex Trade Bot.</p>
+    <div id="key-section" style="display:none;width:100%">
+      <div class="key-box">
+        <div class="key-label">License Key</div>
+        <div class="key-val" id="license-key"></div>
+      </div>
+    </div>
+    <p class="fine">Check your email for full setup instructions and source code download link.</p>
+  </div>
+  <script>
+    const key = new URLSearchParams(window.location.search).get('key');
+    if (key) {
+      document.getElementById('license-key').textContent = key;
+      document.getElementById('key-section').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
