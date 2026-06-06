@@ -20,6 +20,7 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --animate-beam-fade: beam-fade var(--beam-dur,10s) ease-in-out var(--beam-delay,0s) infinite;
+  --animate-border-beam: border-beam calc(var(--duration)*1s) infinite linear;
 }
 
 :root {
@@ -78,3 +79,28 @@ body::before {
 }
 
 @keyframes ticker { from { transform:translateX(0) } to { transform:translateX(-50%) } }
+
+@keyframes border-beam {
+  100% { offset-distance: 100%; }
+}
+
+@keyframes shimmer-slide {
+  to { transform: translate(calc(100cqw - 100%), 0); }
+}
+
+@keyframes spin-around {
+  0% { transform: translateZ(0) rotate(0); }
+  15%, 35% { transform: translateZ(0) rotate(90deg); }
+  65%, 85% { transform: translateZ(0) rotate(270deg); }
+  100% { transform: translateZ(0) rotate(360deg); }
+}
+
+@keyframes fade-in {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-100%); }
+}

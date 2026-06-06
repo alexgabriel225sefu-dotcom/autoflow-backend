@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import ModernPaymentForm from "@/components/ui/modern-payment-form";
+import { NavbarHero } from "@/components/ui/hero-with-video";
 import Script from "next/script";
 import { X } from "lucide-react";
 
@@ -168,81 +169,7 @@ export default function Home() {
       <PaymentModal open={modalOpen} onClose={() => setModalOpen(false)} />
 
       <div className="relative z-[2]">
-        {/* Nav */}
-        <nav className="fixed top-0 left-0 right-0 z-[200] h-[58px] flex items-center justify-between px-6" style={{ borderBottom: "1px solid transparent" }}>
-          <a href="#" className="flex items-center gap-2 text-[13px] font-bold text-white no-underline">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
-            </svg>
-            Apex Trade Bot
-          </a>
-          <div className="hidden md:flex gap-6">
-            {[["How It Works", "#how"], ["Features", "#features"], ["Pricing", "#pricing"]].map(([l, h]) => (
-              <a key={l} href={h} className="text-[12px] no-underline transition-colors" style={{ color: "rgba(255,255,255,.4)" }}>{l}</a>
-            ))}
-          </div>
-          <button
-            onClick={() => setModalOpen(true)}
-            className="px-4 py-2 text-black text-[12px] font-bold rounded-[8px] transition-opacity hover:opacity-90"
-            style={{ background: "#f59e0b" }}
-          >
-            Get Access →
-          </button>
-        </nav>
-
-        {/* Hero */}
-        <section className="min-h-screen flex flex-col items-center justify-center text-center px-6 pt-24 pb-16">
-          <div
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-medium mb-8"
-            style={{ border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.04)", color: "rgba(255,255,255,.4)" }}
-          >
-            500+ bots deployed
-            <span className="w-px h-2.5" style={{ background: "rgba(255,255,255,.12)" }} />
-            Full source code · No subscriptions
-          </div>
-
-          <h1
-            className="font-black leading-[.96] mb-6 max-w-[820px]"
-            style={{ fontSize: "clamp(42px,6vw,82px)", letterSpacing: "-3px" }}
-          >
-            The trading bot<br />
-            you{" "}
-            <span style={{ color: "#f59e0b" }}>actually own.</span>
-          </h1>
-
-          <p
-            className="leading-[1.8] max-w-[520px] mb-10 font-light"
-            style={{ fontSize: "clamp(14px,1.4vw,17px)", color: "rgba(255,255,255,.45)" }}
-          >
-            Others charge $99/month for a bot you don't control. Buy once, get every line of code, deploy it yourself. No fees. No lock-in. No black box.
-          </p>
-
-          <div className="flex gap-3 flex-wrap justify-center mb-10">
-            <button
-              onClick={() => setModalOpen(true)}
-              className="inline-flex items-center gap-2 px-7 py-3.5 text-black text-[13px] font-extrabold rounded-[10px] transition-opacity hover:opacity-90"
-              style={{ background: "#f59e0b", boxShadow: "0 0 40px rgba(245,158,11,.2)" }}
-            >
-              Get the Bot — $297
-            </button>
-            <a
-              href="#how"
-              className="inline-flex items-center gap-2 px-6 py-3.5 text-[13px] rounded-[10px] no-underline transition-colors"
-              style={{ border: "1px solid rgba(255,255,255,.1)", color: "rgba(255,255,255,.55)" }}
-            >
-              See How It Works
-            </a>
-          </div>
-
-          <div className="flex items-center gap-6 flex-wrap justify-center">
-            {["Stripe Encrypted", "Instant Delivery", "No Monthly Fees"].map(t => (
-              <span key={t} className="flex items-center gap-1.5 text-[11px]" style={{ color: "rgba(255,255,255,.25)" }}>
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                {t}
-              </span>
-            ))}
-          </div>
-        </section>
+        <NavbarHero onGetAccess={() => setModalOpen(true)} />
 
         <DashboardMockup />
 
