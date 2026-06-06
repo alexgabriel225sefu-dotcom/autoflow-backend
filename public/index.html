@@ -4,289 +4,287 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Apex Trade Bot — AI Crypto Trading · $297 One-Time</title>
-<meta name="description" content="AI-powered crypto trading bot. Full source code, one payment. Deploy in 10 minutes on Railway. XRP, DOGE, ADA and more."/>
+<meta name="description" content="AI-powered crypto trading bot. Full source code, one payment. Deploy in 10 minutes on Railway."/>
 <script src="https://js.stripe.com/v3/"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#04060f;
-  --bg2:#070a18;
-  --a:#f59e0b;--a2:#fbbf24;--a3:rgba(245,158,11,.12);
-  --g:#22d3a4;--r:#f87171;
-  --t:#ffffff;--t2:rgba(255,255,255,.6);--t3:rgba(255,255,255,.3);--t4:rgba(255,255,255,.08);
-  --br:rgba(255,255,255,.07);--br2:rgba(255,255,255,.12);
-  --f:'Inter',-apple-system,sans-serif;
-  --m:'SF Mono','Fira Code',monospace;
-  --rd:14px;
+  --bg:#030508;--bg2:#06080f;--bg3:#090d18;
+  --a:#f59e0b;--a2:#fbbf24;--a3:rgba(245,158,11,.1);--a4:rgba(245,158,11,.06);
+  --t:#fff;--t2:rgba(255,255,255,.55);--t3:rgba(255,255,255,.28);--t4:rgba(255,255,255,.06);
+  --br:rgba(255,255,255,.07);--br2:rgba(255,255,255,.11);
+  --f:'Inter',system-ui,sans-serif;--m:'SF Mono','Fira Code',monospace;
+  --rd:12px;
 }
 html{scroll-behavior:smooth}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 body{background:var(--bg);color:var(--t);font-family:var(--f);overflow-x:hidden;-webkit-font-smoothing:antialiased;line-height:1.6}
 
-/* ── NOISE GRAIN ── */
-body::before{content:'';position:fixed;inset:0;opacity:.025;pointer-events:none;z-index:1;
+/* ─── GRAIN ─────────────────────────────────────────────── */
+body::before{content:'';position:fixed;inset:0;opacity:.03;pointer-events:none;z-index:1;
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size:200px 200px}
 
-/* ── GLOW BG ── */
-.glow-bg{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
-.glow-bg span{position:absolute;border-radius:50%;filter:blur(120px);opacity:.18}
-.glow-bg span:nth-child(1){width:600px;height:600px;background:#92400e;top:-200px;left:-100px}
-.glow-bg span:nth-child(2){width:500px;height:500px;background:#78350f;bottom:-150px;right:-100px}
-.glow-bg span:nth-child(3){width:300px;height:300px;background:#451a03;top:40%;left:50%;transform:translate(-50%,-50%)}
+/* ─── AMBIENT GLOW ───────────────────────────────────────── */
+.glow{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.glow span{position:absolute;border-radius:50%;filter:blur(130px)}
+.glow span:nth-child(1){width:700px;height:700px;background:#92400e;opacity:.12;top:-250px;left:-150px}
+.glow span:nth-child(2){width:500px;height:500px;background:#78350f;opacity:.1;bottom:-200px;right:-120px}
+.glow span:nth-child(3){width:400px;height:400px;background:#451a03;opacity:.08;top:35%;left:55%;transform:translate(-50%,-50%)}
 
-/* ── NAV ── */
-nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;transition:all .3s}
-nav.on{background:rgba(4,6,15,.9);border-bottom:1px solid var(--br);backdrop-filter:blur(20px)}
-.nl{font-size:15px;font-weight:700;color:var(--t);text-decoration:none;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
-.nm{display:flex;gap:24px;align-items:center}
-.nm a{font-size:13px;color:var(--t2);text-decoration:none;transition:color .2s;font-weight:400}
-.nm a:hover{color:var(--t)}
-.nav-cta{padding:8px 20px;background:var(--a);border-radius:8px;color:#000;font-size:12px;font-weight:700;text-decoration:none;transition:all .2s;letter-spacing:.3px;white-space:nowrap}
-.nav-cta:hover{background:var(--a2);transform:translateY(-1px)}
+/* ─── ETHEREAL BEAMS (shadcnblocks / muhammad-binsalman style) ── */
+.beams{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+@keyframes bm{0%{opacity:0;transform:translateY(-60%) rotate(var(--r,35deg))}15%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translateY(60%) rotate(var(--r,35deg))}}
+.bm{position:absolute;top:0;left:var(--x);width:1px;height:100%;background:linear-gradient(to bottom,transparent 0%,rgba(245,158,11,.45) 40%,rgba(251,191,36,.2) 60%,transparent 100%);filter:blur(.5px);animation:bm var(--d,10s) ease-in-out var(--dl,0s) infinite;transform-origin:center center}
+
+/* ─── NAV ─────────────────────────────────────────────────── */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;transition:all .3s}
+nav.on{background:rgba(3,5,8,.9);border-bottom:1px solid var(--br);backdrop-filter:blur(20px)}
+.nl{font-size:14px;font-weight:700;color:var(--t);text-decoration:none;letter-spacing:-.2px;display:flex;align-items:center;gap:8px}
+.nm{display:flex;gap:22px;align-items:center}
+.nm a{font-size:13px;color:var(--t3);text-decoration:none;transition:color .2s;font-weight:400}
+.nm a:hover{color:var(--t2)}
+.nav-cta{padding:7px 18px;background:var(--a);border-radius:8px;color:#000;font-size:12px;font-weight:700;text-decoration:none;transition:all .2s;letter-spacing:.2px;white-space:nowrap}
+.nav-cta:hover{background:var(--a2)}
 @media(max-width:768px){.nm{display:none}}
 @media(max-width:480px){nav{padding:0 16px}}
 
-/* ── HERO ── */
-.hero-wrap{position:relative;z-index:2;min-height:100vh;display:flex;align-items:center;padding:80px 32px 60px;max-width:1200px;margin:0 auto}
-.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;width:100%}
-.badge{display:inline-flex;align-items:center;gap:7px;padding:5px 14px;border:1px solid rgba(245,158,11,.2);border-radius:100px;font-size:11px;font-weight:600;color:var(--a);letter-spacing:1.5px;background:rgba(245,158,11,.07);margin-bottom:24px;text-transform:uppercase}
-.hero h1{font-size:clamp(36px,4.5vw,66px);font-weight:800;line-height:1.04;letter-spacing:-2.5px;margin-bottom:18px}
-.hero h1 .line2{display:block;background:linear-gradient(135deg,#fbbf24,#f59e0b 40%,#f97316);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hero-desc{font-size:clamp(15px,1.5vw,17px);color:var(--t2);line-height:1.75;max-width:480px;margin-bottom:32px;font-weight:300}
-.hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px}
-.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:var(--a);border-radius:10px;color:#000;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;text-decoration:none;border:none;font-family:var(--f);letter-spacing:.2px;box-shadow:0 0 40px rgba(245,158,11,.3)}
-.btn-primary:hover{background:var(--a2);transform:translateY(-2px);box-shadow:0 0 60px rgba(245,158,11,.45)}
-.btn-ghost{display:inline-flex;align-items:center;gap:8px;padding:14px 24px;background:var(--t4);border:1px solid var(--br2);border-radius:10px;color:var(--t2);font-size:13px;cursor:pointer;transition:all .2s;text-decoration:none;font-family:var(--f)}
-.btn-ghost:hover{background:rgba(255,255,255,.1);color:var(--t);border-color:rgba(255,255,255,.2)}
-.trust-row{display:flex;gap:18px;flex-wrap:wrap}
-.trust-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t3);font-weight:500}
-.trust-item svg{width:12px;height:12px;stroke:var(--g);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+/* ─── HERO ────────────────────────────────────────────────── */
+.hero{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:100px 24px 80px}
+.hero-announce{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border:1px solid var(--br2);border-radius:100px;font-size:11px;font-weight:500;color:var(--t3);background:var(--t4);margin-bottom:28px;cursor:default;transition:border-color .2s}
+.hero-announce:hover{border-color:rgba(245,158,11,.25);color:var(--t2)}
+.hero-announce strong{color:var(--a);font-weight:600}
+.hero-announce-sep{width:1px;height:10px;background:var(--br2)}
+.hero h1{font-size:clamp(42px,6vw,82px);font-weight:900;letter-spacing:-3.5px;line-height:.98;margin-bottom:22px;max-width:860px}
+.hero h1 em{font-style:normal;background:linear-gradient(120deg,#fbbf24 0%,#f59e0b 45%,#f97316 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:clamp(15px,1.5vw,18px);color:var(--t2);line-height:1.75;max-width:560px;margin-bottom:36px;font-weight:300}
+.hero-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:36px}
+.btn-p{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:var(--a);border-radius:10px;color:#000;font-size:13px;font-weight:800;cursor:pointer;transition:all .22s;text-decoration:none;border:none;font-family:var(--f);letter-spacing:.1px;box-shadow:0 0 40px rgba(245,158,11,.25),0 1px 0 rgba(255,255,255,.15) inset}
+.btn-p:hover{background:var(--a2);transform:translateY(-1px);box-shadow:0 0 60px rgba(245,158,11,.4)}
+.btn-g{display:inline-flex;align-items:center;gap:8px;padding:14px 24px;background:transparent;border:1px solid var(--br2);border-radius:10px;color:var(--t2);font-size:13px;cursor:pointer;transition:all .22s;text-decoration:none;font-family:var(--f)}
+.btn-g:hover{background:var(--t4);border-color:rgba(255,255,255,.18);color:var(--t)}
+.trust{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+.ti{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3);font-weight:500}
+.ti svg{width:12px;height:12px;stroke:var(--a);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 
-/* ── ETHEREAL BEAMS ── */
-.beams-wrap{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
-.beams-wrap svg{position:absolute;width:100%;height:100%}
-@keyframes bf{0%,100%{opacity:.18}50%{opacity:.45}}
-@keyframes bf2{0%,100%{opacity:.08}50%{opacity:.28}}
-@keyframes bf3{0%,100%{opacity:.12}50%{opacity:.35}}
+/* ─── MOCKUP ──────────────────────────────────────────────── */
+.mock-outer{position:relative;z-index:2;display:flex;justify-content:center;padding:0 24px 80px;margin-top:-10px}
+.mock-outer::before{content:'';position:absolute;inset:-40px;background:radial-gradient(ellipse at center top,rgba(245,158,11,.07) 0%,transparent 70%);pointer-events:none}
+.mock{background:rgba(6,9,16,.97);border:1px solid var(--br2);border-radius:18px;overflow:hidden;max-width:560px;width:100%;box-shadow:0 40px 100px rgba(0,0,0,.7),0 0 0 1px rgba(245,158,11,.06),inset 0 1px 0 rgba(255,255,255,.05)}
+.mock-bar{background:rgba(255,255,255,.03);border-bottom:1px solid var(--br);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+.mock-dots{display:flex;gap:5px}
+.mock-dot{width:9px;height:9px;border-radius:50%}
+.mock-title{font-size:10px;color:var(--t3);font-family:var(--m);letter-spacing:.5px}
+.mock-status{font-size:10px;font-weight:600;color:var(--t3);font-family:var(--m);letter-spacing:.5px}
+.mock-body{padding:18px 16px}
+.mock-plabel{font-size:9px;color:var(--t3);font-family:var(--m);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px}
+.mock-pval{font-size:32px;font-weight:900;letter-spacing:-1.5px;line-height:1;margin-bottom:4px}
+.mock-pchg{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#10b981;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.18);border-radius:5px;padding:2px 7px}
+.mock-chart{position:relative;height:50px;margin:14px 0}
+.mock-chart svg{position:absolute;inset:0;width:100%;height:100%}
+.mock-div{height:1px;background:var(--br);margin:12px 0}
+.mock-rows{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+.mock-row{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.025);border:1px solid var(--br);border-radius:9px;padding:9px 11px}
+.mock-pair{font-size:12px;font-weight:700;font-family:var(--m)}
+.mock-side{font-size:8px;font-weight:800;padding:2px 5px;border-radius:3px;letter-spacing:.5px}
+.mock-side.l{background:rgba(16,185,129,.13);color:#10b981;border:1px solid rgba(16,185,129,.2)}
+.mock-pnl{font-size:12px;font-weight:700;color:#10b981;font-family:var(--m)}
+.mock-price{font-size:10px;color:var(--t3);font-family:var(--m)}
+.mock-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.ms{background:rgba(255,255,255,.025);border:1px solid var(--br);border-radius:9px;padding:9px}
+.ms-l{font-size:8px;color:var(--t3);font-family:var(--m);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
+.ms-v{font-size:17px;font-weight:800;line-height:1}
 
-/* ── DASHBOARD MOCKUP ── */
-.mock-wrap{position:relative}
-.mock-wrap::before{content:'';position:absolute;inset:-20px;background:radial-gradient(ellipse at center,rgba(245,158,11,.1) 0%,transparent 70%);pointer-events:none}
-.mock{background:rgba(8,12,28,.95);border:1px solid var(--br2);border-radius:20px;padding:0;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.7),0 0 0 1px rgba(245,158,11,.08),inset 0 1px 0 rgba(255,255,255,.06)}
-.mock-bar{background:rgba(255,255,255,.04);border-bottom:1px solid var(--br);padding:12px 18px;display:flex;align-items:center;justify-content:space-between}
-.mock-dots{display:flex;gap:6px}
-.mock-dot{width:10px;height:10px;border-radius:50%}
-.mock-title{font-size:11px;color:var(--t3);font-family:var(--m);letter-spacing:.5px}
-.mock-live-badge{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--t3);font-family:var(--m);letter-spacing:.5px}
-.mock-body{padding:20px 18px}
-.mock-portfolio{margin-bottom:16px}
-.mock-portfolio-label{font-size:10px;color:var(--t3);font-family:var(--m);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px}
-.mock-portfolio-val{font-size:34px;font-weight:800;letter-spacing:-1.5px;line-height:1;margin-bottom:4px}
-.mock-portfolio-chg{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--g);background:rgba(34,211,164,.1);border:1px solid rgba(34,211,164,.2);border-radius:6px;padding:2px 8px}
-.mock-chart-area{position:relative;height:52px;margin:14px 0}
-.mock-chart-area svg{position:absolute;inset:0;width:100%;height:100%}
-.mock-divider{height:1px;background:var(--br);margin:14px 0}
-.mock-positions{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
-.mock-pos{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.03);border:1px solid var(--br);border-radius:10px;padding:10px 12px}
-.mock-pos-left{display:flex;align-items:center;gap:10px}
-.mock-pos-coin{font-size:13px;font-weight:700;font-family:var(--m)}
-.mock-pos-side{font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;letter-spacing:.5px}
-.mock-pos-side.long{background:rgba(34,211,164,.15);color:var(--g);border:1px solid rgba(34,211,164,.2)}
-.mock-pos-side.short{background:rgba(248,113,113,.12);color:var(--r);border:1px solid rgba(248,113,113,.2)}
-.mock-pos-price{font-size:11px;color:var(--t3);font-family:var(--m)}
-.mock-pos-pnl{font-size:13px;font-weight:700;color:var(--g);font-family:var(--m)}
-.mock-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.mstat{background:rgba(255,255,255,.03);border:1px solid var(--br);border-radius:10px;padding:10px}
-.mstat-l{font-size:9px;color:var(--t3);font-family:var(--m);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
-.mstat-v{font-size:18px;font-weight:800;line-height:1}
-.mstat-v.g{color:var(--g)}.mstat-v.a{color:var(--a)}.mstat-v.w{color:var(--t)}
-@media(max-width:960px){.hero-grid{grid-template-columns:1fr;gap:40px}.mock-wrap{max-width:480px;margin:0 auto}}
-@media(max-width:600px){.hero-wrap{padding:80px 16px 40px}}
-
-/* ── TICKER ── */
-.ticker-wrap{position:relative;z-index:2;border-top:1px solid var(--br);border-bottom:1px solid var(--br);background:rgba(255,255,255,.015);padding:14px 0;overflow:hidden}
-.ticker-track{display:flex;gap:48px;animation:tick 30s linear infinite;width:max-content}
+/* ─── TICKER ──────────────────────────────────────────────── */
+.ticker-wrap{position:relative;z-index:2;border-top:1px solid var(--br);border-bottom:1px solid var(--br);background:rgba(255,255,255,.01);padding:12px 0;overflow:hidden}
+.ticker-track{display:flex;gap:48px;animation:tick 35s linear infinite;width:max-content}
 @keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.ticker-item{display:flex;align-items:center;gap:20px;white-space:nowrap}
-.ti{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--t2)}
-.ti-sep{color:var(--br2);font-size:18px;font-weight:200}
-.ti-num{font-family:var(--m);font-size:11px}
-.ti-up{color:var(--g)}.ti-dn{color:var(--r)}
+.ticker-item{display:flex;gap:20px;align-items:center;white-space:nowrap}
+.tk{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:var(--t3)}
+.tk-dot{width:3px;height:3px;border-radius:50%;background:rgba(245,158,11,.4);flex-shrink:0}
 
-/* ── SECTIONS ── */
-.sec{position:relative;z-index:2;padding:100px 32px}
+/* ─── SECTIONS ────────────────────────────────────────────── */
+.sec{position:relative;z-index:2;padding:96px 28px}
 .si{max-width:1100px;margin:0 auto}
-.sec-label{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--a);margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.sec-label::before{content:'';width:20px;height:1px;background:var(--a);display:block}
-.sec-h{font-size:clamp(28px,3vw,44px);font-weight:800;letter-spacing:-1.5px;line-height:1.1;margin-bottom:12px}
-.sec-sub{font-size:16px;color:var(--t2);max-width:500px;line-height:1.75;font-weight:300}
+.sec-eyebrow{font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--a);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.sec-eyebrow::before{content:'';width:18px;height:1px;background:var(--a);display:block}
+.sec-h{font-size:clamp(26px,2.8vw,42px);font-weight:800;letter-spacing:-1.5px;line-height:1.1;margin-bottom:12px}
+.sec-sub{font-size:15px;color:var(--t2);max-width:500px;line-height:1.8;font-weight:300}
 @media(max-width:480px){.sec{padding:70px 16px}}
 
-/* ── HOW IT WORKS ── */
+/* ─── STEPS ───────────────────────────────────────────────── */
 #how{background:linear-gradient(180deg,var(--bg),var(--bg2) 50%,var(--bg))}
-.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:48px;background:var(--br);border-radius:16px;overflow:hidden;border:1px solid var(--br)}
-.step-card{background:var(--bg);padding:36px 30px;position:relative;transition:background .2s}
-.step-card:hover{background:rgba(255,255,255,.03)}
-.step-num{font-size:64px;font-weight:900;color:var(--a);opacity:.1;line-height:1;letter-spacing:-3px;margin-bottom:20px;font-variant-numeric:tabular-nums}
-.step-title{font-size:17px;font-weight:700;margin-bottom:10px;letter-spacing:-.3px}
-.step-desc{font-size:14px;color:var(--t2);line-height:1.75}
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:48px;background:var(--br);border-radius:14px;overflow:hidden;border:1px solid var(--br)}
+.step-card{background:var(--bg);padding:32px 28px;transition:background .2s}
+.step-card:hover{background:rgba(255,255,255,.02)}
+.step-num{font-size:56px;font-weight:900;color:var(--a);opacity:.1;line-height:1;letter-spacing:-3px;margin-bottom:18px}
+.step-title{font-size:16px;font-weight:700;margin-bottom:8px}
+.step-desc{font-size:13px;color:var(--t2);line-height:1.8}
 @media(max-width:768px){.steps-grid{grid-template-columns:1fr}}
 
-/* ── FEATURES ── */
-.feat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;margin-top:48px;background:var(--br);border-radius:16px;overflow:hidden;border:1px solid var(--br)}
-.feat-item{background:var(--bg2);padding:22px 24px;display:flex;align-items:flex-start;gap:14px;transition:background .2s}
-.feat-item:hover{background:rgba(255,255,255,.03)}
-.feat-icon{width:36px;height:36px;border-radius:9px;background:var(--a3);border:1px solid rgba(245,158,11,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.feat-icon svg{width:16px;height:16px;stroke:var(--a);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.feat-text strong{font-size:14px;font-weight:600;display:block;margin-bottom:3px}
-.feat-text span{font-size:12px;color:var(--t3);line-height:1.5}
+/* ─── FEATURES ────────────────────────────────────────────── */
+.feat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;margin-top:48px;background:var(--br);border-radius:14px;overflow:hidden;border:1px solid var(--br)}
+.feat-item{background:var(--bg2);padding:20px 22px;display:flex;align-items:flex-start;gap:13px;transition:background .2s}
+.feat-item:hover{background:rgba(255,255,255,.02)}
+.feat-icon{width:34px;height:34px;border-radius:8px;background:var(--a4);border:1px solid rgba(245,158,11,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.feat-icon svg{width:15px;height:15px;stroke:var(--a);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.feat-text strong{font-size:13px;font-weight:600;display:block;margin-bottom:2px}
+.feat-text span{font-size:11px;color:var(--t3);line-height:1.6}
 @media(max-width:600px){.feat-grid{grid-template-columns:1fr}}
 
-/* ── REVIEWS ── */
+/* ─── REVIEWS ─────────────────────────────────────────────── */
 #reviews{background:var(--bg2)}
-.reviews-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
-.rv{background:rgba(255,255,255,.03);border:1px solid var(--br);border-radius:16px;padding:24px;transition:border-color .2s}
-.rv:hover{border-color:rgba(245,158,11,.18)}
-.rv-stars{color:var(--a);font-size:13px;letter-spacing:2px;margin-bottom:14px}
-.rv-text{font-size:14px;color:var(--t2);line-height:1.8;margin-bottom:16px;font-style:italic}
-.rv-author{font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.5px;text-transform:uppercase}
-@media(max-width:768px){.reviews-grid{grid-template-columns:1fr;gap:12px}}
+.reviews-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:44px}
+.rv{background:rgba(255,255,255,.025);border:1px solid var(--br);border-radius:14px;padding:22px;transition:border-color .2s}
+.rv:hover{border-color:rgba(245,158,11,.15)}
+.rv-stars{color:var(--a);font-size:12px;letter-spacing:2px;margin-bottom:12px}
+.rv-text{font-size:13px;color:var(--t2);line-height:1.85;margin-bottom:14px;font-style:italic}
+.rv-author{font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.5px;text-transform:uppercase}
+@media(max-width:768px){.reviews-grid{grid-template-columns:1fr;gap:10px}}
 
-/* ── PRICING ── */
+/* ─── PRICING ─────────────────────────────────────────────── */
 #pricing{text-align:center}
-.price-card{max-width:480px;margin:48px auto 0;position:relative;border-radius:20px;overflow:visible}
-.price-card::before{content:'';position:absolute;inset:-1px;background:linear-gradient(135deg,rgba(245,158,11,.4),rgba(245,158,11,.1) 50%,rgba(245,158,11,.3));border-radius:21px;z-index:0}
-.price-card-inner{position:relative;z-index:1;background:var(--bg2);border-radius:20px;overflow:hidden}
-.pc-top{padding:32px 32px 24px;background:rgba(245,158,11,.04);border-bottom:1px solid rgba(245,158,11,.1)}
-.pc-label{font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:var(--a);margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px}
-.pc-badge{background:#ef4444;color:#fff;font-size:8px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:1px}
-.pc-price-row{display:flex;align-items:baseline;gap:10px;justify-content:center;margin-bottom:6px}
-.pc-price{font-size:76px;font-weight:900;letter-spacing:-4px;line-height:1;background:linear-gradient(135deg,#fff,rgba(255,255,255,.7));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.pc-was{font-size:24px;color:var(--t3);text-decoration:line-through;font-weight:400}
-.pc-once{font-size:12px;color:var(--t3);letter-spacing:1px}
-.pc-body{padding:24px 32px 28px}
-.pc-list{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:24px;text-align:left}
-.pc-list li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--t2);line-height:1.5}
-.pc-list li svg{width:16px;height:16px;stroke:var(--g);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;margin-top:2px}
+.price-card{max-width:460px;margin:44px auto 0;position:relative;border-radius:18px;overflow:visible}
+.price-card::before{content:'';position:absolute;inset:-1px;background:linear-gradient(135deg,rgba(245,158,11,.35),rgba(245,158,11,.08) 50%,rgba(245,158,11,.25));border-radius:19px;z-index:0}
+.price-card-inner{position:relative;z-index:1;background:var(--bg2);border-radius:18px;overflow:hidden}
+.pc-top{padding:28px 28px 22px;background:rgba(245,158,11,.03);border-bottom:1px solid rgba(245,158,11,.08)}
+.pc-label{font-size:9px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:var(--a);margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px}
+.pc-badge{background:#dc2626;color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:3px;letter-spacing:1px}
+.pc-price-row{display:flex;align-items:baseline;gap:10px;justify-content:center;margin-bottom:5px}
+.pc-price{font-size:72px;font-weight:900;letter-spacing:-4px;line-height:1;background:linear-gradient(135deg,#fff,rgba(255,255,255,.65));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.pc-was{font-size:22px;color:var(--t3);text-decoration:line-through;font-weight:400}
+.pc-once{font-size:11px;color:var(--t3);letter-spacing:1px}
+.pc-body{padding:22px 28px 26px}
+.pc-list{list-style:none;display:flex;flex-direction:column;gap:11px;margin-bottom:22px;text-align:left}
+.pc-list li{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--t2);line-height:1.5}
+.pc-list li svg{width:15px;height:15px;stroke:var(--a);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;margin-top:2px}
 .pc-list li strong{color:var(--t);font-weight:600}
-.pc-cta{width:100%;padding:16px;background:var(--a);border:none;border-radius:10px;color:#000;font-family:var(--f);font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;letter-spacing:.5px;box-shadow:0 0 40px rgba(245,158,11,.3)}
-.pc-cta:hover{background:var(--a2);transform:translateY(-2px);box-shadow:0 0 60px rgba(245,158,11,.5)}
-.pc-note{font-size:11px;color:var(--t3);margin-top:12px;letter-spacing:.3px}
+.pc-cta{width:100%;padding:15px;background:var(--a);border:none;border-radius:10px;color:#000;font-family:var(--f);font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;letter-spacing:.3px;box-shadow:0 0 36px rgba(245,158,11,.28)}
+.pc-cta:hover{background:var(--a2);transform:translateY(-1px)}
+.pc-note{font-size:10px;color:var(--t3);margin-top:10px;letter-spacing:.2px}
 
-/* ── FAQ ── */
+/* ─── FAQ ─────────────────────────────────────────────────── */
 #faq{background:var(--bg2);border-top:1px solid var(--br)}
-.faq-wrap{max-width:660px;margin-top:40px}
+.faq-wrap{max-width:640px;margin-top:40px}
 .fqi{border-bottom:1px solid var(--br)}
-.fqq{display:flex;justify-content:space-between;align-items:center;padding:20px 0;cursor:pointer;font-size:15px;font-weight:500;color:var(--t2);gap:16px;transition:color .2s;user-select:none}
+.fqq{display:flex;justify-content:space-between;align-items:center;padding:18px 0;cursor:pointer;font-size:14px;font-weight:500;color:var(--t2);gap:16px;transition:color .2s;user-select:none}
 .fqq:hover,.fqi.open .fqq{color:var(--t)}
-.fq-icon{width:26px;height:26px;border-radius:7px;background:var(--t4);border:1px solid var(--br);display:flex;align-items:center;justify-content:center;color:var(--a);font-size:17px;flex-shrink:0;transition:all .25s;line-height:1}
-.fqi.open .fq-icon{transform:rotate(45deg);background:var(--a3);border-color:rgba(245,158,11,.3)}
+.fq-icon{width:24px;height:24px;border-radius:6px;background:var(--t4);border:1px solid var(--br);display:flex;align-items:center;justify-content:center;color:var(--a);font-size:16px;flex-shrink:0;transition:all .25s;line-height:1}
+.fqi.open .fq-icon{transform:rotate(45deg);background:var(--a3);border-color:rgba(245,158,11,.25)}
 .fqb{max-height:0;overflow:hidden;transition:max-height .35s ease}
 .fqi.open .fqb{max-height:300px}
-.fqa{padding:0 0 20px;font-size:14px;color:var(--t2);line-height:1.85}
+.fqa{padding:0 0 18px;font-size:13px;color:var(--t2);line-height:1.9}
 .fqa strong{color:var(--t)}
-.fqa code{font-family:var(--m);background:rgba(255,255,255,.07);padding:1px 6px;border-radius:4px;font-size:12px}
+.fqa code{font-family:var(--m);background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px;font-size:11px}
 
-/* ── FOOTER ── */
-footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:28px 32px}
-.fi{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
-.fl{font-size:13px;font-weight:700;color:var(--t2);text-decoration:none}
-.flinks{display:flex;gap:20px}
-.flinks a{font-size:12px;color:var(--t3);text-decoration:none;transition:color .2s}
+/* ─── FOOTER ──────────────────────────────────────────────── */
+footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:24px 28px}
+.fi{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.fl{font-size:13px;font-weight:700;color:var(--t2);text-decoration:none;display:flex;align-items:center;gap:7px}
+.flinks{display:flex;gap:18px}
+.flinks a{font-size:11px;color:var(--t3);text-decoration:none;transition:color .2s}
 .flinks a:hover{color:var(--t2)}
-.fc{font-size:12px;color:var(--t3)}
-@media(max-width:480px){footer{padding:20px 16px}.fi{flex-direction:column;text-align:center}}
+.fc{font-size:11px;color:var(--t3)}
+@media(max-width:480px){footer{padding:18px 16px}.fi{flex-direction:column;text-align:center}}
 
-/* ── REVEAL ── */
-.rev{opacity:0;transform:translateY(20px);transition:opacity .65s ease,transform .65s ease}
+/* ─── REVEAL ──────────────────────────────────────────────── */
+.rev{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
 .rev.in{opacity:1;transform:none}
 .d1{transition-delay:.1s}.d2{transition-delay:.2s}.d3{transition-delay:.3s}
 
-/* ── MODAL ── */
-#apexModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(4,6,15,.95);backdrop-filter:blur(24px)}
+/* ─── PAYMENT MODAL ───────────────────────────────────────── */
+#apexModal{position:fixed;inset:0;z-index:9999;display:none;align-items:flex-start;justify-content:center;padding:16px;background:rgba(3,5,8,.92);backdrop-filter:blur(28px);overflow-y:auto}
 #apexModal.open{display:flex}
-.amc{background:#070b1c;border:1px solid var(--br2);border-radius:16px;width:100%;max-width:460px;position:relative;overflow-y:auto;max-height:90vh;box-shadow:0 0 0 1px rgba(245,158,11,.07),0 40px 100px rgba(0,0,0,.8)}
-.amcl{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:7px;background:var(--t4);border:1px solid var(--br);color:var(--t2);font-size:18px;cursor:pointer;z-index:2;transition:all .2s;display:flex;align-items:center;justify-content:center}
-.amcl:hover{color:var(--t);background:rgba(255,255,255,.1)}
-.amtop{padding:28px 28px 0;text-align:center}
-.amttl{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
-.amsub{font-size:13px;color:var(--t2);margin-bottom:16px;font-weight:300}
-.ambdg{display:inline-flex;align-items:baseline;gap:8px;background:var(--a3);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:10px 22px}
-.amamt{font-size:34px;font-weight:900;color:var(--a);letter-spacing:-1px;line-height:1}
-.amwas{font-size:15px;color:var(--t3);text-decoration:line-through;font-weight:400}
-.amonce{font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;align-self:center}
-.amdiv{height:1px;background:var(--br);margin:20px 28px 0}
-.ambody{padding:20px 28px 24px}
-.aml{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;display:block}
-.ami{width:100%;background:var(--t4);border:1px solid var(--br);border-radius:9px;padding:13px 15px;font-size:14px;color:var(--t);font-family:var(--f);transition:border-color .2s;outline:none;margin-bottom:14px}
-.ami:focus{border-color:var(--a)}
-.ami::placeholder{color:var(--t3)}
-#am-card-element{background:var(--t4);border:1px solid var(--br);border-radius:9px;padding:13px 15px;margin-bottom:6px;transition:border-color .2s}
-#am-card-element.StripeElement--focus{border-color:var(--a)}
-#am-card-error{font-size:11px;color:var(--t3);margin-bottom:12px;min-height:14px;font-family:var(--m)}
-#am-card-error.is-error{color:#f87171}
-.amcks{display:flex;flex-direction:column;gap:9px;margin-bottom:16px}
-.amck{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
-.amck input{width:15px;height:15px;flex-shrink:0;margin-top:2px;accent-color:var(--a);cursor:pointer}
-.amck span{font-size:11px;color:var(--t3);line-height:1.65}
-.amck span strong{color:var(--t2)}
-.amck span a{color:#60a5fa;text-decoration:none}
-.amck span a:hover{text-decoration:underline}
-.ambtn{width:100%;background:var(--a);color:#000;font-size:13px;font-weight:800;padding:16px;border-radius:10px;border:none;cursor:pointer;letter-spacing:.5px;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--f);box-shadow:0 0 32px rgba(245,158,11,.25)}
-.ambtn:hover:not(:disabled){background:var(--a2);box-shadow:0 0 48px rgba(245,158,11,.4)}
-.ambtn:disabled{opacity:.3;cursor:not-allowed}
-.amspin{width:13px;height:13px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:sp .7s linear infinite;display:none}
+.amc{background:#07090f;border:1px solid rgba(255,255,255,.09);border-radius:18px;width:100%;max-width:440px;position:relative;margin:auto;box-shadow:0 0 0 1px rgba(245,158,11,.06),0 48px 120px rgba(0,0,0,.85)}
+.amcl{position:absolute;top:13px;right:13px;width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--br);color:var(--t3);font-size:17px;cursor:pointer;z-index:2;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.amcl:hover{color:var(--t);background:rgba(255,255,255,.09)}
+
+/* Modal header */
+.am-header{padding:24px 24px 0;text-align:center;border-bottom:1px solid var(--br)}
+.am-lock-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid rgba(245,158,11,.18);border-radius:100px;font-size:10px;font-weight:600;color:rgba(245,158,11,.7);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;background:rgba(245,158,11,.05)}
+.am-title{font-size:19px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px}
+.am-sub{font-size:12px;color:var(--t3);margin-bottom:14px;font-weight:400}
+.am-price-row{display:inline-flex;align-items:baseline;gap:8px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.15);border-radius:10px;padding:9px 20px;margin-bottom:18px}
+.am-price{font-size:30px;font-weight:900;color:var(--a);letter-spacing:-1px;line-height:1}
+.am-was{font-size:14px;color:var(--t3);text-decoration:line-through}
+.am-once{font-size:9px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;align-self:center}
+
+/* Modal body */
+.am-body{padding:20px 24px 22px}
+.am-label{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;display:block}
+
+/* Wallet buttons */
+.am-wallets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.am-wallet{background:#0d1017;border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:11px 8px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:all .2s;font-size:12px;font-weight:600;color:var(--t);font-family:var(--f);letter-spacing:.1px}
+.am-wallet:hover{background:#141924;border-color:rgba(255,255,255,.16)}
+
+/* Separator */
+.am-sep{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--t3);font-size:11px;letter-spacing:.3px}
+.am-sep::before,.am-sep::after{content:'';flex:1;height:1px;background:var(--br)}
+
+/* Inputs */
+.am-field{margin-bottom:12px}
+.am-input{width:100%;background:#0d1017;border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:12px 14px;font-size:14px;color:var(--t);font-family:var(--f);transition:border-color .2s;outline:none}
+.am-input:focus{border-color:rgba(245,158,11,.35);background:#0f1219}
+.am-input::placeholder{color:rgba(255,255,255,.22)}
+.am-stripe{background:#0d1017;border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:12px 14px;transition:border-color .2s}
+.am-stripe.focused{border-color:rgba(245,158,11,.35);background:#0f1219}
+.am-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.am-err{font-size:11px;color:var(--t3);min-height:14px;margin-bottom:10px;font-family:var(--m)}
+.am-err.err{color:#f87171}
+
+/* Checkboxes */
+.am-checks{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.am-check{display:flex;align-items:flex-start;gap:9px;cursor:pointer}
+.am-check input{width:14px;height:14px;flex-shrink:0;margin-top:2px;accent-color:var(--a);cursor:pointer}
+.am-check span{font-size:11px;color:var(--t3);line-height:1.6}
+.am-check span strong{color:rgba(255,255,255,.5)}
+.am-check span a{color:rgba(245,158,11,.6);text-decoration:none}
+.am-check span a:hover{color:var(--a)}
+
+/* Submit button */
+.am-btn{width:100%;background:var(--a);color:#000;font-size:13px;font-weight:800;padding:15px;border-radius:10px;border:none;cursor:pointer;letter-spacing:.3px;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--f);box-shadow:0 0 30px rgba(245,158,11,.2)}
+.am-btn:hover:not(:disabled){background:var(--a2)}
+.am-btn:disabled{opacity:.28;cursor:not-allowed}
+.am-spin{width:13px;height:13px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:sp .7s linear infinite;display:none}
 @keyframes sp{to{transform:rotate(360deg)}}
-.amnote{font-size:10px;color:var(--t3);text-align:center;margin-top:10px;letter-spacing:.3px}
-.amsuc{padding:48px 28px;text-align:center;display:none}
-.amsic{width:56px;height:56px;background:var(--a3);border:1px solid rgba(245,158,11,.22);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
-.amsic svg{width:24px;height:24px;stroke:var(--a);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.amsuc h3{font-size:20px;font-weight:800;margin-bottom:10px;color:var(--a);letter-spacing:-.3px}
-.amsuc p{font-size:14px;color:var(--t2);line-height:1.8;font-weight:300}
-.am-wallets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
-.am-wallet-btn{background:#161b2a;border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:11px 8px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:all .2s;font-size:12px;font-weight:700;color:#fff;font-family:var(--f)}
-.am-wallet-btn:hover{background:#1d2436;border-color:rgba(255,255,255,.2);transform:translateY(-1px)}
-.am-separator{display:flex;align-items:center;gap:10px;margin:12px 0;color:var(--t3);font-size:11px}
-.am-separator::before,.am-separator::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07)}
-.am-card-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.stripe-el{background:var(--t4);border:1px solid var(--br);border-radius:9px;padding:13px 15px;transition:border-color .2s}
-.stripe-el.focused{border-color:var(--a)}
+.am-note{font-size:10px;color:var(--t3);text-align:center;margin-top:9px;letter-spacing:.2px}
+
+/* Success */
+.am-success{padding:48px 24px;text-align:center;display:none}
+.am-success-icon{width:52px;height:52px;background:var(--a3);border:1px solid rgba(245,158,11,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.am-success-icon svg{width:22px;height:22px;stroke:var(--a);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.am-success h3{font-size:18px;font-weight:800;margin-bottom:8px;color:var(--a)}
+.am-success p{font-size:13px;color:var(--t2);line-height:1.8}
 </style>
 </head>
 <body>
 
-<div class="glow-bg">
-  <span></span><span></span><span></span>
-</div>
-<div class="beams-wrap" aria-hidden="true">
-  <svg viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
-    <defs>
-      <linearGradient id="bg1" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0"/><stop offset="45%" stop-color="#f59e0b" stop-opacity="1"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/></linearGradient>
-      <linearGradient id="bg2" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#fbbf24" stop-opacity="0"/><stop offset="50%" stop-color="#fbbf24" stop-opacity="1"/><stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/></linearGradient>
-      <linearGradient id="bg3" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#f97316" stop-opacity="0"/><stop offset="50%" stop-color="#f97316" stop-opacity="1"/><stop offset="100%" stop-color="#f97316" stop-opacity="0"/></linearGradient>
-      <linearGradient id="bg4" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0"/><stop offset="50%" stop-color="#f59e0b" stop-opacity="1"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/></linearGradient>
-      <linearGradient id="bg5" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#fbbf24" stop-opacity="0"/><stop offset="50%" stop-color="#fbbf24" stop-opacity="1"/><stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/></linearGradient>
-    </defs>
-    <rect x="120" y="-300" width="1.5" height="1500" fill="url(#bg1)" transform="rotate(35 720 450)" style="animation:bf 8s ease-in-out infinite"/>
-    <rect x="280" y="-300" width="1" height="1500" fill="url(#bg2)" transform="rotate(35 720 450)" style="animation:bf2 11s ease-in-out infinite 1.5s"/>
-    <rect x="430" y="-300" width="1.5" height="1500" fill="url(#bg3)" transform="rotate(35 720 450)" style="animation:bf3 9s ease-in-out infinite 3s"/>
-    <rect x="600" y="-300" width="2" height="1500" fill="url(#bg1)" transform="rotate(35 720 450)" style="animation:bf 14s ease-in-out infinite 0.8s"/>
-    <rect x="760" y="-300" width="1" height="1500" fill="url(#bg4)" transform="rotate(35 720 450)" style="animation:bf2 10s ease-in-out infinite 4s"/>
-    <rect x="920" y="-300" width="1.5" height="1500" fill="url(#bg5)" transform="rotate(35 720 450)" style="animation:bf 12s ease-in-out infinite 2s"/>
-    <rect x="1080" y="-300" width="1" height="1500" fill="url(#bg2)" transform="rotate(35 720 450)" style="animation:bf3 9s ease-in-out infinite 5s"/>
-    <rect x="1240" y="-300" width="1.5" height="1500" fill="url(#bg1)" transform="rotate(35 720 450)" style="animation:bf2 13s ease-in-out infinite 1s"/>
-    <rect x="340" y="-300" width="1" height="1500" fill="url(#bg3)" transform="rotate(-35 720 450)" style="animation:bf3 11s ease-in-out infinite 6s"/>
-    <rect x="700" y="-300" width="1.5" height="1500" fill="url(#bg4)" transform="rotate(-35 720 450)" style="animation:bf 15s ease-in-out infinite 2.5s"/>
-    <rect x="1050" y="-300" width="1" height="1500" fill="url(#bg5)" transform="rotate(-35 720 450)" style="animation:bf2 10s ease-in-out infinite 4.5s"/>
-  </svg>
+<!-- Ambient -->
+<div class="glow"><span></span><span></span><span></span></div>
+
+<!-- Ethereal Beams -->
+<div class="beams" aria-hidden="true">
+  <div class="bm" style="--x:5%;--d:12s;--dl:0s;--r:30deg"></div>
+  <div class="bm" style="--x:12%;--d:9s;--dl:2s;--r:32deg"></div>
+  <div class="bm" style="--x:20%;--d:14s;--dl:.5s;--r:28deg"></div>
+  <div class="bm" style="--x:29%;--d:11s;--dl:3.5s;--r:33deg"></div>
+  <div class="bm" style="--x:38%;--d:10s;--dl:1.5s;--r:29deg"></div>
+  <div class="bm" style="--x:47%;--d:13s;--dl:4s;--r:31deg"></div>
+  <div class="bm" style="--x:55%;--d:8s;--dl:.8s;--r:34deg"></div>
+  <div class="bm" style="--x:63%;--d:15s;--dl:2.5s;--r:27deg"></div>
+  <div class="bm" style="--x:72%;--d:11s;--dl:5s;--r:32deg"></div>
+  <div class="bm" style="--x:80%;--d:9s;--dl:1s;--r:30deg"></div>
+  <div class="bm" style="--x:88%;--d:13s;--dl:3s;--r:28deg"></div>
+  <div class="bm" style="--x:95%;--d:10s;--dl:6s;--r:35deg"></div>
 </div>
 
+<!-- Nav -->
 <nav id="nav">
   <a href="#" class="nl">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
     Apex Trade Bot
   </a>
   <div class="nm">
@@ -297,121 +295,121 @@ footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:28px 3
   <a href="#" onclick="openApexModal();return false;" class="nav-cta">Get Access →</a>
 </nav>
 
-<!-- HERO -->
-<div class="hero-wrap">
-  <div class="hero-grid">
-    <div>
-      <div class="badge">Own It · Control It · 24/7</div>
-      <h1>The only trading bot<br><span class="line2">you actually own.</span></h1>
-      <p class="hero-desc">No monthly fees. No black box. No lock-in.<br>Others charge you monthly for a bot you don't control. You buy once — you have the full source code, you make it trade exactly how you want.</p>
-      <div class="hero-btns">
-        <a href="#" onclick="openApexModal();return false;" class="btn-primary">Get the Bot — $297 →</a>
-        <a href="#how" class="btn-ghost">See How It Works</a>
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-announce">
+    <strong>500+ bots deployed</strong>
+    <div class="hero-announce-sep"></div>
+    Full source code · No subscriptions
+  </div>
+  <h1>The trading bot<br>you <em>actually own.</em></h1>
+  <p class="hero-sub">Others charge $99/month for a bot you don't control. You buy once, get every line of code, and deploy it yourself. No fees. No lock-in. No black box.</p>
+  <div class="hero-btns">
+    <a href="#" onclick="openApexModal();return false;" class="btn-p">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/></svg>
+      Get the Bot — $297
+    </a>
+    <a href="#how" class="btn-g">See How It Works</a>
+  </div>
+  <div class="trust">
+    <span class="ti"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Stripe Encrypted</span>
+    <span class="ti"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Instant Delivery</span>
+    <span class="ti"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>No Monthly Fees</span>
+  </div>
+</div>
+
+<!-- Dashboard Mockup -->
+<div class="mock-outer">
+  <div class="mock">
+    <div class="mock-bar">
+      <div class="mock-dots">
+        <div class="mock-dot" style="background:#ff5f57"></div>
+        <div class="mock-dot" style="background:#febc2e"></div>
+        <div class="mock-dot" style="background:#28c840"></div>
       </div>
-      <div class="trust-row">
-        <span class="trust-item"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Stripe Encrypted</span>
-        <span class="trust-item"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Instant Delivery</span>
-        <span class="trust-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>No Monthly Fees</span>
-      </div>
-      <p style="font-size:11px;color:rgba(255,255,255,.22);margin-top:18px;max-width:460px;line-height:1.65;">This is an automation software tool, not financial advice. Crypto trading involves significant risk of loss. Past results shown are simulated demo data, not a guarantee of future performance. Always start with paper trading mode.</p>
+      <span class="mock-title">APEX · Binance</span>
+      <span class="mock-status">RUNNING</span>
     </div>
-    <div class="mock-wrap rev d1">
-      <div class="mock">
-        <div class="mock-bar">
-          <div class="mock-dots">
-            <div class="mock-dot" style="background:#ff5f57"></div>
-            <div class="mock-dot" style="background:#febc2e"></div>
-            <div class="mock-dot" style="background:#28c840"></div>
+    <div class="mock-body">
+      <div class="mock-plabel">Portfolio Value</div>
+      <div class="mock-pval">$1,284.50</div>
+      <div class="mock-pchg">▲ +28.4% this month</div>
+      <div class="mock-chart">
+        <svg viewBox="0 0 560 50" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#10b981" stop-opacity=".2"/>
+              <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0,42 C30,40 55,37 80,40 C110,36 140,30 170,24 C200,19 230,15 260,12 C290,9 320,12 350,8 C380,4 410,6 440,3 C470,1 510,3 540,2" fill="none" stroke="#10b981" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M0,42 C30,40 55,37 80,40 C110,36 140,30 170,24 C200,19 230,15 260,12 C290,9 320,12 350,8 C380,4 410,6 440,3 C470,1 510,3 540,2 L540,50 L0,50 Z" fill="url(#cg)"/>
+        </svg>
+      </div>
+      <div class="mock-div"></div>
+      <div class="mock-rows">
+        <div class="mock-row">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span class="mock-pair">XRP/USDT</span>
+            <span class="mock-side l">LONG</span>
           </div>
-          <span class="mock-title">APEX · Binance Mainnet</span>
-          <span class="mock-live-badge">RUNNING</span>
-        </div>
-        <div class="mock-body">
-          <div class="mock-portfolio">
-            <div class="mock-portfolio-label">Portfolio Value</div>
-            <div class="mock-portfolio-val">$1,284.50</div>
-            <div class="mock-portfolio-chg">▲ +28.4% this month</div>
-          </div>
-          <div class="mock-chart-area">
-            <svg viewBox="0 0 400 52" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#22d3a4" stop-opacity=".25"/>
-                  <stop offset="100%" stop-color="#22d3a4" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-              <path d="M0,44 C20,42 35,40 50,43 C70,38 90,32 115,27 C135,22 155,18 175,15 C195,11 215,14 235,10 C255,6 275,8 295,5 C315,2 340,4 360,3 L395,1" fill="none" stroke="#22d3a4" stroke-width="1.8" stroke-linecap="round"/>
-              <path d="M0,44 C20,42 35,40 50,43 C70,38 90,32 115,27 C135,22 155,18 175,15 C195,11 215,14 235,10 C255,6 275,8 295,5 C315,2 340,4 360,3 L395,1 L395,52 L0,52 Z" fill="url(#cg)"/>
-            </svg>
-          </div>
-          <div class="mock-divider"></div>
-          <div class="mock-positions">
-            <div class="mock-pos">
-              <div class="mock-pos-left">
-                <span class="mock-pos-coin">XRP/USDT</span>
-                <span class="mock-pos-side long">LONG</span>
-              </div>
-              <div style="text-align:right">
-                <div class="mock-pos-pnl" id="mockPnl">+$24.18</div>
-                <div class="mock-pos-price">@ $2.384</div>
-              </div>
-            </div>
-            <div class="mock-pos">
-              <div class="mock-pos-left">
-                <span class="mock-pos-coin">DOGE/USDT</span>
-                <span class="mock-pos-side long">LONG</span>
-              </div>
-              <div style="text-align:right">
-                <div class="mock-pos-pnl">+$11.44</div>
-                <div class="mock-pos-price">@ $0.182</div>
-              </div>
-            </div>
-          </div>
-          <div class="mock-stats">
-            <div class="mstat"><div class="mstat-l">Win Rate</div><div class="mstat-v a">68%</div></div>
-            <div class="mstat"><div class="mstat-l">Trades</div><div class="mstat-v w">847</div></div>
-            <div class="mstat"><div class="mstat-l">Uptime</div><div class="mstat-v g">24/7</div></div>
+          <div style="text-align:right">
+            <div class="mock-pnl" id="mockPnl">+$24.18</div>
+            <div class="mock-price">@ $2.384</div>
           </div>
         </div>
+        <div class="mock-row">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span class="mock-pair">DOGE/USDT</span>
+            <span class="mock-side l">LONG</span>
+          </div>
+          <div style="text-align:right">
+            <div class="mock-pnl">+$11.44</div>
+            <div class="mock-price">@ $0.182</div>
+          </div>
+        </div>
+      </div>
+      <div class="mock-stats">
+        <div class="ms"><div class="ms-l">Win Rate</div><div class="ms-v" style="color:var(--a)">68%</div></div>
+        <div class="ms"><div class="ms-l">Trades</div><div class="ms-v" style="color:#fff">847</div></div>
+        <div class="ms"><div class="ms-l">Uptime</div><div class="ms-v" style="color:#10b981">24/7</div></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- TICKER -->
+<!-- Ticker -->
 <div class="ticker-wrap">
   <div class="ticker-track">
     <div class="ticker-item">
-      <div class="ti"><span>500+ Bots Deployed</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>Full Source Code — You Own It</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>XRP · DOGE · ADA · BTC · ETH</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>Paper Trading Mode Included</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>12+ Countries</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>6 Legendary Strategies</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>Groq AI Engine</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>Railway Deploy — 60 Seconds</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>$0/mo Running Cost</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>No Monthly Subscription</span></div><div class="ti-sep">·</div>
+      <div class="tk"><span class="tk-dot"></span>500+ Bots Deployed</div>
+      <div class="tk"><span class="tk-dot"></span>Full Source Code — You Own It</div>
+      <div class="tk"><span class="tk-dot"></span>XRP · DOGE · ADA · BTC · ETH</div>
+      <div class="tk"><span class="tk-dot"></span>Paper Trading Mode Included</div>
+      <div class="tk"><span class="tk-dot"></span>12+ Countries</div>
+      <div class="tk"><span class="tk-dot"></span>6 Legendary Strategies</div>
+      <div class="tk"><span class="tk-dot"></span>Groq AI Engine</div>
+      <div class="tk"><span class="tk-dot"></span>Railway Deploy — 60 Seconds</div>
+      <div class="tk"><span class="tk-dot"></span>$0/mo Running Cost</div>
     </div>
     <div class="ticker-item" aria-hidden="true">
-      <div class="ti"><span>500+ Bots Deployed</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>Full Source Code — You Own It</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>XRP · DOGE · ADA · BTC · ETH</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>Paper Trading Mode Included</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>12+ Countries</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>6 Legendary Strategies</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>Groq AI Engine</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>Railway Deploy — 60 Seconds</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>$0/mo Running Cost</span></div><div class="ti-sep">·</div>
-      <div class="ti"><span>No Monthly Subscription</span></div><div class="ti-sep">·</div>
+      <div class="tk"><span class="tk-dot"></span>500+ Bots Deployed</div>
+      <div class="tk"><span class="tk-dot"></span>Full Source Code — You Own It</div>
+      <div class="tk"><span class="tk-dot"></span>XRP · DOGE · ADA · BTC · ETH</div>
+      <div class="tk"><span class="tk-dot"></span>Paper Trading Mode Included</div>
+      <div class="tk"><span class="tk-dot"></span>12+ Countries</div>
+      <div class="tk"><span class="tk-dot"></span>6 Legendary Strategies</div>
+      <div class="tk"><span class="tk-dot"></span>Groq AI Engine</div>
+      <div class="tk"><span class="tk-dot"></span>Railway Deploy — 60 Seconds</div>
+      <div class="tk"><span class="tk-dot"></span>$0/mo Running Cost</div>
     </div>
   </div>
 </div>
 
-<!-- HOW IT WORKS -->
+<!-- How It Works -->
 <section class="sec" id="how">
   <div class="si">
-    <div class="sec-label rev">How It Works</div>
+    <div class="sec-eyebrow rev">How It Works</div>
     <h2 class="sec-h rev">Three steps to a live bot.</h2>
     <p class="sec-sub rev">No trading experience needed. No monthly fees. You own the code forever.</p>
     <div class="steps-grid">
@@ -434,10 +432,10 @@ footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:28px 3
   </div>
 </section>
 
-<!-- FEATURES -->
+<!-- Features -->
 <section class="sec" id="features" style="background:var(--bg2);border-top:1px solid var(--br)">
   <div class="si">
-    <div class="sec-label rev">What's Included</div>
+    <div class="sec-eyebrow rev">What's Included</div>
     <h2 class="sec-h rev">Everything you need for $297.</h2>
     <p class="sec-sub rev">Full source code, zero black box. Deploy it, modify it, own it forever.</p>
     <div class="feat-grid">
@@ -477,10 +475,10 @@ footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:28px 3
   </div>
 </section>
 
-<!-- REVIEWS -->
+<!-- Reviews -->
 <section class="sec" id="reviews">
   <div class="si">
-    <div class="sec-label rev">Traders</div>
+    <div class="sec-eyebrow rev">Traders</div>
     <h2 class="sec-h rev">Real people, real profits.</h2>
     <div class="reviews-grid">
       <div class="rv rev">
@@ -502,10 +500,10 @@ footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:28px 3
   </div>
 </section>
 
-<!-- PRICING -->
+<!-- Pricing -->
 <section class="sec" id="pricing" style="background:var(--bg2);border-top:1px solid var(--br)">
   <div class="si">
-    <div class="sec-label rev" style="justify-content:center">Pricing</div>
+    <div class="sec-eyebrow rev" style="justify-content:center">Pricing</div>
     <h2 class="sec-h rev" style="text-align:center">One payment. Yours forever.</h2>
     <p class="sec-sub rev" style="margin:0 auto;text-align:center">No monthly fees. No SaaS trap. The source code is yours permanently.</p>
     <div class="price-card rev">
@@ -535,7 +533,7 @@ footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:28px 3
 <!-- FAQ -->
 <section class="sec" id="faq">
   <div class="si">
-    <div class="sec-label rev">FAQ</div>
+    <div class="sec-eyebrow rev">FAQ</div>
     <h2 class="sec-h rev">Common questions.</h2>
     <div class="faq-wrap">
       <div class="fqi rev"><div class="fqq" onclick="tfaq(this)">Do I need coding experience?<div class="fq-icon">+</div></div><div class="fqb"><div class="fqa">No. You copy-paste your Binance API keys into Railway's environment variables and click deploy. The setup guide walks through every step. If you can follow instructions, you can run this bot.</div></div></div>
@@ -549,7 +547,10 @@ footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:28px 3
 
 <footer>
   <div class="fi">
-    <a href="#" class="fl">Apex Trade Bot</a>
+    <a href="#" class="fl">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      Apex Trade Bot
+    </a>
     <div class="flinks">
       <a href="/privacy">Privacy</a>
       <a href="/terms">Terms</a>
@@ -557,8 +558,8 @@ footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:28px 3
     </div>
     <div class="fc">&copy; 2025 AICashSystem · aicashsystem.space</div>
   </div>
-  <div style="max-width:1100px;margin:16px auto 0;padding-top:16px;border-top:1px solid rgba(255,255,255,.05);font-size:10px;color:rgba(255,255,255,.2);line-height:1.7;text-align:center;">
-    Apex Trade Bot is an automation software tool sold as source code. It is not financial advice, an investment service, or a managed fund. Purchasing this software does not guarantee profits. Cryptocurrency trading involves substantial risk of loss and is not suitable for all investors. All performance figures shown on this page are from simulated demo environments and are not a representation of real trading results. Past performance is not indicative of future results. Always use paper trading mode before trading with real capital. AI Cash Systems is not liable for any financial losses incurred through use of this software.
+  <div style="max-width:1100px;margin:14px auto 0;padding-top:14px;border-top:1px solid rgba(255,255,255,.04);font-size:10px;color:rgba(255,255,255,.18);line-height:1.7;text-align:center;">
+    Apex Trade Bot is an automation software tool sold as source code. It is not financial advice, an investment service, or a managed fund. Purchasing this software does not guarantee profits. Cryptocurrency trading involves substantial risk of loss. All performance figures shown are from simulated demo environments and are not a representation of real trading results. Past performance is not indicative of future results. Always use paper trading mode before trading with real capital.
   </div>
 </footer>
 
@@ -566,60 +567,80 @@ footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:28px 3
 <div id="apexModal">
   <div class="amc">
     <button class="amcl" aria-label="Close" onclick="closeApexModal()">&#215;</button>
+
     <div id="amForm">
-      <div class="amtop">
-        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <span style="font-size:10px;font-weight:700;letter-spacing:2px;color:rgba(245,158,11,.7);text-transform:uppercase">Secure Checkout</span>
+      <div class="am-header">
+        <div class="am-lock-badge">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Secure Checkout
         </div>
-        <h2 class="amttl">Complete Your Order</h2>
-        <p class="amsub">One-time purchase · Full source code · Instant delivery</p>
-        <div class="ambdg"><span class="amamt">$297</span><span class="amwas">$497</span><span class="amonce">one-time</span></div>
+        <div class="am-title">Complete Your Order</div>
+        <div class="am-sub">One-time purchase · Full source code · Instant delivery</div>
+        <div class="am-price-row">
+          <span class="am-price">$297</span>
+          <span class="am-was">$497</span>
+          <span class="am-once">one-time</span>
+        </div>
       </div>
-      <div class="amdiv"></div>
-      <div class="ambody">
+
+      <div class="am-body">
         <div class="am-wallets">
-          <button class="am-wallet-btn" onclick="handleWalletPay('apple')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+          <button class="am-wallet" onclick="handleWalletPay('apple')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
             Apple Pay
           </button>
-          <button class="am-wallet-btn" onclick="handleWalletPay('google')">
-            <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          <button class="am-wallet" onclick="handleWalletPay('google')">
+            <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
             Google Pay
           </button>
         </div>
-        <div class="am-separator">or pay using credit card</div>
-        <label class="aml" for="amName">Card holder full name</label>
-        <input id="amName" class="ami" type="text" placeholder="Enter your full name" autocomplete="name"/>
-        <label class="aml" for="amEmail">Email — license key delivery</label>
-        <input id="amEmail" class="ami" type="email" placeholder="you@email.com" autocomplete="email"/>
-        <label class="aml">Card Number</label>
-        <div id="am-cardnumber" class="stripe-el" style="margin-bottom:10px"></div>
-        <div class="am-card-row" style="margin-bottom:6px">
+
+        <div class="am-sep">or pay using credit card</div>
+
+        <div class="am-field">
+          <label class="am-label" for="amName">Card holder full name</label>
+          <input id="amName" class="am-input" type="text" placeholder="Enter your full name" autocomplete="name"/>
+        </div>
+        <div class="am-field">
+          <label class="am-label" for="amEmail">Email — license key delivery</label>
+          <input id="amEmail" class="am-input" type="email" placeholder="you@email.com" autocomplete="email"/>
+        </div>
+        <div class="am-field">
+          <label class="am-label">Card Number</label>
+          <div id="am-cardnumber" class="am-stripe"></div>
+        </div>
+        <div class="am-row">
           <div>
-            <label class="aml">Expiry Date</label>
-            <div id="am-cardexpiry" class="stripe-el"></div>
+            <label class="am-label">Expiry Date</label>
+            <div id="am-cardexpiry" class="am-stripe"></div>
           </div>
           <div>
-            <label class="aml">CVV</label>
-            <div id="am-cardcvc" class="stripe-el"></div>
+            <label class="am-label">CVV</label>
+            <div id="am-cardcvc" class="am-stripe"></div>
           </div>
         </div>
-        <div id="am-card-error"></div>
-        <div class="amcks" style="margin-top:12px">
-          <label class="amck"><input type="checkbox" id="ck1" onchange="updateBtn()"/><span>I accept the <strong>risk of loss</strong> — crypto trading involves significant financial risk.</span></label>
-          <label class="amck"><input type="checkbox" id="ck2" onchange="updateBtn()"/><span>This is <strong>NOT financial advice</strong>. Sales are final after digital delivery.</span></label>
-          <label class="amck"><input type="checkbox" id="ck3" onchange="updateBtn()"/><span>I agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
+
+        <div id="am-card-error" class="am-err"></div>
+
+        <div class="am-checks">
+          <label class="am-check"><input type="checkbox" id="ck1" onchange="updateBtn()"/><span>I accept the <strong>risk of loss</strong> — crypto trading involves significant financial risk.</span></label>
+          <label class="am-check"><input type="checkbox" id="ck2" onchange="updateBtn()"/><span>This is <strong>NOT financial advice</strong>. Sales are final after digital delivery.</span></label>
+          <label class="am-check"><input type="checkbox" id="ck3" onchange="updateBtn()"/><span>I agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
         </div>
-        <button id="amBtn" class="ambtn" disabled onclick="submitApexPayment()">
-          <span id="amSpinner" class="amspin"></span>
+
+        <button id="amBtn" class="am-btn" disabled onclick="submitApexPayment()">
+          <span id="amSpinner" class="am-spin"></span>
           <span id="amBtnTxt">Accept terms to continue</span>
         </button>
-        <p class="amnote">Stripe encrypted · Instant delivery · No subscription</p>
+        <p class="am-note">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;opacity:.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Secured by Stripe · Instant delivery · No subscription
+        </p>
       </div>
     </div>
-    <div class="amsuc" id="amSuccess">
-      <div class="amsic"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+
+    <div class="am-success" id="amSuccess">
+      <div class="am-success-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
       <h3>Access Granted</h3>
       <p>Redirecting to your setup page...<br/><br/>Your license key and bot configurator are ready.</p>
     </div>
@@ -637,18 +658,18 @@ function tfaq(el){var it=el.parentElement,was=it.classList.contains('open');docu
 <script>
 var STRIPE_PK='pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS';
 var apexStripe,apexCardNum,apexCardExp,apexCardCvc;
-var elStyle={base:{color:'#fff',fontFamily:'"Inter","Segoe UI",system-ui,sans-serif',fontSize:'14px','::placeholder':{color:'rgba(255,255,255,0.25)'}},invalid:{color:'#ef4444'}};
+var elStyle={base:{color:'#fff',fontFamily:'"Inter",system-ui,sans-serif',fontSize:'14px','::placeholder':{color:'rgba(255,255,255,0.22)'}},invalid:{color:'#f87171'}};
 function handleWalletPay(type){
   var el=document.getElementById('am-card-error');
-  el.classList.remove('is-error');
-  el.textContent=(type==='apple'?'Apple Pay':'Google Pay')+' is available through your browser if supported. Otherwise, use the card form below.';
+  el.classList.remove('err');
+  el.textContent=(type==='apple'?'Apple Pay':'Google Pay')+' is available if your browser supports it. Otherwise use the card form below.';
 }
 function openApexModal(){
   document.getElementById('apexModal').classList.add('open');
   document.body.style.overflow='hidden';
   if(!apexStripe){
     apexStripe=Stripe(STRIPE_PK);
-    var els=apexStripe.elements({appearance:{theme:'night',variables:{colorPrimary:'#f59e0b',colorBackground:'#080d18',colorText:'#ffffff',borderRadius:'9px'}}});
+    var els=apexStripe.elements({appearance:{theme:'night',variables:{colorPrimary:'#f59e0b',colorBackground:'#0d1017',colorText:'#ffffff',borderRadius:'9px',fontFamily:'Inter, system-ui, sans-serif'}}});
     apexCardNum=els.create('cardNumber',{style:elStyle,showIcon:true,placeholder:'0000 0000 0000 0000'});
     apexCardExp=els.create('cardExpiry',{style:elStyle,placeholder:'MM / YY'});
     apexCardCvc=els.create('cardCvc',{style:elStyle,placeholder:'CVV'});
@@ -660,7 +681,10 @@ function openApexModal(){
     apexCardNum.on('focus',onFocus('am-cardnumber'));apexCardNum.on('blur',onBlur('am-cardnumber'));
     apexCardExp.on('focus',onFocus('am-cardexpiry'));apexCardExp.on('blur',onBlur('am-cardexpiry'));
     apexCardCvc.on('focus',onFocus('am-cardcvc'));apexCardCvc.on('blur',onBlur('am-cardcvc'));
-    apexCardNum.on('change',function(e){document.getElementById('am-card-error').textContent=e.error?e.error.message:''});
+    apexCardNum.on('change',function(e){
+      var el=document.getElementById('am-card-error');
+      if(e.error){el.classList.add('err');el.textContent=e.error.message}else{el.classList.remove('err');el.textContent=''}
+    });
   }
 }
 function closeApexModal(){
@@ -677,25 +701,25 @@ async function submitApexPayment(){
   var name=document.getElementById('amName').value.trim();
   var email=document.getElementById('amEmail').value.trim();
   var err=document.getElementById('am-card-error');
-  if(!name){err.textContent='Please enter your name.';return}
-  if(!email||!email.includes('@')){err.textContent='Please enter a valid email.';return}
+  if(!name){err.classList.add('err');err.textContent='Please enter your name.';return}
+  if(!email||!email.includes('@')){err.classList.add('err');err.textContent='Please enter a valid email.';return}
   var btn=document.getElementById('amBtn'),spin=document.getElementById('amSpinner'),txt=document.getElementById('amBtnTxt');
   btn.disabled=true;spin.style.display='block';txt.textContent='Processing...';
   try{
     var r=await fetch('/create-payment-intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:29700,currency:'usd',email,name,product:'apex-bot'})});
     var d=await r.json();
-    if(d.error){err.classList.add('is-error');err.textContent=d.error;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';return}
+    if(d.error){err.classList.add('err');err.textContent=d.error;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';return}
     var _pendingKey=d.pendingKey||'';
     var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCardNum,billing_details:{name,email}}});
     if(result.error){
-      err.classList.add('is-error');err.textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
-    } else if(result.paymentIntent.status==='succeeded'){
+      err.classList.add('err');err.textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
+    }else if(result.paymentIntent.status==='succeeded'){
       document.getElementById('amForm').style.display='none';
       document.getElementById('amSuccess').style.display='block';
       var redirect='/configurator'+(_pendingKey?'?key='+encodeURIComponent(_pendingKey):'');
       setTimeout(function(){window.location.href=redirect},2000);
     }
-  } catch(e){err.classList.add('is-error');err.textContent='Error: '+e.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again'}
+  }catch(e){err.classList.add('err');err.textContent='Error: '+e.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again'}
 }
 </script>
 </body>
