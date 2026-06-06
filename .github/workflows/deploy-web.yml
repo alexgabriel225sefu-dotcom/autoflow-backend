@@ -3,7 +3,6 @@ name: Deploy Web to Vercel
 on:
   push:
     branches: [main, claude/arcads-external-api-gExX7]
-    paths: [web/**]
   workflow_dispatch:
 
 jobs:
@@ -11,12 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: claude/arcads-external-api-gExX7
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
         working-directory: web
