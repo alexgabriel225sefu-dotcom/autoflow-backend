@@ -33,9 +33,9 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;pointer-events:none;
 /* ── GLOW BG ── */
 .glow-bg{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
 .glow-bg span{position:absolute;border-radius:50%;filter:blur(120px);opacity:.18}
-.glow-bg span:nth-child(1){width:600px;height:600px;background:#f59e0b;top:-200px;left:-100px}
-.glow-bg span:nth-child(2){width:500px;height:500px;background:#3b82f6;bottom:-150px;right:-100px}
-.glow-bg span:nth-child(3){width:300px;height:300px;background:#22d3a4;top:40%;left:50%;transform:translate(-50%,-50%)}
+.glow-bg span:nth-child(1){width:600px;height:600px;background:#92400e;top:-200px;left:-100px}
+.glow-bg span:nth-child(2){width:500px;height:500px;background:#78350f;bottom:-150px;right:-100px}
+.glow-bg span:nth-child(3){width:300px;height:300px;background:#451a03;top:40%;left:50%;transform:translate(-50%,-50%)}
 
 /* ── NAV ── */
 nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;transition:all .3s}
@@ -242,6 +242,14 @@ footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:28px 3
 .amsic svg{width:24px;height:24px;stroke:var(--a);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .amsuc h3{font-size:20px;font-weight:800;margin-bottom:10px;color:var(--a);letter-spacing:-.3px}
 .amsuc p{font-size:14px;color:var(--t2);line-height:1.8;font-weight:300}
+.am-wallets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.am-wallet-btn{background:#161b2a;border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:11px 8px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:all .2s;font-size:12px;font-weight:700;color:#fff;font-family:var(--f)}
+.am-wallet-btn:hover{background:#1d2436;border-color:rgba(255,255,255,.2);transform:translateY(-1px)}
+.am-separator{display:flex;align-items:center;gap:10px;margin:12px 0;color:var(--t3);font-size:11px}
+.am-separator::before,.am-separator::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07)}
+.am-card-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stripe-el{background:var(--t4);border:1px solid var(--br);border-radius:9px;padding:13px 15px;transition:border-color .2s}
+.stripe-el.focused{border-color:var(--a)}
 </style>
 </head>
 <body>
@@ -538,22 +546,42 @@ footer{position:relative;z-index:2;border-top:1px solid var(--br);padding:28px 3
       </div>
       <div class="amdiv"></div>
       <div class="ambody">
-        <label class="aml" for="amName">Full name</label>
-        <input id="amName" class="ami" type="text" placeholder="Your name" autocomplete="name"/>
+        <div class="am-wallets">
+          <button class="am-wallet-btn" onclick="handleWalletPay('apple')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            Apple Pay
+          </button>
+          <button class="am-wallet-btn" onclick="handleWalletPay('google')">
+            <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Google Pay
+          </button>
+        </div>
+        <div class="am-separator">or pay using credit card</div>
+        <label class="aml" for="amName">Card holder full name</label>
+        <input id="amName" class="ami" type="text" placeholder="Enter your full name" autocomplete="name"/>
         <label class="aml" for="amEmail">Email — license key delivery</label>
         <input id="amEmail" class="ami" type="email" placeholder="you@email.com" autocomplete="email"/>
-        <label class="aml">Card details</label>
-        <div id="am-card-element"></div>
+        <label class="aml">Card Number</label>
+        <div id="am-cardnumber" class="stripe-el" style="margin-bottom:10px"></div>
+        <div class="am-card-row" style="margin-bottom:6px">
+          <div>
+            <label class="aml">Expiry Date</label>
+            <div id="am-cardexpiry" class="stripe-el"></div>
+          </div>
+          <div>
+            <label class="aml">CVV</label>
+            <div id="am-cardcvc" class="stripe-el"></div>
+          </div>
+        </div>
         <div id="am-card-error"></div>
-        <div class="amcks">
-          <label class="amck"><input type="checkbox" id="ck1" onchange="updateBtn()"/><span>I understand crypto trading involves <strong>significant risk of loss</strong>, including total loss of capital.</span></label>
-          <label class="amck"><input type="checkbox" id="ck2" onchange="updateBtn()"/><span>I confirm this software is <strong>NOT financial advice</strong>. AI Cash Systems is not responsible for trading losses.</span></label>
-          <label class="amck"><input type="checkbox" id="ck3" onchange="updateBtn()"/><span>I consent to <strong>immediate digital delivery</strong> and waive my 14-day withdrawal right. Sales are final.</span></label>
-          <label class="amck"><input type="checkbox" id="ck4" onchange="updateBtn()"/><span>I agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
+        <div class="amcks" style="margin-top:12px">
+          <label class="amck"><input type="checkbox" id="ck1" onchange="updateBtn()"/><span>I accept the <strong>risk of loss</strong> — crypto trading involves significant financial risk.</span></label>
+          <label class="amck"><input type="checkbox" id="ck2" onchange="updateBtn()"/><span>This is <strong>NOT financial advice</strong>. Sales are final after digital delivery.</span></label>
+          <label class="amck"><input type="checkbox" id="ck3" onchange="updateBtn()"/><span>I agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
         </div>
         <button id="amBtn" class="ambtn" disabled onclick="submitApexPayment()">
           <span id="amSpinner" class="amspin"></span>
-          <span id="amBtnTxt">Check all boxes to continue</span>
+          <span id="amBtnTxt">Accept terms to continue</span>
         </button>
         <p class="amnote">Stripe encrypted · Instant delivery · No subscription</p>
       </div>
@@ -576,16 +604,29 @@ function tfaq(el){var it=el.parentElement,was=it.classList.contains('open');docu
 
 <script>
 var STRIPE_PK='pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS';
-var apexStripe,apexCard;
+var apexStripe,apexCardNum,apexCardExp,apexCardCvc;
+var elStyle={base:{color:'#fff',fontFamily:'"Inter","Segoe UI",system-ui,sans-serif',fontSize:'14px','::placeholder':{color:'rgba(255,255,255,0.25)'}},invalid:{color:'#ef4444'}};
+function handleWalletPay(type){
+  document.getElementById('am-card-error').textContent='Use '+(type==='apple'?'Apple':'Google')+' Pay via your browser if available, or complete the card form below.';
+}
 function openApexModal(){
   document.getElementById('apexModal').classList.add('open');
   document.body.style.overflow='hidden';
   if(!apexStripe){
     apexStripe=Stripe(STRIPE_PK);
-    var els=apexStripe.elements({appearance:{theme:'night',variables:{colorPrimary:'#f59e0b',colorBackground:'#070b1c',colorText:'#ffffff',borderRadius:'9px'}}});
-    apexCard=els.create('card',{hidePostalCode:true});
-    apexCard.mount('#am-card-element');
-    apexCard.on('change',function(e){document.getElementById('am-card-error').textContent=e.error?e.error.message:''});
+    var els=apexStripe.elements({appearance:{theme:'night',variables:{colorPrimary:'#f59e0b',colorBackground:'#080d18',colorText:'#ffffff',borderRadius:'9px'}}});
+    apexCardNum=els.create('cardNumber',{style:elStyle,showIcon:true,placeholder:'0000 0000 0000 0000'});
+    apexCardExp=els.create('cardExpiry',{style:elStyle,placeholder:'MM / YY'});
+    apexCardCvc=els.create('cardCvc',{style:elStyle,placeholder:'CVV'});
+    apexCardNum.mount('#am-cardnumber');
+    apexCardExp.mount('#am-cardexpiry');
+    apexCardCvc.mount('#am-cardcvc');
+    function onFocus(id){return function(){document.getElementById(id).classList.add('focused')}}
+    function onBlur(id){return function(){document.getElementById(id).classList.remove('focused')}}
+    apexCardNum.on('focus',onFocus('am-cardnumber'));apexCardNum.on('blur',onBlur('am-cardnumber'));
+    apexCardExp.on('focus',onFocus('am-cardexpiry'));apexCardExp.on('blur',onBlur('am-cardexpiry'));
+    apexCardCvc.on('focus',onFocus('am-cardcvc'));apexCardCvc.on('blur',onBlur('am-cardcvc'));
+    apexCardNum.on('change',function(e){document.getElementById('am-card-error').textContent=e.error?e.error.message:''});
   }
 }
 function closeApexModal(){
@@ -594,9 +635,9 @@ function closeApexModal(){
 }
 document.getElementById('apexModal').addEventListener('click',function(e){if(e.target===this)closeApexModal()});
 function updateBtn(){
-  var all=['ck1','ck2','ck3','ck4'].every(function(id){return document.getElementById(id).checked});
+  var all=['ck1','ck2','ck3'].every(function(id){return document.getElementById(id).checked});
   document.getElementById('amBtn').disabled=!all;
-  document.getElementById('amBtnTxt').textContent=all?'Pay $297 — Get Apex Bot →':'Check all boxes to continue';
+  document.getElementById('amBtnTxt').textContent=all?'Checkout — $297':'Accept terms to continue';
 }
 async function submitApexPayment(){
   var name=document.getElementById('amName').value.trim();
@@ -611,7 +652,7 @@ async function submitApexPayment(){
     var d=await r.json();
     if(d.error){err.textContent=d.error;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';return}
     var _pendingKey=d.pendingKey||'';
-    var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCard,billing_details:{name,email}}});
+    var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCardNum,billing_details:{name,email}}});
     if(result.error){
       err.textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
     } else if(result.paymentIntent.status==='succeeded'){
