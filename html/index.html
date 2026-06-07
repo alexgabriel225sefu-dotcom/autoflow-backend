@@ -3,290 +3,296 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>AiCash System — AI Crypto Trading Bot</title>
-<meta name="description" content="AI-powered crypto trading bot. Pay $297 once. Own the full source code. Trade 24/7 on autopilot with no monthly fees."/>
+<title>AiCash System - AI Crypto Trading Bot</title>
+<meta name="description" content="AI-powered crypto trading bot. $297 one-time. Own the full source code. Trade 24/7 on autopilot. No monthly fees."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#05080f;
-  --bg1:#070c17;
-  --bg2:#0a1020;
-  --surface:rgba(255,255,255,.035);
-  --surface2:rgba(255,255,255,.06);
-  --surface3:rgba(255,255,255,.09);
+  --bg:#050505;
+  --bg1:#0a0a0f;
+  --bg2:#0f1018;
+  --shell:rgba(255,255,255,.04);
+  --shell2:rgba(255,255,255,.06);
   --border:rgba(255,255,255,.07);
   --border2:rgba(255,255,255,.12);
   --border3:rgba(255,255,255,.18);
   --amber:#f59e0b;
   --amber2:#fbbf24;
-  --amber3:#fde68a;
-  --amber-glow:rgba(245,158,11,.2);
-  --amber-glow2:rgba(245,158,11,.08);
+  --amber-lo:rgba(245,158,11,.12);
+  --amber-glo:rgba(245,158,11,.22);
   --purple:#8b5cf6;
-  --purple2:#a78bfa;
-  --purple-glow:rgba(139,92,246,.2);
+  --purple-lo:rgba(139,92,246,.1);
   --green:#10b981;
   --green2:#34d399;
-  --red:#ef4444;
+  --red:#f87171;
   --text:#f1f5f9;
-  --text2:#cbd5e1;
-  --muted:#64748b;
-  --muted2:#475569;
-  --font:'Inter',system-ui,sans-serif;
-  --font-display:'Orbitron',sans-serif;
+  --text2:#94a3b8;
+  --text3:#64748b;
+  --font:'Plus Jakarta Sans',system-ui,sans-serif;
+  --ease:cubic-bezier(0.32,0.72,0,1);
+  --radius:20px;
 }
 html{scroll-behavior:smooth;font-size:16px}
-body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;line-height:1.6;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden;line-height:1.6;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 img,svg{display:block}
-button{font-family:inherit;cursor:pointer;border:none;background:none}
+button,a{font-family:inherit;cursor:pointer}
 a{text-decoration:none;color:inherit}
-::-webkit-scrollbar{width:4px}
-::-webkit-scrollbar-track{background:var(--bg)}
-::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:99px}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07);border-radius:4px}
 
-/* ── GRID BG ── */
-.grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;
-  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
-  background-size:60px 60px}
-.grid-bg::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(139,92,246,.12),transparent),radial-gradient(ellipse 60% 40% at 10% 60%,rgba(245,158,11,.07),transparent),radial-gradient(ellipse 50% 40% at 90% 80%,rgba(139,92,246,.07),transparent)}
+/* grid bg */
+.g-bg{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);background-size:72px 72px}
+.g-bg::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 40% at 50% 0%,rgba(139,92,246,.11),transparent),radial-gradient(ellipse 50% 40% at 15% 65%,rgba(245,158,11,.07),transparent)}
 
-/* ── WRAP ── */
-.wrap{position:relative;z-index:1}
-
-/* ── NAV ── */
-.nav{position:fixed;top:0;left:0;right:0;z-index:100;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;border-bottom:1px solid var(--border);background:rgba(5,8,15,.8);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
-.nav-logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;letter-spacing:-.01em}
-.logo-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--amber),#f97316);border-radius:9px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px var(--amber-glow)}
+/* ── NAV (floating pill) ── */
+.nav{position:fixed;top:20px;left:50%;transform:translateX(-50%);width:calc(100% - 40px);max-width:1040px;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:8px 8px 8px 22px;border-radius:999px;background:rgba(5,5,15,.75);border:1px solid var(--border2);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+.nav-logo{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;letter-spacing:-.01em}
+.nav-mark{width:30px;height:30px;background:linear-gradient(135deg,var(--amber),#f97316);border-radius:9px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px var(--amber-glo)}
 .nav-links{display:flex;align-items:center;gap:2px}
-.nav-links a{font-size:14px;color:var(--muted);padding:7px 14px;border-radius:8px;transition:color .15s,background .15s;font-weight:500}
-.nav-links a:hover{color:var(--text);background:var(--surface2)}
-.nav-right{display:flex;align-items:center;gap:10px}
-.btn-nav{padding:8px 20px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s}
-.btn-nav-ghost{border:1px solid var(--border2);color:var(--text2);background:transparent}
-.btn-nav-ghost:hover{border-color:var(--border3);background:var(--surface2)}
-.btn-nav-fill{background:var(--amber);color:#000;border:none;box-shadow:0 0 24px var(--amber-glow)}
-.btn-nav-fill:hover{background:var(--amber2);box-shadow:0 0 32px rgba(245,158,11,.35)}
-.nav-ham{display:none;flex-direction:column;gap:5px;padding:6px;cursor:pointer}
-.nav-ham span{width:20px;height:1.5px;background:var(--muted);border-radius:2px;transition:all .2s}
-@media(max-width:768px){.nav-links{display:none}.nav-right .btn-nav-ghost{display:none}.nav-ham{display:flex}}
-.mob-menu{display:none;position:fixed;top:64px;inset-x:0;background:rgba(5,8,15,.98);border-bottom:1px solid var(--border);padding:16px 24px;flex-direction:column;gap:4px;z-index:99;backdrop-filter:blur(24px)}
-.mob-menu.open{display:flex}
-.mob-menu a{font-size:15px;color:var(--text2);padding:12px 16px;border-radius:10px;font-weight:500;transition:background .15s,color .15s}
-.mob-menu a:hover{background:var(--surface2);color:var(--text)}
-.mob-cta{background:var(--amber)!important;color:#000!important;font-weight:700!important;text-align:center;margin-top:8px}
+.nav-links a{font-size:14px;font-weight:500;color:var(--text2);padding:7px 14px;border-radius:99px;transition:color .18s var(--ease),background .18s var(--ease)}
+.nav-links a:hover{color:var(--text);background:var(--shell2)}
+.nav-right{display:flex;align-items:center;gap:8px}
+.btn-ghost-sm{padding:8px 18px;border-radius:99px;font-size:13px;font-weight:600;border:1px solid var(--border2);color:var(--text2);background:transparent;transition:all .18s var(--ease)}
+.btn-ghost-sm:hover{border-color:var(--border3);color:var(--text);background:var(--shell2)}
+.nav-ham{display:none;flex-direction:column;gap:4.5px;padding:8px;cursor:pointer;width:40px;height:40px;align-items:center;justify-content:center;border-radius:99px;border:1px solid var(--border)}
+.nav-ham span{width:18px;height:1.5px;background:var(--text2);border-radius:2px;transition:all .25s var(--ease);transform-origin:center}
+.nav-ham.open span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.nav-ham.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.nav-ham.open span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+@media(max-width:760px){.nav-links{display:none}.nav-right .btn-ghost-sm{display:none}.nav-ham{display:flex}}
+.mob-overlay{display:none;position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.85);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);padding-top:84px;flex-direction:column;gap:2px;padding-left:24px;padding-right:24px}
+.mob-overlay.open{display:flex}
+.mob-overlay a{font-size:22px;font-weight:700;color:var(--text2);padding:14px 20px;border-radius:16px;transition:all .2s var(--ease);opacity:0;transform:translateY(16px)}
+.mob-overlay.open a{opacity:1;transform:translateY(0)}
+.mob-overlay.open a:nth-child(1){transition-delay:.08s}
+.mob-overlay.open a:nth-child(2){transition-delay:.14s}
+.mob-overlay.open a:nth-child(3){transition-delay:.2s}
+.mob-overlay.open a:nth-child(4){transition-delay:.26s}
+.mob-overlay.open a:nth-child(5){transition-delay:.32s}
+.mob-overlay a:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.mob-cta-row{margin-top:16px;padding-left:20px}
+
+/* ── BUTTON SYSTEM ── */
+.btn-primary{display:inline-flex;align-items:center;gap:10px;padding:12px 12px 12px 24px;border-radius:999px;background:var(--amber);color:#000;font-weight:800;font-size:15px;border:none;cursor:pointer;transition:all .22s var(--ease);letter-spacing:-.01em}
+.btn-primary:hover{background:var(--amber2);box-shadow:0 0 40px var(--amber-glo),0 8px 24px rgba(245,158,11,.2);transform:translateY(-1px)}
+.btn-primary:active{transform:scale(.98);box-shadow:none}
+.btn-icon{width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;transition:transform .25s var(--ease)}
+.btn-primary:hover .btn-icon{transform:translate(2px,-2px) scale(1.08)}
+.btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:999px;background:var(--shell);color:var(--text2);font-weight:600;font-size:15px;border:1px solid var(--border2);cursor:pointer;transition:all .2s var(--ease)}
+.btn-secondary:hover{background:var(--shell2);border-color:var(--border3);color:var(--text);transform:translateY(-1px)}
+.btn-secondary:active{transform:scale(.98)}
 
 /* ── HERO ── */
-.hero{min-height:100vh;display:flex;align-items:center;padding:64px 32px 80px;position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--amber),transparent);opacity:.4}
-.hero-inner{max-width:1160px;margin:0 auto;width:100%;display:grid;grid-template-columns:1fr 480px;gap:80px;align-items:center}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(245,158,11,.25);background:rgba(245,158,11,.06);border-radius:99px;padding:6px 14px;margin-bottom:28px}
-.eye-dot{width:6px;height:6px;background:var(--amber);border-radius:50%;animation:blink 1.8s ease-in-out infinite}
-@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(245,158,11,.4)}50%{opacity:.6;box-shadow:0 0 0 4px rgba(245,158,11,0)}}
-.eyebrow-text{font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.07em;text-transform:uppercase}
-.hero h1{font-size:clamp(40px,5.5vw,72px);font-weight:900;line-height:1.05;letter-spacing:-.04em;margin-bottom:24px;color:var(--text)}
-.hero h1 .line2{background:linear-gradient(90deg,var(--amber),var(--amber2),#f97316);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hero-desc{font-size:17px;color:var(--text2);line-height:1.75;margin-bottom:36px;max-width:500px;font-weight:400}
-.hero-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:40px}
-.btn-hero{display:inline-flex;align-items:center;gap:9px;padding:15px 30px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:-.01em}
-.btn-hero-primary{background:var(--amber);color:#000;box-shadow:0 0 0 0 var(--amber-glow);border:none}
-.btn-hero-primary:hover{background:var(--amber2);box-shadow:0 0 40px var(--amber-glow),0 8px 32px rgba(245,158,11,.25);transform:translateY(-1px)}
-.btn-hero-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
-.btn-hero-secondary:hover{background:var(--surface3);border-color:var(--border3);transform:translateY(-1px)}
-.hero-proof{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
-.proof-item{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);font-weight:500}
-.proof-icon{color:var(--green)}
+.hero{min-height:100dvh;display:flex;align-items:center;padding:120px 24px 80px;position:relative}
+.hero-inner{max-width:1100px;margin:0 auto;width:100%;display:grid;grid-template-columns:1fr 460px;gap:72px;align-items:center}
+.eye-badge{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(245,158,11,.22);background:rgba(245,158,11,.06);border-radius:99px;padding:5px 14px;margin-bottom:26px}
+.eye-dot{width:6px;height:6px;background:var(--amber);border-radius:50%;animation:pulse 1.9s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.5)}50%{box-shadow:0 0 0 5px rgba(245,158,11,0)}}
+.eye-txt{font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.07em;text-transform:uppercase}
+.hero h1{font-size:clamp(42px,5.5vw,70px);font-weight:800;line-height:1.06;letter-spacing:-.04em;margin-bottom:20px}
+.hero h1 .grad{background:linear-gradient(95deg,var(--amber) 0%,var(--amber2) 45%,#fb923c 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:17px;color:var(--text2);line-height:1.72;margin-bottom:36px;max-width:460px;font-weight:400}
+.hero-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+@media(max-width:900px){.hero-inner{grid-template-columns:1fr}.dash-shell{display:none}}
+@media(max-width:520px){.hero{padding:96px 18px 60px}}
 
-/* ── DASHBOARD CARD ── */
-.dash-wrap{position:relative}
-.dash-wrap::before{content:'';position:absolute;inset:-1px;border-radius:21px;background:linear-gradient(135deg,rgba(245,158,11,.3),rgba(139,92,246,.2),transparent,rgba(139,92,246,.15));z-index:0;animation:borderSpin 6s linear infinite}
-@keyframes borderSpin{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(30deg)}}
-.dash-card{position:relative;z-index:1;background:rgba(7,12,23,.92);border:1px solid rgba(245,158,11,.15);border-radius:20px;overflow:hidden;backdrop-filter:blur(20px)}
-.dash-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
-.dash-title{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
-.dash-live{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--green)}
-.dash-live-dot{width:6px;height:6px;background:var(--green);border-radius:50%;animation:live 2s ease-in-out infinite}
-@keyframes live{0%,100%{opacity:1}50%{opacity:.3}}
-.dash-chart{padding:0 20px;margin:16px 0 0}
-.chart-svg{width:100%;height:110px;overflow:visible}
-.chart-path{fill:none;stroke:url(#chartGrad);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-.chart-area{fill:url(#areaGrad)}
-.chart-dot{fill:var(--amber);filter:drop-shadow(0 0 4px var(--amber))}
-.dash-pnl{display:flex;align-items:baseline;gap:8px;padding:12px 20px 0}
-.pnl-val{font-family:var(--font-display);font-size:28px;font-weight:700;color:var(--green);letter-spacing:-.02em}
-.pnl-change{font-size:13px;font-weight:600;color:var(--green);background:rgba(16,185,129,.1);padding:3px 9px;border-radius:99px}
-.dash-trades{padding:12px 20px 16px}
-.trade-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:10px;margin-bottom:4px;border:1px solid transparent;transition:all .15s;cursor:default}
-.trade-row:hover{background:var(--surface2);border-color:var(--border)}
-.trade-pair{font-size:13px;font-weight:700;color:var(--text);min-width:80px}
-.trade-badge{font-size:10px;font-weight:800;letter-spacing:.05em;padding:2px 8px;border-radius:5px}
-.tb-long{background:rgba(16,185,129,.12);color:var(--green2)}
-.tb-short{background:rgba(239,68,68,.12);color:#f87171}
-.trade-amt{font-size:13px;font-weight:700;min-width:60px;text-align:right}
-.ta-pos{color:var(--green2)}.ta-neg{color:#f87171}
-.trade-time{font-size:11px;color:var(--muted);min-width:44px;text-align:right}
+/* ── DOUBLE-BEZEL DASHBOARD ── */
+.dash-shell{position:relative}
+.dash-shell::before{content:'';position:absolute;inset:-1px;border-radius:calc(var(--radius)+2px);background:linear-gradient(135deg,rgba(245,158,11,.35),rgba(139,92,246,.2),transparent 60%);z-index:0}
+.dash-card{position:relative;z-index:1;background:var(--shell);border:1px solid var(--border2);padding:5px;border-radius:var(--radius)}
+.dash-inner{background:var(--bg1);border-radius:calc(var(--radius) - 5px);overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.dash-top{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.d-title{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase}
+.d-live{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--green)}
+.d-dot{width:5px;height:5px;background:var(--green);border-radius:50%;animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.dash-chart-wrap{padding:18px 18px 8px}
+.dash-chart{width:100%;height:96px;overflow:visible}
+.d-path{fill:none;stroke:url(#cg);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.d-area{fill:url(#ag)}
+.d-dot-end{fill:var(--amber);filter:drop-shadow(0 0 5px var(--amber))}
+.dash-pnl{display:flex;align-items:center;gap:10px;padding:4px 18px 12px}
+.pnl-num{font-size:26px;font-weight:800;color:var(--green);letter-spacing:-.03em}
+.pnl-tag{font-size:12px;font-weight:700;color:var(--green);background:rgba(16,185,129,.1);padding:3px 9px;border-radius:99px}
+.dash-trades{padding:0 12px 12px}
+.t-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;transition:background .15s var(--ease);cursor:default}
+.t-row:hover{background:var(--shell2)}
+.t-pair{font-size:12px;font-weight:700;flex:1;min-width:70px}
+.t-badge{font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:5px;min-width:42px;text-align:center}
+.tb-l{background:rgba(16,185,129,.12);color:var(--green2)}
+.tb-s{background:rgba(248,113,113,.12);color:var(--red)}
+.t-pnl{font-size:12px;font-weight:700;min-width:52px;text-align:right}
+.tp-p{color:var(--green2)}.tp-n{color:var(--red)}
+.t-ago{font-size:10px;color:var(--text3);min-width:40px;text-align:right}
 .dash-footer{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border)}
-.df-stat{padding:14px 16px;text-align:center;border-right:1px solid var(--border)}
-.df-stat:last-child{border-right:none}
-.df-val{font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--amber)}
-.df-lbl{font-size:10px;color:var(--muted);margin-top:2px;font-weight:500;letter-spacing:.03em;text-transform:uppercase}
-@media(max-width:960px){.hero-inner{grid-template-columns:1fr}.dash-wrap{display:none}}
-@media(max-width:520px){.hero{padding:80px 20px 60px}}
+.df{padding:12px 14px;text-align:center;border-right:1px solid var(--border)}
+.df:last-child{border-right:none}
+.df-val{font-size:16px;font-weight:800;color:var(--amber);letter-spacing:-.02em}
+.df-lbl{font-size:10px;color:var(--text3);margin-top:2px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
 
 /* ── TICKER ── */
-.ticker{overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:18px 0;background:rgba(255,255,255,.015)}
-.ticker-track{display:flex;gap:0;white-space:nowrap;animation:ticker 25s linear infinite}
+.ticker{overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:16px 0;background:rgba(255,255,255,.01)}
+.ticker-track{display:flex;gap:0;white-space:nowrap;animation:tick 22s linear infinite}
 .ticker-track:hover{animation-play-state:paused}
-.ticker-item{display:inline-flex;align-items:center;gap:10px;padding:0 40px;font-size:13px;font-weight:700;color:var(--muted2);letter-spacing:.06em;text-transform:uppercase}
-.ticker-item svg{opacity:.5}
-.ticker-sep{color:var(--border2);font-size:8px}
-@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.tick-item{display:inline-flex;align-items:center;gap:8px;padding:0 36px;font-size:12px;font-weight:700;color:var(--text3);letter-spacing:.07em;text-transform:uppercase}
+.tick-sep{color:var(--border2);font-size:6px;margin-left:2px}
+@keyframes tick{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 
 /* ── SECTION BASE ── */
-.section{padding:100px 32px;position:relative}
-.section-inner{max-width:1160px;margin:0 auto}
-.section-line{height:1px;background:linear-gradient(90deg,transparent,var(--border2),transparent);margin-bottom:0}
-.tag{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(139,92,246,.25);background:rgba(139,92,246,.06);border-radius:99px;padding:5px 13px;font-size:11px;font-weight:700;color:var(--purple2);letter-spacing:.05em;text-transform:uppercase;margin-bottom:18px}
-.tag.gold{border-color:rgba(245,158,11,.25);background:rgba(245,158,11,.06);color:var(--amber)}
-.section-h{font-size:clamp(30px,4vw,48px);font-weight:800;letter-spacing:-.03em;line-height:1.12;margin-bottom:14px}
-.section-sub{font-size:16px;color:var(--text2);max-width:540px;line-height:1.75}
-.section-sub.center{margin:0 auto;text-align:center}
-.center-head{text-align:center}
+.section{padding:96px 24px;position:relative}
+.wrap{max-width:1100px;margin:0 auto}
+.section-divider{height:1px;background:linear-gradient(90deg,transparent,var(--border2),transparent)}
+.s-title{font-size:clamp(30px,4vw,46px);font-weight:800;letter-spacing:-.035em;line-height:1.1;margin-bottom:14px}
+.s-sub{font-size:16px;color:var(--text2);line-height:1.75;max-width:520px}
 
-/* ── STEPS ── */
-.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-top:60px;border:1px solid var(--border);border-radius:20px;overflow:hidden}
-.step-card{background:var(--bg1);padding:36px 32px;position:relative;transition:background .2s}
-.step-card:not(:last-child){border-right:1px solid var(--border)}
-.step-card:hover{background:var(--bg2)}
-.step-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--amber),var(--amber2));transform:scaleX(0);transform-origin:left;transition:transform .3s ease}
-.step-card:hover::after{transform:scaleX(1)}
-.step-num{font-family:var(--font-display);font-size:40px;font-weight:900;color:rgba(245,158,11,.15);line-height:1;margin-bottom:24px;letter-spacing:-.02em}
-.step-card h3{font-size:18px;font-weight:700;margin-bottom:10px;letter-spacing:-.01em}
-.step-card p{font-size:14px;color:var(--text2);line-height:1.7}
-@media(max-width:700px){.steps-grid{grid-template-columns:1fr}.step-card:not(:last-child){border-right:none;border-bottom:1px solid var(--border)}}
+/* ── HOW IT WORKS ── */
+.steps-row{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:56px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.step-shell{background:var(--bg1);transition:background .22s var(--ease);position:relative}
+.step-shell:not(:last-child){border-right:1px solid var(--border)}
+.step-shell::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--amber),var(--amber2));transform:scaleX(0);transform-origin:left;transition:transform .35s var(--ease)}
+.step-shell:hover{background:var(--bg2)}
+.step-shell:hover::after{transform:scaleX(1)}
+.step-inner{padding:32px 28px}
+.step-n{font-size:48px;font-weight:800;color:rgba(245,158,11,.12);line-height:1;margin-bottom:20px;letter-spacing:-.04em}
+.step-shell h3{font-size:17px;font-weight:700;margin-bottom:8px;letter-spacing:-.01em}
+.step-shell p{font-size:13px;color:var(--text2);line-height:1.7}
+@media(max-width:680px){.steps-row{grid-template-columns:1fr}.step-shell:not(:last-child){border-right:none;border-bottom:1px solid var(--border)}}
 
-/* ── STATS ROW ── */
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;border:1px solid var(--border);border-radius:20px;overflow:hidden;margin-top:80px}
-.stat-cell{background:var(--bg1);padding:36px 28px;text-align:center;transition:background .2s;border-right:1px solid var(--border)}
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:72px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.stat-cell{background:var(--bg1);padding:32px 24px;text-align:center;border-right:1px solid var(--border);transition:background .2s var(--ease)}
 .stat-cell:last-child{border-right:none}
 .stat-cell:hover{background:var(--bg2)}
-.stat-num{font-family:var(--font-display);font-size:clamp(36px,4vw,52px);font-weight:800;background:linear-gradient(135deg,var(--amber),var(--amber2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.03em;line-height:1}
-.stat-lbl{font-size:13px;color:var(--muted);margin-top:8px;font-weight:500}
-@media(max-width:700px){.stats-row{grid-template-columns:repeat(2,1fr)}.stat-cell:nth-child(2){border-right:none}.stat-cell:nth-child(1),.stat-cell:nth-child(2){border-bottom:1px solid var(--border)}}
+.stat-num{font-size:clamp(38px,4vw,54px);font-weight:800;background:linear-gradient(135deg,var(--amber),var(--amber2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.04em;line-height:1.05}
+.stat-lbl{font-size:12px;color:var(--text3);margin-top:6px;font-weight:600}
+@media(max-width:640px){.stats-grid{grid-template-columns:repeat(2,1fr)}.stat-cell:nth-child(2){border-right:none}.stat-cell:nth-child(1),.stat-cell:nth-child(2){border-bottom:1px solid var(--border)}}
 
 /* ── BENTO FEATURES ── */
-.bento{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:auto auto;gap:16px;margin-top:60px}
-.bento-card{background:var(--bg1);border:1px solid var(--border);border-radius:20px;padding:28px;transition:border-color .2s,background .2s;position:relative;overflow:hidden}
-.bento-card::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 20% 20%,rgba(245,158,11,.04),transparent 60%);opacity:0;transition:opacity .3s}
-.bento-card:hover{border-color:var(--border2);background:var(--bg2)}
-.bento-card:hover::before{opacity:1}
-.bento-wide{grid-column:span 2}
-.bento-tall{grid-row:span 2}
-.bento-icon{width:44px;height:44px;border-radius:12px;border:1px solid rgba(245,158,11,.2);background:rgba(245,158,11,.06);display:flex;align-items:center;justify-content:center;color:var(--amber);margin-bottom:18px}
-.bento-card h3{font-size:16px;font-weight:700;margin-bottom:8px;letter-spacing:-.01em}
-.bento-card p{font-size:13px;color:var(--text2);line-height:1.65}
-.bento-feat-list{margin-top:16px;display:flex;flex-direction:column;gap:8px}
-.bfl{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)}
-.bfl svg{color:var(--green);min-width:14px}
-.bento-big-num{font-family:var(--font-display);font-size:48px;font-weight:800;background:linear-gradient(135deg,var(--amber),var(--amber2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;margin:12px 0 4px;letter-spacing:-.03em}
-.bento-mini-chart{margin-top:16px;display:flex;align-items:flex-end;gap:3px;height:48px}
-.bar{flex:1;background:linear-gradient(180deg,var(--amber),rgba(245,158,11,.3));border-radius:3px 3px 0 0;transition:height .3s}
-@media(max-width:900px){.bento{grid-template-columns:1fr 1fr}.bento-wide{grid-column:span 2}.bento-tall{grid-row:span 1}}
-@media(max-width:600px){.bento{grid-template-columns:1fr}.bento-wide,.bento-tall{grid-column:span 1;grid-row:span 1}}
+.eye-tag{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(245,158,11,.2);background:rgba(245,158,11,.05);border-radius:99px;padding:4px 12px;font-size:10px;font-weight:800;color:var(--amber);letter-spacing:.07em;text-transform:uppercase;margin-bottom:16px}
+.bento{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;margin-top:56px}
+.bc{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius);padding:26px;transition:border-color .22s var(--ease),background .22s var(--ease);position:relative;overflow:hidden}
+.bc::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 20% 20%,rgba(245,158,11,.04),transparent 55%);opacity:0;transition:opacity .3s var(--ease)}
+.bc:hover{border-color:var(--border2);background:var(--bg2)}
+.bc:hover::before{opacity:1}
+.bc-wide{grid-column:span 8}
+.bc-narrow{grid-column:span 4}
+.bc-third{grid-column:span 4}
+.bc-icon{width:42px;height:42px;border-radius:11px;border:1px solid rgba(245,158,11,.18);background:rgba(245,158,11,.06);display:flex;align-items:center;justify-content:center;color:var(--amber);margin-bottom:16px}
+.bc h3{font-size:15px;font-weight:700;margin-bottom:7px;letter-spacing:-.01em}
+.bc p{font-size:13px;color:var(--text2);line-height:1.65}
+.bc-code{background:#020409;border-radius:10px;margin-top:16px;padding:14px;font-family:'SF Mono','Fira Mono','Courier New',monospace;font-size:11px;line-height:1.8;color:#94a3b8;overflow:hidden}
+.bc-code .kw{color:#c084fc}.bc-code .fn{color:#60a5fa}.bc-code .st{color:var(--green2)}.bc-code .cm{color:var(--text3)}
+.bc-bars{display:flex;align-items:flex-end;gap:3px;height:52px;margin-top:16px}
+.bar{flex:1;background:linear-gradient(180deg,var(--amber),rgba(245,158,11,.25));border-radius:3px 3px 0 0;transition:height .3s var(--ease)}
+.bc-check-list{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.bcl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+.bcl svg{color:var(--green);min-width:13px}
+.bc-big{font-size:44px;font-weight:800;background:linear-gradient(135deg,var(--amber),var(--amber2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.04em;line-height:1.1;margin:8px 0 4px}
+@media(max-width:900px){.bc-wide,.bc-narrow,.bc-third{grid-column:span 6}}
+@media(max-width:600px){.bc-wide,.bc-narrow,.bc-third{grid-column:span 12}}
 
 /* ── REVIEWS ── */
-.reviews-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:60px}
-.review-card{background:var(--bg1);border:1px solid var(--border);border-radius:20px;padding:28px;display:flex;flex-direction:column;gap:18px;transition:border-color .2s;position:relative}
-.review-card:hover{border-color:var(--border2)}
-.review-card::before{content:'\201C';position:absolute;top:16px;right:24px;font-size:64px;line-height:1;color:rgba(245,158,11,.08);font-family:Georgia,serif}
-.stars-row{display:flex;gap:3px}
-.stars-row svg{color:var(--amber)}
-.review-text{font-size:14px;color:var(--text2);line-height:1.75;flex:1}
-.reviewer-row{display:flex;align-items:center;gap:12px}
-.rev-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;flex-shrink:0}
-.rev-name{font-size:14px;font-weight:700}
-.rev-meta{font-size:12px;color:var(--muted)}
-@media(max-width:800px){.reviews-grid{grid-template-columns:1fr}}
+.reviews-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:52px}
+.rev-shell{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius);padding:26px;display:flex;flex-direction:column;gap:18px;transition:border-color .2s var(--ease);position:relative;overflow:hidden}
+.rev-shell::after{content:'"';position:absolute;right:20px;top:12px;font-size:60px;line-height:1;color:rgba(245,158,11,.07);font-family:Georgia,serif;pointer-events:none}
+.rev-shell:hover{border-color:var(--border2)}
+.stars{display:flex;gap:2px}
+.stars svg{color:var(--amber)}
+.rev-text{font-size:13px;color:var(--text2);line-height:1.75;flex:1}
+.rev-person{display:flex;align-items:center;gap:12px}
+.rev-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#fff;flex-shrink:0}
+.rev-name{font-size:13px;font-weight:700}
+.rev-meta{font-size:11px;color:var(--text3)}
+@media(max-width:780px){.reviews-grid{grid-template-columns:1fr}}
 
 /* ── PRICING ── */
-.pricing-outer{max-width:500px;margin:60px auto 0;position:relative}
-.pricing-glow{position:absolute;inset:-40px;background:radial-gradient(circle,rgba(245,158,11,.08),transparent 70%);pointer-events:none;z-index:0}
-.pricing-card{position:relative;z-index:1;background:var(--bg1);border:1px solid rgba(245,158,11,.25);border-radius:24px;padding:44px 40px;text-align:center;overflow:hidden}
-.pricing-card::before{content:'';position:absolute;top:0;left:20%;right:20%;height:1px;background:linear-gradient(90deg,transparent,var(--amber),transparent)}
-.pricing-card::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 40% at 50% -10%,rgba(245,158,11,.06),transparent);pointer-events:none}
-.p-badge{display:inline-block;background:var(--amber);color:#000;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:5px 16px;border-radius:99px;margin-bottom:28px}
-.p-price{font-family:var(--font-display);font-size:80px;font-weight:800;line-height:1;letter-spacing:-.04em;color:var(--amber)}
-.p-price sup{font-size:32px;vertical-align:super;margin-right:2px}
-.p-desc{font-size:13px;color:var(--muted);margin:10px 0 32px}
-.p-features{text-align:left;margin-bottom:36px;display:flex;flex-direction:column;gap:13px}
-.p-feat{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--text2);font-weight:500}
-.p-feat svg{color:var(--green);min-width:18px}
-.btn-purchase{width:100%;padding:18px;background:linear-gradient(135deg,var(--amber),#f97316);color:#000;font-weight:800;font-size:16px;border-radius:14px;cursor:pointer;border:none;transition:all .2s;letter-spacing:.01em;position:relative;overflow:hidden}
-.btn-purchase::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.2),transparent);opacity:0;transition:opacity .2s}
-.btn-purchase:hover::before{opacity:1}
-.btn-purchase:hover{transform:translateY(-2px);box-shadow:0 0 48px rgba(245,158,11,.4),0 12px 40px rgba(245,158,11,.2)}
-.p-secure{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:18px;font-size:12px;color:var(--muted)}
+.pricing-outer{max-width:480px;margin:56px auto 0;position:relative}
+.pricing-glow{position:absolute;inset:-60px;background:radial-gradient(circle,rgba(245,158,11,.1),transparent 65%);pointer-events:none;z-index:0}
+.p-shell{position:relative;z-index:1;background:var(--shell);border:1px solid rgba(245,158,11,.22);padding:5px;border-radius:26px}
+.p-core{background:var(--bg1);border-radius:21px;padding:40px 36px;box-shadow:inset 0 1px 0 rgba(255,255,255,.07);position:relative;overflow:hidden}
+.p-core::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,var(--amber),transparent)}
+.p-badge{display:inline-block;background:var(--amber);color:#000;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:5px 16px;border-radius:99px;margin-bottom:24px}
+.p-price{font-size:80px;font-weight:800;letter-spacing:-.05em;line-height:1;color:var(--amber)}
+.p-price sup{font-size:30px;vertical-align:super;margin-right:2px}
+.p-note{font-size:12px;color:var(--text3);margin:8px 0 28px;font-weight:500}
+.p-list{display:flex;flex-direction:column;gap:12px;margin-bottom:32px;text-align:left}
+.p-item{display:flex;align-items:center;gap:11px;font-size:13px;color:var(--text2);font-weight:500}
+.p-item svg{color:var(--green);min-width:16px}
+.btn-buy{width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 14px 14px 24px;border-radius:999px;background:linear-gradient(95deg,var(--amber),#f97316);color:#000;font-weight:800;font-size:15px;border:none;cursor:pointer;transition:all .25s var(--ease)}
+.btn-buy:hover{box-shadow:0 0 48px rgba(245,158,11,.45),0 10px 36px rgba(245,158,11,.2);transform:translateY(-2px)}
+.btn-buy:active{transform:scale(.98);box-shadow:none}
+.buy-icon{width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;transition:transform .25s var(--ease)}
+.btn-buy:hover .buy-icon{transform:translate(2px,-2px) scale(1.1)}
+.p-lock{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:16px;font-size:12px;color:var(--text3)}
 
 /* ── FAQ ── */
-.faq-stack{margin-top:52px;display:flex;flex-direction:column;gap:8px}
-.faq-item{border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color .2s}
+.faq-list{margin-top:48px;display:flex;flex-direction:column;gap:8px}
+.faq-item{background:var(--bg1);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color .2s var(--ease)}
 .faq-item.open{border-color:var(--border2)}
-.faq-q{width:100%;display:flex;align-items:center;justify-content:space-between;padding:20px 24px;background:var(--bg1);cursor:pointer;text-align:left;font-size:15px;font-weight:600;color:var(--text);gap:16px;transition:background .15s;border:none;font-family:var(--font)}
-.faq-q:hover{background:var(--bg2)}
-.faq-arrow{width:24px;height:24px;min-width:24px;border:1px solid var(--border2);border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:16px;font-weight:300;transition:all .25s;line-height:1}
-.faq-item.open .faq-arrow{transform:rotate(45deg);border-color:rgba(245,158,11,.4);color:var(--amber);background:rgba(245,158,11,.06)}
-.faq-body{max-height:0;overflow:hidden;transition:max-height .35s ease}
-.faq-item.open .faq-body{max-height:320px}
-.faq-body p{font-size:14px;color:var(--text2);line-height:1.75;padding:0 24px 20px}
+.faq-q{width:100%;display:flex;align-items:center;justify-content:space-between;padding:19px 22px;background:transparent;border:none;cursor:pointer;text-align:left;font-size:14px;font-weight:600;color:var(--text);gap:16px;font-family:var(--font);transition:background .15s var(--ease)}
+.faq-q:hover{background:var(--shell2)}
+.faq-arr{width:24px;height:24px;min-width:24px;border:1px solid var(--border2);border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:18px;font-weight:300;line-height:1;transition:all .28s var(--ease)}
+.faq-item.open .faq-arr{transform:rotate(45deg);border-color:rgba(245,158,11,.4);color:var(--amber);background:rgba(245,158,11,.06)}
+.faq-body{max-height:0;overflow:hidden;transition:max-height .35s var(--ease)}
+.faq-item.open .faq-body{max-height:280px}
+.faq-ans{font-size:13px;color:var(--text2);line-height:1.75;padding:0 22px 18px}
 
 /* ── FOOTER ── */
-footer{border-top:1px solid var(--border);padding:40px 32px 32px}
-.footer-inner{max-width:1160px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px;padding-bottom:24px;border-bottom:1px solid var(--border)}
-.footer-logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:14px}
-.footer-logo-mark{width:28px;height:28px;background:linear-gradient(135deg,var(--amber),#f97316);border-radius:7px;display:flex;align-items:center;justify-content:center}
-.footer-links{display:flex;gap:24px}
-.footer-links a{font-size:13px;color:var(--muted);transition:color .15s}
-.footer-links a:hover{color:var(--text)}
-.footer-copy{font-size:12px;color:var(--muted)}
-.footer-disc{max-width:1160px;margin:20px auto 0;font-size:12px;color:var(--muted2);line-height:1.65}
+footer{border-top:1px solid var(--border);padding:36px 24px 28px}
+.foot-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;padding-bottom:22px;border-bottom:1px solid var(--border);margin-bottom:18px}
+.foot-logo{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700}
+.foot-mark{width:26px;height:26px;background:linear-gradient(135deg,var(--amber),#f97316);border-radius:7px;display:flex;align-items:center;justify-content:center}
+.foot-links{display:flex;gap:22px}
+.foot-links a{font-size:12px;color:var(--text3);transition:color .15s var(--ease)}
+.foot-links a:hover{color:var(--text)}
+.foot-copy{font-size:12px;color:var(--text3)}
+.foot-disc{max-width:1100px;margin:0 auto;font-size:11px;color:var(--text3);line-height:1.65}
 
 /* ── MODAL ── */
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(12px)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .modal.open{display:flex}
-.modal-box{background:var(--bg2);border:1px solid var(--border2);border-radius:24px;width:100%;max-width:440px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(245,158,11,.08)}
-.modal-header{display:flex;align-items:center;justify-content:space-between;padding:22px 28px;border-bottom:1px solid var(--border)}
-.modal-header h3{font-size:17px;font-weight:700}
-.modal-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .15s}
-.modal-x:hover{background:var(--surface3);color:var(--text)}
-.modal-body{padding:28px}
-.modal-product{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:24px}
-.modal-product-name{font-size:14px;color:var(--text2);font-weight:500}
-.modal-product-price{font-family:var(--font-display);font-size:26px;font-weight:700;color:var(--amber)}
-.modal-agreements{display:flex;flex-direction:column;gap:11px;margin-bottom:28px}
-.modal-agree{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--text2);line-height:1.5}
-.modal-agree input{width:16px;height:16px;min-width:16px;accent-color:var(--amber);cursor:pointer;margin-top:1px}
-.modal-btn{width:100%;padding:16px;background:linear-gradient(135deg,var(--amber),#f97316);color:#000;font-weight:800;font-size:15px;border-radius:12px;cursor:pointer;border:none;transition:all .2s;letter-spacing:.01em}
-.modal-btn:disabled{opacity:.3;cursor:not-allowed;background:var(--muted2)}
-.modal-btn:not(:disabled):hover{transform:translateY(-1px);box-shadow:0 0 32px rgba(245,158,11,.4)}
-.modal-trust{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:14px;font-size:12px;color:var(--muted)}
+.m-shell{background:var(--shell);border:1px solid var(--border2);padding:5px;border-radius:26px;width:100%;max-width:420px;box-shadow:0 40px 80px rgba(0,0,0,.7)}
+.m-core{background:var(--bg2);border-radius:21px;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+.m-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)}
+.m-head h3{font-size:16px;font-weight:700}
+.m-x{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--shell2);color:var(--text3);cursor:pointer;border:none;font-size:18px;font-family:var(--font);transition:all .15s var(--ease)}
+.m-x:hover{background:var(--shell);color:var(--text)}
+.m-body{padding:24px}
+.m-product{display:flex;align-items:center;justify-content:space-between;background:var(--shell);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:22px}
+.m-prod-name{font-size:13px;color:var(--text2);font-weight:500}
+.m-prod-price{font-size:24px;font-weight:800;color:var(--amber);letter-spacing:-.03em}
+.m-agreements{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.m-agree{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--text2);line-height:1.5}
+.m-agree input{width:16px;height:16px;min-width:16px;accent-color:var(--amber);cursor:pointer;margin-top:1px}
+.m-btn{width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 14px 14px 22px;border-radius:999px;background:linear-gradient(95deg,var(--amber),#f97316);color:#000;font-weight:800;font-size:14px;border:none;cursor:pointer;transition:all .22s var(--ease)}
+.m-btn:disabled{opacity:.3;cursor:not-allowed;background:var(--text3)}
+.m-btn:not(:disabled):hover{box-shadow:0 0 32px rgba(245,158,11,.4);transform:translateY(-1px)}
+.m-btn-icon{width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center}
+.m-trust{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;font-size:11px;color:var(--text3)}
 
 /* ── REVEAL ── */
-.reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
 .reveal.in{opacity:1;transform:none}
-@media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+.reveal-d1{transition-delay:.08s}
+.reveal-d2{transition-delay:.16s}
+.reveal-d3{transition-delay:.24s}
+@media(prefers-reduced-motion:reduce){.reveal,.reveal.in{opacity:1;transform:none;transition:none}}
+
+/* ── WRAP ── */
+.page-wrap{position:relative;z-index:1}
 </style>
 </head>
 <body>
-<div class="grid-bg"></div>
-<div class="wrap">
+<div class="g-bg"></div>
+<div class="page-wrap">
 
-<!-- NAV -->
-<nav class="nav">
+<!-- FLOATING PILL NAV -->
+<nav class="nav" id="nav">
   <a href="/" class="nav-logo">
-    <div class="logo-mark">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+    <div class="nav-mark">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
     </div>
     AiCash System
   </a>
@@ -297,131 +303,116 @@ footer{border-top:1px solid var(--border);padding:40px 32px 32px}
     <a href="#faq">FAQ</a>
   </div>
   <div class="nav-right">
-    <button class="btn-nav btn-nav-ghost" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">See Demo</button>
-    <button class="btn-nav btn-nav-fill" onclick="openModal()">Get Access — $297</button>
+    <button class="btn-ghost-sm" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">Learn more</button>
+    <button class="btn-primary" onclick="openModal()" style="font-size:13px;padding:9px 9px 9px 18px">
+      Get Access
+      <span class="btn-icon" style="width:30px;height:30px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </span>
+    </button>
   </div>
-  <div class="nav-ham" onclick="toggleMob()" id="navHam">
+  <div class="nav-ham" id="navHam" onclick="toggleMob()">
     <span></span><span></span><span></span>
   </div>
 </nav>
 
-<div class="mob-menu" id="mobMenu">
+<!-- MOBILE MENU OVERLAY -->
+<div class="mob-overlay" id="mobOverlay">
   <a href="#how" onclick="closeMob()">How It Works</a>
   <a href="#features" onclick="closeMob()">Features</a>
   <a href="#pricing" onclick="closeMob()">Pricing</a>
   <a href="#faq" onclick="closeMob()">FAQ</a>
-  <a href="#" class="mob-cta" onclick="openModal();closeMob();return false;">Get Access — $297</a>
+  <div class="mob-cta-row">
+    <button class="btn-primary" onclick="openModal();closeMob()" style="margin-top:8px">
+      Get Access - $297
+      <span class="btn-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+    </button>
+  </div>
 </div>
 
 <!-- HERO -->
 <section class="hero">
   <div class="hero-inner">
     <div>
-      <div class="hero-eyebrow">
+      <div class="eye-badge">
         <span class="eye-dot"></span>
-        <span class="eyebrow-text">Live Trading · 24/7 Autonomous · AI-Powered</span>
+        <span class="eye-txt">Live Trading · AI-Powered · 24/7</span>
       </div>
-      <h1>Make Money<br/><span class="line2">While You Sleep</span></h1>
-      <p class="hero-desc">An AI trading bot that analyzes crypto markets and executes trades automatically. Pay $297 once — get full Python source code, no monthly fees, no black box, no subscriptions. Ever.</p>
+      <h1>Make Money<br/><span class="grad">While You Sleep</span></h1>
+      <p class="hero-sub">AI crypto bot that trades automatically. Pay $297 once, own the full source code, run it forever with zero monthly fees.</p>
       <div class="hero-actions">
-        <button class="btn-hero btn-hero-primary" onclick="openModal()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-          Get AiCash System — $297
+        <button class="btn-primary" onclick="openModal()">
+          Get AiCash System - $297
+          <span class="btn-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </span>
         </button>
-        <a href="#how" class="btn-hero btn-hero-secondary">
-          How It Works
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <a href="#how" class="btn-secondary">
+          See how it works
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </a>
-      </div>
-      <div class="hero-proof">
-        <div class="proof-item">
-          <svg class="proof-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          One-time payment
-        </div>
-        <div class="proof-item">
-          <svg class="proof-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          Full source code
-        </div>
-        <div class="proof-item">
-          <svg class="proof-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Instant delivery
-        </div>
-        <div class="proof-item">
-          <svg class="proof-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          73% avg win rate
-        </div>
       </div>
     </div>
 
-    <!-- Live Dashboard Card -->
-    <div class="dash-wrap reveal">
+    <!-- DOUBLE-BEZEL DASHBOARD -->
+    <div class="dash-shell reveal">
       <div class="dash-card">
-        <div class="dash-header">
-          <span class="dash-title">AiCash Bot · Live</span>
-          <div class="dash-live">
-            <span class="dash-live-dot"></span>
-            ACTIVE
+        <div class="dash-inner">
+          <div class="dash-top">
+            <span class="d-title">AiCash Bot · Live</span>
+            <div class="d-live"><span class="d-dot"></span>ACTIVE</div>
           </div>
-        </div>
-        <div class="dash-chart">
-          <svg class="chart-svg" viewBox="0 0 440 110" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="chartGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#f59e0b"/>
-                <stop offset="100%" stop-color="#fbbf24"/>
-              </linearGradient>
-              <linearGradient id="areaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="rgba(245,158,11,.18)"/>
-                <stop offset="100%" stop-color="rgba(245,158,11,0)"/>
-              </linearGradient>
-            </defs>
-            <path class="chart-area" d="M0,90 C30,85 50,70 80,65 C110,60 130,72 160,58 C190,44 210,30 240,22 C270,14 290,28 320,18 C350,8 380,14 410,10 L440,8 L440,110 L0,110 Z"/>
-            <path class="chart-path" d="M0,90 C30,85 50,70 80,65 C110,60 130,72 160,58 C190,44 210,30 240,22 C270,14 290,28 320,18 C350,8 380,14 410,10 L440,8"/>
-            <circle class="chart-dot" cx="440" cy="8" r="4"/>
-          </svg>
-        </div>
-        <div class="dash-pnl">
-          <div class="pnl-val" id="pnlVal">+$341.20</div>
-          <div class="pnl-change">+14.2% today</div>
-        </div>
-        <div class="dash-trades">
-          <div class="trade-row">
-            <span class="trade-pair">BTC/USDT</span>
-            <span class="trade-badge tb-long">LONG</span>
-            <span class="trade-amt ta-pos" id="t1">+$24.18</span>
-            <span class="trade-time">2m ago</span>
+          <div class="dash-chart-wrap">
+            <svg class="dash-chart" viewBox="0 0 420 96" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="cg" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#f59e0b"/>
+                  <stop offset="100%" stop-color="#fbbf24"/>
+                </linearGradient>
+                <linearGradient id="ag" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="rgba(245,158,11,.18)"/>
+                  <stop offset="100%" stop-color="rgba(245,158,11,0)"/>
+                </linearGradient>
+              </defs>
+              <path class="d-area" d="M0,88 C40,82 70,68 100,60 C130,52 155,70 185,52 C215,34 240,22 270,16 C300,10 325,24 355,14 C380,6 405,10 420,8 L420,96 L0,96 Z"/>
+              <path class="d-path" d="M0,88 C40,82 70,68 100,60 C130,52 155,70 185,52 C215,34 240,22 270,16 C300,10 325,24 355,14 C380,6 405,10 420,8"/>
+              <circle class="d-dot-end" cx="420" cy="8" r="4"/>
+            </svg>
           </div>
-          <div class="trade-row">
-            <span class="trade-pair">ETH/USDT</span>
-            <span class="trade-badge tb-long">LONG</span>
-            <span class="trade-amt ta-pos" id="t2">+$11.44</span>
-            <span class="trade-time">8m ago</span>
+          <div class="dash-pnl">
+            <div class="pnl-num" id="pnlMain">+$341.20</div>
+            <div class="pnl-tag">+14.2% today</div>
           </div>
-          <div class="trade-row">
-            <span class="trade-pair">SOL/USDT</span>
-            <span class="trade-badge tb-short">SHORT</span>
-            <span class="trade-amt ta-pos">+$8.92</span>
-            <span class="trade-time">15m ago</span>
+          <div class="dash-trades">
+            <div class="t-row">
+              <span class="t-pair">BTC/USDT</span>
+              <span class="t-badge tb-l">LONG</span>
+              <span class="t-pnl tp-p" id="tr1">+$24.18</span>
+              <span class="t-ago">2m ago</span>
+            </div>
+            <div class="t-row">
+              <span class="t-pair">ETH/USDT</span>
+              <span class="t-badge tb-l">LONG</span>
+              <span class="t-pnl tp-p" id="tr2">+$11.44</span>
+              <span class="t-ago">9m ago</span>
+            </div>
+            <div class="t-row">
+              <span class="t-pair">SOL/USDT</span>
+              <span class="t-badge tb-s">SHORT</span>
+              <span class="t-pnl tp-p">+$8.92</span>
+              <span class="t-ago">16m ago</span>
+            </div>
+            <div class="t-row">
+              <span class="t-pair">BNB/USDT</span>
+              <span class="t-badge tb-l">LONG</span>
+              <span class="t-pnl tp-n">-$3.10</span>
+              <span class="t-ago">24m ago</span>
+            </div>
           </div>
-          <div class="trade-row">
-            <span class="trade-pair">BNB/USDT</span>
-            <span class="trade-badge tb-long">LONG</span>
-            <span class="trade-amt ta-neg">-$3.10</span>
-            <span class="trade-time">22m ago</span>
-          </div>
-        </div>
-        <div class="dash-footer">
-          <div class="df-stat">
-            <div class="df-val">73%</div>
-            <div class="df-lbl">Win Rate</div>
-          </div>
-          <div class="df-stat">
-            <div class="df-val">24/7</div>
-            <div class="df-lbl">Uptime</div>
-          </div>
-          <div class="df-stat">
-            <div class="df-val">8+</div>
-            <div class="df-lbl">Exchanges</div>
+          <div class="dash-footer">
+            <div class="df"><div class="df-val">73%</div><div class="df-lbl">Win Rate</div></div>
+            <div class="df"><div class="df-val">24/7</div><div class="df-lbl">Uptime</div></div>
+            <div class="df"><div class="df-val">8+</div><div class="df-lbl">Exchanges</div></div>
           </div>
         </div>
       </div>
@@ -429,331 +420,305 @@ footer{border-top:1px solid var(--border);padding:40px 32px 32px}
   </div>
 </section>
 
-<!-- TICKER -->
+<!-- TICKER (1 marquee total, as per rules) -->
 <div class="ticker">
-  <div class="ticker-track" id="tickerTrack">
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>BINANCE<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>COINBASE<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>BYBIT<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>KRAKEN<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>OKX<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>KUCOIN<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>BITGET<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>MEXC<span class="ticker-sep">●</span></span>
-    <!-- duplicate for seamless loop -->
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>BINANCE<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>COINBASE<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>BYBIT<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>KRAKEN<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>OKX<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>KUCOIN<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>BITGET<span class="ticker-sep">●</span></span>
-    <span class="ticker-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>MEXC<span class="ticker-sep">●</span></span>
+  <div class="ticker-track">
+    <span class="tick-item">BINANCE<span class="tick-sep">●</span></span>
+    <span class="tick-item">COINBASE<span class="tick-sep">●</span></span>
+    <span class="tick-item">BYBIT<span class="tick-sep">●</span></span>
+    <span class="tick-item">KRAKEN<span class="tick-sep">●</span></span>
+    <span class="tick-item">OKX<span class="tick-sep">●</span></span>
+    <span class="tick-item">KUCOIN<span class="tick-sep">●</span></span>
+    <span class="tick-item">BITGET<span class="tick-sep">●</span></span>
+    <span class="tick-item">MEXC<span class="tick-sep">●</span></span>
+    <span class="tick-item">BINANCE<span class="tick-sep">●</span></span>
+    <span class="tick-item">COINBASE<span class="tick-sep">●</span></span>
+    <span class="tick-item">BYBIT<span class="tick-sep">●</span></span>
+    <span class="tick-item">KRAKEN<span class="tick-sep">●</span></span>
+    <span class="tick-item">OKX<span class="tick-sep">●</span></span>
+    <span class="tick-item">KUCOIN<span class="tick-sep">●</span></span>
+    <span class="tick-item">BITGET<span class="tick-sep">●</span></span>
+    <span class="tick-item">MEXC<span class="tick-sep">●</span></span>
   </div>
 </div>
 
-<!-- HOW IT WORKS -->
+<!-- HOW IT WORKS (no eyebrow - already used 1 in hero) -->
 <section id="how" class="section">
-  <div class="section-line"></div>
-  <div class="section-inner">
+  <div class="section-divider"></div>
+  <div class="wrap">
     <div class="reveal">
-      <div class="tag">3 Simple Steps</div>
-      <h2 class="section-h">From zero to<br/>trading in minutes</h2>
-      <p class="section-sub">No coding experience required. Pre-configured and ready to deploy out of the box.</p>
+      <h2 class="s-title">Up and running<br/>in minutes</h2>
+      <p class="s-sub">No coding experience required. Pre-configured and ready to deploy out of the box.</p>
     </div>
-    <div class="steps-grid reveal">
-      <div class="step-card">
-        <div class="step-num">01</div>
-        <h3>Purchase & Download</h3>
-        <p>Complete your one-time payment of $297 via Stripe. Receive an instant email with a secure download link to the full source code.</p>
+    <div class="steps-row reveal">
+      <div class="step-shell">
+        <div class="step-inner">
+          <div class="step-n">01</div>
+          <h3>Purchase and Download</h3>
+          <p>Complete your $297 one-time payment via Stripe. Get an instant email with a secure link to the full source code.</p>
+        </div>
       </div>
-      <div class="step-card">
-        <div class="step-num">02</div>
-        <h3>Connect Your Exchange</h3>
-        <p>Add your API keys from Binance, Coinbase or any supported exchange. Our step-by-step setup guide walks you through it in under 5 minutes.</p>
+      <div class="step-shell">
+        <div class="step-inner">
+          <div class="step-n">02</div>
+          <h3>Connect Your Exchange</h3>
+          <p>Add your API keys from Binance, Coinbase or any supported exchange. Our setup guide walks you through it in under 5 minutes.</p>
+        </div>
       </div>
-      <div class="step-card">
-        <div class="step-num">03</div>
-        <h3>Let It Trade</h3>
-        <p>Start the bot and watch it analyze markets and execute trades automatically around the clock. No babysitting. No manual intervention.</p>
+      <div class="step-shell">
+        <div class="step-inner">
+          <div class="step-n">03</div>
+          <h3>Let It Trade</h3>
+          <p>Start the bot and watch it analyze markets and execute trades around the clock. No babysitting required.</p>
+        </div>
       </div>
     </div>
-    <div class="stats-row reveal">
-      <div class="stat-cell">
-        <div class="stat-num" data-target="73" data-suffix="%">73%</div>
-        <div class="stat-lbl">Average Win Rate</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-num">24/7</div>
-        <div class="stat-lbl">Autonomous Trading</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-num" data-target="8" data-suffix="+">8+</div>
-        <div class="stat-lbl">Supported Exchanges</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-num">$0</div>
-        <div class="stat-lbl">Monthly Fees</div>
-      </div>
+    <div class="stats-grid reveal">
+      <div class="stat-cell"><div class="stat-num">73%</div><div class="stat-lbl">Average Win Rate</div></div>
+      <div class="stat-cell"><div class="stat-num">24/7</div><div class="stat-lbl">Autonomous Trading</div></div>
+      <div class="stat-cell"><div class="stat-num">8+</div><div class="stat-lbl">Supported Exchanges</div></div>
+      <div class="stat-cell"><div class="stat-num">$0</div><div class="stat-lbl">Monthly Fees</div></div>
     </div>
   </div>
 </section>
 
-<!-- FEATURES -->
+<!-- FEATURES BENTO (eyebrow #2 of 2 allowed) -->
 <section id="features" class="section" style="padding-top:0">
-  <div class="section-inner">
+  <div class="wrap">
     <div class="reveal">
-      <div class="tag">Everything Included</div>
-      <h2 class="section-h">Built for results,<br/>not subscriptions</h2>
-      <p class="section-sub">Every tool you need to trade profitably — included at no extra cost.</p>
+      <div class="eye-tag">Everything Included</div>
+      <h2 class="s-title">Built for results,<br/>not subscriptions</h2>
+      <p class="s-sub">Every tool you need to trade profitably, included at no extra cost.</p>
     </div>
     <div class="bento reveal">
-      <div class="bento-card bento-wide">
-        <div class="bento-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      <!-- Wide: AI Signal with animated bars -->
+      <div class="bc bc-wide">
+        <div class="bc-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
         </div>
         <h3>AI Signal Engine</h3>
-        <p>Machine learning model trained on years of crypto market data. Identifies high-probability setups across multiple timeframes simultaneously, filtering noise from real opportunities.</p>
-        <div class="bento-mini-chart" id="miniChart"></div>
+        <p>Machine learning model trained on years of crypto market data. Identifies high-probability setups across multiple timeframes simultaneously.</p>
+        <div class="bc-bars" id="bcBars"></div>
       </div>
-      <div class="bento-card">
-        <div class="bento-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </div>
-        <h3>Risk Management</h3>
-        <p>Automatic stop-loss, take-profit, position sizing, and drawdown limits protect your capital 24/7.</p>
-      </div>
-      <div class="bento-card">
-        <div class="bento-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <!-- Narrow: Source Code with code snippet -->
+      <div class="bc bc-narrow">
+        <div class="bc-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
         </div>
         <h3>Full Source Code</h3>
-        <div class="bento-big-num">100%</div>
-        <p style="font-size:12px;color:var(--muted)">Code ownership. Read it, modify it, run it forever.</p>
+        <div class="bc-big">100%</div>
+        <div class="bc-code">
+          <span class="cm"># bot.py</span><br/>
+          <span class="kw">def</span> <span class="fn">analyze</span>(symbol):<br/>
+          &nbsp;&nbsp;rsi = <span class="fn">rsi</span>(symbol, <span class="st">14</span>)<br/>
+          &nbsp;&nbsp;<span class="kw">return</span> Signal.LONG
+        </div>
       </div>
-      <div class="bento-card">
-        <div class="bento-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <!-- Row 2: 3 equal thirds -->
+      <div class="bc bc-third">
+        <div class="bc-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3>Risk Management</h3>
+        <p>Auto stop-loss, take-profit, position sizing, and drawdown limits protect your capital 24/7.</p>
+      </div>
+      <div class="bc bc-third">
+        <div class="bc-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         </div>
         <h3>Backtesting Engine</h3>
-        <p>Test strategies against years of historical data before risking real capital. Full performance analytics included.</p>
+        <p>Test any strategy against years of historical data before risking real capital. Full analytics included.</p>
       </div>
-      <div class="bento-card">
-        <div class="bento-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <div class="bc bc-third">
+        <div class="bc-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         </div>
         <h3>Multi-Exchange</h3>
-        <div class="bento-feat-list">
-          <div class="bfl"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Binance & Coinbase</div>
-          <div class="bfl"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Bybit, Kraken, OKX</div>
-          <div class="bfl"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>KuCoin, Bitget, MEXC</div>
+        <div class="bc-check-list">
+          <div class="bcl"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Binance, Coinbase</div>
+          <div class="bcl"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Bybit, Kraken, OKX</div>
+          <div class="bcl"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>KuCoin, Bitget, MEXC</div>
         </div>
-      </div>
-      <div class="bento-card">
-        <div class="bento-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
-        </div>
-        <h3>Live Dashboard</h3>
-        <p>Real-time trade feed, P&amp;L tracking, open positions, and performance analytics in a clean web UI.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- REVIEWS -->
+<!-- REVIEWS (no eyebrow) -->
 <section class="section" style="padding-top:0">
-  <div class="section-inner">
+  <div class="wrap">
     <div class="reveal">
-      <div class="tag">Customers</div>
-      <h2 class="section-h">Real people,<br/>real results</h2>
+      <h2 class="s-title">Real people,<br/>real results</h2>
     </div>
     <div class="reviews-grid">
-      <div class="review-card reveal">
-        <div class="stars-row">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <div class="rev-shell reveal reveal-d1">
+        <div class="stars">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </div>
-        <p class="review-text">"I was skeptical at first but after 3 weeks the bot has already returned the $297 purchase price three times over. The setup was surprisingly straightforward."</p>
-        <div class="reviewer-row">
+        <p class="rev-text">"I was skeptical but after 3 weeks the bot returned the $297 purchase price three times over. Setup was surprisingly straightforward."</p>
+        <div class="rev-person">
           <div class="rev-av" style="background:linear-gradient(135deg,#7c3aed,#db2777)">MK</div>
-          <div>
-            <div class="rev-name">Marcus K.</div>
-            <div class="rev-meta">Binance · 3 weeks running</div>
-          </div>
+          <div><div class="rev-name">Marcus Kellner</div><div class="rev-meta">Binance - 3 weeks running</div></div>
         </div>
       </div>
-      <div class="review-card reveal">
-        <div class="stars-row">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <div class="rev-shell reveal reveal-d2">
+        <div class="stars">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </div>
-        <p class="review-text">"As a developer I appreciated seeing every line of code — no black box. Clean, well-structured Python. Running on Bybit for 6 weeks, very happy with the results."</p>
-        <div class="reviewer-row">
+        <p class="rev-text">"Clean, well-structured Python. As a developer I appreciated seeing every line of code. Running on Bybit for 6 weeks, very happy."</p>
+        <div class="rev-person">
           <div class="rev-av" style="background:linear-gradient(135deg,#0891b2,#7c3aed)">SR</div>
-          <div>
-            <div class="rev-name">Sofia R.</div>
-            <div class="rev-meta">Bybit · 6 weeks running</div>
-          </div>
+          <div><div class="rev-name">Sofia Reyes</div><div class="rev-meta">Bybit - 6 weeks running</div></div>
         </div>
       </div>
-      <div class="review-card reveal">
-        <div class="stars-row">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <div class="rev-shell reveal reveal-d3">
+        <div class="stars">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </div>
-        <p class="review-text">"Compared to $99/month subscription bots you never own — this is a no-brainer. Running 2 months now, total cost still just $297. Already made that back week one."</p>
-        <div class="reviewer-row">
+        <p class="rev-text">"Compared to $99/month bots you never own, this is obvious. Two months in and the bot paid for itself in week one."</p>
+        <div class="rev-person">
           <div class="rev-av" style="background:linear-gradient(135deg,#d97706,#dc2626)">JL</div>
-          <div>
-            <div class="rev-name">James L.</div>
-            <div class="rev-meta">Coinbase · 2 months running</div>
-          </div>
+          <div><div class="rev-name">James Lowry</div><div class="rev-meta">Coinbase - 2 months running</div></div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- PRICING -->
-<section id="pricing" class="section" style="padding-top:0">
-  <div class="section-inner center-head">
+<!-- PRICING (no eyebrow) -->
+<section id="pricing" class="section" style="padding-top:0;text-align:center">
+  <div class="wrap">
     <div class="reveal">
-      <div class="tag gold" style="display:inline-flex">Simple Pricing</div>
-      <h2 class="section-h">One price.<br/>Own it forever.</h2>
-      <p class="section-sub center">No subscriptions. No recurring fees. Pay once — the bot and every future update is yours for life.</p>
+      <h2 class="s-title">One price.<br/>Own it forever.</h2>
+      <p class="s-sub center" style="margin:0 auto">No subscriptions. No recurring fees. Pay once and the bot is yours for life.</p>
     </div>
     <div class="pricing-outer reveal">
       <div class="pricing-glow"></div>
-      <div class="pricing-card">
-        <div class="p-badge">Lifetime Access</div>
-        <div class="p-price"><sup>$</sup>297</div>
-        <div class="p-desc">one-time payment · no subscription · full source code</div>
-        <div class="p-features">
-          <div class="p-feat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Full Python source code</div>
-          <div class="p-feat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>AI signal engine included</div>
-          <div class="p-feat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>8+ exchange integrations</div>
-          <div class="p-feat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Backtesting &amp; live dashboard</div>
-          <div class="p-feat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Setup guide + documentation</div>
-          <div class="p-feat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Lifetime updates at no extra cost</div>
-          <div class="p-feat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Email support</div>
-        </div>
-        <button class="btn-purchase" onclick="openModal()">Get Instant Access — $297</button>
-        <div class="p-secure">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Secured by Stripe · Instant delivery after payment
+      <div class="p-shell">
+        <div class="p-core">
+          <div class="p-badge">Lifetime Access</div>
+          <div class="p-price"><sup>$</sup>297</div>
+          <div class="p-note">one-time payment - no subscription - full source code</div>
+          <div class="p-list">
+            <div class="p-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Full Python source code</div>
+            <div class="p-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>AI signal engine included</div>
+            <div class="p-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>8+ exchange integrations</div>
+            <div class="p-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Backtesting and live dashboard</div>
+            <div class="p-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Setup guide and documentation</div>
+            <div class="p-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Lifetime updates at no extra cost</div>
+          </div>
+          <button class="btn-buy" onclick="openModal()">
+            Get Instant Access
+            <span class="buy-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          </button>
+          <div class="p-lock">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Secured by Stripe - Instant delivery after payment
+          </div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- FAQ -->
+<!-- FAQ (no eyebrow) -->
 <section id="faq" class="section" style="padding-top:0">
-  <div class="section-inner">
+  <div class="wrap">
     <div class="reveal">
-      <div class="tag">FAQ</div>
-      <h2 class="section-h">Common questions</h2>
+      <h2 class="s-title">Common questions</h2>
     </div>
-    <div class="faq-stack reveal" id="faqStack"></div>
+    <div class="faq-list reveal" id="faqList"></div>
   </div>
 </section>
 
 <!-- FOOTER -->
 <footer>
-  <div class="footer-inner">
-    <div class="footer-logo">
-      <div class="footer-logo-mark">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-      </div>
+  <div class="foot-inner">
+    <div class="foot-logo">
+      <div class="foot-mark"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
       AiCash System
     </div>
-    <div class="footer-links">
+    <div class="foot-links">
       <a href="privacy.html">Privacy</a>
       <a href="terms.html">Terms</a>
       <a href="mailto:support@aicashsystem.space">Support</a>
     </div>
-    <div class="footer-copy">© 2025 AiCash System</div>
+    <div class="foot-copy">2025 AiCash System</div>
   </div>
-  <div class="footer-disc">AiCash System is automation software sold as source code. Not financial advice. Cryptocurrency trading involves substantial risk of loss. Past performance does not guarantee future results. Always test with paper trading mode before deploying real capital.</div>
+  <div class="foot-disc">AiCash System is automation software sold as source code. Not financial advice. Cryptocurrency trading involves substantial risk of loss. Past performance does not guarantee future results. Always test with paper trading before deploying real capital.</div>
 </footer>
 
-</div>
+</div><!-- /page-wrap -->
 
-<!-- CHECKOUT MODAL -->
+<!-- MODAL -->
 <div class="modal" id="modal" onclick="bgDismiss(event)">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h3>Get AiCash System</h3>
-      <button class="modal-x" onclick="closeModal()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div class="modal-product">
-        <div class="modal-product-name">AiCash System — Lifetime</div>
-        <div class="modal-product-price">$297</div>
+  <div class="m-shell">
+    <div class="m-core">
+      <div class="m-head">
+        <h3>Get AiCash System</h3>
+        <button class="m-x" onclick="closeModal()">+</button>
       </div>
-      <div class="modal-agreements">
-        <label class="modal-agree">
-          <input type="checkbox" id="a0" onchange="syncBtn()"/>
-          I understand this is a one-time payment for source code software
-        </label>
-        <label class="modal-agree">
-          <input type="checkbox" id="a1" onchange="syncBtn()"/>
-          I accept the <a href="terms.html" style="color:var(--amber);text-decoration:underline">Terms of Service</a>
-        </label>
-        <label class="modal-agree">
-          <input type="checkbox" id="a2" onchange="syncBtn()"/>
-          I understand crypto trading involves substantial risk
-        </label>
-      </div>
-      <button class="modal-btn" id="buyBtn" onclick="goCheckout()" disabled>Proceed to Checkout →</button>
-      <div class="modal-trust">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Secured by Stripe · Instant delivery
+      <div class="m-body">
+        <div class="m-product">
+          <div class="m-prod-name">AiCash System - Lifetime</div>
+          <div class="m-prod-price">$297</div>
+        </div>
+        <div class="m-agreements">
+          <label class="m-agree"><input type="checkbox" id="a0" onchange="syncBtn()"/>I understand this is a one-time payment for source code software</label>
+          <label class="m-agree"><input type="checkbox" id="a1" onchange="syncBtn()"/>I accept the <a href="terms.html" style="color:var(--amber);text-decoration:underline">Terms of Service</a></label>
+          <label class="m-agree"><input type="checkbox" id="a2" onchange="syncBtn()"/>I understand crypto trading involves substantial risk</label>
+        </div>
+        <button class="m-btn" id="buyBtn" onclick="goCheckout()" disabled>
+          Proceed to Checkout
+          <span class="m-btn-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        </button>
+        <div class="m-trust">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Secured by Stripe - Instant delivery
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-var PAYMENT_LINK='https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00';
-function goCheckout(){window.location.href=PAYMENT_LINK}
+var PAY='https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00';
+function goCheckout(){window.location.href=PAY}
 function openModal(){document.getElementById('modal').classList.add('open');document.body.style.overflow='hidden'}
 function closeModal(){document.getElementById('modal').classList.remove('open');document.body.style.overflow=''}
 function bgDismiss(e){if(e.target===document.getElementById('modal'))closeModal()}
-function syncBtn(){
-  var ok=document.getElementById('a0').checked&&document.getElementById('a1').checked&&document.getElementById('a2').checked;
-  document.getElementById('buyBtn').disabled=!ok;
-}
-function toggleMob(){document.getElementById('mobMenu').classList.toggle('open')}
-function closeMob(){document.getElementById('mobMenu').classList.remove('open')}
+function syncBtn(){var ok=document.getElementById('a0').checked&&document.getElementById('a1').checked&&document.getElementById('a2').checked;document.getElementById('buyBtn').disabled=!ok}
+function toggleMob(){var h=document.getElementById('navHam');var m=document.getElementById('mobOverlay');h.classList.toggle('open');m.classList.toggle('open');document.body.style.overflow=m.classList.contains('open')?'hidden':''}
+function closeMob(){document.getElementById('navHam').classList.remove('open');document.getElementById('mobOverlay').classList.remove('open');document.body.style.overflow=''}
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeModal();closeMob()}});
 
 /* FAQ */
 var faqs=[
-  {q:'Do I need coding experience?',a:'No. The bot comes pre-configured with a detailed setup guide. If you can follow step-by-step instructions and copy-paste an API key, you can run it. Developers can also customize every aspect of the code.'},
-  {q:'What exchanges does it support?',a:'AiCash System works with Binance, Coinbase Advanced Trade, Bybit, Kraken, OKX, KuCoin, Bitget, MEXC and more. All updates — including new exchange integrations — are free for lifetime customers.'},
-  {q:'How is this different from subscription bots?',a:'You pay once and own the full source code permanently. Subscription bots charge $49–$199/month and if they shut down you lose access entirely. With AiCash System you run it on your own server and can modify it however you want.'},
-  {q:'What does "full source code" mean exactly?',a:'You receive all Python files — strategy logic, exchange connectors, risk management, live dashboard, and backtesting engine. Not a compiled binary. You can read, edit and understand every single line.'},
-  {q:'How much capital do I need to start?',a:'We recommend starting with at least $500–$1,000 to see meaningful results. Always test with the paper trading mode first before using real capital — this is built in and free to use.'},
-  {q:'Is there a refund policy?',a:'Due to the digital nature of source code delivery there are no refunds once the download link is sent. If you have any trouble with setup or need help getting started, email support@aicashsystem.space and we will personally help you get running.'}
+  {q:'Do I need coding experience?',a:'No. The bot comes pre-configured with a detailed setup guide. If you can follow step-by-step instructions and copy-paste an API key, you can run it. Developers can also read and modify every line of code.'},
+  {q:'What exchanges does it support?',a:'AiCash System works with Binance, Coinbase Advanced Trade, Bybit, Kraken, OKX, KuCoin, Bitget, MEXC and more. All updates including new exchange integrations are free for lifetime customers.'},
+  {q:'How is this different from subscription bots?',a:'You pay once and own the full source code permanently. Subscription bots charge $49 to $199 per month and if they shut down you lose access. With AiCash System you run it on your own server and modify it however you want.'},
+  {q:'What does "full source code" mean?',a:'You receive all Python files - strategy logic, exchange connectors, risk management, live dashboard, and backtesting engine. Not a compiled binary. You can read, edit, and understand every single line.'},
+  {q:'How much capital do I need to start?',a:'We recommend starting with at least $500 to see meaningful results. Always test with the paper trading mode first before using real capital - this is built in and free to use.'},
+  {q:'Is there a refund policy?',a:'Due to the digital nature of source code delivery there are no refunds once the download link is sent. If you have any trouble with setup, email support@aicashsystem.space and we will personally help you get running.'}
 ];
-var stack=document.getElementById('faqStack');
+var fl=document.getElementById('faqList');
 faqs.forEach(function(f,i){
   var d=document.createElement('div');
   d.className='faq-item';
-  d.innerHTML='<button class="faq-q" onclick="toggleFaq(this)"><span>'+f.q+'</span><div class="faq-arrow">+</div></button><div class="faq-body"><p>'+f.a+'</p></div>';
-  stack.appendChild(d);
+  d.innerHTML='<button class="faq-q" onclick="toggleFaq(this)"><span>'+f.q+'</span><div class="faq-arr">+</div></button><div class="faq-body"><p class="faq-ans">'+f.a+'</p></div>';
+  fl.appendChild(d);
 });
 function toggleFaq(btn){
   var item=btn.parentElement;
@@ -762,35 +727,25 @@ function toggleFaq(btn){
   if(!open)item.classList.add('open');
 }
 
-/* Mini chart bars */
-var mc=document.getElementById('miniChart');
-if(mc){
-  var heights=[30,45,35,55,40,60,50,70,55,80,65,90,75,85,95];
-  heights.forEach(function(h){
-    var b=document.createElement('div');
-    b.className='bar';
-    b.style.height=h+'%';
-    mc.appendChild(b);
-  });
-}
+/* Bento bars */
+var bc=document.getElementById('bcBars');
+if(bc){[32,48,38,58,44,62,52,70,58,82,68,90,76,88,95].forEach(function(h){var b=document.createElement('div');b.className='bar';b.style.height=h+'%';bc.appendChild(b)})}
 
-/* Live terminal flicker */
+/* Live flicker */
 setInterval(function(){
-  var t1=document.getElementById('t1');
-  var t2=document.getElementById('t2');
-  var pv=document.getElementById('pnlVal');
-  if(t1)t1.textContent='+$'+(24.18+Math.random()*.1-.05).toFixed(2);
-  if(t2)t2.textContent='+$'+(11.44+Math.random()*.08-.04).toFixed(2);
-  if(pv){var v=(341.2+Math.random()*2-1);pv.textContent='+$'+v.toFixed(2)}
+  var t1=document.getElementById('tr1');var t2=document.getElementById('tr2');var pm=document.getElementById('pnlMain');
+  if(t1)t1.textContent='+$'+(24.18+(Math.random()*.1-.05)).toFixed(2);
+  if(t2)t2.textContent='+$'+(11.44+(Math.random()*.08-.04)).toFixed(2);
+  if(pm)pm.textContent='+$'+(341.2+(Math.random()*2-1)).toFixed(2);
 },2800);
 
-/* Scroll reveal */
-var revealObs=new IntersectionObserver(function(entries){
+/* Scroll reveal with IntersectionObserver */
+var ro=new IntersectionObserver(function(entries){
   entries.forEach(function(e){
-    if(e.isIntersecting){e.target.classList.add('in');revealObs.unobserve(e.target)}
+    if(e.isIntersecting){e.target.classList.add('in');ro.unobserve(e.target)}
   });
 },{threshold:.06,rootMargin:'0px 0px -20px 0px'});
-document.querySelectorAll('.reveal').forEach(function(el){revealObs.observe(el)});
+document.querySelectorAll('.reveal').forEach(function(el){ro.observe(el)});
 </script>
 </body>
 </html>
