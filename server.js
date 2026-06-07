@@ -1355,9 +1355,9 @@ app.get('/debug', auth, (req, res) => {
   res.json({ ok: true, env: process.env.NODE_ENV, port: process.env.PORT });
 });
 
-// Root — serve new landing page
+// Root — serve AiCash System landing page
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'html', 'index.html'));
 });
 
 // Configurator (linked from bot delivery email)
