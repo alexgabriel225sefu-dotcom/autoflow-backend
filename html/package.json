@@ -2,6 +2,7 @@
   "name": "aicash-system-landing",
   "version": "1.0.0",
   "scripts": {
+    "build": "echo ok",
     "start": "node server.js"
   }
 }
