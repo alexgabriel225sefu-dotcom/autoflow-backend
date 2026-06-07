@@ -28,7 +28,7 @@ const server = http.createServer((req, res) => {
       });
       return;
     }
-    res.writeHead(200, { 'Content-Type': mime[path.extname(filePath)] || 'text/plain' });
+    res.writeHead(200, { 'Content-Type': mime[path.extname(filePath)] || 'text/plain', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
     res.end(data);
   });
 });
