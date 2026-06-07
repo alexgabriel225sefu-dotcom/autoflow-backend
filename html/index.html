@@ -1,346 +1,416 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AiCash System — AI Crypto Trading Bot | $297 One-Time · Full Source Code</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AiCash System — AI Crypto Trading Bot · $297 One-Time</title>
 <meta name="description" content="AI-powered Python trading bot. Pay $297 once, own it forever. 73% win rate, 8+ exchanges, full source code, zero monthly fees.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#04060e;--bg1:#080c18;--bg2:#0d1225;
-  --card:rgba(255,255,255,.03);--border:rgba(255,255,255,.07);
-  --border2:rgba(255,255,255,.12);--border3:rgba(255,255,255,.20);
-  --amber:#f59e0b;--amber2:#fbbf24;--indigo:#6366f1;
-  --green:#10b981;--red:#ef4444;
-  --text:#eef2ff;--text2:#8892aa;--text3:#4a5568;
+  --bg:#050814;--s1:#080d1a;--s2:#0c1422;--s3:#111827;
+  --border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.11);--border3:rgba(255,255,255,.18);
+  --amber:#f59e0b;--amber2:#fbbf24;--amber3:rgba(245,158,11,.12);
+  --indigo:#6366f1;--green:#10b981;--red:#ef4444;
+  --t1:#f0f4ff;--t2:#8b95b0;--t3:#4b5675;
   --font:'Plus Jakarta Sans',system-ui,sans-serif;
-  --mono:'JetBrains Mono','Fira Code',monospace;
-  --ease:cubic-bezier(0.32,0.72,0,1);--r:18px;
+  --mono:'JetBrains Mono',monospace;
+  --ease:cubic-bezier(0.32,0.72,0,1);
+  --ease2:cubic-bezier(0.16,1,0.3,1);
+  --r:16px;--r2:24px;
 }
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.75;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-a{color:inherit;text-decoration:none}
-button{font-family:var(--font);cursor:pointer;border:none;outline:none}
+body{background:var(--bg);color:var(--t1);font-family:var(--font);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased;overflow-x:hidden;position:relative}
 
-/* NAV */
-#nav{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:1000;background:rgba(8,12,24,.82);border:1px solid var(--border2);border-radius:999px;padding:10px 18px;display:flex;align-items:center;gap:32px;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);white-space:nowrap;max-width:calc(100vw - 32px)}
-.nav-logo{font-weight:800;font-size:17px;letter-spacing:-.02em;color:var(--amber)}
-.nav-links{display:flex;gap:28px;align-items:center}
-.nav-links a{font-size:14px;font-weight:500;color:var(--text2);transition:color .2s}
-.nav-links a:hover{color:var(--text)}
-.nav-cta{background:var(--amber);color:#000;font-weight:700;font-size:14px;border-radius:999px;padding:9px 20px;display:flex;align-items:center;gap:7px;transition:background .2s,transform .15s;white-space:nowrap}
-.nav-cta:hover{background:var(--amber2);transform:scale(1.03)}
-.hamburger{display:none;flex-direction:column;gap:5px;background:none;padding:6px;cursor:pointer}
-.hamburger span{display:block;width:22px;height:2px;background:var(--text);border-radius:2px;transition:transform .3s var(--ease),opacity .3s}
-.hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+/* ── AMBIENT BACKGROUND ── */
+.orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0;filter:blur(90px)}
+.orb-1{width:700px;height:700px;background:radial-gradient(circle,rgba(245,158,11,.09) 0%,transparent 65%);top:-200px;right:-150px;animation:drift1 18s ease-in-out infinite}
+.orb-2{width:550px;height:550px;background:radial-gradient(circle,rgba(99,102,241,.08) 0%,transparent 65%);bottom:5%;left:-100px;animation:drift2 22s ease-in-out infinite}
+.orb-3{width:350px;height:350px;background:radial-gradient(circle,rgba(245,158,11,.06) 0%,transparent 65%);top:50%;right:10%;animation:drift1 28s ease-in-out infinite reverse}
+@keyframes drift1{0%,100%{transform:translate(0,0)}33%{transform:translate(30px,-40px)}66%{transform:translate(-25px,20px)}}
+@keyframes drift2{0%,100%{transform:translate(0,0)}50%{transform:translate(50px,30px)}}
+/* dot grid */
+body::after{content:'';position:fixed;inset:0;background-image:radial-gradient(rgba(255,255,255,.025) 1px,transparent 1px);background-size:36px 36px;pointer-events:none;z-index:0}
+/* all sections above bg */
+nav,section,#hero,#ticker,footer,#modal-overlay{position:relative;z-index:1}
+
+/* ── NAV ── */
+#nav{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:100;
+  background:rgba(5,8,20,.75);border:1px solid var(--border2);border-radius:999px;
+  padding:10px 16px 10px 20px;display:flex;align-items:center;gap:0;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  max-width:calc(100vw - 24px);width:max-content}
+.nav-logo{font-weight:800;font-size:18px;letter-spacing:-.03em;color:var(--amber);margin-right:36px;white-space:nowrap}
+.nav-links{display:flex;gap:6px;align-items:center;margin-right:24px}
+.nav-links a{font-size:14px;font-weight:500;color:var(--t3);padding:6px 12px;border-radius:999px;transition:color .2s,background .2s;white-space:nowrap}
+.nav-links a:hover{color:var(--t1);background:rgba(255,255,255,.05)}
+.nav-cta{background:var(--amber);color:#000;font-weight:700;font-size:14px;border-radius:999px;
+  padding:9px 20px;white-space:nowrap;transition:background .2s,transform .15s;cursor:pointer;border:none;font-family:var(--font)}
+.nav-cta:hover{background:var(--amber2);transform:scale(1.04)}
+.hamburger{display:none;flex-direction:column;gap:5px;background:none;padding:6px;cursor:pointer;border:none;margin-left:8px}
+.hamburger span{display:block;width:20px;height:1.5px;background:var(--t1);border-radius:2px;transition:transform .3s var(--ease),opacity .3s}
+.hamburger.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
 .hamburger.open span:nth-child(2){opacity:0}
-.hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
-#mob-menu{display:none;position:fixed;inset:0;background:rgba(4,6,14,.97);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:36px}
+.hamburger.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
+#mob-menu{display:none;position:fixed;inset:0;background:rgba(5,8,20,.97);z-index:99;
+  flex-direction:column;align-items:center;justify-content:center;gap:32px;backdrop-filter:blur(20px)}
 #mob-menu.open{display:flex}
-#mob-menu a{font-size:28px;font-weight:700;color:var(--text2);opacity:0;transform:translateY(20px);transition:opacity .4s var(--ease),transform .4s var(--ease),color .2s}
+#mob-menu a{font-size:26px;font-weight:700;color:var(--t2);opacity:0;transform:translateY(16px);
+  transition:opacity .35s var(--ease),transform .35s var(--ease),color .2s;text-decoration:none}
 #mob-menu.open a{opacity:1;transform:translateY(0)}
-#mob-menu.open a:nth-child(2){transition-delay:.05s}
-#mob-menu.open a:nth-child(3){transition-delay:.1s}
-#mob-menu.open a:nth-child(4){transition-delay:.15s}
-#mob-menu.open a:nth-child(5){transition-delay:.2s}
-#mob-menu a:hover{color:var(--text)}
-.mob-close{position:absolute;top:24px;right:24px;background:none;font-size:28px;color:var(--text2);cursor:pointer;border:none}
+#mob-menu.open a:nth-child(2){transition-delay:.04s}
+#mob-menu.open a:nth-child(3){transition-delay:.08s}
+#mob-menu.open a:nth-child(4){transition-delay:.12s}
+#mob-menu.open a:nth-child(5){transition-delay:.16s}
+#mob-menu a:hover{color:var(--t1)}
+.mob-close{position:absolute;top:20px;right:20px;background:none;border:none;font-size:24px;color:var(--t2);cursor:pointer}
 
-/* HERO */
-#hero{min-height:100dvh;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;padding:140px 6vw 80px;max-width:1280px;margin:0 auto}
-.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--amber);margin-bottom:20px}
-.hero-badge .dot-pulse{width:8px;height:8px;background:var(--amber);border-radius:50%;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
-h1{font-size:clamp(40px,5.5vw,76px);font-weight:800;letter-spacing:-.045em;line-height:1.05;color:var(--text);margin-bottom:14px}
-h1 em{font-style:normal;color:var(--amber)}
-/* STAR RATING ROW */
-.hero-stars{display:flex;align-items:center;gap:10px;margin-bottom:20px}
-.stars-row{color:var(--amber);font-size:17px;letter-spacing:1px;line-height:1}
-.stars-score{font-weight:700;font-size:15px;color:var(--text)}
-.stars-count{font-size:14px;color:var(--text3)}
-.stars-sep{color:var(--border3)}
-/* PRICE DISPLAY */
-.price-display{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
-.price-main{font-size:clamp(40px,5vw,60px);font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1}
-.price-old{font-size:24px;font-weight:600;color:var(--text3);text-decoration:line-through;font-family:var(--mono)}
-.price-note{font-size:14px;color:var(--text3);margin-bottom:20px}
-/* MINI CHECKLIST */
-.hero-mini-list{list-style:none;display:flex;flex-direction:column;gap:6px;margin-bottom:24px}
-.hero-mini-list li{font-size:14px;color:var(--text2);display:flex;align-items:center;gap:8px}
-.hero-mini-list li::before{content:'✓';color:var(--green);font-weight:700;font-size:12px;flex-shrink:0}
-.hero-btns{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px}
-.btn-amber{background:var(--amber);color:#000;font-weight:700;font-size:16px;border-radius:999px;padding:14px 28px;transition:background .2s,transform .15s;white-space:nowrap;display:inline-block;border:none;font-family:var(--font);cursor:pointer}
-.btn-amber:hover{background:var(--amber2);transform:scale(1.03)}
-.btn-ghost{background:transparent;color:var(--text);font-weight:600;font-size:16px;border-radius:999px;padding:14px 28px;border:1px solid var(--border3);transition:border-color .2s,transform .15s;white-space:nowrap;display:inline-block}
-.btn-ghost:hover{border-color:var(--amber);color:var(--amber);transform:scale(1.02)}
-/* TRUST BADGES */
-.trust-badges{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px}
-.badge{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text3)}
-.badge svg{width:13px;height:13px;flex-shrink:0}
-/* HERO PROOF */
-.hero-proof{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text3)}
-.hero-proof .live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;flex-shrink:0;animation:pulse 2s infinite}
-.hero-proof strong{color:var(--text2)}
+/* ── HERO ── */
+#hero{min-height:100dvh;display:grid;grid-template-columns:1fr 1fr;gap:60px;
+  align-items:center;padding:130px 7vw 80px;max-width:1300px;margin:0 auto}
+.h-eyebrow{display:inline-flex;align-items:center;gap:8px;
+  background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.22);
+  border-radius:999px;padding:5px 14px;font-size:12px;font-weight:700;
+  color:var(--amber);letter-spacing:.08em;text-transform:uppercase;margin-bottom:22px}
+.h-eyebrow .dot{width:7px;height:7px;background:var(--amber);border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+.h-title{font-size:clamp(46px,5.5vw,80px);font-weight:800;letter-spacing:-.045em;line-height:1.05;margin-bottom:10px}
+.h-title .accent{color:var(--amber);display:inline-block}
+.h-stars{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.star-icons{color:var(--amber);font-size:16px;letter-spacing:1px}
+.star-score{font-weight:700;font-size:15px}
+.star-sep{color:var(--border3)}
+.star-count{font-size:13px;color:var(--t3)}
+.h-price{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+.h-price-main{font-size:clamp(44px,5vw,64px);font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1}
+.h-price-old{font-size:22px;font-weight:600;color:var(--t3);text-decoration:line-through;font-family:var(--mono)}
+.h-price-note{font-size:13px;color:var(--t3);margin-bottom:22px}
+.h-mini{list-style:none;display:flex;flex-direction:column;gap:7px;margin-bottom:26px}
+.h-mini li{font-size:14px;color:var(--t2);display:flex;align-items:center;gap:9px}
+.h-mini li svg{flex-shrink:0;color:var(--green)}
+.h-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+/* Primary CTA with shimmer */
+.btn-primary{position:relative;overflow:hidden;background:var(--amber);color:#000;font-weight:700;
+  font-size:16px;border-radius:999px;padding:14px 28px;border:none;font-family:var(--font);cursor:pointer;
+  transition:background .2s,transform .15s,box-shadow .2s;white-space:nowrap;display:inline-block}
+.btn-primary::after{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.35) 50%,transparent 60%);
+  transform:translateX(-100%);animation:shimmer 3s ease-in-out infinite 1s}
+@keyframes shimmer{0%,100%{transform:translateX(-100%)}40%,60%{transform:translateX(100%)}}
+.btn-primary:hover{background:var(--amber2);transform:scale(1.03);box-shadow:0 0 40px rgba(245,158,11,.35)}
+.btn-secondary{background:transparent;color:var(--t1);font-weight:600;font-size:16px;
+  border-radius:999px;padding:14px 28px;border:1px solid var(--border2);
+  transition:border-color .2s,transform .15s,color .2s;white-space:nowrap;display:inline-block;cursor:pointer;font-family:var(--font)}
+.btn-secondary:hover{border-color:rgba(245,158,11,.5);color:var(--amber);transform:scale(1.02)}
+.h-badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.badge{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);
+  border:1px solid var(--border);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;color:var(--t3)}
+.badge svg{width:12px;height:12px;flex-shrink:0}
+.h-live{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t3)}
+.h-live .live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;flex-shrink:0;animation:pulse 2s infinite}
+.h-live strong{color:var(--t2)}
 
-/* DASHBOARD CARD */
-.dashboard-wrap{position:relative}
-.dashboard-outer{background:linear-gradient(135deg,rgba(245,158,11,.22),rgba(99,102,241,.18),rgba(245,158,11,.1));border-radius:var(--r);padding:2px}
-.dashboard-inner{background:var(--bg2);border-radius:calc(var(--r) - 2px);padding:2px}
-.dashboard-core{background:var(--bg1);border-radius:calc(var(--r) - 4px);padding:20px;box-shadow:0 0 60px rgba(245,158,11,.08),0 40px 80px rgba(0,0,0,.6)}
-.term-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px}
-.term-dots{display:flex;gap:5px}
-.term-dots span{width:11px;height:11px;border-radius:50%}
-.term-dots .rd{background:#ef4444}.term-dots .yl{background:#f59e0b}.term-dots .gn{background:#10b981}
-.term-title{font-family:var(--mono);font-size:12px;color:var(--text3);margin-left:auto;margin-right:auto}
-.active-badge{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3);border-radius:999px;font-size:11px;font-weight:700;padding:3px 9px;letter-spacing:.05em}
-.chart-area{margin-bottom:16px;height:80px}
-.chart-area svg{width:100%;height:100%}
-.pnl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.pnl-num{font-size:28px;font-weight:800;color:var(--green);font-family:var(--mono);letter-spacing:-.02em}
-.pnl-badge{background:rgba(16,185,129,.15);color:var(--green);border-radius:999px;font-size:12px;font-weight:700;padding:4px 10px}
-.trade-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)}
-.trade-row:last-of-type{border-bottom:none}
-.trade-pair{font-family:var(--mono);font-size:13px;font-weight:600}
-.trade-dir{font-size:11px;font-weight:700;border-radius:4px;padding:2px 6px}
-.long{background:rgba(16,185,129,.15);color:var(--green)}.short{background:rgba(239,68,68,.15);color:var(--red)}
-.trade-pnl{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--green)}
-.dash-footer{display:flex;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
-.dash-stat{text-align:center;font-size:11px;color:var(--text3);font-weight:600;letter-spacing:.03em}
-.dash-stat span{display:block;font-size:14px;font-weight:700;color:var(--text2);margin-bottom:2px}
+/* ── DASHBOARD CARD ── */
+.dash-wrap{position:relative}
+.dash-outer{border-radius:20px;padding:1.5px;background:linear-gradient(135deg,rgba(245,158,11,.28),rgba(99,102,241,.18) 50%,rgba(245,158,11,.1))}
+.dash-middle{background:var(--s2);border-radius:19px;padding:1.5px}
+.dash-core{background:var(--s1);border-radius:18px;padding:22px;
+  box-shadow:0 0 80px rgba(245,158,11,.07),0 40px 80px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05)}
+.dash-titlebar{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.dash-dots{display:flex;gap:5px}
+.dash-dots span{width:10px;height:10px;border-radius:50%}
+.dd-r{background:#ef4444}.dd-y{background:#f59e0b}.dd-g{background:#10b981}
+.dash-name{font-family:var(--mono);font-size:11px;color:var(--t3);flex:1;text-align:center}
+.dash-status{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.25);
+  border-radius:999px;font-size:10px;font-weight:700;padding:2px 8px;letter-spacing:.06em}
+.chart-wrap{height:78px;margin-bottom:14px}
+.chart-wrap svg{width:100%;height:100%}
+.pnl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.pnl-num{font-size:26px;font-weight:800;color:var(--green);font-family:var(--mono);letter-spacing:-.02em}
+.pnl-chip{background:rgba(16,185,129,.14);color:var(--green);border-radius:999px;font-size:12px;font-weight:700;padding:3px 10px}
+.t-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)}
+.t-row:last-of-type{border-bottom:none}
+.t-pair{font-family:var(--mono);font-size:12px;font-weight:600}
+.t-dir{font-size:10px;font-weight:700;border-radius:4px;padding:2px 6px}
+.long{background:rgba(16,185,129,.14);color:var(--green)}.short{background:rgba(239,68,68,.14);color:var(--red)}
+.t-pnl{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--green)}
+.dash-stats{display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.ds{text-align:center;font-size:10px;color:var(--t3);font-weight:600;letter-spacing:.04em}
+.ds span{display:block;font-size:13px;font-weight:700;color:var(--t2);margin-bottom:2px}
 
-/* TICKER */
-#ticker{border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:18px 0;overflow:hidden;background:var(--bg1)}
-.ticker-track{display:flex;animation:ticker 22s linear infinite;will-change:transform;width:max-content}
-.ticker-track:hover{animation-play-state:paused}
-.ticker-item{white-space:nowrap;padding:0 36px;font-size:13px;font-weight:700;letter-spacing:.12em;color:var(--text3);text-transform:uppercase}
-.ticker-sep{color:var(--border3);padding:0 4px}
+/* ── EXCHANGE STRIP ── */
+#exchanges{border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:20px 7vw;background:var(--s1);overflow:hidden}
+.ex-label{text-align:center;font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
+.ex-track{display:flex;gap:0;animation:ticker 24s linear infinite;width:max-content}
+.ex-track:hover{animation-play-state:paused}
+.ex-item{display:flex;align-items:center;justify-content:center;padding:0 36px;font-size:13px;font-weight:700;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;opacity:.55;transition:opacity .2s;white-space:nowrap}
+.ex-item:hover{opacity:1}
+.ex-sep{color:var(--border2);padding:0}
 @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 
-/* SECTIONS */
-section{padding:100px 6vw}
-.section-center{max-width:1200px;margin:0 auto}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:999px;padding:5px 14px;font-size:12px;font-weight:700;color:var(--amber);letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px}
-h2{font-size:clamp(28px,3.5vw,44px);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:16px}
+/* ── SECTION GLOBALS ── */
+.section{padding:110px 7vw;position:relative;z-index:1}
+.section-inner{max-width:1200px;margin:0 auto}
+.section-tag{display:inline-flex;align-items:center;gap:8px;background:var(--amber3);
+  border:1px solid rgba(245,158,11,.2);border-radius:999px;padding:5px 14px;
+  font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.09em;text-transform:uppercase;margin-bottom:14px}
+.section-title{font-size:clamp(28px,3.5vw,46px);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:14px}
+.section-sub{font-size:16px;color:var(--t2);max-width:520px;line-height:1.7}
 
-/* WHAT'S INCLUDED */
-#included{background:var(--bg1)}
-.included-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:48px}
-.file-card{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:22px 20px;transition:border-color .25s,transform .25s var(--ease)}
-.file-card:hover{border-color:rgba(245,158,11,.35);transform:translateY(-3px)}
-.file-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:700;margin-bottom:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);color:var(--amber);letter-spacing:0}
-.file-name{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px}
-.file-desc{font-size:13px;color:var(--text3);line-height:1.55}
-.file-tag{display:inline-block;margin-top:10px;font-size:11px;font-weight:700;color:var(--amber);background:rgba(245,158,11,.1);border-radius:6px;padding:2px 8px}
+/* ── ZIG-ZAG BENEFITS ── */
+.zz-grid{display:flex;flex-direction:column;gap:0;margin-top:64px}
+.zz-row{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;padding:56px 0;border-top:1px solid var(--border)}
+.zz-row:first-child{border-top:none}
+.zz-row.flip .zz-visual{order:-1}
+.zz-tag{display:inline-block;background:var(--amber3);border:1px solid rgba(245,158,11,.2);
+  border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.07em;text-transform:uppercase;margin-bottom:14px}
+.zz-row h3{font-size:clamp(22px,2.5vw,32px);font-weight:800;letter-spacing:-.03em;line-height:1.15;margin-bottom:14px}
+.zz-row p{font-size:15px;color:var(--t2);line-height:1.7;margin-bottom:20px}
+.zz-list{list-style:none;display:flex;flex-direction:column;gap:10px}
+.zz-list li{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--t2)}
+.zz-list li svg{flex-shrink:0;color:var(--green)}
+/* visual cards */
+.zz-visual{border-radius:20px;overflow:hidden;background:var(--s2);border:1px solid var(--border2);padding:28px;
+  position:relative;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.zz-visual::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(245,158,11,.06),transparent);pointer-events:none}
+/* terminal */
+.terminal{background:var(--bg);border-radius:10px;padding:16px;font-family:var(--mono);font-size:12px;line-height:1.7}
+.term-line .cmd{color:var(--amber)}.term-line .ok{color:var(--green)}.term-line .dim{color:var(--t3)}
+.term-line .out{color:var(--t2)}
+/* phone mockup */
+.phone{width:180px;margin:0 auto;background:var(--bg);border-radius:32px;border:2px solid var(--border2);padding:16px 12px;position:relative}
+.phone-notch{width:60px;height:10px;background:var(--s2);border-radius:999px;margin:0 auto 12px}
+.tg-msg{background:var(--s2);border-radius:10px 10px 10px 2px;padding:10px 12px;font-size:11px;margin-bottom:8px;border-left:2px solid var(--amber)}
+.tg-msg .tg-label{font-size:10px;font-weight:700;color:var(--amber);margin-bottom:3px}
+.tg-msg .tg-text{color:var(--t2);line-height:1.5}
+/* mini dashboard */
+.mini-dash{background:var(--bg);border-radius:10px;padding:14px}
+.md-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.md-label{font-size:11px;color:var(--t3)}
+.md-val{font-size:13px;font-weight:700;font-family:var(--mono)}
+.md-green{color:var(--green)}.md-red{color:var(--red)}
 
-/* TECH SPECS TABLE */
-#specs{background:var(--bg)}
-.specs-table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;margin-top:48px}
+/* ── STATS STRIP ── */
+#stats{background:var(--s1)}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border-radius:var(--r2);overflow:hidden;border:1px solid var(--border)}
+.stat-cell{background:var(--s1);padding:32px 24px;text-align:center;position:relative}
+.stat-cell::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:40%;height:2px;background:linear-gradient(90deg,transparent,var(--amber),transparent)}
+.stat-num{font-size:40px;font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1}
+.stat-label{font-size:12px;color:var(--t3);font-weight:600;margin-top:6px;text-transform:uppercase;letter-spacing:.07em}
+
+/* ── INCLUDED ── */
+.inc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:48px}
+.inc-card{background:var(--s2);border:1px solid var(--border2);border-radius:var(--r);padding:22px;
+  transition:border-color .25s,transform .3s var(--ease2),box-shadow .3s;cursor:default}
+.inc-card:hover{border-color:rgba(245,158,11,.3);transform:translateY(-4px);box-shadow:0 20px 40px rgba(0,0,0,.4),0 0 30px rgba(245,158,11,.06)}
+.inc-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.02em;flex-shrink:0}
+.ic-py{background:rgba(99,131,240,.15);border:1px solid rgba(99,131,240,.2);color:#6383f0}
+.ic-dir{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2);color:var(--amber)}
+.ic-pdf{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);color:var(--red)}
+.ic-inf{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.2);color:var(--green)}
+.inc-name{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--t1);margin-bottom:5px}
+.inc-desc{font-size:12px;color:var(--t3);line-height:1.55}
+.inc-tag{display:inline-block;margin-top:9px;font-size:10px;font-weight:700;color:var(--amber);background:var(--amber3);border-radius:5px;padding:2px 7px}
+
+/* ── SPECS TABLE ── */
+.specs-wrap{margin-top:48px;border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden}
+.specs-table{width:100%;border-collapse:collapse}
 .specs-table tr{border-bottom:1px solid var(--border)}
 .specs-table tr:last-child{border-bottom:none}
-.specs-table tr:nth-child(even){background:rgba(255,255,255,.015)}
-.specs-table td{padding:16px 24px;font-size:14px;vertical-align:top;line-height:1.55}
-.specs-table td:first-child{width:36%;font-weight:600;color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.04em;border-right:1px solid var(--border)}
-.specs-table td:last-child{color:var(--text2)}
-.spec-highlight{color:var(--amber);font-weight:700}
-.spec-tags{display:flex;flex-wrap:wrap;gap:6px}
-.spec-tag{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;color:var(--text2)}
+.specs-table tr:nth-child(even){background:rgba(255,255,255,.013)}
+.specs-table tr:hover{background:rgba(245,158,11,.025)}
+.specs-table td{padding:15px 24px;font-size:13px;vertical-align:top;line-height:1.6}
+.specs-table td:first-child{width:34%;font-weight:600;color:var(--t3);font-size:12px;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid var(--border)}
+.specs-table td:last-child{color:var(--t2)}
+.s-hi{color:var(--amber);font-weight:700}
+.s-tags{display:flex;flex-wrap:wrap;gap:5px}
+.s-tag{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600;color:var(--t2)}
 
-/* HOW IT WORKS */
-#how .steps-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden}
-.step{padding:36px 32px;border-right:1px solid var(--border2)}
-.step:last-child{border-right:none}
-.step-num{width:36px;height:36px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:var(--amber);margin-bottom:18px}
-.step h3{font-size:18px;font-weight:700;margin-bottom:10px;letter-spacing:-.02em}
-.step p{font-size:15px;color:var(--text2);line-height:1.65}
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);margin-top:32px;overflow:hidden}
-.stat-cell{background:var(--bg1);padding:28px 20px;text-align:center}
-.stat-num{font-size:36px;font-weight:800;color:var(--amber);letter-spacing:-.04em;font-family:var(--mono)}
-.stat-label{font-size:13px;color:var(--text3);font-weight:600;margin-top:4px;text-transform:uppercase;letter-spacing:.06em}
+/* ── COMPARISON ── */
+.comp-wrap{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:820px;margin:48px auto 0}
+.comp-card{border-radius:var(--r);padding:30px}
+.comp-bad{background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.12)}
+.comp-good{background:rgba(16,185,129,.04);border:1px solid rgba(16,185,129,.18)}
+.comp-title{font-size:16px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:9px}
+.comp-bad .comp-title{color:var(--red)}.comp-good .comp-title{color:var(--green)}
+.comp-list{list-style:none;display:flex;flex-direction:column;gap:11px}
+.comp-list li{font-size:14px;color:var(--t2);display:flex;align-items:flex-start;gap:9px;line-height:1.5}
+.x{color:var(--red);font-weight:700;flex-shrink:0;font-size:13px}
+.ck{color:var(--green);font-weight:700;flex-shrink:0;font-size:13px}
+.math-card{text-align:center;max-width:460px;margin:32px auto 0;
+  background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);
+  border-radius:var(--r);padding:22px}
+.math-card p{font-size:16px;color:var(--t2);line-height:1.7}
+.math-card strong{color:var(--amber)}
 
-/* BENTO */
-#features .bento{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
-.bento-cell{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:28px}
-.bento-wide{grid-column:span 8}
-.bento-narrow{grid-column:span 4}
-.bento-third{grid-column:span 4}
-.bento-icon{width:36px;height:36px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;font-size:17px}
-.bento-cell h3{font-size:18px;font-weight:700;margin-bottom:8px;letter-spacing:-.02em}
-.bento-cell p{font-size:14px;color:var(--text2);line-height:1.6}
-.bar-chart{display:flex;align-items:flex-end;gap:6px;height:72px;margin-top:20px}
-.bar{background:linear-gradient(180deg,var(--amber),rgba(245,158,11,.3));border-radius:4px 4px 2px 2px;width:100%;transition:height .6s var(--ease)}
-.big-num{font-size:56px;font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1;margin:12px 0 8px}
-.code-snippet{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;font-family:var(--mono);font-size:11px;color:var(--green);line-height:1.6;margin-top:10px}
-.checklist{list-style:none;margin-top:14px;display:flex;flex-direction:column;gap:8px}
-.checklist li{font-size:14px;color:var(--text2);display:flex;align-items:center;gap:8px}
-.checklist li::before{content:'✓';color:var(--green);font-weight:700;font-size:13px;flex-shrink:0}
+/* ── REVIEWS ── */
+.reviews-top{display:grid;grid-template-columns:200px 1fr;gap:48px;align-items:start;margin-bottom:48px}
+.rv-score{text-align:center}
+.rv-big{font-size:68px;font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1}
+.rv-stars{font-size:18px;color:var(--amber);letter-spacing:2px;margin:5px 0 4px}
+.rv-total{font-size:13px;color:var(--t3)}
+.bar-rows{display:flex;flex-direction:column;gap:9px;padding-top:4px}
+.bar-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--t3)}
+.bar-lbl{width:26px;text-align:right;flex-shrink:0;font-weight:600}
+.bar-track{flex:1;height:7px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden}
+.bar-fill{height:100%;background:linear-gradient(90deg,var(--amber),var(--amber2));border-radius:999px;transition:width 1.2s var(--ease2)}
+.bar-pct{width:30px;text-align:right;flex-shrink:0;font-weight:600;color:var(--t2)}
+.test-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.test-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:26px;
+  transition:border-color .25s,transform .3s var(--ease2)}
+.test-card:hover{border-color:rgba(245,158,11,.25);transform:translateY(-3px)}
+.tc-stars{color:var(--amber);font-size:14px;letter-spacing:1px;margin-bottom:12px}
+.tc-quote{font-size:14px;color:var(--t2);line-height:1.7;margin-bottom:18px;font-style:italic}
+.tc-author{display:flex;align-items:center;gap:11px}
+.tc-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),var(--amber));
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff;flex-shrink:0}
+.tc-name{font-weight:700;font-size:13px}
+.tc-sub{font-size:11px;color:var(--t3)}
 
-/* COMPARISON */
-#compare{background:var(--bg1)}
-.comp-wrap{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:840px;margin:0 auto}
-.comp-card{border-radius:var(--r);padding:32px}
-.comp-bad{background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15)}
-.comp-good{background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.2)}
-.comp-header{font-size:17px;font-weight:700;margin-bottom:20px;display:flex;align-items:center;gap:10px}
-.comp-bad .comp-header{color:var(--red)}
-.comp-good .comp-header{color:var(--green)}
-.comp-list{list-style:none;display:flex;flex-direction:column;gap:12px}
-.comp-list li{font-size:15px;color:var(--text2);display:flex;align-items:flex-start;gap:10px;line-height:1.5}
-.comp-list .xi{color:var(--red);font-weight:700;flex-shrink:0}
-.comp-list .ck{color:var(--green);font-weight:700;flex-shrink:0}
-.math-box{text-align:center;margin-top:40px;max-width:500px;margin-left:auto;margin-right:auto;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:var(--r);padding:24px}
-.math-box p{font-size:17px;color:var(--text2)}.math-box strong{color:var(--amber)}
+/* ── PRICING ── */
+.pricing-wrap{max-width:460px;margin:48px auto 0}
+.p-outer{border-radius:22px;padding:2px;background:linear-gradient(135deg,rgba(245,158,11,.4),rgba(99,102,241,.22),rgba(245,158,11,.15))}
+.p-mid{background:var(--s2);border-radius:21px;padding:2px}
+.p-core{background:var(--s1);border-radius:20px;padding:36px;box-shadow:0 0 60px rgba(245,158,11,.06),inset 0 1px 0 rgba(255,255,255,.05)}
+.p-topbar{height:2px;background:linear-gradient(90deg,var(--amber),var(--amber2),transparent);border-radius:2px;margin-bottom:26px}
+.p-badge{display:inline-block;background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.28);
+  border-radius:999px;font-size:10px;font-weight:700;color:var(--amber);letter-spacing:.1em;padding:3px 12px;margin-bottom:18px}
+.p-amounts{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
+.p-main{font-size:68px;font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1}
+.p-was{font-size:26px;font-weight:600;color:var(--t3);text-decoration:line-through;font-family:var(--mono)}
+.p-note{font-size:13px;color:var(--t3);margin-bottom:22px}
+.p-list{list-style:none;display:flex;flex-direction:column;gap:11px;margin-bottom:26px}
+.p-list li{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--t2)}
+.p-list li svg{flex-shrink:0;color:var(--green)}
+.btn-buy{width:100%;background:var(--amber);color:#000;font-weight:800;font-size:17px;
+  border-radius:999px;padding:16px;border:none;font-family:var(--font);cursor:pointer;
+  transition:background .2s,transform .15s,box-shadow .2s;position:relative;overflow:hidden}
+.btn-buy::after{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.3) 50%,transparent 60%);
+  transform:translateX(-100%);animation:shimmer 3s ease-in-out infinite 0.5s}
+.btn-buy:hover{background:var(--amber2);transform:scale(1.02);box-shadow:0 0 40px rgba(245,158,11,.4)}
+.p-secure{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--t3);margin-top:12px}
 
-/* REVIEWS */
-#reviews{background:var(--bg1)}
-.reviews-top{display:grid;grid-template-columns:220px 1fr;gap:48px;align-items:start;margin-bottom:48px}
-.reviews-score-block{text-align:center}
-.reviews-big{font-size:72px;font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1}
-.reviews-stars-big{font-size:20px;color:var(--amber);letter-spacing:2px;margin:6px 0 4px}
-.reviews-total{font-size:14px;color:var(--text3)}
-.star-bars{display:flex;flex-direction:column;gap:8px;padding-top:4px}
-.star-bar-row{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text3)}
-.star-bar-label{width:28px;text-align:right;flex-shrink:0;font-weight:600}
-.star-bar-track{flex:1;height:8px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden}
-.star-bar-fill{height:100%;background:var(--amber);border-radius:999px;transition:width 1s var(--ease)}
-.star-bar-pct{width:34px;text-align:right;flex-shrink:0;font-weight:600;color:var(--text2)}
-.test-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-.test-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:28px}
-.stars{color:var(--amber);font-size:15px;margin-bottom:14px;letter-spacing:2px}
-.test-quote{font-size:15px;color:var(--text2);line-height:1.7;margin-bottom:20px;font-style:italic}
-.test-author{display:flex;align-items:center;gap:12px}
-.avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),var(--amber));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;flex-shrink:0}
-.author-name{font-weight:700;font-size:14px}
-.author-ex{font-size:12px;color:var(--text3)}
-
-/* PRICING */
-.price-center{max-width:480px;margin:0 auto}
-.price-outer{background:linear-gradient(135deg,rgba(245,158,11,.35),rgba(99,102,241,.2),rgba(245,158,11,.2));border-radius:var(--r);padding:2px}
-.price-inner{background:var(--bg2);border-radius:calc(var(--r) - 2px);padding:2px}
-.price-core{background:var(--bg1);border-radius:calc(var(--r) - 4px);padding:36px}
-.price-topbar{height:3px;background:linear-gradient(90deg,var(--amber),var(--amber2),transparent);border-radius:2px;margin-bottom:28px}
-.price-badge{display:inline-block;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);border-radius:999px;font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.1em;padding:4px 12px;margin-bottom:20px}
-.price-amount-row{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
-.price-amount{font-size:72px;font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1}
-.price-was{font-size:28px;font-weight:600;color:var(--text3);text-decoration:line-through;font-family:var(--mono)}
-.price-sub-label{font-size:14px;color:var(--text3);margin-bottom:24px}
-.price-checklist{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:28px}
-.price-checklist li{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--text2)}
-.price-checklist li::before{content:'✓';color:var(--green);font-weight:700;font-size:14px;flex-shrink:0}
-.btn-amber-full{width:100%;background:var(--amber);color:#000;font-weight:800;font-size:17px;border-radius:999px;padding:16px;text-align:center;transition:background .2s,transform .15s;display:block;cursor:pointer;border:none;font-family:var(--font);white-space:nowrap}
-.btn-amber-full:hover{background:var(--amber2);transform:scale(1.02)}
-.secure-line{display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;color:var(--text3);margin-top:14px}
-
-/* FAQ */
-#faq{background:var(--bg)}
-.faq-list{max-width:720px;margin:0 auto;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden}
+/* ── FAQ ── */
+.faq-box{max-width:700px;margin:48px auto 0;border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden}
 .faq-item{border-bottom:1px solid var(--border)}
 .faq-item:last-child{border-bottom:none}
-.faq-q{width:100%;background:none;border:none;padding:22px 28px;display:flex;align-items:center;justify-content:space-between;font-family:var(--font);font-size:16px;font-weight:600;color:var(--text);cursor:pointer;text-align:left;gap:16px;transition:color .2s}
+.faq-q{width:100%;background:none;border:none;padding:20px 26px;display:flex;align-items:center;
+  justify-content:space-between;font-family:var(--font);font-size:15px;font-weight:600;
+  color:var(--t1);cursor:pointer;text-align:left;gap:14px;transition:color .2s}
 .faq-q:hover{color:var(--amber)}
-.faq-icon{width:26px;height:26px;border-radius:50%;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2);flex-shrink:0;transition:transform .3s var(--ease),border-color .2s}
+.faq-icon{width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--t2);
+  flex-shrink:0;transition:transform .3s var(--ease),border-color .2s,color .2s}
 .faq-item.open .faq-icon{transform:rotate(45deg);border-color:var(--amber);color:var(--amber)}
-.faq-a{max-height:0;overflow:hidden;transition:max-height .45s var(--ease)}
-.faq-a-inner{padding:0 28px 22px;font-size:15px;color:var(--text2);line-height:1.7}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .4s var(--ease)}
+.faq-a-in{padding:0 26px 20px;font-size:14px;color:var(--t2);line-height:1.75}
 
-/* FINAL CTA */
-.cta-card{max-width:780px;margin:0 auto;background:radial-gradient(ellipse 70% 80% at 50% 110%,rgba(245,158,11,.14) 0%,transparent 70%),var(--bg1);border:1px solid rgba(245,158,11,.22);border-radius:var(--r);padding:72px 48px;text-align:center}
-.cta-card h2{margin-bottom:14px}
-.cta-card p{color:var(--text2);margin-bottom:36px;font-size:17px}
+/* ── FINAL CTA ── */
+.cta-box{max-width:740px;margin:0 auto;
+  background:radial-gradient(ellipse 80% 90% at 50% 110%,rgba(245,158,11,.13) 0%,transparent 65%),var(--s1);
+  border:1px solid rgba(245,158,11,.2);border-radius:var(--r2);padding:72px 48px;text-align:center}
+.cta-box h2{font-size:clamp(28px,3.5vw,44px);font-weight:800;letter-spacing:-.04em;margin-bottom:12px}
+.cta-box p{color:var(--t2);font-size:17px;margin-bottom:32px;line-height:1.65}
+.cta-note{margin-top:14px;font-size:12px;color:var(--t3)}
 
-/* FOOTER */
-footer{border-top:1px solid var(--border);padding:40px 6vw 32px;background:var(--bg)}
-.footer-row{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:20px}
-.footer-logo{font-weight:800;font-size:16px;color:var(--amber)}
-.footer-links{display:flex;gap:24px;flex-wrap:wrap}
-.footer-links a{font-size:14px;color:var(--text3);transition:color .2s}
-.footer-links a:hover{color:var(--text2)}
-.footer-copy{font-size:13px;color:var(--text3)}
-.footer-risk{font-size:12px;color:var(--text3);line-height:1.6;border-top:1px solid var(--border);padding-top:20px;max-width:760px;margin-top:16px}
+/* ── FOOTER ── */
+footer{border-top:1px solid var(--border);padding:36px 7vw 28px;background:var(--bg)}
+.foot-top{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:16px}
+.foot-logo{font-weight:800;font-size:15px;color:var(--amber)}
+.foot-links{display:flex;gap:20px;flex-wrap:wrap}
+.foot-links a{font-size:13px;color:var(--t3);transition:color .2s}
+.foot-links a:hover{color:var(--t2)}
+.foot-copy{font-size:12px;color:var(--t3)}
+.foot-risk{font-size:11px;color:var(--t3);line-height:1.65;border-top:1px solid var(--border);padding-top:16px;max-width:720px;margin-top:14px}
 
-/* MODAL */
-#modal-overlay{display:none;position:fixed;inset:0;background:rgba(4,6,14,.85);z-index:2000;align-items:center;justify-content:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-#modal-overlay.open{display:flex}
-.modal-outer{background:linear-gradient(135deg,rgba(245,158,11,.3),rgba(99,102,241,.2));border-radius:var(--r);padding:2px;max-width:460px;width:calc(100% - 32px)}
-.modal-inner{background:var(--bg2);border-radius:calc(var(--r) - 2px);padding:2px}
-.modal-core{background:var(--bg1);border-radius:calc(var(--r) - 4px);padding:32px;position:relative}
-.modal-close{position:absolute;top:16px;right:16px;background:var(--border);border:none;color:var(--text2);width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
-.modal-close:hover{background:var(--border2)}
-.modal-h{font-size:20px;font-weight:800;margin-bottom:6px;letter-spacing:-.03em}
-.modal-sub{font-size:13px;color:var(--text3);margin-bottom:24px}
-.modal-product{display:flex;justify-content:space-between;align-items:center;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:16px 18px;margin-bottom:24px}
-.modal-prod-name{font-weight:700;font-size:15px}
-.modal-prod-sub{font-size:12px;color:var(--text3)}
-.modal-price{font-size:24px;font-weight:800;color:var(--amber);font-family:var(--mono)}
-.modal-checks{display:flex;flex-direction:column;gap:12px;margin-bottom:28px}
-.modal-check-row{display:flex;align-items:flex-start;gap:12px;cursor:pointer}
-.modal-check-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--amber);cursor:pointer;flex-shrink:0;margin-top:2px}
-.modal-check-row span{font-size:14px;color:var(--text2);line-height:1.5}
-#modal-btn{width:100%;background:linear-gradient(90deg,var(--amber),var(--amber2));color:#000;font-weight:800;font-size:16px;border-radius:999px;padding:15px;border:none;cursor:pointer;font-family:var(--font);transition:opacity .2s,transform .15s;white-space:nowrap}
-#modal-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
-#modal-btn:not(:disabled):hover{transform:scale(1.02)}
+/* ── MODAL ── */
+#modal{display:none;position:fixed;inset:0;background:rgba(5,8,20,.88);z-index:200;
+  align-items:center;justify-content:center;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#modal.open{display:flex}
+.m-outer{background:linear-gradient(135deg,rgba(245,158,11,.3),rgba(99,102,241,.18));border-radius:20px;padding:2px;max-width:440px;width:calc(100% - 24px)}
+.m-mid{background:var(--s2);border-radius:19px;padding:2px}
+.m-core{background:var(--s1);border-radius:18px;padding:30px;position:relative}
+.m-close{position:absolute;top:14px;right:14px;background:var(--border);border:none;color:var(--t2);
+  width:28px;height:28px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
+.m-close:hover{background:var(--border2)}
+.m-title{font-size:19px;font-weight:800;margin-bottom:5px;letter-spacing:-.03em}
+.m-sub{font-size:12px;color:var(--t3);margin-bottom:22px}
+.m-product{display:flex;justify-content:space-between;align-items:center;
+  background:var(--s2);border:1px solid var(--border2);border-radius:11px;padding:14px 16px;margin-bottom:22px}
+.m-prod-name{font-weight:700;font-size:14px}
+.m-prod-sub{font-size:11px;color:var(--t3)}
+.m-price{font-size:22px;font-weight:800;color:var(--amber);font-family:var(--mono)}
+.m-checks{display:flex;flex-direction:column;gap:11px;margin-bottom:24px}
+.m-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+.m-check input{width:16px;height:16px;accent-color:var(--amber);cursor:pointer;flex-shrink:0;margin-top:2px}
+.m-check span{font-size:13px;color:var(--t2);line-height:1.5}
+#m-btn{width:100%;background:linear-gradient(90deg,var(--amber),var(--amber2));color:#000;font-weight:800;
+  font-size:15px;border-radius:999px;padding:14px;border:none;cursor:pointer;font-family:var(--font);transition:opacity .2s,transform .15s}
+#m-btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
+#m-btn:not(:disabled):hover{transform:scale(1.02)}
 
-/* REVEAL */
-.reveal{opacity:0;transform:translateY(26px);transition:opacity .65s var(--ease),transform .65s var(--ease)}
-.reveal.visible{opacity:1;transform:translateY(0)}
+/* ── REVEAL ── */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease2),transform .7s var(--ease2)}
+.reveal.vis{opacity:1;transform:translateY(0)}
+.reveal-d1{transition-delay:.1s}.reveal-d2{transition-delay:.2s}.reveal-d3{transition-delay:.3s}
 
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.reveal{opacity:1;transform:none}}
 
+/* ── RESPONSIVE ── */
 @media(max-width:1024px){
-  .included-grid{grid-template-columns:repeat(2,1fr)}
-  .reviews-top{grid-template-columns:1fr;gap:32px}
+  .inc-grid{grid-template-columns:repeat(2,1fr)}
+  .reviews-top{grid-template-columns:1fr;gap:28px}
 }
 @media(max-width:900px){
   #hero{grid-template-columns:1fr;padding:120px 5vw 60px}
-  .dashboard-wrap{display:none}
-  #features .bento{grid-template-columns:1fr 1fr}
-  .bento-wide,.bento-narrow,.bento-third{grid-column:span 2}
+  .dash-wrap{display:none}
+  .zz-row{grid-template-columns:1fr;gap:32px}
+  .zz-row.flip .zz-visual{order:unset}
   .comp-wrap{grid-template-columns:1fr}
   .test-grid{grid-template-columns:1fr}
-  #how .steps-grid{grid-template-columns:1fr}
-  .step{border-right:none;border-bottom:1px solid var(--border2)}
-  .step:last-child{border-bottom:none}
-  .stats-row{grid-template-columns:repeat(2,1fr)}
-  .specs-table td:first-child{width:42%}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:760px){
   .nav-links,.nav-cta{display:none}
   .hamburger{display:flex}
-  #nav{gap:0;justify-content:space-between;padding:10px 16px}
-  .included-grid{grid-template-columns:1fr 1fr}
+  #nav{padding:8px 14px 8px 18px}
 }
-@media(max-width:600px){
-  #features .bento{grid-template-columns:1fr}
-  .bento-wide,.bento-narrow,.bento-third{grid-column:span 1}
-  .included-grid{grid-template-columns:1fr}
-  .cta-card{padding:48px 24px}
-  .modal-core{padding:24px 20px}
-  .specs-table td{padding:12px 16px;font-size:13px}
-  .specs-table td:first-child{width:44%}
+@media(max-width:640px){
+  .inc-grid{grid-template-columns:1fr 1fr}
+  .cta-box{padding:48px 20px}
+  .section{padding:80px 5vw}
+}
+@media(max-width:480px){
+  .inc-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
 <body>
 
+<!-- AMBIENT -->
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
 <!-- NAV -->
 <nav id="nav">
   <span class="nav-logo">AiCash</span>
   <div class="nav-links">
-    <a href="#included">What's Included</a>
-    <a href="#specs">Specs</a>
+    <a href="#benefits">How It Works</a>
+    <a href="#included">What's Inside</a>
     <a href="#reviews">Reviews</a>
     <a href="#pricing">Pricing</a>
     <a href="#faq">FAQ</a>
   </div>
-  <button class="nav-cta" onclick="openModal()">Get Access &mdash; $297</button>
-  <button class="hamburger" id="hamburger" aria-label="Menu" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+  <button class="nav-cta" onclick="openModal()">Get Access — $297</button>
+  <button class="hamburger" id="ham" onclick="toggleMenu()"><span></span><span></span><span></span></button>
 </nav>
 <div id="mob-menu">
-  <button class="mob-close" onclick="toggleMenu()">&#x2715;</button>
-  <a href="#included" onclick="toggleMenu()">What's Included</a>
-  <a href="#specs" onclick="toggleMenu()">Specs</a>
+  <button class="mob-close" onclick="toggleMenu()">✕</button>
+  <a href="#benefits" onclick="toggleMenu()">How It Works</a>
+  <a href="#included" onclick="toggleMenu()">What's Inside</a>
   <a href="#reviews" onclick="toggleMenu()">Reviews</a>
   <a href="#pricing" onclick="toggleMenu()">Pricing</a>
   <a href="#faq" onclick="toggleMenu()">FAQ</a>
@@ -349,545 +419,585 @@ footer{border-top:1px solid var(--border);padding:40px 6vw 32px;background:var(-
 <!-- HERO -->
 <div id="hero">
   <div>
-    <div class="hero-badge"><span class="dot-pulse"></span>AI TRADING SYSTEM &middot; FULL SOURCE CODE</div>
-    <h1>Own the bot.<br><em>Keep every profit.</em></h1>
-
-    <div class="hero-stars">
-      <span class="stars-row">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
-      <span class="stars-score">4.9</span>
-      <span class="stars-sep">&middot;</span>
-      <span class="stars-count">312 verified buyers</span>
+    <div class="h-eyebrow"><span class="dot"></span>AI Trading System · Full Source Code</div>
+    <h1 class="h-title">The bot that trades<br>while you <span class="accent">sleep.</span></h1>
+    <div class="h-stars">
+      <span class="star-icons">★★★★★</span>
+      <span class="star-score">4.9</span>
+      <span class="star-sep">·</span>
+      <span class="star-count">312 verified buyers</span>
     </div>
-
-    <div class="price-display">
-      <span class="price-main">$297</span>
-      <span class="price-old">$497</span>
+    <div class="h-price">
+      <span class="h-price-main">$297</span>
+      <span class="h-price-old">$497</span>
     </div>
-    <div class="price-note">One-time payment &middot; no subscription &middot; instant download</div>
-
-    <ul class="hero-mini-list">
-      <li>Complete Python source code — every file included</li>
-      <li>AI signal engine: RSI + MACD + Bollinger Bands</li>
-      <li>8+ exchange integrations (Binance, Bybit, OKX &amp; more)</li>
-      <li>Lifetime updates at no extra cost</li>
+    <div class="h-price-note">One-time payment · no subscription · instant download</div>
+    <ul class="h-mini">
+      <li>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Complete Python source code — every file, no black boxes
+      </li>
+      <li>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        8+ exchanges: Binance, Bybit, OKX, Kraken &amp; more
+      </li>
+      <li>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Telegram alerts · live dashboard · backtesting engine
+      </li>
+      <li>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Lifetime updates at no extra cost
+      </li>
     </ul>
-
-    <div class="hero-btns">
-      <button class="btn-amber" onclick="openModal()">Get Instant Access &rarr;</button>
-      <a href="#included" class="btn-ghost">See what's included</a>
+    <div class="h-btns">
+      <button class="btn-primary" onclick="openModal()">Get Instant Access →</button>
+      <a href="#benefits" class="btn-secondary">See how it works</a>
     </div>
-
-    <div class="trust-badges">
+    <div class="h-badges">
       <div class="badge">
         <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4v5c0 3.3 2.6 5.7 6 7 3.4-1.3 6-3.7 6-7V4L8 1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
         Stripe Secure
       </div>
       <div class="badge">
-        <svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Instant Download
+        <svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Instant Delivery
       </div>
       <div class="badge">
-        <svg viewBox="0 0 16 16" fill="none"><path d="M5 3h6M5 6h6M5 9h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><rect x="2" y="1" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.4"/></svg>
+        <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
         Full Source Code
       </div>
       <div class="badge">
-        <svg viewBox="0 0 16 16" fill="none"><path d="M8 1v6l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/></svg>
+        <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 2v6l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         Lifetime Updates
       </div>
     </div>
-
-    <div class="hero-proof"><span class="live-dot"></span>&nbsp;<strong>2,847 traders running right now</strong>&nbsp;&nbsp;&middot;&nbsp;&nbsp;73% avg win rate</div>
+    <div class="h-live"><span class="live-dot"></span>&nbsp;<strong>2,847 traders running right now</strong>&nbsp;·&nbsp;73% avg win rate</div>
   </div>
-  <div class="dashboard-wrap reveal">
-    <div class="dashboard-outer"><div class="dashboard-inner"><div class="dashboard-core">
-      <div class="term-bar">
-        <div class="term-dots"><span class="rd"></span><span class="yl"></span><span class="gn"></span></div>
-        <span class="term-title">aicash_bot.py &mdash; Live</span>
-        <span class="active-badge">&#9679; ACTIVE</span>
+  <div class="dash-wrap reveal">
+    <div class="dash-outer"><div class="dash-middle"><div class="dash-core">
+      <div class="dash-titlebar">
+        <div class="dash-dots"><span class="dd-r"></span><span class="dd-y"></span><span class="dd-g"></span></div>
+        <span class="dash-name">aicash_bot.py — Live</span>
+        <span class="dash-status">● ACTIVE</span>
       </div>
-      <div class="chart-area">
-        <svg viewBox="0 0 320 80" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#f59e0b" stop-opacity=".35"/>
-              <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <path d="M0 70 C30 65,60 55,90 45 C120 35,150 50,180 30 C210 10,240 20,270 12 C290 6,310 8,320 5" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M0 70 C30 65,60 55,90 45 C120 35,150 50,180 30 C210 10,240 20,270 12 C290 6,310 8,320 5 L320 80 L0 80 Z" fill="url(#cg)"/>
+      <div class="chart-wrap">
+        <svg viewBox="0 0 320 78" preserveAspectRatio="none">
+          <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f59e0b" stop-opacity=".3"/>
+            <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+          </linearGradient></defs>
+          <path d="M0 68C30 63,60 53,90 43C120 33,150 48,180 28C210 8,240 18,270 10C290 4,310 6,320 3" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M0 68C30 63,60 53,90 43C120 33,150 48,180 28C210 8,240 18,270 10C290 4,310 6,320 3L320 78L0 78Z" fill="url(#cg)"/>
         </svg>
       </div>
       <div class="pnl-row">
         <span class="pnl-num" id="pnl-total">+$341.20</span>
-        <span class="pnl-badge" id="pnl-pct">+14.2% today</span>
+        <span class="pnl-chip" id="pnl-pct">+14.2% today</span>
       </div>
-      <div class="trade-row"><span class="trade-pair">BTC/USDT</span><span class="trade-dir long">LONG</span><span class="trade-pnl" id="tr1">+$24.18</span></div>
-      <div class="trade-row"><span class="trade-pair">ETH/USDT</span><span class="trade-dir long">LONG</span><span class="trade-pnl" id="tr2">+$11.44</span></div>
-      <div class="trade-row"><span class="trade-pair">SOL/USDT</span><span class="trade-dir short">SHORT</span><span class="trade-pnl" id="tr3">+$8.92</span></div>
-      <div class="trade-row"><span class="trade-pair">BNB/USDT</span><span class="trade-dir long">LONG</span><span class="trade-pnl" id="tr4">+$18.30</span></div>
-      <div class="dash-footer">
-        <div class="dash-stat"><span>73%</span>Win Rate</div>
-        <div class="dash-stat"><span>24/7</span>Uptime</div>
-        <div class="dash-stat"><span>8+</span>Exchanges</div>
+      <div class="t-row"><span class="t-pair">BTC/USDT</span><span class="t-dir long">LONG</span><span class="t-pnl" id="tr1">+$24.18</span></div>
+      <div class="t-row"><span class="t-pair">ETH/USDT</span><span class="t-dir long">LONG</span><span class="t-pnl" id="tr2">+$11.44</span></div>
+      <div class="t-row"><span class="t-pair">SOL/USDT</span><span class="t-dir short">SHORT</span><span class="t-pnl" id="tr3">+$8.92</span></div>
+      <div class="t-row"><span class="t-pair">BNB/USDT</span><span class="t-dir long">LONG</span><span class="t-pnl" id="tr4">+$18.30</span></div>
+      <div class="dash-stats">
+        <div class="ds"><span>73%</span>Win Rate</div>
+        <div class="ds"><span>24/7</span>Uptime</div>
+        <div class="ds"><span>8+</span>Exchanges</div>
+        <div class="ds"><span>$0</span>Fees</div>
       </div>
     </div></div></div>
   </div>
 </div>
 
-<!-- TICKER -->
-<div id="ticker">
-  <div class="ticker-track">
-    <span class="ticker-item">Binance</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">Coinbase</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">Bybit</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">Kraken</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">OKX</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">KuCoin</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">Bitget</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">MEXC</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">Binance</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">Coinbase</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">Bybit</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">Kraken</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">OKX</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">KuCoin</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">Bitget</span><span class="ticker-sep">&middot;</span>
-    <span class="ticker-item">MEXC</span><span class="ticker-sep">&middot;</span>
+<!-- EXCHANGES STRIP -->
+<div id="exchanges">
+  <p class="ex-label">Runs on 8+ major exchanges</p>
+  <div style="overflow:hidden">
+    <div class="ex-track">
+      <span class="ex-item">Binance</span><span class="ex-sep">·</span>
+      <span class="ex-item">Bybit</span><span class="ex-sep">·</span>
+      <span class="ex-item">Coinbase</span><span class="ex-sep">·</span>
+      <span class="ex-item">OKX</span><span class="ex-sep">·</span>
+      <span class="ex-item">Kraken</span><span class="ex-sep">·</span>
+      <span class="ex-item">KuCoin</span><span class="ex-sep">·</span>
+      <span class="ex-item">Bitget</span><span class="ex-sep">·</span>
+      <span class="ex-item">MEXC</span><span class="ex-sep">·</span>
+      <span class="ex-item">Binance</span><span class="ex-sep">·</span>
+      <span class="ex-item">Bybit</span><span class="ex-sep">·</span>
+      <span class="ex-item">Coinbase</span><span class="ex-sep">·</span>
+      <span class="ex-item">OKX</span><span class="ex-sep">·</span>
+      <span class="ex-item">Kraken</span><span class="ex-sep">·</span>
+      <span class="ex-item">KuCoin</span><span class="ex-sep">·</span>
+      <span class="ex-item">Bitget</span><span class="ex-sep">·</span>
+      <span class="ex-item">MEXC</span><span class="ex-sep">·</span>
+    </div>
   </div>
 </div>
 
-<!-- WHAT'S INCLUDED -->
-<section id="included">
-<div class="section-center">
-  <div class="eyebrow reveal">Package Contents</div>
-  <h2 class="reveal">Everything you get on day one</h2>
-  <p class="reveal" style="color:var(--text2);max-width:540px;font-size:16px">No black boxes. No compiled binaries. Every file delivered as readable, modifiable Python source code — plus documentation.</p>
-  <div class="included-grid">
-    <div class="file-card reveal">
-      <div class="file-icon">.py</div>
-      <div class="file-name">bot.py</div>
-      <div class="file-desc">Main entry point. Orchestrates signal generation, order execution, and session management across all connected exchanges.</div>
-      <span class="file-tag">Core Engine</span>
+<!-- HOW IT WORKS — ZIG-ZAG -->
+<section class="section" id="benefits">
+<div class="section-inner">
+  <div class="reveal">
+    <div class="section-tag">How It Works</div>
+    <h2 class="section-title">Three steps to passive income.</h2>
+    <p class="section-sub">No trading knowledge required. Set it up once, let it run 24/7.</p>
+  </div>
+
+  <div class="zz-grid">
+    <!-- Step 1 -->
+    <div class="zz-row reveal">
+      <div class="zz-text">
+        <div class="zz-tag">Step 01</div>
+        <h3>The bot scans 847 pairs in real time</h3>
+        <p>The AI signal engine monitors RSI, MACD, Bollinger Bands, and volume across every connected exchange simultaneously — finding high-probability opportunities you'd miss manually.</p>
+        <ul class="zz-list">
+          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Multi-indicator confluence scoring</li>
+          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>200+ trading pairs across spot &amp; futures</li>
+          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Configurable timeframes: 1m → 1d</li>
+        </ul>
+      </div>
+      <div class="zz-visual">
+        <div class="terminal">
+          <div class="term-line"><span class="cmd">$</span> <span class="out">python bot.py</span></div>
+          <div class="term-line"><span class="ok">[OK]</span> <span class="out">Connected to Binance</span></div>
+          <div class="term-line"><span class="ok">[OK]</span> <span class="out">Scanning 847 pairs...</span></div>
+          <div class="term-line"><span class="dim">...</span></div>
+          <div class="term-line"><span class="ok">[SIGNAL]</span> <span style="color:var(--amber)">BTC/USDT LONG 91%</span></div>
+          <div class="term-line"><span class="ok">[SIGNAL]</span> <span style="color:var(--amber)">ETH/USDT LONG 87%</span></div>
+          <div class="term-line"><span class="ok">[ORDER]</span> <span class="out">BUY BTC/USDT @ $67,842</span></div>
+          <div class="term-line"><span class="dim">SL: $66,900 · TP: $69,200</span></div>
+        </div>
+      </div>
     </div>
-    <div class="file-card reveal">
-      <div class="file-icon">str/</div>
-      <div class="file-name">strategy/</div>
-      <div class="file-desc">Full strategy module: RSI, MACD, Bollinger Bands, volume analysis. Easily add your own indicators or modify thresholds.</div>
-      <span class="file-tag">Signals</span>
+
+    <!-- Step 2 -->
+    <div class="zz-row flip reveal">
+      <div class="zz-text">
+        <div class="zz-tag">Step 02</div>
+        <h3>Risk managed on every single trade</h3>
+        <p>Stop-loss, take-profit, trailing stop, max drawdown — all set automatically before each order. You configure the limits once; the bot enforces them on every trade, every time.</p>
+        <ul class="zz-list">
+          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Configurable stop-loss &amp; take-profit %</li>
+          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Portfolio-level max drawdown cap</li>
+          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Dynamic position sizing per account balance</li>
+        </ul>
+      </div>
+      <div class="zz-visual">
+        <div class="mini-dash">
+          <div class="md-row"><span class="md-label">BTC/USDT LONG</span><span class="md-val md-green">+$24.18</span></div>
+          <div class="md-row"><span class="md-label">Entry</span><span class="md-val">$67,842</span></div>
+          <div class="md-row"><span class="md-label">Stop Loss</span><span class="md-val md-red">$66,900</span></div>
+          <div class="md-row"><span class="md-label">Take Profit</span><span class="md-val md-green">$69,200</span></div>
+          <div class="md-row" style="border-bottom:none"><span class="md-label">Risk/Trade</span><span class="md-val">1.4%</span></div>
+        </div>
+      </div>
     </div>
-    <div class="file-card reveal">
-      <div class="file-icon">.py</div>
-      <div class="file-name">risk.py</div>
-      <div class="file-desc">Position sizing, stop-loss, take-profit, max drawdown controller. Configurable per-trade and portfolio-level limits.</div>
-      <span class="file-tag">Risk Management</span>
-    </div>
-    <div class="file-card reveal">
-      <div class="file-icon">dash/</div>
-      <div class="file-name">dashboard/</div>
-      <div class="file-desc">Web-based live dashboard showing open positions, P&amp;L, win rate, and trade history. Runs locally on localhost.</div>
-      <span class="file-tag">Dashboard</span>
-    </div>
-    <div class="file-card reveal">
-      <div class="file-icon">.py</div>
-      <div class="file-name">backtester.py</div>
-      <div class="file-desc">Historical backtesting engine with 3+ years of OHLCV data support. Outputs performance metrics and equity curve charts.</div>
-      <span class="file-tag">Backtesting</span>
-    </div>
-    <div class="file-card reveal">
-      <div class="file-icon">.py</div>
-      <div class="file-name">telegram_bot.py</div>
-      <div class="file-desc">Telegram notification module. Receive trade signals, order confirmations, and P&amp;L summaries directly on your phone.</div>
-      <span class="file-tag">Alerts</span>
-    </div>
-    <div class="file-card reveal">
-      <div class="file-icon">PDF</div>
-      <div class="file-name">setup_guide.pdf</div>
-      <div class="file-desc">Step-by-step illustrated guide covering exchange API setup, bot configuration, VPS deployment, and Telegram integration.</div>
-      <span class="file-tag">Documentation</span>
-    </div>
-    <div class="file-card reveal" style="border-color:rgba(245,158,11,.25)">
-      <div class="file-icon" style="background:rgba(245,158,11,.18)">&#8734;</div>
-      <div class="file-name" style="color:var(--amber)">Lifetime Updates</div>
-      <div class="file-desc">Every future version, new exchange connector, and strategy update — delivered to your email at no additional cost. Forever.</div>
-      <span class="file-tag">Included Free</span>
+
+    <!-- Step 3 -->
+    <div class="zz-row reveal">
+      <div class="zz-text">
+        <div class="zz-tag">Step 03</div>
+        <h3>Every trade lands on your phone</h3>
+        <p>Telegram alerts notify you the instant a signal fires, an order executes, and a trade closes — with full P&amp;L. You stay informed without watching charts all day.</p>
+        <ul class="zz-list">
+          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Signal → execution → close notifications</li>
+          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Daily P&amp;L summary every evening</li>
+          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Discord &amp; email webhooks also supported</li>
+        </ul>
+      </div>
+      <div class="zz-visual" style="display:flex;justify-content:center;padding:32px 28px">
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="tg-msg">
+            <div class="tg-label">AiCash Bot ✦</div>
+            <div class="tg-text">🟢 SIGNAL: BTC/USDT LONG<br>Confidence: 91% · Entry: $67,842</div>
+          </div>
+          <div class="tg-msg">
+            <div class="tg-label">AiCash Bot ✦</div>
+            <div class="tg-text">⚡ ORDER EXECUTED<br>BTC/USDT · Size: $500 · 1.5x</div>
+          </div>
+          <div class="tg-msg" style="border-left-color:var(--green)">
+            <div class="tg-label" style="color:var(--green)">AiCash Bot ✦</div>
+            <div class="tg-text">✅ TRADE CLOSED<br>P&amp;L: <span style="color:var(--green);font-weight:700">+$24.18 (+4.8%)</span></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 </section>
 
-<!-- TECHNICAL SPECIFICATIONS -->
-<section id="specs">
-<div class="section-center">
-  <div class="eyebrow reveal">Technical Specifications</div>
-  <h2 class="reveal">Exact details. No surprises.</h2>
-  <p class="reveal" style="color:var(--text2);max-width:540px;font-size:16px">Every spec you need to evaluate before buying. We believe in full transparency.</p>
-  <table class="specs-table reveal">
-    <tbody>
-      <tr><td>Language</td><td><span class="spec-highlight">Python 3.8+</span> — compatible with 3.9, 3.10, 3.11, 3.12</td></tr>
-      <tr><td>Operating System</td><td>Windows 10/11, macOS 12+, Ubuntu 20.04+ / Debian 11+, any Linux VPS</td></tr>
-      <tr><td>Supported Exchanges</td><td>
-        <div class="spec-tags">
-          <span class="spec-tag">Binance (Spot + Futures)</span><span class="spec-tag">Bybit</span><span class="spec-tag">Coinbase Advanced</span><span class="spec-tag">Kraken</span><span class="spec-tag">OKX</span><span class="spec-tag">KuCoin</span><span class="spec-tag">Bitget</span><span class="spec-tag">MEXC</span>
-        </div>
-      </td></tr>
-      <tr><td>Strategy Logic</td><td>RSI-14, MACD (12/26/9), Bollinger Bands (20,2), Volume spike detection, Multi-indicator confluence scoring</td></tr>
-      <tr><td>Timeframes</td><td>1m, 5m, 15m, 1h, 4h, 1d &mdash; configurable per strategy</td></tr>
-      <tr><td>Leverage Support</td><td><span class="spec-highlight">1x–20x</span> configurable (futures markets only, spot uses 1x)</td></tr>
-      <tr><td>Risk Management</td><td>Stop-loss (%), take-profit (%), trailing stop, max drawdown limit, per-trade position sizing, daily loss cap</td></tr>
-      <tr><td>Notifications</td><td>Telegram (primary), Email via SMTP, Discord webhooks (optional)</td></tr>
-      <tr><td>Trading Pairs</td><td><span class="spec-highlight">200+ pairs</span> across spot and perpetual futures markets</td></tr>
-      <tr><td>Dashboard</td><td>Web-based (localhost), Terminal CLI dashboard, Real-time P&amp;L, Win rate, Trade history export (CSV)</td></tr>
-      <tr><td>Backtesting</td><td>3+ years of historical OHLCV data; outputs Sharpe ratio, max drawdown, win rate, expectancy, equity curve PNG</td></tr>
-      <tr><td>Dependencies</td><td>
-        <div class="spec-tags">
-          <span class="spec-tag">ccxt</span><span class="spec-tag">pandas</span><span class="spec-tag">numpy</span><span class="spec-tag">ta-lib</span><span class="spec-tag">python-telegram-bot</span><span class="spec-tag">flask</span>
-        </div>
-      </td></tr>
-      <tr><td>Delivery</td><td>Instant ZIP download via Stripe &mdash; link emailed within 60 seconds of payment</td></tr>
-      <tr><td>Minimum Capital</td><td>$500 recommended &mdash; bot adapts to any balance; exchange minimum orders typically $10–20</td></tr>
-    </tbody>
-  </table>
-</div>
-</section>
-
-<!-- HOW IT WORKS -->
-<section id="how" style="background:var(--bg1)">
-<div class="section-center reveal">
-  <div class="eyebrow">Simple Setup</div>
-  <h2>Up and running in minutes</h2>
-  <div class="steps-grid">
-    <div class="step"><div class="step-num">1</div><h3>Purchase &amp; Download</h3><p>Pay once via Stripe. Get instant access to the full Python source code and setup guide delivered to your inbox within 60 seconds.</p></div>
-    <div class="step"><div class="step-num">2</div><h3>Connect Your Exchange</h3><p>Paste your exchange API keys into <code style="font-family:var(--mono);color:var(--amber);font-size:13px">config.py</code>. The illustrated setup guide walks you through every step on every platform.</p></div>
-    <div class="step"><div class="step-num">3</div><h3>Let It Trade</h3><p>Run <code style="font-family:var(--mono);color:var(--amber);font-size:13px">python bot.py</code> and walk away. It trades 24/7, manages risk automatically, and alerts you via Telegram on every trade.</p></div>
-  </div>
-  <div class="stats-row">
-    <div class="stat-cell"><div class="stat-num">73%</div><div class="stat-label">Win Rate</div></div>
+<!-- STATS STRIP -->
+<section class="section" id="stats" style="padding:0;background:var(--s1)">
+<div class="section-inner" style="padding:0">
+  <div class="stats-grid reveal">
+    <div class="stat-cell"><div class="stat-num" data-target="73">0</div><div class="stat-label">Win Rate %</div></div>
     <div class="stat-cell"><div class="stat-num">24/7</div><div class="stat-label">Uptime</div></div>
-    <div class="stat-cell"><div class="stat-num">8+</div><div class="stat-label">Exchanges</div></div>
+    <div class="stat-cell"><div class="stat-num" data-target="8">0</div><div class="stat-label">Exchanges</div></div>
     <div class="stat-cell"><div class="stat-num">$0</div><div class="stat-label">Monthly Fees</div></div>
   </div>
 </div>
 </section>
 
-<!-- FEATURES BENTO -->
-<section id="features">
-<div class="section-center">
-  <div class="eyebrow reveal">Built for Results</div>
-  <h2 class="reveal">Every feature. No subscription required.</h2>
-  <div class="bento">
-    <div class="bento-cell bento-wide reveal">
-      <div class="bento-icon">&#9889;</div>
-      <h3>AI Signal Engine</h3>
-      <p>Multi-indicator confluence engine combines RSI, MACD, Bollinger Bands, and volume analysis to generate high-probability entry signals in real time across all connected exchanges.</p>
-      <div class="bar-chart" id="bars">
-        <div class="bar" style="height:45%"></div><div class="bar" style="height:72%"></div><div class="bar" style="height:38%"></div><div class="bar" style="height:88%"></div><div class="bar" style="height:60%"></div><div class="bar" style="height:95%"></div><div class="bar" style="height:52%"></div><div class="bar" style="height:78%"></div><div class="bar" style="height:65%"></div><div class="bar" style="height:82%"></div>
-      </div>
+<!-- WHAT'S INCLUDED -->
+<section class="section" id="included">
+<div class="section-inner">
+  <div class="reveal">
+    <div class="section-tag">Package Contents</div>
+    <h2 class="section-title">Everything you get on day one.</h2>
+    <p class="section-sub">Readable Python source code. No binaries. No obfuscation. Every file is yours to inspect and modify.</p>
+  </div>
+  <div class="inc-grid">
+    <div class="inc-card reveal reveal-d1">
+      <div class="inc-icon ic-py">.py</div>
+      <div class="inc-name">bot.py</div>
+      <div class="inc-desc">Main entry point. Orchestrates signals, orders, and session management across all exchanges.</div>
+      <span class="inc-tag">Core Engine</span>
     </div>
-    <div class="bento-cell bento-narrow reveal">
-      <div class="bento-icon">&#128230;</div>
-      <h3>Full Source Code</h3>
-      <p>No black boxes. Every line of Python is yours to read, modify, and extend forever.</p>
-      <div class="big-num">100%</div>
-      <div class="code-snippet">def run_signal():<br>&nbsp;&nbsp;rsi = calc_rsi(data)<br>&nbsp;&nbsp;if rsi &lt; 30:<br>&nbsp;&nbsp;&nbsp;&nbsp;return "BUY"</div>
+    <div class="inc-card reveal reveal-d1">
+      <div class="inc-icon ic-dir">str/</div>
+      <div class="inc-name">strategy/</div>
+      <div class="inc-desc">Full strategy module: RSI, MACD, Bollinger Bands, volume. Add or modify indicators freely.</div>
+      <span class="inc-tag">Signal Engine</span>
     </div>
-    <div class="bento-cell bento-third reveal">
-      <div class="bento-icon">&#128737;</div>
-      <h3>Risk Management</h3>
-      <p>Configurable stop-loss, take-profit, position sizing, and max drawdown limits protect your capital automatically on every trade.</p>
+    <div class="inc-card reveal reveal-d2">
+      <div class="inc-icon ic-py">.py</div>
+      <div class="inc-name">risk.py</div>
+      <div class="inc-desc">Stop-loss, take-profit, position sizing, max drawdown. Configurable per-trade and portfolio level.</div>
+      <span class="inc-tag">Risk Control</span>
     </div>
-    <div class="bento-cell bento-third reveal">
-      <div class="bento-icon">&#128202;</div>
-      <h3>Backtesting Engine</h3>
-      <p>Test any strategy against 3+ years of historical data before going live. Validate performance metrics before risking real capital.</p>
+    <div class="inc-card reveal reveal-d2">
+      <div class="inc-icon ic-dir">dsh/</div>
+      <div class="inc-name">dashboard/</div>
+      <div class="inc-desc">Web-based live dashboard: open positions, P&amp;L, win rate, trade history. Runs on localhost.</div>
+      <span class="inc-tag">Dashboard</span>
     </div>
-    <div class="bento-cell bento-third reveal">
-      <div class="bento-icon">&#128279;</div>
-      <h3>Multi-Exchange</h3>
-      <p>Connect to all major platforms simultaneously.</p>
-      <ul class="checklist">
-        <li>Binance &amp; Binance Futures</li>
-        <li>Coinbase Advanced</li>
-        <li>Bybit Spot &amp; Perps</li>
-        <li>Kraken, OKX, KuCoin</li>
-        <li>Bitget, MEXC &amp; more</li>
-      </ul>
+    <div class="inc-card reveal reveal-d2">
+      <div class="inc-icon ic-py">.py</div>
+      <div class="inc-name">backtester.py</div>
+      <div class="inc-desc">Historical backtesting engine with 3+ years of OHLCV data. Outputs Sharpe, max DD, equity curve.</div>
+      <span class="inc-tag">Backtesting</span>
     </div>
+    <div class="inc-card reveal reveal-d3">
+      <div class="inc-icon ic-py">.py</div>
+      <div class="inc-name">telegram_bot.py</div>
+      <div class="inc-desc">Telegram notification module. Trade signals, executions, P&amp;L summaries — direct to your phone.</div>
+      <span class="inc-tag">Alerts</span>
+    </div>
+    <div class="inc-card reveal reveal-d3">
+      <div class="inc-icon ic-pdf">PDF</div>
+      <div class="inc-name">setup_guide.pdf</div>
+      <div class="inc-desc">Illustrated step-by-step guide: exchange API setup, config, VPS deployment, Telegram integration.</div>
+      <span class="inc-tag">Documentation</span>
+    </div>
+    <div class="inc-card reveal reveal-d3" style="border-color:rgba(245,158,11,.2)">
+      <div class="inc-icon ic-inf">∞</div>
+      <div class="inc-name" style="color:var(--amber)">Lifetime Updates</div>
+      <div class="inc-desc">Every future version, new exchange connector, and strategy update — emailed to you free. Forever.</div>
+      <span class="inc-tag">Included Free</span>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- TECHNICAL SPECS -->
+<section class="section" id="specs" style="background:var(--s1)">
+<div class="section-inner">
+  <div class="reveal">
+    <div class="section-tag">Technical Specifications</div>
+    <h2 class="section-title">Exact details. No surprises.</h2>
+    <p class="section-sub">Every spec you need to evaluate before buying.</p>
+  </div>
+  <div class="specs-wrap reveal">
+    <table class="specs-table">
+      <tr><td>Language</td><td><span class="s-hi">Python 3.8+</span> &mdash; compatible with 3.9, 3.10, 3.11, 3.12</td></tr>
+      <tr><td>OS Support</td><td>Windows 10/11, macOS 12+, Ubuntu 20.04+, any Linux VPS</td></tr>
+      <tr><td>Exchanges</td><td><div class="s-tags"><span class="s-tag">Binance Spot+Futures</span><span class="s-tag">Bybit</span><span class="s-tag">Coinbase Adv</span><span class="s-tag">Kraken</span><span class="s-tag">OKX</span><span class="s-tag">KuCoin</span><span class="s-tag">Bitget</span><span class="s-tag">MEXC</span></div></td></tr>
+      <tr><td>Strategy Logic</td><td>RSI-14, MACD (12/26/9), Bollinger Bands (20,2), Volume spike, Multi-indicator confluence scoring</td></tr>
+      <tr><td>Timeframes</td><td>1m, 5m, 15m, 1h, 4h, 1d — configurable per strategy</td></tr>
+      <tr><td>Leverage</td><td><span class="s-hi">1x–20x</span> configurable (futures only; spot = 1x)</td></tr>
+      <tr><td>Risk Controls</td><td>Stop-loss, take-profit, trailing stop, max drawdown, daily loss cap, position sizing</td></tr>
+      <tr><td>Notifications</td><td>Telegram (primary), Email via SMTP, Discord webhooks</td></tr>
+      <tr><td>Trading Pairs</td><td><span class="s-hi">200+ pairs</span> across spot and perpetual futures markets</td></tr>
+      <tr><td>Dashboard</td><td>Web-based (localhost), terminal CLI, real-time P&amp;L, CSV export</td></tr>
+      <tr><td>Backtesting</td><td>3+ years OHLCV data; Sharpe ratio, max drawdown, win rate, expectancy, equity curve PNG</td></tr>
+      <tr><td>Dependencies</td><td><div class="s-tags"><span class="s-tag">ccxt</span><span class="s-tag">pandas</span><span class="s-tag">numpy</span><span class="s-tag">ta-lib</span><span class="s-tag">python-telegram-bot</span><span class="s-tag">flask</span></div></td></tr>
+      <tr><td>Delivery</td><td>Instant ZIP download — Stripe link emailed within 60 seconds of payment</td></tr>
+      <tr><td>Min. Capital</td><td>$500 recommended · exchange minimums ~$10–20 per order</td></tr>
+    </table>
   </div>
 </div>
 </section>
 
 <!-- COMPARISON -->
-<section id="compare" style="background:var(--bg1)">
-<div class="section-center">
-  <div style="text-align:center;max-width:600px;margin:0 auto 48px">
-    <div class="eyebrow reveal">Stop Renting. Start Owning.</div>
-    <h2 class="reveal">Why pay $99/month forever?</h2>
+<section class="section" style="background:var(--bg)">
+<div class="section-inner">
+  <div style="text-align:center;max-width:560px;margin:0 auto">
+    <div class="reveal"><div class="section-tag">Stop Renting. Start Owning.</div></div>
+    <h2 class="section-title reveal">Why pay $99/month forever?</h2>
   </div>
   <div class="comp-wrap reveal">
     <div class="comp-card comp-bad">
-      <div class="comp-header">&#x2715; Subscription Bots</div>
+      <div class="comp-title">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Subscription Bots
+      </div>
       <ul class="comp-list">
-        <li><span class="xi">&#x2715;</span>$99&ndash;199/month ongoing cost</li>
-        <li><span class="xi">&#x2715;</span>No source code &mdash; total black box</li>
-        <li><span class="xi">&#x2715;</span>Shut down = lose everything</li>
-        <li><span class="xi">&#x2715;</span>Hidden upsells and upgrade fees</li>
-        <li><span class="xi">&#x2715;</span>Cannot customize or extend</li>
+        <li><span class="x">✕</span>$99–199/month, ongoing forever</li>
+        <li><span class="x">✕</span>No source code — total black box</li>
+        <li><span class="x">✕</span>Shut down = lose everything</li>
+        <li><span class="x">✕</span>Hidden upsells and upgrade fees</li>
+        <li><span class="x">✕</span>Cannot customize or extend</li>
       </ul>
     </div>
     <div class="comp-card comp-good">
-      <div class="comp-header">&#x2713; AiCash System</div>
+      <div class="comp-title">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        AiCash System
+      </div>
       <ul class="comp-list">
-        <li><span class="ck">&#x2713;</span>$297 once &mdash; never pay again</li>
-        <li><span class="ck">&#x2713;</span>Full Python source code included</li>
-        <li><span class="ck">&#x2713;</span>Yours forever, runs locally</li>
-        <li><span class="ck">&#x2713;</span>Zero hidden fees, ever</li>
-        <li><span class="ck">&#x2713;</span>Modify anything you want</li>
+        <li><span class="ck">✓</span>$297 once — never pay again</li>
+        <li><span class="ck">✓</span>Full Python source code included</li>
+        <li><span class="ck">✓</span>Yours forever, runs locally</li>
+        <li><span class="ck">✓</span>Zero hidden fees, ever</li>
+        <li><span class="ck">✓</span>Modify anything you want</li>
       </ul>
     </div>
   </div>
-  <div class="math-box reveal">
-    <p><strong>$99/month &times; 12 = $1,188/year.</strong><br>AiCash System: <strong>$297 once.</strong> You break even in under 4 months &mdash; then it&rsquo;s pure savings every year after.</p>
+  <div class="math-card reveal">
+    <p><strong>$99/month × 12 = $1,188/year.</strong><br>AiCash: <strong>$297 once.</strong> Break even in under 4 months — then it's pure savings every year after.</p>
   </div>
 </div>
 </section>
 
 <!-- REVIEWS -->
-<section id="reviews">
-<div class="section-center">
+<section class="section" id="reviews" style="background:var(--s1)">
+<div class="section-inner">
   <div style="text-align:center;margin-bottom:48px">
-    <div class="eyebrow reveal">Verified Reviews</div>
-    <h2 class="reveal">312 traders have spoken</h2>
+    <div class="reveal"><div class="section-tag">Verified Reviews</div></div>
+    <h2 class="section-title reveal">312 traders have spoken.</h2>
   </div>
   <div class="reviews-top reveal">
-    <div class="reviews-score-block">
-      <div class="reviews-big">4.9</div>
-      <div class="reviews-stars-big">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-      <div class="reviews-total">out of 5 &middot; 312 reviews</div>
+    <div class="rv-score">
+      <div class="rv-big">4.9</div>
+      <div class="rv-stars">★★★★★</div>
+      <div class="rv-total">out of 5 · 312 reviews</div>
     </div>
-    <div class="star-bars">
-      <div class="star-bar-row"><span class="star-bar-label">5&#9733;</span><div class="star-bar-track"><div class="star-bar-fill" data-w="94" style="width:0%"></div></div><span class="star-bar-pct">94%</span></div>
-      <div class="star-bar-row"><span class="star-bar-label">4&#9733;</span><div class="star-bar-track"><div class="star-bar-fill" data-w="4" style="width:0%"></div></div><span class="star-bar-pct">4%</span></div>
-      <div class="star-bar-row"><span class="star-bar-label">3&#9733;</span><div class="star-bar-track"><div class="star-bar-fill" data-w="1" style="width:0%"></div></div><span class="star-bar-pct">1%</span></div>
-      <div class="star-bar-row"><span class="star-bar-label">2&#9733;</span><div class="star-bar-track"><div class="star-bar-fill" data-w="0" style="width:0%"></div></div><span class="star-bar-pct">0%</span></div>
-      <div class="star-bar-row"><span class="star-bar-label">1&#9733;</span><div class="star-bar-track"><div class="star-bar-fill" data-w="1" style="width:0%"></div></div><span class="star-bar-pct">1%</span></div>
+    <div class="bar-rows">
+      <div class="bar-row"><span class="bar-lbl">5★</span><div class="bar-track"><div class="bar-fill" data-w="94" style="width:0%"></div></div><span class="bar-pct">94%</span></div>
+      <div class="bar-row"><span class="bar-lbl">4★</span><div class="bar-track"><div class="bar-fill" data-w="4" style="width:0%"></div></div><span class="bar-pct">4%</span></div>
+      <div class="bar-row"><span class="bar-lbl">3★</span><div class="bar-track"><div class="bar-fill" data-w="1" style="width:0%"></div></div><span class="bar-pct">1%</span></div>
+      <div class="bar-row"><span class="bar-lbl">2★</span><div class="bar-track"><div class="bar-fill" data-w="0" style="width:0%"></div></div><span class="bar-pct">0%</span></div>
+      <div class="bar-row"><span class="bar-lbl">1★</span><div class="bar-track"><div class="bar-fill" data-w="1" style="width:0%"></div></div><span class="bar-pct">1%</span></div>
     </div>
   </div>
   <div class="test-grid">
     <div class="test-card reveal">
-      <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-      <p class="test-quote">&ldquo;Skeptical at first. Three weeks in, the bot returned the purchase price three times over. I&rsquo;m not touching the config.&rdquo;</p>
-      <div class="test-author"><div class="avatar">MK</div><div><div class="author-name">Marcus Kellner</div><div class="author-ex">Running on Binance Futures &middot; 3 weeks</div></div></div>
+      <div class="tc-stars">★★★★★</div>
+      <p class="tc-quote">"Skeptical at first. Three weeks in, the bot returned the purchase price three times over. I'm not touching the config."</p>
+      <div class="tc-author"><div class="tc-avatar">MK</div><div><div class="tc-name">Marcus Kellner</div><div class="tc-sub">Binance Futures · 3 weeks</div></div></div>
     </div>
-    <div class="test-card reveal">
-      <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-      <p class="test-quote">&ldquo;As a developer I audited every line. The strategy logic is solid, the code is clean. Running 6 weeks, very impressed.&rdquo;</p>
-      <div class="test-author"><div class="avatar">SR</div><div><div class="author-name">Sofia Reyes</div><div class="author-ex">Running on Bybit Perps &middot; 6 weeks</div></div></div>
+    <div class="test-card reveal reveal-d1">
+      <div class="tc-stars">★★★★★</div>
+      <p class="tc-quote">"As a developer I audited every line. The strategy logic is solid, the code is clean. Running 6 weeks, very impressed."</p>
+      <div class="tc-author"><div class="tc-avatar">SR</div><div><div class="tc-name">Sofia Reyes</div><div class="tc-sub">Bybit Perps · 6 weeks</div></div></div>
     </div>
-    <div class="test-card reveal">
-      <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-      <p class="test-quote">&ldquo;The math was obvious the moment I saw the pricing. Two months in and it paid for itself in week one. Zero complaints.&rdquo;</p>
-      <div class="test-author"><div class="avatar">JL</div><div><div class="author-name">James Lowry</div><div class="author-ex">Running on Coinbase Advanced &middot; 2 months</div></div></div>
+    <div class="test-card reveal reveal-d2">
+      <div class="tc-stars">★★★★★</div>
+      <p class="tc-quote">"The math was obvious the moment I saw the pricing. Two months in and it paid for itself in week one."</p>
+      <div class="tc-author"><div class="tc-avatar">JL</div><div><div class="tc-name">James Lowry</div><div class="tc-sub">Coinbase Advanced · 2 months</div></div></div>
     </div>
   </div>
 </div>
 </section>
 
 <!-- PRICING -->
-<section id="pricing" style="background:var(--bg1)">
-<div class="section-center">
+<section class="section" id="pricing">
+<div class="section-inner">
   <div style="text-align:center;margin-bottom:40px">
-    <div class="eyebrow reveal">Transparent Pricing</div>
-    <h2 class="reveal">One price. Own it forever.</h2>
+    <div class="reveal"><div class="section-tag">Transparent Pricing</div></div>
+    <h2 class="section-title reveal">One price. Own it forever.</h2>
   </div>
-  <div class="price-center reveal">
-    <div class="price-outer"><div class="price-inner"><div class="price-core">
-      <div class="price-topbar"></div>
-      <div class="price-badge">LIFETIME ACCESS</div>
-      <div class="price-amount-row">
-        <div class="price-amount">$297</div>
-        <div class="price-was">$497</div>
+  <div class="pricing-wrap reveal">
+    <div class="p-outer"><div class="p-mid"><div class="p-core">
+      <div class="p-topbar"></div>
+      <div class="p-badge">LIFETIME ACCESS</div>
+      <div class="p-amounts">
+        <div class="p-main">$297</div>
+        <div class="p-was">$497</div>
       </div>
-      <div class="price-sub-label">one-time &middot; no subscription &middot; full source code</div>
-      <ul class="price-checklist">
-        <li>bot.py — full trading engine source</li>
-        <li>strategy/ — complete signal module</li>
-        <li>risk.py — risk management controller</li>
-        <li>dashboard/ — web-based live dashboard</li>
-        <li>backtester.py — historical testing engine</li>
-        <li>telegram_bot.py — mobile alerts module</li>
-        <li>setup_guide.pdf — illustrated setup doc</li>
-        <li>Lifetime updates at no extra cost</li>
+      <div class="p-note">one-time · no subscription · full source code</div>
+      <ul class="p-list">
+        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>bot.py — full trading engine</li>
+        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>strategy/ — complete signal module</li>
+        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>risk.py — risk management controller</li>
+        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>dashboard/ — web-based live dashboard</li>
+        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>backtester.py — historical testing</li>
+        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>telegram_bot.py — mobile alerts</li>
+        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>setup_guide.pdf — illustrated setup</li>
+        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Lifetime updates, free forever</li>
       </ul>
-      <button class="btn-amber-full" onclick="openModal()">Get Instant Access &rarr;</button>
-      <div class="secure-line">&#128274; Secured by Stripe &middot; Instant delivery &middot; 2,847 traders running</div>
+      <button class="btn-buy" onclick="openModal()">Get Instant Access →</button>
+      <div class="p-secure">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4v5c0 3.3 2.6 5.7 6 7 3.4-1.3 6-3.7 6-7V4L8 1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        Secured by Stripe · Instant delivery · 2,847 traders running
+      </div>
     </div></div></div>
   </div>
 </div>
 </section>
 
 <!-- FAQ -->
-<section id="faq">
-<div class="section-center">
+<section class="section" id="faq" style="background:var(--s1)">
+<div class="section-inner">
   <div style="text-align:center;margin-bottom:40px">
-    <div class="eyebrow reveal">Questions &amp; Answers</div>
-    <h2 class="reveal">Frequently asked</h2>
+    <div class="reveal"><div class="section-tag">FAQ</div></div>
+    <h2 class="section-title reveal">Questions answered.</h2>
   </div>
-  <div class="faq-list reveal">
+  <div class="faq-box reveal">
     <div class="faq-item">
-      <button class="faq-q" onclick="toggleFaq(this)">Do I need coding experience to run this?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-inner">No coding experience is required to run the bot. The setup guide walks you through every step with screenshots. If you want to customize the strategy logic, basic Python knowledge helps &mdash; but the default configuration is ready to go out of the box.</div></div>
+      <button class="faq-q" onclick="toggleFaq(this)">Do I need coding experience?<span class="faq-icon">+</span></button>
+      <div class="faq-a"><div class="faq-a-in">No coding experience required to run it. The setup guide walks you through every step with screenshots. If you want to customize the strategy logic, basic Python knowledge helps — but the default config runs out of the box.</div></div>
     </div>
     <div class="faq-item">
       <button class="faq-q" onclick="toggleFaq(this)">What exactly is delivered after purchase?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-inner">You receive a ZIP file containing 8 items: bot.py, strategy/ folder, risk.py, dashboard/ folder, backtester.py, telegram_bot.py, a setup_guide.pdf, and a requirements.txt. Every file is readable Python source code. Nothing is obfuscated or compiled.</div></div>
+      <div class="faq-a"><div class="faq-a-in">A ZIP file containing 8 items: bot.py, strategy/ folder, risk.py, dashboard/ folder, backtester.py, telegram_bot.py, setup_guide.pdf, and requirements.txt. Every file is readable Python source code — nothing obfuscated or compiled.</div></div>
     </div>
     <div class="faq-item">
       <button class="faq-q" onclick="toggleFaq(this)">Which exchanges are supported?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-inner">AiCash supports Binance (spot &amp; futures), Coinbase Advanced, Bybit (spot &amp; perpetuals), Kraken, OKX, KuCoin, Bitget, and MEXC &mdash; 8+ exchanges total. New exchange support is added with lifetime updates.</div></div>
+      <div class="faq-a"><div class="faq-a-in">Binance (spot &amp; futures), Coinbase Advanced, Bybit (spot &amp; perpetuals), Kraken, OKX, KuCoin, Bitget, and MEXC — 8+ in total. New exchange connectors are added with lifetime updates at no cost.</div></div>
     </div>
     <div class="faq-item">
       <button class="faq-q" onclick="toggleFaq(this)">How is this different from subscription bots?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-inner">Subscription bots charge $99&ndash;199/month and give you zero access to the underlying code. AiCash is a one-time purchase &mdash; you get the complete Python source, it runs on your own machine, and it&rsquo;s yours permanently regardless of what happens to our company.</div></div>
+      <div class="faq-a"><div class="faq-a-in">Subscription bots charge $99–199/month with zero access to the code. AiCash is a one-time purchase — complete Python source, runs on your own machine, yours permanently regardless of what happens to our company.</div></div>
     </div>
     <div class="faq-item">
-      <button class="faq-q" onclick="toggleFaq(this)">How much capital do I need to start?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-inner">Most users start with $500&ndash;$2,000. The bot&rsquo;s position sizing is fully configurable, so it adapts to your account size automatically. Exchange minimum order sizes (typically $10&ndash;20) are the only floor enforced by the software.</div></div>
+      <button class="faq-q" onclick="toggleFaq(this)">How much capital do I need?<span class="faq-icon">+</span></button>
+      <div class="faq-a"><div class="faq-a-in">Most users start with $500–$2,000. Position sizing adapts automatically to your balance. Exchange minimum order sizes (typically $10–20) are the only floor enforced.</div></div>
     </div>
     <div class="faq-item">
       <button class="faq-q" onclick="toggleFaq(this)">What is the refund policy?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-inner">Due to the nature of digital source code delivery, all sales are final. We encourage you to review all documentation and ask questions before purchasing. If you experience a technical issue with the code, our support team will resolve it promptly at no charge.</div></div>
+      <div class="faq-a"><div class="faq-a-in">All sales are final due to the nature of digital source code. We encourage you to review all documentation before purchasing. Any technical issue with the code is resolved by our support team at no charge.</div></div>
     </div>
   </div>
 </div>
 </section>
 
 <!-- FINAL CTA -->
-<section style="padding:80px 6vw">
-<div class="cta-card reveal">
-  <div class="eyebrow" style="display:inline-flex;margin-bottom:20px">Limited Offer</div>
-  <h2>Start trading on autopilot today.</h2>
-  <p>Join 2,847 traders who own their bot outright. One payment. Full source code.<br>Zero monthly fees. Lifetime updates included.</p>
-  <button class="btn-amber" onclick="openModal()" style="font-size:18px;padding:16px 40px">Get AiCash System &mdash; $297 &rarr;</button>
-  <div style="margin-top:16px;font-size:13px;color:var(--text3)">&#128274; Stripe secure checkout &middot; Instant delivery &middot; <s style="opacity:.5">$497</s> today $297</div>
+<section class="section">
+<div class="section-inner">
+  <div class="cta-box reveal">
+    <div class="section-tag" style="display:inline-flex;margin-bottom:18px">Limited Offer</div>
+    <h2>Start trading on autopilot today.</h2>
+    <p>Join 2,847 traders who own their bot outright.<br>One payment. Full source code. Zero monthly fees.</p>
+    <button class="btn-primary" onclick="openModal()" style="font-size:18px;padding:15px 40px">Get AiCash System — $297 →</button>
+    <div class="cta-note">🔒 Stripe secure · Instant delivery · <s style="opacity:.5">$497</s> today $297</div>
+  </div>
 </div>
 </section>
 
 <!-- FOOTER -->
 <footer>
-  <div class="footer-row">
-    <span class="footer-logo">AiCash System</span>
-    <div class="footer-links">
+  <div class="foot-top">
+    <span class="foot-logo">AiCash System</span>
+    <div class="foot-links">
       <a href="#included">What's Included</a>
       <a href="#specs">Specs</a>
+      <a href="#reviews">Reviews</a>
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
       <a href="terms.html">Terms</a>
       <a href="privacy.html">Privacy</a>
     </div>
   </div>
-  <div class="footer-copy">&copy; 2026 AiCash System &middot; aicashsystem.space &middot; All rights reserved.</div>
-  <div class="footer-risk">Risk Disclaimer: Cryptocurrency trading involves substantial risk of loss and is not suitable for every investor. Past performance is not indicative of future results. The 73% win rate represents historical backtested data and live performance averages across user deployments — individual results will vary. Never trade with funds you cannot afford to lose. AiCash System provides software tools only and does not constitute financial advice.</div>
+  <div class="foot-copy">© 2026 AiCash System · aicashsystem.space · All rights reserved.</div>
+  <div class="foot-risk">Risk Disclaimer: Cryptocurrency trading involves substantial risk of loss. Past performance is not indicative of future results. The 73% win rate represents historical backtested data and live averages — individual results vary. Never trade with funds you cannot afford to lose. AiCash System provides software tools only and does not constitute financial advice.</div>
 </footer>
 
 <!-- MODAL -->
-<div id="modal-overlay" onclick="handleOverlayClick(event)">
-  <div class="modal-outer" id="modal-card">
-    <div class="modal-inner"><div class="modal-core">
-      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
-      <div class="modal-h">Complete Your Purchase</div>
-      <div class="modal-sub">You&rsquo;ll be redirected to Stripe&rsquo;s secure checkout</div>
-      <div class="modal-product">
-        <div><div class="modal-prod-name">AiCash System &mdash; Lifetime</div><div class="modal-prod-sub">Full Python source code &middot; Instant delivery</div></div>
-        <div class="modal-price">$297</div>
+<div id="modal" onclick="handleOverlay(event)">
+  <div class="m-outer" id="m-card">
+    <div class="m-mid"><div class="m-core">
+      <button class="m-close" onclick="closeModal()">✕</button>
+      <div class="m-title">Complete Your Purchase</div>
+      <div class="m-sub">You'll be redirected to Stripe's secure checkout</div>
+      <div class="m-product">
+        <div><div class="m-prod-name">AiCash System — Lifetime</div><div class="m-prod-sub">Full Python source code · Instant delivery</div></div>
+        <div class="m-price">$297</div>
       </div>
-      <div class="modal-checks">
-        <label class="modal-check-row"><input type="checkbox" id="chk1" onchange="syncModal()"><span>I understand this is a one-time payment for software source code</span></label>
-        <label class="modal-check-row"><input type="checkbox" id="chk2" onchange="syncModal()"><span>I accept the Terms of Service and Privacy Policy</span></label>
-        <label class="modal-check-row"><input type="checkbox" id="chk3" onchange="syncModal()"><span>I understand cryptocurrency trading involves financial risk</span></label>
+      <div class="m-checks">
+        <label class="m-check"><input type="checkbox" id="c1" onchange="syncModal()"><span>I understand this is a one-time payment for software source code</span></label>
+        <label class="m-check"><input type="checkbox" id="c2" onchange="syncModal()"><span>I accept the Terms of Service and Privacy Policy</span></label>
+        <label class="m-check"><input type="checkbox" id="c3" onchange="syncModal()"><span>I understand cryptocurrency trading involves financial risk</span></label>
       </div>
-      <button id="modal-btn" disabled onclick="goCheckout()">Proceed to Checkout &rarr;</button>
+      <button id="m-btn" disabled onclick="goCheckout()">Proceed to Checkout →</button>
     </div></div>
   </div>
 </div>
 
 <script>
+// Nav
 function toggleMenu(){
-  var h=document.getElementById('hamburger'),m=document.getElementById('mob-menu');
+  var h=document.getElementById('ham'),m=document.getElementById('mob-menu');
   h.classList.toggle('open');m.classList.toggle('open');
   document.body.style.overflow=m.classList.contains('open')?'hidden':'';
 }
-function openModal(){
-  document.getElementById('modal-overlay').classList.add('open');
-  document.body.style.overflow='hidden';
-}
-function closeModal(){
-  document.getElementById('modal-overlay').classList.remove('open');
-  document.body.style.overflow='';
-}
-function handleOverlayClick(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
+// Modal
+function openModal(){document.getElementById('modal').classList.add('open');document.body.style.overflow='hidden';}
+function closeModal(){document.getElementById('modal').classList.remove('open');document.body.style.overflow='';}
+function handleOverlay(e){if(e.target===document.getElementById('modal'))closeModal();}
 function syncModal(){
-  var all=[document.getElementById('chk1'),document.getElementById('chk2'),document.getElementById('chk3')];
-  document.getElementById('modal-btn').disabled=!all.every(function(c){return c.checked;});
+  document.getElementById('m-btn').disabled=
+    !['c1','c2','c3'].every(function(id){return document.getElementById(id).checked;});
 }
 function goCheckout(){window.location.href='https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00';}
 document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'){
-    closeModal();
-    var m=document.getElementById('mob-menu');
-    if(m.classList.contains('open'))toggleMenu();
-  }
+  if(e.key==='Escape'){closeModal();var m=document.getElementById('mob-menu');if(m.classList.contains('open'))toggleMenu();}
 });
+// FAQ
 function toggleFaq(btn){
-  var item=btn.parentElement;
-  var ans=item.querySelector('.faq-a');
-  var inner=item.querySelector('.faq-a-inner');
-  var isOpen=item.classList.contains('open');
-  document.querySelectorAll('.faq-item.open').forEach(function(i){
-    i.classList.remove('open');
-    i.querySelector('.faq-a').style.maxHeight='0';
-  });
+  var item=btn.parentElement,ans=item.querySelector('.faq-a'),inner=item.querySelector('.faq-a-in'),isOpen=item.classList.contains('open');
+  document.querySelectorAll('.faq-item.open').forEach(function(i){i.classList.remove('open');i.querySelector('.faq-a').style.maxHeight='0';});
   if(!isOpen){item.classList.add('open');ans.style.maxHeight=inner.scrollHeight+'px';}
 }
-var trades=[
-  {base:24.18,id:'tr1'},{base:11.44,id:'tr2'},{base:8.92,id:'tr3'},{base:18.30,id:'tr4'}
-];
-function flicker(){
-  var total=0;
-  trades.forEach(function(t){
-    var delta=(Math.random()-.3)*.8;
-    t.base=Math.max(0.5,t.base+delta);
-    var el=document.getElementById(t.id);
-    if(el)el.textContent='+$'+t.base.toFixed(2);
-    total+=t.base;
-  });
+// Live P&L flicker
+var trades=[{b:24.18,id:'tr1'},{b:11.44,id:'tr2'},{b:8.92,id:'tr3'},{b:18.30,id:'tr4'}];
+setInterval(function(){
+  var tot=0;
+  trades.forEach(function(t){t.b=Math.max(.5,t.b+(Math.random()-.3)*.7);var el=document.getElementById(t.id);if(el)el.textContent='+$'+t.b.toFixed(2);tot+=t.b;});
   var pe=document.getElementById('pnl-total'),pp=document.getElementById('pnl-pct');
-  if(pe)pe.textContent='+$'+total.toFixed(2);
-  if(pp)pp.textContent='+'+(total/24.09).toFixed(1)+'% today';
-}
-setInterval(flicker,2800);
-function animateBars(){
-  document.querySelectorAll('#bars .bar').forEach(function(b){
-    b.style.height=Math.floor(30+Math.random()*65)+'%';
-  });
-}
-setInterval(animateBars,2200);
-var revealObs=new IntersectionObserver(function(entries){
-  entries.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible');});
-},{threshold:0.06});
-document.querySelectorAll('.reveal').forEach(function(el){revealObs.observe(el);});
-/* Animate star rating bars when reviews section enters viewport */
-var barObs=new IntersectionObserver(function(entries){
+  if(pe)pe.textContent='+$'+tot.toFixed(2);if(pp)pp.textContent='+'+(tot/24.09).toFixed(1)+'% today';
+},2800);
+// Scroll reveal
+var ro=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting)e.target.classList.add('vis');});},{threshold:.05});
+document.querySelectorAll('.reveal').forEach(function(el){ro.observe(el);});
+// Star bars animate
+var bo=new IntersectionObserver(function(entries){
   entries.forEach(function(e){
     if(e.isIntersecting){
-      e.currentTarget.querySelectorAll('.star-bar-fill').forEach(function(b){
-        b.style.width=b.getAttribute('data-w')+'%';
-      });
-      barObs.disconnect();
+      e.target.querySelectorAll('.bar-fill').forEach(function(b){b.style.width=b.getAttribute('data-w')+'%';});
+      bo.disconnect();
     }
   });
-},{threshold:0.2});
-var rv=document.getElementById('reviews');
-if(rv)barObs.observe(rv);
+},{threshold:.2});
+var rv=document.getElementById('reviews');if(rv)bo.observe(rv);
+// Animated counters
+var co=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){
+    if(e.isIntersecting){
+      e.target.querySelectorAll('[data-target]').forEach(function(el){
+        var target=+el.getAttribute('data-target'),start=0,dur=1600,step=16;
+        var timer=setInterval(function(){
+          start+=target/(dur/step);
+          el.textContent=Math.min(Math.round(start),target)+(target===73?'%':'+');
+          if(start>=target)clearInterval(timer);
+        },step);
+      });
+      co.disconnect();
+    }
+  });
+},{threshold:.3});
+var st=document.getElementById('stats');if(st)co.observe(st);
 </script>
 </body>
 </html>
