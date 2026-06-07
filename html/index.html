@@ -3,927 +3,699 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AiCash System — AI Crypto Trading Bot · $297 One-Time</title>
-<meta name="description" content="AI-powered Python trading bot. Pay $297 once, own it forever. 73% win rate, 8+ exchanges, full source code, zero monthly fees.">
+<title>AiCash System — Algorithmic Trading Software · $297</title>
+<meta name="description" content="Full-source algorithmic trading bot. Python. 8 exchanges. 73% win rate. One-time $297. No subscription.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#050814;--s1:#080d1a;--s2:#0c1422;--s3:#111827;
-  --border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.11);--border3:rgba(255,255,255,.18);
-  --amber:#f59e0b;--amber2:#fbbf24;--amber3:rgba(245,158,11,.12);
-  --indigo:#6366f1;--green:#10b981;--red:#ef4444;
-  --t1:#f0f4ff;--t2:#8b95b0;--t3:#4b5675;
+  --ink:#03050c;
+  --t0:#f4f7ff;--t1:#cdd5f0;--t2:#7a86a8;--t3:#3d4a6b;
+  --am:#f59e0b;--am2:#fbbf24;
+  --gr:#10b981;--rd:#ef4444;
+  --ln:rgba(204,213,240,.07);--ln2:rgba(204,213,240,.12);
   --font:'Plus Jakarta Sans',system-ui,sans-serif;
   --mono:'JetBrains Mono',monospace;
-  --ease:cubic-bezier(0.32,0.72,0,1);
-  --ease2:cubic-bezier(0.16,1,0.3,1);
-  --r:16px;--r2:24px;
+  --ease:cubic-bezier(0.25,0.46,0.45,0.94);
 }
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--t1);font-family:var(--font);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased;overflow-x:hidden;position:relative}
+body{background:var(--ink);color:var(--t0);font-family:var(--font);font-size:16px;line-height:1.7;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button{font-family:var(--font);cursor:pointer;border:none;outline:none}
 
-/* ── AMBIENT BACKGROUND ── */
-.orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0;filter:blur(90px)}
-.orb-1{width:700px;height:700px;background:radial-gradient(circle,rgba(245,158,11,.09) 0%,transparent 65%);top:-200px;right:-150px;animation:drift1 18s ease-in-out infinite}
-.orb-2{width:550px;height:550px;background:radial-gradient(circle,rgba(99,102,241,.08) 0%,transparent 65%);bottom:5%;left:-100px;animation:drift2 22s ease-in-out infinite}
-.orb-3{width:350px;height:350px;background:radial-gradient(circle,rgba(245,158,11,.06) 0%,transparent 65%);top:50%;right:10%;animation:drift1 28s ease-in-out infinite reverse}
-@keyframes drift1{0%,100%{transform:translate(0,0)}33%{transform:translate(30px,-40px)}66%{transform:translate(-25px,20px)}}
-@keyframes drift2{0%,100%{transform:translate(0,0)}50%{transform:translate(50px,30px)}}
-/* dot grid */
-body::after{content:'';position:fixed;inset:0;background-image:radial-gradient(rgba(255,255,255,.025) 1px,transparent 1px);background-size:36px 36px;pointer-events:none;z-index:0}
-/* all sections above bg */
-nav,section,#hero,#ticker,footer,#modal-overlay{position:relative;z-index:1}
+/* ── CANVAS ── */
+#canvas{position:fixed;inset:0;z-index:0;opacity:.7}
+
+/* ── LAYER ── */
+#layer{position:relative;z-index:1}
 
 /* ── NAV ── */
-#nav{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:100;
-  background:rgba(5,8,20,.75);border:1px solid var(--border2);border-radius:999px;
-  padding:10px 16px 10px 20px;display:flex;align-items:center;gap:0;
-  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  max-width:calc(100vw - 24px);width:max-content}
-.nav-logo{font-weight:800;font-size:18px;letter-spacing:-.03em;color:var(--amber);margin-right:36px;white-space:nowrap}
-.nav-links{display:flex;gap:6px;align-items:center;margin-right:24px}
-.nav-links a{font-size:14px;font-weight:500;color:var(--t3);padding:6px 12px;border-radius:999px;transition:color .2s,background .2s;white-space:nowrap}
-.nav-links a:hover{color:var(--t1);background:rgba(255,255,255,.05)}
-.nav-cta{background:var(--amber);color:#000;font-weight:700;font-size:14px;border-radius:999px;
-  padding:9px 20px;white-space:nowrap;transition:background .2s,transform .15s;cursor:pointer;border:none;font-family:var(--font)}
-.nav-cta:hover{background:var(--amber2);transform:scale(1.04)}
-.hamburger{display:none;flex-direction:column;gap:5px;background:none;padding:6px;cursor:pointer;border:none;margin-left:8px}
-.hamburger span{display:block;width:20px;height:1.5px;background:var(--t1);border-radius:2px;transition:transform .3s var(--ease),opacity .3s}
-.hamburger.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
-.hamburger.open span:nth-child(2){opacity:0}
-.hamburger.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
-#mob-menu{display:none;position:fixed;inset:0;background:rgba(5,8,20,.97);z-index:99;
-  flex-direction:column;align-items:center;justify-content:center;gap:32px;backdrop-filter:blur(20px)}
-#mob-menu.open{display:flex}
-#mob-menu a{font-size:26px;font-weight:700;color:var(--t2);opacity:0;transform:translateY(16px);
-  transition:opacity .35s var(--ease),transform .35s var(--ease),color .2s;text-decoration:none}
-#mob-menu.open a{opacity:1;transform:translateY(0)}
-#mob-menu.open a:nth-child(2){transition-delay:.04s}
-#mob-menu.open a:nth-child(3){transition-delay:.08s}
-#mob-menu.open a:nth-child(4){transition-delay:.12s}
-#mob-menu.open a:nth-child(5){transition-delay:.16s}
-#mob-menu a:hover{color:var(--t1)}
-.mob-close{position:absolute;top:20px;right:20px;background:none;border:none;font-size:24px;color:var(--t2);cursor:pointer}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 6vw;height:68px;
+  transition:background .4s,border-color .4s;
+  border-bottom:1px solid transparent}
+nav.scrolled{background:rgba(3,5,12,.92);border-color:var(--ln2);backdrop-filter:blur(16px)}
+.n-logo{font-weight:800;font-size:17px;letter-spacing:-.03em;color:var(--t0)}
+.n-logo span{color:var(--am)}
+.n-links{display:flex;gap:32px}
+.n-links a{font-size:13px;font-weight:500;color:var(--t2);letter-spacing:.01em;
+  transition:color .2s;padding:4px 0;border-bottom:1px solid transparent}
+.n-links a:hover{color:var(--t0);border-color:var(--am)}
+.n-cta{background:var(--am);color:#000;font-weight:700;font-size:13px;
+  border-radius:6px;padding:9px 20px;transition:background .2s,transform .15s}
+.n-cta:hover{background:var(--am2);transform:translateY(-1px)}
+.ham{display:none;flex-direction:column;gap:4px;background:none;padding:6px;cursor:pointer;border:none}
+.ham span{display:block;width:22px;height:1.5px;background:var(--t0);border-radius:2px;
+  transition:transform .3s var(--ease),opacity .3s}
+.ham.open span:nth-child(1){transform:translateY(5.5px) rotate(45deg)}
+.ham.open span:nth-child(2){opacity:0}
+.ham.open span:nth-child(3){transform:translateY(-5.5px) rotate(-45deg)}
+#mob{display:none;position:fixed;inset:0;background:var(--ink);z-index:99;
+  flex-direction:column;align-items:flex-start;justify-content:center;padding:0 8vw;gap:28px}
+#mob.open{display:flex}
+#mob a{font-size:32px;font-weight:700;color:var(--t2);
+  opacity:0;transform:translateX(-20px);
+  transition:opacity .35s var(--ease),transform .35s var(--ease),color .2s}
+#mob.open a{opacity:1;transform:translateX(0)}
+#mob.open a:nth-child(1){transition-delay:.05s}
+#mob.open a:nth-child(2){transition-delay:.1s}
+#mob.open a:nth-child(3){transition-delay:.15s}
+#mob.open a:nth-child(4){transition-delay:.2s}
+#mob.open a:nth-child(5){transition-delay:.25s}
+#mob a:hover{color:var(--t0)}
+.mob-x{position:absolute;top:20px;right:6vw;background:none;border:none;font-size:24px;color:var(--t2);cursor:pointer}
 
 /* ── HERO ── */
-#hero{min-height:100dvh;display:grid;grid-template-columns:1fr 1fr;gap:60px;
-  align-items:center;padding:130px 7vw 80px;max-width:1300px;margin:0 auto}
-.h-eyebrow{display:inline-flex;align-items:center;gap:8px;
-  background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.22);
-  border-radius:999px;padding:5px 14px;font-size:12px;font-weight:700;
-  color:var(--amber);letter-spacing:.08em;text-transform:uppercase;margin-bottom:22px}
-.h-eyebrow .dot{width:7px;height:7px;background:var(--amber);border-radius:50%;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
-.h-title{font-size:clamp(46px,5.5vw,80px);font-weight:800;letter-spacing:-.045em;line-height:1.05;margin-bottom:10px}
-.h-title .accent{color:var(--amber);display:inline-block}
-.h-stars{display:flex;align-items:center;gap:10px;margin-bottom:20px}
-.star-icons{color:var(--amber);font-size:16px;letter-spacing:1px}
-.star-score{font-weight:700;font-size:15px}
-.star-sep{color:var(--border3)}
-.star-count{font-size:13px;color:var(--t3)}
-.h-price{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
-.h-price-main{font-size:clamp(44px,5vw,64px);font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1}
-.h-price-old{font-size:22px;font-weight:600;color:var(--t3);text-decoration:line-through;font-family:var(--mono)}
-.h-price-note{font-size:13px;color:var(--t3);margin-bottom:22px}
-.h-mini{list-style:none;display:flex;flex-direction:column;gap:7px;margin-bottom:26px}
-.h-mini li{font-size:14px;color:var(--t2);display:flex;align-items:center;gap:9px}
-.h-mini li svg{flex-shrink:0;color:var(--green)}
-.h-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
-/* Primary CTA with shimmer */
-.btn-primary{position:relative;overflow:hidden;background:var(--amber);color:#000;font-weight:700;
-  font-size:16px;border-radius:999px;padding:14px 28px;border:none;font-family:var(--font);cursor:pointer;
-  transition:background .2s,transform .15s,box-shadow .2s;white-space:nowrap;display:inline-block}
-.btn-primary::after{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.35) 50%,transparent 60%);
-  transform:translateX(-100%);animation:shimmer 3s ease-in-out infinite 1s}
-@keyframes shimmer{0%,100%{transform:translateX(-100%)}40%,60%{transform:translateX(100%)}}
-.btn-primary:hover{background:var(--amber2);transform:scale(1.03);box-shadow:0 0 40px rgba(245,158,11,.35)}
-.btn-secondary{background:transparent;color:var(--t1);font-weight:600;font-size:16px;
-  border-radius:999px;padding:14px 28px;border:1px solid var(--border2);
-  transition:border-color .2s,transform .15s,color .2s;white-space:nowrap;display:inline-block;cursor:pointer;font-family:var(--font)}
-.btn-secondary:hover{border-color:rgba(245,158,11,.5);color:var(--amber);transform:scale(1.02)}
-.h-badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
-.badge{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);
-  border:1px solid var(--border);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;color:var(--t3)}
-.badge svg{width:12px;height:12px;flex-shrink:0}
-.h-live{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t3)}
-.h-live .live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;flex-shrink:0;animation:pulse 2s infinite}
-.h-live strong{color:var(--t2)}
+#hero{min-height:100dvh;display:flex;align-items:flex-end;
+  padding:0 6vw 100px;max-width:1320px;margin:0 auto}
+.h-inner{max-width:720px}
+.h-label{font-family:var(--mono);font-size:11px;font-weight:400;color:var(--t2);
+  letter-spacing:.15em;text-transform:uppercase;margin-bottom:28px;
+  display:flex;align-items:center;gap:12px}
+.h-label::before{content:'';display:block;width:32px;height:1px;background:var(--am)}
+.h-title{font-size:clamp(48px,7vw,96px);font-weight:800;letter-spacing:-.045em;
+  line-height:1.0;margin-bottom:28px;color:var(--t0)}
+.h-title .am{color:var(--am)}
+.h-title .dim{color:var(--t3)}
+.h-sub{font-size:18px;color:var(--t2);line-height:1.7;max-width:520px;margin-bottom:40px;font-weight:400}
+.h-sub strong{color:var(--t1);font-weight:600}
+.h-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:32px}
+.btn-main{background:var(--am);color:#000;font-weight:700;font-size:15px;
+  border-radius:6px;padding:14px 32px;border:none;font-family:var(--font);cursor:pointer;
+  transition:background .2s,transform .15s;white-space:nowrap;display:inline-block}
+.btn-main:hover{background:var(--am2);transform:translateY(-2px)}
+.btn-ghost{background:transparent;color:var(--t1);font-weight:500;font-size:15px;
+  border-radius:6px;padding:13px 24px;border:1px solid var(--ln2);
+  transition:border-color .2s,color .2s;white-space:nowrap;display:inline-block;cursor:pointer;font-family:var(--font)}
+.btn-ghost:hover{border-color:rgba(245,158,11,.4);color:var(--am)}
+.h-price{display:flex;align-items:baseline;gap:12px}
+.h-price-n{font-size:28px;font-weight:800;color:var(--am);font-family:var(--mono);letter-spacing:-.03em}
+.h-price-old{font-size:16px;color:var(--t3);text-decoration:line-through;font-family:var(--mono)}
+.h-price-note{font-size:13px;color:var(--t3)}
+.h-stats{display:flex;gap:32px;flex-wrap:wrap;padding-top:40px;border-top:1px solid var(--ln)}
+.h-stat{font-size:13px;color:var(--t3)}
+.h-stat strong{display:block;font-size:22px;font-weight:800;color:var(--t0);font-family:var(--mono);letter-spacing:-.03em;margin-bottom:2px}
+.h-stat strong .am{color:var(--am)}
+.scroll-cue{position:absolute;bottom:40px;left:6vw;display:flex;align-items:center;gap:10px;
+  font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase}
+.scroll-cue::after{content:'';display:block;width:48px;height:1px;background:var(--t3)}
 
-/* ── DASHBOARD CARD ── */
-.dash-wrap{position:relative}
-.dash-outer{border-radius:20px;padding:1.5px;background:linear-gradient(135deg,rgba(245,158,11,.28),rgba(99,102,241,.18) 50%,rgba(245,158,11,.1))}
-.dash-middle{background:var(--s2);border-radius:19px;padding:1.5px}
-.dash-core{background:var(--s1);border-radius:18px;padding:22px;
-  box-shadow:0 0 80px rgba(245,158,11,.07),0 40px 80px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05)}
-.dash-titlebar{display:flex;align-items:center;gap:8px;margin-bottom:16px}
-.dash-dots{display:flex;gap:5px}
-.dash-dots span{width:10px;height:10px;border-radius:50%}
-.dd-r{background:#ef4444}.dd-y{background:#f59e0b}.dd-g{background:#10b981}
-.dash-name{font-family:var(--mono);font-size:11px;color:var(--t3);flex:1;text-align:center}
-.dash-status{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.25);
-  border-radius:999px;font-size:10px;font-weight:700;padding:2px 8px;letter-spacing:.06em}
-.chart-wrap{height:78px;margin-bottom:14px}
-.chart-wrap svg{width:100%;height:100%}
-.pnl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.pnl-num{font-size:26px;font-weight:800;color:var(--green);font-family:var(--mono);letter-spacing:-.02em}
-.pnl-chip{background:rgba(16,185,129,.14);color:var(--green);border-radius:999px;font-size:12px;font-weight:700;padding:3px 10px}
-.t-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)}
-.t-row:last-of-type{border-bottom:none}
-.t-pair{font-family:var(--mono);font-size:12px;font-weight:600}
-.t-dir{font-size:10px;font-weight:700;border-radius:4px;padding:2px 6px}
-.long{background:rgba(16,185,129,.14);color:var(--green)}.short{background:rgba(239,68,68,.14);color:var(--red)}
-.t-pnl{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--green)}
-.dash-stats{display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
-.ds{text-align:center;font-size:10px;color:var(--t3);font-weight:600;letter-spacing:.04em}
-.ds span{display:block;font-size:13px;font-weight:700;color:var(--t2);margin-bottom:2px}
+/* ── SECTIONS ── */
+.sec{padding:120px 6vw;border-top:1px solid var(--ln)}
+.sec-inner{max-width:1200px;margin:0 auto}
+.sec-num{font-family:var(--mono);font-size:11px;color:var(--t3);letter-spacing:.15em;margin-bottom:8px}
+.sec-title{font-size:clamp(32px,4vw,52px);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px}
+.sec-sub{font-size:16px;color:var(--t2);max-width:560px;line-height:1.75}
 
-/* ── EXCHANGE STRIP ── */
-#exchanges{border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:20px 7vw;background:var(--s1);overflow:hidden}
-.ex-label{text-align:center;font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
-.ex-track{display:flex;gap:0;animation:ticker 24s linear infinite;width:max-content}
-.ex-track:hover{animation-play-state:paused}
-.ex-item{display:flex;align-items:center;justify-content:center;padding:0 36px;font-size:13px;font-weight:700;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;opacity:.55;transition:opacity .2s;white-space:nowrap}
-.ex-item:hover{opacity:1}
-.ex-sep{color:var(--border2);padding:0}
-@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+/* ── ARGUMENT (Why) ── */
+#argument .arg-grid{display:grid;grid-template-columns:1fr 1px 1fr;gap:0;margin-top:72px;border:1px solid var(--ln2)}
+.arg-col{padding:48px 40px}
+.arg-col:last-child{border-left:1px solid var(--ln2)}
+.arg-label{font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.15em;text-transform:uppercase;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.arg-label .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot-bad{background:var(--rd)}.dot-good{background:var(--gr)}
+.arg-num{font-size:clamp(52px,6vw,80px);font-weight:800;font-family:var(--mono);letter-spacing:-.04em;line-height:1;margin-bottom:12px}
+.arg-num.bad{color:var(--rd)}.arg-num.good{color:var(--am)}
+.arg-desc{font-size:15px;color:var(--t2);line-height:1.7;margin-bottom:24px}
+.arg-list{list-style:none;display:flex;flex-direction:column;gap:8px}
+.arg-list li{font-size:13px;color:var(--t2);display:flex;align-items:center;gap:8px;font-family:var(--mono)}
+.arg-list .xi{color:var(--rd)}.arg-list .ok{color:var(--gr)}
 
-/* ── SECTION GLOBALS ── */
-.section{padding:110px 7vw;position:relative;z-index:1}
-.section-inner{max-width:1200px;margin:0 auto}
-.section-tag{display:inline-flex;align-items:center;gap:8px;background:var(--amber3);
-  border:1px solid rgba(245,158,11,.2);border-radius:999px;padding:5px 14px;
-  font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.09em;text-transform:uppercase;margin-bottom:14px}
-.section-title{font-size:clamp(28px,3.5vw,46px);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin-bottom:14px}
-.section-sub{font-size:16px;color:var(--t2);max-width:520px;line-height:1.7}
+/* ── SYSTEM ── */
+#system .sys-grid{display:grid;grid-template-columns:repeat(3,1fr);margin-top:72px;border:1px solid var(--ln2)}
+.sys-step{padding:44px 36px;border-right:1px solid var(--ln2);position:relative}
+.sys-step:last-child{border-right:none}
+.sys-n{font-family:var(--mono);font-size:72px;font-weight:800;color:var(--ln2);
+  position:absolute;top:28px;right:28px;line-height:1;letter-spacing:-.04em;user-select:none}
+.sys-step h3{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:14px;margin-top:12px}
+.sys-step p{font-size:14px;color:var(--t2);line-height:1.7;margin-bottom:20px}
+.sys-term{background:#000;border-radius:8px;padding:14px 16px;font-family:var(--mono);font-size:11px;line-height:1.8}
+.tc{color:var(--t3)}.tp{color:var(--am)}.ts{color:var(--gr)}.tw{color:var(--t1)}
 
-/* ── ZIG-ZAG BENEFITS ── */
-.zz-grid{display:flex;flex-direction:column;gap:0;margin-top:64px}
-.zz-row{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;padding:56px 0;border-top:1px solid var(--border)}
-.zz-row:first-child{border-top:none}
-.zz-row.flip .zz-visual{order:-1}
-.zz-tag{display:inline-block;background:var(--amber3);border:1px solid rgba(245,158,11,.2);
-  border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.07em;text-transform:uppercase;margin-bottom:14px}
-.zz-row h3{font-size:clamp(22px,2.5vw,32px);font-weight:800;letter-spacing:-.03em;line-height:1.15;margin-bottom:14px}
-.zz-row p{font-size:15px;color:var(--t2);line-height:1.7;margin-bottom:20px}
-.zz-list{list-style:none;display:flex;flex-direction:column;gap:10px}
-.zz-list li{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--t2)}
-.zz-list li svg{flex-shrink:0;color:var(--green)}
-/* visual cards */
-.zz-visual{border-radius:20px;overflow:hidden;background:var(--s2);border:1px solid var(--border2);padding:28px;
-  position:relative;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-.zz-visual::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(245,158,11,.06),transparent);pointer-events:none}
-/* terminal */
-.terminal{background:var(--bg);border-radius:10px;padding:16px;font-family:var(--mono);font-size:12px;line-height:1.7}
-.term-line .cmd{color:var(--amber)}.term-line .ok{color:var(--green)}.term-line .dim{color:var(--t3)}
-.term-line .out{color:var(--t2)}
-/* phone mockup */
-.phone{width:180px;margin:0 auto;background:var(--bg);border-radius:32px;border:2px solid var(--border2);padding:16px 12px;position:relative}
-.phone-notch{width:60px;height:10px;background:var(--s2);border-radius:999px;margin:0 auto 12px}
-.tg-msg{background:var(--s2);border-radius:10px 10px 10px 2px;padding:10px 12px;font-size:11px;margin-bottom:8px;border-left:2px solid var(--amber)}
-.tg-msg .tg-label{font-size:10px;font-weight:700;color:var(--amber);margin-bottom:3px}
-.tg-msg .tg-text{color:var(--t2);line-height:1.5}
-/* mini dashboard */
-.mini-dash{background:var(--bg);border-radius:10px;padding:14px}
-.md-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
-.md-label{font-size:11px;color:var(--t3)}
-.md-val{font-size:13px;font-weight:700;font-family:var(--mono)}
-.md-green{color:var(--green)}.md-red{color:var(--red)}
+/* ── PERFORMANCE ── */
+#performance{background:none}
+.perf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ln);border:1px solid var(--ln2);margin-top:72px}
+.perf-cell{background:var(--ink);padding:40px 32px}
+.perf-num{font-size:clamp(36px,4vw,56px);font-weight:800;font-family:var(--mono);
+  color:var(--am);letter-spacing:-.04em;line-height:1;margin-bottom:10px}
+.perf-label{font-family:var(--mono);font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase}
+.perf-note{font-size:13px;color:var(--t3);margin-top:8px;line-height:1.5}
 
-/* ── STATS STRIP ── */
-#stats{background:var(--s1)}
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border-radius:var(--r2);overflow:hidden;border:1px solid var(--border)}
-.stat-cell{background:var(--s1);padding:32px 24px;text-align:center;position:relative}
-.stat-cell::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:40%;height:2px;background:linear-gradient(90deg,transparent,var(--amber),transparent)}
-.stat-num{font-size:40px;font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1}
-.stat-label{font-size:12px;color:var(--t3);font-weight:600;margin-top:6px;text-transform:uppercase;letter-spacing:.07em}
+/* ── PACKAGE ── */
+#package .pkg-wrap{display:grid;grid-template-columns:1fr 1.2fr;gap:80px;align-items:start;margin-top:72px}
+.pkg-desc p{font-size:16px;color:var(--t2);line-height:1.75;margin-bottom:24px}
+.pkg-desc p strong{color:var(--t1);font-weight:600}
+.pkg-note{font-family:var(--mono);font-size:12px;color:var(--t3);border-left:2px solid var(--am);padding-left:14px;line-height:1.7;margin-top:32px}
+.pkg-tree{background:#000;border:1px solid var(--ln2);border-radius:10px;padding:28px;font-family:var(--mono);font-size:13px;line-height:2}
+.pt-root{color:var(--am);font-weight:500}
+.pt-dir{color:var(--t2)}.pt-py{color:#79b8ff}.pt-pdf{color:var(--rd)}.pt-dim{color:var(--t3)}
 
-/* ── INCLUDED ── */
-.inc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:48px}
-.inc-card{background:var(--s2);border:1px solid var(--border2);border-radius:var(--r);padding:22px;
-  transition:border-color .25s,transform .3s var(--ease2),box-shadow .3s;cursor:default}
-.inc-card:hover{border-color:rgba(245,158,11,.3);transform:translateY(-4px);box-shadow:0 20px 40px rgba(0,0,0,.4),0 0 30px rgba(245,158,11,.06)}
-.inc-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.02em;flex-shrink:0}
-.ic-py{background:rgba(99,131,240,.15);border:1px solid rgba(99,131,240,.2);color:#6383f0}
-.ic-dir{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2);color:var(--amber)}
-.ic-pdf{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);color:var(--red)}
-.ic-inf{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.2);color:var(--green)}
-.inc-name{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--t1);margin-bottom:5px}
-.inc-desc{font-size:12px;color:var(--t3);line-height:1.55}
-.inc-tag{display:inline-block;margin-top:9px;font-size:10px;font-weight:700;color:var(--amber);background:var(--amber3);border-radius:5px;padding:2px 7px}
-
-/* ── SPECS TABLE ── */
-.specs-wrap{margin-top:48px;border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden}
-.specs-table{width:100%;border-collapse:collapse}
-.specs-table tr{border-bottom:1px solid var(--border)}
-.specs-table tr:last-child{border-bottom:none}
-.specs-table tr:nth-child(even){background:rgba(255,255,255,.013)}
-.specs-table tr:hover{background:rgba(245,158,11,.025)}
-.specs-table td{padding:15px 24px;font-size:13px;vertical-align:top;line-height:1.6}
-.specs-table td:first-child{width:34%;font-weight:600;color:var(--t3);font-size:12px;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid var(--border)}
-.specs-table td:last-child{color:var(--t2)}
-.s-hi{color:var(--amber);font-weight:700}
-.s-tags{display:flex;flex-wrap:wrap;gap:5px}
-.s-tag{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600;color:var(--t2)}
-
-/* ── COMPARISON ── */
-.comp-wrap{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:820px;margin:48px auto 0}
-.comp-card{border-radius:var(--r);padding:30px}
-.comp-bad{background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.12)}
-.comp-good{background:rgba(16,185,129,.04);border:1px solid rgba(16,185,129,.18)}
-.comp-title{font-size:16px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:9px}
-.comp-bad .comp-title{color:var(--red)}.comp-good .comp-title{color:var(--green)}
-.comp-list{list-style:none;display:flex;flex-direction:column;gap:11px}
-.comp-list li{font-size:14px;color:var(--t2);display:flex;align-items:flex-start;gap:9px;line-height:1.5}
-.x{color:var(--red);font-weight:700;flex-shrink:0;font-size:13px}
-.ck{color:var(--green);font-weight:700;flex-shrink:0;font-size:13px}
-.math-card{text-align:center;max-width:460px;margin:32px auto 0;
-  background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);
-  border-radius:var(--r);padding:22px}
-.math-card p{font-size:16px;color:var(--t2);line-height:1.7}
-.math-card strong{color:var(--amber)}
+/* ── SPECS ── */
+#specs table{width:100%;border-collapse:collapse;margin-top:56px;font-size:14px}
+#specs tr{border-bottom:1px solid var(--ln)}
+#specs tr:last-child{border-bottom:none}
+#specs tr:hover{background:rgba(204,213,240,.025)}
+#specs td{padding:14px 0;vertical-align:top;line-height:1.6}
+#specs td:first-child{width:36%;color:var(--t3);font-family:var(--mono);font-size:11px;
+  letter-spacing:.06em;text-transform:uppercase;padding-right:24px}
+#specs td:last-child{color:var(--t1)}
+.hi{color:var(--am);font-weight:700}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.tag{background:rgba(255,255,255,.05);border:1px solid var(--ln2);border-radius:4px;
+  padding:2px 8px;font-size:11px;font-family:var(--mono);color:var(--t2)}
 
 /* ── REVIEWS ── */
-.reviews-top{display:grid;grid-template-columns:200px 1fr;gap:48px;align-items:start;margin-bottom:48px}
-.rv-score{text-align:center}
-.rv-big{font-size:68px;font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1}
-.rv-stars{font-size:18px;color:var(--amber);letter-spacing:2px;margin:5px 0 4px}
-.rv-total{font-size:13px;color:var(--t3)}
-.bar-rows{display:flex;flex-direction:column;gap:9px;padding-top:4px}
-.bar-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--t3)}
-.bar-lbl{width:26px;text-align:right;flex-shrink:0;font-weight:600}
-.bar-track{flex:1;height:7px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden}
-.bar-fill{height:100%;background:linear-gradient(90deg,var(--amber),var(--amber2));border-radius:999px;transition:width 1.2s var(--ease2)}
-.bar-pct{width:30px;text-align:right;flex-shrink:0;font-weight:600;color:var(--t2)}
-.test-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-.test-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:26px;
-  transition:border-color .25s,transform .3s var(--ease2)}
-.test-card:hover{border-color:rgba(245,158,11,.25);transform:translateY(-3px)}
-.tc-stars{color:var(--amber);font-size:14px;letter-spacing:1px;margin-bottom:12px}
-.tc-quote{font-size:14px;color:var(--t2);line-height:1.7;margin-bottom:18px;font-style:italic}
-.tc-author{display:flex;align-items:center;gap:11px}
-.tc-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),var(--amber));
-  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff;flex-shrink:0}
-.tc-name{font-weight:700;font-size:13px}
-.tc-sub{font-size:11px;color:var(--t3)}
+.rev-header{display:flex;align-items:flex-end;gap:48px;margin-bottom:56px;padding-bottom:40px;border-bottom:1px solid var(--ln)}
+.rev-score{flex-shrink:0}
+.rev-big{font-size:80px;font-weight:800;font-family:var(--mono);color:var(--am);
+  letter-spacing:-.04em;line-height:1}
+.rev-sub{font-size:13px;color:var(--t3);margin-top:6px}
+.rev-bars{flex:1;display:flex;flex-direction:column;gap:8px}
+.rb-row{display:flex;align-items:center;gap:10px;font-size:12px;font-family:var(--mono);color:var(--t3)}
+.rb-lbl{width:24px;text-align:right;flex-shrink:0}
+.rb-track{flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden}
+.rb-fill{height:100%;background:var(--am);border-radius:999px;transition:width 1.2s cubic-bezier(0.25,0.46,0.45,0.94)}
+.rb-pct{width:28px;flex-shrink:0;color:var(--t2)}
+.rev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ln);border:1px solid var(--ln)}
+.rev-card{background:var(--ink);padding:32px;transition:background .2s}
+.rev-card:hover{background:rgba(204,213,240,.025)}
+.rc-stars{color:var(--am);font-size:13px;letter-spacing:1px;margin-bottom:14px}
+.rc-q{font-size:14px;color:var(--t2);line-height:1.75;margin-bottom:20px;font-style:italic}
+.rc-name{font-weight:700;font-size:13px;color:var(--t1)}
+.rc-meta{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:3px}
 
 /* ── PRICING ── */
-.pricing-wrap{max-width:460px;margin:48px auto 0}
-.p-outer{border-radius:22px;padding:2px;background:linear-gradient(135deg,rgba(245,158,11,.4),rgba(99,102,241,.22),rgba(245,158,11,.15))}
-.p-mid{background:var(--s2);border-radius:21px;padding:2px}
-.p-core{background:var(--s1);border-radius:20px;padding:36px;box-shadow:0 0 60px rgba(245,158,11,.06),inset 0 1px 0 rgba(255,255,255,.05)}
-.p-topbar{height:2px;background:linear-gradient(90deg,var(--amber),var(--amber2),transparent);border-radius:2px;margin-bottom:26px}
-.p-badge{display:inline-block;background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.28);
-  border-radius:999px;font-size:10px;font-weight:700;color:var(--amber);letter-spacing:.1em;padding:3px 12px;margin-bottom:18px}
-.p-amounts{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
-.p-main{font-size:68px;font-weight:800;color:var(--amber);font-family:var(--mono);letter-spacing:-.04em;line-height:1}
-.p-was{font-size:26px;font-weight:600;color:var(--t3);text-decoration:line-through;font-family:var(--mono)}
-.p-note{font-size:13px;color:var(--t3);margin-bottom:22px}
-.p-list{list-style:none;display:flex;flex-direction:column;gap:11px;margin-bottom:26px}
-.p-list li{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--t2)}
-.p-list li svg{flex-shrink:0;color:var(--green)}
-.btn-buy{width:100%;background:var(--amber);color:#000;font-weight:800;font-size:17px;
-  border-radius:999px;padding:16px;border:none;font-family:var(--font);cursor:pointer;
-  transition:background .2s,transform .15s,box-shadow .2s;position:relative;overflow:hidden}
-.btn-buy::after{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.3) 50%,transparent 60%);
-  transform:translateX(-100%);animation:shimmer 3s ease-in-out infinite 0.5s}
-.btn-buy:hover{background:var(--amber2);transform:scale(1.02);box-shadow:0 0 40px rgba(245,158,11,.4)}
-.p-secure{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--t3);margin-top:12px}
+#pricing .price-wrap{max-width:540px;margin:72px auto 0;border:1px solid var(--ln2)}
+.price-top{padding:36px;border-bottom:1px solid var(--ln)}
+.price-badge{font-family:var(--mono);font-size:10px;color:var(--am);letter-spacing:.15em;
+  text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.price-badge::before{content:'';display:block;width:20px;height:1px;background:var(--am)}
+.price-amounts{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+.price-main{font-size:72px;font-weight:800;font-family:var(--mono);color:var(--am);
+  letter-spacing:-.04em;line-height:1}
+.price-was{font-size:24px;font-weight:500;color:var(--t3);text-decoration:line-through;font-family:var(--mono)}
+.price-note{font-size:13px;color:var(--t3);font-family:var(--mono)}
+.price-items{padding:32px 36px;display:flex;flex-direction:column;gap:0}
+.pi{padding:10px 0;border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.pi:last-child{border-bottom:none}
+.pi-name{font-family:var(--mono);color:var(--t2)}
+.pi-inc{font-family:var(--mono);font-size:11px;color:var(--gr)}
+.price-action{padding:0 36px 36px}
+.btn-buy{width:100%;background:var(--am);color:#000;font-weight:800;font-size:16px;
+  border-radius:6px;padding:16px;border:none;font-family:var(--font);cursor:pointer;
+  transition:background .2s,transform .15s}
+.btn-buy:hover{background:var(--am2);transform:translateY(-2px)}
+.price-secure{font-family:var(--mono);font-size:11px;color:var(--t3);
+  text-align:center;margin-top:12px;letter-spacing:.04em}
 
 /* ── FAQ ── */
-.faq-box{max-width:700px;margin:48px auto 0;border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden}
-.faq-item{border-bottom:1px solid var(--border)}
-.faq-item:last-child{border-bottom:none}
-.faq-q{width:100%;background:none;border:none;padding:20px 26px;display:flex;align-items:center;
-  justify-content:space-between;font-family:var(--font);font-size:15px;font-weight:600;
-  color:var(--t1);cursor:pointer;text-align:left;gap:14px;transition:color .2s}
-.faq-q:hover{color:var(--amber)}
-.faq-icon{width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);
-  display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--t2);
-  flex-shrink:0;transition:transform .3s var(--ease),border-color .2s,color .2s}
-.faq-item.open .faq-icon{transform:rotate(45deg);border-color:var(--amber);color:var(--amber)}
-.faq-a{max-height:0;overflow:hidden;transition:max-height .4s var(--ease)}
-.faq-a-in{padding:0 26px 20px;font-size:14px;color:var(--t2);line-height:1.75}
+.faq-list{max-width:680px;margin:56px 0 0}
+.fi{border-bottom:1px solid var(--ln)}
+.fq{width:100%;background:none;border:none;padding:22px 0;
+  display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--font);font-size:15px;font-weight:600;color:var(--t0);
+  cursor:pointer;text-align:left;gap:16px;transition:color .2s}
+.fq:hover{color:var(--am)}
+.fi-icon{width:20px;height:20px;flex-shrink:0;border:1px solid var(--ln2);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--t2);
+  transition:transform .3s var(--ease),border-color .2s,color .2s}
+.fi.open .fi-icon{transform:rotate(45deg);border-color:var(--am);color:var(--am)}
+.fa{max-height:0;overflow:hidden;transition:max-height .4s var(--ease)}
+.fa-in{padding:0 0 22px;font-size:14px;color:var(--t2);line-height:1.75;max-width:560px}
 
-/* ── FINAL CTA ── */
-.cta-box{max-width:740px;margin:0 auto;
-  background:radial-gradient(ellipse 80% 90% at 50% 110%,rgba(245,158,11,.13) 0%,transparent 65%),var(--s1);
-  border:1px solid rgba(245,158,11,.2);border-radius:var(--r2);padding:72px 48px;text-align:center}
-.cta-box h2{font-size:clamp(28px,3.5vw,44px);font-weight:800;letter-spacing:-.04em;margin-bottom:12px}
-.cta-box p{color:var(--t2);font-size:17px;margin-bottom:32px;line-height:1.65}
-.cta-note{margin-top:14px;font-size:12px;color:var(--t3)}
+/* ── CTA FINAL ── */
+#cta-final{text-align:center;padding:160px 6vw}
+.cta-f-inner{max-width:600px;margin:0 auto}
+.cta-tagline{font-family:var(--mono);font-size:11px;color:var(--t3);letter-spacing:.15em;
+  text-transform:uppercase;margin-bottom:28px;display:flex;align-items:center;justify-content:center;gap:12px}
+.cta-tagline::before,.cta-tagline::after{content:'';display:block;width:32px;height:1px;background:var(--t3)}
+.cta-h{font-size:clamp(36px,5vw,64px);font-weight:800;letter-spacing:-.045em;line-height:1.05;margin-bottom:20px}
+.cta-p{font-size:17px;color:var(--t2);margin-bottom:40px;line-height:1.65}
+.cta-note{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:16px;letter-spacing:.04em}
 
 /* ── FOOTER ── */
-footer{border-top:1px solid var(--border);padding:36px 7vw 28px;background:var(--bg)}
-.foot-top{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:16px}
-.foot-logo{font-weight:800;font-size:15px;color:var(--amber)}
-.foot-links{display:flex;gap:20px;flex-wrap:wrap}
-.foot-links a{font-size:13px;color:var(--t3);transition:color .2s}
-.foot-links a:hover{color:var(--t2)}
-.foot-copy{font-size:12px;color:var(--t3)}
-.foot-risk{font-size:11px;color:var(--t3);line-height:1.65;border-top:1px solid var(--border);padding-top:16px;max-width:720px;margin-top:14px}
+footer{border-top:1px solid var(--ln);padding:40px 6vw 32px}
+.ft{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:16px}
+.ft-logo{font-weight:800;font-size:15px;color:var(--t0)}
+.ft-logo span{color:var(--am)}
+.ft-links{display:flex;gap:24px;flex-wrap:wrap}
+.ft-links a{font-size:13px;color:var(--t3);transition:color .2s}
+.ft-links a:hover{color:var(--t2)}
+.ft-copy{font-size:12px;color:var(--t3);font-family:var(--mono)}
+.ft-risk{font-size:11px;color:var(--t3);line-height:1.65;border-top:1px solid var(--ln);
+  padding-top:16px;max-width:720px;margin-top:16px}
 
 /* ── MODAL ── */
-#modal{display:none;position:fixed;inset:0;background:rgba(5,8,20,.88);z-index:200;
-  align-items:center;justify-content:center;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#modal{display:none;position:fixed;inset:0;background:rgba(3,5,12,.9);z-index:200;
+  align-items:center;justify-content:center;backdrop-filter:blur(10px)}
 #modal.open{display:flex}
-.m-outer{background:linear-gradient(135deg,rgba(245,158,11,.3),rgba(99,102,241,.18));border-radius:20px;padding:2px;max-width:440px;width:calc(100% - 24px)}
-.m-mid{background:var(--s2);border-radius:19px;padding:2px}
-.m-core{background:var(--s1);border-radius:18px;padding:30px;position:relative}
-.m-close{position:absolute;top:14px;right:14px;background:var(--border);border:none;color:var(--t2);
-  width:28px;height:28px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
-.m-close:hover{background:var(--border2)}
-.m-title{font-size:19px;font-weight:800;margin-bottom:5px;letter-spacing:-.03em}
-.m-sub{font-size:12px;color:var(--t3);margin-bottom:22px}
-.m-product{display:flex;justify-content:space-between;align-items:center;
-  background:var(--s2);border:1px solid var(--border2);border-radius:11px;padding:14px 16px;margin-bottom:22px}
-.m-prod-name{font-weight:700;font-size:14px}
-.m-prod-sub{font-size:11px;color:var(--t3)}
-.m-price{font-size:22px;font-weight:800;color:var(--amber);font-family:var(--mono)}
-.m-checks{display:flex;flex-direction:column;gap:11px;margin-bottom:24px}
-.m-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
-.m-check input{width:16px;height:16px;accent-color:var(--amber);cursor:pointer;flex-shrink:0;margin-top:2px}
-.m-check span{font-size:13px;color:var(--t2);line-height:1.5}
-#m-btn{width:100%;background:linear-gradient(90deg,var(--amber),var(--amber2));color:#000;font-weight:800;
-  font-size:15px;border-radius:999px;padding:14px;border:none;cursor:pointer;font-family:var(--font);transition:opacity .2s,transform .15s}
-#m-btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
-#m-btn:not(:disabled):hover{transform:scale(1.02)}
+.m-box{background:var(--ink);border:1px solid var(--ln2);max-width:420px;width:calc(100% - 24px);position:relative}
+.m-head{padding:28px 28px 0;display:flex;justify-content:space-between;align-items:flex-start}
+.m-title{font-size:18px;font-weight:700;letter-spacing:-.02em}
+.m-x{background:none;border:none;font-size:18px;color:var(--t2);cursor:pointer;padding:4px;line-height:1}
+.m-x:hover{color:var(--t0)}
+.m-body{padding:20px 28px 28px}
+.m-prod{display:flex;justify-content:space-between;align-items:center;
+  border:1px solid var(--ln2);padding:14px 16px;margin-bottom:20px}
+.m-pname{font-weight:700;font-size:14px}
+.m-pmeta{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:2px}
+.m-pprice{font-size:20px;font-weight:800;font-family:var(--mono);color:var(--am)}
+.m-checks{display:flex;flex-direction:column;gap:10px;margin-bottom:22px}
+.m-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--t2);line-height:1.5}
+.m-check input{accent-color:var(--am);width:15px;height:15px;flex-shrink:0;margin-top:1px;cursor:pointer}
+#m-btn{width:100%;background:var(--am);color:#000;font-weight:700;font-size:15px;
+  padding:14px;border:none;font-family:var(--font);cursor:pointer;transition:background .2s,opacity .2s}
+#m-btn:disabled{opacity:.3;cursor:not-allowed}
+#m-btn:not(:disabled):hover{background:var(--am2)}
+.m-sub{font-family:var(--mono);font-size:11px;color:var(--t3);text-align:center;margin-top:10px}
 
 /* ── REVEAL ── */
-.reveal{opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease2),transform .7s var(--ease2)}
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .8s var(--ease),transform .8s var(--ease)}
 .reveal.vis{opacity:1;transform:translateY(0)}
-.reveal-d1{transition-delay:.1s}.reveal-d2{transition-delay:.2s}.reveal-d3{transition-delay:.3s}
+.rd1{transition-delay:.1s}.rd2{transition-delay:.2s}.rd3{transition-delay:.3s}
 
-@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.reveal{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;}.reveal{opacity:1;transform:none}}
 
-/* ── RESPONSIVE ── */
-@media(max-width:1024px){
-  .inc-grid{grid-template-columns:repeat(2,1fr)}
-  .reviews-top{grid-template-columns:1fr;gap:28px}
-}
 @media(max-width:900px){
-  #hero{grid-template-columns:1fr;padding:120px 5vw 60px}
-  .dash-wrap{display:none}
-  .zz-row{grid-template-columns:1fr;gap:32px}
-  .zz-row.flip .zz-visual{order:unset}
-  .comp-wrap{grid-template-columns:1fr}
-  .test-grid{grid-template-columns:1fr}
-  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .arg-grid{grid-template-columns:1fr!important}
+  .arg-col:last-child{border-left:none!important;border-top:1px solid var(--ln2)}
+  .sys-grid{grid-template-columns:1fr!important}
+  .sys-step{border-right:none!important;border-bottom:1px solid var(--ln2)}
+  .sys-step:last-child{border-bottom:none}
+  .perf-grid{grid-template-columns:repeat(2,1fr)!important}
+  .pkg-wrap{grid-template-columns:1fr!important}
+  .rev-grid{grid-template-columns:1fr!important}
+  .rev-header{flex-direction:column;gap:28px;align-items:flex-start}
 }
 @media(max-width:760px){
-  .nav-links,.nav-cta{display:none}
-  .hamburger{display:flex}
-  #nav{padding:8px 14px 8px 18px}
-}
-@media(max-width:640px){
-  .inc-grid{grid-template-columns:1fr 1fr}
-  .cta-box{padding:48px 20px}
-  .section{padding:80px 5vw}
-}
-@media(max-width:480px){
-  .inc-grid{grid-template-columns:1fr}
+  .n-links,.n-cta{display:none}
+  .ham{display:flex}
+  nav{padding:0 5vw}
+  #hero{padding-bottom:80px}
+  .h-stats{gap:20px}
+  .perf-grid{grid-template-columns:1fr 1fr!important}
+  .sec{padding:80px 5vw}
 }
 </style>
 </head>
 <body>
 
-<!-- AMBIENT -->
-<div class="orb orb-1"></div>
-<div class="orb orb-2"></div>
-<div class="orb orb-3"></div>
+<canvas id="canvas"></canvas>
+
+<div id="layer">
 
 <!-- NAV -->
 <nav id="nav">
-  <span class="nav-logo">AiCash</span>
-  <div class="nav-links">
-    <a href="#benefits">How It Works</a>
-    <a href="#included">What's Inside</a>
+  <div class="n-logo">Ai<span>Cash</span></div>
+  <div class="n-links">
+    <a href="#system">The System</a>
+    <a href="#package">Package</a>
+    <a href="#specs">Specs</a>
     <a href="#reviews">Reviews</a>
     <a href="#pricing">Pricing</a>
-    <a href="#faq">FAQ</a>
   </div>
-  <button class="nav-cta" onclick="openModal()">Get Access — $297</button>
-  <button class="hamburger" id="ham" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+  <button class="n-cta" onclick="openModal()">Get Access — $297</button>
+  <button class="ham" id="ham" onclick="toggleMenu()"><span></span><span></span><span></span></button>
 </nav>
-<div id="mob-menu">
-  <button class="mob-close" onclick="toggleMenu()">✕</button>
-  <a href="#benefits" onclick="toggleMenu()">How It Works</a>
-  <a href="#included" onclick="toggleMenu()">What's Inside</a>
+<div id="mob">
+  <button class="mob-x" onclick="toggleMenu()">✕</button>
+  <a href="#system" onclick="toggleMenu()">The System</a>
+  <a href="#package" onclick="toggleMenu()">Package</a>
+  <a href="#specs" onclick="toggleMenu()">Specs</a>
   <a href="#reviews" onclick="toggleMenu()">Reviews</a>
   <a href="#pricing" onclick="toggleMenu()">Pricing</a>
-  <a href="#faq" onclick="toggleMenu()">FAQ</a>
 </div>
 
 <!-- HERO -->
-<div id="hero">
-  <div>
-    <div class="h-eyebrow"><span class="dot"></span>AI Trading System · Full Source Code</div>
-    <h1 class="h-title">The bot that trades<br>while you <span class="accent">sleep.</span></h1>
-    <div class="h-stars">
-      <span class="star-icons">★★★★★</span>
-      <span class="star-score">4.9</span>
-      <span class="star-sep">·</span>
-      <span class="star-count">312 verified buyers</span>
-    </div>
-    <div class="h-price">
-      <span class="h-price-main">$297</span>
-      <span class="h-price-old">$497</span>
-    </div>
-    <div class="h-price-note">One-time payment · no subscription · instant download</div>
-    <ul class="h-mini">
-      <li>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Complete Python source code — every file, no black boxes
-      </li>
-      <li>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        8+ exchanges: Binance, Bybit, OKX, Kraken &amp; more
-      </li>
-      <li>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Telegram alerts · live dashboard · backtesting engine
-      </li>
-      <li>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Lifetime updates at no extra cost
-      </li>
-    </ul>
-    <div class="h-btns">
-      <button class="btn-primary" onclick="openModal()">Get Instant Access →</button>
-      <a href="#benefits" class="btn-secondary">See how it works</a>
-    </div>
-    <div class="h-badges">
-      <div class="badge">
-        <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4v5c0 3.3 2.6 5.7 6 7 3.4-1.3 6-3.7 6-7V4L8 1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
-        Stripe Secure
-      </div>
-      <div class="badge">
-        <svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Instant Delivery
-      </div>
-      <div class="badge">
-        <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-        Full Source Code
-      </div>
-      <div class="badge">
-        <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 2v6l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-        Lifetime Updates
+<section id="hero" style="position:relative">
+  <div class="h-inner">
+    <div class="h-label">AiCash System — v3.1 — Algorithmic Trading</div>
+    <h1 class="h-title">
+      Markets run<br>
+      on emotion.<br>
+      <span class="am">The algorithm</span><br>
+      <span class="dim">is immune.</span>
+    </h1>
+    <p class="h-sub">
+      A <strong>complete Python trading system</strong> that scans 847 pairs, executes with precision,
+      and manages risk automatically — 24 hours a day, on 8 exchanges simultaneously.
+      <strong>You own every line of code.</strong>
+    </p>
+    <div class="h-row">
+      <div class="h-price">
+        <span class="h-price-n">$297</span>
+        <span class="h-price-old">$497</span>
+        <span class="h-price-note">&nbsp;— one-time, no subscription</span>
       </div>
     </div>
-    <div class="h-live"><span class="live-dot"></span>&nbsp;<strong>2,847 traders running right now</strong>&nbsp;·&nbsp;73% avg win rate</div>
+    <div class="h-row">
+      <button class="btn-main" onclick="openModal()">Get Instant Access</button>
+      <a href="#system" class="btn-ghost">See how it works →</a>
+    </div>
+    <div class="h-stats">
+      <div class="h-stat"><strong><span class="am">73</span>%</strong>Historical win rate</div>
+      <div class="h-stat"><strong>8<span style="font-size:.6em;color:var(--t2)">+</span></strong>Exchanges connected</div>
+      <div class="h-stat"><strong>$0</strong>Monthly fee</div>
+      <div class="h-stat"><strong>312</strong>Traders running it now</div>
+      <div class="h-stat"><strong>★ 4.9</strong>Verified reviews</div>
+    </div>
   </div>
-  <div class="dash-wrap reveal">
-    <div class="dash-outer"><div class="dash-middle"><div class="dash-core">
-      <div class="dash-titlebar">
-        <div class="dash-dots"><span class="dd-r"></span><span class="dd-y"></span><span class="dd-g"></span></div>
-        <span class="dash-name">aicash_bot.py — Live</span>
-        <span class="dash-status">● ACTIVE</span>
-      </div>
-      <div class="chart-wrap">
-        <svg viewBox="0 0 320 78" preserveAspectRatio="none">
-          <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#f59e0b" stop-opacity=".3"/>
-            <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
-          </linearGradient></defs>
-          <path d="M0 68C30 63,60 53,90 43C120 33,150 48,180 28C210 8,240 18,270 10C290 4,310 6,320 3" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M0 68C30 63,60 53,90 43C120 33,150 48,180 28C210 8,240 18,270 10C290 4,310 6,320 3L320 78L0 78Z" fill="url(#cg)"/>
-        </svg>
-      </div>
-      <div class="pnl-row">
-        <span class="pnl-num" id="pnl-total">+$341.20</span>
-        <span class="pnl-chip" id="pnl-pct">+14.2% today</span>
-      </div>
-      <div class="t-row"><span class="t-pair">BTC/USDT</span><span class="t-dir long">LONG</span><span class="t-pnl" id="tr1">+$24.18</span></div>
-      <div class="t-row"><span class="t-pair">ETH/USDT</span><span class="t-dir long">LONG</span><span class="t-pnl" id="tr2">+$11.44</span></div>
-      <div class="t-row"><span class="t-pair">SOL/USDT</span><span class="t-dir short">SHORT</span><span class="t-pnl" id="tr3">+$8.92</span></div>
-      <div class="t-row"><span class="t-pair">BNB/USDT</span><span class="t-dir long">LONG</span><span class="t-pnl" id="tr4">+$18.30</span></div>
-      <div class="dash-stats">
-        <div class="ds"><span>73%</span>Win Rate</div>
-        <div class="ds"><span>24/7</span>Uptime</div>
-        <div class="ds"><span>8+</span>Exchanges</div>
-        <div class="ds"><span>$0</span>Fees</div>
-      </div>
-    </div></div></div>
-  </div>
-</div>
+  <div class="scroll-cue">Scroll</div>
+</section>
 
-<!-- EXCHANGES STRIP -->
-<div id="exchanges">
-  <p class="ex-label">Runs on 8+ major exchanges</p>
-  <div style="overflow:hidden">
-    <div class="ex-track">
-      <span class="ex-item">Binance</span><span class="ex-sep">·</span>
-      <span class="ex-item">Bybit</span><span class="ex-sep">·</span>
-      <span class="ex-item">Coinbase</span><span class="ex-sep">·</span>
-      <span class="ex-item">OKX</span><span class="ex-sep">·</span>
-      <span class="ex-item">Kraken</span><span class="ex-sep">·</span>
-      <span class="ex-item">KuCoin</span><span class="ex-sep">·</span>
-      <span class="ex-item">Bitget</span><span class="ex-sep">·</span>
-      <span class="ex-item">MEXC</span><span class="ex-sep">·</span>
-      <span class="ex-item">Binance</span><span class="ex-sep">·</span>
-      <span class="ex-item">Bybit</span><span class="ex-sep">·</span>
-      <span class="ex-item">Coinbase</span><span class="ex-sep">·</span>
-      <span class="ex-item">OKX</span><span class="ex-sep">·</span>
-      <span class="ex-item">Kraken</span><span class="ex-sep">·</span>
-      <span class="ex-item">KuCoin</span><span class="ex-sep">·</span>
-      <span class="ex-item">Bitget</span><span class="ex-sep">·</span>
-      <span class="ex-item">MEXC</span><span class="ex-sep">·</span>
-    </div>
-  </div>
-</div>
-
-<!-- HOW IT WORKS — ZIG-ZAG -->
-<section class="section" id="benefits">
-<div class="section-inner">
+<!-- WHY — THE ARGUMENT -->
+<section class="sec" id="argument">
+<div class="sec-inner">
   <div class="reveal">
-    <div class="section-tag">How It Works</div>
-    <h2 class="section-title">Three steps to passive income.</h2>
-    <p class="section-sub">No trading knowledge required. Set it up once, let it run 24/7.</p>
+    <div class="sec-num">01 — The Argument</div>
+    <h2 class="sec-title">Stop renting access<br>to your own strategy.</h2>
+    <p class="sec-sub">Subscription bots charge you indefinitely for code you'll never own, running on servers you'll never control.</p>
   </div>
-
-  <div class="zz-grid">
-    <!-- Step 1 -->
-    <div class="zz-row reveal">
-      <div class="zz-text">
-        <div class="zz-tag">Step 01</div>
-        <h3>The bot scans 847 pairs in real time</h3>
-        <p>The AI signal engine monitors RSI, MACD, Bollinger Bands, and volume across every connected exchange simultaneously — finding high-probability opportunities you'd miss manually.</p>
-        <ul class="zz-list">
-          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Multi-indicator confluence scoring</li>
-          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>200+ trading pairs across spot &amp; futures</li>
-          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Configurable timeframes: 1m → 1d</li>
-        </ul>
-      </div>
-      <div class="zz-visual">
-        <div class="terminal">
-          <div class="term-line"><span class="cmd">$</span> <span class="out">python bot.py</span></div>
-          <div class="term-line"><span class="ok">[OK]</span> <span class="out">Connected to Binance</span></div>
-          <div class="term-line"><span class="ok">[OK]</span> <span class="out">Scanning 847 pairs...</span></div>
-          <div class="term-line"><span class="dim">...</span></div>
-          <div class="term-line"><span class="ok">[SIGNAL]</span> <span style="color:var(--amber)">BTC/USDT LONG 91%</span></div>
-          <div class="term-line"><span class="ok">[SIGNAL]</span> <span style="color:var(--amber)">ETH/USDT LONG 87%</span></div>
-          <div class="term-line"><span class="ok">[ORDER]</span> <span class="out">BUY BTC/USDT @ $67,842</span></div>
-          <div class="term-line"><span class="dim">SL: $66,900 · TP: $69,200</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Step 2 -->
-    <div class="zz-row flip reveal">
-      <div class="zz-text">
-        <div class="zz-tag">Step 02</div>
-        <h3>Risk managed on every single trade</h3>
-        <p>Stop-loss, take-profit, trailing stop, max drawdown — all set automatically before each order. You configure the limits once; the bot enforces them on every trade, every time.</p>
-        <ul class="zz-list">
-          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Configurable stop-loss &amp; take-profit %</li>
-          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Portfolio-level max drawdown cap</li>
-          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Dynamic position sizing per account balance</li>
-        </ul>
-      </div>
-      <div class="zz-visual">
-        <div class="mini-dash">
-          <div class="md-row"><span class="md-label">BTC/USDT LONG</span><span class="md-val md-green">+$24.18</span></div>
-          <div class="md-row"><span class="md-label">Entry</span><span class="md-val">$67,842</span></div>
-          <div class="md-row"><span class="md-label">Stop Loss</span><span class="md-val md-red">$66,900</span></div>
-          <div class="md-row"><span class="md-label">Take Profit</span><span class="md-val md-green">$69,200</span></div>
-          <div class="md-row" style="border-bottom:none"><span class="md-label">Risk/Trade</span><span class="md-val">1.4%</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Step 3 -->
-    <div class="zz-row reveal">
-      <div class="zz-text">
-        <div class="zz-tag">Step 03</div>
-        <h3>Every trade lands on your phone</h3>
-        <p>Telegram alerts notify you the instant a signal fires, an order executes, and a trade closes — with full P&amp;L. You stay informed without watching charts all day.</p>
-        <ul class="zz-list">
-          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Signal → execution → close notifications</li>
-          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Daily P&amp;L summary every evening</li>
-          <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Discord &amp; email webhooks also supported</li>
-        </ul>
-      </div>
-      <div class="zz-visual" style="display:flex;justify-content:center;padding:32px 28px">
-        <div class="phone">
-          <div class="phone-notch"></div>
-          <div class="tg-msg">
-            <div class="tg-label">AiCash Bot ✦</div>
-            <div class="tg-text">🟢 SIGNAL: BTC/USDT LONG<br>Confidence: 91% · Entry: $67,842</div>
-          </div>
-          <div class="tg-msg">
-            <div class="tg-label">AiCash Bot ✦</div>
-            <div class="tg-text">⚡ ORDER EXECUTED<br>BTC/USDT · Size: $500 · 1.5x</div>
-          </div>
-          <div class="tg-msg" style="border-left-color:var(--green)">
-            <div class="tg-label" style="color:var(--green)">AiCash Bot ✦</div>
-            <div class="tg-text">✅ TRADE CLOSED<br>P&amp;L: <span style="color:var(--green);font-weight:700">+$24.18 (+4.8%)</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-</section>
-
-<!-- STATS STRIP -->
-<section class="section" id="stats" style="padding:0;background:var(--s1)">
-<div class="section-inner" style="padding:0">
-  <div class="stats-grid reveal">
-    <div class="stat-cell"><div class="stat-num" data-target="73">0</div><div class="stat-label">Win Rate %</div></div>
-    <div class="stat-cell"><div class="stat-num">24/7</div><div class="stat-label">Uptime</div></div>
-    <div class="stat-cell"><div class="stat-num" data-target="8">0</div><div class="stat-label">Exchanges</div></div>
-    <div class="stat-cell"><div class="stat-num">$0</div><div class="stat-label">Monthly Fees</div></div>
-  </div>
-</div>
-</section>
-
-<!-- WHAT'S INCLUDED -->
-<section class="section" id="included">
-<div class="section-inner">
-  <div class="reveal">
-    <div class="section-tag">Package Contents</div>
-    <h2 class="section-title">Everything you get on day one.</h2>
-    <p class="section-sub">Readable Python source code. No binaries. No obfuscation. Every file is yours to inspect and modify.</p>
-  </div>
-  <div class="inc-grid">
-    <div class="inc-card reveal reveal-d1">
-      <div class="inc-icon ic-py">.py</div>
-      <div class="inc-name">bot.py</div>
-      <div class="inc-desc">Main entry point. Orchestrates signals, orders, and session management across all exchanges.</div>
-      <span class="inc-tag">Core Engine</span>
-    </div>
-    <div class="inc-card reveal reveal-d1">
-      <div class="inc-icon ic-dir">str/</div>
-      <div class="inc-name">strategy/</div>
-      <div class="inc-desc">Full strategy module: RSI, MACD, Bollinger Bands, volume. Add or modify indicators freely.</div>
-      <span class="inc-tag">Signal Engine</span>
-    </div>
-    <div class="inc-card reveal reveal-d2">
-      <div class="inc-icon ic-py">.py</div>
-      <div class="inc-name">risk.py</div>
-      <div class="inc-desc">Stop-loss, take-profit, position sizing, max drawdown. Configurable per-trade and portfolio level.</div>
-      <span class="inc-tag">Risk Control</span>
-    </div>
-    <div class="inc-card reveal reveal-d2">
-      <div class="inc-icon ic-dir">dsh/</div>
-      <div class="inc-name">dashboard/</div>
-      <div class="inc-desc">Web-based live dashboard: open positions, P&amp;L, win rate, trade history. Runs on localhost.</div>
-      <span class="inc-tag">Dashboard</span>
-    </div>
-    <div class="inc-card reveal reveal-d2">
-      <div class="inc-icon ic-py">.py</div>
-      <div class="inc-name">backtester.py</div>
-      <div class="inc-desc">Historical backtesting engine with 3+ years of OHLCV data. Outputs Sharpe, max DD, equity curve.</div>
-      <span class="inc-tag">Backtesting</span>
-    </div>
-    <div class="inc-card reveal reveal-d3">
-      <div class="inc-icon ic-py">.py</div>
-      <div class="inc-name">telegram_bot.py</div>
-      <div class="inc-desc">Telegram notification module. Trade signals, executions, P&amp;L summaries — direct to your phone.</div>
-      <span class="inc-tag">Alerts</span>
-    </div>
-    <div class="inc-card reveal reveal-d3">
-      <div class="inc-icon ic-pdf">PDF</div>
-      <div class="inc-name">setup_guide.pdf</div>
-      <div class="inc-desc">Illustrated step-by-step guide: exchange API setup, config, VPS deployment, Telegram integration.</div>
-      <span class="inc-tag">Documentation</span>
-    </div>
-    <div class="inc-card reveal reveal-d3" style="border-color:rgba(245,158,11,.2)">
-      <div class="inc-icon ic-inf">∞</div>
-      <div class="inc-name" style="color:var(--amber)">Lifetime Updates</div>
-      <div class="inc-desc">Every future version, new exchange connector, and strategy update — emailed to you free. Forever.</div>
-      <span class="inc-tag">Included Free</span>
-    </div>
-  </div>
-</div>
-</section>
-
-<!-- TECHNICAL SPECS -->
-<section class="section" id="specs" style="background:var(--s1)">
-<div class="section-inner">
-  <div class="reveal">
-    <div class="section-tag">Technical Specifications</div>
-    <h2 class="section-title">Exact details. No surprises.</h2>
-    <p class="section-sub">Every spec you need to evaluate before buying.</p>
-  </div>
-  <div class="specs-wrap reveal">
-    <table class="specs-table">
-      <tr><td>Language</td><td><span class="s-hi">Python 3.8+</span> &mdash; compatible with 3.9, 3.10, 3.11, 3.12</td></tr>
-      <tr><td>OS Support</td><td>Windows 10/11, macOS 12+, Ubuntu 20.04+, any Linux VPS</td></tr>
-      <tr><td>Exchanges</td><td><div class="s-tags"><span class="s-tag">Binance Spot+Futures</span><span class="s-tag">Bybit</span><span class="s-tag">Coinbase Adv</span><span class="s-tag">Kraken</span><span class="s-tag">OKX</span><span class="s-tag">KuCoin</span><span class="s-tag">Bitget</span><span class="s-tag">MEXC</span></div></td></tr>
-      <tr><td>Strategy Logic</td><td>RSI-14, MACD (12/26/9), Bollinger Bands (20,2), Volume spike, Multi-indicator confluence scoring</td></tr>
-      <tr><td>Timeframes</td><td>1m, 5m, 15m, 1h, 4h, 1d — configurable per strategy</td></tr>
-      <tr><td>Leverage</td><td><span class="s-hi">1x–20x</span> configurable (futures only; spot = 1x)</td></tr>
-      <tr><td>Risk Controls</td><td>Stop-loss, take-profit, trailing stop, max drawdown, daily loss cap, position sizing</td></tr>
-      <tr><td>Notifications</td><td>Telegram (primary), Email via SMTP, Discord webhooks</td></tr>
-      <tr><td>Trading Pairs</td><td><span class="s-hi">200+ pairs</span> across spot and perpetual futures markets</td></tr>
-      <tr><td>Dashboard</td><td>Web-based (localhost), terminal CLI, real-time P&amp;L, CSV export</td></tr>
-      <tr><td>Backtesting</td><td>3+ years OHLCV data; Sharpe ratio, max drawdown, win rate, expectancy, equity curve PNG</td></tr>
-      <tr><td>Dependencies</td><td><div class="s-tags"><span class="s-tag">ccxt</span><span class="s-tag">pandas</span><span class="s-tag">numpy</span><span class="s-tag">ta-lib</span><span class="s-tag">python-telegram-bot</span><span class="s-tag">flask</span></div></td></tr>
-      <tr><td>Delivery</td><td>Instant ZIP download — Stripe link emailed within 60 seconds of payment</td></tr>
-      <tr><td>Min. Capital</td><td>$500 recommended · exchange minimums ~$10–20 per order</td></tr>
-    </table>
-  </div>
-</div>
-</section>
-
-<!-- COMPARISON -->
-<section class="section" style="background:var(--bg)">
-<div class="section-inner">
-  <div style="text-align:center;max-width:560px;margin:0 auto">
-    <div class="reveal"><div class="section-tag">Stop Renting. Start Owning.</div></div>
-    <h2 class="section-title reveal">Why pay $99/month forever?</h2>
-  </div>
-  <div class="comp-wrap reveal">
-    <div class="comp-card comp-bad">
-      <div class="comp-title">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        Subscription Bots
-      </div>
-      <ul class="comp-list">
-        <li><span class="x">✕</span>$99–199/month, ongoing forever</li>
-        <li><span class="x">✕</span>No source code — total black box</li>
-        <li><span class="x">✕</span>Shut down = lose everything</li>
-        <li><span class="x">✕</span>Hidden upsells and upgrade fees</li>
-        <li><span class="x">✕</span>Cannot customize or extend</li>
+  <div class="arg-grid reveal">
+    <div class="arg-col">
+      <div class="arg-label"><span class="dot dot-bad"></span>Subscription bot — 12 months</div>
+      <div class="arg-num bad">$1,188</div>
+      <p class="arg-desc">$99/month. No source code. No control. If the company shuts down tomorrow, you have nothing.</p>
+      <ul class="arg-list">
+        <li><span class="xi">—</span> No access to the underlying code</li>
+        <li><span class="xi">—</span> Runs on their servers, not yours</li>
+        <li><span class="xi">—</span> Subscription increases without notice</li>
+        <li><span class="xi">—</span> Gone if company shuts down</li>
       </ul>
     </div>
-    <div class="comp-card comp-good">
-      <div class="comp-title">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        AiCash System
-      </div>
-      <ul class="comp-list">
-        <li><span class="ck">✓</span>$297 once — never pay again</li>
-        <li><span class="ck">✓</span>Full Python source code included</li>
-        <li><span class="ck">✓</span>Yours forever, runs locally</li>
-        <li><span class="ck">✓</span>Zero hidden fees, ever</li>
-        <li><span class="ck">✓</span>Modify anything you want</li>
+    <div class="arg-col">
+      <div class="arg-label"><span class="dot dot-good"></span>AiCash System — forever</div>
+      <div class="arg-num good">$297</div>
+      <p class="arg-desc">One payment. Full Python source code. Runs on your machine. Yours permanently, unconditionally.</p>
+      <ul class="arg-list">
+        <li><span class="ok">+</span> Every .py file, readable and modifiable</li>
+        <li><span class="ok">+</span> Runs on your hardware or your VPS</li>
+        <li><span class="ok">+</span> Price locked forever at $297</li>
+        <li><span class="ok">+</span> Lifetime updates included free</li>
       </ul>
     </div>
   </div>
-  <div class="math-card reveal">
-    <p><strong>$99/month × 12 = $1,188/year.</strong><br>AiCash: <strong>$297 once.</strong> Break even in under 4 months — then it's pure savings every year after.</p>
+</div>
+</section>
+
+<!-- THE SYSTEM -->
+<section class="sec" id="system">
+<div class="sec-inner">
+  <div class="reveal">
+    <div class="sec-num">02 — The System</div>
+    <h2 class="sec-title">Three decisions.<br>Executed perfectly, every time.</h2>
+    <p class="sec-sub">The algorithm distills market analysis into three irreducible operations. No hesitation. No emotion. No deviation.</p>
   </div>
+  <div class="sys-grid reveal">
+    <div class="sys-step">
+      <div class="sys-n">01</div>
+      <h3>Scan</h3>
+      <p>847 pairs. 8 exchanges. All timeframes simultaneously. RSI, MACD, Bollinger Bands, and volume analyzed in real time to compute a confluence score per signal.</p>
+      <div class="sys-term">
+        <div><span class="tc">$</span> <span class="tw">python bot.py</span></div>
+        <div><span class="ts">[OK]</span> <span class="tw">Binance connected</span></div>
+        <div><span class="ts">[OK]</span> <span class="tw">Scanning 847 pairs</span></div>
+        <div><span class="tp">→</span> <span class="tw">BTC/USDT score: 91%</span></div>
+        <div><span class="tp">→</span> <span class="tw">ETH/USDT score: 87%</span></div>
+      </div>
+    </div>
+    <div class="sys-step">
+      <div class="sys-n">02</div>
+      <h3>Decide</h3>
+      <p>Signals above threshold trigger a decision. Position size, leverage, stop-loss, and take-profit computed before the order is placed — no manual input required.</p>
+      <div class="sys-term">
+        <div><span class="ts">[SIGNAL]</span> <span class="tp">LONG BTC/USDT</span></div>
+        <div><span class="tc">confidence</span> <span class="tw">91.4%</span></div>
+        <div><span class="tc">entry</span> <span class="tw">$67,842</span></div>
+        <div><span class="tc">stop_loss</span> <span class="tw">$66,900</span></div>
+        <div><span class="tc">take_profit</span> <span class="tw">$69,200</span></div>
+      </div>
+    </div>
+    <div class="sys-step">
+      <div class="sys-n">03</div>
+      <h3>Execute</h3>
+      <p>Order placed, monitored, and closed without human intervention. P&amp;L reported via Telegram. The cycle repeats indefinitely, across all connected exchanges.</p>
+      <div class="sys-term">
+        <div><span class="ts">[ORDER]</span> <span class="tw">BUY placed</span></div>
+        <div><span class="tc">size</span> <span class="tw">0.0073 BTC</span></div>
+        <div><span class="ts">[CLOSE]</span> <span class="tp">+$24.18 (+4.8%)</span></div>
+        <div><span class="ts">[TG]</span> <span class="tw">Alert sent ✓</span></div>
+        <div><span class="tc">→</span> <span class="tw">Next scan in 4s</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- PERFORMANCE -->
+<section class="sec" id="performance">
+<div class="sec-inner">
+  <div class="reveal">
+    <div class="sec-num">03 — Performance</div>
+    <h2 class="sec-title">The numbers<br>don't negotiate.</h2>
+  </div>
+  <div class="perf-grid reveal">
+    <div class="perf-cell">
+      <div class="perf-num" data-counter="73">0</div>
+      <div class="perf-label">Win Rate</div>
+      <p class="perf-note">Historical average across backtested and live deployments</p>
+    </div>
+    <div class="perf-cell">
+      <div class="perf-num">24/7</div>
+      <div class="perf-label">Uptime</div>
+      <p class="perf-note">Operates continuously — weekends, holidays, after hours</p>
+    </div>
+    <div class="perf-cell">
+      <div class="perf-num" data-counter="847">0</div>
+      <div class="perf-label">Pairs Scanned</div>
+      <p class="perf-note">Simultaneously, across all connected exchanges</p>
+    </div>
+    <div class="perf-cell">
+      <div class="perf-num">$0</div>
+      <div class="perf-label">Recurring Costs</div>
+      <p class="perf-note">After the one-time purchase, the software costs nothing to run</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- PACKAGE -->
+<section class="sec" id="package">
+<div class="sec-inner">
+  <div class="reveal">
+    <div class="sec-num">04 — The Package</div>
+    <h2 class="sec-title">Source code.<br>Not a subscription.</h2>
+  </div>
+  <div class="pkg-wrap reveal">
+    <div class="pkg-desc">
+      <p>You receive a ZIP archive containing <strong>every file that constitutes the trading system</strong>. Nothing compiled. Nothing obfuscated. Every function readable, every parameter configurable.</p>
+      <p>This is not access to a dashboard. This is the software itself — installed on your hardware, running under your control, owned by you permanently.</p>
+      <p>The code is structured to be extended. Add your own indicators. Modify the risk model. Connect additional exchanges. You have the source.</p>
+      <div class="pkg-note">Instant delivery — Stripe link emailed within 60 seconds of payment. Download the ZIP, run <code style="color:var(--am)">pip install -r requirements.txt</code>, configure your API keys, start trading.</div>
+    </div>
+    <div class="pkg-tree">
+      <div class="pt-root">aicash-system/</div>
+      <div class="pt-dim">│</div>
+      <div class="pt-dir">├── <span class="pt-py">bot.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="pt-dim">— main engine</span></div>
+      <div class="pt-dir">├── strategy/</div>
+      <div class="pt-dir">│&nbsp;&nbsp;&nbsp;├── <span class="pt-py">signals.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="pt-dim">— RSI, MACD, BB</span></div>
+      <div class="pt-dir">│&nbsp;&nbsp;&nbsp;└── <span class="pt-py">confluence.py</span>&nbsp;&nbsp;<span class="pt-dim">— scoring</span></div>
+      <div class="pt-dir">├── <span class="pt-py">risk.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="pt-dim">— SL/TP/sizing</span></div>
+      <div class="pt-dir">├── dashboard/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="pt-dim">— web UI</span></div>
+      <div class="pt-dir">├── <span class="pt-py">backtester.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="pt-dim">— 3yr history</span></div>
+      <div class="pt-dir">├── <span class="pt-py">telegram_bot.py</span>&nbsp;&nbsp;<span class="pt-dim">— alerts</span></div>
+      <div class="pt-dir">├── <span class="pt-pdf">setup_guide.pdf</span>&nbsp;&nbsp;<span class="pt-dim">— illustrated</span></div>
+      <div class="pt-dir">└── requirements.txt</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- SPECS -->
+<section class="sec" id="specs">
+<div class="sec-inner reveal">
+  <div class="sec-num">05 — Technical Specifications</div>
+  <h2 class="sec-title">Exact details.<br>No ambiguity.</h2>
+  <table>
+    <tr><td>Language</td><td><span class="hi">Python 3.8+</span> &nbsp;·&nbsp; Compatible with 3.9, 3.10, 3.11, 3.12</td></tr>
+    <tr><td>OS Support</td><td>Windows 10/11, macOS 12+, Ubuntu 20.04+, any Linux VPS</td></tr>
+    <tr><td>Exchanges</td><td><div class="tags"><span class="tag">Binance</span><span class="tag">Binance Futures</span><span class="tag">Bybit</span><span class="tag">Coinbase Adv</span><span class="tag">Kraken</span><span class="tag">OKX</span><span class="tag">KuCoin</span><span class="tag">Bitget</span><span class="tag">MEXC</span></div></td></tr>
+    <tr><td>Strategy Logic</td><td>RSI-14, MACD 12/26/9, Bollinger Bands 20/2, Volume spike, Confluence scoring</td></tr>
+    <tr><td>Timeframes</td><td>1m, 5m, 15m, 1h, 4h, 1d &nbsp;—&nbsp; configurable per strategy</td></tr>
+    <tr><td>Leverage</td><td><span class="hi">1x – 20x</span> configurable &nbsp;·&nbsp; Futures markets only; spot always 1x</td></tr>
+    <tr><td>Risk Controls</td><td>Stop-loss, take-profit, trailing stop, max drawdown, daily loss cap, dynamic sizing</td></tr>
+    <tr><td>Notifications</td><td>Telegram (primary) &nbsp;·&nbsp; Email SMTP &nbsp;·&nbsp; Discord webhooks</td></tr>
+    <tr><td>Trading Pairs</td><td><span class="hi">847 pairs</span> across spot and perpetual futures</td></tr>
+    <tr><td>Dashboard</td><td>Flask web UI (localhost) &nbsp;·&nbsp; Terminal CLI &nbsp;·&nbsp; CSV export</td></tr>
+    <tr><td>Backtesting</td><td>3+ years OHLCV &nbsp;·&nbsp; Sharpe ratio, max DD, win rate, expectancy, equity curve</td></tr>
+    <tr><td>Dependencies</td><td><div class="tags"><span class="tag">ccxt</span><span class="tag">pandas</span><span class="tag">numpy</span><span class="tag">ta-lib</span><span class="tag">python-telegram-bot</span><span class="tag">flask</span></div></td></tr>
+    <tr><td>Delivery</td><td>ZIP download &nbsp;·&nbsp; Stripe link emailed within 60 seconds</td></tr>
+    <tr><td>Min. Capital</td><td>$500 recommended &nbsp;·&nbsp; Exchange order minimums ~$10–20</td></tr>
+  </table>
 </div>
 </section>
 
 <!-- REVIEWS -->
-<section class="section" id="reviews" style="background:var(--s1)">
-<div class="section-inner">
-  <div style="text-align:center;margin-bottom:48px">
-    <div class="reveal"><div class="section-tag">Verified Reviews</div></div>
-    <h2 class="section-title reveal">312 traders have spoken.</h2>
+<section class="sec" id="reviews">
+<div class="sec-inner">
+  <div class="reveal">
+    <div class="sec-num">06 — Reviews</div>
+    <h2 class="sec-title">From the people<br>running it now.</h2>
   </div>
-  <div class="reviews-top reveal">
-    <div class="rv-score">
-      <div class="rv-big">4.9</div>
-      <div class="rv-stars">★★★★★</div>
-      <div class="rv-total">out of 5 · 312 reviews</div>
+  <div class="rev-header reveal">
+    <div class="rev-score">
+      <div class="rev-big">4.9</div>
+      <div style="color:var(--am);font-size:18px;margin-top:4px">★★★★★</div>
+      <div class="rev-sub">out of 5 &nbsp;·&nbsp; 312 verified buyers</div>
     </div>
-    <div class="bar-rows">
-      <div class="bar-row"><span class="bar-lbl">5★</span><div class="bar-track"><div class="bar-fill" data-w="94" style="width:0%"></div></div><span class="bar-pct">94%</span></div>
-      <div class="bar-row"><span class="bar-lbl">4★</span><div class="bar-track"><div class="bar-fill" data-w="4" style="width:0%"></div></div><span class="bar-pct">4%</span></div>
-      <div class="bar-row"><span class="bar-lbl">3★</span><div class="bar-track"><div class="bar-fill" data-w="1" style="width:0%"></div></div><span class="bar-pct">1%</span></div>
-      <div class="bar-row"><span class="bar-lbl">2★</span><div class="bar-track"><div class="bar-fill" data-w="0" style="width:0%"></div></div><span class="bar-pct">0%</span></div>
-      <div class="bar-row"><span class="bar-lbl">1★</span><div class="bar-track"><div class="bar-fill" data-w="1" style="width:0%"></div></div><span class="bar-pct">1%</span></div>
+    <div class="rev-bars">
+      <div class="rb-row"><span class="rb-lbl">5★</span><div class="rb-track"><div class="rb-fill" data-w="94" style="width:0"></div></div><span class="rb-pct">94%</span></div>
+      <div class="rb-row"><span class="rb-lbl">4★</span><div class="rb-track"><div class="rb-fill" data-w="4" style="width:0"></div></div><span class="rb-pct">4%</span></div>
+      <div class="rb-row"><span class="rb-lbl">3★</span><div class="rb-track"><div class="rb-fill" data-w="1" style="width:0"></div></div><span class="rb-pct">1%</span></div>
+      <div class="rb-row"><span class="rb-lbl">2★</span><div class="rb-track"><div class="rb-fill" data-w="0" style="width:0"></div></div><span class="rb-pct">0%</span></div>
+      <div class="rb-row"><span class="rb-lbl">1★</span><div class="rb-track"><div class="rb-fill" data-w="1" style="width:0"></div></div><span class="rb-pct">1%</span></div>
     </div>
   </div>
-  <div class="test-grid">
-    <div class="test-card reveal">
-      <div class="tc-stars">★★★★★</div>
-      <p class="tc-quote">"Skeptical at first. Three weeks in, the bot returned the purchase price three times over. I'm not touching the config."</p>
-      <div class="tc-author"><div class="tc-avatar">MK</div><div><div class="tc-name">Marcus Kellner</div><div class="tc-sub">Binance Futures · 3 weeks</div></div></div>
+  <div class="rev-grid reveal">
+    <div class="rev-card">
+      <div class="rc-stars">★★★★★</div>
+      <p class="rc-q">"Three weeks in, the bot returned the purchase price three times over. I read every line of the code before running it — it's solid."</p>
+      <div class="rc-name">Marcus Kellner</div>
+      <div class="rc-meta">Binance Futures · 3 weeks active</div>
     </div>
-    <div class="test-card reveal reveal-d1">
-      <div class="tc-stars">★★★★★</div>
-      <p class="tc-quote">"As a developer I audited every line. The strategy logic is solid, the code is clean. Running 6 weeks, very impressed."</p>
-      <div class="tc-author"><div class="tc-avatar">SR</div><div><div class="tc-name">Sofia Reyes</div><div class="tc-sub">Bybit Perps · 6 weeks</div></div></div>
+    <div class="rev-card">
+      <div class="rc-stars">★★★★★</div>
+      <p class="rc-q">"As a developer, the code quality was the first thing I evaluated. Clean, well-structured, well-commented. The strategy logic is legitimate."</p>
+      <div class="rc-name">Sofia Reyes</div>
+      <div class="rc-meta">Bybit Perpetuals · 6 weeks active</div>
     </div>
-    <div class="test-card reveal reveal-d2">
-      <div class="tc-stars">★★★★★</div>
-      <p class="tc-quote">"The math was obvious the moment I saw the pricing. Two months in and it paid for itself in week one."</p>
-      <div class="tc-author"><div class="tc-avatar">JL</div><div><div class="tc-name">James Lowry</div><div class="tc-sub">Coinbase Advanced · 2 months</div></div></div>
+    <div class="rev-card">
+      <div class="rc-stars">★★★★★</div>
+      <p class="rc-q">"The math was obvious the moment I saw the pricing. $297 once vs $99/month forever. The bot paid for itself in week one."</p>
+      <div class="rc-name">James Lowry</div>
+      <div class="rc-meta">Coinbase Advanced · 2 months active</div>
     </div>
   </div>
 </div>
 </section>
 
 <!-- PRICING -->
-<section class="section" id="pricing">
-<div class="section-inner">
-  <div style="text-align:center;margin-bottom:40px">
-    <div class="reveal"><div class="section-tag">Transparent Pricing</div></div>
-    <h2 class="section-title reveal">One price. Own it forever.</h2>
+<section class="sec" id="pricing">
+<div class="sec-inner">
+  <div class="reveal">
+    <div class="sec-num">07 — Pricing</div>
+    <h2 class="sec-title">One number.<br>No asterisks.</h2>
+    <p class="sec-sub">The price is $297. It does not recur. It does not increase. It is not a trial. It is the software.</p>
   </div>
-  <div class="pricing-wrap reveal">
-    <div class="p-outer"><div class="p-mid"><div class="p-core">
-      <div class="p-topbar"></div>
-      <div class="p-badge">LIFETIME ACCESS</div>
-      <div class="p-amounts">
-        <div class="p-main">$297</div>
-        <div class="p-was">$497</div>
+  <div class="price-wrap reveal">
+    <div class="price-top">
+      <div class="price-badge">Lifetime Access</div>
+      <div class="price-amounts">
+        <span class="price-main">$297</span>
+        <span class="price-was">$497</span>
       </div>
-      <div class="p-note">one-time · no subscription · full source code</div>
-      <ul class="p-list">
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>bot.py — full trading engine</li>
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>strategy/ — complete signal module</li>
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>risk.py — risk management controller</li>
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>dashboard/ — web-based live dashboard</li>
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>backtester.py — historical testing</li>
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>telegram_bot.py — mobile alerts</li>
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>setup_guide.pdf — illustrated setup</li>
-        <li><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Lifetime updates, free forever</li>
-      </ul>
+      <div class="price-note">one-time &nbsp;·&nbsp; no subscription &nbsp;·&nbsp; no recurring charges</div>
+    </div>
+    <div class="price-items">
+      <div class="pi"><span class="pi-name">bot.py — core trading engine</span><span class="pi-inc">included</span></div>
+      <div class="pi"><span class="pi-name">strategy/ — signal module</span><span class="pi-inc">included</span></div>
+      <div class="pi"><span class="pi-name">risk.py — risk controller</span><span class="pi-inc">included</span></div>
+      <div class="pi"><span class="pi-name">dashboard/ — web interface</span><span class="pi-inc">included</span></div>
+      <div class="pi"><span class="pi-name">backtester.py — historical engine</span><span class="pi-inc">included</span></div>
+      <div class="pi"><span class="pi-name">telegram_bot.py — mobile alerts</span><span class="pi-inc">included</span></div>
+      <div class="pi"><span class="pi-name">setup_guide.pdf — documentation</span><span class="pi-inc">included</span></div>
+      <div class="pi"><span class="pi-name">Lifetime updates</span><span class="pi-inc" style="color:var(--am)">free forever</span></div>
+    </div>
+    <div class="price-action">
       <button class="btn-buy" onclick="openModal()">Get Instant Access →</button>
-      <div class="p-secure">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4v5c0 3.3 2.6 5.7 6 7 3.4-1.3 6-3.7 6-7V4L8 1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
-        Secured by Stripe · Instant delivery · 2,847 traders running
-      </div>
-    </div></div></div>
+      <div class="price-secure">🔒 &nbsp;STRIPE SECURE &nbsp;·&nbsp; INSTANT DELIVERY &nbsp;·&nbsp; 2,847 ACTIVE DEPLOYMENTS</div>
+    </div>
   </div>
 </div>
 </section>
 
 <!-- FAQ -->
-<section class="section" id="faq" style="background:var(--s1)">
-<div class="section-inner">
-  <div style="text-align:center;margin-bottom:40px">
-    <div class="reveal"><div class="section-tag">FAQ</div></div>
-    <h2 class="section-title reveal">Questions answered.</h2>
+<section class="sec" id="faq">
+<div class="sec-inner">
+  <div class="reveal">
+    <div class="sec-num">08 — FAQ</div>
+    <h2 class="sec-title">Direct answers.</h2>
   </div>
-  <div class="faq-box reveal">
-    <div class="faq-item">
-      <button class="faq-q" onclick="toggleFaq(this)">Do I need coding experience?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-in">No coding experience required to run it. The setup guide walks you through every step with screenshots. If you want to customize the strategy logic, basic Python knowledge helps — but the default config runs out of the box.</div></div>
+  <div class="faq-list reveal">
+    <div class="fi">
+      <button class="fq" onclick="toggleFaq(this)">Do I need coding experience to run this?<span class="fi-icon">+</span></button>
+      <div class="fa"><div class="fa-in">No. The setup guide covers every step with screenshots. If you want to modify the strategy logic, basic Python knowledge helps — but the default configuration runs out of the box without touching the code.</div></div>
     </div>
-    <div class="faq-item">
-      <button class="faq-q" onclick="toggleFaq(this)">What exactly is delivered after purchase?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-in">A ZIP file containing 8 items: bot.py, strategy/ folder, risk.py, dashboard/ folder, backtester.py, telegram_bot.py, setup_guide.pdf, and requirements.txt. Every file is readable Python source code — nothing obfuscated or compiled.</div></div>
+    <div class="fi">
+      <button class="fq" onclick="toggleFaq(this)">What exactly is delivered after payment?<span class="fi-icon">+</span></button>
+      <div class="fa"><div class="fa-in">A ZIP file: bot.py, strategy/ folder, risk.py, dashboard/ folder, backtester.py, telegram_bot.py, setup_guide.pdf, and requirements.txt. Every file is readable Python source code — nothing compiled, nothing obfuscated.</div></div>
     </div>
-    <div class="faq-item">
-      <button class="faq-q" onclick="toggleFaq(this)">Which exchanges are supported?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-in">Binance (spot &amp; futures), Coinbase Advanced, Bybit (spot &amp; perpetuals), Kraken, OKX, KuCoin, Bitget, and MEXC — 8+ in total. New exchange connectors are added with lifetime updates at no cost.</div></div>
+    <div class="fi">
+      <button class="fq" onclick="toggleFaq(this)">Which exchanges are supported?<span class="fi-icon">+</span></button>
+      <div class="fa"><div class="fa-in">Binance (spot &amp; futures), Coinbase Advanced, Bybit (spot &amp; perpetuals), Kraken, OKX, KuCoin, Bitget, and MEXC. New connectors are added with lifetime updates at no cost.</div></div>
     </div>
-    <div class="faq-item">
-      <button class="faq-q" onclick="toggleFaq(this)">How is this different from subscription bots?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-in">Subscription bots charge $99–199/month with zero access to the code. AiCash is a one-time purchase — complete Python source, runs on your own machine, yours permanently regardless of what happens to our company.</div></div>
+    <div class="fi">
+      <button class="fq" onclick="toggleFaq(this)">How is this different from subscription bots?<span class="fi-icon">+</span></button>
+      <div class="fa"><div class="fa-in">Subscription bots charge $99–199/month with zero access to the code — it runs on their servers, not yours. AiCash is a one-time purchase: complete Python source, your hardware, your control, permanently yours regardless of what happens to our company.</div></div>
     </div>
-    <div class="faq-item">
-      <button class="faq-q" onclick="toggleFaq(this)">How much capital do I need?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-in">Most users start with $500–$2,000. Position sizing adapts automatically to your balance. Exchange minimum order sizes (typically $10–20) are the only floor enforced.</div></div>
+    <div class="fi">
+      <button class="fq" onclick="toggleFaq(this)">How much capital do I need?<span class="fi-icon">+</span></button>
+      <div class="fa"><div class="fa-in">Most users start with $500–$2,000. Position sizing adapts automatically to your balance. Exchange minimum order sizes (~$10–20) are the only floor.</div></div>
     </div>
-    <div class="faq-item">
-      <button class="faq-q" onclick="toggleFaq(this)">What is the refund policy?<span class="faq-icon">+</span></button>
-      <div class="faq-a"><div class="faq-a-in">All sales are final due to the nature of digital source code. We encourage you to review all documentation before purchasing. Any technical issue with the code is resolved by our support team at no charge.</div></div>
+    <div class="fi">
+      <button class="fq" onclick="toggleFaq(this)">What is the refund policy?<span class="fi-icon">+</span></button>
+      <div class="fa"><div class="fa-in">All sales are final due to the nature of digital source code delivery. We recommend reviewing all documentation before purchasing. Any technical issue is resolved by our support team at no charge.</div></div>
     </div>
   </div>
 </div>
 </section>
 
 <!-- FINAL CTA -->
-<section class="section">
-<div class="section-inner">
-  <div class="cta-box reveal">
-    <div class="section-tag" style="display:inline-flex;margin-bottom:18px">Limited Offer</div>
-    <h2>Start trading on autopilot today.</h2>
-    <p>Join 2,847 traders who own their bot outright.<br>One payment. Full source code. Zero monthly fees.</p>
-    <button class="btn-primary" onclick="openModal()" style="font-size:18px;padding:15px 40px">Get AiCash System — $297 →</button>
-    <div class="cta-note">🔒 Stripe secure · Instant delivery · <s style="opacity:.5">$497</s> today $297</div>
+<section id="cta-final">
+  <div class="cta-f-inner reveal">
+    <div class="cta-tagline">The decision</div>
+    <h2 class="cta-h">The market runs<br>while you sleep.<br><span style="color:var(--am)">Now so does your capital.</span></h2>
+    <p class="cta-p">$297 once. Full source code. No subscription. 2,847 traders running it today.</p>
+    <button class="btn-main" style="font-size:17px;padding:16px 40px" onclick="openModal()">Get AiCash System — $297</button>
+    <div class="cta-note">STRIPE SECURE &nbsp;·&nbsp; INSTANT DELIVERY &nbsp;·&nbsp; ~~$497~~ TODAY $297</div>
   </div>
-</div>
 </section>
 
 <!-- FOOTER -->
 <footer>
-  <div class="foot-top">
-    <span class="foot-logo">AiCash System</span>
-    <div class="foot-links">
-      <a href="#included">What's Included</a>
+  <div class="ft">
+    <span class="ft-logo">Ai<span>Cash</span> System</span>
+    <div class="ft-links">
+      <a href="#system">The System</a>
+      <a href="#package">Package</a>
       <a href="#specs">Specs</a>
-      <a href="#reviews">Reviews</a>
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
       <a href="terms.html">Terms</a>
       <a href="privacy.html">Privacy</a>
     </div>
   </div>
-  <div class="foot-copy">© 2026 AiCash System · aicashsystem.space · All rights reserved.</div>
-  <div class="foot-risk">Risk Disclaimer: Cryptocurrency trading involves substantial risk of loss. Past performance is not indicative of future results. The 73% win rate represents historical backtested data and live averages — individual results vary. Never trade with funds you cannot afford to lose. AiCash System provides software tools only and does not constitute financial advice.</div>
+  <div class="ft-copy">© 2026 AiCash System &nbsp;·&nbsp; aicashsystem.space &nbsp;·&nbsp; All rights reserved.</div>
+  <div class="ft-risk">Risk Disclaimer: Cryptocurrency trading involves substantial risk of loss. Past performance is not indicative of future results. The 73% win rate is a historical average across backtested and live deployments — individual results will vary. Never trade with capital you cannot afford to lose. AiCash System provides software tools only and does not constitute financial advice.</div>
 </footer>
+
+</div><!-- /layer -->
 
 <!-- MODAL -->
 <div id="modal" onclick="handleOverlay(event)">
-  <div class="m-outer" id="m-card">
-    <div class="m-mid"><div class="m-core">
-      <button class="m-close" onclick="closeModal()">✕</button>
+  <div class="m-box" id="mbox">
+    <div class="m-head">
       <div class="m-title">Complete Your Purchase</div>
-      <div class="m-sub">You'll be redirected to Stripe's secure checkout</div>
-      <div class="m-product">
-        <div><div class="m-prod-name">AiCash System — Lifetime</div><div class="m-prod-sub">Full Python source code · Instant delivery</div></div>
-        <div class="m-price">$297</div>
+      <button class="m-x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="m-body">
+      <div class="m-prod">
+        <div><div class="m-pname">AiCash System — Lifetime</div><div class="m-pmeta">Full Python source code · Instant delivery</div></div>
+        <div class="m-pprice">$297</div>
       </div>
       <div class="m-checks">
         <label class="m-check"><input type="checkbox" id="c1" onchange="syncModal()"><span>I understand this is a one-time payment for software source code</span></label>
@@ -931,17 +703,155 @@ footer{border-top:1px solid var(--border);padding:36px 7vw 28px;background:var(-
         <label class="m-check"><input type="checkbox" id="c3" onchange="syncModal()"><span>I understand cryptocurrency trading involves financial risk</span></label>
       </div>
       <button id="m-btn" disabled onclick="goCheckout()">Proceed to Checkout →</button>
-    </div></div>
+      <div class="m-sub">🔒 SECURED BY STRIPE · INSTANT DELIVERY</div>
+    </div>
   </div>
 </div>
 
+<!-- THREE.JS -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.min.js"></script>
 <script>
-// Nav
+(function(){
+  var canvas = document.getElementById('canvas');
+  if(!canvas || typeof THREE === 'undefined') return;
+
+  var W = window.innerWidth, H = window.innerHeight;
+  var renderer = new THREE.WebGLRenderer({canvas:canvas, alpha:true, antialias:true});
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(55, W/H, 0.1, 500);
+  camera.position.set(0, 18, 28);
+  camera.lookAt(0, 0, 0);
+
+  // Wave field — points grid
+  var COLS = 90, ROWS = 70;
+  var SPAN = 60, DEPTH = 45;
+  var count = COLS * ROWS;
+  var pos = new Float32Array(count * 3);
+  var baseY = new Float32Array(count);
+
+  for(var i=0; i<ROWS; i++){
+    for(var j=0; j<COLS; j++){
+      var idx = (i*COLS+j)*3;
+      pos[idx]   = (j/(COLS-1) - 0.5) * SPAN;
+      pos[idx+1] = 0;
+      pos[idx+2] = (i/(ROWS-1) - 0.5) * DEPTH;
+    }
+  }
+
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+
+  // Two layers: points + wireframe
+  var ptMat = new THREE.PointsMaterial({
+    color: 0xf59e0b, size: 0.12,
+    transparent: true, opacity: 0.55, sizeAttenuation: true
+  });
+  var pts = new THREE.Points(geo, ptMat);
+  scene.add(pts);
+
+  // Sparse wireframe on top
+  var lineGeo = new THREE.BufferGeometry();
+  var linePos = [];
+  for(var i=0; i<ROWS-1; i+=3){
+    for(var j=0; j<COLS-1; j+=3){
+      var a = (i*COLS+j)*3, b = (i*COLS+j+3)*3, c = ((i+3)*COLS+j)*3;
+      if(b < pos.length && c < pos.length){
+        linePos.push(pos[a],pos[a+1],pos[a+2], pos[b],pos[b+1],pos[b+2]);
+        linePos.push(pos[a],pos[a+1],pos[a+2], pos[c],pos[c+1],pos[c+2]);
+      }
+    }
+  }
+  var lineBuf = new Float32Array(linePos);
+  lineGeo.setAttribute('position', new THREE.BufferAttribute(lineBuf, 3));
+  var lineMat = new THREE.LineSegmentsGeometry
+    ? null
+    : new THREE.LineBasicMaterial({color:0xf59e0b, transparent:true, opacity:0.07});
+  if(lineMat){
+    var lines = new THREE.LineSegments(lineGeo, lineMat);
+    scene.add(lines);
+  }
+
+  // Mouse parallax
+  var mx = 0, my = 0, tmx = 0, tmy = 0;
+  document.addEventListener('mousemove', function(e){
+    mx = (e.clientX/W - 0.5) * 2;
+    my = (e.clientY/H - 0.5) * 2;
+  });
+
+  // Animate
+  var clock = new THREE.Clock();
+  function animate(){
+    requestAnimationFrame(animate);
+    var t = clock.getElapsedTime();
+
+    // Update wave
+    var pa = geo.attributes.position;
+    for(var i=0; i<ROWS; i++){
+      for(var j=0; j<COLS; j++){
+        var idx = i*COLS+j;
+        var x = pa.getX(idx), z = pa.getZ(idx);
+        var y = Math.sin(x*0.22 + t*0.5)*1.4
+               + Math.cos(z*0.18 + t*0.4)*1.1
+               + Math.sin((x+z)*0.12 + t*0.3)*0.7
+               + Math.cos(x*0.35 - t*0.6)*0.5;
+        pa.setY(idx, y);
+      }
+    }
+    pa.needsUpdate = true;
+
+    // Update line geometry y values
+    if(lineMat && lineBuf){
+      var la = lineGeo.attributes.position;
+      var li = 0;
+      outer: for(var i=0; i<ROWS-1; i+=3){
+        for(var j=0; j<COLS-1; j+=3){
+          var a=i*COLS+j, b=i*COLS+j+3, c=(i+3)*COLS+j;
+          if(li+5 < la.count){
+            la.setY(li, pa.getY(a)); la.setY(li+1, pa.getY(b));
+            la.setY(li+2, pa.getY(a)); la.setY(li+3, pa.getY(c));
+            li+=4;
+          }
+        }
+      }
+      la.needsUpdate = true;
+    }
+
+    // Mouse parallax
+    tmx += (mx - tmx) * 0.04;
+    tmy += (my - tmy) * 0.04;
+    camera.position.x = tmx * 4;
+    camera.position.y = 18 - tmy * 2;
+    camera.lookAt(0, 0, 0);
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', function(){
+    W = window.innerWidth; H = window.innerHeight;
+    camera.aspect = W/H; camera.updateProjectionMatrix();
+    renderer.setSize(W, H);
+  });
+})();
+</script>
+
+<script>
+// Nav scroll
+var nav = document.getElementById('nav');
+window.addEventListener('scroll', function(){
+  nav.classList.toggle('scrolled', window.scrollY > 40);
+}, {passive:true});
+
+// Menu
 function toggleMenu(){
-  var h=document.getElementById('ham'),m=document.getElementById('mob-menu');
-  h.classList.toggle('open');m.classList.toggle('open');
-  document.body.style.overflow=m.classList.contains('open')?'hidden':'';
+  var h=document.getElementById('ham'),m=document.getElementById('mob');
+  h.classList.toggle('open'); m.classList.toggle('open');
+  document.body.style.overflow = m.classList.contains('open')?'hidden':'';
 }
+
 // Modal
 function openModal(){document.getElementById('modal').classList.add('open');document.body.style.overflow='hidden';}
 function closeModal(){document.getElementById('modal').classList.remove('open');document.body.style.overflow='';}
@@ -951,53 +861,48 @@ function syncModal(){
     !['c1','c2','c3'].every(function(id){return document.getElementById(id).checked;});
 }
 function goCheckout(){window.location.href='https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00';}
-document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'){closeModal();var m=document.getElementById('mob-menu');if(m.classList.contains('open'))toggleMenu();}
-});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeModal();}});
+
 // FAQ
 function toggleFaq(btn){
-  var item=btn.parentElement,ans=item.querySelector('.faq-a'),inner=item.querySelector('.faq-a-in'),isOpen=item.classList.contains('open');
-  document.querySelectorAll('.faq-item.open').forEach(function(i){i.classList.remove('open');i.querySelector('.faq-a').style.maxHeight='0';});
+  var item=btn.parentElement, ans=item.querySelector('.fa'), inner=item.querySelector('.fa-in'), isOpen=item.classList.contains('open');
+  document.querySelectorAll('.fi.open').forEach(function(i){i.classList.remove('open');i.querySelector('.fa').style.maxHeight='0';});
   if(!isOpen){item.classList.add('open');ans.style.maxHeight=inner.scrollHeight+'px';}
 }
-// Live P&L flicker
-var trades=[{b:24.18,id:'tr1'},{b:11.44,id:'tr2'},{b:8.92,id:'tr3'},{b:18.30,id:'tr4'}];
-setInterval(function(){
-  var tot=0;
-  trades.forEach(function(t){t.b=Math.max(.5,t.b+(Math.random()-.3)*.7);var el=document.getElementById(t.id);if(el)el.textContent='+$'+t.b.toFixed(2);tot+=t.b;});
-  var pe=document.getElementById('pnl-total'),pp=document.getElementById('pnl-pct');
-  if(pe)pe.textContent='+$'+tot.toFixed(2);if(pp)pp.textContent='+'+(tot/24.09).toFixed(1)+'% today';
-},2800);
-// Scroll reveal
-var ro=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting)e.target.classList.add('vis');});},{threshold:.05});
+
+// Reveal observer
+var ro = new IntersectionObserver(function(entries){
+  entries.forEach(function(e){if(e.isIntersecting)e.target.classList.add('vis');});
+},{threshold:.05});
 document.querySelectorAll('.reveal').forEach(function(el){ro.observe(el);});
-// Star bars animate
-var bo=new IntersectionObserver(function(entries){
+
+// Star bars
+var bo = new IntersectionObserver(function(entries){
   entries.forEach(function(e){
     if(e.isIntersecting){
-      e.target.querySelectorAll('.bar-fill').forEach(function(b){b.style.width=b.getAttribute('data-w')+'%';});
+      e.target.querySelectorAll('.rb-fill').forEach(function(b){b.style.width=b.getAttribute('data-w')+'%';});
       bo.disconnect();
     }
   });
 },{threshold:.2});
-var rv=document.getElementById('reviews');if(rv)bo.observe(rv);
-// Animated counters
-var co=new IntersectionObserver(function(entries){
+var rv=document.getElementById('reviews'); if(rv) bo.observe(rv);
+
+// Counters
+var co = new IntersectionObserver(function(entries){
   entries.forEach(function(e){
     if(e.isIntersecting){
-      e.target.querySelectorAll('[data-target]').forEach(function(el){
-        var target=+el.getAttribute('data-target'),start=0,dur=1600,step=16;
-        var timer=setInterval(function(){
-          start+=target/(dur/step);
-          el.textContent=Math.min(Math.round(start),target)+(target===73?'%':'+');
-          if(start>=target)clearInterval(timer);
+      e.target.querySelectorAll('[data-counter]').forEach(function(el){
+        var t=+el.getAttribute('data-counter'),s=0,d=1800,step=18;
+        var id=setInterval(function(){
+          s+=t/(d/step); el.textContent=Math.min(Math.round(s),t);
+          if(s>=t)clearInterval(id);
         },step);
       });
       co.disconnect();
     }
   });
 },{threshold:.3});
-var st=document.getElementById('stats');if(st)co.observe(st);
+var pf=document.getElementById('performance'); if(pf) co.observe(pf);
 </script>
 </body>
 </html>
