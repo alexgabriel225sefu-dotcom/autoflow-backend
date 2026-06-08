@@ -77,6 +77,11 @@ app.get('/api/email-config', auth, (req, res) => res.json({
   email_will_send: !!(process.env.BREVO_API_KEY || (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_PASS)),
 }));
 
+// GET /api/tg-config — public, used by payment page to build Telegram deep links
+app.get('/api/tg-config', (req, res) => {
+  res.json({ botUsername: TG_BOT_USERNAME });
+});
+
 // ── ENV VARIABLES ──
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -85,6 +90,7 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const HEYGEN_KEY = process.env.HEYGEN_API_KEY;
 const CREATIFY_API_ID  = process.env.CREATIFY_API_ID  || '';
 const CREATIFY_API_KEY = process.env.CREATIFY_API_KEY || '';
+const TG_BOT_USERNAME  = process.env.TELEGRAM_BOT_USERNAME || '';
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
   const fallback = require('crypto').randomBytes(32).toString('hex');
   console.warn('[WARN] JWT_SECRET not set — generated random secret for this session. Sessions will reset on restart. Set JWT_SECRET in Render env vars.');
@@ -1236,7 +1242,7 @@ async function handleStripeWebhook(req, res) {
 
         // Send email as backup (key was already delivered via redirect URL)
         if (email) {
-          const botEmailHtml = _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey);
+          const botEmailHtml = _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey, TG_BOT_USERNAME);
           const result = await _sendEmail({
             to: email,
             subject: '🤖 Your Apex Trade Bot — License Key inside',
@@ -1516,7 +1522,7 @@ publicPages.forEach(p => {
 });
 
 // ── BOT EMAIL HTML — funcție separată reutilizabilă ──────────────────────────
-function _buildBotEmailHtml(safeName, safeEmail, licenseKey = 'APEX-XXXX-XXXX-XXXX') {
+function _buildBotEmailHtml(safeName, safeEmail, licenseKey = 'APEX-XXXX-XXXX-XXXX', botUsername = '') {
   const firstName = safeName.split(' ')[0];
   const chip = (t,c='#f59e0b') => `<span style="display:inline-block;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:4px;padding:1px 7px;color:${c};font-family:'Courier New',monospace;font-size:11px;font-weight:700;letter-spacing:0.3px">${t}</span>`;
 
@@ -1558,8 +1564,10 @@ a{text-decoration:none}
 
 <!-- ── CTA BUTTON ── -->
 <tr><td style="background:#070b1c;border-left:1px solid rgba(245,158,11,0.15);border-right:1px solid rgba(245,158,11,0.15);padding:8px 40px 32px;text-align:center">
-  <a href="https://aicashsystem.space/configurator?key=${licenseKey}" style="display:inline-block;background:#f59e0b;color:#000000;font-family:Arial,sans-serif;font-size:15px;font-weight:900;padding:16px 44px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">Open Bot Configurator &rarr;</a>
-  <p style="margin:12px 0 0;font-size:12px;color:#4b5563;font-family:Arial,sans-serif">Click above to configure and deploy your bot</p>
+  ${botUsername ? `<a href="https://t.me/${botUsername}?start=${licenseKey}" style="display:inline-block;background:#f59e0b;color:#000000;font-family:Arial,sans-serif;font-size:15px;font-weight:900;padding:16px 44px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">Start Bot on Telegram &rarr;</a>
+  <p style="margin:10px 0 10px;font-size:12px;color:#4b5563;font-family:Arial,sans-serif">Tap above to activate your bot directly in Telegram</p>
+  <a href="https://aicashsystem.space/configurator?key=${licenseKey}" style="display:inline-block;color:#6b7280;font-family:Arial,sans-serif;font-size:12px;padding:6px 16px;text-decoration:underline">or setup manually via the configurator</a>` : `<a href="https://aicashsystem.space/configurator?key=${licenseKey}" style="display:inline-block;background:#f59e0b;color:#000000;font-family:Arial,sans-serif;font-size:15px;font-weight:900;padding:16px 44px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">Open Bot Configurator &rarr;</a>
+  <p style="margin:12px 0 0;font-size:12px;color:#4b5563;font-family:Arial,sans-serif">Click above to configure and deploy your bot</p>`}
 </td></tr>
 
 <!-- ── DIVIDER ── -->
@@ -1825,7 +1833,7 @@ async function _sendBotEmailHandler(req, res) {
   if (isPreview) {
     const name  = req.query.name || req.body.name || 'Alex';
     const email = req.query.email || req.body.email || 'preview@example.com';
-    const previewHtml = _buildBotEmailHtml(_he(name), _he(email), 'APEX-DEMO-PREW-2025');
+    const previewHtml = _buildBotEmailHtml(_he(name), _he(email), 'APEX-DEMO-PREW-2025', TG_BOT_USERNAME);
     return res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview: Bot Delivery Email</title>
       <style>body{margin:0;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:40px 20px;font-family:sans-serif}
       .bar{background:#2d2d44;border:1px solid #444;border-radius:8px;padding:10px 20px;margin-bottom:24px;color:#aaa;font-size:13px;text-align:center;max-width:600px;width:100%}
@@ -1841,7 +1849,7 @@ async function _sendBotEmailHandler(req, res) {
 
   // Generate a real license key for test sends
   const testKey = generateLicenseKey();
-  const botEmailHtml = _buildBotEmailHtml(_he(name), _he(email), testKey);
+  const botEmailHtml = _buildBotEmailHtml(_he(name), _he(email), testKey, TG_BOT_USERNAME);
 
   // Save test license to Supabase
   if (supabase) {

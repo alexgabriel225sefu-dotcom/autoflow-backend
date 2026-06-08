@@ -5,6 +5,7 @@ never sees client API keys. All commands are restricted to TELEGRAM_CHAT_ID.
 Polling runs in a background daemon thread.
 """
 import os
+import re
 import json
 import time
 import threading
@@ -389,6 +390,52 @@ _HELP = ("📋 <b>APEX BOT COMMANDS</b>\n"
 
 # ─── Poll loop ────────────────────────────────────────────
 
+_VERIFY_URL = "https://aicashsystem.onrender.com/api/verify-license"
+_DEPLOY_URL = "https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/autoflow-backend"
+
+
+def _handle_buyer_start(chat_id, license_key):
+    """Validate a new buyer's license key and send deployment instructions."""
+    key = license_key.strip().upper()
+    if not re.match(r'^APEX-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$', key):
+        send_to(chat_id,
+            "❌ <b>Invalid license key.</b>\n\n"
+            "Purchase Apex Trade Bot at:\n"
+            "https://aicashsystem.space/apex-bot"
+        )
+        return
+
+    # Validate via API (fall back to format-valid if server unreachable)
+    valid = False
+    try:
+        r = requests.post(_VERIFY_URL, json={"key": key}, timeout=8)
+        valid = r.json().get("valid", False)
+    except Exception:
+        valid = True  # server unreachable — key format already validated
+
+    if not valid:
+        send_to(chat_id,
+            "❌ <b>License not found.</b>\n\n"
+            "Use the key from your purchase email.\n\n"
+            "Need help? supportaicashsystem@gmail.com"
+        )
+        return
+
+    send_to(chat_id,
+        f"✅ <b>License validated!</b>\n\n"
+        f"Welcome to Apex Trade Bot.\n"
+        f"Your key: <code>{key}</code>\n\n"
+        f"<b>Deploy your bot in 1 click:</b>\n"
+        f'👉 <a href="{_DEPLOY_URL}">Deploy to Railway</a>\n\n'
+        f"<b>Add these variables in Railway:</b>\n"
+        f"• <code>TELEGRAM_BOT_TOKEN</code> — from @BotFather\n"
+        f"• <code>TELEGRAM_CHAT_ID</code> — from @userinfobot\n"
+        f"• <code>LICENSE_KEY</code> — <code>{key}</code>\n\n"
+        f"After deploying, send /setup to your new bot to configure exchange + API keys.\n\n"
+        f"Questions? supportaicashsystem@gmail.com"
+    )
+
+
 def _poll_loop():
     global _update_id
     while True:
@@ -406,6 +453,11 @@ def _poll_loop():
                 if not raw or chat_id is None:
                     continue
                 if str(chat_id) != str(CHAT_ID):
+                    # Allow new buyers to activate via /start <license_key>
+                    first = raw.splitlines()[0].strip()
+                    ext_cmd, _, ext_args = first.partition(" ")
+                    if ext_cmd.lower().split("@")[0] == "/start" and ext_args.strip():
+                        _handle_buyer_start(chat_id, ext_args.strip())
                     continue
 
                 # Active wizard step takes priority over /commands

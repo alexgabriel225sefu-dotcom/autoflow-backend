@@ -689,12 +689,16 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(28px);background:rgba
     <div class="am-success" id="amSuccess">
       <div class="am-success-icon"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
       <h3>Access granted.</h3>
-      <p>Redirecting you to the setup page now...<br><br>You'll find your License Key and full setup guide there. Start with paper trading before going live.</p>
+      <p>Setup instructions were sent to your email. Start your bot now:</p>
+      <div id="amSuccessActions" style="margin-top:20px"></div>
     </div>
   </div>
 </div>
 
 <script>
+var tgBotUsername='';
+fetch('/api/tg-config').then(r=>r.json()).then(d=>{tgBotUsername=d.botUsername||'';}).catch(()=>{});
+
 document.addEventListener('mousemove',(e)=>{
   const x=e.clientX/window.innerWidth,y=e.clientY/window.innerHeight;
   const o1=document.getElementById('orb1'),o2=document.getElementById('orb2');
@@ -930,8 +934,14 @@ async function submitApexPayment(){
       err.textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
     }else if(result.paymentIntent.status==='succeeded'){
       document.getElementById('amForm').style.display='none';
+      var cfgLink='/configurator'+(_pendingKey?'?key='+encodeURIComponent(_pendingKey):'');
+      var tgLink=tgBotUsername&&_pendingKey?'https://t.me/'+tgBotUsername+'?start='+encodeURIComponent(_pendingKey):'';
+      var actionsEl=document.getElementById('amSuccessActions');
+      if(actionsEl){
+        actionsEl.innerHTML=(tgLink?'<a href="'+tgLink+'" style="display:block;background:#f59e0b;color:#000;font-weight:900;font-size:14px;padding:14px 20px;border-radius:10px;text-decoration:none;margin-bottom:10px;letter-spacing:.3px">Start Bot on Telegram →</a>':'')
+          +'<a href="'+cfgLink+'" style="display:block;background:rgba(255,255,255,.06);color:#fff;font-size:13px;font-weight:600;padding:12px 20px;border-radius:10px;text-decoration:none">Setup Manually →</a>';
+      }
       document.getElementById('amSuccess').style.display='block';
-      setTimeout(()=>window.location.href='/configurator'+(_pendingKey?'?key='+encodeURIComponent(_pendingKey):''),2000);
     }
   }catch(e){err.textContent='Error: '+e.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';}
 }
