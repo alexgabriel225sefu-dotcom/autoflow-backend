@@ -1069,7 +1069,7 @@ app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
   if (safeAmount === 29700 && product && product !== 'apex-bot') return res.status(400).json({ error: 'Invalid product for this amount' });
   // Server-side email format validation
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
-  const isApexBot = (product === 'apex-bot') || safeAmount === 19700;
+  const isApexBot = (product === 'apex-bot') || safeAmount === 29700;
   try {
     if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe not configured' });
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -1079,7 +1079,7 @@ app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
       automatic_payment_methods: { enabled: true },
       receipt_email: email || undefined,
       metadata: {
-        product: product || (safeAmount === 19700 ? 'apex-bot' : 'course'),
+        product: product || (safeAmount === 29700 ? 'apex-bot' : 'course'),
         email: email || '',
         name: name || ''
       }
@@ -1252,7 +1252,7 @@ async function handleStripeWebhook(req, res) {
           if (!result.ok) addLog(`Apex Bot email NOT sent for ${email} — ${result.error}`, 'email', 'error');
           else addLog(`Apex Bot email sent via ${result.method} to ${email}`, 'email', 'success');
         }
-        addLog(`Apex Bot sold: ${email} — $197 — key: ${licenseKey}`, 'payment', 'success');
+        addLog(`Apex Bot sold: ${email} — $297 — key: ${licenseKey}`, 'payment', 'success');
         return res.json({ received: true });
       }
 
