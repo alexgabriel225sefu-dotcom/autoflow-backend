@@ -84,8 +84,7 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
 .term-top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--bg1)}
 .term-id{display:flex;align-items:center;gap:9px;font:500 12px/1 var(--m);color:var(--t1)}
-.term-id .dot{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc);animation:pulse 1.7s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.term-id .dot{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc)}
 .term-live{font:500 10px/1 var(--m);color:var(--acc3);letter-spacing:.12em;border:1px solid rgba(255,45,79,.32);border-radius:5px;padding:4px 8px}
 .coin-row{display:flex;gap:6px;padding:10px 12px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--bg1);scrollbar-width:none}
 .coin-row::-webkit-scrollbar{display:none}
@@ -151,9 +150,7 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 .flow-tag{font:600 10px/1 var(--m);color:var(--t1);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 8px;white-space:nowrap;flex-shrink:0}
 .flow-tag.ok{color:var(--acc3);background:var(--accdim);border-color:rgba(255,45,79,.24)}
 .flow-link{display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 0;margin-left:39px}
-.flow-link i{width:3px;height:3px;border-radius:50%;background:var(--acc);opacity:.3;animation:fl 1.5s infinite}
-.flow-link i:nth-child(2){animation-delay:.2s}.flow-link i:nth-child(3){animation-delay:.4s}
-@keyframes fl{0%,100%{opacity:.2}50%{opacity:1;box-shadow:0 0 8px var(--acc)}}
+.flow-link i{width:3px;height:3px;border-radius:50%;background:var(--acc);opacity:.5}
 .flow-sec{display:flex;align-items:center;gap:12px;margin-top:18px;background:rgba(39,196,106,.06);border:1px solid rgba(39,196,106,.22);border-radius:12px;padding:14px 16px}
 .flow-sec svg{width:22px;height:22px;color:var(--up);flex-shrink:0}
 .flow-sec span{font:400 12px/1.55 var(--f);color:var(--t1)}
@@ -183,8 +180,6 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 .cp-id b{font:600 14px/1.2 var(--f);color:#fff;display:block}
 .cp-id span{font:400 11px/1.2 var(--f);color:#5a86a8;transition:color .2s}
 .cp-id span.typing{color:var(--acc3)}
-.cp-rec{display:flex;align-items:center;gap:6px;font:600 10px/1 var(--m);letter-spacing:.14em;color:var(--acc3);border:1px solid rgba(255,45,79,.3);border-radius:6px;padding:5px 8px}
-.cp-rec i{width:7px;height:7px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc);animation:pulse 1.4s infinite}
 .cp-screen{flex:1;padding:18px 16px;display:flex;flex-direction:column;gap:9px;overflow:hidden;background:#0b1622;background-image:radial-gradient(rgba(255,255,255,.018) 1px,transparent 1px);background-size:22px 22px}
 .cp-screen .bub{max-width:74%}
 .cp-screen .bub.alert{align-self:flex-start;background:linear-gradient(135deg,#1d2c1f,#16231a);border:1px solid rgba(39,196,106,.25);color:#d6f5e2}
@@ -473,7 +468,6 @@ footer .disc{max-width:560px}
         <div class="cp-head">
           <div class="tg-av">A</div>
           <div class="cp-id"><b>Apex Trade Bot</b><span id="cpPresence">bot · online</span></div>
-          <span class="cp-rec"><i></i>DEMO</span>
         </div>
         <div class="cp-screen" id="cpScreen"></div>
       </div>
