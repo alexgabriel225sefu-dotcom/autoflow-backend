@@ -6,7 +6,9 @@
 <title>Algorithmic Trading Bot · Full Source Code</title>
 <meta name="description" content="The complete source code for an automated crypto trading bot. You set the strategy, pairs and risk. One-time license — $297.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -16,7 +18,7 @@
   --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;
   --accdim:rgba(255,45,79,.12);--accglow:rgba(255,45,79,.45);
   --up:#27c46a;--down:#ff2d4f;
-  --f:'Geist',system-ui,sans-serif;--m:'Geist Mono',monospace;
+  --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
   --ease:cubic-bezier(.32,.72,0,1);--r:16px;
 }
 html{scroll-behavior:smooth}
@@ -45,7 +47,7 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 .wrap{max-width:1280px;margin:0 auto;padding:0 clamp(16px,4vw,46px);position:relative;z-index:2}
 .eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--accdim);border:1px solid rgba(255,45,79,.24);color:var(--acc3);border-radius:100px;padding:6px 14px;font:500 11px/1 var(--m);letter-spacing:.1em;text-transform:uppercase}
 .eyebrow b{width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 9px var(--acc)}
-.h2{font:600 clamp(28px,3.5vw,46px)/1.05 var(--f);letter-spacing:-.04em}
+.h2{font:600 clamp(30px,3.9vw,52px)/1.03 var(--d);letter-spacing:-.025em}
 .lead{font:400 clamp(15px,1.4vw,17px)/1.7 var(--f);color:var(--t1);max-width:560px}
 .label{font:500 11px/1 var(--m);color:var(--acc);letter-spacing:.16em;text-transform:uppercase}
 
@@ -56,8 +58,17 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 .grid3d{position:absolute;left:-25%;right:-25%;bottom:-30%;height:90%;z-index:0;pointer-events:none;perspective:340px;opacity:.7}
 .grid3d::after{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,45,79,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(255,45,79,.14) 1px,transparent 1px);background-size:56px 56px;transform:rotateX(68deg);transform-origin:bottom center;animation:grid 6s linear infinite;-webkit-mask-image:linear-gradient(transparent,#000 55%,transparent);mask-image:linear-gradient(transparent,#000 55%,transparent)}
 @keyframes grid{from{background-position-y:0}to{background-position-y:56px}}
-#hero h1{font:700 clamp(42px,5.8vw,70px)/.98 var(--f);letter-spacing:-.055em;margin:22px 0 18px}
-#hero h1 .grad{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.aurora{position:absolute;top:-15%;right:-8%;width:62%;height:120%;z-index:0;pointer-events:none;background:radial-gradient(closest-side,rgba(255,45,79,.20),rgba(255,45,79,.05) 58%,transparent);filter:blur(34px);will-change:transform;animation:aur 9s ease-in-out infinite}
+@keyframes aur{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-7%,5%) scale(1.14)}}
+/* KINETIC MARQUEE */
+.marquee{overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg);padding:24px 0;position:relative;z-index:2}
+.mq-track{display:inline-flex;align-items:center;white-space:nowrap;will-change:transform;animation:mq 30s linear infinite;font:600 clamp(30px,5.4vw,72px)/1 var(--d);letter-spacing:-.02em}
+.mq-track span{padding:0 .32em;color:var(--t0)}
+.mq-track .o{color:transparent;-webkit-text-stroke:1.2px var(--acc)}
+.mq-track .dot{color:var(--acc);-webkit-text-stroke:0}
+@keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+#hero h1{font:600 clamp(46px,6.4vw,84px)/.95 var(--d);letter-spacing:-.025em;margin:22px 0 18px}
+#hero h1 .grad{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 30px rgba(255,45,79,.35))}
 .hero-cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:30px 0 30px}
 .btn{display:inline-flex;align-items:center;gap:10px;font:600 15px/1 var(--f);border-radius:12px;padding:15px 24px;cursor:pointer;border:none;transition:all .3s var(--ease);will-change:transform}
 .btn-primary{background:var(--acc);color:#fff;box-shadow:0 8px 30px var(--accdim)}
@@ -154,7 +165,7 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 .price-card::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:120%;background:radial-gradient(circle,rgba(255,45,79,.16),transparent 64%);pointer-events:none}
 .price-badge{display:inline-flex;align-items:center;gap:6px;font:500 10px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.3);border-radius:100px;padding:5px 11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:18px;position:relative}
 .price-amt{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;position:relative}
-.price-amt .now{font:700 60px/1 var(--f);letter-spacing:-.05em}
+.price-amt .now{font:600 64px/1 var(--d);letter-spacing:-.03em}
 .price-amt .was{font:400 20px/1 var(--m);color:var(--t2);text-decoration:line-through}
 .price-sub{font:400 13px/1.5 var(--m);color:var(--t2);margin-bottom:24px;position:relative}
 .price-card .btn{width:100%;justify-content:center;font-size:16px;padding:16px;position:relative}
@@ -215,6 +226,7 @@ footer .disc{max-width:560px}
 <!-- HERO -->
 <section class="wrap" id="hero">
   <div class="grid3d"></div>
+  <div class="aurora"></div>
   <div>
     <span class="eyebrow rv"><b></b>Algorithmic Trading · Full Source Code</span>
     <h1 class="rv">Automate your edge.<br><span class="grad">Own every line.</span></h1>
@@ -251,6 +263,12 @@ footer .disc{max-width:560px}
   <span class="trust-tag">Binance</span><span class="trust-tag">Bybit</span><span class="trust-tag">OKX</span>
   <span class="trust-tag">Kraken</span><span class="trust-tag">KuCoin</span><span class="trust-tag">Coinbase</span>
   <span class="trust-tag">Bitget</span><span class="trust-tag">MEXC</span>
+</div></div>
+
+<!-- KINETIC MARQUEE -->
+<div class="marquee" aria-hidden="true"><div class="mq-track">
+  <span>Automated Trading</span><span class="dot">✦</span><span class="o">Full Source Code</span><span class="dot">✦</span><span>Your Rules</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Own Every Line</span><span class="dot">✦</span>
+  <span>Automated Trading</span><span class="dot">✦</span><span class="o">Full Source Code</span><span class="dot">✦</span><span>Your Rules</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Own Every Line</span><span class="dot">✦</span>
 </div></div>
 
 <!-- FEATURES -->
