@@ -416,7 +416,7 @@ def _poll_loop():
                     continue
 
                 cmd, _, args = raw.partition(" ")
-                cmd_l = cmd.lower()
+                cmd_l = cmd.lower().split("@")[0]  # strip @botname suffix
 
                 if cmd_l in ("/status", "/s"):
                     _handle_status(chat_id)
