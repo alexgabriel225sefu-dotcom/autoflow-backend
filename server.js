@@ -1205,8 +1205,14 @@ async function handleStripeWebhook(req, res) {
 
     if (event.type === 'payment_intent.succeeded') {
       const pi = event.data.object;
-      const email = pi.metadata?.email || pi.receipt_email;
-      const product = pi.metadata?.product || 'course';
+      // Payment Link buyers may not populate receipt_email — check charge billing details too
+      const email = pi.metadata?.email || pi.receipt_email
+        || pi.charges?.data?.[0]?.billing_details?.email || '';
+      // $297 (29700) is the apex-bot price — treat any such charge as apex-bot
+      // even when metadata.product is unset (e.g. Stripe Payment Link buyers).
+      const product = (pi.metadata?.product === 'apex-bot' || pi.amount === 29700)
+        ? 'apex-bot'
+        : (pi.metadata?.product || 'course');
       const buyerName = pi.metadata?.name || 'there';
 
       // ── APEX BOT DELIVERY ──
