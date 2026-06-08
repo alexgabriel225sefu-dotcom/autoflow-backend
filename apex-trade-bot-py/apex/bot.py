@@ -16,6 +16,71 @@ from apex.dashboard import render as render_dashboard
 
 exchange = get_exchange()
 
+# ─── Runtime pause control ───────────────────────────────
+_bot_paused = False
+_pause_lock = threading.Lock()
+
+
+def _is_paused() -> bool:
+    with _pause_lock:
+        return _bot_paused
+
+
+def set_paused(paused: bool):
+    global _bot_paused
+    with _pause_lock:
+        _bot_paused = paused
+    print(f"[BOT] {'PAUSED' if paused else 'RESUMED'} via Telegram")
+
+
+def reload_exchange_connector():
+    global exchange
+    try:
+        exchange = get_exchange()
+        tg._exchange = exchange
+        dash["exchange"] = cfg.EXCHANGE.upper()
+        print(f"[BOT] Exchange reloaded → {cfg.EXCHANGE}")
+    except Exception as e:
+        print(f"[BOT] Exchange reload error: {e}")
+
+
+def _load_runtime_config():
+    """Apply persistent settings saved by Telegram commands (runtime.json)."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "runtime.json")
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return
+    except Exception as e:
+        print(f"[BOT] runtime.json error: {e}")
+        return
+    for k, v in data.items():
+        os.environ[k] = str(v)
+    if "EXCHANGE" in data:
+        cfg.EXCHANGE = str(data["EXCHANGE"]).lower()
+    if "TRADE_SYMBOL" in data:
+        cfg.SYMBOL = str(data["TRADE_SYMBOL"])
+    if "PAPER_TRADING" in data:
+        cfg.PAPER_TRADING = str(data["PAPER_TRADING"]).lower() in ("true", "1", "yes", "on")
+    if "RISK_PER_TRADE" in data:
+        cfg.RISK_PER_TRADE = float(data["RISK_PER_TRADE"])
+    _creds = [
+        "BINANCE_API_KEY", "BINANCE_API_SECRET",
+        "BYBIT_API_KEY", "BYBIT_API_SECRET",
+        "OKX_API_KEY", "OKX_API_SECRET", "OKX_API_PASSPHRASE",
+        "KRAKEN_API_KEY", "KRAKEN_API_SECRET",
+        "KUCOIN_API_KEY", "KUCOIN_API_SECRET", "KUCOIN_API_PASSPHRASE",
+        "COINBASE_API_KEY", "COINBASE_API_SECRET",
+        "BITGET_API_KEY", "BITGET_API_SECRET", "BITGET_API_PASSPHRASE",
+        "MEXC_API_KEY", "MEXC_API_SECRET",
+    ]
+    for key in _creds:
+        if key in data:
+            setattr(cfg, key, str(data[key]))
+    print(f"[BOT] runtime.json loaded ({len(data)} settings)")
+
+
 # ─── State ────────────────────────────────────────────────
 open_position = None
 paper_balance = cfg.PAPER_BALANCE
@@ -211,6 +276,8 @@ def best_symbol():
 
 def tick():
     global tick_count, stop_alerted_at
+    if _is_paused():
+        return
     tick_count += 1
     try:
         active_symbol = open_position["symbol"] if open_position else None
@@ -353,8 +420,10 @@ def _start_dashboard_server():
 
 
 def main():
-    global start_balance, paper_balance, open_position
+    global start_balance, paper_balance, open_position, exchange
     print(f"[APEX BOT] Starting... Python {sys.version.split()[0]}")
+    _load_runtime_config()
+    exchange = get_exchange()  # re-init with any runtime-overridden exchange
     validate()
 
     if cfg.PAPER_TRADING:
@@ -376,7 +445,11 @@ def main():
     tg.alert_start(cfg.SYMBOL, cfg.TIMEFRAME, balance, mode)
 
     _start_dashboard_server()
-    tg.start_polling(lambda: dash, exchange)
+    tg.start_polling(lambda: dash, exchange, control={
+        "set_paused": set_paused,
+        "get_paused": _is_paused,
+        "reload_exchange": reload_exchange_connector,
+    })
 
     verify_license()
     logger.info("🚀 First analysis...")

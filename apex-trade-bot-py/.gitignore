@@ -1,0 +1,10 @@
+.env
+runtime.json
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
