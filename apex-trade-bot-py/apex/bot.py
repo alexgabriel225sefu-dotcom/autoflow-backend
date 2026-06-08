@@ -124,8 +124,11 @@ def validate():
     has_anthropic = bool(cfg.ANTHROPIC_API_KEY)
     has_groq = bool(cfg.GROQ_API_KEY)
     if not has_anthropic and not has_groq:
-        print("❌ No AI key found! Add ANTHROPIC_API_KEY or GROQ_API_KEY.")
-        sys.exit(1)
+        if os.getenv("BYPASS_LICENSE") == "true":
+            print("⚠️  No AI key — running in demo mode (HOLD-only signals).")
+        else:
+            print("❌ No AI key found! Add ANTHROPIC_API_KEY or GROQ_API_KEY.")
+            sys.exit(1)
     if not has_anthropic and has_groq:
         print("ℹ️  ANTHROPIC_API_KEY missing — using Groq (free).")
     key_field = {"binance": "BINANCE_API_KEY", "bybit": "BYBIT_API_KEY", "okx": "OKX_API_KEY",
