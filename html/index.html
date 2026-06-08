@@ -3,486 +3,367 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AiCash System — Automated Crypto Trading Bot</title>
-<meta name="description" content="Full Python source code. 8 exchanges. 73% win rate. $297 one-time — no subscription.">
+<title>AiCash — Algorithmic Trading Bot · Full Source Code</title>
+<meta name="description" content="The complete source code for an automated crypto trading bot. You set the strategy, pairs and risk. One-time license — $297. No subscription.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#050814;--bg2:#080f1a;--bg3:#0c1524;--bg4:#111e30;
-  --t0:#eef4ff;--t1:#7a9cc4;--t2:#3d5878;
-  --blue:#3b8ef5;--blue2:#6bb2ff;--blueglow:rgba(59,142,245,.15);
-  --indigo:rgba(99,102,241,.04);
-  --green:#34d399;--red:#f87171;--gold:#fbbf24;
-  --bord:rgba(100,150,220,.08);--bord2:rgba(100,150,220,.16);
+  --bg:#0a0b0d;--bg1:#0e1014;--panel:#14171c;--panel2:#1a1e24;--hover:#21262e;
+  --line:rgba(255,255,255,.06);--line2:rgba(255,255,255,.11);
+  --t0:#eaecef;--t1:#9099a6;--t2:#5c6470;
+  --acc:#3d9bff;--acc2:#69b4ff;--accdim:rgba(61,155,255,.12);
+  --up:#1fc77b;--down:#f0616d;
   --f:'Space Grotesk',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
-  --ease:cubic-bezier(.32,.72,0,1);
+  --ease:cubic-bezier(.32,.72,0,1);--r:14px;
 }
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
+img{max-width:100%}
 
-/* BACKGROUND ORBS */
-body::before{content:'';position:fixed;top:-20%;right:-15%;width:70vw;height:70vw;background:radial-gradient(circle,rgba(59,142,245,.04) 0%,transparent 65%);pointer-events:none;z-index:0;animation:orb1 10s ease-in-out infinite}
-body::after{content:'';position:fixed;bottom:-25%;left:-15%;width:55vw;height:55vw;background:radial-gradient(circle,rgba(99,102,241,.025) 0%,transparent 65%);pointer-events:none;z-index:0;animation:orb1 13s ease-in-out infinite reverse}
-@keyframes orb1{0%,100%{opacity:.8;transform:scale(1)}50%{opacity:1.2;transform:scale(1.07)}}
+/* ambient glow */
+body::before{content:'';position:fixed;top:-30%;left:50%;transform:translateX(-50%);width:120vw;height:60vh;background:radial-gradient(ellipse at center,rgba(61,155,255,.06),transparent 60%);pointer-events:none;z-index:0}
 
-/* TICKER */
-#tk{height:30px;background:rgba(8,15,26,.9);border-bottom:1px solid var(--bord);overflow:hidden;display:flex;align-items:center;position:relative;z-index:10}
-.tkt{display:flex;gap:40px;animation:tks 40s linear infinite;white-space:nowrap;padding:0 40px}
-.ti{display:flex;align-items:center;gap:6px;font:500 10px/1 var(--m)}
-.ts{color:var(--t2)}.tp{color:var(--t1)}.tu{color:var(--green)}.td{color:var(--red)}
-@keyframes tks{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+/* TICKER TAPE host */
+#tape{border-bottom:1px solid var(--line);background:var(--bg1);position:relative;z-index:5}
 
-/* FLOATING ISLAND NAV */
-nav{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:300;display:flex;align-items:center;gap:28px;background:rgba(8,15,26,.92);border:1px solid var(--bord2);border-radius:100px;padding:8px 8px 8px 22px;backdrop-filter:blur(20px);white-space:nowrap;max-width:calc(100vw - 32px)}
-.nl{font:700 14px/1 var(--f);letter-spacing:-.02em;display:flex;align-items:center;gap:7px}
-.nl-dot{width:7px;height:7px;border-radius:50%;background:var(--blue);animation:blink 2s infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.nm{display:flex;gap:20px}
-.nm a{font:400 13px/1 var(--f);color:var(--t2);transition:color .2s;cursor:pointer}
-.nm a:hover{color:var(--t0)}
-.nb{background:var(--blue);color:#fff;font:600 13px/1 var(--f);border-radius:100px;padding:9px 18px;display:flex;align-items:center;gap:8px;transition:all 400ms var(--ease);cursor:pointer}
-.nb:hover{background:var(--blue2);box-shadow:0 0 24px var(--blueglow)}
-.nb-arr{width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:12px;transition:transform 300ms var(--ease)}
-.nb:hover .nb-arr{transform:translate(2px,-1px) scale(1.1)}
-@media(max-width:640px){.nm{display:none}}
+/* NAV */
+nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,44px);background:rgba(10,11,13,.85);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px;font:700 17px/1 var(--f);letter-spacing:-.02em}
+.brand-mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--acc),#2563eb);display:flex;align-items:center;justify-content:center;font:700 14px/1 var(--m);color:#fff}
+.nav-links{display:flex;gap:26px}
+.nav-links a{font:500 14px/1 var(--f);color:var(--t1);transition:color .2s}
+.nav-links a:hover{color:var(--t0)}
+.nav-cta{background:var(--acc);color:#04101f;font:600 14px/1 var(--f);border-radius:9px;padding:10px 18px;transition:all .25s var(--ease)}
+.nav-cta:hover{background:var(--acc2);box-shadow:0 6px 24px var(--accdim)}
+@media(max-width:820px){.nav-links{display:none}}
+
+/* layout */
+.wrap{max-width:1280px;margin:0 auto;padding:0 clamp(16px,4vw,44px);position:relative;z-index:1}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--accdim);border:1px solid rgba(61,155,255,.2);color:var(--acc2);border-radius:100px;padding:6px 14px;font:600 11px/1 var(--m);letter-spacing:.08em;text-transform:uppercase}
+.eyebrow b{width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc)}
+.h2{font:700 clamp(28px,3.4vw,42px)/1.08 var(--f);letter-spacing:-.03em}
+.lead{font:400 clamp(15px,1.4vw,17px)/1.7 var(--f);color:var(--t1);max-width:560px}
+.label{font:600 11px/1 var(--m);color:var(--acc);letter-spacing:.14em;text-transform:uppercase}
 
 /* HERO */
-#hero{display:grid;grid-template-columns:1fr 420px;gap:48px;align-items:start;min-height:100dvh;padding:clamp(100px,12vw,130px) clamp(20px,5vw,60px) 80px;max-width:1300px;margin:0 auto;position:relative;z-index:1}
-@media(max-width:1060px){#hero{grid-template-columns:1fr;min-height:auto;padding-top:100px}}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(59,142,245,.08);border:1px solid rgba(59,142,245,.18);border-radius:100px;padding:5px 14px 5px 8px;font:500 11px/1 var(--m);color:var(--blue);letter-spacing:.06em;text-transform:uppercase;margin-bottom:24px}
-.eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);animation:blink 1.5s infinite}
-h1{font:700 clamp(40px,5.2vw,68px)/1.0 var(--f);letter-spacing:-.04em;margin-bottom:20px;color:var(--t0)}
-.hero-sub{font:400 17px/1.7 var(--f);color:var(--t1);max-width:480px;margin-bottom:32px}
-.hero-sub strong{color:var(--t0);font-weight:600}
-.cta-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:36px}
-.btn-primary{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;font:600 15px/1 var(--f);border-radius:100px;padding:13px 13px 13px 22px;border:none;cursor:pointer;transition:all 450ms var(--ease)}
-.btn-primary:hover{background:var(--blue2);box-shadow:0 0 40px var(--blueglow)}
-.btn-arr{width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;font-size:13px;transition:transform 300ms var(--ease)}
-.btn-primary:hover .btn-arr{transform:translate(2px,-1px) scale(1.08)}
-.btn-ghost{font:400 14px/1 var(--f);color:var(--t1);background:none;border:none;cursor:pointer;transition:color .2s}
-.btn-ghost:hover{color:var(--t0)}
-.live-proof{display:flex;align-items:center;gap:7px;font:400 12px/1 var(--m);color:var(--t2)}
-.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.4s infinite}
-.live-n{color:var(--t1)}
+#hero{padding:clamp(48px,7vw,86px) 0 clamp(40px,5vw,60px);display:grid;grid-template-columns:1.05fr 1.25fr;gap:clamp(32px,4vw,56px);align-items:center}
+@media(max-width:980px){#hero{grid-template-columns:1fr;gap:36px}}
+#hero h1{font:700 clamp(38px,5.4vw,62px)/1.02 var(--f);letter-spacing:-.045em;margin:22px 0 18px}
+#hero h1 .grad{background:linear-gradient(120deg,var(--acc2),#a9d4ff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero-cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:30px 0 26px}
+.btn{display:inline-flex;align-items:center;gap:10px;font:600 15px/1 var(--f);border-radius:11px;padding:14px 22px;cursor:pointer;border:none;transition:all .3s var(--ease)}
+.btn-primary{background:var(--acc);color:#04101f}
+.btn-primary:hover{background:var(--acc2);box-shadow:0 10px 34px var(--accdim);transform:translateY(-1px)}
+.btn-ghost{background:var(--panel);color:var(--t0);border:1px solid var(--line2)}
+.btn-ghost:hover{background:var(--hover)}
+.hero-meta{display:flex;gap:26px;flex-wrap:wrap}
+.hm{display:flex;flex-direction:column;gap:3px}
+.hm b{font:600 20px/1 var(--m);color:var(--t0)}
+.hm span{font:500 12px/1 var(--f);color:var(--t2)}
 
-/* PRODUCT CARD (double-bezel) */
-.pc-outer{background:rgba(59,142,245,.04);border:1px solid var(--bord2);border-radius:24px;padding:3px;flex-shrink:0}
-.product-card{background:linear-gradient(145deg,#0c1828,#080f1c);border:1px solid rgba(100,150,220,.06);border-radius:21px;box-shadow:inset 0 1px 0 rgba(120,170,255,.07);padding:24px;position:relative;overflow:hidden}
-.pc-head{border-bottom:1px solid var(--bord);padding-bottom:18px;margin-bottom:18px}
-.pc-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:100px;padding:3px 10px 3px 7px;font:500 10px/1 var(--m);color:var(--green);letter-spacing:.04em;margin-bottom:14px}
-.pc-badge-d{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.6s infinite}
-.pc-name{font:600 14px/1 var(--f);color:var(--t1);margin-bottom:10px}
-.pc-price{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
-.pc-main{font:700 46px/1 var(--f);letter-spacing:-.05em;color:var(--t0)}
-.pc-was{font:400 18px/1 var(--m);color:var(--t2);text-decoration:line-through}
-.pc-note{font:400 12px/1 var(--m);color:var(--t2)}
-.pc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--bord);border:1px solid var(--bord);border-radius:12px;overflow:hidden;margin-bottom:16px}
-.pc-stat{background:var(--bg2);padding:12px 8px;text-align:center}
-.pc-sn{font:700 16px/1 var(--m);color:var(--t0);margin-bottom:4px}
-.pc-sn.up{color:var(--green)}
-.pc-sl{font:400 10px/1 var(--f);color:var(--t2);text-transform:uppercase;letter-spacing:.04em}
-.pc-feats{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
-.pc-feat{display:flex;align-items:flex-start;gap:8px;font:400 13px/1.5 var(--f);color:var(--t1)}
-.pc-feat::before{content:'✓';color:var(--blue);font-weight:700;flex-shrink:0;margin-top:1px}
-.pc-foot{display:flex;flex-direction:column;gap:8px}
-.btn-buy{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--blue);color:#fff;font:600 15px/1 var(--f);border-radius:100px;padding:14px 20px;cursor:pointer;transition:all 450ms var(--ease);text-align:center}
-.btn-buy:hover{background:var(--blue2);box-shadow:0 0 50px var(--blueglow)}
-.pc-guarantee{font:400 11px/1.4 var(--m);color:var(--t2);text-align:center}
+/* TRADING TERMINAL */
+.terminal{background:var(--panel);border:1px solid var(--line2);border-radius:18px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.term-top{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--bg1)}
+.term-id{display:flex;align-items:center;gap:9px;font:600 12px/1 var(--m);color:var(--t1)}
+.term-id .dot{width:8px;height:8px;border-radius:50%;background:var(--up);box-shadow:0 0 8px var(--up);animation:pulse 1.8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.term-live{font:600 10px/1 var(--m);color:var(--up);letter-spacing:.1em;border:1px solid rgba(31,199,123,.3);border-radius:5px;padding:4px 8px}
+.coin-row{display:flex;gap:6px;padding:10px 12px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--bg1);scrollbar-width:none}
+.coin-row::-webkit-scrollbar{display:none}
+.coin{flex-shrink:0;font:600 12px/1 var(--m);color:var(--t1);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;transition:all .2s}
+.coin:hover{color:var(--t0);border-color:var(--line2)}
+.coin.active{background:var(--accdim);border-color:var(--acc);color:var(--acc2)}
+.chart-host{height:clamp(340px,42vw,440px);background:var(--bg)}
+.chart-host>div{height:100%}
+.term-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;border-top:1px solid var(--line);background:var(--bg1);flex-wrap:wrap}
+.term-foot .note{font:500 11px/1.5 var(--m);color:var(--t2)}
+.term-foot .note b{color:var(--t1)}
 
-/* SECTION UTILITIES */
-.sec{max-width:1300px;margin:0 auto;padding:80px clamp(20px,5vw,60px);position:relative;z-index:1}
-.divider{border:none;border-top:1px solid var(--bord);margin:0 clamp(20px,5vw,60px)}
-.sec-label{font:500 11px/1 var(--m);color:var(--blue);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
-.sec-h2{font:700 clamp(30px,3.5vw,46px)/1.1 var(--f);letter-spacing:-.03em;margin-bottom:12px}
-.sec-sub{font:400 16px/1.7 var(--f);color:var(--t1);max-width:520px;margin-bottom:40px}
+/* TRUST BAR */
+#trust{padding:26px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.trust-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.trust-lbl{font:500 12px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.1em}
+.trust-tag{font:600 13px/1 var(--f);color:var(--t1);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px}
 
-/* EXCHANGE ROW */
-#exchanges{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:18px clamp(20px,5vw,60px);border-top:1px solid var(--bord);border-bottom:1px solid var(--bord);background:rgba(8,15,26,.6);position:relative;z-index:1}
-.ex-lbl{font:400 11px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-right:4px}
-.ex-tag{font:500 12px/1 var(--m);color:var(--t2);border:1px solid var(--bord);border-radius:6px;padding:5px 10px;transition:color .2s,border-color .2s}
-.ex-tag:hover{color:var(--t1);border-color:var(--bord2)}
+/* SECTION */
+.sec{padding:clamp(56px,7vw,90px) 0}
+.sec-head{max-width:620px;margin-bottom:42px}
+.sec-head .h2{margin:14px 0 14px}
 
-/* CANVAS DEMO */
-#demo .sec-inner{background:rgba(8,15,26,.8);border:1px solid var(--bord);border-radius:16px;overflow:hidden}
-.demo-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--bord);background:rgba(5,8,20,.6)}
-.db-dots{display:flex;gap:6px}.db-dots span{width:10px;height:10px;border-radius:50%;background:var(--bord2)}
-.db-dots span:nth-child(1){background:#f87171}.db-dots span:nth-child(2){background:#fbbf24}.db-dots span:nth-child(3){background:#34d399}
-.db-title{font:500 11px/1 var(--m);color:var(--t2)}
-.db-badge{font:600 9px/1 var(--m);color:var(--green);letter-spacing:.08em;border:1px solid rgba(52,211,153,.3);border-radius:4px;padding:3px 7px}
-#demo-cv{display:block;width:100%;height:260px}
-.demo-foot{padding:12px 18px;border-top:1px solid var(--bord);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.df-stat{font:400 11px/1 var(--m);color:var(--t2)}.df-stat b{font-weight:600}
-.up{color:var(--green)}.nt{color:var(--t1)}
+/* FEATURE GRID */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:880px){.feat-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.feat-grid{grid-template-columns:1fr}}
+.feat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:24px;transition:all .3s var(--ease)}
+.feat:hover{border-color:var(--line2);background:var(--panel2);transform:translateY(-2px)}
+.feat-ico{width:42px;height:42px;border-radius:11px;background:var(--accdim);border:1px solid rgba(61,155,255,.22);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.feat-ico svg{width:21px;height:21px;stroke:var(--acc2);fill:none;stroke-width:1.7}
+.feat h3{font:600 17px/1.3 var(--f);margin-bottom:8px}
+.feat p{font:400 14px/1.65 var(--f);color:var(--t1)}
 
-/* TERMINAL */
-.term-outer{background:rgba(59,142,245,.03);border:1px solid var(--bord2);border-radius:20px;padding:3px}
-.term-card{background:linear-gradient(145deg,#060d1a,#050814);border:1px solid rgba(100,150,220,.05);border-radius:17px;box-shadow:inset 0 1px 0 rgba(120,170,255,.04);overflow:hidden}
-.term-bar{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--bord);background:rgba(5,8,20,.5)}
-.term-dots{display:flex;gap:6px}.term-dots span{width:10px;height:10px;border-radius:50%}
-.term-dots span:nth-child(1){background:#f87171}.term-dots span:nth-child(2){background:#fbbf24}.term-dots span:nth-child(3){background:#34d399}
-.term-title{font:500 11px/1 var(--m);color:var(--t2)}
-#term{padding:20px;min-height:200px;max-height:260px;overflow:hidden;font:400 12px/1.9 var(--m);color:var(--t1)}
-#term .g{color:var(--green)}.#term .b{color:var(--blue)}
-.term-line span.g{color:var(--green)}.term-line span.b{color:var(--blue2)}.term-line span.r{color:var(--red)}.term-line span.o{color:var(--gold)}.term-line span.d{color:var(--t2)}
-
-/* STATS */
-.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--bord);border:1px solid var(--bord);border-radius:16px;overflow:hidden}
-@media(max-width:640px){.stat-row{grid-template-columns:repeat(2,1fr)}}
-.sc{background:var(--bg2);padding:28px 24px;text-align:center}
-.sn{font:700 clamp(28px,3.5vw,42px)/1 var(--m);color:var(--t0);letter-spacing:-.03em;margin-bottom:6px}
-.sl{font:600 11px/1 var(--f);color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
-.sno{font:400 12px/1.5 var(--f);color:var(--t2)}
-
-/* HOW IT WORKS */
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:40px}
-@media(max-width:760px){.steps{grid-template-columns:1fr}}
-.step{background:var(--bg2);border:1px solid var(--bord);border-radius:16px;padding:28px}
-.step-n{font:600 11px/1 var(--m);color:var(--blue);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px}
-.step h3{font:600 18px/1.3 var(--f);color:var(--t0);margin-bottom:10px}
-.step p{font:400 14px/1.7 var(--f);color:var(--t1);margin-bottom:16px}
-.mini-t{background:var(--bg);border:1px solid var(--bord);border-radius:8px;padding:12px 14px;font:400 11px/2 var(--m);color:var(--t1)}
-.mini-t .g{color:var(--green)}.mini-t .o{color:var(--gold)}.mini-t .d{color:var(--t2)}.mini-t .w{color:var(--t1)}
+/* STEPS */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+@media(max-width:880px){.steps{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.steps{grid-template-columns:1fr}}
+.step{padding:28px 24px;border-right:1px solid var(--line);background:var(--panel)}
+.step:last-child{border-right:none}
+.step-n{font:600 13px/1 var(--m);color:var(--acc);margin-bottom:14px}
+.step h3{font:600 16px/1.3 var(--f);margin-bottom:8px}
+.step p{font:400 13px/1.6 var(--f);color:var(--t1)}
 
 /* PRICING */
-.price-card-outer{background:rgba(59,142,245,.05);border:1px solid rgba(59,142,245,.2);border-radius:24px;padding:3px;max-width:520px;margin:0 auto}
-.price-card{background:linear-gradient(145deg,#0c1828,#080f1c);border:1px solid rgba(100,150,220,.08);border-radius:21px;box-shadow:inset 0 1px 0 rgba(120,170,255,.08);padding:36px}
-.price-card-top{text-align:center;margin-bottom:28px}
-.price-main{font:700 64px/1 var(--f);letter-spacing:-.05em;color:var(--t0);margin-bottom:6px}
-.price-was{font:400 18px/1 var(--m);color:var(--t2);text-decoration:line-through}
-.price-note{font:400 13px/1 var(--m);color:var(--t2);margin-top:8px}
-.feat-list{list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:28px}
-.feat-list li{display:flex;align-items:center;gap:10px;font:400 14px/1.5 var(--f);color:var(--t1)}
-.feat-list li::before{content:'✓';font-weight:700;color:var(--blue);flex-shrink:0}
+#pricing{background:var(--bg1);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.price-wrap{display:grid;grid-template-columns:1fr 380px;gap:clamp(28px,4vw,52px);align-items:center}
+@media(max-width:880px){.price-wrap{grid-template-columns:1fr}}
+.price-list{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
+@media(max-width:560px){.price-list{grid-template-columns:1fr}}
+.price-list li{display:flex;align-items:flex-start;gap:10px;font:400 14px/1.5 var(--f);color:var(--t1)}
+.price-list li svg{width:18px;height:18px;stroke:var(--acc);fill:none;stroke-width:2.2;flex-shrink:0;margin-top:1px}
+.price-card{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line2);border-radius:20px;padding:32px;box-shadow:0 24px 60px rgba(0,0,0,.45);position:relative;overflow:hidden}
+.price-card::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:120%;background:radial-gradient(circle,var(--accdim),transparent 65%);pointer-events:none}
+.price-badge{display:inline-flex;align-items:center;gap:6px;font:600 10px/1 var(--m);color:var(--acc2);background:var(--accdim);border:1px solid rgba(61,155,255,.25);border-radius:100px;padding:5px 11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:18px}
+.price-amt{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.price-amt .now{font:700 56px/1 var(--f);letter-spacing:-.04em}
+.price-amt .was{font:400 20px/1 var(--m);color:var(--t2);text-decoration:line-through}
+.price-sub{font:400 13px/1.5 var(--m);color:var(--t2);margin-bottom:24px}
+.price-card .btn{width:100%;justify-content:center;font-size:16px;padding:15px}
+.price-fine{font:400 11px/1.6 var(--m);color:var(--t2);text-align:center;margin-top:14px}
 
 /* FAQ */
-.faq{display:flex;flex-direction:column;gap:1px;background:var(--bord);border:1px solid var(--bord);border-radius:16px;overflow:hidden;margin-top:32px}
-.fq{background:var(--bg2)}
-.fq-q{width:100%;display:flex;align-items:center;justify-content:space-between;padding:18px 22px;font:500 14px/1.4 var(--f);color:var(--t0);background:none;border:none;cursor:pointer;text-align:left;transition:color .2s}
-.fq-q:hover{color:var(--blue)}
-.fq-ic{font:400 18px/1 var(--m);color:var(--t2);transition:transform 300ms var(--ease)}
-.fq-q.open .fq-ic{transform:rotate(45deg)}
-.fq-a{display:none;padding:0 22px 18px;font:400 14px/1.7 var(--f);color:var(--t1)}
+.faq{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.fq+.fq{border-top:1px solid var(--line)}
+.fq-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 24px;font:600 15px/1.4 var(--f);color:var(--t0);background:var(--panel);border:none;cursor:pointer;text-align:left;transition:color .2s}
+.fq-q:hover{color:var(--acc2)}
+.fq-ic{font:400 20px/1 var(--m);color:var(--t2);transition:transform .3s var(--ease);flex-shrink:0}
+.fq-q.open .fq-ic{transform:rotate(45deg);color:var(--acc)}
+.fq-a{display:none;padding:0 24px 20px;font:400 14px/1.7 var(--f);color:var(--t1);background:var(--panel)}
 .fq-a.open{display:block}
 
-/* BOTTOM CTA */
-.bottom-cta{text-align:center;padding:80px clamp(20px,5vw,60px);position:relative;z-index:1}
-.bottom-cta h3{font:700 clamp(32px,4vw,52px)/1.1 var(--f);letter-spacing:-.04em;margin-bottom:14px}
-.bottom-cta p{font:400 16px/1.6 var(--f);color:var(--t1);margin-bottom:28px}
+/* FINAL CTA */
+#final{text-align:center;padding:clamp(60px,8vw,100px) 0}
+#final .h2{font-size:clamp(30px,4vw,48px);margin-bottom:16px}
+#final p{font:400 16px/1.6 var(--f);color:var(--t1);max-width:480px;margin:0 auto 30px}
 
 /* FOOTER */
-footer{text-align:center;padding:30px clamp(20px,5vw,60px);border-top:1px solid var(--bord);font:400 12px/1.7 var(--f);color:var(--t2);position:relative;z-index:1}
+footer{border-top:1px solid var(--line);padding:34px 0;font:400 12px/1.7 var(--f);color:var(--t2)}
+footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+footer .disc{max-width:560px}
 
-/* FOMO TOAST */
-.fomo{position:fixed;bottom:24px;left:24px;z-index:400;background:var(--bg3);border:1px solid var(--bord2);border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;max-width:300px;box-shadow:0 8px 40px rgba(0,0,0,.4);transform:translateY(90px);opacity:0;transition:all 500ms var(--ease)}
-.fomo.show{transform:translateY(0);opacity:1}
-.fomo-ico{width:34px;height:34px;border-radius:50%;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);display:flex;align-items:center;justify-content:center;color:var(--green);font-size:14px;flex-shrink:0}
-.fomo-nm{font:600 13px/1 var(--f);color:var(--t0);margin-bottom:4px}
-.fomo-tm{font:400 11px/1 var(--m);color:var(--t2)}
-
-/* SCROLL REVEAL */
-.rv{opacity:0;transform:translateY(24px);filter:blur(2px);transition:opacity 700ms var(--ease),transform 700ms var(--ease),filter 700ms var(--ease)}
-.rv.in{opacity:1;transform:translateY(0);filter:blur(0)}
+/* reveal */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.rv.in{opacity:1;transform:none}
 </style>
 <body>
 
-<!-- TICKER -->
-<div id="tk"><div class="tkt" id="tkt"></div></div>
+<!-- LIVE TICKER TAPE (TradingView) -->
+<div id="tape"><div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div></div></div>
 
-<!-- FLOATING ISLAND NAV -->
+<!-- NAV -->
 <nav>
-  <div class="nl"><span class="nl-dot"></span>AiCash</div>
-  <div class="nm">
-    <a href="#demo">Live Demo</a>
+  <a href="#" class="brand"><span class="brand-mark">A</span>AiCash</a>
+  <div class="nav-links">
+    <a href="#markets">Live Markets</a>
+    <a href="#features">What You Get</a>
     <a href="#how">How It Works</a>
-    <a href="#buy">Pricing</a>
+    <a href="#pricing">Pricing</a>
     <a href="#faq">FAQ</a>
   </div>
-  <a href="#buy" class="nb">Get It — $297 <span class="nb-arr">→</span></a>
+  <a href="#pricing" class="nav-cta">Get License</a>
 </nav>
 
 <!-- HERO -->
-<section id="hero">
+<section class="wrap" id="hero">
   <div>
-    <div class="eyebrow rv"><span class="eyebrow-dot"></span>Algorithmic Trading Bot · Source Code</div>
-    <h1 class="rv">Your exchange.<br>Your config.<br>Your bot.</h1>
-    <p class="hero-sub rv">Full Python source code for an automated trading bot. <strong>8 exchanges.</strong> You set the pairs, the strategy, the risk. Buy once — own it forever.</p>
-    <div class="cta-row rv">
-      <a href="#buy" class="btn-primary">Get the Source Code — $297 <span class="btn-arr">→</span></a>
-      <a href="#demo" class="btn-ghost">See it in action ↓</a>
+    <span class="eyebrow rv"><b></b>Algorithmic Trading · Full Source Code</span>
+    <h1 class="rv">Own the bot.<br><span class="grad">Set your own rules.</span></h1>
+    <p class="lead rv">AiCash is the complete source code for an automated crypto trading bot. <strong style="color:var(--t0)">You</strong> define the strategy, the pairs and the risk — then run it on your own exchange account.</p>
+    <div class="hero-cta rv">
+      <a href="#pricing" class="btn btn-primary">Get the License — $297 →</a>
+      <a href="#markets" class="btn btn-ghost">View live markets</a>
     </div>
-    <p class="live-proof rv">
-      <span class="live-dot"></span>
-      <span class="live-n" id="viewers">47</span>&thinsp;people viewing now
-      &nbsp;·&nbsp;<span class="live-n">23</span> purchases today
-    </p>
+    <div class="hero-meta rv">
+      <div class="hm"><b>8</b><span>Exchanges</span></div>
+      <div class="hm"><b>$0</b><span>Monthly fee</span></div>
+      <div class="hm"><b>100%</b><span>Source included</span></div>
+      <div class="hm"><b>1×</b><span>Pay once</span></div>
+    </div>
   </div>
 
-  <!-- PRODUCT CARD (double-bezel) -->
-  <div class="pc-outer rv" id="buy">
-    <div class="product-card">
-      <div class="pc-head">
-        <div class="pc-badge"><span class="pc-badge-d"></span>FULL SOURCE CODE · PYTHON</div>
-        <div class="pc-name">AiCash System · Developer License</div>
-        <div class="pc-price"><span class="pc-main">$297</span><span class="pc-was">$497</span></div>
-        <div class="pc-note">One-time · No subscription · Instant delivery</div>
-      </div>
-      <div class="pc-stats">
-        <div class="pc-stat"><div class="pc-sn up">8</div><div class="pc-sl">Exchanges</div></div>
-        <div class="pc-stat"><div class="pc-sn">847</div><div class="pc-sl">Pairs</div></div>
-        <div class="pc-stat"><div class="pc-sn up">73%</div><div class="pc-sl">Backtested</div></div>
-        <div class="pc-stat"><div class="pc-sn">$0</div><div class="pc-sl">Monthly</div></div>
-      </div>
-      <div class="pc-feats">
-        <div class="pc-feat">Full Python source code — nothing compiled</div>
-        <div class="pc-feat">8 exchange connectors (Binance, Bybit, OKX…)</div>
-        <div class="pc-feat">Backtesting engine + 3 years historical data</div>
-        <div class="pc-feat">Risk management: SL, TP, drawdown cap</div>
-        <div class="pc-feat">Telegram alerts + Flask dashboard + Setup guide</div>
-        <div class="pc-feat">Free updates for 12 months</div>
-      </div>
-      <div class="pc-foot">
-        <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn-buy">Buy Now — $297 →</a>
-        <p class="pc-guarantee">Stripe · ZIP delivered in 60s · 30-day refund guarantee</p>
-      </div>
+  <!-- LIVE TRADING TERMINAL -->
+  <div class="terminal rv" id="markets">
+    <div class="term-top">
+      <div class="term-id"><span class="dot"></span><span id="sym-label">BTC / USDT</span></div>
+      <span class="term-live">● LIVE</span>
+    </div>
+    <div class="coin-row" id="coins"></div>
+    <div class="chart-host" id="tvchart"></div>
+    <div class="term-foot">
+      <span class="note">Real-time data via TradingView. <b>Pick any pair</b> to update the chart.</span>
+      <span class="note">Strategy engine supports <b>847 pairs</b></span>
     </div>
   </div>
 </section>
 
-<!-- EXCHANGE ROW -->
-<div id="exchanges">
-  <span class="ex-lbl">Supported</span>
-  <span class="ex-tag">Binance</span><span class="ex-tag">Binance Futures</span>
-  <span class="ex-tag">Bybit</span><span class="ex-tag">OKX</span>
-  <span class="ex-tag">Kraken</span><span class="ex-tag">KuCoin</span>
-  <span class="ex-tag">Coinbase</span><span class="ex-tag">Bitget</span>
-  <span class="ex-tag">MEXC</span>
-</div>
+<!-- TRUST -->
+<div id="trust"><div class="wrap trust-inner rv">
+  <span class="trust-lbl">Compatible with</span>
+  <span class="trust-tag">Binance</span><span class="trust-tag">Bybit</span><span class="trust-tag">OKX</span>
+  <span class="trust-tag">Kraken</span><span class="trust-tag">KuCoin</span><span class="trust-tag">Coinbase</span>
+  <span class="trust-tag">Bitget</span><span class="trust-tag">MEXC</span>
+</div></div>
 
-<!-- LIVE TRADING DEMO -->
-<section id="demo" class="sec">
-  <p class="sec-label rv">Strategy Demo</p>
-  <h2 class="sec-h2 rv">The strategy logic, visualised.</h2>
-  <p class="sec-sub rv">Simulation of the included strategy engine scanning BTC/USDT. You can configure it to scan any pair on any exchange you have API access to.</p>
-  <div class="sec-inner rv" style="margin-bottom:28px">
-    <div class="demo-bar">
-      <div class="db-dots"><span></span><span></span><span></span></div>
-      <div class="db-title">AiCash System v2.1 · BTC/USDT · Binance Futures</div>
-      <div class="db-badge">ACTIVE</div>
-    </div>
-    <canvas id="demo-cv"></canvas>
-    <div class="demo-foot">
-      <div class="df-stat">Session P&L: <b class="up" id="cv-pnl">+$0.00</b>&emsp;Trades: <b class="nt" id="cv-tr">0</b>&emsp;Win rate: <b class="nt" id="cv-wr">—</b></div>
-      <div class="df-stat">Also scanning: <b class="nt">ETH · SOL · BNB · XRP · +843 more</b></div>
-    </div>
+<!-- FEATURES -->
+<section class="wrap sec" id="features">
+  <div class="sec-head rv">
+    <span class="label">What You Get</span>
+    <h2 class="h2">Everything is in the source code.</h2>
+    <p class="lead">A complete, readable codebase — not a black box. You own it, you read it, you configure it however you want.</p>
   </div>
-  <div class="term-outer rv">
-    <div class="term-card">
-      <div class="term-bar"><div class="term-dots"><span></span><span></span><span></span></div><div class="term-title">aicash.py — Terminal Output</div></div>
-      <div id="term"></div>
-    </div>
+  <div class="feat-grid">
+    <div class="feat rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div><h3>Complete source code</h3><p>The full Python codebase, nothing compiled or hidden. Read every line before you run it.</p></div>
+    <div class="feat rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><h3>You define the strategy</h3><p>Choose the pairs, the timeframes and the entry logic. The strategy is yours to shape — not ours to dictate.</p></div>
+    <div class="feat rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h3>Built-in risk controls</h3><p>Stop-loss, take-profit and max-drawdown limits are part of the engine. You set the numbers.</p></div>
+    <div class="feat rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><h3>Multi-exchange ready</h3><p>Connectors for 8 major exchanges. Run it on the account you already have — your keys never leave your machine.</p></div>
+    <div class="feat rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><h3>Backtesting engine</h3><p>Test your configuration against historical data before committing real capital. The results are yours to judge.</p></div>
+    <div class="feat rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H4z"/><path d="M2 20h20"/></svg></div><h3>Real-time dashboard</h3><p>A clean local dashboard to watch what the bot is doing in real time — running entirely on your side.</p></div>
   </div>
 </section>
-
-<hr class="divider">
-
-<!-- STATS -->
-<section class="sec">
-  <p class="sec-label rv">Strategy Stats</p>
-  <h2 class="sec-h2 rv">What's included in the source.</h2>
-  <div class="stat-row rv">
-    <div class="sc"><div class="sn" data-counter="73" data-suffix="%">0%</div><div class="sl">Win Rate</div><p class="sno">Backtested, 3-year dataset</p></div>
-    <div class="sc"><div class="sn">8</div><div class="sl">Exchanges</div><p class="sno">Connectors ready to use</p></div>
-    <div class="sc"><div class="sn" data-counter="847" data-suffix="">0</div><div class="sl">Pairs</div><p class="sno">Configurable — use any subset</p></div>
-    <div class="sc"><div class="sn">$0</div><div class="sl">Monthly Cost</div><p class="sno">One-time purchase, no fees</p></div>
-  </div>
-</section>
-
-<hr class="divider">
 
 <!-- HOW IT WORKS -->
-<section class="sec" id="how">
-  <p class="sec-label rv">How It Works</p>
-  <h2 class="sec-h2 rv">How the strategy engine works.</h2>
+<section class="wrap sec" id="how">
+  <div class="sec-head rv">
+    <span class="label">How It Works</span>
+    <h2 class="h2">From checkout to running — fast.</h2>
+    <p class="lead">A SaaS-grade delivery flow. No back-and-forth, no waiting on a human.</p>
+  </div>
   <div class="steps">
-    <div class="step rv">
-      <div class="step-n">01 — Scan</div>
-      <h3>847 pairs, all timeframes</h3>
-      <p>RSI, MACD, Bollinger Bands and volume evaluated on every pair, every few seconds.</p>
-      <div class="mini-t"><span class="d">$</span> <span class="w">python aicash.py</span><br><span class="g">[OK]</span> <span class="w">Connected to Binance Futures</span><br><span class="o">→</span> <span class="w"> Scanning 847 pairs…</span></div>
-    </div>
-    <div class="step rv">
-      <div class="step-n">02 — Decide</div>
-      <h3>Entry, SL, TP computed</h3>
-      <p>Position size, stop-loss and take-profit calculated automatically. Zero manual input.</p>
-      <div class="mini-t"><span class="g">[SIG]</span> <span class="o">LONG BTC/USDT</span><br><span class="d">entry</span> <span class="w">$67,842</span><br><span class="d">sl/tp</span> <span class="w">−1.4% / +2.0%</span></div>
-    </div>
-    <div class="step rv">
-      <div class="step-n">03 — Execute</div>
-      <h3>Order in. Order out.</h3>
-      <p>Trade placed, monitored, and closed automatically. P&L reported via Telegram. Repeats.</p>
-      <div class="mini-t"><span class="g">[CLOSE]</span><span class="o"> +$24.18 (+4.8%)</span><br><span class="g">[TG]</span><span class="w">    Alert sent ✓</span><br><span class="d">→</span><span class="w">      Next scan 4s</span></div>
-    </div>
+    <div class="step rv"><div class="step-n">01</div><h3>Purchase securely</h3><p>One-time payment through Stripe. No subscription, no recurring charge.</p></div>
+    <div class="step rv"><div class="step-n">02</div><h3>Instant license</h3><p>Your license key and private access link arrive by email the moment payment clears.</p></div>
+    <div class="step rv"><div class="step-n">03</div><h3>Open your dashboard</h3><p>Follow your link into a private setup space built around the source code.</p></div>
+    <div class="step rv"><div class="step-n">04</div><h3>Configure & run</h3><p>Set your strategy and risk on your terms, then deploy on your own account.</p></div>
   </div>
 </section>
-
-<hr class="divider">
 
 <!-- PRICING -->
-<section class="sec" id="pricing">
-  <p class="sec-label rv" style="text-align:center">Pricing</p>
-  <h2 class="sec-h2 rv" style="text-align:center;max-width:100%">One payment. Full ownership.</h2>
-  <div class="price-card-outer rv" style="margin-top:36px">
-    <div class="price-card">
-      <div class="price-card-top">
-        <div class="price-main">$297</div>
-        <div class="price-was">$497</div>
-        <div class="price-note">One-time payment · No subscription · Full source code</div>
-      </div>
-      <ul class="feat-list">
-        <li>Complete Python source code — 100% readable</li>
-        <li>Connectors for 8 major exchanges</li>
-        <li>Backtesting engine with 3 years data</li>
-        <li>Risk manager: SL, TP, max drawdown cap</li>
-        <li>Telegram bot alerts + Flask web dashboard</li>
-        <li>Step-by-step setup guide (PDF + video)</li>
-        <li>12 months of free updates</li>
-        <li>30-day money-back guarantee</li>
+<section id="pricing">
+  <div class="wrap sec price-wrap">
+    <div class="rv">
+      <span class="label">Pricing</span>
+      <h2 class="h2" style="margin:14px 0 14px">One payment. Full ownership.</h2>
+      <p class="lead">No subscription, no monthly fees, no upsells. Buy the source code once and it's yours to keep, run and modify.</p>
+      <ul class="price-list">
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Complete Python source code</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>8 exchange connectors</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Backtesting engine</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Risk-control module</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Real-time dashboard</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Private setup access</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>12 months of updates</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>30-day money-back guarantee</li>
       </ul>
-      <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn-buy">Buy Now — $297 →</a>
-      <p class="price-note" style="text-align:center;margin-top:10px">Stripe checkout · ZIP delivered in under 60 seconds</p>
+    </div>
+    <div class="price-card rv">
+      <span class="price-badge">Developer License</span>
+      <div class="price-amt"><span class="now">$297</span><span class="was">$497</span></div>
+      <p class="price-sub">One-time payment · Lifetime use · Instant delivery</p>
+      <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn btn-primary">Get the License — $297 →</a>
+      <p class="price-fine">Secure Stripe checkout · License emailed in seconds</p>
     </div>
   </div>
 </section>
 
-<hr class="divider">
-
 <!-- FAQ -->
-<section class="sec" id="faq">
-  <p class="sec-label rv">FAQ</p>
-  <h2 class="sec-h2 rv">Common questions.</h2>
+<section class="wrap sec" id="faq">
+  <div class="sec-head rv">
+    <span class="label">FAQ</span>
+    <h2 class="h2">Straight answers.</h2>
+  </div>
   <div class="faq rv">
-    <div class="fq"><button class="fq-q">Do I need coding experience?<span class="fq-ic">+</span></button><div class="fq-a"><p>No. Install Python, run one command to install dependencies, add your API keys to the config file, and start. Most buyers are live within an hour. Full setup guide included.</p></div></div>
-    <div class="fq"><button class="fq-q">How much capital do I need?<span class="fq-ic">+</span></button><div class="fq-a"><p>$500 minimum recommended. Exchange order minimums are $10–20. Below $500 the bot works but position sizing is less efficient.</p></div></div>
-    <div class="fq"><button class="fq-q">Can I run it 24/7 on a VPS?<span class="fq-ic">+</span></button><div class="fq-a"><p>Yes — strongly recommended. A $5–10/month VPS (DigitalOcean, Vultr, Hetzner) keeps it running around the clock. VPS setup is covered in the guide.</p></div></div>
-    <div class="fq"><button class="fq-q">Do you have access to my API keys or funds?<span class="fq-ic">+</span></button><div class="fq-a"><p>Never. The code runs on your machine with your keys. We have zero access to your account or funds at any time. Trade-only API keys are recommended.</p></div></div>
-    <div class="fq"><button class="fq-q">What's the refund policy?<span class="fq-ic">+</span></button><div class="fq-a"><p>30-day full refund if the bot fails to connect and execute a trade. Processed via Stripe within 24 hours, no questions asked.</p></div></div>
+    <div class="fq"><button class="fq-q">What exactly am I buying?<span class="fq-ic">+</span></button><div class="fq-a">You're buying the complete source code for an automated crypto trading bot, plus a private setup space and a license to use it. It's a software product — a tool you configure and run yourself.</div></div>
+    <div class="fq"><button class="fq-q">Do you guarantee profit?<span class="fq-ic">+</span></button><div class="fq-a">No. The bot does exactly what you configure it to do — the strategy, pairs and risk are entirely under your control. Results depend on your settings and market conditions. We sell the tool, not a return.</div></div>
+    <div class="fq"><button class="fq-q">Do you ever touch my funds or API keys?<span class="fq-ic">+</span></button><div class="fq-a">Never. The bot runs on your machine with your keys. We have zero access to your exchange account or funds at any point.</div></div>
+    <div class="fq"><button class="fq-q">Is it a one-time payment?<span class="fq-ic">+</span></button><div class="fq-a">Yes. $297 once. No subscription, no recurring fees. You keep the source code permanently and get 12 months of updates included.</div></div>
+    <div class="fq"><button class="fq-q">How is it delivered?<span class="fq-ic">+</span></button><div class="fq-a">Immediately after checkout you receive a license key and a private access link by email — no waiting and no manual steps on our end.</div></div>
+    <div class="fq"><button class="fq-q">What's the refund policy?<span class="fq-ic">+</span></button><div class="fq-a">30-day money-back guarantee. If it doesn't work as described, request a refund through Stripe and it's processed within 24 hours.</div></div>
   </div>
 </section>
 
-<!-- BOTTOM CTA -->
-<div class="bottom-cta">
-  <h3 class="rv">$297. Once.<br>Yours forever.</h3>
-  <p class="rv">Full source code. No subscription. No monthly fee. Deploy it your way.</p>
-  <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn-primary rv" style="font-size:16px;padding:15px 15px 15px 28px">Get the Source Code — $297 <span class="btn-arr">→</span></a>
-  <p class="rv" style="font:400 11px/1 var(--m);color:var(--t2);margin-top:14px">Stripe · Instant delivery · 30-day guarantee</p>
-</div>
+<!-- FINAL CTA -->
+<section class="wrap" id="final">
+  <h2 class="h2 rv">$297, once. Then it's yours.</h2>
+  <p class="rv">Full source code. Your strategy. Your account. No subscriptions, ever.</p>
+  <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn btn-primary rv" style="font-size:16px;padding:16px 30px">Get the License — $297 →</a>
+</section>
 
-<footer>
-  <p>AiCash System — Algorithmic Trading Software</p>
-  <p style="margin-top:6px;max-width:560px;margin-left:auto;margin-right:auto">AiCash is a source code product — a configurable algorithmic trading tool. Performance figures are from backtests on historical data and do not guarantee future results. Crypto trading involves risk; only trade capital you can afford to lose.</p>
-</footer>
-
-<!-- FOMO TOAST -->
-<div class="fomo" id="fomo">
-  <div class="fomo-ico">✓</div>
-  <div><div class="fomo-nm" id="fomo-nm"></div><div class="fomo-tm" id="fomo-tm"></div></div>
-</div>
+<footer><div class="wrap">
+  <div>© AiCash — Algorithmic Trading Software</div>
+  <div class="disc">AiCash is a source-code software product that you configure and operate yourself. It does not provide financial advice or guarantee returns. Crypto trading carries risk; only trade capital you can afford to lose. Market data shown is provided by TradingView for reference.</div>
+</div></footer>
 
 <script>
-// TICKER
-var C=[
-  {s:'BTC/USDT',p:'67,842',c:'+1.24%',u:1},{s:'ETH/USDT',p:'3,541',c:'+0.87%',u:1},
-  {s:'SOL/USDT',p:'168.45',c:'+2.31%',u:1},{s:'BNB/USDT',p:'594.20',c:'−0.42%',u:0},
-  {s:'XRP/USDT',p:'0.6112',c:'+1.05%',u:1},{s:'DOGE/USDT',p:'0.1632',c:'+3.14%',u:1},
-  {s:'AVAX/USDT',p:'38.71',c:'+1.88%',u:1},{s:'DOT/USDT',p:'7.43',c:'−0.55%',u:0},
+// ---- LIVE TICKER TAPE (TradingView) ----
+(function(){
+  var s=document.createElement('script');
+  s.src='https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';
+  s.async=true;
+  s.innerHTML=JSON.stringify({symbols:[
+    {proName:'BINANCE:BTCUSDT',title:'BTC'},{proName:'BINANCE:ETHUSDT',title:'ETH'},
+    {proName:'BINANCE:SOLUSDT',title:'SOL'},{proName:'BINANCE:BNBUSDT',title:'BNB'},
+    {proName:'BINANCE:XRPUSDT',title:'XRP'},{proName:'BINANCE:DOGEUSDT',title:'DOGE'},
+    {proName:'BINANCE:AVAXUSDT',title:'AVAX'},{proName:'BINANCE:ADAUSDT',title:'ADA'}
+  ],showSymbolLogo:true,isTransparent:true,displayMode:'compact',colorTheme:'dark',locale:'en'});
+  document.querySelector('#tape .tradingview-widget-container').appendChild(s);
+})();
+
+// ---- LIVE ADVANCED CHART with coin selector ----
+var COINS=[
+  {s:'BINANCE:BTCUSDT',l:'BTC / USDT'},{s:'BINANCE:ETHUSDT',l:'ETH / USDT'},
+  {s:'BINANCE:SOLUSDT',l:'SOL / USDT'},{s:'BINANCE:BNBUSDT',l:'BNB / USDT'},
+  {s:'BINANCE:XRPUSDT',l:'XRP / USDT'},{s:'BINANCE:DOGEUSDT',l:'DOGE / USDT'},
+  {s:'BINANCE:AVAXUSDT',l:'AVAX / USDT'},{s:'BINANCE:ADAUSDT',l:'ADA / USDT'},
+  {s:'BINANCE:LINKUSDT',l:'LINK / USDT'},{s:'BINANCE:DOTUSDT',l:'DOT / USDT'}
 ];
-(function(){var el=document.getElementById('tkt');el.innerHTML=[...C,...C].map(function(t){return'<span class="ti"><span class="ts">'+t.s+'</span><span class="tp"> '+t.p+'</span><span class="'+(t.u?'tu':'td')+'"> '+t.c+'</span></span>';}).join('');})();
-
-// CANVAS
+function loadChart(sym){
+  var host=document.getElementById('tvchart');host.innerHTML='';
+  var s=document.createElement('script');
+  s.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+  s.async=true;
+  s.innerHTML=JSON.stringify({
+    autosize:true,symbol:sym,interval:'15',timezone:'Etc/UTC',theme:'dark',style:'1',
+    locale:'en',hide_side_toolbar:true,allow_symbol_change:false,save_image:false,
+    backgroundColor:'rgba(10,11,13,1)',gridColor:'rgba(255,255,255,0.04)',
+    enable_publishing:false,support_host:'https://www.tradingview.com'
+  });
+  host.appendChild(s);
+}
 (function(){
-  var cv=document.getElementById('demo-cv'),ctx=cv.getContext('2d'),dpr=window.devicePixelRatio||1;
-  var W,H=260,candles=[],signals=[],pnl=0,trades=0,wins=0,running=false;
-  function rz(){W=cv.offsetWidth;cv.width=W*dpr;cv.height=H*dpr;cv.style.height=H+'px';ctx.scale(dpr,dpr);}
-  function gen(){var p=67200,a=[];for(var i=0;i<52;i++){var o=p,mv=(Math.random()-.47)*p*.009,cl=p+mv;a.push({o:o,c:cl,h:Math.max(o,cl)+Math.random()*Math.abs(mv)*.55,l:Math.min(o,cl)-Math.random()*Math.abs(mv)*.55,v:25+Math.random()*70});p=cl;}return a;}
-  candles=gen();
-  function draw(){
-    if(!W)return;
-    ctx.fillStyle='#060d1a';ctx.fillRect(0,0,W,H);
-    var pL=6,pR=62,pT=44,pB=Math.floor(H*.18),cW=W-pL-pR,cH=H-pT-pB;
-    var vis=candles.slice(Math.max(0,candles.length-48));
-    var mn=Math.min.apply(null,vis.map(function(c){return c.l;}))*.9996,mx=Math.max.apply(null,vis.map(function(c){return c.h;}))*1.0004,rng=mx-mn;
-    function ty(p){return pT+cH-((p-mn)/rng)*cH;}
-    var st=cW/vis.length,cw=Math.max(2,st*.6);
-    ctx.strokeStyle='rgba(100,150,220,.04)';ctx.lineWidth=1;
-    for(var i=0;i<=4;i++){var gy=pT+(cH/4)*i;ctx.beginPath();ctx.moveTo(pL,gy);ctx.lineTo(W-pR,gy);ctx.stroke();var gp=mx-(rng/4)*i;ctx.fillStyle='rgba(100,130,180,.4)';ctx.font='9px JetBrains Mono,monospace';ctx.textAlign='left';ctx.fillText('$'+Math.round(gp/50)*50,W-pR+4,gy+3);}
-    var mv2=Math.max.apply(null,vis.map(function(c){return c.v;}));
-    vis.forEach(function(c,i){var x=pL+i*st+st/2,isG=c.c>=c.o;ctx.fillStyle=isG?'rgba(52,211,153,.08)':'rgba(248,113,113,.08)';var vh=(c.v/mv2)*(H*.15);ctx.fillRect(x-cw/2,H-vh,cw,vh);});
-    vis.forEach(function(c,i){var x=pL+i*st+st/2,isG=c.c>=c.o;ctx.strokeStyle=isG?'#34d399':'#f87171';ctx.fillStyle=isG?'rgba(52,211,153,.9)':'rgba(248,113,113,.9)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,ty(c.h));ctx.lineTo(x,ty(c.l));ctx.stroke();var by=Math.min(ty(c.o),ty(c.c)),bh=Math.max(Math.abs(ty(c.c)-ty(c.o)),1.5);ctx.fillRect(x-cw/2,by,cw,bh);});
-    signals.forEach(function(s){var off=candles.length-vis.length,vi=s.ci-off;if(vi<0||vi>=vis.length)return;var x=pL+vi*st+st/2,c=vis[vi];ctx.fillStyle=s.dir==='long'?'rgba(59,142,245,.95)':'rgba(248,113,113,.8)';ctx.beginPath();if(s.dir==='long'){ctx.moveTo(x,ty(c.l)+10);ctx.lineTo(x-5,ty(c.l)+19);ctx.lineTo(x+5,ty(c.l)+19);}else{ctx.moveTo(x,ty(c.h)-10);ctx.lineTo(x-5,ty(c.h)-19);ctx.lineTo(x+5,ty(c.h)-19);}ctx.closePath();ctx.fill();
-      if(s.closed){var eci=s.ci+3-off;if(eci>=0&&eci<vis.length){var ex=pL+eci*st+st/2;ctx.font='bold 9px JetBrains Mono,monospace';ctx.fillStyle=s.profit>=0?'#34d399':'#f87171';ctx.textAlign='center';ctx.fillText((s.profit>=0?'+':'')+s.profit.toFixed(1)+'%',ex,pT-6);}}});
-    var lc=vis[vis.length-1].c,py=ty(lc);
-    ctx.setLineDash([3,4]);ctx.strokeStyle='rgba(59,142,245,.25)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pL,py);ctx.lineTo(W-pR,py);ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle='#3b8ef5';ctx.fillRect(W-pR,py-9,58,18);ctx.fillStyle='#fff';ctx.font='bold 9px JetBrains Mono,monospace';ctx.textAlign='center';ctx.fillText('$'+Math.round(lc).toLocaleString(),W-pR+29,py+3.5);
-    ctx.fillStyle='rgba(6,13,26,.78)';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(pL,pT-36,148,32,5);else ctx.rect(pL,pT-36,148,32);ctx.fill();
-    ctx.font='8px JetBrains Mono,monospace';ctx.fillStyle='rgba(100,130,180,.7)';ctx.textAlign='left';ctx.fillText('SESSION P&L',pL+8,pT-24);
-    ctx.font='bold 13px JetBrains Mono,monospace';ctx.fillStyle=pnl>=0?'#34d399':'#f87171';ctx.fillText((pnl>=0?'+':'')+pnl.toFixed(2),pL+8,pT-9);
-  }
-  var activeSig=null;
-  function tick(){if(!running)return;
-    if(Math.random()>.988&&candles.length<90){var last=candles[candles.length-1],mv=(Math.random()-.47)*last.c*.009,cl=last.c+mv;candles.push({o:last.c,c:cl,h:Math.max(last.c,cl)+Math.random()*Math.abs(mv)*.5,l:Math.min(last.c,cl)-Math.random()*Math.abs(mv)*.5,v:25+Math.random()*70});if(!activeSig&&Math.random()>.5){activeSig={ci:candles.length-1,dir:Math.random()>.45?'long':'short',closed:false,profit:0};signals.push(activeSig);}}
-    if(activeSig&&!activeSig.closed&&candles.length>activeSig.ci+3){var entry=candles[activeSig.ci].c,exit=candles[activeSig.ci+3].c,pct=activeSig.dir==='long'?(exit-entry)/entry*100:(entry-exit)/entry*100;activeSig.profit=parseFloat(pct.toFixed(1));activeSig.closed=true;pnl+=pct*4;trades++;if(pct>0)wins++;activeSig=null;document.getElementById('cv-pnl').textContent=(pnl>=0?'+':'')+pnl.toFixed(2);document.getElementById('cv-pnl').style.color=pnl>=0?'#34d399':'#f87171';document.getElementById('cv-tr').textContent=trades;if(trades)document.getElementById('cv-wr').textContent=Math.round(wins/trades*100)+'%';}
-    draw();requestAnimationFrame(tick);}
-  var started=false;
-  new IntersectionObserver(function(e){if(e[0].isIntersecting&&!started){started=true;running=true;rz();draw();setTimeout(function(){requestAnimationFrame(tick);},300);}},{threshold:.15}).observe(cv);
-  window.addEventListener('resize',function(){rz();draw();});
+  var row=document.getElementById('coins'),lbl=document.getElementById('sym-label');
+  COINS.forEach(function(c,i){
+    var b=document.createElement('button');b.className='coin'+(i===0?' active':'');
+    b.textContent=c.l.split(' ')[0];
+    b.onclick=function(){
+      document.querySelectorAll('.coin').forEach(function(x){x.classList.remove('active');});
+      b.classList.add('active');lbl.textContent=c.l;loadChart(c.s);
+    };
+    row.appendChild(b);
+  });
+  loadChart(COINS[0].s);
 })();
 
-// TERMINAL ANIMATION
-(function(){
-  var el=document.getElementById('term');
-  var lines=[
-    ['<span class="d">$</span> python aicash.py',''],
-    ['<span class="g">[INIT]</span> Loading config...','ok'],
-    ['<span class="g">[INIT]</span> Connected to Binance Futures',''],
-    ['<span class="g">[SCAN]</span> Analyzing 847 pairs across 5 timeframes…',''],
-    ['<span class="b">[SIG ]</span> <span class="o">BTC/USDT</span> — LONG   score: 91.4%  entry: $67,842',''],
-    ['<span class="g">[ORD ]</span> Position opened: 0.12 BTC @ $67,842',''],
-    ['<span class="g">[SCAN]</span> ETH/USDT — no signal  score: 62.1%',''],
-    ['<span class="g">[SCAN]</span> SOL/USDT — no signal  score: 54.8%',''],
-    ['<span class="b">[SIG ]</span> <span class="o">ETH/USDT</span> — LONG   score: 88.7%  entry: $3,541',''],
-    ['<span class="g">[ORD ]</span> Position opened: 0.8 ETH @ $3,541',''],
-    ['<span class="g">[CLOSE]</span> BTC/USDT  <span class="g">+$24.18 (+4.8%)</span>  duration: 8 min',''],
-    ['<span class="g">[TG  ]</span> Alert sent → @YourTelegramBot ✓',''],
-    ['<span class="g">[CLOSE]</span> ETH/USDT  <span class="g">+$11.34 (+2.1%)</span>  duration: 6 min',''],
-    ['<span class="g">[TG  ]</span> Alert sent → @YourTelegramBot ✓',''],
-    ['<span class="d">→</span>     Next scan cycle in 4s…',''],
-  ];
-  var li=0,ti=0,started=false;
-  function addLine(){
-    if(li>=lines.length){li=0;el.innerHTML='';return;}
-    var div=document.createElement('div');div.className='term-line';div.innerHTML=lines[li][0];el.appendChild(div);li++;el.scrollTop=el.scrollHeight;
-    setTimeout(addLine,180+Math.random()*220);}
-  new IntersectionObserver(function(e){if(e[0].isIntersecting&&!started){started=true;setTimeout(addLine,400);}},{threshold:.2}).observe(el);
-})();
+// ---- FAQ ----
+document.querySelectorAll('.fq-q').forEach(function(btn){btn.addEventListener('click',function(){
+  var op=this.classList.contains('open');
+  document.querySelectorAll('.fq-q').forEach(function(b){b.classList.remove('open');});
+  document.querySelectorAll('.fq-a').forEach(function(a){a.classList.remove('open');});
+  if(!op){this.classList.add('open');this.nextElementSibling.classList.add('open');}
+});});
 
-// REVEAL
-var obs=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;e.target.classList.add('in');e.target.querySelectorAll('[data-counter]').forEach(function(el){var tgt=parseInt(el.dataset.counter),suf=el.dataset.suffix||'',t0=performance.now(),dur=1400;(function tk(n){var p=Math.min((n-t0)/dur,1),ease=1-Math.pow(1-p,3);el.textContent=Math.round(ease*tgt)+suf;if(p<1)requestAnimationFrame(tk);})(t0);});obs.unobserve(e.target);});},{threshold:.1});
+// ---- REVEAL ----
+var obs=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target);}});},{threshold:.12});
 document.querySelectorAll('.rv').forEach(function(el){obs.observe(el);});
-
-// FAQ
-document.querySelectorAll('.fq-q').forEach(function(btn){btn.addEventListener('click',function(){var op=this.classList.contains('open');document.querySelectorAll('.fq-q').forEach(function(b){b.classList.remove('open');});document.querySelectorAll('.fq-a').forEach(function(a){a.classList.remove('open');});if(!op){this.classList.add('open');this.nextElementSibling.classList.add('open');}});});
-
-// FOMO
-var FM=[{n:'Marco T. from 🇮🇹 Italy',t:'got the source code · just now'},{n:'Sarah K. from 🇩🇪 Germany',t:'got the source code · 9 min ago'},{n:'James W. from 🇺🇸 USA',t:'got the source code · 17 min ago'},{n:'Yuki R. from 🇯🇵 Japan',t:'got the source code · 26 min ago'},{n:'Ahmed S. from 🇦🇪 UAE',t:'got the source code · 38 min ago'},{n:'Luca F. from 🇧🇷 Brazil',t:'got the source code · 51 min ago'}];
-var fi=Math.floor(Math.random()*FM.length),ft=document.getElementById('fomo');
-function showFomo(){var d=FM[fi%FM.length];fi++;document.getElementById('fomo-nm').textContent=d.n;document.getElementById('fomo-tm').textContent=d.t;ft.classList.add('show');setTimeout(function(){ft.classList.remove('show');},4500);}
-setTimeout(function(){showFomo();setInterval(showFomo,12000);},3500);
-
-// VIEWERS
-(function(){var el=document.getElementById('viewers');if(!el)return;var v=44+Math.floor(Math.random()*9);el.textContent=v;setInterval(function(){v+=Math.random()>.5?1:-1;v=Math.max(38,Math.min(66,v));el.textContent=v;},8000);})();
 </script>
 </body>
 </html>
