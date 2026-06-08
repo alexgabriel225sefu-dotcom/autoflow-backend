@@ -391,13 +391,17 @@ _HELP = ("📋 <b>APEX BOT COMMANDS</b>\n"
 
 def _poll_loop():
     global _update_id
+    _poll_errors = 0
     while True:
         try:
             r = requests.get(f"{_API}/getUpdates",
                              params={"offset": _update_id, "timeout": 10,
                                      "allowed_updates": json.dumps(["message"])},
                              timeout=15)
-            for u in r.json().get("result", []):
+            data = r.json()
+            if not data.get("ok"):
+                print(f"[TG] getUpdates error: {data}")
+            for u in data.get("result", []):
                 _update_id = u["update_id"] + 1
                 msg = u.get("message", {})
                 raw = (msg.get("text") or "").strip()
@@ -442,8 +446,10 @@ def _poll_loop():
                     _handle_start(chat_id)
                 elif cmd_l == "/stop":
                     _handle_stop(chat_id)
-        except Exception:
-            pass
+        except Exception as _e:
+            _poll_errors += 1
+            if _poll_errors <= 5 or _poll_errors % 30 == 0:
+                print(f"[TG] Poll error #{_poll_errors}: {type(_e).__name__}: {_e}")
         time.sleep(2)
 
 
