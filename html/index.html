@@ -3,93 +3,93 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AiCash — Algorithmic Trading Bot · Full Source Code</title>
+<title>Algorithmic Trading Bot · Full Source Code</title>
 <meta name="description" content="The complete source code for an automated crypto trading bot. You set the strategy, pairs and risk. One-time license — $297. No subscription.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0b0d;--bg1:#0e1014;--panel:#14171c;--panel2:#1a1e24;--hover:#21262e;
-  --line:rgba(255,255,255,.06);--line2:rgba(255,255,255,.11);
-  --t0:#eaecef;--t1:#9099a6;--t2:#5c6470;
-  --acc:#3d9bff;--acc2:#69b4ff;--accdim:rgba(61,155,255,.12);
-  --up:#1fc77b;--down:#f0616d;
-  --f:'Space Grotesk',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
+  --bg:#0b0907;--bg1:#100d0a;--panel:#16110c;--panel2:#1d1710;--hover:#261e14;
+  --line:rgba(255,236,212,.07);--line2:rgba(255,236,212,.14);
+  --t0:#f5efe7;--t1:#aa9a85;--t2:#6c6050;
+  --acc:#e08a3c;--acc2:#f2ad5e;--accdim:rgba(224,138,60,.12);
+  --up:#3fb96b;--down:#e2564f;
+  --f:'Geist',system-ui,sans-serif;--m:'Geist Mono','JetBrains Mono',monospace;
   --ease:cubic-bezier(.32,.72,0,1);--r:14px;
 }
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;letter-spacing:-.01em;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
 img{max-width:100%}
 
-/* ambient glow */
-body::before{content:'';position:fixed;top:-30%;left:50%;transform:translateX(-50%);width:120vw;height:60vh;background:radial-gradient(ellipse at center,rgba(61,155,255,.06),transparent 60%);pointer-events:none;z-index:0}
+body::before{content:'';position:fixed;top:-30%;left:50%;transform:translateX(-50%);width:120vw;height:60vh;background:radial-gradient(ellipse at center,rgba(224,138,60,.07),transparent 60%);pointer-events:none;z-index:0}
 
 /* TICKER TAPE host */
 #tape{border-bottom:1px solid var(--line);background:var(--bg1);position:relative;z-index:5}
 
 /* NAV */
-nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,44px);background:rgba(10,11,13,.85);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:center;gap:9px;font:700 17px/1 var(--f);letter-spacing:-.02em}
-.brand-mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--acc),#2563eb);display:flex;align-items:center;justify-content:center;font:700 14px/1 var(--m);color:#fff}
-.nav-links{display:flex;gap:26px}
+nav{position:sticky;top:0;z-index:300;height:62px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,44px);background:rgba(11,9,7,.82);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;transition:transform .3s var(--ease)}
+.brand:hover{transform:scale(1.06)}
+.logo{width:30px;height:30px;display:block;filter:drop-shadow(0 0 10px rgba(224,138,60,.35))}
+.nav-links{display:flex;gap:28px}
 .nav-links a{font:500 14px/1 var(--f);color:var(--t1);transition:color .2s}
 .nav-links a:hover{color:var(--t0)}
-.nav-cta{background:var(--acc);color:#04101f;font:600 14px/1 var(--f);border-radius:9px;padding:10px 18px;transition:all .25s var(--ease)}
-.nav-cta:hover{background:var(--acc2);box-shadow:0 6px 24px var(--accdim)}
+.nav-cta{background:var(--acc);color:#1a0f04;font:600 14px/1 var(--f);border-radius:10px;padding:11px 19px;transition:all .25s var(--ease)}
+.nav-cta:hover{background:var(--acc2);box-shadow:0 6px 26px var(--accdim)}
 @media(max-width:820px){.nav-links{display:none}}
 
 /* layout */
 .wrap{max-width:1280px;margin:0 auto;padding:0 clamp(16px,4vw,44px);position:relative;z-index:1}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--accdim);border:1px solid rgba(61,155,255,.2);color:var(--acc2);border-radius:100px;padding:6px 14px;font:600 11px/1 var(--m);letter-spacing:.08em;text-transform:uppercase}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--accdim);border:1px solid rgba(224,138,60,.22);color:var(--acc2);border-radius:100px;padding:6px 14px;font:500 11px/1 var(--m);letter-spacing:.1em;text-transform:uppercase}
 .eyebrow b{width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc)}
-.h2{font:700 clamp(28px,3.4vw,42px)/1.08 var(--f);letter-spacing:-.03em}
+.h2{font:600 clamp(28px,3.4vw,44px)/1.06 var(--f);letter-spacing:-.035em}
 .lead{font:400 clamp(15px,1.4vw,17px)/1.7 var(--f);color:var(--t1);max-width:560px}
-.label{font:600 11px/1 var(--m);color:var(--acc);letter-spacing:.14em;text-transform:uppercase}
+.label{font:500 11px/1 var(--m);color:var(--acc);letter-spacing:.16em;text-transform:uppercase}
 
 /* HERO */
-#hero{padding:clamp(48px,7vw,86px) 0 clamp(40px,5vw,60px);display:grid;grid-template-columns:1.05fr 1.25fr;gap:clamp(32px,4vw,56px);align-items:center}
+#hero{padding:clamp(48px,7vw,88px) 0 clamp(40px,5vw,60px);display:grid;grid-template-columns:1.05fr 1.25fr;gap:clamp(32px,4vw,56px);align-items:center}
 @media(max-width:980px){#hero{grid-template-columns:1fr;gap:36px}}
-#hero h1{font:700 clamp(38px,5.4vw,62px)/1.02 var(--f);letter-spacing:-.045em;margin:22px 0 18px}
-#hero h1 .grad{background:linear-gradient(120deg,var(--acc2),#a9d4ff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.hero-cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:30px 0 26px}
+#hero h1{font:600 clamp(40px,5.6vw,66px)/1.0 var(--f);letter-spacing:-.05em;margin:22px 0 18px}
+#hero h1 .grad{background:linear-gradient(115deg,var(--acc),#ffd29e);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero-cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:30px 0 28px}
 .btn{display:inline-flex;align-items:center;gap:10px;font:600 15px/1 var(--f);border-radius:11px;padding:14px 22px;cursor:pointer;border:none;transition:all .3s var(--ease)}
-.btn-primary{background:var(--acc);color:#04101f}
-.btn-primary:hover{background:var(--acc2);box-shadow:0 10px 34px var(--accdim);transform:translateY(-1px)}
+.btn-primary{background:var(--acc);color:#1a0f04}
+.btn-primary:hover{background:var(--acc2);box-shadow:0 12px 36px var(--accdim);transform:translateY(-1px)}
 .btn-ghost{background:var(--panel);color:var(--t0);border:1px solid var(--line2)}
 .btn-ghost:hover{background:var(--hover)}
-.hero-meta{display:flex;gap:26px;flex-wrap:wrap}
-.hm{display:flex;flex-direction:column;gap:3px}
-.hm b{font:600 20px/1 var(--m);color:var(--t0)}
-.hm span{font:500 12px/1 var(--f);color:var(--t2)}
+.hero-meta{display:flex;gap:28px;flex-wrap:wrap}
+.hm{display:flex;flex-direction:column;gap:4px}
+.hm b{font:500 21px/1 var(--m);color:var(--t0);letter-spacing:-.02em}
+.hm span{font:400 12px/1 var(--f);color:var(--t2)}
 
 /* TRADING TERMINAL */
-.terminal{background:var(--panel);border:1px solid var(--line2);border-radius:18px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)}
-.term-top{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--bg1)}
-.term-id{display:flex;align-items:center;gap:9px;font:600 12px/1 var(--m);color:var(--t1)}
-.term-id .dot{width:8px;height:8px;border-radius:50%;background:var(--up);box-shadow:0 0 8px var(--up);animation:pulse 1.8s infinite}
+.terminal{background:var(--panel);border:1px solid var(--line2);border-radius:18px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.55)}
+.term-top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--bg1)}
+.term-id{display:flex;align-items:center;gap:9px;font:500 12px/1 var(--m);color:var(--t1)}
+.term-id .dot{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 9px var(--acc);animation:pulse 1.8s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-.term-live{font:600 10px/1 var(--m);color:var(--up);letter-spacing:.1em;border:1px solid rgba(31,199,123,.3);border-radius:5px;padding:4px 8px}
+.term-live{font:500 10px/1 var(--m);color:var(--acc2);letter-spacing:.12em;border:1px solid rgba(224,138,60,.3);border-radius:5px;padding:4px 8px}
 .coin-row{display:flex;gap:6px;padding:10px 12px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--bg1);scrollbar-width:none}
 .coin-row::-webkit-scrollbar{display:none}
-.coin{flex-shrink:0;font:600 12px/1 var(--m);color:var(--t1);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;transition:all .2s}
+.coin{flex-shrink:0;font:500 12px/1 var(--m);color:var(--t1);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;transition:all .2s}
 .coin:hover{color:var(--t0);border-color:var(--line2)}
 .coin.active{background:var(--accdim);border-color:var(--acc);color:var(--acc2)}
 .chart-host{height:clamp(340px,42vw,440px);background:var(--bg)}
 .chart-host>div{height:100%}
-.term-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;border-top:1px solid var(--line);background:var(--bg1);flex-wrap:wrap}
-.term-foot .note{font:500 11px/1.5 var(--m);color:var(--t2)}
-.term-foot .note b{color:var(--t1)}
+.term-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid var(--line);background:var(--bg1);flex-wrap:wrap}
+.term-foot .note{font:400 11px/1.5 var(--m);color:var(--t2)}
+.term-foot .note b{color:var(--t1);font-weight:500}
 
 /* TRUST BAR */
 #trust{padding:26px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .trust-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.trust-lbl{font:500 12px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.1em}
-.trust-tag{font:600 13px/1 var(--f);color:var(--t1);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px}
+.trust-lbl{font:400 12px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.1em}
+.trust-tag{font:500 13px/1 var(--f);color:var(--t1);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px}
 
 /* SECTION */
-.sec{padding:clamp(56px,7vw,90px) 0}
+.sec{padding:clamp(56px,7vw,92px) 0}
 .sec-head{max-width:620px;margin-bottom:42px}
 .sec-head .h2{margin:14px 0 14px}
 
@@ -97,21 +97,21 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
 .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 @media(max-width:880px){.feat-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.feat-grid{grid-template-columns:1fr}}
-.feat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:24px;transition:all .3s var(--ease)}
+.feat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:26px;transition:all .3s var(--ease)}
 .feat:hover{border-color:var(--line2);background:var(--panel2);transform:translateY(-2px)}
-.feat-ico{width:42px;height:42px;border-radius:11px;background:var(--accdim);border:1px solid rgba(61,155,255,.22);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.feat-ico{width:42px;height:42px;border-radius:11px;background:var(--accdim);border:1px solid rgba(224,138,60,.24);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
 .feat-ico svg{width:21px;height:21px;stroke:var(--acc2);fill:none;stroke-width:1.7}
-.feat h3{font:600 17px/1.3 var(--f);margin-bottom:8px}
+.feat h3{font:600 17px/1.3 var(--f);margin-bottom:9px;letter-spacing:-.02em}
 .feat p{font:400 14px/1.65 var(--f);color:var(--t1)}
 
 /* STEPS */
-.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 @media(max-width:880px){.steps{grid-template-columns:1fr 1fr}}
 @media(max-width:480px){.steps{grid-template-columns:1fr}}
 .step{padding:28px 24px;border-right:1px solid var(--line);background:var(--panel)}
 .step:last-child{border-right:none}
-.step-n{font:600 13px/1 var(--m);color:var(--acc);margin-bottom:14px}
-.step h3{font:600 16px/1.3 var(--f);margin-bottom:8px}
+.step-n{font:500 13px/1 var(--m);color:var(--acc);margin-bottom:14px}
+.step h3{font:600 16px/1.3 var(--f);margin-bottom:8px;letter-spacing:-.02em}
 .step p{font:400 13px/1.6 var(--f);color:var(--t1)}
 
 /* PRICING */
@@ -122,11 +122,11 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
 @media(max-width:560px){.price-list{grid-template-columns:1fr}}
 .price-list li{display:flex;align-items:flex-start;gap:10px;font:400 14px/1.5 var(--f);color:var(--t1)}
 .price-list li svg{width:18px;height:18px;stroke:var(--acc);fill:none;stroke-width:2.2;flex-shrink:0;margin-top:1px}
-.price-card{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line2);border-radius:20px;padding:32px;box-shadow:0 24px 60px rgba(0,0,0,.45);position:relative;overflow:hidden}
+.price-card{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line2);border-radius:20px;padding:34px;box-shadow:0 24px 60px rgba(0,0,0,.5);position:relative;overflow:hidden}
 .price-card::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:120%;background:radial-gradient(circle,var(--accdim),transparent 65%);pointer-events:none}
-.price-badge{display:inline-flex;align-items:center;gap:6px;font:600 10px/1 var(--m);color:var(--acc2);background:var(--accdim);border:1px solid rgba(61,155,255,.25);border-radius:100px;padding:5px 11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:18px}
+.price-badge{display:inline-flex;align-items:center;gap:6px;font:500 10px/1 var(--m);color:var(--acc2);background:var(--accdim);border:1px solid rgba(224,138,60,.28);border-radius:100px;padding:5px 11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:18px}
 .price-amt{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
-.price-amt .now{font:700 56px/1 var(--f);letter-spacing:-.04em}
+.price-amt .now{font:600 58px/1 var(--f);letter-spacing:-.05em}
 .price-amt .was{font:400 20px/1 var(--m);color:var(--t2);text-decoration:line-through}
 .price-sub{font:400 13px/1.5 var(--m);color:var(--t2);margin-bottom:24px}
 .price-card .btn{width:100%;justify-content:center;font-size:16px;padding:15px}
@@ -135,7 +135,7 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
 /* FAQ */
 .faq{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .fq+.fq{border-top:1px solid var(--line)}
-.fq-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 24px;font:600 15px/1.4 var(--f);color:var(--t0);background:var(--panel);border:none;cursor:pointer;text-align:left;transition:color .2s}
+.fq-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 24px;font:600 15px/1.4 var(--f);color:var(--t0);background:var(--panel);border:none;cursor:pointer;text-align:left;letter-spacing:-.01em;transition:color .2s}
 .fq-q:hover{color:var(--acc2)}
 .fq-ic{font:400 20px/1 var(--m);color:var(--t2);transition:transform .3s var(--ease);flex-shrink:0}
 .fq-q.open .fq-ic{transform:rotate(45deg);color:var(--acc)}
@@ -144,7 +144,7 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
 
 /* FINAL CTA */
 #final{text-align:center;padding:clamp(60px,8vw,100px) 0}
-#final .h2{font-size:clamp(30px,4vw,48px);margin-bottom:16px}
+#final .h2{font-size:clamp(30px,4vw,50px);margin-bottom:16px}
 #final p{font:400 16px/1.6 var(--f);color:var(--t1);max-width:480px;margin:0 auto 30px}
 
 /* FOOTER */
@@ -155,6 +155,9 @@ footer .disc{max-width:560px}
 /* reveal */
 .rv{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
 .rv.in{opacity:1;transform:none}
+
+/* logo gradient def reuse */
+.lg-stop1{stop-color:#b5641f}.lg-stop2{stop-color:#f2ad5e}
 </style>
 <body>
 
@@ -163,7 +166,16 @@ footer .disc{max-width:560px}
 
 <!-- NAV -->
 <nav>
-  <a href="#" class="brand"><span class="brand-mark">A</span>AiCash</a>
+  <a href="#" class="brand" aria-label="Home">
+    <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <defs><linearGradient id="cg" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse">
+        <stop class="lg-stop1"/><stop offset="1" class="lg-stop2"/></linearGradient></defs>
+      <rect x="3" y="19" width="5" height="10" rx="2.5" fill="url(#cg)" opacity=".45"/>
+      <rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="url(#cg)" opacity=".72"/>
+      <rect x="20" y="6" width="5" height="23" rx="2.5" fill="url(#cg)"/>
+      <circle cx="22.5" cy="5" r="3.1" fill="#f2ad5e"/>
+    </svg>
+  </a>
   <div class="nav-links">
     <a href="#markets">Live Markets</a>
     <a href="#features">What You Get</a>
@@ -179,7 +191,7 @@ footer .disc{max-width:560px}
   <div>
     <span class="eyebrow rv"><b></b>Algorithmic Trading · Full Source Code</span>
     <h1 class="rv">Own the bot.<br><span class="grad">Set your own rules.</span></h1>
-    <p class="lead rv">AiCash is the complete source code for an automated crypto trading bot. <strong style="color:var(--t0)">You</strong> define the strategy, the pairs and the risk — then run it on your own exchange account.</p>
+    <p class="lead rv">The complete source code for an automated crypto trading bot. <strong style="color:var(--t0);font-weight:500">You</strong> define the strategy, the pairs and the risk — then run it on your own exchange account.</p>
     <div class="hero-cta rv">
       <a href="#pricing" class="btn btn-primary">Get the License — $297 →</a>
       <a href="#markets" class="btn btn-ghost">View live markets</a>
@@ -219,7 +231,7 @@ footer .disc{max-width:560px}
 <section class="wrap sec" id="features">
   <div class="sec-head rv">
     <span class="label">What You Get</span>
-    <h2 class="h2">Everything is in the source code.</h2>
+    <h2 class="h2">Everything lives in the source.</h2>
     <p class="lead">A complete, readable codebase — not a black box. You own it, you read it, you configure it however you want.</p>
   </div>
   <div class="feat-grid">
@@ -299,8 +311,8 @@ footer .disc{max-width:560px}
 </section>
 
 <footer><div class="wrap">
-  <div>© AiCash — Algorithmic Trading Software</div>
-  <div class="disc">AiCash is a source-code software product that you configure and operate yourself. It does not provide financial advice or guarantee returns. Crypto trading carries risk; only trade capital you can afford to lose. Market data shown is provided by TradingView for reference.</div>
+  <div>© Algorithmic Trading Software</div>
+  <div class="disc">This is a source-code software product that you configure and operate yourself. It does not provide financial advice or guarantee returns. Crypto trading carries risk; only trade capital you can afford to lose. Market data shown is provided by TradingView for reference.</div>
 </div></footer>
 
 <script>
@@ -334,7 +346,7 @@ function loadChart(sym){
   s.innerHTML=JSON.stringify({
     autosize:true,symbol:sym,interval:'15',timezone:'Etc/UTC',theme:'dark',style:'1',
     locale:'en',hide_side_toolbar:true,allow_symbol_change:false,save_image:false,
-    backgroundColor:'rgba(10,11,13,1)',gridColor:'rgba(255,255,255,0.04)',
+    backgroundColor:'rgba(11,9,7,1)',gridColor:'rgba(255,236,212,0.04)',
     enable_publishing:false,support_host:'https://www.tradingview.com'
   });
   host.appendChild(s);
