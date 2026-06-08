@@ -415,8 +415,10 @@ def _poll_loop():
                     _handle_wizard_reply(chat_id, raw, msg_id)
                     continue
 
-                cmd, _, args = raw.partition(" ")
+                first_line = raw.splitlines()[0].strip()
+                cmd, _, args = first_line.partition(" ")
                 cmd_l = cmd.lower().split("@")[0]  # strip @botname suffix
+                args = args.split("\n")[0].strip()  # first line of args only
 
                 if cmd_l in ("/status", "/s"):
                     _handle_status(chat_id)
