@@ -11,9 +11,8 @@ const buildDashboard = require('./dashboard');
 const http           = require('http');
 
 // ─── Exchange ─────────────────────────────────────────────
-const exchange = cfg.EXCHANGE === 'binance'
-  ? require('./binance')
-  : require('./bybit');
+// Factory selects the connector for cfg.EXCHANGE (8 supported).
+const exchange = require('./exchange');
 
 // ─── State ────────────────────────────────────────────────
 let openPosition      = null;
@@ -87,7 +86,12 @@ function validate() {
     console.log('ℹ️  Anthropic + Groq configured — Anthropic primary, Groq fallback.');
   }
 
-  const hasKey = cfg.EXCHANGE === 'binance' ? cfg.BINANCE_API_KEY : cfg.BYBIT_API_KEY;
+  const KEY_FIELD = {
+    binance: 'BINANCE_API_KEY', bybit: 'BYBIT_API_KEY', okx: 'OKX_API_KEY',
+    kraken: 'KRAKEN_API_KEY', kucoin: 'KUCOIN_API_KEY', coinbase: 'COINBASE_API_KEY',
+    bitget: 'BITGET_API_KEY', mexc: 'MEXC_API_KEY',
+  };
+  const hasKey = cfg[KEY_FIELD[cfg.EXCHANGE]] || '';
   if (!hasKey && !cfg.PAPER_TRADING) {
     console.warn('⚠️  No exchange API key found — falling back to PAPER TRADING automatically');
     cfg.PAPER_TRADING = true;

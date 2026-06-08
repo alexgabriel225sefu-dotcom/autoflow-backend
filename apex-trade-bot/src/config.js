@@ -5,14 +5,46 @@ const isTruthy = v => ['true','1','yes','on'].includes((v || '').toLowerCase().t
 
 const PAPER = isTruthy(process.env.PAPER_TRADING);
 
+// Supported exchanges (each has a connector in src/<name>.js)
+const SUPPORTED_EXCHANGES = ['binance','bybit','okx','kraken','kucoin','coinbase','bitget','mexc'];
+
 module.exports = {
   // ─── Exchange ────────────────────────────────────────────
-  EXCHANGE: process.env.EXCHANGE || 'binance', // 'binance' (default) or 'bybit'
+  // One of: binance, bybit, okx, kraken, kucoin, coinbase, bitget, mexc
+  EXCHANGE: (process.env.EXCHANGE || 'binance').toLowerCase(),
+  SUPPORTED_EXCHANGES,
 
   // ─── Bybit ──────────────────────────────────────────────
   BYBIT_API_KEY:    process.env.BYBIT_API_KEY    || '',
   BYBIT_API_SECRET: process.env.BYBIT_API_SECRET || '',
   BYBIT_TESTNET:    isTruthy(process.env.BYBIT_TESTNET),
+
+  // ─── OKX ────────────────────────────────────────────────
+  OKX_API_KEY:        process.env.OKX_API_KEY        || '',
+  OKX_API_SECRET:     process.env.OKX_API_SECRET     || '',
+  OKX_API_PASSPHRASE: process.env.OKX_API_PASSPHRASE || '',
+
+  // ─── Kraken ─────────────────────────────────────────────
+  KRAKEN_API_KEY:    process.env.KRAKEN_API_KEY    || '',
+  KRAKEN_API_SECRET: process.env.KRAKEN_API_SECRET || '',
+
+  // ─── KuCoin ─────────────────────────────────────────────
+  KUCOIN_API_KEY:        process.env.KUCOIN_API_KEY        || '',
+  KUCOIN_API_SECRET:     process.env.KUCOIN_API_SECRET     || '',
+  KUCOIN_API_PASSPHRASE: process.env.KUCOIN_API_PASSPHRASE || '',
+
+  // ─── Coinbase (Advanced Trade, JWT key) ─────────────────
+  COINBASE_API_KEY:    process.env.COINBASE_API_KEY    || '', // key name: organizations/.../apiKeys/...
+  COINBASE_API_SECRET: process.env.COINBASE_API_SECRET || '', // EC private key PEM
+
+  // ─── Bitget ─────────────────────────────────────────────
+  BITGET_API_KEY:        process.env.BITGET_API_KEY        || '',
+  BITGET_API_SECRET:     process.env.BITGET_API_SECRET     || '',
+  BITGET_API_PASSPHRASE: process.env.BITGET_API_PASSPHRASE || '',
+
+  // ─── MEXC ───────────────────────────────────────────────
+  MEXC_API_KEY:    process.env.MEXC_API_KEY    || '',
+  MEXC_API_SECRET: process.env.MEXC_API_SECRET || '',
 
   // ─── Binance ────────────────────────────────────────────
   BINANCE_API_KEY:    process.env.BINANCE_API_KEY    || '',
