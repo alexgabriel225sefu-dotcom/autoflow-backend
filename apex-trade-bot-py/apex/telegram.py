@@ -405,7 +405,9 @@ def _poll_loop():
                 msg_id = msg.get("message_id")
                 if not raw or chat_id is None:
                     continue
+                print(f"[TG] msg from chat_id={chat_id} | configured={CHAT_ID} | match={str(chat_id)==str(CHAT_ID)}")
                 if str(chat_id) != str(CHAT_ID):
+                    print(f"[TG] IGNORED — chat_id {chat_id} != TELEGRAM_CHAT_ID {CHAT_ID}")
                     continue
 
                 # Active wizard step takes priority over /commands
