@@ -11,8 +11,8 @@ import threading
 import requests
 from apex import config as cfg
 
-TOKEN = cfg.TELEGRAM_BOT_TOKEN
-CHAT_ID = cfg.TELEGRAM_CHAT_ID
+TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
+CHAT_ID = (cfg.TELEGRAM_CHAT_ID or "").strip()
 DASHBOARD_URL = cfg.DASHBOARD_URL
 _API = f"https://api.telegram.org/bot{TOKEN}"
 _RUNTIME = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "runtime.json")
@@ -456,7 +456,9 @@ def _poll_loop():
 def start_polling(get_dash, exchange, control=None):
     global _get_dash, _exchange, _bot_control
     if not TOKEN or not CHAT_ID:
+        print(f"[TELEGRAM] Missing TOKEN={bool(TOKEN)} CHAT_ID={bool(CHAT_ID)} — polling disabled")
         return
+    print(f"[TELEGRAM] Token: ...{TOKEN[-10:]} | Chat ID: {CHAT_ID}")
     _get_dash = get_dash
     _exchange = exchange
     _bot_control = control or {}
