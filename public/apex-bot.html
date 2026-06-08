@@ -2,632 +2,539 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Apex Trade Bot — AI Crypto Trading System</title>
-<meta name="description" content="AI-powered crypto trading bot. Runs 24/7 on Bybit. Deploy in 10 minutes. Start with $10.">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apex Trade Bot · AI Crypto Trading — Controlled from Telegram</title>
+<meta name="description" content="An AI-powered crypto trading bot you run on your own exchange account and control entirely from Telegram. Full source code. One-time license — $297.">
 <meta property="og:title" content="Apex Trade Bot — AI Crypto Trading System">
-<meta property="og:description" content="Runs 24/7. 5 pairs. 6 indicators. Telegram alerts. Deploy in 10 minutes. One-time $297.">
+<meta property="og:description" content="Runs 24/7. Multi-exchange. Set it up and control it from Telegram. Deploy in 10 minutes. One-time $297.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://aicashsystem.space/apex-bot">
-<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://js.stripe.com/v3/"></script>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --c:#f59e0b;--c2:rgba(245,158,11,.08);--c3:rgba(245,158,11,.15);
-  --p:#d97706;
-  --green:#10b981;--warn:#f59e0b;--red:#ef4444;
-  --bg:#050814;--bg2:rgba(255,255,255,.04);
-  --bd:rgba(255,255,255,.07);--bd2:rgba(255,255,255,.12);
-  --t1:#fff;--t2:rgba(255,255,255,.55);--t3:rgba(255,255,255,.28);
-  --mono:'JetBrains Mono','SF Mono',Menlo,monospace;
+  --bg:#060608;--bg1:#0b0b0e;--panel:#111115;--panel2:#18181d;--hover:#212128;
+  --line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.13);
+  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
+  --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;
+  --accdim:rgba(255,45,79,.12);--accglow:rgba(255,45,79,.45);
+  --tg:#2aabee;--tgdim:rgba(42,171,238,.12);
+  --up:#27c46a;--down:#ff2d4f;
+  --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
+  --ease:cubic-bezier(.32,.72,0,1);--r:16px;
 }
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;letter-spacing:-.011em;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
 
-.bg-radial{position:fixed;inset:0;z-index:-2;
-  background:radial-gradient(ellipse 80% 60% at 10% 0%,rgba(180,83,9,.1) 0%,transparent 55%),
-             radial-gradient(ellipse 60% 50% at 90% 100%,rgba(120,53,15,.08) 0%,transparent 55%),
-             #050814}
-.bg-grid{position:fixed;inset:0;z-index:-1;
-  background-image:linear-gradient(rgba(255,255,255,.024) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.024) 1px,transparent 1px);
-  background-size:50px 50px;
-  mask-image:linear-gradient(to bottom,rgba(0,0,0,.7) 0%,transparent 80%)}
-.blur-orb{position:fixed;border-radius:50%;filter:blur(120px);pointer-events:none;z-index:-1;opacity:.18}
-.orb1{width:600px;height:600px;background:#92400e;top:-150px;left:-100px}
-.orb2{width:500px;height:500px;background:#78350f;bottom:-120px;right:-100px}
+#glow{position:fixed;top:0;left:0;width:680px;height:680px;border-radius:50%;background:radial-gradient(circle,rgba(255,45,79,.10),transparent 62%);pointer-events:none;z-index:1;transform:translate3d(-50%,-50%,0);opacity:0;transition:opacity .5s;will-change:transform}
+@media(hover:none){#glow{display:none}}
 
-.flash{background:linear-gradient(90deg,rgba(245,158,11,.03),rgba(245,158,11,.06),rgba(245,158,11,.03));border-bottom:1px solid rgba(245,158,11,.1);padding:10px 24px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;position:relative;z-index:10}
-.flash-txt{font-size:11px;font-weight:700;color:var(--c);letter-spacing:.5px;text-transform:uppercase}
-.flash-cd{font-size:15px;font-weight:900;color:#fff;font-family:var(--mono);letter-spacing:2px}
-.flash-sep{color:rgba(245,158,11,.25)}
-.flash-tag{font-size:11px;font-weight:700;color:var(--c);background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.18);border-radius:6px;padding:3px 12px}
+#tape{border-bottom:1px solid var(--line);background:var(--bg1);position:relative;z-index:5}
 
-nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(28px);background:rgba(5,8,20,.65);border-bottom:1px solid var(--bd)}
-.nav-inner{max-width:1160px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 36px;height:64px}
-.logo{font-size:16px;font-weight:900;letter-spacing:.5px;font-family:var(--mono);display:flex;align-items:center;gap:10px}
-.logo-pulse{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:blink 1.4s step-end infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
-.nav-links{display:flex;gap:32px}
-.nav-links a{font-size:12px;color:var(--t3);font-weight:600;letter-spacing:.5px;text-transform:uppercase;transition:color .2s}.nav-links a:hover{color:var(--t1)}
-.nav-cta{background:var(--c);color:#000;font-size:11px;font-weight:900;padding:10px 22px;border-radius:8px;letter-spacing:.5px;text-transform:uppercase;transition:all .2s;box-shadow:0 0 18px rgba(245,158,11,.18)}
-.nav-cta:hover{opacity:.9;box-shadow:0 0 30px rgba(245,158,11,.32);transform:translateY(-1px)}
+nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,46px);background:rgba(6,6,8,.78);backdrop-filter:blur(20px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;transition:transform .3s var(--ease)}
+.brand:hover{transform:scale(1.06)}
+.logo{width:32px;height:32px;display:block;filter:drop-shadow(0 0 12px rgba(255,45,79,.5))}
+.brand-name{font:600 17px/1 var(--d);letter-spacing:-.01em}
+.nav-links{display:flex;gap:28px}
+.nav-links a{font:500 14px/1 var(--f);color:var(--t1);transition:color .2s}
+.nav-links a:hover{color:var(--t0)}
+.nav-cta{background:var(--acc);color:#fff;font:600 14px/1 var(--f);border-radius:10px;padding:11px 19px;transition:all .25s var(--ease);cursor:pointer;border:none}
+.nav-cta:hover{background:var(--acc2);box-shadow:0 6px 28px var(--accglow)}
+@media(max-width:880px){.nav-links{display:none}}
 
-.hero-wrap{position:relative;overflow:hidden;min-height:100vh;display:flex;align-items:center}
-.hero-glow{position:absolute;top:0;left:50%;transform:translateX(-50%);width:1000px;height:700px;background:radial-gradient(ellipse at 50% 20%,rgba(245,158,11,.04) 0%,transparent 65%);pointer-events:none}
-.hero{max-width:1160px;margin:0 auto;padding:120px 36px 80px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center;position:relative;z-index:1;width:100%}
-.hero-label{display:inline-flex;align-items:center;gap:10px;background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.18);border-radius:999px;padding:8px 18px;font-size:11px;font-weight:700;color:var(--green);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:32px;font-family:var(--mono)}
-.hero-label-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:blink 1.4s step-end infinite}
-.hero h1{font-size:clamp(42px,4.8vw,72px);font-weight:900;line-height:.97;letter-spacing:-3.5px;margin-bottom:28px}
-.hero h1 em{font-style:normal;color:var(--c)}
-.hero-sub{font-size:16px;color:var(--t2);line-height:1.8;max-width:480px;margin-bottom:40px}
-.btn-main{display:inline-flex;align-items:center;gap:10px;background:var(--c);color:#000;font-size:15px;font-weight:900;padding:18px 34px;border-radius:12px;letter-spacing:.2px;transition:all .25s;border:none;cursor:pointer;box-shadow:0 6px 28px rgba(245,158,11,.22)}
-.btn-main:hover{transform:translateY(-2px);box-shadow:0 10px 42px rgba(245,158,11,.36);opacity:.93}
-.hero-meta{margin-top:20px;font-size:12px;color:var(--t3);font-family:var(--mono);display:flex;gap:20px;flex-wrap:wrap}
-.hero-meta span{display:flex;align-items:center;gap:6px}
-.dot-ok{width:5px;height:5px;border-radius:50%;background:var(--green)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 clamp(16px,4vw,46px);position:relative;z-index:2}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--accdim);border:1px solid rgba(255,45,79,.24);color:var(--acc3);border-radius:100px;padding:6px 14px;font:500 11px/1 var(--m);letter-spacing:.1em;text-transform:uppercase}
+.eyebrow b{width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 9px var(--acc)}
+.h2{font:600 clamp(30px,3.9vw,52px)/1.03 var(--d);letter-spacing:-.025em}
+.lead{font:400 clamp(15px,1.4vw,17px)/1.7 var(--f);color:var(--t1);max-width:560px}
+.label{font:500 11px/1 var(--m);color:var(--acc);letter-spacing:.16em;text-transform:uppercase}
 
-.hero-right{position:relative;animation:float 6s ease-in-out infinite}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
-.glass-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:22px;padding:24px;backdrop-filter:blur(20px);box-shadow:0 20px 70px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.07)}
-.gc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
-.gc-title{font-size:13px;font-weight:800;color:rgba(255,255,255,.65)}
-.gc-live{font-size:11px;font-weight:700;color:var(--green);display:flex;align-items:center;gap:6px}
-.gc-live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 1.4s step-end infinite}
+#hero{position:relative;padding:clamp(54px,7vw,96px) 0 clamp(44px,5vw,64px);display:grid;grid-template-columns:1.05fr 1.25fr;gap:clamp(32px,4vw,56px);align-items:center;overflow:hidden}
+@media(max-width:980px){#hero{grid-template-columns:1fr;gap:36px}}
+.grid3d{position:absolute;left:-25%;right:-25%;bottom:-30%;height:90%;z-index:0;pointer-events:none;perspective:340px;opacity:.7}
+.grid3d::after{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,45,79,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(255,45,79,.14) 1px,transparent 1px);background-size:56px 56px;transform:rotateX(68deg);transform-origin:bottom center;animation:grid 6s linear infinite;-webkit-mask-image:linear-gradient(transparent,#000 55%,transparent);mask-image:linear-gradient(transparent,#000 55%,transparent)}
+@keyframes grid{from{background-position-y:0}to{background-position-y:56px}}
+.aurora{position:absolute;top:-15%;right:-8%;width:62%;height:120%;z-index:0;pointer-events:none;background:radial-gradient(closest-side,rgba(255,45,79,.20),rgba(255,45,79,.05) 58%,transparent);filter:blur(34px);will-change:transform;animation:aur 9s ease-in-out infinite}
+@keyframes aur{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-7%,5%) scale(1.14)}}
+.marquee{overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg);padding:24px 0;position:relative;z-index:2}
+.mq-track{display:inline-flex;align-items:center;white-space:nowrap;will-change:transform;animation:mq 30s linear infinite;font:600 clamp(30px,5.4vw,72px)/1 var(--d);letter-spacing:-.02em}
+.mq-track span{padding:0 .32em;color:var(--t0)}
+.mq-track .o{color:transparent;-webkit-text-stroke:1.2px var(--acc)}
+.mq-track .dot{color:var(--acc);-webkit-text-stroke:0}
+@keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+#hero h1{font:600 clamp(46px,6.4vw,84px)/.95 var(--d);letter-spacing:-.025em;margin:22px 0 18px}
+#hero h1 .grad{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 30px rgba(255,45,79,.35))}
+.hero-cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:30px 0 30px}
+.btn{display:inline-flex;align-items:center;gap:10px;font:600 15px/1 var(--f);border-radius:12px;padding:15px 24px;cursor:pointer;border:none;transition:all .3s var(--ease);will-change:transform}
+.btn-primary{background:var(--acc);color:#fff;box-shadow:0 8px 30px var(--accdim)}
+.btn-primary:hover{background:var(--acc2);box-shadow:0 14px 44px var(--accglow)}
+.btn-ghost{background:var(--panel);color:var(--t0);border:1px solid var(--line2)}
+.btn-ghost:hover{background:var(--hover)}
+.hero-meta{display:flex;gap:30px;flex-wrap:wrap}
+.hm{display:flex;flex-direction:column;gap:5px}
+.hm b{font:600 22px/1 var(--m);color:var(--t0);letter-spacing:-.02em}
+.hm span{font:400 12px/1 var(--f);color:var(--t2)}
 
-.terminal{background:rgba(0,4,14,.9);border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden}
-.term-bar{background:rgba(0,3,10,.8);border-bottom:1px solid rgba(255,255,255,.05);padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
-.term-dots{display:flex;gap:5px}.term-dots span{width:9px;height:9px;border-radius:50%}
-.term-dots .d1{background:#ff5f57}.term-dots .d2{background:#febc2e}.term-dots .d3{background:#28c840}
-.term-id{font-size:10px;color:var(--c);font-family:var(--mono);letter-spacing:1px}
-.term-status{font-size:9px;color:var(--green);font-family:var(--mono);letter-spacing:.5px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);padding:2px 8px;border-radius:4px}
-.term-body{padding:12px 14px;font-family:var(--mono);font-size:11px;line-height:1.75;min-height:230px}
-.tl{display:flex;gap:8px}.ts{color:rgba(245,158,11,.2);min-width:40px;flex-shrink:0}.tm{flex:1}
-.tl.c .tm{color:var(--c)}.tl.g .tm{color:var(--green)}.tl.r .tm{color:var(--red)}
-.tl.y .tm{color:#fbbf24}.tl.w .tm{color:rgba(255,255,255,.65)}.tl.d .tm{color:rgba(255,255,255,.18)}
-.term-chart{height:72px;border-top:1px solid rgba(255,255,255,.04)}
-#miniChart{width:100%;height:100%}
-.term-footer{background:rgba(0,3,10,.5);border-top:1px solid rgba(255,255,255,.04);padding:8px 14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.tf-item{text-align:center}
-.tf-label{font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);margin-bottom:2px}
-.tf-val{font-size:12px;font-weight:700;font-family:var(--mono)}
+.terminal{background:var(--panel);border:1px solid var(--line2);border-radius:18px;overflow:hidden;box-shadow:0 40px 90px rgba(0,0,0,.6),0 0 0 1px rgba(255,45,79,.08),0 0 60px rgba(255,45,79,.08);animation:float 7s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.term-top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--bg1)}
+.term-id{display:flex;align-items:center;gap:9px;font:500 12px/1 var(--m);color:var(--t1)}
+.term-id .dot{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc);animation:pulse 1.7s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.term-live{font:500 10px/1 var(--m);color:var(--acc3);letter-spacing:.12em;border:1px solid rgba(255,45,79,.32);border-radius:5px;padding:4px 8px}
+.coin-row{display:flex;gap:6px;padding:10px 12px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--bg1);scrollbar-width:none}
+.coin-row::-webkit-scrollbar{display:none}
+.coin{flex-shrink:0;font:500 12px/1 var(--m);color:var(--t1);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;transition:all .2s}
+.coin:hover{color:var(--t0);border-color:var(--line2)}
+.coin.active{background:var(--accdim);border-color:var(--acc);color:var(--acc3)}
+.chart-host{height:clamp(340px,42vw,440px);background:var(--bg)}
+.chart-host>div{height:100%}
+.term-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid var(--line);background:var(--bg1);flex-wrap:wrap}
+.term-foot .note{font:400 11px/1.5 var(--m);color:var(--t2)}
+.term-foot .note b{color:var(--t1);font-weight:500}
 
-.stats-wrap{max-width:1160px;margin:0 auto;padding:0 36px 80px;position:relative;z-index:1}
-.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
-.stat{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:26px 16px;text-align:center;backdrop-filter:blur(10px);transition:all .25s;cursor:default}
-.stat:hover{background:rgba(255,255,255,.07);border-color:rgba(245,158,11,.2);transform:translateY(-4px);box-shadow:0 10px 32px rgba(245,158,11,.07)}
-.stat-val{font-size:clamp(24px,2.5vw,38px);font-weight:900;letter-spacing:-1.5px;margin-bottom:6px;font-family:var(--mono)}
-.stat-val.c{color:var(--c)}.stat-val.w{color:#fff}
-.stat-lbl{font-size:10px;color:var(--t3);font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+#trust{padding:26px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg1)}
+.trust-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.trust-lbl{font:400 12px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.1em}
+.trust-tag{font:600 14px/1 var(--f);color:var(--t1);letter-spacing:-.01em;opacity:.85;transition:color .2s,opacity .2s}
+.trust-tag:hover{color:var(--t0);opacity:1}
 
-.section{max-width:1160px;margin:0 auto;padding:0 36px 100px;position:relative;z-index:1}
-.ey{font-size:10px;font-weight:700;color:var(--c);letter-spacing:3px;text-transform:uppercase;font-family:var(--mono);margin-bottom:12px;display:block}
-.sh{font-size:clamp(30px,3.8vw,52px);font-weight:900;letter-spacing:-2px;margin-bottom:10px;line-height:1.05}
-.sh em{font-style:normal;color:var(--c)}
-.ss{font-size:15px;color:var(--t2);margin-bottom:48px;line-height:1.7}
-
-.proof-section{max-width:1160px;margin:0 auto;padding:0 36px 100px;position:relative;z-index:1}
-.proof-grid{display:grid;grid-template-columns:1fr 1.6fr;gap:60px;align-items:center}
-.tg-screen{background:rgba(16,24,32,.97);border-radius:18px;overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.05);max-width:320px}
-.tg-topbar{background:rgba(22,32,43,.95);padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.05)}
-.tg-avatar{width:36px;height:36px;border-radius:50%;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--c)}
-.tg-name{font-size:13px;font-weight:700;color:#fff}
-.tg-online{font-size:10px;color:var(--green)}
-.tg-msgs{padding:16px 14px;display:flex;flex-direction:column;gap:10px}
-.tg-bubble{background:rgba(22,34,48,.95);border-radius:12px 12px 12px 3px;padding:13px 16px;font-size:12.5px;line-height:1.75;color:#e8eaed;border:1px solid rgba(255,255,255,.05)}
-.tg-bubble.active{border-color:rgba(245,158,11,.14);background:rgba(16,28,42,.97)}
-.tb-row{display:flex;align-items:baseline;gap:6px;margin-bottom:2px}
-.tb-label{color:rgba(255,255,255,.36);font-size:11.5px}
-.tb-val{color:#fff;font-weight:700;font-size:12.5px}
-.tb-profit{color:var(--green);font-weight:800}
-.tb-time{font-size:10px;color:rgba(255,255,255,.18);text-align:right;margin-top:6px}
-.tb-title{font-size:13px;font-weight:800;color:var(--c);margin-bottom:8px}
-.tb-sep{height:1px;background:rgba(255,255,255,.05);margin:8px 0}
-.tg-badge{position:absolute;top:-8px;right:-8px;background:var(--c);color:#000;font-size:9px;font-weight:900;padding:3px 10px;border-radius:20px;letter-spacing:.5px;font-family:var(--mono)}
-.proof-copy .ey{color:var(--c);margin-bottom:10px}
-.proof-copy h2{font-size:clamp(28px,3.5vw,44px);font-weight:900;letter-spacing:-1.5px;line-height:1.1;margin-bottom:18px}
-.proof-copy h2 span{color:var(--c)}
-.proof-copy p{font-size:15px;color:var(--t2);line-height:1.85;margin-bottom:28px}
-.proof-pills{display:flex;flex-direction:column;gap:12px}
-.proof-pill{display:flex;align-items:flex-start;gap:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:16px 18px;transition:all .25s}
-.proof-pill:hover{background:rgba(255,255,255,.06);border-color:rgba(245,158,11,.14)}
-.proof-pill-ico{width:36px;height:36px;border-radius:10px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;color:var(--c)}
-.proof-pill h4{font-size:13px;font-weight:800;margin-bottom:4px}
-.proof-pill p{font-size:12px;color:var(--t2);line-height:1.6;margin:0}
-
-.chart-section{background:rgba(255,255,255,.015);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd);padding:80px 0;position:relative;z-index:1;overflow:hidden}
-.chart-glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:800px;height:400px;background:radial-gradient(ellipse,rgba(245,158,11,.03) 0%,transparent 70%);pointer-events:none}
-.chart-inner{max-width:1160px;margin:0 auto;padding:0 36px}
-.chart-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:16px}
-.chart-title-block .ey{color:var(--c);margin-bottom:8px}
-.chart-title-block h2{font-size:clamp(24px,3vw,38px);font-weight:900;letter-spacing:-1.5px}
-.chart-metrics{display:flex;gap:32px}
-.cm{text-align:right}
-.cm-val{font-size:20px;font-weight:900;font-family:var(--mono)}
-.cm-val.g{color:var(--green)}.cm-val.c{color:var(--c)}
-.cm-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
-.chart-canvas-wrap{background:rgba(0,3,12,.7);border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden}
-.chart-canvas-header{padding:12px 20px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between}
-.cch-pair{font-size:13px;font-weight:800;font-family:var(--mono);color:var(--c)}
-.cch-tf{font-size:10px;color:var(--t3);font-family:var(--mono);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);padding:2px 10px;border-radius:6px}
-#liveChart{width:100%;display:block}
-.chart-legend{padding:12px 20px;border-top:1px solid rgba(255,255,255,.05);display:flex;gap:20px;flex-wrap:wrap}
-.cl-item{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t3);font-family:var(--mono)}
-.cl-dot{width:10px;height:3px;border-radius:2px}
-
-.passive-section{max-width:1160px;margin:0 auto;padding:100px 36px;position:relative;z-index:1}
-.passive-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:56px}
-.passive-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:36px 30px;transition:all .3s}
-.passive-card:hover{transform:translateY(-6px);border-color:rgba(245,158,11,.18);box-shadow:0 18px 48px rgba(245,158,11,.05)}
-.passive-num{font-size:11px;font-weight:800;color:var(--c);letter-spacing:3px;font-family:var(--mono);margin-bottom:20px;text-transform:uppercase}
-.passive-ico{width:46px;height:46px;border-radius:13px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.18);display:flex;align-items:center;justify-content:center;margin-bottom:18px;color:var(--c)}
-.passive-card h3{font-size:19px;font-weight:900;letter-spacing:-.5px;margin-bottom:12px}
-.passive-card p{font-size:13px;color:var(--t2);line-height:1.8}
-.passive-tag{display:inline-block;font-size:10px;font-weight:700;color:var(--c);letter-spacing:1.5px;text-transform:uppercase;font-family:var(--mono);border:1px solid rgba(245,158,11,.2);background:rgba(245,158,11,.06);padding:4px 12px;border-radius:6px;margin-top:18px}
+.sec{padding:clamp(58px,7vw,96px) 0}
+.sec-head{max-width:620px;margin-bottom:44px}
+.sec-head .h2{margin:14px 0 14px}
+.center{text-align:center;margin-left:auto;margin-right:auto}
 
 .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.feat{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:32px;transition:all .3s;position:relative;overflow:hidden}
-.feat::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(245,158,11,.4),transparent);opacity:0;transition:opacity .3s}
-.feat:hover{transform:translateY(-5px);border-color:rgba(245,158,11,.16);box-shadow:0 16px 44px rgba(245,158,11,.05)}
-.feat:hover::after{opacity:1}
-.feat-tag{display:inline-block;font-size:9px;font-weight:700;color:var(--c);letter-spacing:2px;text-transform:uppercase;font-family:var(--mono);border:1px solid rgba(245,158,11,.2);background:rgba(245,158,11,.06);padding:3px 10px;border-radius:6px;margin-bottom:14px}
-.feat-icon{width:46px;height:46px;border-radius:13px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.18);display:flex;align-items:center;justify-content:center;margin-bottom:16px;color:var(--c)}
-.feat h3{font-size:16px;font-weight:800;margin-bottom:10px;letter-spacing:-.3px}
-.feat p{font-size:13px;color:var(--t2);line-height:1.75}
+@media(max-width:880px){.feat-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.feat-grid{grid-template-columns:1fr}}
+.feat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:26px;transition:transform .25s var(--ease),border-color .25s,background .25s;transform-style:preserve-3d}
+.feat:hover{border-color:rgba(255,45,79,.3);background:var(--panel2)}
+.feat-ico{width:44px;height:44px;border-radius:12px;background:var(--accdim);border:1px solid rgba(255,45,79,.26);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+.feat-ico svg{width:22px;height:22px;stroke:var(--acc2);fill:none;stroke-width:1.7}
+.feat h3{font:600 17px/1.3 var(--f);margin-bottom:9px;letter-spacing:-.02em}
+.feat p{font:400 14px/1.65 var(--f);color:var(--t1)}
 
-.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative}
-.steps::before{content:'';position:absolute;top:24px;left:12.5%;right:12.5%;height:1px;background:linear-gradient(90deg,transparent,rgba(245,158,11,.22),transparent)}
-.step{padding:0 20px;text-align:center}
-.step-n{width:48px;height:48px;border-radius:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--c);margin:0 auto 20px}
-.step h3{font-size:14px;font-weight:800;margin-bottom:8px}
-.step p{font-size:12px;color:var(--t2);line-height:1.7}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel)}
+@media(max-width:680px){.stats{grid-template-columns:1fr 1fr}}
+.stat{padding:30px 24px;text-align:center;border-right:1px solid var(--line)}
+.stat:last-child{border-right:none}
+.stat b{display:block;font:600 clamp(28px,3.6vw,40px)/1 var(--m);letter-spacing:-.03em;background:linear-gradient(120deg,var(--t0),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.stat span{font:400 12px/1.4 var(--f);color:var(--t2)}
 
-.price-wrap{max-width:540px;margin:0 auto}
-.price-card{background:rgba(0,5,15,.92);border:1px solid rgba(245,158,11,.16);border-radius:18px;overflow:hidden;box-shadow:0 0 60px rgba(245,158,11,.05)}
-.price-head{padding:40px 40px 32px;border-bottom:1px solid rgba(255,255,255,.05);position:relative;overflow:hidden}
-.price-head::before{content:'';position:absolute;top:-80px;right:-80px;width:240px;height:240px;background:radial-gradient(circle,rgba(245,158,11,.05) 0%,transparent 70%)}
-.price-badge{font-size:10px;font-weight:700;color:var(--c);letter-spacing:2px;text-transform:uppercase;font-family:var(--mono);margin-bottom:16px;display:block}
-.price-amount{font-size:88px;font-weight:900;letter-spacing:-4px;font-family:var(--mono);line-height:1;color:#fff;position:relative;z-index:1}
-.price-amount sup{font-size:38px;vertical-align:top;margin-top:18px;font-weight:700;color:var(--c)}
-.price-was{font-size:13px;color:var(--t3);text-decoration:line-through;margin-top:10px}
-.price-body{padding:36px 40px}
-.price-list{display:flex;flex-direction:column;gap:13px;margin-bottom:36px}
-.pi{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--t2)}
-.pi-ico{width:18px;height:18px;border-radius:50%;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--c)}
-.buy-btn{width:100%;background:var(--c);color:#000;font-size:15px;font-weight:900;padding:20px;border-radius:12px;border:none;cursor:pointer;letter-spacing:.3px;text-transform:uppercase;transition:all .25s;display:block;text-align:center;box-shadow:0 6px 28px rgba(245,158,11,.22)}
-.buy-btn:hover{box-shadow:0 10px 42px rgba(245,158,11,.38);transform:translateY(-2px);opacity:.93}
-.buy-meta{text-align:center;font-size:11px;color:var(--t3);margin-top:16px;font-family:var(--mono)}
+/* TELEGRAM CONTROL */
+#telegram{background:var(--bg1);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.tg-wrap{display:grid;grid-template-columns:360px 1fr;gap:clamp(32px,4vw,60px);align-items:center}
+@media(max-width:880px){.tg-wrap{grid-template-columns:1fr;gap:40px}}
+.phone{width:300px;max-width:100%;margin:0 auto;background:#0e0e12;border:1px solid var(--line2);border-radius:34px;padding:12px;box-shadow:0 40px 90px rgba(0,0,0,.6),0 0 60px rgba(42,171,238,.08);position:relative}
+.phone-notch{width:120px;height:22px;background:#000;border-radius:0 0 14px 14px;margin:0 auto 8px}
+.phone-screen{background:#0b1622;border-radius:24px;overflow:hidden;height:520px;display:flex;flex-direction:column}
+.tg-top{display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(180deg,#17212b,#0e1620);border-bottom:1px solid rgba(255,255,255,.05)}
+.tg-av{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#7a1020);display:flex;align-items:center;justify-content:center;font:600 14px/1 var(--f);color:#fff}
+.tg-top b{font:600 14px/1.2 var(--f);color:#fff;display:block}
+.tg-top span{font:400 11px/1.2 var(--f);color:#5a86a8}
+.tg-chat{flex:1;padding:16px 14px;display:flex;flex-direction:column;gap:9px;overflow:hidden;background:#0b1622}
+.bub{max-width:80%;padding:9px 13px;border-radius:14px;font:400 13px/1.45 var(--f);white-space:pre-line;opacity:0;transform:translateY(8px);animation:bubIn .4s var(--ease) forwards}
+.bub.me{align-self:flex-end;background:linear-gradient(135deg,#2b5278,#3a6ea5);color:#fff;border-bottom-right-radius:5px;font-family:var(--m);font-size:12px}
+.bub.bot{align-self:flex-start;background:#1c2733;color:#e6edf3;border-bottom-left-radius:5px}
+@keyframes bubIn{to{opacity:1;transform:none}}
+.tg-input{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#17212b;border-top:1px solid rgba(255,255,255,.05)}
+.tg-input .box{flex:1;background:#0b1622;border-radius:18px;padding:9px 14px;font:400 12px/1 var(--f);color:#5a86a8}
+.tg-input .snd{width:30px;height:30px;border-radius:50%;background:var(--tg);display:flex;align-items:center;justify-content:center}
+.cmd-list{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px}
+@media(max-width:560px){.cmd-list{grid-template-columns:1fr}}
+.cmd{display:flex;gap:12px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;transition:border-color .2s,background .2s}
+.cmd:hover{border-color:rgba(255,45,79,.3);background:var(--panel2)}
+.cmd code{font:600 13px/1.2 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:6px;padding:3px 8px;white-space:nowrap;flex-shrink:0}
+.cmd span{font:400 13px/1.5 var(--f);color:var(--t1)}
 
-.faq-list{display:flex;flex-direction:column;gap:8px;max-width:780px;margin:0 auto}
-.faq-item{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:13px;overflow:hidden;transition:border-color .2s}
-.faq-item.open{border-color:rgba(245,158,11,.18)}
-.faq-q{padding:20px 24px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:700;user-select:none;transition:background .2s}
-.faq-q:hover{background:rgba(255,255,255,.03)}
-.faq-ico{color:var(--c);font-size:18px;transition:transform .3s;font-family:var(--mono);flex-shrink:0}
-.faq-item.open .faq-ico{transform:rotate(45deg)}
-.faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease}
-.faq-item.open .faq-a{max-height:220px}
-.faq-ans{padding:0 24px 20px;font-size:13px;color:var(--t2);line-height:1.8;border-top:1px solid rgba(255,255,255,.04)}
+/* VIDEO */
+.vid-wrap{display:grid;grid-template-columns:1.4fr 1fr;gap:clamp(28px,4vw,48px);align-items:center}
+@media(max-width:880px){.vid-wrap{grid-template-columns:1fr}}
+.vid-frame{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line2);background:#000;box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 50px rgba(255,45,79,.06);aspect-ratio:16/9}
+.vid-frame video{width:100%;height:100%;object-fit:cover;display:block;background:#000}
+.vid-poster{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:radial-gradient(circle at 50% 40%,rgba(255,45,79,.16),transparent 60%),var(--panel);cursor:pointer;transition:opacity .4s}
+.vid-poster.hide{opacity:0;pointer-events:none}
+.vid-play{width:72px;height:72px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;box-shadow:0 12px 40px var(--accglow);transition:transform .3s var(--ease)}
+.vid-poster:hover .vid-play{transform:scale(1.08)}
+.vid-play svg{width:28px;height:28px;fill:#fff;margin-left:4px}
+.vid-poster b{font:600 16px/1.3 var(--d);color:var(--t0)}
+.vid-poster span{font:400 12px/1 var(--m);color:var(--t2);letter-spacing:.1em;text-transform:uppercase}
+.vsteps{list-style:none;display:flex;flex-direction:column;gap:6px}
+.vstep{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+.vstep:last-child{border-bottom:none}
+.vstep b{flex-shrink:0;width:28px;height:28px;border-radius:8px;background:var(--accdim);border:1px solid rgba(255,45,79,.26);color:var(--acc3);font:600 13px/28px var(--m);text-align:center}
+.vstep div{font:400 14px/1.55 var(--f);color:var(--t1)}
+.vstep div strong{color:var(--t0);font-weight:600}
 
-.foot{max-width:1160px;margin:0 auto;padding:40px 36px 60px;border-top:1px solid var(--bd);position:relative;z-index:1}
-.foot p{font-size:11px;color:var(--t3);line-height:1.8}
-.foot a{color:var(--t3);border-bottom:1px solid rgba(255,255,255,.07)}.foot a:hover{color:var(--c)}
-.foot-warn{background:rgba(239,68,68,.03);border:1px solid rgba(239,68,68,.09);border-radius:12px;padding:16px 20px;margin-bottom:20px}
-.foot-warn p{color:rgba(239,100,100,.45)}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+@media(max-width:880px){.steps{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.steps{grid-template-columns:1fr}}
+.step{padding:28px 24px;border-right:1px solid var(--line);background:var(--panel)}
+.step:last-child{border-right:none}
+.step-n{font:500 13px/1 var(--m);color:var(--acc);margin-bottom:14px}
+.step h3{font:600 16px/1.3 var(--f);margin-bottom:8px;letter-spacing:-.02em}
+.step p{font:400 13px/1.6 var(--f);color:var(--t1)}
 
-.sticky{position:fixed;bottom:0;left:0;right:0;background:rgba(5,8,20,.97);border-top:1px solid rgba(255,255,255,.07);backdrop-filter:blur(28px);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;z-index:150;transform:translateY(100%);transition:transform .4s}
-.sticky.show{transform:translateY(0)}
-.st-price{font-size:24px;font-weight:900;font-family:var(--mono);color:var(--c)}
-.st-was{font-size:12px;color:var(--t3);text-decoration:line-through;margin-left:10px;vertical-align:middle}
-.st-info{font-size:11px;color:var(--t3);font-family:var(--mono);margin-top:3px}
-.st-btn{background:var(--c);color:#000;font-size:13px;font-weight:900;padding:14px 28px;border-radius:10px;letter-spacing:.5px;text-transform:uppercase;border:none;cursor:pointer;transition:all .2s;box-shadow:0 4px 18px rgba(245,158,11,.22)}
-.st-btn:hover{box-shadow:0 4px 32px rgba(245,158,11,.4);transform:translateY(-1px)}
+.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:880px){.tgrid{grid-template-columns:1fr}}
+.tcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:26px;transition:transform .25s var(--ease),border-color .25s}
+.tcard:hover{border-color:rgba(255,45,79,.3)}
+.tstars{color:var(--acc);font:500 14px/1 var(--m);letter-spacing:2px;margin-bottom:14px}
+.tcard p{font:400 15px/1.6 var(--f);color:var(--t0);margin-bottom:18px}
+.tmeta{display:flex;align-items:center;gap:11px}
+.tav{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#7a1020);display:flex;align-items:center;justify-content:center;font:600 14px/1 var(--f);color:#fff}
+.tmeta b{font:600 13px/1.2 var(--f);display:block}
+.tmeta span{font:400 12px/1.2 var(--f);color:var(--t2)}
 
-#apexModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(5,8,20,.88);backdrop-filter:blur(24px)}
+#pricing{background:var(--bg1);border-top:1px solid var(--line);border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+.price-wrap{display:grid;grid-template-columns:1fr 384px;gap:clamp(28px,4vw,52px);align-items:center}
+@media(max-width:880px){.price-wrap{grid-template-columns:1fr}}
+.price-list{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
+@media(max-width:560px){.price-list{grid-template-columns:1fr}}
+.price-list li{display:flex;align-items:flex-start;gap:10px;font:400 14px/1.5 var(--f);color:var(--t1)}
+.price-list li svg{width:18px;height:18px;stroke:var(--acc);fill:none;stroke-width:2.4;flex-shrink:0;margin-top:1px}
+.price-card{background:linear-gradient(165deg,var(--panel2),var(--panel));border:1px solid var(--line2);border-radius:20px;padding:34px;box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 50px rgba(255,45,79,.06);position:relative;overflow:hidden}
+.price-card::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:120%;background:radial-gradient(circle,rgba(255,45,79,.16),transparent 64%);pointer-events:none}
+.price-badge{display:inline-flex;align-items:center;gap:6px;font:500 10px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.3);border-radius:100px;padding:5px 11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:18px;position:relative}
+.price-amt{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;position:relative}
+.price-amt .now{font:600 64px/1 var(--d);letter-spacing:-.03em}
+.price-amt .was{font:400 20px/1 var(--m);color:var(--t2);text-decoration:line-through}
+.price-sub{font:400 13px/1.5 var(--m);color:var(--t2);margin-bottom:24px;position:relative}
+.price-card .btn{width:100%;justify-content:center;font-size:16px;padding:16px;position:relative}
+.price-fine{font:400 11px/1.6 var(--m);color:var(--t2);text-align:center;margin-top:14px;position:relative}
+
+.faq{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.fq+.fq{border-top:1px solid var(--line)}
+.fq-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 24px;font:600 15px/1.4 var(--f);color:var(--t0);background:var(--panel);border:none;cursor:pointer;text-align:left;letter-spacing:-.01em;transition:color .2s}
+.fq-q:hover{color:var(--acc3)}
+.fq-ic{font:400 20px/1 var(--m);color:var(--t2);transition:transform .3s var(--ease);flex-shrink:0}
+.fq-q.open .fq-ic{transform:rotate(45deg);color:var(--acc)}
+.fq-a{display:none;padding:0 24px 20px;font:400 14px/1.7 var(--f);color:var(--t1);background:var(--panel)}
+.fq-a.open{display:block}
+
+#final{text-align:center;padding:clamp(64px,8vw,104px) 0;position:relative;overflow:hidden}
+#final .h2{font-size:clamp(32px,4vw,52px);margin-bottom:16px}
+#final p{font:400 16px/1.6 var(--f);color:var(--t1);max-width:480px;margin:0 auto 30px}
+
+footer{border-top:1px solid var(--line);padding:34px 0;font:400 12px/1.7 var(--f);color:var(--t2)}
+footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+footer .disc{max-width:560px}
+
+.rv{opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.rv.in{opacity:1;transform:none}
+.lg1{stop-color:#7a1020}.lg2{stop-color:#ff5c74}
+
+/* CHECKOUT MODAL */
+#apexModal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(3,3,5,.82);backdrop-filter:blur(8px)}
 #apexModal.open{display:flex}
-.am-card{background:#080d18;border:1px solid rgba(245,158,11,.16);border-radius:18px;width:100%;max-width:448px;position:relative;overflow:hidden;box-shadow:0 0 60px rgba(245,158,11,.06),0 40px 120px rgba(0,0,0,.85)}
-.am-close{position:absolute;top:14px;right:18px;background:none;border:none;color:var(--t3);font-size:24px;cursor:pointer;font-family:var(--mono);z-index:2;transition:color .2s;line-height:1}
-.am-close:hover{color:#fff}
-.am-head{padding:26px 28px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
-.am-tag{font-size:9px;font-weight:700;color:var(--c);letter-spacing:2.5px;text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;display:block}
-.am-title{font-size:22px;font-weight:900;letter-spacing:-.5px}
-.am-price{display:flex;align-items:baseline;gap:10px;margin-top:6px}
-.am-amount{font-size:32px;font-weight:900;color:var(--c);font-family:var(--mono)}
-.am-was{font-size:14px;color:var(--t3);text-decoration:line-through}
-.am-body{padding:20px 28px}
+.am-card{width:100%;max-width:430px;max-height:94vh;overflow-y:auto;background:linear-gradient(165deg,var(--panel2),var(--panel));border:1px solid var(--line2);border-radius:20px;position:relative;box-shadow:0 40px 100px rgba(0,0,0,.7),0 0 60px rgba(255,45,79,.08);scrollbar-width:none}
+.am-card::-webkit-scrollbar{display:none}
+.am-close{position:absolute;top:14px;right:16px;width:30px;height:30px;border-radius:50%;background:var(--panel);border:1px solid var(--line2);color:var(--t1);font-size:18px;cursor:pointer;z-index:2;transition:all .2s}
+.am-close:hover{color:var(--t0);border-color:var(--line2);background:var(--hover)}
+.am-head{padding:30px 30px 18px;border-bottom:1px solid var(--line);text-align:center}
+.am-tag{display:inline-block;font:500 10px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.3);border-radius:100px;padding:5px 11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
+.am-title{font:600 22px/1.1 var(--d);letter-spacing:-.02em;margin-bottom:8px}
+.am-price{font:600 38px/1 var(--d);color:var(--t0)}
+.am-body{padding:24px 30px 30px}
 .am-field{margin-bottom:14px}
-.am-label{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;font-family:var(--mono)}
-.am-input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:12px 14px;font-size:14px;color:#fff;font-family:'Inter',sans-serif;transition:border-color .2s;outline:none}
-.am-input:focus{border-color:rgba(245,158,11,.38);background:rgba(245,158,11,.03)}
-#am-card-element{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:12px 14px;transition:border-color .2s}
-#am-card-element.StripeElement--focus{border-color:rgba(245,158,11,.38)}
-#am-card-error{font-size:11px;color:var(--red);margin-top:5px;min-height:14px;font-family:var(--mono)}
-.am-checks{display:flex;flex-direction:column;gap:10px;margin:14px 0}
-.am-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
-.am-check input[type=checkbox]{width:15px;height:15px;flex-shrink:0;margin-top:2px;accent-color:var(--c);cursor:pointer}
-.am-check-txt{font-size:11px;color:var(--t2);line-height:1.6}
-.am-check-txt a{color:var(--c);text-decoration:underline}
-.am-submit{width:100%;background:var(--c);color:#000;font-size:13px;font-weight:900;padding:16px;border-radius:10px;border:none;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;box-shadow:0 4px 18px rgba(245,158,11,.18)}
-.am-submit:hover:not(:disabled){box-shadow:0 4px 32px rgba(245,158,11,.36);transform:translateY(-1px)}
-.am-submit:disabled{opacity:.35;cursor:not-allowed}
-.am-spinner{width:14px;height:14px;border:2px solid rgba(0,0,0,.25);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;display:none}
-@keyframes spin{to{transform:rotate(360deg)}}
-.am-note{font-size:10px;color:var(--t3);text-align:center;margin-top:12px;font-family:var(--mono)}
-.am-success{padding:48px 28px;text-align:center;display:none}
-.am-success-icon{margin-bottom:18px;color:var(--c);display:flex;justify-content:center}
-.am-success h3{font-size:24px;font-weight:900;margin-bottom:10px;color:var(--c)}
-.am-success p{font-size:13px;color:var(--t2);line-height:1.8}
-.am-wallets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
-.am-wallet-btn{background:#1a1a1a;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px 8px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:all .2s;font-size:12px;font-weight:700;color:#fff}
-.am-wallet-btn:hover{background:#222;border-color:rgba(255,255,255,.2);transform:translateY(-1px)}
-.am-separator{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--t3);font-size:11px}
-.am-separator::before,.am-separator::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07)}
+.am-label{display:block;font:500 11px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px}
+.am-input{width:100%;background:var(--bg1);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;font:400 14px/1.2 var(--f);color:var(--t0);transition:border-color .2s;outline:none}
+.am-input:focus{border-color:var(--acc)}
+.am-input::placeholder{color:var(--t2)}
+.stripe-el{background:var(--bg1);border:1px solid var(--line2);border-radius:10px;padding:13px 14px;transition:border-color .2s}
+.stripe-el.focused{border-color:var(--acc)}
 .am-card-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.stripe-el{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:12px 14px;transition:border-color .2s}
-.stripe-el.focused{border-color:rgba(245,158,11,.38)}
-
-@media(max-width:1000px){
-  .hero{grid-template-columns:1fr;gap:40px;padding-top:100px}
-  .hero h1{font-size:clamp(38px,7vw,58px)}
-  .hero-right{display:none}
-  .stats{grid-template-columns:repeat(3,1fr)}
-  .proof-grid{grid-template-columns:1fr}
-  .tg-screen{max-width:100%}
-  .passive-grid{grid-template-columns:1fr}
-  .feat-grid{grid-template-columns:repeat(2,1fr)}
-  .steps{grid-template-columns:repeat(2,1fr);gap:24px}
-  .steps::before{display:none}
-  .chart-metrics{display:none}
-}
-@media(max-width:600px){
-  .nav-links{display:none}
-  .flash{flex-direction:column;gap:6px;text-align:center}
-  .stats{grid-template-columns:repeat(2,1fr)}
-  .feat-grid{grid-template-columns:1fr}
-  .steps{grid-template-columns:1fr!important;gap:24px!important}
-  .price-amount{font-size:70px}
-  .price-head,.price-body{padding:28px}
-  .section,.passive-section,.proof-section{padding-left:20px;padding-right:20px}
-  .hero,.stats-wrap{padding-left:20px;padding-right:20px}
-}
+#am-card-error{font:400 11px/1.4 var(--m);color:var(--acc2);margin-top:7px;min-height:14px}
+.am-wallets{display:grid;gap:8px;margin-bottom:14px}
+.am-wallet-btn{background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .2s;font:600 13px/1 var(--f);color:var(--t0)}
+.am-wallet-btn:hover{background:var(--hover);border-color:var(--line2)}
+.am-separator{display:flex;align-items:center;gap:10px;margin:6px 0 16px;color:var(--t2);font:400 11px/1 var(--m)}
+.am-separator::before,.am-separator::after{content:'';flex:1;height:1px;background:var(--line)}
+.am-checks{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+.am-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+.am-check input{width:15px;height:15px;flex-shrink:0;margin-top:2px;accent-color:var(--acc);cursor:pointer}
+.am-check-txt{font:400 11px/1.55 var(--f);color:var(--t1)}
+.am-check-txt a{color:var(--acc3);text-decoration:underline}
+.am-submit{width:100%;background:var(--acc);color:#fff;font:600 15px/1 var(--f);padding:16px;border-radius:12px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;transition:all .25s var(--ease);box-shadow:0 8px 30px var(--accdim)}
+.am-submit:hover:not(:disabled){background:var(--acc2);box-shadow:0 12px 40px var(--accglow)}
+.am-submit:disabled{opacity:.4;cursor:not-allowed}
+.am-spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.am-note{font:400 10px/1.4 var(--m);color:var(--t2);text-align:center;margin-top:12px}
+.am-success{padding:44px 30px;text-align:center;display:none}
+.am-success-icon{margin-bottom:18px;color:var(--up);display:flex;justify-content:center}
+.am-success h3{font:600 24px/1.1 var(--d);margin-bottom:10px}
+.am-success p{font:400 13px/1.7 var(--f);color:var(--t1)}
+.am-tg-btn{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--tg);color:#fff;font:600 15px/1 var(--f);padding:15px 20px;border-radius:12px;text-decoration:none;margin-bottom:10px;transition:all .25s var(--ease);box-shadow:0 8px 30px rgba(42,171,238,.25)}
+.am-tg-btn:hover{background:#3bb6f0;box-shadow:0 12px 40px rgba(42,171,238,.45)}
+.am-cfg-btn{display:flex;align-items:center;justify-content:center;background:var(--panel);color:var(--t0);font:600 13px/1 var(--f);padding:12px 20px;border-radius:12px;border:1px solid var(--line2);text-decoration:none;transition:all .2s}
+.am-cfg-btn:hover{background:var(--hover)}
 </style>
-</head>
 <body>
-<div class="bg-radial"></div>
-<div class="bg-grid"></div>
-<div class="blur-orb orb1" id="orb1"></div>
-<div class="blur-orb orb2" id="orb2"></div>
 
-<div class="flash">
-  <span class="flash-txt">Launch price ends in</span>
-  <span class="flash-cd" id="countdown">--:--:--</span>
-  <span class="flash-sep">·</span>
-  <span class="flash-tag">Lifetime access · No subscription</span>
-</div>
+<div id="glow"></div>
 
+<!-- TICKER -->
+<div id="tape"><div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div></div></div>
+
+<!-- NAV -->
 <nav>
-  <div class="nav-inner">
-    <div class="logo"><span class="logo-pulse"></span>APEX<span style="color:var(--c)">.</span>BOT</div>
-    <div class="nav-links">
-      <a href="#proof">Live Proof</a>
-      <a href="#features">Features</a>
-      <a href="#pricing">Pricing</a>
-      <a href="#faq">FAQ</a>
-    </div>
-    <a href="#pricing" class="nav-cta">Get Access — $297</a>
+  <a href="#" class="brand" aria-label="Home">
+    <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <defs><linearGradient id="cg" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse">
+        <stop class="lg1"/><stop offset="1" class="lg2"/></linearGradient></defs>
+      <rect x="3" y="19" width="5" height="10" rx="2.5" fill="url(#cg)" opacity=".45"/>
+      <rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="url(#cg)" opacity=".72"/>
+      <rect x="20" y="6" width="5" height="23" rx="2.5" fill="url(#cg)"/>
+      <circle cx="22.5" cy="5" r="3.1" fill="#ff5c74"/>
+    </svg>
+    <span class="brand-name">Apex&nbsp;Bot</span>
+  </a>
+  <div class="nav-links">
+    <a href="#markets">Live Markets</a>
+    <a href="#features">Features</a>
+    <a href="#telegram">Telegram</a>
+    <a href="#video">Setup Video</a>
+    <a href="#pricing">Pricing</a>
   </div>
+  <button class="nav-cta" onclick="openApexModal()">Get Access — $297</button>
 </nav>
 
-<div class="hero-wrap">
-  <div class="hero-glow"></div>
-  <div class="hero">
-    <div class="hero-copy">
-      <div class="hero-label">
-        <div class="hero-label-dot"></div>
-        AI System Online · Trading Now
-      </div>
-      <h1>The machine that<br>trades while<br><em>you sleep.</em></h1>
-      <p class="hero-sub">Apex Bot runs 24/7 on Bybit, scanning 5 crypto pairs every 5 minutes with strategies from Turtle Trading, Livermore, Soros and PTJ. AI validates every signal. Telegram alerts you. You just watch.</p>
-      <button onclick="openApexModal()" class="btn-main">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3L4 14h7v7l9-11h-7V3z"/></svg>
-        Deploy Apex Bot — $297
-      </button>
-      <div class="hero-meta">
-        <span><span class="dot-ok"></span>Paper trading included</span>
-        <span><span class="dot-ok"></span>No coding needed</span>
-        <span><span class="dot-ok"></span>Live in 10 min</span>
-      </div>
-    </div>
-    <div class="hero-right">
-      <div class="glass-card">
-        <div class="gc-top">
-          <div class="gc-title">Live Performance</div>
-          <div class="gc-live"><div class="gc-live-dot"></div>LIVE</div>
-        </div>
-        <div class="terminal">
-          <div class="term-bar">
-            <div class="term-dots"><span class="d1"></span><span class="d2"></span><span class="d3"></span></div>
-            <div class="term-id">APEX-BOT v3.0</div>
-            <div class="term-status">● RUNNING</div>
-          </div>
-          <div class="term-body" id="termBody"></div>
-          <div class="term-chart"><canvas id="miniChart"></canvas></div>
-          <div class="term-footer">
-            <div class="tf-item"><div class="tf-label">Balance</div><div class="tf-val" id="tfBal" style="color:var(--c)">$10.00</div></div>
-            <div class="tf-item"><div class="tf-label">PnL</div><div class="tf-val" id="tfPnl" style="color:var(--green)">+0.0%</div></div>
-            <div class="tf-item"><div class="tf-label">Mode</div><div class="tf-val" style="color:var(--warn)">PAPER</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="stats-wrap">
-  <div class="stats">
-    <div class="stat"><div class="stat-val c">5</div><div class="stat-lbl">Top Pairs</div></div>
-    <div class="stat"><div class="stat-val c">6</div><div class="stat-lbl">Indicators</div></div>
-    <div class="stat"><div class="stat-val w">5m</div><div class="stat-lbl">Every Scan</div></div>
-    <div class="stat"><div class="stat-val w">$10</div><div class="stat-lbl">Min Start</div></div>
-    <div class="stat"><div class="stat-val c">24/7</div><div class="stat-lbl">Never Stops</div></div>
-  </div>
-</div>
-
-<div id="proof" class="proof-section">
-  <div class="proof-grid">
-    <div>
-      <div class="tg-screen" style="position:relative">
-        <div class="tg-topbar">
-          <div class="tg-avatar">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-          </div>
-          <div>
-            <div class="tg-name">Apex Trade Alerts</div>
-            <div class="tg-online">● online</div>
-          </div>
-        </div>
-        <div class="tg-msgs">
-          <div class="tg-bubble" style="opacity:.42;transform:scale(.97);transform-origin:left">
-            <div class="tb-title" style="font-size:12px">APEX BOT — <span style="color:var(--green)">ACTIVE</span> (tick #18)</div>
-            <div class="tb-row"><span class="tb-label">Balance:</span><span class="tb-val">$100.0000</span></div>
-            <div class="tb-row"><span class="tb-label">No open position</span></div>
-            <div class="tb-time">21:31</div>
-          </div>
-          <div class="tg-bubble active" style="position:relative">
-            <div class="tb-title">APEX BOT — <span style="color:var(--green)">ACTIVE</span> (tick #24)</div>
-            <div class="tb-sep"></div>
-            <div class="tb-row"><span class="tb-label">Balance:</span><span class="tb-val" style="color:var(--green);font-weight:900">$126.4000</span></div>
-            <div class="tb-row"><span class="tb-label">SHORT</span><span class="tb-val">SOLUSDT @ $85.28</span></div>
-            <div class="tb-row"><span class="tb-label">PnL:</span><span class="tb-profit">+$26.40 (+26.4%)</span></div>
-            <div class="tb-sep"></div>
-            <div class="tb-row"><span class="tb-label">SL:</span><span class="tb-val">$85.96</span><span class="tb-label" style="margin-left:8px">TP:</span><span class="tb-val">$83.91</span></div>
-            <div class="tb-time">22:01</div>
-            <div class="tg-badge">LIVE</div>
-          </div>
-          <div style="background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.15);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;margin-top:2px">
-            <div style="width:30px;height:30px;border-radius:8px;background:rgba(16,185,129,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--green)"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-            </div>
-            <div>
-              <div style="font-size:11px;font-weight:900;color:var(--green)">$100 → $126.40 · fully automated</div>
-              <div style="font-size:10px;color:rgba(255,255,255,.28);margin-top:2px">No manual input. Bot scanned, entered and tracked the trade.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="proof-copy">
-      <p class="ey">// LIVE BOT OUTPUT</p>
-      <h2>$100 started.<br><span>$126.40 in one session.</span></h2>
-      <p>This is what it looks like on your phone. Every 5 minutes the bot reports — balance, position, PnL, SL/TP. You watch. The bot works.</p>
-      <div style="background:rgba(16,185,129,.04);border:1px solid rgba(16,185,129,.12);border-radius:14px;padding:22px 24px;margin-bottom:28px;display:flex;align-items:center;gap:20px">
-        <div style="font-size:44px;font-weight:900;color:var(--green);font-family:var(--mono);letter-spacing:-2px;line-height:1">+26.4%</div>
-        <div>
-          <div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:4px">One automated session</div>
-          <div style="font-size:11px;color:rgba(255,255,255,.32);line-height:1.5">$100 starting balance<br>No manual input — bot handled everything<br>SHORT SOLUSDT · closed automatically</div>
-        </div>
-      </div>
-      <div class="proof-pills">
-        <div class="proof-pill">
-          <div class="proof-pill-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-          <div><h4>Heartbeat every 5 minutes</h4><p>Even when no trade is taken, the bot sends a status ping. You always know it's alive.</p></div>
-        </div>
-        <div class="proof-pill">
-          <div class="proof-pill-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-          <div><h4>Entry, SL and TP on every alert</h4><p>Every alert includes the exact entry, stop-loss and take-profit. Full transparency.</p></div>
-        </div>
-        <div class="proof-pill">
-          <div class="proof-pill-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-          <div><h4>Start in Paper mode — zero risk</h4><p>The bot runs in simulation first. Real signals with fake money before going live.</p></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="chart-section">
-  <div class="chart-glow"></div>
-  <div class="chart-inner">
-    <div class="chart-header">
-      <div class="chart-title-block">
-        <p class="ey">// PRICE ACTION + SIGNALS</p>
-        <h2>Real signals. Real entries.</h2>
-        <p style="font-size:11px;color:rgba(245,158,11,.45);font-family:var(--mono);margin-top:8px">Simulated paper trading demo — not real performance data</p>
-      </div>
-      <div class="chart-metrics">
-        <div class="cm"><div class="cm-val g" id="cmPnl">+2.4%</div><div class="cm-lbl">Demo PnL</div></div>
-        <div class="cm"><div class="cm-val c">PAPER</div><div class="cm-lbl">Mode</div></div>
-        <div class="cm"><div class="cm-val g">LIVE</div><div class="cm-lbl">Chart Feed</div></div>
-      </div>
-    </div>
-    <div class="chart-canvas-wrap">
-      <div class="chart-canvas-header">
-        <span class="cch-pair">ADAUSDT · Bybit</span>
-        <span class="cch-tf">5m · PAPER</span>
-      </div>
-      <canvas id="liveChart" height="220"></canvas>
-      <div class="chart-legend">
-        <div class="cl-item"><div class="cl-dot" style="background:var(--green)"></div>Price up / <div class="cl-dot" style="background:var(--red);margin-left:4px"></div>Price down</div>
-        <div class="cl-item"><div class="cl-dot" style="background:var(--green)"></div>BUY signal</div>
-        <div class="cl-item"><div class="cl-dot" style="background:var(--red)"></div>SHORT signal</div>
-        <div class="cl-item"><div class="cl-dot" style="background:rgba(245,158,11,.6);height:1px"></div>Stop Loss</div>
-        <div class="cl-item"><div class="cl-dot" style="background:rgba(16,185,129,.35);height:1px"></div>Take Profit</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="passive-section">
-  <div style="text-align:center">
-    <span class="ey" style="display:block;text-align:center">// THE WHOLE POINT</span>
-    <h2 class="sh" style="text-align:center;font-size:clamp(34px,4.5vw,58px)">Deploy once.<br><em>Never babysit it again.</em></h2>
-    <p class="ss" style="max-width:560px;margin:12px auto 0;text-align:center">You're not here to watch charts 12 hours a day. Set it up in 10 minutes, let it run forever.</p>
-  </div>
-  <div class="passive-grid">
-    <div class="passive-card">
-      <div class="passive-num">01 · SETUP</div>
-      <div class="passive-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-      <h3>10-minute deploy</h3>
-      <p>Fork the repo, paste 5 variables into Railway, done. No server knowledge. No terminal. No downloads. The bot runs in the cloud — forever.</p>
-      <span class="passive-tag">One-click deploy</span>
-    </div>
-    <div class="passive-card">
-      <div class="passive-num">02 · RUNNING</div>
-      <div class="passive-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg></div>
-      <h3>24/7 — zero intervention</h3>
-      <p>While you sleep, work, travel — Apex scans 5 pairs every 5 minutes. It opens trades, manages risk, hits stop-losses automatically.</p>
-      <span class="passive-tag">Fully autonomous</span>
-    </div>
-    <div class="passive-card">
-      <div class="passive-num">03 · ALERTS</div>
-      <div class="passive-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
-      <h3>Telegram notifies you</h3>
-      <p>Every trade, every result, every heartbeat arrives as a Telegram message. You're informed without being involved. Check from your phone in 10 seconds.</p>
-      <span class="passive-tag">Real-time alerts</span>
-    </div>
-  </div>
-</div>
-
-<section class="section" id="features">
-  <span class="ey">// SYSTEM SPECS</span>
-  <h2 class="sh">Built different.</h2>
-  <p class="ss">Every component engineered for reliability, not marketing.</p>
-  <div class="feat-grid">
-    <div class="feat">
-      <span class="feat-tag">AI ENGINE</span>
-      <div class="feat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v2h1a3 3 0 0 1 0 6h-1v2a4 4 0 0 1-8 0v-2H7a3 3 0 0 1 0-6h1V6a4 4 0 0 1 4-4z"/></svg></div>
-      <h3>Groq Llama 3.3 70B AI</h3>
-      <p>Groq Llama 3.3 70B analyzes every signal for confirmation (14,400 req/day free). The bot never executes without AI validation.</p>
-    </div>
-    <div class="feat">
-      <span class="feat-tag">STRATEGY</span>
-      <div class="feat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
-      <h3>Legendary Traders Engine</h3>
-      <p>Turtle breakout detection, Livermore market structure, Soros momentum reflexivity, PTJ daily loss limits. 6 indicators: RSI, MACD, BB, ATR, EMA, Volume.</p>
-    </div>
-    <div class="feat">
-      <span class="feat-tag">RISK</span>
-      <div class="feat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-      <h3>Defense-First Risk System</h3>
-      <p>Auto-stop after 3 consecutive losses (Seykota rule). Daily loss limit at -3% (PTJ rule). Trend-conflict filter (Livermore). Rules, not guesswork.</p>
-    </div>
-    <div class="feat">
-      <span class="feat-tag">EXCHANGE</span>
-      <div class="feat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
-      <h3>Bybit — Global Access</h3>
-      <p>Primary: Bybit. Works globally including EU. Switch exchange with one environment variable — no code edits. Full API key support.</p>
-    </div>
-    <div class="feat">
-      <span class="feat-tag">TELEGRAM</span>
-      <div class="feat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.9 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.81 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9a16 16 0 0 0 6 6l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
-      <h3>Real-Time Mobile Alerts</h3>
-      <p>Every trade, every heartbeat, every stop-loss — instant Telegram notification. Track the bot from your phone without opening any dashboard.</p>
-    </div>
-    <div class="feat">
-      <span class="feat-tag">DEPLOY</span>
-      <div class="feat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
-      <h3>Railway Cloud Deploy</h3>
-      <p>Full Node.js source code. Railway deploy included. No server knowledge required. Railway Hobby plan ~$5/month for 24/7 uptime.</p>
-    </div>
-  </div>
-</section>
-
-<section class="section">
-  <span class="ey">// SETUP SEQUENCE</span>
-  <h2 class="sh">Live in <em>10 minutes.</em></h2>
-  <p class="ss">Four steps. No coding. No downloads.</p>
-  <div class="steps">
-    <div class="step"><div class="step-n">01</div><h3>Purchase</h3><p>One-time payment. Instantly redirected to the setup page with your License Key and all instructions.</p></div>
-    <div class="step"><div class="step-n">02</div><h3>Fork on GitHub</h3><p>Copy the bot repo to your GitHub account in one click. You own your copy permanently.</p></div>
-    <div class="step"><div class="step-n">03</div><h3>Deploy to Railway</h3><p>Connect GitHub to Railway, deploy in ~30 seconds. Add your License Key, Bybit API and Groq key.</p></div>
-    <div class="step"><div class="step-n">04</div><h3>It runs. You relax.</h3><p>Bot starts in paper mode — zero risk. Watch it trade for a few days, then switch one variable to go live.</p></div>
-  </div>
-</section>
-
-<section class="section" id="pricing">
-  <span class="ey" style="text-align:center;display:block">// ACCESS</span>
-  <h2 class="sh" style="text-align:center">One price. <em>Forever yours.</em></h2>
-  <p class="ss" style="text-align:center;max-width:480px;margin:8px auto 52px">No subscription. No monthly fees. Full source code. Runs forever on your Railway account.</p>
-  <div class="price-wrap">
-    <div class="price-card">
-      <div class="price-head">
-        <span class="price-badge">Launch Price · One-Time Payment</span>
-        <div class="price-amount"><sup>$</sup>297</div>
-        <div class="price-was">One-time payment · Lifetime updates</div>
-        <div style="margin-top:14px;font-size:12px;color:rgba(245,158,11,.45);font-family:var(--mono)">Less than most copy-trading services charge per month — and this is yours forever.</div>
-      </div>
-      <div class="price-body">
-        <div class="price-list">
-          <div class="pi"><span class="pi-ico"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L4.5 8 2 5.5"/></svg></span>Full Node.js source code (yours forever)</div>
-          <div class="pi"><span class="pi-ico"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L4.5 8 2 5.5"/></svg></span>License key — verified on every startup</div>
-          <div class="pi"><span class="pi-ico"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L4.5 8 2 5.5"/></svg></span>Groq Llama 3.3 70B AI (free)</div>
-          <div class="pi"><span class="pi-ico"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L4.5 8 2 5.5"/></svg></span>6-indicator analysis engine</div>
-          <div class="pi"><span class="pi-ico"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L4.5 8 2 5.5"/></svg></span>Bybit support (global)</div>
-          <div class="pi"><span class="pi-ico"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L4.5 8 2 5.5"/></svg></span>Paper trading + live mode</div>
-          <div class="pi"><span class="pi-ico"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L4.5 8 2 5.5"/></svg></span>Telegram real-time alerts</div>
-          <div class="pi"><span class="pi-ico"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L4.5 8 2 5.5"/></svg></span>Railway cloud deploy</div>
-          <div class="pi"><span class="pi-ico"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L4.5 8 2 5.5"/></svg></span>Email support · Lifetime updates</div>
-        </div>
-        <div style="background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.12);border-radius:10px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <span style="font-size:11px;color:var(--c);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Launch price ends in</span>
-          <span style="font-size:15px;font-weight:900;color:#fff;font-family:var(--mono)" id="countdown2">--:--:--</span>
-        </div>
-        <button onclick="openApexModal()" class="buy-btn">Get Apex Bot — $297</button>
-        <div class="buy-meta">Stripe encrypted · Instant access · One-time · No subscription</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="section" id="faq">
-  <span class="ey" style="text-align:center;display:block">// QUESTIONS</span>
-  <h2 class="sh" style="text-align:center;margin-bottom:40px">FAQ</h2>
-  <div class="faq-list">
-    <div class="faq-item"><div class="faq-q">Do I need to watch it or manage it daily?<span class="faq-ico">+</span></div><div class="faq-a"><div class="faq-ans">No. That's the whole point. Once deployed, the bot runs completely autonomously — 24/7. It scans, decides, trades, manages risk and sends you Telegram alerts. You don't need to log in anywhere or touch anything.</div></div></div>
-    <div class="faq-item"><div class="faq-q">Do I need coding skills?<span class="faq-ico">+</span></div><div class="faq-a"><div class="faq-ans">No. The setup page walks through every step visually. You need to copy-paste some values into Railway Variables — that's it. No terminal, no coding, no server knowledge.</div></div></div>
-    <div class="faq-item"><div class="faq-q">How do I get access after payment?<span class="faq-ico">+</span></div><div class="faq-a"><div class="faq-ans">Instantly. After payment you're redirected to the setup page which includes your License Key, the GitHub fork link, and full step-by-step configuration instructions. No waiting.</div></div></div>
-    <div class="faq-item"><div class="faq-q">Is profit guaranteed?<span class="faq-ico">+</span></div><div class="faq-a"><div class="faq-ans">No. Crypto trading carries real risk of loss, including total loss of capital. Always run paper trading mode first before connecting real funds. Only trade with money you can afford to lose entirely.</div></div></div>
-    <div class="faq-item"><div class="faq-q">What are the ongoing costs?<span class="faq-ico">+</span></div><div class="faq-a"><div class="faq-ans">Railway Hobby plan ~$5/month for 24/7 uptime. Groq AI: completely free. Exchange trading fees: 0.1% per trade on Binance. No other costs. The $297 is a one-time payment — nothing else.</div></div></div>
-    <div class="faq-item"><div class="faq-q">Can I modify the strategy?<span class="faq-ico">+</span></div><div class="faq-a"><div class="faq-ans">Yes. You receive the full source code. Every parameter — risk per trade, stop loss, take profit, timeframe, indicators, confidence threshold — is configurable via environment variables or by editing the code directly.</div></div></div>
-    <div class="faq-item"><div class="faq-q">What happens to my bot if you shut down?<span class="faq-ico">+</span></div><div class="faq-a"><div class="faq-ans">Nothing. Your bot keeps running. You receive the full source code and it deploys on YOUR Railway account — completely independent from our servers. If we disappeared tomorrow, your bot would not notice. Zero dependency on us after setup.</div></div></div>
-  </div>
-</section>
-
-<div class="foot">
-  <div class="foot-warn">
-    <p>Cryptocurrency trading involves substantial risk of loss. Apex Bot is a software automation tool, not financial advice. Past simulated results do not guarantee future performance. Only trade with capital you can afford to lose entirely. AI Cash Systems is not a licensed financial advisor or broker.</p>
-  </div>
-  <p>© 2026 Apex Trade Bot — AI Cash Systems · <a href="mailto:contact@aicashsystem.space">contact@aicashsystem.space</a> · <a href="/">aicashsystem.space</a> · <a href="/terms">Terms of Service</a> · <a href="/privacy">Privacy Policy</a></p>
-</div>
-
-<div class="sticky" id="sticky">
+<!-- HERO -->
+<section class="wrap" id="hero">
+  <div class="grid3d"></div>
+  <div class="aurora"></div>
   <div>
-    <div><span class="st-price">$297</span></div>
-    <div class="st-info">Launch price · One-time · No subscription</div>
+    <span class="eyebrow rv"><b></b>AI Trading Bot · Controlled from Telegram</span>
+    <h1 class="rv">The bot that trades<br><span class="grad">while you sleep.</span></h1>
+    <p class="lead rv">An AI-powered crypto trading bot you run on <strong style="color:var(--t0);font-weight:500">your own</strong> exchange account — and set up and control entirely from <strong style="color:var(--t0);font-weight:500">Telegram</strong>. No coding. Deploy in 10 minutes.</p>
+    <div class="hero-cta rv">
+      <button class="btn btn-primary magnetic" onclick="openApexModal()">Get Apex Bot — $297 →</button>
+      <a href="#video" class="btn btn-ghost">Watch setup video</a>
+    </div>
+    <div class="hero-meta rv">
+      <div class="hm"><b>24/7</b><span>Always on</span></div>
+      <div class="hm"><b>$0</b><span>Monthly fee</span></div>
+      <div class="hm"><b>11</b><span>Telegram commands</span></div>
+      <div class="hm"><b>1×</b><span>Pay once</span></div>
+    </div>
   </div>
-  <button onclick="openApexModal()" class="st-btn">Get Apex Bot</button>
-</div>
 
+  <div class="terminal rv" id="markets">
+    <div class="term-top">
+      <div class="term-id"><span class="dot"></span><span id="sym-label">BTC / USDT</span></div>
+      <span class="term-live">● LIVE</span>
+    </div>
+    <div class="coin-row" id="coins"></div>
+    <div class="chart-host" id="tvchart"></div>
+    <div class="term-foot">
+      <span class="note">Real-time data via TradingView. <b>Pick any pair</b> to update the chart.</span>
+      <span class="note">Bot scans <b>5 pairs</b> every cycle</span>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST -->
+<div id="trust"><div class="wrap trust-inner rv">
+  <span class="trust-lbl">Compatible with</span>
+  <span class="trust-tag">Binance</span><span class="trust-tag">Bybit</span><span class="trust-tag">OKX</span>
+  <span class="trust-tag">Kraken</span><span class="trust-tag">KuCoin</span><span class="trust-tag">Coinbase</span>
+  <span class="trust-tag">Bitget</span><span class="trust-tag">MEXC</span>
+</div></div>
+
+<!-- MARQUEE -->
+<div class="marquee" aria-hidden="true"><div class="mq-track">
+  <span>Automated Trading</span><span class="dot">✦</span><span class="o">Telegram Control</span><span class="dot">✦</span><span>Your Rules</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Own Every Line</span><span class="dot">✦</span>
+  <span>Automated Trading</span><span class="dot">✦</span><span class="o">Telegram Control</span><span class="dot">✦</span><span>Your Rules</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Own Every Line</span><span class="dot">✦</span>
+</div></div>
+
+<!-- FEATURES -->
+<section class="wrap sec" id="features">
+  <div class="sec-head rv">
+    <span class="label">What You Get</span>
+    <h2 class="h2">A real trading system — not a black box.</h2>
+    <p class="lead">Complete source code, AI-validated signals, and full control from your phone. You own it, you configure it, you run it.</p>
+  </div>
+  <div class="feat-grid">
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0-3 3 3 3 0 0 0 0 6 3 3 0 0 0 3 3v1a3 3 0 0 0 6 0v-1a3 3 0 0 0 3-3 3 3 0 0 0 0-6 3 3 0 0 0-3-3V5a3 3 0 0 0-3-3z"/></svg></div><h3>AI-validated signals</h3><p>Strategies from Turtle Trading, Livermore, Soros and PTJ. An AI model validates every signal before a trade opens.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div><h3>Controlled from Telegram</h3><p>Set it up, change risk, switch pairs, start and stop — all with simple Telegram commands. No terminal, no code.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h3>Built-in risk controls</h3><p>Stop-loss, take-profit and position sizing are part of the engine. Set your risk % per trade in one command.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><h3>Multi-exchange ready</h3><p>Connectors for 8 major exchanges. Run it on the account you already have — your API keys never leave your server.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><h3>Paper trading first</h3><p>Start in simulation mode with zero real funds. Watch the bot trade for days, then flip one setting to go live.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div><h3>Complete source code</h3><p>The full Python codebase — nothing compiled or hidden. Read every line, modify anything, keep it forever.</p></div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="wrap sec" style="padding-top:0">
+  <div class="stats rv">
+    <div class="stat"><b data-count="8">0</b><span>Supported exchanges</span></div>
+    <div class="stat"><b data-count="5">0</b><span>Pairs scanned per cycle</span></div>
+    <div class="stat"><b data-count="11">0</b><span>Telegram commands</span></div>
+    <div class="stat"><b data-count="14" data-suffix="-day">0</b><span>Risk-free paper trading</span></div>
+  </div>
+</section>
+
+<!-- TELEGRAM CONTROL -->
+<section id="telegram">
+  <div class="wrap sec">
+    <div class="tg-wrap">
+      <div class="rv">
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="tg-top">
+              <div class="tg-av">A</div>
+              <div><b>Apex Trade Bot</b><span>bot · online</span></div>
+            </div>
+            <div class="tg-chat" id="tgChat"></div>
+            <div class="tg-input">
+              <div class="box">Message</div>
+              <div class="snd"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="rv">
+        <span class="label">Telegram Control</span>
+        <h2 class="h2" style="margin:14px 0 14px">Run your bot with a text message.</h2>
+        <p class="lead">No dashboards to learn, no code to touch. Everything — setup, risk, pairs, start/stop — happens in a Telegram chat that only you can access.</p>
+        <div class="cmd-list">
+          <div class="cmd"><code>/setup</code><span>Guided setup wizard</span></div>
+          <div class="cmd"><code>/setkeys</code><span>Set your exchange API keys</span></div>
+          <div class="cmd"><code>/exchange</code><span>Switch exchange</span></div>
+          <div class="cmd"><code>/paper</code><span>Toggle paper / live mode</span></div>
+          <div class="cmd"><code>/risk 20</code><span>Risk % per trade (1–50)</span></div>
+          <div class="cmd"><code>/symbol</code><span>Set the trading pair</span></div>
+          <div class="cmd"><code>/status</code><span>Live trading snapshot</span></div>
+          <div class="cmd"><code>/config</code><span>Show current settings</span></div>
+          <div class="cmd"><code>/start</code><span>Resume trading</span></div>
+          <div class="cmd"><code>/stop</code><span>Pause instantly</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VIDEO WALKTHROUGH -->
+<section class="wrap sec" id="video">
+  <div class="sec-head rv center">
+    <span class="label">Step-by-Step</span>
+    <h2 class="h2">Watch the full setup — start to first trade.</h2>
+    <p class="lead center">A short walkthrough showing exactly how to deploy the bot and control it from Telegram. No experience needed.</p>
+  </div>
+  <div class="vid-wrap">
+    <div class="vid-frame rv">
+      <video id="setupVideo" controls preload="none" playsinline poster="/apex-setup-poster.jpg">
+        <source src="/apex-setup.mp4" type="video/mp4">
+      </video>
+      <div class="vid-poster" id="vidPoster" onclick="playSetupVideo()">
+        <div class="vid-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+        <b>Apex Bot — Telegram Setup Walkthrough</b>
+        <span>Tap to play</span>
+      </div>
+    </div>
+    <ol class="vsteps rv">
+      <li class="vstep"><b>1</b><div>Pay once, then tap <strong>Start Bot on Telegram</strong> — your license validates automatically.</div></li>
+      <li class="vstep"><b>2</b><div>Deploy to Railway in one click and add three variables. The video shows each field.</div></li>
+      <li class="vstep"><b>3</b><div>Send <strong>/setup</strong> to your bot — it walks you through exchange, paper mode and pair.</div></li>
+      <li class="vstep"><b>4</b><div>Use <strong>/risk</strong>, <strong>/symbol</strong> and <strong>/status</strong> to control everything from your phone.</div></li>
+      <li class="vstep"><b>5</b><div>Start in paper mode, watch it trade, then send <strong>/paper off</strong> to go live.</div></li>
+    </ol>
+  </div>
+</section>
+
+<!-- HOW -->
+<section class="wrap sec" id="how" style="padding-top:0">
+  <div class="sec-head rv">
+    <span class="label">How It Works</span>
+    <h2 class="h2">From checkout to running — fast.</h2>
+    <p class="lead">A SaaS-grade delivery flow. No back-and-forth, no waiting on a human.</p>
+  </div>
+  <div class="steps">
+    <div class="step rv"><div class="step-n">01</div><h3>Purchase securely</h3><p>One-time payment through Stripe. No subscription, no recurring charge.</p></div>
+    <div class="step rv"><div class="step-n">02</div><h3>Open in Telegram</h3><p>Tap the button you get instantly — it opens your bot in Telegram with your license.</p></div>
+    <div class="step rv"><div class="step-n">03</div><h3>Deploy in 1 click</h3><p>Connect to Railway, add three variables. The setup video shows every step.</p></div>
+    <div class="step rv"><div class="step-n">04</div><h3>Configure & run</h3><p>Send /setup, set your risk on your terms, then run it on your own account.</p></div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="wrap sec" id="reviews" style="padding-top:0">
+  <div class="sec-head rv">
+    <span class="label">From Buyers</span>
+    <h2 class="h2">Built for people who want control.</h2>
+  </div>
+  <div class="tgrid">
+    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"Controlling it from Telegram is the killer feature. I change risk and pairs from my phone on the bus. Set up in under an hour."</p><div class="tmeta"><div class="tav">M</div><div><b>Marcus K.</b><span>Software engineer</span></div></div></div>
+    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"Ran it in paper mode for a week before risking anything. The /status command gives me everything at a glance. No monthly fee sealed it."</p><div class="tmeta"><div class="tav">S</div><div><b>Sofia R.</b><span>Self-directed trader</span></div></div></div>
+    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"Full source code, my own exchange keys, one payment. I read every module before running it. Exactly what I wanted to own."</p><div class="tmeta"><div class="tav">J</div><div><b>James L.</b><span>Quant hobbyist</span></div></div></div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="wrap sec price-wrap">
+    <div class="rv">
+      <span class="label">Pricing</span>
+      <h2 class="h2" style="margin:14px 0 14px">One payment. Full ownership.</h2>
+      <p class="lead">No subscription, no monthly fees, no upsells. Buy the bot once and it's yours to keep, run and modify.</p>
+      <ul class="price-list">
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Complete Python source code</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Full Telegram control layer</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>8 exchange connectors</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>AI signal validation</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Risk-control module</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>1-click Railway deploy</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>12 months of updates</li>
+        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>14-day risk-free paper start</li>
+      </ul>
+    </div>
+    <div class="price-card rv">
+      <span class="price-badge">Launch Price · Limited</span>
+      <div class="price-amt"><span class="now">$297</span><span class="was">$497</span></div>
+      <p class="price-sub">One-time payment · Lifetime use · Instant delivery</p>
+      <button class="btn btn-primary magnetic" onclick="openApexModal()">Get the License — $297 →</button>
+      <p class="price-fine">Secure Stripe checkout · Paper-trade 14 days before risking real funds</p>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="wrap sec" id="faq">
+  <div class="sec-head rv">
+    <span class="label">FAQ</span>
+    <h2 class="h2">Straight answers.</h2>
+  </div>
+  <div class="faq rv">
+    <div class="fq"><button class="fq-q">What exactly am I buying?<span class="fq-ic">+</span></button><div class="fq-a">The complete source code for an AI crypto trading bot, plus a full Telegram control layer and a license to use it. It's a software tool you configure and run yourself on your own exchange account.</div></div>
+    <div class="fq"><button class="fq-q">Do I need to know how to code?<span class="fq-ic">+</span></button><div class="fq-a">No. You deploy in one click to Railway and control everything from Telegram with simple commands like /setup, /risk and /status. The setup video shows every step.</div></div>
+    <div class="fq"><button class="fq-q">Do you guarantee profit?<span class="fq-ic">+</span></button><div class="fq-a">No. The bot does exactly what you configure it to do — the strategy, pairs and risk are entirely under your control. Results depend on your settings and market conditions. We sell the tool, not a return.</div></div>
+    <div class="fq"><button class="fq-q">Do you ever touch my funds or API keys?<span class="fq-ic">+</span></button><div class="fq-a">Never. The bot runs on your own server with your keys. We have zero access to your exchange account or funds at any point — you host it yourself.</div></div>
+    <div class="fq"><button class="fq-q">How is it delivered?<span class="fq-ic">+</span></button><div class="fq-a">Instantly. The moment payment clears you get a button that opens your bot in Telegram with your license key, plus an email backup with the full setup guide and 1-click deploy link.</div></div>
+    <div class="fq"><button class="fq-q">Can I test it before risking real money?<span class="fq-ic">+</span></button><div class="fq-a">Yes — and we recommend it. Run the bot in paper-trading mode for your first 14 days to see exactly how your configuration behaves, with zero real funds at risk. Send /paper off only once you're confident.</div></div>
+    <div class="fq"><button class="fq-q">What are the ongoing costs?<span class="fq-ic">+</span></button><div class="fq-a">Railway hosting is roughly $5/month for 24/7 uptime. The AI signal key is free. Exchange trading fees are ~0.1% per trade. The $297 is a one-time payment — nothing else recurring from us.</div></div>
+  </div>
+</section>
+
+<!-- FINAL -->
+<section class="wrap" id="final">
+  <h2 class="h2 rv">$297, once. Then it's yours.</h2>
+  <p class="rv">Full source code. Your strategy. Your account. Controlled from Telegram. No subscriptions, ever.</p>
+  <button class="btn btn-primary magnetic rv" style="font-size:16px;padding:17px 32px" onclick="openApexModal()">Get Apex Bot — $297 →</button>
+</section>
+
+<footer><div class="wrap">
+  <div>© Apex Trade Bot · AI Cash Systems</div>
+  <div class="disc">This is a source-code software product that you configure and operate yourself. It does not provide financial advice or guarantee returns. Crypto trading carries substantial risk; only trade capital you can afford to lose. Market data shown is provided by TradingView for reference.</div>
+</div></footer>
+
+<!-- CHECKOUT MODAL -->
 <div id="apexModal">
   <div class="am-card">
     <button class="am-close" onclick="closeApexModal()">×</button>
@@ -635,22 +542,20 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(28px);background:rgba
       <div class="am-head">
         <span class="am-tag">One-Time Payment</span>
         <div class="am-title">Apex Trade Bot</div>
-        <div class="am-price"><span class="am-amount">$297</span></div>
+        <div class="am-price">$297</div>
       </div>
       <div class="am-body">
-        <div id="am-pr-container">
-          <div class="am-wallets" style="grid-template-columns:1fr 1fr">
-            <button class="am-wallet-btn" onclick="handleWalletPay('apple')">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-              Apple Pay
-            </button>
-            <button class="am-wallet-btn" onclick="handleWalletPay('google')">
-              <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-              Google Pay
-            </button>
-          </div>
-          <div class="am-separator">or pay using credit card</div>
+        <div class="am-wallets">
+          <button class="am-wallet-btn" onclick="handleWalletPay('apple')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            Apple Pay
+          </button>
+          <button class="am-wallet-btn" onclick="handleWalletPay('google')">
+            <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Google Pay
+          </button>
         </div>
+        <div class="am-separator">or pay using credit card</div>
         <div class="am-field">
           <label class="am-label">Card holder full name</label>
           <input id="amName" class="am-input" type="text" placeholder="Enter your full name" autocomplete="name">
@@ -674,7 +579,7 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(28px);background:rgba
           </div>
         </div>
         <div id="am-card-error"></div>
-        <div class="am-checks" style="margin-top:12px">
+        <div class="am-checks">
           <label class="am-check"><input type="checkbox" id="ck1" onchange="updateBtn()"><span class="am-check-txt">I accept the <strong>risk of loss</strong> — crypto trading involves significant financial risk.</span></label>
           <label class="am-check"><input type="checkbox" id="ck2" onchange="updateBtn()"><span class="am-check-txt">This is NOT financial advice. Sales are final after digital delivery.</span></label>
           <label class="am-check"><input type="checkbox" id="ck3" onchange="updateBtn()"><span class="am-check-txt">I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
@@ -696,194 +601,94 @@ nav{position:sticky;top:0;z-index:200;backdrop-filter:blur(28px);background:rgba
 </div>
 
 <script>
+// TELEGRAM CONFIG (for the success deep-link button)
 var tgBotUsername='';
-fetch('/api/tg-config').then(r=>r.json()).then(d=>{tgBotUsername=d.botUsername||'';}).catch(()=>{});
+fetch('/api/tg-config').then(function(r){return r.json();}).then(function(d){tgBotUsername=d.botUsername||'';}).catch(function(){});
 
-document.addEventListener('mousemove',(e)=>{
-  const x=e.clientX/window.innerWidth,y=e.clientY/window.innerHeight;
-  const o1=document.getElementById('orb1'),o2=document.getElementById('orb2');
-  if(o1)o1.style.transform=`translate(${x*40}px,${y*40}px)`;
-  if(o2)o2.style.transform=`translate(-${x*30}px,-${y*30}px)`;
+// CURSOR GLOW
+(function(){var g=document.getElementById('glow');window.addEventListener('mousemove',function(e){g.style.transform='translate3d('+e.clientX+'px,'+e.clientY+'px,0) translate(-50%,-50%)';g.style.opacity='1';});})();
+
+// MAGNETIC BUTTONS
+document.querySelectorAll('.magnetic').forEach(function(b){
+  b.addEventListener('mousemove',function(e){var r=b.getBoundingClientRect();b.style.transform='translate('+((e.clientX-r.left-r.width/2)*.18)+'px,'+((e.clientY-r.top-r.height/2)*.3)+'px)';});
+  b.addEventListener('mouseleave',function(){b.style.transform='';});
 });
 
-const observer=new IntersectionObserver((entries)=>{
-  entries.forEach(entry=>{
-    if(entry.isIntersecting){
-      entry.target.style.opacity='0';entry.target.style.transform='translateY(28px)';
-      entry.target.animate([{opacity:0,transform:'translateY(28px)'},{opacity:1,transform:'translateY(0)'}],{duration:650,fill:'forwards',easing:'cubic-bezier(.16,1,.3,1)',delay:40});
-    }
+// 3D TILT
+if(window.matchMedia('(hover:hover)').matches){
+  document.querySelectorAll('.tilt').forEach(function(c){
+    c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();var x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.transform='perspective(820px) rotateY('+(x*7)+'deg) rotateX('+(-y*7)+'deg) translateY(-4px)';});
+    c.addEventListener('mouseleave',function(){c.style.transform='';});
   });
-},{threshold:.1});
-document.querySelectorAll('.feat,.passive-card,.proof-pill,.stat').forEach(el=>observer.observe(el));
+}
 
+// TICKER TAPE
+(function(){var s=document.createElement('script');s.src='https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';s.async=true;
+  s.innerHTML=JSON.stringify({symbols:[{proName:'BINANCE:BTCUSDT',title:'BTC'},{proName:'BINANCE:ETHUSDT',title:'ETH'},{proName:'BINANCE:SOLUSDT',title:'SOL'},{proName:'BINANCE:BNBUSDT',title:'BNB'},{proName:'BINANCE:XRPUSDT',title:'XRP'},{proName:'BINANCE:DOGEUSDT',title:'DOGE'},{proName:'BINANCE:AVAXUSDT',title:'AVAX'},{proName:'BINANCE:ADAUSDT',title:'ADA'}],showSymbolLogo:true,isTransparent:true,displayMode:'compact',colorTheme:'dark',locale:'en'});
+  document.querySelector('#tape .tradingview-widget-container').appendChild(s);})();
+
+// LIVE CHART + SELECTOR
+var COINS=[{s:'BINANCE:BTCUSDT',l:'BTC / USDT'},{s:'BINANCE:ETHUSDT',l:'ETH / USDT'},{s:'BINANCE:SOLUSDT',l:'SOL / USDT'},{s:'BINANCE:BNBUSDT',l:'BNB / USDT'},{s:'BINANCE:XRPUSDT',l:'XRP / USDT'},{s:'BINANCE:DOGEUSDT',l:'DOGE / USDT'},{s:'BINANCE:AVAXUSDT',l:'AVAX / USDT'},{s:'BINANCE:ADAUSDT',l:'ADA / USDT'},{s:'BINANCE:LINKUSDT',l:'LINK / USDT'},{s:'BINANCE:DOTUSDT',l:'DOT / USDT'}];
+function loadChart(sym){var h=document.getElementById('tvchart');h.innerHTML='';var s=document.createElement('script');s.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';s.async=true;
+  s.innerHTML=JSON.stringify({autosize:true,symbol:sym,interval:'15',timezone:'Etc/UTC',theme:'dark',style:'1',locale:'en',hide_side_toolbar:true,allow_symbol_change:false,save_image:false,backgroundColor:'rgba(6,6,8,1)',gridColor:'rgba(255,255,255,0.04)',enable_publishing:false,support_host:'https://www.tradingview.com'});h.appendChild(s);}
+(function(){var row=document.getElementById('coins'),lbl=document.getElementById('sym-label');COINS.forEach(function(c,i){var b=document.createElement('button');b.className='coin'+(i===0?' active':'');b.textContent=c.l.split(' ')[0];b.onclick=function(){document.querySelectorAll('.coin').forEach(function(x){x.classList.remove('active');});b.classList.add('active');lbl.textContent=c.l;loadChart(c.s);};row.appendChild(b);});loadChart(COINS[0].s);})();
+
+// FAQ
+document.querySelectorAll('.fq-q').forEach(function(btn){btn.addEventListener('click',function(){var op=this.classList.contains('open');document.querySelectorAll('.fq-q').forEach(function(b){b.classList.remove('open');});document.querySelectorAll('.fq-a').forEach(function(a){a.classList.remove('open');});if(!op){this.classList.add('open');this.nextElementSibling.classList.add('open');}});});
+
+// REVEAL + COUNT-UP
+var obs=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;e.target.classList.add('in');
+  e.target.querySelectorAll('[data-count]').forEach(function(el){var tg=parseInt(el.dataset.count),sf=el.dataset.suffix||'',t0=performance.now();(function tk(n){var p=Math.min((n-t0)/1300,1),ev=1-Math.pow(1-p,3);el.textContent=Math.round(ev*tg)+sf;if(p<1)requestAnimationFrame(tk);})(t0);});
+  obs.unobserve(e.target);});},{threshold:.12});
+document.querySelectorAll('.rv').forEach(function(el){obs.observe(el);});
+
+// TELEGRAM CHAT DEMO (animated)
 (function(){
-  const K='apex_cd2';
-  let end=parseInt(localStorage.getItem(K)||'0');
-  if(!end||end<Date.now()){end=Date.now()+72*3600*1000;localStorage.setItem(K,end);}
-  function tick(){
-    const d=Math.max(0,end-Date.now());
-    const h=String(Math.floor(d/3600000)).padStart(2,'0');
-    const m=String(Math.floor(d%3600000/60000)).padStart(2,'0');
-    const s=String(Math.floor(d%60000/1000)).padStart(2,'0');
-    const txt=h+':'+m+':'+s;
-    document.getElementById('countdown').textContent=d>0?txt:'Offer ended';
-    const c2=document.getElementById('countdown2');if(c2)c2.textContent=d>0?txt:'Offer ended';
+  var chat=document.getElementById('tgChat');
+  var convo=[
+    {who:'me',t:'/setup'},
+    {who:'bot',t:'⚙️ Setup wizard\nWhich exchange? (binance / bybit / okx)'},
+    {who:'me',t:'binance'},
+    {who:'bot',t:'Paper trading on? (yes / no)'},
+    {who:'me',t:'yes'},
+    {who:'bot',t:'✅ Setup complete. Send /start to begin.'},
+    {who:'me',t:'/risk 20'},
+    {who:'bot',t:'⚖️ Risk per trade set to 20% of balance.'},
+    {who:'me',t:'/status'},
+    {who:'bot',t:'💗 ACTIVE · tick #6\n💼 Balance: $100.00\n📭 No position'}
+  ];
+  var i=0;
+  function step(){
+    if(i>=convo.length){
+      setTimeout(function(){chat.innerHTML='';i=0;step();},3400);
+      return;
+    }
+    var m=convo[i++];
+    var b=document.createElement('div');
+    b.className='bub '+(m.who==='me'?'me':'bot');
+    b.textContent=m.t;
+    chat.appendChild(b);
+    chat.scrollTop=chat.scrollHeight;
+    setTimeout(step,m.who==='me'?760:1150);
   }
-  setInterval(tick,1000);tick();
+  step();
 })();
 
-window.addEventListener('scroll',function(){
-  document.getElementById('sticky').classList.toggle('show',window.scrollY>500);
-});
-
-const logs=[
-  {c:'d',m:'[APEX] v3.0 — Legendary Traders Engine init'},
-  {c:'c',m:'[SCAN] Checking SOL, XRP, DOGE, TRX, ADA...'},
-  {c:'c',m:'[SCAN] Best signal → XRPUSDT (score: 0.74)'},
-  {c:'w',m:'[DATA] 200 candles · Bybit API ✓'},
-  {c:'w',m:'[LIVERMORE] BULLISH · HH+HL structure (85%)'},
-  {c:'w',m:'[TURTLE] STRONG breakout BUY · H20: $1.342'},
-  {c:'c',m:'[SOROS] Momentum BULLISH · velocity +1.24%'},
-  {c:'c',m:'[GROQ] Llama 3.3 70B · signal in 0.8s'},
-  {c:'g',m:'━━ BUY (confidence: 87% · criteria: 4/5) ━━'},
-  {c:'w',m:'RSI oversold + Bullish divergence + Vol 1.8×'},
-  {c:'y',m:'[DRUCKENMILLER] Position ×1.56 — high conviction'},
-  {c:'g',m:'[PAPER] BUY 2 XRPUSDT @ $1.3157'},
-  {c:'c',m:'SL: $1.3052 · TP: $1.3368 · R:R = 1:2.0'},
-  {c:'g',m:'[TELEGRAM] ✓ Alert sent'},
-  {c:'d',m:'Next analysis in 5:00...'},
-];
-const tb=document.getElementById('termBody');let tli=0;
-function addLog(){
-  if(tli>=logs.length){setTimeout(()=>{tb.innerHTML='';tli=0;addLog();},2500);return;}
-  const l=logs[tli++];
-  const d=document.createElement('div');d.className='tl '+l.c;
-  const t=new Date();
-  const ts=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
-  d.innerHTML=`<span class="ts">${ts}</span><span class="tm">${l.m}</span>`;
-  tb.appendChild(d);tb.scrollTop=tb.scrollHeight;
-  setTimeout(addLog,l.c==='d'?160:l.c==='g'?260:200);
+// VIDEO
+function playSetupVideo(){
+  var v=document.getElementById('setupVideo'),p=document.getElementById('vidPoster');
+  p.classList.add('hide');
+  try{v.play();}catch(e){}
 }
-addLog();
+document.getElementById('setupVideo').addEventListener('play',function(){document.getElementById('vidPoster').classList.add('hide');});
 
-const mc=document.getElementById('miniChart'),mcx=mc.getContext('2d');
-let mcData=Array.from({length:60},(_,i)=>0.1+Math.sin(i*.12)*.005+Math.random()*.003);
-let mcBase=mcData.at(-1);
-function drawMini(){
-  mc.width=mc.offsetWidth;mc.height=mc.offsetHeight;
-  const W=mc.width,H=mc.height,P=3;
-  if(!W||!H)return;
-  const mn=Math.min(...mcData),mx=Math.max(...mcData),rng=mx-mn||.001;
-  const sy=v=>P+(1-(v-mn)/rng)*(H-P*2);
-  const sx=(_,i)=>P+i/(mcData.length-1)*(W-P*2);
-  mcx.clearRect(0,0,W,H);
-  const grd=mcx.createLinearGradient(0,0,0,H);
-  grd.addColorStop(0,'rgba(245,158,11,.16)');grd.addColorStop(1,'rgba(245,158,11,.01)');
-  mcx.beginPath();mcx.moveTo(sx(mcData[0],0),sy(mcData[0]));
-  mcData.forEach((v,i)=>{if(i)mcx.lineTo(sx(v,i),sy(v))});
-  mcx.lineTo(sx(mcData.at(-1),mcData.length-1),H);mcx.lineTo(sx(mcData[0],0),H);mcx.closePath();mcx.fillStyle=grd;mcx.fill();
-  mcx.beginPath();mcx.moveTo(sx(mcData[0],0),sy(mcData[0]));
-  mcData.forEach((v,i)=>{if(i)mcx.lineTo(sx(v,i),sy(v))});
-  mcx.strokeStyle='#f59e0b';mcx.lineWidth=2;mcx.stroke();
-  mcBase+=(Math.random()-.488)*.0005;
-  mcData.push(mcBase);if(mcData.length>80)mcData.shift();
-  const pnl=(mcBase-.1013)/.1013*100;
-  const bal=10*(1+pnl/100);
-  document.getElementById('tfBal').textContent='$'+bal.toFixed(2);
-  document.getElementById('tfPnl').textContent=(pnl>=0?'+':'')+pnl.toFixed(1)+'%';
-  document.getElementById('tfPnl').style.color=pnl>=0?'#10b981':'#ef4444';
-}
-setInterval(drawMini,600);setTimeout(drawMini,300);
-
-(function(){
-  const canvas=document.getElementById('liveChart');
-  if(!canvas)return;
-  const ctx=canvas.getContext('2d');
-  const signals=[];
-  let base=0.2467,price=base;
-  let prices=[];
-  for(let i=0;i<80;i++){price+=(Math.random()-.495)*.0008;prices.push(price);}
-  signals.push(
-    {idx:15,type:'buy',sl:prices[15]*(1-.006),tp:prices[15]*(1+.012)},
-    {idx:38,type:'short',sl:prices[38]*(1+.005),tp:prices[38]*(1-.01)},
-    {idx:62,type:'buy',sl:prices[62]*(1-.005),tp:prices[62]*(1+.011)}
-  );
-  function draw(){
-    const W=canvas.offsetWidth;if(!W)return;
-    canvas.width=W;canvas.height=220;
-    const H=220,PAD=14,LPAD=50;
-    const pts=prices;
-    const mn=Math.min(...pts)*.998,mx=Math.max(...pts)*1.002,rng=mx-mn;
-    const sy=v=>PAD+(1-(v-mn)/rng)*(H-PAD*2);
-    const sx=(_,i)=>LPAD+i/(pts.length-1)*(W-LPAD-PAD);
-    const rising=pts.at(-1)>=pts[0];
-    const lc=rising?'#10b981':'#ef4444';
-    const fc=rising?'rgba(16,185,129,':'rgba(239,68,68,';
-    ctx.clearRect(0,0,W,H);
-    ctx.strokeStyle='rgba(255,255,255,.03)';ctx.lineWidth=1;
-    for(let i=0;i<=5;i++){const y=PAD+i/5*(H-PAD*2);ctx.beginPath();ctx.moveTo(LPAD,y);ctx.lineTo(W-PAD,y);ctx.stroke();}
-    signals.forEach(s=>{
-      if(s.idx>=pts.length-20){
-        ctx.fillStyle='rgba(16,185,129,.03)';
-        ctx.fillRect(sx(null,s.idx),sy(s.tp),W-PAD-sx(null,s.idx),sy(s.type==='buy'?s.sl:s.tp)-sy(s.type==='buy'?s.tp:s.sl));
-        ctx.strokeStyle='rgba(239,68,68,.5)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
-        ctx.beginPath();ctx.moveTo(sx(null,s.idx),sy(s.sl));ctx.lineTo(W-PAD,sy(s.sl));ctx.stroke();
-        ctx.strokeStyle='rgba(16,185,129,.4)';
-        ctx.beginPath();ctx.moveTo(sx(null,s.idx),sy(s.tp));ctx.lineTo(W-PAD,sy(s.tp));ctx.stroke();
-        ctx.setLineDash([]);
-      }
-    });
-    const grd=ctx.createLinearGradient(0,0,0,H);
-    grd.addColorStop(0,fc+'.09)');grd.addColorStop(1,fc+'0)');
-    ctx.beginPath();ctx.moveTo(sx(pts[0],0),sy(pts[0]));
-    pts.forEach((v,i)=>{if(i)ctx.lineTo(sx(v,i),sy(v))});
-    ctx.lineTo(sx(pts.at(-1),pts.length-1),H);ctx.lineTo(sx(pts[0],0),H);ctx.closePath();ctx.fillStyle=grd;ctx.fill();
-    ctx.beginPath();ctx.moveTo(sx(pts[0],0),sy(pts[0]));
-    pts.forEach((v,i)=>{if(i)ctx.lineTo(sx(v,i),sy(v))});
-    ctx.strokeStyle=lc;ctx.lineWidth=2;ctx.stroke();
-    signals.forEach(s=>{
-      if(s.idx>=pts.length)return;
-      const x=sx(null,s.idx),y=sy(pts[s.idx]),isBuy=s.type==='buy';
-      ctx.beginPath();
-      if(isBuy){ctx.moveTo(x,y+14);ctx.lineTo(x-7,y+22);ctx.lineTo(x+7,y+22);}
-      else{ctx.moveTo(x,y-14);ctx.lineTo(x-7,y-22);ctx.lineTo(x+7,y-22);}
-      ctx.closePath();ctx.fillStyle=isBuy?'#10b981':'#ef4444';ctx.fill();
-    });
-    ctx.fillStyle='rgba(255,255,255,.2)';ctx.font='10px JetBrains Mono,monospace';ctx.textAlign='right';
-    for(let i=0;i<=4;i++){const v=mn+i/4*rng;ctx.fillText('$'+v.toFixed(4),LPAD-4,sy(v)+3);}
-    const cy=sy(pts.at(-1));
-    ctx.fillStyle=lc;ctx.fillRect(LPAD,cy-9,W-LPAD-PAD,18);
-    ctx.fillStyle='#000';ctx.font='bold 10px JetBrains Mono,monospace';ctx.textAlign='left';
-    ctx.fillText('$'+pts.at(-1).toFixed(4),LPAD+4,cy+4);
-  }
-  function update(){
-    price+=(Math.random()-.494)*.0006;prices.push(price);
-    if(prices.length>120)prices.shift();
-    if(Math.random()<.015){
-      const isBuy=Math.random()>.5;
-      signals.push({idx:prices.length-1,type:isBuy?'buy':'short',sl:price*(isBuy?1-.005:1+.005),tp:price*(isBuy?1+.011:1-.011)});
-      if(signals.length>6)signals.shift();
-    }
-    draw();
-    document.getElementById('cmPnl').textContent='+'+(2.1+Math.random()*.8).toFixed(1)+'%';
-  }
-  setTimeout(draw,100);setInterval(update,800);
-})();
-
-document.querySelectorAll('.faq-item').forEach(el=>{
-  el.querySelector('.faq-q').addEventListener('click',()=>{
-    const was=el.classList.contains('open');
-    document.querySelectorAll('.faq-item').forEach(i=>i.classList.remove('open'));
-    if(!was)el.classList.add('open');
-  });
-});
-
+// ─── STRIPE CHECKOUT ───
 var STRIPE_PK='pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS';
 var apexStripe,apexCardNum,apexCardExp,apexCardCvc;
-var elStyle={base:{color:'#fff',fontFamily:'"Inter",-apple-system,sans-serif',fontSize:'14px','::placeholder':{color:'rgba(255,255,255,0.25)'},iconColor:'rgba(245,158,11,.7)'},invalid:{color:'#ef4444'}};
+var elStyle={base:{color:'#f5f5f7',fontFamily:'"Satoshi",-apple-system,sans-serif',fontSize:'14px','::placeholder':{color:'#56565f'},iconColor:'#ff5c74'},invalid:{color:'#ff5c74'}};
 
 function handleWalletPay(type){
-  document.getElementById('am-card-error').textContent='Use '+( type==='apple'?'Apple':'Google')+' Pay via your browser if available, or complete the card form below.';
+  document.getElementById('am-card-error').textContent='Use '+(type==='apple'?'Apple':'Google')+' Pay via your browser if available, or complete the card form below.';
 }
 
 function openApexModal(){
@@ -891,7 +696,7 @@ function openApexModal(){
   document.body.style.overflow='hidden';
   if(!apexStripe){
     apexStripe=Stripe(STRIPE_PK);
-    var els=apexStripe.elements({fonts:[{cssSrc:'https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap'}]});
+    var els=apexStripe.elements();
     apexCardNum=els.create('cardNumber',{style:elStyle,showIcon:true,placeholder:'0000 0000 0000 0000'});
     apexCardExp=els.create('cardExpiry',{style:elStyle,placeholder:'MM / YY'});
     apexCardCvc=els.create('cardCvc',{style:elStyle,placeholder:'CVV'});
@@ -912,7 +717,7 @@ function closeApexModal(){
 }
 document.getElementById('apexModal').addEventListener('click',function(e){if(e.target===this)closeApexModal();});
 function updateBtn(){
-  var all=['ck1','ck2','ck3'].every(id=>document.getElementById(id).checked);
+  var all=['ck1','ck2','ck3'].every(function(id){return document.getElementById(id).checked;});
   document.getElementById('amBtn').disabled=!all;
   document.getElementById('amBtnTxt').textContent=all?'Checkout — $297':'Accept terms to continue';
 }
@@ -925,11 +730,11 @@ async function submitApexPayment(){
   var btn=document.getElementById('amBtn'),spin=document.getElementById('amSpinner'),txt=document.getElementById('amBtnTxt');
   btn.disabled=true;spin.style.display='block';txt.textContent='Processing...';
   try{
-    var r=await fetch('/create-payment-intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:29700,currency:'usd',email,name,product:'apex-bot'})});
+    var r=await fetch('/create-payment-intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:29700,currency:'usd',email:email,name:name,product:'apex-bot'})});
     var d=await r.json();
     if(d.error){err.textContent=d.error;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';return;}
     var _pendingKey=d.pendingKey||'';
-    var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCardNum,billing_details:{name,email}}});
+    var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCardNum,billing_details:{name:name,email:email}}});
     if(result.error){
       err.textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
     }else if(result.paymentIntent.status==='succeeded'){
@@ -938,8 +743,7 @@ async function submitApexPayment(){
       var tgLink=tgBotUsername&&_pendingKey?'https://t.me/'+tgBotUsername+'?start='+encodeURIComponent(_pendingKey):'';
       var actionsEl=document.getElementById('amSuccessActions');
       if(actionsEl){
-        actionsEl.innerHTML=(tgLink?'<a href="'+tgLink+'" style="display:block;background:#f59e0b;color:#000;font-weight:900;font-size:14px;padding:14px 20px;border-radius:10px;text-decoration:none;margin-bottom:10px;letter-spacing:.3px">Start Bot on Telegram →</a>':'')
-          +'<a href="'+cfgLink+'" style="display:block;background:rgba(255,255,255,.06);color:#fff;font-size:13px;font-weight:600;padding:12px 20px;border-radius:10px;text-decoration:none">Setup Manually →</a>';
+        actionsEl.innerHTML=(tgLink?'<a href="'+tgLink+'" class="am-tg-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M9.8 16.6l-.4 3.9c.6 0 .8-.2 1.1-.5l2.6-2.5 5.4 4c1 .5 1.7.3 1.9-.9l3.5-16.4c.3-1.4-.5-2-1.5-1.6L1.1 9.3C-.3 9.9-.3 10.7.8 11l5.2 1.6L18.6 5c.6-.4 1.1-.2.7.2"/></svg>Start Bot on Telegram →</a>':'')+'<a href="'+cfgLink+'" class="am-cfg-btn">Setup Manually →</a>';
       }
       document.getElementById('amSuccess').style.display='block';
     }

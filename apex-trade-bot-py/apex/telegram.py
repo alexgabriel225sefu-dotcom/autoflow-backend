@@ -401,7 +401,7 @@ def _handle_buyer_start(chat_id, license_key):
         send_to(chat_id,
             "❌ <b>Invalid license key.</b>\n\n"
             "Purchase Apex Trade Bot at:\n"
-            "https://www.aicashsystem.space"
+            "https://aicashsystem.space/apex-bot"
         )
         return
 
