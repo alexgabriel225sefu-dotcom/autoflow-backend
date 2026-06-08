@@ -391,17 +391,13 @@ _HELP = ("📋 <b>APEX BOT COMMANDS</b>\n"
 
 def _poll_loop():
     global _update_id
-    _poll_errors = 0
     while True:
         try:
             r = requests.get(f"{_API}/getUpdates",
                              params={"offset": _update_id, "timeout": 10,
                                      "allowed_updates": json.dumps(["message"])},
                              timeout=15)
-            data = r.json()
-            if not data.get("ok"):
-                print(f"[TG] getUpdates error: {data}")
-            for u in data.get("result", []):
+            for u in r.json().get("result", []):
                 _update_id = u["update_id"] + 1
                 msg = u.get("message", {})
                 raw = (msg.get("text") or "").strip()
@@ -409,9 +405,7 @@ def _poll_loop():
                 msg_id = msg.get("message_id")
                 if not raw or chat_id is None:
                     continue
-                print(f"[TG] msg from chat_id={chat_id} | configured={CHAT_ID} | match={str(chat_id)==str(CHAT_ID)}")
                 if str(chat_id) != str(CHAT_ID):
-                    print(f"[TG] IGNORED — chat_id {chat_id} != TELEGRAM_CHAT_ID {CHAT_ID}")
                     continue
 
                 # Active wizard step takes priority over /commands
@@ -446,10 +440,8 @@ def _poll_loop():
                     _handle_start(chat_id)
                 elif cmd_l == "/stop":
                     _handle_stop(chat_id)
-        except Exception as _e:
-            _poll_errors += 1
-            if _poll_errors <= 5 or _poll_errors % 30 == 0:
-                print(f"[TG] Poll error #{_poll_errors}: {type(_e).__name__}: {_e}")
+        except Exception:
+            pass
         time.sleep(2)
 
 
@@ -458,7 +450,6 @@ def start_polling(get_dash, exchange, control=None):
     if not TOKEN or not CHAT_ID:
         print(f"[TELEGRAM] Missing TOKEN={bool(TOKEN)} CHAT_ID={bool(CHAT_ID)} — polling disabled")
         return
-    print(f"[TELEGRAM] Token: ...{TOKEN[-10:]} | Chat ID: {CHAT_ID}")
     _get_dash = get_dash
     _exchange = exchange
     _bot_control = control or {}
