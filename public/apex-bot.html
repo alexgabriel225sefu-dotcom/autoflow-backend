@@ -152,24 +152,41 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 .cmd code{font:600 13px/1.2 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:6px;padding:3px 8px;white-space:nowrap;flex-shrink:0}
 .cmd span{font:400 13px/1.5 var(--f);color:var(--t1)}
 
-/* VIDEO */
+/* VIDEO / DEMO */
 .vid-wrap{display:grid;grid-template-columns:1.4fr 1fr;gap:clamp(28px,4vw,48px);align-items:center}
 @media(max-width:880px){.vid-wrap{grid-template-columns:1fr}}
-.vid-frame{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line2);background:#000;box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 50px rgba(255,45,79,.06);aspect-ratio:16/9}
-.vid-frame video{width:100%;height:100%;object-fit:cover;display:block;background:#000}
-.vid-poster{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:radial-gradient(circle at 50% 40%,rgba(255,45,79,.16),transparent 60%),var(--panel);cursor:pointer;transition:opacity .4s}
-.vid-poster.hide{opacity:0;pointer-events:none}
-.vid-play{width:72px;height:72px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;box-shadow:0 12px 40px var(--accglow);transition:transform .3s var(--ease)}
-.vid-poster:hover .vid-play{transform:scale(1.08)}
-.vid-play svg{width:28px;height:28px;fill:#fff;margin-left:4px}
-.vid-poster b{font:600 16px/1.3 var(--d);color:var(--t0)}
-.vid-poster span{font:400 12px/1 var(--m);color:var(--t2);letter-spacing:.1em;text-transform:uppercase}
 .vsteps{list-style:none;display:flex;flex-direction:column;gap:6px}
 .vstep{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
 .vstep:last-child{border-bottom:none}
 .vstep b{flex-shrink:0;width:28px;height:28px;border-radius:8px;background:var(--accdim);border:1px solid rgba(255,45,79,.26);color:var(--acc3);font:600 13px/28px var(--m);text-align:center}
 .vstep div{font:400 14px/1.55 var(--f);color:var(--t1)}
 .vstep div strong{color:var(--t0);font-weight:600}
+
+/* CHAT PLAYER ("video") */
+.cplayer{border-radius:18px;overflow:hidden;border:1px solid var(--line2);background:var(--panel);box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 50px rgba(255,45,79,.06)}
+.cp-frame{aspect-ratio:16/10;display:flex;flex-direction:column;background:#0b1622}
+.cp-head{display:flex;align-items:center;gap:11px;padding:13px 16px;background:linear-gradient(180deg,#17212b,#0e1620);border-bottom:1px solid rgba(255,255,255,.05);flex-shrink:0}
+.cp-id{flex:1;min-width:0}
+.cp-id b{font:600 14px/1.2 var(--f);color:#fff;display:block}
+.cp-id span{font:400 11px/1.2 var(--f);color:#5a86a8;transition:color .2s}
+.cp-id span.typing{color:var(--acc3)}
+.cp-rec{display:flex;align-items:center;gap:6px;font:600 10px/1 var(--m);letter-spacing:.14em;color:var(--acc3);border:1px solid rgba(255,45,79,.3);border-radius:6px;padding:5px 8px}
+.cp-rec i{width:7px;height:7px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc);animation:pulse 1.4s infinite}
+.cp-screen{flex:1;padding:18px 16px;display:flex;flex-direction:column;gap:9px;overflow:hidden;background:#0b1622;background-image:radial-gradient(rgba(255,255,255,.018) 1px,transparent 1px);background-size:22px 22px}
+.cp-screen .bub{max-width:74%}
+.cp-screen .bub.alert{align-self:flex-start;background:linear-gradient(135deg,#1d2c1f,#16231a);border:1px solid rgba(39,196,106,.25);color:#d6f5e2}
+.cp-screen .bub.alert.red{background:linear-gradient(135deg,#2c1d20,#231619);border-color:rgba(255,45,79,.28);color:#ffd9df}
+.cp-typing{align-self:flex-start;display:flex;align-items:center;gap:4px;background:#1c2733;border-radius:14px;border-bottom-left-radius:5px;padding:11px 14px}
+.cp-typing i{width:6px;height:6px;border-radius:50%;background:#5a86a8;animation:td 1.2s infinite}
+.cp-typing i:nth-child(2){animation-delay:.18s}.cp-typing i:nth-child(3){animation-delay:.36s}
+@keyframes td{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+.cp-controls{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg1);border-top:1px solid var(--line)}
+.cp-btn{flex-shrink:0;width:34px;height:34px;border-radius:9px;background:var(--panel2);border:1px solid var(--line2);color:var(--t0);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s}
+.cp-btn:hover{background:var(--hover);border-color:var(--acc)}
+.cp-btn svg{width:16px;height:16px}
+.cp-bar{flex:1;height:5px;border-radius:3px;background:var(--panel2);cursor:pointer;overflow:hidden}
+.cp-fill{height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc3));border-radius:3px;transition:width .25s linear}
+.cp-time{font:500 12px/1 var(--m);color:var(--t2);flex-shrink:0;min-width:34px;text-align:right}
 
 .steps{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 @media(max-width:880px){.steps{grid-template-columns:1fr 1fr}}
@@ -424,27 +441,38 @@ footer .disc{max-width:560px}
 <!-- VIDEO WALKTHROUGH -->
 <section class="wrap sec" id="video">
   <div class="sec-head rv center">
-    <span class="label">Step-by-Step</span>
-    <h2 class="h2">Watch the full setup — start to first trade.</h2>
-    <p class="lead center">A short walkthrough showing exactly how to deploy the bot and control it from Telegram. No experience needed.</p>
+    <span class="label">Live Demo</span>
+    <h2 class="h2">See every command, exactly as it replies.</h2>
+    <p class="lead center">A real recording of the full conversation between you and the bot — setup, keys, risk, live trade alerts and more. Plays automatically.</p>
   </div>
   <div class="vid-wrap">
-    <div class="vid-frame rv">
-      <video id="setupVideo" controls preload="none" playsinline poster="/apex-setup-poster.jpg">
-        <source src="/apex-setup.mp4" type="video/mp4">
-      </video>
-      <div class="vid-poster" id="vidPoster" onclick="playSetupVideo()">
-        <div class="vid-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-        <b>Apex Bot — Telegram Setup Walkthrough</b>
-        <span>Tap to play</span>
+    <div class="cplayer rv">
+      <div class="cp-frame">
+        <div class="cp-head">
+          <div class="tg-av">A</div>
+          <div class="cp-id"><b>Apex Trade Bot</b><span id="cpPresence">bot · online</span></div>
+          <span class="cp-rec"><i></i>DEMO</span>
+        </div>
+        <div class="cp-screen" id="cpScreen"></div>
+      </div>
+      <div class="cp-controls">
+        <button class="cp-btn" id="cpToggle" aria-label="Play / pause">
+          <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+          <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <div class="cp-bar" id="cpBar"><div class="cp-fill" id="cpFill"></div></div>
+        <span class="cp-time" id="cpTime">0:00</span>
+        <button class="cp-btn" id="cpReplay" aria-label="Replay" title="Replay">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        </button>
       </div>
     </div>
     <ol class="vsteps rv">
-      <li class="vstep"><b>1</b><div>Pay once, then tap <strong>Start Bot on Telegram</strong> — your license validates automatically.</div></li>
-      <li class="vstep"><b>2</b><div>Deploy to Railway in one click and add three variables. The video shows each field.</div></li>
-      <li class="vstep"><b>3</b><div>Send <strong>/setup</strong> to your bot — it walks you through exchange, paper mode and pair.</div></li>
-      <li class="vstep"><b>4</b><div>Use <strong>/risk</strong>, <strong>/symbol</strong> and <strong>/status</strong> to control everything from your phone.</div></li>
-      <li class="vstep"><b>5</b><div>Start in paper mode, watch it trade, then send <strong>/paper off</strong> to go live.</div></li>
+      <li class="vstep"><b>1</b><div>Send <strong>/setup</strong> — the bot walks you through exchange, paper mode and pair.</div></li>
+      <li class="vstep"><b>2</b><div><strong>/setkeys</strong> stores your API keys and instantly deletes the message for safety.</div></li>
+      <li class="vstep"><b>3</b><div>Tune it live: <strong>/risk 20</strong>, <strong>/symbol SOLUSDT</strong>, <strong>/paper off</strong>.</div></li>
+      <li class="vstep"><b>4</b><div><strong>/start</strong> and the bot trades — you get an alert the moment a position opens.</div></li>
+      <li class="vstep"><b>5</b><div>Check anytime with <strong>/status</strong>, and <strong>/stop</strong> pauses everything at once.</div></li>
     </ol>
   </div>
 </section>
@@ -674,13 +702,111 @@ document.querySelectorAll('.rv').forEach(function(el){obs.observe(el);});
   step();
 })();
 
-// VIDEO
-function playSetupVideo(){
-  var v=document.getElementById('setupVideo'),p=document.getElementById('vidPoster');
-  p.classList.add('hide');
-  try{v.play();}catch(e){}
-}
-document.getElementById('setupVideo').addEventListener('play',function(){document.getElementById('vidPoster').classList.add('hide');});
+// ─── CHAT PLAYER ("video" of the full bot interaction) ───
+(function(){
+  var screen=document.getElementById('cpScreen'),
+      presence=document.getElementById('cpPresence'),
+      fill=document.getElementById('cpFill'),
+      timeEl=document.getElementById('cpTime'),
+      bar=document.getElementById('cpBar'),
+      toggle=document.getElementById('cpToggle'),
+      replay=document.getElementById('cpReplay'),
+      icPause=toggle.querySelector('.ic-pause'),
+      icPlay=toggle.querySelector('.ic-play');
+
+  // type: 'me' user message · 'bot' reply · 'alert'(/'alert red') trade alert · 'note' system
+  var script=[
+    {ty:'me',  t:'/help'},
+    {ty:'bot', t:'📋 APEX BOT COMMANDS\n/setup · /config · /status\n/exchange · /paper · /risk\n/symbol · /setkeys\n/start · /stop · /help'},
+    {ty:'me',  t:'/setup'},
+    {ty:'bot', t:'⚙️ Setup wizard (1/3)\nWhich exchange?  binance / bybit / okx'},
+    {ty:'me',  t:'binance'},
+    {ty:'bot', t:'Paper trading (simulated money)?  yes / no'},
+    {ty:'me',  t:'yes'},
+    {ty:'bot', t:'Which pair should it trade?  e.g. SOLUSDT'},
+    {ty:'me',  t:'SOLUSDT'},
+    {ty:'bot', t:'✅ Setup complete!\nExchange: BINANCE · Paper: ON · Pair: SOLUSDT\nSend /setkeys to add API keys.'},
+    {ty:'me',  t:'/setkeys BINANCE_API_KEY=•••• BINANCE_API_SECRET=••••'},
+    {ty:'note',t:'🔒 message auto-deleted for security'},
+    {ty:'bot', t:'🔑 Saved 2 credentials.\nKey: 7Qd4•••• (hidden)'},
+    {ty:'me',  t:'/risk 20'},
+    {ty:'bot', t:'⚖️ Risk per trade set to 20% of balance.'},
+    {ty:'me',  t:'/paper off'},
+    {ty:'bot', t:'🔴 LIVE mode ON. Real funds will be used.'},
+    {ty:'me',  t:'/start'},
+    {ty:'bot', t:'▶️ Bot started. Trading is now active.'},
+    {ty:'alert',t:'🟢 LONG OPENED — SOLUSDT\n💰 @ $142.50  Qty: 1.4\n🛡 SL: $141.20  🎯 TP: $145.80'},
+    {ty:'me',  t:'/status'},
+    {ty:'bot', t:'💗 ACTIVE · tick #6\n💼 Balance: $100.00 → $101.85\n📈 LONG SOLUSDT  PnL: +1.85%'},
+    {ty:'alert',t:'✅ CLOSED — SOLUSDT  +$1.85 (+1.85%)\n🎯 Take-profit hit.'},
+    {ty:'me',  t:'/stop'},
+    {ty:'bot', t:'⏸️ Bot paused. No new trades will open.\nSend /start to resume.'}
+  ];
+
+  function dur(s){
+    if(s.ty==='me')return 900;
+    if(s.ty==='note')return 1100;
+    return Math.min(2600,1300+s.t.length*14);
+  }
+  var total=script.reduce(function(a,s){return a+dur(s);},0);
+
+  var idx=0,elapsed=0,playing=false,timer=null,typingEl=null;
+
+  function fmt(ms){var s=Math.round(ms/1000);return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2);}
+  function setProg(){fill.style.width=(Math.min(elapsed,total)/total*100)+'%';timeEl.textContent=fmt(Math.min(elapsed,total))+' / '+fmt(total);}
+
+  function showTyping(){
+    presence.textContent='typing…';presence.classList.add('typing');
+    typingEl=document.createElement('div');typingEl.className='cp-typing';
+    typingEl.innerHTML='<i></i><i></i><i></i>';
+    screen.appendChild(typingEl);screen.scrollTop=screen.scrollHeight;
+  }
+  function clearTyping(){presence.textContent='bot · online';presence.classList.remove('typing');if(typingEl){typingEl.remove();typingEl=null;}}
+
+  function addMsg(s){
+    if(s.ty==='note'){
+      var n=document.createElement('div');
+      n.style.cssText='align-self:center;font:400 11px/1.4 var(--m);color:#5a86a8;background:rgba(255,255,255,.04);border-radius:10px;padding:5px 12px;opacity:0;animation:bubIn .4s var(--ease) forwards';
+      n.textContent=s.t;screen.appendChild(n);
+    }else{
+      var b=document.createElement('div');
+      b.className=s.ty==='me'?'bub me':s.ty==='alert'?'bub alert':'bub bot';
+      b.textContent=s.t;screen.appendChild(b);
+    }
+    // keep the view trimmed so it scrolls like a recording
+    while(screen.children.length>9)screen.removeChild(screen.firstChild);
+    screen.scrollTop=screen.scrollHeight;
+  }
+
+  function next(){
+    if(idx>=script.length){playing=false;updateBtnIcon();return;}
+    var s=script[idx];
+    if(s.ty==='me'||s.ty==='note'){
+      addMsg(s);idx++;elapsed+=dur(s);setProg();
+      timer=setTimeout(next,dur(s));
+    }else{
+      showTyping();
+      timer=setTimeout(function(){
+        clearTyping();addMsg(s);idx++;elapsed+=dur(s);setProg();
+        timer=setTimeout(next,420);
+      },Math.min(1100,600+s.t.length*8));
+    }
+  }
+
+  function updateBtnIcon(){icPause.style.display=playing?'block':'none';icPlay.style.display=playing?'none':'block';}
+  function play(){if(playing)return;if(idx>=script.length)reset();playing=true;updateBtnIcon();next();}
+  function pause(){playing=false;clearTimeout(timer);clearTyping();updateBtnIcon();}
+  function reset(){clearTimeout(timer);clearTyping();screen.innerHTML='';idx=0;elapsed=0;setProg();}
+
+  toggle.addEventListener('click',function(){playing?pause():play();});
+  replay.addEventListener('click',function(){reset();play();});
+  bar.addEventListener('click',function(){ /* restart from beginning for simplicity */ reset();play();});
+
+  setProg();
+  // autoplay once the player scrolls into view
+  var started=false;
+  new IntersectionObserver(function(en,o){en.forEach(function(e){if(e.isIntersecting&&!started){started=true;play();o.disconnect();}});},{threshold:.4}).observe(screen);
+})();
 
 // ─── STRIPE CHECKOUT ───
 var STRIPE_PK='pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS';
