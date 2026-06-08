@@ -255,17 +255,25 @@ footer .disc{max-width:560px}
 .lg1{stop-color:#7a1020}.lg2{stop-color:#ff5c74}
 
 /* CHECKOUT MODAL */
-#apexModal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(3,3,5,.82);backdrop-filter:blur(8px)}
+#apexModal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(3,3,5,.88);backdrop-filter:blur(10px)}
 #apexModal.open{display:flex}
-.am-card{width:100%;max-width:430px;max-height:94vh;overflow-y:auto;background:linear-gradient(165deg,var(--panel2),var(--panel));border:1px solid var(--line2);border-radius:20px;position:relative;box-shadow:0 40px 100px rgba(0,0,0,.7),0 0 60px rgba(255,45,79,.08);scrollbar-width:none}
+.am-card{width:100%;max-width:420px;max-height:94vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line2);border-radius:20px;position:relative;box-shadow:0 40px 100px rgba(0,0,0,.75),0 0 0 1px rgba(255,45,79,.05);scrollbar-width:none}
 .am-card::-webkit-scrollbar{display:none}
-.am-close{position:absolute;top:14px;right:16px;width:30px;height:30px;border-radius:50%;background:var(--panel);border:1px solid var(--line2);color:var(--t1);font-size:18px;cursor:pointer;z-index:2;transition:all .2s}
-.am-close:hover{color:var(--t0);border-color:var(--line2);background:var(--hover)}
-.am-head{padding:30px 30px 18px;border-bottom:1px solid var(--line);text-align:center}
-.am-tag{display:inline-block;font:500 10px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.3);border-radius:100px;padding:5px 11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
-.am-title{font:600 22px/1.1 var(--d);letter-spacing:-.02em;margin-bottom:8px}
-.am-price{font:600 38px/1 var(--d);color:var(--t0)}
-.am-body{padding:24px 30px 30px}
+.am-close{position:absolute;top:14px;right:16px;width:30px;height:30px;border-radius:50%;background:var(--bg1);border:1px solid var(--line);color:var(--t1);font-size:18px;cursor:pointer;z-index:2;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.am-close:hover{color:var(--t0);background:var(--hover)}
+.am-head{padding:24px 26px 20px;border-bottom:1px solid var(--line)}
+.am-prod-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.am-prod-icon{width:40px;height:40px;border-radius:12px;background:var(--accdim);border:1px solid rgba(255,45,79,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.am-prod-info{flex:1}
+.am-tag{display:inline-block;font:500 10px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.25);border-radius:100px;padding:4px 10px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
+.am-title{font:600 17px/1.1 var(--d);letter-spacing:-.01em}
+.am-price-col{text-align:right;flex-shrink:0}
+.am-price{font:700 28px/1 var(--d);color:var(--t0);letter-spacing:-.02em}
+.am-price-note{font:400 10px/1 var(--m);color:var(--t2);margin-top:3px;letter-spacing:.04em;text-transform:uppercase}
+.am-features{display:flex;flex-direction:column;gap:8px}
+.am-feat{display:flex;align-items:center;gap:9px;font:400 13px/1 var(--f);color:var(--t1)}
+.am-feat svg{flex-shrink:0;color:var(--up)}
+.am-body{padding:22px 26px 26px}
 .am-field{margin-bottom:14px}
 .am-label{display:block;font:500 11px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px}
 .am-input{width:100%;background:var(--bg1);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;font:400 14px/1.2 var(--f);color:var(--t0);transition:border-color .2s;outline:none}
@@ -273,31 +281,24 @@ footer .disc{max-width:560px}
 .am-input::placeholder{color:var(--t2)}
 .stripe-el{background:var(--bg1);border:1px solid var(--line2);border-radius:10px;padding:13px 14px;transition:border-color .2s}
 .stripe-el.focused{border-color:var(--acc)}
-.am-card-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-#am-card-error{font:400 11px/1.4 var(--m);color:var(--acc2);margin-top:7px;min-height:14px}
-.am-wallets{display:grid;gap:8px;margin-bottom:14px}
-.am-wallet-btn{background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .2s;font:600 13px/1 var(--f);color:var(--t0)}
-.am-wallet-btn:hover{background:var(--hover);border-color:var(--line2)}
-.am-separator{display:flex;align-items:center;gap:10px;margin:6px 0 16px;color:var(--t2);font:400 11px/1 var(--m)}
-.am-separator::before,.am-separator::after{content:'';flex:1;height:1px;background:var(--line)}
-.am-checks{display:flex;flex-direction:column;gap:10px;margin:16px 0}
-.am-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
-.am-check input{width:15px;height:15px;flex-shrink:0;margin-top:2px;accent-color:var(--acc);cursor:pointer}
-.am-check-txt{font:400 11px/1.55 var(--f);color:var(--t1)}
-.am-check-txt a{color:var(--acc3);text-decoration:underline}
-.am-submit{width:100%;background:var(--acc);color:#fff;font:600 15px/1 var(--f);padding:16px;border-radius:12px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;transition:all .25s var(--ease);box-shadow:0 8px 30px var(--accdim)}
+#am-card-error{font:400 11px/1.4 var(--m);color:var(--acc2);margin-top:6px;min-height:14px}
+.am-terms{display:flex;align-items:flex-start;gap:9px;cursor:pointer;margin:14px 0}
+.am-terms input{width:15px;height:15px;flex-shrink:0;margin-top:2px;accent-color:var(--acc);cursor:pointer}
+.am-terms span{font:400 11px/1.55 var(--f);color:var(--t1)}
+.am-terms a{color:var(--acc3);text-decoration:underline}
+.am-submit{width:100%;background:var(--acc);color:#fff;font:600 15px/1 var(--f);padding:16px;border-radius:12px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;transition:all .25s var(--ease);box-shadow:0 8px 30px var(--accdim)}
 .am-submit:hover:not(:disabled){background:var(--acc2);box-shadow:0 12px 40px var(--accglow)}
-.am-submit:disabled{opacity:.4;cursor:not-allowed}
+.am-submit:disabled{opacity:.35;cursor:not-allowed}
 .am-spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
-.am-note{font:400 10px/1.4 var(--m);color:var(--t2);text-align:center;margin-top:12px}
-.am-success{padding:44px 30px;text-align:center;display:none}
+.am-secure{display:flex;align-items:center;justify-content:center;gap:7px;font:400 10px/1 var(--m);color:var(--t2);margin-top:14px;letter-spacing:.03em}
+.am-success{padding:44px 26px;text-align:center;display:none}
 .am-success-icon{margin-bottom:18px;color:var(--up);display:flex;justify-content:center}
 .am-success h3{font:600 24px/1.1 var(--d);margin-bottom:10px}
 .am-success p{font:400 13px/1.7 var(--f);color:var(--t1)}
 .am-tg-btn{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--tg);color:#fff;font:600 15px/1 var(--f);padding:15px 20px;border-radius:12px;text-decoration:none;margin-bottom:10px;transition:all .25s var(--ease);box-shadow:0 8px 30px rgba(42,171,238,.25)}
 .am-tg-btn:hover{background:#3bb6f0;box-shadow:0 12px 40px rgba(42,171,238,.45)}
-.am-cfg-btn{display:flex;align-items:center;justify-content:center;background:var(--panel);color:var(--t0);font:600 13px/1 var(--f);padding:12px 20px;border-radius:12px;border:1px solid var(--line2);text-decoration:none;transition:all .2s}
+.am-cfg-btn{display:flex;align-items:center;justify-content:center;background:var(--bg1);color:var(--t0);font:600 13px/1 var(--f);padding:12px 20px;border-radius:12px;border:1px solid var(--line2);text-decoration:none;transition:all .2s}
 .am-cfg-btn:hover{background:var(--hover)}
 </style>
 <body>
@@ -584,55 +585,64 @@ footer .disc{max-width:560px}
     <button class="am-close" onclick="closeApexModal()">×</button>
     <div id="amForm">
       <div class="am-head">
-        <span class="am-tag">One-Time Payment</span>
-        <div class="am-title">Apex Trade Bot</div>
-        <div class="am-price">$297</div>
+        <div class="am-prod-row">
+          <div class="am-prod-icon">
+            <svg width="22" height="22" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <rect x="3" y="19" width="5" height="10" rx="2.5" fill="#ff5c74" opacity=".45"/>
+              <rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="#ff5c74" opacity=".72"/>
+              <rect x="20" y="6" width="5" height="23" rx="2.5" fill="#ff5c74"/>
+            </svg>
+          </div>
+          <div class="am-prod-info">
+            <span class="am-tag">One-Time · No Subscription</span>
+            <div class="am-title">Apex Trade Bot</div>
+          </div>
+          <div class="am-price-col">
+            <div class="am-price">$297</div>
+            <div class="am-price-note">one time</div>
+          </div>
+        </div>
+        <div class="am-features">
+          <div class="am-feat">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Full source code — you own it forever
+          </div>
+          <div class="am-feat">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Telegram control + 1-click Railway deploy
+          </div>
+          <div class="am-feat">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Binance · Bybit · OKX · Kraken + 5 more
+          </div>
+        </div>
       </div>
       <div class="am-body">
-        <div class="am-wallets">
-          <button class="am-wallet-btn" onclick="handleWalletPay('apple')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-            Apple Pay
-          </button>
-          <button class="am-wallet-btn" onclick="handleWalletPay('google')">
-            <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-            Google Pay
-          </button>
-        </div>
-        <div class="am-separator">or pay using credit card</div>
         <div class="am-field">
-          <label class="am-label">Card holder full name</label>
-          <input id="amName" class="am-input" type="text" placeholder="Enter your full name" autocomplete="name">
+          <label class="am-label">Full Name</label>
+          <input id="amName" class="am-input" type="text" placeholder="Your full name" autocomplete="name">
         </div>
         <div class="am-field">
-          <label class="am-label">Email</label>
+          <label class="am-label">Email address</label>
           <input id="amEmail" class="am-input" type="email" placeholder="you@email.com" autocomplete="email">
         </div>
         <div class="am-field">
-          <label class="am-label">Card Number</label>
-          <div id="am-cardnumber" class="stripe-el"></div>
-        </div>
-        <div class="am-card-row">
-          <div class="am-field">
-            <label class="am-label">Expiry Date</label>
-            <div id="am-cardexpiry" class="stripe-el"></div>
-          </div>
-          <div class="am-field">
-            <label class="am-label">CVV</label>
-            <div id="am-cardcvc" class="stripe-el"></div>
-          </div>
+          <label class="am-label">Card details</label>
+          <div id="am-card" class="stripe-el"></div>
         </div>
         <div id="am-card-error"></div>
-        <div class="am-checks">
-          <label class="am-check"><input type="checkbox" id="ck1" onchange="updateBtn()"><span class="am-check-txt">I accept the <strong>risk of loss</strong> — crypto trading involves significant financial risk.</span></label>
-          <label class="am-check"><input type="checkbox" id="ck2" onchange="updateBtn()"><span class="am-check-txt">This is NOT financial advice. Sales are final after digital delivery.</span></label>
-          <label class="am-check"><input type="checkbox" id="ck3" onchange="updateBtn()"><span class="am-check-txt">I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
-        </div>
+        <label class="am-terms">
+          <input type="checkbox" id="ck1" onchange="updateBtn()">
+          <span>I accept the financial risk — crypto trading can result in losses. This is NOT financial advice. Sales are final after digital delivery. I agree to the <a href="/terms" target="_blank">Terms of Service</a>.</span>
+        </label>
         <button id="amBtn" class="am-submit" disabled onclick="submitApexPayment()">
           <span id="amSpinner" class="am-spinner"></span>
           <span id="amBtnTxt">Accept terms to continue</span>
         </button>
-        <p class="am-note">Stripe encrypted · One-time · No subscription</p>
+        <div class="am-secure">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Secured by Stripe · 256-bit SSL encrypted
+        </div>
       </div>
     </div>
     <div class="am-success" id="amSuccess">
@@ -801,12 +811,8 @@ document.querySelectorAll('.rv').forEach(function(el){obs.observe(el);});
 
 // ─── STRIPE CHECKOUT ───
 var STRIPE_PK='pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS';
-var apexStripe,apexCardNum,apexCardExp,apexCardCvc;
-var elStyle={base:{color:'#f5f5f7',fontFamily:'"Satoshi",-apple-system,sans-serif',fontSize:'14px','::placeholder':{color:'#56565f'},iconColor:'#ff5c74'},invalid:{color:'#ff5c74'}};
-
-function handleWalletPay(type){
-  document.getElementById('am-card-error').textContent='Use '+(type==='apple'?'Apple':'Google')+' Pay via your browser if available, or complete the card form below.';
-}
+var apexStripe,apexCard;
+var elStyle={base:{color:'#f5f5f7',fontFamily:'"Satoshi",-apple-system,sans-serif',fontSize:'14px',lineHeight:'1.5','::placeholder':{color:'#56565f'},iconColor:'#ff5c74'},invalid:{color:'#ff5c74'}};
 
 function openApexModal(){
   document.getElementById('apexModal').classList.add('open');
@@ -814,18 +820,11 @@ function openApexModal(){
   if(!apexStripe){
     apexStripe=Stripe(STRIPE_PK);
     var els=apexStripe.elements();
-    apexCardNum=els.create('cardNumber',{style:elStyle,showIcon:true,placeholder:'0000 0000 0000 0000'});
-    apexCardExp=els.create('cardExpiry',{style:elStyle,placeholder:'MM / YY'});
-    apexCardCvc=els.create('cardCvc',{style:elStyle,placeholder:'CVV'});
-    apexCardNum.mount('#am-cardnumber');
-    apexCardExp.mount('#am-cardexpiry');
-    apexCardCvc.mount('#am-cardcvc');
-    [apexCardNum,apexCardExp,apexCardCvc].forEach(function(el,i){
-      var ids=['am-cardnumber','am-cardexpiry','am-cardcvc'];
-      el.on('focus',function(){document.getElementById(ids[i]).classList.add('focused');});
-      el.on('blur',function(){document.getElementById(ids[i]).classList.remove('focused');});
-      el.on('change',function(e){document.getElementById('am-card-error').textContent=e.error?e.error.message:'';});
-    });
+    apexCard=els.create('card',{style:elStyle,hidePostalCode:true});
+    apexCard.mount('#am-card');
+    apexCard.on('focus',function(){document.getElementById('am-card').classList.add('focused');});
+    apexCard.on('blur',function(){document.getElementById('am-card').classList.remove('focused');});
+    apexCard.on('change',function(e){document.getElementById('am-card-error').textContent=e.error?e.error.message:'';});
   }
 }
 function closeApexModal(){
@@ -834,9 +833,9 @@ function closeApexModal(){
 }
 document.getElementById('apexModal').addEventListener('click',function(e){if(e.target===this)closeApexModal();});
 function updateBtn(){
-  var all=['ck1','ck2','ck3'].every(function(id){return document.getElementById(id).checked;});
-  document.getElementById('amBtn').disabled=!all;
-  document.getElementById('amBtnTxt').textContent=all?'Checkout — $297':'Accept terms to continue';
+  var checked=document.getElementById('ck1').checked;
+  document.getElementById('amBtn').disabled=!checked;
+  document.getElementById('amBtnTxt').textContent=checked?'Pay $297 Securely →':'Accept terms to continue';
 }
 async function submitApexPayment(){
   var name=document.getElementById('amName').value.trim();
@@ -851,7 +850,7 @@ async function submitApexPayment(){
     var d=await r.json();
     if(d.error){err.textContent=d.error;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';return;}
     var _pendingKey=d.pendingKey||'';
-    var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCardNum,billing_details:{name:name,email:email}}});
+    var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCard,billing_details:{name:name,email:email}}});
     if(result.error){
       err.textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
     }else if(result.paymentIntent.status==='succeeded'){
