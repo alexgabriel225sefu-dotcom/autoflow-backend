@@ -20,7 +20,6 @@
   --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
   --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;
   --accdim:rgba(255,45,79,.12);--accglow:rgba(255,45,79,.45);
-  --cta:#f59e0b;--cta-glow:rgba(245,158,11,.45);--cta-dim:rgba(245,158,11,.12);
   --tg:#2aabee;--tgdim:rgba(42,171,238,.12);
   --up:#27c46a;--down:#ff2d4f;
   --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
@@ -43,8 +42,8 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 .nav-links{display:flex;gap:28px}
 .nav-links a{font:500 14px/1 var(--f);color:var(--t1);transition:color .2s}
 .nav-links a:hover{color:var(--t0)}
-.nav-cta{background:var(--cta);color:#1a0d00;font:600 14px/1 var(--f);border-radius:10px;padding:11px 19px;transition:all .25s var(--ease);cursor:pointer;border:none}
-.nav-cta:hover{background:#fbbf24;box-shadow:0 6px 28px var(--cta-glow)}
+.nav-cta{background:var(--acc);color:#fff;font:600 14px/1 var(--f);border-radius:10px;padding:11px 19px;transition:all .25s var(--ease);cursor:pointer;border:none}
+.nav-cta:hover{background:var(--acc2);box-shadow:0 6px 28px var(--accglow)}
 @media(max-width:880px){.nav-links{display:none}}
 
 .wrap{max-width:1280px;margin:0 auto;padding:0 clamp(16px,4vw,46px);position:relative;z-index:2}
@@ -71,8 +70,8 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 #hero h1 .grad{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 30px rgba(255,45,79,.35))}
 .hero-cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:30px 0 30px}
 .btn{display:inline-flex;align-items:center;gap:10px;font:600 15px/1 var(--f);border-radius:12px;padding:15px 24px;cursor:pointer;border:none;transition:all .3s var(--ease);will-change:transform}
-.btn-primary{background:var(--cta);color:#1a0d00;box-shadow:0 8px 30px var(--cta-dim)}
-.btn-primary:hover{background:#fbbf24;box-shadow:0 14px 44px var(--cta-glow)}
+.btn-primary{background:var(--acc);color:#fff;box-shadow:0 8px 30px var(--accdim)}
+.btn-primary:hover{background:var(--acc2);box-shadow:0 14px 44px var(--accglow)}
 .btn-ghost{background:var(--panel);color:var(--t0);border:1px solid var(--line2)}
 .btn-ghost:hover{background:var(--hover)}
 .hero-meta{display:flex;gap:30px;flex-wrap:wrap}
