@@ -1529,154 +1529,197 @@ publicPages.forEach(p => {
 // ── BOT EMAIL HTML — funcție separată reutilizabilă ──────────────────────────
 function _buildBotEmailHtml(safeName, safeEmail, licenseKey = 'APEX-XXXX-XXXX-XXXX', botUsername = '') {
   const firstName = safeName.split(' ')[0];
-  const chip = (t,c='#f59e0b') => `<span style="display:inline-block;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:4px;padding:1px 7px;color:${c};font-family:'Courier New',monospace;font-size:11px;font-weight:700;letter-spacing:0.3px">${t}</span>`;
+  const envRow = (k, v) => `<tr>
+    <td style="padding:9px 14px 9px 0;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top;border-bottom:1px solid rgba(255,255,255,0.05)">${k}</td>
+    <td style="padding:9px 0;font-size:12px;color:#94a3b8;font-family:Arial,sans-serif;line-height:1.7;vertical-align:top;border-bottom:1px solid rgba(255,255,255,0.05)">${v}</td>
+  </tr>`;
+  const code = (t) => `<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:11px;font-weight:700">${t}</span>`;
+  const pill = (t, c='#f59e0b', bg='rgba(245,158,11,0.12)', br='rgba(245,158,11,0.3)') =>
+    `<span style="background:${bg};border:1px solid ${br};border-radius:4px;padding:1px 7px;color:${c};font-family:'Courier New',monospace;font-size:11px;font-weight:700">${t}</span>`;
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-body{margin:0;padding:0;background:#04060f;font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased}
-table{border-collapse:collapse;mso-table-lspace:0;mso-table-rspace:0}
-img{border:0;display:block;outline:none}
+body,table,td,p,a,li,blockquote{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+table,td{mso-table-lspace:0;mso-table-rspace:0}
+img{border:0;outline:none;text-decoration:none;display:block}
+body{margin:0;padding:0;background:#060608}
 a{text-decoration:none}
-.wrap{max-width:600px;margin:0 auto;background:#04060f}
-
-@media only screen and (max-width:600px){.key-text{font-size:20px!important;letter-spacing:2px!important}.hero-title{font-size:28px!important}.pad{padding:20px 16px!important}}
+@media only screen and (max-width:600px){
+  .key-mono{font-size:18px!important;letter-spacing:2px!important}
+  .hero-h1{font-size:26px!important}
+  .outer-pad{padding:24px 12px 0!important}
+  .inner-pad{padding:28px 20px!important}
+}
 </style></head>
-<body style="margin:0;padding:0;background:#04060f">
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#04060f">
-<tr><td align="center" style="padding:32px 16px 0">
+<body style="margin:0;padding:0;background:#060608">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;min-height:100vh">
+<tr><td class="outer-pad" align="center" style="padding:36px 16px 0">
 
-<!-- WRAPPER -->
+<!-- ── OUTER WRAPPER ── -->
 <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%">
 
-<!-- ── HEADER ── -->
-<tr><td align="center" style="background:#070b1c;border:1px solid rgba(245,158,11,0.15);border-bottom:none;border-radius:16px 16px 0 0;padding:40px 40px 32px">
-  <p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#f59e0b;font-family:Arial,sans-serif">ACCESS GRANTED</p>
-  <p style="margin:0 0 8px;font-size:36px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:-1px;line-height:1.1">Apex Trade Bot</p>
-  <p style="margin:0 0 16px;font-size:36px;font-weight:900;color:#f59e0b;font-family:Arial,sans-serif;letter-spacing:-1px;line-height:1.1">is yours, ${firstName}.</p>
-  <p style="margin:0;font-size:15px;color:#9ca3af;font-family:Arial,sans-serif;line-height:1.7">Your AI-powered crypto trading bot is ready to deploy.<br>Follow the steps below — live in under 10 minutes.</p>
+<!-- TOP LABEL -->
+<tr><td align="center" style="padding:0 0 20px">
+  <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:3.5px;text-transform:uppercase;color:#374151;font-family:Arial,sans-serif">APEX TRADE BOT &nbsp;&bull;&nbsp; PURCHASE CONFIRMATION</p>
 </td></tr>
 
-<!-- ── LICENSE KEY ── -->
-<tr><td style="background:#070b1c;border-left:1px solid rgba(245,158,11,0.15);border-right:1px solid rgba(245,158,11,0.15);padding:0 40px 32px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(245,158,11,0.06);border:2px solid rgba(245,158,11,0.4);border-radius:12px">
-    <tr><td style="padding:24px 28px">
-      <p style="margin:0 0 12px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#f59e0b;font-family:Arial,sans-serif">YOUR LICENSE KEY</p>
-      <p class="key-text" style="margin:0 0 12px;font-family:'Courier New',Courier,monospace;font-size:26px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#000000;border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:14px 20px">${licenseKey}</p>
-      <p style="margin:0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;text-align:center">Add this to Railway Variables as <span style="color:#f59e0b;font-family:'Courier New',monospace;font-weight:700">LICENSE_KEY</span></p>
+<!-- ── HEADER CARD ── -->
+<tr><td style="background:#0a0d18;border:1px solid rgba(255,255,255,0.07);border-bottom:none;border-radius:18px 18px 0 0">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+
+    <!-- red top accent bar -->
+    <tr><td style="background:linear-gradient(90deg,#ff2d4f,#c9193a);height:3px;border-radius:17px 17px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
+
+    <!-- header content -->
+    <tr><td class="inner-pad" align="center" style="padding:36px 40px 32px">
+      <!-- ACCESS GRANTED chip -->
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 24px">
+        <tr><td style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:20px;padding:5px 16px">
+          <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#22c55e;font-family:Arial,sans-serif">&#10003;&nbsp; ACCESS GRANTED</p>
+        </td></tr>
+      </table>
+      <!-- headline -->
+      <p class="hero-h1" style="margin:0 0 6px;font-size:32px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">Your bot is ready,</p>
+      <p class="hero-h1" style="margin:0 0 20px;font-size:32px;font-weight:900;color:#ff2d4f;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">${firstName}.</p>
+      <p style="margin:0;font-size:14px;color:#64748b;font-family:Arial,sans-serif;line-height:1.75;max-width:420px">Apex Trade Bot is fully set up and ready to deploy.<br>Follow the steps below — you can be live in under 10 minutes.</p>
     </td></tr>
   </table>
 </td></tr>
 
-<!-- ── CTA BUTTON ── -->
-<tr><td style="background:#070b1c;border-left:1px solid rgba(245,158,11,0.15);border-right:1px solid rgba(245,158,11,0.15);padding:8px 40px 32px;text-align:center">
-  ${botUsername ? `<a href="https://t.me/${botUsername}?start=${licenseKey}" style="display:inline-block;background:#f59e0b;color:#000000;font-family:Arial,sans-serif;font-size:15px;font-weight:900;padding:16px 44px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">Start Bot on Telegram &rarr;</a>
-  <p style="margin:10px 0 10px;font-size:12px;color:#4b5563;font-family:Arial,sans-serif">Tap above to activate your bot directly in Telegram</p>
-  <a href="https://aicashsystem.space/configurator?key=${licenseKey}" style="display:inline-block;color:#6b7280;font-family:Arial,sans-serif;font-size:12px;padding:6px 16px;text-decoration:underline">or setup manually via the configurator</a>` : `<a href="https://aicashsystem.space/configurator?key=${licenseKey}" style="display:inline-block;background:#f59e0b;color:#000000;font-family:Arial,sans-serif;font-size:15px;font-weight:900;padding:16px 44px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">Open Bot Configurator &rarr;</a>
-  <p style="margin:12px 0 0;font-size:12px;color:#4b5563;font-family:Arial,sans-serif">Click above to configure and deploy your bot</p>`}
+<!-- ── LICENSE KEY CARD ── -->
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,45,79,0.3);border-radius:12px">
+    <tr>
+      <!-- left red accent line -->
+      <td style="background:#ff2d4f;width:4px;border-radius:12px 0 0 12px;font-size:0;line-height:0">&nbsp;</td>
+      <td style="padding:22px 24px">
+        <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#ff2d4f;font-family:Arial,sans-serif">YOUR LICENSE KEY &mdash; KEEP THIS SAFE</p>
+        <p class="key-mono" style="margin:0 0 14px;font-family:'Courier New',Courier,monospace;font-size:24px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px 12px;word-break:break-all">${licenseKey}</p>
+        <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Add this to Railway environment variables as ${code('LICENSE_KEY')}</p>
+      </td>
+    </tr>
+  </table>
 </td></tr>
 
-<!-- ── DIVIDER ── -->
-<tr><td style="background:#070b1c;border-left:1px solid rgba(245,158,11,0.15);border-right:1px solid rgba(245,158,11,0.15);padding:0 40px 24px">
+<!-- ── PRIMARY CTA ── -->
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:4px 32px 32px;text-align:center">
+  ${botUsername
+    ? `<a href="https://t.me/${botUsername}?start=${licenseKey}" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:900;padding:16px 42px;border-radius:10px;text-decoration:none;letter-spacing:0.3px;mso-padding-alt:0">Activate on Telegram &rarr;</a>
+       <p style="margin:14px 0 4px;font-size:12px;color:#374151;font-family:Arial,sans-serif">Tap above to link your license and start setup in Telegram</p>
+       <a href="https://aicashsystem.space/configurator?key=${licenseKey}" style="font-size:12px;color:#475569;font-family:Arial,sans-serif;text-decoration:underline">or use the web configurator</a>`
+    : `<a href="https://aicashsystem.space/configurator?key=${licenseKey}" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:900;padding:16px 42px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">Open Bot Configurator &rarr;</a>
+       <p style="margin:14px 0 0;font-size:12px;color:#374151;font-family:Arial,sans-serif">Click above to configure and deploy your bot</p>`}
+</td></tr>
+
+<!-- ── SECTION DIVIDER: GETTING STARTED ── -->
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 24px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
     <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
-    <td style="white-space:nowrap;padding:0 16px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#374151;font-family:Arial,sans-serif">GETTING STARTED</td>
+    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#1e293b;font-family:Arial,sans-serif">SETUP GUIDE</td>
     <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
   </tr></table>
 </td></tr>
 
 <!-- ── STEP 1: BINANCE API ── -->
-<tr><td style="background:#070b1c;border-left:1px solid rgba(245,158,11,0.15);border-right:1px solid rgba(245,158,11,0.15);padding:0 40px 16px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.12);border-radius:12px">
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 16px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
     <tr><td style="padding:22px 24px">
-      <p style="margin:0 0 16px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#f59e0b;font-family:Arial,sans-serif">STEP 1 &mdash; GET YOUR BINANCE API KEYS</p>
+      <!-- step header -->
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
+        <tr>
+          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">1</td>
+          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:0.2px">Get your Binance API keys</td>
+        </tr>
+      </table>
+      <!-- sub-steps -->
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr><td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
-          <p style="margin:0;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">1. Create a Binance account</p>
-          <p style="margin:4px 0 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;line-height:1.7">Go to binance.com &rarr; Sign up &rarr; Complete ID verification to unlock spot trading</p>
+        <tr><td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
+          <p style="margin:0;font-size:13px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">Create a Binance account</p>
+          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">binance.com &rarr; Sign up &rarr; Complete ID verification to unlock spot trading</p>
         </td></tr>
-        <tr><td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
-          <p style="margin:0;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">2. Open API Management</p>
-          <p style="margin:4px 0 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;line-height:1.7">Profile icon &rarr; <strong style="color:#d1d5db">API Management</strong> &rarr; <strong style="color:#d1d5db">Create API</strong> &rarr; System generated</p>
+        <tr><td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
+          <p style="margin:0;font-size:13px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">Open API Management</p>
+          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">Profile icon &rarr; API Management &rarr; Create API &rarr; System generated</p>
         </td></tr>
-        <tr><td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
-          <p style="margin:0;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">3. Set permissions</p>
-          <p style="margin:4px 0 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;line-height:1.7">Enable: <strong style="color:#d1d5db">Enable Reading</strong> + <strong style="color:#d1d5db">Enable Spot &amp; Margin Trading</strong> &mdash; leave Withdrawals OFF. IP restriction: unrestricted.</p>
+        <tr><td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
+          <p style="margin:0;font-size:13px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">Set permissions correctly</p>
+          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">Enable: <strong style="color:#e2e8f0">Reading</strong> + <strong style="color:#e2e8f0">Spot &amp; Margin Trading</strong> &mdash; leave Withdrawals <strong style="color:#f87171">OFF</strong>. IP restriction: unrestricted.</p>
         </td></tr>
-        <tr><td style="padding:10px 0;vertical-align:top">
-          <p style="margin:0;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">4. Save keys immediately</p>
-          <p style="margin:4px 0 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;line-height:1.7">Copy both <strong style="color:#d1d5db">API Key</strong> and <strong style="color:#d1d5db">Secret Key</strong> now. <span style="color:#f87171;font-weight:600">The Secret is shown only once.</span></p>
+        <tr><td style="padding:8px 0;vertical-align:top">
+          <p style="margin:0;font-size:13px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">Save both keys immediately</p>
+          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">Copy API Key + Secret Key now. <span style="color:#f87171;font-weight:700">The Secret is shown only once.</span></p>
         </td></tr>
       </table>
     </td></tr>
   </table>
 </td></tr>
 
-<!-- ── STEP 2: ENV VARS ── -->
-<tr><td style="background:#070b1c;border-left:1px solid rgba(245,158,11,0.15);border-right:1px solid rgba(245,158,11,0.15);padding:16px 40px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:12px">
+<!-- ── STEP 2: FREE GROQ KEY ── -->
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
     <tr><td style="padding:22px 24px">
-      <p style="margin:0 0 16px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#9ca3af;font-family:Arial,sans-serif">STEP 2 &mdash; RAILWAY ENV VARIABLES</p>
-      <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top;min-width:150px">LICENSE_KEY</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;line-height:1.7;vertical-align:top">Your key above &mdash; <span style="color:#f59e0b;font-family:'Courier New',monospace;font-weight:700">${licenseKey}</span></td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">EXCHANGE</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">Set to <span style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 6px;color:#f59e0b;font-family:'Courier New',monospace;font-weight:700">binance</span></td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">BINANCE_API_KEY</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">The API Key from Step 1</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">BINANCE_API_SECRET</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">The Secret Key from Step 1 &mdash; <strong style="color:#d1d5db">shown only once</strong></td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">GROQ_API_KEY</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top"><strong style="color:#d1d5db">Required</strong> &mdash; Free AI key. Go to <a href="https://console.groq.com" style="color:#f59e0b">console.groq.com</a> &rarr; API Keys &rarr; Create API Key (no card needed)</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">PAPER_TRADING</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">Start with <span style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);border-radius:4px;padding:1px 6px;color:#22c55e;font-family:'Courier New',monospace;font-weight:700">true</span> (simulated money). Change to <span style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 6px;color:#f59e0b;font-family:'Courier New',monospace;font-weight:700">false</span> to go live.</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">PAPER_BALANCE</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">Simulated balance. Default: <span style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 6px;color:#f59e0b;font-family:'Courier New',monospace;font-weight:700">10</span> (= $10 USDT)</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">TRADE_SYMBOL</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">Optional. E.g. <span style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 6px;color:#f59e0b;font-family:'Courier New',monospace;font-weight:700">DOGEUSDT</span>. Default: AI picks best coin automatically.</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">TELEGRAM_BOT_TOKEN</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">Optional &mdash; live trade alerts on your phone</td>
-        </tr>
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px">
         <tr>
-          <td style="padding:10px 16px 10px 0;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">TELEGRAM_CHAT_ID</td>
-          <td style="padding:10px 0;font-size:12px;color:#6b7280;font-family:Arial,sans-serif;vertical-align:top">Optional &mdash; your Telegram chat ID</td>
+          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">2</td>
+          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">Get your free Groq AI key</td>
         </tr>
       </table>
+      <p style="margin:0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Go to <a href="https://console.groq.com" style="color:#f59e0b;font-weight:700">console.groq.com</a> &rarr; Sign up (free) &rarr; API Keys &rarr; Create Key. <strong style="color:#e2e8f0">No credit card required.</strong> This powers the AI signal engine.</p>
+    </td></tr>
+  </table>
+</td></tr>
+
+<!-- ── STEP 3: RAILWAY ENV VARS ── -->
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
+    <tr><td style="padding:22px 24px">
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
+        <tr>
+          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">3</td>
+          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">Deploy on Railway — set environment variables</td>
+        </tr>
+      </table>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        ${envRow('LICENSE_KEY', `Your key &mdash; ${pill(licenseKey)}`)}
+        ${envRow('EXCHANGE', `Set to ${pill('binance')}`)}
+        ${envRow('BINANCE_API_KEY', 'API Key from Step 1')}
+        ${envRow('BINANCE_API_SECRET', 'Secret Key from Step 1 &mdash; <strong style="color:#e2e8f0">shown only once</strong>')}
+        ${envRow('GROQ_API_KEY', 'Free AI key from Step 2')}
+        ${envRow('PAPER_TRADING', `Start with ${pill('true','#22c55e','rgba(34,197,94,0.1)','rgba(34,197,94,0.25)')} (sim money). Change to ${pill('false')} when ready to go live.`)}
+        ${envRow('PAPER_BALANCE', `Simulated balance. Default: ${pill('10')} (= $10 USDT)`)}
+        ${envRow('TRADE_SYMBOL', `Optional. E.g. ${pill('DOGEUSDT')}. Leave empty &mdash; AI picks best coin.`)}
+        <tr>
+          <td style="padding:9px 14px 0 0;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">TELEGRAM_BOT_TOKEN</td>
+          <td style="padding:9px 0 0;font-size:12px;color:#94a3b8;font-family:Arial,sans-serif;vertical-align:top">Optional &mdash; live trade alerts on your phone</td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</td></tr>
+
+<!-- ── START WITH PAPER TRADING REMINDER ── -->
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px 28px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.18);border-radius:10px">
+    <tr><td style="padding:16px 20px">
+      <p style="margin:0;font-size:12px;color:#94a3b8;font-family:Arial,sans-serif;line-height:1.8"><strong style="color:#22c55e">&#10003; Start with Paper Trading.</strong> Keep ${code('PAPER_TRADING=true')} for at least 14 days. Watch the signals, verify performance, then switch to live funds only when you're confident.</p>
     </td></tr>
   </table>
 </td></tr>
 
 <!-- ── RISK DISCLOSURE ── -->
-<tr><td style="background:#070b1c;border-left:1px solid rgba(245,158,11,0.15);border-right:1px solid rgba(245,158,11,0.15);padding:16px 40px 32px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(239,68,68,0.03);border:1px solid rgba(239,68,68,0.1);border-radius:10px">
-    <tr><td style="padding:16px 20px">
-      <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3);font-family:Arial,sans-serif;line-height:1.8"><strong style="color:rgba(248,113,113,0.7)">Risk Disclosure</strong> &mdash; Crypto trading involves substantial risk. Always start with paper trading. Only invest what you can afford to lose. Apex Trade Bot is an automation tool, not financial advice. You are solely responsible for your trading decisions.</p>
-    </td></tr>
-  </table>
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
+  <p style="margin:0;font-size:11px;color:#1e293b;font-family:Arial,sans-serif;line-height:1.8;text-align:center"><strong style="color:#374151">Risk Disclosure</strong> &mdash; Crypto trading involves substantial risk of loss. Only invest what you can afford to lose. Apex Trade Bot is an automation tool, not financial advice. You are solely responsible for all trading decisions.</p>
 </td></tr>
 
 <!-- ── FOOTER ── -->
-<tr><td align="center" style="background:#070b1c;border:1px solid rgba(245,158,11,0.15);border-top:1px solid rgba(255,255,255,0.06);border-radius:0 0 16px 16px;padding:24px 40px 32px">
-  <p style="margin:0 0 6px;font-size:12px;color:#4b5563;font-family:Arial,sans-serif">Questions? We respond within 24 hours.</p>
-  <a href="mailto:supportaicashsystem@gmail.com" style="color:#f59e0b;font-size:13px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">supportaicashsystem@gmail.com</a>
-  <p style="margin:16px 0 0;font-size:10px;color:#1f2937;font-family:Arial,sans-serif">&copy; 2025 AI Cash Systems &nbsp;&middot;&nbsp; <a href="https://aicashsystem.space" style="color:#1f2937;text-decoration:none">aicashsystem.space</a></p>
+<tr><td align="center" style="background:#0a0d18;border:1px solid rgba(255,255,255,0.07);border-top:1px solid rgba(255,255,255,0.05);border-radius:0 0 18px 18px;padding:24px 40px 28px">
+  <p style="margin:0 0 6px;font-size:12px;color:#334155;font-family:Arial,sans-serif">Questions? Reply to this email or reach us at:</p>
+  <a href="mailto:supportaicashsystem@gmail.com" style="color:#ff2d4f;font-size:13px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">supportaicashsystem@gmail.com</a>
+  <p style="margin:16px 0 0;font-size:10px;color:#0f172a;font-family:Arial,sans-serif">&copy; 2025 AI Cash Systems &nbsp;&middot;&nbsp; <a href="https://aicashsystem.space" style="color:#0f172a;text-decoration:none">aicashsystem.space</a></p>
 </td></tr>
+
+<!-- bottom spacing -->
+<tr><td style="height:36px;font-size:0;line-height:0">&nbsp;</td></tr>
 
 </table><!-- /wrapper -->
 </td></tr>
