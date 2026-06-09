@@ -1,5 +1,4 @@
 """Binance Spot connector (API v3) with OKX public-data fallback."""
-import os
 import time
 import hmac
 import hashlib
@@ -7,8 +6,7 @@ from urllib.parse import urlencode
 import requests
 from apex import config as cfg
 
-# Default to testnet unless BINANCE_TESTNET is explicitly 'false'
-_TESTNET = (os.getenv("BINANCE_TESTNET") or "").strip().lower() != "false"
+_TESTNET = cfg.BINANCE_TESTNET
 BASE = "https://testnet.binance.vision/api/v3" if _TESTNET else "https://api.binance.com/api/v3"
 UA = {"User-Agent": "ApexTradeBot/2.0"}
 
@@ -72,7 +70,7 @@ def place_order(side, quantity, symbol=None):
         print(f"[PAPER][BINANCE] {side} {quantity} {symbol}")
         return {"orderId": "PAPER_" + str(int(time.time() * 1000)), "status": "FILLED"}
     params = {"symbol": symbol, "side": side, "type": "MARKET",
-              "quantity": f"{quantity:.0f}", "timestamp": int(time.time() * 1000)}
+              "quantity": str(quantity), "timestamp": int(time.time() * 1000)}
     r = requests.post(f"{BASE}/order?{_sign(params)}",
                       headers={**UA, "X-MBX-APIKEY": cfg.BINANCE_API_KEY}, timeout=10)
     data = r.json()

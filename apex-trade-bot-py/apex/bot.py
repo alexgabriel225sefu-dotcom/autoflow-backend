@@ -204,6 +204,10 @@ def open_trade(side, price, balance, atr_value=0, symbol=None, druck_mult=1.0):
     if quantity <= 0:
         logger.warn(f"Quantity too small for {symbol} @ ${price} — skip")
         return
+    min_notional = float(os.getenv("MIN_NOTIONAL", "10.0"))
+    if not cfg.PAPER_TRADING and price * quantity < min_notional:
+        logger.warn(f"Order notional ${price * quantity:.2f} below exchange minimum ${min_notional:.0f} — skip (increase balance or lower MIN_NOTIONAL)")
+        return
     if druck_mult != 1.0:
         logger.info(f"🎯 Druckenmiller: position size ×{druck_mult:.2f}")
     exchange.place_order(side, quantity, symbol)
