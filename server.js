@@ -1240,8 +1240,7 @@ async function handleStripeWebhook(req, res) {
         }
         if (supabase) {
           const { error } = await supabase.from('licenses')
-            .update({ active: true, activated_at: new Date().toISOString(), email: email || '', name: buyerName })
-            .eq('key', licenseKey);
+            .upsert([{ key: licenseKey, active: true, activated_at: new Date().toISOString(), email: email || '', name: buyerName }], { onConflict: 'key' });
           if (error) addLog(`License activate DB error: ${error.message}`, 'license', 'error');
         }
         addLog(`License activated: ${licenseKey} for ${email}`, 'license', 'success');
