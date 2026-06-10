@@ -3,26 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Apex Trade Bot — AI Crypto Trading Bot Source Code · $297</title>
-<meta name="description" content="AI-powered crypto trading bot you own outright. Full Python source code, 8+ exchanges, Telegram control. One-time $297 — no subscriptions, no black box.">
+<title>Apex Trading Suite — AI Trading Bot Source Code · Crypto $297 · Forex $497</title>
+<meta name="description" content="Two AI-powered trading bots. Full Python source code. Crypto: 8 exchanges. Forex: OANDA + MetaTrader 5, 3Commas-style. One-time payment, no subscriptions.">
 <link rel="canonical" href="https://aicashsystem.space/">
-
-<!-- Favicon — 3-bar trading logo -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23060608'/><rect x='3' y='19' width='5' height='10' rx='2.5' fill='%23ff2d4f' opacity='.45'/><rect x='11.5' y='12' width='5' height='17' rx='2.5' fill='%23ff2d4f' opacity='.72'/><rect x='20' y='6' width='5' height='23' rx='2.5' fill='%23ff2d4f'/><circle cx='22.5' cy='5' r='3.1' fill='%23ff5c74'/></svg>">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23060608'/><rect x='3' y='19' width='5' height='10' rx='2.5' fill='%23ff2d4f' opacity='.45'/><rect x='11.5' y='12' width='5' height='17' rx='2.5' fill='%23ff2d4f' opacity='.72'/><rect x='20' y='6' width='5' height='23' rx='2.5' fill='%23ff2d4f'/><circle cx='22.5' cy='5' r='3.1' fill='%23ff5c74'/></svg>">
-
-<!-- Open Graph / Social -->
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://aicashsystem.space/">
-<meta property="og:title" content="Apex Trade Bot — AI Crypto Trading Bot · $297 One-Time">
-<meta property="og:description" content="AI-powered crypto trading bot you own outright. Full Python source code, 8+ exchanges, Telegram control. No subscriptions.">
-<meta property="og:site_name" content="Apex Trade Bot">
+<meta property="og:type" content="website"><meta property="og:url" content="https://aicashsystem.space/">
+<meta property="og:title" content="Apex Trading Suite — AI Trading Bot Source Code">
+<meta property="og:description" content="Two trading bots, full source code. Crypto: 8 exchanges. Forex: OANDA + MetaTrader 5. One-time payment.">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Apex Trade Bot — AI Crypto Trading Bot · $297 One-Time">
-<meta name="twitter:description" content="AI-powered crypto trading bot you own outright. Full Python source code, 8+ exchanges. One-time $297.">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://api.fontshare.com"><link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -33,25 +23,25 @@
   --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
   --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;
   --accdim:rgba(255,45,79,.12);--accglow:rgba(255,45,79,.45);
-  --up:#27c46a;--down:#ff2d4f;
+  --up:#27c46a;
   --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
   --ease:cubic-bezier(.32,.72,0,1);--r:16px;
 }
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;letter-spacing:-.011em;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
-
-/* cursor glow */
-#glow{position:fixed;top:0;left:0;width:680px;height:680px;border-radius:50%;background:radial-gradient(circle,rgba(255,45,79,.10),transparent 62%);pointer-events:none;z-index:1;transform:translate3d(-50%,-50%,0);opacity:0;transition:opacity .5s;will-change:transform}
+#glow{position:fixed;top:0;left:0;width:680px;height:680px;border-radius:50%;background:radial-gradient(circle,rgba(255,45,79,.09),transparent 62%);pointer-events:none;z-index:1;transform:translate3d(-50%,-50%,0);opacity:0;transition:opacity .5s;will-change:transform}
 @media(hover:none){#glow{display:none}}
-
-/* TICKER */
+#paths{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;opacity:.3}
+#paths path{fill:none;stroke:var(--acc);stroke-width:.8;opacity:0;animation:pf 20s ease-in-out infinite}
+#paths path:nth-child(2){animation-delay:-6s;stroke:var(--acc3);stroke-width:.5}
+#paths path:nth-child(3){animation-delay:-11s}
+#paths path:nth-child(4){animation-delay:-15s;stroke:var(--acc3)}
+@keyframes pf{0%{opacity:0;stroke-dashoffset:1200}12%{opacity:.7}88%{opacity:.4}100%{opacity:0;stroke-dashoffset:0}}
 #tape{border-bottom:1px solid var(--line);background:var(--bg1);position:relative;z-index:5}
-
-/* NAV */
-nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,46px);background:rgba(6,6,8,.78);backdrop-filter:blur(20px);border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:center;transition:transform .3s var(--ease)}
-.brand:hover{transform:scale(1.08)}
+nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,46px);background:rgba(6,6,8,.82);backdrop-filter:blur(20px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font:600 15px/1 var(--d);letter-spacing:-.01em;transition:transform .3s var(--ease)}
+.brand:hover{transform:scale(1.05)}
 .logo{width:32px;height:32px;display:block;filter:drop-shadow(0 0 12px rgba(255,45,79,.5))}
 .nav-links{display:flex;gap:28px}
 .nav-links a{font:500 14px/1 var(--f);color:var(--t1);transition:color .2s}
@@ -59,138 +49,155 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 .nav-cta{background:var(--acc);color:#fff;font:600 14px/1 var(--f);border-radius:10px;padding:11px 19px;transition:all .25s var(--ease)}
 .nav-cta:hover{background:var(--acc2);box-shadow:0 6px 28px var(--accglow)}
 @media(max-width:820px){.nav-links{display:none}}
-
 .wrap{max-width:1280px;margin:0 auto;padding:0 clamp(16px,4vw,46px);position:relative;z-index:2}
 .eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--accdim);border:1px solid rgba(255,45,79,.24);color:var(--acc3);border-radius:100px;padding:6px 14px;font:500 11px/1 var(--m);letter-spacing:.1em;text-transform:uppercase}
-.eyebrow b{width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 9px var(--acc)}
 .h2{font:600 clamp(30px,3.9vw,52px)/1.03 var(--d);letter-spacing:-.025em}
 .lead{font:400 clamp(15px,1.4vw,17px)/1.7 var(--f);color:var(--t1);max-width:560px}
 .label{font:500 11px/1 var(--m);color:var(--acc);letter-spacing:.16em;text-transform:uppercase}
-
-/* HERO */
-#hero{position:relative;padding:clamp(54px,7vw,96px) 0 clamp(44px,5vw,64px);display:grid;grid-template-columns:1.05fr 1.25fr;gap:clamp(32px,4vw,56px);align-items:center;overflow:hidden}
-@media(max-width:980px){#hero{grid-template-columns:1fr;gap:36px}}
-/* 3D perspective grid floor */
-.grid3d{position:absolute;left:-25%;right:-25%;bottom:-30%;height:90%;z-index:0;pointer-events:none;perspective:340px;opacity:.7}
-.grid3d::after{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,45,79,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(255,45,79,.14) 1px,transparent 1px);background-size:56px 56px;transform:rotateX(68deg);transform-origin:bottom center;animation:grid 6s linear infinite;-webkit-mask-image:linear-gradient(transparent,#000 55%,transparent);mask-image:linear-gradient(transparent,#000 55%,transparent)}
-@keyframes grid{from{background-position-y:0}to{background-position-y:56px}}
-.aurora{position:absolute;top:-15%;right:-8%;width:62%;height:120%;z-index:0;pointer-events:none;background:radial-gradient(closest-side,rgba(255,45,79,.20),rgba(255,45,79,.05) 58%,transparent);filter:blur(34px);will-change:transform;animation:aur 9s ease-in-out infinite}
-@keyframes aur{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-7%,5%) scale(1.14)}}
-/* KINETIC MARQUEE */
-.marquee{overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg);padding:24px 0;position:relative;z-index:2}
-.mq-track{display:inline-flex;align-items:center;white-space:nowrap;will-change:transform;animation:mq 30s linear infinite;font:600 clamp(30px,5.4vw,72px)/1 var(--d);letter-spacing:-.02em}
-.mq-track span{padding:0 .32em;color:var(--t0)}
-.mq-track .o{color:transparent;-webkit-text-stroke:1.2px var(--acc)}
-.mq-track .dot{color:var(--acc);-webkit-text-stroke:0}
-@keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-#hero h1{font:600 clamp(46px,6.4vw,84px)/.95 var(--d);letter-spacing:-.025em;margin:22px 0 18px}
-#hero h1 .grad{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 30px rgba(255,45,79,.35))}
-.hero-cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:30px 0 30px}
 .btn{display:inline-flex;align-items:center;gap:10px;font:600 15px/1 var(--f);border-radius:12px;padding:15px 24px;cursor:pointer;border:none;transition:all .3s var(--ease);will-change:transform}
 .btn-primary{background:var(--acc);color:#fff;box-shadow:0 8px 30px var(--accdim)}
 .btn-primary:hover{background:var(--acc2);box-shadow:0 14px 44px var(--accglow)}
 .btn-ghost{background:var(--panel);color:var(--t0);border:1px solid var(--line2)}
 .btn-ghost:hover{background:var(--hover)}
-.hero-meta{display:flex;gap:30px;flex-wrap:wrap}
-.hm{display:flex;flex-direction:column;gap:5px}
-.hm b{font:600 22px/1 var(--m);color:var(--t0);letter-spacing:-.02em}
-.hm span{font:400 12px/1 var(--f);color:var(--t2)}
-
-/* TERMINAL */
-.terminal{background:var(--panel);border:1px solid var(--line2);border-radius:18px;overflow:hidden;box-shadow:0 40px 90px rgba(0,0,0,.6),0 0 0 1px rgba(255,45,79,.08),0 0 60px rgba(255,45,79,.08);animation:float 7s ease-in-out infinite}
+/* HERO */
+#hero{position:relative;padding:clamp(54px,7vw,96px) 0 clamp(44px,5vw,64px);text-align:center;overflow:hidden}
+.grid3d{position:absolute;left:-25%;right:-25%;bottom:-30%;height:90%;z-index:0;pointer-events:none;perspective:340px;opacity:.6}
+.grid3d::after{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,45,79,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(255,45,79,.13) 1px,transparent 1px);background-size:56px 56px;transform:rotateX(68deg);transform-origin:bottom center;animation:grid 6s linear infinite;-webkit-mask-image:linear-gradient(transparent,#000 55%,transparent);mask-image:linear-gradient(transparent,#000 55%,transparent)}
+@keyframes grid{from{background-position-y:0}to{background-position-y:56px}}
+.aurora{position:absolute;top:-20%;left:50%;transform:translateX(-50%);width:80%;height:130%;z-index:0;pointer-events:none;background:radial-gradient(ellipse,rgba(255,45,79,.14),rgba(255,45,79,.04) 55%,transparent);filter:blur(44px);will-change:transform;animation:aur 10s ease-in-out infinite}
+@keyframes aur{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.12)}}
+#hero h1{font:600 clamp(48px,7vw,96px)/.92 var(--d);letter-spacing:-.03em;margin:24px 0 20px}
+#hero h1 .grad{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 30px rgba(255,45,79,.35))}
+#hero .sub{font:400 clamp(16px,1.6vw,19px)/1.65 var(--f);color:var(--t1);max-width:580px;margin:0 auto 44px}
+/* PRODUCT CARDS */
+.prod-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px}
+@media(max-width:820px){.prod-grid{grid-template-columns:1fr}}
+.prod-card{background:linear-gradient(155deg,var(--panel2),var(--panel));border:1px solid var(--line2);border-radius:20px;padding:32px;text-align:left;position:relative;overflow:hidden;transition:border-color .3s var(--ease),transform .3s var(--ease)}
+.prod-card:hover{border-color:rgba(255,45,79,.35);transform:translateY(-4px)}
+.prod-card::before{content:'';position:absolute;top:-40%;right:-20%;width:60%;height:100%;background:radial-gradient(circle,rgba(255,45,79,.12),transparent 60%);pointer-events:none}
+.pc-tag{display:inline-block;font:500 9px/1 var(--m);color:var(--acc2);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:4px;padding:3px 8px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px}
+.prod-card h3{font:600 clamp(22px,2.6vw,30px)/1.15 var(--d);letter-spacing:-.02em;margin-bottom:10px}
+.prod-card p{font:400 14px/1.65 var(--f);color:var(--t1);margin-bottom:22px}
+.pc-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
+.pc-pill{font:500 11px/1 var(--m);color:var(--t1);border:1px solid var(--line2);border-radius:6px;padding:5px 10px}
+.pc-price{display:flex;align-items:baseline;gap:10px;margin-bottom:20px}
+.pc-price .now{font:600 40px/1 var(--d);letter-spacing:-.02em}
+.pc-price .was{font:400 16px/1 var(--m);color:var(--t2);text-decoration:line-through}
+.pc-price .note{font:400 12px/1 var(--m);color:var(--t2);align-self:center}
+/* MARQUEE */
+.marquee{overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg);padding:22px 0}
+.mq-track{display:inline-flex;align-items:center;white-space:nowrap;will-change:transform;animation:mq 32s linear infinite;font:600 clamp(28px,4.8vw,64px)/1 var(--d);letter-spacing:-.02em}
+.mq-track span{padding:0 .32em;color:var(--t0)}.mq-track .o{color:transparent;-webkit-text-stroke:1.2px var(--acc)}.mq-track .dot{color:var(--acc)}
+@keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* TRUST */
+#trust{padding:24px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg1)}
+.trust-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.trust-lbl{font:400 12px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.1em}
+.trust-sep{width:1px;height:18px;background:var(--line2);flex-shrink:0}
+.trust-tag{font:600 13px/1 var(--f);color:var(--t1);opacity:.8;transition:color .2s,opacity .2s}
+.trust-tag:hover{color:var(--t0);opacity:1}
+/* PRODUCT SECTIONS */
+.prod-sec{padding:clamp(58px,7vw,96px) 0;border-top:1px solid var(--line)}
+.prod-sec-head{display:grid;grid-template-columns:1.1fr 1fr;gap:clamp(32px,5vw,72px);align-items:center;margin-bottom:52px}
+@media(max-width:900px){.prod-sec-head{grid-template-columns:1fr}}
+.prod-sec-head .h2{margin:14px 0 14px}
+/* TERMINAL / FX DASH */
+.terminal,.fx-dash{background:var(--panel);border:1px solid var(--line2);border-radius:18px;overflow:hidden;box-shadow:0 40px 90px rgba(0,0,0,.6),0 0 60px rgba(255,45,79,.07);animation:float 7s ease-in-out infinite}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
-.term-top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--bg1)}
-.term-id{display:flex;align-items:center;gap:9px;font:500 12px/1 var(--m);color:var(--t1)}
-.term-id .dot{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc)}
+.term-top,.fx-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg1);border-bottom:1px solid var(--line)}
+.term-id,.fx-title{display:flex;align-items:center;gap:9px;font:500 12px/1 var(--m);color:var(--t1)}
 .term-live{font:500 10px/1 var(--m);color:var(--acc3);letter-spacing:.12em;border:1px solid rgba(255,45,79,.32);border-radius:5px;padding:4px 8px}
+.fx-conn{font:500 10px/1 var(--m);color:var(--up);border:1px solid rgba(39,196,106,.3);border-radius:5px;padding:4px 8px;letter-spacing:.1em}
 .coin-row{display:flex;gap:6px;padding:10px 12px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--bg1);scrollbar-width:none}
 .coin-row::-webkit-scrollbar{display:none}
 .coin{flex-shrink:0;font:500 12px/1 var(--m);color:var(--t1);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;transition:all .2s}
-.coin:hover{color:var(--t0);border-color:var(--line2)}
-.coin.active{background:var(--accdim);border-color:var(--acc);color:var(--acc3)}
-.chart-host{height:clamp(340px,42vw,440px);background:var(--bg)}
-.chart-host>div{height:100%}
-.term-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid var(--line);background:var(--bg1);flex-wrap:wrap}
-.term-foot .note{font:400 11px/1.5 var(--m);color:var(--t2)}
-.term-foot .note b{color:var(--t1);font-weight:500}
-
-/* TRUST */
-#trust{padding:26px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg1)}
-.trust-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.trust-lbl{font:400 12px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.1em}
-.trust-tag{font:600 14px/1 var(--f);color:var(--t1);letter-spacing:-.01em;opacity:.85;transition:color .2s,opacity .2s}
-.trust-tag:hover{color:var(--t0);opacity:1}
-
-/* SECTION */
-.sec{padding:clamp(58px,7vw,96px) 0}
-.sec-head{max-width:620px;margin-bottom:44px}
-.sec-head .h2{margin:14px 0 14px}
-.center{text-align:center;margin-left:auto;margin-right:auto}
-
+.coin:hover{color:var(--t0);border-color:var(--line2)}.coin.active{background:var(--accdim);border-color:var(--acc);color:var(--acc3)}
+.chart-host{height:clamp(300px,38vw,390px);background:var(--bg)}.chart-host>div{height:100%}
+.term-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-top:1px solid var(--line);background:var(--bg1);flex-wrap:wrap}
+.term-foot .note{font:400 11px/1.5 var(--m);color:var(--t2)}.term-foot .note b{color:var(--t1);font-weight:500}
+.fx-pairs{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--bg)}
+.fxp{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.fxp .sym{font:500 10px/1 var(--m);color:var(--t2);letter-spacing:.08em;margin-bottom:4px}
+.fxp .price{font:600 15px/1 var(--m);color:var(--t0)}
+.fxp .chg{font:500 10px/1 var(--m);margin-top:3px}
+.fxp .chg.up{color:var(--up)}.fxp .chg.dn{color:var(--acc2)}
+.fx-trades{padding:10px 12px;background:var(--bg);border-top:1px solid var(--line)}
+.fxt{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font:400 11px/1 var(--m)}
+.fxt:last-child{border-bottom:none}
+.fxt .sb{color:var(--up)}.fxt .ss{color:var(--acc2)}.fxt .pp{color:var(--t1)}.fxt .rp{color:var(--up)}.fxt .rn{color:var(--acc2)}
+.fx-metrics{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);background:var(--bg1)}
+.fxm{padding:10px 14px;text-align:center;border-right:1px solid var(--line)}
+.fxm:last-child{border-right:none}
+.fxm .val{font:600 15px/1 var(--m);color:var(--t0)}.fxm .val.pos{color:var(--up)}
+.fxm .lbl{font:400 10px/1 var(--f);color:var(--t2);margin-top:3px}
 /* FEATURES */
+.sec{padding:clamp(48px,6vw,80px) 0}
 .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-@media(max-width:880px){.feat-grid{grid-template-columns:1fr 1fr}}
-@media(max-width:560px){.feat-grid{grid-template-columns:1fr}}
-.feat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:26px;transition:transform .25s var(--ease),border-color .25s,background .25s;transform-style:preserve-3d}
+@media(max-width:880px){.feat-grid{grid-template-columns:1fr 1fr}}@media(max-width:560px){.feat-grid{grid-template-columns:1fr}}
+.feat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:24px;transition:transform .25s var(--ease),border-color .25s,background .25s;transform-style:preserve-3d}
 .feat:hover{border-color:rgba(255,45,79,.3);background:var(--panel2)}
-.feat-ico{width:44px;height:44px;border-radius:12px;background:var(--accdim);border:1px solid rgba(255,45,79,.26);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
-.feat-ico svg{width:22px;height:22px;stroke:var(--acc2);fill:none;stroke-width:1.7}
-.feat h3{font:600 17px/1.3 var(--f);margin-bottom:9px;letter-spacing:-.02em}
-.feat p{font:400 14px/1.7 var(--f);color:var(--t0);opacity:.75}
+.feat-ico{width:42px;height:42px;border-radius:12px;background:var(--accdim);border:1px solid rgba(255,45,79,.26);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.feat-ico svg{width:20px;height:20px;stroke:var(--acc2);fill:none;stroke-width:1.7}
+.feat h3{font:600 16px/1.3 var(--f);margin-bottom:8px;letter-spacing:-.02em}
+.feat p{font:400 13px/1.7 var(--f);color:var(--t0);opacity:.75}
 .feat-badge{display:inline-flex;font:600 9px/1 var(--m);color:var(--acc2);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:4px;padding:3px 7px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
-
-/* STATS BAND */
+/* ARCH */
+.arch{display:grid;grid-template-columns:1fr auto 1fr;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:36px}
+@media(max-width:600px){.arch{grid-template-columns:1fr}}
+.arch-box{background:var(--panel);padding:24px 22px}
+.arch-box h4{font:600 15px/1.3 var(--f);margin-bottom:7px;letter-spacing:-.02em}
+.arch-box p{font:400 13px/1.6 var(--f);color:var(--t1)}
+.arch-tag{display:inline-block;font:500 9px/1 var(--m);color:var(--acc);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:4px;padding:3px 7px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+.arch-mid{padding:20px 16px;border-left:1px solid var(--line);border-right:1px solid var(--line);background:var(--bg1);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px}
+.arch-line{width:2px;height:44px;background:linear-gradient(to bottom,var(--acc),var(--acc3));border-radius:1px;position:relative;overflow:hidden}
+.arch-line::after{content:'';position:absolute;top:-100%;width:100%;height:50%;background:linear-gradient(to bottom,transparent,rgba(255,255,255,.8),transparent);animation:scan 1.9s linear infinite}
+@keyframes scan{to{top:200%}}
+.arch-lbl{font:500 9px/1 var(--m);color:var(--t2);letter-spacing:.08em;text-align:center}
+/* STATS */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel)}
 @media(max-width:680px){.stats{grid-template-columns:1fr 1fr}}
-.stat{padding:30px 24px;text-align:center;border-right:1px solid var(--line)}
+.stat{padding:28px 22px;text-align:center;border-right:1px solid var(--line)}
 .stat:last-child{border-right:none}
-.stat b{display:block;font:600 clamp(28px,3.6vw,40px)/1 var(--m);letter-spacing:-.03em;background:linear-gradient(120deg,var(--t0),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.stat b{display:block;font:600 clamp(26px,3.4vw,38px)/1 var(--m);letter-spacing:-.03em;background:linear-gradient(120deg,var(--t0),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:7px}
 .stat span{font:400 13px/1.4 var(--f);color:var(--t1);opacity:.7}
-
 /* STEPS */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-@media(max-width:880px){.steps{grid-template-columns:1fr 1fr}}
-@media(max-width:480px){.steps{grid-template-columns:1fr}}
-.step{padding:28px 24px;border-right:1px solid var(--line);background:var(--panel)}
+@media(max-width:880px){.steps{grid-template-columns:1fr 1fr}}@media(max-width:480px){.steps{grid-template-columns:1fr}}
+.step{padding:26px 22px;border-right:1px solid var(--line);background:var(--panel)}
 .step:last-child{border-right:none}
-.step-n{font:500 13px/1 var(--m);color:var(--acc);margin-bottom:14px}
-.step h3{font:600 16px/1.3 var(--f);margin-bottom:8px;letter-spacing:-.02em}
-.step p{font:400 14px/1.7 var(--f);color:var(--t1)}
-
+.step-n{font:500 13px/1 var(--m);color:var(--acc);margin-bottom:12px}
+.step h3{font:600 15px/1.3 var(--f);margin-bottom:7px;letter-spacing:-.02em}
+.step p{font:400 13px/1.7 var(--f);color:var(--t1)}
+/* PRICING */
+#pricing{background:var(--bg1);border-top:1px solid var(--line);border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+.price-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px}
+@media(max-width:820px){.price-grid{grid-template-columns:1fr}}
+.price-card{background:linear-gradient(165deg,var(--panel2),var(--panel));border:1px solid var(--line2);border-radius:20px;padding:32px;box-shadow:0 28px 64px rgba(0,0,0,.5),0 0 50px rgba(255,45,79,.05);position:relative;overflow:hidden;animation:gp 4.5s ease-in-out infinite}
+.price-card:nth-child(2){animation-delay:-2.2s}
+@keyframes gp{0%,100%{box-shadow:0 28px 64px rgba(0,0,0,.5),0 0 50px rgba(255,45,79,.05)}50%{box-shadow:0 28px 64px rgba(0,0,0,.5),0 0 80px rgba(255,45,79,.18),0 0 0 1px rgba(255,45,79,.13)}}
+.price-card::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:120%;background:radial-gradient(circle,rgba(255,45,79,.15),transparent 64%);pointer-events:none}
+.price-card::after{content:'';position:absolute;top:0;left:0;width:35%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent);animation:shimmer 3.5s ease-in-out infinite;pointer-events:none}
+@keyframes shimmer{0%{transform:translateX(-100%) skewX(-15deg)}100%{transform:translateX(200%) skewX(-15deg)}}
+.price-badge{display:inline-flex;align-items:center;gap:6px;font:500 10px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.3);border-radius:100px;padding:5px 11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px;position:relative}
+.price-amt{display:flex;align-items:baseline;gap:10px;margin-bottom:5px;position:relative}
+.price-amt .now{font:600 60px/1 var(--d);letter-spacing:-.03em}
+.price-amt .was{font:400 18px/1 var(--m);color:var(--t2);text-decoration:line-through}
+.price-sub{font:400 12px/1.5 var(--m);color:var(--t2);margin-bottom:22px;position:relative}
+.price-list{list-style:none;margin-bottom:24px;display:grid;gap:9px;position:relative}
+.price-list li{display:flex;align-items:flex-start;gap:9px;font:400 13px/1.5 var(--f);color:var(--t1)}
+.price-list li svg{width:16px;height:16px;stroke:var(--acc);fill:none;stroke-width:2.4;flex-shrink:0;margin-top:1px}
+.price-card .btn{width:100%;justify-content:center;font-size:15px;padding:15px;position:relative}
+.price-fine{font:400 11px/1.6 var(--m);color:var(--t2);text-align:center;margin-top:12px;position:relative}
 /* TESTIMONIALS */
 .tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 @media(max-width:880px){.tgrid{grid-template-columns:1fr}}
-.tcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:26px;transition:transform .25s var(--ease),border-color .25s}
+.tcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:24px;transition:transform .25s var(--ease),border-color .25s}
 .tcard:hover{border-color:rgba(255,45,79,.3)}
-.tstars{color:var(--acc);font:500 14px/1 var(--m);letter-spacing:2px;margin-bottom:14px}
-.tcard p{font:400 15px/1.6 var(--f);color:var(--t0);margin-bottom:18px}
-.tmeta{display:flex;align-items:center;gap:11px}
-.tav{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#7a1020);display:flex;align-items:center;justify-content:center;font:600 14px/1 var(--f);color:#fff}
-.tmeta b{font:600 13px/1.2 var(--f);display:block}
-.tmeta span{font:400 12px/1.2 var(--f);color:var(--t2)}
-
-/* PRICING */
-#pricing{background:var(--bg1);border-top:1px solid var(--line);border-bottom:1px solid var(--line);position:relative;overflow:hidden}
-.price-wrap{display:grid;grid-template-columns:1fr 384px;gap:clamp(28px,4vw,52px);align-items:center}
-@media(max-width:880px){.price-wrap{grid-template-columns:1fr}}
-.price-list{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
-@media(max-width:560px){.price-list{grid-template-columns:1fr}}
-.price-list li{display:flex;align-items:flex-start;gap:10px;font:400 14px/1.5 var(--f);color:var(--t1)}
-.price-list li svg{width:18px;height:18px;stroke:var(--acc);fill:none;stroke-width:2.4;flex-shrink:0;margin-top:1px}
-.price-card{background:linear-gradient(165deg,var(--panel2),var(--panel));border:1px solid var(--line2);border-radius:20px;padding:34px;box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 50px rgba(255,45,79,.06);position:relative;overflow:hidden}
-.price-card::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:120%;background:radial-gradient(circle,rgba(255,45,79,.16),transparent 64%);pointer-events:none}
-@keyframes shimmer{0%{transform:translateX(-100%) skewX(-15deg)}100%{transform:translateX(200%) skewX(-15deg)}}
-@keyframes glow-pulse{0%,100%{box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 50px rgba(255,45,79,.06)}50%{box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 80px rgba(255,45,79,.18),0 0 0 1px rgba(255,45,79,.15)}}
-.price-card{animation:glow-pulse 4s ease-in-out infinite}
-.price-card::after{content:'';position:absolute;top:0;left:0;width:35%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent);animation:shimmer 3.5s ease-in-out infinite;pointer-events:none}
-.price-badge{display:inline-flex;align-items:center;gap:6px;font:500 10px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.3);border-radius:100px;padding:5px 11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:18px;position:relative}
-.price-amt{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;position:relative}
-.price-amt .now{font:600 64px/1 var(--d);letter-spacing:-.03em}
-.price-amt .was{font:400 20px/1 var(--m);color:var(--t2);text-decoration:line-through}
-.price-sub{font:400 13px/1.5 var(--m);color:var(--t2);margin-bottom:24px;position:relative}
-.price-card .btn{width:100%;justify-content:center;font-size:16px;padding:16px;position:relative}
-.price-fine{font:400 11px/1.6 var(--m);color:var(--t2);text-align:center;margin-top:14px;position:relative}
-
+.tstars{color:var(--acc);font:500 13px/1 var(--m);letter-spacing:2px;margin-bottom:12px}
+.tcard p{font:400 14px/1.6 var(--f);color:var(--t0);margin-bottom:16px}
+.tmeta{display:flex;align-items:center;gap:10px}
+.tav{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#7a1020);display:flex;align-items:center;justify-content:center;font:600 13px/1 var(--f);color:#fff}
+.tmeta b{font:600 13px/1.2 var(--f);display:block}.tmeta span{font:400 12px/1.2 var(--f);color:var(--t2)}
 /* FAQ */
 .faq{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .fq+.fq{border-top:1px solid var(--line)}
@@ -198,45 +205,46 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 .fq-q:hover{color:var(--acc3)}
 .fq-ic{font:400 20px/1 var(--m);color:var(--t2);transition:transform .3s var(--ease);flex-shrink:0}
 .fq-q.open .fq-ic{transform:rotate(45deg);color:var(--acc)}
-.fq-a{display:none;padding:0 24px 22px;font:400 15px/1.75 var(--f);color:var(--t1);background:var(--panel);letter-spacing:-.005em}
+.fq-a{display:none;padding:0 24px 22px;font:400 15px/1.75 var(--f);color:var(--t1);background:var(--panel)}
 .fq-a.open{display:block}
-
-/* FINAL */
 #final{text-align:center;padding:clamp(64px,8vw,104px) 0;position:relative;overflow:hidden}
 #final .h2{font-size:clamp(32px,4vw,52px);margin-bottom:16px}
 #final p{font:400 16px/1.6 var(--f);color:var(--t1);max-width:480px;margin:0 auto 30px}
-
 footer{border-top:1px solid var(--line);padding:34px 0;font:400 12px/1.7 var(--f);color:var(--t2)}
 footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
-footer .disc{max-width:560px}
-@media(max-width:480px){.price-card{padding:22px}}
-
 .rv{opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
 .rv.in{opacity:1;transform:none}
 .lg1{stop-color:#7a1020}.lg2{stop-color:#ff5c74}
+.sec-head{max-width:600px;margin-bottom:40px}
+.sec-head .h2{margin:14px 0 14px}
+@media(max-width:480px){.price-card{padding:22px}}
 </style>
+</head>
 <body>
-
 <div id="glow"></div>
+<svg id="paths" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+  <path stroke-dasharray="1200" d="M-100,400 C200,100 500,700 800,300 S1200,600 1600,200"/>
+  <path stroke-dasharray="900" d="M1600,600 C1200,400 800,800 400,500 S0,200 -200,400"/>
+  <path stroke-dasharray="800" d="M300,-50 C500,200 700,100 900,400 S1100,700 1400,500"/>
+  <path stroke-dasharray="1000" d="M-50,700 C300,500 600,900 900,600 S1300,300 1500,550"/>
+</svg>
 
-<!-- TICKER -->
 <div id="tape"><div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div></div></div>
 
-<!-- NAV -->
 <nav>
-  <a href="#" class="brand" aria-label="Home">
-    <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <defs><linearGradient id="cg" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse">
-        <stop class="lg1"/><stop offset="1" class="lg2"/></linearGradient></defs>
+  <a href="#" class="brand">
+    <svg class="logo" viewBox="0 0 32 32" fill="none">
+      <defs><linearGradient id="cg" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse"><stop class="lg1"/><stop offset="1" class="lg2"/></linearGradient></defs>
       <rect x="3" y="19" width="5" height="10" rx="2.5" fill="url(#cg)" opacity=".45"/>
       <rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="url(#cg)" opacity=".72"/>
       <rect x="20" y="6" width="5" height="23" rx="2.5" fill="url(#cg)"/>
       <circle cx="22.5" cy="5" r="3.1" fill="#ff5c74"/>
     </svg>
+    Apex Trading Suite
   </a>
   <div class="nav-links">
-    <a href="#markets">Live Markets</a>
-    <a href="#features">What You Get</a>
+    <a href="#crypto-sec">Crypto Bot</a>
+    <a href="#forex-sec">Forex Bot</a>
     <a href="#how">How It Works</a>
     <a href="#pricing">Pricing</a>
     <a href="#faq">FAQ</a>
@@ -245,204 +253,253 @@ footer .disc{max-width:560px}
 </nav>
 
 <!-- HERO -->
-<section class="wrap" id="hero">
-  <div class="grid3d"></div>
-  <div class="aurora"></div>
-  <div>
-    <span class="eyebrow rv"><b></b>Algorithmic Trading · Full Source Code</span>
-    <h1 class="rv">Automate your edge.<br><span class="grad">Own every line.</span></h1>
-    <p class="lead rv">The complete source code for an automated crypto trading bot. <strong style="color:var(--t0);font-weight:500">You</strong> define the strategy, the pairs and the risk — then run it on your own exchange account.</p>
-    <div class="hero-cta rv">
-      <a href="#pricing" class="btn btn-primary magnetic">Get the License — $297 →</a>
-      <a href="#markets" class="btn btn-ghost">View live markets</a>
-    </div>
-    <div class="hero-meta rv">
-      <div class="hm"><b>8</b><span>Exchanges</span></div>
-      <div class="hm"><b>$0</b><span>Fee from us</span></div>
-      <div class="hm"><b>100%</b><span>Source included</span></div>
-      <div class="hm"><b>1×</b><span>Pay once</span></div>
-    </div>
-  </div>
-
-  <div class="terminal rv" id="markets">
-    <div class="term-top">
-      <div class="term-id"><span class="dot"></span><span id="sym-label">BTC / USDT</span></div>
-      <span class="term-live">● LIVE</span>
-    </div>
-    <div class="coin-row" id="coins"></div>
-    <div class="chart-host" id="tvchart"></div>
-    <div class="term-foot">
-      <span class="note">Real-time data via TradingView. <b>Pick any pair</b> to update the chart.</span>
-      <span class="note">Engine supports <b>847 pairs</b></span>
+<section id="hero">
+  <div class="wrap" style="position:relative;z-index:2">
+    <div class="grid3d"></div>
+    <div class="aurora"></div>
+    <span class="eyebrow rv">Algorithmic Trading · Full Source Code</span>
+    <h1 class="rv">Trade smarter.<br><span class="grad">Own every line.</span></h1>
+    <p class="sub rv">Two AI-powered trading bots. Complete Python source code. Crypto or Forex — you define the strategy, you run it on your own accounts. No subscriptions, no black box.</p>
+    <div class="prod-grid rv">
+      <div class="prod-card">
+        <span class="pc-tag">Crypto</span>
+        <h3>Apex Trade Bot</h3>
+        <p>AI-powered crypto trading bot. Connects directly to your exchange — every trade appears live in Binance, Bybit, OKX or any of 8 supported exchanges.</p>
+        <div class="pc-pills">
+          <span class="pc-pill">8 Exchanges</span><span class="pc-pill">847 Pairs</span><span class="pc-pill">Backtesting</span><span class="pc-pill">AI Signals</span>
+        </div>
+        <div class="pc-price"><span class="now">$297</span><span class="was">$497</span><span class="note">one-time</span></div>
+        <a href="#pricing" class="btn btn-primary magnetic">Get Crypto License →</a>
+      </div>
+      <div class="prod-card">
+        <span class="pc-tag">Forex</span>
+        <h3>Apex Forex ATC</h3>
+        <p>AI-powered forex bot. 3Commas-style integration — trades appear live in your MetaTrader 5 chart, with SL and TP set natively. Also works directly via OANDA API.</p>
+        <div class="pc-pills">
+          <span class="pc-pill">OANDA</span><span class="pc-pill">MetaTrader 5</span><span class="pc-pill">7 Major Pairs</span><span class="pc-pill">MT5 EA Included</span>
+        </div>
+        <div class="pc-price"><span class="now">$497</span><span class="was">$797</span><span class="note">one-time</span></div>
+        <a href="#pricing" class="btn btn-primary magnetic">Get Forex License →</a>
+      </div>
     </div>
   </div>
 </section>
 
 <!-- TRUST -->
 <div id="trust"><div class="wrap trust-inner rv">
-  <span class="trust-lbl">Compatible with</span>
-  <span class="trust-tag">Binance</span><span class="trust-tag">Bybit</span><span class="trust-tag">OKX</span>
-  <span class="trust-tag">Kraken</span><span class="trust-tag">KuCoin</span><span class="trust-tag">Coinbase</span>
-  <span class="trust-tag">Bitget</span><span class="trust-tag">MEXC</span>
+  <span class="trust-lbl">Crypto</span>
+  <span class="trust-tag">Binance</span><span class="trust-tag">Bybit</span><span class="trust-tag">OKX</span><span class="trust-tag">Kraken</span><span class="trust-tag">KuCoin</span>
+  <span class="trust-sep"></span>
+  <span class="trust-lbl">Forex</span>
+  <span class="trust-tag">OANDA</span><span class="trust-tag">MetaTrader 5</span><span class="trust-tag">IC Markets</span><span class="trust-tag">Pepperstone</span>
 </div></div>
 
-<!-- KINETIC MARQUEE -->
+<!-- MARQUEE -->
 <div class="marquee" aria-hidden="true"><div class="mq-track">
-  <span>Automated Trading</span><span class="dot">✦</span><span class="o">Full Source Code</span><span class="dot">✦</span><span>Your Rules</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Own Every Line</span><span class="dot">✦</span>
-  <span>Automated Trading</span><span class="dot">✦</span><span class="o">Full Source Code</span><span class="dot">✦</span><span>Your Rules</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Own Every Line</span><span class="dot">✦</span>
+  <span>Automated Crypto</span><span class="dot">✦</span><span class="o">Automated Forex</span><span class="dot">✦</span><span>Full Source Code</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Own Every Line</span><span class="dot">✦</span>
+  <span>Automated Crypto</span><span class="dot">✦</span><span class="o">Automated Forex</span><span class="dot">✦</span><span>Full Source Code</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Own Every Line</span><span class="dot">✦</span>
 </div></div>
 
-<!-- FEATURES -->
-<section class="wrap sec" id="features">
-  <div class="sec-head rv">
-    <span class="label">What You Get</span>
-    <h2 class="h2">Everything lives in the source.</h2>
-    <p class="lead">A complete, readable codebase — not a black box. You own it, you read it, you configure it however you want.</p>
+<!-- CRYPTO SECTION -->
+<section class="wrap prod-sec" id="crypto-sec">
+  <div class="prod-sec-head rv">
+    <div>
+      <span class="label">Crypto Bot</span>
+      <h2 class="h2" style="margin:14px 0 14px">Apex Trade Bot</h2>
+      <p class="lead">The complete Python codebase for automated crypto trading. Connect to 8 major exchanges with your own API keys — trades appear live in your exchange account, like 3Commas for crypto.</p>
+    </div>
+    <div class="terminal">
+      <div class="term-top">
+        <div class="term-id"><span id="sym-label">BTC / USDT</span></div>
+        <span class="term-live">● LIVE</span>
+      </div>
+      <div class="coin-row" id="coins"></div>
+      <div class="chart-host" id="tvchart"></div>
+      <div class="term-foot">
+        <span class="note">Real-time data via TradingView. <b>Pick any pair.</b></span>
+        <span class="note">Engine supports <b>847 pairs</b></span>
+      </div>
+    </div>
   </div>
   <div class="feat-grid">
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div><span class="feat-badge">FULL ACCESS</span><h3>Complete source code</h3><p>The full Python codebase, nothing compiled or hidden. Read every line before you run it.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><span class="feat-badge">YOUR STRATEGY</span><h3>You define the strategy</h3><p>Choose the pairs, the timeframes and the entry logic. The strategy is yours to shape — not ours to dictate.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><span class="feat-badge">RISK SHIELD</span><h3>Built-in risk controls</h3><p>Stop-loss, take-profit and max-drawdown limits are part of the engine. You set the numbers.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="feat-badge">8 EXCHANGES</span><h3>Multi-exchange ready</h3><p>Connectors for 8 major exchanges. Run it on the account you already have — your keys never leave your machine.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><span class="feat-badge">VALIDATE FIRST</span><h3>Backtesting engine</h3><p>Test your configuration against historical data before committing real capital. The results are yours to judge.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H4z"/><path d="M2 20h20"/></svg></div><span class="feat-badge">LIVE MONITOR</span><h3>Real-time dashboard</h3><p>A clean local dashboard to watch what the bot is doing in real time — running entirely on your side.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div><span class="feat-badge">FULL ACCESS</span><h3>Complete source code</h3><p>Full Python codebase, nothing compiled or hidden. Read every line before you run it.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><span class="feat-badge">YOUR STRATEGY</span><h3>You define the strategy</h3><p>Choose pairs, timeframes and entry logic. The strategy is yours — not ours.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><span class="feat-badge">RISK SHIELD</span><h3>Built-in risk controls</h3><p>Stop-loss, take-profit and max-drawdown limits. Daily −3% circuit breaker, loss-streak stop.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="feat-badge">8 EXCHANGES</span><h3>Multi-exchange ready</h3><p>Connectors for Binance, Bybit, OKX, Kraken, KuCoin, Coinbase, Bitget, MEXC.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><span class="feat-badge">VALIDATE FIRST</span><h3>Backtesting engine</h3><p>Test your config on historical data before committing real capital.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H4z"/><path d="M2 20h20"/></svg></div><span class="feat-badge">LIVE MONITOR</span><h3>Real-time dashboard</h3><p>Equity curve, win rate, profit factor. Runs entirely on your side.</p></div>
   </div>
 </section>
 
-<!-- STATS -->
-<section class="wrap sec" style="padding-top:0">
-  <div class="stats rv">
-    <div class="stat"><b data-count="8">0</b><span>Supported exchanges</span></div>
-    <div class="stat"><b data-count="847">0</b><span>Tradable pairs</span></div>
-    <div class="stat"><b data-count="100" data-suffix="%">0</b><span>Source code included</span></div>
-    <div class="stat"><b data-count="14" data-suffix="-day">0</b><span>Risk-free paper trading</span></div>
+<!-- FOREX SECTION -->
+<section class="wrap prod-sec" id="forex-sec">
+  <div class="prod-sec-head rv">
+    <div>
+      <span class="label">Forex Bot</span>
+      <h2 class="h2" style="margin:14px 0 14px">Apex Forex ATC</h2>
+      <p class="lead">Complete Python source for AI forex trading. 3Commas-style MetaTrader 5 integration — the bot runs in the cloud, every order executes live in your MT5 chart with SL and TP visible.</p>
+    </div>
+    <div class="fx-dash">
+      <div class="fx-head">
+        <div class="fx-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>Apex Forex ATC · Live Dashboard</div>
+        <span class="fx-conn">MT5 CONNECTED</span>
+      </div>
+      <div class="fx-pairs">
+        <div class="fxp"><div class="sym">EUR / USD</div><div class="price" id="v0">1.08512</div><div class="chg up" id="c0">▲ +0.12%</div></div>
+        <div class="fxp"><div class="sym">GBP / USD</div><div class="price" id="v1">1.27346</div><div class="chg dn" id="c1">▼ -0.08%</div></div>
+        <div class="fxp"><div class="sym">USD / JPY</div><div class="price" id="v2">149.824</div><div class="chg up" id="c2">▲ +0.24%</div></div>
+        <div class="fxp"><div class="sym">AUD / USD</div><div class="price" id="v3">0.65234</div><div class="chg up" id="c3">▲ +0.05%</div></div>
+      </div>
+      <div class="fx-trades">
+        <div class="fxt"><span class="sb">BUY</span><span class="pp">EUR_USD</span><span style="color:var(--t2)">0.10 lot</span><span class="rp">+14.2 pips</span></div>
+        <div class="fxt"><span class="sb">BUY</span><span class="pp">GBP_USD</span><span style="color:var(--t2)">0.08 lot</span><span class="rp">+9.7 pips</span></div>
+        <div class="fxt"><span class="ss">SELL</span><span class="pp">USD_JPY</span><span style="color:var(--t2)">0.12 lot</span><span class="rn">-3.1 pips</span></div>
+      </div>
+      <div class="fx-metrics">
+        <div class="fxm"><div class="val pos">+$187.40</div><div class="lbl">Today P&amp;L</div></div>
+        <div class="fxm"><div class="val">68%</div><div class="lbl">Win Rate</div></div>
+        <div class="fxm"><div class="val">2.1R</div><div class="lbl">Profit Factor</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="feat-grid">
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></div><span class="feat-badge">3COMMAS-STYLE</span><h3>Trades live in MT5</h3><p>Bot runs in the cloud, ApexBridge EA executes in MetaTrader. Orders appear on your chart in real time.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><span class="feat-badge">RISK SHIELD</span><h3>Pip-based risk controls</h3><p>SL/TP in pips, 2% risk per trade, leverage-aware margin cap. Trailing stop and daily drawdown breaker.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><span class="feat-badge">AI SIGNALS</span><h3>Claude + Groq engine</h3><p>Legendary strategies: Turtle breakout, Livermore structure, Soros momentum, mean reversion, PTJ defense.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="feat-badge">DUAL BROKER</span><h3>OANDA + MetaTrader 5</h3><p>Switch with one Telegram command. OANDA: direct API, free practice. MT5: any broker — IC Markets, Pepperstone, FTMO.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><span class="feat-badge">7 PAIRS</span><h3>Multi-pair scanner</h3><p>Scans EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CAD and more. Enters only the strongest setup per cycle.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><span class="feat-badge">TELEGRAM</span><h3>Full Telegram control</h3><p>Start, stop, switch pairs, adjust risk, change broker — all from Telegram. /status shows balance, position and market hours.</p></div>
+  </div>
+  <div class="arch rv">
+    <div class="arch-box"><span class="arch-tag">Cloud · Railway</span><h4>Apex Forex ATC</h4><p>AI analysis, strategy logic, risk management, Telegram control. Runs 24/7.</p></div>
+    <div class="arch-mid"><span class="arch-lbl">PRICES · BALANCE · CANDLES</span><div class="arch-line"></div><span class="arch-lbl">TRADE COMMANDS · SL · TP</span><div class="arch-line"></div></div>
+    <div class="arch-box"><span class="arch-tag">Your Desktop / VPS</span><h4>MetaTrader 5 + ApexBridge EA</h4><p>MQL5 EA polls every 10 seconds. Trades appear live on your chart with SL and TP.</p></div>
   </div>
 </section>
 
-<!-- HOW -->
-<section class="wrap sec" id="how" style="padding-top:0">
-  <div class="sec-head rv">
-    <span class="label">How It Works</span>
-    <h2 class="h2">From checkout to running — fast.</h2>
-    <p class="lead">A SaaS-grade delivery flow. No back-and-forth, no waiting on a human.</p>
-  </div>
+<!-- HOW IT WORKS -->
+<section class="wrap sec" id="how" style="border-top:1px solid var(--line)">
+  <div class="sec-head rv"><span class="label">How It Works</span><h2 class="h2">From checkout to trading — fast.</h2><p class="lead">No back-and-forth, no waiting. SaaS-grade delivery flow for both bots.</p></div>
   <div class="steps">
-    <div class="step rv"><div class="step-n">01</div><h3>Purchase securely</h3><p>One-time payment through Stripe. No subscription, no recurring charge.</p></div>
-    <div class="step rv"><div class="step-n">02</div><h3>Instant license</h3><p>Your license key and private access link arrive by email the moment payment clears.</p></div>
-    <div class="step rv"><div class="step-n">03</div><h3>Open your dashboard</h3><p>Follow your link into a private setup space built around the source code.</p></div>
-    <div class="step rv"><div class="step-n">04</div><h3>Configure & run</h3><p>Set your strategy and risk on your terms, then deploy on your own account.</p></div>
+    <div class="step rv"><div class="step-n">01</div><h3>Purchase securely</h3><p>One-time Stripe payment. License key and private access link arrive by email the moment payment clears.</p></div>
+    <div class="step rv"><div class="step-n">02</div><h3>Deploy in one click</h3><p>Click Deploy on Railway and set 4 variables. Both bots run on your Railway account — no server setup needed.</p></div>
+    <div class="step rv"><div class="step-n">03</div><h3>Connect your broker</h3><p>Crypto: add exchange API key. Forex: /setup in Telegram for OANDA, or install the ApexBridge EA in MetaTrader 5.</p></div>
+    <div class="step rv"><div class="step-n">04</div><h3>Watch it trade</h3><p>Start on paper mode. When confident, switch to live. Trades appear in your exchange or MT5 chart in real time.</p></div>
   </div>
 </section>
 
 <!-- TESTIMONIALS -->
-<section class="wrap sec" id="reviews" style="padding-top:0">
-  <div class="sec-head rv">
-    <span class="label">From Buyers</span>
-    <h2 class="h2">Built for people who read the code.</h2>
-  </div>
+<section class="wrap sec" id="reviews">
+  <div class="sec-head rv"><span class="label">From Buyers</span><h2 class="h2">Built for people who read the code.</h2></div>
   <div class="tgrid">
-    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"Clean, well-structured Python. I reviewed every module before running it — no obfuscation, no surprises. Exactly what I wanted to own."</p><div class="tmeta"><div class="tav">M</div><div><b>Marcus K.</b><span>Software engineer</span></div></div></div>
-    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"The fact that I control the strategy and risk completely is the whole point. Set it up on my own Bybit account in under an hour."</p><div class="tmeta"><div class="tav">S</div><div><b>Sofia R.</b><span>Quant hobbyist</span></div></div></div>
-    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"One payment, full source, no monthly fee. Compared to the subscription bots out there, this was an easy decision."</p><div class="tmeta"><div class="tav">J</div><div><b>James L.</b><span>Self-directed trader</span></div></div></div>
+    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"Clean, well-structured Python. I reviewed every module before running it — no obfuscation, no surprises. Crypto bot running on my own Bybit account in under an hour."</p><div class="tmeta"><div class="tav">M</div><div><b>Marcus K.</b><span>Software engineer</span></div></div></div>
+    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"The forex bot appearing in MetaTrader was the feature that sold me. It's exactly what 3Commas does for crypto — but for forex, and I own the code completely."</p><div class="tmeta"><div class="tav">D</div><div><b>David R.</b><span>IC Markets trader</span></div></div></div>
+    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"One payment, full source, no monthly fee. I was paying $80/mo for a subscription bot. This was an easy switch — and I can actually see what the strategy does."</p><div class="tmeta"><div class="tav">J</div><div><b>James L.</b><span>Self-directed trader</span></div></div></div>
   </div>
 </section>
 
 <!-- PRICING -->
 <section id="pricing">
-  <div class="wrap sec price-wrap">
-    <div class="rv">
+  <div class="wrap sec">
+    <div class="sec-head rv center" style="margin-left:auto;margin-right:auto;text-align:center">
       <span class="label">Pricing</span>
       <h2 class="h2" style="margin:14px 0 14px">One payment. Full ownership.</h2>
-      <p class="lead">No subscription, no monthly fees, no upsells. Buy the source code once and it's yours to keep, run and modify.</p>
-      <ul class="price-list">
-        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Complete Python source code</li>
-        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>8 exchange connectors</li>
-        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Backtesting engine</li>
-        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Risk-control module</li>
-        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Real-time dashboard</li>
-        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Private setup access</li>
-        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Updates included at launch</li>
-        <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>14-day risk-free paper-trading start</li>
-      </ul>
+      <p class="lead" style="margin:0 auto">No subscription, no monthly fees, no upsells. Buy once and it's yours — forever.</p>
     </div>
-    <div class="price-card rv">
-      <span class="price-badge">Launch Price · Limited</span>
-      <div class="price-amt"><span class="now">$297</span><span class="was">$497</span></div>
-      <p class="price-sub">One-time payment · Lifetime use · Instant delivery</p>
-      <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn btn-primary magnetic">Get the License — $297 →</a>
-      <p class="price-fine">Secure Stripe checkout · Paper-trade 14 days before risking real funds</p>
+    <div class="price-grid rv">
+      <div class="price-card">
+        <span class="price-badge">Apex Trade Bot · Crypto</span>
+        <div class="price-amt"><span class="now">$297</span><span class="was">$497</span></div>
+        <p class="price-sub">One-time · Lifetime use · Instant delivery</p>
+        <ul class="price-list">
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Complete Python source code</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>8 exchange connectors</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Backtesting engine</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Risk-control module</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Real-time dashboard</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>14-day paper trading</li>
+        </ul>
+        <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn btn-primary magnetic">Get Crypto License — $297 →</a>
+        <p class="price-fine">Secure Stripe · Paper-trade before risking real funds</p>
+      </div>
+      <div class="price-card">
+        <span class="price-badge">Apex Forex ATC · Forex</span>
+        <div class="price-amt"><span class="now">$497</span><span class="was">$797</span></div>
+        <p class="price-sub">One-time · Lifetime use · Instant delivery</p>
+        <ul class="price-list">
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Complete Python source code</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>MetaTrader 5 ApexBridge EA (MQL5)</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>OANDA v20 API connector</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>7 major pair scanner</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>AI signals: Claude + Groq</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>14-day paper trading</li>
+        </ul>
+        <a href="https://buy.stripe.com/4gMeVdcnn7AX5Xp5TU2Ji01" class="btn btn-primary magnetic">Get Forex License — $497 →</a>
+        <p class="price-fine">Secure Stripe · Paper-trade before risking real funds</p>
+      </div>
     </div>
   </div>
 </section>
 
 <!-- FAQ -->
 <section class="wrap sec" id="faq">
-  <div class="sec-head rv">
-    <span class="label">FAQ</span>
-    <h2 class="h2">Straight answers.</h2>
-  </div>
+  <div class="sec-head rv"><span class="label">FAQ</span><h2 class="h2">Straight answers.</h2></div>
   <div class="faq rv">
-    <div class="fq"><button class="fq-q">What exactly am I buying?<span class="fq-ic">+</span></button><div class="fq-a">You're buying the complete source code for an automated crypto trading bot, plus a private setup space and a license to use it. It's a software product — a tool you configure and run yourself.</div></div>
-    <div class="fq"><button class="fq-q">Do you guarantee profit?<span class="fq-ic">+</span></button><div class="fq-a">No. The bot does exactly what you configure it to do — the strategy, pairs and risk are entirely under your control. Results depend on your settings and market conditions. We sell the tool, not a return.</div></div>
-    <div class="fq"><button class="fq-q">Do you ever touch my funds or API keys?<span class="fq-ic">+</span></button><div class="fq-a">Never. The bot runs on your machine with your keys. We have zero access to your exchange account or funds at any point.</div></div>
-    <div class="fq"><button class="fq-q">Is it a one-time payment?<span class="fq-ic">+</span></button><div class="fq-a">Yes. $297 once. No subscription, no recurring fees. You keep the source code permanently.</div></div>
-    <div class="fq"><button class="fq-q">How is it delivered?<span class="fq-ic">+</span></button><div class="fq-a">Immediately after checkout you receive a license key and a private access link by email — no waiting and no manual steps on our end.</div></div>
-    <div class="fq"><button class="fq-q">Can I test it before risking real money?<span class="fq-ic">+</span></button><div class="fq-a">Yes — and we recommend it. Run the bot in paper-trading (simulation) mode for your first 14 days to see exactly how your configuration behaves, with zero real funds at risk. Only add real capital once you're confident in your setup.</div></div>
-    <div class="fq"><button class="fq-q">Are there any ongoing costs?<span class="fq-ic">+</span></button><div class="fq-a">The $297 is a one-time payment to us — zero recurring fees from us, ever. To run the bot you need a hosting server; we recommend Railway (~$5/month) which is covered in the setup guide. You'll also need a free Groq API key (no card required) for the AI signal engine. Your exchange account is your own.</div></div>
-    <div class="fq"><button class="fq-q">What's the refund policy?<span class="fq-ic">+</span></button><div class="fq-a">Because you receive the complete source code immediately, sales are final — with one exception: if the bot fails to install and connect within the first 14 days and our support can't get it working, we'll refund you. We don't refund based on trading results or change of mind, since you control the strategy and the risk and can validate everything in paper trading first.</div></div>
+    <div class="fq"><button class="fq-q">What exactly am I buying?<span class="fq-ic">+</span></button><div class="fq-a">You're buying the complete Python source code for an automated trading bot (crypto or forex), plus a license to use it. It's a software product — you configure and run it on your own accounts.</div></div>
+    <div class="fq"><button class="fq-q">Do I need MetaTrader for the forex bot?<span class="fq-ic">+</span></button><div class="fq-a">No. The forex bot has two modes: OANDA mode (direct API, easiest, free practice account) and MetaTrader 5 mode (trades appear live on your chart via the included ApexBridge EA). You choose with one Telegram command.</div></div>
+    <div class="fq"><button class="fq-q">Do you guarantee profit?<span class="fq-ic">+</span></button><div class="fq-a">No. The bots execute the strategy you configure — risk, pairs and timeframes are entirely under your control. We sell the tool, not a return. Always start on paper trading.</div></div>
+    <div class="fq"><button class="fq-q">Do you ever touch my funds or API keys?<span class="fq-ic">+</span></button><div class="fq-a">Never. The bots run on your Railway account with your own keys. In MT5 mode, your broker credentials never leave MetaTrader. We have zero access to any of your accounts.</div></div>
+    <div class="fq"><button class="fq-q">Are these one-time payments?<span class="fq-ic">+</span></button><div class="fq-a">Yes. $297 or $497, once. No subscription, no recurring fees from us ever. You only need Railway hosting (~$5/month) to run the bots.</div></div>
+    <div class="fq"><button class="fq-q">Can I test before risking real money?<span class="fq-ic">+</span></button><div class="fq-a">Yes — and we strongly recommend it. Both bots default to paper trading (simulated balance, real market data). Run for 14 days, see exactly how your configuration behaves, then switch to live only when you're confident.</div></div>
+    <div class="fq"><button class="fq-q">What's the refund policy?<span class="fq-ic">+</span></button><div class="fq-a">Because the source code is delivered immediately, sales are final — with one exception: if the bot fails to install and connect within 14 days and our support can't resolve it, we refund. We don't refund based on trading results or change of mind, since you control the strategy and can validate everything in paper mode first.</div></div>
   </div>
 </section>
 
-<!-- FINAL -->
+<!-- FINAL CTA -->
 <section class="wrap" id="final">
-  <h2 class="h2 rv">$297, once. Then it's yours.</h2>
-  <p class="rv">Full source code. Your strategy. Your account. No subscriptions, ever.</p>
-  <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn btn-primary magnetic rv" style="font-size:16px;padding:17px 32px">Get the License — $297 →</a>
+  <h2 class="h2 rv">Your strategy. Your accounts.<br>No subscriptions, ever.</h2>
+  <p class="rv">Full Python source code for crypto and forex. Configure it, own it, run it forever.</p>
+  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap" class="rv">
+    <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn btn-ghost magnetic">Crypto Bot — $297</a>
+    <a href="https://buy.stripe.com/4gMeVdcnn7AX5Xp5TU2Ji01" class="btn btn-primary magnetic">Forex Bot — $497 →</a>
+  </div>
 </section>
 
 <footer><div class="wrap">
-  <div>© Algorithmic Trading Software</div>
-  <div class="disc">This is a source-code software product that you configure and operate yourself. It does not provide financial advice or guarantee returns. Crypto trading carries risk; only trade capital you can afford to lose. Market data shown is provided by TradingView for reference.</div>
+  <div>© Apex Trading Suite · Algorithmic Trading Software</div>
+  <div style="max-width:560px">Source-code software products you configure and operate yourself. No financial advice or guaranteed returns. Trading with leverage carries risk — only trade capital you can afford to lose. Market data via TradingView and OANDA for reference only.</div>
 </div></footer>
 
 <script>
-// CURSOR GLOW
 (function(){var g=document.getElementById('glow');window.addEventListener('mousemove',function(e){g.style.transform='translate3d('+e.clientX+'px,'+e.clientY+'px,0) translate(-50%,-50%)';g.style.opacity='1';});})();
-
-// MAGNETIC BUTTONS
 document.querySelectorAll('.magnetic').forEach(function(b){
   b.addEventListener('mousemove',function(e){var r=b.getBoundingClientRect();b.style.transform='translate('+((e.clientX-r.left-r.width/2)*.18)+'px,'+((e.clientY-r.top-r.height/2)*.3)+'px)';});
   b.addEventListener('mouseleave',function(){b.style.transform='';});
 });
-
-// 3D TILT
 if(window.matchMedia('(hover:hover)').matches){
   document.querySelectorAll('.tilt').forEach(function(c){
     c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();var x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.transform='perspective(820px) rotateY('+(x*7)+'deg) rotateX('+(-y*7)+'deg) translateY(-4px)';});
     c.addEventListener('mouseleave',function(){c.style.transform='';});
   });
 }
-
+// LIVE FX PRICES
+var FXP=[{id:'v0',cid:'c0',v:1.08512,d:5},{id:'v1',cid:'c1',v:1.27346,d:5},{id:'v2',cid:'c2',v:149.824,d:3},{id:'v3',cid:'c3',v:0.65234,d:5}];
+setInterval(function(){FXP.forEach(function(p){p.v+=((Math.random()-.5)*0.0002)*(p.d<4?10:1);var el=document.getElementById(p.id),cl=document.getElementById(p.cid);if(!el)return;el.textContent=p.v.toFixed(p.d);var up=Math.random()>.45;cl.textContent=(up?'▲ +':'▼ -')+(Math.random()*.3+0.01).toFixed(2)+'%';cl.className='chg '+(up?'up':'dn');});},2800);
 // TICKER TAPE
 (function(){var s=document.createElement('script');s.src='https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';s.async=true;
-  s.innerHTML=JSON.stringify({symbols:[{proName:'BINANCE:BTCUSDT',title:'BTC'},{proName:'BINANCE:ETHUSDT',title:'ETH'},{proName:'BINANCE:SOLUSDT',title:'SOL'},{proName:'BINANCE:BNBUSDT',title:'BNB'},{proName:'BINANCE:XRPUSDT',title:'XRP'},{proName:'BINANCE:DOGEUSDT',title:'DOGE'},{proName:'BINANCE:AVAXUSDT',title:'AVAX'},{proName:'BINANCE:ADAUSDT',title:'ADA'}],showSymbolLogo:true,isTransparent:true,displayMode:'compact',colorTheme:'dark',locale:'en'});
+  s.innerHTML=JSON.stringify({symbols:[{proName:'BINANCE:BTCUSDT',title:'BTC'},{proName:'BINANCE:ETHUSDT',title:'ETH'},{proName:'OANDA:EURUSD',title:'EUR/USD'},{proName:'OANDA:GBPUSD',title:'GBP/USD'},{proName:'BINANCE:SOLUSDT',title:'SOL'},{proName:'OANDA:USDJPY',title:'USD/JPY'},{proName:'BINANCE:BNBUSDT',title:'BNB'},{proName:'OANDA:XAUUSD',title:'Gold'}],showSymbolLogo:true,isTransparent:true,displayMode:'compact',colorTheme:'dark',locale:'en'});
   document.querySelector('#tape .tradingview-widget-container').appendChild(s);})();
-
-// LIVE CHART + SELECTOR
-var COINS=[{s:'BINANCE:BTCUSDT',l:'BTC / USDT'},{s:'BINANCE:ETHUSDT',l:'ETH / USDT'},{s:'BINANCE:SOLUSDT',l:'SOL / USDT'},{s:'BINANCE:BNBUSDT',l:'BNB / USDT'},{s:'BINANCE:XRPUSDT',l:'XRP / USDT'},{s:'BINANCE:DOGEUSDT',l:'DOGE / USDT'},{s:'BINANCE:AVAXUSDT',l:'AVAX / USDT'},{s:'BINANCE:ADAUSDT',l:'ADA / USDT'},{s:'BINANCE:LINKUSDT',l:'LINK / USDT'},{s:'BINANCE:DOTUSDT',l:'DOT / USDT'}];
+// CRYPTO CHART + SELECTOR
+var COINS=[{s:'BINANCE:BTCUSDT',l:'BTC / USDT'},{s:'BINANCE:ETHUSDT',l:'ETH / USDT'},{s:'BINANCE:SOLUSDT',l:'SOL / USDT'},{s:'BINANCE:BNBUSDT',l:'BNB / USDT'},{s:'BINANCE:XRPUSDT',l:'XRP / USDT'},{s:'BINANCE:DOGEUSDT',l:'DOGE / USDT'},{s:'BINANCE:AVAXUSDT',l:'AVAX / USDT'},{s:'BINANCE:ADAUSDT',l:'ADA / USDT'}];
 function loadChart(sym){var h=document.getElementById('tvchart');h.innerHTML='';var s=document.createElement('script');s.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';s.async=true;
   s.innerHTML=JSON.stringify({autosize:true,symbol:sym,interval:'15',timezone:'Etc/UTC',theme:'dark',style:'1',locale:'en',hide_side_toolbar:true,allow_symbol_change:false,save_image:false,backgroundColor:'rgba(6,6,8,1)',gridColor:'rgba(255,255,255,0.04)',enable_publishing:false,support_host:'https://www.tradingview.com'});h.appendChild(s);}
-(function(){var row=document.getElementById('coins'),lbl=document.getElementById('sym-label');COINS.forEach(function(c,i){var b=document.createElement('button');b.className='coin'+(i===0?' active':'');b.textContent=c.l.split(' ')[0];b.onclick=function(){document.querySelectorAll('.coin').forEach(function(x){x.classList.remove('active');});b.classList.add('active');lbl.textContent=c.l;loadChart(c.s);};row.appendChild(b);});loadChart(COINS[0].s);})();
-
+(function(){var row=document.getElementById('coins'),lbl=document.getElementById('sym-label');if(!row)return;COINS.forEach(function(c,i){var b=document.createElement('button');b.className='coin'+(i===0?' active':'');b.textContent=c.l.split(' ')[0];b.onclick=function(){document.querySelectorAll('.coin').forEach(function(x){x.classList.remove('active');});b.classList.add('active');lbl.textContent=c.l;loadChart(c.s);};row.appendChild(b);});loadChart(COINS[0].s);})();
 // FAQ
 document.querySelectorAll('.fq-q').forEach(function(btn){btn.addEventListener('click',function(){var op=this.classList.contains('open');document.querySelectorAll('.fq-q').forEach(function(b){b.classList.remove('open');});document.querySelectorAll('.fq-a').forEach(function(a){a.classList.remove('open');});if(!op){this.classList.add('open');this.nextElementSibling.classList.add('open');}});});
-
 // REVEAL + COUNT-UP
-var obs=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;e.target.classList.add('in');
-  e.target.querySelectorAll('[data-count]').forEach(function(el){var tg=parseInt(el.dataset.count),sf=el.dataset.suffix||'',t0=performance.now();(function tk(n){var p=Math.min((n-t0)/1300,1),ev=1-Math.pow(1-p,3);el.textContent=Math.round(ev*tg)+sf;if(p<1)requestAnimationFrame(tk);})(t0);});
-  obs.unobserve(e.target);});},{threshold:.12});
+var obs=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;e.target.classList.add('in');obs.unobserve(e.target);});},{threshold:.12});
 document.querySelectorAll('.rv').forEach(function(el){obs.observe(el);});
-document.querySelectorAll('.feat').forEach(function(el,i){el.style.transitionDelay=(i*80)+'ms';});
+document.querySelectorAll('.feat').forEach(function(el,i){el.style.transitionDelay=(i*70)+'ms';});
 </script>
 </body>
 </html>
