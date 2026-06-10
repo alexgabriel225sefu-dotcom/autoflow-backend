@@ -158,7 +158,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
       <div class="sdr" style="cursor:pointer" onclick="closeTrade(this,'pnl3')" title="Tap to close"><span class="sdr-pair">GBP/USD</span><span class="sdr-dir buy">BUY</span><span class="sdr-pnl pos" id="pnl3">+$54.60</span></div>
       <div class="sdm">
         <div class="sdm-cell"><div class="sdm-val pos" id="totalPnl">+$272.50</div><div class="sdm-lbl">Today P&amp;L</div></div>
-        <div class="sdm-cell"><div class="sdm-val">71%</div><div class="sdm-lbl">Win Rate</div></div>
+        <div class="sdm-cell"><div class="sdm-val">2.4R</div><div class="sdm-lbl">Prof. Factor</div></div>
         <div class="sdm-cell"><div class="sdm-val">2.4R</div><div class="sdm-lbl">Profit Factor</div></div>
       </div>
     </div>
@@ -290,7 +290,7 @@ q('cbtn').addEventListener('click',function(e){e.preventDefault();exit()});
 
 // INTERACTIVE TERMINAL
 var TD={
-  status:['$ /status','Balance: $2,450.00 USDT','Positions: 3 open','Win Rate (30d): 71.2%','Trades today: 8','Uptime: 14d 06h 22m','Mode: ● LIVE'],
+  status:['$ /status','Balance: $2,450.00 USDT','Positions: 3 open','Trades today: 8','Uptime: 14d 06h 22m','Mode: ● LIVE'],
   trade:['$ /trade BTC/USDT','Analyzing BTC/USDT 15m...','RSI: 42.1 · MACD: bull cross','Confidence: 94%','▲ SIGNAL: BUY detected','Sending order @ 67,234...','✓ Filled 0.036 BTC'],
   balance:['$ /balance --detailed','Spot: $2,450.00','Unrealized P&L: +$142.80','Today P&L: +$312.40 (+2.1%)','7d: +$1,240.00 (+8.4%)','Drawdown: 1.2% ✓'],
   pairs:['$ /pairs --active','✓ BTC/USDT  [scanning]','✓ ETH/USDT  [scanning]','✓ SOL/USDT  [scanning]','○ BNB/USDT  [idle]','847 pairs available']

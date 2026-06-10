@@ -307,8 +307,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     <div class="hstats rv">
       <div class="hs"><span class="hs-n" data-t="847" data-s="+">0+</span><span class="hs-l">Trading Pairs</span></div>
       <div class="hs"><span class="hs-n" data-t="8">0</span><span class="hs-l">Exchanges</span></div>
-      <div class="hs"><span class="hs-n" data-t="71" data-s="%">0%</span><span class="hs-l">Win Rate</span></div>
-      <div class="hs"><span class="hs-n" data-t="99" data-s="%">0%</span><span class="hs-l">Uptime</span></div>
+      <div class="hs"><span class="hs-n hs-static">1×</span><span class="hs-l">One-Time Payment</span></div>
+      <div class="hs"><span class="hs-n" data-t="14" data-s="d">0d</span><span class="hs-l">Paper Trial</span></div>
     </div>
     <div class="prod-grid rv">
       <div class="prod-card">
@@ -408,7 +408,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
       </div>
       <div class="fx-metrics">
         <div class="fxm"><div class="val pos">+$187.40</div><div class="lbl">Today P&amp;L</div></div>
-        <div class="fxm"><div class="val">68%</div><div class="lbl">Win Rate</div></div>
+        <div class="fxm"><div class="val">2.1R</div><div class="lbl">Profit Factor</div></div>
         <div class="fxm"><div class="val">2.1R</div><div class="lbl">Profit Factor</div></div>
       </div>
     </div>
@@ -565,7 +565,7 @@ setTimeout(popSig,5500);setInterval(popSig,14000);
 // COUNT-UP STATS
 function countUp(el){var t=+el.getAttribute('data-t'),suf=el.getAttribute('data-s')||'',n=0,step=Math.max(1,Math.floor(t/55));var ti=setInterval(function(){n=Math.min(n+step,t);el.textContent=n.toLocaleString()+suf;if(n>=t)clearInterval(ti);},18);}
 var cobs=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;countUp(e.target);cobs.unobserve(e.target);});},{threshold:.5});
-document.querySelectorAll('.hs-n').forEach(function(el){cobs.observe(el);});
+document.querySelectorAll('.hs-n[data-t]').forEach(function(el){cobs.observe(el);});
 </script>
 </body>
 </html>
