@@ -66,8 +66,12 @@ def get_balance():
     return float(r.json()["account"]["balance"])
 
 
-def place_order(side, units, instrument=None):
-    """Market order. OANDA uses signed units: positive = buy, negative = sell."""
+def place_order(side, units, instrument=None, sl=None, tp=None):
+    """Market order. OANDA uses signed units: positive = buy, negative = sell.
+
+    sl/tp are managed virtually by the bot loop (trailing included); they are
+    accepted here only for interface parity with the MT bridge.
+    """
     instrument = instrument or cfg.SYMBOL
     signed = int(units) if side == "BUY" else -int(units)
     if cfg.PAPER_TRADING:

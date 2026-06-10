@@ -12,6 +12,7 @@ from apex import config as cfg
 
 _REGISTRY = {
     "oanda": "apex.brokers.oanda",
+    "mt": "apex.brokers.mtbridge",      # MetaTrader 5 via ApexBridge EA
 }
 
 

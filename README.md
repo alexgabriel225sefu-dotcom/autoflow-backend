@@ -1,6 +1,10 @@
 # 💱 Apex Forex Bot
 
-AI-powered forex trading bot. **OANDA-connected. Telegram-controlled. Zero config files.**
+AI-powered forex trading bot. **OANDA + MetaTrader 5. Telegram-controlled. Zero config files.**
+
+Two ways to connect (3Commas-style — trades appear live in the app you already use):
+- **OANDA** — direct API, easiest setup, free practice account
+- **MetaTrader 5** — via the included ApexBridge EA: IC Markets, Pepperstone, or any MT5 broker ([guide](docs/METATRADER.md))
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/autoflow-backend)
 
@@ -39,6 +43,7 @@ The bot walks you through connecting your **free OANDA practice account**
 | Command | Action |
 |---|---|
 | `/setup` | Guided setup wizard (OANDA → paper → pair) |
+| `/broker oanda\|mt` | Switch between OANDA API and MetaTrader bridge |
 | `/start` | Start trading |
 | `/stop` | Pause trading |
 | `/status` | Live balance, position, PnL, market hours |
@@ -54,6 +59,7 @@ The bot walks you through connecting your **free OANDA practice account**
 
 ## Features
 - **OANDA v20 API** — practice + live, free practice account for data
+- **MetaTrader 5 bridge** — ApexBridge EA executes on any MT5 broker; trades, SL and TP visible on your chart
 - **7 major pairs scanner** — EUR_USD, GBP_USD, USD_JPY, AUD_USD, USD_CAD + custom
 - **Pip-based risk** — SL/TP in pips, 2% risk per trade default, leverage-aware sizing with margin cap
 - **Spread guard** — skips entries when the spread is too wide
@@ -70,6 +76,7 @@ The bot walks you through connecting your **free OANDA practice account**
 | Guide | What's inside |
 |---|---|
 | [docs/SETUP.md](docs/SETUP.md) | Step-by-step deployment + OANDA account |
+| [docs/METATRADER.md](docs/METATRADER.md) | MetaTrader 5 / IC Markets integration |
 | [docs/CONFIG.md](docs/CONFIG.md) | Every setting + all Telegram commands |
 | [docs/STRATEGIES.md](docs/STRATEGIES.md) | How the bot decides to trade |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Fixes for common problems |
@@ -81,6 +88,7 @@ The bot walks you through connecting your **free OANDA practice account**
 
 ```bash
 python tests/test_forex.py        # pip math, sizing, margin, market hours
+python tests/test_mtbridge.py     # MetaTrader bridge protocol
 python tests/test_indicators.py   # indicator math
 python tests/test_strategies.py   # strategies + risk circuit breakers
 python tests/test_ai.py           # AI signal layer (no network needed)

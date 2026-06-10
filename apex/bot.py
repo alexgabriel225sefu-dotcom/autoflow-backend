@@ -16,6 +16,11 @@ from apex.dashboard import render as render_dashboard
 
 broker = get_broker()
 
+
+def broker_label():
+    return "MT BRIDGE" if cfg.BROKER == "mt" else f"OANDA ({cfg.OANDA_ENV})"
+
+
 # ─── Runtime pause control ───────────────────────────────
 _bot_paused = False
 _pause_lock = threading.Lock()
@@ -38,8 +43,8 @@ def reload_broker_connector():
     try:
         broker = get_broker()
         tg._broker = broker
-        dash["broker"] = f"OANDA ({cfg.OANDA_ENV})"
-        print(f"[BOT] Broker reloaded → {cfg.BROKER} ({cfg.OANDA_ENV})")
+        dash["broker"] = broker_label()
+        print(f"[BOT] Broker reloaded → {broker_label()}")
     except Exception as e:
         print(f"[BOT] Broker reload error: {e}")
 
@@ -59,6 +64,8 @@ def _load_runtime_config():
         os.environ[k] = str(v)
     if "BROKER" in data:
         cfg.BROKER = str(data["BROKER"]).lower()
+    if "MT_BRIDGE_SECRET" in data:
+        cfg.MT_BRIDGE_SECRET = str(data["MT_BRIDGE_SECRET"])
     if "OANDA_ENV" in data:
         cfg.OANDA_ENV = str(data["OANDA_ENV"]).lower()
     if "TRADE_SYMBOL" in data:
@@ -89,7 +96,7 @@ dash = {
     "balance": 0, "startBalance": 0, "currentSymbol": cfg.SYMBOL, "currentPrice": 0,
     "openPosition": None, "trades": [], "lastTick": None,
     "mode": "PAPER" if cfg.PAPER_TRADING else cfg.OANDA_ENV.upper(),
-    "broker": f"OANDA ({cfg.OANDA_ENV})",
+    "broker": broker_label(),
     "marketOpen": True,
 }
 
@@ -127,7 +134,12 @@ def validate():
             sys.exit(1)
     if not has_anthropic and has_groq:
         print("ℹ️  ANTHROPIC_API_KEY missing — using Groq (free).")
-    if not cfg.OANDA_API_TOKEN or not cfg.OANDA_ACCOUNT_ID:
+    if cfg.BROKER == "mt":
+        if not cfg.MT_BRIDGE_SECRET:
+            print("❌ BROKER=mt requires MT_BRIDGE_SECRET (same value as in the EA).")
+            sys.exit(1)
+        print("🔗 MetaTrader bridge mode — waiting for the ApexBridge EA to sync.")
+    elif not cfg.OANDA_API_TOKEN or not cfg.OANDA_ACCOUNT_ID:
         print("⚠️  OANDA credentials missing — market data unavailable.")
         print("    Create a FREE practice account at oanda.com, then send /setup")
         print("    to your Telegram bot (or set OANDA_API_TOKEN + OANDA_ACCOUNT_ID).")
@@ -209,7 +221,8 @@ def open_trade(side, price, balance, atr_value=0, symbol=None, druck_mult=1.0):
         return
     if druck_mult != 1.0:
         logger.info(f"🎯 Druckenmiller: position size ×{druck_mult:.2f}")
-    result = broker.place_order(side, units, symbol)
+    result = broker.place_order(side, units, symbol,
+                                sl=sltp["stopLoss"], tp=sltp["takeProfit"])
     if result.get("status") == "REJECTED":
         logger.warn(f"Order rejected by broker: {result.get('reason')}")
         return
@@ -229,7 +242,7 @@ def open_trade(side, price, balance, atr_value=0, symbol=None, druck_mult=1.0):
     state.save(paper_balance, open_position)
 
 
-def close_trade(price, reason):
+def close_trade(price, reason, send_order=True):
     global open_position, paper_balance
     if not open_position:
         return
@@ -237,8 +250,12 @@ def close_trade(price, reason):
     entry_price = open_position["entryPrice"]
     units = open_position["quantity"]
     symbol = open_position.get("symbol", cfg.SYMBOL)
-    close_side = "SELL" if side == "BUY" else "BUY"
-    broker.place_order(close_side, units, symbol)
+    if send_order:
+        if hasattr(broker, "close_position"):
+            broker.close_position(symbol)
+        else:
+            close_side = "SELL" if side == "BUY" else "BUY"
+            broker.place_order(close_side, units, symbol)
     pnl = forex.pnl_usd(side, entry_price, price, units, symbol)
     if cfg.PAPER_TRADING:
         paper_balance += pnl
@@ -262,6 +279,8 @@ def close_trade(price, reason):
 
 
 def best_symbol():
+    if cfg.BROKER == "mt":          # the EA only sees its own chart
+        return cfg.SYMBOL
     if not cfg.MULTI_SYMBOL or len(cfg.SCAN_SYMBOLS) <= 1:
         return cfg.SYMBOL
     results = []
@@ -300,6 +319,18 @@ def tick():
                 market_closed_alerted = True
             return
         market_closed_alerted = False
+
+        # ── MT bridge: the EA's chart dictates the symbol; reconcile
+        #    positions the EA closed natively (its safety-net SL/TP) ──
+        if cfg.BROKER == "mt":
+            ea_symbol = broker.current_symbol()
+            if ea_symbol:
+                cfg.SYMBOL = ea_symbol
+            if open_position and not cfg.PAPER_TRADING and broker.position_reported() is None:
+                last_price = dash.get("currentPrice") or open_position["entryPrice"]
+                logger.warn("MT reports flat — position closed inside MetaTrader (SL/TP)")
+                close_trade(last_price, "MT_SLTP", send_order=False)
+                return
 
         active_symbol = open_position["symbol"] if open_position else None
         symbol = active_symbol or best_symbol()
@@ -419,6 +450,22 @@ def _start_dashboard_server():
         def log_message(self, *args):
             pass
 
+        def do_POST(self):
+            if self.path == "/api/mt/sync":
+                from apex.brokers import mtbridge
+                length = int(self.headers.get("Content-Length") or 0)
+                body = self.rfile.read(min(length, 1_000_000)).decode("utf-8", "replace")
+                status, text = mtbridge.handle_sync(body)
+                payload = text.encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+            else:
+                self.send_response(404)
+                self.end_headers()
+
         def do_GET(self):
             if self.path == "/api/status":
                 body = json.dumps({**dash, "tickCount": tick_count}).encode()
@@ -459,7 +506,8 @@ def main():
     logger.print_banner(balance)
 
     mode = "📝 PAPER TRADING" if cfg.PAPER_TRADING else (
-        "🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE")
+        "🔗 METATRADER" if cfg.BROKER == "mt" else (
+            "🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE"))
     dash["mode"] = mode.replace("📝", "").replace("🧪", "").replace("🔴", "").strip()
     tg.alert_start(cfg.SYMBOL, cfg.TIMEFRAME, balance, mode)
 
