@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Apex Trading Suite — AI Trading Bot Source Code · Crypto $297 · Forex $497</title>
-<meta name="description" content="Two AI-powered trading bots. Full Python source code. Crypto: 8 exchanges. Forex: OANDA + MetaTrader 5, 3Commas-style. One-time payment, no subscriptions.">
+<meta name="description" content="Two AI-powered trading bots. Full Python source code. Crypto: 8 exchanges. Forex: OANDA + MetaTrader 5 native integration. One-time payment, no subscriptions.">
 <link rel="canonical" href="https://aicashsystem.space/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" href="/favicon.svg">
@@ -221,6 +221,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .sec-head{max-width:600px;margin-bottom:40px}
 .sec-head .h2{margin:14px 0 14px}
 @media(max-width:480px){.price-card{padding:22px}}
+@media(max-width:600px){.chart-host{height:200px}.trust-inner{gap:8px}.trust-tag{font-size:11px}.mq-track{font-size:clamp(22px,7vw,36px)}.arch{grid-template-columns:1fr}.arch-mid{border-left:none;border-right:none;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.prod-sec-head{gap:24px}.stat{padding:18px 10px}}
+.bot-divider{border:none;border-top:2px solid var(--acc);opacity:.18;margin:0}
 /* HAMBURGER */
 #ham{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:6px;z-index:400}
 #ham span{display:block;width:22px;height:2px;background:var(--t0);border-radius:1px;transition:all .3s var(--ease)}
@@ -304,7 +306,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
       <div class="prod-card">
         <span class="pc-tag">Forex</span>
         <h3>Apex Forex ATC</h3>
-        <p>AI-powered forex bot. 3Commas-style integration — trades appear live in your MetaTrader 5 chart, with SL and TP set natively. Also works directly via OANDA API.</p>
+        <p>AI-powered forex bot. Trades appear live in your MetaTrader 5 chart with SL and TP set natively. Also works directly via OANDA API.</p>
         <div class="pc-pills">
           <span class="pc-pill">OANDA</span><span class="pc-pill">MetaTrader 5</span><span class="pc-pill">7 Major Pairs</span><span class="pc-pill">MT5 EA Included</span>
         </div>
@@ -336,7 +338,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     <div>
       <span class="label">Crypto Bot</span>
       <h2 class="h2" style="margin:14px 0 14px">Apex Trade Bot</h2>
-      <p class="lead">The complete Python codebase for automated crypto trading. Connect to 8 major exchanges with your own API keys — trades appear live in your exchange account, like 3Commas for crypto.</p>
+      <p class="lead">The complete Python codebase for automated crypto trading. Connect to 8 major exchanges with your own API keys — every trade executes live inside your exchange account.</p>
     </div>
     <div class="terminal">
       <div class="term-top">
@@ -362,12 +364,13 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 </section>
 
 <!-- FOREX SECTION -->
+<hr class="bot-divider">
 <section class="wrap prod-sec" id="forex-sec">
   <div class="prod-sec-head rv">
     <div>
       <span class="label">Forex Bot</span>
       <h2 class="h2" style="margin:14px 0 14px">Apex Forex ATC</h2>
-      <p class="lead">Complete Python source for AI forex trading. 3Commas-style MetaTrader 5 integration — the bot runs in the cloud, every order executes live in your MT5 chart with SL and TP visible.</p>
+      <p class="lead">Complete Python source for AI forex trading. Direct MetaTrader 5 integration — the bot runs in the cloud, every order executes live in your MT5 chart with SL and TP visible.</p>
     </div>
     <div class="fx-dash">
       <div class="fx-head">
@@ -393,7 +396,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     </div>
   </div>
   <div class="feat-grid">
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></div><span class="feat-badge">3COMMAS-STYLE</span><h3>Trades live in MT5</h3><p>Bot runs in the cloud, ApexBridge EA executes in MetaTrader. Orders appear on your chart in real time.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></div><span class="feat-badge">MT5 NATIVE</span><h3>Trades live in MT5</h3><p>Bot runs in the cloud, ApexBridge EA executes in MetaTrader. Orders appear on your chart in real time.</p></div>
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><span class="feat-badge">RISK SHIELD</span><h3>Pip-based risk controls</h3><p>SL/TP in pips, 2% risk per trade, leverage-aware margin cap. Trailing stop and daily drawdown breaker.</p></div>
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><span class="feat-badge">AI SIGNALS</span><h3>Claude + Groq engine</h3><p>Legendary strategies: Turtle breakout, Livermore structure, Soros momentum, mean reversion, PTJ defense.</p></div>
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="feat-badge">DUAL BROKER</span><h3>OANDA + MetaTrader 5</h3><p>Switch with one Telegram command. OANDA: direct API, free practice. MT5: any broker — IC Markets, Pepperstone, FTMO.</p></div>
@@ -423,7 +426,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
   <div class="sec-head rv"><span class="label">From Buyers</span><h2 class="h2">Built for people who read the code.</h2></div>
   <div class="tgrid">
     <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"Clean, well-structured Python. I reviewed every module before running it — no obfuscation, no surprises. Crypto bot running on my own Bybit account in under an hour."</p><div class="tmeta"><div class="tav">M</div><div><b>Marcus K.</b><span>Software engineer</span></div></div></div>
-    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"The forex bot appearing in MetaTrader was the feature that sold me. It's exactly what 3Commas does for crypto — but for forex, and I own the code completely."</p><div class="tmeta"><div class="tav">D</div><div><b>David R.</b><span>IC Markets trader</span></div></div></div>
+    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"The forex bot appearing in MetaTrader was the feature that sold me. Trades live on my chart with SL and TP — and I own the full code."</p><div class="tmeta"><div class="tav">D</div><div><b>David R.</b><span>IC Markets trader</span></div></div></div>
     <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"One payment, full source, no monthly fee. I was paying $80/mo for a subscription bot. This was an easy switch — and I can actually see what the strategy does."</p><div class="tmeta"><div class="tav">J</div><div><b>James L.</b><span>Self-directed trader</span></div></div></div>
   </div>
 </section>

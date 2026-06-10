@@ -152,8 +152,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <div class="stage" id="s3">
   <div class="comp-pre" id="cp">You don't need</div>
   <div class="comp-big">
-    <span class="hit" id="ch1">3Commas.</span>
-    <span class="hit2" id="ch2">You need the code.</span>
+    <span class="hit" id="ch1">Subscriptions.</span>
+    <span class="hit2" id="ch2">You own the code.</span>
   </div>
   <div class="comp-line" id="cl"></div>
 </div>
@@ -179,10 +179,10 @@ drawPts();
 
 // CANDLESTICK CHART
 var cc=document.getElementById('cc'),cctx=cc.getContext('2d'),cW,cH;
-function resizeChart(){cW=cc.width=innerWidth;cH=cc.height=innerHeight;drawChart()}
-resizeChart();
 var candles=[];
 (function(){var p=67400;for(var i=0;i<50;i++){var d=Math.random()>.44?1:-1,m=(Math.random()*800+80)*d,o=p,c=p+m,h=Math.max(o,c)+Math.random()*380,l=Math.min(o,c)-Math.random()*300;candles.push({o:o,c:c,h:h,l:l});p=c;}})();
+function resizeChart(){cW=cc.width=innerWidth;cH=cc.height=innerHeight;drawChart()}
+resizeChart();
 function drawChart(){
   cctx.clearRect(0,0,cW,cH);
   var ml=cW*.34,mr=cW*.97,mt=cH*.07,mb=cH*.85,n=candles.length;
