@@ -61,6 +61,7 @@ def _legendary_section(strategy_data):
     t = strategy_data["turtle"]
     lv = strategy_data["livermore"]
     so = strategy_data["soros"]
+    mr = strategy_data.get("meanReversion", {})
     se = strategy_data["session"]
     lv_strength = f"{lv['strength'] * 100:.0f}%" if lv.get("strength") is not None else "N/A"
     so_mom = f"{so['momentum'] * 100:.0f}%" if so.get("momentum") is not None else "N/A"
@@ -81,6 +82,10 @@ def _legendary_section(strategy_data):
 - Momentum direction: {so.get('direction')}
 - Bullish candles: {so_mom} of last 8
 - Price velocity: {so_vel}
+
+### 📉 Mean Reversion (Z-score vs SMA20)
+- Z-score: {mr.get('zscore', 0)} | Stretched: {'YES — price extended, expect snap-back' if mr.get('stretched') else 'no'}
+- Reversion signal: {mr.get('signal') or 'NONE'}
 
 ### 📊 Current session (Ed Seykota rules)
 - Consecutive losses: {se.get('consecutiveLosses')} (stop at 3)

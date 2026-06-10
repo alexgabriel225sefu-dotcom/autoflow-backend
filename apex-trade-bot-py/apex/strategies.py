@@ -110,6 +110,23 @@ def soros_momentum(candles):
     return {"momentum": 0.5, "direction": "NEUTRAL", "velocity": velocity}
 
 
+def mean_reversion(candles, period=20, threshold=2.0):
+    """Z-score of price vs SMA — flags stretched moves likely to snap back."""
+    if len(candles) < period + 1:
+        return {"signal": None, "zscore": 0, "stretched": False}
+    closes = [c["close"] for c in candles[-period:]]
+    mean = sum(closes) / period
+    std = (sum((c - mean) ** 2 for c in closes) / period) ** 0.5
+    price = candles[-1]["close"]
+    z = (price - mean) / std if std else 0
+    return {
+        "signal": "SELL" if z > threshold else ("BUY" if z < -threshold else None),
+        "zscore": round(z, 2),
+        "stretched": abs(z) > threshold,
+        "mean": round(mean, 6),
+    }
+
+
 def druckenmiller_multiplier(confidence, criteria_score, livermore, turtle):
     mult = 1.0
     if confidence >= 85 and criteria_score >= 5:
@@ -147,5 +164,6 @@ def analyze(candles):
         "turtle": turtle_breakout(candles),
         "livermore": livermore_structure(candles),
         "soros": soros_momentum(candles),
+        "meanReversion": mean_reversion(candles),
         "session": dict(session),
     }

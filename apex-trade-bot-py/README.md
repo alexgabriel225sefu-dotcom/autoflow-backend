@@ -52,10 +52,34 @@ The bot will guide you through everything — exchange, API keys, trading pair. 
 ## Features
 - **8 exchanges** — Binance, Bybit, OKX, Kraken, KuCoin, Coinbase, Bitget, MEXC
 - **Paper trading** — simulated money, zero risk while you test
-- **Legendary strategies** — Turtle breakout, Livermore structure, Soros momentum, Druckenmiller sizing, PTJ/Seykota defense
+- **Legendary strategies** — Turtle breakout, Livermore structure, Soros momentum, mean reversion, Druckenmiller sizing, PTJ/Seykota defense
 - **AI signals** — Anthropic (primary) + Groq (free fallback)
 - **Risk controls** — stop-loss, take-profit, trailing stop, daily/drawdown limits
-- **Live web dashboard** — auto-refreshing at `/` on your Railway URL
+- **Live web dashboard** — equity curve, win rate, profit factor, trade history, live position (at `/` on your Railway URL)
+
+---
+
+## Documentation
+
+| Guide | What's inside |
+|---|---|
+| [docs/SETUP.md](docs/SETUP.md) | Step-by-step deployment (Railway + local) |
+| [docs/CONFIG.md](docs/CONFIG.md) | Every setting + all Telegram commands |
+| [docs/STRATEGIES.md](docs/STRATEGIES.md) | How the bot decides to trade |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Fixes for common problems |
+| [docs/API.md](docs/API.md) | Dashboard JSON API + connector interface |
+| [docs/FAQ.md](docs/FAQ.md) | Common questions |
+
+---
+
+## Tests
+
+```bash
+python tests/test_indicators.py        # indicator math
+python tests/test_strategies.py       # strategies + risk circuit breakers
+python tests/test_ai.py               # AI signal layer (no network needed)
+python tests/test_telegram_commands.py # Telegram command handling
+```
 
 ---
 
