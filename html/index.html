@@ -223,6 +223,16 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 @media(max-width:480px){.price-card{padding:22px}}
 @media(max-width:600px){.chart-host{height:200px}.trust-inner{gap:8px}.trust-tag{font-size:11px}.mq-track{font-size:clamp(22px,7vw,36px)}.arch{grid-template-columns:1fr}.arch-mid{border-left:none;border-right:none;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.prod-sec-head{gap:24px}.stat{padding:18px 10px}}
 .bot-divider{border:none;border-top:2px solid var(--acc);opacity:.18;margin:0}
+#spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--acc),var(--acc3));z-index:600;will-change:width;pointer-events:none}
+@keyframes blk{0%,100%{opacity:1}50%{opacity:.2}}.blink-live{animation:blk 1.6s ease-in-out infinite}
+#sig{position:fixed;bottom:28px;right:28px;z-index:400;background:var(--panel2);border:1px solid var(--line2);border-radius:14px;padding:14px 16px;font:400 11px/1.5 var(--m);color:var(--t0);transform:translateX(calc(100% + 50px));transition:transform .5s var(--ease);max-width:205px;box-shadow:0 12px 40px rgba(0,0,0,.7);pointer-events:none}
+#sig.on{transform:none}
+.sdir{display:inline-block;font:700 9px/1 var(--m);border-radius:3px;padding:2px 6px;letter-spacing:.08em;margin-left:4px;vertical-align:middle}
+.sb{background:rgba(39,196,106,.15);color:#27c46a}.ss{background:rgba(255,45,79,.15);color:var(--acc2)}
+.hstats{display:flex;gap:clamp(16px,4vw,48px);justify-content:center;flex-wrap:wrap;margin:0 auto 36px;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.hs{text-align:center}
+.hs-n{display:block;font:700 clamp(20px,2.8vw,30px)/1 var(--m);letter-spacing:-.04em;background:linear-gradient(120deg,var(--t0),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hs-l{font:400 10px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.1em;margin-top:5px;display:block}
 /* HAMBURGER */
 #ham{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:6px;z-index:400}
 #ham span{display:block;width:22px;height:2px;background:var(--t0);border-radius:1px;transition:all .3s var(--ease)}
@@ -244,6 +254,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 </style>
 </head>
 <body>
+<div id="spbar"></div>
+<div id="sig"></div>
 <div id="glow"></div>
 <svg id="paths" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
   <path stroke-dasharray="1200" d="M-100,400 C200,100 500,700 800,300 S1200,600 1600,200"/>
@@ -292,6 +304,12 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     <span class="eyebrow rv">Algorithmic Trading · Full Source Code</span>
     <h1 class="rv">Trade smarter.<br><span class="grad">Own every line.</span></h1>
     <p class="sub rv">Two AI-powered trading bots. Complete Python source code. Crypto or Forex — you define the strategy, you run it on your own accounts. No subscriptions, no black box.</p>
+    <div class="hstats rv">
+      <div class="hs"><span class="hs-n" data-t="847" data-s="+">0+</span><span class="hs-l">Trading Pairs</span></div>
+      <div class="hs"><span class="hs-n" data-t="8">0</span><span class="hs-l">Exchanges</span></div>
+      <div class="hs"><span class="hs-n" data-t="71" data-s="%">0%</span><span class="hs-l">Win Rate</span></div>
+      <div class="hs"><span class="hs-n" data-t="99" data-s="%">0%</span><span class="hs-l">Uptime</span></div>
+    </div>
     <div class="prod-grid rv">
       <div class="prod-card">
         <span class="pc-tag">Crypto</span>
@@ -532,10 +550,22 @@ function loadChart(sym){var h=document.getElementById('tvchart');h.innerHTML='';
 (function(){var row=document.getElementById('coins'),lbl=document.getElementById('sym-label');if(!row)return;COINS.forEach(function(c,i){var b=document.createElement('button');b.className='coin'+(i===0?' active':'');b.textContent=c.l.split(' ')[0];b.onclick=function(){document.querySelectorAll('.coin').forEach(function(x){x.classList.remove('active');});b.classList.add('active');lbl.textContent=c.l;loadChart(c.s);};row.appendChild(b);});loadChart(COINS[0].s);})();
 // FAQ
 document.querySelectorAll('.fq-q').forEach(function(btn){btn.addEventListener('click',function(){var op=this.classList.contains('open');document.querySelectorAll('.fq-q').forEach(function(b){b.classList.remove('open');});document.querySelectorAll('.fq-a').forEach(function(a){a.classList.remove('open');});if(!op){this.classList.add('open');this.nextElementSibling.classList.add('open');}});});
-// REVEAL + COUNT-UP
+// REVEAL
 var obs=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;e.target.classList.add('in');obs.unobserve(e.target);});},{threshold:.12});
 document.querySelectorAll('.rv').forEach(function(el){obs.observe(el);});
 document.querySelectorAll('.feat').forEach(function(el,i){el.style.transitionDelay=(i*70)+'ms';});
+// SCROLL PROGRESS BAR
+window.addEventListener('scroll',function(){document.getElementById('spbar').style.width=(window.scrollY/(document.documentElement.scrollHeight-innerHeight)*100)+'%';},{passive:true});
+// BLINK LIVE BADGES
+document.querySelectorAll('.term-live,.fx-conn').forEach(function(el){el.classList.add('blink-live');});
+// SIGNAL TOAST
+var SIGS=[{sym:'BTC/USDT',dir:'BUY',p:'67,234',c:'sb'},{sym:'EUR/USD',dir:'BUY',p:'1.0851',c:'sb'},{sym:'ETH/USDT',dir:'SELL',p:'3,451',c:'ss'},{sym:'GBP/USD',dir:'BUY',p:'1.2734',c:'sb'},{sym:'SOL/USDT',dir:'BUY',p:'182.34',c:'sb'},{sym:'USD/JPY',dir:'SELL',p:'149.82',c:'ss'},{sym:'BNB/USDT',dir:'BUY',p:'412.50',c:'sb'}];
+function popSig(){var s=SIGS[Math.floor(Math.random()*SIGS.length)],el=document.getElementById('sig');el.innerHTML='<span style="font:500 9px/1 var(--m);color:var(--t2);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:6px;margin-bottom:8px"><span class="blink-live" style="width:5px;height:5px;border-radius:50%;background:#27c46a;display:inline-block"></span>AI SIGNAL</span><b style="font:600 13px/1 var(--m);color:var(--t0)">'+s.sym+'</b><span class="sdir '+s.c+'">'+s.dir+'</span><br><span style="color:var(--t2);font-size:10px;margin-top:5px;display:block">@ '+s.p+' · Confidence 94%</span>';el.classList.add('on');setTimeout(function(){el.classList.remove('on');},4800);}
+setTimeout(popSig,5500);setInterval(popSig,14000);
+// COUNT-UP STATS
+function countUp(el){var t=+el.getAttribute('data-t'),suf=el.getAttribute('data-s')||'',n=0,step=Math.max(1,Math.floor(t/55));var ti=setInterval(function(){n=Math.min(n+step,t);el.textContent=n.toLocaleString()+suf;if(n>=t)clearInterval(ti);},18);}
+var cobs=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;countUp(e.target);cobs.unobserve(e.target);});},{threshold:.5});
+document.querySelectorAll('.hs-n').forEach(function(el){cobs.observe(el);});
 </script>
 </body>
 </html>

@@ -78,20 +78,35 @@ canvas{position:fixed;inset:0;pointer-events:none}
 .comp-big .hit2{color:#fff;display:block}
 .comp-line{width:0;height:2px;background:linear-gradient(90deg,#ff2d4f,#ff97a8);margin:22px auto 0;border-radius:1px;transition:width 1.2s cubic-bezier(.32,.72,0,1);box-shadow:0 0 12px rgba(255,45,79,.5)}
 .comp-line.in{width:280px}
-#s4{text-align:center}
-.cta-eyebrow{font:500 11px/1 'Satoshi',sans-serif;letter-spacing:.2em;color:rgba(255,255,255,.3);text-transform:uppercase;opacity:0;transform:translateY(10px);transition:opacity .5s,transform .5s;margin-bottom:22px}
+#s4{padding:0 clamp(20px,5vw,60px)}
+.s4-row{display:flex;align-items:center;gap:clamp(28px,5vw,64px);width:min(1100px,94vw)}
+@media(max-width:700px){.s4-row{flex-direction:column;gap:20px}.td-wrap{width:100%;max-width:360px}}
+.s4-left{flex:1;min-width:0}
+.cta-eyebrow{font:500 11px/1 'Satoshi',sans-serif;letter-spacing:.2em;color:rgba(255,255,255,.3);text-transform:uppercase;opacity:0;transform:translateY(10px);transition:opacity .5s,transform .5s;margin-bottom:18px}
 .cta-eyebrow.in{opacity:1;transform:none}
-.cta-big{font:700 clamp(14px,2vw,22px)/1.5 'Satoshi',sans-serif;color:rgba(255,255,255,.55);margin-bottom:38px;opacity:0;transform:translateY(10px);transition:opacity .6s .15s,transform .6s .15s;max-width:380px}
+.cta-big{font:700 clamp(14px,2vw,20px)/1.6 'Satoshi',sans-serif;color:rgba(255,255,255,.55);margin-bottom:30px;opacity:0;transform:translateY(10px);transition:opacity .6s .15s,transform .6s .15s;max-width:360px}
 .cta-big.in{opacity:1;transform:none}
-.cta-btn{display:inline-flex;align-items:center;gap:12px;background:linear-gradient(135deg,#ff2d4f,#c41a36);color:#fff;font:700 16px/1 'Satoshi',sans-serif;border:none;border-radius:14px;padding:18px 36px;cursor:pointer;text-decoration:none;opacity:0;transform:translateY(20px) scale(.96);transition:opacity .6s .3s,transform .6s .3s cubic-bezier(.22,1,.36,1),box-shadow .3s;box-shadow:0 12px 40px rgba(255,45,79,.3),0 0 0 1px rgba(255,45,79,.25);letter-spacing:-.01em;position:relative;overflow:hidden}
+.cta-btn{display:inline-flex;align-items:center;gap:12px;background:linear-gradient(135deg,#ff2d4f,#c41a36);color:#fff;font:700 15px/1 'Satoshi',sans-serif;border:none;border-radius:14px;padding:16px 32px;cursor:pointer;text-decoration:none;opacity:0;transform:translateY(20px) scale(.96);transition:opacity .6s .3s,transform .6s .3s cubic-bezier(.22,1,.36,1),box-shadow .3s;box-shadow:0 12px 40px rgba(255,45,79,.3),0 0 0 1px rgba(255,45,79,.25);letter-spacing:-.01em;position:relative;overflow:hidden}
 .cta-btn.in{opacity:1;transform:none}
 .cta-btn:hover{box-shadow:0 18px 56px rgba(255,45,79,.5),0 0 0 1px rgba(255,45,79,.4);transform:translateY(-3px)}
 .cta-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.12),transparent);opacity:0;transition:opacity .3s}
 .cta-btn:hover::before{opacity:1}
 .cta-arrow{transition:transform .3s}
 .cta-btn:hover .cta-arrow{transform:translateX(4px)}
-.cta-url{font:400 12px/1 'Satoshi',sans-serif;color:rgba(255,255,255,.22);margin-top:18px;letter-spacing:.06em;opacity:0;transition:opacity .6s .6s}
+.cta-url{font:400 11px/1 'Satoshi',sans-serif;color:rgba(255,255,255,.2);margin-top:14px;letter-spacing:.06em;opacity:0;transition:opacity .6s .6s}
 .cta-url.in{opacity:1}
+.td-wrap{flex:0 0 clamp(240px,26vw,300px);background:rgba(3,4,10,.92);border:1px solid rgba(255,255,255,.12);border-radius:14px;overflow:hidden;opacity:0;transform:translateX(40px);transition:opacity .7s 1s,transform .7s 1s cubic-bezier(.22,1,.36,1)}
+.td-wrap.in{opacity:1;transform:none}
+.tdh{display:flex;justify-content:space-between;align-items:center;padding:9px 13px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.07);font:600 9px/1 monospace;letter-spacing:.1em;color:rgba(255,255,255,.3);text-transform:uppercase}
+.tdh-live{color:#27c46a;animation:blklv 1.4s ease-in-out infinite}
+@keyframes blklv{0%,100%{opacity:1}50%{opacity:.25}}
+.tdo{padding:10px 13px;min-height:100px;display:flex;flex-direction:column;gap:2px}
+.tl{font:400 10px/1.7 monospace;color:rgba(255,255,255,.5);display:block}
+.tl.ok{color:#27c46a}.tl.acc{color:#ff97a8}.tl.cmd{color:rgba(255,255,255,.25)}
+.tdcmds{display:flex;flex-wrap:wrap;gap:5px;padding:9px 13px;border-top:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02)}
+.tdc{font:600 9px/1 monospace;color:rgba(255,255,255,.45);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:4px 8px;cursor:pointer;letter-spacing:.06em;transition:all .2s;user-select:none}
+.tdc:hover{background:rgba(255,45,79,.14);border-color:rgba(255,45,79,.32);color:#ff97a8}
+.tdc:active{transform:scale(.95)}
 #corner{position:fixed;top:22px;left:24px;z-index:50;font:700 14px/1 'Clash Display',sans-serif;letter-spacing:-.01em;opacity:0;transition:opacity .5s;display:flex;align-items:center;gap:8px}
 #corner .dot{width:8px;height:8px;border-radius:50%;background:#ff2d4f;box-shadow:0 0 10px rgba(255,45,79,.7)}
 body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 40%,rgba(0,0,0,.65) 100%);z-index:2;pointer-events:none}
@@ -137,10 +152,10 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
     </div>
     <div class="s2-dash" id="s2dash">
       <div class="sdh"><span>LIVE POSITIONS</span><span class="sdh-live">● ACTIVE</span></div>
-      <div class="sdr"><span class="sdr-pair">BTC/USDT</span><span class="sdr-dir buy">BUY</span><span class="sdr-pnl pos" id="pnl0">+$142.80</span></div>
-      <div class="sdr"><span class="sdr-pair">EUR/USD</span><span class="sdr-dir buy">BUY</span><span class="sdr-pnl pos" id="pnl1">+$87.40</span></div>
-      <div class="sdr"><span class="sdr-pair">ETH/USDT</span><span class="sdr-dir sell">SELL</span><span class="sdr-pnl neg" id="pnl2">-$12.30</span></div>
-      <div class="sdr"><span class="sdr-pair">GBP/USD</span><span class="sdr-dir buy">BUY</span><span class="sdr-pnl pos" id="pnl3">+$54.60</span></div>
+      <div class="sdr" style="cursor:pointer" onclick="closeTrade(this,'pnl0')" title="Tap to close"><span class="sdr-pair">BTC/USDT</span><span class="sdr-dir buy">BUY</span><span class="sdr-pnl pos" id="pnl0">+$142.80</span></div>
+      <div class="sdr" style="cursor:pointer" onclick="closeTrade(this,'pnl1')" title="Tap to close"><span class="sdr-pair">EUR/USD</span><span class="sdr-dir buy">BUY</span><span class="sdr-pnl pos" id="pnl1">+$87.40</span></div>
+      <div class="sdr" style="cursor:pointer" onclick="closeTrade(this,'pnl2')" title="Tap to close"><span class="sdr-pair">ETH/USDT</span><span class="sdr-dir sell">SELL</span><span class="sdr-pnl neg" id="pnl2">-$12.30</span></div>
+      <div class="sdr" style="cursor:pointer" onclick="closeTrade(this,'pnl3')" title="Tap to close"><span class="sdr-pair">GBP/USD</span><span class="sdr-dir buy">BUY</span><span class="sdr-pnl pos" id="pnl3">+$54.60</span></div>
       <div class="sdm">
         <div class="sdm-cell"><div class="sdm-val pos" id="totalPnl">+$272.50</div><div class="sdm-lbl">Today P&amp;L</div></div>
         <div class="sdm-cell"><div class="sdm-val">71%</div><div class="sdm-lbl">Win Rate</div></div>
@@ -158,10 +173,29 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
   <div class="comp-line" id="cl"></div>
 </div>
 <div class="stage" id="s4">
-  <div class="cta-eyebrow" id="ce">Full Python source code · Instant delivery</div>
-  <div class="cta-big" id="cb">8 exchanges. OANDA + MetaTrader 5.<br>Start trading in under an hour.</div>
-  <a href="/" class="cta-btn" id="cbtn"><span>Get Started Now</span><span class="cta-arrow">→</span></a>
-  <div class="cta-url" id="curl">aicashsystem.space</div>
+  <div class="s4-row">
+    <div class="s4-left">
+      <div class="cta-eyebrow" id="ce">Full Python source code · Instant delivery</div>
+      <div class="cta-big" id="cb">8 exchanges. OANDA + MetaTrader 5.<br>Start trading in under an hour.</div>
+      <a href="/?_s=ok" class="cta-btn" id="cbtn"><span>Get Started Now</span><span class="cta-arrow">→</span></a>
+      <div class="cta-url" id="curl">aicashsystem.space</div>
+    </div>
+    <div class="td-wrap" id="tdWrap">
+      <div class="tdh"><span>apex-bot@railway:~$</span><span class="tdh-live">● LIVE</span></div>
+      <div class="tdo" id="tdo">
+        <span class="tl cmd">$ apex-bot start --exchange binance</span>
+        <span class="tl ok">✓ Bot initialized</span>
+        <span class="tl ok">✓ Market data streaming</span>
+        <span class="tl" style="color:rgba(255,255,255,.25)">Click a command below ↓</span>
+      </div>
+      <div class="tdcmds">
+        <button class="tdc" onclick="tdCmd('status')">/status</button>
+        <button class="tdc" onclick="tdCmd('trade')">/trade BTC</button>
+        <button class="tdc" onclick="tdCmd('balance')">/balance</button>
+        <button class="tdc" onclick="tdCmd('pairs')">/pairs</button>
+      </div>
+    </div>
+  </div>
 </div>
 <script>
 // PARTICLES
@@ -249,10 +283,22 @@ setTimeout(function(){
 },7000);
 setTimeout(function(){
   if(!run)return;stageOff('s3');
-  setTimeout(function(){stageOn('s4');setTimeout(function(){show(q('ce'))},100);setTimeout(function(){show(q('cb'))},350);setTimeout(function(){q('cbtn').classList.add('in')},650);setTimeout(function(){show(q('curl'))},950);},600);
+  setTimeout(function(){stageOn('s4');setTimeout(function(){show(q('ce'))},100);setTimeout(function(){show(q('cb'))},350);setTimeout(function(){q('cbtn').classList.add('in')},650);setTimeout(function(){show(q('curl'))},950);setTimeout(function(){q('tdWrap').classList.add('in')},900);},600);
 },10800);
 setTimeout(function(){if(run)exit()},14800);
 q('cbtn').addEventListener('click',function(e){e.preventDefault();exit()});
+
+// INTERACTIVE TERMINAL
+var TD={
+  status:['$ /status','Balance: $2,450.00 USDT','Positions: 3 open','Win Rate (30d): 71.2%','Trades today: 8','Uptime: 14d 06h 22m','Mode: ● LIVE'],
+  trade:['$ /trade BTC/USDT','Analyzing BTC/USDT 15m...','RSI: 42.1 · MACD: bull cross','Confidence: 94%','▲ SIGNAL: BUY detected','Sending order @ 67,234...','✓ Filled 0.036 BTC'],
+  balance:['$ /balance --detailed','Spot: $2,450.00','Unrealized P&L: +$142.80','Today P&L: +$312.40 (+2.1%)','7d: +$1,240.00 (+8.4%)','Drawdown: 1.2% ✓'],
+  pairs:['$ /pairs --active','✓ BTC/USDT  [scanning]','✓ ETH/USDT  [scanning]','✓ SOL/USDT  [scanning]','○ BNB/USDT  [idle]','847 pairs available']
+};
+function tdCmd(k){var el=q('tdo'),lines=TD[k];if(!el||!lines)return;el.innerHTML='';var i=0;(function next(){if(i>=lines.length)return;var s=document.createElement('span');var l=lines[i];s.className='tl '+(l.startsWith('$')?'cmd':l.startsWith('✓')||l.startsWith('Mode')?'ok':l.startsWith('▲')?'acc':'');s.textContent=l;el.appendChild(s);i++;setTimeout(next,i===1?0:90);})();}
+
+// CLOSE TRADE INTERACTION
+function closeTrade(row,pid){if(row.dataset.closed)return;row.dataset.closed='1';var pnl=q(pid);var orig=pnl.textContent;pnl.textContent='CLOSING...';pnl.style.color='rgba(255,255,255,.4)';setTimeout(function(){pnl.textContent='CLOSED ✓';pnl.style.color='#27c46a';row.style.opacity='.35';row.style.transition='opacity .4s';},500);}
 </script>
 </body>
 </html>
