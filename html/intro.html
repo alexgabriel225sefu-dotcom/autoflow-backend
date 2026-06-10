@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AICashSystem</title>
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@700&f[]=satoshi@500,700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;width:100%;overflow:hidden;background:#03040a;color:#f0f2f8;font-family:'Satoshi',system-ui,sans-serif;-webkit-font-smoothing:antialiased;cursor:default;user-select:none}
+canvas{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5}
+
+/* SKIP */
+#skip{position:fixed;top:22px;right:24px;z-index:100;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.45);font:500 12px/1 'Satoshi',sans-serif;letter-spacing:.08em;padding:8px 16px;border-radius:100px;cursor:pointer;transition:all .25s;text-transform:uppercase}
+#skip:hover{background:rgba(255,255,255,.12);color:rgba(255,255,255,.8)}
+
+/* PROGRESS BAR */
+#bar{position:fixed;bottom:0;left:0;height:2px;width:0%;background:linear-gradient(90deg,#c41a36,#ff2d4f,#ff97a8);z-index:100;transition:none;box-shadow:0 0 12px rgba(255,45,79,.6)}
+
+/* STAGE WRAPPER */
+.stage{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;opacity:0;pointer-events:none;transition:opacity .6s cubic-bezier(.32,.72,0,1)}
+.stage.on{opacity:1;pointer-events:auto}
+.stage.off{opacity:0}
+
+/* ═══ STAGE 1: LOGO ═══ */
+#s1{text-align:center}
+.logo-wrap{display:flex;align-items:center;justify-content:center;gap:0;overflow:hidden;margin-bottom:0}
+.logo-wrap .l{display:inline-block;font:700 clamp(52px,9vw,120px)/1 'Clash Display',sans-serif;letter-spacing:-.04em;opacity:0;transform:translateY(-60px) scale(1.4);transition:opacity .5s cubic-bezier(.22,1,.36,1),transform .5s cubic-bezier(.22,1,.36,1)}
+.logo-wrap .l.in{opacity:1;transform:translateY(0) scale(1)}
+.logo-wrap .l.acc{color:#ff2d4f;text-shadow:0 0 30px rgba(255,45,79,.5),0 0 60px rgba(255,45,79,.25)}
+.logo-sub{font:500 clamp(13px,1.5vw,16px)/1 'Satoshi',sans-serif;letter-spacing:.22em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-top:18px;opacity:0;transform:translateY(12px);transition:opacity .6s .2s,transform .6s .2s cubic-bezier(.32,.72,0,1)}
+.logo-sub.in{opacity:1;transform:none}
+#s1 .tag1{margin-top:28px;font:700 clamp(18px,2.5vw,28px)/1.2 'Clash Display',sans-serif;letter-spacing:-.02em;opacity:0;transform:translateX(-30px);transition:opacity .5s,transform .5s cubic-bezier(.32,.72,0,1)}
+#s1 .tag2{font:700 clamp(18px,2.5vw,28px)/1.2 'Clash Display',sans-serif;letter-spacing:-.02em;color:#ff2d4f;opacity:0;transform:translateX(30px);transition:opacity .5s,transform .5s cubic-bezier(.32,.72,0,1)}
+#s1 .tag1.in,#s1 .tag2.in{opacity:1;transform:none}
+
+/* GLITCH effect */
+.glitch{position:relative}
+.glitch::before,.glitch::after{content:attr(data-text);position:absolute;top:0;left:0;width:100%;height:100%;opacity:0}
+.glitch.glitching::before{animation:gb .12s steps(1) infinite;color:#ff2d4f;clip-path:polygon(0 0,100% 0,100% 45%,0 45%)}
+.glitch.glitching::after{animation:ga .1s steps(1) infinite;color:#0ff;clip-path:polygon(0 55%,100% 55%,100% 100%,0 100%)}
+@keyframes gb{0%,100%{transform:translate(-3px,0);opacity:.7}50%{transform:translate(3px,0);opacity:.5}}
+@keyframes ga{0%,100%{transform:translate(3px,0);opacity:.7}50%{transform:translate(-3px,0);opacity:.5}}
+
+/* ═══ STAGE 2: VALUE PROP ═══ */
+#s2{padding:0 clamp(20px,5vw,80px);max-width:860px;text-align:left;width:100%}
+.vp-line{overflow:hidden;margin-bottom:4px}
+.vp-txt{display:block;font:700 clamp(38px,6.5vw,88px)/1.05 'Clash Display',sans-serif;letter-spacing:-.04em;transform:translateY(100%);transition:transform .7s cubic-bezier(.22,1,.36,1)}
+.vp-txt.in{transform:translateY(0)}
+.vp-txt.acc{background:linear-gradient(100deg,#ff2d4f,#ff97a8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none}
+.vp-note{font:500 clamp(14px,1.6vw,18px)/1.6 'Satoshi',sans-serif;color:rgba(255,255,255,.4);margin-top:24px;letter-spacing:.01em;opacity:0;transform:translateY(14px);transition:opacity .6s .35s,transform .6s .35s cubic-bezier(.32,.72,0,1)}
+.vp-note.in{opacity:1;transform:none}
+
+/* ═══ STAGE 3: COMPARISON ═══ */
+#s3{text-align:center;padding:0 20px}
+.comp-pre{font:500 clamp(14px,1.8vw,20px)/1 'Satoshi',sans-serif;letter-spacing:.2em;color:rgba(255,255,255,.3);text-transform:uppercase;opacity:0;transform:translateY(10px);transition:opacity .5s,transform .5s cubic-bezier(.32,.72,0,1);margin-bottom:16px}
+.comp-pre.in{opacity:1;transform:none}
+.comp-big{font:700 clamp(54px,10vw,130px)/.9 'Clash Display',sans-serif;letter-spacing:-.04em;opacity:0;transform:scale(.85);transition:opacity .4s,transform .4s cubic-bezier(.22,1,.36,1)}
+.comp-big.in{opacity:1;transform:scale(1)}
+.comp-big .hit{color:#ff2d4f;text-shadow:0 0 40px rgba(255,45,79,.55),0 0 80px rgba(255,45,79,.25);display:block}
+.comp-big .hit2{color:#fff;display:block}
+.comp-line{width:0%;height:2px;background:linear-gradient(90deg,#ff2d4f,#ff97a8);margin:22px auto 0;border-radius:1px;transition:width 1.2s cubic-bezier(.32,.72,0,1);box-shadow:0 0 12px rgba(255,45,79,.5)}
+.comp-line.in{width:280px}
+
+/* ═══ STAGE 4: CTA ═══ */
+#s4{text-align:center}
+.cta-eyebrow{font:500 11px/1 'Satoshi',sans-serif;letter-spacing:.2em;color:rgba(255,255,255,.3);text-transform:uppercase;opacity:0;transform:translateY(10px);transition:opacity .5s,transform .5s cubic-bezier(.32,.72,0,1);margin-bottom:22px}
+.cta-eyebrow.in{opacity:1;transform:none}
+.cta-big{font:700 clamp(14px,2vw,22px)/1.5 'Satoshi',sans-serif;color:rgba(255,255,255,.55);margin-bottom:38px;opacity:0;transform:translateY(10px);transition:opacity .6s .15s,transform .6s .15s cubic-bezier(.32,.72,0,1);max-width:380px}
+.cta-big.in{opacity:1;transform:none}
+.cta-btn{display:inline-flex;align-items:center;gap:12px;background:linear-gradient(135deg,#ff2d4f,#c41a36);color:#fff;font:700 16px/1 'Satoshi',sans-serif;border:none;border-radius:14px;padding:18px 36px;cursor:pointer;text-decoration:none;opacity:0;transform:translateY(20px) scale(.96);transition:opacity .6s .3s,transform .6s .3s cubic-bezier(.22,1,.36,1),box-shadow .3s;box-shadow:0 12px 40px rgba(255,45,79,.3),0 0 0 1px rgba(255,45,79,.25);letter-spacing:-.01em;position:relative;overflow:hidden}
+.cta-btn.in{opacity:1;transform:none}
+.cta-btn:hover{box-shadow:0 18px 56px rgba(255,45,79,.5),0 0 0 1px rgba(255,45,79,.4);transform:translateY(-3px)}
+.cta-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.12),transparent);opacity:0;transition:opacity .3s}
+.cta-btn:hover::before{opacity:1}
+.cta-arrow{font:400 20px/1 sans-serif;transition:transform .3s}
+.cta-btn:hover .cta-arrow{transform:translateX(4px)}
+.cta-url{font:400 12px/1 'Satoshi',sans-serif;color:rgba(255,255,255,.22);margin-top:18px;letter-spacing:.06em;opacity:0;transition:opacity .6s .6s}
+.cta-url.in{opacity:1}
+
+/* CORNER LOGO */
+#corner{position:fixed;top:22px;left:24px;z-index:50;font:700 14px/1 'Clash Display',sans-serif;letter-spacing:-.01em;opacity:0;transition:opacity .5s;display:flex;align-items:center;gap:8px}
+#corner .dot{width:8px;height:8px;border-radius:50%;background:#ff2d4f;box-shadow:0 0 10px rgba(255,45,79,.7)}
+
+/* VIGNETTE */
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 40%,rgba(0,0,0,.65) 100%);z-index:1;pointer-events:none}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<button id="skip" onclick="exit()">Skip →</button>
+<div id="bar"></div>
+<div id="corner"><span class="dot"></span><span>Apex Trading Suite</span></div>
+
+<!-- STAGE 1: LOGO + TAGLINES -->
+<div class="stage" id="s1">
+  <div class="logo-wrap glitch" id="logoWrap" data-text="AICashSystem">
+    <span class="l" style="transition-delay:.03s">A</span><span class="l" style="transition-delay:.08s">I</span><span class="l acc" style="transition-delay:.13s">C</span><span class="l acc" style="transition-delay:.18s">a</span><span class="l acc" style="transition-delay:.23s">s</span><span class="l acc" style="transition-delay:.28s">h</span><span class="l" style="transition-delay:.33s">S</span><span class="l" style="transition-delay:.38s">y</span><span class="l" style="transition-delay:.43s">s</span><span class="l" style="transition-delay:.48s">t</span><span class="l" style="transition-delay:.53s">e</span><span class="l" style="transition-delay:.58s">m</span>
+  </div>
+  <div class="logo-sub" id="logoSub">Algorithmic Trading Suite</div>
+  <div style="display:flex;gap:24px;margin-top:36px;align-items:center">
+    <div class="tag1" id="t1" style="transition-delay:.0s">Crypto</div>
+    <div style="width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.2);opacity:0;transition:opacity .4s .1s" id="tdiv"></div>
+    <div class="tag2" id="t2" style="transition-delay:.1s">Forex</div>
+  </div>
+</div>
+
+<!-- STAGE 2: VALUE PROP -->
+<div class="stage" id="s2">
+  <div class="vp-line"><span class="vp-txt" id="vp1">One-time payment.</span></div>
+  <div class="vp-line"><span class="vp-txt acc" id="vp2" style="transition-delay:.15s">Full control.</span></div>
+  <p class="vp-note" id="vpn">No subscription. No black box. You own every line of code.</p>
+</div>
+
+<!-- STAGE 3: COMPARISON -->
+<div class="stage" id="s3">
+  <div class="comp-pre" id="cp">You don't need</div>
+  <div class="comp-big">
+    <span class="hit" id="ch1">3Commas.</span>
+    <span class="hit2" id="ch2">You need the code.</span>
+  </div>
+  <div class="comp-line" id="cl"></div>
+</div>
+
+<!-- STAGE 4: CTA -->
+<div class="stage" id="s4">
+  <div class="cta-eyebrow" id="ce">Full Python source code · Instant delivery</div>
+  <div class="cta-big" id="cb">8 exchanges. OANDA + MetaTrader 5.<br>Start trading in under an hour.</div>
+  <a href="./index.html" class="cta-btn" id="cbtn">
+    <span>Get Started Now</span>
+    <span class="cta-arrow">→</span>
+  </a>
+  <div class="cta-url" id="curl">aicashsystem.space</div>
+</div>
+
+<script>
+// ─── PARTICLES ───────────────────────────────
+var cv=document.getElementById('c'),ctx=cv.getContext('2d');
+var W,H,pts=[];
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;pts=[];for(var i=0;i<55;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.4,vy:(Math.random()-.5)*.35,r:Math.random()*1.8+.4,o:Math.random()*.5+.1})}
+resize();window.addEventListener('resize',resize);
+function drawPts(){
+  ctx.clearRect(0,0,W,H);
+  pts.forEach(function(p){
+    p.x+=p.vx;p.y+=p.vy;
+    if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,45,79,'+p.o+')';ctx.fill();
+  });
+  // connecting lines
+  for(var i=0;i<pts.length;i++){for(var j=i+1;j<pts.length;j++){var dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);if(d<140){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.strokeStyle='rgba(255,45,79,'+(0.08*(1-d/140))+')';ctx.lineWidth=.6;ctx.stroke();}}}
+  requestAnimationFrame(drawPts);
+}
+drawPts();
+
+// ─── HELPERS ─────────────────────────────────
+function show(el){if(el)el.classList.add('in')}
+function stageOn(id){document.getElementById(id).classList.add('on')}
+function stageOff(id){document.getElementById(id).classList.add('off');setTimeout(function(){document.getElementById(id).classList.remove('on','off')},700)}
+function q(id){return document.getElementById(id)}
+
+// ─── PROGRESS BAR ────────────────────────────
+var TOTAL=14800,barEl=q('bar'),t0=Date.now();
+function tickBar(){var p=Math.min((Date.now()-t0)/TOTAL*100,100);barEl.style.width=p+'%';if(p<100)requestAnimationFrame(tickBar)}
+requestAnimationFrame(tickBar);
+
+// ─── EXIT ─────────────────────────────────────
+function exit(){localStorage.setItem('ats_intro','1');document.body.style.transition='opacity .7s';document.body.style.opacity='0';setTimeout(function(){window.location.href='./index.html'},700)}
+
+// ─── SEQUENCE ────────────────────────────────
+var run=true;
+
+// PHASE 1: Logo
+setTimeout(function(){
+  if(!run)return;
+  stageOn('s1');
+  q('logoWrap').querySelectorAll('.l').forEach(function(l){setTimeout(function(){l.classList.add('in')},0)});
+},200);
+
+setTimeout(function(){if(!run)return;show(q('logoSub'));},1300);
+
+// Glitch effect
+setTimeout(function(){
+  if(!run)return;
+  q('logoWrap').classList.add('glitching');
+  setTimeout(function(){q('logoWrap').classList.remove('glitching')},280);
+},1700);
+
+// Crypto / Forex tags + corner logo
+setTimeout(function(){
+  if(!run)return;
+  show(q('t1'));show(q('tdiv'));
+  setTimeout(function(){show(q('t2'))},120);
+  q('corner').style.opacity='1';
+},2000);
+
+// PHASE 2: Value prop
+setTimeout(function(){
+  if(!run)return;
+  stageOff('s1');
+  setTimeout(function(){
+    stageOn('s2');
+    setTimeout(function(){show(q('vp1'))},80);
+    setTimeout(function(){show(q('vp2'))},380);
+    setTimeout(function(){show(q('vpn'))},700);
+  },600);
+},3800);
+
+// PHASE 3: Comparison
+setTimeout(function(){
+  if(!run)return;
+  stageOff('s2');
+  setTimeout(function(){
+    stageOn('s3');
+    setTimeout(function(){show(q('cp'))},100);
+    setTimeout(function(){q('ch1').classList.add('in')},400);
+    setTimeout(function(){q('ch2').classList.add('in')},780);
+    setTimeout(function(){q('cl').classList.add('in')},1000);
+    // Second glitch
+    setTimeout(function(){
+      q('logoWrap').classList.add('glitching');
+      setTimeout(function(){if(q('logoWrap'))q('logoWrap').classList.remove('glitching')},200);
+    },500);
+  },600);
+},7000);
+
+// PHASE 4: CTA
+setTimeout(function(){
+  if(!run)return;
+  stageOff('s3');
+  setTimeout(function(){
+    stageOn('s4');
+    setTimeout(function(){show(q('ce'))},100);
+    setTimeout(function(){show(q('cb'))},350);
+    setTimeout(function(){q('cbtn').classList.add('in')},650);
+    setTimeout(function(){show(q('curl'))},950);
+  },600);
+},10800);
+
+// AUTO EXIT
+setTimeout(function(){if(run)exit()},14800);
+q('cbtn').addEventListener('click',function(e){e.preventDefault();exit()});
+</script>
+</body>
+</html>
