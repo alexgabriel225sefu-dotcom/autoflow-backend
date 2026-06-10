@@ -220,7 +220,7 @@ function q(id){return document.getElementById(id)}
 var TOTAL=14800,barEl=q('bar'),t0=Date.now();
 function tickBar(){var p=Math.min((Date.now()-t0)/TOTAL*100,100);barEl.style.width=p+'%';if(p<100)requestAnimationFrame(tickBar)}
 requestAnimationFrame(tickBar);
-function exit(){localStorage.setItem('ats_intro','1');document.body.style.transition='opacity .7s';document.body.style.opacity='0';setTimeout(function(){window.location.href='/'},700)}
+function exit(){sessionStorage.setItem('ats_intro','1');document.body.style.transition='opacity .7s';document.body.style.opacity='0';setTimeout(function(){window.location.href='/'},700)}
 setTimeout(function(){q('ticker').classList.add('on')},1200);
 
 // LIVE P&L
