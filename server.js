@@ -1371,6 +1371,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'html', 'index.html'));
 });
 
+// /index and /index.html also serve the landing page (prevent publicPages override)
+app.get('/index', (req, res) => {
+  res.sendFile(path.join(__dirname, 'html', 'index.html'));
+});
+app.get('/index.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'html', 'index.html'));
+});
+
 // Intro animation page
 app.get('/intro', (req, res) => {
   res.sendFile(path.join(__dirname, 'html', 'intro.html'));
