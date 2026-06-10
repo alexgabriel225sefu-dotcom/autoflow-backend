@@ -1371,6 +1371,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'html', 'index.html'));
 });
 
+// Intro animation page
+app.get('/intro', (req, res) => {
+  res.sendFile(path.join(__dirname, 'html', 'intro.html'));
+});
+app.get('/intro.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'html', 'intro.html'));
+});
+
 // Configurator (linked from bot delivery email)
 app.get('/configurator', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'configurator.html'));
