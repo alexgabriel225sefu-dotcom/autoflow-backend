@@ -13,6 +13,7 @@ Settings come from three places (highest priority first):
 | Command | What it does |
 |---|---|
 | `/setup` | Guided wizard: OANDA → paper → pair |
+| `/broker oanda\|mt` | OANDA API or MetaTrader bridge ([guide](METATRADER.md)) |
 | `/config` | Show all current settings |
 | `/status` | Live balance, position, PnL, market hours, sessions |
 | `/env practice\|live` | Switch OANDA environment |
@@ -32,9 +33,11 @@ Settings come from three places (highest priority first):
 | Variable | Default | Description |
 |---|---|---|
 | `LICENSE_KEY` | — | Your license from the purchase email (**required**) |
-| `OANDA_API_TOKEN` | — | Personal Access Token from OANDA (**required**) |
-| `OANDA_ACCOUNT_ID` | — | e.g. `101-001-1234567-001` (**required**) |
+| `BROKER` | `oanda` | `oanda` (direct API) or `mt` (MetaTrader 5 bridge) |
+| `OANDA_API_TOKEN` | — | Personal Access Token from OANDA (required for `oanda`) |
+| `OANDA_ACCOUNT_ID` | — | e.g. `101-001-1234567-001` (required for `oanda`) |
 | `OANDA_ENV` | `practice` | `practice` or `live` — must match your token |
+| `MT_BRIDGE_SECRET` | — | Shared secret for the ApexBridge EA (required for `mt`) |
 | `TRADE_SYMBOL` | `EUR_USD` | Pair to trade when scanner is off |
 | `TIMEFRAME` | `5m` | Candle interval: `1m` `5m` `15m` `30m` `1h` `4h` `1d` |
 | `PAPER_TRADING` | `true` | Simulated balance (data still comes from OANDA) |

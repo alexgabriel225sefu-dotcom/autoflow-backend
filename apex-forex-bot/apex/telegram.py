@@ -93,7 +93,12 @@ _CFG_MAP = {
 
 _BROKER_KEYS = {
     "oanda": ["OANDA_API_TOKEN", "OANDA_ACCOUNT_ID"],
+    "mt": ["MT_BRIDGE_SECRET"],
 }
+
+
+def _broker_label():
+    return "MetaTrader Bridge" if cfg.BROKER == "mt" else f"OANDA ({cfg.OANDA_ENV})"
 
 
 def _apply(env_key: str, value):
@@ -273,6 +278,29 @@ def _handle_setkeys(chat_id, args_text, msg_id):
     send_to(chat_id, f"🔑 <b>{len(pairs)} credential(s) updated:</b>\n<code>{masked}</code>")
 
 
+def _handle_broker(chat_id, args):
+    b = (args or "").strip().lower()
+    if b not in cfg.SUPPORTED_BROKERS:
+        return send_to(chat_id,
+                       "❌ Usage: <code>/broker oanda</code> or <code>/broker mt</code>\n\n"
+                       "• <b>oanda</b> — direct API (easiest)\n"
+                       "• <b>mt</b> — MetaTrader 5 via the ApexBridge EA "
+                       "(IC Markets &amp; any MT5 broker)")
+    _save_runtime({"BROKER": b})
+    _apply("BROKER", b)
+    if _bot_control.get("reload_broker"):
+        _bot_control["reload_broker"]()
+    if b == "mt":
+        send_to(chat_id,
+                "🔗 Broker set to <b>MetaTrader Bridge</b>.\n\n"
+                "1. Set a secret: <code>/setkeys MT_BRIDGE_SECRET=choose_something_long</code>\n"
+                "2. Install <b>ApexBridge.mq5</b> in MetaTrader (see docs/METATRADER.md)\n"
+                "3. Put the same secret + your bot URL in the EA settings\n\n"
+                "I'll start trading as soon as the EA connects.")
+    else:
+        send_to(chat_id, "✅ Broker set to <b>OANDA</b>. Use /setup if you need to enter credentials.")
+
+
 def _handle_env(chat_id, args):
     env = (args or "").strip().lower()
     if env not in ("practice", "live"):
@@ -360,10 +388,11 @@ def _handle_config(chat_id):
         for k in keys)
     paused = _bot_control.get("get_paused", lambda: False)()
     state_tag = "⏸️ PAUSED" if paused else "▶️ RUNNING"
+    key_title = "MT bridge" if cfg.BROKER == "mt" else "OANDA"
     send_to(chat_id,
             f"⚙️ <b>Config</b>  [{state_tag}]\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"Broker:    <b>OANDA ({cfg.OANDA_ENV})</b>\n"
+            f"Broker:    <b>{_broker_label()}</b>\n"
             f"Pair:      <b>{cfg.SYMBOL}</b>\n"
             f"Timeframe: <b>{cfg.TIMEFRAME}</b>\n"
             f"Paper:     <b>{'ON' if cfg.PAPER_TRADING else 'OFF'}</b>\n"
@@ -372,7 +401,7 @@ def _handle_config(chat_id):
             f"Leverage:  <b>1:{cfg.LEVERAGE:g}</b>\n"
             f"Min conf:  <b>{cfg.MIN_CONFIDENCE}%</b>\n"
             f"Interval:  <b>{cfg.LOOP_INTERVAL_MS // 60000}m</b>\n\n"
-            f"🔑 OANDA keys:\n{key_lines or '  (none set — use /setup)'}")
+            f"🔑 {key_title} keys:\n{key_lines or '  (none set — use /setup)'}")
 
 
 _HELP = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
@@ -381,6 +410,7 @@ _HELP = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
          "/config — show current settings\n"
          "/status — live trading snapshot\n"
          "━━━━━━━━━━━━━━━━━━━━\n"
+         "/broker oanda|mt — OANDA API or MetaTrader\n"
          "/env practice|live — OANDA environment\n"
          "/paper on|off — toggle paper mode\n"
          "/risk &lt;0.5-10&gt; — risk % per trade\n"
@@ -490,6 +520,8 @@ def _poll_loop():
                     _handle_config(chat_id)
                 elif cmd_l == "/setkeys":
                     _handle_setkeys(chat_id, args, msg_id)
+                elif cmd_l == "/broker":
+                    _handle_broker(chat_id, args)
                 elif cmd_l == "/env":
                     _handle_env(chat_id, args)
                 elif cmd_l == "/paper":
