@@ -194,13 +194,14 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 /* TESTIMONIALS */
 .tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 @media(max-width:880px){.tgrid{grid-template-columns:1fr}}
-.tcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:24px;transition:transform .25s var(--ease),border-color .25s}
-.tcard:hover{border-color:rgba(255,45,79,.3)}
-.tstars{color:var(--acc);font:500 13px/1 var(--m);letter-spacing:2px;margin-bottom:12px}
-.tcard p{font:400 14px/1.6 var(--f);color:var(--t0);margin-bottom:16px}
+.tcard{background:var(--panel);border:1px solid var(--line2);border-radius:20px;padding:28px;transition:transform .3s var(--ease),border-color .3s;position:relative;overflow:hidden}
+.tcard::before{content:'\201C';position:absolute;top:-12px;right:20px;font:700 96px/1 Georgia,serif;color:var(--acc);opacity:.09;pointer-events:none}
+.tcard:hover{border-color:rgba(255,45,79,.28);transform:translateY(-3px)}
+.tcard p{font:400 14px/1.8 var(--f);color:var(--t0);margin-bottom:20px;position:relative}
 .tmeta{display:flex;align-items:center;gap:10px}
-.tav{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#7a1020);display:flex;align-items:center;justify-content:center;font:600 13px/1 var(--f);color:#fff}
-.tmeta b{font:600 13px/1.2 var(--f);display:block}.tmeta span{font:400 12px/1.2 var(--f);color:var(--t2)}
+.tav{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#7a1020);display:flex;align-items:center;justify-content:center;font:600 13px/1 var(--f);color:#fff;flex-shrink:0}
+.tmeta b{font:600 13px/1.2 var(--f);display:block}.tmeta span{font:400 12px/1.2 var(--f);color:var(--t2);margin-top:2px}
+.tvbadge{margin-left:auto;font:500 9px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:100px;padding:3px 9px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
 /* FAQ */
 .faq{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .fq+.fq{border-top:1px solid var(--line)}
@@ -221,7 +222,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .sec-head{max-width:600px;margin-bottom:40px}
 .sec-head .h2{margin:14px 0 14px}
 @media(max-width:480px){.price-card{padding:22px}}
-@media(max-width:600px){.chart-host{height:200px}.trust-inner{gap:8px}.trust-tag{font-size:11px}.mq-track{font-size:clamp(22px,7vw,36px)}.arch{grid-template-columns:1fr}.arch-mid{border-left:none;border-right:none;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.prod-sec-head{gap:24px}.stat{padding:18px 10px}}
+@media(max-width:600px){.chart-host{height:200px}.trust-inner{gap:8px}.trust-tag{font-size:11px}.mq-track{font-size:clamp(22px,7vw,36px)}.arch{grid-template-columns:1fr}.arch-mid{display:none}.prod-sec-head{gap:24px}.stat{padding:18px 10px}}
 .bot-divider{border:none;border-top:2px solid var(--acc);opacity:.18;margin:0}
 #spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--acc),var(--acc3));z-index:600;will-change:width;pointer-events:none}
 @keyframes blk{0%,100%{opacity:1}50%{opacity:.2}}.blink-live{animation:blk 1.6s ease-in-out infinite}
@@ -438,9 +439,9 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <section class="wrap sec" id="reviews">
   <div class="sec-head rv"><span class="label">From Buyers</span><h2 class="h2">Built for people who read the code.</h2></div>
   <div class="tgrid">
-    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"Clean, well-structured Python. I reviewed every module before running it — no obfuscation, no surprises. Crypto bot running on my own Bybit account in under an hour."</p><div class="tmeta"><div class="tav">M</div><div><b>Marcus K.</b><span>Software engineer</span></div></div></div>
-    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"The forex bot appearing in MetaTrader was the feature that sold me. Trades live on my chart with SL and TP — and I own the full code."</p><div class="tmeta"><div class="tav">D</div><div><b>David R.</b><span>IC Markets trader</span></div></div></div>
-    <div class="tcard tilt rv"><div class="tstars">★★★★★</div><p>"One payment, full source, no monthly fee. I was paying $80/mo for a subscription bot. This was an easy switch — and I can actually see what the strategy does."</p><div class="tmeta"><div class="tav">J</div><div><b>James L.</b><span>Self-directed trader</span></div></div></div>
+    <div class="tcard tilt rv"><p>"Clean, well-structured Python. I reviewed every module before running it — no obfuscation, no surprises. Crypto bot running on my own Bybit account in under an hour."</p><div class="tmeta"><div class="tav">M</div><div><b>Marcus K.</b><span>Software engineer</span></div><span class="tvbadge">Verified</span></div></div>
+    <div class="tcard tilt rv"><p>"The forex bot appearing in MetaTrader was the feature that sold me. Trades live on my chart with SL and TP — and I own the full code."</p><div class="tmeta"><div class="tav">D</div><div><b>David R.</b><span>IC Markets trader</span></div><span class="tvbadge">Verified</span></div></div>
+    <div class="tcard tilt rv"><p>"One payment, full source, no monthly fee. I was paying $80/mo for a subscription bot. This was an easy switch — and I can actually see what the strategy does."</p><div class="tmeta"><div class="tav">J</div><div><b>James L.</b><span>Self-directed trader</span></div><span class="tvbadge">Verified</span></div></div>
   </div>
 </section>
 
