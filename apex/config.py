@@ -11,10 +11,13 @@ def _truthy(v: str) -> bool:
 
 # ─── Broker ─────────────────────────────────────────────
 BROKER = (os.getenv("BROKER") or "oanda").lower()
-SUPPORTED_BROKERS = ["oanda", "mt"]
+SUPPORTED_BROKERS = ["oanda", "mt", "td"]
 
 # ─── MetaTrader bridge (BROKER=mt) ──────────────────────
 MT_BRIDGE_SECRET = os.getenv("MT_BRIDGE_SECRET", "")
+
+# ─── Twelve Data (BROKER=td) ────────────────────────────
+TWELVE_DATA_KEY = os.getenv("TWELVE_DATA_KEY", "")
 
 # ─── OANDA ──────────────────────────────────────────────
 OANDA_API_TOKEN = os.getenv("OANDA_API_TOKEN", "")

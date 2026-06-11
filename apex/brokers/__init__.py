@@ -13,6 +13,7 @@ from apex import config as cfg
 _REGISTRY = {
     "oanda": "apex.brokers.oanda",
     "mt": "apex.brokers.mtbridge",      # MetaTrader 5 via ApexBridge EA
+    "td": "apex.brokers.twelvedata",    # Twelve Data — free forex data, paper only
 }
 
 
