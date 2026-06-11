@@ -169,7 +169,8 @@ def analyze(candles):
 
     vol_recent = sum(volumes[-5:]) / 5
     vol_avg20 = sum(volumes[-20:]) / 20
-    volume_ratio = f"{vol_recent / vol_avg20:.2f}" if vol_avg20 else "0"
+    has_volume = vol_avg20 > 0  # Twelve Data forex has no tick volume — neutral, not 0
+    volume_ratio = f"{vol_recent / vol_avg20:.2f}" if has_volume else "1.00"
 
     divergence = detect_divergence(closes, rsi_values)
     structure = market_structure(candles)
@@ -196,6 +197,7 @@ def analyze(candles):
         "volume": f"{volumes[last]:.0f}",
         "volumeAvg": f"{vol_avg20:.0f}",
         "volumeRatio": volume_ratio,
+        "hasVolume": has_volume,
         "high24h": f"{max(highs[-96:]):.6f}",
         "low24h": f"{min(lows[-96:]):.6f}",
         "emaTrend": "BULLISH" if (ema20[last] or 0) > (ema50[last] or 0) else "BEARISH",

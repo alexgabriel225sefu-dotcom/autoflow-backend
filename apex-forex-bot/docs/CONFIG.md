@@ -68,15 +68,26 @@ Settings come from three places (highest priority first):
 | `LEVERAGE` | `30` | Account leverage (used for margin-aware sizing) |
 | `MARGIN_CAP` | `0.5` | Never use more than 50% of available margin |
 | `MAX_SPREAD_PIPS` | `3.0` | Skip entries when spread is wider than this |
-| `MIN_CONFIDENCE` | `65` | Minimum AI confidence (0–100) to enter |
+| `MIN_CONFIDENCE` | `62` | Minimum AI confidence (0–100) to enter |
 | `MIN_CRITERIA` | `3` | Minimum entry criteria score (0–5) |
 
-## Trailing stop & ATR
+## Entry filters (anti-chop)
+
+| Variable | Default | Description |
+|---|---|---|
+| `HTF_FILTER` | `true` | Block trades against the 1h trend (EMA50). Off in MT mode. |
+| `HTF_TIMEFRAME` | `1h` | Timeframe used by the trend filter |
+| `COOLDOWN_AFTER_LOSS_MIN` | `15` | Minutes without new entries after a losing trade |
+
+## Exit management (cut losses, let profits run)
 
 | Variable | Default | Description |
 |---|---|---|
 | `TRAILING_STOP` | `true` | Stop follows price to lock in profit |
 | `TRAILING_STOP_PIPS` | `10` | Trail distance in pips |
+| `BREAKEVEN_AT_R` | `1.0` | At +1R profit, move SL to entry +1 pip — the trade can no longer lose. `0` = off |
+| `LET_WINNERS_RUN` | `true` | At TP, switch to a tight trail instead of closing (paper mode; live brokers execute their server-side TP) |
+| `RUNNER_TRAIL_PIPS` | `6` | Trail distance once runner mode is active |
 | `ATR_BASED_SL` | `false` | Volatility-based SL/TP instead of fixed pips |
 | `ATR_SL_MULT` | `1.5` | Stop loss = 1.5 × ATR |
 | `ATR_TP_MULT` | `3.0` | Take profit = 3 × ATR |
@@ -98,14 +109,24 @@ Settings come from three places (highest priority first):
 
 ---
 
-## Recommended starter profile
+## Tuning profiles
 
+**Conservative** (fewer trades, higher win rate — watch on paper first):
 ```env
 PAPER_TRADING=true
 RISK_PER_TRADE=0.01
 MIN_CONFIDENCE=70
+MIN_CRITERIA=4
+COOLDOWN_AFTER_LOSS_MIN=30
 ```
 
-1% risk and a higher confidence bar while you watch the bot trade on paper
-for a week or two. The defaults (2% / 65) are already conservative by
-industry standards — never go above 5% risk per trade with leverage.
+**Default / balanced** — just deploy, no extra variables needed (2% risk, 62% confidence).
+
+**More active** (more entries, bigger swings — only with money you can lose):
+```env
+MIN_CONFIDENCE=58
+RISK_PER_TRADE=0.03
+COOLDOWN_AFTER_LOSS_MIN=5
+```
+
+Never go above 5% risk per trade with leverage — one bad week wipes the account.

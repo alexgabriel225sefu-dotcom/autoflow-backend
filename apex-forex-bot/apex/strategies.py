@@ -3,6 +3,7 @@
 Turtle breakout, Livermore structure, Soros momentum, PTJ/Seykota defense,
 Druckenmiller position sizing.
 """
+import time
 from datetime import date
 
 session = {
@@ -14,6 +15,7 @@ session = {
     "lastResetDay": date.today().isoformat(),
     "peakBalance": None,
     "totalTrades": 0,
+    "lastLossAt": 0.0,
 }
 
 
@@ -153,10 +155,40 @@ def record_trade(won, pnl_amount, start_balance):
     else:
         session["consecutiveLosses"] += 1
         session["consecutiveWins"] = 0
+        session["lastLossAt"] = time.time()
     icon = "✅" if won else "❌"
     print(f"[STRATEGY] {icon} Streak: {session['consecutiveLosses']} losses / "
           f"{session['consecutiveWins']} wins | Today: {session['dailyTrades']} trades | "
           f"Daily PnL: {'+' if session['dailyPnL'] >= 0 else ''}${session['dailyPnL']:.4f}")
+
+
+def cooldown_remaining(cooldown_min):
+    """Ed Seykota: after a loss, the worst trade is the revenge trade.
+    Returns minutes left until entries are allowed again (0 = clear)."""
+    if not session["lastLossAt"] or cooldown_min <= 0:
+        return 0
+    elapsed = (time.time() - session["lastLossAt"]) / 60
+    return 0 if elapsed >= cooldown_min else int(cooldown_min - elapsed) + 1
+
+
+def htf_trend(candles):
+    """Higher-timeframe trend via EMA50 (Livermore: trade WITH the tape).
+    Price above rising EMA = BULLISH, below falling EMA = BEARISH, else NEUTRAL."""
+    if not candles or len(candles) < 55:
+        return "NEUTRAL"
+    closes = [c["close"] for c in candles]
+    k = 2 / 51
+    ema = sum(closes[:50]) / 50
+    ema_prev = ema
+    for px in closes[50:]:
+        ema_prev = ema
+        ema = px * k + ema * (1 - k)
+    price = closes[-1]
+    if price > ema and ema >= ema_prev:
+        return "BULLISH"
+    if price < ema and ema <= ema_prev:
+        return "BEARISH"
+    return "NEUTRAL"
 
 
 def analyze(candles):

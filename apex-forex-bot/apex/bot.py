@@ -180,31 +180,44 @@ def check_position(price):
         return None
     side = open_position["side"]
     symbol = open_position.get("symbol", cfg.SYMBOL)
+    entry = open_position["entryPrice"]
+
+    # Breakeven (PTJ): la +1R mută SL la entry ±1 pip — trade-ul nu mai poate pierde
+    if cfg.BREAKEVEN_AT_R > 0 and not open_position.get("beDone") and open_position.get("initialStop"):
+        one_r = abs(entry - open_position["initialStop"]) * cfg.BREAKEVEN_AT_R
+        pip = forex.from_pips(1, symbol)
+        be_price = entry + pip if side == "BUY" else entry - pip
+        if ((side == "BUY" and price >= entry + one_r and be_price > open_position["stopLoss"])
+                or (side == "SELL" and price <= entry - one_r and be_price < open_position["stopLoss"])):
+            open_position["stopLoss"] = be_price
+            open_position["beDone"] = True
+            logger.info(f"🛡️ Breakeven: SL moved to {be_price:.5f} — risk-free trade")
+
+    # Trailing stop (strâns în runner mode — Seykota: let profits run)
     if cfg.TRAILING_STOP:
-        trail_dist = forex.from_pips(cfg.TRAILING_STOP_PIPS, symbol)
+        trail_pips = cfg.RUNNER_TRAIL_PIPS if open_position.get("runner") else cfg.TRAILING_STOP_PIPS
+        trail_dist = forex.from_pips(trail_pips, symbol)
         if side == "BUY":
             open_position["trailHigh"] = max(open_position.get("trailHigh") or price, price)
-            trail_sl = open_position["trailHigh"] - trail_dist
-            if trail_sl > open_position["stopLoss"]:
-                open_position["stopLoss"] = trail_sl
+            open_position["stopLoss"] = max(open_position["stopLoss"], open_position["trailHigh"] - trail_dist)
         else:
             open_position["trailLow"] = min(open_position.get("trailLow") or price, price)
-            trail_sl = open_position["trailLow"] + trail_dist
-            if trail_sl < open_position["stopLoss"]:
-                open_position["stopLoss"] = trail_sl
-    pnl_pips = forex.to_pips(price - open_position["entryPrice"] if side == "BUY"
-                             else open_position["entryPrice"] - price, symbol)
+            open_position["stopLoss"] = min(open_position["stopLoss"], open_position["trailLow"] + trail_dist)
+
+    pnl_pips = forex.to_pips(price - entry if side == "BUY" else entry - price, symbol)
     open_position["pnlPips"] = round(pnl_pips, 1)
-    if side == "BUY":
-        if price <= open_position["stopLoss"]:
-            return "STOP_LOSS"
-        if price >= open_position["takeProfit"]:
-            return "TAKE_PROFIT"
-    else:
-        if price >= open_position["stopLoss"]:
-            return "STOP_LOSS"
-        if price <= open_position["takeProfit"]:
-            return "TAKE_PROFIT"
+
+    hit_sl = price <= open_position["stopLoss"] if side == "BUY" else price >= open_position["stopLoss"]
+    hit_tp = price >= open_position["takeProfit"] if side == "BUY" else price <= open_position["takeProfit"]
+    if hit_sl:
+        return "TRAIL_PROFIT" if open_position.get("runner") else "STOP_LOSS"
+    if hit_tp and not open_position.get("runner"):
+        # Runner doar pe paper — la live brokerul execută TP-ul server-side oricum
+        if cfg.LET_WINNERS_RUN and cfg.TRAILING_STOP and cfg.PAPER_TRADING:
+            open_position["runner"] = True
+            logger.info(f"🏃 TP hit at {price} — runner mode: letting profit run (trail {cfg.RUNNER_TRAIL_PIPS:g} pips)")
+            return None
+        return "TAKE_PROFIT"
     return None
 
 
@@ -240,6 +253,7 @@ def open_trade(side, price, balance, atr_value=0, symbol=None, druck_mult=1.0):
     open_position = {
         "symbol": symbol, "side": side, "entryPrice": price, "quantity": units,
         "stopLoss": sltp["stopLoss"], "takeProfit": sltp["takeProfit"],
+        "initialStop": sltp["stopLoss"],  # referință pentru breakeven (+1R)
         "openedAt": datetime.utcnow().isoformat(), "pnlPips": 0,
         "trailHigh": price if side == "BUY" else None, "trailLow": price if side == "SELL" else None,
     }
@@ -434,6 +448,25 @@ def tick():
             logger.warn("⚡ Signal filtered: SELL against strong BULLISH structure — forced HOLD (PTJ)")
             tg.alert_filtered("SELL", "BULLISH 85%", "STRONG BUY")
             signal["action"] = "HOLD"
+
+        # Seykota: cooldown după pierdere — fără revenge trading
+        cd_min = strategies.cooldown_remaining(cfg.COOLDOWN_AFTER_LOSS_MIN)
+        if not open_position and cd_min > 0 and signal["action"] in ("BUY", "SELL"):
+            logger.info(f"⏸️ Post-loss cooldown: {cd_min} min before re-entry")
+            signal["action"] = "HOLD"
+
+        # Filtru trend HTF: nu tranzacționa 5m contra trendului 1h
+        # (skip pe MT — EA-ul trimite un singur timeframe)
+        if (cfg.HTF_FILTER and cfg.BROKER != "mt" and not open_position
+                and signal["action"] in ("BUY", "SELL")):
+            try:
+                htf = strategies.htf_trend(broker.get_candles(symbol, cfg.HTF_TIMEFRAME, 60))
+            except Exception:
+                htf = "NEUTRAL"
+            if ((signal["action"] == "BUY" and htf == "BEARISH")
+                    or (signal["action"] == "SELL" and htf == "BULLISH")):
+                logger.warn(f"⚡ {cfg.HTF_TIMEFRAME} filter: {signal['action']} against {htf} trend — HOLD (trade with the tape)")
+                signal["action"] = "HOLD"
 
         if signal["action"] == "HOLD" or signal["confidence"] < cfg.MIN_CONFIDENCE or not criteria_ok:
             logger.info(f"HOLD — confidence: {signal['confidence']}% | "

@@ -111,6 +111,12 @@ def get_signal(ind, balance, open_position, strategy_data=None):
            f"PnL: {open_position.get('pnlPips', 0):.1f} pips") if open_position else "NONE"
     sessions = ", ".join(forex.active_sessions()) or "between sessions"
 
+    # Twelve Data forex has no tick volume — swap the dead criterion for Stoch RSI
+    has_volume = ind.get("hasVolume", True)
+    vol_line = (f"- Volume ratio: {ind['volumeRatio']}x" if has_volume
+                else "- Volume: N/A (this data source has no forex tick volume — judge on price action, do NOT treat as low liquidity)")
+    vol_crit = "tick volume>1.2x" if has_volume else "Stoch RSI K aligned with direction"
+
     prompt = f"""You are a professional FOREX trader with 20 years of experience applying the rules of the great traders: Turtle breakout, Livermore structure, Soros momentum, PTJ defense. Analyze ALL the data and give a precise signal.
 
 ## MARKET DATA — {cfg.SYMBOL} ({cfg.TIMEFRAME})
@@ -131,7 +137,7 @@ def get_signal(ind, balance, open_position, strategy_data=None):
 ### Volatility & Volume
 - ATR: {ind['atrPct']}% of price
 - BB Bandwidth: {ind['bb_bandwidth']}% | Position in BB: {ind['bb_position']}%
-- Volume ratio: {ind['volumeRatio']}x
+{vol_line}
 - High 24h: {ind['high24h']} | Low 24h: {ind['low24h']}
 
 ### Last 5 candles
@@ -144,8 +150,8 @@ def get_signal(ind, balance, open_position, strategy_data=None):
 ## ENTRY RULES
 - SL: {cfg.STOP_LOSS_PIPS:g} pips | TP: {cfg.TAKE_PROFIT_PIPS:g} pips | Risk: {cfg.RISK_PER_TRADE * 100:g}% per trade
 - Minimum confidence: {cfg.MIN_CONFIDENCE}%
-- BUY criteria (min 3/5): bullish trend, RSI<50 or bullish div, MACD up, tick volume>1.2x, price below EMA20
-- SELL criteria (min 3/5): bearish trend, RSI>50 or bearish div, MACD down, tick volume>1.2x, price above EMA20
+- BUY criteria (min 3/5): bullish trend, RSI<50 or bullish div, MACD up, {vol_crit}, price below EMA20
+- SELL criteria (min 3/5): bearish trend, RSI>50 or bearish div, MACD down, {vol_crit}, price above EMA20
 - BONUS +1 criterion if Turtle=STRONG BUY/SELL OR Livermore confirms direction OR Soros momentum aligned
 - Do not trade against Livermore trend with strength >0.8
 
