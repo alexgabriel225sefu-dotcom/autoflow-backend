@@ -32,6 +32,28 @@ _INTERVAL_MAP = {
 }
 
 
+def _get_with_retry(url: str, params: dict, timeout: int):
+    """GET with retry on Twelve Data rate-limit (free tier: 8 credits/min).
+
+    TD signals the limit either with HTTP 429 or with a JSON body
+    {"code": 429, "message": "You have run out of API credits..."}.
+    Retries wait long enough for the per-minute window to refill.
+    """
+    last = None
+    for attempt in range(3):
+        r = requests.get(url, params=params, timeout=timeout)
+        data = r.json()
+        rate_limited = r.status_code == 429 or (isinstance(data, dict) and data.get("code") == 429)
+        if not rate_limited:
+            return data
+        last = data
+        wait = 20 * (attempt + 1)
+        print(f"[TD] ⏳ Rate limit (free tier 8 req/min) — retry in {wait}s "
+              f"(attempt {attempt + 1}/3)")
+        time.sleep(wait)
+    return last
+
+
 def _to_td_symbol(symbol: str) -> str:
     return symbol.replace("_", "/").upper()
 
@@ -49,8 +71,7 @@ def _fetch_price(symbol: str) -> dict:
         return c
 
     params = {"symbol": _to_td_symbol(symbol), "apikey": cfg.TWELVE_DATA_KEY}
-    r = requests.get(f"{BASE_URL}/price", params=params, timeout=10)
-    data = r.json()
+    data = _get_with_retry(f"{BASE_URL}/price", params, timeout=10)
     if "price" not in data:
         with _lock:
             c = _price_cache.get(symbol)
@@ -112,8 +133,7 @@ def get_candles(instrument=None, interval=None, limit=None):
         "apikey": cfg.TWELVE_DATA_KEY,
         "order": "ASC",
     }
-    r = requests.get(f"{BASE_URL}/time_series", params=params, timeout=15)
-    data = r.json()
+    data = _get_with_retry(f"{BASE_URL}/time_series", params, timeout=15)
     if "values" not in data:
         with _lock:
             c = _candle_cache.get(cache_key)
