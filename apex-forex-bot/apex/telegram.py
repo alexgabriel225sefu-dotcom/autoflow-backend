@@ -476,13 +476,19 @@ def _handle_buyer_start(chat_id, license_key):
 
 def _poll_loop():
     global _update_id
+    print(f"[TELEGRAM] Poll loop started. TOKEN={bool(TOKEN)} CHAT_ID={CHAT_ID}")
     while True:
         try:
             r = requests.get(f"{_API}/getUpdates",
                              params={"offset": _update_id, "timeout": 10,
                                      "allowed_updates": json.dumps(["message"])},
                              timeout=15)
-            for u in r.json().get("result", []):
+            data = r.json()
+            if not data.get("ok"):
+                print(f"[TELEGRAM] API error: {data.get('description')} (code {data.get('error_code')})")
+                time.sleep(10)
+                continue
+            for u in data.get("result", []):
                 _update_id = u["update_id"] + 1
                 msg = u.get("message", {})
                 raw = (msg.get("text") or "").strip()
@@ -538,8 +544,8 @@ def _poll_loop():
                     _handle_start(chat_id)
                 elif cmd_l == "/stop":
                     _handle_stop(chat_id)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[TELEGRAM] Poll error: {e}")
         time.sleep(2)
 
 
