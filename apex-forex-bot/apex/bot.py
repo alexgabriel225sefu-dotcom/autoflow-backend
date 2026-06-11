@@ -18,7 +18,11 @@ broker = get_broker()
 
 
 def broker_label():
-    return "MT BRIDGE" if cfg.BROKER == "mt" else f"OANDA ({cfg.OANDA_ENV})"
+    if cfg.BROKER == "mt":
+        return "MT BRIDGE"
+    if cfg.BROKER == "td":
+        return "TWELVE DATA"
+    return f"OANDA ({cfg.OANDA_ENV})"
 
 
 # ─── Runtime pause control ───────────────────────────────
@@ -139,6 +143,12 @@ def validate():
             print("❌ BROKER=mt requires MT_BRIDGE_SECRET (same value as in the EA).")
             sys.exit(1)
         print("🔗 MetaTrader bridge mode — waiting for the ApexBridge EA to sync.")
+    elif cfg.BROKER == "td":
+        if not cfg.TWELVE_DATA_KEY:
+            print("❌ BROKER=td requires TWELVE_DATA_KEY.")
+            print("    Get a free key at: https://twelvedata.com (800 calls/day, no CC)")
+            sys.exit(1)
+        print("📡 Twelve Data mode — paper trading with live forex prices.")
     elif not cfg.OANDA_API_TOKEN or not cfg.OANDA_ACCOUNT_ID:
         print("⚠️  OANDA credentials missing — market data unavailable.")
         print("    Create a FREE practice account at oanda.com, then send /setup")
@@ -348,7 +358,7 @@ def tick():
                 hb_price = None
             tg.alert_heartbeat(tick_count, hb_balance, open_position, hb_price)
 
-        logger.info(f"[{tick_count}] Analyzing {symbol} (OANDA {cfg.OANDA_ENV})"
+        logger.info(f"[{tick_count}] Analyzing {symbol} ({broker_label()})"
                     f"{' 🔒 active position' if active_symbol else ''}...")
 
         candles = broker.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES)
@@ -507,7 +517,8 @@ def main():
 
     mode = "📝 PAPER TRADING" if cfg.PAPER_TRADING else (
         "🔗 METATRADER" if cfg.BROKER == "mt" else (
-            "🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE"))
+            "📡 TWELVE DATA" if cfg.BROKER == "td" else (
+                "🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE")))
     dash["mode"] = mode.replace("📝", "").replace("🧪", "").replace("🔴", "").strip()
     tg.alert_start(cfg.SYMBOL, cfg.TIMEFRAME, balance, mode)
 
