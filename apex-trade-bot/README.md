@@ -68,7 +68,7 @@ Paper trading now **includes exchange fees** (0.1% per side), so simulated resul
 | Variable | Value |
 |---|---|
 | `LICENSE_KEY` | Your key from [aicashsystem.space](https://aicashsystem.space) |
-| `EXCHANGE` | `binance` (recommended), `bybit`, `okx`, `kraken`, `kucoin`, `coinbase`, `bitget`, `mexc` |
+| `EXCHANGE` | `binance` — **the only exchange validated for live trading** (server-side stops, tested order math). `bybit`, `okx`, `kraken`, `kucoin`, `coinbase`, `bitget`, `mexc` work for market data + paper trading; selecting them with `PAPER_TRADING=false` automatically falls back to paper unless you set `ALLOW_EXPERIMENTAL_LIVE=true` (at your own risk) |
 | `BINANCE_API_KEY` | From Binance → Profile → API Management. **Enable only "Spot Trading" — NEVER enable withdrawals** |
 | `BINANCE_API_SECRET` | Shown once when you create the key |
 | `GROQ_API_KEY` | Free from [console.groq.com](https://console.groq.com) |

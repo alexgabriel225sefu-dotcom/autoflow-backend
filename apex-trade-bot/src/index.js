@@ -95,6 +95,16 @@ function validate() {
     console.warn('⚠️  No exchange API key found — falling back to PAPER TRADING automatically');
     cfg.PAPER_TRADING = true;
   }
+
+  // Live trading e validat (ordine corecte + stop server-side) doar pe Binance.
+  // Celelalte exchange-uri: date + paper. Override explicit pentru experți.
+  const LIVE_VALIDATED = ['binance'];
+  if (!cfg.PAPER_TRADING && !LIVE_VALIDATED.includes(cfg.EXCHANGE)
+      && process.env.ALLOW_EXPERIMENTAL_LIVE !== 'true') {
+    console.warn(`⚠️  Live trading pe "${cfg.EXCHANGE}" nu e validat cu bani reali — trec pe PAPER TRADING.`);
+    console.warn('    Suportat live: Binance. Override (pe riscul tău): ALLOW_EXPERIMENTAL_LIVE=true');
+    cfg.PAPER_TRADING = true;
+  }
 }
 
 // ─── Balanță ──────────────────────────────────────────────
