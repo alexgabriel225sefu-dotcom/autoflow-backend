@@ -3,8 +3,8 @@
 AI-powered forex trading bot. **OANDA + MetaTrader 5. Telegram-controlled. Zero config files.**
 
 Two ways to connect (3Commas-style — trades appear live in the app you already use):
-- **OANDA** — direct API, easiest setup, free practice account
-- **MetaTrader 5** — via the included ApexBridge EA: IC Markets, Pepperstone, or any MT5 broker ([guide](docs/METATRADER.md))
+- **OANDA** — direct API, easiest setup, free practice account. **The validated live-trading path**: SL/TP are placed server-side at OANDA and positions are reconciled automatically after a restart
+- **MetaTrader 5** — via the included ApexBridge EA: IC Markets, Pepperstone, or any MT5 broker ([guide](docs/METATRADER.md)). Paper + practice supported; live mode requires the `ALLOW_EXPERIMENTAL_LIVE=true` flag
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/autoflow-backend)
 

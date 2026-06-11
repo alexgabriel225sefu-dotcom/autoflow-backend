@@ -138,6 +138,15 @@ def validate():
             sys.exit(1)
     if not has_anthropic and has_groq:
         print("ℹ️  ANTHROPIC_API_KEY missing — using Groq (free).")
+    # Live trading e validat doar pe OANDA (SL/TP server-side + reconciliere).
+    # MT bridge / altele: paper până la override explicit.
+    if (not cfg.PAPER_TRADING and cfg.BROKER != "oanda"
+            and os.getenv("ALLOW_EXPERIMENTAL_LIVE") != "true"):
+        print(f"⚠️  Live trading on broker '{cfg.BROKER}' is not validated — "
+              "forcing PAPER_TRADING.")
+        print("    Supported live: OANDA. Override (at your own risk): "
+              "ALLOW_EXPERIMENTAL_LIVE=true")
+        cfg.PAPER_TRADING = True
     if cfg.BROKER == "mt":
         if not cfg.MT_BRIDGE_SECRET:
             print("❌ BROKER=mt requires MT_BRIDGE_SECRET (same value as in the EA).")

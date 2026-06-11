@@ -33,7 +33,7 @@ Settings come from three places (highest priority first):
 | Variable | Default | Description |
 |---|---|---|
 | `LICENSE_KEY` | — | Your license from the purchase email (**required**) |
-| `BROKER` | `oanda` | `oanda` (direct API) or `mt` (MetaTrader 5 bridge) |
+| `BROKER` | `oanda` | `oanda` (direct API — **the only broker validated for live trading**, with server-side SL/TP), `mt` (MetaTrader 5 bridge) or `td` (Twelve Data, paper only). With `mt`, live mode requires `ALLOW_EXPERIMENTAL_LIVE=true` — otherwise the bot stays in paper for safety |
 | `OANDA_API_TOKEN` | — | Personal Access Token from OANDA (required for `oanda`) |
 | `OANDA_ACCOUNT_ID` | — | e.g. `101-001-1234567-001` (required for `oanda`) |
 | `OANDA_ENV` | `practice` | `practice` or `live` — must match your token |
