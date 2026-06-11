@@ -141,8 +141,8 @@ Răspunde DOAR cu JSON valid:
 {"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 prop română>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}`;
 
   // Încearcă Anthropic, dacă nu merge → Groq (gratuit)
-  try { return await callAnthropic(prompt); } catch {}
-  try { return await callGroq(prompt); } catch (err) {
+  try { return sanitize(await callAnthropic(prompt)); } catch {}
+  try { return sanitize(await callGroq(prompt)); } catch (err) {
     console.error('[AI ❌] Groq failed:', err.message);
   }
 
@@ -150,4 +150,26 @@ Răspunde DOAR cu JSON valid:
   return { action: 'HOLD', confidence: 0, reasoning: 'Eroare AI', riskLevel: 'HIGH', keyFactors: [], criteriaScore: 0 };
 }
 
-module.exports = { getSignal };
+// Validare strictă a JSON-ului de la LLM. Fără asta, "confidence":"high"
+// devine NaN și NaN < MIN_CONFIDENCE e false — gate-ul ar trece pe date corupte.
+const VALID_ACTIONS = ['BUY', 'SELL', 'HOLD', 'CLOSE'];
+function sanitize(raw) {
+  const action     = VALID_ACTIONS.includes(raw?.action) ? raw.action : 'HOLD';
+  const confidence = Number(raw?.confidence);
+  const criteria   = Number(raw?.criteriaScore);
+  if (action === 'HOLD' || !Number.isFinite(confidence) || !Number.isFinite(criteria)) {
+    if (action !== 'HOLD') console.warn('[AI ⚠️] Răspuns AI malformat (confidence/criteriaScore non-numeric) → HOLD');
+    return { action: 'HOLD', confidence: 0, reasoning: String(raw?.reasoning ?? 'malformed'),
+             riskLevel: 'HIGH', keyFactors: [], criteriaScore: 0 };
+  }
+  return {
+    action,
+    confidence:    Math.min(100, Math.max(0, confidence)),
+    criteriaScore: Math.min(5, Math.max(0, criteria)),
+    reasoning:     String(raw.reasoning ?? ''),
+    riskLevel:     ['LOW', 'MEDIUM', 'HIGH'].includes(raw.riskLevel) ? raw.riskLevel : 'MEDIUM',
+    keyFactors:    Array.isArray(raw.keyFactors) ? raw.keyFactors.slice(0, 5) : [],
+  };
+}
+
+module.exports = { getSignal, sanitize };

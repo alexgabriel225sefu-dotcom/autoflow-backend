@@ -197,7 +197,8 @@ function recordTrade(won, pnlAmount, startBalance) {
   } else {
     session.consecutiveLosses++;
     session.consecutiveWins = 0;
-    session.lastLossAt = Date.now();
+    // Cooldown doar pe pierdere reală — breakeven (PnL=0) nu e revenge-trade material
+    if (pnlAmount < 0) session.lastLossAt = Date.now();
   }
 
   const icon = won ? '✅' : '❌';
@@ -240,4 +241,19 @@ function analyze(candles) {
   return { turtle, livermore, soros, session: { ...session } };
 }
 
-module.exports = { shouldStop, analyze, druckenmillerMultiplier, recordTrade, turtleBreakout, livermoreStructure, sorosMomentum, cooldownRemaining, htfTrend, session };
+// ─── Persistență sesiune (supraviețuiește restart-urilor) ────
+// Fără asta, daily-stop / loss-streak / drawdown se resetează la fiecare
+// redeploy Railway — adică exact protecțiile dispar când e instabilitate.
+function sessionSnapshot() {
+  return { ...session };
+}
+
+function restoreSession(saved) {
+  if (!saved || typeof saved !== 'object') return;
+  // Restaurează doar dacă e din aceeași zi — peste zi se resetează oricum
+  if (saved.lastResetDay !== new Date().toDateString()) return;
+  Object.assign(session, saved);
+  console.log(`[STRATEGY] ♻️ Sesiune restaurată: ${session.consecutiveLosses} pierderi consecutive, ${session.dailyTrades} tranzacții azi`);
+}
+
+module.exports = { shouldStop, analyze, druckenmillerMultiplier, recordTrade, turtleBreakout, livermoreStructure, sorosMomentum, cooldownRemaining, htfTrend, session, sessionSnapshot, restoreSession };

@@ -1,7 +1,9 @@
 /**
- * APEX TRADE BOT — Premium Dashboard HTML
+ * APEX TRADE BOT — Premium Dashboard HTML + HTTP server
  */
-module.exports = function buildDashboard(dash) {
+const http = require('http');
+
+function buildDashboard(dash) {
   const sym      = dash.currentSymbol || 'SOLUSDT';
   const exch     = (dash.exchange || 'BINANCE').toUpperCase();
   const tvSym    = `${exch === 'BYBIT' ? 'BYBIT' : 'BINANCE'}:${sym}`;
@@ -170,4 +172,36 @@ tr.win td{color:#d1fae5}tr.loss td{color:#fee2e2}
 <div class="footer">Auto-refresh 30s · Tick #${tick} · Last: ${lastTick} · ${exch}</div>
 </body>
 </html>`;
-};
+}
+
+// ─── HTTP server cu auth opțional prin token ──────────────
+// DASHBOARD_TOKEN setat → balanța/istoricul nu mai sunt publice pe internet.
+function serve(getData, logger) {
+  const PORT  = parseInt(process.env.PORT || process.env.DASHBOARD_PORT || '3000');
+  const TOKEN = process.env.DASHBOARD_TOKEN || '';
+  if (!TOKEN) {
+    console.warn('⚠️  DASHBOARD_TOKEN nu e setat — dashboard-ul (balanță + istoric) e PUBLIC pe URL-ul Railway.');
+  }
+  http.createServer((req, res) => {
+    if (TOKEN) {
+      const url    = new URL(req.url, 'http://localhost');
+      const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      if (url.searchParams.get('token') !== TOKEN && bearer !== TOKEN) {
+        res.writeHead(401, { 'Content-Type': 'text/plain' });
+        res.end('Unauthorized — open with ?token=YOUR_DASHBOARD_TOKEN');
+        return;
+      }
+    }
+    const data = getData();
+    if (req.url.startsWith('/api/status')) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(buildDashboard(data));
+  }).listen(PORT, () => logger.info(`📊 Dashboard: http://localhost:${PORT}${TOKEN ? ' (protejat cu token)' : ''}`));
+}
+
+module.exports = buildDashboard;
+module.exports.serve = serve;

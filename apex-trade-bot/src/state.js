@@ -7,11 +7,12 @@ const path = require('path');
 
 const STATE_FILE = process.env.STATE_FILE || '/tmp/apex-state.json';
 
-function save(paperBalance, openPosition) {
+function save(paperBalance, openPosition, session = null) {
   try {
     fs.writeFileSync(STATE_FILE, JSON.stringify({
       paperBalance,
       openPosition,
+      session, // streak-uri/daily-stop — protecțiile nu se resetează la restart
       savedAt: new Date().toISOString(),
     }, null, 2));
   } catch (err) {

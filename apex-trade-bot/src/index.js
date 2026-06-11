@@ -8,7 +8,6 @@ const strategies     = require('./strategies');
 const tg             = require('./telegram');
 const state          = require('./state');
 const buildDashboard = require('./dashboard');
-const http           = require('http');
 
 // ─── Exchange ─────────────────────────────────────────────
 // Factory selects the connector for cfg.EXCHANGE (8 supported).
@@ -118,74 +117,25 @@ async function calcQuantity(price, balance, symbol = cfg.SYMBOL, druckMult = 1.0
   return result;
 }
 
-// ─── Calculează SL/TP (fix sau ATR-based) ──────────────────
-function calcSLTP(side, price, atrValue) {
-  if (cfg.ATR_BASED_SL && atrValue > 0) {
-    const slDist = atrValue * cfg.ATR_SL_MULT;
-    const tpDist = atrValue * cfg.ATR_TP_MULT;
-    return {
-      stopLoss:   side === 'BUY' ? price - slDist : price + slDist,
-      takeProfit: side === 'BUY' ? price + tpDist : price - tpDist,
-    };
-  }
-  return {
-    stopLoss:   side === 'BUY' ? price * (1 - cfg.STOP_LOSS_PCT)   : price * (1 + cfg.STOP_LOSS_PCT),
-    takeProfit: side === 'BUY' ? price * (1 + cfg.TAKE_PROFIT_PCT) : price * (1 - cfg.TAKE_PROFIT_PCT),
-  };
-}
-
-// ─── Verifică SL/TP, Breakeven, Trailing și Runner mode ───
-function checkPosition(price) {
-  if (!openPosition) return null;
-  const { side, entryPrice, takeProfit } = openPosition;
-
-  // Breakeven (PTJ): la +1R mută SL la entry + comisioane — trade-ul nu mai poate pierde
-  if (cfg.BREAKEVEN_AT_R > 0 && !openPosition.beDone && openPosition.initialStop) {
-    const oneR = Math.abs(entryPrice - openPosition.initialStop) * cfg.BREAKEVEN_AT_R;
-    const bePrice = side === 'BUY' ? entryPrice * (1 + 2 * cfg.FEE_PCT) : entryPrice * (1 - 2 * cfg.FEE_PCT);
-    if ((side === 'BUY' && price >= entryPrice + oneR && bePrice > openPosition.stopLoss) ||
-        (side === 'SELL' && price <= entryPrice - oneR && bePrice < openPosition.stopLoss)) {
-      Object.assign(openPosition, { stopLoss: bePrice, beDone: true });
-      logger.info(`🛡️ Breakeven: SL mutat la $${bePrice.toFixed(5)} — trade fără risc`);
-    }
-  }
-
-  // Trailing stop (strâns în runner mode — Seykota: let profits run)
-  if (cfg.TRAILING_STOP) {
-    const dist = openPosition.runner ? cfg.RUNNER_TRAIL_DIST : cfg.TRAILING_STOP_DIST;
-    if (side === 'BUY') {
-      openPosition.trailHigh = Math.max(openPosition.trailHigh ?? price, price);
-      openPosition.stopLoss  = Math.max(openPosition.stopLoss, openPosition.trailHigh * (1 - dist));
-    } else {
-      openPosition.trailLow  = Math.min(openPosition.trailLow ?? price, price);
-      openPosition.stopLoss  = Math.min(openPosition.stopLoss, openPosition.trailLow * (1 + dist));
-    }
-  }
-
-  openPosition.pnlPct = (side === 'BUY' ? price - entryPrice : entryPrice - price) / entryPrice * 100;
-
-  const hitSL = side === 'BUY' ? price <= openPosition.stopLoss : price >= openPosition.stopLoss;
-  const hitTP = side === 'BUY' ? price >= takeProfit            : price <= takeProfit;
-
-  if (hitSL) return openPosition.runner ? 'TRAIL_PROFIT' : 'STOP_LOSS';
-  if (hitTP && !openPosition.runner) {
-    if (cfg.LET_WINNERS_RUN && cfg.TRAILING_STOP) {
-      openPosition.runner = true;
-      logger.info(`🏃 TP atins la $${price} — runner mode: las profitul să curgă (trail ${cfg.RUNNER_TRAIL_DIST * 100}%)`);
-      return null;
-    }
-    return 'TAKE_PROFIT';
-  }
-  return null;
-}
+// ─── Exit management (SL/TP/breakeven/trailing/runner) ─────
+const { calcSLTP, checkPosition } = require('./position');
 
 // ─── Deschide poziție ─────────────────────────────────────
 async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL, druckMult = 1.0) {
+  // Pe spot live nu există short — un SELL ar vinde monede pe care clientul
+  // nu le are (ordin respins) sau pe care le deținea deja (pierdere reală).
+  if (side === 'SELL' && !cfg.PAPER_TRADING) {
+    logger.warn(`⛔ SELL pe spot LIVE blocat (${symbol}) — short doar în paper trading`);
+    return;
+  }
   const quantity = await calcQuantity(price, balance, symbol, druckMult);
   if (quantity <= 0) { logger.warn(`Cantitate prea mică pentru ${symbol} @ $${price} — skip`); return; }
   if (druckMult !== 1.0) logger.info(`🎯 Druckenmiller: mărime poziție ×${druckMult.toFixed(2)}`);
 
-  await exchange.placeOrder(side, quantity, symbol);
+  const order = await exchange.placeOrder(side, quantity, symbol);
+  // Live: folosește fill-ul real (preț mediu + cantitate executată), nu ticker-ul
+  const fillPrice = !cfg.PAPER_TRADING && order?.avgPrice    ? order.avgPrice    : price;
+  const fillQty   = !cfg.PAPER_TRADING && order?.executedQty ? order.executedQty : quantity;
 
   if (cfg.PAPER_TRADING) {
     const fee = price * quantity * cfg.FEE_PCT; // comision real, altfel paper-ul minte
@@ -193,34 +143,58 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL
     else                paperBalance += price * quantity - fee; // short: primim încasarea
   }
 
-  const { stopLoss, takeProfit } = calcSLTP(side, price, atrValue);
-  const rrRatio = Math.abs(takeProfit - price) / Math.abs(price - stopLoss);
+  const { stopLoss, takeProfit } = calcSLTP(side, fillPrice, atrValue);
+  const rrRatio = Math.abs(takeProfit - fillPrice) / Math.abs(fillPrice - stopLoss);
 
   openPosition = {
     symbol,  // ← stocăm simbolul real al poziției
-    side, entryPrice: price, quantity, stopLoss, takeProfit,
+    side, entryPrice: fillPrice, quantity: fillQty, stopLoss, takeProfit,
     initialStop: stopLoss, // referință pentru breakeven (+1R)
     openedAt: new Date().toISOString(), pnlPct: 0,
-    trailHigh: side === 'BUY' ? price : null,
-    trailLow:  side === 'SELL' ? price : null,
+    openFee: order?.quoteFee ?? 0, // comision real de intrare (live)
+    trailHigh: side === 'BUY' ? fillPrice : null,
+    trailLow:  side === 'SELL' ? fillPrice : null,
   };
+
+  // Live: pune SL/TP și la exchange (OCO) — dacă botul moare, poziția rămâne protejată
+  if (!cfg.PAPER_TRADING && typeof exchange.placeProtection === 'function') {
+    try {
+      await exchange.placeProtection(symbol, fillQty, stopLoss, takeProfit);
+      openPosition.hasProtection = true;
+    } catch (e) {
+      // Fără protecție server-side nu ținem poziție live deschisă — închidem imediat
+      logger.error(`❌ OCO eșuat (${e.message}) — închid poziția imediat, nu las trade live neprotejat`);
+      await exchange.placeOrder('SELL', fillQty, symbol).catch(err =>
+        logger.error(`‼️ Închiderea de siguranță a eșuat: ${err.message} — ÎNCHIDE MANUAL ${symbol}!`));
+      openPosition = null;
+      return;
+    }
+  }
   dash.openPosition = openPosition;
 
-  logger.printTrade(side, symbol, price, quantity);
+  logger.printTrade(side, symbol, fillPrice, fillQty);
   logger.info(`SL: $${stopLoss.toFixed(5)} | TP: $${takeProfit.toFixed(5)} | R:R = 1:${rrRatio.toFixed(2)}`);
-  tg.alertOpen(side, symbol, price, quantity, stopLoss, takeProfit, druckMult);
-  state.save(paperBalance, openPosition);
+  tg.alertOpen(side, symbol, fillPrice, fillQty, stopLoss, takeProfit, druckMult);
+  state.save(paperBalance, openPosition, strategies.sessionSnapshot());
 }
 
 // ─── Închide poziție ──────────────────────────────────────
-async function closeTrade(price, reason) {
+async function closeTrade(price, reason, alreadyClosed = false) {
   if (!openPosition) return;
   const { side, entryPrice, quantity, symbol = cfg.SYMBOL } = openPosition;
   const closeSide = side === 'BUY' ? 'SELL' : 'BUY';
 
-  await exchange.placeOrder(closeSide, quantity, symbol);
+  let fillPrice = price, closeFee = 0;
+  if (!alreadyClosed) {
+    // Live: anulează OCO-ul de protecție înainte de market-close, altfel ar rămâne agățat
+    if (!cfg.PAPER_TRADING && openPosition.hasProtection && typeof exchange.cancelAllOrders === 'function') {
+      await exchange.cancelAllOrders(symbol).catch(e => logger.warn(`Cancel OCO: ${e.message}`));
+    }
+    const order = await exchange.placeOrder(closeSide, quantity, symbol);
+    if (!cfg.PAPER_TRADING && order?.avgPrice) { fillPrice = order.avgPrice; closeFee = order.quoteFee ?? 0; }
+  }
 
-  let pnl = (side === 'BUY' ? price - entryPrice : entryPrice - price) * quantity;
+  let pnl = (side === 'BUY' ? fillPrice - entryPrice : entryPrice - fillPrice) * quantity;
 
   if (cfg.PAPER_TRADING) {
     // vinzi (BUY) sau răscumperi (SELL) — comision pe fiecare parte
@@ -228,7 +202,13 @@ async function closeTrade(price, reason) {
     if (side === 'BUY') paperBalance += price * quantity - fee;
     else                paperBalance -= price * quantity + fee;
     pnl -= (entryPrice + price) * quantity * cfg.FEE_PCT; // PnL net de comisioane (ambele părți)
+  } else {
+    // Live: scade comisioanele reale (sau estimate la FEE_PCT dacă lipsesc din fill)
+    const fees = (openPosition.openFee || entryPrice * quantity * cfg.FEE_PCT)
+               + (closeFee            || fillPrice  * quantity * cfg.FEE_PCT);
+    pnl -= fees;
   }
+  price = fillPrice;
 
   logger.printTrade(closeSide, symbol, price, quantity, pnl);
   logger.info(`Motivul: ${reason} | PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}`);
@@ -254,7 +234,7 @@ async function closeTrade(price, reason) {
   dash.balance      = bal;
 
   openPosition = null;
-  state.save(paperBalance, null);
+  state.save(paperBalance, null, strategies.sessionSnapshot());
 }
 
 // ─── Selectează cel mai bun simbol (scanner) ──────────────
@@ -281,9 +261,22 @@ async function bestSymbol() {
 }
 
 // ─── Loop principal ───────────────────────────────────────
+let ticking = false; // guard: AI-ul poate dura >interval → fără tick-uri suprapuse
 async function tick() {
+  if (ticking) { logger.warn('Tick anterior încă rulează — skip'); return; }
+  ticking = true;
   tickCount++;
   try {
+    // Live: dacă OCO-ul de la exchange s-a executat (SL sau TP), poziția nu mai
+    // există acolo — sincronizăm, altfel botul ar deschide alta peste ea
+    if (!cfg.PAPER_TRADING && openPosition?.hasProtection && typeof exchange.getOpenOrders === 'function') {
+      const open = await exchange.getOpenOrders(openPosition.symbol).catch(() => null);
+      if (Array.isArray(open) && open.length === 0) {
+        const px = await exchange.getPrice(openPosition.symbol);
+        logger.warn(`🛡️ OCO executat la exchange (${openPosition.symbol}) — închid poziția în evidență`);
+        await closeTrade(px, 'EXCHANGE_SLTP', true);
+      }
+    }
     // Dacă e poziție deschisă → monitorizăm ACELAȘI simbol, nu lăsăm scannerul să schimbe
     const activeSymbol = openPosition?.symbol ?? null;
     const symbol = activeSymbol || await bestSymbol();
@@ -320,7 +313,7 @@ async function tick() {
     }
 
     // Verifică SL/TP/Trailing
-    const trigger = checkPosition(price);
+    const trigger = checkPosition(openPosition, price);
     if (trigger) {
       logger.warn(`${trigger} atins la $${price} (SL curent: $${openPosition?.stopLoss?.toFixed(5)})`);
       await closeTrade(price, trigger);
@@ -441,6 +434,8 @@ async function tick() {
     logger.printStats(await getBalance(), openPosition, price);
   } catch (err) {
     logger.error(`Tick error: ${err.message}`);
+  } finally {
+    ticking = false;
   }
 }
 
@@ -448,13 +443,14 @@ async function tick() {
 async function main() {
   validate();
 
-  // Restaurează starea după restart
-  if (cfg.PAPER_TRADING) {
-    const saved = state.load(cfg.PAPER_BALANCE);
-    if (saved) {
-      paperBalance = saved.paperBalance;
-      openPosition = saved.openPosition;
-    }
+  // Restaurează starea după restart — și în live, altfel botul uită poziția
+  // deschisă și ar deschide alta peste ea (dublă expunere)
+  const saved = state.load(cfg.PAPER_BALANCE);
+  if (saved) {
+    if (cfg.PAPER_TRADING) paperBalance = saved.paperBalance;
+    openPosition = saved.openPosition;
+    strategies.restoreSession(saved.session);
+    if (openPosition) dash.openPosition = openPosition;
   }
 
   const balance = await getBalance();
@@ -474,17 +470,8 @@ async function main() {
   dash.mode = mode.replace(/[📝🧪🔴]/g, '').trim();
   tg.alertStart(cfg.SYMBOL, cfg.TIMEFRAME, balance, mode);
 
-  // ─── Dashboard HTTP server ────────────────────────────────
-  const PORT = parseInt(process.env.PORT || process.env.DASHBOARD_PORT || '3000');
-  http.createServer((req, res) => {
-    if (req.url === '/api/status') {
-      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-      res.end(JSON.stringify({ ...dash, tickCount }));
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(buildDashboard({ ...dash, tickCount }));
-  }).listen(PORT, () => logger.info(`📊 Dashboard: http://localhost:${PORT}`));
+  // ─── Dashboard HTTP server (auth cu DASHBOARD_TOKEN) ──────
+  buildDashboard.serve(() => ({ ...dash, tickCount }), logger);
 
   tg.startPolling(() => dash, exchange);
 

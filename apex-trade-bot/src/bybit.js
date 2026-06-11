@@ -159,6 +159,9 @@ async function placeOrder(side, quantity, symbol = cfg.SYMBOL) {
     side:      side === 'BUY' ? 'Buy' : 'Sell',
     orderType: 'Market',
     qty:       String(quantity),
+    // Fără asta, Bybit interpretează qty la market BUY ca monedă QUOTE (USDT),
+    // nu ca monedă de bază — ordinul ar fi greșit cu un factor de ~preț
+    marketUnit: 'baseCoin',
   };
 
   const { data } = await axios.post(

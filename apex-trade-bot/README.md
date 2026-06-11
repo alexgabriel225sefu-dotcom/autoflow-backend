@@ -24,8 +24,20 @@ Every 5 minutes the bot runs one analysis cycle:
 |---|---|
 | Entry | SL at `STOP_LOSS_PCT` (0.8%), TP at `TAKE_PROFIT_PCT` (1.6%) — or ATR-based if `ATR_BASED_SL=true` |
 | +1R in profit | **Breakeven stop** — SL moves to entry + fees. The trade can no longer lose (`BREAKEVEN_AT_R`) |
-| TP reached | **Runner mode** — instead of closing, the trailing stop tightens to `RUNNER_TRAIL_DIST` (0.5%) and the trade keeps riding the trend (`LET_WINNERS_RUN`) |
+| TP reached | **Runner mode** (paper trading) — instead of closing, the trailing stop tightens to `RUNNER_TRAIL_DIST` (0.5%) and the trade keeps riding the trend (`LET_WINNERS_RUN`) |
 | Trail hit | Position closes as `TRAIL_PROFIT` — usually well above the original TP in a real trend |
+
+### Live trading safety (Binance)
+
+- **Server-side OCO** — at entry the bot places a take-profit + stop-loss order pair directly
+  at Binance. If the bot crashes or restarts, the exchange still protects the position.
+- **Restart recovery** — open positions and risk-session state (loss streaks, daily stop)
+  are restored after a restart; the bot never forgets a live position.
+- **Real fills** — entry/exit prices and fees come from the actual exchange fill, not the ticker.
+- **No spot shorts** — SELL entries are paper-only; on a live spot account a short is impossible
+  and would only sell coins you already hold.
+- Live execution is fully wired for **Binance** (and order sizing fixed for Bybit). The other
+  exchanges work for data + paper trading; validate live orders with a small amount first.
 
 ### Capital protection (Paul Tudor Jones rules)
 
@@ -38,7 +50,7 @@ The bot stops opening new trades when any of these trigger (existing positions s
 
 ## Realistic expectations
 
-With default settings each winning trade adds roughly **+0.3–0.5% of your balance** (20% position × 1.6%+ move, minus 0.2% fees), and each loss costs ~0.2%. The edge comes from many small wins compounding plus the occasional runner that rides a big trend — not from doubling your money overnight. On a $100 account, a good week looks like **+2–5%**, and losing days are normal. Anyone promising more from a 5m bot is lying.
+With default settings each winning trade adds roughly **+0.05–0.1% of your balance** (5% position × 1.6%+ move, minus 0.2% fees), and each loss costs ~0.05%. The edge comes from many small wins compounding plus the occasional runner that rides a big trend — not from doubling your money overnight. Raise `RISK_PER_TRADE` only once you trust the system, and never above 0.10–0.15. Losing days are normal. Anyone promising guaranteed profit from a 5m bot is lying.
 
 Paper trading now **includes exchange fees** (0.1% per side), so simulated results match what real trading would do.
 
@@ -57,7 +69,7 @@ Paper trading now **includes exchange fees** (0.1% per side), so simulated resul
 |---|---|
 | `LICENSE_KEY` | Your key from [aicashsystem.space](https://aicashsystem.space) |
 | `EXCHANGE` | `binance` (recommended), `bybit`, `okx`, `kraken`, `kucoin`, `coinbase`, `bitget`, `mexc` |
-| `BINANCE_API_KEY` | From Binance → Profile → API Management |
+| `BINANCE_API_KEY` | From Binance → Profile → API Management. **Enable only "Spot Trading" — NEVER enable withdrawals** |
 | `BINANCE_API_SECRET` | Shown once when you create the key |
 | `GROQ_API_KEY` | Free from [console.groq.com](https://console.groq.com) |
 | `PAPER_TRADING` | `true` to start (simulated), `false` for real money |
@@ -73,7 +85,8 @@ Paper trading now **includes exchange fees** (0.1% per side), so simulated resul
 
 | Variable | Default | What it does |
 |---|---|---|
-| `RISK_PER_TRADE` | `0.20` | Fraction of balance used per trade (0.20 = 20%) |
+| `RISK_PER_TRADE` | `0.05` | Fraction of balance used per trade (0.05 = 5%) |
+| `DASHBOARD_TOKEN` | — | Set it to protect the web dashboard; open with `?token=...`. Without it the dashboard is public |
 | `STOP_LOSS_PCT` | `0.008` | Stop loss distance (0.8%) |
 | `TAKE_PROFIT_PCT` | `0.016` | Take profit distance (1.6%) — runner mode can exceed it |
 | `MIN_CONFIDENCE` | `62` | Minimum AI confidence to enter (raise for fewer, better trades) |
@@ -107,7 +120,7 @@ COOLDOWN_AFTER_LOSS_MIN=30
 **Aggressive** (more trades, bigger swings — only with money you can lose):
 ```
 MIN_CONFIDENCE=58
-RISK_PER_TRADE=0.30
+RISK_PER_TRADE=0.10
 COOLDOWN_AFTER_LOSS_MIN=5
 ```
 
