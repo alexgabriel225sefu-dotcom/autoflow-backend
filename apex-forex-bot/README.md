@@ -86,15 +86,32 @@ The bot walks you through connecting your **free OANDA practice account**
 
 ---
 
-## Tests
+## Tests & backtest
 
 ```bash
+python tests/run_all.py           # everything in one shot (6 suites, 70+ checks)
+
 python tests/test_forex.py        # pip math, sizing, margin, market hours
+python tests/test_brokers.py      # OANDA server-side SL/TP, TD rate-limit retry, cross-pair sizing
 python tests/test_mtbridge.py     # MetaTrader bridge protocol
 python tests/test_indicators.py   # indicator math
 python tests/test_strategies.py   # strategies + risk circuit breakers
 python tests/test_ai.py           # AI signal layer (no network needed)
 ```
+
+**Backtest the real strategy** (the AI's entry rubric computed mechanically +
+the exact live exit code from `apex/position.py`):
+
+```bash
+python backtest.py                          # uses your OANDA/TD key from .env
+BT_SYMBOL=GBP_USD python backtest.py
+BT_SYNTHETIC=true python backtest.py        # engine validation, no internet
+```
+
+It pays spread + slippage on every entry and reports win rate, profit factor,
+net return, max drawdown and exit breakdown. The AI layer itself is not
+simulated (live it filters *additional* trades), and past results never
+guarantee future profit — treat the backtest as a sanity check, not a promise.
 
 ---
 

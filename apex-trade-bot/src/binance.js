@@ -92,10 +92,8 @@ async function getSymbolInfo(symbol = cfg.SYMBOL) {
   return info;
 }
 
-// Rotunjește cantitatea la stepSize-ul perechii (LOT_SIZE) și validează minNotional
-async function normalizeQty(symbol, quantity, price) {
-  const info = await getSymbolInfo(symbol);
-  if (!info) throw new Error(`Binance: simbol necunoscut ${symbol}`);
+// Rotunjire la regulile perechii — funcție pură, testabilă fără rețea
+function applyFilters(info, quantity, price, symbol = '?') {
   const lot = info.filters.find(f => f.filterType === 'LOT_SIZE');
   const notional = info.filters.find(f => f.filterType === 'NOTIONAL' || f.filterType === 'MIN_NOTIONAL');
   const step = parseFloat(lot.stepSize);
@@ -109,6 +107,13 @@ async function normalizeQty(symbol, quantity, price) {
     throw new Error(`Binance: valoare ordin $${(qty * price).toFixed(2)} sub minimul $${minNotional} pentru ${symbol}`);
   }
   return { qty, qtyStr, decimals };
+}
+
+// Rotunjește cantitatea la stepSize-ul perechii (LOT_SIZE) și validează minNotional
+async function normalizeQty(symbol, quantity, price) {
+  const info = await getSymbolInfo(symbol);
+  if (!info) throw new Error(`Binance: simbol necunoscut ${symbol}`);
+  return applyFilters(info, quantity, price, symbol);
 }
 
 // Plasare ordin MARKET — rotunjit la LOT_SIZE, returnează fill-ul real
@@ -190,5 +195,5 @@ async function getTicker24h(symbol = cfg.SYMBOL) {
 
 module.exports = {
   getPrice, getCandles, getBalance, placeOrder, getSymbolInfo, getTicker24h,
-  placeProtection, cancelAllOrders, getOpenOrders,
+  placeProtection, cancelAllOrders, getOpenOrders, applyFilters,
 };

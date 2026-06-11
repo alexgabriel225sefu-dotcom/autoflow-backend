@@ -124,6 +124,27 @@ RISK_PER_TRADE=0.10
 COOLDOWN_AFTER_LOSS_MIN=5
 ```
 
+## Tests & backtest
+
+```bash
+npm test          # 40 unit tests: exit engine, risk circuit breakers,
+                  # Binance lot-size math, AI signal validation, state recovery
+```
+
+**Backtest the real strategy** — the AI's entry rubric computed mechanically,
+the live filters (1h trend, Livermore/Turtle veto, cooldown) and the exact
+exit code from `src/position.js`, with 0.1% fees per side + slippage:
+
+```bash
+npm run backtest                              # fetches real candles (Binance/OKX)
+BT_SYMBOL=XRPUSDT BT_CANDLES=1000 npm run backtest
+BT_SYNTHETIC=true npm run backtest            # engine validation, no internet
+```
+
+The AI layer itself is not simulated — live, it filters *additional* trades.
+Past results never guarantee future profit; use the backtest as a sanity
+check, not a promise.
+
 ## FAQ
 
 **Why is the bot holding instead of trading?**

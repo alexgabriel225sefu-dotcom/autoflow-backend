@@ -1,175 +1,195 @@
-// ─── Backtest rapid pe date istorice ─────────────────────────────────────────
-// Rulare: node src/backtest.js
-//         BT_SYMBOL=XRPUSDT BT_TIMEFRAME=15m BT_CANDLES=500 node src/backtest.js
-// Testează strategia fără AI (doar indicatori tehnici) pe ultimele N lumânări
+// ─── Backtest pe STRATEGIA REALĂ (nu un proxy diferit) ───────────────────────
+// Rulare:  node src/backtest.js
+//          BT_SYMBOL=XRPUSDT BT_TIMEFRAME=5m BT_CANDLES=1000 node src/backtest.js
+//          BT_SYNTHETIC=true node src/backtest.js   (fără internet — doar validare motor)
+//
+// Ce simulează FIDEL:  rubrica de criterii din promptul AI (calculată mecanic),
+//   gate-urile MIN_CRITERIA/MIN_VOLUME_RATIO, filtrul de trend 1h, veto-ul
+//   Livermore+Turtle, cooldown după pierdere, sizing Druckenmiller, și exiturile
+//   REALE din src/position.js (SL/TP/breakeven/trailing/runner) evaluate la close
+//   de lumânare — exact cum face botul live la fiecare tick. Comisioane 0.1%/parte
+//   + slippage pe intrare/ieșire.
+// Ce NU simulează:  judecata LLM-ului. AI-ul poate respinge trade-uri pe care
+//   rubrica le-ar lua (e un filtru în plus), deci live-ul ia DE REGULĂ mai puține
+//   trade-uri decât acest backtest. Rezultatele NU sunt o promisiune de profit.
 
 require('dotenv').config();
 const indicators = require('./indicators');
+const strategies = require('./strategies');
+const logger     = require('./logger');
 const cfg        = require('./config');
-const exchange   = cfg.EXCHANGE === 'binance' ? require('./binance') : require('./bybit');
+const { calcSLTP, checkPosition } = require('./position');
 
-const SYMBOL     = process.env.BT_SYMBOL    || cfg.SYMBOL;
-const TIMEFRAME  = process.env.BT_TIMEFRAME || cfg.TIMEFRAME;
-const CANDLES    = parseInt(process.env.BT_CANDLES || '500');
-const START_BAL  = parseFloat(process.env.BT_BALANCE || '10');
+const SYMBOL    = process.env.BT_SYMBOL    || cfg.SYMBOL;
+const TIMEFRAME = process.env.BT_TIMEFRAME || cfg.TIMEFRAME;
+const CANDLES   = parseInt(process.env.BT_CANDLES || '1000');
+const START_BAL = parseFloat(process.env.BT_BALANCE || '100');
+const SLIPPAGE  = parseFloat(process.env.BT_SLIPPAGE || '0.0005'); // 0.05%/parte
+const SYNTHETIC = process.env.BT_SYNTHETIC === 'true';
 
-// ─── Semnal simplu bazat pe indicatori (fără AI = rapid) ──────────────────
-function simpleSignal(ind) {
-  const rsi    = parseFloat(ind.rsi);
-  const macdH  = parseFloat(ind.macdHist);
-  const srsiK  = parseFloat(ind.stochRsiK);
-  const srsiD  = parseFloat(ind.stochRsiD);
-  const bbPos  = parseFloat(ind.bb_position);
-  const volR   = parseFloat(ind.volumeRatio);
-  const trend  = ind.emaTrend;
+logger.info = () => {}; // fără spam de breakeven/runner pe mii de lumânări
 
-  let buyScore  = 0;
-  let sellScore = 0;
+// ─── Rubrica de criterii — identică cu cea cerută AI-ului în prompt ──────────
+function criteriaSignal(ind, strat) {
+  const rsi = parseFloat(ind.rsi), macdH = parseFloat(ind.macdHist);
+  const volR = parseFloat(ind.volumeRatio), price = parseFloat(ind.price);
+  const ema20 = parseFloat(ind.ema20);
+  const bonus = (dir) =>
+    (strat.turtle.breakoutStr === 'STRONG' && strat.turtle.signal === dir) ||
+    (strat.livermore.trend === (dir === 'BUY' ? 'BULLISH' : 'BEARISH') && strat.livermore.strength >= 0.5) ||
+    (strat.soros.direction === (dir === 'BUY' ? 'BULLISH' : 'BEARISH')) ? 1 : 0;
 
-  // Criterii BUY
-  if (trend === 'BULLISH')                         buyScore++;
-  if (rsi < 45)                                    buyScore++;
-  if (macdH > 0)                                   buyScore++;
-  if (srsiK < 30 || (srsiK > srsiD && srsiK < 50)) buyScore++;
-  if (bbPos < 30)                                  buyScore++;
-  if (ind.divergence === 'BULLISH')                buyScore++;
-  if (volR > 1.2)                                  buyScore++;
+  let buy = 0;
+  if (ind.emaTrend === 'BULLISH') buy++;
+  if (rsi < 50 || ind.divergence === 'BULLISH') buy++;
+  if (macdH > 0) buy++;
+  if (volR > 1.2) buy++;
+  if (price < ema20) buy++;
+  buy += bonus('BUY');
 
-  // Criterii SELL
-  if (trend === 'BEARISH')                          sellScore++;
-  if (rsi > 55)                                     sellScore++;
-  if (macdH < 0)                                    sellScore++;
-  if (srsiK > 70 || (srsiK < srsiD && srsiK > 50))  sellScore++;
-  if (bbPos > 70)                                    sellScore++;
-  if (ind.divergence === 'BEARISH')                  sellScore++;
-  if (volR > 1.2)                                    sellScore++;
+  let sell = 0;
+  if (ind.emaTrend === 'BEARISH') sell++;
+  if (rsi > 50 || ind.divergence === 'BEARISH') sell++;
+  if (macdH < 0) sell++;
+  if (volR > 1.2) sell++;
+  if (price > ema20) sell++;
+  sell += bonus('SELL');
 
-  if (buyScore  >= 4 && buyScore  > sellScore) return { action: 'BUY',  score: buyScore };
-  if (sellScore >= 4 && sellScore > buyScore)  return { action: 'SELL', score: sellScore };
-  return { action: 'HOLD', score: 0 };
+  const minC = parseInt(process.env.MIN_CRITERIA || '3');
+  if (buy >= minC && buy > sell) return { action: 'BUY', criteriaScore: Math.min(5, buy) };
+  if (sell >= minC && sell > buy) return { action: 'SELL', criteriaScore: Math.min(5, sell) };
+  return { action: 'HOLD', criteriaScore: 0 };
 }
 
-// ─── Fetch date istorice prin modulul exchange ────────────
-async function fetchCandles(symbol, interval, limit) {
-  // exchange.getCandles folosește Binance public API (accesibil din Railway)
-  return await exchange.getCandles(symbol, interval, limit);
+// 5m → 1h pentru filtrul HTF (12 lumânări de 5m = 1h)
+function resample1h(candles, ratio = 12) {
+  const out = [];
+  for (let i = 0; i + ratio <= candles.length; i += ratio) {
+    const grp = candles.slice(i, i + ratio);
+    out.push({
+      time: grp[0].time, open: grp[0].open, close: grp[grp.length - 1].close,
+      high: Math.max(...grp.map(c => c.high)), low: Math.min(...grp.map(c => c.low)),
+      volume: grp.reduce((a, c) => a + c.volume, 0),
+    });
+  }
+  return out;
 }
 
-// ─── Rulează backtest ─────────────────────────────────────
+// Date sintetice cu seed — DOAR pentru validarea motorului, nu pentru concluzii
+function syntheticCandles(n) {
+  let seed = 42;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  const out = []; let p = 100, drift = 0;
+  for (let i = 0; i < n; i++) {
+    if (i % 200 === 0) drift = (rnd() - 0.5) * 0.0015; // regimuri de trend
+    const ret = drift + (rnd() - 0.5) * 0.006;
+    const o = p; p = Math.max(1, p * (1 + ret));
+    out.push({ time: i, open: o, close: p,
+               high: Math.max(o, p) * (1 + rnd() * 0.002),
+               low: Math.min(o, p) * (1 - rnd() * 0.002),
+               volume: 800 + rnd() * 600 });
+  }
+  return out;
+}
+
+async function fetchCandles() {
+  if (SYNTHETIC) return syntheticCandles(CANDLES + 200);
+  const exchange = require('./exchange');
+  return await exchange.getCandles(SYMBOL, TIMEFRAME, Math.min(CANDLES + 200, 1000));
+}
+
 async function runBacktest() {
-  console.log('\n' + '═'.repeat(60));
-  console.log('  📊 APEX BACKTEST ENGINE');
-  console.log(`  Symbol: ${SYMBOL} | Timeframe: ${TIMEFRAME} | Lumânări: ${CANDLES}`);
-  console.log(`  Start balance: $${START_BAL} | SL: ${cfg.STOP_LOSS_PCT*100}% | TP: ${cfg.TAKE_PROFIT_PCT*100}%`);
-  console.log('═'.repeat(60));
+  const FEE = cfg.FEE_PCT;
+  console.log('\n' + '═'.repeat(64));
+  console.log('  📊 APEX BACKTEST — strategia reală (rubrică AI + filtre + exituri live)');
+  console.log(`  ${SYNTHETIC ? '⚠️  DATE SINTETICE — validare motor, NU concluzii de profit' : `Symbol: ${SYMBOL} | TF: ${TIMEFRAME}`}`);
+  console.log(`  Balanță: $${START_BAL} | SL ${cfg.STOP_LOSS_PCT * 100}% | TP ${cfg.TAKE_PROFIT_PCT * 100}% | fee ${FEE * 100}%/parte | slippage ${SLIPPAGE * 100}%/parte`);
+  console.log('═'.repeat(64));
 
-  const allCandles = await fetchCandles(SYMBOL, TIMEFRAME, CANDLES + 200);
+  const all = await fetchCandles();
+  if (all.length < 300) throw new Error(`Doar ${all.length} lumânări — minim 300`);
 
-  let balance     = START_BAL;
-  let position    = null;
-  let trades      = [];
-  let wins = 0, losses = 0;
+  let balance = START_BAL, position = null, lastLossIdx = -1e9;
+  const trades = [];
+  const cooldownBars = Math.ceil(cfg.COOLDOWN_AFTER_LOSS_MIN / 5);
+  let equityPeak = START_BAL, maxDD = 0, feesPaid = 0;
 
-  // Simulăm iterând prin fiecare lumânare
-  for (let i = 100; i < allCandles.length; i++) {
-    const window  = allCandles.slice(0, i + 1);
-    const ind     = indicators.analyze(window);
-    const price   = allCandles[i].close;
-    const candle  = allCandles[i];
+  const close = (exitRaw, reason, i) => {
+    const dir = position.side === 'BUY' ? 1 : -1;
+    const exit = exitRaw * (1 - dir * SLIPPAGE);
+    const fee = (position.entryPrice + exit) * position.quantity * FEE;
+    const pnl = dir * (exit - position.entryPrice) * position.quantity - fee;
+    feesPaid += fee;
+    balance += pnl;
+    trades.push({ side: position.side, entry: position.entryPrice, exit, pnl, reason, bars: i - position.openedAt });
+    if (pnl < 0) lastLossIdx = i;
+    position = null;
+    equityPeak = Math.max(equityPeak, balance);
+    maxDD = Math.max(maxDD, (equityPeak - balance) / equityPeak);
+  };
 
-    // Verifică SL/TP pe poziție deschisă
+  for (let i = 250; i < all.length; i++) {
+    const window = all.slice(0, i + 1);
+    const price = all[i].close;
+
     if (position) {
-      const { side, entryPrice, quantity, stopLoss, takeProfit } = position;
-      let closed = false;
-      let closePrice = null;
-      let reason = '';
+      const trigger = checkPosition(position, price);
+      if (trigger) { close(price, trigger, i); continue; }
+    }
+    if (position || balance < 1) continue;
+    if (i - lastLossIdx < cooldownBars) continue;            // cooldown după pierdere
 
-      // Verifică dacă SL sau TP a fost atins în această lumânare
-      if (side === 'BUY') {
-        if (candle.low <= stopLoss) { closePrice = stopLoss; reason = 'SL'; closed = true; }
-        else if (candle.high >= takeProfit) { closePrice = takeProfit; reason = 'TP'; closed = true; }
-      } else {
-        if (candle.high >= stopLoss) { closePrice = stopLoss; reason = 'SL'; closed = true; }
-        else if (candle.low <= takeProfit) { closePrice = takeProfit; reason = 'TP'; closed = true; }
-      }
+    const ind = indicators.analyze(window);
+    const strat = strategies.analyze(window);
+    const sig = criteriaSignal(ind, strat);
+    if (sig.action === 'HOLD') continue;
+    if (parseFloat(ind.volumeRatio) < parseFloat(process.env.MIN_VOLUME_RATIO || '0.7')) continue;
 
-      if (closed) {
-        const pnl = side === 'BUY'
-          ? (closePrice - entryPrice) * quantity
-          : (entryPrice - closePrice) * quantity;
-        balance += entryPrice * quantity + pnl;
-        if (pnl > 0) wins++; else losses++;
-        trades.push({ i, side, entry: entryPrice, exit: closePrice, pnl, reason });
-        position = null;
-      }
+    // Veto Livermore+Turtle (identic cu live)
+    const contra = strat.livermore.trend === 'BEARISH' && strat.turtle.signal === 'SELL' ? 'BUY'
+                 : strat.livermore.trend === 'BULLISH' && strat.turtle.signal === 'BUY' ? 'SELL' : null;
+    if ((strat.livermore.strength ?? 0) >= 0.8 && sig.action === contra) continue;
+
+    // Filtru HTF 1h (identic cu live)
+    if (cfg.HTF_FILTER) {
+      const htf = strategies.htfTrend(resample1h(window.slice(-720)));
+      if ((sig.action === 'BUY' && htf === 'BEARISH') || (sig.action === 'SELL' && htf === 'BULLISH')) continue;
     }
 
-    // Deschide poziție nouă dacă nu avem una
-    if (!position && balance > 1) {
-      const signal = simpleSignal(ind);
-      if (signal.action !== 'HOLD') {
-        const riskAmt  = balance * cfg.RISK_PER_TRADE;
-        const quantity = signal.action === 'BUY' || signal.action === 'SELL'
-          ? riskAmt / price
-          : 0;
-
-        if (quantity > 0) {
-          const sl = signal.action === 'BUY' ? price * (1 - cfg.STOP_LOSS_PCT) : price * (1 + cfg.STOP_LOSS_PCT);
-          const tp = signal.action === 'BUY' ? price * (1 + cfg.TAKE_PROFIT_PCT) : price * (1 - cfg.TAKE_PROFIT_PCT);
-          balance -= riskAmt;
-          position = { side: signal.action, entryPrice: price, quantity, stopLoss: sl, takeProfit: tp, openedAt: i };
-        }
-      }
-    }
+    const mult = strategies.druckenmillerMultiplier(70, sig.criteriaScore, strat.livermore, strat.turtle);
+    const dir = sig.action === 'BUY' ? 1 : -1;
+    const entry = price * (1 + dir * SLIPPAGE);
+    const quantity = (balance * cfg.RISK_PER_TRADE * mult) / entry;
+    const { stopLoss, takeProfit } = calcSLTP(sig.action, entry, parseFloat(ind.atr));
+    position = { side: sig.action, entryPrice: entry, quantity, stopLoss, takeProfit,
+                 initialStop: stopLoss, openedAt: i,
+                 trailHigh: sig.action === 'BUY' ? entry : null,
+                 trailLow: sig.action === 'SELL' ? entry : null };
   }
+  if (position) close(all[all.length - 1].close, 'END', all.length - 1);
 
-  // Închide poziție deschisă la final
-  if (position) {
-    const lastPrice = allCandles[allCandles.length - 1].close;
-    const pnl = position.side === 'BUY'
-      ? (lastPrice - position.entryPrice) * position.quantity
-      : (position.entryPrice - lastPrice) * position.quantity;
-    balance += position.entryPrice * position.quantity + pnl;
-    trades.push({ side: position.side, entry: position.entryPrice, exit: lastPrice, pnl, reason: 'END' });
-    if (pnl > 0) wins++; else losses++;
+  // ─── Raport ────────────────────────────────────────────
+  const wins = trades.filter(t => t.pnl > 0), losses = trades.filter(t => t.pnl <= 0);
+  const gw = wins.reduce((a, t) => a + t.pnl, 0), gl = Math.abs(losses.reduce((a, t) => a + t.pnl, 0));
+  const pf = gl > 0 ? (gw / gl).toFixed(2) : '∞';
+  const ret = ((balance - START_BAL) / START_BAL * 100).toFixed(2);
+  const barsDays = ((all.length - 250) * (TIMEFRAME === '5m' ? 5 : 15) / 1440).toFixed(1);
+
+  console.log(`\n  Perioadă: ~${barsDays} zile (${all.length - 250} lumânări) | Trades: ${trades.length} (✅ ${wins.length} / ❌ ${losses.length})`);
+  console.log(`  Win rate: ${trades.length ? (wins.length / trades.length * 100).toFixed(1) : 0}% | Profit factor: ${pf}`);
+  console.log(`  Rezultat net: ${ret >= 0 ? '+' : ''}${ret}% ($${balance.toFixed(2)}) | Comisioane+slippage plătite: $${feesPaid.toFixed(2)}`);
+  console.log(`  Max drawdown: -${(maxDD * 100).toFixed(1)}%`);
+  if (trades.length) {
+    const exp = trades.reduce((a, t) => a + t.pnl, 0) / trades.length;
+    console.log(`  Expectancy: ${exp >= 0 ? '+' : ''}$${exp.toFixed(4)}/trade`);
+    const byReason = {};
+    trades.forEach(t => byReason[t.reason] = (byReason[t.reason] || 0) + 1);
+    console.log(`  Exituri: ${Object.entries(byReason).map(([r, n]) => `${r}×${n}`).join(' | ')}`);
   }
-
-  // ─── Raport ─────────────────────────────────────────────
-  const totalTrades = wins + losses;
-  const winRate     = totalTrades > 0 ? (wins / totalTrades * 100).toFixed(1) : 0;
-  const pnlTotal    = balance - START_BAL;
-  const pnlPct      = (pnlTotal / START_BAL * 100).toFixed(2);
-  const avgWin      = trades.filter(t => t.pnl > 0).reduce((a, t) => a + t.pnl, 0) / (wins || 1);
-  const avgLoss     = trades.filter(t => t.pnl < 0).reduce((a, t) => a + t.pnl, 0) / (losses || 1);
-  const profitFactor = losses > 0 && avgLoss !== 0 ? (wins * avgWin / (losses * Math.abs(avgLoss))).toFixed(2) : '∞';
-
-  console.log('\n📊 REZULTATE BACKTEST:');
-  console.log(`   Balanță finală:   $${balance.toFixed(4)} (${pnlPct >= 0 ? '+' : ''}${pnlPct}%)`);
-  console.log(`   Total trades:     ${totalTrades} | ✅ ${wins} | ❌ ${losses}`);
-  console.log(`   Win Rate:         ${winRate}%`);
-  console.log(`   Profit Factor:    ${profitFactor} (>1.5 = bun, >2 = excelent)`);
-  console.log(`   Avg Win:         +$${avgWin.toFixed(4)}`);
-  console.log(`   Avg Loss:        -$${Math.abs(avgLoss).toFixed(4)}`);
-  console.log(`   Profit total:     ${pnlTotal >= 0 ? '+' : ''}$${pnlTotal.toFixed(4)}`);
-
-  console.log('\n📈 Ultimele 10 trades:');
-  trades.slice(-10).forEach((t, i) => {
-    const sign = t.pnl >= 0 ? '✅' : '❌';
-    console.log(`   ${sign} ${t.side} | Entry: $${t.entry?.toFixed(5)} | Exit: $${t.exit?.toFixed(5)} | PnL: ${t.pnl >= 0 ? '+' : ''}$${t.pnl?.toFixed(4)} | ${t.reason}`);
-  });
-
-  // Recomandare
-  console.log('\n💡 CONCLUZIE:');
-  if (parseFloat(winRate) >= 55 && parseFloat(profitFactor) >= 1.5) {
-    console.log('   ✅ STRATEGIE PROFITABILĂ — poți testa live cu capital mic');
-  } else if (parseFloat(winRate) >= 45 && parseFloat(profitFactor) >= 1.2) {
-    console.log('   ⚠️  STRATEGIE MARGINALĂ — testează mai mult înainte de live');
-  } else {
-    console.log('   ❌ STRATEGIE NEPROFITABILĂ — ajustează SL/TP sau timeframe');
-  }
-  console.log('═'.repeat(60) + '\n');
-
-  return { balance, winRate, profitFactor, totalTrades };
+  console.log('\n  ⚠️  Stratul AI nu e simulat (filtrează în plus la live). Rezultatele');
+  console.log('      trecute nu garantează nimic. Testează pe paper înainte de live.');
+  console.log('═'.repeat(64) + '\n');
+  return { balance, trades: trades.length, pf };
 }
 
 runBacktest().catch(err => { console.error('Backtest error:', err.message); process.exit(1); });

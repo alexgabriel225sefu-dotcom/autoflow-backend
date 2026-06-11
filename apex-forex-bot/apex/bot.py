@@ -170,60 +170,13 @@ def get_balance():
         return 0
 
 
-def calc_sltp(side, price, atr_value, symbol):
-    if cfg.ATR_BASED_SL and atr_value > 0:
-        sl_dist, tp_dist = atr_value * cfg.ATR_SL_MULT, atr_value * cfg.ATR_TP_MULT
-    else:
-        sl_dist = forex.from_pips(cfg.STOP_LOSS_PIPS, symbol)
-        tp_dist = forex.from_pips(cfg.TAKE_PROFIT_PIPS, symbol)
-    return {"stopLoss": price - sl_dist if side == "BUY" else price + sl_dist,
-            "takeProfit": price + tp_dist if side == "BUY" else price - tp_dist}
+# Exit management — implementat în apex/position.py, partajat cu backtest.py,
+# ca backtest-ul să ruleze EXACT codul care tranzacționează live
+from apex.position import calc_sltp, check_position as _check_position  # noqa: E402
 
 
 def check_position(price):
-    if not open_position:
-        return None
-    side = open_position["side"]
-    symbol = open_position.get("symbol", cfg.SYMBOL)
-    entry = open_position["entryPrice"]
-
-    # Breakeven (PTJ): la +1R mută SL la entry ±1 pip — trade-ul nu mai poate pierde
-    if cfg.BREAKEVEN_AT_R > 0 and not open_position.get("beDone") and open_position.get("initialStop"):
-        one_r = abs(entry - open_position["initialStop"]) * cfg.BREAKEVEN_AT_R
-        pip = forex.from_pips(1, symbol)
-        be_price = entry + pip if side == "BUY" else entry - pip
-        if ((side == "BUY" and price >= entry + one_r and be_price > open_position["stopLoss"])
-                or (side == "SELL" and price <= entry - one_r and be_price < open_position["stopLoss"])):
-            open_position["stopLoss"] = be_price
-            open_position["beDone"] = True
-            logger.info(f"🛡️ Breakeven: SL moved to {be_price:.5f} — risk-free trade")
-
-    # Trailing stop (strâns în runner mode — Seykota: let profits run)
-    if cfg.TRAILING_STOP:
-        trail_pips = cfg.RUNNER_TRAIL_PIPS if open_position.get("runner") else cfg.TRAILING_STOP_PIPS
-        trail_dist = forex.from_pips(trail_pips, symbol)
-        if side == "BUY":
-            open_position["trailHigh"] = max(open_position.get("trailHigh") or price, price)
-            open_position["stopLoss"] = max(open_position["stopLoss"], open_position["trailHigh"] - trail_dist)
-        else:
-            open_position["trailLow"] = min(open_position.get("trailLow") or price, price)
-            open_position["stopLoss"] = min(open_position["stopLoss"], open_position["trailLow"] + trail_dist)
-
-    pnl_pips = forex.to_pips(price - entry if side == "BUY" else entry - price, symbol)
-    open_position["pnlPips"] = round(pnl_pips, 1)
-
-    hit_sl = price <= open_position["stopLoss"] if side == "BUY" else price >= open_position["stopLoss"]
-    hit_tp = price >= open_position["takeProfit"] if side == "BUY" else price <= open_position["takeProfit"]
-    if hit_sl:
-        return "TRAIL_PROFIT" if open_position.get("runner") else "STOP_LOSS"
-    if hit_tp and not open_position.get("runner"):
-        # Runner doar pe paper — la live brokerul execută TP-ul server-side oricum
-        if cfg.LET_WINNERS_RUN and cfg.TRAILING_STOP and cfg.PAPER_TRADING:
-            open_position["runner"] = True
-            logger.info(f"🏃 TP hit at {price} — runner mode: letting profit run (trail {cfg.RUNNER_TRAIL_PIPS:g} pips)")
-            return None
-        return "TAKE_PROFIT"
-    return None
+    return _check_position(open_position, price)
 
 
 def _quote_usd_rate(symbol):
