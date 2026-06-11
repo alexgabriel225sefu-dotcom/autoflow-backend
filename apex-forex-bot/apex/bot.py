@@ -149,6 +149,11 @@ def validate():
             print("    Get a free key at: https://twelvedata.com (800 calls/day, no CC)")
             sys.exit(1)
         print("📡 Twelve Data mode — paper trading with live forex prices.")
+        if cfg.MULTI_SYMBOL and len(cfg.SCAN_SYMBOLS) > 3:
+            print(f"⚠️  MULTI_SYMBOL with {len(cfg.SCAN_SYMBOLS)} pairs needs "
+                  f"{len(cfg.SCAN_SYMBOLS) + 3}+ TD calls/cycle — the free tier allows 8/min.")
+            print("    If you see rate-limit retries, set SCAN_SYMBOLS to max 3 pairs"
+                  " or MULTI_SYMBOL=false.")
     elif not cfg.OANDA_API_TOKEN or not cfg.OANDA_ACCOUNT_ID:
         print("⚠️  OANDA credentials missing — market data unavailable.")
         print("    Create a FREE practice account at oanda.com, then send /setup")
@@ -221,11 +226,28 @@ def check_position(price):
     return None
 
 
+def _quote_usd_rate(symbol):
+    """USD value of the quote currency, for cross-pair sizing (EUR_JPY etc.)."""
+    base, _, quote = symbol.upper().partition("_")
+    if quote == "USD" or base == "USD":
+        return None
+    try:
+        return broker.get_price(f"{quote}_USD")
+    except Exception:
+        pass
+    try:
+        return 1.0 / broker.get_price(f"USD_{quote}")
+    except Exception:
+        logger.warn(f"No USD rate for {quote} — cross-pair sizing approximated for {symbol}")
+        return None
+
+
 def open_trade(side, price, balance, atr_value=0, symbol=None, druck_mult=1.0):
     global open_position
     symbol = symbol or cfg.SYMBOL
 
     # Spread guard — wide spreads eat the edge
+    bid = ask = None
     try:
         bid, ask = broker.get_bid_ask(symbol)
         spread = forex.spread_pips(bid, ask, symbol)
@@ -235,10 +257,16 @@ def open_trade(side, price, balance, atr_value=0, symbol=None, druck_mult=1.0):
     except Exception:
         pass
 
+    # Paper: intrarea plătește spread-ul (fill la ask pe BUY / bid pe SELL),
+    # altfel rezultatele simulate ies sistematic mai bune decât realitatea
+    if cfg.PAPER_TRADING and bid and ask:
+        price = ask if side == "BUY" else bid
+
     sltp = calc_sltp(side, price, atr_value, symbol)
     stop_pips = forex.to_pips(abs(price - sltp["stopLoss"]), symbol)
     units = forex.calc_units(balance, cfg.RISK_PER_TRADE, stop_pips, symbol, price,
-                             cfg.LEVERAGE, cfg.MARGIN_CAP, druck_mult)
+                             cfg.LEVERAGE, cfg.MARGIN_CAP, druck_mult,
+                             quote_usd_rate=_quote_usd_rate(symbol))
     if units <= 0:
         logger.warn(f"Position size 0 for {symbol} @ {price} — skip")
         return
@@ -249,6 +277,9 @@ def open_trade(side, price, balance, atr_value=0, symbol=None, druck_mult=1.0):
     if result.get("status") == "REJECTED":
         logger.warn(f"Order rejected by broker: {result.get('reason')}")
         return
+    # Live: prețul real de fill (poate diferi de semnal cu 0.5-2 pips)
+    if not cfg.PAPER_TRADING and result.get("fillPrice"):
+        price = result["fillPrice"]
     rr = abs(sltp["takeProfit"] - price) / abs(price - sltp["stopLoss"]) if (price - sltp["stopLoss"]) else 0
     open_position = {
         "symbol": symbol, "side": side, "entryPrice": price, "quantity": units,
@@ -274,13 +305,17 @@ def close_trade(price, reason, send_order=True):
     entry_price = open_position["entryPrice"]
     units = open_position["quantity"]
     symbol = open_position.get("symbol", cfg.SYMBOL)
+    close_side = "SELL" if side == "BUY" else "BUY"
     if send_order:
         if hasattr(broker, "close_position"):
-            broker.close_position(symbol)
+            result = broker.close_position(symbol)
         else:
-            close_side = "SELL" if side == "BUY" else "BUY"
-            broker.place_order(close_side, units, symbol)
-    pnl = forex.pnl_usd(side, entry_price, price, units, symbol)
+            result = broker.place_order(close_side, units, symbol)
+        # Live: PnL pe prețul real de execuție, nu pe ticker
+        if not cfg.PAPER_TRADING and isinstance(result, dict) and result.get("fillPrice"):
+            price = result["fillPrice"]
+    pnl = forex.pnl_usd(side, entry_price, price, units, symbol,
+                        quote_usd_rate=_quote_usd_rate(symbol))
     if cfg.PAPER_TRADING:
         paper_balance += pnl
     pips = forex.to_pips(price - entry_price if side == "BUY" else entry_price - price, symbol)
@@ -487,11 +522,25 @@ def tick():
 
 # ─── Dashboard HTTP server ────────────────────────────────
 def _start_dashboard_server():
+    from urllib.parse import urlparse, parse_qs
     port = int(os.getenv("PORT") or os.getenv("DASHBOARD_PORT") or 3000)
+    token = os.getenv("DASHBOARD_TOKEN") or ""
+    if not token:
+        print("⚠️  DASHBOARD_TOKEN not set — the dashboard (balance + trade history) "
+              "is PUBLIC on your Railway URL.")
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
+
+        def _authorized(self):
+            if not token:
+                return True
+            qs = parse_qs(urlparse(self.path).query)
+            if qs.get("token", [""])[0] == token:
+                return True
+            bearer = (self.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+            return bearer == token
 
         def do_POST(self):
             if self.path == "/api/mt/sync":
@@ -510,11 +559,16 @@ def _start_dashboard_server():
                 self.end_headers()
 
         def do_GET(self):
-            if self.path == "/api/status":
+            if not self._authorized():
+                self.send_response(401)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"Unauthorized - open with ?token=YOUR_DASHBOARD_TOKEN")
+                return
+            if self.path.startswith("/api/status"):
                 body = json.dumps({**dash, "tickCount": tick_count}).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(body)
             else:
@@ -540,6 +594,33 @@ def main():
         if saved:
             paper_balance = saved["paperBalance"]
             open_position = saved.get("openPosition")
+    elif hasattr(broker, "get_open_trades"):
+        # Live: brokerul e sursa de adevăr — fără reconciliere, botul ar uita
+        # poziția existentă și ar deschide alta peste ea (dublă expunere)
+        try:
+            trades = broker.get_open_trades()
+            if trades:
+                t = trades[0]
+                sltp = calc_sltp(t["side"], t["entryPrice"], 0, t["instrument"])
+                open_position = {
+                    "symbol": t["instrument"], "side": t["side"],
+                    "entryPrice": t["entryPrice"], "quantity": t["units"],
+                    "stopLoss": t["sl"] or sltp["stopLoss"],
+                    "takeProfit": t["tp"] or sltp["takeProfit"],
+                    "initialStop": t["sl"] or sltp["stopLoss"],
+                    "openedAt": t.get("openTime") or datetime.utcnow().isoformat(),
+                    "pnlPips": 0,
+                    "trailHigh": t["entryPrice"] if t["side"] == "BUY" else None,
+                    "trailLow": t["entryPrice"] if t["side"] == "SELL" else None,
+                }
+                dash["openPosition"] = open_position
+                logger.warn(f"♻️ Live position reconciled from broker: "
+                            f"{t['side']} {t['units']} {t['instrument']} @ {t['entryPrice']}")
+                if len(trades) > 1:
+                    logger.warn(f"⚠️ {len(trades)} open trades at the broker — "
+                                f"managing the first, close the rest manually!")
+        except Exception as e:
+            logger.warn(f"Open-trade reconciliation failed: {e}")
 
     balance = get_balance()
     start_balance = balance

@@ -132,7 +132,11 @@ async function _pollLoop() {
             '/help — această listă'
           );
       }
-    } catch {}
+    } catch (e) {
+      // token invalid / rețea picată — log + backoff, nu spin silențios la 2s
+      console.warn('[TG] Poll error:', e.message);
+      await new Promise(r => setTimeout(r, 28000));
+    }
     await new Promise(r => setTimeout(r, 2000));
   }
 }

@@ -120,7 +120,7 @@ async function getSignal(indicators, balance, openPosition, strategyData = null)
 - ATR: ${indicators.atrPct}% din preț
 - BB Bandwidth: ${indicators.bb_bandwidth}% | Poziție în BB: ${indicators.bb_position}% ${bbPos < 15 ? '📉 La lower band' : bbPos > 85 ? '📈 La upper band' : ''}
 - Volum ratio: ${indicators.volumeRatio}× ${volR > 1.5 ? '⚡ VOLUM MARE' : volR < 0.7 ? '⚠️ Volum mic' : ''}
-- High 24h: ${indicators.high24h} | Low 24h: ${indicators.low24h}
+- High recent (8h): ${indicators.high24h} | Low recent (8h): ${indicators.low24h}
 
 ### Ultimele 5 lumânări
 ${indicators.recentCandles.map((c, i) => `${i+1}. ${c.direction} O:${c.open} H:${c.high} L:${c.low} C:${c.close} (body: ${c.bodyPct}%)`).join('\n')}

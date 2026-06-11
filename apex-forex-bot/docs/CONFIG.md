@@ -105,6 +105,7 @@ Settings come from three places (highest priority first):
 |---|---|---|
 | `LOOP_INTERVAL_MS` | `300000` | Analysis interval (5 minutes) |
 | `PORT` | `3000` | Dashboard port (Railway sets this automatically) |
+| `DASHBOARD_TOKEN` | — | Protects the web dashboard. Open with `?token=...`. **Without it, balance and trade history are public on your Railway URL** |
 | `LICENSE_SERVER` | `https://aicashsystem.space` | License verification endpoint |
 
 ---

@@ -35,10 +35,12 @@ async function getPrice(symbol = cfg.SYMBOL) {
 async function getCandles(symbol = cfg.SYMBOL, interval = cfg.TIMEFRAME, limit = cfg.CANDLES) {
   const { data } = await client.get('/api/v2/spot/market/candles', { params: { symbol, granularity: IV[interval] || '5min', limit } });
   if (data.code !== '00000') throw new Error('Bitget candles: ' + data.msg);
+  // Sortare explicită ascendentă — indicatorii presupun vechi → nou,
+  // iar Bitget nu garantează aceeași ordine ca celelalte exchange-uri
   return data.data.map(k => ({
     time: parseInt(k[0]), open: parseFloat(k[1]), high: parseFloat(k[2]),
     low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5]),
-  }));
+  })).sort((a, b) => a.time - b.time);
 }
 
 async function getBalance(coin = cfg.QUOTE_ASSET) {
