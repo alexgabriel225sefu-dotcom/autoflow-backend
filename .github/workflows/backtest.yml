@@ -4,7 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches: [claude/arcads-external-api-gExX7]
-    paths: ['.github/workflows/backtest.yml']
+    paths:
+      - '.github/workflows/backtest.yml'
+      - 'apex-trade-bot/src/backtest.js'
+      - 'apex-forex-bot/backtest.py'
 
 jobs:
   crypto:

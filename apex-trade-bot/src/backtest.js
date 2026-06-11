@@ -92,10 +92,43 @@ function syntheticCandles(n) {
   return out;
 }
 
+// OKX public, paginat — singura sursă publică ne-geo-blocată care dă istoric lung
+// (Binance răspunde 451 din cloud US/EU; OKX /candles max 300, /history-candles max 100)
+async function fetchOKXPaginated(symbol, bar, total) {
+  const axios = require('axios');
+  const instId = symbol.replace('USDT', '-USDT');
+  const opts = { headers: { 'User-Agent': 'ApexTradeBot/2.0' }, timeout: 10000 };
+  const parse = rows => rows.map(k => ({
+    time: parseInt(k[0]), open: parseFloat(k[1]), high: parseFloat(k[2]),
+    low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5]),
+  }));
+  const { data } = await axios.get('https://www.okx.com/api/v5/market/candles',
+    { ...opts, params: { instId, bar, limit: 300 } });
+  if (data.code !== '0') throw new Error('OKX: ' + data.msg);
+  let candles = parse(data.data); // newest-first
+  while (candles.length < total) {
+    const oldest = candles[candles.length - 1].time;
+    const { data: h } = await axios.get('https://www.okx.com/api/v5/market/history-candles',
+      { ...opts, params: { instId, bar, after: oldest, limit: 100 } });
+    if (h.code !== '0' || !h.data?.length) break;
+    candles = candles.concat(parse(h.data));
+    await new Promise(r => setTimeout(r, 250)); // rate limit OKX: 10 req/2s
+  }
+  return candles.reverse(); // vechi → nou, cum așteaptă indicatorii
+}
+
 async function fetchCandles() {
   if (SYNTHETIC) return syntheticCandles(CANDLES + 200);
+  const want = CANDLES + 250;
   const exchange = require('./exchange');
-  return await exchange.getCandles(SYMBOL, TIMEFRAME, Math.min(CANDLES + 200, 1000));
+  let candles = [];
+  try { candles = await exchange.getCandles(SYMBOL, TIMEFRAME, Math.min(want, 1000)); } catch {}
+  if (candles.length < Math.min(want, 600)) {
+    console.log(`[DATA] Doar ${candles.length} lumânări de la exchange — paginez OKX pentru istoric complet...`);
+    candles = await fetchOKXPaginated(SYMBOL, TIMEFRAME, want);
+  }
+  console.log(`[DATA] ${candles.length} lumânări reale încărcate`);
+  return candles;
 }
 
 async function runBacktest() {
