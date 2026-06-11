@@ -31,14 +31,15 @@ jobs:
             shift 2
             env "$@" BT_SYMBOL="$SYM" node src/backtest.js | grep -E "Perioadă|Win rate|Rezultat|Expectancy|Exituri|Max draw" || true
           }
+          # Runda 2: exiturile sunt suspectul principal — trailingul strâns taie
+          # câștigurile la valori mici în timp ce pierderile rămân întregi
           for SYM in SOLUSDT XRPUSDT DOGEUSDT; do
             export SYM
-            run_cfg baseline      "$SYM"
-            run_cfg crit4         "$SYM" MIN_CRITERIA=4
-            run_cfg htf-strict    "$SYM" BT_HTF_STRICT=true
-            run_cfg crit4+strict  "$SYM" MIN_CRITERIA=4 BT_HTF_STRICT=true
-            run_cfg atr-sl        "$SYM" ATR_BASED_SL=true
-            run_cfg wide-tp       "$SYM" TAKE_PROFIT_PCT=0.024 TRAILING_STOP_DIST=0.02
+            run_cfg pure-tp       "$SYM" TRAILING_STOP=false BREAKEVEN_AT_R=0
+            run_cfg no-trail      "$SYM" TRAILING_STOP=false
+            run_cfg no-be         "$SYM" BREAKEVEN_AT_R=0
+            run_cfg loose-trail   "$SYM" TRAILING_STOP_DIST=0.03 RUNNER_TRAIL_DIST=0.015 BREAKEVEN_AT_R=1.5
+            run_cfg strict+pure   "$SYM" MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0
           done
 
   forex:
@@ -71,9 +72,9 @@ jobs:
             env "$@" BT_SYMBOL="$sym" python backtest.py | grep -E "Perioadă|Win rate|Rezultat|Expectancy|Exituri|Max DD" || true
             sleep 10  # TD free tier: 8 credite/min
           }
-          run_cfg baseline   EUR_USD
-          run_cfg crit4      EUR_USD MIN_CRITERIA=4
-          run_cfg htf-strict EUR_USD BT_HTF_STRICT=true
-          run_cfg atr-sl     EUR_USD ATR_BASED_SL=true
-          run_cfg baseline   GBP_USD
-          run_cfg htf-strict GBP_USD BT_HTF_STRICT=true
+          run_cfg pure-tp      EUR_USD TRAILING_STOP=false BREAKEVEN_AT_R=0
+          run_cfg no-trail     EUR_USD TRAILING_STOP=false
+          run_cfg loose-trail  EUR_USD TRAILING_STOP_PIPS=25 RUNNER_TRAIL_PIPS=12 BREAKEVEN_AT_R=1.5
+          run_cfg strict+pure  EUR_USD BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0
+          run_cfg pure-tp      GBP_USD TRAILING_STOP=false BREAKEVEN_AT_R=0
+          run_cfg strict+pure  GBP_USD BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0
