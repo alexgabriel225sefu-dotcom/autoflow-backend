@@ -134,40 +134,47 @@ function calcSLTP(side, price, atrValue) {
   };
 }
 
-// ─── Verifică SL/TP și Trailing Stop ─────────────────────
+// ─── Verifică SL/TP, Breakeven, Trailing și Runner mode ───
 function checkPosition(price) {
   if (!openPosition) return null;
-  const { side, stopLoss, takeProfit } = openPosition;
+  const { side, entryPrice, takeProfit } = openPosition;
 
-  // Actualizează trailing stop
-  if (cfg.TRAILING_STOP) {
-    if (side === 'BUY') {
-      openPosition.trailHigh = Math.max(openPosition.trailHigh ?? price, price);
-      const trailSL = openPosition.trailHigh * (1 - cfg.TRAILING_STOP_DIST);
-      if (trailSL > openPosition.stopLoss) {
-        openPosition.stopLoss = trailSL; // ridică SL-ul cu prețul
-      }
-    } else {
-      openPosition.trailLow = Math.min(openPosition.trailLow ?? price, price);
-      const trailSL = openPosition.trailLow * (1 + cfg.TRAILING_STOP_DIST);
-      if (trailSL < openPosition.stopLoss) {
-        openPosition.stopLoss = trailSL; // coboară SL-ul cu prețul
-      }
+  // Breakeven (PTJ): la +1R mută SL la entry + comisioane — trade-ul nu mai poate pierde
+  if (cfg.BREAKEVEN_AT_R > 0 && !openPosition.beDone && openPosition.initialStop) {
+    const oneR = Math.abs(entryPrice - openPosition.initialStop) * cfg.BREAKEVEN_AT_R;
+    const bePrice = side === 'BUY' ? entryPrice * (1 + 2 * cfg.FEE_PCT) : entryPrice * (1 - 2 * cfg.FEE_PCT);
+    if ((side === 'BUY' && price >= entryPrice + oneR && bePrice > openPosition.stopLoss) ||
+        (side === 'SELL' && price <= entryPrice - oneR && bePrice < openPosition.stopLoss)) {
+      Object.assign(openPosition, { stopLoss: bePrice, beDone: true });
+      logger.info(`🛡️ Breakeven: SL mutat la $${bePrice.toFixed(5)} — trade fără risc`);
     }
   }
 
-  const pnlPct = side === 'BUY'
-    ? (price - openPosition.entryPrice) / openPosition.entryPrice * 100
-    : (openPosition.entryPrice - price) / openPosition.entryPrice * 100;
-  openPosition.pnlPct = pnlPct;
-
-  if (side === 'BUY') {
-    if (price <= openPosition.stopLoss)  return 'STOP_LOSS';
-    if (price >= takeProfit)              return 'TAKE_PROFIT';
+  // Trailing stop (strâns în runner mode — Seykota: let profits run)
+  if (cfg.TRAILING_STOP) {
+    const dist = openPosition.runner ? cfg.RUNNER_TRAIL_DIST : cfg.TRAILING_STOP_DIST;
+    if (side === 'BUY') {
+      openPosition.trailHigh = Math.max(openPosition.trailHigh ?? price, price);
+      openPosition.stopLoss  = Math.max(openPosition.stopLoss, openPosition.trailHigh * (1 - dist));
+    } else {
+      openPosition.trailLow  = Math.min(openPosition.trailLow ?? price, price);
+      openPosition.stopLoss  = Math.min(openPosition.stopLoss, openPosition.trailLow * (1 + dist));
+    }
   }
-  if (side === 'SELL') {
-    if (price >= openPosition.stopLoss)  return 'STOP_LOSS';
-    if (price <= takeProfit)             return 'TAKE_PROFIT';
+
+  openPosition.pnlPct = (side === 'BUY' ? price - entryPrice : entryPrice - price) / entryPrice * 100;
+
+  const hitSL = side === 'BUY' ? price <= openPosition.stopLoss : price >= openPosition.stopLoss;
+  const hitTP = side === 'BUY' ? price >= takeProfit            : price <= takeProfit;
+
+  if (hitSL) return openPosition.runner ? 'TRAIL_PROFIT' : 'STOP_LOSS';
+  if (hitTP && !openPosition.runner) {
+    if (cfg.LET_WINNERS_RUN && cfg.TRAILING_STOP) {
+      openPosition.runner = true;
+      logger.info(`🏃 TP atins la $${price} — runner mode: las profitul să curgă (trail ${cfg.RUNNER_TRAIL_DIST * 100}%)`);
+      return null;
+    }
+    return 'TAKE_PROFIT';
   }
   return null;
 }
@@ -181,8 +188,9 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL
   await exchange.placeOrder(side, quantity, symbol);
 
   if (cfg.PAPER_TRADING) {
-    if (side === 'BUY') paperBalance -= price * quantity; // cumpărăm: scade balanța
-    else                paperBalance += price * quantity; // short: primim încasarea
+    const fee = price * quantity * cfg.FEE_PCT; // comision real, altfel paper-ul minte
+    if (side === 'BUY') paperBalance -= price * quantity + fee; // cumpărăm: scade balanța
+    else                paperBalance += price * quantity - fee; // short: primim încasarea
   }
 
   const { stopLoss, takeProfit } = calcSLTP(side, price, atrValue);
@@ -191,6 +199,7 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL
   openPosition = {
     symbol,  // ← stocăm simbolul real al poziției
     side, entryPrice: price, quantity, stopLoss, takeProfit,
+    initialStop: stopLoss, // referință pentru breakeven (+1R)
     openedAt: new Date().toISOString(), pnlPct: 0,
     trailHigh: side === 'BUY' ? price : null,
     trailLow:  side === 'SELL' ? price : null,
@@ -211,16 +220,14 @@ async function closeTrade(price, reason) {
 
   await exchange.placeOrder(closeSide, quantity, symbol);
 
-  const pnl = side === 'BUY'
-    ? (price - entryPrice) * quantity
-    : (entryPrice - price) * quantity;
+  let pnl = (side === 'BUY' ? price - entryPrice : entryPrice - price) * quantity;
 
   if (cfg.PAPER_TRADING) {
-    // BUY close → vindem coinul, primim price*qty
-    // SELL close → cumpărăm coinul înapoi, plătim price*qty
-    // Compound sau nu: balanța reflectă automat profitul/pierderea
-    if (side === 'BUY') paperBalance += price * quantity;
-    else                paperBalance -= price * quantity;
+    // vinzi (BUY) sau răscumperi (SELL) — comision pe fiecare parte
+    const fee = price * quantity * cfg.FEE_PCT;
+    if (side === 'BUY') paperBalance += price * quantity - fee;
+    else                paperBalance -= price * quantity + fee;
+    pnl -= (entryPrice + price) * quantity * cfg.FEE_PCT; // PnL net de comisioane (ambele părți)
   }
 
   logger.printTrade(closeSide, symbol, price, quantity, pnl);
@@ -391,19 +398,31 @@ async function tick() {
     // ─── Hard filter: Jesse Livermore anti-contra-trend rule ──
     // "Never fight the tape." — dacă Livermore + Turtle sunt unanimi,
     // blocăm AI-ul să intre contra trendului (indiferent de RSI/MACD)
-    const liveSTR   = stratData.livermore.strength ?? 0;
-    const turtleSig = stratData.turtle.signal;
-    if (!openPosition && signal.action === 'BUY' &&
-        stratData.livermore.trend === 'BEARISH' && liveSTR >= 0.8 && turtleSig === 'SELL') {
-      logger.warn(`⚡ Signal filtrat: BUY contra Livermore BEARISH ${(liveSTR*100).toFixed(0)}% + Turtle STRONG SELL — HOLD forțat (PTJ: play defense)`);
-      tg.alertFiltered('BUY', 'BEARISH 85%', 'STRONG SELL');
+    const liveSTR    = stratData.livermore.strength ?? 0;
+    const liveTrend  = stratData.livermore.trend;
+    const turtleSig  = stratData.turtle.signal;
+    const contraSide = liveTrend === 'BEARISH' && turtleSig === 'SELL' ? 'BUY'
+                     : liveTrend === 'BULLISH' && turtleSig === 'BUY'  ? 'SELL' : null;
+    if (!openPosition && liveSTR >= 0.8 && signal.action === contraSide) {
+      logger.warn(`⚡ Signal filtrat: ${contraSide} contra Livermore ${liveTrend} ${(liveSTR*100).toFixed(0)}% + Turtle STRONG ${turtleSig} — HOLD forțat (PTJ: play defense)`);
+      tg.alertFiltered(contraSide, `${liveTrend} ${(liveSTR*100).toFixed(0)}%`, `STRONG ${turtleSig}`);
       signal.action = 'HOLD';
     }
-    if (!openPosition && signal.action === 'SELL' &&
-        stratData.livermore.trend === 'BULLISH' && liveSTR >= 0.8 && turtleSig === 'BUY') {
-      logger.warn(`⚡ Signal filtrat: SELL contra Livermore BULLISH ${(liveSTR*100).toFixed(0)}% + Turtle STRONG BUY — HOLD forțat (PTJ: play defense)`);
-      tg.alertFiltered('SELL', 'BULLISH 85%', 'STRONG BUY');
+
+    // ─── Seykota: cooldown după pierdere — fără revenge trading ──
+    const cdMin = strategies.cooldownRemaining(cfg.COOLDOWN_AFTER_LOSS_MIN);
+    if (!openPosition && cdMin > 0 && (signal.action === 'BUY' || signal.action === 'SELL')) {
+      logger.info(`⏸️ Cooldown după pierdere: mai aștept ${cdMin} min înainte de re-intrare`);
       signal.action = 'HOLD';
+    }
+
+    // ─── Filtru trend HTF: nu tranzacționa 5m contra trendului 1h ──
+    if (cfg.HTF_FILTER && !openPosition && (signal.action === 'BUY' || signal.action === 'SELL')) {
+      const htf = strategies.htfTrend(await exchange.getCandles(symbol, cfg.HTF_TIMEFRAME, 60).catch(() => null));
+      if ((signal.action === 'BUY' && htf === 'BEARISH') || (signal.action === 'SELL' && htf === 'BULLISH')) {
+        logger.warn(`⚡ Filtru ${cfg.HTF_TIMEFRAME}: ${signal.action} contra trend ${htf} — HOLD (trade with the tape)`);
+        signal.action = 'HOLD';
+      }
     }
 
     // Execuție

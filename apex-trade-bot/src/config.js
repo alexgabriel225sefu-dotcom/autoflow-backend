@@ -83,7 +83,18 @@ module.exports = {
 
   // ─── Trailing Stop ──────────────────────────────────────
   TRAILING_STOP:        process.env.TRAILING_STOP !== 'false', // activat implicit
-  TRAILING_STOP_DIST:   parseFloat(process.env.TRAILING_STOP_DIST || '0.01'), // 1%
+  TRAILING_STOP_DIST:   parseFloat(process.env.TRAILING_STOP_DIST || '0.015'), // 1.5% — lasă loc TP-ului
+
+  // ─── Exit management (cut losses, let profits run) ──────
+  FEE_PCT:           parseFloat(process.env.FEE_PCT || '0.001'),           // 0.1% taker/side (Binance spot)
+  BREAKEVEN_AT_R:    parseFloat(process.env.BREAKEVEN_AT_R || '1.0'),      // la +1R mută SL la breakeven (0 = off)
+  LET_WINNERS_RUN:   process.env.LET_WINNERS_RUN !== 'false',              // la TP nu închide — trailing strâns
+  RUNNER_TRAIL_DIST: parseFloat(process.env.RUNNER_TRAIL_DIST || '0.005'), // 0.5% trail în runner mode
+
+  // ─── Entry filters (anti-chop) ───────────────────────────
+  HTF_FILTER:    process.env.HTF_FILTER !== 'false',                       // nu intra contra trendului mare
+  HTF_TIMEFRAME: process.env.HTF_TIMEFRAME || '1h',
+  COOLDOWN_AFTER_LOSS_MIN: parseInt(process.env.COOLDOWN_AFTER_LOSS_MIN || '15'),
 
   // ─── ATR dinamic ────────────────────────────────────────
   ATR_BASED_SL:  process.env.ATR_BASED_SL === 'true',  // SL/TP bazat pe ATR (volatilitate)

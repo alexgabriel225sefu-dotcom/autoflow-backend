@@ -20,6 +20,7 @@ const session = {
   lastResetDay:      new Date().toDateString(),
   peakBalance:       null,
   totalTrades:       0,
+  lastLossAt:        0,
 };
 
 function resetDailyIfNeeded() {
@@ -196,10 +197,39 @@ function recordTrade(won, pnlAmount, startBalance) {
   } else {
     session.consecutiveLosses++;
     session.consecutiveWins = 0;
+    session.lastLossAt = Date.now();
   }
 
   const icon = won ? '✅' : '❌';
   console.log(`[STRATEGY] ${icon} Streak: ${session.consecutiveLosses} pierderi / ${session.consecutiveWins} câștiguri consecutive | Azi: ${session.dailyTrades} tranzacții | PnL zilnic: ${session.dailyPnL >= 0 ? '+' : ''}$${session.dailyPnL.toFixed(4)}`);
+}
+
+// ─── Ed Seykota: cooldown after a loss ───────────────────────
+// "After a loss, the worst trade is the revenge trade."
+// Returns minutes left until entries are allowed again (0 = clear).
+function cooldownRemaining(cooldownMin) {
+  if (!session.lastLossAt || cooldownMin <= 0) return 0;
+  const elapsed = (Date.now() - session.lastLossAt) / 60000;
+  return elapsed >= cooldownMin ? 0 : Math.ceil(cooldownMin - elapsed);
+}
+
+// ─── Higher-timeframe trend filter (Livermore: trade WITH the tape) ──
+// EMA50 on the big timeframe: price above + EMA rising = BULLISH,
+// price below + EMA falling = BEARISH, otherwise NEUTRAL (allow both).
+function htfTrend(candles) {
+  if (!candles || candles.length < 55) return 'NEUTRAL';
+  const closes = candles.map(c => c.close);
+  const k = 2 / (50 + 1);
+  let ema = closes.slice(0, 50).reduce((a, b) => a + b, 0) / 50;
+  let emaPrev = ema;
+  for (let i = 50; i < closes.length; i++) {
+    emaPrev = ema;
+    ema = closes[i] * k + ema * (1 - k);
+  }
+  const price = closes[closes.length - 1];
+  if (price > ema && ema >= emaPrev) return 'BULLISH';
+  if (price < ema && ema <= emaPrev) return 'BEARISH';
+  return 'NEUTRAL';
 }
 
 // ─── Full analysis (all strategies combined) ─────────────────
@@ -210,4 +240,4 @@ function analyze(candles) {
   return { turtle, livermore, soros, session: { ...session } };
 }
 
-module.exports = { shouldStop, analyze, druckenmillerMultiplier, recordTrade, turtleBreakout, livermoreStructure, sorosMomentum, session };
+module.exports = { shouldStop, analyze, druckenmillerMultiplier, recordTrade, turtleBreakout, livermoreStructure, sorosMomentum, cooldownRemaining, htfTrend, session };
