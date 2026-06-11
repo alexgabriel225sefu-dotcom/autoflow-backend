@@ -55,9 +55,21 @@ breakout ×1.3, Livermore ≥0.8 ×1.1, weak setups ×0.6.
 Everything above — plus **active trading sessions** (London/New York overlap
 has the best liquidity) and leverage context — goes to the AI (Claude Haiku,
 or Groq Llama free). It must return a JSON verdict with confidence and a 0–5
-criteria score. A trade requires confidence ≥ 65 **and** ≥ 3/5 criteria.
+criteria score. A trade requires confidence ≥ 62 **and** ≥ 3/5 criteria.
+
+When the data source provides no forex tick volume (e.g. Twelve Data), the
+volume criterion is automatically replaced with a Stoch RSI alignment check,
+so the score stays reachable.
 
 If every AI provider is down, the bot returns **HOLD** — it never trades blind.
+
+## 3b. Entry filters (after the AI, before the order)
+
+| Filter | Behavior |
+|---|---|
+| **1h trend filter** | EMA50 on the 1h chart: no BUY in a downtrend, no SELL in an uptrend. The single biggest chop-killer. (`HTF_FILTER`, off in MT mode) |
+| **Loss cooldown** | After a losing trade, no new entries for 15 minutes — no revenge trading (`COOLDOWN_AFTER_LOSS_MIN`) |
+| **Counter-trend veto** | Strong Livermore structure + Turtle breakout in the opposite direction forces HOLD |
 
 ## 4. Position sizing (pip-based)
 
@@ -80,11 +92,25 @@ never the risk.
 | Overtrading stop | 10 trades in one day | Turtle rules |
 | Counter-trend veto | Trading against strong structure | PTJ |
 
-## 6. Exit management
+## 6. Exit management (cut losses short, let profits run)
 
-- **SL/TP in pips** set at entry (15/30 default = 1:2 R:R)
-- **Trailing stop** (10 pips) ratchets in your favor, locking profit
-- **AI CLOSE** — the AI can close early if conditions reverse
+| Stage | What happens |
+|---|---|
+| Entry | SL 15 pips, TP 30 pips (1:2 R:R) — or ATR-based with `ATR_BASED_SL=true` |
+| +1R in profit (+15 pips) | **Breakeven stop** — SL moves to entry +1 pip. The trade can no longer lose (`BREAKEVEN_AT_R`) |
+| Trailing | Stop ratchets 10 pips behind price, locking profit as it moves |
+| TP reached | **Runner mode** (paper trading) — instead of closing, the trail tightens to 6 pips and the trade rides the trend (`LET_WINNERS_RUN`). Exits as `TRAIL_PROFIT`, often well past the 30-pip TP |
+| Live brokers | SL/TP are placed server-side at the broker (OANDA/MT5) — they protect you even if the bot goes offline |
+| AI CLOSE | The AI can close early if conditions reverse |
+
+## Realistic expectations
+
+Each win at default settings is roughly **+2–4% of balance** (2% risk × 1:2
+R:R, more with a runner), each loss −2%. Forex moves slower than crypto:
+0–3 trades per day is normal, and quiet days with zero trades are part of
+the system. A good month on a $1,000 paper account looks like **+5–15%**,
+with losing weeks in between. Anyone promising more from a 5-minute bot
+is selling fiction.
 
 ---
 

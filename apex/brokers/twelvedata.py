@@ -97,10 +97,11 @@ def get_candles(instrument=None, interval=None, limit=None):
     td_sym = _to_td_symbol(symbol)
     td_interval = _INTERVAL_MAP.get(interval or cfg.TIMEFRAME, "5min")
     count = limit or cfg.CANDLES
+    cache_key = f"{symbol}:{td_interval}"  # per interval — altfel 1h ar otrăvi cache-ul de 5m
 
     now = time.time()
     with _lock:
-        c = _candle_cache.get(symbol)
+        c = _candle_cache.get(cache_key)
     if c and now - c["time"] < CANDLE_TTL:
         return c["data"][-count:]
 
@@ -115,7 +116,7 @@ def get_candles(instrument=None, interval=None, limit=None):
     data = r.json()
     if "values" not in data:
         with _lock:
-            c = _candle_cache.get(symbol)
+            c = _candle_cache.get(cache_key)
         if c:
             return c["data"][-count:]
         raise RuntimeError(f"Twelve Data candles: {data.get('message', data)}")
@@ -136,7 +137,7 @@ def get_candles(instrument=None, interval=None, limit=None):
             continue
 
     with _lock:
-        _candle_cache[symbol] = {"data": candles, "time": now}
+        _candle_cache[cache_key] = {"data": candles, "time": now}
     return candles[-count:]
 
 

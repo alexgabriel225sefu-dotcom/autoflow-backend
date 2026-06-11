@@ -66,6 +66,8 @@ The bot walks you through connecting your **free OANDA practice account**
 - **Market hours aware** — sleeps over the weekend, knows active sessions (London/NY/Tokyo/Sydney)
 - **Legendary strategies** — Turtle breakout, Livermore structure, Soros momentum, mean reversion, Druckenmiller sizing, PTJ/Seykota defense
 - **AI signals** — Anthropic (primary) + Groq (free fallback)
+- **Smart entries** — 1h trend filter (never fight the big trend), post-loss cooldown, counter-trend veto
+- **Smart exits** — breakeven stop at +1R (trade becomes risk-free), runner mode that lets winners run past TP on a tight trail
 - **Risk controls** — trailing stop, daily −3% stop, −20% drawdown stop, loss-streak stop
 - **Live web dashboard** — equity curve, win rate, profit factor, pips per trade
 

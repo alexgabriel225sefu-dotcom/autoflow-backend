@@ -56,10 +56,24 @@ The bot skips and retries next cycle.
 ## Trading
 
 ### Bot never opens a trade
-Usually correct behavior. It needs AI confidence ≥ 65 **and** 3/5 criteria
-**and** acceptable spread, during market hours. Forex pairs move slower than
-crypto — expect 0–3 trades per day. To see more action (and more risk):
-`MIN_CONFIDENCE=58`, `MIN_CRITERIA=2`.
+Check the logs — every HOLD prints its reason. The full entry checklist:
+
+1. **Market open** — forex closes Friday ~21:00 UTC until Sunday 21:00 UTC.
+2. **AI confidence ≥ 62** and **criteria ≥ 3/5** (printed with each signal).
+3. **Spread ≤ `MAX_SPREAD_PIPS`** — widens around news and rollover.
+4. **1h trend filter** — no BUY in a 1h downtrend, no SELL in a 1h uptrend
+   (`⚡ 1h filter` in logs). Disable with `HTF_FILTER=false`.
+5. **Loss cooldown** — 15 min without entries after a loss (`⏸️` in logs).
+6. **Not against strong Livermore + Turtle structure** (`⚡ Signal filtered`).
+
+Forex pairs move slower than crypto — expect 0–3 trades per day, sometimes
+zero on quiet days. If it holds for **days** during active sessions, lower the
+bar: `MIN_CONFIDENCE=58`, `MIN_CRITERIA=2`.
+
+> Note: on older versions, Twelve Data mode could never trade because forex
+> candles carry no tick volume and the AI's volume criterion was impossible
+> to satisfy. This is fixed — volume is treated as neutral when the data
+> source doesn't provide it. Update if you're on an old deploy.
 
 ### `Spread too wide — skip entry`
 Working as intended. Spreads widen around news releases, the daily rollover

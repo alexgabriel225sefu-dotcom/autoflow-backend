@@ -46,7 +46,7 @@ MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
 RISK_PER_TRADE = float(os.getenv("RISK_PER_TRADE") or 0.02)   # 2% — forex standard
 STOP_LOSS_PIPS = float(os.getenv("STOP_LOSS_PIPS") or 15)
 TAKE_PROFIT_PIPS = float(os.getenv("TAKE_PROFIT_PIPS") or 30)  # 1:2 R:R
-MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 65)
+MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 62)
 LEVERAGE = float(os.getenv("LEVERAGE") or 30)
 MARGIN_CAP = float(os.getenv("MARGIN_CAP") or 0.5)             # use ≤50% of available margin
 MAX_SPREAD_PIPS = float(os.getenv("MAX_SPREAD_PIPS") or 3.0)   # skip entries on wide spreads
@@ -54,6 +54,16 @@ MAX_SPREAD_PIPS = float(os.getenv("MAX_SPREAD_PIPS") or 3.0)   # skip entries on
 # ─── Trailing stop ──────────────────────────────────────
 TRAILING_STOP = os.getenv("TRAILING_STOP") != "false"
 TRAILING_STOP_PIPS = float(os.getenv("TRAILING_STOP_PIPS") or 10)
+
+# ─── Exit management (cut losses, let profits run) ──────
+BREAKEVEN_AT_R = float(os.getenv("BREAKEVEN_AT_R") or 1.0)        # la +1R mută SL la breakeven (0 = off)
+LET_WINNERS_RUN = os.getenv("LET_WINNERS_RUN") != "false"          # la TP nu închide — trailing strâns (doar paper)
+RUNNER_TRAIL_PIPS = float(os.getenv("RUNNER_TRAIL_PIPS") or 6)     # trail în runner mode
+
+# ─── Entry filters (anti-chop) ──────────────────────────
+HTF_FILTER = os.getenv("HTF_FILTER") != "false"                    # nu intra contra trendului mare
+HTF_TIMEFRAME = os.getenv("HTF_TIMEFRAME") or "1h"
+COOLDOWN_AFTER_LOSS_MIN = int(os.getenv("COOLDOWN_AFTER_LOSS_MIN") or 15)
 
 # ─── ATR-based SL/TP (overrides pip-based when on) ──────
 ATR_BASED_SL = os.getenv("ATR_BASED_SL") == "true"
