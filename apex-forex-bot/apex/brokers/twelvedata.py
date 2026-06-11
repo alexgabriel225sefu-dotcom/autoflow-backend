@@ -129,7 +129,7 @@ def get_candles(instrument=None, interval=None, limit=None):
     params = {
         "symbol": td_sym,
         "interval": td_interval,
-        "outputsize": min(count + 10, 500),
+        "outputsize": min(count + 10, 5000),  # TD permite max 5000 (1 credit) — backtest-ul are nevoie de istoric lung
         "apikey": cfg.TWELVE_DATA_KEY,
         "order": "ASC",
     }

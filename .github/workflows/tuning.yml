@@ -1,0 +1,79 @@
+name: Tuning sweep (real data)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/arcads-external-api-gExX7]
+    paths: ['.github/workflows/tuning.yml']
+
+jobs:
+  crypto:
+    name: Crypto parameter sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        working-directory: apex-trade-bot
+        run: npm install --omit=dev
+      - name: Sweep
+        working-directory: apex-trade-bot
+        env:
+          PAPER_TRADING: 'true'
+          BT_CANDLES: '1200'
+        run: |
+          run_cfg () {
+            echo ""
+            echo "############ CFG=$1 SYM=$2 ############"
+            shift 2
+            env "$@" BT_SYMBOL="$SYM" node src/backtest.js | grep -E "Perioadă|Win rate|Rezultat|Expectancy|Exituri|Max draw" || true
+          }
+          for SYM in SOLUSDT XRPUSDT DOGEUSDT; do
+            export SYM
+            run_cfg baseline      "$SYM"
+            run_cfg crit4         "$SYM" MIN_CRITERIA=4
+            run_cfg htf-strict    "$SYM" BT_HTF_STRICT=true
+            run_cfg crit4+strict  "$SYM" MIN_CRITERIA=4 BT_HTF_STRICT=true
+            run_cfg atr-sl        "$SYM" ATR_BASED_SL=true
+            run_cfg wide-tp       "$SYM" TAKE_PROFIT_PCT=0.024 TRAILING_STOP_DIST=0.02
+          done
+
+  forex:
+    name: Forex parameter sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        working-directory: apex-forex-bot
+        run: pip install -r requirements.txt
+      - name: Sweep
+        working-directory: apex-forex-bot
+        env:
+          PAPER_TRADING: 'true'
+          BROKER: td
+          TWELVE_DATA_KEY: ${{ secrets.TWELVE_DATA_KEY }}
+          BT_CANDLES: '3000'
+        run: |
+          if [ -z "$TWELVE_DATA_KEY" ]; then
+            echo "::error::Secret TWELVE_DATA_KEY lipsește"; exit 1
+          fi
+          run_cfg () {
+            echo ""
+            echo "############ CFG=$1 SYM=$2 ############"
+            local sym="$2"; shift 2
+            env "$@" BT_SYMBOL="$sym" python backtest.py | grep -E "Perioadă|Win rate|Rezultat|Expectancy|Exituri|Max DD" || true
+            sleep 10  # TD free tier: 8 credite/min
+          }
+          run_cfg baseline   EUR_USD
+          run_cfg crit4      EUR_USD MIN_CRITERIA=4
+          run_cfg htf-strict EUR_USD BT_HTF_STRICT=true
+          run_cfg atr-sl     EUR_USD ATR_BASED_SL=true
+          run_cfg baseline   GBP_USD
+          run_cfg htf-strict GBP_USD BT_HTF_STRICT=true

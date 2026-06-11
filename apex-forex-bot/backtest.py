@@ -173,7 +173,11 @@ def run():
             continue
         if cfg.HTF_FILTER:
             htf = strategies.htf_trend(resample_1h(window[-720:]))
-            if ((sig["action"] == "BUY" and htf == "BEARISH")
+            if os.getenv("BT_HTF_STRICT") == "true":
+                # strict: intră DOAR pe direcția trendului 1h (NEUTRAL = HOLD)
+                if htf != ("BULLISH" if sig["action"] == "BUY" else "BEARISH"):
+                    continue
+            elif ((sig["action"] == "BUY" and htf == "BEARISH")
                     or (sig["action"] == "SELL" and htf == "BULLISH")):
                 continue
 

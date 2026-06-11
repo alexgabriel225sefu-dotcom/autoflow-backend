@@ -183,10 +183,17 @@ async function runBacktest() {
                  : strat.livermore.trend === 'BULLISH' && strat.turtle.signal === 'BUY' ? 'SELL' : null;
     if ((strat.livermore.strength ?? 0) >= 0.8 && sig.action === contra) continue;
 
-    // Filtru HTF 1h (identic cu live)
+    // Filtru HTF 1h (identic cu live). BT_HTF_STRICT: intră DOAR pe direcția
+    // trendului mare (NEUTRAL = stai pe mâini), nu doar blochează contra-trend.
     if (cfg.HTF_FILTER) {
-      const htf = strategies.htfTrend(resample1h(window.slice(-720)));
-      if ((sig.action === 'BUY' && htf === 'BEARISH') || (sig.action === 'SELL' && htf === 'BULLISH')) continue;
+      const ratio = TIMEFRAME === '15m' ? 4 : TIMEFRAME === '1h' ? 1 : 12;
+      const htf = ratio === 1 ? strategies.htfTrend(window.slice(-80))
+                              : strategies.htfTrend(resample1h(window.slice(-60 * ratio), ratio));
+      if (process.env.BT_HTF_STRICT === 'true') {
+        if (htf !== (sig.action === 'BUY' ? 'BULLISH' : 'BEARISH')) continue;
+      } else if ((sig.action === 'BUY' && htf === 'BEARISH') || (sig.action === 'SELL' && htf === 'BULLISH')) {
+        continue;
+      }
     }
 
     const mult = strategies.druckenmillerMultiplier(70, sig.criteriaScore, strat.livermore, strat.turtle);
