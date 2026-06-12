@@ -5,10 +5,10 @@ Using project: id=82186fe2-60ea-47ea-8767-6be58ae717fa name=apex-trade
 project detail: {"data":{"project":{"environments":{"edges":[{"node":{"id":"fdc10f11-f4b2-4773-87a0-7e9f66cd8a55","name":"production"}}]},"services":{"edges":[{"node":{"id":"7843114d-01cb-4b57-ac12-9dfefcf0292b","name":"grateful-commitment"}}]}}}}
 Environment: id=fdc10f11-f4b2-4773-87a0-7e9f66cd8a55
 Existing services: grateful-commitment
-Template generated: id=15133712-3b51-4b03-9b83-be257e7912bc code=UMCVOQ
-DEPLOY_URL=https://railway.com/deploy/UMCVOQ
-templatePublish result: {"errors":[{"message":"Field \"templatePublish\" of type \"Template!\" must have a selection of subfields. Did you mean \"templatePublish { ... }\"?","locations":[{"line":3,"column":7}],"extensions":{"code":"GRAPHQL_VALIDATION_FAILED"},"traceId":"4677499954765711307"}]}
+Template generated: id=98d44c6f-fca4-4043-9689-7eb8ff14338f code=natc6h
+DEPLOY_URL=https://railway.com/deploy/natc6h
+templatePublish result: {"errors":[{"message":"You have been blocked from publishing templates. Please reach out to the team for more information.","locations":[{"line":3,"column":7}],"path":["templatePublish"],"extensions":{"code":"INTERNAL_SERVER_ERROR"},"traceId":"7202140661303105168"}],"data":null}
 
 === DONE ===
-Deploy URL: https://railway.com/deploy/UMCVOQ
-Template ID: 15133712-3b51-4b03-9b83-be257e7912bc
+Deploy URL: https://railway.com/deploy/natc6h
+Template ID: 98d44c6f-fca4-4043-9689-7eb8ff14338f
