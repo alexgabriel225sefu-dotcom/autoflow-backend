@@ -71,7 +71,7 @@ module.exports = {
 
   // ─── Scanner multi-simbol ───────────────────────────────
   // Ordonate după volatilitate + lichiditate + potențial profit pe capital mic
-  SCAN_SYMBOLS: (process.env.SCAN_SYMBOLS || 'XRPUSDT,SOLUSDT,BTCUSDT,BNBUSDT,ADAUSDT').split(','),
+  SCAN_SYMBOLS: (process.env.SCAN_SYMBOLS || 'XRPUSDT,SOLUSDT,BTCUSDT,BNBUSDT,ETHUSDT').split(','),  // tuning r6: ETH +0.46% PF1.73 with sl1.6-rr3; ADA removed (low volume edge)
   MULTI_SYMBOL: process.env.MULTI_SYMBOL !== 'false', // activat implicit
 
   // ─── Risc (optimizat pt 5m + capital mic $10-50) ────────────

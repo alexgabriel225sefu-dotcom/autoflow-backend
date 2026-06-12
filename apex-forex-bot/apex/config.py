@@ -44,8 +44,8 @@ MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
 
 # ─── Risk ───────────────────────────────────────────────
 RISK_PER_TRADE = float(os.getenv("RISK_PER_TRADE") or 0.005)  # 0.5% — tuning r3: scales linearly; 1% → -9.7%/10d in chop
-STOP_LOSS_PIPS = float(os.getenv("STOP_LOSS_PIPS") or 25)   # tuning r4: sl25 winner (EUR+AUD)
-TAKE_PROFIT_PIPS = float(os.getenv("TAKE_PROFIT_PIPS") or 75)  # tuning r4: R:R 3:1 (AUD +1.46%, EUR breakeven)
+STOP_LOSS_PIPS = float(os.getenv("STOP_LOSS_PIPS") or 30)   # tuning r6: sl30 winner (NZD +2.59% PF4.49)
+TAKE_PROFIT_PIPS = float(os.getenv("TAKE_PROFIT_PIPS") or 90)  # tuning r6: sl30×rr3=90p (NZD best result)
 MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 62)
 LEVERAGE = float(os.getenv("LEVERAGE") or 30)
 MARGIN_CAP = float(os.getenv("MARGIN_CAP") or 0.5)             # use ≤50% of available margin
