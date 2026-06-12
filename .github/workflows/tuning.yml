@@ -10,7 +10,7 @@ jobs:
   crypto:
     name: Crypto parameter sweep
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,43 +31,47 @@ jobs:
             shift 2
             env "$@" BT_SYMBOL="$SYM" node src/backtest.js | grep -E "Perioadă|Win rate|Rezultat|Expectancy|Exituri|Max draw" || true
           }
-          # Runda 2: trailingul strâns taie câștigurile la valori mici — testat
-          for SYM in SOLUSDT XRPUSDT DOGEUSDT; do
+          # ── Runda 4: R:R sweep + simboluri noi + perioadă lungă ──────────────────
+          # Ipoteză: la 40% WR (mc5) R:R 2:1 abia acoperă comisioane → -0.05R/trade
+          #          R:R 3:1 → +0.35R/trade net; R:R 4:1 → +0.75R/trade net
+          echo "======== RUNDA 4A: R:R sweep (mc5, 4800 lumânări ~17 zile) ========"
+          for SYM in SOLUSDT XRPUSDT BTCUSDT ETHUSDT; do
             export SYM
-            run_cfg pure-tp       "$SYM" TRAILING_STOP=false BREAKEVEN_AT_R=0
-            run_cfg no-trail      "$SYM" TRAILING_STOP=false
-            run_cfg no-be         "$SYM" BREAKEVEN_AT_R=0
-            run_cfg loose-trail   "$SYM" TRAILING_STOP_DIST=0.03 RUNNER_TRAIL_DIST=0.015 BREAKEVEN_AT_R=1.5
-            run_cfg strict+pure   "$SYM" MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0
+            # baseline mc5 2:1 (valoare referință, perioadă lungă)
+            run_cfg mc5-rr2  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 TAKE_PROFIT_PCT=0.016 BT_CANDLES=4800
+            # R:R 3:1 — SL=0.8%, TP=2.4%
+            run_cfg mc5-rr3  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 TAKE_PROFIT_PCT=0.024 BT_CANDLES=4800
+            # R:R 4:1 — SL=0.8%, TP=3.2%
+            run_cfg mc5-rr4  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 TAKE_PROFIT_PCT=0.032 BT_CANDLES=4800
+            # R:R 5:1 — SL=0.8%, TP=4.0%
+            run_cfg mc5-rr5  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 TAKE_PROFIT_PCT=0.040 BT_CANDLES=4800
           done
+
           echo ""
-          echo "======== RUNDA 3: risk sizing + ATR stops + MIN_CRITERIA ========"
-          # Runda 3a: risc per trade — găsim sizing-ul optim
-          for SYM in SOLUSDT XRPUSDT; do
+          echo "======== RUNDA 4B: SL larg + R:R 3:1 (mc5, 4800 lumânări) ========"
+          # Stop larg = mai puțin whipsaw; R:R 3:1 la stop mai larg
+          for SYM in SOLUSDT XRPUSDT BTCUSDT; do
             export SYM
-            run_cfg risk1pct      "$SYM" MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 RISK_PER_TRADE=0.01
-            run_cfg risk3pct      "$SYM" MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 RISK_PER_TRADE=0.03
-            run_cfg risk5pct      "$SYM" MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 RISK_PER_TRADE=0.05
+            # SL=1.2%, TP=2.4% (R:R 2:1 dar mai puțin whipsaw)
+            run_cfg mc5-sl1.2-rr2  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PCT=0.012 TAKE_PROFIT_PCT=0.024 BT_CANDLES=4800
+            # SL=1.2%, TP=3.6% (R:R 3:1 cu stop larg)
+            run_cfg mc5-sl1.2-rr3  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PCT=0.012 TAKE_PROFIT_PCT=0.036 BT_CANDLES=4800
           done
-          # Runda 3b: ATR-based SL/TP vs fixed pip — adaptat la volatilitate
-          for SYM in SOLUSDT XRPUSDT DOGEUSDT; do
+
+          echo ""
+          echo "======== RUNDA 4C: mc5 + risk optimal (1%, 2%, 3%) pe câștigător ========"
+          # Dacă găsim R:R pozitiv, testăm sizing-ul optim
+          for SYM in XRPUSDT BTCUSDT; do
             export SYM
-            run_cfg atr-sl        "$SYM" MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 ATR_BASED_SL=true ATR_SL_MULT=1.5 ATR_TP_MULT=3.0
-            run_cfg atr-tight     "$SYM" MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 ATR_BASED_SL=true ATR_SL_MULT=1.0 ATR_TP_MULT=2.5
-            run_cfg atr-wide      "$SYM" MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 ATR_BASED_SL=true ATR_SL_MULT=2.0 ATR_TP_MULT=4.0
-          done
-          # Runda 3c: MIN_CRITERIA sweep — câte semnale sunt prea puține?
-          for SYM in SOLUSDT XRPUSDT; do
-            export SYM
-            run_cfg mc3-pure      "$SYM" MIN_CRITERIA=3 TRAILING_STOP=false BREAKEVEN_AT_R=0
-            run_cfg mc4-pure      "$SYM" MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0
-            run_cfg mc5-pure      "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0
+            run_cfg mc5-rr3-r1   "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 TAKE_PROFIT_PCT=0.024 RISK_PER_TRADE=0.01 BT_CANDLES=4800
+            run_cfg mc5-rr3-r2   "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 TAKE_PROFIT_PCT=0.024 RISK_PER_TRADE=0.02 BT_CANDLES=4800
+            run_cfg mc5-rr3-r3   "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 TAKE_PROFIT_PCT=0.024 RISK_PER_TRADE=0.03 BT_CANDLES=4800
           done
 
   forex:
     name: Forex parameter sweep
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -94,30 +98,29 @@ jobs:
             env "$@" BT_SYMBOL="$sym" python backtest.py | grep -E "Perioadă|Win rate|Rezultat|Expectancy|Exituri|Max DD" || true
             sleep 12  # TD free tier: 8 credite/min
           }
-          # Runda 2: trailingul testat
-          run_cfg pure-tp      EUR_USD TRAILING_STOP=false BREAKEVEN_AT_R=0
-          run_cfg no-trail     EUR_USD TRAILING_STOP=false
-          run_cfg loose-trail  EUR_USD TRAILING_STOP_PIPS=25 RUNNER_TRAIL_PIPS=12 BREAKEVEN_AT_R=1.5
-          run_cfg strict+pure  EUR_USD BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0
-          run_cfg pure-tp      GBP_USD TRAILING_STOP=false BREAKEVEN_AT_R=0
-          run_cfg strict+pure  GBP_USD BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0
+          echo "======== RUNDA 4A: combo câștigători (sl25 + strict + 0.5%) ========"
+          # Combinăm top picks din rundele 2+3: sl25-tp50 + HTF_STRICT + 0.5% risc
+          run_cfg best-gbp     GBP_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=50 RISK_PER_TRADE=0.005
+          run_cfg best-eur     EUR_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=50 RISK_PER_TRADE=0.005
+
           echo ""
-          echo "======== RUNDA 3: risk sizing + ATR stops + SL larg ========"
-          # Runda 3a: risc per trade — 1% vs 2% vs 0.5%
-          run_cfg risk0.5pct   EUR_USD MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 RISK_PER_TRADE=0.005
-          run_cfg risk1pct     EUR_USD MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 RISK_PER_TRADE=0.01
-          run_cfg risk2pct     EUR_USD MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 RISK_PER_TRADE=0.02
-          # Runda 3b: SL mai larg — 15p vs 20p vs 25p (stop prea strâns = whipsaw)
-          run_cfg sl15-tp30    EUR_USD MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=15 TAKE_PROFIT_PIPS=30
-          run_cfg sl20-tp40    EUR_USD MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=20 TAKE_PROFIT_PIPS=40
-          run_cfg sl25-tp50    EUR_USD MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=50
-          # Runda 3c: ATR-based SL/TP pentru forex
-          run_cfg atr-sl1.5    EUR_USD MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 ATR_BASED_SL=true ATR_SL_MULT=1.5 ATR_TP_MULT=3.0
-          run_cfg atr-sl2.0    EUR_USD MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 ATR_BASED_SL=true ATR_SL_MULT=2.0 ATR_TP_MULT=4.0
-          run_cfg atr-tight    EUR_USD MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0 ATR_BASED_SL=true ATR_SL_MULT=1.0 ATR_TP_MULT=2.5
-          # Runda 3d: MIN_CRITERIA sweep pe forex
-          run_cfg mc3-eur      EUR_USD MIN_CRITERIA=3 TRAILING_STOP=false BREAKEVEN_AT_R=0
-          run_cfg mc4-eur      EUR_USD MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0
-          run_cfg mc5-eur      EUR_USD MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0
-          run_cfg mc4-gbp      GBP_USD MIN_CRITERIA=4 TRAILING_STOP=false BREAKEVEN_AT_R=0
-          run_cfg mc5-gbp      GBP_USD MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0
+          echo "======== RUNDA 4B: R:R 3:1 pe forex (sl larg) ========"
+          # La WR~27% pe GBP_USD: R:R 3:1 → E=0.27×3-0.73×1=0.81-0.73=+0.08R (pozitiv!)
+          # R:R 4:1 → E=0.27×4-0.73×1=1.08-0.73=+0.35R (mult mai bine!)
+          run_cfg gbp-sl20-rr3 GBP_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=20 TAKE_PROFIT_PIPS=60
+          run_cfg gbp-sl25-rr3 GBP_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=75
+          run_cfg gbp-sl30-rr3 GBP_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=30 TAKE_PROFIT_PIPS=90
+          run_cfg gbp-sl25-rr4 GBP_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=100
+          run_cfg eur-sl25-rr3 EUR_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=75
+
+          echo ""
+          echo "======== RUNDA 4C: mc3 + sl larg pe GBP (mai multe trade-uri) ========"
+          # mc5 pe forex → prea puțin trade-uri; mc3 cu stops largi = mai multe oportunități
+          run_cfg gbp-mc3-sl25-rr3  GBP_USD MIN_CRITERIA=3 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=75
+          run_cfg gbp-mc3-sl30-rr3  GBP_USD MIN_CRITERIA=3 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=30 TAKE_PROFIT_PIPS=90
+
+          echo ""
+          echo "======== RUNDA 4D: simboluri forex suplimentare ========"
+          # USDJPY și AUDUSD — comportament diferit vs EUR/GBP
+          run_cfg jpy-mc4-sl25-rr3  USD_JPY MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=75
+          run_cfg aud-mc4-sl25-rr3  AUD_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=75
