@@ -1,0 +1,23 @@
+name: Railway Template
+on:
+  workflow_dispatch:
+    inputs:
+      railway_token:
+        description: Railway API token
+        required: true
+      mode:
+        description: inspect | create | full
+        required: false
+        default: full
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mask token
+        run: echo "::add-mask::${{ inputs.railway_token }}"
+      - name: Create Railway template
+        run: node scripts/railway-template.js
+        env:
+          RAILWAY_TOKEN: ${{ inputs.railway_token }}
+          MODE: ${{ inputs.mode }}
