@@ -1,7 +1,5 @@
 Looking for existing Railway projects...
 projects query: {"data":{"projects":{"edges":[{"node":{"id":"7542ef4e-073e-48c2-98e4-f9f8a720e634","name":"Apex-Forex-Bot"}},{"node":{"id":"82186fe2-60ea-47ea-8767-6be58ae717fa","name":"apex-trade"}}]}}}
 Found 2 projects: Apex-Forex-Bot, apex-trade
-Using project: id=7542ef4e-073e-48c2-98e4-f9f8a720e634 name=Apex-Forex-Bot
-Environment: id=631135ea-5863-4958-8f5c-6bff009ad2c1
-Service created: id=232f51b5-50df-4e4b-8734-48ce4e45aad6
-TEMPLATE GENERATE FAILED: {"errors":[{"message":"Service apex-trade-bot does not have a source that can be used to generate a template","locations":[{"line":3,"column":7}],"path":["templateGenerate"],"extensions":{"code":"INTERNAL_SERVER_ERROR"},"traceId":"7570567187662270589"}],"data":null}
+Using project: id=82186fe2-60ea-47ea-8767-6be58ae717fa name=apex-trade
+FATAL: Cannot read properties of undefined (reading 'slice')
