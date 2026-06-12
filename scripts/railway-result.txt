@@ -1,0 +1,73 @@
+=== TEMPLATE MUTATIONS ===
+sandboxTemplateBuild(environmentId: String!, input: SandboxTemplateInput!)
+templateClone(input: TemplateCloneInput!)
+templateDelete(id: String!, input: TemplateDeleteInput!)
+templateDeployV2(input: TemplateDeployV2Input!)
+templateGenerate(input: TemplateGenerateInput!)
+templatePublish(id: String!, input: TemplatePublishInput!)
+templateServiceSourceEject(input: TemplateServiceSourceEjectInput!)
+templateUnpublish(id: String!)
+--- input SandboxTemplateInput ---
+  baseImageDigest: String
+  instructions: String[]!
+  name: String
+  variables: EnvironmentVariables
+--- input TemplateCloneInput ---
+  code: String!
+  workspaceId: String
+--- input TemplateDeleteInput ---
+  workspaceId: String
+--- input TemplateDeployV2Input ---
+  environmentId: String
+  projectId: String
+  serializedConfig: SerializedTemplateConfig!
+  templateId: String!
+  workspaceId: String
+--- input TemplateGenerateInput ---
+  environmentId: String
+  projectId: String!
+--- input TemplatePublishInput ---
+  category: String!
+  demoProjectId: String
+  description: String!
+  image: String
+  readme: String!
+  workspaceId: String
+--- input TemplateServiceSourceEjectInput ---
+  projectId: String!
+  repoName: String!
+  repoOwner: String!
+  serviceIds: String![]!
+  upstreamUrl: String!
+=== templateCreate (HTTP 400) ===
+{
+  "errors": [
+    {
+      "message": "Unknown type \"TemplateCreateInput\". Did you mean \"TemplateCloneInput\", \"TemplateDeleteInput\", \"TemplateGenerateInput\", \"ServiceCreateInput\", or \"TCPProxyCreateInput\"?",
+      "locations": [
+        {
+          "line": 2,
+          "column": 22
+        }
+      ],
+      "extensions": {
+        "code": "GRAPHQL_VALIDATION_FAILED"
+      },
+      "traceId": "1545226585432217619"
+    },
+    {
+      "message": "Cannot query field \"templateCreate\" on type \"Mutation\". Did you mean \"templateClone\", \"templateDelete\", \"templateGenerate\", \"serviceCreate\", or \"tcpProxyCreate\"?",
+      "locations": [
+        {
+          "line": 3,
+          "column": 7
+        }
+      ],
+      "extensions": {
+        "code": "GRAPHQL_VALIDATION_FAILED"
+      },
+      "traceId": "1545226585432217619"
+    }
+  ]
+}
+CREATE FAILED — see introspection above for correct input shape
