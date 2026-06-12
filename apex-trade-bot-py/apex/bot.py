@@ -422,6 +422,13 @@ def _start_dashboard_server():
             return bearer == token
 
         def do_GET(self):
+            # Railway healthcheck — fără auth, nu expune date
+            if self.path.startswith("/health"):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"ok")
+                return
             if not self._authorized():
                 self.send_response(401)
                 self.send_header("Content-Type", "text/plain")

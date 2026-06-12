@@ -183,6 +183,12 @@ function serve(getData, logger) {
     console.warn('⚠️  DASHBOARD_TOKEN nu e setat — dashboard-ul (balanță + istoric) e PUBLIC pe URL-ul Railway.');
   }
   http.createServer((req, res) => {
+    // Railway healthcheck — fără auth, nu expune date
+    if (req.url.startsWith('/health')) {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('ok');
+      return;
+    }
     if (TOKEN) {
       const url    = new URL(req.url, 'http://localhost');
       const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
