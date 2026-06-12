@@ -28,21 +28,18 @@ app.use((req, res, next) => {
   _serveStatic(req, res, next);
 });
 
-// Health check — first route, no deps, always responds
-app.get('/health', (req, res) => res.json({ ok: true, node: process.version, time: new Date().toISOString() }));
-app.get('/ping', (req, res) => res.json({ ok: true, version: 'v8-audit-fixes', time: new Date().toISOString() }));
-
-// /health — lightweight DB ping to keep Supabase free tier from pausing
+// /health — DB ping to keep Supabase free tier from pausing (use for cron-job.org)
 app.get('/health', async (req, res) => {
   let db = 'skip';
   if (supabase) {
     try {
-      const { count } = await supabase.from('licenses').select('*', { count: 'exact', head: true });
+      await supabase.from('licenses').select('*', { count: 'exact', head: true });
       db = 'ok';
     } catch(e) { db = 'error'; }
   }
-  res.json({ ok: true, db, time: new Date().toISOString() });
+  res.json({ ok: true, db, node: process.version, time: new Date().toISOString() });
 });
+app.get('/ping', (req, res) => res.json({ ok: true, version: 'v8-audit-fixes', time: new Date().toISOString() }));
 app.get('/api/stripe-config', auth, async (req, res) => {
   const key = process.env.STRIPE_SECRET_KEY || '';
   const isLive = key.startsWith('sk_live_');
