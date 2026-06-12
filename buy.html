@@ -26,6 +26,7 @@ body{background:#080808;color:#F0EAD6;font-family:sans-serif;min-height:100vh;di
 .btn-gold{background:linear-gradient(135deg,#8A6A2E,#E8CB8A);color:#080808;}
 .btn-outline{background:transparent;border:1px solid rgba(200,169,110,0.3);color:#C8A96E;}
 .btn:hover{transform:translateY(-2px);opacity:.9;}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;filter:grayscale(.5);}
 @media(max-width:600px){.grid{grid-template-columns:1fr;}}
 </style>
 </head>
@@ -47,7 +48,7 @@ body{background:#080808;color:#F0EAD6;font-family:sans-serif;min-height:100vh;di
         <li class="feature"><span class="check">✦</span>Client outreach scripts</li>
         <li class="feature"><span class="check">✦</span>Lifetime access</li>
       </ul>
-      <button class="btn btn-outline" onclick="buyStarter()">Get Starter — $37</button>
+      <button class="btn btn-outline" disabled>Coming Soon</button>
     </div>
     <div class="card popular">
       <div class="badge">Most Popular</div>
@@ -63,7 +64,7 @@ body{background:#080808;color:#F0EAD6;font-family:sans-serif;min-height:100vh;di
         <li class="feature"><span class="check">✦</span>Agency Website module</li>
         <li class="feature"><span class="check">✦</span>Lifetime access + updates</li>
       </ul>
-      <button class="btn btn-gold" onclick="buyPro()">Get PRO — $97</button>
+      <button class="btn btn-gold" disabled>Coming Soon</button>
     </div>
   </div>
 </div>
