@@ -1,14 +1,8 @@
-Looking for existing Railway projects...
-projects query: {"data":{"projects":{"edges":[{"node":{"id":"7542ef4e-073e-48c2-98e4-f9f8a720e634","name":"Apex-Forex-Bot"}},{"node":{"id":"82186fe2-60ea-47ea-8767-6be58ae717fa","name":"apex-trade"}}]}}}
-Found 2 projects: Apex-Forex-Bot, apex-trade
-Using project: id=82186fe2-60ea-47ea-8767-6be58ae717fa name=apex-trade
-project detail: {"data":{"project":{"environments":{"edges":[{"node":{"id":"fdc10f11-f4b2-4773-87a0-7e9f66cd8a55","name":"production"}}]},"services":{"edges":[{"node":{"id":"7843114d-01cb-4b57-ac12-9dfefcf0292b","name":"grateful-commitment"}}]}}}}
-Environment: id=fdc10f11-f4b2-4773-87a0-7e9f66cd8a55
-Existing services: grateful-commitment
-Template generated: id=98d44c6f-fca4-4043-9689-7eb8ff14338f code=natc6h
-DEPLOY_URL=https://railway.com/deploy/natc6h
-templatePublish result: {"errors":[{"message":"You have been blocked from publishing templates. Please reach out to the team for more information.","locations":[{"line":3,"column":7}],"path":["templatePublish"],"extensions":{"code":"INTERNAL_SERVER_ERROR"},"traceId":"7202140661303105168"}],"data":null}
+Publishing template id=15133712-3b51-4b03-9b83-be257e7912bc code=UMCVOQ
+templatePublish result: {"errors":[{"message":"You have been blocked from publishing templates. Please reach out to the team for more information.","locations":[{"line":3,"column":7}],"path":["templatePublish"],"extensions":{"code":"INTERNAL_SERVER_ERROR"},"traceId":"5319684966412395982"}],"data":null}
+template query: {"data":{"template":{"id":"15133712-3b51-4b03-9b83-be257e7912bc","code":"UMCVOQ","name":"apex-trade","status":"UNPUBLISHED","activeProjects":0}}}
 
-=== DONE ===
-Deploy URL: https://railway.com/deploy/natc6h
-Template ID: 98d44c6f-fca4-4043-9689-7eb8ff14338f
+=== URLS TO TRY ===
+https://railway.com/template/UMCVOQ
+https://railway.com/deploy/UMCVOQ
+https://railway.com/new/template/UMCVOQ
