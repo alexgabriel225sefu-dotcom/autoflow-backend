@@ -47,7 +47,7 @@ async function main() {
     query($id: String!) {
       project(id: $id) {
         environments { edges { node { id name } } }
-        services { edges { node { id name source { repo image } } } }
+        services { edges { node { id name } } }
       }
     }`, { id: projNode.id });
   summary('project detail: ' + JSON.stringify(projRes2.json).slice(0, 3000));
