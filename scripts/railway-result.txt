@@ -1,1 +1,2 @@
-AUTH FAILED: {"errors":[{"message":"Not Authorized","locations":[{"line":1,"column":9}],"path":["me"],"extensions":{"code":"INTERNAL_SERVER_ERROR"},"traceId":"2760287297046294959"}],"data":null}
+me query failed (maybe scope issue), trying projectCreate directly...
+PROJECT CREATE FAILED: {"errors":[{"message":"Free plan resource provision limit exceeded. Please upgrade to provision more resources!","locations":[{"line":3,"column":7}],"path":["projectCreate"],"extensions":{"code":"INTERNAL_SERVER_ERROR"},"traceId":"1211700925089380906"}],"data":null}
