@@ -2203,6 +2203,64 @@ app.use((err, req, res, next) => {
 });
 
 // ════════════════════════════════════════
+// BOT CONFIG — save from configurator / fetch by bot
+// Table needed: CREATE TABLE bot_configs (license_key TEXT PRIMARY KEY, config TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW());
+// ════════════════════════════════════════
+function _botConfigKey() {
+  const s = process.env.JWT_SECRET || process.env.COOKIE_SECRET || 'bot-cfg-fallback-change-me';
+  return crypto.createHash('sha256').update(s).digest();
+}
+function encryptBotConfig(obj) {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-cbc', _botConfigKey(), iv);
+  const enc = Buffer.concat([cipher.update(JSON.stringify(obj), 'utf8'), cipher.final()]);
+  return iv.toString('hex') + ':' + enc.toString('hex');
+}
+function decryptBotConfig(data) {
+  const [ivHex, encHex] = data.split(':');
+  const dc = crypto.createDecipheriv('aes-256-cbc', _botConfigKey(), Buffer.from(ivHex, 'hex'));
+  return JSON.parse(Buffer.concat([dc.update(Buffer.from(encHex, 'hex')), dc.final()]).toString('utf8'));
+}
+
+// POST /api/save-bot-config  — called by configurator when client clicks "Save & Deploy"
+app.post('/api/save-bot-config', async (req, res) => {
+  const { key, config } = req.body || {};
+  if (!key || !config || typeof config !== 'object') return res.status(400).json({ error: 'key and config required' });
+  if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+
+  const { data: lic } = await supabase.from('licenses').select('active').eq('key', key).eq('active', true).single();
+  if (!lic) return res.status(403).json({ error: 'Invalid or inactive license key' });
+
+  const encrypted = encryptBotConfig(config);
+  const { error } = await supabase.from('bot_configs').upsert(
+    { license_key: key, config: encrypted, updated_at: new Date().toISOString() },
+    { onConflict: 'license_key' }
+  );
+  if (error) return res.status(500).json({ error: 'Save failed. Run: CREATE TABLE bot_configs (license_key TEXT PRIMARY KEY, config TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW());', detail: error.message });
+  res.json({ success: true });
+});
+
+// GET /api/bot-config?key=APEX-XXXX  — called by bot on startup to fetch remote config
+app.get('/api/bot-config', async (req, res) => {
+  const key = (req.query.key || '').trim();
+  if (!key) return res.status(400).json({ error: 'key required' });
+  if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+
+  const { data: lic } = await supabase.from('licenses').select('active').eq('key', key).eq('active', true).single();
+  if (!lic) return res.status(403).json({ error: 'Invalid license key' });
+
+  const { data, error } = await supabase.from('bot_configs').select('config').eq('license_key', key).single();
+  if (error || !data) return res.status(404).json({ error: 'No config found for this key. Complete the configurator at aicashsystem.space/configurator first.' });
+
+  try {
+    const config = decryptBotConfig(data.config);
+    res.json({ success: true, config });
+  } catch(e) {
+    res.status(500).json({ error: 'Config decryption failed' });
+  }
+});
+
+// ════════════════════════════════════════
 // START SERVER
 // ════════════════════════════════════════
 const PORT = process.env.PORT || 3000;

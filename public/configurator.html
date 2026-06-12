@@ -335,21 +335,38 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           <div class="pc"><div class="pck">Target gain / trade</div><div class="pcv gain" id="pGain">+$32</div></div>
         </div>
         <div class="gw">
-          <button class="genbtn" id="genBtn">Generate Railway Config →</button>
-          <div class="eout" id="eout">
-            <textarea id="etxt" readonly></textarea>
-            <button class="cpybtn" id="cpyBtn">Copy to clipboard</button>
-            <div class="dsteps">
-              <div class="dstep"><div class="dn">1</div><span>Copy the config above, then open your Render service</span></div>
-              <a class="railbtn" href="https://dashboard.render.com" target="_blank" rel="noopener">🚀 Open Render Dashboard →</a>
-              <div class="dstep"><div class="dn">2</div><span>Select your <b>apex-trade-bot</b> service</span></div>
-              <div class="dstep"><div class="dn">3</div><span>Go to <b>Environment</b> tab → click <b>Add from .env</b></span></div>
-              <div class="dstep"><div class="dn">4</div><span>Paste all lines and click <b>Save Changes</b></span></div>
-              <div class="dstep"><div class="dn">5</div><span>Render redeploys automatically — bot starts in ~1 minute ✓</span></div>
+          <button class="genbtn" id="genBtn">🚀 Save Config &amp; Deploy →</button>
+          <div class="eout" id="eout" style="display:none">
+            <!-- Deploy success -->
+            <div id="deploySuccess" style="display:none">
+              <div style="background:#052e16;border:1px solid #00ff8840;border-radius:10px;padding:16px;margin-bottom:12px">
+                <div style="color:#00ff88;font-weight:700;margin-bottom:8px">✅ Config saved on server!</div>
+                <div style="color:#9ca3af;font-size:.83rem;line-height:1.6">Your settings are stored. Deploy your bot — it will auto-load your config on startup using just your license key.</div>
+              </div>
+              <div style="font-size:.82rem;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Your License Key</div>
+              <div style="display:flex;gap:8px;margin-bottom:16px">
+                <code id="licDisplay" style="flex:1;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#00ff88;font-size:.9rem;letter-spacing:.1em">—</code>
+                <button id="cpyLicBtn" onclick="copyLic()" style="background:#00ff8820;border:1px solid #00ff8840;color:#00ff88;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:.82rem">Copy</button>
+              </div>
+              <div class="dsteps">
+                <div class="dstep"><div class="dn">1</div><span>Go to <a href="https://railway.com/new" target="_blank" style="color:#60a5fa">railway.com/new</a> → <b>Deploy from GitHub repo</b></span></div>
+                <div class="dstep"><div class="dn">2</div><span>Search and select <b>apex-trade-bot</b></span></div>
+                <div class="dstep"><div class="dn">3</div><span>Add ONE variable: <code>LICENSE_KEY</code> = your key above</span></div>
+                <div class="dstep"><div class="dn">4</div><span>Click <b>Deploy</b> — bot starts and loads all your settings automatically ✓</span></div>
+              </div>
+              <div style="margin-top:12px;text-align:center;color:#6b7280;font-size:.78rem">Can't use Railway? <a href="https://render.com/deploy?repo=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" target="_blank" style="color:#60a5fa">Deploy on Render</a> (same flow, just LICENSE_KEY needed)</div>
+            </div>
+            <!-- Manual fallback -->
+            <div id="deployManual">
+              <textarea id="etxt" readonly></textarea>
+              <button class="cpybtn" id="cpyBtn">Copy to clipboard</button>
+              <div style="text-align:center;margin-top:8px"><button id="switchToAuto" style="background:none;border:none;color:#60a5fa;cursor:pointer;font-size:.8rem;text-decoration:underline">← Save config to server instead (recommended)</button></div>
             </div>
           </div>
+          <div id="savingMsg" style="display:none;text-align:center;color:#6b7280;font-size:.85rem;padding:12px">Saving config…</div>
+          <div id="saveErr" style="display:none;background:#2d1515;border:1px solid #ff446640;border-radius:8px;padding:12px;color:#ff9999;font-size:.82rem;margin-top:8px"></div>
         </div>
-        <div class="snote">Keys processed locally in your browser.<br>Nothing is sent to our servers.</div>
+        <div class="snote" id="privNote">API keys are encrypted and stored securely on our server.<br>Only your bot can access them using your license key.</div>
       </div>
     </div>
 
@@ -433,61 +450,100 @@ function updSum(){
 }
 updSum();
 
-// Generate config
-document.getElementById('genBtn').addEventListener('click',()=>{
-  const k1v=document.getElementById('k1').value.trim()||'YOUR_API_KEY';
-  const k2v=document.getElementById('k2').value.trim()||'YOUR_SECRET';
-  const aiKv=document.getElementById('aiKey').value.trim()||'YOUR_AI_KEY';
+// Build config object (env-var keys)
+function buildConfig(){
+  const k1v=document.getElementById('k1').value.trim();
+  const k2v=document.getElementById('k2').value.trim();
+  const aiKv=document.getElementById('aiKey').value.trim();
   const tgT=document.getElementById('tgTok').value.trim();
   const tgC=document.getElementById('tgCid').value.trim();
-  const dt=document.getElementById('dtok').value.trim();
-  const lk=document.getElementById('licK').value.trim()||sessionStorage.getItem('apx_lic')||'YOUR_LICENSE_KEY';
   const [ek1,ek2]=EK[S.ex];
-  let env=`# Apex Trade Bot — Railway Environment Variables
-# Generated: ${new Date().toISOString().slice(0,10)}
-# Keys processed locally. Nothing sent to our servers.
+  const cfg={
+    EXCHANGE:S.ex.toLowerCase(),
+    PAPER_TRADING:S.mode==='PAPER'?'true':'false',
+    PAPER_BALANCE:String(S.bal),
+    MAX_CONCURRENT:String(S.mc),
+    MIN_CONFIDENCE:S.conf.toFixed(2),
+    MIN_CRITERIA:String(S.crit),
+    HTF_FILTER:S.htf?'true':'false',
+    STOP_LOSS_PCT:(S.sl/100).toFixed(4),
+    TAKE_PROFIT_PCT:(S.tp/100).toFixed(4),
+    TRAILING_STOP:S.trail?'true':'false',
+    BREAKEVEN_AT_R:S.be?'true':'false',
+    RISK_PER_TRADE:(S.risk/100).toFixed(4),
+  };
+  if(k1v)cfg[ek1]=k1v;
+  if(k2v)cfg[ek2]=k2v;
+  if(aiKv){if(S.ai==='GROQ')cfg.GROQ_API_KEY=aiKv;else cfg.ANTHROPIC_API_KEY=aiKv;}
+  if(tgT)cfg.TELEGRAM_BOT_TOKEN=tgT;
+  if(tgC)cfg.TELEGRAM_CHAT_ID=tgC;
+  return cfg;
+}
 
-# Exchange
-EXCHANGE=${S.ex.toLowerCase()}
-${ek1}=${k1v}
-${ek2}=${k2v}
+// Save config to server → show Railway deploy steps
+document.getElementById('genBtn').addEventListener('click',async()=>{
+  const lk=document.getElementById('licK').value.trim()||sessionStorage.getItem('apx_lic')||'';
+  if(!lk){document.getElementById('saveErr').textContent='Enter your license key first.';document.getElementById('saveErr').style.display='block';return;}
+  document.getElementById('saveErr').style.display='none';
+  const btn=document.getElementById('genBtn');
+  btn.disabled=true;btn.textContent='Saving…';
+  document.getElementById('savingMsg').style.display='block';
+  try{
+    const r=await fetch('/api/save-bot-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:lk,config:buildConfig()})});
+    const data=await r.json();
+    document.getElementById('savingMsg').style.display='none';
+    if(data.success){
+      document.getElementById('eout').style.display='block';
+      document.getElementById('deploySuccess').style.display='block';
+      document.getElementById('deployManual').style.display='none';
+      document.getElementById('licDisplay').textContent=lk;
+      document.getElementById('privNote').textContent='Config encrypted & saved. Your bot loads it automatically on startup.';
+      btn.textContent='✓ Config saved!';btn.style.background='var(--up)';btn.style.color='#052e16';
+    } else {
+      // Fallback to manual .env
+      showManual(lk);
+      btn.textContent='🚀 Save Config & Deploy →';btn.disabled=false;
+      document.getElementById('saveErr').textContent=(data.error||'Server error')+(data.detail?' — '+data.detail:'');
+      document.getElementById('saveErr').style.display='block';
+    }
+  }catch(e){
+    document.getElementById('savingMsg').style.display='none';
+    showManual(lk);
+    btn.textContent='🚀 Save Config & Deploy →';btn.disabled=false;
+  }
+});
 
-# License
-LICENSE_KEY=${lk}
-
-# Mode
-PAPER_TRADING=${S.mode==='PAPER'}
-
-# Portfolio
-MAX_CONCURRENT=${S.mc}
-
-# Entry
-MIN_CONFIDENCE=${S.conf.toFixed(2)}
-MIN_CRITERIA=${S.crit}
-HTF_FILTER=${S.htf?1:0}
-
-# Exit
-STOP_LOSS_PCT=${S.sl.toFixed(1)}
-TAKE_PROFIT_PCT=${S.tp.toFixed(1)}
-TRAILING_STOP=${S.trail?1:0}
-BREAKEVEN_AT_R=${S.be?1:0}
-
-# AI
-AI_PROVIDER=${S.ai}
-${S.ai==='GROQ'?'GROQ_API_KEY':'ANTHROPIC_API_KEY'}=${aiKv}`;
-  if(tgT)env+=`\n\n# Telegram\nTELEGRAM_BOT_TOKEN=${tgT}`;
-  if(tgC)env+=`\nTELEGRAM_CHAT_ID=${tgC}`;
-  if(dt)env+=`\n\n# Dashboard\nDASHBOARD_TOKEN=${dt}`;
+function showManual(lk){
+  const [ek1,ek2]=EK[S.ex];
+  const cfg=buildConfig();
+  let env=`# Apex Trade Bot — Environment Variables\n# Generated: ${new Date().toISOString().slice(0,10)}\n\nLICENSE_KEY=${lk}\n`;
+  for(const[k,v] of Object.entries(cfg))env+=`${k}=${v}\n`;
   document.getElementById('etxt').value=env;
   document.getElementById('eout').style.display='block';
-  const btn=document.getElementById('genBtn');
-  btn.textContent='✓ Config ready — copy below';btn.style.background='var(--up)';btn.style.color='#052e16';
-});
+  document.getElementById('deploySuccess').style.display='none';
+  document.getElementById('deployManual').style.display='block';
+}
+
 document.getElementById('cpyBtn').addEventListener('click',()=>{
   navigator.clipboard.writeText(document.getElementById('etxt').value).then(()=>{
     const b=document.getElementById('cpyBtn');b.textContent='✓ Copied!';b.classList.add('ok');
     setTimeout(()=>{b.textContent='Copy to clipboard';b.classList.remove('ok');},2500);
   });
+});
+
+function copyLic(){
+  navigator.clipboard.writeText(document.getElementById('licDisplay').textContent).then(()=>{
+    const b=document.getElementById('cpyLicBtn');b.textContent='✓ Copied!';
+    setTimeout(()=>b.textContent='Copy',2000);
+  });
+}
+
+document.getElementById('switchToAuto').addEventListener('click',()=>{
+  document.getElementById('deployManual').style.display='none';
+  document.getElementById('eout').style.display='none';
+  document.getElementById('genBtn').disabled=false;
+  document.getElementById('genBtn').textContent='🚀 Save Config & Deploy →';
+  document.getElementById('genBtn').style.background='';document.getElementById('genBtn').style.color='';
 });
 
 // License gate

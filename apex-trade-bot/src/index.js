@@ -486,6 +486,7 @@ async function main() {
   tg.startPolling(() => dash, exchange);
 
   await verifyLicense();
+  await cfg.loadRemote(); // fetch config saved in configurator
   logger.info('🚀 Prima analiză...');
   await tick();
   setInterval(tick, cfg.LOOP_INTERVAL_MS);

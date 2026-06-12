@@ -120,3 +120,33 @@ module.exports = {
   LICENSE_KEY:    process.env.LICENSE_KEY    || '',
   LICENSE_SERVER: process.env.LICENSE_SERVER || 'https://aicashsystem.space',
 };
+
+// Fetch config saved by the configurator and apply to process.env + module.exports.
+// Called once at startup, after license verification.
+module.exports.loadRemote = async function loadRemote() {
+  const key    = module.exports.LICENSE_KEY;
+  const server = module.exports.LICENSE_SERVER;
+  if (!key) return false;
+  try {
+    const resp = await fetch(`${server}/api/bot-config?key=${encodeURIComponent(key)}`, {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!resp.ok) return false;
+    const data = await resp.json();
+    if (!data.success || !data.config) return false;
+    // Apply each env-var-named key from remote config
+    for (const [k, v] of Object.entries(data.config)) {
+      if (v !== undefined && v !== null && v !== '') {
+        process.env[k] = String(v);
+        if (Object.prototype.hasOwnProperty.call(module.exports, k)) {
+          module.exports[k] = v;
+        }
+      }
+    }
+    console.log('✅  Remote config loaded from license server.');
+    return true;
+  } catch(e) {
+    console.warn(`⚠️   Could not load remote config (${e.message}) — using env vars only.`);
+    return false;
+  }
+};
