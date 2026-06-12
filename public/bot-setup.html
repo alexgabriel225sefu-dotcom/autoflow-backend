@@ -3,682 +3,337 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Apex Trade Bot — Setup Guide</title>
-<link rel="stylesheet" href="/fonts/fonts.css">
+<title>Setup Guide — Apex Trade Bot</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--c:#00e5ff;--p:#7c5cff;--bg:#050816}
-body{background:var(--bg);color:#e2e8f0;font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 16px 80px;overflow-x:hidden}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060608;--bg1:#0b0b0e;--panel:#111115;--panel2:#18181d;--hov:#1e1e23;
+  --ln:rgba(255,255,255,.07);--ln2:rgba(255,255,255,.13);
+  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
+  --a:#ff2d4f;--a2:#ff5c74;--a3:#ff97a8;
+  --adim:rgba(255,45,79,.12);--aglow:rgba(255,45,79,.4);
+  --up:#27c46a;--tg:#2aabee;
+  --d:'Clash Display',system-ui,sans-serif;
+  --f:'Satoshi',system-ui,sans-serif;
+  --m:'JetBrains Mono',monospace;
+  --e:cubic-bezier(.32,.72,0,1)
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;min-height:100dvh;padding-bottom:80px}
+a{color:var(--a3)}
 
-/* BACKGROUND */
-.bg-grid{position:fixed;inset:0;background-image:linear-gradient(rgba(124,92,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(124,92,255,.04) 1px,transparent 1px);background-size:50px 50px;-webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 40%,#000 40%,transparent 100%);mask-image:radial-gradient(ellipse 80% 60% at 50% 40%,#000 40%,transparent 100%);pointer-events:none;z-index:0}
-.blur-orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0}
-.orb1{width:500px;height:500px;background:radial-gradient(circle,rgba(0,229,255,.1),transparent 70%);top:-120px;left:-180px}
-.orb2{width:400px;height:400px;background:radial-gradient(circle,rgba(124,92,255,.14),transparent 70%);bottom:-80px;right:-130px}
+/* Nav */
+nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,3vw,40px);background:rgba(6,6,8,.88);backdrop-filter:blur(20px);border-bottom:1px solid var(--ln)}
+.nbrand{font:700 16px/1 var(--d);letter-spacing:-.3px}
+.nbrand b{color:var(--a)}
+.ntag{font:600 11px/1 var(--m);color:var(--t2);background:var(--panel);border:1px solid var(--ln2);border-radius:99px;padding:6px 12px;letter-spacing:.05em}
 
-.page{position:relative;z-index:1;width:100%;max-width:560px;padding-top:48px}
+/* Wrap */
+.wrap{max-width:680px;margin:0 auto;padding:40px clamp(16px,3vw,40px) 0}
 
-/* BADGE */
-.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.22);border-radius:100px;padding:6px 16px;margin-bottom:24px}
-.bdot{width:7px;height:7px;border-radius:50%;background:#00e5ff;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,229,255,.55)}70%{box-shadow:0 0 0 8px rgba(0,229,255,0)}}
-.btxt{font-size:11px;font-weight:800;color:#00e5ff;letter-spacing:2px;text-transform:uppercase}
+/* Access badge */
+.access{display:inline-flex;align-items:center;gap:8px;background:rgba(39,196,106,.1);border:1px solid rgba(39,196,106,.25);color:#4ade80;border-radius:100px;padding:6px 14px;font:700 11px/1 var(--m);letter-spacing:.1em;text-transform:uppercase;margin-bottom:20px}
+.access i{width:6px;height:6px;border-radius:50%;background:#4ade80;display:block;box-shadow:0 0 8px #4ade80}
+.ph h1{font:700 clamp(28px,4vw,42px)/1.1 var(--d);letter-spacing:-.04em;margin-bottom:8px}
+.ph p{font:400 14px/1.7 var(--f);color:var(--t1);margin-bottom:28px}
 
-/* HERO */
-.hero{text-align:center;margin-bottom:32px}
-.hero h1{font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1.2;margin-bottom:8px}
-.hero h1 span{background:linear-gradient(90deg,#00e5ff,#7c5cff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hero p{font-size:14px;color:rgba(255,255,255,.4);line-height:1.6}
+/* License key card */
+.lic-card{background:var(--panel);border:1px solid rgba(255,45,79,.3);border-radius:20px;padding:22px 24px;margin-bottom:32px;position:relative;overflow:hidden}
+.lic-card::before{content:'';position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:300px;height:150px;background:radial-gradient(ellipse,rgba(255,45,79,.12),transparent 70%);pointer-events:none}
+.lic-lbl{font:700 10px/1 var(--m);color:var(--a);letter-spacing:.2em;text-transform:uppercase;margin-bottom:12px}
+.lic-key{display:block;background:var(--bg1);border:1px solid rgba(255,45,79,.2);border-radius:12px;font:700 18px/1 var(--m);color:#fff;letter-spacing:3px;padding:16px;text-align:center;cursor:pointer;transition:border-color .2s;word-break:break-all;user-select:all}
+.lic-key:hover{border-color:rgba(255,45,79,.5)}
+.lic-hint{font:400 11.5px/1.6 var(--f);color:var(--t2);margin-top:10px;text-align:center}
+.lic-hint b{color:var(--t1);font-weight:600}
+.cplic{width:100%;background:var(--adim);border:1px solid rgba(255,45,79,.25);border-radius:11px;color:var(--a3);font:700 13px/1 var(--f);padding:11px;cursor:pointer;transition:all .2s;margin-top:12px}
+.cplic:hover{background:rgba(255,45,79,.18)}
+.cplic.ok{color:var(--up);border-color:rgba(39,196,106,.35);background:rgba(39,196,106,.08)}
 
-/* TIME ESTIMATE */
-.eta{display:inline-flex;align-items:center;gap:6px;background:rgba(124,92,255,.1);border:1px solid rgba(124,92,255,.25);border-radius:8px;padding:8px 14px;font-size:12px;color:#c4b5fd;margin-bottom:28px;font-weight:600}
+/* Step cards */
+.steps-lbl{font:700 11px/1 var(--m);color:var(--t2);letter-spacing:.15em;text-transform:uppercase;margin-bottom:14px}
+.sc{background:var(--panel);border:1px solid var(--ln);border-radius:20px;margin-bottom:12px;overflow:hidden;transition:border-color .25s}
+.sc.open{border-color:var(--ln2)}
+.sc.done{border-color:rgba(39,196,106,.3)}
+.sc-head{display:flex;align-items:center;gap:14px;padding:18px 22px;cursor:pointer;user-select:none}
+.sc-num{width:30px;height:30px;border-radius:10px;background:var(--adim);color:var(--a3);font:700 13px/1 var(--m);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s}
+.sc.open .sc-num{background:var(--a);color:#fff}
+.sc.done .sc-num{background:rgba(39,196,106,.15);color:#4ade80;font-size:16px}
+.sc-title{flex:1}
+.sc-title strong{font:600 15px/1 var(--d);display:block;letter-spacing:-.02em}
+.sc-title span{font:400 12px/1 var(--f);color:var(--t2);margin-top:3px;display:block}
+.sc-arr{color:var(--t2);font-size:18px;transition:transform .25s var(--e);flex-shrink:0}
+.sc.open .sc-arr{transform:rotate(180deg)}
+.sc-body{display:none;padding:0 22px 22px;border-top:1px solid var(--ln)}
+.sc.open .sc-body{display:block}
 
-/* LICENSE KEY CARD */
-.key-card{width:100%;background:rgba(255,255,255,.03);border:1px solid rgba(124,92,255,.3);border-radius:20px;padding:24px;text-align:center;margin-bottom:12px;position:relative;overflow:hidden;backdrop-filter:blur(12px)}
-.key-card::before{content:'';position:absolute;top:-50px;left:50%;transform:translateX(-50%);width:280px;height:140px;background:radial-gradient(ellipse,rgba(124,92,255,.2),transparent 70%);pointer-events:none}
-.key-lbl{font-size:10px;font-weight:800;letter-spacing:2.5px;color:rgba(0,229,255,.8);text-transform:uppercase;margin-bottom:12px;position:relative}
-.key-val{font-family:'JetBrains Mono','Courier New',monospace;font-size:18px;font-weight:900;letter-spacing:3px;color:#fff;background:rgba(0,0,0,.35);border:1px solid rgba(124,92,255,.25);border-radius:10px;padding:14px 16px;display:block;cursor:pointer;transition:all .2s;user-select:all;word-break:break-all;position:relative}
-.key-val:hover{background:rgba(124,92,255,.1);border-color:rgba(124,92,255,.5)}
-.key-hint{font-size:11px;color:rgba(255,255,255,.3);margin-top:10px;line-height:1.6;position:relative}
-.key-hint b{color:rgba(255,255,255,.5)}
-.btn-copy{width:100%;background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:10px;color:#c4b5fd;font-weight:800;font-size:14px;padding:11px;cursor:pointer;transition:all .2s;margin-top:12px;position:relative}
-.btn-copy:hover{background:rgba(124,92,255,.25);border-color:rgba(124,92,255,.5)}
-.btn-copy.ok{background:rgba(0,229,255,.1);border-color:rgba(0,229,255,.35);color:#00e5ff}
+/* Step body content */
+.inst{display:flex;gap:11px;margin-bottom:12px}
+.inst:last-of-type{margin-bottom:0}
+.in{width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--ln2);color:var(--t2);font:700 10px/1 var(--m);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.it{font:400 13px/1.65 var(--f);color:var(--t1)}
+.it b{color:var(--t0);font-weight:600}
+.it a{color:var(--a3)}
+.it code{background:rgba(255,255,255,.06);border:1px solid var(--ln);border-radius:5px;padding:1px 6px;font:500 12px var(--m);color:var(--a3)}
 
-/* SECTION LABEL */
-.section-lbl{font-size:11px;font-weight:800;letter-spacing:2px;color:rgba(255,255,255,.25);text-transform:uppercase;margin:28px 0 10px}
+/* Callout boxes */
+.warn-box{background:rgba(255,159,67,.07);border:1px solid rgba(255,159,67,.2);border-radius:12px;padding:12px 14px;font:400 12px/1.6 var(--f);color:#fbbf24;margin-top:12px}
+.ok-box{background:rgba(39,196,106,.06);border:1px solid rgba(39,196,106,.2);border-radius:12px;padding:12px 14px;font:400 12px/1.6 var(--f);color:#86efac;margin-top:12px}
 
-/* STEP CARD */
-.step-card{width:100%;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:20px;margin-bottom:8px;backdrop-filter:blur(8px);transition:border-color .25s,background .25s}
-.step-card.active{border-color:rgba(124,92,255,.4);background:rgba(124,92,255,.05)}
-.step-head{display:flex;align-items:center;gap:12px;margin-bottom:0;cursor:pointer}
-.step-num{width:32px;height:32px;border-radius:50%;background:rgba(124,92,255,.12);border:1px solid rgba(124,92,255,.3);color:#a78bfa;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .25s}
-.step-card.active .step-num{background:rgba(124,92,255,.22);border-color:rgba(124,92,255,.6);color:#c4b5fd;box-shadow:0 0 14px rgba(124,92,255,.35)}
-.step-card.done .step-num{background:rgba(0,229,255,.12);border-color:rgba(0,229,255,.4);color:#00e5ff}
-.step-title-wrap{flex:1}
-.step-title{font-size:14px;font-weight:800;line-height:1.3}
-.step-sub{font-size:11px;color:rgba(255,255,255,.32);margin-top:2px}
-.step-check{font-size:18px;opacity:0;transition:opacity .2s}
-.step-card.done .step-check{opacity:1}
-.step-body{margin-top:16px;border-top:1px solid rgba(255,255,255,.05);padding-top:16px}
-.step-body.hidden{display:none}
+/* Big buttons */
+.btn-deploy{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:18px;background:var(--a);color:#fff;font:700 16px/1 var(--f);border:none;border-radius:14px;padding:18px;cursor:pointer;text-decoration:none;transition:all .3s var(--e)}
+.btn-deploy:hover{background:var(--a2);box-shadow:0 14px 40px var(--aglow);transform:translateY(-1px)}
+.btn-deploy:active{transform:scale(.98)}
+.btn-config{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:18px;background:var(--a);color:#fff;font:700 16px/1 var(--f);border:none;border-radius:14px;padding:18px;cursor:pointer;text-decoration:none;transition:all .3s var(--e)}
+.btn-config:hover{background:var(--a2);box-shadow:0 14px 40px var(--aglow);transform:translateY(-1px)}
+.btn-secondary{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;background:var(--panel2);color:var(--t1);font:600 13px/1 var(--f);border:1px solid var(--ln2);border-radius:12px;padding:13px;text-decoration:none;transition:all .2s}
+.btn-secondary:hover{border-color:var(--ln2);background:var(--hov);color:var(--t0)}
+.mark-done{width:100%;margin-top:18px;background:transparent;border:1px solid var(--ln2);border-radius:11px;color:var(--t2);font:600 12.5px/1 var(--f);padding:10px;cursor:pointer;transition:all .2s}
+.mark-done:hover{border-color:rgba(39,196,106,.4);color:#86efac}
 
-/* INSTRUCTION ROWS */
-.inst{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px}
-.inst:last-child{margin-bottom:0}
-.inst-dot{width:20px;height:20px;border-radius:50%;background:rgba(124,92,255,.08);border:1px solid rgba(124,92,255,.2);color:rgba(196,181,253,.6);font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
-.inst-text{font-size:13px;color:rgba(255,255,255,.6);line-height:1.6}
-.inst-text b{color:#e2e8f0}
-.inst-text a{color:#00e5ff;text-decoration:none}
-.inst-text a:hover{text-decoration:underline}
-.inst-text code{background:rgba(124,92,255,.1);border:1px solid rgba(124,92,255,.22);border-radius:4px;padding:1px 6px;font-family:'JetBrains Mono','Courier New',monospace;font-size:12px;color:#c4b5fd}
+/* Railway deploy card */
+.rw-card{background:var(--bg1);border:1px solid var(--ln2);border-radius:14px;padding:16px 18px;margin-top:16px}
+.rw-card p{font:400 12.5px/1.65 var(--f);color:var(--t1)}
+.rw-card p b{color:var(--t0);font-weight:600}
 
-/* WARNING BOX */
-.warn-box{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(245,158,11,.85);line-height:1.6;margin-top:12px}
-.warn-box b{color:#fbbf24}
+/* Keys table */
+.kgroup{margin-top:16px}
+.kgroup-lbl{font:600 12px/1 var(--f);color:var(--t2);margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.kgroup-lbl::after{content:'';flex:1;height:1px;background:var(--ln)}
+.krow{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg1);border:1px solid var(--ln);border-radius:10px;margin-bottom:6px}
+.krow:last-child{margin-bottom:0}
+.kk{font:600 12px/1 var(--m);color:var(--a3);min-width:140px;flex-shrink:0}
+.kv{font:400 11.5px/1.4 var(--f);color:var(--t2);flex:1}
+.kv b{color:var(--t1);font-weight:600}
 
-/* INFO BOX */
-.info-box{background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(0,229,255,.75);line-height:1.6;margin-top:12px}
+/* Done card */
+.done-card{background:var(--panel);border:1px solid rgba(39,196,106,.3);border-radius:20px;padding:28px 24px;text-align:center;margin-top:8px}
+.done-icon{font-size:36px;margin-bottom:14px}
+.done-card h2{font:700 22px/1.1 var(--d);letter-spacing:-.03em;margin-bottom:8px}
+.done-card p{font:400 13px/1.7 var(--f);color:var(--t1);margin-bottom:18px;max-width:420px;margin-left:auto;margin-right:auto}
+.done-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.dg{background:var(--bg1);border:1px solid var(--ln);border-radius:12px;padding:14px}
+.dg strong{font:600 13px/1 var(--d);display:block;margin-bottom:4px}
+.dg span{font:400 12px/1.55 var(--f);color:var(--t2)}
 
-/* SUCCESS BOX */
-.ok-box{background:rgba(124,92,255,.07);border:1px solid rgba(124,92,255,.22);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(196,181,253,.85);line-height:1.6;margin-top:12px}
-
-/* ENV TABLE */
-.env-list{display:flex;flex-direction:column;gap:6px;margin-top:14px}
-.env-row{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:9px 11px;display:flex;align-items:center;gap:8px}
-.env-row.required{border-color:rgba(124,92,255,.2);background:rgba(124,92,255,.04)}
-.ekey{font-family:'JetBrains Mono','Courier New',monospace;font-size:11px;font-weight:700;color:#00e5ff;min-width:145px;flex-shrink:0}
-.ekey.purple{color:#c4b5fd}
-.eval{font-size:11px;color:rgba(255,255,255,.38);flex:1;line-height:1.4}
-.eval a{color:#00e5ff;text-decoration:none}
-.cpb{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:4px;color:rgba(255,255,255,.3);font-size:10px;font-weight:700;padding:3px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s}
-.cpb:hover{background:rgba(124,92,255,.15);border-color:rgba(124,92,255,.35);color:#c4b5fd}
-.cpb.ok{color:#00e5ff;border-color:rgba(0,229,255,.35);background:rgba(0,229,255,.08)}
-.cpb.dim{opacity:.2;cursor:default;pointer-events:none}
-
-/* BIG BUTTON */
-.btn-primary{display:block;width:100%;background:linear-gradient(135deg,#7c5cff,#5b3fdb);color:#fff;font-size:15px;font-weight:900;padding:14px;border-radius:12px;border:none;cursor:pointer;text-decoration:none;letter-spacing:-.2px;transition:all .2s;text-align:center;margin-top:14px;box-shadow:0 4px 24px rgba(124,92,255,.25)}
-.btn-primary:hover{background:linear-gradient(135deg,#8e6fff,#6e4fee);transform:translateY(-1px);box-shadow:0 8px 32px rgba(124,92,255,.35)}
-.btn-secondary{display:block;width:100%;background:rgba(255,255,255,.04);color:rgba(255,255,255,.5);font-size:13px;font-weight:700;padding:11px;border-radius:10px;border:1px solid rgba(255,255,255,.09);text-decoration:none;transition:all .2s;text-align:center;margin-top:8px}
-.btn-secondary:hover{background:rgba(255,255,255,.07)}
-
-/* DONE CTA */
-.done-card{background:rgba(255,255,255,.03);border:1px solid rgba(124,92,255,.28);border-radius:20px;padding:28px 24px;text-align:center;margin-bottom:12px;backdrop-filter:blur(12px);position:relative;overflow:hidden}
-.done-card::before{content:'';position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:320px;height:160px;background:radial-gradient(ellipse,rgba(124,92,255,.18),transparent 70%);pointer-events:none}
-.done-title{font-size:22px;font-weight:900;margin-bottom:8px;position:relative}
-.done-sub{font-size:13px;color:rgba(255,255,255,.4);line-height:1.6;position:relative}
-
-/* COIN OPTIONS */
-.coin-opt{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:10px 12px;cursor:pointer;transition:all .15s}
-.coin-opt:hover{border-color:rgba(124,92,255,.3);background:rgba(124,92,255,.06)}
-.coin-opt.selected{border-color:rgba(0,229,255,.45);background:rgba(0,229,255,.06)}
-.coin-icon{font-size:18px;width:28px;text-align:center;flex-shrink:0;color:rgba(255,255,255,.5)}
-.coin-name{font-family:'JetBrains Mono','Courier New',monospace;font-size:12px;font-weight:700;color:#e2e8f0}
-.coin-desc{font-size:10px;color:rgba(255,255,255,.3);margin-top:1px}
-
-/* RISK / SUPPORT */
-.risk{font-size:11px;color:rgba(255,255,255,.22);text-align:center;line-height:1.7;padding:0 10px;margin-top:8px}
-.support{font-size:12px;color:rgba(255,255,255,.2);text-align:center;margin-top:24px}
-.support a{color:#00e5ff;text-decoration:none}
+.support{margin-top:32px;text-align:center;font:400 12.5px/1.6 var(--f);color:var(--t2)}
+.support a{color:var(--a3)}
 </style>
 </head>
 <body>
-<div class="bg-grid"></div>
-<div class="blur-orb orb1"></div>
-<div class="blur-orb orb2"></div>
-<div class="page">
 
-<div class="hero">
-  <div class="badge"><div class="bdot"></div><span class="btxt">Purchase confirmed</span></div>
-  <h1>Your <span>Apex Trade Bot</span><br>is ready 🤖</h1>
-  <p>Follow the steps below — bot live in under 10 minutes, no coding required.</p>
-</div>
+<nav>
+  <div class="nbrand"><b>Apex</b> Trade Bot</div>
+  <div class="ntag">SETUP GUIDE</div>
+</nav>
 
-<div style="text-align:center">
-  <div class="eta">⏱ Setup takes about 5–10 minutes</div>
-</div>
+<div class="wrap">
 
-<!-- LICENSE KEY -->
-<div class="key-card">
-  <div class="key-lbl">✓ Your Personal License Key</div>
-  <span class="key-val" id="keyDisplay" onclick="copyKey()" title="Tap to copy">—</span>
-  <div class="key-hint">Keep this safe — it activates <b>your copy</b> of the bot.<br>Also sent to your email as backup.</div>
-  <button class="btn-copy" id="copyBtn" onclick="copyKey()">📋 Copy My License Key</button>
-</div>
+  <!-- Header -->
+  <div class="ph">
+    <div class="access"><i></i>Access Granted</div>
+    <h1>Your bot is ready.<br>Let's get it running.</h1>
+    <p>Four steps — under 15 minutes. No coding required.</p>
+  </div>
 
-<div class="section-lbl">Setup Steps</div>
+  <!-- License key -->
+  <div class="lic-card">
+    <div class="lic-lbl">Your License Key — keep this safe</div>
+    <span class="lic-key" id="keyDisplay" title="Tap to copy">—</span>
+    <div class="lic-hint">This activates your copy of the bot. <b>Also saved in your email as backup.</b></div>
+    <button class="cplic" id="cplic" onclick="copyKey()">Copy License Key</button>
+  </div>
 
-<!-- ── STEP 1: GitHub ── -->
-<div class="step-card" id="s1">
-  <div class="step-head" onclick="toggleStep(1)">
-    <div class="step-num">1</div>
-    <div class="step-title-wrap">
-      <div class="step-title">Create a GitHub account</div>
-      <div class="step-sub">Free — takes 2 minutes (optional if using Deploy button)</div>
-    </div>
-    <div class="step-check">✅</div>
-  </div>
-  <div class="step-body" id="sb1">
-    <div class="inst">
-      <div class="inst-dot">1</div>
-      <div class="inst-text">Go to <a href="https://github.com/signup" target="_blank"><b>github.com/signup</b></a> and create a free account (just email + password — no credit card).</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">2</div>
-      <div class="inst-text">Once logged in, click the button below to copy the bot to your account:</div>
-    </div>
-    <a href="https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot/fork" target="_blank" class="btn-primary">🍴 Copy Bot to My GitHub →</a>
-    <a href="https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot/archive/refs/heads/main.zip" class="btn-secondary">⬇ Skip GitHub — download ZIP instead</a>
-    <div class="info-box">💡 "Forking" just copies the bot code to your own GitHub account. You'll own your copy — it's free and takes 10 seconds.</div>
-    <div style="margin-top:12px;text-align:center">
-      <button onclick="markDone(1)" style="background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:8px;color:#c4b5fd;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(124,92,255,.25)'" onmouseout="this.style.background='rgba(124,92,255,.15)'">✓ Done — go to Step 2</button>
-    </div>
-  </div>
-</div>
+  <div class="steps-lbl">Setup Steps</div>
 
-<!-- ── STEP 2: Bybit ── -->
-<div class="step-card" id="s2">
-  <div class="step-head" onclick="toggleStep(2)">
-    <div class="step-num">2</div>
-    <div class="step-title-wrap">
-      <div class="step-title">Create a Bybit account &amp; get API keys</div>
-      <div class="step-sub">Free — identity verification required (1–24 hours)</div>
-    </div>
-    <div class="step-check">✅</div>
-  </div>
-  <div class="step-body hidden" id="sb2">
-    <div class="inst">
-      <div class="inst-dot">1</div>
-      <div class="inst-text">Go to <a href="https://bybit.com" target="_blank"><b>bybit.com</b></a> → click <b>Sign Up</b> → enter your email and create a password.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">2</div>
-      <div class="inst-text">Complete <b>identity verification</b> — click your profile icon (top right) → <b>Account &amp; Security</b> → <b>Identity Verification</b> → upload your ID. Usually approved in 30 min – 24 hours.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">3</div>
-      <div class="inst-text">Once verified, go to your profile → <b>API</b> → <b>Create New Key</b> → choose <b>System-generated</b>.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">4</div>
-      <div class="inst-text">Give it a name (e.g. <code>apex-bot</code>). Under <b>Permissions</b> enable: <b>Read</b> + <b>Trade</b>. Leave IP restriction blank for now.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">5</div>
-      <div class="inst-text">Copy both the <b>API Key</b> and the <b>Secret Key</b> — the secret is <b>shown only once</b>. Save them somewhere safe (Notes app, etc.).</div>
-    </div>
-    <div class="warn-box">⚠ <b>Never enable "Withdrawal" permission</b> on the API key — the bot only needs Read + Trade. This keeps your funds safe even if the key is ever leaked.</div>
-    <div style="margin-top:12px;text-align:center">
-      <button onclick="markDone(2)" style="background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:8px;color:#c4b5fd;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(124,92,255,.25)'" onmouseout="this.style.background='rgba(124,92,255,.15)'">✓ Done — go to Step 3</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── STEP 3: Groq ── -->
-<div class="step-card" id="s3">
-  <div class="step-head" onclick="toggleStep(3)">
-    <div class="step-num">3</div>
-    <div class="step-title-wrap">
-      <div class="step-title">Get a free Groq AI key</div>
-      <div class="step-sub">Free — takes 2 minutes, no credit card</div>
-    </div>
-    <div class="step-check">✅</div>
-  </div>
-  <div class="step-body hidden" id="sb3">
-    <div class="inst">
-      <div class="inst-dot">1</div>
-      <div class="inst-text">Go to <a href="https://console.groq.com" target="_blank"><b>console.groq.com</b></a> → click <b>Sign In</b> → create a free account (Google login works).</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">2</div>
-      <div class="inst-text">In the left menu click <b>API Keys</b> → <b>Create API Key</b> → give it any name → click <b>Submit</b>.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">3</div>
-      <div class="inst-text">Copy the key that appears (starts with <code>gsk_...</code>). You won't see it again after closing, so copy it now.</div>
-    </div>
-    <div class="ok-box">✅ Groq is completely free for the volume the bot uses — no billing needed.</div>
-    <div style="margin-top:12px;text-align:center">
-      <button onclick="markDone(3)" style="background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:8px;color:#c4b5fd;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(124,92,255,.25)'" onmouseout="this.style.background='rgba(124,92,255,.15)'">✓ Done — go to Step 4</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── STEP 4: Railway ── -->
-<div class="step-card" id="s4">
-  <div class="step-head" onclick="toggleStep(4)">
-    <div class="step-num">4</div>
-    <div class="step-title-wrap">
-      <div class="step-title">Create a Railway account</div>
-      <div class="step-sub">Free $5 credit — bot costs ~$1–2/month</div>
-    </div>
-    <div class="step-check">✅</div>
-  </div>
-  <div class="step-body hidden" id="sb4">
-    <div class="inst">
-      <div class="inst-dot">1</div>
-      <div class="inst-text">Go to <a href="https://railway.app" target="_blank"><b>railway.app</b></a> → click <b>Start a New Project</b> → sign up with <b>GitHub</b> (use the same GitHub you created in Step 1).</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">2</div>
-      <div class="inst-text">Railway will ask to connect your GitHub account — click <b>Authorize Railway</b>. This lets Railway deploy your bot from GitHub automatically.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">3</div>
-      <div class="inst-text">Add a payment method (card) — you won't be charged until your $5 free credit runs out, which takes several months at bot usage levels.</div>
-    </div>
-    <div style="margin-top:12px;text-align:center">
-      <button onclick="markDone(4)" style="background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:8px;color:#c4b5fd;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(124,92,255,.25)'" onmouseout="this.style.background='rgba(124,92,255,.15)'">✓ Done — go to Step 5</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── STEP 5: Deploy ── -->
-<div class="step-card" id="s5">
-  <div class="step-head" onclick="toggleStep(5)">
-    <div class="step-num">5</div>
-    <div class="step-title-wrap">
-      <div class="step-title">Deploy the bot on Railway</div>
-      <div class="step-sub">2 minutes — Railway handles everything</div>
-    </div>
-    <div class="step-check">✅</div>
-  </div>
-  <div class="step-body hidden" id="sb5">
-    <div class="inst">
-      <div class="inst-dot">1</div>
-      <div class="inst-text">Click the button below — Railway opens automatically and sets everything up for you.</div>
-    </div>
-    <div style="margin:18px 0;text-align:center">
-      <a href="https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" target="_blank" style="display:inline-block;background:linear-gradient(135deg,#7c5cff,#00e5ff);border-radius:12px;padding:14px 28px;color:#fff;font-weight:800;font-size:15px;text-decoration:none;letter-spacing:.5px;box-shadow:0 4px 24px rgba(124,92,255,.4);transition:transform .2s" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">🚀 Deploy on Railway — One Click</a>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">2</div>
-      <div class="inst-text">Railway will show a form with fields for your API keys. Fill them in (see Step 6 below for what to enter) → click <b>Deploy</b>.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">3</div>
-      <div class="inst-text">Railway builds and starts your bot automatically. In ~2 minutes you'll see it running. ✅</div>
-    </div>
-    <div style="margin-top:12px;text-align:center">
-      <button onclick="markDone(5)" style="background:rgba(124,92,255,.15);border:1px solid rgba(124,92,255,.35);border-radius:8px;color:#c4b5fd;font-size:12px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(124,92,255,.25)'" onmouseout="this.style.background='rgba(124,92,255,.15)'">✓ Done — go to Step 6</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── STEP 6: Variables ── -->
-<div class="step-card" id="s6">
-  <div class="step-head" onclick="toggleStep(6)">
-    <div class="step-num">6</div>
-    <div class="step-title-wrap">
-      <div class="step-title">Add your keys to Railway</div>
-      <div class="step-sub">This activates the bot — takes 3 minutes</div>
-    </div>
-    <div class="step-check">✅</div>
-  </div>
-  <div class="step-body hidden" id="sb6">
-    <div class="inst">
-      <div class="inst-dot">1</div>
-      <div class="inst-text">In Railway, click your project → click the <b>apex-trade-bot</b> service → go to the <b>Variables</b> tab.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">2</div>
-      <div class="inst-text">Click <b>New Variable</b> for each row below. Copy the name exactly and paste in the value from Steps 1–3.</div>
-    </div>
-
-    <div class="env-list">
-      <div class="env-row required">
-        <span class="ekey purple">LICENSE_KEY</span>
-        <span class="eval" id="envKeyVal">Your key shown at the top of this page</span>
-        <button class="cpb" id="envCopyBtn" onclick="cpEnvKey(this)">Copy</button>
+  <!-- Step 1: Deploy to Railway -->
+  <div class="sc open" id="s1">
+    <div class="sc-head" onclick="toggle(1)">
+      <div class="sc-num" id="sn1">1</div>
+      <div class="sc-title">
+        <strong>Deploy bot to Railway</strong>
+        <span>~2 minutes · one click</span>
       </div>
-      <div class="env-row">
-        <span class="ekey">EXCHANGE</span>
-        <span class="eval">Which exchange to use</span>
-        <button class="cpb" onclick="cp(this,'bybit')">Copy</button>
-      </div>
-      <div class="env-row">
-        <span class="ekey">BYBIT_API_KEY</span>
-        <span class="eval">Your API Key from Bybit (Step 2)</span>
-        <button class="cpb dim">yours</button>
-      </div>
-      <div class="env-row">
-        <span class="ekey">BYBIT_API_SECRET</span>
-        <span class="eval">Your Secret Key from Bybit (Step 2)</span>
-        <button class="cpb dim">yours</button>
-      </div>
-      <div class="env-row">
-        <span class="ekey">GROQ_API_KEY</span>
-        <span class="eval">Your key from Groq (Step 3) — starts with gsk_</span>
-        <button class="cpb dim">yours</button>
-      </div>
-      <div class="env-row required">
-        <span class="ekey">PAPER_TRADING</span>
-        <span class="eval"><b>Start with this set to true</b> — simulated trades, zero real money risk</span>
-        <button class="cpb" onclick="cp(this,'true')">Copy</button>
-      </div>
-      <div class="env-row">
-        <span class="ekey">PAPER_BALANCE</span>
-        <span class="eval">Simulated starting balance in USDT</span>
-        <button class="cpb" onclick="cp(this,'100')">Copy</button>
-      </div>
-      <div class="env-row">
-        <span class="ekey">TRADE_SYMBOL</span>
-        <span class="eval">Optional — leave empty for AI auto-pick, or set a specific coin (see below)</span>
-        <button class="cpb dim">optional</button>
-      </div>
-      <div class="env-row">
-        <span class="ekey">TELEGRAM_BOT_TOKEN</span>
-        <span class="eval">Optional — get alerts on your phone (setup below)</span>
-        <button class="cpb dim">optional</button>
-      </div>
+      <span class="sc-arr">▾</span>
     </div>
-
-    <!-- COIN SELECTOR -->
-    <div style="margin-top:16px;background:rgba(0,0,0,.2);border:1px solid rgba(124,92,255,.15);border-radius:10px;padding:14px;backdrop-filter:blur(8px)">
-      <div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,.3);text-transform:uppercase;margin-bottom:10px">🪙 TRADE_SYMBOL — Which coin to trade</div>
-      <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.7;margin-bottom:12px">
-        <b style="color:#00e5ff">Leave empty (recommended)</b> — the AI scanner checks 50+ coins every 5 minutes and picks the one with the best signal automatically. Best for most users.<br><br>
-        <b style="color:#e2e8f0">Or set a specific coin</b> — the bot trades only that pair. Use this if you prefer full control over which market you're in.
+    <div class="sc-body" id="sb1">
+      <div class="rw-card">
+        <p>Railway is the cloud server that runs your bot 24/7. Click the button below to deploy your bot automatically — Railway handles everything, no technical knowledge needed.</p>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <div class="coin-opt" onclick="pickCoin(this,'BTCUSDT')">
-          <span class="coin-icon">₿</span>
-          <div><div class="coin-name">BTCUSDT</div><div class="coin-desc">Bitcoin — safest, most stable</div></div>
-        </div>
-        <div class="coin-opt" onclick="pickCoin(this,'ETHUSDT')">
-          <span class="coin-icon">Ξ</span>
-          <div><div class="coin-name">ETHUSDT</div><div class="coin-desc">Ethereum — solid, liquid</div></div>
-        </div>
-        <div class="coin-opt" onclick="pickCoin(this,'SOLUSDT')">
-          <span class="coin-icon">◎</span>
-          <div><div class="coin-name">SOLUSDT</div><div class="coin-desc">Solana — high movement</div></div>
-        </div>
-        <div class="coin-opt" onclick="pickCoin(this,'DOGEUSDT')">
-          <span class="coin-icon">Ð</span>
-          <div><div class="coin-name">DOGEUSDT</div><div class="coin-desc">Doge — volatile, high reward/risk</div></div>
-        </div>
-        <div class="coin-opt" onclick="pickCoin(this,'BNBUSDT')">
-          <span class="coin-icon">◈</span>
-          <div><div class="coin-name">BNBUSDT</div><div class="coin-desc">BNB — steady, mid volatility</div></div>
-        </div>
-        <div class="coin-opt" onclick="pickCoin(this,'XRPUSDT')">
-          <span class="coin-icon">✕</span>
-          <div><div class="coin-name">XRPUSDT</div><div class="coin-desc">XRP — fast, news-sensitive</div></div>
-        </div>
-      </div>
-      <div id="coinSelected" style="display:none;margin-top:10px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:12px;color:rgba(255,255,255,.5)">Selected: <b id="coinSelectedVal" style="color:#00e5ff;font-family:'JetBrains Mono','Courier New',monospace"></b></span>
-        <button id="coinCopyBtn" onclick="copyCoin()" style="background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.25);border-radius:5px;color:#00e5ff;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer">Copy value</button>
-      </div>
-    </div>
-
-    <div class="inst" style="margin-top:14px">
-      <div class="inst-dot">3</div>
-      <div class="inst-text">After adding all variables, Railway redeploys automatically. Wait ~1 minute then check the <b>Logs</b> tab — you should see <code>✅ License verified</code> and <code>Bot started in PAPER mode</code>.</div>
-    </div>
-    <div class="ok-box">🎉 <b>Bot is now running in Paper Trading mode!</b><br>It's simulating real trades with fake money — zero risk. Watch it work for a few days before going live.</div>
-  </div>
-</div>
-
-<!-- ── PHASE 1 COMPLETE ── -->
-<div style="margin:28px 0 10px;text-align:center">
-  <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(124,92,255,.08);border:1px solid rgba(124,92,255,.25);border-radius:10px;padding:10px 18px">
-    <span style="font-size:18px">🧪</span>
-    <div style="text-align:left">
-      <div style="font-size:13px;font-weight:800;color:#c4b5fd">Phase 1 complete — Paper Trading is running</div>
-      <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px">Watch the bot for 3–7 days, then switch to real money below</div>
+      <a id="deployBtn" href="https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" target="_blank" class="btn-deploy">
+        🚂 Deploy Bot to Railway →
+      </a>
+      <a href="https://railway.app/new" target="_blank" class="btn-secondary">Don't have Railway? Create a free account first →</a>
+      <div class="ok-box">✓ Railway gives you <b>$5 free credit</b> — the bot costs ~$1–2/month. No charge until your credit runs out.</div>
+      <div class="warn-box">⚠ After deploying, don't add API keys yet — do that in Step 3 using the configurator.</div>
+      <button class="mark-done" onclick="markDone(1,2)">✓ Bot deployed — go to Step 2</button>
     </div>
   </div>
-</div>
 
-<div class="section-lbl">Phase 2 — Switch to Real Trading</div>
-
-<!-- ── GO LIVE CARD ── -->
-<div class="step-card" id="sLive">
-  <div class="step-head" onclick="toggleLive()">
-    <div class="step-num" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.28);color:#fbbf24;font-size:16px">💰</div>
-    <div class="step-title-wrap">
-      <div class="step-title">Go Live — trade with real money</div>
-      <div class="step-sub">Only do this after watching paper results for a few days</div>
+  <!-- Step 2: API Keys -->
+  <div class="sc" id="s2">
+    <div class="sc-head" onclick="toggle(2)">
+      <div class="sc-num" id="sn2">2</div>
+      <div class="sc-title">
+        <strong>Get your API keys</strong>
+        <span>~10 minutes · free</span>
+      </div>
+      <span class="sc-arr">▾</span>
     </div>
-    <div id="liveArrow" style="color:rgba(255,255,255,.2);font-size:12px">▼</div>
+    <div class="sc-body" id="sb2">
+      <div class="kgroup">
+        <div class="kgroup-lbl">Exchange — Binance (recommended)</div>
+        <div class="krow"><span class="kk">Where</span><span class="kv"><b>binance.com</b> → Profile → API Management → Create API</span></div>
+        <div class="krow"><span class="kk">Permissions</span><span class="kv">Enable <b>Spot Trading</b> only. Leave Withdrawals <b>OFF</b>.</span></div>
+        <div class="krow"><span class="kk">Save</span><span class="kv">Copy both API Key + Secret Key. <b>Secret shown only once.</b></span></div>
+      </div>
+      <div class="kgroup">
+        <div class="kgroup-lbl">AI — Groq (free)</div>
+        <div class="krow"><span class="kk">Where</span><span class="kv"><b>console.groq.com</b> → API Keys → Create API Key</span></div>
+        <div class="krow"><span class="kk">Cost</span><span class="kv"><b>Completely free</b> — no credit card needed</span></div>
+      </div>
+      <div class="kgroup">
+        <div class="kgroup-lbl">Telegram (optional — highly recommended)</div>
+        <div class="krow"><span class="kk">Bot Token</span><span class="kv">Message <b>@BotFather</b> → /newbot → get your token</span></div>
+        <div class="krow"><span class="kk">Chat ID</span><span class="kv">Message <b>@userinfobot</b> → it replies with your ID</span></div>
+        <div class="krow"><span class="kk">What you get</span><span class="kv">Trade alerts + /stop, /pause, /status commands</span></div>
+      </div>
+      <button class="mark-done" onclick="markDone(2,3)">✓ Keys ready — go to Step 3</button>
+    </div>
   </div>
-  <div class="step-body hidden" id="sbLive">
 
-    <div class="warn-box">⚠ <b>Before going live, make sure:</b><br>
-    • You watched the bot trade in Paper mode for at least 3 days<br>
-    • You're comfortable with how it picks coins and enters trades<br>
-    • You deposit only money you can afford to lose<br>
-    • Crypto markets are volatile — the bot doesn't guarantee profits</div>
-
-    <div style="height:1px;background:rgba(255,255,255,.05);margin:16px 0"></div>
-
-    <div class="inst">
-      <div class="inst-dot">1</div>
-      <div class="inst-text"><b>Deposit USDT on Bybit.</b> Go to bybit.com → <b>Assets</b> → <b>Deposit</b> → select <b>USDT</b> → choose a network (TRC20 is cheapest) → send from your exchange or wallet. Start small — $50–200 is enough to test.</div>
+  <!-- Step 3: Configure -->
+  <div class="sc" id="s3">
+    <div class="sc-head" onclick="toggle(3)">
+      <div class="sc-num" id="sn3">3</div>
+      <div class="sc-title">
+        <strong>Configure your settings</strong>
+        <span>~5 minutes · web configurator</span>
+      </div>
+      <span class="sc-arr">▾</span>
     </div>
-    <div class="inst">
-      <div class="inst-dot">2</div>
-      <div class="inst-text"><b>In Railway, go to your project → Variables tab.</b> Find <b>PAPER_TRADING</b> and change the value from <code>true</code> to <code>false</code>. Click Save.</div>
+    <div class="sc-body" id="sb3">
+      <div class="inst">
+        <div class="in">1</div>
+        <div class="it">Open the configurator below. Your license key is pre-filled.</div>
+      </div>
+      <div class="inst">
+        <div class="in">2</div>
+        <div class="it">Select your exchange, choose <b>Paper Trading</b> to start (no real funds), paste your API keys and Groq key.</div>
+      </div>
+      <div class="inst">
+        <div class="in">3</div>
+        <div class="it">Click <b>Generate Railway Config →</b> — copy the output, paste into your Railway project under <b>Variables → Raw Editor</b>, click Save.</div>
+      </div>
+      <div class="inst">
+        <div class="in">4</div>
+        <div class="it">Railway redeploys automatically in ~30 seconds. Your bot is now configured.</div>
+      </div>
+      <a id="configBtn" href="/configurator" target="_blank" class="btn-config">
+        ⚙️ Open Bot Configurator →
+      </a>
+      <button class="mark-done" onclick="markDone(3,4)">✓ Settings saved — go to Step 4</button>
     </div>
-    <div class="inst">
-      <div class="inst-dot">3</div>
-      <div class="inst-text">Optionally set <b>PAPER_BALANCE</b> to how much USDT you deposited (e.g. <code>100</code> for $100). This helps the bot size positions correctly.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">4</div>
-      <div class="inst-text">Railway redeploys automatically. Check the <b>Logs</b> tab — you should see <code>Bot started in LIVE mode</code>. The bot will now execute real trades on Bybit using your balance.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">5</div>
-      <div class="inst-text">Monitor the first few trades in your Bybit account under <b>Orders → Order History</b>. Everything normal? Leave it running — it works 24/7 automatically.</div>
-    </div>
-
-    <div class="ok-box" style="margin-top:4px">✅ <b>That's it.</b> The bot runs fully automatically — no daily action needed from you. It scans markets every 5 minutes, picks the best opportunity, and executes trades.</div>
   </div>
-</div>
 
-<!-- ── TELEGRAM CARD ── -->
-<div class="section-lbl">Optional — Telegram Alerts</div>
-<div class="step-card" id="sTg">
-  <div class="step-head" onclick="toggleTg()">
-    <div class="step-num" style="background:rgba(0,229,255,.07);border-color:rgba(0,229,255,.22);color:#00e5ff;font-size:16px">📱</div>
-    <div class="step-title-wrap">
-      <div class="step-title">Get live trade alerts on your phone</div>
-      <div class="step-sub">Free — every trade, every signal, instantly on Telegram</div>
+  <!-- Step 4: Verify -->
+  <div class="sc" id="s4">
+    <div class="sc-head" onclick="toggle(4)">
+      <div class="sc-num" id="sn4">4</div>
+      <div class="sc-title">
+        <strong>Verify bot is running</strong>
+        <span>~1 minute · Railway logs</span>
+      </div>
+      <span class="sc-arr">▾</span>
     </div>
-    <div id="tgArrow" style="color:rgba(255,255,255,.2);font-size:12px">▼</div>
+    <div class="sc-body" id="sb4">
+      <div class="inst">
+        <div class="in">1</div>
+        <div class="it">In Railway, click your <b>apex-trade-bot</b> service → <b>Deployments</b> → click the active deployment → <b>View Logs</b>.</div>
+      </div>
+      <div class="inst">
+        <div class="in">2</div>
+        <div class="it">You should see: <code>✓ License valid</code> then <code>Bot started — scanning markets</code>. If you set up Telegram, you'll get a message too.</div>
+      </div>
+      <div class="inst">
+        <div class="in">3</div>
+        <div class="it">If you see an error, check your <b>API Key</b> is correct in Railway Variables. Most issues are a typo in an env var.</div>
+      </div>
+      <div class="ok-box">✅ The bot scans markets every 5 minutes. It will only open a trade when all conditions are met — this can take hours. That's normal.</div>
+      <button class="mark-done" onclick="showDone()">✓ Bot is running — done!</button>
+    </div>
   </div>
-  <div class="step-body hidden" id="sbTg">
-    <div class="inst">
-      <div class="inst-dot">1</div>
-      <div class="inst-text">Open the <b>Telegram</b> app on your phone (download free from App Store / Google Play if you don't have it).</div>
+
+  <!-- Done state -->
+  <div class="done-card" id="doneCard" style="display:none">
+    <div class="done-icon">🎉</div>
+    <h2>You're live.</h2>
+    <p>Your Apex Trade Bot is running 24/7 on Railway, scanning markets and executing trades based on your settings.</p>
+    <div class="done-grid">
+      <div class="dg"><strong>Change settings</strong><span>Open the configurator anytime to adjust risk, SL/TP, or switch to live trading.</span></div>
+      <div class="dg"><strong>Control via Telegram</strong><span>/stop, /pause, /status, /balance — from anywhere.</span></div>
+      <div class="dg"><strong>View trades</strong><span>Railway Dashboard → your service → open the /dashboard URL.</span></div>
+      <div class="dg"><strong>Switch to live</strong><span>Run paper mode for 1–2 weeks first. Validate before using real funds.</span></div>
     </div>
-    <div class="inst">
-      <div class="inst-dot">2</div>
-      <div class="inst-text">In the search bar type <b>@BotFather</b> → open it → send the message <code>/newbot</code> → it asks for a name (e.g. <code>My Apex Bot</code>) → then a username ending in <code>bot</code> (e.g. <code>myapex_bot</code>).</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">3</div>
-      <div class="inst-text">BotFather gives you a token like <code>7123456789:AAFxxxxxxx</code> — copy it. This is your <b>TELEGRAM_BOT_TOKEN</b>.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">4</div>
-      <div class="inst-text">Search for your new bot by its username → open it → press <b>Start</b> → send any message (e.g. <code>hello</code>).</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">5</div>
-      <div class="inst-text">Open this link in your browser (replace TOKEN with your actual token):<br>
-      <code>https://api.telegram.org/botTOKEN/getUpdates</code><br>
-      Look for <code>"chat":{"id":123456789}</code> — that number is your <b>TELEGRAM_CHAT_ID</b>.</div>
-    </div>
-    <div class="inst">
-      <div class="inst-dot">6</div>
-      <div class="inst-text">In Railway → Variables tab, add:<br>
-      <code>TELEGRAM_BOT_TOKEN</code> = your token<br>
-      <code>TELEGRAM_CHAT_ID</code> = your chat ID number<br>
-      Railway redeploys and from now on you get a message for every trade.</div>
-    </div>
-    <div class="ok-box">📲 You'll get alerts like: <b>"✅ BUY SOLUSDT — $42.30 | Signal: AI bullish 87%"</b> — live, as soon as the bot trades.</div>
   </div>
-</div>
 
-<!-- DONE -->
-<div class="done-card" style="margin-top:20px">
-  <div style="font-size:36px;margin-bottom:8px">🚀</div>
-  <div class="done-title">Bot is running!</div>
-  <div class="done-sub">Start in Paper Trading mode → watch results for a few days → switch to real money when you're ready.</div>
-</div>
+  <div class="support">
+    Need help? Email <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a>
+  </div>
 
-<div class="risk">⚠ Crypto trading involves real risk of loss. Always start with Paper Trading.<br>Only invest money you can afford to lose. Past performance doesn't guarantee future results.</div>
-
-</div><!-- /page -->
-
-<div class="support">
-  Stuck? Email us — <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a> — we reply within 24h
-</div>
+</div><!-- .wrap -->
 
 <script>
-/* ── LICENSE KEY ── */
-var _key = '';
-(function(){
-  var p = new URLSearchParams(location.search);
-  var k = p.get('key') || localStorage.getItem('apex_license_key');
-  if (k && k.startsWith('APEX-')) {
-    _key = k;
-    localStorage.setItem('apex_license_key', k);
-    document.getElementById('keyDisplay').textContent = k;
-    var ev = document.getElementById('envKeyVal');
-    if (ev) ev.textContent = k;
-    if (p.get('key')) history.replaceState({}, '', location.pathname);
-  } else {
-    document.getElementById('keyDisplay').textContent = 'KEY LOADING… check your email';
-    document.getElementById('keyDisplay').style.opacity = '.4';
-    document.getElementById('keyDisplay').style.cursor = 'default';
-    document.getElementById('keyDisplay').style.fontSize = '13px';
-    document.getElementById('keyDisplay').style.letterSpacing = '0';
-  }
-})();
-
-function copyKey(){
-  if (!_key) return;
-  navigator.clipboard.writeText(_key).then(() => {
-    var b = document.getElementById('copyBtn');
-    b.textContent = '✓ Copied!';
-    b.classList.add('ok');
-    setTimeout(() => { b.textContent = '📋 Copy My License Key'; b.classList.remove('ok'); }, 2000);
-  }).catch(() => { alert('Your key: ' + _key); });
+// Read license key from URL
+const params = new URLSearchParams(location.search);
+const licKey = params.get('key') || params.get('license') || '';
+if (licKey) {
+  document.getElementById('keyDisplay').textContent = licKey;
+  // Pre-fill configurator link with license key
+  document.getElementById('configBtn').href = '/configurator?key=' + encodeURIComponent(licKey);
 }
 
-function cpEnvKey(btn){ cp(btn, _key || ''); }
-
-function cp(btn, val){
-  if (!val) return;
-  navigator.clipboard.writeText(val).then(() => {
-    var prev = btn.textContent;
-    btn.textContent = '✓';
-    btn.classList.add('ok');
-    setTimeout(() => { btn.textContent = prev; btn.classList.remove('ok'); }, 1800);
-  }).catch(() => { btn.textContent = val.slice(0, 10); });
+// Copy license key
+function copyKey() {
+  const k = document.getElementById('keyDisplay').textContent;
+  if (!k || k === '—') return;
+  navigator.clipboard.writeText(k).then(() => {
+    const b = document.getElementById('cplic');
+    b.textContent = '✓ Copied!'; b.classList.add('ok');
+    setTimeout(() => { b.textContent = 'Copy License Key'; b.classList.remove('ok'); }, 2500);
+  });
 }
 
-/* ── COIN PICKER ── */
-var _selectedCoin = '';
-function pickCoin(el, val){
-  document.querySelectorAll('.coin-opt').forEach(function(o){ o.classList.remove('selected'); });
-  el.classList.add('selected');
-  _selectedCoin = val;
-  var box = document.getElementById('coinSelected');
-  var lbl = document.getElementById('coinSelectedVal');
-  box.style.display = 'flex';
-  lbl.textContent = val;
-}
-function copyCoin(){
-  if (!_selectedCoin) return;
-  navigator.clipboard.writeText(_selectedCoin).then(function(){
-    var b = document.getElementById('coinCopyBtn');
-    b.textContent = '✓ Copied!';
-    setTimeout(function(){ b.textContent = 'Copy value'; }, 1800);
-  }).catch(function(){ alert('Value: ' + _selectedCoin); });
+// Step toggle
+function toggle(n) {
+  const sc = document.getElementById('s'+n);
+  sc.classList.toggle('open');
 }
 
-/* ── TELEGRAM TOGGLE ── */
-var tgOpen = false;
-function toggleTg(){
-  var body = document.getElementById('sbTg');
-  var arrow = document.getElementById('tgArrow');
-  tgOpen = !tgOpen;
-  body.classList.toggle('hidden', !tgOpen);
-  arrow.textContent = tgOpen ? '▲' : '▼';
-  if (tgOpen) document.getElementById('sTg').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-/* ── LIVE TOGGLE ── */
-var liveOpen = false;
-function toggleLive(){
-  var body = document.getElementById('sbLive');
-  var arrow = document.getElementById('liveArrow');
-  liveOpen = !liveOpen;
-  body.classList.toggle('hidden', !liveOpen);
-  arrow.textContent = liveOpen ? '▲' : '▼';
-  if (liveOpen) document.getElementById('sLive').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-/* ── STEPS ── */
-var openStep = 1;
-
-function toggleStep(n){
-  var body = document.getElementById('sb'+n);
-  if (body.classList.contains('hidden')) {
-    // close current open
-    if (openStep && openStep !== n) {
-      var ob = document.getElementById('sb'+openStep);
-      if (ob) ob.classList.add('hidden');
-    }
-    body.classList.remove('hidden');
-    document.getElementById('s'+n).classList.add('active');
-    openStep = n;
-  } else {
-    body.classList.add('hidden');
-    document.getElementById('s'+n).classList.remove('active');
-    openStep = null;
+// Mark step done & open next
+function markDone(cur, next) {
+  const sc = document.getElementById('s'+cur);
+  sc.classList.remove('open');
+  sc.classList.add('done');
+  document.getElementById('sn'+cur).textContent = '✓';
+  if (next) {
+    const ns = document.getElementById('s'+next);
+    ns.classList.add('open');
+    ns.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
 
-function markDone(n){
-  var card = document.getElementById('s'+n);
-  card.classList.add('done');
-  card.classList.remove('active');
-  document.getElementById('sb'+n).classList.add('hidden');
-  // open next step automatically
-  var next = n + 1;
-  if (next <= 6) {
-    openStep = null;
-    toggleStep(next);
-    document.getElementById('s'+next).scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-  // persist
-  try { var d = JSON.parse(localStorage.getItem('apex_steps')||'{}'); d[n]=1; localStorage.setItem('apex_steps',JSON.stringify(d)); } catch(e){}
+// Show done
+function showDone() {
+  markDone(4, null);
+  const d = document.getElementById('doneCard');
+  d.style.display = 'block';
+  d.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
-
-// Restore done state + open first incomplete step
-(function(){
-  try {
-    var d = JSON.parse(localStorage.getItem('apex_steps')||'{}');
-    var firstIncomplete = null;
-    for (var i = 1; i <= 6; i++) {
-      if (d[i]) {
-        document.getElementById('s'+i).classList.add('done');
-      } else if (!firstIncomplete) {
-        firstIncomplete = i;
-      }
-    }
-    // open first incomplete step (or step 1 if none done)
-    var toOpen = firstIncomplete || 1;
-    openStep = null;
-    toggleStep(toOpen);
-  } catch(e) { toggleStep(1); }
-})();
 </script>
 </body>
 </html>
