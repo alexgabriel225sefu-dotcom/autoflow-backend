@@ -84,12 +84,12 @@ module.exports = {
   MIN_CONFIDENCE:  parseInt(process.env.MIN_CONFIDENCE    || '62'),    // 62% — permite mai multe intrări
 
   // ─── Trailing Stop ──────────────────────────────────────
-  TRAILING_STOP:        process.env.TRAILING_STOP !== 'false', // activat implicit
+  TRAILING_STOP:        process.env.TRAILING_STOP === 'true', // off implicit — tuning sweep: pure-TP bate trailing în chop
   TRAILING_STOP_DIST:   parseFloat(process.env.TRAILING_STOP_DIST || '0.015'), // 1.5% — lasă loc TP-ului
 
   // ─── Exit management (cut losses, let profits run) ──────
   FEE_PCT:           parseFloat(process.env.FEE_PCT || '0.001'),           // 0.1% taker/side (Binance spot)
-  BREAKEVEN_AT_R:    parseFloat(process.env.BREAKEVEN_AT_R || '1.0'),      // la +1R mută SL la breakeven (0 = off)
+  BREAKEVEN_AT_R:    parseFloat(process.env.BREAKEVEN_AT_R || '0'),        // 0 = off; tuning: BE+trail taie câștiguri în chop
   LET_WINNERS_RUN:   process.env.LET_WINNERS_RUN !== 'false',              // la TP nu închide — trailing strâns
   RUNNER_TRAIL_DIST: parseFloat(process.env.RUNNER_TRAIL_DIST || '0.005'), // 0.5% trail în runner mode
 
@@ -99,9 +99,9 @@ module.exports = {
   COOLDOWN_AFTER_LOSS_MIN: parseInt(process.env.COOLDOWN_AFTER_LOSS_MIN || '15'),
 
   // ─── ATR dinamic ────────────────────────────────────────
-  ATR_BASED_SL:  process.env.ATR_BASED_SL === 'true',  // SL/TP bazat pe ATR (volatilitate)
-  ATR_SL_MULT:   parseFloat(process.env.ATR_SL_MULT  || '1.5'), // SL = 1.5× ATR
-  ATR_TP_MULT:   parseFloat(process.env.ATR_TP_MULT  || '3.0'), // TP = 3.0× ATR
+  ATR_BASED_SL:  process.env.ATR_BASED_SL === 'true',   // SL/TP bazat pe ATR (volatilitate)
+  ATR_SL_MULT:   parseFloat(process.env.ATR_SL_MULT   || '1.5'), // SL = 1.5× ATR
+  ATR_TP_MULT:   parseFloat(process.env.ATR_TP_MULT   || '3.0'), // TP = 3.0× ATR
 
   // ─── Compound mode ──────────────────────────────────────
   COMPOUND:      process.env.COMPOUND !== 'false', // reinvestește profiturile

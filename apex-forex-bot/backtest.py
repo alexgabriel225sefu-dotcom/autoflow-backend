@@ -28,7 +28,7 @@ CANDLES = int(os.getenv("BT_CANDLES") or 2000)
 SLIPPAGE_PIPS = float(os.getenv("BT_SLIPPAGE_PIPS") or 0.3)
 SPREAD_PIPS = float(os.getenv("BT_SPREAD_PIPS") or 1.0)
 SYNTHETIC = os.getenv("BT_SYNTHETIC") == "true"
-MIN_CRITERIA = int(os.getenv("MIN_CRITERIA") or 3)  # același default ca bot.py
+MIN_CRITERIA = int(os.getenv("MIN_CRITERIA") or 4)  # 4/5 — tuning sweep: mai puține semnale dar mai curate
 
 logger.info = lambda *a, **k: None  # fără spam pe mii de lumânări
 

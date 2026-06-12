@@ -43,7 +43,7 @@ SCAN_SYMBOLS = (os.getenv("SCAN_SYMBOLS") or "EUR_USD,GBP_USD,USD_JPY,AUD_USD,US
 MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
 
 # ─── Risk ───────────────────────────────────────────────
-RISK_PER_TRADE = float(os.getenv("RISK_PER_TRADE") or 0.02)   # 2% — forex standard
+RISK_PER_TRADE = float(os.getenv("RISK_PER_TRADE") or 0.01)   # 1% — conservative default validated by tuning sweep
 STOP_LOSS_PIPS = float(os.getenv("STOP_LOSS_PIPS") or 15)
 TAKE_PROFIT_PIPS = float(os.getenv("TAKE_PROFIT_PIPS") or 30)  # 1:2 R:R
 MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 62)
@@ -52,11 +52,11 @@ MARGIN_CAP = float(os.getenv("MARGIN_CAP") or 0.5)             # use ≤50% of a
 MAX_SPREAD_PIPS = float(os.getenv("MAX_SPREAD_PIPS") or 3.0)   # skip entries on wide spreads
 
 # ─── Trailing stop ──────────────────────────────────────
-TRAILING_STOP = os.getenv("TRAILING_STOP") != "false"
+TRAILING_STOP = os.getenv("TRAILING_STOP") == "true"  # off implicit — tuning: pure-TP bate trailing în chop
 TRAILING_STOP_PIPS = float(os.getenv("TRAILING_STOP_PIPS") or 10)
 
 # ─── Exit management (cut losses, let profits run) ──────
-BREAKEVEN_AT_R = float(os.getenv("BREAKEVEN_AT_R") or 1.0)        # la +1R mută SL la breakeven (0 = off)
+BREAKEVEN_AT_R = float(os.getenv("BREAKEVEN_AT_R") or 0)           # 0 = off; tuning: BE+trail taie câștiguri în chop
 LET_WINNERS_RUN = os.getenv("LET_WINNERS_RUN") != "false"          # la TP nu închide — trailing strâns (doar paper)
 RUNNER_TRAIL_PIPS = float(os.getenv("RUNNER_TRAIL_PIPS") or 6)     # trail în runner mode
 
