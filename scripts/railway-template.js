@@ -27,22 +27,18 @@ async function gql(query, variables) {
 }
 
 async function main() {
-  // 1. Get user info + team ID
-  const meRes = await gql(`query { me { id teams { edges { node { id name } } } } }`);
+  // 1. Verify auth
+  const meRes = await gql(`query { me { id name email } }`);
   if (!meRes.json.data) { summary('AUTH FAILED: ' + JSON.stringify(meRes.json).slice(0, 500)); process.exit(1); }
   const me = meRes.json.data.me;
-  const teamId = me.teams.edges[0]?.node?.id;
-  summary(`Authenticated. teamId=${teamId || 'none (personal)'}`);
+  summary(`Authenticated as ${me.email || me.name} (id=${me.id})`);
 
   // 2. Create a Railway project
   const projRes = await gql(`
     mutation($input: ProjectCreateInput!) {
       projectCreate(input: $input) { id name }
     }`, {
-    input: {
-      name: 'apex-trade-bot-template-source',
-      ...(teamId ? { teamId } : {}),
-    },
+    input: { name: 'apex-trade-bot-template-source' },
   });
   const proj = projRes.json.data?.projectCreate;
   if (!proj) { summary('PROJECT CREATE FAILED: ' + JSON.stringify(projRes.json).slice(0, 1000)); process.exit(1); }
@@ -91,7 +87,6 @@ async function main() {
       category: 'Other',
       description: 'AI crypto trading bot — RSI, MACD, legendary trader strategies, trailing stop, Telegram alerts.',
       readme: 'AI-powered crypto trading bot. Purchase a license at https://aicashsystem.space then add your license key, Binance API keys, and a free Groq key. Starts in paper-trading (simulated) mode by default.',
-      ...(teamId ? { workspaceId: teamId } : {}),
     },
   });
   summary('templatePublish result: ' + JSON.stringify(pubRes.json).slice(0, 500));
