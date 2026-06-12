@@ -55,7 +55,7 @@ function criteriaSignal(ind, strat) {
   if (price > ema20) sell++;
   sell += bonus('SELL');
 
-  const minC = parseInt(process.env.MIN_CRITERIA || '4');
+  const minC = parseInt(process.env.MIN_CRITERIA || '5');
   if (buy >= minC && buy > sell) return { action: 'BUY', criteriaScore: Math.min(5, buy) };
   if (sell >= minC && sell > buy) return { action: 'SELL', criteriaScore: Math.min(5, sell) };
   return { action: 'HOLD', criteriaScore: 0 };

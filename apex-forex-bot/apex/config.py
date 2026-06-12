@@ -43,7 +43,7 @@ SCAN_SYMBOLS = (os.getenv("SCAN_SYMBOLS") or "EUR_USD,GBP_USD,USD_JPY,AUD_USD,US
 MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
 
 # ─── Risk ───────────────────────────────────────────────
-RISK_PER_TRADE = float(os.getenv("RISK_PER_TRADE") or 0.01)   # 1% — conservative default validated by tuning sweep
+RISK_PER_TRADE = float(os.getenv("RISK_PER_TRADE") or 0.005)  # 0.5% — tuning r3: scales linearly; 1% → -9.7%/10d in chop
 STOP_LOSS_PIPS = float(os.getenv("STOP_LOSS_PIPS") or 15)
 TAKE_PROFIT_PIPS = float(os.getenv("TAKE_PROFIT_PIPS") or 30)  # 1:2 R:R
 MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 62)
@@ -62,6 +62,7 @@ RUNNER_TRAIL_PIPS = float(os.getenv("RUNNER_TRAIL_PIPS") or 6)     # trail în r
 
 # ─── Entry filters (anti-chop) ──────────────────────────
 HTF_FILTER = os.getenv("HTF_FILTER") != "false"                    # nu intra contra trendului mare
+HTF_STRICT = os.getenv("HTF_STRICT") == "true"                     # intră DOAR pe direcția HTF (tuning: best forex config)
 HTF_TIMEFRAME = os.getenv("HTF_TIMEFRAME") or "1h"
 COOLDOWN_AFTER_LOSS_MIN = int(os.getenv("COOLDOWN_AFTER_LOSS_MIN") or 15)
 

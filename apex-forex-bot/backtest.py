@@ -28,7 +28,7 @@ CANDLES = int(os.getenv("BT_CANDLES") or 2000)
 SLIPPAGE_PIPS = float(os.getenv("BT_SLIPPAGE_PIPS") or 0.3)
 SPREAD_PIPS = float(os.getenv("BT_SPREAD_PIPS") or 1.0)
 SYNTHETIC = os.getenv("BT_SYNTHETIC") == "true"
-MIN_CRITERIA = int(os.getenv("MIN_CRITERIA") or 4)  # 4/5 — tuning sweep: mai puține semnale dar mai curate
+MIN_CRITERIA = int(os.getenv("MIN_CRITERIA") or 4)  # 4/5 — forex: mc4>mc5 (mc5 prea puține semnale pe 3000 lumânări)
 
 logger.info = lambda *a, **k: None  # fără spam pe mii de lumânări
 
@@ -173,7 +173,7 @@ def run():
             continue
         if cfg.HTF_FILTER:
             htf = strategies.htf_trend(resample_1h(window[-720:]))
-            if os.getenv("BT_HTF_STRICT") == "true":
+            if os.getenv("BT_HTF_STRICT") == "true" or cfg.HTF_STRICT:
                 # strict: intră DOAR pe direcția trendului 1h (NEUTRAL = HOLD)
                 if htf != ("BULLISH" if sig["action"] == "BUY" else "BEARISH"):
                     continue

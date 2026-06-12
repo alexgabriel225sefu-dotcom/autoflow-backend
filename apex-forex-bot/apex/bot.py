@@ -460,7 +460,12 @@ def tick():
                 htf = strategies.htf_trend(broker.get_candles(symbol, cfg.HTF_TIMEFRAME, 60))
             except Exception:
                 htf = "NEUTRAL"
-            if ((signal["action"] == "BUY" and htf == "BEARISH")
+            if cfg.HTF_STRICT:
+                # strict mode (tuning r3 best forex): intră DOAR pe direcția HTF, NEUTRAL=HOLD
+                if htf != ("BULLISH" if signal["action"] == "BUY" else "BEARISH"):
+                    logger.warn(f"⚡ HTF strict: {signal['action']} needs {htf} → HOLD")
+                    signal["action"] = "HOLD"
+            elif ((signal["action"] == "BUY" and htf == "BEARISH")
                     or (signal["action"] == "SELL" and htf == "BULLISH")):
                 logger.warn(f"⚡ {cfg.HTF_TIMEFRAME} filter: {signal['action']} against {htf} trend — HOLD (trade with the tape)")
                 signal["action"] = "HOLD"
