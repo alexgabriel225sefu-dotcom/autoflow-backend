@@ -71,7 +71,7 @@ module.exports = {
 
   // ─── Scanner multi-simbol ───────────────────────────────
   // Ordonate după volatilitate + lichiditate + potențial profit pe capital mic
-  SCAN_SYMBOLS: (process.env.SCAN_SYMBOLS || 'SOLUSDT,XRPUSDT,DOGEUSDT,TRXUSDT,ADAUSDT').split(','),
+  SCAN_SYMBOLS: (process.env.SCAN_SYMBOLS || 'XRPUSDT,SOLUSDT,BTCUSDT,BNBUSDT,ADAUSDT').split(','),
   MULTI_SYMBOL: process.env.MULTI_SYMBOL !== 'false', // activat implicit
 
   // ─── Risc (optimizat pt 5m + capital mic $10-50) ────────────
@@ -79,8 +79,8 @@ module.exports = {
   // 5% din balanță per poziție default. 20% era iresponsabil ca default —
   // cu Druckenmiller ×2 ajungea la 40% din cont pe un singur trade.
   RISK_PER_TRADE:  parseFloat(process.env.RISK_PER_TRADE  || '0.05'),
-  STOP_LOSS_PCT:   parseFloat(process.env.STOP_LOSS_PCT   || '0.008'), // 0.8% (potrivit pt 5m)
-  TAKE_PROFIT_PCT: parseFloat(process.env.TAKE_PROFIT_PCT || '0.016'), // 1.6% → R:R = 2:1
+  STOP_LOSS_PCT:   parseFloat(process.env.STOP_LOSS_PCT   || '0.008'), // 0.8% — tuning r4: standard SL wins for XRP
+  TAKE_PROFIT_PCT: parseFloat(process.env.TAKE_PROFIT_PCT || '0.040'), // 4.0% → R:R 5:1 — tuning r4: XRP rr5 +0.36% PF 1.83
   MIN_CONFIDENCE:  parseInt(process.env.MIN_CONFIDENCE    || '62'),    // 62% — permite mai multe intrări
 
   // ─── Trailing Stop ──────────────────────────────────────
