@@ -34,37 +34,37 @@ async function main() {
   const projects = projsRes.json.data?.projects?.edges || [];
   summary(`Found ${projects.length} projects: ${projects.map(e => e.node.name).join(', ')}`);
 
-  const proj = projects.find(e => /apex|trade|bot/i.test(e.node.name))?.node || projects[0]?.node;
-  if (!proj) { summary('NO PROJECT FOUND — need a Railway project to generate template from'); process.exit(1); }
-  summary(`Using project: id=${proj.id} name=${proj.name}`);
+  // Use the apex-trade project (not forex)
+  const proj = projects.find(e => /^apex.trade$/i.test(e.node.name)) ||
+               projects.find(e => /apex.trade/i.test(e.node.name) && !/forex/i.test(e.node.name)) ||
+               projects[0];
+  const projNode = proj?.node;
+  if (!projNode) { summary('NO PROJECT FOUND'); process.exit(1); }
+  summary(`Using project: id=${projNode.id} name=${projNode.name}`);
 
-  // 3. Get the default environment ID
-  const envRes = await gql(`query($id: String!) { project(id: $id) { environments { edges { node { id name } } } } }`, { id: proj.id });
-  const envId = envRes.json.data?.project?.environments?.edges[0]?.node?.id;
-  if (!envId) { summary('ENV NOT FOUND: ' + JSON.stringify(envRes.json).slice(0, 500)); process.exit(1); }
+  // 3. Inspect project services
+  const projRes2 = await gql(`
+    query($id: String!) {
+      project(id: $id) {
+        environments { edges { node { id name } } }
+        services { edges { node { id name source { repo image } } } }
+      }
+    }`, { id: projNode.id });
+  summary('project detail: ' + JSON.stringify(projRes2.json.data?.project).slice(0, 2000));
+
+  const envId = projRes2.json.data?.project?.environments?.edges[0]?.node?.id;
+  if (!envId) { summary('ENV NOT FOUND'); process.exit(1); }
   summary(`Environment: id=${envId}`);
 
-  // 4. Create service from GitHub repo
-  const svcRes = await gql(`
-    mutation($input: ServiceCreateInput!) {
-      serviceCreate(input: $input) { id name }
-    }`, {
-    input: {
-      projectId: proj.id,
-      name: 'apex-trade-bot',
-      source: { repo: 'alexgabriel225sefu-dotcom/apex-trade-bot' },
-    },
-  });
-  const svc = svcRes.json.data?.serviceCreate;
-  if (!svc) { summary('SERVICE CREATE FAILED: ' + JSON.stringify(svcRes.json).slice(0, 1000)); process.exit(1); }
-  summary(`Service created: id=${svc.id}`);
+  const existingSvcs = projRes2.json.data?.project?.services?.edges || [];
+  summary(`Existing services: ${existingSvcs.map(e => e.node.name).join(', ')}`);
 
-  // 5. Generate template from project
+  // 5. Generate template from project using existing services (with GitHub source)
   const genRes = await gql(`
     mutation($input: TemplateGenerateInput!) {
       templateGenerate(input: $input) { id code }
     }`, {
-    input: { projectId: proj.id, environmentId: envId },
+    input: { projectId: projNode.id, environmentId: envId },
   });
   const tpl = genRes.json.data?.templateGenerate;
   if (!tpl) { summary('TEMPLATE GENERATE FAILED: ' + JSON.stringify(genRes.json).slice(0, 1000)); process.exit(1); }
