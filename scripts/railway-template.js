@@ -27,25 +27,16 @@ async function gql(query, variables) {
 }
 
 async function main() {
-  // 1. Test token with a simple query
-  const meRes = await gql(`query { me { id name email } }`);
-  if (!meRes.json.data) {
-    summary('me query failed (maybe scope issue), trying projectCreate directly...');
-  } else {
-    const me = meRes.json.data.me;
-    summary(`Authenticated as ${me.email || me.name} (id=${me.id})`);
-  }
+  // 1. Find existing apex-trade-bot project
+  summary('Looking for existing Railway projects...');
+  const projsRes = await gql(`query { projects { edges { node { id name } } } }`);
+  summary('projects query: ' + JSON.stringify(projsRes.json).slice(0, 2000));
+  const projects = projsRes.json.data?.projects?.edges || [];
+  summary(`Found ${projects.length} projects: ${projects.map(e => e.node.name).join(', ')}`);
 
-  // 2. Create a Railway project
-  const projRes = await gql(`
-    mutation($input: ProjectCreateInput!) {
-      projectCreate(input: $input) { id name }
-    }`, {
-    input: { name: 'apex-trade-bot-template-source' },
-  });
-  const proj = projRes.json.data?.projectCreate;
-  if (!proj) { summary('PROJECT CREATE FAILED: ' + JSON.stringify(projRes.json).slice(0, 1000)); process.exit(1); }
-  summary(`Project created: id=${proj.id} name=${proj.name}`);
+  const proj = projects.find(e => /apex|trade|bot/i.test(e.node.name))?.node || projects[0]?.node;
+  if (!proj) { summary('NO PROJECT FOUND — need a Railway project to generate template from'); process.exit(1); }
+  summary(`Using project: id=${proj.id} name=${proj.name}`);
 
   // 3. Get the default environment ID
   const envRes = await gql(`query($id: String!) { project(id: $id) { environments { edges { node { id name } } } } }`, { id: proj.id });
@@ -94,9 +85,7 @@ async function main() {
   });
   summary('templatePublish result: ' + JSON.stringify(pubRes.json).slice(0, 500));
 
-  // 7. Clean up temp project (optional — comment out if you want to keep it)
-  await gql(`mutation($id: String!) { projectDelete(id: $id) }`, { id: proj.id });
-  summary('Temp project deleted.');
+  // 7. No cleanup — we used an existing project, don't delete it
 
   summary('');
   summary(`=== DONE ===`);
