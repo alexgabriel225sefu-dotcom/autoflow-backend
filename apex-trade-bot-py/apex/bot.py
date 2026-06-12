@@ -401,18 +401,37 @@ def tick():
 
 # ─── Dashboard HTTP server ────────────────────────────────
 def _start_dashboard_server():
+    from urllib.parse import urlparse, parse_qs
     port = int(os.getenv("PORT") or os.getenv("DASHBOARD_PORT") or 3000)
+    token = os.getenv("DASHBOARD_TOKEN") or ""
+    if not token:
+        print("⚠️  DASHBOARD_TOKEN not set — the dashboard (balance + trade history) "
+              "is PUBLIC on your Railway URL.")
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
 
+        def _authorized(self):
+            if not token:
+                return True
+            qs = parse_qs(urlparse(self.path).query)
+            if qs.get("token", [""])[0] == token:
+                return True
+            bearer = (self.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+            return bearer == token
+
         def do_GET(self):
-            if self.path == "/api/status":
+            if not self._authorized():
+                self.send_response(401)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"Unauthorized - open with ?token=YOUR_DASHBOARD_TOKEN")
+                return
+            if self.path.startswith("/api/status"):
                 body = json.dumps({**dash, "tickCount": tick_count}).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(body)
             else:
