@@ -2102,12 +2102,12 @@ app.get('/admin/sync-bot-repo', async (req, res) => {
 
   const readmeContent = `# Apex Trade Bot 🤖
 
-AI-powered crypto trading bot. Deploy with one click on Railway.
+AI-powered crypto trading bot. Deploy with one click on Render.
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/${OWNER}/${REPO})
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/${OWNER}/${REPO})
 
 ## Setup
-After deploying, add these variables in Railway → Variables:
+After deploying, add these environment variables in Render → Environment:
 
 | Variable | Value |
 |----------|-------|
