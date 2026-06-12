@@ -31,28 +31,22 @@ jobs:
             shift 2
             env "$@" BT_SYMBOL="$SYM" node src/backtest.js | grep -E "Perioadă|Win rate|Rezultat|Expectancy|Exituri|Max draw" || true
           }
-          # ── Runda 8A: ADA confirmare rr2 (R7 a testat doar rr3 pe ADA) ─────────────
-          # R7C: ADA sl1.6-rr3=+0.81% PF2.73. Restul simbolurilor câștigă la rr2.
-          # Testăm ADA sl1.6-rr2 și rr3 pe 9600 lumânări — robustețe pe 33 zile.
-          echo "======== RUNDA 8A: ADA long-window (9600c) validare — sl1.6 rr2 vs rr3 ========"
-          export SYM=ADAUSDT
-          run_cfg ada-sl1.6-rr2-9600  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PCT=0.016 TAKE_PROFIT_PCT=0.032 BT_CANDLES=9600
-          run_cfg ada-sl1.6-rr3-9600  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PCT=0.016 TAKE_PROFIT_PCT=0.048 BT_CANDLES=9600
-
-          echo ""
-          echo "======== RUNDA 8B: XRP long-window (9600c) — singura fereastră testată ========"
-          # XRP sl1.6-rr2 = +0.45% PF1.97 (R7, 17 zile). Validăm pe 33 zile.
-          export SYM=XRPUSDT
-          run_cfg xrp-sl1.6-rr2-9600  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PCT=0.016 TAKE_PROFIT_PCT=0.032 BT_CANDLES=9600
-          run_cfg xrp-sl1.6-rr3-9600  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PCT=0.016 TAKE_PROFIT_PCT=0.048 BT_CANDLES=9600
-
-          echo ""
-          echo "======== RUNDA 8C: ETH vs ADA comparație directă — același simbol, aceeași fereastră ========"
-          # Pe R7 ambele testate pe aceeași fereastră 4800c: ADA > ETH clar.
-          # Confirmăm că ADA > ETH și pe 9600c — validăm decizia de swap BNB→ADA.
-          for SYM in ETHUSDT ADAUSDT; do
+          # ── Runda 9A: ADA a 3-a fereastră 4800c — confirmare finală ─────────────────
+          # R7C: ADA sl1.6-rr2 +0.59% (4800c). R8C: ADA sl1.6-rr2 +0.59% (4800c fresh).
+          # R8A: ADA sl1.6-rr2 +1.04% (9600c). Confirmăm cu o a 3-a fereastră scurtă.
+          echo "======== RUNDA 9A: ADA a 3-a fereastră 4800c + BNB ca reper negativ ========"
+          for SYM in ADAUSDT BNBUSDT SOLUSDT; do
             export SYM
             run_cfg mc5-sl1.6-rr2  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PCT=0.016 TAKE_PROFIT_PCT=0.032 BT_CANDLES=4800
+          done
+
+          echo ""
+          echo "======== RUNDA 9B: Configurație default finală — toți 5 simboluri, aceeași fereastră ========"
+          # Rulăm configurația exactă din config.js default pe toți 5 simboluri noi
+          # pentru a vedea performanța agregată a botului ca un tot.
+          for SYM in XRPUSDT SOLUSDT BTCUSDT ADAUSDT ETHUSDT; do
+            export SYM
+            run_cfg final-default  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PCT=0.016 TAKE_PROFIT_PCT=0.032 BT_CANDLES=4800
           done
 
   forex:
@@ -85,26 +79,23 @@ jobs:
             env "$@" BT_SYMBOL="$sym" python backtest.py | grep -E "Perioadă|Win rate|Rezultat|Expectancy|Exituri|Max DD" || true
             sleep 12  # TD free tier: 8 credite/min
           }
-          echo "======== RUNDA 8A: NZD sl30-rr2 a 3-a fereastră de confirmare ========"
-          # R6: nzd-sl30-rr3 = +2.59% (fereastră 1). R7: nzd-sl30-rr2 = +1.51% (fereastră 2).
-          # Rulăm din nou nzd-sl30-rr2 pe date noi (fereastră 3) — verificăm consistența.
-          run_cfg nzd-sl30-rr2    NZD_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=30 TAKE_PROFIT_PIPS=60
-          # Și sl25-rr2 (mai sigur, mai scurt SL) — comparație cross-rundă
-          run_cfg nzd-sl25-rr2    NZD_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=50
-          # sl20-rr2 (cel mai strâns SL cu rr2)
+          echo "======== RUNDA 9A: NZD sl20-rr2 a 2-a fereastră — cel mai bun config din R8 ========"
+          # R8: nzd-sl20-rr2 = +2.03% PF1.87 (o singură fereastră). Testăm pe date noi.
+          # Dacă confirmă, actualizăm config-ul la sl20/40p din sl30/60p.
           run_cfg nzd-sl20-rr2    NZD_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=20 TAKE_PROFIT_PIPS=40
+          # sl30-rr2 ca referință pe același window nou
+          run_cfg nzd-sl30-rr2    NZD_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=30 TAKE_PROFIT_PIPS=60
 
           echo ""
-          echo "======== RUNDA 8B: AUD sl20-rr2 pe date noi — poate AUD se redresează ========"
-          # R7C: aud-sl20-rr2 = -0.07% (fereastră specifică). Testăm pe date noi.
-          run_cfg aud-sl20-rr2    AUD_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=20 TAKE_PROFIT_PIPS=40
-          run_cfg aud-sl25-rr2    AUD_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=50
-          run_cfg aud-sl30-rr2    AUD_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=30 TAKE_PROFIT_PIPS=60
+          echo "======== RUNDA 9B: NZD sl20 R:R bracket — rr2 vs rr3 pe sl20 ========"
+          # sl20-rr2 câștigă în R8. Testăm dacă rr3 (60p TP) sau rr4 (80p) bat rr2 (40p).
+          run_cfg nzd-sl20-rr3    NZD_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=20 TAKE_PROFIT_PIPS=60
+          run_cfg nzd-sl20-rr4    NZD_USD MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=20 TAKE_PROFIT_PIPS=80
 
           echo ""
-          echo "======== RUNDA 8C: NZD mc3 cu rr2 — mai multe intrări, același edge? ========"
-          # mc4 e filtrul curent. mc3 generează mai multe trade-uri — dacă edge-ul e robust, PF rămâne bun.
-          run_cfg nzd-mc3-sl30-rr2  NZD_USD MIN_CRITERIA=3 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=30 TAKE_PROFIT_PIPS=60
-          run_cfg nzd-mc3-sl25-rr2  NZD_USD MIN_CRITERIA=3 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=25 TAKE_PROFIT_PIPS=50
-          # NZD mc5 (filtru maxim) — mai puține trade-uri, WR mai mare?
-          run_cfg nzd-mc5-sl30-rr2  NZD_USD MIN_CRITERIA=5 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=30 TAKE_PROFIT_PIPS=60
+          echo "======== RUNDA 9C: Config default final forex — NZD sl30-rr2 pe toate perechile ========"
+          # NZD sl30-rr2 e confirmat pe 3 ferestre. Testăm configurația default actuală pe
+          # toate perechile din SCAN_SYMBOLS pentru a vedea performanța agregată a botului.
+          for sym in NZD_USD AUD_USD EUR_USD USD_JPY USD_CAD; do
+            run_cfg final-sl30-rr2  "$sym" MIN_CRITERIA=4 BT_HTF_STRICT=true TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PIPS=30 TAKE_PROFIT_PIPS=60
+          done
