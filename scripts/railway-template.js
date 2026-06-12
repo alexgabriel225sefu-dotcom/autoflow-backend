@@ -27,11 +27,14 @@ async function gql(query, variables) {
 }
 
 async function main() {
-  // 1. Verify auth
+  // 1. Test token with a simple query
   const meRes = await gql(`query { me { id name email } }`);
-  if (!meRes.json.data) { summary('AUTH FAILED: ' + JSON.stringify(meRes.json).slice(0, 500)); process.exit(1); }
-  const me = meRes.json.data.me;
-  summary(`Authenticated as ${me.email || me.name} (id=${me.id})`);
+  if (!meRes.json.data) {
+    summary('me query failed (maybe scope issue), trying projectCreate directly...');
+  } else {
+    const me = meRes.json.data.me;
+    summary(`Authenticated as ${me.email || me.name} (id=${me.id})`);
+  }
 
   // 2. Create a Railway project
   const projRes = await gql(`
