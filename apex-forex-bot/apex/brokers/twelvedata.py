@@ -9,6 +9,7 @@ Set in .env:
     PAPER_TRADING=true   (required — TD does not execute real orders)
 """
 import time
+import calendar
 import threading
 import requests
 from apex import config as cfg
@@ -144,7 +145,7 @@ def get_candles(instrument=None, interval=None, limit=None):
     candles = []
     for row in data["values"]:
         try:
-            ts = int(time.mktime(time.strptime(row["datetime"], "%Y-%m-%d %H:%M:%S")))
+            ts = int(calendar.timegm(time.strptime(row["datetime"], "%Y-%m-%d %H:%M:%S")))
             candles.append({
                 "time": ts,
                 "open": float(row["open"]),

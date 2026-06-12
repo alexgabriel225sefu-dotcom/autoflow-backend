@@ -91,6 +91,7 @@ def place_order(side, units, instrument=None, sl=None, tp=None):
         order["takeProfitOnFill"] = {"price": f"{tp:.{prec}f}", "timeInForce": "GTC"}
     r = requests.post(f"{_base()}/accounts/{cfg.OANDA_ACCOUNT_ID}/orders",
                       json={"order": order}, headers=_headers(), timeout=10)
+    r.raise_for_status()
     data = r.json()
     if "orderRejectTransaction" in data:
         reason = data["orderRejectTransaction"].get("rejectReason", "unknown")
@@ -113,6 +114,7 @@ def close_position(instrument=None):
     r = requests.put(f"{_base()}/accounts/{cfg.OANDA_ACCOUNT_ID}/positions/{instrument}/close",
                      json={"longUnits": "ALL", "shortUnits": "ALL"},
                      headers=_headers(), timeout=10)
+    r.raise_for_status()
     data = r.json()
     tx = data.get("longOrderFillTransaction") or data.get("shortOrderFillTransaction") or {}
     fill_price = float(tx["price"]) if tx.get("price") else None
