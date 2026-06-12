@@ -190,26 +190,10 @@ a{color:inherit;text-decoration:none}
     <button class="hdr-buy" onclick="location.href='/'">Get Full Access — $97</button>
   </div>
 
-  <!-- urgency bar -->
-  <div class="urgency-bar">
-    <div class="urg-left"><strong id="buyers-count">14</strong> people bought today · <strong id="spots-left">6</strong> spots left at $97</div>
-    <div class="urg-cd">
-      <span>Price goes up in</span>
-      <span class="urg-cd-val" id="urg-mm">09</span>:<span class="urg-cd-val" id="urg-ss">47</span>
-    </div>
-  </div>
-
   <div class="hero">
     <div class="hero-pill">🔴 Live Demo — No Signup</div>
-    <h1 class="hero-h1">See exactly how you build<br><span>a $800–$1,200 automation</span></h1>
-    <p class="hero-sub">Type what you want to automate. Watch Blueprint Studio generate a real Make.com plan, your selling price, and a copy-paste client message — in 60 seconds.</p>
-    <div class="hero-stats">
-      <div class="hero-stat"><div class="hero-stat-v">247</div><div class="hero-stat-l">Students</div></div>
-      <div class="hero-sep"></div>
-      <div class="hero-stat"><div class="hero-stat-v">$850</div><div class="hero-stat-l">Avg/client</div></div>
-      <div class="hero-sep"></div>
-      <div class="hero-stat"><div class="hero-stat-v" id="live-users">3</div><div class="hero-stat-l">Live now</div></div>
-    </div>
+    <h1 class="hero-h1">See exactly how you build<br><span>a client-ready automation</span></h1>
+    <p class="hero-sub">Type what you want to automate. Watch Blueprint Studio generate a real Make.com plan, a suggested selling price, and a copy-paste client message — in 60 seconds.</p>
   </div>
 
   <div class="input-card">
@@ -311,24 +295,9 @@ a{color:inherit;text-decoration:none}
 
       <div class="fomo-top">
         <div class="fomo-tag">⚡ Your blueprint is ready</div>
-        <div class="fomo-h">Don't leave <span>$1,200</span><br>on the table</div>
+        <div class="fomo-h">Get the full<br><span>toolkit</span></div>
         <div class="fomo-sub">You just saw how fast it works. Now get everything you need to sell it to clients — starting today.</div>
       </div>
-
-      <!-- countdown -->
-      <div class="fomo-cd-row">
-        <div class="fomo-cd-box">
-          <div class="fomo-cd-num" id="cd-mm">09</div>
-          <div class="fomo-cd-lbl">Min</div>
-        </div>
-        <div class="fomo-cd-sep">:</div>
-        <div class="fomo-cd-box">
-          <div class="fomo-cd-num" id="cd-ss">47</div>
-          <div class="fomo-cd-lbl">Sec</div>
-        </div>
-      </div>
-      <div class="fomo-cd-msg" id="cd-msg">Price locks at <strong>$97</strong> for the next <strong id="cd-label">9 min 47 sec</strong></div>
-      <div class="fomo-buyers">🔥 <strong id="fomo-buyers-txt">14 people</strong> bought Blueprint Studio today</div>
 
       <div class="fomo-items">
         <div class="fomo-item">
@@ -361,67 +330,16 @@ a{color:inherit;text-decoration:none}
 
       <button class="fomo-cta" onclick="location.href='/'">⚡ Unlock Everything — $97</button>
 
-      <!-- testimonials -->
-      <div class="testi-section">
-        <div class="testi-h">Students already earning</div>
-        <div class="testi-grid">
-          <div class="testi-card">
-            <div class="testi-top">
-              <div class="testi-av">🇷🇴</div>
-              <div class="testi-meta">
-                <div class="testi-name">Alex M.</div>
-                <div class="testi-loc">Romania</div>
-              </div>
-            </div>
-            <div class="testi-earn">$900</div>
-            <div class="testi-desc">First client 3 days after watching the course. WhatsApp bot for a restaurant.</div>
-          </div>
-          <div class="testi-card">
-            <div class="testi-top">
-              <div class="testi-av">🇬🇧</div>
-              <div class="testi-meta">
-                <div class="testi-name">Sarah K.</div>
-                <div class="testi-loc">United Kingdom</div>
-              </div>
-            </div>
-            <div class="testi-earn">$1,100</div>
-            <div class="testi-desc">Sold a lead follow-up automation on the first cold DM I sent.</div>
-          </div>
-          <div class="testi-card">
-            <div class="testi-top">
-              <div class="testi-av">🇮🇹</div>
-              <div class="testi-meta">
-                <div class="testi-name">Marco D.</div>
-                <div class="testi-loc">Italy</div>
-              </div>
-            </div>
-            <div class="testi-earn">$3,400/mo</div>
-            <div class="testi-desc">3 retainer clients. $1,100 avg/month each. Best decision I made.</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="fomo-proof" style="margin-top:16px">
-        <div class="fomo-proof-dot"></div>
-        <span>247 students enrolled</span>
-        <span>·</span>
-        <span>avg $850/client</span>
-        <span>·</span>
-        <span>first client this week</span>
-      </div>
-      <div class="fomo-gtee">🔒 Secure checkout · 30-day money-back guarantee</div>
+      <div class="fomo-gtee">🔒 Secure checkout via Stripe</div>
     </div>
   </div>
 
-  <div class="proof-bar" id="proof-bar" style="display:none">
-    <div class="proof-live"></div>
-    <span id="proof-txt">3 people are looking at this right now</span>
+  <div style="text-align:center;padding:20px 0;font-size:11px;color:#666">
+    Results vary — no income guarantee. <a href="/privacy" style="color:inherit">Privacy Policy</a> · <a href="/terms" style="color:inherit">Terms of Service</a>
   </div>
 
 </div><!-- /wrap -->
 
-<!-- activity popup -->
-<div id="act"></div>
 <div id="toast"></div>
 
 <script>
@@ -490,7 +408,6 @@ async function generate(){
   $('loading').style.display='flex';
   $('results').style.display='none';
   $('fomo').style.display='none';
-  $('proof-bar').style.display='none';
   resetLoading();
   startLoading();
 
@@ -518,7 +435,6 @@ function showResults(d){
   if(d.outreach) $('out-outreach').textContent=d.outreach;
   $('results').style.display='flex';
   setTimeout(showFomo, 800);
-  setTimeout(function(){ $('proof-bar').style.display='flex'; }, 1400);
   setTimeout(function(){ $('fomo').scrollIntoView({behavior:'smooth',block:'start'}); }, 1200);
 }
 
@@ -527,104 +443,6 @@ function showFomo(){
   toast('🔒 Your blueprint is locked — unlock everything for $97','');
 }
 
-/* ── countdown (shared between urgency bar + fomo) ── */
-var _cdSec = 1547 + Math.floor(Math.random()*600);
-function tickCd(){
-  if(_cdSec<=0){ _cdSec=0; }
-  var m=Math.floor(_cdSec/60), s=_cdSec%60;
-  var mm=pad(m), ss=pad(s);
-  /* urgency bar */
-  $('urg-mm').textContent=mm; $('urg-ss').textContent=ss;
-  /* fomo section */
-  $('cd-mm').textContent=mm; $('cd-ss').textContent=ss;
-  $('cd-label').textContent=m+'m '+s+'s';
-  if(_cdSec>0){ _cdSec--; setTimeout(tickCd,1000); }
-}
-tickCd();
-
-/* ── live users counter (fluctuates realistically) ── */
-var _liveBase=3;
-setInterval(function(){
-  var delta=Math.random()<.5?1:-1;
-  _liveBase=Math.max(2,Math.min(8,_liveBase+delta));
-  $('live-users').textContent=_liveBase;
-  $('proof-txt').textContent=_liveBase+' people are looking at this right now';
-},18000);
-
-/* ── buyers counter (slowly ticks up) ── */
-var _buyersCount=14;
-setInterval(function(){
-  if(Math.random()<.25){
-    _buyersCount++;
-    $('buyers-count').textContent=_buyersCount;
-    $('fomo-buyers-txt').textContent=_buyersCount+' people';
-    var sl=Math.max(0, 20-_buyersCount);
-    $('spots-left').textContent=sl;
-  }
-},90000);
-
-/* ── activity popup ── */
-var _acts=[
-  {av:'🇷🇴',name:'Alex M.',txt:'just purchased Blueprint Studio',t:'just now'},
-  {av:'🇩🇪',name:'Daniel K.',txt:'just generated a WhatsApp bot',t:'1m ago'},
-  {av:'🇬🇧',name:'Emma L.',txt:'just purchased Blueprint Studio',t:'2m ago'},
-  {av:'🇪🇸',name:'Diego R.',txt:'generated a cold email automation',t:'3m ago'},
-  {av:'🇫🇷',name:'Sophie B.',txt:'just purchased Blueprint Studio',t:'4m ago'},
-  {av:'🇳🇱',name:'Lucas V.',txt:'generated a lead follow-up bot',t:'5m ago'},
-  {av:'🇮🇹',name:'Marco D.',txt:'just purchased Blueprint Studio',t:'6m ago'},
-  {av:'🇵🇱',name:'Kasia W.',txt:'generated an Instagram DM bot',t:'7m ago'},
-  {av:'🇧🇷',name:'Rafael S.',txt:'just purchased Blueprint Studio',t:'8m ago'},
-  {av:'🇲🇽',name:'Carlos H.',txt:'generated a WhatsApp AI bot',t:'9m ago'},
-  {av:'🇦🇺',name:'Jake T.',txt:'just purchased Blueprint Studio',t:'10m ago'},
-  {av:'🇺🇸',name:'Tyler B.',txt:'generated a cold outreach bot',t:'11m ago'},
-  {av:'🇨🇦',name:'Nathan F.',txt:'just purchased Blueprint Studio',t:'12m ago'},
-  {av:'🇯🇵',name:'Kenji A.',txt:'generated an email automation',t:'13m ago'},
-  {av:'🇰🇷',name:'Ji-ho P.',txt:'just purchased Blueprint Studio',t:'14m ago'},
-  {av:'🇿🇦',name:'Liam N.',txt:'generated a Stripe payment bot',t:'15m ago'},
-  {av:'🇸🇪',name:'Axel L.',txt:'just purchased Blueprint Studio',t:'16m ago'},
-  {av:'🇵🇹',name:'Miguel F.',txt:'generated a lead follow-up bot',t:'17m ago'},
-  {av:'🇦🇷',name:'Valentina G.',txt:'just purchased Blueprint Studio',t:'18m ago'},
-  {av:'🇨🇴',name:'Sebastian R.',txt:'generated a WhatsApp bot',t:'19m ago'},
-  {av:'🇮🇳',name:'Arjun P.',txt:'just purchased Blueprint Studio',t:'20m ago'},
-  {av:'🇹🇷',name:'Emre Y.',txt:'generated a cold email automation',t:'21m ago'},
-  {av:'🇨🇿',name:'Tomáš N.',txt:'just purchased Blueprint Studio',t:'22m ago'},
-  {av:'🇭🇺',name:'Bence K.',txt:'generated an Instagram DM bot',t:'23m ago'},
-  {av:'🇬🇷',name:'Nikos P.',txt:'just purchased Blueprint Studio',t:'24m ago'},
-  {av:'🇺🇦',name:'Dmytro S.',txt:'generated a lead follow-up bot',t:'25m ago'},
-  {av:'🇸🇰',name:'Martin H.',txt:'just purchased Blueprint Studio',t:'26m ago'},
-  {av:'🇷🇸',name:'Nikola J.',txt:'generated a WhatsApp AI bot',t:'27m ago'},
-  {av:'🇫🇮',name:'Mikko A.',txt:'just purchased Blueprint Studio',t:'28m ago'},
-  {av:'🇩🇰',name:'Oliver B.',txt:'generated a cold outreach bot',t:'29m ago'},
-  {av:'🇧🇪',name:'Louis D.',txt:'just purchased Blueprint Studio',t:'30m ago'},
-  {av:'🇨🇭',name:'Luca M.',txt:'generated an email automation',t:'31m ago'},
-  {av:'🇦🇹',name:'Florian W.',txt:'just purchased Blueprint Studio',t:'32m ago'},
-  {av:'🇳🇴',name:'Kristian O.',txt:'generated an Instagram DM bot',t:'33m ago'},
-  {av:'🇸🇦',name:'Omar A.',txt:'just purchased Blueprint Studio',t:'34m ago'},
-  {av:'🇦🇪',name:'Khalid R.',txt:'generated a WhatsApp bot',t:'35m ago'},
-  {av:'🇵🇭',name:'Paolo C.',txt:'just purchased Blueprint Studio',t:'36m ago'},
-  {av:'🇮🇩',name:'Budi S.',txt:'generated a lead follow-up bot',t:'37m ago'},
-  {av:'🇲🇾',name:'Haziq I.',txt:'just purchased Blueprint Studio',t:'38m ago'},
-  {av:'🇳🇬',name:'Emeka O.',txt:'generated a cold email automation',t:'39m ago'},
-  {av:'🇰🇪',name:'Brian M.',txt:'just purchased Blueprint Studio',t:'40m ago'},
-  {av:'🇷🇺',name:'Pavel Z.',txt:'generated a WhatsApp AI bot',t:'41m ago'},
-  {av:'🇮🇱',name:'Noa K.',txt:'just purchased Blueprint Studio',t:'42m ago'},
-  {av:'🇨🇱',name:'Matías V.',txt:'generated a Stripe payment bot',t:'43m ago'},
-  {av:'🇵🇪',name:'Rodrigo T.',txt:'just purchased Blueprint Studio',t:'44m ago'},
-];
-var _actI=0;
-function showAct(){
-  /* pick random, avoid repeating last shown */
-  var idx;
-  do { idx=Math.floor(Math.random()*_acts.length); } while(idx===_actI && _acts.length>1);
-  _actI=idx;
-  var a=_acts[idx];
-  var el=$('act');
-  el.innerHTML='<div class="act-inner"><div class="act-avatar">'+a.av+'</div><div class="act-body"><div class="act-name">'+a.name+'</div><div class="act-txt">'+a.txt+'</div></div><div class="act-time">'+a.t+'</div></div>';
-  el.style.display='block';
-  setTimeout(function(){ el.style.display='none'; },5000);
-}
-setTimeout(showAct, 6000);
-setInterval(showAct, 28000 + Math.floor(Math.random()*22000));
 </script>
 </body>
 </html>
