@@ -1,20 +1,18 @@
-// Creates and publishes the Apex Trade Bot template on Railway via GraphQL API.
-// Runs inside GitHub Actions (sandbox has no egress to backboard.railway.com).
-// Env: RAILWAY_TOKEN (required), MODE = inspect | create | full (default: full)
+// Creates and publishes the Apex Trade Bot Railway template via GraphQL API.
+// Flow: create project → add service from GitHub → generate template → publish
+// Env: RAILWAY_TOKEN (required)
 
 const API = 'https://backboard.railway.com/graphql/v2';
 const TOKEN = process.env.RAILWAY_TOKEN;
-const MODE = process.env.MODE || 'full';
 const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY;
+const GITHUB_OUTPUT = process.env.GITHUB_OUTPUT;
 
 if (!TOKEN) { console.error('RAILWAY_TOKEN missing'); process.exit(1); }
 
 function summary(msg) {
   console.log(msg);
-  if (SUMMARY_FILE) {
-    const fs = require('fs');
-    fs.appendFileSync(SUMMARY_FILE, msg + '\n');
-  }
+  if (SUMMARY_FILE) require('fs').appendFileSync(SUMMARY_FILE, msg + '\n');
+  if (GITHUB_OUTPUT && msg.startsWith('DEPLOY_URL=')) require('fs').appendFileSync(GITHUB_OUTPUT, msg + '\n');
 }
 
 async function gql(query, variables) {
@@ -24,100 +22,67 @@ async function gql(query, variables) {
     body: JSON.stringify({ query, variables }),
   });
   const text = await r.text();
-  let json;
-  try { json = JSON.parse(text); } catch { json = { parseError: text.slice(0, 2000) }; }
-  return { status: r.status, json };
-}
-
-function typeName(t) {
-  // unwrap NON_NULL / LIST wrappers
-  let s = '';
-  while (t) {
-    if (t.kind === 'NON_NULL') { s += '!'; t = t.ofType; }
-    else if (t.kind === 'LIST') { s += '[]'; t = t.ofType; }
-    else { return (t.name || '?') + s; }
-  }
-  return '?' + s;
-}
-
-async function inspect() {
-  const q = `query { __schema { mutationType { fields { name args { name type { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } } } }`;
-  const { status, json } = await gql(q);
-  if (!json.data) { console.log('INTROSPECTION FAILED', status, JSON.stringify(json).slice(0, 3000)); return []; }
-  const fields = json.data.__schema.mutationType.fields.filter(f => /template/i.test(f.name));
-  console.log('=== TEMPLATE MUTATIONS ===');
-  const inputTypes = new Set();
-  for (const f of fields) {
-    const args = f.args.map(a => {
-      const tn = typeName(a.type);
-      const base = tn.replace(/[!\[\]]/g, '');
-      if (/Input/i.test(base)) inputTypes.add(base);
-      return `${a.name}: ${tn}`;
-    });
-    console.log(`${f.name}(${args.join(', ')})`);
-  }
-  for (const tn of inputTypes) {
-    const tq = `query { __type(name: "${tn}") { inputFields { name type { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } }`;
-    const { json: tj } = await gql(tq);
-    const ifs = tj.data && tj.data.__type && tj.data.__type.inputFields;
-    if (!ifs) continue;
-    console.log(`--- input ${tn} ---`);
-    for (const f of ifs) console.log(`  ${f.name}: ${typeName(f.type)}`);
-  }
-  return fields.map(f => f.name);
-}
-
-const SERIALIZED_CONFIG = {
-  services: {
-    'apex-trade-bot': {
-      name: 'apex-trade-bot',
-      icon: 'https://devicons.railway.com/i/nodejs.svg',
-      source: { repo: 'https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot' },
-      variables: {
-        LICENSE_KEY: { description: 'Your license key from the purchase email', isOptional: false },
-        EXCHANGE: { description: 'Exchange to trade on', defaultValue: 'binance', isOptional: true },
-        BINANCE_API_KEY: { description: 'Binance API key (enable Reading + Spot Trading, leave Withdrawals OFF)', isOptional: false },
-        BINANCE_API_SECRET: { description: 'Binance API secret — shown only once when created', isOptional: false },
-        GROQ_API_KEY: { description: 'Free AI key from console.groq.com', isOptional: false },
-        PAPER_TRADING: { description: 'Start with true (simulated money). Switch to false to go live.', defaultValue: 'true', isOptional: true },
-        PAPER_BALANCE: { description: 'Simulated balance in USDT for paper trading', defaultValue: '100', isOptional: true },
-        TELEGRAM_BOT_TOKEN: { description: 'Optional — trade alerts on Telegram', isOptional: true },
-      },
-    },
-  },
-};
-
-async function tryMutation(label, query, variables) {
-  const { status, json } = await gql(query, variables);
-  console.log(`=== ${label} (HTTP ${status}) ===`);
-  console.log(JSON.stringify(json, null, 2).slice(0, 5000));
-  return json;
+  try { return { status: r.status, json: JSON.parse(text) }; }
+  catch { return { status: r.status, json: { parseError: text.slice(0, 2000) } }; }
 }
 
 async function main() {
-  await inspect();
-  if (MODE === 'inspect') return;
+  // 1. Get user info + team ID
+  const meRes = await gql(`query { me { id teams { edges { node { id name } } } } }`);
+  if (!meRes.json.data) { summary('AUTH FAILED: ' + JSON.stringify(meRes.json).slice(0, 500)); process.exit(1); }
+  const me = meRes.json.data.me;
+  const teamId = me.teams.edges[0]?.node?.id;
+  summary(`Authenticated. teamId=${teamId || 'none (personal)'}`);
 
-  // Attempt 1: templateCreate with serializedConfig
-  const create = await tryMutation('templateCreate', `
-    mutation($input: TemplateCreateInput!) {
-      templateCreate(input: $input) { id code name }
+  // 2. Create a Railway project
+  const projRes = await gql(`
+    mutation($input: ProjectCreateInput!) {
+      projectCreate(input: $input) { id name }
     }`, {
     input: {
-      name: 'Apex Trade Bot',
-      description: 'AI crypto trading bot — RSI, MACD, legendary trader strategies, trailing stop, Telegram alerts.',
-      serializedConfig: SERIALIZED_CONFIG,
+      name: 'apex-trade-bot-template-source',
+      ...(teamId ? { teamId } : {}),
     },
   });
+  const proj = projRes.json.data?.projectCreate;
+  if (!proj) { summary('PROJECT CREATE FAILED: ' + JSON.stringify(projRes.json).slice(0, 1000)); process.exit(1); }
+  summary(`Project created: id=${proj.id} name=${proj.name}`);
 
-  const tpl = create.data && create.data.templateCreate;
-  if (!tpl) { summary('CREATE FAILED — see introspection above for correct input shape'); return; }
+  // 3. Get the default environment ID
+  const envRes = await gql(`query($id: String!) { project(id: $id) { environments { edges { node { id name } } } } }`, { id: proj.id });
+  const envId = envRes.json.data?.project?.environments?.edges[0]?.node?.id;
+  if (!envId) { summary('ENV NOT FOUND: ' + JSON.stringify(envRes.json).slice(0, 500)); process.exit(1); }
+  summary(`Environment: id=${envId}`);
 
-  summary(`TEMPLATE CREATED: id=${tpl.id} code=${tpl.code}`);
-  summary(`DEPLOY URL: https://railway.com/deploy/${tpl.code}`);
+  // 4. Create service from GitHub repo
+  const svcRes = await gql(`
+    mutation($input: ServiceCreateInput!) {
+      serviceCreate(input: $input) { id name }
+    }`, {
+    input: {
+      projectId: proj.id,
+      name: 'apex-trade-bot',
+      source: { repo: 'alexgabriel225sefu-dotcom/apex-trade-bot' },
+    },
+  });
+  const svc = svcRes.json.data?.serviceCreate;
+  if (!svc) { summary('SERVICE CREATE FAILED: ' + JSON.stringify(svcRes.json).slice(0, 1000)); process.exit(1); }
+  summary(`Service created: id=${svc.id}`);
 
-  // Attempt publish
-  await tryMutation('templatePublish', `
+  // 5. Generate template from project
+  const genRes = await gql(`
+    mutation($input: TemplateGenerateInput!) {
+      templateGenerate(input: $input) { id code }
+    }`, {
+    input: { projectId: proj.id, environmentId: envId },
+  });
+  const tpl = genRes.json.data?.templateGenerate;
+  if (!tpl) { summary('TEMPLATE GENERATE FAILED: ' + JSON.stringify(genRes.json).slice(0, 1000)); process.exit(1); }
+  summary(`Template generated: id=${tpl.id} code=${tpl.code}`);
+  summary(`DEPLOY_URL=https://railway.com/deploy/${tpl.code}`);
+
+  // 6. Publish template
+  const pubRes = await gql(`
     mutation($id: String!, $input: TemplatePublishInput!) {
       templatePublish(id: $id, input: $input)
     }`, {
@@ -125,9 +90,20 @@ async function main() {
     input: {
       category: 'Other',
       description: 'AI crypto trading bot — RSI, MACD, legendary trader strategies, trailing stop, Telegram alerts.',
-      readme: 'AI-powered crypto trading bot. Add your license key, Binance API keys and a free Groq key, then deploy. Starts in paper-trading mode by default. Purchase a license at https://aicashsystem.space',
+      readme: 'AI-powered crypto trading bot. Purchase a license at https://aicashsystem.space then add your license key, Binance API keys, and a free Groq key. Starts in paper-trading (simulated) mode by default.',
+      ...(teamId ? { workspaceId: teamId } : {}),
     },
   });
+  summary('templatePublish result: ' + JSON.stringify(pubRes.json).slice(0, 500));
+
+  // 7. Clean up temp project (optional — comment out if you want to keep it)
+  await gql(`mutation($id: String!) { projectDelete(id: $id) }`, { id: proj.id });
+  summary('Temp project deleted.');
+
+  summary('');
+  summary(`=== DONE ===`);
+  summary(`Deploy URL: https://railway.com/deploy/${tpl.code}`);
+  summary(`Template ID: ${tpl.id}`);
 }
 
-main().catch(e => { console.error('FATAL', e); process.exit(1); });
+main().catch(e => { summary('FATAL: ' + e.message); process.exit(1); });
