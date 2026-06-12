@@ -1660,10 +1660,10 @@ a{text-decoration:none}
       <p style="margin:0 0 16px;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Railway is a free cloud platform. Click below to deploy your bot — no server setup required. If you don't have a Railway account, create one first (it's free).</p>
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr><td style="padding-bottom:10px;text-align:center">
-          <a href="https://railway.com/new/template?template=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:900;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">&#128642; Deploy Bot to Railway &rarr;</a>
+          <a href="https://render.com/deploy?repo=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:900;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">&#128640; Deploy Bot to Render &rarr;</a>
         </td></tr>
         <tr><td style="text-align:center">
-          <a href="https://railway.app/new" style="font-size:11px;color:#475569;font-family:Arial,sans-serif;text-decoration:underline">Don&rsquo;t have Railway? Create a free account first &rarr;</a>
+          <a href="https://render.com/register" style="font-size:11px;color:#475569;font-family:Arial,sans-serif;text-decoration:underline">Don&rsquo;t have Render? Create a free account first &rarr;</a>
         </td></tr>
       </table>
     </td></tr>
@@ -2097,7 +2097,7 @@ app.get('/admin/sync-bot-repo', async (req, res) => {
     'src/ai.js', 'src/backtest.js', 'src/binance.js', 'src/bybit.js',
     'src/config.js', 'src/index.js', 'src/indicators.js', 'src/logger.js',
     'src/state.js', 'src/strategies.js', 'src/telegram.js',
-    'package.json', 'railway.json', '.env.example',
+    'package.json', 'railway.json', 'render.yaml', '.env.example',
   ];
 
   const readmeContent = `# Apex Trade Bot 🤖
