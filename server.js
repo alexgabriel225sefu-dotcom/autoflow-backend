@@ -1647,14 +1647,37 @@ a{text-decoration:none}
   </tr></table>
 </td></tr>
 
-<!-- ── STEP 1: BINANCE API ── -->
+<!-- ── STEP 1: DEPLOY TO RAILWAY ── -->
 <tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 16px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
+    <tr><td style="padding:22px 24px">
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
+        <tr>
+          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">1</td>
+          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:0.2px">Deploy bot to Railway (one click)</td>
+        </tr>
+      </table>
+      <p style="margin:0 0 16px;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Railway is a free cloud platform. Click below to deploy your bot — no server setup required. If you don't have a Railway account, create one first (it's free).</p>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr><td style="padding-bottom:10px;text-align:center">
+          <a href="https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:900;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">&#128642; Deploy Bot to Railway &rarr;</a>
+        </td></tr>
+        <tr><td style="text-align:center">
+          <a href="https://railway.app/new" style="font-size:11px;color:#475569;font-family:Arial,sans-serif;text-decoration:underline">Don&rsquo;t have Railway? Create a free account first &rarr;</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</td></tr>
+
+<!-- ── STEP 2: BINANCE API ── -->
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px 16px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
     <tr><td style="padding:22px 24px">
       <!-- step header -->
       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
         <tr>
-          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">1</td>
+          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">2</td>
           <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:0.2px">Get your Binance API keys</td>
         </tr>
       </table>
@@ -1681,13 +1704,13 @@ a{text-decoration:none}
   </table>
 </td></tr>
 
-<!-- ── STEP 2: FREE GROQ KEY ── -->
+<!-- ── STEP 3: FREE GROQ KEY ── -->
 <tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
     <tr><td style="padding:22px 24px">
       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px">
         <tr>
-          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">2</td>
+          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">3</td>
           <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">Get your free Groq AI key</td>
         </tr>
       </table>
@@ -1696,14 +1719,14 @@ a{text-decoration:none}
   </table>
 </td></tr>
 
-<!-- ── STEP 3: RAILWAY ENV VARS ── -->
+<!-- ── STEP 4: RAILWAY ENV VARS ── -->
 <tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
     <tr><td style="padding:22px 24px">
       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
         <tr>
-          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">3</td>
-          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">Deploy on Railway — set environment variables</td>
+          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">4</td>
+          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">Set environment variables in Railway</td>
         </tr>
       </table>
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
