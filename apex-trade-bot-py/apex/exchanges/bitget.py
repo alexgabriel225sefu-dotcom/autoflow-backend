@@ -36,8 +36,9 @@ def get_candles(symbol=None, interval=None, limit=None):
     data = r.json()
     if data.get("code") != "00000":
         raise RuntimeError("Bitget candles: " + str(data.get("msg")))
-    return [{"time": int(k[0]), "open": float(k[1]), "high": float(k[2]),
-             "low": float(k[3]), "close": float(k[4]), "volume": float(k[5])} for k in data["data"]]
+    candles = [{"time": int(k[0]), "open": float(k[1]), "high": float(k[2]),
+                "low": float(k[3]), "close": float(k[4]), "volume": float(k[5])} for k in data["data"]]
+    return sorted(candles, key=lambda c: c["time"])
 
 
 def get_balance(coin=None):
