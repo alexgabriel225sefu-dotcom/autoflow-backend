@@ -1,699 +1,682 @@
 <!DOCTYPE html>
 <html lang="ro">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>APEX Trade Bot — Setup Wizard</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #050814; --card: #0d1225; --border: #1e2a45;
-      --text: #e5e7eb; --muted: #6b7280;
-      --amber: #f59e0b; --green: #00e87a; --danger: #ff4d6d;
-    }
-    html, body { min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 16px; line-height: 1.5; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configurator — Apex Trading Suite</title>
+<meta name="robots" content="noindex">
+<style>
+:root{
+  --bg:#050814;--bg2:#0a0f1f;--card:#0d1326;--card2:#111831;
+  --br:rgba(255,255,255,.07);--br2:rgba(255,255,255,.12);
+  --t1:#f2f4fa;--t2:#9aa3b8;--t3:#5d6680;
+  --amber:#f59e0b;--amber2:#fbbf24;--green:#10b981;--red:#f43f5e;--blue:#3b82f6;
+  --f:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono',Menlo,monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t1);font-family:var(--f);-webkit-font-smoothing:antialiased;min-height:100vh}
+a{color:var(--amber)}
+::selection{background:rgba(245,158,11,.3)}
 
-    .header { text-align: center; padding: 2.5rem 1rem 1.5rem; }
-    .header .logo { font-size: 0.75rem; letter-spacing: 0.25em; color: var(--amber); text-transform: uppercase; font-weight: 700; margin-bottom: 0.75rem; }
-    .header h1 { font-size: clamp(1.5rem, 4vw, 2.2rem); font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
-    .header p { color: var(--muted); font-size: 0.9rem; }
+/* ── Topbar ── */
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px;background:rgba(5,8,20,.86);backdrop-filter:blur(14px);border-bottom:1px solid var(--br)}
+.topbar .logo{font-weight:800;font-size:15px;letter-spacing:-.3px}
+.topbar .logo b{color:var(--amber)}
+.lic{font:600 11px var(--mono);color:var(--t2);background:var(--card);border:1px solid var(--br);border-radius:99px;padding:6px 12px}
 
-    .progress-wrap { max-width: 680px; margin: 0 auto 2rem; padding: 0 1rem; }
-    .progress-labels { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
-    .progress-label { font-size: 0.68rem; color: var(--muted); text-align: center; flex: 1; transition: color 0.3s; }
-    .progress-label.active { color: var(--amber); font-weight: 700; }
-    .progress-label.done   { color: var(--green); }
-    .progress-track { height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; }
-    .progress-fill  { height: 100%; background: linear-gradient(90deg, var(--amber), var(--green)); border-radius: 99px; transition: width 0.4s ease; }
+/* ── Layout ── */
+.shell{max-width:1180px;margin:0 auto;padding:28px 20px 80px;display:grid;grid-template-columns:1fr 350px;gap:24px;align-items:start}
+@media(max-width:920px){.shell{grid-template-columns:1fr}.aside{position:static!important;order:-1}}
 
-    .wizard { max-width: 680px; margin: 0 auto; padding: 0 1rem 4rem; }
-    .step { display: none; animation: fadeIn 0.3s ease; }
-    .step.active { display: block; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.head{grid-column:1/-1}
+.head h1{font-size:26px;font-weight:800;letter-spacing:-.5px}
+.head p{color:var(--t2);font-size:13.5px;margin-top:6px;max-width:640px;line-height:1.6}
 
-    .step-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 0.4rem; color: #fff; }
-    .step-sub   { color: var(--muted); font-size: 0.87rem; margin-bottom: 1.5rem; }
+/* ── Bot type tabs ── */
+.bot-tabs{grid-column:1/-1;display:flex;gap:10px}
+.bot-tab{flex:1;max-width:300px;display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--br);border-radius:14px;padding:14px 16px;cursor:pointer;transition:border-color .2s,background .2s}
+.bot-tab:hover{border-color:var(--br2)}
+.bot-tab.active{border-color:var(--amber);background:linear-gradient(180deg,rgba(245,158,11,.08),rgba(245,158,11,.02))}
+.bot-tab .ic{width:36px;height:36px;border-radius:10px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.bot-tab b{display:block;font-size:14px}
+.bot-tab span{display:block;font-size:11.5px;color:var(--t2);margin-top:2px}
 
-    /* Strategy cards */
-    .strategy-cards { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem; }
-    .strategy-card {
-      background: var(--card); border: 1.5px solid var(--border); border-radius: 14px;
-      padding: 1.1rem 1.25rem; cursor: pointer; transition: all 0.2s;
-      display: flex; align-items: flex-start; gap: 1rem;
-    }
-    .strategy-card:hover { border-color: var(--amber); background: #111a2e; }
-    .strategy-card.selected { border-color: var(--amber); background: rgba(245,158,11,0.06); box-shadow: 0 0 20px rgba(245,158,11,0.1); }
-    .strategy-card.selected .sc-radio { border-color: var(--amber); background: var(--amber); box-shadow: 0 0 8px rgba(245,158,11,0.5); }
-    .sc-radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); margin-top: 2px; flex-shrink: 0; transition: all 0.15s; }
-    .sc-body { flex: 1; }
-    .sc-name { font-weight: 700; color: #fff; font-size: 0.95rem; margin-bottom: 0.25rem; }
-    .sc-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
-    .sc-badge { font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-top: 6px; display: inline-block; }
-    .sc-badge.low    { background: rgba(0,232,122,0.12); color: var(--green); }
-    .sc-badge.medium { background: rgba(245,158,11,0.12); color: var(--amber); }
-    .sc-badge.high   { background: rgba(255,77,109,0.12); color: var(--danger); }
+/* ── Section cards ── */
+.sec{background:var(--card);border:1px solid var(--br);border-radius:16px;margin-bottom:18px;overflow:hidden}
+.sec-h{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--br)}
+.sec-h .n{width:24px;height:24px;border-radius:8px;background:rgba(245,158,11,.12);color:var(--amber);font:800 12px var(--f);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sec-h b{font-size:14.5px;font-weight:700}
+.sec-h span{font-size:11.5px;color:var(--t2);margin-left:auto;text-align:right}
+.sec-b{padding:18px 20px}
 
-    /* Coin grid */
-    .coin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
-    .coin-btn { background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 0.9rem 0.75rem; cursor: pointer; text-align: center; transition: all 0.2s; position: relative; }
-    .coin-btn:hover { border-color: var(--amber); }
-    .coin-btn.selected { border-color: var(--amber); background: rgba(245,158,11,0.05); }
-    .coin-btn.selected::after { content: '✓'; position: absolute; top: 6px; right: 8px; font-size: 0.7rem; color: var(--amber); font-weight: 800; }
-    .coin-icon { font-size: 1.5rem; display: block; margin-bottom: 0.3rem; color: var(--amber); font-weight: 800; font-family: monospace; }
-    .coin-name { font-size: 0.9rem; font-weight: 700; color: #fff; }
-    .coin-sym  { font-size: 0.68rem; color: var(--amber); font-weight: 600; letter-spacing: 0.04em; margin-bottom: 0.1rem; }
-    .coin-tag  { font-size: 0.63rem; color: var(--muted); }
+.flabel{display:flex;align-items:baseline;justify-content:space-between;font-size:12.5px;font-weight:600;color:var(--t2);margin:0 0 8px}
+.flabel .v{font:700 13px var(--mono);color:var(--amber)}
+.hint{font-size:11.5px;color:var(--t3);line-height:1.55;margin-top:7px}
+.hint strong{color:var(--t2)}
+.grp{margin-bottom:18px}.grp:last-child{margin-bottom:0}
 
-    /* Risk cards */
-    .risk-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
-    .risk-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 1.2rem 1rem; cursor: pointer; transition: all 0.2s; position: relative; text-align: center; }
-    .risk-card:hover { border-color: var(--amber); }
-    .risk-card.selected { border-color: var(--amber); background: rgba(245,158,11,0.05); }
-    .risk-card.selected::after { content: '✓'; position: absolute; top: 7px; right: 9px; font-size: 0.72rem; color: var(--amber); font-weight: 800; }
-    .risk-icon { font-size: 1.5rem; display: block; margin-bottom: 0.4rem; }
-    .risk-name { font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.25rem; }
-    .risk-desc { font-size: 0.7rem; color: var(--muted); line-height: 1.35; }
+/* inputs */
+.inp{width:100%;background:var(--bg2);border:1px solid var(--br);border-radius:10px;color:var(--t1);font:500 13.5px var(--f);padding:11px 13px;outline:none;transition:border-color .2s}
+.inp:focus{border-color:var(--amber)}
+.inp.mono{font-family:var(--mono);font-size:12.5px}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239aa3b8' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center}
 
-    /* Input fields */
-    .input-group { margin-bottom: 1.25rem; }
-    .input-label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text); margin-bottom: 0.4rem; }
-    .input-label .opt { color: var(--muted); font-weight: 400; margin-left: 4px; }
-    .input-field { width: 100%; background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem; font-size: 0.88rem; color: var(--text); font-family: 'Cascadia Code', 'Courier New', monospace; transition: border-color 0.2s; }
-    .input-field:focus { outline: none; border-color: var(--amber); }
-    .input-hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; }
-    .input-hint a { color: var(--amber); }
+/* sliders */
+.slider-row{display:flex;align-items:center;gap:14px}
+input[type=range]{flex:1;-webkit-appearance:none;height:4px;border-radius:4px;background:var(--bg2);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--amber);border:3px solid var(--bg);box-shadow:0 0 0 1px var(--amber);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--amber);border:3px solid var(--bg);cursor:pointer}
+.slider-num{width:86px;flex-shrink:0;text-align:center;background:var(--bg2);border:1px solid var(--br);border-radius:8px;color:var(--amber);font:700 13px var(--mono);padding:8px 6px}
 
-    /* Telegram box */
-    .telegram-box { background: rgba(245,158,11,0.04); border: 1.5px solid rgba(245,158,11,0.18); border-radius: 12px; padding: 1.1rem 1.25rem; margin-bottom: 1.5rem; }
-    .tb-title { font-weight: 700; font-size: 0.88rem; color: var(--amber); margin-bottom: 0.25rem; }
-    .tb-desc  { font-size: 0.77rem; color: var(--muted); margin-bottom: 1rem; line-height: 1.45; }
+/* toggle */
+.tgl-row{display:flex;align-items:flex-start;gap:14px;padding:12px 0;border-top:1px solid var(--br)}
+.tgl-row:first-child{border-top:none;padding-top:0}
+.tgl-row .txt b{font-size:13px;font-weight:600;display:block}
+.tgl-row .txt span{font-size:11.5px;color:var(--t3);line-height:1.5;display:block;margin-top:3px}
+.tgl{margin-left:auto;flex-shrink:0;width:42px;height:24px;border-radius:99px;background:var(--bg2);border:1px solid var(--br2);position:relative;cursor:pointer;transition:background .2s}
+.tgl::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--t2);transition:transform .2s,background .2s}
+.tgl.on{background:var(--amber)}
+.tgl.on::after{transform:translateX(18px);background:#0a0f1f}
 
-    /* Code box */
-    .config-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-    .config-header span { font-size: 0.72rem; color: var(--muted); font-weight: 600; letter-spacing: 0.03em; }
-    .copy-btn { background: rgba(124,92,255,0.15); border: 1px solid rgba(124,92,255,0.35); border-radius: 7px; color: #a78bfa; padding: 0.3rem 0.85rem; font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
-    .copy-btn:hover { background: rgba(124,92,255,0.28); }
-    .copy-btn.copied { background: rgba(0,232,122,0.12); border-color: var(--green); color: var(--green); }
+/* chips (pairs) */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 14px;border-radius:99px;border:1px solid var(--br);background:var(--bg2);color:var(--t2);font-size:12.5px;font-weight:600;cursor:pointer;transition:all .15s;user-select:none}
+.chip:hover{border-color:var(--br2);color:var(--t1)}
+.chip.on{border-color:var(--amber);color:var(--amber);background:rgba(245,158,11,.08)}
 
-    .code-box { background: #05080f; border: 1.5px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; font-size: 0.8rem; line-height: 1.85; color: #e5e7eb; overflow-x: auto; margin-bottom: 1rem; }
-    .code-box .k { color: #93c5fd; }
-    .code-box .v { color: var(--green); }
-    .code-box .c { color: #64748b; }
+/* exchange grid */
+.exgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:680px){.exgrid{grid-template-columns:repeat(2,1fr)}}
+.excard{background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:13px 10px;text-align:center;cursor:pointer;transition:all .15s;position:relative}
+.excard:hover{border-color:var(--br2)}
+.excard.on{border-color:var(--amber);background:rgba(245,158,11,.06)}
+.excard .x-ic{font-size:18px;font-weight:800;margin-bottom:5px}
+.excard b{display:block;font-size:12.5px}
+.excard .x-tag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-top:5px;padding:2px 7px;border-radius:99px}
+.x-tag.live{background:rgba(16,185,129,.12);color:var(--green)}
+.x-tag.exp{background:rgba(255,255,255,.06);color:var(--t2)}
 
-    .warn-box { background: rgba(245,158,11,0.06); border: 1.5px solid rgba(245,158,11,0.22); border-radius: 10px; padding: 0.9rem 1.1rem; font-size: 0.82rem; color: var(--amber); margin-bottom: 1.5rem; line-height: 1.5; }
+/* mode cards */
+.mode-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modecard{background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s}
+.modecard.on{border-color:var(--green);background:rgba(16,185,129,.06)}
+.modecard.live.on{border-color:var(--red);background:rgba(244,63,94,.06)}
+.modecard b{font-size:13.5px;display:block}
+.modecard span{font-size:11.5px;color:var(--t3);display:block;margin-top:4px;line-height:1.5}
 
-    .deploy-btn { display: block; width: 100%; background: linear-gradient(135deg, var(--amber), #f97316); color: #040810; font-weight: 800; font-size: 1rem; border: none; border-radius: 12px; padding: 1rem 1.5rem; cursor: pointer; text-align: center; letter-spacing: 0.02em; transition: opacity 0.2s; box-shadow: 0 4px 24px rgba(245,158,11,0.2); font-family: inherit; }
-    .deploy-btn:hover { opacity: 0.88; }
-    .deploy-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.warnbox{background:rgba(244,63,94,.07);border:1px solid rgba(244,63,94,.25);border-radius:10px;padding:12px 14px;font-size:12px;color:#fda4af;line-height:1.6;margin-top:12px}
+.infobox{background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:12px 14px;font-size:12px;color:#93c5fd;line-height:1.6;margin-top:12px}
 
-    .stop-btn { display: block; width: 100%; background: rgba(255,77,109,0.08); border: 1.5px solid rgba(255,77,109,0.3); color: var(--danger); font-weight: 700; font-size: 0.9rem; border-radius: 12px; padding: 0.85rem; cursor: pointer; text-align: center; font-family: inherit; transition: background 0.2s; margin-top: 0.75rem; }
-    .stop-btn:hover { background: rgba(255,77,109,0.16); }
+/* ── Summary aside (3commas style) ── */
+.aside{position:sticky;top:76px}
+.sum{background:var(--card);border:1px solid var(--br);border-radius:16px;overflow:hidden}
+.sum-h{padding:16px 18px;border-bottom:1px solid var(--br);display:flex;align-items:center;justify-content:space-between}
+.sum-h b{font-size:14px}
+.badge{font-size:10px;font-weight:800;letter-spacing:.6px;padding:4px 10px;border-radius:99px;text-transform:uppercase}
+.badge.paper{background:rgba(16,185,129,.14);color:var(--green)}
+.badge.live{background:rgba(244,63,94,.14);color:var(--red)}
+.sum-b{padding:8px 18px 16px}
+.srow{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--br);font-size:12.5px}
+.srow:last-child{border-bottom:none}
+.srow .k{color:var(--t2)}
+.srow .v{font:600 12.5px var(--mono);text-align:right;max-width:60%;overflow-wrap:anywhere}
+.srow .v.am{color:var(--amber)}
+.srow .v.gr{color:var(--green)}
+.srow .v.rd{color:var(--red)}
+.rrbar{margin:12px 0 4px}
+.rrbar .lbl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--t3);margin-bottom:5px}
+.rrbar .bar{height:8px;border-radius:99px;overflow:hidden;display:flex}
+.rrbar .sl{background:var(--red);height:100%}
+.rrbar .tp{background:var(--green);height:100%}
+.gen-btn{display:block;width:100%;margin-top:14px;background:linear-gradient(135deg,var(--amber),var(--amber2));color:#1a1306;border:none;border-radius:12px;font:800 14px var(--f);padding:14px;cursor:pointer;transition:transform .15s,opacity .15s}
+.gen-btn:hover{opacity:.92}
+.gen-btn:active{transform:scale(.98)}
+.sum-note{font-size:10.5px;color:var(--t3);text-align:center;margin-top:10px;line-height:1.5}
 
-    .nav-row { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
-    .btn-back { background: transparent; border: 1.5px solid var(--border); color: var(--muted); border-radius: 10px; padding: 0.7rem 1.4rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
-    .btn-back:hover { border-color: var(--muted); color: var(--text); }
-    .btn-next { flex: 1; background: var(--amber); color: #040810; border: none; border-radius: 10px; padding: 0.75rem 1.5rem; font-size: 0.9rem; font-weight: 800; cursor: pointer; transition: opacity 0.2s; letter-spacing: 0.02em; font-family: inherit; }
-    .btn-next:hover { opacity: 0.88; }
-    .btn-next:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; opacity: 1; }
+/* ── Output / deploy ── */
+.out{grid-column:1/-1;display:none}
+.out.show{display:block;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.out .sec-b{padding:18px 20px}
+.codehead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.codehead span{font:600 11px var(--mono);color:var(--t3);letter-spacing:.5px}
+.copy-btn{background:var(--card2);border:1px solid var(--br2);color:var(--t1);border-radius:8px;font:600 12px var(--f);padding:8px 14px;cursor:pointer}
+.copy-btn:hover{border-color:var(--amber);color:var(--amber)}
+.codebox{background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:16px;font:500 12px/1.8 var(--mono);color:#c8d0e0;overflow-x:auto;white-space:pre;max-height:380px;overflow-y:auto}
+.codebox .ck{color:var(--t3)}.codebox .cv{color:var(--amber2)}
+.dstep{display:flex;gap:10px;font-size:12.5px;color:var(--t2);line-height:1.6;padding:7px 0;border-bottom:1px solid var(--br)}
+.dstep:last-child{border-bottom:none}
+.dstep .dn{color:var(--amber);font-weight:800;flex-shrink:0}
+.dstep strong{color:var(--t1)}
 
-    .summary-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
-    .chip { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); border-radius: 99px; padding: 0.25rem 0.75rem; font-size: 0.72rem; color: var(--amber); font-weight: 600; }
-
-    .deploy-phase { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
-    .phase-num { background: var(--amber); color: #040810; font-weight: 800; font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.05em; flex-shrink: 0; }
-    .phase-title { font-weight: 700; color: #fff; font-size: 1rem; }
-
-    .deploy-phases { background: rgba(255,255,255,.02); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; }
-    .phase-section { }
-    .phase-section-title { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); margin-bottom: 0.75rem; }
-    .phase-step { font-size: 0.82rem; color: rgba(255,255,255,.5); line-height: 1.5; padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,.04); display: flex; gap: 0.5rem; }
-    .phase-step:last-child { border-bottom: none; }
-    .phase-step .num { color: var(--amber); font-weight: 800; flex-shrink: 0; }
-    .phase-step a { color: var(--amber); }
-    .phase-step strong { color: rgba(255,255,255,.75); }
-
-    @media (max-width: 520px) {
-      .coin-grid { grid-template-columns: repeat(2,1fr); }
-      .risk-cards { grid-template-columns: 1fr; }
-      .code-box { font-size: 0.72rem; padding: 1rem; }
-      .header h1 { font-size: 1.4rem; }
-    }
-
-    /* License key overlay */
-    .key-overlay {
-      display: none;
-      position: fixed; inset: 0; z-index: 999;
-      background: rgba(5,8,20,0.92);
-      backdrop-filter: blur(6px);
-      align-items: center; justify-content: center;
-      padding: 1rem;
-    }
-    .key-overlay-box {
-      background: var(--card);
-      border: 1.5px solid var(--border);
-      border-radius: 18px;
-      padding: 2rem 1.75rem;
-      max-width: 440px; width: 100%;
-      text-align: center;
-    }
-    .key-overlay-box h2 { font-size: 1.2rem; font-weight: 800; color: #fff; margin-bottom: 0.4rem; }
-    .key-overlay-box p  { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.5; }
-    .key-overlay-box .input-field { text-align: center; letter-spacing: 0.08em; font-size: 1rem; margin-bottom: 0.5rem; }
-    .key-overlay-box .err { font-size: 0.75rem; color: var(--danger); min-height: 1.2em; margin-bottom: 0.75rem; }
-    .key-overlay-box .btn-next { display: block; width: 100%; }
-  </style>
+/* key overlay */
+.overlay{display:none;position:fixed;inset:0;z-index:100;background:rgba(3,5,12,.92);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px}
+.ovcard{background:var(--card);border:1px solid var(--br2);border-radius:18px;padding:30px;max-width:420px;width:100%}
+.ovcard h2{font-size:19px;margin-bottom:8px}
+.ovcard p{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:18px}
+</style>
 </head>
 <body>
 
-<!-- License Key Overlay -->
-<div class="key-overlay" id="key-overlay">
-  <div class="key-overlay-box">
-    <h2>Introdu Cheia de Licență</h2>
-    <p>Ai primit cheia APEX prin email după cumpărare.<br>Format: <code style="color:var(--amber)">APEX-XXXX-XXXX-XXXX</code></p>
-    <input class="input-field" id="manual-key-input" type="text"
-           placeholder="APEX-XXXX-XXXX-XXXX"
-           maxlength="19"
-           oninput="this.value=this.value.toUpperCase()"
-           onkeydown="if(event.key==='Enter')submitManualKey()" />
-    <div class="err" id="key-overlay-err"></div>
-    <button class="btn-next" onclick="submitManualKey()">Activează →</button>
-    <div style="margin-top:1rem;font-size:0.75rem;color:var(--muted)">
-      Nu ai cheie? <a href="/" style="color:var(--amber)">Cumpără botul</a>
-    </div>
-  </div>
+<div class="topbar">
+  <div class="logo"><b>Apex</b> Configurator</div>
+  <div class="lic" id="lic-chip">APEX-····</div>
 </div>
 
-<div class="header">
-  <div class="logo">APEX Trade Bot</div>
-  <h1>Setup Wizard</h1>
-  <p>Configurează-ți botul în 5 pași — fără cod necesar.</p>
+<div class="shell">
+
+  <div class="head">
+    <h1>Configurează-ți botul</h1>
+    <p>Setezi tot de aici — ce tranzacționează, cât riscă, când intră și când iese. Sumarul din dreapta se actualizează live. La final primești configurația gata de lipit în Railway. Cheile tale nu părăsesc browserul.</p>
+  </div>
+
+  <!-- Bot type -->
+  <div class="bot-tabs">
+    <div class="bot-tab active" id="tab-crypto" onclick="setBot('crypto')">
+      <div class="ic">₿</div>
+      <div><b>Crypto Bot</b><span>8 exchange-uri · spot</span></div>
+    </div>
+    <div class="bot-tab" id="tab-forex" onclick="setBot('forex')">
+      <div class="ic">F</div>
+      <div><b>Forex Bot</b><span>OANDA · MetaTrader 5</span></div>
+    </div>
+  </div>
+
+  <!-- LEFT column -->
+  <div class="main">
+
+    <!-- 1. Main settings -->
+    <div class="sec">
+      <div class="sec-h"><div class="n">1</div><b>Setări principale</b><span>exchange & perechi</span></div>
+      <div class="sec-b">
+
+        <div class="grp" id="exch-grp">
+          <div class="flabel">Exchange</div>
+          <div class="exgrid" id="exgrid"></div>
+          <div class="hint" id="exch-hint"></div>
+        </div>
+
+        <div class="grp" id="broker-grp" style="display:none">
+          <div class="flabel">Broker / sursă de date</div>
+          <div class="exgrid" style="grid-template-columns:repeat(3,1fr)" id="brokergrid"></div>
+          <div class="hint" id="broker-hint"></div>
+        </div>
+
+        <div class="grp">
+          <div class="flabel">Perechi scanate <span class="v" id="pairs-count"></span></div>
+          <div class="chips" id="pair-chips"></div>
+          <div class="hint">Botul scanează perechile selectate și intră pe cea cu cel mai bun semnal. Prima selectată e perechea principală.</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 2. Mode & sizing -->
+    <div class="sec">
+      <div class="sec-h"><div class="n">2</div><b>Mod & dimensiune poziție</b><span>paper / live · risc</span></div>
+      <div class="sec-b">
+
+        <div class="grp">
+          <div class="mode-row">
+            <div class="modecard on" id="mode-paper" onclick="setMode(true)">
+              <b>📝 Paper Trading</b><span>Bani simulați. Botul tranzacționează identic, dar fără fonduri reale. Recomandat 1–2 săptămâni la început.</span>
+            </div>
+            <div class="modecard live" id="mode-live" onclick="setMode(false)">
+              <b>🔴 Live Trading</b><span>Bani reali din contul tău. Activează doar după ce ai verificat botul pe paper.</span>
+            </div>
+          </div>
+          <div class="warnbox" id="live-warn" style="display:none">
+            Tranzacționezi cu bani reali, pe riscul tău. Pierderile pot fi totale. Pornește cu o sumă mică pe care îți permiți să o pierzi integral.
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="flabel">Balanță <span id="bal-lbl">simulată</span> <span class="v" id="bal-v"></span></div>
+          <div class="slider-row">
+            <input type="range" id="bal" min="50" max="10000" step="50" value="100" oninput="upd()">
+            <input class="slider-num" id="bal-num" value="100" oninput="syncNum('bal')">
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="flabel">Risc per tranzacție <span class="v" id="risk-v"></span></div>
+          <div class="slider-row">
+            <input type="range" id="risk" min="1" max="20" step="0.5" value="5" oninput="upd()">
+            <input class="slider-num" id="risk-num" value="5" oninput="syncNum('risk')">
+          </div>
+          <div class="hint" id="risk-hint"></div>
+        </div>
+
+        <div class="grp" id="lev-grp" style="display:none">
+          <div class="flabel">Leverage <span class="v" id="lev-v"></span></div>
+          <div class="slider-row">
+            <input type="range" id="lev" min="1" max="100" step="1" value="30" oninput="upd()">
+            <input class="slider-num" id="lev-num" value="30" oninput="syncNum('lev')">
+          </div>
+          <div class="hint">UE (ESMA): max 30:1 pe majors pentru retail. Leverage mai mare = risc proporțional mai mare.</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 3. Entry conditions -->
+    <div class="sec">
+      <div class="sec-h"><div class="n">3</div><b>Condiții de intrare</b><span>cât de selectiv e botul</span></div>
+      <div class="sec-b">
+
+        <div class="grp">
+          <div class="flabel">Încredere AI minimă <span class="v" id="conf-v"></span></div>
+          <div class="slider-row">
+            <input type="range" id="conf" min="50" max="90" step="1" value="62" oninput="upd()">
+            <input class="slider-num" id="conf-num" value="62" oninput="syncNum('conf')">
+          </div>
+          <div class="hint">Sub acest prag, semnalul devine HOLD. Mai mare = mai puține tranzacții, mai selective.</div>
+        </div>
+
+        <div class="grp">
+          <div class="flabel">Criterii tehnice minime <span class="v" id="crit-v"></span></div>
+          <div class="slider-row">
+            <input type="range" id="crit" min="1" max="5" step="1" value="5" oninput="upd()">
+            <input class="slider-num" id="crit-num" value="5" oninput="syncNum('crit')">
+          </div>
+          <div class="hint" id="crit-hint">Din 5 criterii (trend, RSI, MACD, volum, structură). Setarea testată în backtest: <strong id="crit-rec">5/5</strong>.</div>
+        </div>
+
+        <div class="tgl-row">
+          <div class="txt"><b>Filtru trend 1h (HTF)</b><span>Intră doar în direcția trendului de pe 1 oră. Reduce intrările contra-trend.</span></div>
+          <div class="tgl on" id="tgl-htf" onclick="tgl('htf')"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 4. Exit strategy -->
+    <div class="sec">
+      <div class="sec-h"><div class="n">4</div><b>Strategie de ieșire</b><span>stop loss & take profit</span></div>
+      <div class="sec-b">
+
+        <div class="grp">
+          <div class="flabel">Stop Loss <span class="v" id="sl-v"></span></div>
+          <div class="slider-row">
+            <input type="range" id="sl" min="0.4" max="3" step="0.1" value="1.6" oninput="upd()">
+            <input class="slider-num" id="sl-num" value="1.6" oninput="syncNum('sl')">
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="flabel">Take Profit <span class="v" id="tp-v"></span></div>
+          <div class="slider-row">
+            <input type="range" id="tp" min="0.8" max="9" step="0.1" value="3.2" oninput="upd()">
+            <input class="slider-num" id="tp-num" value="3.2" oninput="syncNum('tp')">
+          </div>
+          <div class="hint" id="exit-hint"></div>
+        </div>
+
+        <div class="tgl-row">
+          <div class="txt"><b>Trailing stop</b><span>SL-ul urcă după preț. Implicit oprit — în backtest, ieșirea pură pe TP a performat mai bine pe piețe agitate.</span></div>
+          <div class="tgl" id="tgl-trail" onclick="tgl('trail')"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 5. Connections -->
+    <div class="sec">
+      <div class="sec-h"><div class="n">5</div><b>Conexiuni</b><span>chei API — rămân la tine</span></div>
+      <div class="sec-b">
+
+        <div id="keys-area"></div>
+
+        <div class="grp">
+          <div class="flabel">Cheie AI pentru semnale</div>
+          <select class="inp" id="ai-prov" onchange="upd()">
+            <option value="groq">Groq — gratuit (recomandat la început)</option>
+            <option value="anthropic">Anthropic Claude — plătit, semnale primare</option>
+          </select>
+          <input class="inp mono" id="ai-key" style="margin-top:8px" placeholder="Lipește cheia API" oninput="upd()">
+          <div class="hint" id="ai-hint"></div>
+        </div>
+
+        <div class="grp">
+          <div class="flabel">Telegram (opțional, recomandat)</div>
+          <input class="inp mono" id="tg-token" placeholder="Bot Token — de la @BotFather" oninput="upd()">
+          <input class="inp mono" id="tg-chat" style="margin-top:8px" placeholder="Chat ID — de la @userinfobot" oninput="upd()">
+          <div class="hint">Primești alertă la fiecare tranzacție + control: /stop, /pause, /status, schimbi riscul din chat.</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT summary -->
+  <div class="aside">
+    <div class="sum">
+      <div class="sum-h"><b>Botul tău</b><span class="badge paper" id="sum-badge">Paper</span></div>
+      <div class="sum-b">
+        <div class="srow"><span class="k">Bot</span><span class="v" id="s-bot">Crypto</span></div>
+        <div class="srow"><span class="k" id="s-venue-k">Exchange</span><span class="v am" id="s-venue">Binance</span></div>
+        <div class="srow"><span class="k">Perechi</span><span class="v" id="s-pairs">—</span></div>
+        <div class="srow"><span class="k">Risc / trade</span><span class="v" id="s-risk">—</span></div>
+        <div class="srow"><span class="k">Pierdere max / trade</span><span class="v rd" id="s-maxloss">—</span></div>
+        <div class="srow"><span class="k">Câștig țintă / trade</span><span class="v gr" id="s-maxwin">—</span></div>
+        <div class="srow"><span class="k">Încredere AI min.</span><span class="v" id="s-conf">—</span></div>
+        <div class="srow"><span class="k">Filtru 1h</span><span class="v" id="s-htf">—</span></div>
+        <div class="rrbar">
+          <div class="lbl"><span>SL <b id="rr-sl"></b></span><span>R:R <b id="rr-val" style="color:var(--amber)"></b></span><span>TP <b id="rr-tp"></b></span></div>
+          <div class="bar"><div class="sl" id="bar-sl" style="width:33%"></div><div class="tp" id="bar-tp" style="width:67%"></div></div>
+        </div>
+        <button class="gen-btn" onclick="generate()">Generează configurația →</button>
+        <div class="sum-note">Config-ul se generează local, în browserul tău.<br>Nimic nu se trimite către serverele noastre.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OUTPUT -->
+  <div class="out" id="out">
+    <div class="sec">
+      <div class="sec-h"><div class="n">✓</div><b>Configurația ta — deploy în 3 pași</b></div>
+      <div class="sec-b">
+
+        <div class="codehead"><span>VARIABILE DE MEDIU — Railway Raw Editor</span><button class="copy-btn" id="copy-btn" onclick="copyVars()">Copiază tot</button></div>
+        <div class="codebox" id="code"></div>
+
+        <div style="margin-top:20px">
+          <div class="dstep"><span class="dn">1.</span><span>Deschide <a href="https://railway.com" target="_blank" rel="noopener">railway.com</a> → <strong>New Project</strong> → <strong>Deploy from GitHub repo</strong> → selectează <strong id="repo-name">apex-trade-bot</strong> → Deploy Now</span></div>
+          <div class="dstep"><span class="dn">2.</span><span>Tab <strong>Variables</strong> → <strong>Raw Editor</strong> → lipești tot ce ai copiat mai sus → <strong>Update</strong></span></div>
+          <div class="dstep"><span class="dn">3.</span><span>Railway face redeploy automat. Dacă ai pus Telegram, primești mesaj că botul a pornit. Dashboard-ul e pe URL-ul Railway cu <strong>?token=</strong> (e inclus în config).</span></div>
+        </div>
+
+        <div id="mt5-steps" style="display:none;margin-top:16px">
+          <div class="flabel" style="margin-bottom:6px">Pași suplimentari MetaTrader 5</div>
+          <div class="dstep"><span class="dn">4.</span><span>Copiază <strong>mt5/ApexBridge.mq5</strong> din codul sursă în MetaTrader: File → Open Data Folder → <strong>MQL5/Experts</strong>, apoi restart MT5</span></div>
+          <div class="dstep"><span class="dn">5.</span><span>Tools → Options → Expert Advisors → bifează <strong>Allow WebRequest</strong> și adaugă URL-ul tău Railway</span></div>
+          <div class="dstep"><span class="dn">6.</span><span>Trage EA-ul pe chart-ul perechii (M5), setează <strong>BotURL</strong> + <strong>Secret</strong> (același MT_BRIDGE_SECRET din config) și pornește <strong>Algo Trading</strong></span></div>
+        </div>
+
+        <div class="infobox" id="paper-note">Configul e pe <strong>PAPER_TRADING=true</strong> — bani simulați. Lasă-l să ruleze 1–2 săptămâni, verifică rezultatele în dashboard, apoi schimbă în <strong>false</strong> doar dacă ești mulțumit.</div>
+
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<div class="progress-wrap">
-  <div class="progress-labels">
-    <div class="progress-label active" id="lbl-1">1. Profil</div>
-    <div class="progress-label" id="lbl-2">2. Monedă</div>
-    <div class="progress-label" id="lbl-3">3. Binance</div>
-    <div class="progress-label" id="lbl-4">4. API Keys</div>
-    <div class="progress-label" id="lbl-5">5. Config</div>
+<!-- license overlay -->
+<div class="overlay" id="key-overlay">
+  <div class="ovcard">
+    <h2>Introdu cheia de licență</h2>
+    <p>Cheia APEX- din emailul de livrare. O introduci o singură dată — rămâne salvată în acest browser.</p>
+    <input class="inp mono" id="manual-key" placeholder="APEX-XXXXXXXX-XXXX">
+    <button class="gen-btn" style="margin-top:14px" onclick="submitKey()">Continuă</button>
   </div>
-  <div class="progress-track">
-    <div class="progress-fill" id="progress-fill" style="width:20%"></div>
-  </div>
-</div>
-
-<div class="wizard">
-
-  <!-- Step 1: Profile -->
-  <div class="step active" id="step-1">
-    <div class="step-title">Alege Profilul de Trading</div>
-    <div class="step-sub">Toate profilurile folosesc același motor AI bazat pe 6 traderi legendari. Diferența este cât de des tranzacționează și câți bani riscă per trade.</div>
-    <div class="strategy-cards" id="strategy-cards"></div>
-    <div class="nav-row">
-      <button class="btn-next" id="next-1" onclick="goTo(2)" disabled>Continuă →</button>
-    </div>
-  </div>
-
-  <!-- Step 2: Coin -->
-  <div class="step" id="step-2">
-    <div class="step-title">Alege Moneda Principală</div>
-    <div class="step-sub">Botul scanează automat mai multe monede — asta o setezi ca principală. Poți activa multi-simbol din env vars.</div>
-    <div class="coin-grid" id="coin-grid"></div>
-    <div class="nav-row">
-      <button class="btn-back" onclick="goTo(1)">← Înapoi</button>
-      <button class="btn-next" id="next-2" onclick="goTo(3)" disabled>Continuă →</button>
-    </div>
-  </div>
-
-  <!-- Step 3: Exchange (Binance only) -->
-  <div class="step" id="step-3">
-    <div class="step-title">Exchange — Binance</div>
-    <div class="step-sub">Botul funcționează cu Binance — disponibil în toate țările, lichiditate maximă. Vei introduce cheile API în pasul următor.</div>
-    <div class="risk-cards" id="exchange-cards"></div>
-    <div class="nav-row">
-      <button class="btn-back" onclick="goTo(2)">← Înapoi</button>
-      <button class="btn-next" id="next-3" onclick="goTo(4)">Continuă →</button>
-    </div>
-  </div>
-
-  <!-- Step 4: API Keys + Telegram -->
-  <div class="step" id="step-4">
-    <div class="step-title" id="api-step-title">Chei API Binance</div>
-    <div class="step-sub" id="api-step-sub">Botul are nevoie de cheile tale pentru a plasa ordine pe contul tău Binance.</div>
-
-    <div class="input-group">
-      <label class="input-label">Binance API Key <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
-      <input class="input-field" id="api-key" type="text" placeholder="Lipeste API Key-ul" autocomplete="off" oninput="onApiKeyInput()" />
-      <div class="input-hint" id="api-key-hint">
-        Du-te la <a id="api-link" href="https://www.binance.com/en/my/settings/api-management" target="_blank">Binance → API Management</a> → Create API → activează permisiunea <strong>Spot &amp; Margin Trading</strong>
-      </div>
-    </div>
-
-    <div class="input-group">
-      <label class="input-label">Binance Secret Key <span style="color:var(--danger);font-size:.8rem">obligatoriu</span></label>
-      <input class="input-field" id="api-secret" type="password" placeholder="Lipeste Secret Key-ul" autocomplete="off" oninput="onApiKeyInput()" />
-      <div class="input-hint">
-        Secretul apare <strong>o singură dată</strong> la creare. Activează permisiunea <strong>Spot Trading</strong>. NU activa Withdrawals.
-      </div>
-    </div>
-
-    <div class="telegram-box">
-      <div class="tb-title">Telegram — Notificări + Buton /stop</div>
-      <div class="tb-desc">
-        Opțional dar recomandat: primești un mesaj la fiecare tranzacție și poți opri botul din orice loc cu <code>/stop</code>.
-        Fără Telegram, poți opri botul din Railway Dashboard → serviciul tău → Deploy → Stop.
-      </div>
-      <div class="input-group" style="margin-bottom:.75rem">
-        <label class="input-label">Telegram Bot Token <span class="opt">(opțional)</span></label>
-        <input class="input-field" id="tg-token" type="text" placeholder="123456:ABCdef..." />
-        <div class="input-hint">Deschide <a href="https://t.me/BotFather" target="_blank">@BotFather</a> → /newbot → copiază token-ul</div>
-      </div>
-      <div class="input-group" style="margin-bottom:0">
-        <label class="input-label">Telegram Chat ID <span class="opt">(opțional)</span></label>
-        <input class="input-field" id="tg-chat-id" type="text" placeholder="Ex: 123456789" />
-        <div class="input-hint">Trimite /start la <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> → copiază ID-ul</div>
-      </div>
-    </div>
-
-    <div class="nav-row">
-      <button class="btn-back" onclick="goTo(3)">← Înapoi</button>
-      <button class="btn-next" id="next-4" onclick="goTo(5)" disabled>Generează Config →</button>
-    </div>
-  </div>
-
-  <!-- Step 5: Config + Deploy -->
-  <div class="step" id="step-5">
-    <div class="step-title">Configurația Ta</div>
-    <div class="step-sub">Copiază variabilele și deployează pe Railway în 3 pași.</div>
-
-    <div class="summary-row" id="summary-chips"></div>
-
-    <!-- ALL VARS — copy first -->
-    <div class="deploy-phase">
-      <div class="phase-num">Pasul 1</div>
-      <div class="phase-title">Copiază variabilele</div>
-    </div>
-    <div class="config-header">
-      <span>RAW EDITOR — lipești tot în Railway</span>
-      <button class="copy-btn" id="copy-btn" onclick="copyVars()">Copiază Tot</button>
-    </div>
-    <div class="code-box" id="config-output"></div>
-
-    <!-- RAILWAY STEPS -->
-    <div class="deploy-phase" style="margin-top:1.75rem">
-      <div class="phase-num">Pasul 2</div>
-      <div class="phase-title">Deschide Railway</div>
-    </div>
-    <a href="https://railway.com" target="_blank" class="deploy-btn" style="display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none;margin-bottom:1rem">
-      Deschide railway.com →
-    </a>
-    <div class="deploy-phases">
-      <div class="phase-section">
-        <div class="phase-step"><span class="num">1.</span>Click <strong>New Project</strong></div>
-        <div class="phase-step"><span class="num">2.</span>Click <strong>Deploy from GitHub repo</strong></div>
-        <div class="phase-step"><span class="num">3.</span>Selectează <strong>apex-trade-bot</strong> din lista ta</div>
-        <div class="phase-step"><span class="num">4.</span>Click <strong>Deploy Now</strong></div>
-      </div>
-    </div>
-
-    <!-- PASTE VARS -->
-    <div class="deploy-phase" style="margin-top:1.75rem">
-      <div class="phase-num">Pasul 3</div>
-      <div class="phase-title">Lipești variabilele în Railway</div>
-    </div>
-    <div class="deploy-phases">
-      <div class="phase-section">
-        <div class="phase-step"><span class="num">1.</span>Pe proiectul creat mergi la tab-ul <strong>Variables</strong></div>
-        <div class="phase-step"><span class="num">2.</span>Click <strong>Raw Editor</strong> (dreapta sus)</div>
-        <div class="phase-step"><span class="num">3.</span>Lipești tot ce ai copiat la Pasul 1</div>
-        <div class="phase-step"><span class="num">4.</span>Click <strong>Update</strong> → Railway redeploys automat</div>
-        <div class="phase-step"><span class="num">5.</span>Dacă ai Telegram activ, primești mesaj că botul a pornit</div>
-      </div>
-    </div>
-
-    <div class="warn-box" style="margin-top:1.5rem">
-      <strong>PAPER_TRADING=true</strong> înseamnă simulare fără bani reali. Testează o zi, verifică că funcționează, apoi schimbă în <strong>PAPER_TRADING=false</strong>.
-    </div>
-
-    <div id="stop-section" style="display:none;margin-top:1.5rem">
-      <button class="stop-btn" onclick="emergencyStop()">Opreste Botul Acum (Urgenta)</button>
-      <div style="font-size:11px;color:rgba(255,77,109,.35);text-align:center;margin-top:6px">Sau trimite /stop în Telegram</div>
-    </div>
-
-    <div class="nav-row" style="margin-top:1.25rem">
-      <button class="btn-back" onclick="goTo(4)">← Înapoi</button>
-    </div>
-  </div>
-
 </div>
 
 <script>
-const STRATEGIES = [
-  {
-    id: 'conservator', name: 'Conservator — Lent și Sigur',
-    desc: 'Verifică semnale la fiecare 15 minute. Riscă 10% din sold per trade. Ideal pentru capital mic sau începători.',
-    risk: 'low', riskLabel: 'Risc scăzut', detail: 'Recomandat pentru cei care încep',
-    timeframe: '15m', riskPct: 0.10, sl: 0.010, tp: 0.020,
-  },
-  {
-    id: 'echilibrat', name: 'Echilibrat — Configurat Implicit',
-    desc: 'Verifică semnale la fiecare 5 minute. Riscă 20% din sold. Raport risc/recompensă 1:2 — cel mai testat.',
-    risk: 'medium', riskLabel: 'Risc mediu', detail: 'Cel mai popular — setările implicite ale botului',
-    timeframe: '5m', riskPct: 0.20, sl: 0.008, tp: 0.016,
-  },
-  {
-    id: 'agresiv', name: 'Agresiv — Scalping Rapid',
-    desc: 'Semnale dese pe 5 minute. Riscă 30% din sold. Mai multe tranzacții, volatilitate mai mare în ambele direcții.',
-    risk: 'high', riskLabel: 'Risc ridicat', detail: 'Necesită monitorizare activă',
-    timeframe: '5m', riskPct: 0.30, sl: 0.012, tp: 0.024,
-  },
-];
-
-const COINS = [
-  { sym: 'SOLUSDT',  name: 'Solana',   icon: '◎',  tag: 'Default bot'    },
-  { sym: 'XRPUSDT',  name: 'XRP',      icon: '✕',  tag: 'High Velocity'  },
-  { sym: 'DOGEUSDT', name: 'DOGE',     icon: 'Ð',  tag: 'Meme Coin'      },
-  { sym: 'ADAUSDT',  name: 'Cardano',  icon: '₳',  tag: 'Stable'         },
-  { sym: 'BTCUSDT',  name: 'Bitcoin',  icon: '₿',  tag: 'Cel mai lichid' },
-  { sym: 'ETHUSDT',  name: 'Ethereum', icon: 'Ξ',  tag: 'DeFi Leader'    },
-  { sym: 'BNBUSDT',  name: 'BNB',      icon: 'B',  tag: 'Exchange Coin'  },
-  { sym: 'TRXUSDT',  name: 'TRON',     icon: '⟡', tag: 'Low Fee'        },
-];
-
+/* ─── Data ─── */
 const EXCHANGES = [
-  { id: 'binance', name: 'Binance', detail: 'Disponibil în toate țările — lichiditate maximă, paper trading inclus în bot', risk: 'low' },
+  {id:'binance', name:'Binance',  ic:'◆', tag:'live validat', live:true,  keys:[['API Key','API_KEY'],['Secret Key','API_SECRET']], url:'binance.com → API Management', env:'BINANCE'},
+  {id:'bybit',   name:'Bybit',    ic:'◇', tag:'experimental', live:false, keys:[['API Key','API_KEY'],['Secret Key','API_SECRET']], url:'bybit.com → API', env:'BYBIT'},
+  {id:'okx',     name:'OKX',      ic:'○', tag:'experimental', live:false, keys:[['API Key','API_KEY'],['Secret','API_SECRET'],['Passphrase','API_PASSPHRASE']], url:'okx.com → API', env:'OKX'},
+  {id:'kraken',  name:'Kraken',   ic:'◈', tag:'experimental', live:false, keys:[['API Key','API_KEY'],['Private Key','API_SECRET']], url:'kraken.com → Settings → API', env:'KRAKEN'},
+  {id:'kucoin',  name:'KuCoin',   ic:'◉', tag:'experimental', live:false, keys:[['API Key','API_KEY'],['Secret','API_SECRET'],['Passphrase','API_PASSPHRASE']], url:'kucoin.com → API Management', env:'KUCOIN'},
+  {id:'coinbase',name:'Coinbase', ic:'●', tag:'experimental', live:false, keys:[['API Key name','API_KEY'],['EC Private Key','API_SECRET']], url:'coinbase.com → Advanced Trade API', env:'COINBASE'},
+  {id:'bitget',  name:'Bitget',   ic:'◐', tag:'experimental', live:false, keys:[['API Key','API_KEY'],['Secret','API_SECRET'],['Passphrase','API_PASSPHRASE']], url:'bitget.com → API', env:'BITGET'},
+  {id:'mexc',    name:'MEXC',     ic:'◒', tag:'experimental', live:false, keys:[['API Key','API_KEY'],['Secret Key','API_SECRET']], url:'mexc.com → API', env:'MEXC'},
 ];
+const BROKERS = [
+  {id:'oanda', name:'OANDA', ic:'◆', tag:'live validat', live:true,
+   keys:[['API Token','OANDA_API_TOKEN'],['Account ID','OANDA_ACCOUNT_ID']],
+   hint:'Cont gratuit de practice pe oanda.com → Manage API Access. Live validat complet (SL/TP server-side).'},
+  {id:'mt', name:'MetaTrader 5', ic:'◇', tag:'orice broker MT5', live:false,
+   keys:[['Bridge Secret (inventezi tu, 16+ caractere)','MT_BRIDGE_SECRET']],
+   hint:'Funcționează cu orice broker MT5 (IC Markets, Pepperstone…) prin EA-ul ApexBridge inclus. Pașii MT5 apar la final.'},
+  {id:'td', name:'Twelve Data', ic:'○', tag:'doar paper', live:false,
+   keys:[['API Key','TWELVE_DATA_KEY']],
+   hint:'Date live gratuite (twelvedata.com, 800 calls/zi) — doar pentru paper trading, fără execuție reală.'},
+];
+const CRYPTO_PAIRS = ['XRPUSDT','SOLUSDT','BTCUSDT','ADAUSDT','ETHUSDT','BNBUSDT','DOGEUSDT','TRXUSDT','LINKUSDT','AVAXUSDT'];
+const CRYPTO_DEFAULT = ['XRPUSDT','SOLUSDT','BTCUSDT','ADAUSDT','ETHUSDT'];
+const FX_PAIRS = ['NZD_USD','AUD_USD','EUR_USD','GBP_USD','USD_JPY','USD_CAD','USD_CHF','EUR_JPY'];
+const FX_DEFAULT = ['NZD_USD'];
 
-const state = {
-  licenseKey: 'APEX-XXXX-XXXX-XXXX',
-  strategy: null, coin: null, exchange: null,
-  apiKey: '', apiSecret: '', telegramToken: '', telegramChatId: '',
-  currentStep: 1,
+/* ─── State ─── */
+const S = {
+  bot:'crypto', venue:'binance', pairs:[...CRYPTO_DEFAULT], paper:true,
+  htf:true, trail:false, lic:'',
+  keyVals:{},
 };
 
-(function init() {
-  // 1. URL param takes priority
-  const urlKey = new URLSearchParams(window.location.search).get('key');
-  if (urlKey && /^APEX-/i.test(urlKey)) {
-    state.licenseKey = urlKey.toUpperCase();
-    try { localStorage.setItem('apex_license', state.licenseKey); } catch {}
-  } else {
-    // 2. Fallback to localStorage (user re-opened page without URL)
-    try {
-      const saved = localStorage.getItem('apex_license');
-      if (saved && /^APEX-/i.test(saved)) state.licenseKey = saved;
-    } catch {}
-  }
-
-  renderStrategies();
-  renderCoins();
-  renderExchanges();
-
-  // Auto-select Binance (only exchange supported)
-  state.exchange = 'binance';
-
-  // 3. If still no valid key, show the key entry overlay
-  if (state.licenseKey === 'APEX-XXXX-XXXX-XXXX') showKeyOverlay();
+/* ─── Init ─── */
+(function(){
+  const url = new URLSearchParams(location.search).get('key');
+  if (url && /^APEX-/i.test(url)) { S.lic = url.toUpperCase(); try{localStorage.setItem('apex_license',S.lic)}catch(e){} }
+  else { try{ const s=localStorage.getItem('apex_license'); if(s) S.lic=s; }catch(e){} }
+  if (!S.lic) document.getElementById('key-overlay').style.display='flex';
+  document.getElementById('lic-chip').textContent = S.lic ? S.lic.slice(0,9)+'····' : 'APEX-····';
+  renderVenues(); renderPairs(); renderKeys(); upd();
 })();
-
-function showKeyOverlay() {
-  document.getElementById('key-overlay').style.display = 'flex';
+function submitKey(){
+  const v=document.getElementById('manual-key').value.trim().toUpperCase();
+  if(!/^APEX-/.test(v)){ alert('Cheia trebuie să înceapă cu APEX-'); return; }
+  S.lic=v; try{localStorage.setItem('apex_license',v)}catch(e){}
+  document.getElementById('lic-chip').textContent=v.slice(0,9)+'····';
+  document.getElementById('key-overlay').style.display='none';
 }
 
-function submitManualKey() {
-  const val = document.getElementById('manual-key-input').value.trim().toUpperCase();
-  if (!/^APEX-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(val)) {
-    document.getElementById('key-overlay-err').textContent = 'Format invalid. Exemplu: APEX-AB12-CD34-EF56';
-    return;
+/* ─── Bot type switch ─── */
+function setBot(b){
+  S.bot=b;
+  document.getElementById('tab-crypto').classList.toggle('active',b==='crypto');
+  document.getElementById('tab-forex').classList.toggle('active',b==='forex');
+  document.getElementById('exch-grp').style.display = b==='crypto'?'':'none';
+  document.getElementById('broker-grp').style.display = b==='forex'?'':'none';
+  document.getElementById('lev-grp').style.display = b==='forex'?'':'none';
+  S.venue = b==='crypto'?'binance':'oanda';
+  S.pairs = b==='crypto'?[...CRYPTO_DEFAULT]:[...FX_DEFAULT];
+  S.keyVals={};
+  // re-range sliders per bot
+  if(b==='crypto'){
+    setSlider('risk',1,20,.5,5); setSlider('sl',0.4,3,.1,1.6); setSlider('tp',0.8,9,.1,3.2);
+    setSlider('bal',50,10000,50,100); setSlider('crit',1,5,1,5);
+  } else {
+    setSlider('risk',0.25,3,.25,0.5); setSlider('sl',10,60,5,20); setSlider('tp',20,180,5,40);
+    setSlider('bal',100,50000,100,1000); setSlider('crit',1,5,1,4);
   }
-  state.licenseKey = val;
-  try { localStorage.setItem('apex_license', val); } catch {}
-  document.getElementById('key-overlay').style.display = 'none';
+  renderVenues(); renderPairs(); renderKeys(); upd();
+}
+function setSlider(id,min,max,step,val){
+  const r=document.getElementById(id); r.min=min;r.max=max;r.step=step;r.value=val;
+  document.getElementById(id+'-num').value=val;
 }
 
-function renderStrategies() {
-  document.getElementById('strategy-cards').innerHTML = STRATEGIES.map(s => `
-    <div class="strategy-card" data-id="${s.id}" onclick="selectStrategy('${s.id}')">
-      <div class="sc-radio" id="radio-${s.id}"></div>
-      <div class="sc-body">
-        <div class="sc-name">${s.name}</div>
-        <div class="sc-desc">${s.desc}</div>
-        <span class="sc-badge ${s.risk}">${s.riskLabel} &nbsp;·&nbsp; ${s.detail}</span>
-      </div>
-    </div>`).join('');
-}
-
-function renderCoins() {
-  document.getElementById('coin-grid').innerHTML = COINS.map(c => `
-    <button class="coin-btn" data-sym="${c.sym}" onclick="selectCoin('${c.sym}')">
-      <span class="coin-icon">${c.icon}</span>
-      <div class="coin-name">${c.name}</div>
-      <div class="coin-sym">${c.sym}</div>
-      <div class="coin-tag">${c.tag}</div>
-    </button>`).join('');
-}
-
-function renderExchanges() {
-  document.getElementById('exchange-cards').innerHTML = EXCHANGES.map(e => `
-    <div class="risk-card" data-id="${e.id}" onclick="selectExchange('${e.id}')">
-      <div class="risk-name">${e.name}</div>
-      <div class="risk-desc">${e.detail}</div>
-    </div>`).join('');
-}
-
-function selectStrategy(id) {
-  state.strategy = id;
-  document.querySelectorAll('.strategy-card').forEach(c => c.classList.toggle('selected', c.dataset.id === id));
-  document.getElementById('next-1').disabled = false;
-}
-function selectCoin(sym) {
-  state.coin = sym;
-  document.querySelectorAll('.coin-btn').forEach(b => b.classList.toggle('selected', b.dataset.sym === sym));
-  document.getElementById('next-2').disabled = false;
-}
-function selectExchange(id) {
-  state.exchange = id;
-  document.querySelectorAll('#exchange-cards .risk-card').forEach(c => c.classList.toggle('selected', c.dataset.id === id));
-}
-function onApiKeyInput() {
-  state.apiKey    = document.getElementById('api-key').value.trim();
-  state.apiSecret = document.getElementById('api-secret').value.trim();
-  document.getElementById('next-4').disabled = !(state.apiKey && state.apiSecret);
-}
-
-function goTo(n) {
-  document.getElementById('step-' + state.currentStep).classList.remove('active');
-  state.currentStep = n;
-  document.getElementById('step-' + n).classList.add('active');
-  document.getElementById('progress-fill').style.width = (n / 5 * 100) + '%';
-  for (let i = 1; i <= 5; i++) {
-    document.getElementById('lbl-' + i).className = 'progress-label' + (i === n ? ' active' : i < n ? ' done' : '');
-  }
-  if (n === 5) buildConfig();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function buildConfig() {
-  try {
-    state.telegramToken  = document.getElementById('tg-token').value.trim();
-    state.telegramChatId = document.getElementById('tg-chat-id').value.trim();
-
-    const strat    = STRATEGIES.find(s => s.id === state.strategy) || STRATEGIES[1];
-    const symbol   = state.coin || 'SOLUSDT';
-    const exchange = 'binance';
-
-    document.getElementById('summary-chips').innerHTML = [
-      `<span class="chip">${strat.name.split('—')[0].trim()}</span>`,
-      `<span class="chip">${symbol}</span>`,
-      `<span class="chip">Binance</span>`,
-      state.telegramToken ? `<span class="chip">Telegram activ</span>` : '',
-    ].join('');
-
-    window._configPlain = buildVarsPlain(strat, symbol);
-    document.getElementById('config-output').innerHTML = buildVarsHTML(strat, symbol, exchange);
-    document.getElementById('stop-section').style.display = state.apiKey ? 'block' : 'none';
-  } catch(e) {
-    document.getElementById('config-output').textContent = 'Eroare la generare: ' + e.message;
+/* ─── Venues ─── */
+function renderVenues(){
+  if(S.bot==='crypto'){
+    document.getElementById('exgrid').innerHTML = EXCHANGES.map(e=>`
+      <div class="excard ${S.venue===e.id?'on':''}" onclick="setVenue('${e.id}')">
+        <div class="x-ic">${e.ic}</div><b>${e.name}</b>
+        <span class="x-tag ${e.live?'live':'exp'}">${e.tag}</span>
+      </div>`).join('');
+    const ex=EXCHANGES.find(e=>e.id===S.venue);
+    document.getElementById('exch-hint').innerHTML = ex.live
+      ? 'Live trading <strong>validat complet</strong> pe Binance — SL/TP plasate server-side la exchange (OCO).'
+      : `${ex.name}: date de piață + paper trading complet. Live e <strong>experimental</strong> — îl activezi explicit, pe riscul tău, după teste pe paper.`;
+  } else {
+    document.getElementById('brokergrid').innerHTML = BROKERS.map(b=>`
+      <div class="excard ${S.venue===b.id?'on':''}" onclick="setVenue('${b.id}')">
+        <div class="x-ic">${b.ic}</div><b>${b.name}</b>
+        <span class="x-tag ${b.live?'live':'exp'}">${b.tag}</span>
+      </div>`).join('');
+    document.getElementById('broker-hint').innerHTML = BROKERS.find(b=>b.id===S.venue).hint;
   }
 }
+function setVenue(v){ S.venue=v; S.keyVals={}; renderVenues(); renderKeys(); upd(); }
 
-function buildVarsPlain(strat, symbol) {
-  const t  = state.telegramToken  || '';
-  const tc = state.telegramChatId || '';
-  const lines = [
-    `# ── Apex Trade Bot — Environment Variables ──`,
-    ``,
-    `# Exchange`,
-    `EXCHANGE=binance`,
-    ``,
-    `# Binance API`,
-    `BINANCE_API_KEY=${state.apiKey || 'YOUR_BINANCE_API_KEY'}`,
-    `BINANCE_API_SECRET=${state.apiSecret || 'YOUR_BINANCE_SECRET'}`,
-    `BINANCE_TESTNET=false`,
-    ``,
-    `# Trading`,
-    `TRADE_SYMBOL=${symbol}`,
-    `TIMEFRAME=${strat.timeframe}`,
-    `RISK_PER_TRADE=${strat.riskPct}`,
-    `STOP_LOSS_PCT=${strat.sl}`,
-    `TAKE_PROFIT_PCT=${strat.tp}`,
-    `MIN_CONFIDENCE=62`,
-    `TRAILING_STOP=true`,
-    ``,
-    `# AI Engine (Groq = gratuit | Anthropic = opțional)`,
-    `GROQ_API_KEY=console.groq.com → API Keys → Create`,
-    `ANTHROPIC_API_KEY=optional`,
-    ``,
-    `# Paper Trading (LASĂ true prima dată)`,
-    `PAPER_TRADING=true`,
-    `PAPER_BALANCE=100`,
-    ``,
-  ];
-  if (t) {
-    lines.push(`# Telegram`);
-    lines.push(`TELEGRAM_BOT_TOKEN=${t}`);
-    lines.push(`TELEGRAM_CHAT_ID=${tc}`);
-    lines.push(``);
-  }
-  lines.push(`# License`);
-  lines.push(`LICENSE_KEY=${state.licenseKey}`);
-  lines.push(`LICENSE_SERVER=https://aicashsystem.space`);
-  return lines.join('\n');
+/* ─── Pairs ─── */
+function renderPairs(){
+  const list = S.bot==='crypto'?CRYPTO_PAIRS:FX_PAIRS;
+  document.getElementById('pair-chips').innerHTML = list.map(p=>
+    `<span class="chip ${S.pairs.includes(p)?'on':''}" onclick="togglePair('${p}')">${p.replace('USDT','').replace('_','/')}</span>`).join('');
+}
+function togglePair(p){
+  const i=S.pairs.indexOf(p);
+  if(i>=0){ if(S.pairs.length>1) S.pairs.splice(i,1); }
+  else S.pairs.push(p);
+  renderPairs(); upd();
 }
 
-function buildVarsHTML(strat, symbol, exchange) {
-  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const kv  = (k, v) => `<span class="k">${esc(k)}</span>=<span class="v">${esc(v)}</span>`;
-  const cm  = t => `<span class="c">${esc(t)}</span>`;
-  const tg  = state.telegramToken  || '';
-  const tc  = state.telegramChatId || '';
-  const secretDisplay = state.apiSecret ? '•'.repeat(Math.min(state.apiSecret.length, 20)) : 'YOUR_BINANCE_SECRET';
-  const rows = [
-    cm('# ── Apex Trade Bot — Environment Variables ──'),
-    '',
-    cm('# Exchange'),
-    kv('EXCHANGE', 'binance'),
-    '',
-    cm('# Binance API'),
-    kv('BINANCE_API_KEY', state.apiKey || 'YOUR_BINANCE_API_KEY'),
-    kv('BINANCE_API_SECRET', secretDisplay),
-    kv('BINANCE_TESTNET', 'false'),
-    '',
-    cm('# Trading'),
-    kv('TRADE_SYMBOL', symbol),
-    kv('TIMEFRAME', strat.timeframe),
-    kv('RISK_PER_TRADE', String(strat.riskPct)),
-    kv('STOP_LOSS_PCT', String(strat.sl)),
-    kv('TAKE_PROFIT_PCT', String(strat.tp)),
-    kv('MIN_CONFIDENCE', '62'),
-    kv('TRAILING_STOP', 'true'),
-    '',
-    cm('# AI Engine (Groq = gratuit | Anthropic = opțional)'),
-    kv('GROQ_API_KEY', 'console.groq.com → API Keys → Create'),
-    kv('ANTHROPIC_API_KEY', 'optional'),
-    '',
-    cm('# Paper Trading — LASĂ true prima dată'),
-    kv('PAPER_TRADING', 'true'),
-    kv('PAPER_BALANCE', '100'),
-  ];
-  if (tg) {
-    rows.push('');
-    rows.push(cm('# Telegram'));
-    rows.push(kv('TELEGRAM_BOT_TOKEN', tg));
-    rows.push(kv('TELEGRAM_CHAT_ID', tc));
-  }
-  rows.push('');
-  rows.push(cm('# License'));
-  rows.push(kv('LICENSE_KEY', state.licenseKey));
-  rows.push(kv('LICENSE_SERVER', 'https://aicashsystem.space'));
-  return rows.map(r => r === '' ? '<br>' : r + '<br>').join('');
-}
-
-function dlMsg(text, color) {
-  const el = document.getElementById('download-msg');
-  if (el) { el.textContent = text; el.style.color = color || 'rgba(255,255,255,.35)'; }
-}
-
-function downloadBot() {
-  const key = state.licenseKey;
-  if (!key || key === 'APEX-XXXX-XXXX-XXXX') {
-    dlMsg('Cheie lipsă — introdu-o în overlay-ul de la start.', '#ff4d6d');
-    return;
-  }
-
-  // iOS Safari & mobile: blob download doesn't work — open URL directly
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if (isMobile) {
-    dlMsg('Se deschide descărcarea...', 'rgba(245,158,11,.6)');
-    window.location.href = '/bot-access?key=' + encodeURIComponent(key);
-    return;
-  }
-
-  const btn = document.getElementById('download-btn');
-  btn.textContent = 'Se pregătește... asteaptă';
-  btn.disabled = true;
-  dlMsg('Se generează arhiva, poate dura 5-10 secunde...', 'rgba(245,158,11,.6)');
-
-  // 30s timeout — if server hangs, reset the button
-  const controller = new AbortController();
-  const timeout = setTimeout(() => { controller.abort(); }, 30000);
-
-  fetch('/bot-access?key=' + encodeURIComponent(key), { signal: controller.signal })
-    .then(r => {
-      clearTimeout(timeout);
-      if (!r.ok) return r.text().then(t => { throw new Error(t || 'Licență invalidă sau server indisponibil'); });
-      return r.blob();
-    })
-    .then(blob => {
-      const url = URL.createObjectURL(blob);
-      const a   = document.createElement('a');
-      a.href     = url;
-      a.download = 'apex-trade-bot.zip';
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 2000);
-
-      btn.textContent = 'Descărcat! Verifică folderul Downloads';
-      btn.style.background = 'linear-gradient(135deg,#00e87a,#16a34a)';
-      dlMsg('ZIP descărcat cu succes. Urmează Pasul 2 de mai jos.', '#00e87a');
-      setTimeout(() => {
-        btn.textContent = 'Descarcă apex-trade-bot.zip';
-        btn.style.background = '';
-        btn.disabled = false;
-        dlMsg('Licență: ' + state.licenseKey.slice(0, 11) + '...', 'rgba(255,255,255,.35)');
-      }, 5000);
-    })
-    .catch(err => {
-      clearTimeout(timeout);
-      btn.textContent = 'Descarcă apex-trade-bot.zip';
-      btn.disabled = false;
-      const msg = err.name === 'AbortError' ? 'Timeout — serverul nu a răspuns în 30s. Încearcă din nou.' : 'Eroare: ' + err.message;
-      dlMsg(msg, '#ff4d6d');
-    });
-}
-
-function copyVars() {
-  const text = window._configPlain || '';
-  const btn = document.getElementById('copy-btn');
-  const done = () => { btn.textContent = 'Copiat!'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = 'Copiază Tot'; btn.classList.remove('copied'); }, 2000); };
-  navigator.clipboard.writeText(text).then(done).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;';
-    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
-    document.body.removeChild(ta); done();
+/* ─── Keys area ─── */
+function renderKeys(){
+  const v = S.bot==='crypto' ? EXCHANGES.find(e=>e.id===S.venue) : BROKERS.find(b=>b.id===S.venue);
+  let html = `<div class="grp"><div class="flabel">Chei ${v.name}</div>`;
+  v.keys.forEach((k,i)=>{
+    html += `<input class="inp mono" ${i?'style="margin-top:8px"':''} id="vk-${i}" placeholder="${k[0]}" oninput="S.keyVals[${i}]=this.value.trim()">`;
   });
+  if(S.bot==='crypto') html += `<div class="hint">Creezi cheile pe <strong>${v.url}</strong>. Activează doar permisiunea de <strong>trading</strong> — NU activa Withdrawals. Pentru paper trading poți lăsa gol.</div>`;
+  else if(S.venue==='oanda') html += `<div class="hint">OANDA → Manage API Access. Pentru paper trading poți lăsa gol.</div>`;
+  html += '</div>';
+  document.getElementById('keys-area').innerHTML = html;
 }
 
-async function emergencyStop() {
-  if (!confirm('Oprești botul? Toate ordinele deschise vor fi anulate.')) return;
-  try {
-    const res = await fetch('/bot/stop', { method: 'POST' });
-    const data = await res.json();
-    alert(data.message || 'Bot oprit.');
-  } catch {
-    alert('Nu s-a putut contacta serverul. Trimite /stop în Telegram sau oprește Railway din dashboard.');
+/* ─── Toggles / sync ─── */
+function tgl(id){
+  S[id==='htf'?'htf':'trail'] = !S[id==='htf'?'htf':'trail'];
+  document.getElementById('tgl-'+id).classList.toggle('on');
+  upd();
+}
+function setMode(paper){
+  S.paper=paper;
+  document.getElementById('mode-paper').classList.toggle('on',paper);
+  document.getElementById('mode-live').classList.toggle('on',!paper);
+  document.getElementById('live-warn').style.display=paper?'none':'block';
+  document.getElementById('bal-lbl').textContent=paper?'simulată':'(informativ — balanța reală e din cont)';
+  upd();
+}
+function syncNum(id){
+  const n=parseFloat(document.getElementById(id+'-num').value);
+  if(!isNaN(n)) document.getElementById(id).value=n;
+  upd();
+}
+const g = id => parseFloat(document.getElementById(id).value);
+
+/* ─── Live update ─── */
+function upd(){
+  ['bal','risk','lev','conf','crit','sl','tp'].forEach(id=>{
+    const el=document.getElementById(id+'-num'); if(el&&document.activeElement!==el) el.value=document.getElementById(id).value;
+  });
+  const fx=S.bot==='forex';
+  const bal=g('bal'), risk=g('risk'), sl=g('sl'), tp=g('tp'), conf=g('conf'), crit=g('crit');
+  const rr=(tp/sl).toFixed(2);
+
+  document.getElementById('bal-v').textContent='$'+bal.toLocaleString();
+  document.getElementById('risk-v').textContent=risk+'%';
+  document.getElementById('lev-v').textContent=g('lev')+':1';
+  document.getElementById('conf-v').textContent=conf+'%';
+  document.getElementById('crit-v').textContent=crit+'/5';
+  document.getElementById('sl-v').textContent=fx?sl+' pips':sl+'%';
+  document.getElementById('tp-v').textContent=fx?tp+' pips':tp+'%';
+  document.getElementById('crit-rec').textContent=fx?'4/5':'5/5';
+  document.getElementById('risk-hint').innerHTML=fx
+    ?'Procent din balanță riscat dacă SL e atins. Setarea testată: <strong>0.5%</strong>.'
+    :'Procent din balanță alocat per poziție. Setarea testată: <strong>5%</strong>.';
+  document.getElementById('exit-hint').innerHTML=
+    `Raport risc:recompensă <strong>1:${rr}</strong>. Setările testate în backtest: ${fx?'<strong>SL 20 / TP 40 pips</strong> (NZD/USD)':'<strong>SL 1.6% / TP 3.2%</strong>'}.`;
+
+  /* summary */
+  const vn = S.bot==='crypto'?EXCHANGES.find(e=>e.id===S.venue):BROKERS.find(b=>b.id===S.venue);
+  document.getElementById('s-bot').textContent=fx?'Forex':'Crypto';
+  document.getElementById('s-venue-k').textContent=fx?'Broker':'Exchange';
+  document.getElementById('s-venue').textContent=vn.name;
+  document.getElementById('s-pairs').textContent=S.pairs.length<=3?S.pairs.map(p=>p.replace('USDT','').replace('_','/')).join(', '):S.pairs.length+' perechi';
+  document.getElementById('pairs-count').textContent=S.pairs.length+' selectate';
+  document.getElementById('s-risk').textContent=risk+'%'+(fx?' · lev '+g('lev')+':1':'');
+  const maxloss=bal*risk/100;
+  document.getElementById('s-maxloss').textContent='−$'+maxloss.toFixed(2);
+  document.getElementById('s-maxwin').textContent='+$'+(maxloss*tp/sl).toFixed(2);
+  document.getElementById('s-conf').textContent=conf+'% · '+crit+'/5 criterii';
+  document.getElementById('s-htf').textContent=S.htf?'activ':'oprit';
+  const badge=document.getElementById('sum-badge');
+  badge.textContent=S.paper?'Paper':'LIVE';
+  badge.className='badge '+(S.paper?'paper':'live');
+  document.getElementById('rr-sl').textContent=fx?sl+'p':sl+'%';
+  document.getElementById('rr-tp').textContent=fx?tp+'p':tp+'%';
+  document.getElementById('rr-val').textContent='1:'+rr;
+  const slw=100*sl/(parseFloat(sl)+parseFloat(tp));
+  document.getElementById('bar-sl').style.width=slw+'%';
+  document.getElementById('bar-tp').style.width=(100-slw)+'%';
+  document.getElementById('ai-hint').innerHTML=document.getElementById('ai-prov').value==='groq'
+    ?'Gratuit pe <strong>console.groq.com</strong> — fără card. Suficient pentru toate semnalele.'
+    :'<strong>console.anthropic.com</strong> — plătit per utilizare; semnale generate de Claude.';
+}
+
+/* ─── Generate ─── */
+function rndToken(n){ const c='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let s=''; const a=new Uint32Array(n); crypto.getRandomValues(a); for(let i=0;i<n;i++)s+=c[a[i]%c.length]; return s; }
+
+function generate(){
+  const fx=S.bot==='forex';
+  const vn = fx?BROKERS.find(b=>b.id===S.venue):EXCHANGES.find(e=>e.id===S.venue);
+  const L=[];
+  const push=(k,v)=>{ if(v!==''&&v!==undefined&&v!==null) L.push([k,String(v)]); };
+
+  push('PAPER_TRADING', S.paper?'true':'false');
+  push('PAPER_BALANCE', g('bal'));
+  if(fx){
+    push('BROKER', S.venue);
+    vn.keys.forEach((k,i)=>push(k[1], S.keyVals[i]||''));
+    if(S.venue==='oanda') push('OANDA_ENV', S.paper?'practice':'live');
+    push('TRADE_SYMBOL', S.pairs[0]);
+    push('SCAN_SYMBOLS', S.pairs.join(','));
+    push('MULTI_SYMBOL', S.pairs.length>1?'true':'false');
+    push('RISK_PER_TRADE', (g('risk')/100).toFixed(4));
+    push('STOP_LOSS_PIPS', g('sl'));
+    push('TAKE_PROFIT_PIPS', g('tp'));
+    push('LEVERAGE', g('lev'));
+    push('HTF_STRICT', S.htf?'true':'false');
+    if(!S.paper && S.venue!=='oanda') push('ALLOW_EXPERIMENTAL_LIVE','true');
+  } else {
+    push('EXCHANGE', S.venue);
+    vn.keys.forEach((k,i)=>push(vn.env+'_'+k[1], S.keyVals[i]||''));
+    push('TRADE_SYMBOL', S.pairs[0]);
+    push('SCAN_SYMBOLS', S.pairs.join(','));
+    push('MULTI_SYMBOL', S.pairs.length>1?'true':'false');
+    push('RISK_PER_TRADE', (g('risk')/100).toFixed(4));
+    push('STOP_LOSS_PCT', (g('sl')/100).toFixed(4));
+    push('TAKE_PROFIT_PCT', (g('tp')/100).toFixed(4));
+    push('HTF_FILTER', S.htf?'true':'false');
   }
+  push('MIN_CONFIDENCE', g('conf'));
+  push('MIN_CRITERIA', g('crit'));
+  push('TRAILING_STOP', S.trail?'true':'false');
+  const prov=document.getElementById('ai-prov').value, aikey=document.getElementById('ai-key').value.trim();
+  push(prov==='groq'?'GROQ_API_KEY':'ANTHROPIC_API_KEY', aikey||'PUNE_CHEIA_AICI');
+  const tk=document.getElementById('tg-token').value.trim(), tc=document.getElementById('tg-chat').value.trim();
+  if(tk) push('TELEGRAM_BOT_TOKEN', tk);
+  if(tc) push('TELEGRAM_CHAT_ID', tc);
+  push('DASHBOARD_TOKEN', rndToken(24));
+  push('LICENSE_KEY', S.lic||'APEX-XXXX');
+  push('LICENSE_SERVER','https://aicashsystem.space');
+
+  window._plain = L.map(([k,v])=>k+'='+v).join('\n');
+  document.getElementById('code').innerHTML = L.map(([k,v])=>{
+    const masked=/KEY|SECRET|TOKEN|PASSPHRASE/.test(k)&&v.length>10&&!v.startsWith('PUNE')?v.slice(0,4)+'…'+v.slice(-4):v;
+    return `<span class="ck">${k}=</span><span class="cv">${masked}</span>`;
+  }).join('\n');
+
+  document.getElementById('repo-name').textContent = fx?'apex-forex-bot':'apex-trade-bot';
+  document.getElementById('mt5-steps').style.display = (fx&&S.venue==='mt')?'block':'none';
+  document.getElementById('paper-note').style.display = S.paper?'block':'none';
+  const out=document.getElementById('out');
+  out.classList.add('show');
+  out.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function copyVars(){
+  navigator.clipboard.writeText(window._plain||'').then(()=>{
+    const b=document.getElementById('copy-btn'); b.textContent='✓ Copiat';
+    setTimeout(()=>b.textContent='Copiază tot',2000);
+  });
 }
 </script>
 </body>
