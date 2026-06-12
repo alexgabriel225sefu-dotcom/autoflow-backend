@@ -74,7 +74,7 @@ async function main() {
   // 6. Publish template
   const pubRes = await gql(`
     mutation($id: String!, $input: TemplatePublishInput!) {
-      templatePublish(id: $id, input: $input)
+      templatePublish(id: $id, input: $input) { id code }
     }`, {
     id: tpl.id,
     input: {
