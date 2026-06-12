@@ -1,5 +1,6 @@
 name: Railway Template
 on:
+  workflow_dispatch:
   push:
     branches: [claude/arcads-external-api-gExX7]
     paths:
