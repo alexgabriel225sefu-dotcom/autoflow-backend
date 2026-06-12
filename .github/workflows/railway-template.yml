@@ -12,7 +12,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Create Railway template
-        run: node scripts/railway-template.js
+        run: node scripts/railway-template.js 2>&1 | tee scripts/railway-result.txt
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           MODE: full
+      - name: Commit result
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add scripts/railway-result.txt
+          git diff --cached --quiet || git commit -m "ci: Railway template result" && git push
