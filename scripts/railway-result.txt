@@ -2,4 +2,5 @@ Looking for existing Railway projects...
 projects query: {"data":{"projects":{"edges":[{"node":{"id":"7542ef4e-073e-48c2-98e4-f9f8a720e634","name":"Apex-Forex-Bot"}},{"node":{"id":"82186fe2-60ea-47ea-8767-6be58ae717fa","name":"apex-trade"}}]}}}
 Found 2 projects: Apex-Forex-Bot, apex-trade
 Using project: id=82186fe2-60ea-47ea-8767-6be58ae717fa name=apex-trade
-FATAL: Cannot read properties of undefined (reading 'slice')
+project detail: {"errors":[{"message":"Cannot query field \"source\" on type \"Service\".","locations":[{"line":5,"column":43}],"extensions":{"code":"GRAPHQL_VALIDATION_FAILED"},"traceId":"8429389420616303792"}]}
+ENV NOT FOUND
