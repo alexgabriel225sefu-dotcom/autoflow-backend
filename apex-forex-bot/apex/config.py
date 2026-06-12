@@ -39,13 +39,13 @@ TIMEFRAME = os.getenv("TIMEFRAME", "5m")
 CANDLES = 200
 
 # ─── Scanner ────────────────────────────────────────────
-SCAN_SYMBOLS = (os.getenv("SCAN_SYMBOLS") or "NZD_USD,AUD_USD,EUR_USD,USD_JPY,USD_CAD").split(",")  # tuning r5: NZD +2.10%, AUD +0.40%; GBP removed (0%WR)
+SCAN_SYMBOLS = (os.getenv("SCAN_SYMBOLS") or "NZD_USD").split(",")  # tuning r9: NZD-only (EUR/AUD/JPY/CAD all negative; NZD edge is signal-specific)
 MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
 
 # ─── Risk ───────────────────────────────────────────────
 RISK_PER_TRADE = float(os.getenv("RISK_PER_TRADE") or 0.005)  # 0.5% — tuning r3: scales linearly; 1% → -9.7%/10d in chop
-STOP_LOSS_PIPS = float(os.getenv("STOP_LOSS_PIPS") or 30)   # tuning r6: sl30 winner (NZD +2.59% PF4.49)
-TAKE_PROFIT_PIPS = float(os.getenv("TAKE_PROFIT_PIPS") or 60)  # tuning r7: rr2=60p robust (r7 nzd-sl30-rr2 +1.51% vs rr3 -1.02% same window)
+STOP_LOSS_PIPS = float(os.getenv("STOP_LOSS_PIPS") or 20)   # tuning r9: sl20-rr2 confirmed 2× (R8 +2.03% PF1.87, R9 +2.16% PF1.97; sl30-rr2 +0.40%/+0.41% same windows)
+TAKE_PROFIT_PIPS = float(os.getenv("TAKE_PROFIT_PIPS") or 40)  # tuning r9: rr2=40p @ sl20 (13 trades/window, 46% WR consistent across both windows)
 MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 62)
 LEVERAGE = float(os.getenv("LEVERAGE") or 30)
 MARGIN_CAP = float(os.getenv("MARGIN_CAP") or 0.5)             # use ≤50% of available margin
