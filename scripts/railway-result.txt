@@ -2,5 +2,13 @@ Looking for existing Railway projects...
 projects query: {"data":{"projects":{"edges":[{"node":{"id":"7542ef4e-073e-48c2-98e4-f9f8a720e634","name":"Apex-Forex-Bot"}},{"node":{"id":"82186fe2-60ea-47ea-8767-6be58ae717fa","name":"apex-trade"}}]}}}
 Found 2 projects: Apex-Forex-Bot, apex-trade
 Using project: id=82186fe2-60ea-47ea-8767-6be58ae717fa name=apex-trade
-project detail: {"errors":[{"message":"Cannot query field \"source\" on type \"Service\".","locations":[{"line":5,"column":43}],"extensions":{"code":"GRAPHQL_VALIDATION_FAILED"},"traceId":"8429389420616303792"}]}
-ENV NOT FOUND
+project detail: {"data":{"project":{"environments":{"edges":[{"node":{"id":"fdc10f11-f4b2-4773-87a0-7e9f66cd8a55","name":"production"}}]},"services":{"edges":[{"node":{"id":"7843114d-01cb-4b57-ac12-9dfefcf0292b","name":"grateful-commitment"}}]}}}}
+Environment: id=fdc10f11-f4b2-4773-87a0-7e9f66cd8a55
+Existing services: grateful-commitment
+Template generated: id=15133712-3b51-4b03-9b83-be257e7912bc code=UMCVOQ
+DEPLOY_URL=https://railway.com/deploy/UMCVOQ
+templatePublish result: {"errors":[{"message":"Field \"templatePublish\" of type \"Template!\" must have a selection of subfields. Did you mean \"templatePublish { ... }\"?","locations":[{"line":3,"column":7}],"extensions":{"code":"GRAPHQL_VALIDATION_FAILED"},"traceId":"4677499954765711307"}]}
+
+=== DONE ===
+Deploy URL: https://railway.com/deploy/UMCVOQ
+Template ID: 15133712-3b51-4b03-9b83-be257e7912bc
