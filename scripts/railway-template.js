@@ -5,8 +5,17 @@
 const API = 'https://backboard.railway.com/graphql/v2';
 const TOKEN = process.env.RAILWAY_TOKEN;
 const MODE = process.env.MODE || 'full';
+const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY;
 
 if (!TOKEN) { console.error('RAILWAY_TOKEN missing'); process.exit(1); }
+
+function summary(msg) {
+  console.log(msg);
+  if (SUMMARY_FILE) {
+    const fs = require('fs');
+    fs.appendFileSync(SUMMARY_FILE, msg + '\n');
+  }
+}
 
 async function gql(query, variables) {
   const r = await fetch(API, {
@@ -102,10 +111,10 @@ async function main() {
   });
 
   const tpl = create.data && create.data.templateCreate;
-  if (!tpl) { console.log('CREATE FAILED — see introspection above for correct input shape'); return; }
+  if (!tpl) { summary('CREATE FAILED — see introspection above for correct input shape'); return; }
 
-  console.log(`TEMPLATE CREATED: id=${tpl.id} code=${tpl.code}`);
-  console.log(`DEPLOY URL: https://railway.com/deploy/${tpl.code}`);
+  summary(`TEMPLATE CREATED: id=${tpl.id} code=${tpl.code}`);
+  summary(`DEPLOY URL: https://railway.com/deploy/${tpl.code}`);
 
   // Attempt publish
   await tryMutation('templatePublish', `
