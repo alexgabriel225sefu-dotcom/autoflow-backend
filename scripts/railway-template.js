@@ -50,7 +50,7 @@ async function main() {
         services { edges { node { id name source { repo image } } } }
       }
     }`, { id: projNode.id });
-  summary('project detail: ' + JSON.stringify(projRes2.json.data?.project).slice(0, 2000));
+  summary('project detail: ' + JSON.stringify(projRes2.json).slice(0, 3000));
 
   const envId = projRes2.json.data?.project?.environments?.edges[0]?.node?.id;
   if (!envId) { summary('ENV NOT FOUND'); process.exit(1); }
