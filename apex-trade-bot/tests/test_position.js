@@ -45,35 +45,53 @@ test('SL hit pe BUY închide cu STOP_LOSS', () => {
 });
 
 test('breakeven: la +1R SL se mută peste entry', () => {
-  const pos = freshPos('BUY', 100);
-  const oneR = 100 - pos.initialStop;
-  checkPosition(pos, 100 + oneR * 1.05);
-  assert.strictEqual(pos.beDone, true);
-  assert.ok(pos.stopLoss >= 100, `SL ${pos.stopLoss} trebuie >= entry`);
+  const prev = cfg.BREAKEVEN_AT_R;
+  cfg.BREAKEVEN_AT_R = 1;
+  try {
+    const pos = freshPos('BUY', 100);
+    const oneR = 100 - pos.initialStop;
+    checkPosition(pos, 100 + oneR * 1.05);
+    assert.strictEqual(pos.beDone, true);
+    assert.ok(pos.stopLoss >= 100, `SL ${pos.stopLoss} trebuie >= entry`);
+  } finally { cfg.BREAKEVEN_AT_R = prev; }
 });
 
 test('breakeven nu se mută înainte de +1R', () => {
-  const pos = freshPos('BUY', 100);
-  const oneR = 100 - pos.initialStop;
-  checkPosition(pos, 100 + oneR * 0.5);
-  assert.ok(!pos.beDone);
+  const prev = cfg.BREAKEVEN_AT_R;
+  cfg.BREAKEVEN_AT_R = 1;
+  try {
+    const pos = freshPos('BUY', 100);
+    const oneR = 100 - pos.initialStop;
+    checkPosition(pos, 100 + oneR * 0.5);
+    assert.ok(!pos.beDone);
+  } finally { cfg.BREAKEVEN_AT_R = prev; }
 });
 
 test('runner mode: la TP pe paper nu închide, trecere pe trail strâns', () => {
-  const pos = freshPos('BUY', 100);
-  const trigger = checkPosition(pos, pos.takeProfit + 0.01);
-  assert.strictEqual(trigger, null);
-  assert.strictEqual(pos.runner, true);
+  const prevTrail = cfg.TRAILING_STOP;
+  const prevLWR   = cfg.LET_WINNERS_RUN;
+  cfg.TRAILING_STOP = true; cfg.LET_WINNERS_RUN = true;
+  try {
+    const pos = freshPos('BUY', 100);
+    const trigger = checkPosition(pos, pos.takeProfit + 0.01);
+    assert.strictEqual(trigger, null);
+    assert.strictEqual(pos.runner, true);
+  } finally { cfg.TRAILING_STOP = prevTrail; cfg.LET_WINNERS_RUN = prevLWR; }
 });
 
 test('runner: trail hit returnează TRAIL_PROFIT (profit, nu pierdere)', () => {
-  const pos = freshPos('BUY', 100);
-  checkPosition(pos, pos.takeProfit + 0.5);     // intră în runner
-  const peak = pos.takeProfit + 2;
-  checkPosition(pos, peak);                     // trail urcă după preț
-  const trigger = checkPosition(pos, peak * (1 - cfg.RUNNER_TRAIL_DIST) - 0.01);
-  assert.strictEqual(trigger, 'TRAIL_PROFIT');
-  assert.ok(pos.stopLoss > pos.entryPrice, 'iese pe profit');
+  const prevTrail = cfg.TRAILING_STOP;
+  const prevLWR   = cfg.LET_WINNERS_RUN;
+  cfg.TRAILING_STOP = true; cfg.LET_WINNERS_RUN = true;
+  try {
+    const pos = freshPos('BUY', 100);
+    checkPosition(pos, pos.takeProfit + 0.5);     // intră în runner
+    const peak = pos.takeProfit + 2;
+    checkPosition(pos, peak);                     // trail urcă după preț
+    const trigger = checkPosition(pos, peak * (1 - cfg.RUNNER_TRAIL_DIST) - 0.01);
+    assert.strictEqual(trigger, 'TRAIL_PROFIT');
+    assert.ok(pos.stopLoss > pos.entryPrice, 'iese pe profit');
+  } finally { cfg.TRAILING_STOP = prevTrail; cfg.LET_WINNERS_RUN = prevLWR; }
 });
 
 test('trailing pe BUY nu coboară niciodată SL-ul', () => {
