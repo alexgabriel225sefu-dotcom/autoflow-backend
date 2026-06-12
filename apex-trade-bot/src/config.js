@@ -79,8 +79,8 @@ module.exports = {
   // 5% din balanță per poziție default. 20% era iresponsabil ca default —
   // cu Druckenmiller ×2 ajungea la 40% din cont pe un singur trade.
   RISK_PER_TRADE:  parseFloat(process.env.RISK_PER_TRADE  || '0.05'),
-  STOP_LOSS_PCT:   parseFloat(process.env.STOP_LOSS_PCT   || '0.008'), // 0.8% — tuning r4: standard SL wins for XRP
-  TAKE_PROFIT_PCT: parseFloat(process.env.TAKE_PROFIT_PCT || '0.040'), // 4.0% → R:R 5:1 — tuning r4: XRP rr5 +0.36% PF 1.83
+  STOP_LOSS_PCT:   parseFloat(process.env.STOP_LOSS_PCT   || '0.016'), // 1.6% — tuning r5: wide SL winner (BTC 69%WR PF3.14, SOL 61%WR PF2.75)
+  TAKE_PROFIT_PCT: parseFloat(process.env.TAKE_PROFIT_PCT || '0.032'), // 3.2% → R:R 2:1 (wide SL+rr2 beats narrow SL+rr5)
   MIN_CONFIDENCE:  parseInt(process.env.MIN_CONFIDENCE    || '62'),    // 62% — permite mai multe intrări
 
   // ─── Trailing Stop ──────────────────────────────────────

@@ -39,7 +39,7 @@ TIMEFRAME = os.getenv("TIMEFRAME", "5m")
 CANDLES = 200
 
 # ─── Scanner ────────────────────────────────────────────
-SCAN_SYMBOLS = (os.getenv("SCAN_SYMBOLS") or "EUR_USD,GBP_USD,USD_JPY,AUD_USD,USD_CAD").split(",")
+SCAN_SYMBOLS = (os.getenv("SCAN_SYMBOLS") or "NZD_USD,AUD_USD,EUR_USD,USD_JPY,USD_CAD").split(",")  # tuning r5: NZD +2.10%, AUD +0.40%; GBP removed (0%WR)
 MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
 
 # ─── Risk ───────────────────────────────────────────────
