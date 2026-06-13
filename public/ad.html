@@ -192,12 +192,39 @@ html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var
 .pc.sec .pc-type{color:var(--t1)}
 .pc-price{font-family:var(--d);font-weight:700;font-size:100px;letter-spacing:-.04em;line-height:1}
 .pc-note{font-size:26px;color:var(--t1);margin-top:10px}
+/* scene 2 total */
+.s2-headline{font-family:var(--d);font-weight:700;font-size:88px;letter-spacing:-.03em;text-align:center;line-height:1}
+.s2-sub{font-size:40px;color:var(--t1);text-align:center;margin-top:20px;margin-bottom:44px}
+.s2-total{width:100%;margin-top:20px;padding:28px 40px;border-radius:20px;
+  background:rgba(39,196,106,.07);border:1px solid rgba(39,196,106,.2);
+  font:700 40px/1 var(--m);display:flex;justify-content:space-between;align-items:center}
+
+/* scene 5 contrast */
+.contrast-headline{font-family:var(--d);font-weight:700;font-size:100px;
+  letter-spacing:-.03em;text-align:center;line-height:1.0;margin-bottom:14px}
+.contrast-sub{font-size:48px;color:var(--t1);text-align:center;margin-bottom:52px}
+.contrast-cards{display:flex;gap:20px;width:100%}
+.cc{flex:1;border-radius:26px;padding:44px 38px}
+.cc-you{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1)}
+.cc-bot{background:linear-gradient(145deg,rgba(39,196,106,.12),rgba(39,196,106,.04));
+  border:1.5px solid rgba(39,196,106,.35);box-shadow:0 0 50px rgba(39,196,106,.1)}
+.cc-lbl{font:700 28px/1 var(--m);letter-spacing:.14em;text-transform:uppercase;color:var(--t1);margin-bottom:12px}
+.cc-bot .cc-lbl{color:var(--up)}
+.cc-val{font-family:var(--d);font-weight:700;font-size:86px;letter-spacing:-.04em;line-height:1;margin-bottom:28px}
+.cc-val.red-val{color:var(--acc)}
+.cc-items{display:flex;flex-direction:column;gap:14px}
+.cc-item{font-size:30px;padding:12px 16px;border-radius:12px;line-height:1.3}
+.cc-item.bad{background:rgba(255,45,79,.08);color:var(--t1)}
+.cc-item.good{background:rgba(39,196,106,.08);color:#7ee8a2}
+.stop-line{font-family:var(--d);font-weight:700;font-size:62px;
+  text-align:center;margin-top:44px;color:var(--t0);letter-spacing:-.02em}
+
 .cta-features{width:100%;margin-top:56px;display:flex;flex-direction:column;gap:20px}
 .cf{display:flex;align-items:center;gap:22px;font-family:var(--d);font-weight:600;font-size:46px;
   padding:28px 40px;border-radius:20px;background:var(--panel);border:1px solid var(--line2);
   letter-spacing:-.01em}
 .cf-icon{color:var(--up);font-size:40px;flex:none;width:48px;text-align:center}
-.s5-url{font-family:var(--m);font-weight:700;font-size:58px;color:var(--acc2);margin-top:56px;letter-spacing:.02em}
+.s5-url{font-family:var(--m);font-weight:700;font-size:58px;color:var(--acc2);margin-top:44px;letter-spacing:.02em}
 .s5-bio{font-size:34px;color:var(--t1);margin-top:14px}
 .s5-badge{margin-top:54px;display:inline-flex;align-items:center;gap:14px;
   padding:22px 44px;border-radius:999px;
@@ -240,18 +267,15 @@ html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var
     <div class="s1-tag rv d5">Without touching a single button.</div>
   </section>
 
-  <!-- ══ 2 · 3AM ══ -->
+  <!-- ══ 2 · LIVE TRADES ══ -->
   <section class="scene" data-dur="5000" id="s2">
-    <div class="rv" style="text-align:center">
-      <span class="s2-time">03<span class="s2-colon">:</span>47</span><span class="s2-am">AM</span>
+    <div class="s2-headline rv">
+      The bot never <span class="acc">stops.</span>
     </div>
-    <div class="s2-headline rv d1">
-      The bot<br>never <span class="acc">sleeps.</span>
-    </div>
-    <div class="s2-sub rv d2">You rest. It trades.</div>
-    <div class="ticker rv d3">
+    <div class="s2-sub rv d1">Crypto & Forex · Running right now.</div>
+    <div class="ticker rv d2">
       <div class="ticker-head">
-        <span class="t-pair">All Markets — Live</span>
+        <span class="t-pair">Live Positions</span>
         <span class="t-live"><span class="live-dot"></span>LIVE</span>
       </div>
       <div class="t-row">
@@ -263,17 +287,10 @@ html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var
       </div>
       <div class="t-row">
         <div>
-          <div class="t-name">XAU / USD <span class="t-tag gold">Gold · MT5</span></div>
-          <div class="t-type">Buy · 0.5 lot · Bybit</div>
-        </div>
-        <div class="t-profit">+$162.40</div>
-      </div>
-      <div class="t-row">
-        <div>
           <div class="t-name">EUR / USD <span class="t-tag forex">Forex · MT5</span></div>
           <div class="t-type">Buy · 1 lot · MT5</div>
         </div>
-        <div class="t-profit" id="sol-v">+$47.80</div>
+        <div class="t-profit" id="eur-v">+$47.80</div>
       </div>
       <div class="t-row">
         <div>
@@ -287,8 +304,11 @@ html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var
           <div class="t-name">SOL / USDT <span class="t-tag crypto">Crypto</span></div>
           <div class="t-type">Long · 2x · Binance</div>
         </div>
-        <div class="t-profit" id="sol2-v">+$21.40</div>
+        <div class="t-profit" id="sol-v">+$21.40</div>
       </div>
+    </div>
+    <div class="s2-total rv d3">
+      Total open P&amp;L &nbsp;<span id="s2total" style="color:var(--up)">+$191.80</span>
     </div>
   </section>
 
@@ -308,46 +328,57 @@ html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var
   </section>
 
   <!-- ══ 4 · YOURS TO BUILD ══ -->
-  <section class="scene" data-dur="5200" id="s4">
+  <section class="scene" data-dur="4800" id="s4">
     <div class="s4-h rv">
-      Build your<br><span class="acc">own bot.</span>
+      Your bot.<br><span class="acc">Your rules.</span>
     </div>
-    <div class="s4-sub rv d1">Full source code. Yours forever. Customize anything.</div>
+    <div class="s4-sub rv d1">Full source code. Customize everything. Own it forever.</div>
     <div class="step" data-at="350">
       <div class="step-num">1</div>
-      <div><div class="step-h">Get the full source code</div><div class="step-p">Python · runs on Crypto, Forex & Gold via MT5</div></div>
+      <div><div class="step-h">Get the full source code</div><div class="step-p">Python · Crypto on Binance/Bybit · Forex via MT5</div></div>
     </div>
-    <div class="step" data-at="1100">
+    <div class="step" data-at="1050">
       <div class="step-num">2</div>
-      <div><div class="step-h">Make it your own</div><div class="step-p">Change strategies, add pairs, set your own risk rules</div></div>
+      <div><div class="step-h">Customize your strategy</div><div class="step-p">Change pairs, risk levels, signals — it's your code</div></div>
     </div>
-    <div class="step" data-at="1850">
+    <div class="step" data-at="1750">
       <div class="step-num">3</div>
-      <div><div class="step-h">Deploy in 10 minutes</div><div class="step-p">Runs 24/7 on Binance · Bybit · MT5 · No monthly fees</div></div>
+      <div><div class="step-h">Deploy in 10 minutes</div><div class="step-p">Runs 24/7 on your server — no monthly fee, ever</div></div>
     </div>
-    <div class="s4-close rv" style="transition-delay:.68s">
-      Not a subscription. You own it.
+    <div class="s4-close rv" style="transition-delay:.64s">
+      Not a subscription. You own it forever.
     </div>
   </section>
 
-  <!-- ══ 5 · CTA ══ -->
-  <section class="scene" data-dur="5500" id="s5">
-    <div class="s5-eye rv">
-      <div class="eyebrow"><b></b>Get yours today</div>
+  <!-- ══ 5 · CONTRAST CTA ══ -->
+  <section class="scene" data-dur="6000" id="s5">
+    <div class="contrast-headline rv">
+      The market ran<br><span class="acc">168 hours</span> this week.
     </div>
-    <div class="s5-name rv d1">
-      Apex<br><span class="grad">Trade Bot</span>
+    <div class="contrast-sub rv d1">How many did you trade?</div>
+    <div class="contrast-cards rv d2">
+      <div class="cc cc-you">
+        <div class="cc-lbl">You</div>
+        <div class="cc-val red-val">~8h</div>
+        <div class="cc-items">
+          <div class="cc-item bad">Missed signals at 2AM</div>
+          <div class="cc-item bad">Emotions. Hesitation.</div>
+          <div class="cc-item bad">Sleeping. Working.</div>
+        </div>
+      </div>
+      <div class="cc cc-bot">
+        <div class="cc-lbl">The Bot</div>
+        <div class="cc-val up">168h</div>
+        <div class="cc-items">
+          <div class="cc-item good">Every signal. Every entry.</div>
+          <div class="cc-item good">No emotions. No sleep.</div>
+          <div class="cc-item good">Crypto + Forex. Always on.</div>
+        </div>
+      </div>
     </div>
-    <div class="s5-tag rv d2">AI that trades while you live your life</div>
-    <div class="cta-features rv d3">
-      <div class="cf"><span class="cf-icon">✓</span>Crypto · Forex · Gold</div>
-      <div class="cf"><span class="cf-icon">✓</span>Full source code — yours forever</div>
-      <div class="cf"><span class="cf-icon">✓</span>One-time payment · No subscription</div>
-      <div class="cf"><span class="cf-icon">✓</span>Customize everything</div>
-    </div>
+    <div class="stop-line rv d3">Stop leaving money on the table.</div>
     <div class="s5-url rv d4">aicashsystem.space</div>
-    <div class="s5-bio rv d5">Link in bio</div>
-    <div class="s5-badge rv d6"><span class="dot"></span>Trading 24/7 · No monthly fees</div>
+    <div class="s5-bio rv d5">Link in bio · One-time payment</div>
   </section>
 </div>
 
@@ -410,12 +441,20 @@ function animS1(){
 }
 
 function animS2(){
-  /* each entry: [elementId, starting value, step range] */
   var tickers=[
-    {id:'sol-v', val:47.80, steps:[52.30,58.90,67.40,74.80,89.20,101.60]},
-    {id:'eth-v', val:38.60, steps:[44.10,51.30,59.70,68.90]},
-    {id:'sol2-v',val:21.40, steps:[28.60,35.20,44.80,52.10]}
+    {id:'eur-v', steps:[52.30,61.80,74.20,88.40]},
+    {id:'eth-v', steps:[44.10,53.70,62.30,71.90]},
+    {id:'sol-v', steps:[28.60,37.40,47.80,58.10]}
   ];
+  var totals=[191.80,212.40,238.70,264.10,297.30,318.60];
+  var ti=0;
+  function tickTotal(){
+    if(ti>=totals.length)return;
+    var el=document.getElementById('s2total');
+    if(el){el.textContent='+$'+totals[ti].toFixed(2);el.classList.remove('flash');requestAnimationFrame(function(){el.classList.add('flash')});}
+    ti++;T(tickTotal,Math.random()*600+400);
+  }
+  T(tickTotal,1800);
   tickers.forEach(function(t){
     var el=document.getElementById(t.id);if(!el)return;
     var i=0;
@@ -426,7 +465,7 @@ function animS2(){
       requestAnimationFrame(function(){el.classList.add('flash')});
       i++;T(tick,Math.random()*700+500);
     }
-    T(tick,Math.random()*1200+800);
+    T(tick,Math.random()*1000+600);
   });
 }
 
