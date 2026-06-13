@@ -2102,12 +2102,18 @@ app.get('/admin/sync-bot-repo', async (req, res) => {
   const REPO  = 'apex-trade-bot';
   const botDir = path.join(__dirname, 'apex-trade-bot');
 
-  const filesToPush = [
-    'src/ai.js', 'src/backtest.js', 'src/binance.js', 'src/bybit.js',
-    'src/config.js', 'src/index.js', 'src/indicators.js', 'src/logger.js',
-    'src/state.js', 'src/strategies.js', 'src/telegram.js',
-    'package.json', 'railway.json', 'render.yaml', '.env.example',
-  ];
+  // Push ALL .js files under src/ automatically (so no module is ever missed),
+  // plus the root config files.
+  const fs = require('fs');
+  let srcFiles = [];
+  try {
+    srcFiles = fs.readdirSync(path.join(botDir, 'src'))
+      .filter(f => f.endsWith('.js'))
+      .map(f => `src/${f}`);
+  } catch(_) {}
+  const rootFiles = ['package.json', 'railway.json', 'render.yaml', '.env.example']
+    .filter(f => fs.existsSync(path.join(botDir, f)));
+  const filesToPush = [...srcFiles, ...rootFiles];
 
   const readmeContent = `# Apex Trade Bot 🤖
 
