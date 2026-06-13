@@ -3,280 +3,441 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Apex Trade Bot — Animated Ad</title>
+<title>Apex Trade Bot — Ad</title>
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#060608;--panel:#0e0e12;--line:rgba(255,255,255,.08);
-  --t0:#f5f5f7;--t1:#9a9aa4;--t2:#56565f;
-  --acc:#ff2d4f;--acc2:#ff5c74;--up:#27c46a;--down:#ff2d4f;--tg:#2aabee;
+  --bg:#050814;--panel:rgba(255,255,255,.04);--line:rgba(255,255,255,.07);
+  --t0:#f0f0f8;--t1:#8080a0;--t2:#50506a;
+  --gold:#f59e0b;--gold2:#fbbf24;--gold3:rgba(245,158,11,.15);
+  --up:#22c55e;--down:#ef4444;
   --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
   --e:cubic-bezier(.16,1,.3,1);--eo:cubic-bezier(.34,1.56,.64,1);
 }
+
 html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var(--f)}
 
-/* 9:16 recording stage, centered with fixed positioning + scaled to viewport */
 #stage{
   position:fixed;top:50%;left:50%;width:1080px;height:1920px;
   transform:translate(-50%,-50%) scale(var(--s,.36));transform-origin:center center;
-  background:radial-gradient(120% 80% at 50% -10%,rgba(255,45,79,.12),transparent 55%),var(--bg);
-  overflow:hidden;color:var(--t0);
-  box-shadow:0 0 0 1px rgba(255,255,255,.05);
+  background:var(--bg);overflow:hidden;color:var(--t0);
 }
-/* faint grid */
-#stage::before{content:"";position:absolute;inset:0;
-  background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
-  background-size:90px 90px;mask:radial-gradient(120% 100% at 50% 40%,#000 40%,transparent 85%);pointer-events:none}
-/* film grain */
-#stage::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.05;z-index:60;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 
-.scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 90px;opacity:0;visibility:hidden;transition:opacity .7s var(--e),transform .7s var(--e),filter .7s var(--e)}
+/* ambient orbs — NO grid lines */
+#orbs{position:absolute;inset:0;pointer-events:none;z-index:0}
+.orb{position:absolute;border-radius:50%;filter:blur(120px);opacity:.55}
+.orb1{width:900px;height:900px;left:-200px;top:-200px;background:radial-gradient(circle,rgba(245,158,11,.22),transparent 70%)}
+.orb2{width:700px;height:700px;right:-180px;bottom:300px;background:radial-gradient(circle,rgba(251,191,36,.14),transparent 70%)}
+.orb3{width:600px;height:600px;left:50%;transform:translateX(-50%);bottom:-100px;background:radial-gradient(circle,rgba(245,158,11,.1),transparent 70%)}
+
+/* floating particles */
+#ptc{position:absolute;inset:0;pointer-events:none;z-index:1}
+.p{position:absolute;border-radius:50%;background:var(--gold2);opacity:0;animation:float linear infinite}
+@keyframes float{0%{opacity:0;transform:translateY(0)}20%{opacity:.7}80%{opacity:.3}100%{opacity:0;transform:translateY(-220px)}}
+
+.scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:0 88px;opacity:0;visibility:hidden;z-index:10;
+  transition:opacity .65s var(--e),transform .65s var(--e),filter .65s var(--e)}
 .scene.in{opacity:1;visibility:visible;transform:none;filter:none}
-.scene.out{opacity:0;transform:translateY(-40px);filter:blur(10px)}
-.scene.pre{transform:translateY(40px);filter:blur(10px)}
+.scene.out{opacity:0;transform:translateY(-50px);filter:blur(12px);visibility:hidden}
+.scene.pre{transform:translateY(50px);filter:blur(12px)}
 
-/* ── reveal helpers ── */
-.rv{opacity:0;transform:translateY(36px);filter:blur(8px);transition:opacity .8s var(--e),transform .8s var(--e),filter .8s var(--e)}
+.rv{opacity:0;transform:translateY(40px);filter:blur(8px);transition:opacity .75s var(--e),transform .75s var(--e),filter .75s var(--e)}
 .in .rv{opacity:1;transform:none;filter:none}
-.in .rv.d1{transition-delay:.12s}.in .rv.d2{transition-delay:.24s}.in .rv.d3{transition-delay:.36s}
-.in .rv.d4{transition-delay:.48s}.in .rv.d5{transition-delay:.60s}.in .rv.d6{transition-delay:.72s}
+.in .rv.d1{transition-delay:.1s}.in .rv.d2{transition-delay:.22s}.in .rv.d3{transition-delay:.34s}
+.in .rv.d4{transition-delay:.46s}.in .rv.d5{transition-delay:.58s}.in .rv.d6{transition-delay:.70s}
 
-/* ── LOGO ── */
-.logo{position:relative;width:340px;height:300px;margin-bottom:30px}
-.bar{position:absolute;bottom:0;width:58px;border-radius:28px;background:linear-gradient(180deg,var(--acc2),var(--acc));transform:scaleY(0);transform-origin:bottom;box-shadow:0 0 40px rgba(255,45,79,.45)}
-.in .bar{animation:rise .9s var(--eo) forwards}
-.bar.b1{left:0;height:150px}.bar.b2{left:100px;height:210px;opacity:.92}.bar.b3{left:200px;height:270px}
-.in .bar.b1{animation-delay:.05s}.in .bar.b2{animation-delay:.20s}.in .bar.b3{animation-delay:.35s}
-@keyframes rise{0%{transform:scaleY(0)}100%{transform:scaleY(1)}}
-.dot{position:absolute;left:208px;top:-12px;width:68px;height:68px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffb3bf,var(--acc2));transform:scale(0);box-shadow:0 0 36px rgba(255,92,116,.6)}
-.in .dot{animation:pop .55s var(--eo) .55s forwards}
-@keyframes pop{0%{transform:scale(0)}100%{transform:scale(1)}}
-/* light sweep */
-.sweep{position:absolute;inset:-40px;pointer-events:none;overflow:hidden;border-radius:30px}
-.sweep::after{content:"";position:absolute;top:-30%;left:-60%;width:60%;height:160%;
-  background:linear-gradient(105deg,transparent,rgba(255,255,255,.55),transparent);
-  transform:skewX(-18deg) translateX(0);opacity:0}
-.in .sweep::after{animation:sweep 1.1s var(--e) 1.0s}
-@keyframes sweep{0%{left:-60%;opacity:0}25%{opacity:1}100%{left:140%;opacity:0}}
+/* ─── SCENE 1 · INTRO ──────────────────────── */
+.s1-glow{position:absolute;width:700px;height:700px;border-radius:50%;
+  background:radial-gradient(circle,rgba(245,158,11,.35),transparent 65%);
+  top:50%;left:50%;transform:translate(-50%,-50%);filter:blur(60px);
+  animation:pulse-orb 3s ease-in-out infinite}
+@keyframes pulse-orb{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.08)}}
+.bars-wrap{position:relative;width:320px;height:260px}
+.bar{position:absolute;bottom:0;width:56px;border-radius:26px;
+  background:linear-gradient(180deg,var(--gold2),var(--gold));
+  transform:scaleY(0);transform-origin:bottom;
+  box-shadow:0 0 50px rgba(245,158,11,.6)}
+.in .bar{animation:rise .85s var(--eo) forwards}
+.bar.b1{left:0;height:130px;animation-delay:.05s}
+.bar.b2{left:96px;height:190px;animation-delay:.2s}
+.bar.b3{left:192px;height:250px;animation-delay:.35s}
+@keyframes rise{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.dot-badge{position:absolute;right:-10px;top:-8px;width:62px;height:62px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#ffe58a,var(--gold));
+  transform:scale(0);box-shadow:0 0 30px rgba(245,158,11,.8)}
+.in .dot-badge{animation:pop .5s var(--eo) .52s forwards}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.s1-eyebrow{font:600 26px/1 var(--f);letter-spacing:.28em;text-transform:uppercase;color:var(--gold);margin-bottom:48px}
+.s1-name{font-family:var(--d);font-weight:700;font-size:108px;letter-spacing:-.03em;line-height:.95;text-align:center;margin-top:42px}
+.s1-tag{font-size:44px;color:rgba(245,158,11,.85);font-weight:500;margin-top:28px;letter-spacing:-.01em}
 
-h1.name{font-family:var(--d);font-weight:700;font-size:104px;letter-spacing:-.03em;line-height:1;text-align:center}
-.tag{font-size:46px;color:var(--acc2);font-weight:500;margin-top:24px;letter-spacing:-.01em}
-.eyebrow{font:600 24px/1 var(--f);letter-spacing:.32em;text-transform:uppercase;color:var(--t2)}
+/* ─── SCENE 2 · LIVE TRADING ───────────────── */
+.panel{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);
+  border-radius:32px;padding:44px 50px;backdrop-filter:blur(8px)}
+.panel-head{display:flex;align-items:center;justify-content:space-between}
+.pair{font-family:var(--d);font-weight:700;font-size:62px;letter-spacing:-.02em}
+.sig-badge{display:inline-flex;align-items:center;gap:12px;padding:14px 28px;
+  background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);
+  border-radius:999px;font:700 28px/1 var(--f);color:#22c55e}
+.pulse{width:14px;height:14px;border-radius:50%;background:#22c55e;flex:none;
+  box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 20px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+canvas#chart{display:block;width:100%;height:480px;margin:28px 0}
+.sig-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:4px}
+.sig{padding:12px 24px;border-radius:999px;font:700 26px/1 var(--m);opacity:0;transform:scale(.85);transition:opacity .4s,transform .4s var(--eo)}
+.sig.show{opacity:1;transform:scale(1)}
+.sig.buy{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);color:#22c55e}
+.sig.sell{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#ef4444}
+.sig.gold{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:var(--gold2)}
+.stats2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;width:100%;margin-top:28px}
+.stat{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:24px;padding:34px 36px}
+.stat .lbl{font-size:28px;color:var(--t1)}
+.stat .val{font-family:var(--m);font-weight:700;font-size:66px;margin-top:6px}
+.val.up{color:var(--up)}.val.gold{color:var(--gold2)}
 
-/* ── DASHBOARD ── */
-.card{width:100%;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));border:1px solid var(--line);border-radius:36px;padding:48px;backdrop-filter:blur(8px)}
-.card .pair{font-family:var(--d);font-weight:600;font-size:56px;letter-spacing:-.02em}
-.signal{display:inline-flex;align-items:center;gap:12px;margin-top:14px;font:600 30px/1 var(--f);color:var(--up)}
-.signal .pulse{width:16px;height:16px;border-radius:50%;background:var(--up);box-shadow:0 0 0 0 rgba(39,196,106,.6);animation:pulse 1.6s infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(39,196,106,.5)}70%{box-shadow:0 0 0 22px rgba(39,196,106,0)}100%{box-shadow:0 0 0 0 rgba(39,196,106,0)}}
-canvas{display:block;width:100%;height:520px;margin-top:30px}
-.stats{display:grid;grid-template-columns:1fr 1fr;gap:24px;width:100%;margin-top:36px}
-.stat{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:28px;padding:36px 40px}
-.stat .lbl{font-size:30px;color:var(--t1);font-weight:500}
-.stat .val{font-family:var(--m);font-weight:700;font-size:78px;margin-top:8px}
-.val.up{color:var(--up)}
-.cap{font-family:var(--d);font-weight:600;font-size:60px;text-align:center;line-height:1.12;letter-spacing:-.02em;margin-top:54px}
-.cap .r{color:var(--acc2)}
+/* ─── SCENE 3 · RESULTS ────────────────────── */
+.res-label{font-family:var(--d);font-weight:700;font-size:48px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--gold);margin-bottom:50px}
+.res-card{width:100%;border-radius:36px;overflow:hidden;margin-bottom:24px;position:relative}
+.res-card-inner{background:rgba(255,255,255,.04);border:1px solid var(--line);
+  border-radius:36px;padding:52px 60px;display:flex;align-items:center;justify-content:space-between}
+.rc-left .rc-name{font-size:36px;color:var(--t1);margin-bottom:8px}
+.rc-left .rc-val{font-family:var(--d);font-weight:700;font-size:110px;letter-spacing:-.04em;line-height:1}
+.rc-right{text-align:right}
+.rc-right .rc-tag{font:600 26px/1 var(--f);letter-spacing:.15em;text-transform:uppercase;
+  padding:10px 22px;border-radius:999px}
+.rc-right .rc-tag.green{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#22c55e}
+.rc-right .rc-tag.gold{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:var(--gold2)}
+.glow-bar{position:absolute;bottom:0;left:0;width:0;height:3px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:0 0 3px 3px;
+  transition:width 1.8s var(--e)}
+.in .glow-bar{width:100%}
+.res-footer{font-size:40px;color:var(--t1);text-align:center;margin-top:44px;line-height:1.5}
+.res-footer span{color:var(--t0);font-weight:600}
 
-/* ── TELEGRAM ── */
-.phone{width:680px;height:1240px;background:#0c0d12;border:3px solid rgba(255,255,255,.12);border-radius:64px;padding:22px;box-shadow:0 50px 120px rgba(0,0,0,.6)}
-.screen{height:100%;background:#0e1117;border-radius:46px;overflow:hidden;display:flex;flex-direction:column}
-.tg-head{background:#17212b;padding:30px 32px;display:flex;align-items:center;gap:20px}
-.tg-av{width:74px;height:74px;border-radius:50%;background:var(--bg);position:relative;flex:none}
-.tg-av .mini{position:absolute;inset:0;display:grid;place-items:center}
-.tg-name{font-family:var(--d);font-weight:600;font-size:38px}
-.tg-on{font-size:26px;color:var(--tg);margin-top:2px}
-.chat{flex:1;padding:34px 30px;display:flex;flex-direction:column;gap:24px}
-.bub{max-width:78%;padding:24px 30px;border-radius:28px;font-size:30px;line-height:1.5;opacity:0;transform:translateY(24px) scale(.96);transition:opacity .5s var(--e),transform .5s var(--e)}
-.in .bub.show{opacity:1;transform:none}
-.bub.me{align-self:flex-end;background:#2b6e9e;font-family:var(--m);font-weight:500}
-.bub.bot{align-self:flex-start;background:#212b36;color:var(--t0)}
-.bub .g,.bub .rdot{display:inline-block;width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-left:8px}
-.bub .g{background:var(--up)}.bub .rdot{background:var(--down)}
-.tg-title{font-family:var(--d);font-weight:600;font-size:64px;text-align:center;margin-bottom:50px;letter-spacing:-.02em}
+/* ─── SCENE 4 · HOW IT WORKS ───────────────── */
+.hw-title{font-family:var(--d);font-weight:700;font-size:96px;letter-spacing:-.03em;
+  text-align:center;line-height:1;margin-bottom:16px}
+.hw-sub{font-size:40px;color:var(--t1);text-align:center;margin-bottom:64px}
+.hw-step{width:100%;display:flex;align-items:flex-start;gap:36px;margin-bottom:32px;
+  opacity:0;transform:translateX(-30px);transition:opacity .6s var(--e),transform .6s var(--e)}
+.in .hw-step.show{opacity:1;transform:none}
+.hw-num{flex:none;width:80px;height:80px;border-radius:20px;
+  background:linear-gradient(135deg,var(--gold2),var(--gold));
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--d);font-weight:700;font-size:40px;color:#000;
+  box-shadow:0 0 40px rgba(245,158,11,.4);margin-top:4px}
+.hw-txt .hw-h{font-family:var(--d);font-weight:600;font-size:50px;letter-spacing:-.01em}
+.hw-txt .hw-p{font-size:34px;color:var(--t1);margin-top:6px}
+.hw-cta{margin-top:44px;width:100%;background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(245,158,11,.06));
+  border:1px solid rgba(245,158,11,.35);border-radius:30px;padding:44px 50px;
+  text-align:center;font:700 48px/1 var(--d);color:var(--gold2)}
 
-/* ── DEPLOY ── */
-.dep-h{font-family:var(--d);font-weight:700;font-size:88px;text-align:center;letter-spacing:-.03em}
-.dep-sub{font-size:42px;color:var(--t1);margin-top:18px;margin-bottom:64px}
-.step{width:100%;display:flex;align-items:center;gap:34px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:30px;padding:40px 44px;margin-bottom:28px}
-.step .num{flex:none;width:84px;height:84px;border-radius:50%;background:var(--acc);display:grid;place-items:center;font-family:var(--d);font-weight:700;font-size:44px;box-shadow:0 0 30px rgba(255,45,79,.4)}
-.step .txt{font-size:44px;font-weight:500;flex:1}
-.step .chk{flex:none;width:64px;height:64px}
-.step .chk path{stroke:var(--up);stroke-width:7;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke-dasharray:60;stroke-dashoffset:60;transition:stroke-dashoffset .5s var(--e)}
-.in .step.done .chk path{stroke-dashoffset:0}
-.banner{width:100%;margin-top:30px;background:rgba(39,196,106,.1);border:1px solid rgba(39,196,106,.4);border-radius:30px;padding:44px;text-align:center;font-family:var(--d);font-weight:600;font-size:50px;color:var(--up)}
+/* ─── SCENE 5 · CTA ─────────────────────────── */
+.cta-wrap{text-align:center;position:relative;z-index:2}
+.cta-eyebrow{font:700 24px/1 var(--f);letter-spacing:.3em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:50px}
+.cta-name{font-family:var(--d);font-weight:700;font-size:112px;letter-spacing:-.03em;line-height:.95}
+.cta-price-row{display:flex;gap:36px;justify-content:center;margin-top:44px}
+.price-pill{padding:24px 48px;border-radius:999px;text-align:center}
+.price-pill.main{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;
+  font-family:var(--d);font-weight:700;box-shadow:0 20px 60px rgba(245,158,11,.4)}
+.price-pill.main .pp-type{font-size:30px;font-weight:600;opacity:.7;letter-spacing:.06em}
+.price-pill.main .pp-val{font-size:86px;letter-spacing:-.03em;line-height:1}
+.price-pill.alt{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--t0)}
+.price-pill.alt .pp-type{font-size:28px;color:var(--t1);letter-spacing:.06em}
+.price-pill.alt .pp-val{font-size:78px;letter-spacing:-.03em;line-height:1}
+.pp-note{font-size:22px;margin-top:4px;opacity:.6}
+.cta-url{font-family:var(--m);font-weight:700;font-size:52px;
+  color:var(--gold2);margin-top:70px;letter-spacing:.02em}
+.cta-bio{font-size:34px;color:var(--t1);margin-top:12px}
+.cta-badge{display:inline-flex;align-items:center;gap:14px;margin-top:50px;
+  padding:20px 40px;border-radius:999px;background:rgba(34,197,94,.1);
+  border:1px solid rgba(34,197,94,.3);font:600 32px/1 var(--f);color:#22c55e}
+.cta-badge .dot{width:12px;height:12px;border-radius:50%;background:#22c55e;
+  animation:pulse 1.6s infinite}
 
-/* ── CTA ── */
-.cta-price{font-size:54px;color:var(--acc2);font-weight:500;margin-top:30px;letter-spacing:.01em}
-.cta-btn{margin-top:54px;display:inline-flex;align-items:center;gap:16px;background:var(--acc);color:#fff;font-family:var(--d);font-weight:600;font-size:50px;padding:34px 64px;border-radius:60px;box-shadow:0 20px 60px rgba(255,45,79,.4);animation:breathe 2.4s var(--e) infinite}
-@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
-.cta-url{font-family:var(--m);font-weight:700;font-size:44px;margin-top:60px}
-.cta-bio{font-size:34px;color:var(--t1);margin-top:14px}
-
-/* controls (hidden during recording) */
-#ui{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:200;font-family:var(--f)}
-#ui button{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer;backdrop-filter:blur(10px);transition:background .2s}
-#ui button:hover{background:rgba(255,255,255,.2)}
-#hint{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:200;color:#8a8a92;font:500 13px/1.5 var(--f);text-align:center;max-width:90vw}
+/* controls */
+#ui{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+  display:flex;gap:12px;z-index:300;font-family:var(--f)}
+#ui button{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);
+  border-radius:999px;padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer;
+  backdrop-filter:blur(10px);transition:background .2s}
+#ui button:hover{background:rgba(255,255,255,.22)}
+#hint{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:300;
+  color:#60607a;font:500 13px/1.5 var(--f);text-align:center;max-width:90vw}
 .clean #ui,.clean #hint{display:none}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
-<div id="hint">Apasă <b>▶ Play</b> · înregistrează ecranul · <b>C</b> = ascunde tot (clean mode pentru recording)</div>
+<div id="hint">▶ Play · <b>C</b> = clean mode pentru înregistrare · Space = restart</div>
 
 <div id="stage">
-  <!-- 1 · LOGO -->
-  <section class="scene" data-dur="3600" id="s1">
-    <div class="eyebrow rv">AI Trading System</div>
-    <div class="logo" style="margin-top:40px">
-      <div class="sweep"></div>
+  <div id="orbs"><div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div></div>
+  <div id="ptc"></div>
+
+  <!-- ── 1 · INTRO ── -->
+  <section class="scene" data-dur="3800" id="s1">
+    <div class="s1-glow"></div>
+    <div class="s1-eyebrow rv">AI Trading System</div>
+    <div class="bars-wrap rv d1">
       <div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div>
-      <div class="dot"></div>
+      <div class="dot-badge"></div>
     </div>
-    <h1 class="name rv d3">Apex&nbsp;Trade&nbsp;Bot</h1>
-    <div class="tag rv d4">AI that trades while you sleep</div>
+    <h1 class="s1-name rv d3">Apex<br>Trade Bot</h1>
+    <div class="s1-tag rv d4">AI that trades while you sleep</div>
   </section>
 
-  <!-- 2 · DASHBOARD -->
-  <section class="scene" data-dur="4800" id="s2">
-    <div class="card rv">
-      <div class="pair">BTC / USDT</div>
-      <div class="signal"><span class="pulse"></span> AI signal · STRONG BUY</div>
-      <canvas id="chart" width="1700" height="1040"></canvas>
-    </div>
-    <div class="stats">
-      <div class="stat rv d2"><div class="lbl">Today’s P&amp;L</div><div class="val up" id="pnl">+$0.00</div></div>
-      <div class="stat rv d3"><div class="lbl">Win rate</div><div class="val" id="wr">0%</div></div>
-    </div>
-    <div class="cap rv d4">Real exchange. Real trades.<br><span class="r">Your account. Your keys.</span></div>
-  </section>
-
-  <!-- 3 · TELEGRAM -->
-  <section class="scene" data-dur="4600" id="s3">
-    <div class="tg-title rv">Control it from Telegram</div>
-    <div class="phone rv d1">
-      <div class="screen">
-        <div class="tg-head">
-          <div class="tg-av"><div class="mini">
-            <svg width="40" height="40" viewBox="0 0 32 32"><rect x="3" y="19" width="5" height="10" rx="2.5" fill="#ff2d4f" opacity=".45"/><rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="#ff2d4f" opacity=".72"/><rect x="20" y="6" width="5" height="23" rx="2.5" fill="#ff2d4f"/><circle cx="22.5" cy="5" r="3.1" fill="#ff5c74"/></svg>
-          </div></div>
-          <div><div class="tg-name">Apex Trade Bot</div><div class="tg-on">online</div></div>
-        </div>
-        <div class="chat" id="chat">
-          <div class="bub me"  data-at="300">/status</div>
-          <div class="bub bot" data-at="900">Balance: $1,247.80<br>Today: +$247 (+24.7%)<br>3 open positions <span class="g"></span></div>
-          <div class="bub me"  data-at="2000">/positions</div>
-          <div class="bub bot" data-at="2600">BTC&nbsp;&nbsp;+5.2% <span class="g"></span><br>ETH&nbsp;&nbsp;+2.8% <span class="g"></span><br>SOL&nbsp;&nbsp;−0.4% <span class="rdot"></span></div>
-        </div>
+  <!-- ── 2 · LIVE CHART ── -->
+  <section class="scene" data-dur="5200" id="s2">
+    <div class="panel rv">
+      <div class="panel-head">
+        <div class="pair">BTC / USDT</div>
+        <div class="sig-badge"><span class="pulse"></span> AI SIGNAL ACTIVE</div>
+      </div>
+      <canvas id="chart" width="1700" height="960"></canvas>
+      <div class="sig-row">
+        <span class="sig buy" data-at="800">▲ BUY $43,200</span>
+        <span class="sig gold" data-at="1400">RSI 58 · MACD+</span>
+        <span class="sig buy" data-at="2100">▲ BUY $43,650</span>
+        <span class="sig sell" data-at="3100">▼ SELL $45,120</span>
       </div>
     </div>
-  </section>
-
-  <!-- 4 · DEPLOY -->
-  <section class="scene" data-dur="4600" id="s4">
-    <div class="dep-h rv">Live in 10 minutes.</div>
-    <div class="dep-sub rv d1">No coding. No monthly fees.</div>
-    <div class="step" data-at="500"><div class="num">1</div><div class="txt">Paste your exchange API key</div>
-      <svg class="chk" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
-    <div class="step" data-at="1200"><div class="num">2</div><div class="txt">Pick your risk &amp; strategy</div>
-      <svg class="chk" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
-    <div class="step" data-at="1900"><div class="num">3</div><div class="txt">Click “Save &amp; Deploy”</div>
-      <svg class="chk" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
-    <div class="banner rv" style="transition-delay:2.6s">✓ Trading 24/7 on your account</div>
-  </section>
-
-  <!-- 5 · CTA -->
-  <section class="scene" data-dur="4200" id="s5">
-    <div class="logo" style="transform:scale(1.15);margin-bottom:70px">
-      <div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div><div class="dot"></div>
+    <div class="stats2 rv d2">
+      <div class="stat"><div class="lbl">Today P&L</div><div class="val up" id="pnl">$0</div></div>
+      <div class="stat"><div class="lbl">Win Rate</div><div class="val gold" id="wr">0%</div></div>
+      <div class="stat"><div class="lbl">Trades</div><div class="val" id="tr">0</div></div>
     </div>
-    <h1 class="name rv d1">Apex&nbsp;Trade&nbsp;Bot</h1>
-    <div class="cta-price rv d2">Crypto&nbsp;$297&nbsp;&nbsp;·&nbsp;&nbsp;Forex&nbsp;$497</div>
-    <div class="rv d3"><a class="cta-btn">Get the bot →</a></div>
-    <div class="cta-url rv d4">aicashsystem.space</div>
-    <div class="cta-bio rv d5">Link in bio</div>
+  </section>
+
+  <!-- ── 3 · RESULTS ── -->
+  <section class="scene" data-dur="4800" id="s3">
+    <div class="res-label rv">30-Day Results</div>
+
+    <div class="res-card rv d1">
+      <div class="res-card-inner">
+        <div class="rc-left">
+          <div class="rc-name">Total Profit</div>
+          <div class="rc-val up" id="r1">$0</div>
+        </div>
+        <div class="rc-right"><span class="rc-tag green">+284%</span></div>
+      </div>
+      <div class="glow-bar"></div>
+    </div>
+
+    <div class="res-card rv d2">
+      <div class="res-card-inner">
+        <div class="rc-left">
+          <div class="rc-name">Successful Trades</div>
+          <div class="rc-val gold" id="r2">0 / 0</div>
+        </div>
+        <div class="rc-right"><span class="rc-tag gold">68% win</span></div>
+      </div>
+      <div class="glow-bar"></div>
+    </div>
+
+    <div class="res-card rv d3">
+      <div class="res-card-inner">
+        <div class="rc-left">
+          <div class="rc-name">Monthly Fee</div>
+          <div class="rc-val" style="color:var(--t0)">$0</div>
+        </div>
+        <div class="rc-right"><span class="rc-tag green">One-time</span></div>
+      </div>
+    </div>
+
+    <div class="res-footer rv d4"><span>Starting capital</span> $1,000 · <span>No manual trades</span> · <span>24/7 running</span></div>
+  </section>
+
+  <!-- ── 4 · HOW IT WORKS ── -->
+  <section class="scene" data-dur="5000" id="s4">
+    <div class="hw-title rv">Live in<br><span style="color:var(--gold2)">10 minutes.</span></div>
+    <div class="hw-sub rv d1">Zero coding. One-time payment.</div>
+
+    <div class="hw-step" data-at="400">
+      <div class="hw-num">1</div>
+      <div class="hw-txt"><div class="hw-h">Connect your exchange</div><div class="hw-p">Paste your Binance or Bybit API key — read-only, no withdrawal access</div></div>
+    </div>
+    <div class="hw-step" data-at="1200">
+      <div class="hw-num">2</div>
+      <div class="hw-txt"><div class="hw-h">Set risk & strategy</div><div class="hw-p">Choose from 3 built-in AI strategies, set max daily risk %</div></div>
+    </div>
+    <div class="hw-step" data-at="2000">
+      <div class="hw-num">3</div>
+      <div class="hw-txt"><div class="hw-h">Deploy & forget</div><div class="hw-p">Bot runs 24/7 on our servers. Your funds stay on your exchange.</div></div>
+    </div>
+
+    <div class="hw-cta rv" style="transition-delay:.7s">Your keys. Your exchange. Your profits.</div>
+  </section>
+
+  <!-- ── 5 · CTA ── -->
+  <section class="scene" data-dur="5000" id="s5">
+    <div class="cta-wrap">
+      <div class="cta-eyebrow rv">Get started today</div>
+      <div class="cta-name rv d1">Apex<br>Trade Bot</div>
+      <div class="cta-price-row rv d2">
+        <div class="price-pill main">
+          <div class="pp-type">CRYPTO</div>
+          <div class="pp-val">$297</div>
+          <div class="pp-note">one-time · lifetime access</div>
+        </div>
+        <div class="price-pill alt">
+          <div class="pp-type">FOREX</div>
+          <div class="pp-val">$497</div>
+          <div class="pp-note">one-time · lifetime access</div>
+        </div>
+      </div>
+      <div class="cta-url rv d3">aicashsystem.space</div>
+      <div class="cta-bio rv d4">Link in bio</div>
+      <div class="cta-badge rv d5"><span class="dot"></span> 24/7 automated trading · No monthly fees</div>
+    </div>
   </section>
 </div>
 
 <div id="ui">
   <button onclick="play()">▶ Play</button>
-  <button onclick="toggleClean()">Clean mode (C)</button>
-  <button onclick="document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()">⛶ Fullscreen</button>
+  <button onclick="toggleClean()">Clean (C)</button>
+  <button onclick="document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()">⛶ Full</button>
 </div>
 
 <script>
+/* ── scale stage ── */
 function fit(){
-  var pad=window.innerHeight, s=Math.min(window.innerWidth/1080, pad/1920);
-  document.getElementById('stage').style.setProperty('--s', s);
+  var s=Math.min(window.innerWidth/1080,window.innerHeight/1920);
+  document.getElementById('stage').style.setProperty('--s',s);
 }
-addEventListener('resize',fit); fit();
+addEventListener('resize',fit);fit();
 
-var scenes=[...document.querySelectorAll('.scene')];
-var timers=[];
+/* ── particles ── */
+(function spawnParticles(){
+  var c=document.getElementById('ptc');
+  for(var i=0;i<28;i++){
+    var p=document.createElement('div');p.className='p';
+    var sz=Math.random()*4+2;
+    p.style.cssText='width:'+sz+'px;height:'+sz+'px;left:'+(Math.random()*100)+'%;bottom:'+(Math.random()*40)+'%;'
+      +'animation-duration:'+(Math.random()*8+6)+'s;animation-delay:'+(Math.random()*8)+'s;opacity:0';
+    c.appendChild(p);
+  }
+})();
+
+/* ── scene engine ── */
+var scenes=[...document.querySelectorAll('.scene')],timers=[];
 function clearT(){timers.forEach(clearTimeout);timers=[]}
 function T(fn,ms){timers.push(setTimeout(fn,ms))}
 
 function resetScene(sc){
   sc.classList.remove('in','out');sc.classList.add('pre');
-  sc.querySelectorAll('.bub').forEach(b=>b.classList.remove('show'));
-  sc.querySelectorAll('.step').forEach(b=>b.classList.remove('done'));
+  sc.querySelectorAll('.sig').forEach(e=>e.classList.remove('show'));
+  sc.querySelectorAll('.hw-step').forEach(e=>e.classList.remove('show'));
 }
 function runScene(i){
-  if(i>=scenes.length){ return done(); }
-  var sc=scenes[i], dur=+sc.dataset.dur||4000;
-  scenes.forEach((s,j)=>{ if(j!==i){s.classList.remove('in');s.classList.add(j<i?'out':'pre');} });
+  if(i>=scenes.length){T(play,1400);return;}
+  var sc=scenes[i],dur=+sc.dataset.dur||4200;
+  scenes.forEach((s,j)=>{if(j!==i){s.classList.remove('in');s.classList.add(j<i?'out':'pre');}});
   resetScene(sc);
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{ sc.classList.remove('pre');sc.classList.add('in');
-    if(sc.id==='s2') animChart();
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    sc.classList.remove('pre');sc.classList.add('in');
+    var id=sc.id;
+    if(id==='s2')animChart();
+    if(id==='s3')animResults();
     sc.querySelectorAll('[data-at]').forEach(el=>{
       var at=+el.dataset.at;
-      if(el.classList.contains('bub')) T(()=>el.classList.add('show'),at);
-      if(el.classList.contains('step')){ T(()=>el.classList.add('done'),at+500); }
+      if(el.classList.contains('sig')) T(()=>el.classList.add('show'),at);
+      if(el.classList.contains('hw-step')) T(()=>el.classList.add('show'),at);
     });
   }));
   T(()=>runScene(i+1),dur);
 }
-function play(){ clearT(); document.body.classList.add('playing'); runScene(0); }
-function done(){ /* hold last + loop */ T(()=>play(),1600); }
+function play(){clearT();scenes.forEach(s=>s.classList.add('pre'));T(()=>runScene(0),200);}
 
-/* count-up + chart */
-function countUp(el,to,ms,fmt){var st=performance.now();function f(n){var p=Math.min(1,(n-st)/ms);var e=1-Math.pow(1-p,3);el.textContent=fmt(to*e);if(p<1)requestAnimationFrame(f)}requestAnimationFrame(f)}
+/* ── count-up ── */
+function countUp(el,to,ms,fmt){
+  var st=performance.now();
+  (function f(n){
+    var p=Math.min(1,(n-st)/ms),e=1-Math.pow(1-p,3);
+    el.textContent=fmt(to*e);if(p<1)requestAnimationFrame(f);
+  })(performance.now());
+}
+
+/* ── chart ── */
 function animChart(){
-  countUp(document.getElementById('pnl'),247.80,2600,v=>'+$'+v.toFixed(2));
-  countUp(document.getElementById('wr'),68,2600,v=>Math.round(v)+'%');
+  countUp(document.getElementById('pnl'),284,2800,v=>'+$'+v.toFixed(0));
+  countUp(document.getElementById('wr'),68,2800,v=>Math.round(v)+'%');
+  countUp(document.getElementById('tr'),41,2800,v=>Math.round(v)+'');
   var cv=document.getElementById('chart'),x=cv.getContext('2d');
-  var n=44,seed=11,p=100,drift=0,data=[];
-  function rnd(){seed=(seed*1103515245+12345)%2147483648;return seed/2147483648}
-  for(var i=0;i<n;i++){if(i%7===0)drift=(rnd()-.32)*1.2;var o=p;p=Math.max(60,o+drift+(rnd()-.5)*2.4);data.push([o,Math.max(o,p)+rnd()*1.3,Math.min(o,p)-rnd()*1.3,p])}
-  var lo=Math.min(...data.map(d=>d[2])),hi=Math.max(...data.map(d=>d[1])),rng=hi-lo||1;
+  var n=50,seed=42,p=100,drift=0,data=[];
+  function rnd(){seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff}
+  for(var i=0;i<n;i++){
+    if(i%6===0)drift=(rnd()-.3)*1.5+(i/n)*0.3;
+    var o=p;p=Math.max(55,o+drift+(rnd()-.5)*2);
+    data.push([o,Math.max(o,p)+rnd()*1.8,Math.min(o,p)-rnd()*1.8,p]);
+  }
+  var lo=Math.min(...data.map(d=>d[2]))-2,hi=Math.max(...data.map(d=>d[1]))+2,rng=hi-lo||1;
   var W=cv.width,H=cv.height,cw=W/n;
-  function yv(v){return H-(v-lo)/rng*(H-40)-20}
-  var t0=performance.now(),DUR=2200;
+  function yv(v){return H-((v-lo)/rng)*(H-50)-25}
+  var t0=performance.now(),DUR=2600;
+
+  /* gradient under line */
   function draw(now){
-    var prog=Math.min(1,(now-t0)/DUR),shown=prog*n;x.clearRect(0,0,W,H);
+    var prog=Math.min(1,(now-t0)/DUR),shown=prog*n;
+    x.clearRect(0,0,W,H);
     var pts=[];
-    for(var i=0;i<n;i++){ if(i>shown)break; var g=Math.min(1,shown-i);var d=data[i];var up=d[3]>=d[0];var col=up?'#27c46a':'#ff2d4f';var xc=cw*(i+.5);
-      x.strokeStyle=col;x.globalAlpha=.85*g;x.lineWidth=3;x.beginPath();x.moveTo(xc,yv(d[1]));x.lineTo(xc,yv(d[2]));x.stroke();
-      var bt=yv(Math.max(d[0],d[3])),bb=yv(Math.min(d[0],d[3])),bw=cw*.55;x.globalAlpha=g;x.fillStyle=col;
-      var top=bb-(bb-bt)*g;roundRect(x,xc-bw/2,top,bw,Math.max(2,bb-top),6);x.fill();
+    for(var i=0;i<n;i++){
+      if(i>shown)break;
+      var g=Math.min(1,shown-i),d=data[i],up=d[3]>=d[0];
+      var col=up?'#22c55e':'#ef4444',xc=cw*(i+.5);
+      x.strokeStyle=col;x.globalAlpha=.7*g;x.lineWidth=2.5;
+      x.beginPath();x.moveTo(xc,yv(d[1]));x.lineTo(xc,yv(d[2]));x.stroke();
+      var bt=yv(Math.max(d[0],d[3])),bb=yv(Math.min(d[0],d[3])),bw=cw*.6;
+      x.globalAlpha=g;x.fillStyle=col;
+      rr(x,xc-bw/2,Math.min(bt,bb),bw,Math.max(2,Math.abs(bb-bt)),5);x.fill();
       pts.push([xc,yv(d[3])]);
     }
     x.globalAlpha=1;
-    if(pts.length>1){x.strokeStyle='rgba(255,92,116,.6)';x.lineWidth=3;x.beginPath();pts.forEach((q,k)=>k?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1]));x.stroke();
-      var l=pts[pts.length-1];x.fillStyle='#ff2d4f';x.beginPath();x.arc(l[0],l[1],10,0,7);x.fill();}
+    if(pts.length>1){
+      /* glow line */
+      x.save();
+      var gr=x.createLinearGradient(0,0,0,H);
+      gr.addColorStop(0,'rgba(245,158,11,.7)');gr.addColorStop(1,'rgba(245,158,11,.05)');
+      x.strokeStyle='rgba(245,158,11,.9)';x.lineWidth=4;
+      x.shadowColor='rgba(245,158,11,.8)';x.shadowBlur=16;
+      x.beginPath();pts.forEach((q,k)=>k?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1]));x.stroke();
+      /* area fill */
+      x.shadowBlur=0;
+      x.beginPath();pts.forEach((q,k)=>k?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1]));
+      x.lineTo(pts[pts.length-1][0],H);x.lineTo(pts[0][0],H);x.closePath();
+      var af=x.createLinearGradient(0,0,0,H);
+      af.addColorStop(0,'rgba(245,158,11,.18)');af.addColorStop(1,'rgba(245,158,11,0)');
+      x.fillStyle=af;x.fill();
+      /* dot */
+      var l=pts[pts.length-1];
+      x.fillStyle='#f59e0b';x.shadowColor='rgba(245,158,11,.9)';x.shadowBlur=20;
+      x.beginPath();x.arc(l[0],l[1],9,0,7);x.fill();
+      x.restore();
+    }
     if(prog<1)requestAnimationFrame(draw);
   }
   requestAnimationFrame(draw);
 }
-function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+
+/* ── results count-up ── */
+function animResults(){
+  countUp(document.getElementById('r1'),2847,2600,v=>'$'+Math.round(v).toLocaleString());
+  var r2=document.getElementById('r2');
+  countUp({set textContent(v){r2.textContent=v}},68,2600,v=>Math.round(v*1.47)+' / '+Math.round(v*2.15));
+}
 
 function toggleClean(){document.body.classList.toggle('clean')}
-addEventListener('keydown',e=>{if(e.key==='c'||e.key==='C')toggleClean();if(e.key===' '){e.preventDefault();play()}});
+addEventListener('keydown',e=>{
+  if(e.key==='c'||e.key==='C')toggleClean();
+  if(e.key===' '){e.preventDefault();play();}
+});
 
 /* autostart */
 scenes.forEach(s=>s.classList.add('pre'));
