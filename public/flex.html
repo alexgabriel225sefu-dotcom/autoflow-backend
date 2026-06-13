@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flex — Apex Trade Bot</title>
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@600,700,800&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#000;overflow:hidden}
+
+/* ── Stage 9:16 ── */
+#stage{
+  position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%) scale(var(--s,1));
+  transform-origin:center center;
+  width:390px;height:844px;
+  overflow:hidden;background:#000;
+}
+
+/* ── Photo background ── */
+.bg-photo{
+  position:absolute;inset:0;
+  background:url('/bmw-flex.jpg') center center/cover no-repeat;
+  transform:scale(1.08);
+  transition:transform 6s cubic-bezier(.1,.1,.1,1);
+}
+.bg-photo.zoomed{transform:scale(1.18)}
+
+/* ── Dark overlays ── */
+.ov-dark{position:absolute;inset:0;background:rgba(0,0,0,.52)}
+.ov-top{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.7) 0%,transparent 38%)}
+.ov-bottom{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.92) 0%,transparent 52%)}
+.ov-red{position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% 100%,rgba(255,45,79,.18) 0%,transparent 70%)}
+
+/* ── Scanline texture ── */
+.scanlines{
+  position:absolute;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.06) 3px,rgba(0,0,0,.06) 4px);
+  pointer-events:none;
+}
+
+/* ── Scene ── */
+.scene{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:flex-end;
+  padding:0 28px 72px;
+  opacity:0;transition:opacity .5s ease;
+  pointer-events:none;
+}
+.scene.in{opacity:1;pointer-events:auto}
+
+/* ── Top badge ── */
+.top-badge{
+  position:absolute;top:52px;left:0;right:0;
+  display:flex;align-items:center;justify-content:center;
+  gap:8px;
+}
+.tb{
+  background:rgba(255,45,79,.12);
+  border:1px solid rgba(255,45,79,.3);
+  border-radius:20px;padding:6px 16px;
+  font:700 10px/1 'Satoshi',sans-serif;
+  letter-spacing:3px;text-transform:uppercase;
+  color:rgba(255,45,79,.9);
+}
+
+/* ── Content blocks ── */
+.content{width:100%;text-align:left}
+
+.eyebrow{
+  font:700 10px/1 'Satoshi',sans-serif;
+  letter-spacing:3.5px;text-transform:uppercase;
+  color:rgba(255,255,255,.38);
+  margin-bottom:14px;
+  opacity:0;transform:translateY(14px);
+  transition:all .55s cubic-bezier(.32,.72,0,1);
+}
+.headline{
+  font:800 42px/1.05 'Clash Display',sans-serif;
+  letter-spacing:-.5px;
+  color:#fff;
+  margin-bottom:10px;
+  opacity:0;transform:translateY(20px);
+  transition:all .65s cubic-bezier(.32,.72,0,1) .1s;
+}
+.headline em{color:#ff2d4f;font-style:normal}
+.sub{
+  font:500 16px/1.6 'Satoshi',sans-serif;
+  color:rgba(255,255,255,.62);
+  margin-bottom:32px;
+  opacity:0;transform:translateY(16px);
+  transition:all .6s cubic-bezier(.32,.72,0,1) .2s;
+}
+.sub b{color:rgba(255,255,255,.92)}
+
+/* stat pills row */
+.pills{
+  display:flex;gap:10px;flex-wrap:wrap;
+  margin-bottom:28px;
+  opacity:0;transform:translateY(14px);
+  transition:all .6s cubic-bezier(.32,.72,0,1) .25s;
+}
+.pill{
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;padding:9px 16px;
+  font:700 12px/1 'Satoshi',sans-serif;
+  color:#fff;
+}
+.pill span{display:block;font-size:10px;font-weight:500;color:rgba(255,255,255,.4);margin-bottom:4px;letter-spacing:.05em}
+.pill.red{background:rgba(255,45,79,.1);border-color:rgba(255,45,79,.25);color:#ff2d4f}
+.pill.green{background:rgba(39,196,106,.1);border-color:rgba(39,196,106,.25);color:#27c46a}
+
+/* divider line */
+.divider{
+  width:40px;height:2px;
+  background:linear-gradient(90deg,#ff2d4f,transparent);
+  margin:0 0 20px;
+  opacity:0;
+  transition:all .5s cubic-bezier(.32,.72,0,1) .15s;
+}
+
+/* big number */
+.bignum{
+  font:800 64px/1 'Clash Display',sans-serif;
+  letter-spacing:-2px;color:#27c46a;
+  text-shadow:0 0 40px rgba(39,196,106,.5);
+  opacity:0;transform:translateY(20px) scale(.95);
+  transition:all .7s cubic-bezier(.32,.72,0,1) .1s;
+}
+
+/* 3-col stats */
+.stats3{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+  width:100%;margin-bottom:28px;
+  opacity:0;transform:translateY(16px);
+  transition:all .65s cubic-bezier(.32,.72,0,1) .2s;
+}
+.s3{
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:12px;padding:14px 10px;text-align:center;
+}
+.s3 .sv{font:700 20px/1 'Clash Display',sans-serif;color:#fff;margin-bottom:5px}
+.s3 .sk{font:500 10px/1 'Satoshi',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35)}
+.s3.accent .sv{color:#ff2d4f}
+.s3.green .sv{color:#27c46a}
+
+/* cta */
+.cta-block{
+  width:100%;
+  opacity:0;transform:translateY(14px);
+  transition:all .6s cubic-bezier(.32,.72,0,1) .3s;
+}
+.cta-btn{
+  display:block;width:100%;
+  background:#ff2d4f;color:#fff;
+  font:700 15px/1 'Satoshi',sans-serif;
+  letter-spacing:.2px;
+  border-radius:14px;padding:18px;
+  text-align:center;text-decoration:none;
+}
+.cta-sub{
+  margin-top:12px;text-align:center;
+  font:500 12px/1.5 'Satoshi',sans-serif;
+  color:rgba(255,255,255,.3);
+}
+
+/* reveal on .in */
+.scene.in .eyebrow,
+.scene.in .headline,
+.scene.in .sub,
+.scene.in .pills,
+.scene.in .divider,
+.scene.in .bignum,
+.scene.in .stats3,
+.scene.in .cta-block{
+  opacity:1;transform:none;
+}
+
+/* ── Scene 1 specific center layout ── */
+#s1{justify-content:center;align-items:flex-start;padding:0 28px}
+#s1 .content{margin-top:420px}
+
+/* ── Progress dots ── */
+#dots{
+  position:absolute;top:42px;right:20px;
+  display:flex;flex-direction:column;gap:5px;
+}
+.dot{width:3px;height:16px;border-radius:2px;background:rgba(255,255,255,.18);transition:background .4s,height .4s}
+.dot.active{background:#ff2d4f;height:24px}
+
+/* ── Logo watermark ── */
+.logo-wm{
+  position:absolute;top:52px;left:24px;
+  font:700 13px/1 'Clash Display',sans-serif;
+  letter-spacing:-.2px;color:rgba(255,255,255,.55);
+  opacity:0;transition:opacity .5s .3s;
+}
+.logo-wm b{color:#ff2d4f}
+.scene.in .logo-wm{opacity:1}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- Photo background -->
+  <div class="bg-photo" id="bgPhoto"></div>
+
+  <!-- Overlays -->
+  <div class="ov-dark"></div>
+  <div class="ov-top"></div>
+  <div class="ov-bottom"></div>
+  <div class="ov-red"></div>
+  <div class="scanlines"></div>
+
+  <!-- Progress dots -->
+  <div id="dots">
+    <div class="dot active" id="d0"></div>
+    <div class="dot" id="d1"></div>
+    <div class="dot" id="d2"></div>
+    <div class="dot" id="d3"></div>
+  </div>
+
+  <!-- ══ SCENE 1 — The Setup ══ -->
+  <div class="scene in" id="s1">
+    <div class="logo-wm"><b>APEX</b> BOT</div>
+    <div class="content">
+      <div class="eyebrow">While the bot traded</div>
+      <div class="headline">I didn't<br>check my<br><em>phone once.</em></div>
+      <div class="divider"></div>
+      <div class="sub">24/7 automation.<br><b>No alerts. No stress.</b></div>
+    </div>
+  </div>
+
+  <!-- ══ SCENE 2 — The Numbers ══ -->
+  <div class="scene" id="s2">
+    <div class="logo-wm"><b>APEX</b> BOT</div>
+    <div class="content">
+      <div class="eyebrow">Last 30 days · Paper trading</div>
+      <div class="bignum" id="bignum">+$0</div>
+      <div class="sub" style="margin-top:12px">Simulated P&L · <b>Bot ran solo.</b></div>
+      <div class="stats3">
+        <div class="s3 green"><div class="sv">68%</div><div class="sk">Win Rate</div></div>
+        <div class="s3"><div class="sv">134</div><div class="sk">Trades</div></div>
+        <div class="s3 accent"><div class="sv">1.81</div><div class="sk">Profit Factor</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SCENE 3 — The Lifestyle ══ -->
+  <div class="scene" id="s3">
+    <div class="logo-wm"><b>APEX</b> BOT</div>
+    <div class="content">
+      <div class="eyebrow">The reality</div>
+      <div class="headline">No boss.<br>No office.<br><em>Just signals.</em></div>
+      <div class="divider"></div>
+      <div class="pills">
+        <div class="pill"><span>Crypto</span>BTC · ETH · SOL</div>
+        <div class="pill"><span>Forex · MT5</span>XAUUSD · EURUSD</div>
+        <div class="pill red"><span>Ownership</span>One-time. Forever.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SCENE 4 — CTA ══ -->
+  <div class="scene" id="s4">
+    <div class="logo-wm"><b>APEX</b> BOT</div>
+    <div class="content">
+      <div class="eyebrow">You can build this too</div>
+      <div class="headline">Your bot.<br>Your <em>rules.</em></div>
+      <div class="divider"></div>
+      <div class="sub">Full source code + setup guide.<br><b>No subscription. Own it forever.</b></div>
+      <div class="cta-block">
+        <div class="cta-btn">aicashsystem.space</div>
+        <div class="cta-sub">⚠️ Not financial advice · Educational only</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Scale stage to fill screen ──
+function resize(){
+  var W=window.innerWidth,H=window.innerHeight;
+  var s=Math.min(W/390,H/844);
+  document.getElementById('stage').style.setProperty('--s',s);
+}
+resize();window.addEventListener('resize',resize);
+
+// ── Scene engine ──
+var scenes=['s1','s2','s3','s4'];
+var durations=[3800,4200,3800,4500];
+var current=0;
+var bg=document.getElementById('bgPhoto');
+
+function goScene(i){
+  // hide current
+  document.getElementById(scenes[current]).classList.remove('in');
+  document.getElementById('d'+current).classList.remove('active');
+  current=i;
+  // show next
+  var el=document.getElementById(scenes[current]);
+  el.classList.add('in');
+  document.getElementById('d'+current).classList.add('active');
+  // photo zoom pulse
+  bg.classList.toggle('zoomed');
+  // scene-specific animations
+  if(current===1) animS2();
+  // schedule next
+  if(current<scenes.length-1){
+    setTimeout(function(){goScene(current+1)},durations[current]);
+  } else {
+    // loop back
+    setTimeout(function(){goScene(0)},durations[current]);
+  }
+}
+
+// kick off
+setTimeout(function(){goScene(1)},durations[0]);
+
+// count-up
+function countUp(el,target,duration,prefix){
+  var start=performance.now();
+  function frame(now){
+    var p=Math.min((now-start)/duration,1);
+    var ease=1-Math.pow(1-p,3);
+    el.textContent=prefix+Math.round(ease*target).toLocaleString();
+    if(p<1)requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+function animS2(){
+  setTimeout(function(){
+    countUp(document.getElementById('bignum'),2847,2000,'+$');
+  },500);
+}
+</script>
+</body>
+</html>
