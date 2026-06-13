@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://js.stripe.com/v3/"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -265,6 +266,55 @@ footer .disc{max-width:560px}
 .rv.in{opacity:1;transform:none}
 .lg1{stop-color:#7a1020}.lg2{stop-color:#ff5c74}
 
+/* ─── PAYMENT MODAL (inline checkout — instant license) ─── */
+#apexModal{position:fixed;inset:0;z-index:9999;display:none;align-items:flex-start;justify-content:center;padding:16px;background:rgba(6,6,8,.92);backdrop-filter:blur(28px);overflow-y:auto}
+#apexModal.open{display:flex}
+.amc{background:#0b0b0e;border:1px solid var(--line2);border-radius:18px;width:100%;max-width:440px;position:relative;margin:auto;box-shadow:0 0 0 1px rgba(255,45,79,.06),0 48px 120px rgba(0,0,0,.85)}
+.amcl{position:absolute;top:13px;right:13px;width:28px;height:28px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);color:var(--t1);font-size:17px;cursor:pointer;z-index:2;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.amcl:hover{color:var(--t0);background:var(--hover)}
+.am-header{padding:24px 24px 0;text-align:center;border-bottom:1px solid var(--line)}
+.am-lock-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid rgba(255,45,79,.22);border-radius:100px;font:600 10px/1 var(--m);color:var(--acc3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px;background:var(--accdim)}
+.am-title{font:600 19px/1.2 var(--d);letter-spacing:-.02em;margin-bottom:4px}
+.am-sub{font-size:12px;color:var(--t1);margin-bottom:14px}
+.am-price-row{display:inline-flex;align-items:baseline;gap:8px;background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:10px;padding:9px 20px;margin-bottom:18px}
+.am-price{font:700 30px/1 var(--d);color:var(--acc);letter-spacing:-.02em}
+.am-was{font-size:14px;color:var(--t2);text-decoration:line-through}
+.am-once{font-size:9px;color:var(--t2);letter-spacing:1px;text-transform:uppercase;align-self:center}
+.am-body{padding:20px 24px 22px}
+.am-label{font-size:10px;font-weight:600;color:var(--t1);text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;display:block}
+.am-wallets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.am-wallet{background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:11px 8px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:all .2s;font:600 12px/1 var(--f);color:var(--t0)}
+.am-wallet:hover{background:var(--hover);border-color:var(--acc)}
+.am-sep{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--t2);font-size:11px}
+.am-sep::before,.am-sep::after{content:'';flex:1;height:1px;background:var(--line)}
+.am-field{margin-bottom:12px}
+.am-input{width:100%;background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:12px 14px;font:400 14px/1.4 var(--f);color:var(--t0);transition:border-color .2s;outline:none}
+.am-input:focus{border-color:var(--acc)}
+.am-input::placeholder{color:var(--t2)}
+.am-stripe{background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:12px 14px;transition:border-color .2s}
+.am-stripe.focused{border-color:var(--acc)}
+.am-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.am-err{font:400 11px/1.4 var(--m);color:var(--t2);min-height:14px;margin-bottom:10px}
+.am-err.err{color:#ff5c74}
+.am-checks{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.am-check{display:flex;align-items:flex-start;gap:9px;cursor:pointer}
+.am-check input{width:14px;height:14px;flex-shrink:0;margin-top:2px;accent-color:var(--acc);cursor:pointer}
+.am-check span{font-size:11px;color:var(--t1);line-height:1.6}
+.am-check span strong{color:var(--t0)}
+.am-check span a{color:var(--acc3);text-decoration:none}
+.am-check span a:hover{color:var(--acc)}
+.am-btn{width:100%;background:var(--acc);color:#fff;font:700 14px/1 var(--f);padding:15px;border-radius:12px;border:none;cursor:pointer;letter-spacing:.02em;transition:all .25s var(--ease);display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 30px var(--accdim)}
+.am-btn:hover:not(:disabled){background:var(--acc2);box-shadow:0 14px 44px var(--accglow)}
+.am-btn:disabled{opacity:.3;cursor:not-allowed}
+.am-spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+.am-note{font:400 10px/1.5 var(--m);color:var(--t2);text-align:center;margin-top:9px}
+.am-success{padding:48px 24px;text-align:center;display:none}
+.am-success-icon{width:52px;height:52px;background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.am-success-icon svg{width:22px;height:22px;stroke:var(--acc);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.am-success h3{font:600 18px/1.2 var(--d);margin-bottom:8px;color:var(--acc3)}
+.am-success p{font-size:13px;color:var(--t1);line-height:1.8}
+
 </style>
 <body>
 
@@ -293,7 +343,7 @@ footer .disc{max-width:560px}
     <a href="#video">Setup Video</a>
     <a href="#pricing">Pricing</a>
   </div>
-  <a class="nav-cta" href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00">Get Access — $297</a>
+  <a class="nav-cta" href="#pricing" onclick="openApexModal();return false;">Get Access — $297</a>
 </nav>
 
 <!-- HERO -->
@@ -305,7 +355,7 @@ footer .disc{max-width:560px}
     <h1 class="rv">Runs 24/7.<br><span class="grad">Your rules. Your money.</span></h1>
     <p class="lead rv">An AI-powered crypto trading bot you run on <strong style="color:var(--t0);font-weight:500">your own</strong> exchange account — set up and controlled from <strong style="color:var(--t0);font-weight:500">Telegram</strong>. No coding required. Configure it once and the algorithm handles continuous market scanning — <strong style="color:var(--t0);font-weight:500">you stay in full control of strategy and risk.</strong> <span style="color:var(--t2);font-size:.95em">Results depend entirely on your configuration and market conditions.</span></p>
     <div class="hero-cta rv">
-      <a class="btn btn-primary magnetic" href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00">Get Apex Bot — $297 →</a>
+      <a class="btn btn-primary magnetic" href="#pricing" onclick="openApexModal();return false;">Get Apex Bot — $297 →</a>
       <a href="#video" class="btn btn-ghost">Watch setup video</a>
     </div>
     <div class="hero-meta rv">
@@ -512,7 +562,7 @@ footer .disc{max-width:560px}
       <span class="price-badge">Launch Price · Limited</span>
       <div class="price-amt"><span class="now">$297</span><span class="was">$497</span></div>
       <p class="price-sub">One-time payment · Lifetime use · Instant delivery</p>
-      <a class="btn btn-primary magnetic" href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00">Get the License — $297 →</a>
+      <a class="btn btn-primary magnetic" href="#pricing" onclick="openApexModal();return false;">Get the License — $297 →</a>
       <p class="price-fine">Secure Stripe checkout · Paper-trade 14 days before risking real funds</p>
     </div>
   </div>
@@ -541,7 +591,7 @@ footer .disc{max-width:560px}
 <section class="wrap" id="final">
   <h2 class="h2 rv">$297, once. Then it's yours.</h2>
   <p class="rv">Full source code. Your strategy. Your account. Controlled from Telegram. No subscriptions, ever.</p>
-  <a class="btn btn-primary magnetic rv" href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" style="font-size:16px;padding:17px 32px">Get Apex Bot — $297 →</a>
+  <a class="btn btn-primary magnetic rv" href="#pricing" onclick="openApexModal();return false;" style="font-size:16px;padding:17px 32px">Get Apex Bot — $297 →</a>
 </section>
 
 <footer><div class="wrap">
@@ -733,6 +783,128 @@ document.querySelectorAll('.feat').forEach(function(el,i){el.style.transitionDel
   new IntersectionObserver(function(en,o){en.forEach(function(e){if(e.isIntersecting&&!started){started=true;play();o.disconnect();}});},{threshold:.4}).observe(screen);
 })();
 
+</script>
+<!-- INLINE CHECKOUT MODAL — instant license, then straight to configurator -->
+<div id="apexModal">
+  <div class="amc">
+    <button class="amcl" aria-label="Close" onclick="closeApexModal()">&#215;</button>
+    <div id="amForm">
+      <div class="am-header">
+        <div class="am-lock-badge">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Secure Checkout
+        </div>
+        <div class="am-title">Complete Your Order</div>
+        <div class="am-sub">One-time purchase · Full source code · Instant delivery</div>
+        <div class="am-price-row">
+          <span class="am-price">$297</span>
+          <span class="am-was">$497</span>
+          <span class="am-once">one-time</span>
+        </div>
+      </div>
+      <div class="am-body">
+        <div class="am-field">
+          <label class="am-label" for="amName">Card holder full name</label>
+          <input id="amName" class="am-input" type="text" placeholder="Enter your full name" autocomplete="name"/>
+        </div>
+        <div class="am-field">
+          <label class="am-label" for="amEmail">Email — license key delivery</label>
+          <input id="amEmail" class="am-input" type="email" placeholder="you@email.com" autocomplete="email"/>
+        </div>
+        <div class="am-field">
+          <label class="am-label">Card Number</label>
+          <div id="am-cardnumber" class="am-stripe"></div>
+        </div>
+        <div class="am-row">
+          <div>
+            <label class="am-label">Expiry Date</label>
+            <div id="am-cardexpiry" class="am-stripe"></div>
+          </div>
+          <div>
+            <label class="am-label">CVV</label>
+            <div id="am-cardcvc" class="am-stripe"></div>
+          </div>
+        </div>
+        <div id="am-card-error" class="am-err"></div>
+        <div class="am-checks">
+          <label class="am-check"><input type="checkbox" id="ck1" onchange="updateBtn()"/><span>I accept the <strong>risk of loss</strong> — crypto trading involves significant financial risk.</span></label>
+          <label class="am-check"><input type="checkbox" id="ck2" onchange="updateBtn()"/><span>This is <strong>NOT financial advice</strong>. Sales are final after digital delivery.</span></label>
+          <label class="am-check"><input type="checkbox" id="ck3" onchange="updateBtn()"/><span>I agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
+        </div>
+        <button id="amBtn" class="am-btn" disabled onclick="submitApexPayment()">
+          <span id="amSpinner" class="am-spin"></span>
+          <span id="amBtnTxt">Accept terms to continue</span>
+        </button>
+        <p class="am-note">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;opacity:.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Secured by Stripe · Instant delivery · No subscription
+        </p>
+      </div>
+    </div>
+    <div class="am-success" id="amSuccess">
+      <div class="am-success-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <h3>Access Granted</h3>
+      <p>Redirecting to your setup page...<br/><br/>Your license key and bot configurator are ready.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+var STRIPE_PK='pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS';
+var apexStripe,apexCardNum,apexCardExp,apexCardCvc;
+var elStyle={base:{color:'#f5f5f7',fontFamily:'"Satoshi",system-ui,sans-serif',fontSize:'14px','::placeholder':{color:'#56565f'}},invalid:{color:'#ff5c74'}};
+function openApexModal(){
+  document.getElementById('apexModal').classList.add('open');
+  document.body.style.overflow='hidden';
+  if(!apexStripe){
+    apexStripe=Stripe(STRIPE_PK);
+    var els=apexStripe.elements({appearance:{theme:'night',variables:{colorPrimary:'#ff2d4f',colorBackground:'#18181d',colorText:'#f5f5f7',borderRadius:'9px',fontFamily:'Satoshi, system-ui, sans-serif'}}});
+    apexCardNum=els.create('cardNumber',{style:elStyle,showIcon:true,placeholder:'0000 0000 0000 0000'});
+    apexCardExp=els.create('cardExpiry',{style:elStyle,placeholder:'MM / YY'});
+    apexCardCvc=els.create('cardCvc',{style:elStyle,placeholder:'CVV'});
+    apexCardNum.mount('#am-cardnumber');apexCardExp.mount('#am-cardexpiry');apexCardCvc.mount('#am-cardcvc');
+    function onFocus(id){return function(){document.getElementById(id).classList.add('focused')}}
+    function onBlur(id){return function(){document.getElementById(id).classList.remove('focused')}}
+    apexCardNum.on('focus',onFocus('am-cardnumber'));apexCardNum.on('blur',onBlur('am-cardnumber'));
+    apexCardExp.on('focus',onFocus('am-cardexpiry'));apexCardExp.on('blur',onBlur('am-cardexpiry'));
+    apexCardCvc.on('focus',onFocus('am-cardcvc'));apexCardCvc.on('blur',onBlur('am-cardcvc'));
+    apexCardNum.on('change',function(e){
+      var el=document.getElementById('am-card-error');
+      if(e.error){el.classList.add('err');el.textContent=e.error.message}else{el.classList.remove('err');el.textContent=''}
+    });
+  }
+}
+function closeApexModal(){document.getElementById('apexModal').classList.remove('open');document.body.style.overflow=''}
+document.getElementById('apexModal').addEventListener('click',function(e){if(e.target===this)closeApexModal()});
+function updateBtn(){
+  var all=['ck1','ck2','ck3'].every(function(id){return document.getElementById(id).checked});
+  document.getElementById('amBtn').disabled=!all;
+  document.getElementById('amBtnTxt').textContent=all?'Checkout — $297':'Accept terms to continue';
+}
+async function submitApexPayment(){
+  var name=document.getElementById('amName').value.trim();
+  var email=document.getElementById('amEmail').value.trim();
+  var err=document.getElementById('am-card-error');
+  if(!name){err.classList.add('err');err.textContent='Please enter your name.';return}
+  if(!email||!email.includes('@')){err.classList.add('err');err.textContent='Please enter a valid email.';return}
+  var btn=document.getElementById('amBtn'),spin=document.getElementById('amSpinner'),txt=document.getElementById('amBtnTxt');
+  btn.disabled=true;spin.style.display='block';txt.textContent='Processing...';
+  try{
+    var r=await fetch('/create-payment-intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:29700,currency:'usd',email,name,product:'apex-bot'})});
+    var d=await r.json();
+    if(d.error){err.classList.add('err');err.textContent=d.error;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';return}
+    var _pendingKey=d.pendingKey||'';
+    var result=await apexStripe.confirmCardPayment(d.clientSecret,{payment_method:{card:apexCardNum,billing_details:{name,email}}});
+    if(result.error){
+      err.classList.add('err');err.textContent=result.error.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';
+    }else if(result.paymentIntent.status==='succeeded'){
+      document.getElementById('amForm').style.display='none';
+      document.getElementById('amSuccess').style.display='block';
+      var redirect='/configurator'+(_pendingKey?'?key='+encodeURIComponent(_pendingKey):'');
+      setTimeout(function(){window.location.href=redirect},2000);
+    }
+  }catch(e){err.classList.add('err');err.textContent='Error: '+e.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again'}
+}
 </script>
 <script src="/lang.js"></script>
 </body>
