@@ -2204,22 +2204,9 @@ Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsys
 });
 
 // ════════════════════════════════════════
-// CATCH-ALL 404
-// ════════════════════════════════════════
-app.use((req, res) => {
-  res.status(404).json({ error: 'route not found', path: req.path, method: req.method });
-});
-
-// GLOBAL ERROR HANDLER — catches any unhandled async throws
-app.use((err, req, res, next) => {
-  console.error('EXPRESS ERROR:', err.stack || err.message || err);
-  if (res.headersSent) return next(err);
-  res.status(500).json({ error: 'Internal server error' });
-});
-
-// ════════════════════════════════════════
 // BOT CONFIG — save from configurator / fetch by bot
 // Table needed: CREATE TABLE bot_configs (license_key TEXT PRIMARY KEY, config TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW());
+// NOTE: must be registered BEFORE the catch-all 404 below.
 // ════════════════════════════════════════
 function _botConfigKey() {
   const s = process.env.JWT_SECRET || process.env.COOKIE_SECRET || 'bot-cfg-fallback-change-me';
@@ -2273,6 +2260,20 @@ app.get('/api/bot-config', async (req, res) => {
   } catch(e) {
     res.status(500).json({ error: 'Config decryption failed' });
   }
+});
+
+// ════════════════════════════════════════
+// CATCH-ALL 404  (must be after ALL routes)
+// ════════════════════════════════════════
+app.use((req, res) => {
+  res.status(404).json({ error: 'route not found', path: req.path, method: req.method });
+});
+
+// GLOBAL ERROR HANDLER — catches any unhandled async throws
+app.use((err, req, res, next) => {
+  console.error('EXPRESS ERROR:', err.stack || err.message || err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // ════════════════════════════════════════
