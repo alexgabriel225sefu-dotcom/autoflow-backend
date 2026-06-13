@@ -1654,7 +1654,7 @@ a{text-decoration:none}
       <td style="padding:22px 24px">
         <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#ff2d4f;font-family:Arial,sans-serif">YOUR LICENSE KEY &mdash; KEEP THIS SAFE</p>
         <p class="key-mono" style="margin:0 0 14px;font-family:'Courier New',Courier,monospace;font-size:24px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px 12px;word-break:break-all">${licenseKey}</p>
-        <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Add this to Railway environment variables as ${code('LICENSE_KEY')}</p>
+        <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Add this to Render environment variables as ${code('LICENSE_KEY')}</p>
       </td>
     </tr>
   </table>
@@ -1686,10 +1686,10 @@ a{text-decoration:none}
       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
         <tr>
           <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">1</td>
-          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:0.2px">Deploy bot to Railway (one click)</td>
+          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:0.2px">Deploy bot to Render (one click)</td>
         </tr>
       </table>
-      <p style="margin:0 0 16px;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Railway is a free cloud platform. Click below to deploy your bot — no server setup required. If you don't have a Railway account, create one first (it's free).</p>
+      <p style="margin:0 0 16px;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Render is a free cloud platform. Click below to deploy your bot — no server setup required. If you don't have a Render account, create one first (it's free).</p>
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr><td style="padding-bottom:10px;text-align:center">
           <a href="https://render.com/deploy?repo=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:900;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">&#128640; Deploy Bot to Render &rarr;</a>
@@ -1758,7 +1758,7 @@ a{text-decoration:none}
       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
         <tr>
           <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">4</td>
-          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">Set environment variables in Railway</td>
+          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">Set environment variables in Render</td>
         </tr>
       </table>
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
