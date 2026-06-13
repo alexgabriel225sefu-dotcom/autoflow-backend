@@ -461,15 +461,20 @@ function buildConfig(){
   const cfg={
     EXCHANGE:S.ex.toLowerCase(),
     PAPER_TRADING:S.mode==='PAPER'?'true':'false',
+    // Connect to the REAL Binance account (not the fake testnet). Without this
+    // the bot defaults to testnet.binance.vision and trades fake money even in
+    // "Live" mode — so a client's real API keys would never actually trade.
+    // Paper mode also benefits: it simulates against real market prices.
+    BINANCE_TESTNET:'false',
     PAPER_BALANCE:String(S.bal),
     MAX_CONCURRENT:String(S.mc),
-    MIN_CONFIDENCE:S.conf.toFixed(2),
+    MIN_CONFIDENCE:String(Math.round(S.conf*100)),
     MIN_CRITERIA:String(S.crit),
     HTF_FILTER:S.htf?'true':'false',
     STOP_LOSS_PCT:(S.sl/100).toFixed(4),
     TAKE_PROFIT_PCT:(S.tp/100).toFixed(4),
     TRAILING_STOP:S.trail?'true':'false',
-    BREAKEVEN_AT_R:S.be?'true':'false',
+    BREAKEVEN_AT_R:S.be?'1':'0',
     RISK_PER_TRADE:(S.risk/100).toFixed(4),
   };
   if(k1v)cfg[ek1]=k1v;

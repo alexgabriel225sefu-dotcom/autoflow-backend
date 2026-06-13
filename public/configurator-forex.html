@@ -464,36 +464,38 @@ document.getElementById('genBtn').addEventListener('click',()=>{
   const tgC=document.getElementById('tgCid').value.trim();
   const dt=document.getElementById('dtok').value.trim();
   const lk=document.getElementById('licK').value.trim()||sessionStorage.getItem('apx_lic')||'YOUR_LICENSE_KEY';
-  let env=`# Apex Forex Bot — Railway Environment Variables
+  let env=`# Apex Forex Bot — Render Environment Variables
 # Generated: ${new Date().toISOString().slice(0,10)}
 # Keys processed locally. Nothing sent to our servers.
 
-# Broker
-OANDA_ACCOUNT=${oaAcc}
-OANDA_TOKEN=${oaTok}
+# Broker — names must match the bot config (OANDA_ACCOUNT_ID / OANDA_API_TOKEN)
+OANDA_ACCOUNT_ID=${oaAcc}
+OANDA_API_TOKEN=${oaTok}
+# practice = demo money · live = your real OANDA account (set automatically by mode)
+OANDA_ENV=${S.mode==='LIVE'?'live':'practice'}
 
 # License
 LICENSE_KEY=${lk}
 
 # Mode
-PAPER_TRADING=${S.mode==='PAPER'}
+PAPER_TRADING=${S.mode==='PAPER'?'true':'false'}
 
 # Instruments
 SCAN_SYMBOLS=${S.pairs.join(',')}
 
 # Portfolio
 MAX_CONCURRENT=${S.mc}
-RISK_PER_TRADE=${S.risk}
+# fraction, not whole percent (0.02 = 2%)
+RISK_PER_TRADE=${(S.risk/100).toFixed(4)}
 
 # Entry
-MIN_CONFIDENCE=0.55
-MIN_CRITERIA=5
-HTF_FILTER=${S.htf?1:0}
+MIN_CONFIDENCE=62
+HTF_FILTER=${S.htf?'true':'false'}
 
 # Exit
 STOP_LOSS_PIPS=${S.sl}
 TAKE_PROFIT_PIPS=${S.tp}
-TRAILING_STOP=${S.trail?1:0}
+TRAILING_STOP=${S.trail?'true':'false'}
 
 # AI
 AI_PROVIDER=${S.ai}
