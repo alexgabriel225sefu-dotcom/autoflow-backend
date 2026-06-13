@@ -1069,16 +1069,20 @@ app.get('/api/logout', (req, res) => {
 });
 
 // POST /create-payment-intent — Stripe
-const VALID_AMOUNTS = [3700, 9700, 19700, 29700]; // $37 starter, $97 pro, $197 legacy, $297 apex-bot (in cents)
+const VALID_AMOUNTS = [3700, 9700, 19700, 29700, 49700]; // $37 starter, $97 pro, $197 legacy, $297 crypto, $497 forex (in cents)
 app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
   const { amount, currency, email, name, product } = req.body;
   const safeAmount = VALID_AMOUNTS.includes(Number(amount)) ? Number(amount) : 3700;
-  // Enforce: apex-bot MUST be $297 — reject mismatched product/amount combos
-  if (product === 'apex-bot' && safeAmount !== 29700) return res.status(400).json({ error: 'Invalid amount for apex-bot' });
-  if (safeAmount === 29700 && product && product !== 'apex-bot') return res.status(400).json({ error: 'Invalid product for this amount' });
+  // Enforce product/amount consistency
+  if (product === 'apex-bot'   && safeAmount !== 29700) return res.status(400).json({ error: 'Invalid amount for apex-bot' });
+  if (product === 'apex-forex' && safeAmount !== 49700) return res.status(400).json({ error: 'Invalid amount for apex-forex' });
+  if (safeAmount === 29700 && product && product !== 'apex-bot')   return res.status(400).json({ error: 'Invalid product for this amount' });
+  if (safeAmount === 49700 && product && product !== 'apex-forex') return res.status(400).json({ error: 'Invalid product for this amount' });
   // Server-side email format validation
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
-  const isApexBot = (product === 'apex-bot') || safeAmount === 29700;
+  const isApexBot   = (product === 'apex-bot')   || safeAmount === 29700;
+  const isApexForex = (product === 'apex-forex')  || safeAmount === 49700;
+  const isBotProduct = isApexBot || isApexForex;
   try {
     if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe not configured' });
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -1088,28 +1092,26 @@ app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
       automatic_payment_methods: { enabled: true },
       receipt_email: email || undefined,
       metadata: {
-        product: product || (safeAmount === 29700 ? 'apex-bot' : 'course'),
+        product: product || (safeAmount === 29700 ? 'apex-bot' : safeAmount === 49700 ? 'apex-forex' : 'course'),
         email: email || '',
         name: name || ''
       }
     });
 
-    // Pre-generate license key for apex-bot so buyer gets it immediately on success
-    // (no email dependency — key is passed directly via redirect URL)
+    // Pre-generate license key for bot products so buyer gets it immediately on success
     let pendingKey = null;
-    if (isApexBot) {
-      pendingKey = generateLicenseKey();
-      // Store in memory map (fast path) AND in Supabase (survives server restart)
-      _pendingLicenses.set(paymentIntent.id, { key: pendingKey, email: email || '', name: name || '' });
+    if (isBotProduct) {
+      pendingKey = isApexForex ? generateForexKey() : generateLicenseKey();
+      _pendingLicenses.set(paymentIntent.id, { key: pendingKey, email: email || '', name: name || '', product: isApexForex ? 'apex-forex' : 'apex-bot' });
       setTimeout(() => _pendingLicenses.delete(paymentIntent.id), 2 * 3600 * 1000);
       if (supabase) {
         const { error: insErr } = await supabase.from('licenses').insert([{
-          key: pendingKey, email: email || '', name: name || '',
+          key: pendingKey, email: email || '', name: name || '', product: isApexForex ? 'apex-forex' : 'apex-bot',
           active: false, payment_intent_id: paymentIntent.id
         }]);
         if (insErr) console.error('Pending license insert error:', insErr.message);
       }
-      addLog(`Pending license generated for ${email} — ${pendingKey}`, 'license', 'success');
+      addLog(`Pending ${isApexForex ? 'forex' : 'crypto'} license generated for ${email} — ${pendingKey}`, 'license', 'success');
     }
 
     res.json({ clientSecret: paymentIntent.client_secret, pendingKey });
@@ -1120,14 +1122,17 @@ app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
 });
 
 // ── LICENSE KEY HELPERS ──────────────────────────────────────────────────────
-// Keys are HMAC-signed: APEX-[8 random chars][4 HMAC chars]
-// Verification tries multiple secrets — always works regardless of env config.
+// Crypto keys:  APEX-XXXX-XXXX-XXXX  (verified by crypto bot only)
+// Forex keys:   FORX-XXXX-XXXX-XXXX  (verified by forex bot only)
+// Both use HMAC-SHA256 with product-specific salt embedded in the prefix.
 const _KEY_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 chars, no 0/O/1/I
-const _LIC_SALT = 'apex-bot-2025-v1'; // embedded fallback — never changes
+const _LIC_SALT       = 'apex-bot-2025-v1';   // crypto fallback — never changes
+const _FOREX_LIC_SALT = 'apex-forex-2025-v1'; // forex fallback — never changes
 
-function _licSecrets() {
+function _licSecrets(product = 'apex-bot') {
   const env = process.env.BOT_EMAIL_SECRET;
-  return env ? [env, _LIC_SALT] : [_LIC_SALT];
+  const salt = product === 'apex-forex' ? _FOREX_LIC_SALT : _LIC_SALT;
+  return env ? [`${env}-${product}`, salt] : [salt];
 }
 
 function _hmacMac4(data, secret) {
@@ -1135,62 +1140,81 @@ function _hmacMac4(data, secret) {
   return [0, 1, 2, 3].map(i => _KEY_CHARS[mac[i] % 32]).join('');
 }
 
-function generateLicenseKey() {
-  const secret = _licSecrets()[0];
-  // Use CSPRNG (crypto.randomBytes) not Math.random for key entropy
+function _generateKey(prefix, product) {
+  const secret = _licSecrets(product)[0];
   const buf = crypto.randomBytes(8);
   const rnd8 = Array.from(buf).map(b => _KEY_CHARS[b % 32]).join('');
   const mac4 = _hmacMac4(rnd8, secret);
   const full = rnd8 + mac4;
-  return `APEX-${full.slice(0, 4)}-${full.slice(4, 8)}-${full.slice(8, 12)}`;
+  return `${prefix}-${full.slice(0, 4)}-${full.slice(4, 8)}-${full.slice(8, 12)}`;
 }
 
-// Returns true if key has a valid HMAC signature against ANY known secret
+function generateLicenseKey() { return _generateKey('APEX', 'apex-bot'); }
+function generateForexKey()   { return _generateKey('FORX', 'apex-forex'); }
+
+// Returns { valid, product } — product is 'apex-bot' | 'apex-forex' | null
 function verifyLicenseKeyHmac(key) {
-  if (!key) return false;
-  const m = key.toUpperCase().match(/^APEX-([A-Z2-9]{4})-([A-Z2-9]{4})-([A-Z2-9]{4})$/);
-  if (!m) return false;
-  const full = m[1] + m[2] + m[3];
-  const data = full.slice(0, 8);
-  const given = full.slice(8, 12);
-  return _licSecrets().some(secret => _hmacMac4(data, secret) === given);
+  if (!key) return { valid: false, product: null };
+  const k = key.toUpperCase();
+  const prefixMap = { APEX: 'apex-bot', FORX: 'apex-forex' };
+  for (const [prefix, product] of Object.entries(prefixMap)) {
+    const re = new RegExp(`^${prefix}-([A-Z2-9]{4})-([A-Z2-9]{4})-([A-Z2-9]{4})$`);
+    const m = k.match(re);
+    if (!m) continue;
+    const full = m[1] + m[2] + m[3];
+    const data = full.slice(0, 8), given = full.slice(8, 12);
+    if (_licSecrets(product).some(s => _hmacMac4(data, s) === given)) return { valid: true, product };
+  }
+  return { valid: false, product: null };
 }
 
 // GET /api/owner-license — generate a license key for the owner (requires BOT_EMAIL_SECRET)
+// ?product=apex-bot (default) or ?product=apex-forex
 app.get('/api/owner-license', async (req, res) => {
   const secret = req.query.secret || req.headers['x-owner-secret'];
   const expected = process.env.BOT_EMAIL_SECRET;
   if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden — secret required' });
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const key = generateLicenseKey();
-  const { error } = await supabase.from('licenses').insert([{ key, email: 'owner@aicashsystem.space', name: 'Owner', active: true }]);
+  const product = req.query.product === 'apex-forex' ? 'apex-forex' : 'apex-bot';
+  const key = product === 'apex-forex' ? generateForexKey() : generateLicenseKey();
+  const { error } = await supabase.from('licenses').insert([{ key, email: 'owner@aicashsystem.space', name: 'Owner', active: true, product }]);
   if (error) return res.status(500).json({ error: error.message, hint: error.hint });
-  res.json({ key, message: 'Add this as LICENSE_KEY in Railway Variables', supabase: 'inserted ok' });
+  res.json({ key, product, message: `Add this as LICENSE_KEY for your ${product} bot`, supabase: 'inserted ok' });
 });
 
 // POST /api/verify-license — called by the bot on every startup
+// Body: { key, product? }  — product is 'apex-bot' | 'apex-forex'
 // Primary: HMAC signature check (no DB). Fallback: Supabase for legacy keys.
 app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
-  const { key } = req.body || {};
+  const { key, product: claimedProduct } = req.body || {};
   if (!key) return res.json({ valid: false, message: 'No license key provided' });
 
   // 1. HMAC check — works without any database
-  if (verifyLicenseKeyHmac(key)) {
-    // Best-effort: log activation timestamp in Supabase (non-blocking, ignore errors)
+  const hmacResult = verifyLicenseKeyHmac(key);
+  if (hmacResult.valid) {
+    // Product mismatch check: FORX- key on crypto bot (or APEX- on forex) → reject
+    if (claimedProduct && hmacResult.product && claimedProduct !== hmacResult.product) {
+      return res.json({ valid: false, message: `Wrong license type. This key is for ${hmacResult.product}. Purchase the correct bot at aicashsystem.space` });
+    }
     if (supabase) {
       supabase.from('licenses')
-        .upsert([{ key, active: true, activated_at: new Date().toISOString() }], { onConflict: 'key' })
+        .upsert([{ key, active: true, activated_at: new Date().toISOString(), product: hmacResult.product }], { onConflict: 'key' })
         .then(() => {}).catch(() => {});
     }
-    return res.json({ valid: true, message: 'License valid' });
+    return res.json({ valid: true, message: 'License valid', product: hmacResult.product });
   }
 
-  // 2. Supabase fallback — for legacy keys generated before HMAC scheme
+  // 2. Supabase fallback — for legacy keys or manual inserts
   if (supabase) {
     try {
       const { data } = await supabase
-        .from('licenses').select('active').eq('key', key).eq('active', true).single();
-      if (data?.active) return res.json({ valid: true, message: 'License valid (legacy)' });
+        .from('licenses').select('active,product').eq('key', key).eq('active', true).single();
+      if (data?.active) {
+        if (claimedProduct && data.product && claimedProduct !== data.product) {
+          return res.json({ valid: false, message: `Wrong license type. This key is for ${data.product}.` });
+        }
+        return res.json({ valid: true, message: 'License valid (legacy)', product: data.product });
+      }
     } catch (_) {}
   }
 
@@ -1217,16 +1241,17 @@ async function handleStripeWebhook(req, res) {
       // Payment Link buyers may not populate receipt_email — check charge billing details too
       const email = pi.metadata?.email || pi.receipt_email
         || pi.charges?.data?.[0]?.billing_details?.email || '';
-      // $297 (29700) is the apex-bot price — treat any such charge as apex-bot
-      // even when metadata.product is unset (e.g. Stripe Payment Link buyers).
-      const product = (pi.metadata?.product === 'apex-bot' || pi.amount === 29700)
-        ? 'apex-bot'
-        : (pi.metadata?.product || 'course');
+      // Detect product from metadata (inline checkout) or amount (Payment Link)
+      const product = pi.metadata?.product === 'apex-forex' || pi.amount === 49700
+        ? 'apex-forex'
+        : (pi.metadata?.product === 'apex-bot' || pi.amount === 29700)
+          ? 'apex-bot'
+          : (pi.metadata?.product || 'course');
       const buyerName = pi.metadata?.name || 'there';
 
-      // ── APEX BOT DELIVERY ──
-      if (product === 'apex-bot') {
-        // Try to use pre-generated pending key (created at payment intent time)
+      // ── BOT LICENSE DELIVERY (crypto + forex) ──
+      if (product === 'apex-bot' || product === 'apex-forex') {
+        const isForex = product === 'apex-forex';
         const pending = _pendingLicenses.get(pi.id);
         let licenseKey;
 
@@ -1234,7 +1259,6 @@ async function handleStripeWebhook(req, res) {
           licenseKey = pending.key;
           _pendingLicenses.delete(pi.id);
         } else if (supabase) {
-          // Server restarted — recover key from Supabase by payment_intent_id
           const { data: dbRow } = await supabase.from('licenses')
             .select('key').eq('payment_intent_id', pi.id).single();
           if (dbRow?.key) {
@@ -1243,30 +1267,29 @@ async function handleStripeWebhook(req, res) {
           }
         }
         if (!licenseKey) {
-          // Last resort: generate fresh key
-          licenseKey = generateLicenseKey();
+          licenseKey = isForex ? generateForexKey() : generateLicenseKey();
           addLog(`License generated (last-resort): ${licenseKey} for ${email}`, 'license', 'warn');
         }
         if (supabase) {
           const { error } = await supabase.from('licenses')
-            .upsert([{ key: licenseKey, active: true, activated_at: new Date().toISOString(), email: email || '', name: buyerName }], { onConflict: 'key' });
+            .upsert([{ key: licenseKey, active: true, activated_at: new Date().toISOString(), email: email || '', name: buyerName, product }], { onConflict: 'key' });
           if (error) addLog(`License activate DB error: ${error.message}`, 'license', 'error');
         }
-        addLog(`License activated: ${licenseKey} for ${email}`, 'license', 'success');
+        addLog(`License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
 
-        // Send email as backup (key was already delivered via redirect URL)
         if (email) {
-          const botEmailHtml = _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey, TG_BOT_USERNAME);
-          const result = await _sendEmail({
-            to: email,
-            subject: '🤖 Your Apex Trade Bot — License Key inside',
-            html: botEmailHtml,
-            fromName: 'Apex.Bot',
-          });
-          if (!result.ok) addLog(`Apex Bot email NOT sent for ${email} — ${result.error}`, 'email', 'error');
-          else addLog(`Apex Bot email sent via ${result.method} to ${email}`, 'email', 'success');
+          const html = isForex
+            ? _buildForexEmailHtml(_he(buyerName), _he(email), licenseKey)
+            : _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey, TG_BOT_USERNAME);
+          const subject = isForex
+            ? '🤖 Your Apex Forex Bot — License Key inside'
+            : '🤖 Your Apex Trade Bot — License Key inside';
+          const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
+          if (!result.ok) addLog(`Bot email NOT sent for ${email} — ${result.error}`, 'email', 'error');
+          else addLog(`${isForex ? 'Forex' : 'Crypto'} Bot email sent via ${result.method} to ${email}`, 'email', 'success');
         }
-        addLog(`Apex Bot sold: ${email} — $297 — key: ${licenseKey}`, 'payment', 'success');
+        const price = isForex ? '$497' : '$297';
+        addLog(`${isForex ? 'Forex' : 'Crypto'} Bot sold: ${email} — ${price} — key: ${licenseKey}`, 'payment', 'success');
         return res.json({ received: true });
       }
 
@@ -1784,6 +1807,80 @@ a{text-decoration:none}
 </td></tr>
 </table><!-- /outer -->
 </body></html>`;}
+
+// ── FOREX BOT EMAIL ─────────────────────────────────────────────────────────
+function _buildForexEmailHtml(safeName, safeEmail, licenseKey = 'FORX-XXXX-XXXX-XXXX') {
+  const firstName = safeName.split(' ')[0];
+  const code = (t) => `<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:11px;font-weight:700">${t}</span>`;
+  const pill = (t, c='#f59e0b', bg='rgba(245,158,11,0.12)', br='rgba(245,158,11,0.3)') =>
+    `<span style="background:${bg};border:1px solid ${br};border-radius:4px;padding:1px 7px;color:${c};font-family:'Courier New',monospace;font-size:11px;font-weight:700">${t}</span>`;
+  const step = (n, title, body) => `<tr><td style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:22px 24px;margin-bottom:12px"><table width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#2aabee;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#fff;font-family:Arial,sans-serif">${n}</td><td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#fff;font-family:Arial,sans-serif">${title}</td></tr><tr><td colspan="2" style="padding:12px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">${body}</td></tr></table></td></tr><tr><td style="height:12px"></td></tr>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#060608">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;min-height:100vh">
+<tr><td align="center" style="padding:36px 16px 0">
+<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%">
+
+<tr><td align="center" style="padding:0 0 20px">
+  <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:3.5px;text-transform:uppercase;color:#374151;font-family:Arial,sans-serif">APEX FOREX BOT &nbsp;&bull;&nbsp; PURCHASE CONFIRMATION</p>
+</td></tr>
+
+<tr><td style="background:#0a0d18;border:1px solid rgba(255,255,255,0.07);border-bottom:none;border-radius:18px 18px 0 0">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td style="background:linear-gradient(90deg,#2aabee,#1a8fc9);height:3px;border-radius:17px 17px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
+    <tr><td align="center" style="padding:36px 40px 32px">
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 24px"><tr><td style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:20px;padding:5px 16px"><p style="margin:0;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#22c55e;font-family:Arial,sans-serif">&#10003;&nbsp; ACCESS GRANTED</p></td></tr></table>
+      <p style="margin:0 0 6px;font-size:32px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">Your Forex bot is ready,</p>
+      <p style="margin:0 0 20px;font-size:32px;font-weight:900;color:#2aabee;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">${firstName}.</p>
+      <p style="margin:0;font-size:14px;color:#64748b;font-family:Arial,sans-serif;line-height:1.75;max-width:420px">Apex Forex Bot is ready to deploy. Follow the steps below — you can be trading in under 10 minutes.</p>
+    </td></tr>
+  </table>
+</td></tr>
+
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(42,171,238,0.3);border-radius:12px"><tr>
+    <td style="background:#2aabee;width:4px;border-radius:12px 0 0 12px;font-size:0;line-height:0">&nbsp;</td>
+    <td style="padding:22px 24px">
+      <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#2aabee;font-family:Arial,sans-serif">YOUR FOREX LICENSE KEY &mdash; KEEP THIS SAFE</p>
+      <p style="margin:0 0 14px;font-family:'Courier New',Courier,monospace;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px 12px;word-break:break-all">${licenseKey}</p>
+      <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Add this to Render environment variables as ${code('LICENSE_KEY')}</p>
+    </td>
+  </tr></table>
+</td></tr>
+
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:4px 32px 32px;text-align:center">
+  <a href="https://aicashsystem.space/configurator-forex?key=${licenseKey}" style="display:inline-block;background:#2aabee;color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:900;padding:16px 42px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">Open Forex Configurator &rarr;</a>
+  <p style="margin:14px 0 0;font-size:12px;color:#374151;font-family:Arial,sans-serif">Click above to configure your broker and deploy</p>
+</td></tr>
+
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 24px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
+    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#1e293b;font-family:Arial,sans-serif">SETUP GUIDE</td>
+    <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
+  </tr></table>
+</td></tr>
+
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 16px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    ${step(1, 'Open OANDA and create an API key', 'Login to OANDA → Manage Funds → API Access → Generate Token. Keep the token and your Account ID ready.')}
+    ${step(2, 'Configure your bot', 'Click the "Open Forex Configurator" button above. Paste your OANDA credentials, choose PAPER mode to start, set your risk (1-2% recommended).')}
+    ${step(3, 'Deploy to Render', 'Click "Save Config &amp; Deploy" in the configurator. The bot starts automatically with just your LICENSE_KEY — all settings are stored securely.')}
+    ${step(4, 'Start with Paper Trading', `Keep ${code('PAPER_TRADING=true')} for at least 7 days. Verify signals match your strategy before going live.`)}
+  </table>
+</td></tr>
+
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
+  <p style="margin:0;font-size:11px;color:#1e293b;font-family:Arial,sans-serif;line-height:1.8;text-align:center"><strong style="color:#374151">Risk Disclosure</strong> &mdash; Forex trading involves substantial risk of loss. Only trade capital you can afford to lose. Apex Forex Bot is an automation tool, not financial advice.</p>
+</td></tr>
+
+<tr><td align="center" style="background:#0a0d18;border:1px solid rgba(255,255,255,0.07);border-top:1px solid rgba(255,255,255,0.05);border-radius:0 0 18px 18px;padding:24px 40px 28px">
+  <p style="margin:0 0 6px;font-size:12px;color:#334155;font-family:Arial,sans-serif">Questions? Reply to this email:</p>
+  <a href="mailto:supportaicashsystem@gmail.com" style="color:#2aabee;font-size:13px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">supportaicashsystem@gmail.com</a>
+  <p style="margin:16px 0 0;font-size:10px;color:#0f172a;font-family:Arial,sans-serif">&copy; 2025 AI Cash Systems &nbsp;&middot;&nbsp; <a href="https://aicashsystem.space" style="color:#0f172a;text-decoration:none">aicashsystem.space</a></p>
+</td></tr>
+<tr><td style="height:36px;font-size:0;line-height:0">&nbsp;</td></tr>
+</table></td></tr></table></body></html>`;}
 
 // ── BOT ACCESS — streams a clean ZIP; requires valid HMAC-signed license key
 app.get('/bot-access', async (req, res) => {

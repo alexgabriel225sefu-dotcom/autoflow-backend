@@ -167,12 +167,12 @@ def verify_license():
         print("    Purchase at: https://aicashsystem.space\n")
         sys.exit(1)
     try:
-        res = requests.post(f"{server}/api/verify-license", json={"key": key}, timeout=10)
+        res = requests.post(f"{server}/api/verify-license", json={"key": key, "product": "apex-forex"}, timeout=10)
         data = res.json()
         if not data.get("valid"):
             print(f"\n❌  License invalid: {data.get('message')}\n")
             sys.exit(1)
-        print(f"✅  License verified — welcome, {data.get('email', 'trader')}!")
+        print(f"✅  Forex license verified — welcome, {data.get('email', 'trader')}!")
     except Exception as e:
         print(f"⚠️   License server unreachable ({e}) — starting in grace mode.")
 

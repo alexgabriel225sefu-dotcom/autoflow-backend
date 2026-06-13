@@ -53,7 +53,7 @@ async function verifyLicense() {
     const res  = await fetch(`${server}/api/verify-license`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ key }),
+      body:    JSON.stringify({ key, product: 'apex-bot' }),
       signal:  AbortSignal.timeout(10000),
     });
     const data = await res.json();
