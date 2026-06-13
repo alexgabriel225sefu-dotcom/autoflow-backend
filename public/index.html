@@ -13,6 +13,8 @@
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://js.stripe.com/v3/"></script>
+<!-- Refersion affiliate tracking — replace pub_XXXXXXXXXXXXXXXX with your Merchant ID from Refersion Settings → Integration -->
+<script>!function(f,b,e,v,n,t,s){if(f.rfrsn)return;n=f.rfrsn={};n._c=[];n.push=function(){n._c.push(arguments)};if(!b.getElementById(e)){t=b.createElement(v);t.id=e;t.async=!0;t.src='https://cdn.refersion.com/refersion.js';s=b.getElementsByTagName(v)[0];s.parentNode.insertBefore(t,s)}}(window,document,'refersion-js','script');window.rfrsn.push('setMerchantId','pub_XXXXXXXXXXXXXXXX');</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -852,6 +854,16 @@ document.querySelectorAll('.feat').forEach(function(el,i){el.style.transitionDel
 <script>
 var STRIPE_PK='pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS';
 var apexStripe,apexCardNum,apexCardExp,apexCardCvc;
+
+// Refersion: capture affiliate code from URL (?ref= or ?r_id=) and persist in sessionStorage
+(function(){
+  var p=new URLSearchParams(window.location.search);
+  var code=p.get('ref')||p.get('r_id')||p.get('rfsn');
+  if(code) sessionStorage.setItem('rfrsn_ref',code);
+  if(window.rfrsn && sessionStorage.getItem('rfrsn_ref')){
+    window.rfrsn.push('setCreatorCode', sessionStorage.getItem('rfrsn_ref'));
+  }
+})();
 var elStyle={base:{color:'#f5f5f7',fontFamily:'"Satoshi",system-ui,sans-serif',fontSize:'14px','::placeholder':{color:'#56565f'}},invalid:{color:'#ff5c74'}};
 function openApexModal(){
   document.getElementById('apexModal').classList.add('open');
@@ -900,6 +912,11 @@ async function submitApexPayment(){
     }else if(result.paymentIntent.status==='succeeded'){
       document.getElementById('amForm').style.display='none';
       document.getElementById('amSuccess').style.display='block';
+      // Refersion conversion — fire after confirmed payment
+      if(window.rfrsn){
+        var _rOrder={id:result.paymentIntent.id,items:[{sku:'APEX-BOT-297',name:'Apex Trade Bot License',price:297,quantity:1}],customer:{email:email,first_name:name.split(' ')[0]||name,last_name:name.split(' ').slice(1).join(' ')||''}};
+        window.rfrsn.push('trackOrder',_rOrder);
+      }
       var redirect='/configurator'+(_pendingKey?'?key='+encodeURIComponent(_pendingKey):'');
       setTimeout(function(){window.location.href=redirect},2000);
     }
