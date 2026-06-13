@@ -457,6 +457,11 @@ async function main() {
   await cfg.loadRemote();
   validate();
 
+  // Re-sync paper balance from the (now loaded) remote config. `paperBalance`
+  // was initialized at module load from the default cfg value, before
+  // loadRemote() updated it — without this it would stay at the $100 default.
+  paperBalance = cfg.PAPER_BALANCE;
+
   // Restaurează starea după restart — și în live, altfel botul uită poziția
   // deschisă și ar deschide alta peste ea (dublă expunere)
   const saved = state.load(cfg.PAPER_BALANCE);
