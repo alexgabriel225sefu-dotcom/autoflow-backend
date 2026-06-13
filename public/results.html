@@ -3,137 +3,108 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Bot Results — Animated</title>
+<title>Bot Results</title>
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#060608;--panel:#111115;--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.13);
+  --bg:#060608;--panel:#0f0f13;--panel2:#161619;--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.13);
   --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
-  --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;
-  --accdim:rgba(255,45,79,.12);--accglow:rgba(255,45,79,.4);
-  --up:#27c46a;--upglow:rgba(39,196,106,.4);
-  --d:'Clash Display',system-ui,sans-serif;
-  --f:'Satoshi',system-ui,sans-serif;
-  --m:'JetBrains Mono',monospace;
+  --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;--accdim:rgba(255,45,79,.12);
+  --up:#27c46a;--upglow:rgba(39,196,106,.5);--down:#ef4444;
+  --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
   --e:cubic-bezier(.32,.72,0,1);--eo:cubic-bezier(.34,1.56,.64,1);
 }
 html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var(--f);-webkit-font-smoothing:antialiased}
-
 #stage{
-  position:fixed;top:50%;left:50%;
-  width:1080px;height:1920px;
-  transform:translate(-50%,-50%) scale(var(--s,.36));
-  transform-origin:center center;
+  position:fixed;top:50%;left:50%;width:1080px;height:1920px;
+  transform:translate(-50%,-50%) scale(var(--s,.36));transform-origin:center center;
   background:var(--bg);overflow:hidden;color:var(--t0);
 }
-
-/* 3D grid */
-#g3d{position:absolute;left:-25%;right:-25%;bottom:0;height:52%;z-index:0;pointer-events:none;perspective:400px;opacity:.55}
-#g3d::after{content:'';position:absolute;inset:0;
-  background-image:linear-gradient(rgba(255,45,79,.14) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(255,45,79,.14) 1px,transparent 1px);
-  background-size:72px 72px;transform:rotateX(70deg);transform-origin:bottom center;
-  animation:grid 5s linear infinite;
-  mask-image:linear-gradient(transparent,#000 55%,transparent)}
-@keyframes grid{from{background-position-y:0}to{background-position-y:72px}}
-
 /* aurora */
-.aur{position:absolute;border-radius:50%;pointer-events:none;z-index:0;
-  background:radial-gradient(closest-side,rgba(255,45,79,.2),rgba(255,45,79,.05) 60%,transparent);
-  filter:blur(60px);animation:aur 9s ease-in-out infinite}
-@keyframes aur{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
-.aur-up{background:radial-gradient(closest-side,rgba(39,196,106,.18),rgba(39,196,106,.04) 60%,transparent)}
+.aur{position:absolute;border-radius:50%;pointer-events:none;z-index:0;filter:blur(80px);animation:aur 10s ease-in-out infinite}
+@keyframes aur{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
 
-.scene{position:absolute;inset:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;padding:0 80px;
-  opacity:0;visibility:hidden;z-index:10;
-  transition:opacity .6s var(--e),transform .6s var(--e),filter .6s var(--e)}
+.scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 72px;opacity:0;visibility:hidden;z-index:10;transition:opacity .6s var(--e),transform .6s var(--e),filter .6s var(--e)}
 .scene.in{opacity:1;visibility:visible;transform:none;filter:none}
 .scene.out{opacity:0;transform:translateY(-50px);filter:blur(14px);visibility:hidden}
 .scene.pre{transform:translateY(50px);filter:blur(14px)}
-
-.rv{opacity:0;transform:translateY(34px);filter:blur(8px);
-  transition:opacity .7s var(--e),transform .7s var(--e),filter .7s var(--e)}
+.rv{opacity:0;transform:translateY(30px);filter:blur(6px);transition:opacity .65s var(--e),transform .65s var(--e),filter .65s var(--e)}
 .in .rv{opacity:1;transform:none;filter:none}
-.in .rv.d1{transition-delay:.1s}.in .rv.d2{transition-delay:.22s}
-.in .rv.d3{transition-delay:.34s}.in .rv.d4{transition-delay:.46s}
-.in .rv.d5{transition-delay:.60s}
+.in .rv.d1{transition-delay:.1s}.in .rv.d2{transition-delay:.22s}.in .rv.d3{transition-delay:.34s}
+.in .rv.d4{transition-delay:.46s}.in .rv.d5{transition-delay:.58s}.in .rv.d6{transition-delay:.70s}
 
-/* ──────── SCENE 1 · INTRO ──────── */
-.s1-eye{font:600 26px/1 var(--f);letter-spacing:.3em;text-transform:uppercase;color:var(--acc);margin-bottom:48px}
-.s1-h{font-family:var(--d);font-weight:700;font-size:100px;letter-spacing:-.03em;line-height:1.05;text-align:center}
-.s1-h .hl{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 30px rgba(255,45,79,.4))}
-.s1-sub{font-size:44px;color:var(--t1);text-align:center;margin-top:24px}
-.s1-badge{margin-top:60px;display:flex;gap:18px;flex-wrap:wrap;justify-content:center}
-.badge{padding:16px 32px;border-radius:999px;font:600 28px/1 var(--m);letter-spacing:.06em}
-.badge.red{background:var(--accdim);border:1px solid rgba(255,45,79,.3);color:var(--acc2)}
-.badge.gr{background:rgba(39,196,106,.1);border:1px solid rgba(39,196,106,.25);color:var(--up)}
+/* ═══ SCENE 1 · HOOK ═══ */
+.s1-eye{font:700 26px/1 var(--m);letter-spacing:.3em;text-transform:uppercase;color:var(--acc);margin-bottom:44px}
+.s1-h{font-family:var(--d);font-weight:700;font-size:106px;letter-spacing:-.03em;line-height:1.0;text-align:center}
+.s1-h em{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-style:normal}
+.s1-sub{font-size:44px;color:var(--t1);text-align:center;margin-top:28px;line-height:1.5}
+.s1-pair{margin-top:60px;display:inline-flex;align-items:center;gap:16px;
+  padding:22px 44px;border-radius:999px;background:var(--accdim);border:1px solid rgba(255,45,79,.3);
+  font:700 36px/1 var(--m);color:var(--acc2)}
+.s1-pair .dot{width:12px;height:12px;border-radius:50%;background:var(--acc);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,45,79,.5)}70%{box-shadow:0 0 0 18px rgba(255,45,79,0)}100%{box-shadow:0 0 0 0 rgba(255,45,79,0)}}
 
-/* ──────── SCENE 2 · BIG PROFIT ──────── */
-.s2-setup{font:700 34px/1 var(--m);color:var(--acc);letter-spacing:.14em;text-transform:uppercase;margin-bottom:16px}
-.s2-desc{font-size:40px;color:var(--t1);text-align:center;margin-bottom:64px}
-.s2-profit-lbl{font:700 30px/1 var(--m);letter-spacing:.2em;text-transform:uppercase;color:var(--t1)}
-.s2-profit{font-family:var(--d);font-weight:700;font-size:220px;letter-spacing:-.06em;line-height:.88;
-  color:var(--up);text-shadow:0 0 100px rgba(39,196,106,.5),0 0 200px rgba(39,196,106,.2)}
-.s2-capital{font-size:38px;color:var(--t1);margin-top:16px}
-.s2-capital b{color:var(--t0)}
-.s2-row{display:flex;gap:0;width:100%;margin-top:52px}
-.sm{flex:1;text-align:center;padding:40px 16px;background:var(--panel);border:1px solid var(--line)}
-.sm:first-child{border-radius:22px 0 0 22px}
-.sm:last-child{border-radius:0 22px 22px 0}
-.sm .mv{font-family:var(--d);font-weight:700;font-size:76px;letter-spacing:-.03em}
-.sm .ml{font-size:26px;color:var(--t1);margin-top:8px}
+/* ═══ SCENE 2 · TRADE TABLE ═══ */
+.report-box{width:100%;border-radius:24px;overflow:hidden;background:var(--panel);border:1px solid var(--line2)}
+.rbox-head{display:flex;align-items:center;justify-content:space-between;padding:26px 36px;background:var(--panel2);border-bottom:1px solid var(--line2)}
+.rbox-title{font:700 30px/1 var(--m);color:var(--t1);letter-spacing:.1em;text-transform:uppercase}
+.rbox-badge{font:700 24px/1 var(--m);color:var(--acc);padding:8px 18px;border-radius:8px;background:var(--accdim);border:1px solid rgba(255,45,79,.25)}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font:600 22px/1 var(--m);color:var(--t2);letter-spacing:.08em;text-transform:uppercase;padding:16px 20px;text-align:left;border-bottom:1px solid var(--line)}
+.tbl td{font:500 26px/1 var(--m);padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.04)}
+.tbl tr.tr-in{opacity:0;transform:translateX(-20px);transition:opacity .4s var(--e),transform .4s var(--e)}
+.in .tbl tr.tr-in.show{opacity:1;transform:none}
+.buy{color:var(--up)}.sell{color:var(--down)}.neutral{color:var(--t1)}
+.acct-row{display:flex;justify-content:space-between;padding:24px 36px;border-top:1px solid var(--line2)}
+.ar-item{text-align:center}
+.ar-lbl{font:500 22px/1 var(--m);color:var(--t2);letter-spacing:.06em;text-transform:uppercase}
+.ar-val{font:700 38px/1 var(--m);color:var(--t0);margin-top:6px}
+.s2-cap{font-family:var(--d);font-weight:700;font-size:56px;text-align:center;margin-top:40px;letter-spacing:-.02em;line-height:1.2}
+.s2-cap .acc{color:var(--acc2)}
 
-/* ──────── SCENE 3 · CURVE ──────── */
-.s3-h{font-family:var(--d);font-weight:700;font-size:92px;letter-spacing:-.03em;line-height:1.05;text-align:center;margin-bottom:16px}
-.s3-sub{font-size:40px;color:var(--t1);text-align:center;margin-bottom:48px}
-.chart-wrap{width:100%;border-radius:28px;overflow:hidden;background:var(--panel);border:1px solid var(--line2)}
-.chart-head{display:flex;justify-content:space-between;align-items:center;padding:30px 40px;border-bottom:1px solid var(--line)}
-.ch-pair{font:700 40px/1 var(--d);letter-spacing:-.02em}
-.ch-profit{font:700 42px/1 var(--m);color:var(--up)}
-canvas#cv{display:block;width:100%;height:420px}
-.chart-foot{display:flex;justify-content:space-between;padding:22px 40px;font:500 26px/1 var(--m);color:var(--t2)}
-.s3-facts{display:flex;gap:20px;width:100%;margin-top:28px}
-.sf{flex:1;border-radius:20px;padding:32px 28px;text-align:center;background:var(--panel);border:1px solid var(--line)}
-.sf .fv{font-family:var(--d);font-weight:700;font-size:60px;letter-spacing:-.03em}
-.sf .fl{font-size:26px;color:var(--t1);margin-top:6px}
+/* ═══ SCENE 3 · BALANCE CURVE ═══ */
+.chart-panel{width:100%;border-radius:24px;overflow:hidden;background:var(--panel);border:1px solid var(--line2)}
+.cp-head{display:flex;justify-content:space-between;align-items:center;padding:28px 36px;border-bottom:1px solid var(--line)}
+.cp-lbl{font:700 32px/1 var(--m);color:var(--t1);letter-spacing:.08em;text-transform:uppercase}
+.cp-val{font:700 48px/1 var(--d);color:var(--up);text-shadow:0 0 30px var(--upglow)}
+canvas#cv{display:block;width:100%;height:480px}
+.cp-foot{display:flex;justify-content:space-between;padding:20px 36px;font:500 26px/1 var(--m);color:var(--t2)}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%;margin-top:28px}
+.sg-item{border-radius:18px;padding:30px 32px;background:var(--panel);border:1px solid var(--line)}
+.sg-lbl{font:500 24px/1 var(--m);color:var(--t2);letter-spacing:.06em;text-transform:uppercase}
+.sg-val{font-family:var(--d);font-weight:700;font-size:64px;letter-spacing:-.03em;margin-top:8px}
+.sg-val.up{color:var(--up)}.sg-val.acc{color:var(--acc2)}.sg-val.neutral{color:var(--t0)}
 
-/* ──────── SCENE 4 · YOU CAN TOO ──────── */
-.s4-h{font-family:var(--d);font-weight:700;font-size:104px;letter-spacing:-.03em;text-align:center;line-height:1.0}
-.s4-h .acc{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.s4-sub{font-size:44px;color:var(--t1);text-align:center;margin:26px 0 62px}
-.config-card{width:100%;border-radius:26px;background:var(--panel);border:1px solid var(--line2);overflow:hidden;margin-bottom:22px}
-.cc-head{display:flex;align-items:center;gap:16px;padding:28px 40px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
-.cc-dot{width:10px;height:10px;border-radius:50%;background:var(--acc)}
-.cc-title{font:600 30px/1 var(--m);color:var(--t1);letter-spacing:.08em;text-transform:uppercase}
-.cc-rows{padding:8px 0}
-.cc-row{display:flex;align-items:center;justify-content:space-between;padding:22px 40px}
-.cc-row .label{font:500 32px/1 var(--f);color:var(--t1)}
-.cc-row .val{font:700 32px/1 var(--m);color:var(--t0)}
-.cc-row .val.acc{color:var(--acc2)}
-.cc-row .val.up{color:var(--up)}
-.cc-row.appear{opacity:0;transform:translateX(-14px);transition:opacity .45s var(--e),transform .45s var(--e)}
-.in .cc-row.appear.show{opacity:1;transform:none}
+/* ═══ SCENE 4 · FULL RESULTS ═══ */
+.results-h{font-family:var(--d);font-weight:700;font-size:74px;letter-spacing:-.03em;text-align:center;margin-bottom:36px;line-height:1}
+.res-section{width:100%;border-radius:22px;background:var(--panel);border:1px solid var(--line2);overflow:hidden;margin-bottom:18px}
+.res-sec-head{font:700 24px/1 var(--m);letter-spacing:.12em;text-transform:uppercase;color:var(--t2);padding:18px 32px;background:var(--panel2);border-bottom:1px solid var(--line)}
+.res-rows{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.res-row{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid rgba(255,255,255,.04)}
+.res-row:nth-child(odd){border-right:1px solid rgba(255,255,255,.04)}
+.res-row .rl{font:500 26px/1 var(--f);color:var(--t1)}
+.res-row .rv2{font:700 28px/1 var(--m)}
+.rv2.up{color:var(--up)}.rv2.down{color:var(--down)}.rv2.acc{color:var(--acc2)}.rv2.nt{color:var(--t0)}
+.res-row.appear{opacity:0;transition:opacity .4s var(--e)}
+.in .res-row.appear.show{opacity:1}
 
-/* ──────── SCENE 5 · CTA ──────── */
-.s5-h{font-family:var(--d);font-weight:700;font-size:110px;letter-spacing:-.04em;text-align:center;line-height:.95}
+/* ═══ SCENE 5 · YOU CAN TOO ═══ */
+.s5-h{font-family:var(--d);font-weight:700;font-size:108px;letter-spacing:-.04em;text-align:center;line-height:.95}
 .s5-h .acc{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 30px rgba(255,45,79,.4))}
-.s5-sub{font-size:44px;color:var(--t1);text-align:center;margin-top:24px;margin-bottom:56px;line-height:1.5}
-.checks{width:100%;display:flex;flex-direction:column;gap:18px;margin-bottom:56px}
-.chk{display:flex;align-items:center;gap:26px;padding:30px 40px;border-radius:20px;background:var(--panel);border:1px solid var(--line2);font:600 44px/1 var(--d);letter-spacing:-.01em}
-.chk-icon{width:52px;height:52px;border-radius:14px;background:rgba(39,196,106,.15);border:1px solid rgba(39,196,106,.3);display:flex;align-items:center;justify-content:center;color:var(--up);font-size:30px;flex:none}
-.s5-url{font-family:var(--m);font-weight:700;font-size:58px;color:var(--acc2);letter-spacing:.02em}
-.s5-bio{font-size:34px;color:var(--t1);margin-top:14px}
-.s5-disc{font-size:22px;color:var(--t2);margin-top:36px;text-align:center;max-width:860px;line-height:1.6}
+.s5-sub{font-size:44px;color:var(--t1);text-align:center;margin:26px 0 56px;line-height:1.55}
+.feat-list{width:100%;display:flex;flex-direction:column;gap:18px}
+.feat{display:flex;align-items:center;gap:26px;padding:32px 40px;border-radius:20px;background:var(--panel);border:1px solid var(--line2);font:600 44px/1 var(--d);letter-spacing:-.01em}
+.feat-ic{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;flex:none;background:rgba(39,196,106,.12);border:1px solid rgba(39,196,106,.25);color:var(--up)}
+.s5-url{font-family:var(--m);font-weight:700;font-size:58px;color:var(--acc2);margin-top:56px;letter-spacing:.02em}
+.s5-bio{font-size:34px;color:var(--t1);margin-top:12px}
+.disc{font-size:22px;color:var(--t2);margin-top:36px;text-align:center;line-height:1.6;max-width:880px}
 
 /* controls */
 #ui{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:300}
-#ui button{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.15);
-  border-radius:999px;padding:12px 22px;font:600 15px/1 var(--f);cursor:pointer;
-  backdrop-filter:blur(12px);transition:background .2s}
-#ui button:hover{background:rgba(255,255,255,.18)}
+#ui button{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:12px 22px;font:600 15px/1 var(--f);cursor:pointer;backdrop-filter:blur(12px);transition:background .2s}
+#ui button:hover{background:rgba(255,255,255,.2)}
 #hint{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:300;color:#50505e;font:500 13px/1.5 var(--f);text-align:center}
 .clean #ui,.clean #hint{display:none}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -143,90 +114,113 @@ canvas#cv{display:block;width:100%;height:420px}
 <div id="hint">▶ Play · C = clean mode · Space = restart</div>
 
 <div id="stage">
-  <div id="g3d"></div>
-  <div class="aur" style="width:900px;height:900px;top:-250px;right:-200px"></div>
-  <div class="aur aur-up" style="width:700px;height:700px;bottom:-150px;left:-150px;animation-delay:-5s"></div>
+  <div class="aur" style="width:900px;height:900px;top:-300px;right:-200px;background:radial-gradient(closest-side,rgba(255,45,79,.18),rgba(255,45,79,.04) 60%,transparent)"></div>
+  <div class="aur" style="width:700px;height:700px;bottom:-200px;left:-100px;background:radial-gradient(closest-side,rgba(39,196,106,.14),rgba(39,196,106,.03) 60%,transparent);animation-delay:-5s"></div>
 
-  <!-- ══ 1 · INTRO ══ -->
+  <!-- ══ 1 · HOOK ══ -->
   <section class="scene" data-dur="3800" id="s1">
-    <div class="s1-eye rv">My Bot. Real Results.</div>
+    <div class="s1-eye rv">My bot. Real numbers.</div>
     <div class="s1-h rv d1">
-      I built it.<br>I <span class="hl">configured</span> it.<br>It works.
+      I configured it.<br>Here are the <em>real</em><br>results.
     </div>
-    <div class="s1-sub rv d2">Here's what happened.</div>
-    <div class="s1-badge rv d3">
-      <span class="badge red">XAUUSD · MT5</span>
-      <span class="badge gr">Backtest · 3310 bars</span>
-    </div>
+    <div class="s1-sub rv d2">XAUUSD · MT5 Strategy Tester<br>No demo. No edits.</div>
+    <div class="s1-pair rv d3"><span class="dot"></span>XAUUSD · 3,310 bars · 1,653 trades</div>
   </section>
 
-  <!-- ══ 2 · BIG PROFIT ══ -->
-  <section class="scene" data-dur="5200" id="s2">
-    <div class="s2-setup rv">My configuration</div>
-    <div class="s2-desc rv d1">XAUUSD · Sell stop + Buy stop · Custom risk</div>
-    <div class="s2-profit-lbl rv d2">Total Net Profit</div>
-    <div class="s2-profit rv d2" id="s2p">$0</div>
-    <div class="s2-capital rv d3">Starting capital: <b>$1,529</b> → <b>$187,611</b></div>
-    <div class="s2-row rv d4">
-      <div class="sm"><div class="mv up" id="s2wr">0%</div><div class="ml">Win Rate</div></div>
-      <div class="sm"><div class="mv" style="color:var(--acc2)">1.74</div><div class="ml">Profit Factor</div></div>
-      <div class="sm"><div class="mv" id="s2tr">0</div><div class="ml">Total Trades</div></div>
+  <!-- ══ 2 · TRADE TABLE ══ -->
+  <section class="scene" data-dur="5400" id="s2">
+    <div class="report-box rv" style="margin-bottom:28px">
+      <div class="rbox-head">
+        <span class="rbox-title">Open Orders · XAUUSD</span>
+        <span class="rbox-badge">MT5 Report</span>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Time</th><th>Symbol</th><th>Type</th><th>Vol</th><th>Price</th><th>T/P</th></tr></thead>
+        <tbody>
+          <tr class="tr-in" data-at="200"><td class="neutral">01:00</td><td>XAUUSD</td><td class="sell">sell stop</td><td>21.4</td><td>4148.50</td><td class="sell">4139.61</td></tr>
+          <tr class="tr-in" data-at="450"><td class="neutral">01:00</td><td>XAUUSD</td><td class="sell">sell stop</td><td>21.4</td><td>4148.35</td><td class="sell">4135.49</td></tr>
+          <tr class="tr-in" data-at="700"><td class="neutral">01:06</td><td>XAUUSD</td><td class="sell">sell stop</td><td>19.84</td><td>4151.15</td><td class="sell">4143.45</td></tr>
+          <tr class="tr-in" data-at="950"><td class="neutral">04:48</td><td>XAUUSD</td><td class="buy">buy stop</td><td>24.33</td><td>4193.07</td><td class="buy">4201.96</td></tr>
+          <tr class="tr-in" data-at="1200"><td class="neutral">04:48</td><td>XAUUSD</td><td class="buy">buy stop</td><td>22.56</td><td>4193.40</td><td class="buy">4201.10</td></tr>
+          <tr class="tr-in" data-at="1450"><td class="neutral">04:48</td><td>XAUUSD</td><td class="buy">buy stop</td><td>24.33</td><td>4193.22</td><td class="buy">4206.08</td></tr>
+        </tbody>
+      </table>
+      <div class="acct-row">
+        <div class="ar-item"><div class="ar-lbl">Balance</div><div class="ar-val" id="s2bal">$0</div></div>
+        <div class="ar-item"><div class="ar-lbl">Free Margin</div><div class="ar-val" id="s2fm">$0</div></div>
+        <div class="ar-item"><div class="ar-lbl">Equity</div><div class="ar-val" id="s2eq">$0</div></div>
+      </div>
     </div>
+    <div class="s2-cap rv d3">Every trade placed <span class="acc">automatically.</span><br>Zero manual input.</div>
   </section>
 
   <!-- ══ 3 · BALANCE CURVE ══ -->
-  <section class="scene" data-dur="4800" id="s3">
-    <div class="s3-h rv">Balance grew<br><span style="color:var(--up)">12,161%</span></div>
-    <div class="s3-sub rv d1">Starting from $1,529 · XAUUSD · MT5</div>
-    <div class="chart-wrap rv d2">
-      <div class="chart-head">
-        <span class="ch-pair">XAUUSD Balance</span>
-        <span class="ch-profit">+$186,082</span>
+  <section class="scene" data-dur="5000" id="s3">
+    <div class="chart-panel rv">
+      <div class="cp-head">
+        <span class="cp-lbl">Balance Curve</span>
+        <span class="cp-val" id="s3val">$1,529</span>
       </div>
-      <canvas id="cv" width="1700" height="840"></canvas>
-      <div class="chart-foot"><span>Start: $1,529</span><span>End: $187,611</span></div>
+      <canvas id="cv" width="1700" height="960"></canvas>
+      <div class="cp-foot"><span>Start: $1,529</span><span>Bars: 3,310</span><span>End: $187,611</span></div>
     </div>
-    <div class="s3-facts rv d3">
-      <div class="sf"><div class="fv">28.76%</div><div class="fl">Max Drawdown</div></div>
-      <div class="sf"><div class="fv" style="color:var(--up)">6.47</div><div class="fl">Recovery Factor</div></div>
-      <div class="sf"><div class="fv">$455</div><div class="fl">Avg Win</div></div>
+    <div class="stat-grid rv d2">
+      <div class="sg-item"><div class="sg-lbl">Net Profit</div><div class="sg-val up" id="s3np">$0</div></div>
+      <div class="sg-item"><div class="sg-lbl">Win Rate</div><div class="sg-val acc" id="s3wr">0%</div></div>
+      <div class="sg-item"><div class="sg-lbl">Profit Factor</div><div class="sg-val neutral">1.74</div></div>
+      <div class="sg-item"><div class="sg-lbl">Max Drawdown</div><div class="sg-val acc">15.65%</div></div>
     </div>
   </section>
 
-  <!-- ══ 4 · YOU CAN CONFIGURE ══ -->
-  <section class="scene" data-dur="5200" id="s4">
-    <div class="s4-h rv">Your bot.<br>Your <span class="acc">settings.</span></div>
-    <div class="s4-sub rv d1">Everything I set, you can change.</div>
-    <div class="config-card rv d2">
-      <div class="cc-head"><div class="cc-dot"></div><div class="cc-title">Strategy Config</div></div>
-      <div class="cc-rows">
-        <div class="cc-row appear" data-at="600"><span class="label">Trading pair</span><span class="val acc">XAUUSD / EURUSD / BTC</span></div>
-        <div class="cc-row appear" data-at="900"><span class="label">Position size</span><span class="val">0.1 – 5.0 lots</span></div>
-        <div class="cc-row appear" data-at="1200"><span class="label">Risk per trade</span><span class="val up">1% – 10% (your call)</span></div>
-        <div class="cc-row appear" data-at="1500"><span class="label">Stop loss</span><span class="val">Fixed / ATR-based / None</span></div>
-        <div class="cc-row appear" data-at="1800"><span class="label">Signal type</span><span class="val acc">Buy stop · Sell stop · Both</span></div>
+  <!-- ══ 4 · FULL STATS ══ -->
+  <section class="scene" data-dur="5500" id="s4">
+    <div class="results-h rv">Full Results</div>
+    <div class="res-section rv d1">
+      <div class="res-sec-head">Profit & Loss</div>
+      <div class="res-rows">
+        <div class="res-row appear" data-at="200"><span class="rl">Total Net Profit</span><span class="rv2 up">$186,082.10</span></div>
+        <div class="res-row appear" data-at="300"><span class="rl">Gross Profit</span><span class="rv2 up">$437,292.92</span></div>
+        <div class="res-row appear" data-at="400"><span class="rl">Gross Loss</span><span class="rv2 down">-$251,210.82</span></div>
+        <div class="res-row appear" data-at="500"><span class="rl">Expected Payoff</span><span class="rv2 acc">$112.57</span></div>
+        <div class="res-row appear" data-at="600"><span class="rl">Profit Factor</span><span class="rv2 nt">1.74</span></div>
+        <div class="res-row appear" data-at="700"><span class="rl">Recovery Factor</span><span class="rv2 up">6.47</span></div>
       </div>
     </div>
-    <div class="s4-close rv" style="transition-delay:.7s;width:100%;margin-top:22px;padding:38px 44px;border-radius:22px;
-      background:linear-gradient(135deg,rgba(255,45,79,.14),rgba(255,45,79,.04));
-      border:1px solid rgba(255,45,79,.28);text-align:center;font:700 48px/1 var(--d);color:var(--acc2)">
-      Full source code. Change anything.
+    <div class="res-section rv d2">
+      <div class="res-sec-head">Trades</div>
+      <div class="res-rows">
+        <div class="res-row appear" data-at="900"><span class="rl">Total Trades</span><span class="rv2 nt">1,653</span></div>
+        <div class="res-row appear" data-at="1000"><span class="rl">Win Rate</span><span class="rv2 up">58.08%</span></div>
+        <div class="res-row appear" data-at="1100"><span class="rl">Short trades won</span><span class="rv2 acc">631 (56.42%)</span></div>
+        <div class="res-row appear" data-at="1200"><span class="rl">Long trades won</span><span class="rv2 acc">1,022 (59.10%)</span></div>
+        <div class="res-row appear" data-at="1300"><span class="rl">Largest win</span><span class="rv2 up">$17,346.60</span></div>
+        <div class="res-row appear" data-at="1400"><span class="rl">Largest loss</span><span class="rv2 down">-$9,047.28</span></div>
+      </div>
+    </div>
+    <div class="res-section rv d3">
+      <div class="res-sec-head">Drawdown</div>
+      <div class="res-rows">
+        <div class="res-row appear" data-at="1600"><span class="rl">Max Drawdown</span><span class="rv2 acc">$28,760 (15.65%)</span></div>
+        <div class="res-row appear" data-at="1700"><span class="rl">Max consec. wins</span><span class="rv2 up">13 trades</span></div>
+        <div class="res-row appear" data-at="1800"><span class="rl">Max consec. losses</span><span class="rv2 down">12 trades</span></div>
+        <div class="res-row appear" data-at="1900"><span class="rl">Avg win</span><span class="rv2 up">$455.51</span></div>
+      </div>
     </div>
   </section>
 
   <!-- ══ 5 · CTA ══ -->
   <section class="scene" data-dur="6000" id="s5">
-    <div class="s5-h rv">Get the<br>same <span class="acc">bot.</span></div>
-    <div class="s5-sub rv d1">Configure it your way.<br>Run it on your account.</div>
-    <div class="checks rv d2">
-      <div class="chk"><div class="chk-icon">✓</div>Full Python source code — yours forever</div>
-      <div class="chk"><div class="chk-icon">✓</div>Crypto on Binance/Bybit</div>
-      <div class="chk"><div class="chk-icon">✓</div>Forex via MT5 · XAUUSD · EURUSD</div>
-      <div class="chk"><div class="chk-icon">✓</div>One-time payment · No subscription</div>
+    <div class="s5-h rv">You can run<br>the <span class="acc">same bot.</span></div>
+    <div class="s5-sub rv d1">Configure it your way.<br>Your exchange. Your rules.</div>
+    <div class="feat-list rv d2">
+      <div class="feat"><div class="feat-ic">✓</div>Full Python source code — yours forever</div>
+      <div class="feat"><div class="feat-ic">✓</div>Crypto · Binance / Bybit</div>
+      <div class="feat"><div class="feat-ic">✓</div>Forex via MT5 · XAUUSD · EURUSD</div>
+      <div class="feat"><div class="feat-ic">✓</div>One-time payment · No monthly fees</div>
     </div>
     <div class="s5-url rv d3">aicashsystem.space</div>
     <div class="s5-bio rv d4">Link in bio</div>
-    <div class="s5-disc rv d5">Backtest results shown. Past performance does not guarantee future results.</div>
+    <div class="disc rv d5">Backtest results · Past performance does not guarantee future results.</div>
   </section>
 </div>
 
@@ -246,7 +240,8 @@ function T(fn,ms){timers.push(setTimeout(fn,ms))}
 
 function resetScene(sc){
   sc.classList.remove('in','out');sc.classList.add('pre');
-  sc.querySelectorAll('.cc-row').forEach(e=>e.classList.remove('show'));
+  sc.querySelectorAll('.tr-in').forEach(e=>e.classList.remove('show'));
+  sc.querySelectorAll('.appear').forEach(e=>e.classList.remove('show'));
 }
 function runScene(i){
   if(i>=scenes.length){T(play,1400);return;}
@@ -256,9 +251,10 @@ function runScene(i){
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     sc.classList.remove('pre');sc.classList.add('in');
     if(sc.id==='s2')animS2();
-    if(sc.id==='s3')animChart();
-    sc.querySelectorAll('.cc-row[data-at]').forEach(el=>{
-      T(()=>el.classList.add('show'),+el.dataset.at);
+    if(sc.id==='s3')animS3();
+    sc.querySelectorAll('[data-at]').forEach(el=>{
+      var at=+el.dataset.at;
+      T(()=>el.classList.add('show'),at);
     });
   }));
   T(()=>runScene(i+1),dur);
@@ -272,53 +268,59 @@ function cu(id,to,ms,fmt){
 }
 
 function animS2(){
-  cu('s2p',186082,2600,v=>'$'+Math.round(v).toLocaleString());
-  cu('s2wr',58.08,2600,v=>v.toFixed(1)+'%');
-  cu('s2tr',1653,2600,v=>Math.round(v).toLocaleString());
+  var v=187611.36;
+  cu('s2bal',v,2000,n=>'$'+n.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  cu('s2fm', v,2000,n=>'$'+n.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  cu('s2eq', v,2000,n=>'$'+n.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}));
 }
 
-function animChart(){
+function animS3(){
+  /* balance counter */
+  var valEl=document.getElementById('s3val');
+  var start=1529,end=187611;
+  var st=performance.now(),dur=3200;
+  (function f(n){var p=Math.min(1,(n-st)/dur),e=1-Math.pow(1-p,3);
+    valEl.textContent='$'+Math.round(start+(end-start)*e).toLocaleString();
+    if(p<1)requestAnimationFrame(f);})(performance.now());
+  cu('s3np',186082,3000,v=>'$'+Math.round(v).toLocaleString());
+  cu('s3wr',58.08,3000,v=>v.toFixed(1)+'%');
+
+  /* draw chart */
   var cv=document.getElementById('cv'),x=cv.getContext('2d');
-  var W=cv.width,H=cv.height;
-  /* recreate the MT5 balance curve shape — flat then exponential growth */
-  var pts=[];
-  var n=120;
+  var W=cv.width,H=cv.height,pad=50;
+  /* recreate MT5 curve: flat 40%, plateau, then explosive climb */
+  var n=200,pts=[];
   for(var i=0;i<n;i++){
-    var frac=i/(n-1);
-    /* flat zone first 40%, then accelerate — mirrors the screenshot */
-    var base;
-    if(frac<0.40){base=frac/0.40*0.06;}
-    else if(frac<0.70){var f2=(frac-0.40)/0.30;base=0.06+f2*0.25;}
-    else{var f3=(frac-0.70)/0.30;base=0.31+f3*0.69;}
-    /* add noise */
-    var noise=(Math.sin(i*7.3)*0.018+Math.sin(i*3.1)*0.012+Math.sin(i*17.9)*0.006)*Math.max(0.05,base);
-    pts.push(Math.max(0,Math.min(1,base+noise)));
+    var f=i/(n-1);
+    var v;
+    if(f<0.38)v=f/0.38*0.04+Math.sin(i*5.1)*.008;
+    else if(f<0.55){var f2=(f-0.38)/0.17;v=0.04+f2*0.15+Math.sin(i*4.3)*.015;}
+    else if(f<0.72){var f3=(f-0.55)/0.17;v=0.19+f3*0.18+Math.sin(i*6.7)*.018;}
+    else{var f4=(f-0.72)/0.28;v=0.37+Math.pow(f4,1.4)*0.63+Math.sin(i*8.1)*.022;}
+    pts.push(Math.max(0,Math.min(1,v)));
   }
-  var t0=performance.now(),DUR=3000;
+  var t0=performance.now(),DUR=3400;
   function draw(now){
     var prog=Math.min(1,(now-t0)/DUR),shown=Math.floor(prog*n);
     x.clearRect(0,0,W,H);
-    var pad=40,iw=W-pad*2,ih=H-pad*2;
-    /* grid lines */
-    x.strokeStyle='rgba(255,255,255,.06)';x.lineWidth=1;
-    for(var g=0;g<=4;g++){var gy=pad+ih*(1-g/4);x.beginPath();x.moveTo(pad,gy);x.lineTo(W-pad,gy);x.stroke();}
+    var iw=W-pad*2,ih=H-pad*2;
+    /* grid */
+    x.strokeStyle='rgba(255,255,255,.05)';x.lineWidth=1;
+    for(var g=0;g<=5;g++){var gy=pad+ih*(1-g/5);x.beginPath();x.moveTo(pad,gy);x.lineTo(W-pad,gy);x.stroke();}
     if(shown<2){requestAnimationFrame(draw);return;}
-    var visiblePts=pts.slice(0,shown);
-    var coords=visiblePts.map((v,i)=>[pad+i/(n-1)*iw,pad+ih*(1-v)]);
-    /* area fill */
-    x.save();
-    var grd=x.createLinearGradient(0,pad,0,H-pad);
-    grd.addColorStop(0,'rgba(39,196,106,.3)');grd.addColorStop(1,'rgba(39,196,106,0)');
+    var vis=pts.slice(0,shown);
+    var coords=vis.map((v,i)=>[pad+i/(n-1)*iw,pad+ih*(1-v)]);
+    /* fill */
+    var gf=x.createLinearGradient(0,pad,0,H-pad);
+    gf.addColorStop(0,'rgba(39,196,106,.25)');gf.addColorStop(1,'rgba(39,196,106,0)');
     x.beginPath();coords.forEach((p,k)=>k?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));
     x.lineTo(coords[coords.length-1][0],H-pad);x.lineTo(coords[0][0],H-pad);x.closePath();
-    x.fillStyle=grd;x.fill();
+    x.fillStyle=gf;x.fill();
     /* line */
-    x.strokeStyle='#27c46a';x.lineWidth=5;
-    x.shadowColor='rgba(39,196,106,.8)';x.shadowBlur=18;
+    x.save();x.strokeStyle='#27c46a';x.lineWidth=6;x.shadowColor='rgba(39,196,106,.9)';x.shadowBlur=20;
     x.beginPath();coords.forEach((p,k)=>k?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.stroke();
     /* dot */
-    var last=coords[coords.length-1];
-    x.fillStyle='#27c46a';x.beginPath();x.arc(last[0],last[1],9,0,7);x.fill();
+    var l=coords[coords.length-1];x.fillStyle='#27c46a';x.beginPath();x.arc(l[0],l[1],10,0,7);x.fill();
     x.restore();
     if(prog<1)requestAnimationFrame(draw);
   }
@@ -330,7 +332,6 @@ addEventListener('keydown',e=>{
   if(e.key==='c'||e.key==='C')toggleClean();
   if(e.key===' '){e.preventDefault();play();}
 });
-
 scenes.forEach(s=>s.classList.add('pre'));
 T(play,400);
 </script>
