@@ -441,14 +441,14 @@ function runNumberScene(){
   el.classList.remove('glitch-active');
   var start=performance.now();
   var dur=2200;
-  var target=2847;
+  var target=4183;
   function frame(now){
     var p=Math.min((now-start)/dur,1);
     var ease=1-Math.pow(1-p,3);
     el.textContent='+$'+Math.round(ease*target).toLocaleString();
     if(p<1)requestAnimationFrame(frame);
     else{
-      el.textContent='+$2,847';
+      el.textContent='+$4,183';
       el.classList.add('glitch-active');
     }
   }
