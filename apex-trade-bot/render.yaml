@@ -1,5 +1,7 @@
 services:
-  - type: background
+  # 'web' (not 'background') so it works on Render's FREE plan.
+  # The bot's built-in dashboard binds to $PORT, so Render's health checks pass.
+  - type: web
     name: apex-trade-bot
     env: node
     buildCommand: npm install
