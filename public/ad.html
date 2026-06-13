@@ -16,13 +16,12 @@
   --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
   --e:cubic-bezier(.16,1,.3,1);--eo:cubic-bezier(.34,1.56,.64,1);
 }
-html,body{height:100%;background:#000;overflow:hidden;font-family:var(--f)}
-body{display:grid;place-items:center}
+html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var(--f)}
 
-/* 9:16 recording stage, scaled to viewport */
+/* 9:16 recording stage, centered with fixed positioning + scaled to viewport */
 #stage{
-  position:relative;width:1080px;height:1920px;
-  transform:scale(var(--s,.42));transform-origin:center;
+  position:fixed;top:50%;left:50%;width:1080px;height:1920px;
+  transform:translate(-50%,-50%) scale(var(--s,.36));transform-origin:center center;
   background:radial-gradient(120% 80% at 50% -10%,rgba(255,45,79,.12),transparent 55%),var(--bg);
   overflow:hidden;color:var(--t0);
   box-shadow:0 0 0 1px rgba(255,255,255,.05);
