@@ -125,6 +125,11 @@ html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var
 .t-profit{font:700 44px/1 var(--m);color:var(--up)}
 .t-profit.flash{animation:flash .4s var(--eo)}
 @keyframes flash{0%{transform:scale(1.25);opacity:0}100%{transform:scale(1);opacity:1}}
+.t-tag{display:inline-block;font:600 20px/1 var(--m);letter-spacing:.06em;text-transform:uppercase;
+  padding:4px 12px;border-radius:6px;margin-left:10px;vertical-align:middle}
+.t-tag.crypto{background:rgba(255,45,79,.12);color:var(--acc2);border:1px solid rgba(255,45,79,.2)}
+.t-tag.gold{background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.25)}
+.t-tag.forex{background:rgba(42,171,238,.12);color:#2aabee;border:1px solid rgba(42,171,238,.22)}
 
 /* ═══════════════════════════════════════
    SCENE 3 · BIG NUMBER
@@ -241,20 +246,43 @@ html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var
     <div class="s2-sub rv d2">You rest. It trades.</div>
     <div class="ticker rv d3">
       <div class="ticker-head">
-        <span class="t-pair">Apex Trade Bot</span>
+        <span class="t-pair">All Markets — Live</span>
         <span class="t-live"><span class="live-dot"></span>LIVE</span>
       </div>
       <div class="t-row">
-        <div><div class="t-name">BTC / USDT</div><div class="t-type">Long · 2x</div></div>
+        <div>
+          <div class="t-name">BTC / USDT <span class="t-tag crypto">Crypto</span></div>
+          <div class="t-type">Long · 2x · Binance</div>
+        </div>
         <div class="t-profit">+$84.20</div>
       </div>
       <div class="t-row">
-        <div><div class="t-name">ETH / USDT</div><div class="t-type">Long · 1.5x</div></div>
-        <div class="t-profit">+$47.60</div>
+        <div>
+          <div class="t-name">XAU / USD <span class="t-tag gold">Gold · MT5</span></div>
+          <div class="t-type">Buy · 0.5 lot · Bybit</div>
+        </div>
+        <div class="t-profit">+$162.40</div>
       </div>
       <div class="t-row">
-        <div><div class="t-name">SOL / USDT</div><div class="t-type">Long · 2x</div></div>
-        <div class="t-profit" id="sol-v">+$12.40</div>
+        <div>
+          <div class="t-name">EUR / USD <span class="t-tag forex">Forex · MT5</span></div>
+          <div class="t-type">Buy · 1 lot · MT5</div>
+        </div>
+        <div class="t-profit" id="sol-v">+$47.80</div>
+      </div>
+      <div class="t-row">
+        <div>
+          <div class="t-name">ETH / USDT <span class="t-tag crypto">Crypto</span></div>
+          <div class="t-type">Long · 1.5x · Binance</div>
+        </div>
+        <div class="t-profit" id="eth-v">+$38.60</div>
+      </div>
+      <div class="t-row" style="border-bottom:none">
+        <div>
+          <div class="t-name">SOL / USDT <span class="t-tag crypto">Crypto</span></div>
+          <div class="t-type">Long · 2x · Binance</div>
+        </div>
+        <div class="t-profit" id="sol2-v">+$21.40</div>
       </div>
     </div>
   </section>
@@ -383,17 +411,24 @@ function animS1(){
 }
 
 function animS2(){
-  var vals=[12.40,29.80,41.30,58.90,74.50,93.20,112.40];
-  var i=0,el=document.getElementById('sol-v');
-  function tick(){
-    if(i>=vals.length)return;
-    el.textContent='+$'+vals[i].toFixed(2);
-    el.classList.remove('flash');
-    requestAnimationFrame(()=>el.classList.add('flash'));
-    i++;
-    T(tick,Math.random()*550+450);
-  }
-  T(tick,1100);
+  /* each entry: [elementId, starting value, step range] */
+  var tickers=[
+    {id:'sol-v', val:47.80, steps:[52.30,58.90,67.40,74.80,89.20,101.60]},
+    {id:'eth-v', val:38.60, steps:[44.10,51.30,59.70,68.90]},
+    {id:'sol2-v',val:21.40, steps:[28.60,35.20,44.80,52.10]}
+  ];
+  tickers.forEach(function(t){
+    var el=document.getElementById(t.id);if(!el)return;
+    var i=0;
+    function tick(){
+      if(i>=t.steps.length)return;
+      el.textContent='+$'+t.steps[i].toFixed(2);
+      el.classList.remove('flash');
+      requestAnimationFrame(function(){el.classList.add('flash')});
+      i++;T(tick,Math.random()*700+500);
+    }
+    T(tick,Math.random()*1200+800);
+  });
 }
 
 function animS3(){
