@@ -1,0 +1,17 @@
+services:
+  # 'web' (not 'background') so it works on Render's FREE plan.
+  # The bot's built-in dashboard binds to $PORT, so Render's health checks pass.
+  - type: web
+    name: apex-forex-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    plan: free
+    autoDeploy: false
+    envVars:
+      # The ONLY thing the client enters. Everything else (broker, OANDA keys,
+      # live/practice, strategy, risk) is configured on
+      # aicashsystem.space/configurator-forex and loaded automatically at
+      # startup via load_remote().
+      - key: LICENSE_KEY
+        sync: false

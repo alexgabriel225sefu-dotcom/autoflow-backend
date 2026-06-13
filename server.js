@@ -2086,53 +2086,79 @@ app.post('/api/builder/logo', auth, _aiLimiter, async (req, res) => {
 
 
 // ════════════════════════════════════════
-// ADMIN: SYNC BOT FILES → apex-trade-bot repo
-// Usage: GET /admin/sync-bot-repo?secret=BOT_EMAIL_SECRET&token=ghp_xxx
+// ADMIN: SYNC BOT FILES → GitHub repo
+// Usage: GET /admin/sync-bot-repo?secret=BOT_EMAIL_SECRET&token=ghp_xxx[&bot=crypto|forex]
 // ════════════════════════════════════════
 app.get('/admin/sync-bot-repo', async (req, res) => {
   const secret = req.query.secret || '';
   const ghToken = req.query.token || '';
+  const bot = (req.query.bot || 'crypto').toLowerCase();
   const adminSecret = process.env.BOT_EMAIL_SECRET || '';
 
   if (!adminSecret) return res.status(500).json({ error: 'BOT_EMAIL_SECRET not set' });
   if (secret !== adminSecret) return res.status(403).json({ error: 'Wrong secret' });
   if (!ghToken) return res.status(400).json({ error: 'GitHub token required (?token=ghp_...)' });
+  if (!['crypto', 'forex'].includes(bot)) return res.status(400).json({ error: "bot must be 'crypto' or 'forex'" });
 
-  const OWNER = 'alexgabriel225sefu-dotcom';
-  const REPO  = 'apex-trade-bot';
-  const botDir = path.join(__dirname, 'apex-trade-bot');
-
-  // Push ALL .js files under src/ automatically (so no module is ever missed),
-  // plus the root config files.
   const fs = require('fs');
-  let srcFiles = [];
-  try {
-    srcFiles = fs.readdirSync(path.join(botDir, 'src'))
-      .filter(f => f.endsWith('.js'))
-      .map(f => `src/${f}`);
-  } catch(_) {}
-  const rootFiles = ['package.json', 'railway.json', 'render.yaml', '.env.example']
-    .filter(f => fs.existsSync(path.join(botDir, f)));
-  const filesToPush = [...srcFiles, ...rootFiles];
+  const OWNER = 'alexgabriel225sefu-dotcom';
+  const REPO  = bot === 'forex' ? 'apex-forex-bot' : 'apex-trade-bot';
+  const botDir = path.join(__dirname, REPO);
 
-  const readmeContent = `# Apex Trade Bot 🤖
+  // Recursively collect deployable source files (skips caches/tests/git noise).
+  const SKIP_DIRS = new Set(['node_modules', '__pycache__', '.git', '.claude-flow', 'tests']);
+  const KEEP_EXT  = new Set(['.js', '.py', '.json', '.txt', '.yaml', '.yml', '.mq5', '.example']);
+  const KEEP_NAME = new Set(['Procfile']);
+  function walk(dir, base = '') {
+    let out = [];
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch(_) { return out; }
+    for (const e of entries) {
+      const rel = base ? `${base}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (SKIP_DIRS.has(e.name)) continue;
+        out = out.concat(walk(path.join(dir, e.name), rel));
+      } else if (e.name === 'README.md') {
+        continue; // README is generated below
+      } else if (KEEP_NAME.has(e.name) || KEEP_EXT.has(path.extname(e.name))) {
+        out.push(rel);
+      }
+    }
+    return out;
+  }
+  const filesToPush = walk(botDir);
+
+  const readmeContent = bot === 'forex' ? `# Apex Forex Bot 🤖
+
+AI-powered forex trading bot (OANDA + MT5 bridge). Deploy with one click on Render.
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/${OWNER}/${REPO})
+
+## Setup
+The only variable you set is your license key — everything else is configured
+on [aicashsystem.space/configurator-forex](https://aicashsystem.space/configurator-forex)
+and loaded automatically at startup.
+
+| Variable | Value |
+|----------|-------|
+| \`LICENSE_KEY\` | Your key from purchase email |
+
+## License
+Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsystem.space).
+` : `# Apex Trade Bot 🤖
 
 AI-powered crypto trading bot. Deploy with one click on Render.
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/${OWNER}/${REPO})
 
 ## Setup
-After deploying, add these environment variables in Render → Environment:
+The only variable you set is your license key — everything else is configured
+on [aicashsystem.space/configurator](https://aicashsystem.space/configurator)
+and loaded automatically at startup.
 
 | Variable | Value |
 |----------|-------|
 | \`LICENSE_KEY\` | Your key from purchase email |
-| \`EXCHANGE\` | \`binance\` |
-| \`BINANCE_API_KEY\` | Your Binance API key |
-| \`BINANCE_API_SECRET\` | Your Binance API secret |
-| \`GROQ_API_KEY\` | Free key from console.groq.com |
-| \`PAPER_TRADING\` | \`true\` (start safe) |
-| \`PAPER_BALANCE\` | \`100\` |
 
 ## License
 Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsystem.space).

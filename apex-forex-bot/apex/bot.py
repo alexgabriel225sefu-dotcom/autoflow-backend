@@ -53,6 +53,44 @@ def reload_broker_connector():
         print(f"[BOT] Broker reload error: {e}")
 
 
+def _apply_config(data, source="config"):
+    """Apply a {ENV_NAME: value} dict to os.environ and the live cfg module.
+
+    Values arrive as strings (from the server) and are coerced to the type of
+    the existing cfg attribute, so "false" doesn't stay a truthy string and
+    "0.02" becomes a float. Shared by runtime.json and the remote loader.
+    """
+    applied = 0
+    for k, v in data.items():
+        if v is None or v == "":
+            continue
+        os.environ[k] = str(v)
+        applied += 1
+
+    # Env var name → cfg attribute name where they differ
+    if "TRADE_SYMBOL" in data:
+        cfg.SYMBOL = str(data["TRADE_SYMBOL"])
+    if "SCAN_SYMBOLS" in data and data["SCAN_SYMBOLS"]:
+        cfg.SCAN_SYMBOLS = str(data["SCAN_SYMBOLS"]).split(",")
+
+    for k, v in data.items():
+        if v is None or v == "" or not hasattr(cfg, k):
+            continue
+        cur = getattr(cfg, k)
+        try:
+            if isinstance(cur, bool):
+                setattr(cfg, k, cfg._truthy(str(v)))
+            elif isinstance(cur, int) and not isinstance(cur, bool):
+                setattr(cfg, k, int(float(v)))
+            elif isinstance(cur, float):
+                setattr(cfg, k, float(v))
+            elif isinstance(cur, str):
+                setattr(cfg, k, str(v).lower() if k in ("BROKER", "OANDA_ENV") else str(v))
+        except (ValueError, TypeError):
+            pass  # leave the default if the value can't be coerced
+    return applied
+
+
 def _load_runtime_config():
     """Apply persistent settings saved by Telegram commands (runtime.json)."""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "runtime.json")
@@ -64,28 +102,40 @@ def _load_runtime_config():
     except Exception as e:
         print(f"[BOT] runtime.json error: {e}")
         return
-    for k, v in data.items():
-        os.environ[k] = str(v)
-    if "BROKER" in data:
-        cfg.BROKER = str(data["BROKER"]).lower()
-    if "MT_BRIDGE_SECRET" in data:
-        cfg.MT_BRIDGE_SECRET = str(data["MT_BRIDGE_SECRET"])
-    if "OANDA_ENV" in data:
-        cfg.OANDA_ENV = str(data["OANDA_ENV"]).lower()
-    if "TRADE_SYMBOL" in data:
-        cfg.SYMBOL = str(data["TRADE_SYMBOL"])
-    if "PAPER_TRADING" in data:
-        cfg.PAPER_TRADING = str(data["PAPER_TRADING"]).lower() in ("true", "1", "yes", "on")
-    if "RISK_PER_TRADE" in data:
-        cfg.RISK_PER_TRADE = float(data["RISK_PER_TRADE"])
-    if "STOP_LOSS_PIPS" in data:
-        cfg.STOP_LOSS_PIPS = float(data["STOP_LOSS_PIPS"])
-    if "TAKE_PROFIT_PIPS" in data:
-        cfg.TAKE_PROFIT_PIPS = float(data["TAKE_PROFIT_PIPS"])
-    for key in ("OANDA_API_TOKEN", "OANDA_ACCOUNT_ID"):
-        if key in data:
-            setattr(cfg, key, str(data[key]))
-    print(f"[BOT] runtime.json loaded ({len(data)} settings)")
+    n = _apply_config(data, "runtime.json")
+    print(f"[BOT] runtime.json loaded ({n} settings)")
+
+
+def load_remote():
+    """Fetch the config the client saved in the configurator and apply it.
+
+    Mirrors the crypto bot's cfg.loadRemote(): with only LICENSE_KEY set, the
+    bot pulls broker keys, OANDA_ENV, risk and strategy from the license server
+    so deployment is truly one-click. Falls back to env vars on any failure.
+    """
+    key = cfg.LICENSE_KEY
+    server = cfg.LICENSE_SERVER
+    if not key:
+        print("⚠️   load_remote: LICENSE_KEY not set — skipping remote config.")
+        return False
+    try:
+        r = requests.get(f"{server}/api/bot-config",
+                         params={"key": key}, timeout=10,
+                         headers={"User-Agent": "ApexForexBot/1.0"})
+        if r.status_code != 200:
+            print(f"⚠️   load_remote: server returned {r.status_code} — {r.text[:200]}")
+            print('     → Did you complete the configurator and click "Save Config & Deploy"?')
+            return False
+        data = r.json()
+        if not data.get("success") or not data.get("config"):
+            print("⚠️   load_remote: no config in response.")
+            return False
+        n = _apply_config(data["config"], "remote")
+        print(f"✅  Remote config loaded from license server ({n} settings).")
+        return True
+    except Exception as e:
+        print(f"⚠️   Could not load remote config ({e}) — using env vars only.")
+        return False
 
 
 # ─── State ────────────────────────────────────────────────
@@ -559,9 +609,11 @@ def _start_dashboard_server():
 def main():
     global start_balance, paper_balance, open_position, broker
     print(f"[APEX FOREX BOT] Starting... Python {sys.version.split()[0]}")
-    _load_runtime_config()
-    broker = get_broker()  # re-init with any runtime-overridden settings
+    load_remote()           # config saved in the configurator (broker keys, env, risk)
+    _load_runtime_config()  # Telegram-saved overrides take precedence
+    broker = get_broker()   # re-init with the now-loaded settings
     validate()
+    paper_balance = cfg.PAPER_BALANCE  # re-sync after remote config loaded
 
     if cfg.PAPER_TRADING:
         saved = state.load(cfg.PAPER_BALANCE)
