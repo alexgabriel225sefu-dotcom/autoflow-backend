@@ -126,14 +126,19 @@ module.exports = {
 module.exports.loadRemote = async function loadRemote() {
   const key    = module.exports.LICENSE_KEY;
   const server = module.exports.LICENSE_SERVER;
-  if (!key) return false;
+  if (!key) { console.warn('⚠️   loadRemote: LICENSE_KEY not set — skipping remote config.'); return false; }
   try {
     const resp = await fetch(`${server}/api/bot-config?key=${encodeURIComponent(key)}`, {
       signal: AbortSignal.timeout(10000),
     });
-    if (!resp.ok) return false;
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '');
+      console.warn(`⚠️   loadRemote: server returned ${resp.status} — ${body.slice(0,200)}`);
+      console.warn('     → Did you complete the configurator and click "Save Config & Deploy" for this license key?');
+      return false;
+    }
     const data = await resp.json();
-    if (!data.success || !data.config) return false;
+    if (!data.success || !data.config) { console.warn('⚠️   loadRemote: no config in response.'); return false; }
     // Apply each env-var-named key from remote config.
     // Config arrives as strings — coerce to the type of the existing cfg field
     // (e.g. PAPER_TRADING boolean, STOP_LOSS_PCT number) so "false" doesn't
