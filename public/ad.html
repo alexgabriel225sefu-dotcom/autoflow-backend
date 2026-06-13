@@ -4,298 +4,332 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Apex Trade Bot — Ad</title>
-<link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#050814;--panel:rgba(255,255,255,.04);--line:rgba(255,255,255,.07);
-  --t0:#f0f0f8;--t1:#8080a0;--t2:#50506a;
-  --gold:#f59e0b;--gold2:#fbbf24;--gold3:rgba(245,158,11,.15);
+  --bg:#050814;--t0:#f0f0f8;--t1:#7070a0;
+  --gold:#f59e0b;--gold2:#fbbf24;
   --up:#22c55e;--down:#ef4444;
-  --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
-  --e:cubic-bezier(.16,1,.3,1);--eo:cubic-bezier(.34,1.56,.64,1);
+  --d:'Clash Display',system-ui,sans-serif;
+  --f:'Satoshi',system-ui,sans-serif;
+  --m:'JetBrains Mono',monospace;
+  --e:cubic-bezier(.16,1,.3,1);
+  --eo:cubic-bezier(.34,1.56,.64,1);
 }
-
 html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var(--f)}
 
 #stage{
-  position:fixed;top:50%;left:50%;width:1080px;height:1920px;
-  transform:translate(-50%,-50%) scale(var(--s,.36));transform-origin:center center;
+  position:fixed;top:50%;left:50%;
+  width:1080px;height:1920px;
+  transform:translate(-50%,-50%) scale(var(--s,.36));
+  transform-origin:center center;
   background:var(--bg);overflow:hidden;color:var(--t0);
 }
 
-/* ambient orbs — NO grid lines */
-#orbs{position:absolute;inset:0;pointer-events:none;z-index:0}
-.orb{position:absolute;border-radius:50%;filter:blur(120px);opacity:.55}
-.orb1{width:900px;height:900px;left:-200px;top:-200px;background:radial-gradient(circle,rgba(245,158,11,.22),transparent 70%)}
-.orb2{width:700px;height:700px;right:-180px;bottom:300px;background:radial-gradient(circle,rgba(251,191,36,.14),transparent 70%)}
-.orb3{width:600px;height:600px;left:50%;transform:translateX(-50%);bottom:-100px;background:radial-gradient(circle,rgba(245,158,11,.1),transparent 70%)}
+/* ─── ambient glow ─── */
+.orb{position:absolute;border-radius:50%;pointer-events:none;z-index:0}
+.o1{width:1100px;height:1100px;top:-300px;left:-200px;
+  background:radial-gradient(circle,rgba(245,158,11,.18),transparent 65%);filter:blur(80px)}
+.o2{width:800px;height:800px;bottom:-100px;right:-200px;
+  background:radial-gradient(circle,rgba(245,158,11,.12),transparent 65%);filter:blur(100px)}
 
-/* floating particles */
-#ptc{position:absolute;inset:0;pointer-events:none;z-index:1}
-.p{position:absolute;border-radius:50%;background:var(--gold2);opacity:0;animation:float linear infinite}
-@keyframes float{0%{opacity:0;transform:translateY(0)}20%{opacity:.7}80%{opacity:.3}100%{opacity:0;transform:translateY(-220px)}}
+/* ─── particles ─── */
+.p{position:absolute;border-radius:50%;background:var(--gold2);pointer-events:none;z-index:1;
+  animation:pfloat linear infinite;opacity:0}
+@keyframes pfloat{0%{opacity:0;transform:translateY(0)}20%{opacity:.6}80%{opacity:.2}100%{opacity:0;transform:translateY(-180px)}}
 
-.scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;padding:0 88px;opacity:0;visibility:hidden;z-index:10;
-  transition:opacity .65s var(--e),transform .65s var(--e),filter .65s var(--e)}
+.scene{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:0 80px;opacity:0;visibility:hidden;z-index:10;
+  transition:opacity .65s var(--e),transform .65s var(--e),filter .65s var(--e)
+}
 .scene.in{opacity:1;visibility:visible;transform:none;filter:none}
-.scene.out{opacity:0;transform:translateY(-50px);filter:blur(12px);visibility:hidden}
-.scene.pre{transform:translateY(50px);filter:blur(12px)}
+.scene.out{opacity:0;transform:translateY(-50px);filter:blur(14px);visibility:hidden}
+.scene.pre{transform:translateY(50px);filter:blur(14px)}
 
-.rv{opacity:0;transform:translateY(40px);filter:blur(8px);transition:opacity .75s var(--e),transform .75s var(--e),filter .75s var(--e)}
+.rv{opacity:0;transform:translateY(38px);filter:blur(8px);
+  transition:opacity .72s var(--e),transform .72s var(--e),filter .72s var(--e)}
 .in .rv{opacity:1;transform:none;filter:none}
-.in .rv.d1{transition-delay:.1s}.in .rv.d2{transition-delay:.22s}.in .rv.d3{transition-delay:.34s}
-.in .rv.d4{transition-delay:.46s}.in .rv.d5{transition-delay:.58s}.in .rv.d6{transition-delay:.70s}
+.in .rv.d1{transition-delay:.1s}.in .rv.d2{transition-delay:.22s}
+.in .rv.d3{transition-delay:.34s}.in .rv.d4{transition-delay:.46s}
+.in .rv.d5{transition-delay:.60s}.in .rv.d6{transition-delay:.74s}
 
-/* ─── SCENE 1 · INTRO ──────────────────────── */
-.s1-glow{position:absolute;width:700px;height:700px;border-radius:50%;
-  background:radial-gradient(circle,rgba(245,158,11,.35),transparent 65%);
-  top:50%;left:50%;transform:translate(-50%,-50%);filter:blur(60px);
-  animation:pulse-orb 3s ease-in-out infinite}
-@keyframes pulse-orb{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.08)}}
-.bars-wrap{position:relative;width:320px;height:260px}
-.bar{position:absolute;bottom:0;width:56px;border-radius:26px;
-  background:linear-gradient(180deg,var(--gold2),var(--gold));
-  transform:scaleY(0);transform-origin:bottom;
-  box-shadow:0 0 50px rgba(245,158,11,.6)}
-.in .bar{animation:rise .85s var(--eo) forwards}
-.bar.b1{left:0;height:130px;animation-delay:.05s}
-.bar.b2{left:96px;height:190px;animation-delay:.2s}
-.bar.b3{left:192px;height:250px;animation-delay:.35s}
-@keyframes rise{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-.dot-badge{position:absolute;right:-10px;top:-8px;width:62px;height:62px;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%,#ffe58a,var(--gold));
-  transform:scale(0);box-shadow:0 0 30px rgba(245,158,11,.8)}
-.in .dot-badge{animation:pop .5s var(--eo) .52s forwards}
-@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
-.s1-eyebrow{font:600 26px/1 var(--f);letter-spacing:.28em;text-transform:uppercase;color:var(--gold);margin-bottom:48px}
-.s1-name{font-family:var(--d);font-weight:700;font-size:108px;letter-spacing:-.03em;line-height:.95;text-align:center;margin-top:42px}
-.s1-tag{font-size:44px;color:rgba(245,158,11,.85);font-weight:500;margin-top:28px;letter-spacing:-.01em}
+/* ═══════════════════════════════════════
+   SCENE 1 · HOOK — "Cât ai câștigat TU azi?"
+   ═══════════════════════════════════════ */
+.s1-question{
+  font-family:var(--d);font-weight:700;
+  font-size:96px;letter-spacing:-.03em;line-height:1.05;
+  text-align:center;color:var(--t1)
+}
+.s1-question em{color:var(--t0);font-style:normal}
+.s1-divider{width:120px;height:4px;border-radius:2px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2));
+  margin:52px auto}
+.s1-answer-label{font:600 34px/1 var(--f);letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:24px}
+.s1-amount{
+  font-family:var(--d);font-weight:700;font-size:190px;
+  letter-spacing:-.05em;line-height:.9;
+  color:var(--up);
+  text-shadow:0 0 60px rgba(34,197,94,.5)
+}
+.s1-suffix{font-size:52px;color:var(--t1);margin-top:20px;font-weight:500}
+.s1-tag{
+  margin-top:60px;padding:22px 52px;border-radius:999px;
+  background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);
+  font:700 38px/1 var(--f);color:var(--gold2)
+}
 
-/* ─── SCENE 2 · LIVE TRADING ───────────────── */
-.panel{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);
-  border-radius:32px;padding:44px 50px;backdrop-filter:blur(8px)}
-.panel-head{display:flex;align-items:center;justify-content:space-between}
-.pair{font-family:var(--d);font-weight:700;font-size:62px;letter-spacing:-.02em}
-.sig-badge{display:inline-flex;align-items:center;gap:12px;padding:14px 28px;
-  background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);
-  border-radius:999px;font:700 28px/1 var(--f);color:#22c55e}
-.pulse{width:14px;height:14px;border-radius:50%;background:#22c55e;flex:none;
-  box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:pulse 1.6s infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 20px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
-canvas#chart{display:block;width:100%;height:480px;margin:28px 0}
-.sig-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:4px}
-.sig{padding:12px 24px;border-radius:999px;font:700 26px/1 var(--m);opacity:0;transform:scale(.85);transition:opacity .4s,transform .4s var(--eo)}
-.sig.show{opacity:1;transform:scale(1)}
-.sig.buy{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);color:#22c55e}
-.sig.sell{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#ef4444}
-.sig.gold{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:var(--gold2)}
-.stats2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;width:100%;margin-top:28px}
-.stat{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:24px;padding:34px 36px}
-.stat .lbl{font-size:28px;color:var(--t1)}
-.stat .val{font-family:var(--m);font-weight:700;font-size:66px;margin-top:6px}
-.val.up{color:var(--up)}.val.gold{color:var(--gold2)}
-
-/* ─── SCENE 3 · RESULTS ────────────────────── */
-.res-label{font-family:var(--d);font-weight:700;font-size:48px;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--gold);margin-bottom:50px}
-.res-card{width:100%;border-radius:36px;overflow:hidden;margin-bottom:24px;position:relative}
-.res-card-inner{background:rgba(255,255,255,.04);border:1px solid var(--line);
-  border-radius:36px;padding:52px 60px;display:flex;align-items:center;justify-content:space-between}
-.rc-left .rc-name{font-size:36px;color:var(--t1);margin-bottom:8px}
-.rc-left .rc-val{font-family:var(--d);font-weight:700;font-size:110px;letter-spacing:-.04em;line-height:1}
-.rc-right{text-align:right}
-.rc-right .rc-tag{font:600 26px/1 var(--f);letter-spacing:.15em;text-transform:uppercase;
-  padding:10px 22px;border-radius:999px}
-.rc-right .rc-tag.green{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#22c55e}
-.rc-right .rc-tag.gold{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:var(--gold2)}
-.glow-bar{position:absolute;bottom:0;left:0;width:0;height:3px;
-  background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:0 0 3px 3px;
-  transition:width 1.8s var(--e)}
-.in .glow-bar{width:100%}
-.res-footer{font-size:40px;color:var(--t1);text-align:center;margin-top:44px;line-height:1.5}
-.res-footer span{color:var(--t0);font-weight:600}
-
-/* ─── SCENE 4 · HOW IT WORKS ───────────────── */
-.hw-title{font-family:var(--d);font-weight:700;font-size:96px;letter-spacing:-.03em;
-  text-align:center;line-height:1;margin-bottom:16px}
-.hw-sub{font-size:40px;color:var(--t1);text-align:center;margin-bottom:64px}
-.hw-step{width:100%;display:flex;align-items:flex-start;gap:36px;margin-bottom:32px;
-  opacity:0;transform:translateX(-30px);transition:opacity .6s var(--e),transform .6s var(--e)}
-.in .hw-step.show{opacity:1;transform:none}
-.hw-num{flex:none;width:80px;height:80px;border-radius:20px;
-  background:linear-gradient(135deg,var(--gold2),var(--gold));
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--d);font-weight:700;font-size:40px;color:#000;
-  box-shadow:0 0 40px rgba(245,158,11,.4);margin-top:4px}
-.hw-txt .hw-h{font-family:var(--d);font-weight:600;font-size:50px;letter-spacing:-.01em}
-.hw-txt .hw-p{font-size:34px;color:var(--t1);margin-top:6px}
-.hw-cta{margin-top:44px;width:100%;background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(245,158,11,.06));
-  border:1px solid rgba(245,158,11,.35);border-radius:30px;padding:44px 50px;
-  text-align:center;font:700 48px/1 var(--d);color:var(--gold2)}
-
-/* ─── SCENE 5 · CTA ─────────────────────────── */
-.cta-wrap{text-align:center;position:relative;z-index:2}
-.cta-eyebrow{font:700 24px/1 var(--f);letter-spacing:.3em;text-transform:uppercase;
-  color:var(--gold);margin-bottom:50px}
-.cta-name{font-family:var(--d);font-weight:700;font-size:112px;letter-spacing:-.03em;line-height:.95}
-.cta-price-row{display:flex;gap:36px;justify-content:center;margin-top:44px}
-.price-pill{padding:24px 48px;border-radius:999px;text-align:center}
-.price-pill.main{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;
-  font-family:var(--d);font-weight:700;box-shadow:0 20px 60px rgba(245,158,11,.4)}
-.price-pill.main .pp-type{font-size:30px;font-weight:600;opacity:.7;letter-spacing:.06em}
-.price-pill.main .pp-val{font-size:86px;letter-spacing:-.03em;line-height:1}
-.price-pill.alt{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--t0)}
-.price-pill.alt .pp-type{font-size:28px;color:var(--t1);letter-spacing:.06em}
-.price-pill.alt .pp-val{font-size:78px;letter-spacing:-.03em;line-height:1}
-.pp-note{font-size:22px;margin-top:4px;opacity:.6}
-.cta-url{font-family:var(--m);font-weight:700;font-size:52px;
-  color:var(--gold2);margin-top:70px;letter-spacing:.02em}
-.cta-bio{font-size:34px;color:var(--t1);margin-top:12px}
-.cta-badge{display:inline-flex;align-items:center;gap:14px;margin-top:50px;
-  padding:20px 40px;border-radius:999px;background:rgba(34,197,94,.1);
-  border:1px solid rgba(34,197,94,.3);font:600 32px/1 var(--f);color:#22c55e}
-.cta-badge .dot{width:12px;height:12px;border-radius:50%;background:#22c55e;
+/* ═══════════════════════════════════════
+   SCENE 2 · "Botul nu doarme niciodată"
+   ═══════════════════════════════════════ */
+.s2-clock-wrap{position:relative;margin-bottom:56px}
+.s2-clock{
+  font-family:var(--m);font-weight:700;font-size:180px;
+  letter-spacing:-.02em;color:var(--t0);
+  text-shadow:0 0 40px rgba(245,158,11,.3)
+}
+.s2-clock .colon{animation:blink .8s step-start infinite;color:var(--gold)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.s2-am{font:700 60px/1 var(--m);color:var(--gold2);margin-left:16px;vertical-align:middle}
+.s2-subtitle{font-family:var(--d);font-weight:700;font-size:92px;
+  letter-spacing:-.03em;text-align:center;line-height:1.05}
+.s2-subtitle .gold{color:var(--gold2)}
+.s2-you{font-size:44px;color:var(--t1);margin-top:30px;text-align:center}
+/* live ticker */
+.ticker-wrap{width:100%;margin-top:52px;border-radius:28px;overflow:hidden;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)}
+.ticker-head{display:flex;justify-content:space-between;align-items:center;
+  padding:28px 40px;border-bottom:1px solid rgba(255,255,255,.06)}
+.t-pair{font-family:var(--d);font-weight:700;font-size:48px}
+.t-live{display:flex;align-items:center;gap:12px;font:700 28px/1 var(--f);
+  color:var(--up);padding:10px 22px;border-radius:999px;
+  background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25)}
+.t-live .dot{width:12px;height:12px;border-radius:50%;background:var(--up);
   animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 18px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+.ticker-row{display:flex;align-items:center;justify-content:space-between;padding:24px 40px;border-bottom:1px solid rgba(255,255,255,.04)}
+.ticker-row:last-child{border-bottom:none}
+.tr-name{font:600 34px/1 var(--f)}
+.tr-type{font-size:26px;color:var(--t1)}
+.tr-profit{font-family:var(--m);font-weight:700;font-size:44px;color:var(--up)}
+.tr-profit.new{animation:popIn .4s var(--eo)}
+@keyframes popIn{0%{transform:scale(1.3);opacity:0}100%{transform:scale(1);opacity:1}}
 
-/* controls */
+/* ═══════════════════════════════════════
+   SCENE 3 · PROFIT COUNTER (impact)
+   ═══════════════════════════════════════ */
+.s3-label{font:700 30px/1 var(--f);letter-spacing:.28em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:20px}
+.s3-since{font-size:36px;color:var(--t1);margin-bottom:56px}
+.s3-profit{
+  font-family:var(--d);font-weight:700;font-size:230px;
+  letter-spacing:-.06em;line-height:.9;color:var(--up);
+  text-shadow:0 0 80px rgba(34,197,94,.5),0 0 160px rgba(34,197,94,.2)
+}
+.s3-meta{display:flex;gap:0;width:100%;margin-top:60px}
+.s3-m{flex:1;text-align:center;padding:40px 20px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
+.s3-m:first-child{border-radius:24px 0 0 24px}
+.s3-m:last-child{border-radius:0 24px 24px 0}
+.s3-m .mv{font-family:var(--d);font-weight:700;font-size:80px;letter-spacing:-.03em}
+.s3-m .ml{font-size:28px;color:var(--t1);margin-top:6px}
+.s3-quote{
+  margin-top:60px;font-size:42px;line-height:1.5;text-align:center;
+  color:var(--t1);font-style:italic
+}
+.s3-quote strong{color:var(--t0);font-style:normal}
+
+/* ═══════════════════════════════════════
+   SCENE 4 · FREEDOM ("Set it. Forget it.")
+   ═══════════════════════════════════════ */
+.s4-big{
+  font-family:var(--d);font-weight:700;font-size:104px;
+  letter-spacing:-.03em;text-align:center;line-height:1.0
+}
+.s4-big .gold{color:var(--gold2)}
+.s4-sub{font-size:44px;color:var(--t1);text-align:center;margin:28px 0 68px}
+.freedom-list{width:100%;display:flex;flex-direction:column;gap:20px}
+.fl-item{
+  display:flex;align-items:center;gap:30px;
+  padding:34px 40px;border-radius:24px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+  opacity:0;transform:translateX(-28px);
+  transition:opacity .55s var(--e),transform .55s var(--e)
+}
+.in .fl-item.show{opacity:1;transform:none}
+.fl-icon{width:72px;height:72px;border-radius:18px;flex:none;
+  background:linear-gradient(135deg,rgba(245,158,11,.25),rgba(245,158,11,.08));
+  border:1px solid rgba(245,158,11,.25);display:flex;align-items:center;justify-content:center;
+  font-size:36px}
+.fl-txt{font-family:var(--d);font-weight:600;font-size:48px;letter-spacing:-.01em}
+.fl-sub{font-size:32px;color:var(--t1);margin-top:4px}
+.s4-badge{
+  margin-top:48px;width:100%;padding:40px 50px;border-radius:28px;
+  background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(245,158,11,.04));
+  border:1px solid rgba(245,158,11,.3);
+  text-align:center;font-family:var(--d);font-weight:600;font-size:52px;color:var(--gold2)
+}
+
+/* ═══════════════════════════════════════
+   SCENE 5 · CTA
+   ═══════════════════════════════════════ */
+.s5-above{font:700 30px/1 var(--f);letter-spacing:.28em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:52px}
+.s5-name{font-family:var(--d);font-weight:700;font-size:120px;
+  letter-spacing:-.04em;text-align:center;line-height:.9}
+.s5-tagline{font-size:46px;color:var(--t1);text-align:center;margin-top:30px}
+.price-cards{display:flex;gap:24px;width:100%;margin-top:56px}
+.pc{flex:1;border-radius:30px;padding:48px 40px;text-align:center}
+.pc.featured{
+  background:linear-gradient(145deg,rgba(245,158,11,.2),rgba(245,158,11,.06));
+  border:1.5px solid rgba(245,158,11,.5);
+  box-shadow:0 0 60px rgba(245,158,11,.15)
+}
+.pc.secondary{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1)
+}
+.pc-type{font:700 26px/1 var(--f);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:16px}
+.pc.secondary .pc-type{color:var(--t1)}
+.pc-price{font-family:var(--d);font-weight:700;font-size:100px;letter-spacing:-.04em;line-height:1}
+.pc-note{font-size:28px;color:var(--t1);margin-top:10px}
+.s5-url{font-family:var(--m);font-weight:700;font-size:58px;
+  color:var(--gold2);margin-top:72px;letter-spacing:.02em}
+.s5-bio{font-size:36px;color:var(--t1);margin-top:14px}
+.s5-trust{
+  margin-top:52px;display:flex;align-items:center;gap:16px;
+  padding:22px 44px;border-radius:999px;
+  background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);
+  font:600 32px/1 var(--f);color:var(--up)
+}
+.s5-trust .dot{width:12px;height:12px;border-radius:50%;background:var(--up);animation:pulse 1.6s infinite}
+
+/* ─── controls ─── */
 #ui{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
   display:flex;gap:12px;z-index:300;font-family:var(--f)}
-#ui button{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);
-  border-radius:999px;padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer;
-  backdrop-filter:blur(10px);transition:background .2s}
+#ui button{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.18);
+  border-radius:999px;padding:12px 22px;font-size:15px;font-weight:600;
+  cursor:pointer;backdrop-filter:blur(12px);transition:background .2s}
 #ui button:hover{background:rgba(255,255,255,.22)}
 #hint{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:300;
-  color:#60607a;font:500 13px/1.5 var(--f);text-align:center;max-width:90vw}
+  color:#50507a;font:500 13px/1.5 var(--f);text-align:center}
 .clean #ui,.clean #hint{display:none}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
-<div id="hint">▶ Play · <b>C</b> = clean mode pentru înregistrare · Space = restart</div>
+<div id="hint">▶ Play · <b>C</b> = clean mode · Space = restart</div>
 
 <div id="stage">
-  <div id="orbs"><div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div></div>
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
   <div id="ptc"></div>
 
-  <!-- ── 1 · INTRO ── -->
-  <section class="scene" data-dur="3800" id="s1">
-    <div class="s1-glow"></div>
-    <div class="s1-eyebrow rv">AI Trading System</div>
-    <div class="bars-wrap rv d1">
-      <div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div>
-      <div class="dot-badge"></div>
+  <!-- ══ 1 · HOOK ══ -->
+  <section class="scene" data-dur="4200" id="s1">
+    <div class="s1-question rv">
+      Cât ai câștigat<br><em>tu</em> azi la muncă?
     </div>
-    <h1 class="s1-name rv d3">Apex<br>Trade Bot</h1>
-    <div class="s1-tag rv d4">AI that trades while you sleep</div>
+    <div class="s1-divider rv d2"></div>
+    <div class="s1-answer-label rv d3">Botul a câștigat</div>
+    <div class="s1-amount rv d3" id="s1cnt">$0</div>
+    <div class="s1-suffix rv d4">în timp ce dormeai</div>
+    <div class="s1-tag rv d5">Fără să miști un deget.</div>
   </section>
 
-  <!-- ── 2 · LIVE CHART ── -->
-  <section class="scene" data-dur="5200" id="s2">
-    <div class="panel rv">
-      <div class="panel-head">
-        <div class="pair">BTC / USDT</div>
-        <div class="sig-badge"><span class="pulse"></span> AI SIGNAL ACTIVE</div>
-      </div>
-      <canvas id="chart" width="1700" height="960"></canvas>
-      <div class="sig-row">
-        <span class="sig buy" data-at="800">▲ BUY $43,200</span>
-        <span class="sig gold" data-at="1400">RSI 58 · MACD+</span>
-        <span class="sig buy" data-at="2100">▲ BUY $43,650</span>
-        <span class="sig sell" data-at="3100">▼ SELL $45,120</span>
-      </div>
+  <!-- ══ 2 · LIVE TICKER ══ -->
+  <section class="scene" data-dur="5000" id="s2">
+    <div class="s2-clock-wrap rv">
+      <span class="s2-clock">03<span class="colon">:</span>47</span><span class="s2-am">AM</span>
     </div>
-    <div class="stats2 rv d2">
-      <div class="stat"><div class="lbl">Today P&L</div><div class="val up" id="pnl">$0</div></div>
-      <div class="stat"><div class="lbl">Win Rate</div><div class="val gold" id="wr">0%</div></div>
-      <div class="stat"><div class="lbl">Trades</div><div class="val" id="tr">0</div></div>
+    <div class="s2-subtitle rv d1">
+      Botul <span class="gold">nu doarme</span><br>niciodată.
+    </div>
+    <div class="s2-you rv d2">Tu dormi. El câștigă.</div>
+    <div class="ticker-wrap rv d3">
+      <div class="ticker-head">
+        <span class="t-pair">Apex Trade Bot</span>
+        <span class="t-live"><span class="dot"></span> LIVE</span>
+      </div>
+      <div class="ticker-row" id="tr1">
+        <div><div class="tr-name">BTC / USDT</div><div class="tr-type">Long · 2x</div></div>
+        <div class="tr-profit">+$84.20</div>
+      </div>
+      <div class="ticker-row" id="tr2">
+        <div><div class="tr-name">ETH / USDT</div><div class="tr-type">Long · 1.5x</div></div>
+        <div class="tr-profit">+$47.60</div>
+      </div>
+      <div class="ticker-row" id="tr3">
+        <div><div class="tr-name">SOL / USDT</div><div class="tr-type">Long · 2x</div></div>
+        <div class="tr-profit" id="tr3v">+$0.00</div>
+      </div>
     </div>
   </section>
 
-  <!-- ── 3 · RESULTS ── -->
+  <!-- ══ 3 · PROFIT IMPACT ══ -->
   <section class="scene" data-dur="4800" id="s3">
-    <div class="res-label rv">30-Day Results</div>
-
-    <div class="res-card rv d1">
-      <div class="res-card-inner">
-        <div class="rc-left">
-          <div class="rc-name">Total Profit</div>
-          <div class="rc-val up" id="r1">$0</div>
-        </div>
-        <div class="rc-right"><span class="rc-tag green">+284%</span></div>
-      </div>
-      <div class="glow-bar"></div>
+    <div class="s3-label rv">Profit real · 30 zile</div>
+    <div class="s3-since rv d1">Capital inițial: $1,000</div>
+    <div class="s3-profit rv d2" id="s3cnt">$0</div>
+    <div class="s3-meta rv d3">
+      <div class="s3-m"><div class="mv up" id="s3wr">0%</div><div class="ml">Win rate</div></div>
+      <div class="s3-m"><div class="mv gold" style="color:var(--gold2)" id="s3tr">0</div><div class="ml">Trades</div></div>
+      <div class="s3-m"><div class="mv" style="color:var(--t0)">$0</div><div class="ml">Fee lunar</div></div>
     </div>
-
-    <div class="res-card rv d2">
-      <div class="res-card-inner">
-        <div class="rc-left">
-          <div class="rc-name">Successful Trades</div>
-          <div class="rc-val gold" id="r2">0 / 0</div>
-        </div>
-        <div class="rc-right"><span class="rc-tag gold">68% win</span></div>
-      </div>
-      <div class="glow-bar"></div>
+    <div class="s3-quote rv d4">
+      &ldquo;M-am trezit cu <strong>+$284</strong> față de seara.<br>Nu am atins nimic.&rdquo;
     </div>
-
-    <div class="res-card rv d3">
-      <div class="res-card-inner">
-        <div class="rc-left">
-          <div class="rc-name">Monthly Fee</div>
-          <div class="rc-val" style="color:var(--t0)">$0</div>
-        </div>
-        <div class="rc-right"><span class="rc-tag green">One-time</span></div>
-      </div>
-    </div>
-
-    <div class="res-footer rv d4"><span>Starting capital</span> $1,000 · <span>No manual trades</span> · <span>24/7 running</span></div>
   </section>
 
-  <!-- ── 4 · HOW IT WORKS ── -->
+  <!-- ══ 4 · FREEDOM ══ -->
   <section class="scene" data-dur="5000" id="s4">
-    <div class="hw-title rv">Live in<br><span style="color:var(--gold2)">10 minutes.</span></div>
-    <div class="hw-sub rv d1">Zero coding. One-time payment.</div>
-
-    <div class="hw-step" data-at="400">
-      <div class="hw-num">1</div>
-      <div class="hw-txt"><div class="hw-h">Connect your exchange</div><div class="hw-p">Paste your Binance or Bybit API key — read-only, no withdrawal access</div></div>
+    <div class="s4-big rv">
+      Set it.<br><span class="gold">Forget it.</span>
     </div>
-    <div class="hw-step" data-at="1200">
-      <div class="hw-num">2</div>
-      <div class="hw-txt"><div class="hw-h">Set risk & strategy</div><div class="hw-p">Choose from 3 built-in AI strategies, set max daily risk %</div></div>
+    <div class="s4-sub rv d1">3 pași. 10 minute. Toată viața.</div>
+    <div class="freedom-list">
+      <div class="fl-item" data-at="400">
+        <div class="fl-icon">🔑</div>
+        <div><div class="fl-txt">Conectezi exchange-ul</div><div class="fl-sub">Binance sau Bybit · API read-only</div></div>
+      </div>
+      <div class="fl-item" data-at="1100">
+        <div class="fl-icon">⚡</div>
+        <div><div class="fl-txt">Alegi strategia AI</div><div class="fl-sub">Risk scăzut · mediu · agresiv</div></div>
+      </div>
+      <div class="fl-item" data-at="1800">
+        <div class="fl-icon">🌍</div>
+        <div><div class="fl-txt">Trăiești cum vrei</div><div class="fl-sub">Botul rulează 24/7 pe serverele noastre</div></div>
+      </div>
     </div>
-    <div class="hw-step" data-at="2000">
-      <div class="hw-num">3</div>
-      <div class="hw-txt"><div class="hw-h">Deploy & forget</div><div class="hw-p">Bot runs 24/7 on our servers. Your funds stay on your exchange.</div></div>
+    <div class="s4-badge rv" style="transition-delay:.7s">
+      Banii tăi rămân pe exchange. Tu ai controlul.
     </div>
-
-    <div class="hw-cta rv" style="transition-delay:.7s">Your keys. Your exchange. Your profits.</div>
   </section>
 
-  <!-- ── 5 · CTA ── -->
-  <section class="scene" data-dur="5000" id="s5">
-    <div class="cta-wrap">
-      <div class="cta-eyebrow rv">Get started today</div>
-      <div class="cta-name rv d1">Apex<br>Trade Bot</div>
-      <div class="cta-price-row rv d2">
-        <div class="price-pill main">
-          <div class="pp-type">CRYPTO</div>
-          <div class="pp-val">$297</div>
-          <div class="pp-note">one-time · lifetime access</div>
-        </div>
-        <div class="price-pill alt">
-          <div class="pp-type">FOREX</div>
-          <div class="pp-val">$497</div>
-          <div class="pp-note">one-time · lifetime access</div>
-        </div>
+  <!-- ══ 5 · CTA ══ -->
+  <section class="scene" data-dur="5500" id="s5">
+    <div class="s5-above rv">Începe azi</div>
+    <div class="s5-name rv d1">Apex<br>Trade Bot</div>
+    <div class="s5-tagline rv d2">AI care câștigă în locul tău</div>
+    <div class="price-cards rv d3">
+      <div class="pc featured">
+        <div class="pc-type">Crypto</div>
+        <div class="pc-price">$297</div>
+        <div class="pc-note">o singură plată · acces pe viață</div>
       </div>
-      <div class="cta-url rv d3">aicashsystem.space</div>
-      <div class="cta-bio rv d4">Link in bio</div>
-      <div class="cta-badge rv d5"><span class="dot"></span> 24/7 automated trading · No monthly fees</div>
+      <div class="pc secondary">
+        <div class="pc-type">Forex</div>
+        <div class="pc-price">$497</div>
+        <div class="pc-note">o singură plată · acces pe viață</div>
+      </div>
     </div>
+    <div class="s5-url rv d4">aicashsystem.space</div>
+    <div class="s5-bio rv d5">Link în bio</div>
+    <div class="s5-trust rv d6"><span class="dot"></span> Trading live 24/7 · Fără abonament lunar</div>
   </section>
 </div>
 
@@ -306,7 +340,7 @@ canvas#chart{display:block;width:100%;height:480px;margin:28px 0}
 </div>
 
 <script>
-/* ── scale stage ── */
+/* ── fit ── */
 function fit(){
   var s=Math.min(window.innerWidth/1080,window.innerHeight/1920);
   document.getElementById('stage').style.setProperty('--s',s);
@@ -314,41 +348,41 @@ function fit(){
 addEventListener('resize',fit);fit();
 
 /* ── particles ── */
-(function spawnParticles(){
+(function(){
   var c=document.getElementById('ptc');
-  for(var i=0;i<28;i++){
+  for(var i=0;i<22;i++){
     var p=document.createElement('div');p.className='p';
-    var sz=Math.random()*4+2;
-    p.style.cssText='width:'+sz+'px;height:'+sz+'px;left:'+(Math.random()*100)+'%;bottom:'+(Math.random()*40)+'%;'
-      +'animation-duration:'+(Math.random()*8+6)+'s;animation-delay:'+(Math.random()*8)+'s;opacity:0';
+    var sz=Math.random()*3+2;
+    p.style.cssText='width:'+sz+'px;height:'+sz+'px;left:'+(Math.random()*100)
+      +'%;bottom:'+(Math.random()*30)+'%;animation-duration:'+(6+Math.random()*8)
+      +'s;animation-delay:'+(Math.random()*10)+'s';
     c.appendChild(p);
   }
 })();
 
-/* ── scene engine ── */
+/* ── engine ── */
 var scenes=[...document.querySelectorAll('.scene')],timers=[];
 function clearT(){timers.forEach(clearTimeout);timers=[]}
 function T(fn,ms){timers.push(setTimeout(fn,ms))}
 
 function resetScene(sc){
   sc.classList.remove('in','out');sc.classList.add('pre');
-  sc.querySelectorAll('.sig').forEach(e=>e.classList.remove('show'));
-  sc.querySelectorAll('.hw-step').forEach(e=>e.classList.remove('show'));
+  sc.querySelectorAll('.fl-item').forEach(e=>e.classList.remove('show'));
 }
 function runScene(i){
-  if(i>=scenes.length){T(play,1400);return;}
+  if(i>=scenes.length){T(play,1200);return;}
   var sc=scenes[i],dur=+sc.dataset.dur||4200;
   scenes.forEach((s,j)=>{if(j!==i){s.classList.remove('in');s.classList.add(j<i?'out':'pre');}});
   resetScene(sc);
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     sc.classList.remove('pre');sc.classList.add('in');
     var id=sc.id;
-    if(id==='s2')animChart();
-    if(id==='s3')animResults();
+    if(id==='s1')animS1();
+    if(id==='s2')animS2();
+    if(id==='s3')animS3();
     sc.querySelectorAll('[data-at]').forEach(el=>{
       var at=+el.dataset.at;
-      if(el.classList.contains('sig')) T(()=>el.classList.add('show'),at);
-      if(el.classList.contains('hw-step')) T(()=>el.classList.add('show'),at);
+      if(el.classList.contains('fl-item')) T(()=>el.classList.add('show'),at);
     });
   }));
   T(()=>runScene(i+1),dur);
@@ -356,81 +390,42 @@ function runScene(i){
 function play(){clearT();scenes.forEach(s=>s.classList.add('pre'));T(()=>runScene(0),200);}
 
 /* ── count-up ── */
-function countUp(el,to,ms,fmt){
+function cu(el,to,ms,fmt){
   var st=performance.now();
   (function f(n){
     var p=Math.min(1,(n-st)/ms),e=1-Math.pow(1-p,3);
-    el.textContent=fmt(to*e);if(p<1)requestAnimationFrame(f);
+    if(typeof el==='string')document.getElementById(el).textContent=fmt(to*e);
+    else el.textContent=fmt(to*e);
+    if(p<1)requestAnimationFrame(f);
   })(performance.now());
 }
 
-/* ── chart ── */
-function animChart(){
-  countUp(document.getElementById('pnl'),284,2800,v=>'+$'+v.toFixed(0));
-  countUp(document.getElementById('wr'),68,2800,v=>Math.round(v)+'%');
-  countUp(document.getElementById('tr'),41,2800,v=>Math.round(v)+'');
-  var cv=document.getElementById('chart'),x=cv.getContext('2d');
-  var n=50,seed=42,p=100,drift=0,data=[];
-  function rnd(){seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff}
-  for(var i=0;i<n;i++){
-    if(i%6===0)drift=(rnd()-.3)*1.5+(i/n)*0.3;
-    var o=p;p=Math.max(55,o+drift+(rnd()-.5)*2);
-    data.push([o,Math.max(o,p)+rnd()*1.8,Math.min(o,p)-rnd()*1.8,p]);
-  }
-  var lo=Math.min(...data.map(d=>d[2]))-2,hi=Math.max(...data.map(d=>d[1]))+2,rng=hi-lo||1;
-  var W=cv.width,H=cv.height,cw=W/n;
-  function yv(v){return H-((v-lo)/rng)*(H-50)-25}
-  var t0=performance.now(),DUR=2600;
-
-  /* gradient under line */
-  function draw(now){
-    var prog=Math.min(1,(now-t0)/DUR),shown=prog*n;
-    x.clearRect(0,0,W,H);
-    var pts=[];
-    for(var i=0;i<n;i++){
-      if(i>shown)break;
-      var g=Math.min(1,shown-i),d=data[i],up=d[3]>=d[0];
-      var col=up?'#22c55e':'#ef4444',xc=cw*(i+.5);
-      x.strokeStyle=col;x.globalAlpha=.7*g;x.lineWidth=2.5;
-      x.beginPath();x.moveTo(xc,yv(d[1]));x.lineTo(xc,yv(d[2]));x.stroke();
-      var bt=yv(Math.max(d[0],d[3])),bb=yv(Math.min(d[0],d[3])),bw=cw*.6;
-      x.globalAlpha=g;x.fillStyle=col;
-      rr(x,xc-bw/2,Math.min(bt,bb),bw,Math.max(2,Math.abs(bb-bt)),5);x.fill();
-      pts.push([xc,yv(d[3])]);
-    }
-    x.globalAlpha=1;
-    if(pts.length>1){
-      /* glow line */
-      x.save();
-      var gr=x.createLinearGradient(0,0,0,H);
-      gr.addColorStop(0,'rgba(245,158,11,.7)');gr.addColorStop(1,'rgba(245,158,11,.05)');
-      x.strokeStyle='rgba(245,158,11,.9)';x.lineWidth=4;
-      x.shadowColor='rgba(245,158,11,.8)';x.shadowBlur=16;
-      x.beginPath();pts.forEach((q,k)=>k?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1]));x.stroke();
-      /* area fill */
-      x.shadowBlur=0;
-      x.beginPath();pts.forEach((q,k)=>k?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1]));
-      x.lineTo(pts[pts.length-1][0],H);x.lineTo(pts[0][0],H);x.closePath();
-      var af=x.createLinearGradient(0,0,0,H);
-      af.addColorStop(0,'rgba(245,158,11,.18)');af.addColorStop(1,'rgba(245,158,11,0)');
-      x.fillStyle=af;x.fill();
-      /* dot */
-      var l=pts[pts.length-1];
-      x.fillStyle='#f59e0b';x.shadowColor='rgba(245,158,11,.9)';x.shadowBlur=20;
-      x.beginPath();x.arc(l[0],l[1],9,0,7);x.fill();
-      x.restore();
-    }
-    if(prog<1)requestAnimationFrame(draw);
-  }
-  requestAnimationFrame(draw);
+/* ── scene 1 ── */
+function animS1(){
+  cu('s1cnt',284,2200,v=>'+$'+v.toFixed(0));
 }
-function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
 
-/* ── results count-up ── */
-function animResults(){
-  countUp(document.getElementById('r1'),2847,2600,v=>'$'+Math.round(v).toLocaleString());
-  var r2=document.getElementById('r2');
-  countUp({set textContent(v){r2.textContent=v}},68,2600,v=>Math.round(v*1.47)+' / '+Math.round(v*2.15));
+/* ── scene 2 · live ticker ── */
+function animS2(){
+  var r3=document.getElementById('tr3v');
+  var vals=[12.40,27.80,52.30,67.90,89.50,112.40];
+  var i=0;
+  function tick(){
+    if(i>=vals.length)return;
+    r3.textContent='+$'+vals[i].toFixed(2);
+    r3.classList.remove('new');
+    requestAnimationFrame(()=>r3.classList.add('new'));
+    i++;
+    T(tick,Math.random()*600+500);
+  }
+  T(tick,1200);
+}
+
+/* ── scene 3 ── */
+function animS3(){
+  cu('s3cnt',2847,2400,v=>'$'+Math.round(v).toLocaleString());
+  cu('s3wr',68,2400,v=>Math.round(v)+'%');
+  cu('s3tr',134,2400,v=>Math.round(v)+'');
 }
 
 function toggleClean(){document.body.classList.toggle('clean')}
@@ -439,7 +434,6 @@ addEventListener('keydown',e=>{
   if(e.key===' '){e.preventDefault();play();}
 });
 
-/* autostart */
 scenes.forEach(s=>s.classList.add('pre'));
 T(play,400);
 </script>
