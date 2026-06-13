@@ -7,19 +7,8 @@ services:
     plan: free
     autoDeploy: false
     envVars:
+      # The ONLY thing the client enters. Everything else (exchange, API keys,
+      # strategy, risk) is configured on aicashsystem.space/configurator and
+      # loaded automatically at startup via cfg.loadRemote().
       - key: LICENSE_KEY
-        sync: false
-      - key: EXCHANGE
-        value: binance
-      - key: BINANCE_API_KEY
-        sync: false
-      - key: BINANCE_API_SECRET
-        sync: false
-      - key: GROQ_API_KEY
-        sync: false
-      - key: PAPER_TRADING
-        value: true
-      - key: PAPER_BALANCE
-        value: "100"
-      - key: TELEGRAM_BOT_TOKEN
         sync: false
