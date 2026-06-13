@@ -134,13 +134,18 @@ module.exports.loadRemote = async function loadRemote() {
     if (!resp.ok) return false;
     const data = await resp.json();
     if (!data.success || !data.config) return false;
-    // Apply each env-var-named key from remote config
+    // Apply each env-var-named key from remote config.
+    // Config arrives as strings — coerce to the type of the existing cfg field
+    // (e.g. PAPER_TRADING boolean, STOP_LOSS_PCT number) so "false" doesn't
+    // stay a truthy string.
     for (const [k, v] of Object.entries(data.config)) {
-      if (v !== undefined && v !== null && v !== '') {
-        process.env[k] = String(v);
-        if (Object.prototype.hasOwnProperty.call(module.exports, k)) {
-          module.exports[k] = v;
-        }
+      if (v === undefined || v === null || v === '') continue;
+      process.env[k] = String(v);
+      if (Object.prototype.hasOwnProperty.call(module.exports, k)) {
+        const cur = module.exports[k];
+        if (typeof cur === 'boolean')      module.exports[k] = isTruthy(String(v));
+        else if (typeof cur === 'number')  module.exports[k] = parseFloat(v);
+        else                               module.exports[k] = v;
       }
     }
     console.log('✅  Remote config loaded from license server.');

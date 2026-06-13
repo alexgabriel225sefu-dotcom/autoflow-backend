@@ -451,6 +451,10 @@ async function tick() {
 
 // ─── Start ────────────────────────────────────────────────
 async function main() {
+  // Load config saved in the configurator FIRST — it provides the AI key,
+  // exchange keys, strategy and mode. Must run before validate()/getBalance(),
+  // otherwise validate() exits (no AI key yet) and the deploy "fails".
+  await cfg.loadRemote();
   validate();
 
   // Restaurează starea după restart — și în live, altfel botul uită poziția
@@ -486,7 +490,6 @@ async function main() {
   tg.startPolling(() => dash, exchange);
 
   await verifyLicense();
-  await cfg.loadRemote(); // fetch config saved in configurator
   logger.info('🚀 Prima analiză...');
   await tick();
   setInterval(tick, cfg.LOOP_INTERVAL_MS);
