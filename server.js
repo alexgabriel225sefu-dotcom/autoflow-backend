@@ -1569,17 +1569,60 @@ app.post('/api/heygen/generate', async (req, res) => {
 });
 
 app.get('/api/heygen/status/:id', async (req, res) => {
-  if (!HEYGEN_KEY) return res.status(503).json({ error: 'HeyGen key not configured' });
+  const key = req.headers['x-heygen-key'] || HEYGEN_KEY;
+  if (!key) return res.status(503).json({ error: 'HeyGen key not configured' });
+  const hdrs = { 'X-Api-Key': key, 'Accept': 'application/json' };
   try {
-    const r = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${req.params.id}`, { headers: _heyHeaders() });
+    const r = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${req.params.id}`, { headers: hdrs });
     const d = await r.json();
     res.json(d.data || d);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/heygen/photo-generate — talking photo video from base64 image
+// Body: { image_b64, mime_type, script, voice_id }
+app.post('/api/heygen/photo-generate', async (req, res) => {
+  const key = req.headers['x-heygen-key'] || HEYGEN_KEY;
+  if (!key) return res.status(503).json({ error: 'HeyGen key not configured' });
+  const { image_b64, mime_type = 'image/jpeg', script, voice_id } = req.body;
+  if (!image_b64) return res.status(400).json({ error: 'image_b64 required' });
+  if (!script || script.length < 5) return res.status(400).json({ error: 'script required' });
+  try {
+    const imgBuf = Buffer.from(image_b64, 'base64');
+
+    // Step 1: upload image as binary to HeyGen asset endpoint
+    const upResp = await fetch('https://upload.heygen.com/v1/asset', {
+      method: 'POST',
+      headers: { 'X-Api-Key': key, 'Content-Type': mime_type, 'Accept': 'application/json' },
+      body: imgBuf
+    });
+    const upData = await upResp.json();
+    const asset_id = upData.data?.id || upData.id;
+    if (!asset_id) return res.status(400).json({ error: 'Photo upload failed', detail: upData });
+
+    // Step 2: generate talking photo video 9:16
+    const genBody = {
+      video_inputs: [{
+        character: { type: 'talking_photo', talking_photo_id: asset_id },
+        voice: { type: 'text', input_text: script, voice_id: voice_id || '2d5b0e6cf36f460aa7fc47e3eee4ba54', speed: 0.95 },
+        background: { type: 'color', value: '#060606' }
+      }],
+      dimension: { width: 720, height: 1280 }
+    };
+    const genResp = await fetch('https://api.heygen.com/v2/video/generate', {
+      method: 'POST',
+      headers: { 'X-Api-Key': key, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(genBody)
+    });
+    const genData = await genResp.json();
+    if (genData.error) return res.status(400).json({ error: genData.error });
+    res.json({ video_id: genData.data?.video_id || genData.video_id });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Explicit HTML page routes
 // Public pages — no auth required
-const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','apex-bot','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3'];
+const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','apex-bot','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
