@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Apex Trade Bot — Live Terminal</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #0d0d0d;
+  --bg2: #161616;
+  --bg3: #1e1e1e;
+  --border: #2a2a2a;
+  --green: #00c853;
+  --red: #ff3d3d;
+  --gold: #f59e0b;
+  --text: #e8e8e8;
+  --muted: #666;
+  --blue: #2196f3;
+}
+body { background: var(--bg); color: var(--text); font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+
+/* TOP BAR */
+.topbar { background: #111; border-bottom: 1px solid var(--border); padding: 10px 14px 8px; }
+.topbar-row1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.account-name { font-size: 11px; color: var(--muted); letter-spacing: .5px; }
+.connection { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--green); }
+.dot-live { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: pulse 1.4s ease infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.topbar-row2 { display: flex; gap: 0; }
+.stat-box { flex: 1; }
+.stat-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 2px; }
+.stat-val { font-size: 16px; font-weight: 700; letter-spacing: -.3px; }
+.stat-val.green { color: var(--green); }
+.stat-val.gold { color: var(--gold); }
+.stat-divider { width: 1px; background: var(--border); margin: 0 10px; }
+
+/* SECONDARY STATS */
+.sec-stats { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 7px 14px; display: flex; gap: 0; }
+.ss { flex: 1; text-align: center; }
+.ss-l { font-size: 9px; color: var(--muted); }
+.ss-v { font-size: 11px; font-weight: 600; margin-top: 1px; }
+
+/* TABS */
+.tabs { display: flex; background: var(--bg2); border-bottom: 1px solid var(--border); }
+.tab { flex: 1; text-align: center; padding: 9px 0; font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; letter-spacing: .3px; transition: all .2s; }
+.tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+/* POSITIONS */
+.pos-header { display: grid; grid-template-columns: 68px 30px 44px 52px 52px 60px; gap: 0; padding: 6px 14px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+.ph { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+.ph:last-child { text-align: right; }
+.ph.center { text-align: center; }
+
+.positions-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.positions-list::-webkit-scrollbar { display: none; }
+
+.pos-row { display: grid; grid-template-columns: 68px 30px 44px 52px 52px 60px; gap: 0; padding: 8px 14px; border-bottom: 1px solid #1a1a1a; align-items: center; transition: background .3s; }
+.pos-row.new-flash { animation: rowflash .5s ease; }
+@keyframes rowflash { 0%{background:#1a2a1a} 100%{background:transparent} }
+.pos-row.close-flash { animation: closeflash .4s ease; }
+@keyframes closeflash { 0%{background:#2a1a1a} 100%{background:transparent} }
+
+.sym { font-size: 12px; font-weight: 700; color: var(--text); }
+.sym-sub { font-size: 9px; color: var(--muted); margin-top: 1px; }
+.type-badge { font-size: 9px; font-weight: 800; padding: 2px 4px; border-radius: 3px; text-align: center; letter-spacing: .5px; }
+.type-badge.buy { background: rgba(0,200,83,.15); color: var(--green); }
+.type-badge.sell { background: rgba(255,61,61,.15); color: var(--red); }
+.col-num { font-size: 11px; color: var(--text); }
+.col-num.muted { color: var(--muted); font-size: 10px; }
+.profit-col { text-align: right; }
+.profit-val { font-size: 12px; font-weight: 700; }
+.profit-val.pos { color: var(--green); }
+.profit-val.neg { color: var(--red); }
+.profit-pips { font-size: 9px; color: var(--muted); text-align: right; margin-top: 1px; }
+
+/* HISTORY TAB */
+.history-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: none; }
+.history-list::-webkit-scrollbar { display: none; }
+.hist-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; border-bottom: 1px solid #1a1a1a; }
+.hist-left { display: flex; flex-direction: column; gap: 2px; }
+.hist-sym { font-size: 12px; font-weight: 700; }
+.hist-meta { font-size: 9px; color: var(--muted); }
+.hist-right { text-align: right; }
+.hist-profit { font-size: 13px; font-weight: 700; }
+.hist-profit.pos { color: var(--green); }
+.hist-profit.neg { color: var(--red); }
+.hist-time { font-size: 9px; color: var(--muted); margin-top: 2px; }
+
+/* BOTTOM NAV */
+.bottom-nav { background: #111; border-top: 1px solid var(--border); padding: 8px 0 12px; display: flex; justify-content: space-around; }
+.bn-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--muted); font-size: 9px; letter-spacing: .3px; }
+.bn-item.active { color: var(--gold); }
+.bn-icon { font-size: 18px; }
+
+/* SETTINGS HIDDEN */
+.settings-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 99; align-items: flex-end; }
+.settings-overlay.open { display: flex; }
+.settings-panel { background: var(--bg2); border-radius: 20px 20px 0 0; padding: 20px 20px 32px; width: 100%; }
+.settings-title { font-size: 15px; font-weight: 700; color: var(--gold); margin-bottom: 16px; text-align: center; }
+.settings-row { margin-bottom: 14px; }
+.settings-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.settings-input { width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.settings-btn { width: 100%; background: var(--gold); color: #000; font-weight: 800; font-size: 14px; border: none; border-radius: 10px; padding: 13px; margin-top: 6px; cursor: pointer; }
+
+/* NOTIFY TOAST */
+.toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: #1e2e1e; border: 1px solid var(--green); border-radius: 10px; padding: 8px 16px; font-size: 11px; color: var(--green); font-weight: 600; z-index: 200; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+.toast.show { opacity: 1; }
+.toast.loss { background: #2e1e1e; border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar" id="topbarEl" ontouchstart="">
+  <div class="topbar-row1">
+    <span class="account-name" id="accName">Apex Trading · Live</span>
+    <span class="connection"><span class="dot-live"></span>CONNECTED</span>
+  </div>
+  <div class="topbar-row2">
+    <div class="stat-box">
+      <div class="stat-label">Balance</div>
+      <div class="stat-val gold" id="balance">$0.00</div>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-box">
+      <div class="stat-label">Equity</div>
+      <div class="stat-val gold" id="equity">$0.00</div>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-box">
+      <div class="stat-label">Profit</div>
+      <div class="stat-val green" id="totalProfit">+$0.00</div>
+    </div>
+  </div>
+</div>
+
+<!-- SECONDARY STATS -->
+<div class="sec-stats">
+  <div class="ss"><div class="ss-l">Trades</div><div class="ss-v" id="tradeCount">0</div></div>
+  <div class="ss"><div class="ss-l">Win Rate</div><div class="ss-v" style="color:var(--green)" id="winRate">—</div></div>
+  <div class="ss"><div class="ss-l">Today</div><div class="ss-v" style="color:var(--green)" id="todayProfit">+$0.00</div></div>
+  <div class="ss"><div class="ss-l">Open</div><div class="ss-v" id="openCount">0</div></div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('positions')">Positions</div>
+  <div class="tab" onclick="switchTab('history')">History</div>
+</div>
+
+<!-- POSITIONS HEADER -->
+<div class="pos-header" id="posHeader">
+  <div class="ph">Symbol</div>
+  <div class="ph center">Type</div>
+  <div class="ph">Vol</div>
+  <div class="ph">Open</div>
+  <div class="ph">Current</div>
+  <div class="ph" style="text-align:right">Profit</div>
+</div>
+
+<!-- POSITIONS LIST -->
+<div class="positions-list" id="positionsList"></div>
+
+<!-- HISTORY LIST -->
+<div class="history-list" id="historyList"></div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <div class="bn-item active"><div class="bn-icon">📊</div><span>Terminal</span></div>
+  <div class="bn-item"><div class="bn-icon">📈</div><span>Charts</span></div>
+  <div class="bn-item" onclick="openSettings()"><div class="bn-icon">⚙️</div><span>Settings</span></div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div class="settings-overlay" id="settingsOverlay" onclick="closeSettings(event)">
+  <div class="settings-panel">
+    <div class="settings-title">Bot Configuration</div>
+    <div class="settings-row">
+      <div class="settings-label">Starting Balance (USD)</div>
+      <input class="settings-input" type="number" id="inputBalance" value="10000" placeholder="e.g. 10000">
+    </div>
+    <div class="settings-row">
+      <div class="settings-label">Account Name</div>
+      <input class="settings-input" type="text" id="inputName" value="Apex Trading · Live" placeholder="Account name">
+    </div>
+    <div class="settings-row">
+      <div class="settings-label">Bot Aggression</div>
+      <input class="settings-input" type="range" id="inputAggression" min="1" max="5" value="3" style="height:36px;padding:8px 4px">
+    </div>
+    <button class="settings-btn" onclick="applySettings()">Apply & Reset</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────
+let startBalance = parseFloat(localStorage.getItem('mt5_balance') || '10000');
+let accName = localStorage.getItem('mt5_name') || 'Apex Trading · Live';
+let aggression = parseInt(localStorage.getItem('mt5_aggression') || '3');
+
+const PAIRS = [
+  { sym: 'BTC/USD', base: 65420, spread: 12, digits: 1, pip: 1 },
+  { sym: 'ETH/USD', base: 3485,  spread: 0.8, digits: 2, pip: 0.1 },
+  { sym: 'SOL/USD', base: 178.5, spread: 0.15, digits: 3, pip: 0.01 },
+  { sym: 'XRP/USD', base: 0.6812, spread: 0.0003, digits: 4, pip: 0.0001 },
+  { sym: 'BNB/USD', base: 612.4, spread: 0.25, digits: 2, pip: 0.01 },
+  { sym: 'DOGE/USD', base: 0.1623, spread: 0.0002, digits: 4, pip: 0.0001 },
+  { sym: 'ADA/USD', base: 0.4521, spread: 0.0002, digits: 4, pip: 0.0001 },
+  { sym: 'AVAX/USD', base: 38.72, spread: 0.04, digits: 3, pip: 0.001 },
+];
+
+const LOTS = [0.01, 0.02, 0.03, 0.05, 0.10];
+
+// ── STATE ───────────────────────────────────────────────────────
+let balance = startBalance;
+let openPositions = [];
+let historyItems = [];
+let totalWins = 0, totalLosses = 0;
+let todayProfit = 0;
+let posIdCounter = 100001;
+let prices = {};
+
+// init prices
+PAIRS.forEach(p => { prices[p.sym] = p.base + (Math.random() - .5) * p.spread * 10; });
+
+// ── HELPERS ─────────────────────────────────────────────────────
+function fmt(n, d=2) { return n.toFixed(d); }
+function fmtUSD(n) { return (n >= 0 ? '+$' : '-$') + Math.abs(n).toFixed(2); }
+function randInt(a,b) { return Math.floor(Math.random()*(b-a+1))+a; }
+function randFloat(a,b) { return Math.random()*(b-a)+a; }
+function now() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
+
+// ── PRICE ENGINE ────────────────────────────────────────────────
+function tickPrices() {
+  PAIRS.forEach(p => {
+    const drift = (Math.random() - .48) * p.spread * 0.6;
+    prices[p.sym] = Math.max(p.base * 0.85, prices[p.sym] + drift);
+  });
+}
+
+function calcProfit(pos) {
+  const pair = PAIRS.find(p => p.sym === pos.sym);
+  const curr = prices[pos.sym];
+  const diff = pos.type === 'BUY' ? curr - pos.open : pos.open - curr;
+  const pips = diff / pair.pip;
+  // approx $1 per pip per 0.01 lot for crypto
+  return pips * pos.lot * 1.2;
+}
+
+// ── OPEN TRADE ───────────────────────────────────────────────────
+function openTrade() {
+  if (openPositions.length >= 6) return;
+  const pair = PAIRS[randInt(0, PAIRS.length - 1)];
+  const type = Math.random() > .42 ? 'BUY' : 'SELL'; // slight buy bias = more wins
+  const lot = LOTS[randInt(0, Math.min(aggression, LOTS.length - 1))];
+  const openPrice = prices[pair.sym] + (type === 'BUY' ? pair.spread : -pair.spread);
+
+  const pos = {
+    id: posIdCounter++,
+    sym: pair.sym,
+    type,
+    lot,
+    open: openPrice,
+    time: now(),
+    ttl: randInt(18, 55) * 1000, // how long trade stays open
+    startedAt: Date.now(),
+    // bias: most trades will be winners
+    bias: Math.random() > 0.28 ? 'win' : 'loss'
+  };
+  openPositions.push(pos);
+  showToast(`▶ ${pos.type} ${pos.sym} @ ${fmt(openPrice, 2)} opened`, false);
+  renderPositions();
+}
+
+// ── CLOSE TRADE ──────────────────────────────────────────────────
+function closeTrade(pos, forced = false) {
+  openPositions = openPositions.filter(p => p.id !== pos.id);
+
+  let profit = calcProfit(pos);
+
+  // bias result
+  if (pos.bias === 'win' && profit < 0) profit = Math.abs(profit);
+  if (pos.bias === 'loss' && profit > 0) profit = -Math.abs(profit) * 0.4;
+
+  // clamp
+  const maxGain = 80 * aggression;
+  const maxLoss = 25 * aggression;
+  profit = Math.max(-maxLoss, Math.min(maxGain, profit));
+  profit = Math.round(profit * 100) / 100;
+
+  balance += profit;
+  todayProfit += profit;
+  if (profit >= 0) totalWins++; else totalLosses++;
+
+  historyItems.unshift({
+    sym: pos.sym,
+    type: pos.type,
+    lot: pos.lot,
+    open: pos.open,
+    close: prices[pos.sym],
+    profit,
+    time: now()
+  });
+  if (historyItems.length > 50) historyItems.pop();
+
+  showToast(`✔ ${pos.sym} closed ${fmtUSD(profit)}`, profit < 0);
+  renderAll();
+}
+
+// ── RENDER ───────────────────────────────────────────────────────
+function renderAll() {
+  renderStats();
+  renderPositions();
+  renderHistory();
+}
+
+function renderStats() {
+  const openPL = openPositions.reduce((s, p) => s + calcProfit(p), 0);
+  const equity = balance + openPL;
+
+  document.getElementById('balance').textContent = '$' + fmt(balance);
+  document.getElementById('equity').textContent = '$' + fmt(equity);
+  document.getElementById('totalProfit').textContent = fmtUSD(balance - startBalance);
+  document.getElementById('totalProfit').style.color = (balance >= startBalance) ? 'var(--green)' : 'var(--red)';
+
+  const total = totalWins + totalLosses;
+  document.getElementById('winRate').textContent = total ? Math.round(totalWins/total*100) + '%' : '—';
+  document.getElementById('tradeCount').textContent = total;
+  document.getElementById('todayProfit').textContent = fmtUSD(todayProfit);
+  document.getElementById('todayProfit').style.color = todayProfit >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('openCount').textContent = openPositions.length;
+  document.getElementById('accName').textContent = accName;
+}
+
+function renderPositions() {
+  const list = document.getElementById('positionsList');
+  if (openPositions.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px 20px;font-size:12px;">Scanning markets...<br><span style="font-size:20px;margin-top:8px;display:block">🔍</span></div>';
+    return;
+  }
+  list.innerHTML = openPositions.map(pos => {
+    const profit = calcProfit(pos);
+    const curr = prices[pos.sym];
+    const pair = PAIRS.find(p => p.sym === pos.sym);
+    return `<div class="pos-row" id="pr${pos.id}">
+      <div><div class="sym">${pos.sym.replace('/USD','')}</div><div class="sym-sub">#${pos.id}</div></div>
+      <div class="type-badge ${pos.type.toLowerCase()}">${pos.type}</div>
+      <div class="col-num">${pos.lot}</div>
+      <div class="col-num muted">${fmt(pos.open, pair.digits)}</div>
+      <div class="col-num">${fmt(curr, pair.digits)}</div>
+      <div class="profit-col">
+        <div class="profit-val ${profit >= 0 ? 'pos' : 'neg'}">${fmtUSD(profit)}</div>
+        <div class="profit-pips">${fmt(profit/(pos.lot*1.2), 0)} pips</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (historyItems.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:12px;">No closed trades yet</div>';
+    return;
+  }
+  list.innerHTML = historyItems.map(h => `
+    <div class="hist-row">
+      <div class="hist-left">
+        <div class="hist-sym">${h.sym} <span style="font-size:9px;color:${h.type==='BUY'?'var(--green)':'var(--red)'}">${h.type}</span></div>
+        <div class="hist-meta">Vol: ${h.lot} · ${h.time}</div>
+      </div>
+      <div class="hist-right">
+        <div class="hist-profit ${h.profit >= 0 ? 'pos' : 'neg'}">${fmtUSD(h.profit)}</div>
+        <div class="hist-time">${fmt(h.open, 2)} → ${fmt(h.close, 2)}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── TABS ─────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0 && tab==='positions') || (i===1 && tab==='history')));
+  document.getElementById('positionsList').style.display = tab === 'positions' ? '' : 'none';
+  document.getElementById('posHeader').style.display = tab === 'positions' ? '' : 'none';
+  document.getElementById('historyList').style.display = tab === 'history' ? 'block' : 'none';
+  if (tab === 'history') renderHistory();
+}
+
+// ── TOAST ────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, isLoss = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isLoss ? ' loss' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.classList.remove('show'); }, 2200);
+}
+
+// ── SETTINGS ─────────────────────────────────────────────────────
+function openSettings() { document.getElementById('settingsOverlay').classList.add('open'); }
+function closeSettings(e) { if (e.target === document.getElementById('settingsOverlay')) document.getElementById('settingsOverlay').classList.remove('open'); }
+function applySettings() {
+  startBalance = parseFloat(document.getElementById('inputBalance').value) || 10000;
+  accName = document.getElementById('inputName').value || 'Apex Trading · Live';
+  aggression = parseInt(document.getElementById('inputAggression').value) || 3;
+  localStorage.setItem('mt5_balance', startBalance);
+  localStorage.setItem('mt5_name', accName);
+  localStorage.setItem('mt5_aggression', aggression);
+  balance = startBalance;
+  openPositions = [];
+  historyItems = [];
+  totalWins = 0; totalLosses = 0; todayProfit = 0;
+  document.getElementById('settingsOverlay').classList.remove('open');
+  renderAll();
+}
+
+// ── GAME LOOP ────────────────────────────────────────────────────
+function mainLoop() {
+  tickPrices();
+  // close expired trades
+  const now2 = Date.now();
+  openPositions.filter(p => now2 - p.startedAt > p.ttl).forEach(p => closeTrade(p));
+  // open new trades
+  const openChance = 0.18 + (aggression * 0.04);
+  if (Math.random() < openChance && openPositions.length < 5) openTrade();
+  renderStats();
+  renderPositions();
+}
+
+// ── INIT ─────────────────────────────────────────────────────────
+document.getElementById('inputBalance').value = startBalance;
+document.getElementById('inputName').value = accName;
+document.getElementById('inputAggression').value = aggression;
+renderAll();
+
+// open 1-2 trades immediately
+setTimeout(openTrade, 800);
+setTimeout(openTrade, 2200);
+
+setInterval(mainLoop, 1400);
+</script>
+</body>
+</html>
