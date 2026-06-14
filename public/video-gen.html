@@ -79,7 +79,7 @@ h1{font-size:20px;font-weight:900;color:#E53E2E;margin-bottom:3px}
 <body>
 
 <h1>🎬 Video Generator</h1>
-<p class="sub">Creatify AI — videouri UGC reale cu oameni reali</p>
+<p class="sub">Creatify AI — videouri UGC reale cu oameni reali pentru Apex Trade Bot</p>
 
 <!-- ── STEP 0: CREDENTIALS ── -->
 <div id="creds-panel">
@@ -100,19 +100,19 @@ h1{font-size:20px;font-weight:900;color:#E53E2E;margin-bottom:3px}
 <div class="lbl">Pas 1 — Alege scriptul UGC</div>
 
 <div class="sc-card sel" id="sc0" onclick="pickScript(0)">
-  <div class="sc-badge">⭐ UGC #1 — Best performer</div>
-  <div class="sc-title">"Nu reușeam să fac bani cu AI"</div>
-  <div class="sc-hook">Blueprint Studio → $900 prima vânzare — cea mai directă abordare</div>
+  <div class="sc-badge">⭐ UGC #1 — Hook "verificam telefonul"</div>
+  <div class="sc-title">"Verificam telefonul la 3 dimineața"</div>
+  <div class="sc-hook">Problema → soluție → $183 overnight — cel mai direct</div>
 </div>
 <div class="sc-card" id="sc1" onclick="pickScript(1)">
-  <div class="sc-badge">UGC #2 — Local biz angle</div>
-  <div class="sc-title">"Nimeni nu vorbește despre AI + business local"</div>
-  <div class="sc-hook">Restaurant, gym, salon — $800–$1,200 per client, zero coding</div>
+  <div class="sc-badge">UGC #2 — Hook "salariu vs bot"</div>
+  <div class="sc-title">"Eu muncesc 8 ore. Botul muncește 24."</div>
+  <div class="sc-hook">Comparație directă salariu vs pasiv — relatable pentru orice job</div>
 </div>
 <div class="sc-card" id="sc2" onclick="pickScript(2)">
-  <div class="sc-badge">UGC #3 — Saturation angle</div>
-  <div class="sc-title">"Orice metodă AI era saturată"</div>
-  <div class="sc-hook">Proprietar de gym → $1,200. Primul client AI.</div>
+  <div class="sc-badge">UGC #3 — Hook "piața mișcă la 3AM"</div>
+  <div class="sc-title">"Crypto nu se oprește când dormi tu"</div>
+  <div class="sc-hook">Fear of missing out — pentru cei care au ratat mișcări mari</div>
 </div>
 
 <!-- SCRIPT EDITOR -->
@@ -149,7 +149,7 @@ h1{font-size:20px;font-weight:900;color:#E53E2E;margin-bottom:3px}
 <div class="result-box" id="result-box">
   <video id="rv" controls playsinline></video>
   <div class="dl-row">
-    <a class="dl-btn" id="dl-btn" download="blueprint-ugc.mp4">⬇️ Descarcă</a>
+    <a class="dl-btn" id="dl-btn" download="apex-bot-ugc.mp4">⬇️ Descarcă</a>
     <button class="cp-btn" onclick="copyVidLink()">🔗 Copiază link</button>
   </div>
 </div>
@@ -168,43 +168,34 @@ h1{font-size:20px;font-weight:900;color:#E53E2E;margin-bottom:3px}
 <script>
 /* ── SCRIPTS ── */
 const SCRIPTS = [
-`I couldn't figure out how to make actual money with AI.
+`I was checking my phone every hour at night because I was scared I'd miss a trade.
 
-Tried selling prompts. Nobody bought.
-Tried courses. Nobody signed up.
-Tried content. Zero conversions.
+I tried signals groups. Paid fifty dollars a month. Still had to be there to press the button myself.
 
-Then I found Blueprint Studio — you type any business automation and it gives you the full plan, the price to charge, and the message to send the client. Sixty seconds.
+Then I set up this bot. It connects to Bybit, runs on its own, and trades while I sleep.
 
-First blueprint I sold to a restaurant owner. Nine hundred dollars. One DM.
+Last week I woke up and it had made nine trades overnight. Was up a hundred and eighty three dollars before I even had coffee.
 
-Link's below if you're dealing with the same thing.`,
+One-time thing, like three hundred dollars. Link's below if you want to check it out.`,
 
-`Nobody talks about selling AI to local businesses. It's the easiest sale I've ever made.
+`I work nine to six. The crypto market moves at three AM. That's not a schedule I can compete with manually.
 
-Restaurants need WhatsApp bots.
-Gyms need DM automation.
-Salons need booking systems.
+So I set up a trading bot. One time setup, runs twenty four seven on its own server. I just check the results in the morning.
 
-They have the budget. They just need someone to show them what's possible.
+Last month it made more in a week than I make in two days at work.
 
-Blueprint Studio generates the full plan, the price, and the client pitch in sixty seconds. No coding needed.
+It's not magic. It's automation. Link's below.`,
 
-Link's below if you want your first online income.`,
+`I've missed so many big crypto moves because I was asleep or at work.
 
-`Every AI money method I tried was saturated or needed skills I didn't have.
+ETH pumped forty percent overnight. I was sleeping.
+BTC dropped and recovered while I was in a meeting.
 
-Content creation — too much competition.
-Prompt selling — market's dead.
-Building tools — needed coding.
+I stopped trying to trade manually and just set up a bot.
 
-Then I found Blueprint Studio.
+It watches the market all day, all night. Places trades automatically. I check results when I wake up.
 
-You describe any automation. It gives you the full technical plan, the price, and the pitch. Sixty seconds.
-
-Gym owner. Twelve hundred dollars. My first AI sale.
-
-Link's below.`
+Link in bio if you're tired of missing moves.`
 ];
 
 let selScript = 0;
