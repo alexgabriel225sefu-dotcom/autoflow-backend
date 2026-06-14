@@ -1654,7 +1654,7 @@ a{text-decoration:none}
       <td style="padding:22px 24px">
         <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#ff2d4f;font-family:Arial,sans-serif">YOUR LICENSE KEY &mdash; KEEP THIS SAFE</p>
         <p class="key-mono" style="margin:0 0 14px;font-family:'Courier New',Courier,monospace;font-size:24px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px 12px;word-break:break-all">${licenseKey}</p>
-        <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Add this to Render environment variables as ${code('LICENSE_KEY')}</p>
+        <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Add this to Railway environment variables as ${code('LICENSE_KEY')}</p>
       </td>
     </tr>
   </table>
@@ -1686,16 +1686,16 @@ a{text-decoration:none}
       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
         <tr>
           <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">1</td>
-          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:0.2px">Deploy bot to Render (one click)</td>
+          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:0.2px">Deploy bot to Railway (one click)</td>
         </tr>
       </table>
-      <p style="margin:0 0 16px;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Render is a free cloud platform. Click below to deploy your bot — no server setup required. If you don't have a Render account, create one first (it's free).</p>
+      <p style="margin:0 0 16px;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Railway is a cloud platform that runs your bot 24/7 — it never sleeps, so your bot keeps trading. New accounts get $5 free credit to start. Click below to deploy — no server setup required.</p>
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr><td style="padding-bottom:10px;text-align:center">
-          <a href="https://render.com/deploy?repo=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:900;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">&#128640; Deploy Bot to Render &rarr;</a>
+          <a href="https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:900;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">&#128640; Deploy Bot to Railway &rarr;</a>
         </td></tr>
         <tr><td style="text-align:center">
-          <a href="https://render.com/register" style="font-size:11px;color:#475569;font-family:Arial,sans-serif;text-decoration:underline">Don&rsquo;t have Render? Create a free account first &rarr;</a>
+          <a href="https://railway.app" style="font-size:11px;color:#475569;font-family:Arial,sans-serif;text-decoration:underline">Don&rsquo;t have Railway? Create a free account first &rarr;</a>
         </td></tr>
       </table>
     </td></tr>
@@ -1758,7 +1758,7 @@ a{text-decoration:none}
       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
         <tr>
           <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">4</td>
-          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">Set environment variables in Render</td>
+          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">Set environment variables in Railway</td>
         </tr>
       </table>
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -1843,7 +1843,7 @@ function _buildForexEmailHtml(safeName, safeEmail, licenseKey = 'FORX-XXXX-XXXX-
     <td style="padding:22px 24px">
       <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#2aabee;font-family:Arial,sans-serif">YOUR FOREX LICENSE KEY &mdash; KEEP THIS SAFE</p>
       <p style="margin:0 0 14px;font-family:'Courier New',Courier,monospace;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px 12px;word-break:break-all">${licenseKey}</p>
-      <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Add this to Render environment variables as ${code('LICENSE_KEY')}</p>
+      <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Add this to Railway environment variables as ${code('LICENSE_KEY')}</p>
     </td>
   </tr></table>
 </td></tr>
@@ -1865,7 +1865,7 @@ function _buildForexEmailHtml(safeName, safeEmail, licenseKey = 'FORX-XXXX-XXXX-
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
     ${step(1, 'Open OANDA and create an API key', 'Login to OANDA → Manage Funds → API Access → Generate Token. Keep the token and your Account ID ready.')}
     ${step(2, 'Configure your bot', 'Click the "Open Forex Configurator" button above. Paste your OANDA credentials, choose PAPER mode to start, set your risk (1-2% recommended).')}
-    ${step(3, 'Deploy to Render', 'Click "Save Config &amp; Deploy" in the configurator. The bot starts automatically with just your LICENSE_KEY — all settings are stored securely.')}
+    ${step(3, 'Deploy to Railway', 'Click "Save Config &amp; Deploy" in the configurator. The bot starts automatically with just your LICENSE_KEY — all settings are stored securely.')}
     ${step(4, 'Start with Paper Trading', `Keep ${code('PAPER_TRADING=true')} for at least 7 days. Verify signals match your strategy before going live.`)}
   </table>
 </td></tr>
@@ -2227,9 +2227,9 @@ app.get('/admin/sync-bot-repo', async (req, res) => {
 
   const readmeContent = bot === 'forex' ? `# Apex Forex Bot 🤖
 
-AI-powered forex trading bot (OANDA + MT5 bridge). Deploy with one click on Render.
+AI-powered forex trading bot (OANDA + MT5 bridge). Deploy with one click on Railway — runs 24/7, never sleeps.
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/${OWNER}/${REPO})
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/${OWNER}/${REPO})
 
 ## Setup
 The only variable you set is your license key — everything else is configured
@@ -2244,9 +2244,9 @@ and loaded automatically at startup.
 Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsystem.space).
 ` : `# Apex Trade Bot 🤖
 
-AI-powered crypto trading bot. Deploy with one click on Render.
+AI-powered crypto trading bot. Deploy with one click on Railway — runs 24/7, never sleeps.
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/${OWNER}/${REPO})
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/${OWNER}/${REPO})
 
 ## Setup
 The only variable you set is your license key — everything else is configured

@@ -150,25 +150,25 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
 
   <div class="steps-lbl">Setup Steps</div>
 
-  <!-- Step 1: Deploy to Render -->
+  <!-- Step 1: Deploy to Railway -->
   <div class="sc open" id="s1">
     <div class="sc-head" onclick="toggle(1)">
       <div class="sc-num" id="sn1">1</div>
       <div class="sc-title">
-        <strong>Deploy bot to Render</strong>
+        <strong>Deploy bot to Railway</strong>
         <span>~2 minutes · one click</span>
       </div>
       <span class="sc-arr">▾</span>
     </div>
     <div class="sc-body" id="sb1">
       <div class="rw-card">
-        <p>Render is the cloud server that runs your bot 24/7. Click the button below to deploy your bot automatically — Render handles everything, no technical knowledge needed.</p>
+        <p>Railway is the cloud server that runs your bot 24/7 — it never sleeps, so your bot keeps trading around the clock. Click the button below to deploy automatically — Railway handles everything, no technical knowledge needed.</p>
       </div>
-      <a id="deployBtn" href="https://render.com/deploy?repo=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" target="_blank" class="btn-deploy">
-        🚀 Deploy Bot to Render →
+      <a id="deployBtn" href="https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" target="_blank" class="btn-deploy">
+        🚀 Deploy Bot to Railway →
       </a>
-      <a href="https://render.com/register" target="_blank" class="btn-secondary">Don't have Render? Create a free account first →</a>
-      <div class="ok-box">✓ Render's free plan works for the bot — you can upgrade anytime for dedicated resources.</div>
+      <a href="https://railway.app" target="_blank" class="btn-secondary">Don't have Railway? Create a free account first →</a>
+      <div class="ok-box">✓ New Railway accounts get $5 free trial credit — then about $5/month for 24/7 always-on.</div>
       <div class="warn-box">⚠ After deploying, don't add API keys yet — do that in Step 3 using the configurator.</div>
       <button class="mark-done" onclick="markDone(1,2)">✓ Bot deployed — go to Step 2</button>
     </div>
@@ -227,11 +227,11 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
       </div>
       <div class="inst">
         <div class="in">3</div>
-        <div class="it">Click <b>Generate Config →</b> — copy the output, paste into your Render service under <b>Environment → Add from .env</b>, click Save.</div>
+        <div class="it">Click <b>Generate Config →</b> — copy the output, paste into your Railway service under <b>Variables → Raw Editor</b>, click Save.</div>
       </div>
       <div class="inst">
         <div class="in">4</div>
-        <div class="it">Render redeploys automatically in ~1 minute. Your bot is now configured.</div>
+        <div class="it">Railway redeploys automatically in ~1 minute. Your bot is now configured.</div>
       </div>
       <a id="configBtn" href="/configurator" target="_blank" class="btn-config">
         ⚙️ Open Bot Configurator →
@@ -253,7 +253,7 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
     <div class="sc-body" id="sb4">
       <div class="inst">
         <div class="in">1</div>
-        <div class="it">In Render, click your <b>apex-trade-bot</b> service → <b>Logs</b> tab (top menu).</div>
+        <div class="it">In Railway, click your <b>apex-trade-bot</b> service → <b>Deployments</b> → <b>View Logs</b>.</div>
       </div>
       <div class="inst">
         <div class="in">2</div>
@@ -261,7 +261,7 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
       </div>
       <div class="inst">
         <div class="in">3</div>
-        <div class="it">If you see an error, check your <b>API Key</b> is correct in Render Environment variables. Most issues are a typo in an env var.</div>
+        <div class="it">If you see an error, check your <b>API Key</b> is correct in Railway Variables. Most issues are a typo in an env var.</div>
       </div>
       <div class="ok-box">✅ The bot scans markets every 5 minutes. It will only open a trade when all conditions are met — this can take hours. That's normal.</div>
       <button class="mark-done" onclick="showDone()">✓ Bot is running — done!</button>
@@ -272,11 +272,11 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
   <div class="done-card" id="doneCard" style="display:none">
     <div class="done-icon">🎉</div>
     <h2>You're live.</h2>
-    <p>Your Apex Trade Bot is running 24/7 on Render, scanning markets and executing trades based on your settings.</p>
+    <p>Your Apex Trade Bot is running 24/7 on Railway, scanning markets and executing trades based on your settings.</p>
     <div class="done-grid">
       <div class="dg"><strong>Change settings</strong><span>Open the configurator anytime to adjust risk, SL/TP, or switch to live trading.</span></div>
       <div class="dg"><strong>Control via Telegram</strong><span>/stop, /pause, /status, /balance — from anywhere.</span></div>
-      <div class="dg"><strong>View trades</strong><span>Render Dashboard → your service → open the /dashboard URL.</span></div>
+      <div class="dg"><strong>View trades</strong><span>Railway Dashboard → your service → open the /dashboard URL.</span></div>
       <div class="dg"><strong>Switch to live</strong><span>Run paper mode for 1–2 weeks first. Validate before using real funds.</span></div>
     </div>
   </div>
