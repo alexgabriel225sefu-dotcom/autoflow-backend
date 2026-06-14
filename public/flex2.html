@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>flex2</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000}
+
+/* 9:16 stage */
+#stage{
+  position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%) scale(var(--s,1));
+  transform-origin:center center;
+  width:390px;height:844px;
+  background:#000;
+  overflow:hidden;
+  font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+}
+
+/* ── BACKGROUND: dark room / ambient glow ── */
+.bg{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse 70% 60% at 50% 30%,#0a0f1e 0%,#000 100%);
+}
+.bg::before{
+  content:'';position:absolute;
+  width:300px;height:300px;
+  left:50%;top:20%;transform:translateX(-50%);
+  background:radial-gradient(circle,rgba(42,90,180,0.15) 0%,transparent 70%);
+  border-radius:50%;
+}
+
+/* Film grain overlay */
+.grain{
+  position:absolute;inset:0;pointer-events:none;z-index:50;opacity:.55;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E");
+  background-size:150px 150px;
+  animation:grain .08s steps(1) infinite;
+  mix-blend-mode:overlay;
+}
+@keyframes grain{
+  0%{background-position:0 0}10%{background-position:-20px -30px}20%{background-position:15px -10px}
+  30%{background-position:-5px 20px}40%{background-position:25px 5px}50%{background-position:-15px -20px}
+  60%{background-position:10px 30px}70%{background-position:-25px 10px}80%{background-position:5px -25px}
+  90%{background-position:20px 15px}100%{background-position:-10px 5px}
+}
+
+/* Vignette */
+.vignette{
+  position:absolute;inset:0;pointer-events:none;z-index:49;
+  background:radial-gradient(ellipse 85% 85% at 50% 50%,transparent 55%,rgba(0,0,0,.75) 100%);
+}
+
+/* ── WHITE FLASH TRANSITION ── */
+.flash{
+  position:absolute;inset:0;z-index:200;
+  background:#fff;opacity:0;pointer-events:none;
+}
+
+/* ── SCENE BASE ── */
+.scene{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  opacity:0;transition:opacity .5s ease;
+  z-index:10;
+}
+.scene.active{opacity:1}
+
+/* ══════════════════════════════════
+   SCENE 1 — Ceas 3:17 AM
+══════════════════════════════════ */
+#s1{background:transparent}
+
+.clock-wrap{
+  display:flex;flex-direction:column;align-items:center;
+  gap:6px;
+}
+.clock-date{
+  font-size:13px;letter-spacing:2px;text-transform:uppercase;
+  color:rgba(255,255,255,0.35);font-weight:400;
+}
+.clock-time{
+  font-size:92px;font-weight:200;letter-spacing:-3px;
+  color:#fff;line-height:1;
+  text-shadow:0 0 80px rgba(80,120,255,0.3);
+}
+.clock-ampm{
+  font-size:18px;font-weight:300;letter-spacing:3px;
+  color:rgba(255,255,255,0.4);
+  align-self:flex-end;margin-bottom:16px;
+}
+
+.s1-label{
+  margin-top:52px;
+  font-size:15px;letter-spacing:.5px;
+  color:rgba(255,255,255,0.3);
+  font-weight:300;
+  text-align:center;
+  line-height:1.7;
+}
+.s1-label strong{color:rgba(255,255,255,0.7);font-weight:500}
+
+/* ══════════════════════════════════
+   SCENE 2 — Notificări trade
+══════════════════════════════════ */
+#s2{justify-content:flex-start;padding-top:60px}
+
+.notif-stream{
+  width:100%;padding:0 16px;
+  display:flex;flex-direction:column;gap:10px;
+}
+
+.notif{
+  background:rgba(15,20,35,0.92);
+  border:1px solid rgba(255,255,255,0.09);
+  border-radius:16px;padding:13px 16px;
+  display:flex;align-items:center;gap:12px;
+  backdrop-filter:blur(20px);
+  transform:translateY(-28px) scale(.95);
+  opacity:0;
+  transition:transform .4s cubic-bezier(.34,1.4,.64,1), opacity .35s ease;
+  position:relative;
+  overflow:hidden;
+}
+.notif::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;
+  width:3px;border-radius:16px 0 0 16px;
+}
+.notif.green::before{background:#22c55e}
+.notif.red::before{background:#ef4444}
+
+.notif.show{
+  transform:translateY(0) scale(1);
+  opacity:1;
+}
+
+.notif-icon{
+  width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;flex-shrink:0;
+}
+.notif.green .notif-icon{background:rgba(34,197,94,0.12)}
+.notif.red .notif-icon{background:rgba(239,68,68,0.12)}
+
+.notif-body{flex:1}
+.notif-title{
+  font-size:12px;font-weight:600;color:rgba(255,255,255,0.9);
+  letter-spacing:.2px;
+}
+.notif-sub{
+  font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;
+}
+.notif-pnl{
+  font-size:14px;font-weight:700;letter-spacing:.3px;
+}
+.notif.green .notif-pnl{color:#4ade80}
+.notif.red .notif-pnl{color:#f87171}
+
+/* Stream label */
+.stream-label{
+  font-size:11px;letter-spacing:2.5px;text-transform:uppercase;
+  color:rgba(255,255,255,0.2);
+  text-align:center;
+  margin-bottom:8px;
+}
+
+/* ══════════════════════════════════
+   SCENE 3 — P&L total
+══════════════════════════════════ */
+#s3{}
+
+.pnl-wrap{
+  display:flex;flex-direction:column;align-items:center;
+  gap:0;
+}
+.pnl-label-top{
+  font-size:11px;letter-spacing:3px;text-transform:uppercase;
+  color:rgba(255,255,255,0.25);margin-bottom:18px;font-weight:400;
+}
+.pnl-amount{
+  font-size:84px;font-weight:700;
+  color:#4ade80;
+  letter-spacing:-2px;
+  line-height:1;
+  text-shadow:0 0 60px rgba(74,222,128,0.4);
+}
+.pnl-label-bot{
+  font-size:13px;color:rgba(255,255,255,0.25);
+  margin-top:14px;letter-spacing:.5px;
+}
+
+.night-label{
+  margin-top:40px;
+  font-size:16px;color:rgba(255,255,255,0.5);
+  font-weight:300;letter-spacing:.3px;
+  text-align:center;line-height:1.6;
+}
+.night-label em{
+  font-style:normal;
+  color:rgba(255,255,255,0.85);font-weight:500;
+}
+
+/* ══════════════════════════════════
+   SCENE 4 — CTA
+══════════════════════════════════ */
+#s4{}
+
+.cta-wrap{
+  display:flex;flex-direction:column;align-items:center;
+  gap:20px;
+  padding:0 36px;
+  text-align:center;
+}
+.cta-eyebrow{
+  font-size:11px;letter-spacing:3px;text-transform:uppercase;
+  color:rgba(255,255,255,0.25);
+}
+.cta-headline{
+  font-size:30px;font-weight:700;color:#fff;
+  line-height:1.25;letter-spacing:-.5px;
+}
+.cta-headline span{color:#4ade80}
+.cta-sub{
+  font-size:13px;color:rgba(255,255,255,0.4);
+  line-height:1.65;
+}
+.cta-btn{
+  background:linear-gradient(135deg,#4ade80,#22c55e);
+  color:#052e16;
+  font-size:15px;font-weight:800;
+  padding:16px 42px;
+  border-radius:100px;
+  letter-spacing:.3px;
+  box-shadow:0 0 40px rgba(74,222,128,0.35);
+}
+.cta-domain{
+  font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  color:rgba(255,255,255,0.2);
+}
+
+/* ── PROGRESS BAR ── */
+#progress{
+  position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
+  width:48px;height:3px;background:rgba(255,255,255,0.08);
+  border-radius:2px;z-index:100;overflow:hidden;
+}
+#progress-fill{
+  height:100%;width:0%;background:rgba(255,255,255,0.4);
+  border-radius:2px;transition:width linear;
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg"></div>
+  <div class="grain"></div>
+  <div class="vignette"></div>
+  <div class="flash" id="flash"></div>
+
+  <!-- SCENE 1: 3:17 AM -->
+  <div class="scene active" id="s1">
+    <div class="clock-wrap">
+      <div class="clock-date">Luni, 9 Iunie</div>
+      <div style="display:flex;align-items:flex-end;gap:6px">
+        <div class="clock-time">3:17</div>
+        <div class="clock-ampm">AM</div>
+      </div>
+    </div>
+    <div class="s1-label">Tu dormeai.<br><strong>Bot-ul tău nu.</strong></div>
+  </div>
+
+  <!-- SCENE 2: Notificări -->
+  <div class="scene" id="s2">
+    <div class="stream-label">Tranzacții active</div>
+    <div class="notif-stream" id="notifStream">
+      <div class="notif green" id="n1">
+        <div class="notif-icon">▲</div>
+        <div class="notif-body">
+          <div class="notif-title">BTC/USDT — LONG</div>
+          <div class="notif-sub">Închis automat • 2h ago</div>
+        </div>
+        <div class="notif-pnl">+$83.40</div>
+      </div>
+      <div class="notif green" id="n2">
+        <div class="notif-icon">▲</div>
+        <div class="notif-body">
+          <div class="notif-title">ETH/USDT — LONG</div>
+          <div class="notif-sub">Închis automat • 3h ago</div>
+        </div>
+        <div class="notif-pnl">+$61.20</div>
+      </div>
+      <div class="notif red" id="n3">
+        <div class="notif-icon">▼</div>
+        <div class="notif-body">
+          <div class="notif-title">SOL/USDT — SHORT</div>
+          <div class="notif-sub">Stop loss • 4h ago</div>
+        </div>
+        <div class="notif-pnl">−$18.50</div>
+      </div>
+      <div class="notif green" id="n4">
+        <div class="notif-icon">▲</div>
+        <div class="notif-body">
+          <div class="notif-title">XRP/USDT — LONG</div>
+          <div class="notif-sub">Închis automat • 5h ago</div>
+        </div>
+        <div class="notif-pnl">+$44.80</div>
+      </div>
+      <div class="notif green" id="n5">
+        <div class="notif-icon">▲</div>
+        <div class="notif-body">
+          <div class="notif-title">DOGE/USDT — LONG</div>
+          <div class="notif-sub">Închis automat • 6h ago</div>
+        </div>
+        <div class="notif-pnl">+$29.60</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCENE 3: P&L total -->
+  <div class="scene" id="s3">
+    <div class="pnl-wrap">
+      <div class="pnl-label-top">Profit noapte asta</div>
+      <div class="pnl-amount" id="pnlAmount">+$0</div>
+      <div class="pnl-label-bot">în timp ce dormeai</div>
+    </div>
+    <div class="night-label">
+      Bot-ul a rulat <em>6 ore</em><br>
+      fără să atingi telefonul.
+    </div>
+  </div>
+
+  <!-- SCENE 4: CTA -->
+  <div class="scene" id="s4">
+    <div class="cta-wrap">
+      <div class="cta-eyebrow">Apex Trade Bot</div>
+      <div class="cta-headline">
+        Și botul tău<br>poate face<br><span>asta noaptea.</span>
+      </div>
+      <div class="cta-sub">
+        O singură plată. Rulează 24/7.<br>Nu ai nevoie de experiență.
+      </div>
+      <div class="cta-btn">aicashsystem.space</div>
+      <div class="cta-domain">Link in bio ↑</div>
+    </div>
+  </div>
+
+  <div id="progress"><div id="progress-fill"></div></div>
+</div>
+
+<script>
+/* ── Scale to viewport ── */
+function scaleStage(){
+  const s=document.getElementById('stage');
+  const sx=window.innerWidth/390, sy=window.innerHeight/844;
+  s.style.setProperty('--s',Math.min(sx,sy));
+}
+scaleStage();
+window.addEventListener('resize',scaleStage);
+
+/* ── Flash ── */
+function flash(cb){
+  const f=document.getElementById('flash');
+  f.style.transition='none';f.style.opacity='1';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    f.style.transition='opacity .55s ease';f.style.opacity='0';
+    setTimeout(cb,120);
+  }));
+}
+
+/* ── Scene switching ── */
+const scenes=['s1','s2','s3','s4'];
+let cur=0;
+function goTo(idx){
+  document.getElementById(scenes[cur]).classList.remove('active');
+  cur=idx;
+  document.getElementById(scenes[cur]).classList.add('active');
+}
+
+/* ── Progress bar ── */
+const fill=document.getElementById('progress-fill');
+let pTimer=null;
+function startProgress(ms){
+  fill.style.transition='none';fill.style.width='0%';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    fill.style.transition=`width ${ms}ms linear`;
+    fill.style.width='100%';
+  }));
+}
+
+/* ── P&L count-up ── */
+function countUp(el,target,ms){
+  const start=performance.now();
+  function frame(now){
+    const p=Math.min((now-start)/ms,1);
+    const ease=1-Math.pow(1-p,3);
+    const val=Math.round(ease*target*100)/100;
+    el.textContent='+$'+val.toFixed(0);
+    if(p<1)requestAnimationFrame(frame);
+    else el.textContent='+$'+target;
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ── Notification stagger ── */
+function showNotifs(){
+  const ids=['n1','n2','n3','n4','n5'];
+  ids.forEach((id,i)=>{
+    setTimeout(()=>{
+      document.getElementById(id).classList.add('show');
+    },i*380+200);
+  });
+}
+
+/* ── Timeline ── */
+const DURATIONS=[3200,4200,3800,4000]; // ms per scene
+
+function runScene(idx){
+  if(idx===0){
+    startProgress(DURATIONS[0]);
+    setTimeout(()=>flash(()=>{ goTo(1); runScene(1); }),DURATIONS[0]);
+  } else if(idx===1){
+    showNotifs();
+    startProgress(DURATIONS[1]);
+    setTimeout(()=>flash(()=>{ goTo(2); runScene(2); }),DURATIONS[1]);
+  } else if(idx===2){
+    startProgress(DURATIONS[2]);
+    const el=document.getElementById('pnlAmount');
+    setTimeout(()=>countUp(el,200.50,1800),300);
+    setTimeout(()=>flash(()=>{ goTo(3); runScene(3); }),DURATIONS[2]);
+  } else if(idx===3){
+    startProgress(DURATIONS[3]);
+    // loop
+    setTimeout(()=>flash(()=>{
+      // reset notifs
+      document.querySelectorAll('.notif').forEach(n=>n.classList.remove('show'));
+      document.getElementById('pnlAmount').textContent='+$0';
+      goTo(0); runScene(0);
+    }),DURATIONS[3]);
+  }
+}
+
+// Kick off
+runScene(0);
+</script>
+</body>
+</html>
