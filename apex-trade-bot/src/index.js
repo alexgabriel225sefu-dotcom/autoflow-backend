@@ -25,7 +25,7 @@ let stopAlertedAt     = 0; // previne spam Strategy Stop pe Telegram
 const dash = {
   balance:       0,
   startBalance:  0,
-  currentSymbol: cfg.SYMBOL,
+  currentSymbol: settings.get('SYMBOL'),
   currentPrice:  0,
   openPosition:  null,
   trades:        [], // max 50 trades history
@@ -119,7 +119,7 @@ async function getBalance() {
 }
 
 // ─── Calcul cantitate ─────────────────────────────────────
-async function calcQuantity(price, balance, symbol = cfg.SYMBOL, druckMult = 1.0) {
+async function calcQuantity(price, balance, symbol = settings.get('SYMBOL'), druckMult = 1.0) {
   const riskAmount = balance * settings.get('RISK_PER_TRADE') * druckMult;
   const qty        = riskAmount / price;
   // Coins under $1 → whole units; expensive coins (SOL, BNB etc.) → 6 decimals
@@ -132,7 +132,7 @@ async function calcQuantity(price, balance, symbol = cfg.SYMBOL, druckMult = 1.0
 const { calcSLTP, checkPosition } = require('./position');
 
 // ─── Deschide poziție ─────────────────────────────────────
-async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL, druckMult = 1.0) {
+async function openTrade(side, price, balance, atrValue = 0, symbol = settings.get('SYMBOL'), druckMult = 1.0) {
   // Pe spot live nu există short — un SELL ar vinde monede pe care clientul
   // nu le are (ordin respins) sau pe care le deținea deja (pierdere reală).
   if (side === 'SELL' && !cfg.PAPER_TRADING) {
@@ -192,7 +192,7 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL
 // ─── Închide poziție ──────────────────────────────────────
 async function closeTrade(price, reason, alreadyClosed = false) {
   if (!openPosition) return;
-  const { side, entryPrice, quantity, symbol = cfg.SYMBOL } = openPosition;
+  const { side, entryPrice, quantity, symbol = settings.get('SYMBOL') } = openPosition;
   const closeSide = side === 'BUY' ? 'SELL' : 'BUY';
 
   let fillPrice = price, closeFee = 0;
@@ -250,7 +250,7 @@ async function closeTrade(price, reason, alreadyClosed = false) {
 
 // ─── Selectează cel mai bun simbol (scanner) ──────────────
 async function bestSymbol() {
-  if (!cfg.MULTI_SYMBOL || cfg.SCAN_SYMBOLS.length <= 1) return cfg.SYMBOL;
+  if (!cfg.MULTI_SYMBOL || cfg.SCAN_SYMBOLS.length <= 1) return settings.get('SYMBOL');
 
   const results = await Promise.all(cfg.SCAN_SYMBOLS.map(async sym => {
     try {
@@ -510,7 +510,7 @@ async function main() {
   const isTestnet = cfg.BYBIT_TESTNET || isBinanceTestnet;
   const mode = cfg.PAPER_TRADING ? '📝 PAPER TRADING' : isTestnet ? '🧪 TESTNET' : '🔴 LIVE';
   dash.mode = mode.replace(/[📝🧪🔴]/g, '').trim();
-  tg.alertStart(cfg.SYMBOL, cfg.TIMEFRAME, balance, mode);
+  tg.alertStart(settings.get('SYMBOL'), cfg.TIMEFRAME, balance, mode);
 
   // ─── Dashboard HTTP server (auth cu DASHBOARD_TOKEN) ──────
   buildDashboard.serve(() => ({ ...dash, tickCount }), logger);

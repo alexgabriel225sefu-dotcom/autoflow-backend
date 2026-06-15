@@ -45,12 +45,26 @@ function dashboardKeyboard(symbol) {
 }
 function menuKeyboard() {
   const rows = [
-    [{ text: '📊 Status',  callback_data: 'menu:status'  }, { text: '⚙️ Config', callback_data: 'menu:config'  }],
-    [{ text: '📋 Trades',  callback_data: 'menu:trades'  }, { text: '📈 Chart',  callback_data: 'menu:chart'   }],
-    [{ text: '⏸ Pause',   callback_data: 'menu:pause'   }, { text: '▶️ Resume', callback_data: 'menu:resume'  }],
+    [{ text: '📊 Status',  callback_data: 'menu:status'  }, { text: '⚙️ Config',  callback_data: 'menu:config'  }],
+    [{ text: '📋 Trades',  callback_data: 'menu:trades'  }, { text: '📈 Chart',   callback_data: 'menu:chart'   }],
+    [{ text: '💎 Symbol',  callback_data: 'menu:symbol'  }, { text: '🎯 Method',  callback_data: 'menu:method'  }],
+    [{ text: '⏸ Pause',   callback_data: 'menu:pause'   }, { text: '▶️ Start',   callback_data: 'menu:resume'  }],
   ];
   if (DASHBOARD_URL) rows.push([{ text: '🚀 Open App', web_app: { url: DASHBOARD_URL } }]);
   return { reply_markup: JSON.stringify({ inline_keyboard: rows }) };
+}
+
+function symbolKeyboard() {
+  return {
+    reply_markup: JSON.stringify({
+      inline_keyboard: [
+        [{ text: '₿ BTCUSDT',  callback_data: 'symbol:BTCUSDT'  }, { text: '⟠ ETHUSDT',  callback_data: 'symbol:ETHUSDT'  }],
+        [{ text: '◎ SOLUSDT',  callback_data: 'symbol:SOLUSDT'  }, { text: '⬡ BNBUSDT',  callback_data: 'symbol:BNBUSDT'  }],
+        [{ text: '✕ XRPUSDT',  callback_data: 'symbol:XRPUSDT'  }, { text: 'Ð DOGEUSDT', callback_data: 'symbol:DOGEUSDT' }],
+        [{ text: '△ AVAXUSDT', callback_data: 'symbol:AVAXUSDT' }, { text: '◈ ADAUSDT',  callback_data: 'symbol:ADAUSDT'  }],
+      ],
+    }),
+  };
 }
 
 // ─── Fear & Greed Index ───────────────────────────────────
@@ -204,13 +218,27 @@ async function _handleCallback(cb) {
   await answerCb(cb.id);
   if (!chatId) return;
   const d   = cb.data;
-  const sym = _getDash()?.currentSymbol || cfg.SYMBOL;
+  const sym = _getDash()?.currentSymbol || settings.get('SYMBOL');
+
   if (d === 'menu:status')  return _handleStatus(chatId);
   if (d === 'menu:config')  return sendTo(chatId, buildConfig());
   if (d === 'menu:trades')  return sendTo(chatId, buildTrades(_getDash()?.trades));
+  if (d === 'menu:symbol')  return sendTo(chatId, `💎 <b>Choose trading pair:</b>\n<i>Current: <b>${settings.get('SYMBOL')}</b></i>`, symbolKeyboard());
+  if (d === 'menu:method')  return _handleMethod(chatId, null);
   if (d === 'menu:chart')   return sendTo(chatId, `📈 <b>${sym}</b>`, { reply_markup: JSON.stringify({ inline_keyboard: [[{ text:`📈 Open ${sym} on TradingView`, url: tvUrl(sym) }]] }) });
-  if (d === 'menu:pause')   { settings.set('PAUSED',true);  return sendTo(chatId,'⏸️ <b>Bot PAUSED</b>'); }
-  if (d === 'menu:resume')  { settings.set('PAUSED',false); return sendTo(chatId,'▶️ <b>Bot RESUMED</b>'); }
+  if (d === 'menu:pause')   { settings.set('PAUSED',true);  return sendTo(chatId,'⏸️ <b>Bot PAUSED</b> — no new trades until you press Start'); }
+  if (d === 'menu:resume')  { settings.set('PAUSED',false); return sendTo(chatId,'▶️ <b>Bot STARTED</b> — trading active! Good luck 🚀'); }
+
+  // Symbol selection buttons
+  if (d.startsWith('symbol:')) {
+    const newSym = d.replace('symbol:', '');
+    settings.set('SYMBOL', newSym);
+    return sendTo(chatId,
+      `💎 Symbol set to <b>${newSym}</b> — active from next tick.\n\n` +
+      `Now press <b>▶️ Start</b> in /menu when ready to trade.`,
+      menuKeyboard()
+    );
+  }
 }
 
 async function _pollLoop() {
@@ -240,6 +268,15 @@ async function _pollLoop() {
           await sendTo(chatId,'🚀 <b>Apex Trade Bot</b>', { reply_markup: JSON.stringify({ inline_keyboard: [[{ text:'🚀 Open App', web_app:{ url: DASHBOARD_URL } }]] }) });
         }
         else if (cmd==='/chart')  await sendTo(chatId, `📈 <b>${sym}</b>`, { reply_markup: JSON.stringify({ inline_keyboard: [[{ text:`📈 Open ${sym} on TradingView`, url: tvUrl(sym) }]] }) });
+        else if (cmd==='/symbol') {
+          if (args[0]) {
+            const newSym = args[0].toUpperCase();
+            settings.set('SYMBOL', newSym);
+            await sendTo(chatId, `💎 Symbol set to <b>${newSym}</b> — active from next tick.`);
+          } else {
+            await sendTo(chatId, `💎 <b>Choose trading pair:</b>\n<i>Current: <b>${settings.get('SYMBOL')}</b></i>`, symbolKeyboard());
+          }
+        }
         else if (cmd==='/method') await _handleMethod(chatId, args[0]);
         else if (cmd==='/set')    await _handleSet(chatId, args);
         else if (cmd==='/pause')  { settings.set('PAUSED',true);  await sendTo(chatId,'⏸️ <b>Bot PAUSED</b> — no new trades until /resume'); }
@@ -248,7 +285,7 @@ async function _pollLoop() {
           `📋 <b>APEX BOT COMMANDS</b>\n\n` +
           `<b>Quick access:</b>\n/menu · /app · /chart\n\n` +
           `<b>Info:</b>\n/status · /config · /trades\n\n` +
-          `<b>Strategy:</b>\n/method auto|turtle|livermore|soros|ptj|druckenmiller\n\n` +
+          `<b>Strategy:</b>\n/symbol — choose trading pair\n/method auto|turtle|livermore|soros|ptj|druckenmiller\n\n` +
           `<b>Settings:</b>\n/set risk 1.5 · sl 2 · tp 4 · confidence 70 · paper on/off\n\n` +
           `<b>Control:</b>\n/pause · /resume`
         );
@@ -310,11 +347,21 @@ function alertFiltered(action, livermore, turtle) {
 }
 
 function alertStart(symbol, timeframe, balance, mode) {
+  const s = settings.snapshot();
   send(
-    `🚀 <b>APEX TRADE BOT STARTED</b>\n📊 ${symbol} | ${timeframe} | $${balance.toFixed(2)}\n⚙️ ${mode}\n` +
-    (DASHBOARD_URL ? `🌐 Dashboard: ${DASHBOARD_URL}\n` : '') +
-    `<i>Type /menu for the control panel</i>`,
-    dashboardKeyboard(symbol)
+    `⚡ <b>APEX TRADE BOT — READY</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `⏸️ <b>Bot is PAUSED</b> — configure before trading!\n\n` +
+    `<b>Step 1:</b> Choose your coin → /symbol\n` +
+    `<b>Step 2:</b> Choose strategy → /method\n` +
+    `<b>Step 3:</b> Review settings → /config\n` +
+    `<b>Step 4:</b> Press ▶️ Start in /menu\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `💎 Symbol: <b>${symbol}</b>  |  ⚙️ ${mode}\n` +
+    `💸 Risk: <b>${(s.RISK_PER_TRADE*100).toFixed(1)}%</b>  ·  🛡 SL: <b>${(s.STOP_LOSS_PCT*100).toFixed(1)}%</b>  ·  🎯 TP: <b>${(s.TAKE_PROFIT_PCT*100).toFixed(1)}%</b>\n` +
+    `💼 Balance: <b>$${balance.toFixed(2)}</b>\n\n` +
+    `<i>When ready → /menu then press ▶️ Start</i>`,
+    menuKeyboard()
   );
 }
 
