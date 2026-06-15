@@ -1,13 +1,25 @@
 /**
  * APEX TRADE BOT — Telegram Alerts + Interactive Bot Controls
- * Commands: /status /config /method /set /pause /resume /help
+ * Commands: /status /config /method /set /pause /resume /chart /help
  */
 const axios    = require('axios');
+const cfg      = require('./config');
 const settings = require('./settings');
 
 const TOKEN         = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
 const CHAT_ID       = (process.env.TELEGRAM_CHAT_ID   || '').trim();
 const DASHBOARD_URL = (process.env.DASHBOARD_URL       || '').trim();
+
+// ─── TradingView URL builder ──────────────────────────────
+const TV_EXCHANGE = {
+  binance: 'BINANCE', bybit: 'BYBIT', okx: 'OKX',
+  kraken: 'KRAKEN', kucoin: 'KUCOIN', mexc: 'MEXC',
+  coinbase: 'COINBASE', bitget: 'BITGET',
+};
+function tvUrl(symbol) {
+  const ex = TV_EXCHANGE[cfg.EXCHANGE?.toLowerCase()] || 'BINANCE';
+  return `https://www.tradingview.com/chart/?symbol=${ex}:${symbol}`;
+}
 
 // ─── Send helpers ─────────────────────────────────────────
 async function send(text, extra = {}) {
@@ -38,13 +50,12 @@ function miniChart(closes) {
   return sl.map(c => blocks[Math.min(7, Math.floor(((c - min) / range) * 8))]).join('');
 }
 
-function dashboardKeyboard() {
-  if (!DASHBOARD_URL) return {};
-  return {
-    reply_markup: JSON.stringify({
-      inline_keyboard: [[{ text: '📊 Live Dashboard', web_app: { url: DASHBOARD_URL } }]],
-    }),
-  };
+function dashboardKeyboard(symbol) {
+  const buttons = [];
+  if (DASHBOARD_URL) buttons.push({ text: '📊 Live Dashboard', web_app: { url: DASHBOARD_URL } });
+  if (symbol) buttons.push({ text: '📈 TradingView', url: tvUrl(symbol) });
+  if (!buttons.length) return {};
+  return { reply_markup: JSON.stringify({ inline_keyboard: [buttons] }) };
 }
 
 // ─── Status message builder ───────────────────────────────
@@ -119,7 +130,7 @@ async function _handleStatus(chatId) {
       chart = miniChart(candles.map(c => c.close));
     } catch {}
   }
-  await sendTo(chatId, buildStatus(dash, chart), dashboardKeyboard());
+  await sendTo(chatId, buildStatus(dash, chart), dashboardKeyboard(dash.currentSymbol));
 }
 
 async function _handleMethod(chatId, arg) {
@@ -230,6 +241,13 @@ async function _pollLoop() {
           await _handleMethod(chatId, args[0]);
         } else if (cmd === '/set') {
           await _handleSet(chatId, args);
+        } else if (cmd === '/chart') {
+          const d = _getDash();
+          const sym = d?.currentSymbol || cfg.SYMBOL;
+          await sendTo(chatId,
+            `📈 <b>${sym} — Live Chart</b>\n<i>Opens TradingView in your browser</i>`,
+            { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: `📈 Open ${sym} on TradingView`, url: tvUrl(sym) }]] }) }
+          );
         } else if (cmd === '/pause') {
           settings.set('PAUSED', true);
           await sendTo(chatId, '⏸️ <b>Bot PAUSED</b> — no new trades until /resume');
@@ -241,7 +259,8 @@ async function _pollLoop() {
             `📋 <b>APEX BOT COMMANDS</b>\n\n` +
             `<b>Info:</b>\n` +
             `/status  — live snapshot\n` +
-            `/config  — current settings\n\n` +
+            `/config  — current settings\n` +
+            `/chart   — open TradingView chart\n\n` +
             `<b>Strategy:</b>\n` +
             `/method  — choose legendary trader method\n` +
             `/method auto | turtle | livermore | soros | ptj | druckenmiller\n\n` +
@@ -270,7 +289,7 @@ function startPolling(getDash, exchange) {
   _getDash  = getDash;
   _exchange = exchange;
   _pollLoop();
-  console.log('[TELEGRAM] Polling started. Commands: /help /status /config /method /set /pause /resume');
+  console.log('[TELEGRAM] Polling started. Commands: /help /status /config /chart /method /set /pause /resume');
 }
 
 // ─── Alerts ───────────────────────────────────────────────
@@ -284,7 +303,7 @@ function alertOpen(side, symbol, price, quantity, stopLoss, takeProfit, druckMul
     `💰 @ $${price}  Qty: ${quantity}\n` +
     `🛡 SL: $${stopLoss.toFixed(5)}\n` +
     `🎯 TP: $${takeProfit.toFixed(5)}` + mult + modeTag,
-    dashboardKeyboard()
+    dashboardKeyboard(symbol)
   );
 }
 
@@ -296,7 +315,7 @@ function alertClose(reason, symbol, side, entryPrice, closePrice, pnl, balance) 
     `📊 ${dir}  $${entryPrice} → $${closePrice}\n` +
     `💵 PnL: <b>${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}</b>\n` +
     `💼 Balance: $${balance.toFixed(4)}`,
-    dashboardKeyboard()
+    dashboardKeyboard(symbol)
   );
 }
 
@@ -319,7 +338,7 @@ function alertStart(symbol, timeframe, balance, mode) {
     `⚙️ ${mode}\n` +
     (DASHBOARD_URL ? `🌐 Dashboard: ${DASHBOARD_URL}\n` : '') +
     `<i>Try /help for all commands</i>`,
-    dashboardKeyboard()
+    dashboardKeyboard(symbol)
   );
 }
 
@@ -335,11 +354,12 @@ function alertHeartbeat(tickCount, balance, openPosition, currentPrice) {
       `${openPosition.side === 'BUY' ? '🟢' : '🔴'} ${dir} <b>${openPosition.symbol}</b> @ $${openPosition.entryPrice}\n` +
       `PnL: <b>${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}</b>`;
   }
+  const hbSymbol = openPosition?.symbol || cfg.SYMBOL;
   send(
     `💓 <b>ACTIVE</b>  tick #${tickCount}${paused}\n` +
     `💼 Balance: $${balance.toFixed(4)}\n` +
-    `${posLine}\n<i>/status for details · /help for commands</i>`,
-    dashboardKeyboard()
+    `${posLine}\n<i>/status for details · /chart for TradingView</i>`,
+    dashboardKeyboard(hbSymbol)
   );
 }
 
