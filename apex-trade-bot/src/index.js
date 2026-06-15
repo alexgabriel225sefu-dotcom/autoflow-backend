@@ -1,6 +1,7 @@
 process.stdout.write(`[APEX BOT] Starting... Node ${process.version}\n`);
 require('dotenv').config();
 const cfg            = require('./config');
+const settings       = require('./settings');
 const indicators     = require('./indicators');
 const ai             = require('./ai');
 const logger         = require('./logger');
@@ -119,7 +120,7 @@ async function getBalance() {
 
 // ─── Calcul cantitate ─────────────────────────────────────
 async function calcQuantity(price, balance, symbol = cfg.SYMBOL, druckMult = 1.0) {
-  const riskAmount = balance * cfg.RISK_PER_TRADE * druckMult;
+  const riskAmount = balance * settings.get('RISK_PER_TRADE') * druckMult;
   const qty        = riskAmount / price;
   // Coins under $1 → whole units; expensive coins (SOL, BNB etc.) → 6 decimals
   const isWhole    = ['DOGEUSDT','SHIBUSDT','XRPUSDT','ADAUSDT','MATICUSDT','TRXUSDT'].includes(symbol);
@@ -277,6 +278,10 @@ async function tick() {
   ticking = true;
   tickCount++;
   try {
+    if (settings.get('PAUSED')) {
+      logger.info('⏸️ Bot is paused — /resume to restart');
+      return;
+    }
     // Live: dacă OCO-ul de la exchange s-a executat (SL sau TP), poziția nu mai
     // există acolo — sincronizăm, altfel botul ar deschide alta peste ea
     if (!cfg.PAPER_TRADING && openPosition?.hasProtection && typeof exchange.getOpenOrders === 'function') {
@@ -398,6 +403,24 @@ async function tick() {
       ? strategies.druckenmillerMultiplier(signal.confidence, signal.criteriaScore, stratData.livermore, stratData.turtle)
       : 1.0;
 
+    // ─── Strategy mode filter (Telegram /method setting) ────────
+    const stratMode = settings.get('STRATEGY_MODE');
+    if (stratMode !== 'auto' && !openPosition && (signal.action === 'BUY' || signal.action === 'SELL')) {
+      let blocked = false;
+      if (stratMode === 'turtle' && !stratData.turtle.signal) blocked = true;
+      else if (stratMode === 'livermore' &&
+               !((stratData.livermore.trend === 'BULLISH' && signal.action === 'BUY') ||
+                 (stratData.livermore.trend === 'BEARISH' && signal.action === 'SELL'))) blocked = true;
+      else if (stratMode === 'soros' &&
+               !((stratData.soros.direction === 'BULLISH' && signal.action === 'BUY') ||
+                 (stratData.soros.direction === 'BEARISH' && signal.action === 'SELL'))) blocked = true;
+      else if (stratMode === 'ptj' && (signal.confidence < 85 || signal.criteriaScore < 4)) blocked = true;
+      if (blocked) {
+        logger.info(`⚡ Method ${stratMode}: not confirmed — HOLD`);
+        signal.action = 'HOLD';
+      }
+    }
+
     // ─── Hard filter: Jesse Livermore anti-contra-trend rule ──
     // "Never fight the tape." — dacă Livermore + Turtle sunt unanimi,
     // blocăm AI-ul să intre contra trendului (indiferent de RSI/MACD)
@@ -429,7 +452,7 @@ async function tick() {
     }
 
     // Execuție
-    if (signal.action === 'HOLD' || signal.confidence < cfg.MIN_CONFIDENCE || !criteriaOk || (!volumeOk && !openPosition)) {
+    if (signal.action === 'HOLD' || signal.confidence < settings.get('MIN_CONFIDENCE') || !criteriaOk || (!volumeOk && !openPosition)) {
       logger.info(`HOLD — confidence: ${signal.confidence}% | criterii: ${signal.criteriaScore ?? '?'}/5 | volum: ${ind.volumeRatio}×`);
     } else if (signal.action === 'CLOSE' && openPosition) {
       await closeTrade(price, 'AI_CLOSE');
