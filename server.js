@@ -1735,16 +1735,27 @@ a{text-decoration:none}
       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
         <tr>
           <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">1</td>
-          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:0.2px">Deploy bot to Railway (one click)</td>
+          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:0.2px">Deploy bot to Railway (3 steps, under 2 min)</td>
         </tr>
       </table>
-      <p style="margin:0 0 16px;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Railway is a cloud platform that runs your bot 24/7 — it never sleeps, so your bot keeps trading. New accounts get $5 free credit to start. Click below to deploy — no server setup required.</p>
+      <p style="margin:0 0 14px;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Railway runs your bot 24/7 in the cloud — no server, no laptop needed. New accounts get $5 free credit. Follow the 3 steps below:</p>
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr><td style="padding-bottom:10px;text-align:center">
-          <a href="https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:900;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">&#128640; Deploy Bot to Railway &rarr;</a>
+        <tr><td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
+          <p style="margin:0;font-size:12px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">&#10122; Create a free Railway account</p>
+          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">Go to <a href="https://railway.app" style="color:#f59e0b;text-decoration:none;font-weight:700">railway.app</a> &rarr; Sign up with GitHub (free)</p>
         </td></tr>
+        <tr><td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
+          <p style="margin:0;font-size:12px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">&#10123; Create a new project from GitHub</p>
+          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">Dashboard &rarr; <strong style="color:#e2e8f0">New Project</strong> &rarr; <strong style="color:#e2e8f0">Deploy from GitHub repo</strong> &rarr; search <strong style="color:#f59e0b">apex-trade-bot</strong> &rarr; Deploy Now</p>
+        </td></tr>
+        <tr><td style="padding:8px 0;vertical-align:top">
+          <p style="margin:0;font-size:12px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">&#10124; Add your environment variables (Step 4 below)</p>
+          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">In Railway: your project &rarr; <strong style="color:#e2e8f0">Variables</strong> tab &rarr; paste all keys from Step 4</p>
+        </td></tr>
+      </table>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px">
         <tr><td style="text-align:center">
-          <a href="https://railway.app" style="font-size:11px;color:#475569;font-family:Arial,sans-serif;text-decoration:underline">Don&rsquo;t have Railway? Create a free account first &rarr;</a>
+          <a href="https://railway.app/new" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:900;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">&#128640; Open Railway &rarr;</a>
         </td></tr>
       </table>
     </td></tr>
@@ -1821,7 +1832,11 @@ a{text-decoration:none}
         ${envRow('TRADE_SYMBOL', `Optional. E.g. ${pill('DOGEUSDT')}. Leave empty &mdash; AI picks best coin.`)}
         <tr>
           <td style="padding:9px 14px 0 0;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">TELEGRAM_BOT_TOKEN</td>
-          <td style="padding:9px 0 0;font-size:12px;color:#94a3b8;font-family:Arial,sans-serif;vertical-align:top">Optional &mdash; live trade alerts on your phone</td>
+          <td style="padding:9px 0 0;font-size:12px;color:#94a3b8;font-family:Arial,sans-serif;vertical-align:top">Optional &mdash; token from @BotFather &rarr; <code style="font-size:11px">/newbot</code></td>
+        </tr>
+        <tr>
+          <td style="padding:6px 14px 0 0;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">TELEGRAM_CHAT_ID</td>
+          <td style="padding:6px 0 0;font-size:12px;color:#94a3b8;font-family:Arial,sans-serif;vertical-align:top">Optional &mdash; your ID from @userinfobot &rarr; send it <code style="font-size:11px">/start</code></td>
         </tr>
       </table>
     </td></tr>
