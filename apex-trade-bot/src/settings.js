@@ -9,7 +9,8 @@ const DEFAULTS = {
   STOP_LOSS_PCT:   cfg.STOP_LOSS_PCT,
   TAKE_PROFIT_PCT: cfg.TAKE_PROFIT_PCT,
   MIN_CONFIDENCE:  cfg.MIN_CONFIDENCE,
-  PAUSED:          false,
+  SYMBOL:          cfg.SYMBOL,   // trading pair — changeable via /symbol
+  PAUSED:          true,         // start PAUSED — client must press Start after setup
 };
 
 let _s = { ...DEFAULTS };
