@@ -1,0 +1,23 @@
+{
+  "name": "apex-trade-bot",
+  "version": "2.0.0",
+  "description": "Apex Trade Bot v2 — AI crypto trading cu trailing stop, ATR, backtest (Claude Haiku)",
+  "main": "src/index.js",
+  "scripts": {
+    "start":    "node src/index.js",
+    "test":     "node --test tests/*.js",
+    "paper":    "PAPER_TRADING=true node src/index.js",
+    "testnet":  "BYBIT_TESTNET=true node src/index.js",
+    "backtest": "node src/backtest.js",
+    "bt:doge":  "BT_SYMBOL=DOGEUSDT BT_TIMEFRAME=15m BT_CANDLES=500 node src/backtest.js",
+    "bt:xrp":   "BT_SYMBOL=XRPUSDT  BT_TIMEFRAME=15m BT_CANDLES=500 node src/backtest.js",
+    "bt:trx":   "BT_SYMBOL=TRXUSDT  BT_TIMEFRAME=15m BT_CANDLES=500 node src/backtest.js",
+    "bt:all":   "npm run bt:doge && npm run bt:xrp && npm run bt:trx"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.20.0",
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5"
+  },
+  "engines": { "node": ">=18.0.0" }
+}
