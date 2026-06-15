@@ -9,15 +9,15 @@ function getAnthropic() {
   return anthropicClient;
 }
 
-// ─── Groq (gratuit — fallback) ────────────────────────────
+// ─── Groq (free fallback) ────────────────────────────────
 async function callGroq(prompt) {
   const key = process.env.GROQ_API_KEY || '';
-  if (!key) throw new Error('GROQ_API_KEY lipsă');
+  if (!key) throw new Error('GROQ_API_KEY missing');
 
   const { data } = await axios.post(
     'https://api.groq.com/openai/v1/chat/completions',
     {
-      model: 'llama-3.3-70b-versatile',  // model gratuit puternic
+      model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 400,
       temperature: 0,
@@ -33,11 +33,11 @@ async function callGroq(prompt) {
   const text  = data.choices[0].message.content.trim();
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('No JSON in Groq response');
-  console.log('[AI] ✅ Groq (gratuit) — semnal generat');
+  console.log('[AI] ✅ Groq — signal generated');
   return JSON.parse(match[0]);
 }
 
-// ─── Anthropic (plătit) ───────────────────────────────────
+// ─── Anthropic (paid, optional) ──────────────────────────
 async function callAnthropic(prompt) {
   const MODELS = [
     'claude-haiku-4-5-20251001',
@@ -58,7 +58,7 @@ async function callAnthropic(prompt) {
     } catch (err) {
       const status = err.status || err.response?.status || 'N/A';
       console.error(`[AI ❌] Anthropic ${model} | Status: ${status} | ${err.message}`);
-      // Credit insuficient sau key invalid — nu mai încearca alte modele
+      // Invalid key or insufficient credits — stop trying other models
       if (status === 400 || status === 401) break;
     }
   }
@@ -79,68 +79,68 @@ async function getSignal(indicators, balance, openPosition, strategyData = null)
     legendarySection = `
 ## LEGENDARY TRADERS ANALYSIS
 ### 🐢 Turtle Trading (Richard Dennis / Eckhardt)
-- Breakout signal: ${turtle.signal ?? 'NONE'} | Putere: ${turtle.breakoutStr}
-- High 20 perioade: ${turtle.high20} | Low 20 perioade: ${turtle.low20}
+- Breakout signal: ${turtle.signal ?? 'NONE'} | Strength: ${turtle.breakoutStr}
+- High 20 periods: ${turtle.high20} | Low 20 periods: ${turtle.low20}
 - Near breakout: ${turtle.nearSignal ?? 'NO'}
 
 ### 📐 Jesse Livermore (Pivot Structure)
-- Trend structură: ${livermore.trend} (${livermore.reason ?? 'N/A'})
-- Putere semnal: ${livermore.strength !== undefined ? (livermore.strength * 100).toFixed(0) + '%' : 'N/A'}
-- Regula: dacă trend=BULLISH → confirmă BUY; dacă BEARISH → confirmă SELL; NEUTRAL → prudent
+- Trend structure: ${livermore.trend} (${livermore.reason ?? 'N/A'})
+- Signal strength: ${livermore.strength !== undefined ? (livermore.strength * 100).toFixed(0) + '%' : 'N/A'}
+- Rule: if trend=BULLISH → confirms BUY; if BEARISH → confirms SELL; NEUTRAL → caution
 
 ### 💡 George Soros (Reflexivity / Momentum)
-- Direcție momentum: ${soros.direction}
-- Bullish candles: ${soros.momentum !== undefined ? (soros.momentum * 100).toFixed(0) + '%' : 'N/A'} din ultimele 8
-- Velocity preț: ${soros.velocity !== undefined ? soros.velocity.toFixed(3) + '%' : 'N/A'}
+- Momentum direction: ${soros.direction}
+- Bullish candles: ${soros.momentum !== undefined ? (soros.momentum * 100).toFixed(0) + '%' : 'N/A'} of last 8
+- Price velocity: ${soros.velocity !== undefined ? soros.velocity.toFixed(3) + '%' : 'N/A'}
 
-### 📊 Sesiune curentă (Ed Seykota rules)
-- Pierderi consecutive: ${session.consecutiveLosses} (stop la 3)
-- Câștiguri consecutive: ${session.consecutiveWins}
-- Tranzacții azi: ${session.dailyTrades}/10
-- PnL zilnic: ${session.dailyPnL >= 0 ? '+' : ''}$${session.dailyPnL.toFixed(4)}`;
+### 📊 Current session (Ed Seykota rules)
+- Consecutive losses: ${session.consecutiveLosses} (stop at 3)
+- Consecutive wins: ${session.consecutiveWins}
+- Trades today: ${session.dailyTrades}/10
+- Daily PnL: ${session.dailyPnL >= 0 ? '+' : ''}$${session.dailyPnL.toFixed(4)}`;
   }
 
-  const prompt = `Ești un trader profesionist cu 20 ani experiență. Aplici regulile marilor traideri: Turtle breakout, Livermore structure, Soros momentum, PTJ defense. Analizează TOATE datele și dă un semnal precis.
+  const prompt = `You are a professional trader with 20 years of experience. Apply the rules of legendary traders: Turtle breakout, Livermore structure, Soros momentum, PTJ defense. Analyze ALL data and give a precise signal.
 
 ## MARKET DATA — ${cfg.SYMBOL} (${cfg.TIMEFRAME})
-### Preț & Trend
-- Preț curent: $${indicators.price}
+### Price & Trend
+- Current price: $${indicators.price}
 - EMA 20: ${indicators.ema20} | EMA 50: ${indicators.ema50} | EMA 200: ${indicators.ema200}
-- Trend EMA20/50: ${indicators.emaTrend} | Trend EMA50/200: ${indicators.ema200Trend}
-- Preț vs EMA20: ${indicators.priceVsEma20}
-- Structura pieței: ${indicators.marketStructure}
+- EMA20/50 trend: ${indicators.emaTrend} | EMA50/200 trend: ${indicators.ema200Trend}
+- Price vs EMA20: ${indicators.priceVsEma20}
+- Market structure: ${indicators.marketStructure}
 
 ### Momentum
-- RSI (14): ${indicators.rsi} ${rsi < 30 ? '⚡ OVERSOLD EXTREM' : rsi < 40 ? '📉 Oversold' : rsi > 70 ? '🔥 OVERBOUGHT EXTREM' : rsi > 60 ? '📈 Overbought' : '⚖️ Neutru'}
+- RSI (14): ${indicators.rsi} ${rsi < 30 ? '⚡ EXTREME OVERSOLD' : rsi < 40 ? '📉 Oversold' : rsi > 70 ? '🔥 EXTREME OVERBOUGHT' : rsi > 60 ? '📈 Overbought' : '⚖️ Neutral'}
 - Stoch RSI K: ${indicators.stochRsiK} | D: ${indicators.stochRsiD} ${srsiK < 20 ? '⚡ Oversold' : srsiK > 80 ? '🔥 Overbought' : ''}
 - MACD Histogram: ${indicators.macdHist} ${macdH > 0 ? '▲ Bullish' : '▼ Bearish'}
-- Divergență RSI: ${indicators.divergence} ${indicators.divergence !== 'NONE' ? '⚡ SEMNAL PUTERNIC!' : ''}
+- RSI Divergence: ${indicators.divergence} ${indicators.divergence !== 'NONE' ? '⚡ STRONG SIGNAL!' : ''}
 
-### Volatilitate & Volum
-- ATR: ${indicators.atrPct}% din preț
-- BB Bandwidth: ${indicators.bb_bandwidth}% | Poziție în BB: ${indicators.bb_position}% ${bbPos < 15 ? '📉 La lower band' : bbPos > 85 ? '📈 La upper band' : ''}
-- Volum ratio: ${indicators.volumeRatio}× ${volR > 1.5 ? '⚡ VOLUM MARE' : volR < 0.7 ? '⚠️ Volum mic' : ''}
-- High recent (8h): ${indicators.high24h} | Low recent (8h): ${indicators.low24h}
+### Volatility & Volume
+- ATR: ${indicators.atrPct}% of price
+- BB Bandwidth: ${indicators.bb_bandwidth}% | BB Position: ${indicators.bb_position}% ${bbPos < 15 ? '📉 At lower band' : bbPos > 85 ? '📈 At upper band' : ''}
+- Volume ratio: ${indicators.volumeRatio}× ${volR > 1.5 ? '⚡ HIGH VOLUME' : volR < 0.7 ? '⚠️ Low volume' : ''}
+- Recent high (8h): ${indicators.high24h} | Recent low (8h): ${indicators.low24h}
 
-### Ultimele 5 lumânări
+### Last 5 candles
 ${indicators.recentCandles.map((c, i) => `${i+1}. ${c.direction} O:${c.open} H:${c.high} L:${c.low} C:${c.close} (body: ${c.bodyPct}%)`).join('\n')}
 ${legendarySection}
-## CONT
-- Balanță: $${balance.toFixed(2)} USDT
-- Poziție deschisă: ${openPosition ? `${openPosition.side} @ $${openPosition.entryPrice} | PnL: ${openPosition.pnlPct?.toFixed(2)}%` : 'NICIUNA'}
+## ACCOUNT
+- Balance: $${balance.toFixed(2)} USDT
+- Open position: ${openPosition ? `${openPosition.side} @ $${openPosition.entryPrice} | PnL: ${openPosition.pnlPct?.toFixed(2)}%` : 'NONE'}
 
-## REGULI DE INTRARE
-- SL: ${cfg.STOP_LOSS_PCT * 100}% | TP: ${cfg.TAKE_PROFIT_PCT * 100}% | Risc: ${cfg.RISK_PER_TRADE * 100}%
+## ENTRY RULES
+- SL: ${cfg.STOP_LOSS_PCT * 100}% | TP: ${cfg.TAKE_PROFIT_PCT * 100}% | Risk: ${cfg.RISK_PER_TRADE * 100}%
 - Minimum confidence: ${cfg.MIN_CONFIDENCE}%
-- CRITERII BUY (min 3/5): trend bullish, RSI<50 sau div.bullish, MACD▲, volum>1.2×, preț sub EMA20
-- CRITERII SELL (min 3/5): trend bearish, RSI>50 sau div.bearish, MACD▼, volum>1.2×, preț peste EMA20
-- BONUS +1 criteriu dacă Turtle=STRONG BUY/SELL SAU Livermore confirmă direcția SAU Soros momentum alininat
-- Nu tranzacționa contra trendului Livermore cu putere >0.8
+- BUY CRITERIA (min 3/5): bullish trend, RSI<50 or bullish div, MACD▲, volume>1.2×, price below EMA20
+- SELL CRITERIA (min 3/5): bearish trend, RSI>50 or bearish div, MACD▼, volume>1.2×, price above EMA20
+- BONUS +1 criterion if Turtle=STRONG BUY/SELL OR Livermore confirms direction OR Soros momentum aligned
+- Do not trade against Livermore trend with strength >0.8
 
-Răspunde DOAR cu JSON valid:
-{"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 prop română>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}`;
+Respond ONLY with valid JSON:
+{"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 sentences>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}`;
 
-  // Încearcă Anthropic, dacă nu merge → Groq (gratuit)
+  // Try Anthropic first, fall back to Groq (free)
   try { return sanitize(await callAnthropic(prompt)); } catch {}
   try { return sanitize(await callGroq(prompt)); } catch (err) {
     console.error('[AI ❌] Groq failed:', err.message);
