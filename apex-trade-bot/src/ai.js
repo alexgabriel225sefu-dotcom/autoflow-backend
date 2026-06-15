@@ -146,8 +146,8 @@ Răspunde DOAR cu JSON valid:
     console.error('[AI ❌] Groq failed:', err.message);
   }
 
-  console.error('[AI ❌] Toate sursele AI au eșuat — HOLD');
-  return { action: 'HOLD', confidence: 0, reasoning: 'Eroare AI', riskLevel: 'HIGH', keyFactors: [], criteriaScore: 0 };
+  console.error('[AI ❌] All AI sources failed — HOLD');
+  return { action: 'HOLD', confidence: 0, reasoning: 'AI error', riskLevel: 'HIGH', keyFactors: [], criteriaScore: 0 };
 }
 
 // Validare strictă a JSON-ului de la LLM. Fără asta, "confidence":"high"

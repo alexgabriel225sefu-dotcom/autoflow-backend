@@ -180,7 +180,7 @@ function serve(getData, logger) {
   const PORT  = parseInt(process.env.PORT || process.env.DASHBOARD_PORT || '3000');
   const TOKEN = process.env.DASHBOARD_TOKEN || '';
   if (!TOKEN) {
-    console.warn('⚠️  DASHBOARD_TOKEN nu e setat — dashboard-ul (balanță + istoric) e PUBLIC pe URL-ul Railway.');
+    console.warn('⚠️  DASHBOARD_TOKEN not set — dashboard (balance + history) is PUBLIC on the Railway URL.');
   }
   http.createServer((req, res) => {
     // Railway healthcheck — fără auth, nu expune date

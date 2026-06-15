@@ -112,7 +112,7 @@ function applyFilters(info, quantity, price, symbol = '?') {
 // Rotunjește cantitatea la stepSize-ul perechii (LOT_SIZE) și validează minNotional
 async function normalizeQty(symbol, quantity, price) {
   const info = await getSymbolInfo(symbol);
-  if (!info) throw new Error(`Binance: simbol necunoscut ${symbol}`);
+  if (!info) throw new Error(`Binance: unknown symbol ${symbol}`);
   return applyFilters(info, quantity, price, symbol);
 }
 
@@ -175,7 +175,7 @@ async function cancelAllOrders(symbol = cfg.SYMBOL) {
     const { data } = await client.delete(`/openOrders?${sign(params)}`, { headers: headers() });
     return data;
   } catch (e) {
-    // -2011 = nu există ordine deschise — nu e eroare
+    // -2011 = no open orders — not an error
     if (e.response?.data?.code === -2011) return null;
     throw e;
   }

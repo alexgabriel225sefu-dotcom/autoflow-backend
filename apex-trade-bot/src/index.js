@@ -139,8 +139,8 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = cfg.SYMBOL
     return;
   }
   const quantity = await calcQuantity(price, balance, symbol, druckMult);
-  if (quantity <= 0) { logger.warn(`Cantitate prea mică pentru ${symbol} @ $${price} — skip`); return; }
-  if (druckMult !== 1.0) logger.info(`🎯 Druckenmiller: mărime poziție ×${druckMult.toFixed(2)}`);
+  if (quantity <= 0) { logger.warn(`Quantity too small for ${symbol} @ $${price} — skip`); return; }
+  if (druckMult !== 1.0) logger.info(`🎯 Druckenmiller: position size ×${druckMult.toFixed(2)}`);
 
   const order = await exchange.placeOrder(side, quantity, symbol);
   // Live: folosește fill-ul real (preț mediu + cantitate executată), nu ticker-ul
@@ -266,7 +266,7 @@ async function bestSymbol() {
 
   results.sort((a, b) => b.score - a.score);
   const best = results[0];
-  if (best.sym !== cfg.SYMBOL) logger.info(`📡 Scanner: cel mai bun simbol → ${best.sym} (scor: ${best.score.toFixed(2)})`);
+  if (best.sym !== cfg.SYMBOL) logger.info(`📡 Scanner: best symbol → ${best.sym} (score: ${best.score.toFixed(2)})`);
   return best.sym;
 }
 
@@ -301,7 +301,7 @@ async function tick() {
       tg.alertHeartbeat(tickCount, hbBalance, openPosition, hbPrice);
     }
 
-    logger.info(`[${tickCount}] Analizez ${symbol} (${cfg.EXCHANGE})${activeSymbol ? ' 🔒 poziție activă' : ''}...`);
+    logger.info(`[${tickCount}] Analyzing ${symbol} (${cfg.EXCHANGE})${activeSymbol ? ' 🔒 active position' : ''}...`);
 
     const [candles, price] = await Promise.all([
       exchange.getCandles(symbol, cfg.TIMEFRAME, cfg.CANDLES),
@@ -438,7 +438,7 @@ async function tick() {
     } else if (signal.action === 'SELL' && !openPosition) {
       await openTrade('SELL', price, balance, parseFloat(ind.atr), symbol, druckMult);
     } else {
-      logger.info(`Skip — poziție ${openPosition ? 'deja deschisă' : 'deja închisă'}`);
+      logger.info(`Skip — position ${openPosition ? 'already open' : 'already closed'}`);
     }
 
     logger.printStats(await getBalance(), openPosition, price);
@@ -495,10 +495,10 @@ async function main() {
   tg.startPolling(() => dash, exchange);
 
   await verifyLicense();
-  logger.info('🚀 Prima analiză...');
+  logger.info('🚀 First analysis...');
   await tick();
   setInterval(tick, cfg.LOOP_INTERVAL_MS);
-  logger.info(`⏱️  Analiză la fiecare ${cfg.LOOP_INTERVAL_MS / 60000} minute.`);
+  logger.info(`⏱️  Analyzing every ${cfg.LOOP_INTERVAL_MS / 60000} minutes.`);
 }
 
 main().catch(err => { logger.error('Fatal: ' + err.message); process.exit(1); });
