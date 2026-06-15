@@ -1132,7 +1132,13 @@ const _FOREX_LIC_SALT = 'apex-forex-2025-v1'; // forex fallback — never change
 function _licSecrets(product = 'apex-bot') {
   const env = process.env.BOT_EMAIL_SECRET;
   const salt = product === 'apex-forex' ? _FOREX_LIC_SALT : _LIC_SALT;
-  return env ? [`${env}-${product}`, salt] : [salt];
+  // When BOT_EMAIL_SECRET is set, ONLY the env-derived secret is trusted for
+  // HMAC signing/verification. The hardcoded salt is deliberately dropped so
+  // that anyone who can read this source cannot forge valid keys. Legacy keys
+  // signed with the salt (issued before BOT_EMAIL_SECRET existed) still pass
+  // through the Supabase fallback in /api/verify-license, because every real
+  // buyer's key is stored active in the licenses table.
+  return env ? [`${env}-${product}`] : [salt];
 }
 
 function _hmacMac4(data, secret) {
