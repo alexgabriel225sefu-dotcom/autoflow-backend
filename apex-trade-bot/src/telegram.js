@@ -4,9 +4,9 @@
  */
 const axios = require('axios');
 
-const TOKEN        = process.env.TELEGRAM_BOT_TOKEN || '';
-const CHAT_ID      = process.env.TELEGRAM_CHAT_ID   || '';
-const DASHBOARD_URL = process.env.DASHBOARD_URL      || '';
+const TOKEN        = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+const CHAT_ID      = (process.env.TELEGRAM_CHAT_ID   || '').trim();
+const DASHBOARD_URL = (process.env.DASHBOARD_URL      || '').trim();
 
 // ─── Send helpers ─────────────────────────────────────────
 async function send(text, extra = {}) {
