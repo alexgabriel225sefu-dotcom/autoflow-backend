@@ -2364,14 +2364,40 @@ Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsys
     }
   }
 
+  // ── CLEANUP: remove the OTHER bot's folder if it was nested in here by a
+  // mistaken earlier push (e.g. apex-forex-bot/ committed inside apex-trade-bot).
+  // Each bot must live in its own repo — a nested folder makes Railway build the
+  // wrong service. We mirror by deleting any blob under the stray bot dir.
+  const strayDir = bot === 'forex' ? 'apex-trade-bot' : 'apex-forex-bot';
+  let deleted = 0;
+  try {
+    const treeRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/HEAD?recursive=1`, {
+      headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+    });
+    if (treeRes.ok) {
+      const tree = await treeRes.json();
+      const stray = (tree.tree || []).filter(t => t.type === 'blob' && t.path.startsWith(`${strayDir}/`));
+      for (const f of stray) {
+        const delRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${f.path}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' },
+          body: JSON.stringify({ message: `Remove stray ${f.path} (wrong repo)`, sha: f.sha }),
+        });
+        if (delRes.ok) { deleted++; results.push({ file: f.path, ok: true, deleted: true }); }
+        else { const eb = await delRes.json().catch(() => ({})); results.push({ file: f.path, ok: false, deleted: true, ghError: eb.message }); errors++; }
+      }
+    }
+  } catch(e) { results.push({ cleanup: false, err: e.message }); }
+
   const allOk = errors === 0;
   res.json({
     success: allOk,
-    pushed: results.filter(r => r.ok).length,
+    pushed: results.filter(r => r.ok && !r.deleted).length,
+    deleted,
     failed: errors,
     results,
     repoUrl: `https://github.com/${OWNER}/${REPO}`,
-    railwayButton: `https://railway.app/new/template?template=https://github.com/${OWNER}/${REPO}`,
+    deployFromRepo: `https://railway.com/new — choose "Deploy from GitHub repo" → ${REPO}`,
   });
 });
 
