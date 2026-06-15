@@ -63,7 +63,7 @@ function buildStatus(dash, chart = '') {
     ? `\n<code>${chart}</code>  <b>$${dash.currentPrice?.toFixed(4) || '—'}</b>`
     : '';
 
-  let posLine = '📭 Nicio poziție deschisă';
+  let posLine = '📭 No open position';
   if (dash.openPosition) {
     const dir  = dash.openPosition.side === 'BUY' ? '🟢 LONG' : '🔴 SHORT';
     const pnl  = dash.openPosition.currentPnl || 0;
@@ -101,7 +101,7 @@ async function _fetchUpdates() {
 async function _handleStatus(chatId) {
   const dash = _getDash();
   if (!dash || !dash.exchange) {
-    return sendTo(chatId, '⏳ Bot pornește, mai așteaptă...');
+    return sendTo(chatId, '⏳ Bot is starting up, please wait...');
   }
   let chart = '';
   if (_exchange) {
@@ -127,13 +127,13 @@ async function _pollLoop() {
           await _handleStatus(chatId);
         else if (text === '/help')
           await sendTo(chatId,
-            '📋 <b>Comenzi disponibile:</b>\n' +
-            '/status — snapshot live\n' +
-            '/help — această listă'
+            '📋 <b>Available commands:</b>\n' +
+            '/status — live snapshot\n' +
+            '/help — this list'
           );
       }
     } catch (e) {
-      // token invalid / rețea picată — log + backoff, nu spin silențios la 2s
+      // token invalid / network down — log + backoff
       console.warn('[TG] Poll error:', e.message);
       await new Promise(r => setTimeout(r, 28000));
     }
@@ -196,14 +196,14 @@ function alertStart(symbol, timeframe, balance, mode) {
     `📊 ${symbol} | ${timeframe} | $${balance.toFixed(2)}\n` +
     `⚙️ ${mode}\n` +
     (DASHBOARD_URL ? `🌐 Dashboard: ${DASHBOARD_URL}\n` : '') +
-    `<i>Scrie /status pentru snapshot live</i>`,
+    `<i>Send /status for a live snapshot</i>`,
     dashboardKeyboard()
   );
 }
 
 // ─── Heartbeat (every 30 min) ────────────────────────────
 function alertHeartbeat(tickCount, balance, openPosition, currentPrice) {
-  let posLine = '📭 Nicio poziție';
+  let posLine = '📭 No open position';
   if (openPosition && currentPrice) {
     const dir = openPosition.side === 'BUY' ? 'LONG' : 'SHORT';
     const pnl = openPosition.side === 'BUY'
@@ -216,7 +216,7 @@ function alertHeartbeat(tickCount, balance, openPosition, currentPrice) {
   send(
     `💓 <b>ACTIVE</b>  tick #${tickCount}\n` +
     `💼 Balance: $${balance.toFixed(4)}\n` +
-    `${posLine}\n<i>/status pentru detalii</i>`,
+    `${posLine}\n<i>/status for details</i>`,
     dashboardKeyboard()
   );
 }
