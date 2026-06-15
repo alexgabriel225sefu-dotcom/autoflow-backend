@@ -2237,13 +2237,15 @@ app.post('/api/builder/logo', auth, _aiLimiter, async (req, res) => {
 // ════════════════════════════════════════
 app.get('/admin/sync-bot-repo', async (req, res) => {
   const secret = req.query.secret || '';
-  const ghToken = req.query.token || '';
+  // Token can come from the URL (?token=ghp_...) or, preferably, a Render env
+  // var GH_TOKEN so it stays out of browser history and URLs.
+  const ghToken = req.query.token || process.env.GH_TOKEN || '';
   const bot = (req.query.bot || 'crypto').toLowerCase();
   const adminSecret = process.env.BOT_EMAIL_SECRET || '';
 
   if (!adminSecret) return res.status(500).json({ error: 'BOT_EMAIL_SECRET not set' });
   if (secret !== adminSecret) return res.status(403).json({ error: 'Wrong secret' });
-  if (!ghToken) return res.status(400).json({ error: 'GitHub token required (?token=ghp_...)' });
+  if (!ghToken) return res.status(400).json({ error: 'GitHub token required — add GH_TOKEN in Render env, or pass ?token=ghp_...' });
   if (!['crypto', 'forex'].includes(bot)) return res.status(400).json({ error: "bot must be 'crypto' or 'forex'" });
 
   const fs = require('fs');
