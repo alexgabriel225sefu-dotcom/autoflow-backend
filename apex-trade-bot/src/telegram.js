@@ -1,6 +1,6 @@
 /**
  * APEX TRADE BOT — Telegram Alerts + Interactive Bot Controls
- * Commands: /menu /status /trades /chart /config /symbol /method /set /pause /resume /app /help
+ * Commands: /menu /status /trades /chart /config /method /set /pause /resume /app /help
  */
 const axios    = require('axios');
 const cfg      = require('./config');
@@ -18,12 +18,12 @@ function tvUrl(sym) { return `https://www.tradingview.com/chart/?symbol=${TV_EX[
 async function send(text, extra = {}) {
   if (!TOKEN || !CHAT_ID) return;
   try { await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, { chat_id: CHAT_ID, text, parse_mode: 'HTML', ...extra }, { timeout: 6000 }); }
-  catch (e) { console.warn('[TG] Send error:', e.message); }
+  catch (e) { console.warn('[TG] Send error:', e.message, e.response?.data?.description || ''); }
 }
 async function sendTo(chatId, text, extra = {}) {
   if (!TOKEN) return;
   try { await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, { chat_id: chatId, text, parse_mode: 'HTML', ...extra }, { timeout: 6000 }); }
-  catch (e) { console.warn('[TG] Send error:', e.message); }
+  catch (e) { console.warn('[TG] Send error:', e.message, e.response?.data?.description || ''); }
 }
 async function answerCb(id) {
   try { await axios.post(`https://api.telegram.org/bot${TOKEN}/answerCallbackQuery`, { callback_query_id: id }, { timeout: 5000 }); } catch {}
@@ -53,6 +53,7 @@ function menuKeyboard() {
   if (DASHBOARD_URL) rows.push([{ text: '🚀 Open App', web_app: { url: DASHBOARD_URL } }]);
   return { reply_markup: JSON.stringify({ inline_keyboard: rows }) };
 }
+
 function symbolKeyboard() {
   return {
     reply_markup: JSON.stringify({
@@ -86,7 +87,7 @@ function buildStatus(dash, chart = '') {
   const winRate = total > 0 ? ((wins/total)*100).toFixed(0)+'%' : '—';
   const chartLine = chart ? `\n<code>${chart}</code>  <b>$${dash.currentPrice?.toFixed(4)||'—'}</b>` : '';
   const mode   = settings.get('STRATEGY_MODE');
-  const paused = settings.get('PAUSED') ? '\n⏸️ <b>PAUSED</b> — press ▶️ Start in /menu' : '';
+  const paused = settings.get('PAUSED') ? '\n⏸️ <b>PAUSED</b> — /resume to restart' : '';
   let posLine = '📭 No open position';
   if (dash.openPosition) {
     const dir = dash.openPosition.side === 'BUY' ? '🟢 LONG' : '🔴 SHORT';
@@ -95,7 +96,7 @@ function buildStatus(dash, chart = '') {
   }
   return (
     `⚡ <b>APEX TRADE BOT</b>  ${dash.mode||''} · ${dash.exchange||''}\n` +
-    `💎 Symbol: <b>${settings.get('SYMBOL')}</b>  · Method: <b>${mode.toUpperCase()}</b>${paused}\n━━━━━━━━━━━━━━━━━━━━\n` +
+    `Method: <b>${mode.toUpperCase()}</b>${paused}\n━━━━━━━━━━━━━━━━━━━━\n` +
     `💰 Balance: <b>$${(dash.balance||0).toFixed(2)}</b>  (${pnlSign}${pnlPct}%)${chartLine}\n\n` +
     `${posLine}\n\n` +
     `📈 ${total} trades · ${wins}W/${total-wins}L · Win: ${winRate}\n⏱️ Last tick: ${dash.lastTick||'—'}`
@@ -107,13 +108,12 @@ function buildConfig() {
   const DESC = { auto:'🤖 Auto — all strategies', turtle:'🐢 Turtle breakout', livermore:'📐 Livermore pivot', soros:'💡 Soros momentum', ptj:'🛡️ PTJ defense', druckenmiller:'📊 Druckenmiller sizing' };
   return (
     `⚙️ <b>CURRENT CONFIGURATION</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
-    `💎 Symbol: <b>${s.SYMBOL}</b>\n` +
     `🎯 Method: <b>${DESC[s.STRATEGY_MODE]||s.STRATEGY_MODE}</b>\n` +
     `💸 Risk/trade: <b>${(s.RISK_PER_TRADE*100).toFixed(1)}%</b>\n` +
     `🛡 Stop Loss: <b>${(s.STOP_LOSS_PCT*100).toFixed(1)}%</b>\n` +
     `🎯 Take Profit: <b>${(s.TAKE_PROFIT_PCT*100).toFixed(1)}%</b>\n` +
     `🧠 Min confidence: <b>${s.MIN_CONFIDENCE}%</b>\n` +
-    `⏸️ Paused: <b>${s.PAUSED?'YES':'NO'}</b>\n\n<i>Edit with /set, /symbol, /method — instant effect</i>`
+    `⏸️ Paused: <b>${s.PAUSED?'YES':'NO'}</b>\n\n<i>Edit with /set or /method — instant effect</i>`
   );
 }
 
@@ -242,6 +242,11 @@ async function _handleCallback(cb) {
 }
 
 async function _pollLoop() {
+  // Clear any stale webhook so polling works cleanly after redeploy
+  try {
+    await axios.post(`https://api.telegram.org/bot${TOKEN}/deleteWebhook`, { drop_pending_updates: true }, { timeout: 5000 });
+  } catch {}
+
   while (true) {
     try {
       const updates = await _fetchUpdates();
@@ -257,7 +262,7 @@ async function _pollLoop() {
         const parts = raw.toLowerCase().split(/\s+/);
         const cmd   = parts[0];
         const args  = parts.slice(1);
-        const sym   = _getDash()?.currentSymbol || settings.get('SYMBOL');
+        const sym   = _getDash()?.currentSymbol || cfg.SYMBOL;
 
         if      (cmd==='/status'||cmd==='/s')   await _handleStatus(chatId);
         else if (cmd==='/config'||cmd==='/c')   await sendTo(chatId, buildConfig());
@@ -279,8 +284,8 @@ async function _pollLoop() {
         }
         else if (cmd==='/method') await _handleMethod(chatId, args[0]);
         else if (cmd==='/set')    await _handleSet(chatId, args);
-        else if (cmd==='/pause')  { settings.set('PAUSED',true);  await sendTo(chatId,'⏸️ <b>Bot PAUSED</b> — no new trades until you press Start'); }
-        else if (cmd==='/resume') { settings.set('PAUSED',false); await sendTo(chatId,'▶️ <b>Bot STARTED</b> — trading active! Good luck 🚀'); }
+        else if (cmd==='/pause')  { settings.set('PAUSED',true);  await sendTo(chatId,'⏸️ <b>Bot PAUSED</b> — no new trades until /resume'); }
+        else if (cmd==='/resume') { settings.set('PAUSED',false); await sendTo(chatId,'▶️ <b>Bot RESUMED</b> — trading active again'); }
         else if (cmd==='/help')   await sendTo(chatId,
           `📋 <b>APEX BOT COMMANDS</b>\n\n` +
           `<b>Quick access:</b>\n/menu · /app · /chart\n\n` +
@@ -291,8 +296,15 @@ async function _pollLoop() {
         );
       }
     } catch (e) {
-      console.warn('[TG] Poll error:', e.message);
-      await new Promise(r => setTimeout(r, 28000));
+      const status = e.response?.status;
+      if (status === 409) {
+        // Another instance is polling — wait for it to stop (Railway deploy overlap)
+        console.warn('[TG] Poll 409 — previous instance still running, waiting 30s...');
+        await new Promise(r => setTimeout(r, 30000));
+      } else {
+        console.warn('[TG] Poll error:', e.message, e.response?.data?.description || '');
+        await new Promise(r => setTimeout(r, 5000));
+      }
     }
     await new Promise(r => setTimeout(r, 2000));
   }
@@ -316,7 +328,7 @@ function startPolling(getDash, exchange) {
   _exchange = exchange;
   _pollLoop();
   _scheduleDailyReport(getDash);
-  console.log('[TELEGRAM] Polling started — /menu /symbol /status /trades /chart /method /set /pause /resume /app /help');
+  console.log('[TELEGRAM] Polling started — /menu /status /trades /chart /config /method /set /pause /resume /app /help');
 }
 
 // ─── Alerts ───────────────────────────────────────────────
@@ -352,14 +364,15 @@ function alertStart(symbol, timeframe, balance, mode) {
     `⚡ <b>APEX TRADE BOT — READY</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `⏸️ <b>Bot is PAUSED</b> — configure before trading!\n\n` +
-    `<b>Step 1:</b> Choose your coin → press 💎 Symbol\n` +
-    `<b>Step 2:</b> Choose strategy → press 🎯 Method\n` +
-    `<b>Step 3:</b> Review settings → press ⚙️ Config\n` +
-    `<b>Step 4:</b> Press ▶️ Start to begin trading\n\n` +
+    `<b>Step 1:</b> Choose your coin → /symbol\n` +
+    `<b>Step 2:</b> Choose strategy → /method\n` +
+    `<b>Step 3:</b> Review settings → /config\n` +
+    `<b>Step 4:</b> Press ▶️ Start in /menu\n\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `💎 Symbol: <b>${symbol}</b>  |  ⚙️ ${mode}\n` +
     `💸 Risk: <b>${(s.RISK_PER_TRADE*100).toFixed(1)}%</b>  ·  🛡 SL: <b>${(s.STOP_LOSS_PCT*100).toFixed(1)}%</b>  ·  🎯 TP: <b>${(s.TAKE_PROFIT_PCT*100).toFixed(1)}%</b>\n` +
-    `💼 Balance: <b>$${balance.toFixed(2)}</b>`,
+    `💼 Balance: <b>$${balance.toFixed(2)}</b>\n\n` +
+    `<i>When ready → /menu then press ▶️ Start</i>`,
     menuKeyboard()
   );
 }
@@ -380,7 +393,7 @@ async function alertHeartbeat(tickCount, balance, openPosition, currentPrice) {
     `💼 Balance: $${balance.toFixed(4)}\n` +
     (fg ? `🧠 Sentiment: ${fg}\n` : '') +
     `${posLine}\n<i>/menu · /chart · /trades</i>`,
-    dashboardKeyboard(openPosition?.symbol || settings.get('SYMBOL'))
+    dashboardKeyboard(openPosition?.symbol || cfg.SYMBOL)
   );
 }
 
