@@ -18,12 +18,12 @@ function tvUrl(sym) { return `https://www.tradingview.com/chart/?symbol=${TV_EX[
 async function send(text, extra = {}) {
   if (!TOKEN || !CHAT_ID) return;
   try { await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, { chat_id: CHAT_ID, text, parse_mode: 'HTML', ...extra }, { timeout: 6000 }); }
-  catch (e) { console.warn('[TG] Send error:', e.message); }
+  catch (e) { console.warn('[TG] Send error:', e.message, e.response?.data?.description || ''); }
 }
 async function sendTo(chatId, text, extra = {}) {
   if (!TOKEN) return;
   try { await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, { chat_id: chatId, text, parse_mode: 'HTML', ...extra }, { timeout: 6000 }); }
-  catch (e) { console.warn('[TG] Send error:', e.message); }
+  catch (e) { console.warn('[TG] Send error:', e.message, e.response?.data?.description || ''); }
 }
 async function answerCb(id) {
   try { await axios.post(`https://api.telegram.org/bot${TOKEN}/answerCallbackQuery`, { callback_query_id: id }, { timeout: 5000 }); } catch {}
@@ -242,6 +242,11 @@ async function _handleCallback(cb) {
 }
 
 async function _pollLoop() {
+  // Clear any stale webhook so polling works cleanly after redeploy
+  try {
+    await axios.post(`https://api.telegram.org/bot${TOKEN}/deleteWebhook`, { drop_pending_updates: true }, { timeout: 5000 });
+  } catch {}
+
   while (true) {
     try {
       const updates = await _fetchUpdates();
@@ -291,8 +296,15 @@ async function _pollLoop() {
         );
       }
     } catch (e) {
-      console.warn('[TG] Poll error:', e.message);
-      await new Promise(r => setTimeout(r, 28000));
+      const status = e.response?.status;
+      if (status === 409) {
+        // Another instance is polling — wait for it to stop (Railway deploy overlap)
+        console.warn('[TG] Poll 409 — previous instance still running, waiting 30s...');
+        await new Promise(r => setTimeout(r, 30000));
+      } else {
+        console.warn('[TG] Poll error:', e.message, e.response?.data?.description || '');
+        await new Promise(r => setTimeout(r, 5000));
+      }
     }
     await new Promise(r => setTimeout(r, 2000));
   }
