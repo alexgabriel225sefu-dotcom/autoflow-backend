@@ -2006,8 +2006,8 @@ app.post('/api/heygen/photo-generate', async (req, res) => {
 // Public pages — no auth required
 const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','apex-bot','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','affiliate','affiliate-terms'];
 publicPages.forEach(p => {
-  app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
-  app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
+  app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
+  app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
 });
 
 // ── BOT EMAIL HTML — funcție separată reutilizabilă ──────────────────────────
