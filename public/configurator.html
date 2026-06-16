@@ -380,9 +380,9 @@ const EX={
   KUCOIN: {n:'KuCoin',  ab:'KC',tag:'BETA',live:false,k1:'API Key',    k2:'API Secret',  where:'kucoin.com → My Account → API','hint':'No Withdraw permission.'},
   COINBASE:{n:'Coinbase',ab:'CB',tag:'BETA',live:false,k1:'API Key',   k2:'API Secret',  where:'coinbase.com → Settings → API','hint':'Requires Advanced Trade account.'},
   BITGET: {n:'Bitget',  ab:'BG',tag:'BETA',live:false,k1:'API Key',    k2:'Secret Key',  where:'bitget.com → Personal Center → API','hint':'Spot Read + Trade.'},
-  HTX:    {n:'HTX',     ab:'HT',tag:'BETA',live:false,k1:'Access Key', k2:'Secret Key',  where:'htx.com → API Management',    hint:'Read + Trade only.'},
+  MEXC:   {n:'MEXC',    ab:'MX',tag:'BETA',live:false,k1:'API Key',    k2:'Secret Key',  where:'mexc.com → Account → API Management', hint:'Enable Spot Read + Trade. No Withdraw.'},
 };
-const EK={BINANCE:['BINANCE_API_KEY','BINANCE_API_SECRET'],BYBIT:['BYBIT_API_KEY','BYBIT_API_SECRET'],OKX:['OKX_API_KEY','OKX_API_SECRET'],KRAKEN:['KRAKEN_API_KEY','KRAKEN_API_SECRET'],KUCOIN:['KUCOIN_API_KEY','KUCOIN_API_SECRET'],COINBASE:['COINBASE_API_KEY','COINBASE_API_SECRET'],BITGET:['BITGET_API_KEY','BITGET_API_SECRET'],HTX:['HUOBI_API_KEY','HUOBI_API_SECRET']};
+const EK={BINANCE:['BINANCE_API_KEY','BINANCE_API_SECRET'],BYBIT:['BYBIT_API_KEY','BYBIT_API_SECRET'],OKX:['OKX_API_KEY','OKX_API_SECRET'],KRAKEN:['KRAKEN_API_KEY','KRAKEN_API_SECRET'],KUCOIN:['KUCOIN_API_KEY','KUCOIN_API_SECRET'],COINBASE:['COINBASE_API_KEY','COINBASE_API_SECRET'],BITGET:['BITGET_API_KEY','BITGET_API_SECRET'],MEXC:['MEXC_API_KEY','MEXC_API_SECRET']};
 
 // Build exchange grid
 const exg=document.getElementById('exg');
@@ -450,6 +450,7 @@ function buildConfig(){
   const aiKv=document.getElementById('aiKey').value.trim();
   const tgT=document.getElementById('tgTok').value.trim();
   const tgC=document.getElementById('tgCid').value.trim();
+  const dt=document.getElementById('dtok').value.trim();
   const [ek1,ek2]=EK[S.ex];
   const cfg={
     EXCHANGE:S.ex.toLowerCase(),
@@ -474,6 +475,7 @@ function buildConfig(){
   if(aiKv){if(S.ai==='GROQ')cfg.GROQ_API_KEY=aiKv;else cfg.ANTHROPIC_API_KEY=aiKv;}
   if(tgT)cfg.TELEGRAM_BOT_TOKEN=tgT;
   if(tgC)cfg.TELEGRAM_CHAT_ID=tgC;
+  if(dt)cfg.DASHBOARD_TOKEN=dt;
   return cfg;
 }
 
