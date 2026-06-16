@@ -29,3 +29,6 @@ CREATE INDEX IF NOT EXISTS idx_referral_sales_affiliate_code ON referral_sales(a
 -- CREATE TABLE IF NOT EXISTS does not alter an existing table.
 ALTER TABLE affiliates ALTER COLUMN commission_percent SET DEFAULT 30;
 UPDATE affiliates SET commission_percent = 30 WHERE commission_percent = 20;
+
+-- Affiliate login: password (scrypt salt:hash, set on signup or account claim).
+ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS password_hash TEXT;

@@ -1185,6 +1185,26 @@ function _generateAffiliateCode(name) {
   const slug = (name || 'creator').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 10) || 'creator';
   return `${slug}${crypto.randomBytes(2).toString('hex')}`;
 }
+function _hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+function _verifyPassword(password, stored) {
+  if (!stored || !stored.includes(':')) return false;
+  const [salt, hash] = stored.split(':');
+  const check = crypto.scryptSync(String(password), salt, 64).toString('hex');
+  try { return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(check, 'hex')); } catch { return false; }
+}
+function _affiliateLink(code) { return `https://aicashsystem.space/?ref=${code}`; }
+// Resolve the logged-in affiliate code from a Bearer token; null if invalid.
+function _affiliateFromAuth(req) {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  const payload = verifyToken(token);
+  if (!payload || !payload.id) return null;
+  return String(payload.id).toLowerCase().trim();
+}
 
 // POST /api/affiliates/apply — { name, email, tiktokHandle } -> { code, link }
 app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
@@ -1208,6 +1228,85 @@ app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
     addLog(`New affiliate: ${cleanEmail} — code ${code}`, 'affiliate', 'success');
     res.json({ code, link: `https://aicashsystem.space/?ref=${code}` });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/affiliates/signup — { name, email, password, tiktokHandle } -> { token, code, link }
+app.post('/api/affiliates/signup', _authLimiter, async (req, res) => {
+  const { name, email, password, tiktokHandle } = req.body || {};
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
+  if (!password || String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const cleanEmail = email.toLowerCase().trim();
+  try {
+    const { data: existing } = await supabase.from('affiliates').select('code,password_hash').eq('email', cleanEmail).maybeSingle();
+    const pwHash = _hashPassword(password);
+    if (existing?.code) {
+      if (existing.password_hash) return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
+      // Claim a pre-existing (passwordless) affiliate row created before auth existed.
+      await supabase.from('affiliates').update({ password_hash: pwHash, name: name || '', tiktok_handle: tiktokHandle || '' }).eq('code', existing.code);
+      addLog(`Affiliate claimed account: ${cleanEmail} — code ${existing.code}`, 'affiliate', 'success');
+      return res.json({ token: createToken({ id: existing.code, email: cleanEmail }), code: existing.code, link: _affiliateLink(existing.code) });
+    }
+    let code;
+    for (let attempts = 0; attempts < 5; attempts++) {
+      code = _generateAffiliateCode(name);
+      const { data: clash } = await supabase.from('affiliates').select('code').eq('code', code).maybeSingle();
+      if (!clash) break;
+    }
+    const { error } = await supabase.from('affiliates').insert([{
+      code, email: cleanEmail, name: name || '', tiktok_handle: tiktokHandle || '', status: 'active', password_hash: pwHash
+    }]);
+    if (error) return res.status(500).json({ error: error.message });
+    addLog(`New affiliate signup: ${cleanEmail} — code ${code}`, 'affiliate', 'success');
+    res.json({ token: createToken({ id: code, email: cleanEmail }), code, link: _affiliateLink(code) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/affiliates/login — { email, password } -> { token, code, link }
+app.post('/api/affiliates/login', _authLimiter, async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const cleanEmail = email.toLowerCase().trim();
+  try {
+    const { data: aff } = await supabase.from('affiliates').select('code,password_hash,status').eq('email', cleanEmail).maybeSingle();
+    if (!aff || !aff.password_hash || !_verifyPassword(password, aff.password_hash)) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    if (aff.status !== 'active') return res.status(403).json({ error: 'This account is suspended.' });
+    res.json({ token: createToken({ id: aff.code, email: cleanEmail }), code: aff.code, link: _affiliateLink(aff.code) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/affiliates/me — dashboard data for the logged-in affiliate (Bearer token)
+app.get('/api/affiliates/me', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const code = _affiliateFromAuth(req);
+  if (!code) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    const { data: affiliate } = await supabase.from('affiliates').select('code,name,email,commission_percent,status').eq('code', code).maybeSingle();
+    if (!affiliate) return res.status(404).json({ error: 'Affiliate not found' });
+    const { data } = await supabase.from('referral_sales').select('amount,commission_amount,paid,product,created_at').eq('affiliate_code', code).order('created_at', { ascending: false });
+    const rows = data || [];
+    const totalCommission = rows.reduce((s, r) => s + r.commission_amount, 0);
+    const paidCommission  = rows.filter(r => r.paid).reduce((s, r) => s + r.commission_amount, 0);
+    res.json({
+      code: affiliate.code, name: affiliate.name, email: affiliate.email,
+      commissionPercent: affiliate.commission_percent, status: affiliate.status,
+      link: _affiliateLink(affiliate.code),
+      totalSales: rows.length,
+      totalCommissionCents: totalCommission,
+      paidCommissionCents: paidCommission,
+      unpaidCommissionCents: totalCommission - paidCommission,
+      sales: rows.map(r => ({ amount: r.amount, commission: r.commission_amount, paid: r.paid, product: r.product, date: r.created_at }))
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
