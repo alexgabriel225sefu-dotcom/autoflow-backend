@@ -127,6 +127,13 @@ module.exports.loadRemote = async function loadRemote() {
   const key    = module.exports.LICENSE_KEY;
   const server = module.exports.LICENSE_SERVER;
   if (!key) { console.warn('⚠️   loadRemote: LICENSE_KEY not set — skipping remote config.'); return false; }
+  // Env vars the user set explicitly in Railway (or .env) take precedence over
+  // the configurator's saved config. This lets a power user override a single
+  // setting straight in Railway — e.g. flip PAPER_TRADING to "false" to go
+  // live, or paste real API keys — without having to re-run the configurator,
+  // exactly as the setup guide instructs. Snapshotted here, before the loop
+  // below writes any remote value into process.env.
+  const userSet = new Set(Object.keys(process.env));
   try {
     const resp = await fetch(`${server}/api/bot-config?key=${encodeURIComponent(key)}`, {
       signal: AbortSignal.timeout(10000),
@@ -145,6 +152,7 @@ module.exports.loadRemote = async function loadRemote() {
     // stay a truthy string.
     for (const [k, v] of Object.entries(data.config)) {
       if (v === undefined || v === null || v === '') continue;
+      if (userSet.has(k)) { console.log(`ℹ️   ${k}: keeping Railway env value (overrides saved config)`); continue; }
       process.env[k] = String(v);
       if (Object.prototype.hasOwnProperty.call(module.exports, k)) {
         const cur = module.exports[k];

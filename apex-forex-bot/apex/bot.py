@@ -130,7 +130,17 @@ def load_remote():
         if not data.get("success") or not data.get("config"):
             print("⚠️   load_remote: no config in response.")
             return False
-        n = _apply_config(data["config"], "remote")
+        # Env vars the user set explicitly in Railway take precedence over the
+        # configurator's saved config — lets a power user flip PAPER_TRADING to
+        # "false" to go live, or paste live broker keys, straight in Railway
+        # without re-running the configurator (as the setup guide instructs).
+        # runtime.json (Telegram overrides) is applied separately, after this,
+        # and still wins — it is the live user-control layer.
+        remote_cfg = {k: v for k, v in data["config"].items() if k not in os.environ}
+        skipped = [k for k in data["config"] if k in os.environ]
+        if skipped:
+            print(f"ℹ️   Keeping Railway env values (override saved config): {', '.join(skipped)}")
+        n = _apply_config(remote_cfg, "remote")
         print(f"✅  Remote config loaded from license server ({n} settings).")
         return True
     except Exception as e:
