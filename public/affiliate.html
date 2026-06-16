@@ -367,13 +367,14 @@ async function requestPayout(){
   } catch (e) { showMsg(msg, 'Error: ' + e.message, false); btn.disabled = false; btn.textContent = 'Request payout'; }
 }
 // Silent refresh — pulls fresh numbers without flipping back to the loading view.
+// Returns: true = ok, 'unauthorized' = bad/expired token (log out), or an error string (keep session, just show it).
 async function refreshDashboard(){
-  if (!token()) return false;
+  if (!token()) return 'unauthorized';
   try {
     var r = await fetch('/api/affiliates/me', { headers: { 'Authorization': 'Bearer ' + token() } });
-    if (r.status === 401) { return false; }
+    if (r.status === 401) return 'unauthorized';
     var d = await r.json();
-    if (d.error) return false;
+    if (d.error) return d.error;
     populate(d);
     return true;
   } catch (err) { return null; } // null = network hiccup, keep session
@@ -382,7 +383,12 @@ async function loadDashboard(){
   if (!token()) { show('authView'); switchTab('login'); return; }
   show('loadView');
   var ok = await refreshDashboard();
-  if (ok === false) { clearToken(); show('authView'); switchTab('login'); return; }
+  if (ok === 'unauthorized') { clearToken(); show('authView'); switchTab('login'); return; }
+  if (ok !== true) {
+    show('authView'); switchTab('login');
+    showMsg(document.getElementById('liMsg'), 'Could not load your account: ' + (ok || 'unknown error') + '. Please log in again.', false);
+    return;
+  }
   show('dashView');
   if (_pollTimer) clearInterval(_pollTimer);
   // Live updates: re-pull every 20s while the tab is open and visible.
