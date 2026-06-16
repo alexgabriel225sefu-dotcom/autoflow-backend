@@ -221,6 +221,9 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .ai-spin-txt{font-size:9px;color:var(--t3)}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── PERSISTENT LEGAL DISCLAIMER ── */
+#legal{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);width:min(94%,560px);text-align:center;font-size:8px;line-height:1.45;color:var(--t3);z-index:96;pointer-events:none}
 </style>
 </head>
 <body>
@@ -228,13 +231,13 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <!-- ── SCENE 0: HOOK ── -->
 <div class="scene" id="s0">
   <div style="display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;padding:32px">
-    <div class="hook-tag">What Blueprint Studio students earn</div>
-    <div class="hook-pre">Average per client deal</div>
+    <div class="hook-tag">What clients pay for an automation</div>
+    <div class="hook-pre">Typical project price (market rate)</div>
     <div class="hook-money" id="hook-money">$0</div>
-    <div class="hook-sub">Generated in <strong>60 seconds</strong> — not hours.<br>Real Make.com blueprint, ready to sell.</div>
+    <div class="hook-sub">Built in <strong>60 seconds</strong> — not hours.<br>Real Make.com blueprint, ready to sell.</div>
     <div class="hook-proof">
       <span style="font-size:13px">🟢</span>
-      <span><strong style="color:var(--t1)">247 students</strong> enrolled · avg <strong style="color:var(--t1)">$850/client</strong></span>
+      <span>Example market rates for automation projects · <strong style="color:var(--t1)">results vary</strong></span>
     </div>
   </div>
 </div>
@@ -250,13 +253,13 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
         </div>
         <div style="flex:1;overflow:hidden;padding:0 14px 10px">
           <div class="sp-hero" style="padding:12px 0">
-            <div class="sp-badge">⚡ Limited Spots</div>
-            <div class="sp-h1">Turn $0 into<br><span>$3,000/month</span><br>selling AI automations</div>
-            <div class="sp-sub">No coding. No tech skills. Just Blueprint Studio + Make.com = paying clients.</div>
+            <div class="sp-badge">⚡ Blueprint Studio</div>
+            <div class="sp-h1">Sell AI automations<br><span>clients pay for</span><br>— no coding needed</div>
+            <div class="sp-sub">No coding. No tech skills. Blueprint Studio + Make.com gives you the tools to find and serve clients.</div>
             <div class="sp-feats">
               <div class="sp-feat"><div class="sp-feat-dot">✓</div>Blueprint Studio — generate automations in 60 sec</div>
               <div class="sp-feat"><div class="sp-feat-dot">✓</div>Ready-to-sell scripts + client outreach templates</div>
-              <div class="sp-feat"><div class="sp-feat-dot">✓</div>First client in your first week — guaranteed</div>
+              <div class="sp-feat"><div class="sp-feat-dot">✓</div>Step-by-step path to landing your first client</div>
             </div>
             <div class="sp-price-row">
               <div class="sp-price-old">$297</div>
@@ -264,7 +267,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
               <div class="sp-price-badge">67% OFF</div>
             </div>
             <button class="sp-cta">⚡ Enroll Now — Get Instant Access</button>
-            <div class="sp-proof">🔒 Secure checkout · <span>247 students already enrolled</span></div>
+            <div class="sp-proof">🔒 Secure checkout · <span>Instant access</span></div>
           </div>
         </div>
       </div>
@@ -291,7 +294,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
           <div class="cm-mod done"><div class="cm-mod-num">✓</div><div class="cm-mod-info"><div class="cm-mod-name">Client Outreach Scripts</div><div class="cm-mod-tag">Complete</div></div></div>
           <div class="cm-mod active" id="cm-active"><div class="cm-mod-num">▶</div><div class="cm-mod-info"><div class="cm-mod-name">Blueprint Studio — $300–$1,000/Client</div><div class="cm-mod-tag">▶ Now Playing — Module 7</div></div><div class="cm-mod-arrow">›</div></div>
           <div class="cm-mod locked"><div class="cm-mod-num">🔒</div><div class="cm-mod-info"><div class="cm-mod-name">Closing High-Ticket Deals</div><div class="cm-mod-tag">Locked</div></div></div>
-          <div class="cm-mod locked"><div class="cm-mod-num">🔒</div><div class="cm-mod-info"><div class="cm-mod-name">Scaling to $10k/month</div><div class="cm-mod-tag">Locked</div></div></div>
+          <div class="cm-mod locked"><div class="cm-mod-num">🔒</div><div class="cm-mod-info"><div class="cm-mod-name">Scaling Your Automation Business</div><div class="cm-mod-tag">Locked</div></div></div>
           <div class="cm-mod locked"><div class="cm-mod-num">🔒</div><div class="cm-mod-info"><div class="cm-mod-name">Building a Team & Automating Sales</div><div class="cm-mod-tag">Locked</div></div></div>
         </div>
       </div>
@@ -433,10 +436,11 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
       <div class="cta-bl">DM me the word</div>
       <div class="cta-bw">"BLUEPRINT"</div>
     </div>
-    <div class="cta-proof"><span>🟢 247 students enrolled</span>&nbsp;·&nbsp;<span>avg $850/client</span></div>
+    <div class="cta-proof"><span>🟢 Instant access</span>&nbsp;·&nbsp;<span>results vary</span></div>
   </div>
 </div>
 
+<div id="legal">Educational product. Results vary and are not typical — no income is promised or guaranteed. Dollar figures are example market rates clients may pay for automation projects, not your earnings. Building a business takes work and outcomes depend on your effort, skills and market.</div>
 <div id="prog"><div id="pfill"></div></div>
 <div id="fade"></div>
 <div class="glbl" id="glbl"></div>
@@ -533,12 +537,10 @@ function runS0(){
     el('s0').classList.add('s0on');
   }, 50);
   later(function(){ countUp('hook-money', 0, 1200, 2200); }, 600);
-  later(function(){ notify('🔔 Maria just enrolled — Romania'); }, 2000);
 }
 
 function runS1(){
   setLabel('aicashsystem.space');
-  later(function(){ notify('🔔 247 students enrolled'); }, 1500);
 }
 
 function runS2(){
@@ -614,7 +616,6 @@ function runS6(){
   var s6 = el('s6');
   s6.classList.remove('ctaon');
   later(function(){ s6.classList.add('ctaon'); }, 80);
-  later(function(){ notify('🔥 47 people DM\'d this week'); }, 1500);
 }
 
 var RUNNERS = [runS0, runS1, runS2, runS3, runS4, runS5, runS6];
