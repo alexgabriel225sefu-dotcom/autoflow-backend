@@ -24,3 +24,8 @@ CREATE TABLE IF NOT EXISTS referral_sales (
 );
 
 CREATE INDEX IF NOT EXISTS idx_referral_sales_affiliate_code ON referral_sales(affiliate_code);
+
+-- Run this if the tables already existed with the old 20% default —
+-- CREATE TABLE IF NOT EXISTS does not alter an existing table.
+ALTER TABLE affiliates ALTER COLUMN commission_percent SET DEFAULT 30;
+UPDATE affiliates SET commission_percent = 30 WHERE commission_percent = 20;
