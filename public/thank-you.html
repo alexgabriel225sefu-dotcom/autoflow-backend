@@ -80,17 +80,16 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
         </div>
         <p class="copyhint">We also emailed this to you, along with full setup instructions.</p>
         <div class="cta-row">
-          <a class="cta" id="tgBtn" href="#" target="_blank" rel="noopener" style="display:none">Activate on Telegram &rarr;</a>
           <a class="cta" id="ctaBtn" href="#" style="display:none">Open Bot Configurator &rarr;</a>
           <a class="cta-secondary" id="deployBtn" href="#" target="_blank" rel="noopener">Deploy My Bot Now (Railway) &rarr;</a>
         </div>
 
         <div class="steps">
           <div class="steps-label">What happens next</div>
-          <div class="step" id="stepTg" style="display:none"><div class="stepn">1</div><div class="stepbody">Tap <b>Activate on Telegram</b> above to link your license and start setup right in the chat.</div></div>
           <div class="step" id="step1"><div class="stepn" id="step1n">1</div><div class="stepbody">Open the <b>Bot Configurator</b> above — your license key is already filled in.</div></div>
           <div class="step"><div class="stepn" id="step2n">2</div><div class="stepbody">Choose how the bot should trade (pairs, risk level, strategy) and save your settings.</div></div>
           <div class="step"><div class="stepn" id="step3n">3</div><div class="stepbody">Click <b>Deploy My Bot Now</b> to launch it on Railway — free hosting tier included, live in under 10 minutes.</div></div>
+          <div class="step" id="stepTg"><div class="stepn" id="step4n">4</div><div class="stepbody">Optional: add your own <b>Telegram bot token</b> in Railway's variables (steps in your email) — your bot will then message you directly and you can control it with <b>/menu</b>, <b>/status</b>, <b>/pause</b> and more, right from the chat.</div></div>
         </div>
         <p class="email-note">Check your inbox (and spam folder) for the full setup email with this license key and step-by-step screenshots.</p>
       </div>
@@ -120,9 +119,6 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
 
   if (!sessionId) { show('stateError'); return; }
 
-  var botUsername = '';
-  fetch('/api/tg-config').then(function(r){ return r.json(); }).then(function(d){ botUsername = d.botUsername || ''; }).catch(function(){});
-
   var attempts = 0;
   var maxAttempts = 14; // ~35s of polling
 
@@ -140,22 +136,9 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
           var repo = isForex ? 'apex-forex-bot' : 'apex-trade-bot';
           document.getElementById('deployBtn').href = 'https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/' + repo;
 
-          var showTg = !isForex && botUsername;
-          var stepNum = 1;
-          if (showTg) {
-            var tgBtn = document.getElementById('tgBtn');
-            tgBtn.href = 'https://t.me/' + botUsername + '?start=' + encodeURIComponent(key);
-            tgBtn.style.display = 'block';
-            document.getElementById('stepTg').style.display = 'flex';
-            document.getElementById('ctaBtn').textContent = 'Or use the web configurator instead';
-            document.getElementById('ctaBtn').className = 'cta-secondary';
-            stepNum = 2;
-          }
           document.getElementById('ctaBtn').href = configuratorUrl;
           document.getElementById('ctaBtn').style.display = 'block';
-          document.getElementById('step1n').textContent = stepNum;
-          document.getElementById('step2n').textContent = stepNum + 1;
-          document.getElementById('step3n').textContent = stepNum + 2;
+          document.getElementById('stepTg').style.display = isForex ? 'none' : 'flex';
 
           show('stateReady');
           return;
