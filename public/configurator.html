@@ -228,11 +228,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <input type="range" id="riskR" min="0.5" max="5" step="0.5" value="1">
             <p class="hn">Account % risked per trade. <b>1–2% recommended for most accounts.</b></p>
           </div>
-          <div class="row">
-            <div class="rl"><label>Max concurrent trades</label><span class="rv" id="mcV">5</span></div>
-            <input type="range" id="mcR" min="1" max="15" step="1" value="5">
-            <p class="hn">Max open positions at any time. <b>Backtested optimal: 5.</b></p>
-          </div>
         </div>
       </div>
 
@@ -318,7 +313,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           <div class="sr"><span class="sk">Bot</span><span class="sv">Crypto</span></div>
           <div class="sr"><span class="sk">Exchange</span><span class="sv" id="sEx">Binance</span></div>
           <div class="sr"><span class="sk">Mode</span><span class="sv" id="sMode">Paper</span></div>
-          <div class="sr"><span class="sk">Max trades</span><span class="sv" id="sMc">5</span></div>
           <div class="sr"><span class="sk">Risk / trade</span><span class="sv" id="sRisk">1%</span></div>
           <div class="sr"><span class="sk">Stop Loss</span><span class="sv" id="sSl">1.6%</span></div>
           <div class="sr"><span class="sk">Take Profit</span><span class="sv" id="sTp">3.2%</span></div>
@@ -375,7 +369,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
 <script>
 // State
-const S={ex:'BINANCE',mode:'PAPER',bal:1000,risk:1,mc:5,conf:.70,crit:5,htf:true,sl:1.6,tp:3.2,trail:false,be:false,ai:'GROQ'};
+const S={ex:'BINANCE',mode:'PAPER',bal:1000,risk:1,conf:.70,crit:5,htf:true,sl:1.6,tp:3.2,trail:false,be:false,ai:'GROQ'};
 
 // Exchange data
 const EX={
@@ -414,7 +408,7 @@ document.getElementById('mPaper').addEventListener('click',()=>{S.mode='PAPER';d
 document.getElementById('mLive').addEventListener('click',()=>{S.mode='LIVE';document.getElementById('mLive').className='mc onL';document.getElementById('mPaper').className='mc';document.getElementById('liveWarn').style.display='block';updSum();});
 
 // Sliders
-[['balR','balV','bal',v=>'$'+Number(v).toLocaleString()],['riskR','riskV','risk',v=>v+'%'],['mcR','mcV','mc',v=>v],['confR','confV','conf',v=>parseFloat(v).toFixed(2)],['critR','critV','crit',v=>v+' / 5'],['slR','slV','sl',v=>parseFloat(v).toFixed(1)+'%'],['tpR','tpV','tp',v=>parseFloat(v).toFixed(1)+'%']].forEach(([rid,vid,key,fmt])=>{
+[['balR','balV','bal',v=>'$'+Number(v).toLocaleString()],['riskR','riskV','risk',v=>v+'%'],['confR','confV','conf',v=>parseFloat(v).toFixed(2)],['critR','critV','crit',v=>v+' / 5'],['slR','slV','sl',v=>parseFloat(v).toFixed(1)+'%'],['tpR','tpV','tp',v=>parseFloat(v).toFixed(1)+'%']].forEach(([rid,vid,key,fmt])=>{
   const r=document.getElementById(rid),v=document.getElementById(vid);
   r.addEventListener('input',()=>{S[key]=parseFloat(r.value);v.textContent=fmt(r.value);updSum();});
 });
@@ -433,7 +427,6 @@ function updSum(){
   const rr=(S.tp/S.sl).toFixed(1),tot=S.sl+S.tp;
   document.getElementById('sEx').textContent=EX[S.ex].n;
   document.getElementById('sMode').textContent=S.mode==='PAPER'?'Paper':'Live';
-  document.getElementById('sMc').textContent=S.mc;
   document.getElementById('sRisk').textContent=S.risk+'%';
   document.getElementById('sSl').textContent=S.sl.toFixed(1)+'%';
   document.getElementById('sTp').textContent=S.tp.toFixed(1)+'%';
@@ -467,7 +460,6 @@ function buildConfig(){
     // Paper mode also benefits: it simulates against real market prices.
     BINANCE_TESTNET:'false',
     PAPER_BALANCE:String(S.bal),
-    MAX_CONCURRENT:String(S.mc),
     MIN_CONFIDENCE:String(Math.round(S.conf*100)),
     MIN_CRITERIA:String(S.crit),
     HTF_FILTER:S.htf?'true':'false',

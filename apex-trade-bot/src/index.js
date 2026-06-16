@@ -12,7 +12,14 @@ const buildDashboard = require('./dashboard');
 
 // ─── Exchange ─────────────────────────────────────────────
 // Factory selects the connector for cfg.EXCHANGE (8 supported).
-const exchange = require('./exchange');
+// IMPORTANT: required lazily, inside main() AFTER cfg.loadRemote() —
+// the connector modules (binance.js/bybit.js) read cfg.EXCHANGE/
+// cfg.BINANCE_TESTNET/cfg.BYBIT_TESTNET into top-level consts at
+// require-time. Requiring this eagerly here (before the configurator's
+// saved settings are pulled from the license server) would freeze the
+// wrong exchange and/or strand Binance/Bybit on testnet even when the
+// customer configured live trading with real API keys.
+let exchange;
 
 // ─── State ────────────────────────────────────────────────
 let openPosition      = null;
@@ -478,6 +485,8 @@ async function main() {
   // exchange keys, strategy and mode. Must run before validate()/getBalance(),
   // otherwise validate() exits (no AI key yet) and the deploy "fails".
   await cfg.loadRemote();
+  exchange = require('./exchange'); // after loadRemote: cfg.EXCHANGE/TESTNET flags are final
+  settings.refreshFromConfig(); // after loadRemote: pull the configurator's risk/SL/TP/confidence/symbol
   validate();
 
   // Re-sync paper balance from the (now loaded) remote config. `paperBalance`

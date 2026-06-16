@@ -268,11 +268,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <input type="range" id="riskR" min="0.5" max="5" step="0.5" value="2">
             <p class="hn">Account % risked per trade. <b>2% recommended for forex.</b></p>
           </div>
-          <div class="row">
-            <div class="rl"><label>Max concurrent positions</label><span class="rv" id="mcV">4</span></div>
-            <input type="range" id="mcR" min="1" max="10" step="1" value="4">
-            <p class="hn">Max open positions at any time. <b>Backtested optimal: 4.</b></p>
-          </div>
         </div>
       </div>
 
@@ -346,7 +341,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           <div class="sr"><span class="sk">Broker</span><span class="sv" id="sBk">OANDA</span></div>
           <div class="sr"><span class="sk">Mode</span><span class="sv" id="sMode">Paper</span></div>
           <div class="sr"><span class="sk">Pairs</span><span class="sv" id="sPairs">NZD/USD</span></div>
-          <div class="sr"><span class="sk">Max positions</span><span class="sv" id="sMc">4</span></div>
           <div class="sr"><span class="sk">Risk / trade</span><span class="sv" id="sRisk">2%</span></div>
           <div class="sr"><span class="sk">Stop Loss</span><span class="sv" id="sSl">20 pips</span></div>
           <div class="sr"><span class="sk">Take Profit</span><span class="sv" id="sTp">40 pips</span></div>
@@ -401,7 +395,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
 <script>
 // State
-const S={broker:'OANDA',mode:'PAPER',bal:1000,risk:2,mc:4,sl:20,tp:40,trail:false,htf:true,ai:'GROQ',pairs:['NZD_USD']};
+const S={broker:'OANDA',mode:'PAPER',bal:1000,risk:2,sl:20,tp:40,trail:false,htf:true,ai:'GROQ',pairs:['NZD_USD']};
 
 // Pair chips
 const PAIRS=[{id:'NZD_USD',label:'NZD/USD'},{id:'EUR_USD',label:'EUR/USD'},{id:'GBP_USD',label:'GBP/USD'},{id:'USD_JPY',label:'USD/JPY'},{id:'AUD_USD',label:'AUD/USD'},{id:'USD_CAD',label:'USD/CAD'},{id:'EUR_GBP',label:'EUR/GBP'}];
@@ -430,7 +424,7 @@ document.getElementById('mPaper').addEventListener('click',()=>{S.mode='PAPER';d
 document.getElementById('mLive').addEventListener('click',()=>{S.mode='LIVE';document.getElementById('mLive').className='mc onL';document.getElementById('mPaper').className='mc';document.getElementById('liveWarn').style.display='block';updSum();});
 
 // Sliders
-[['balR','balV','bal',v=>'$'+Number(v).toLocaleString()],['riskR','riskV','risk',v=>v+'%'],['mcR','mcV','mc',v=>v],['slR','slV','sl',v=>v+' pips'],['tpR','tpV','tp',v=>v+' pips']].forEach(([rid,vid,key,fmt])=>{
+[['balR','balV','bal',v=>'$'+Number(v).toLocaleString()],['riskR','riskV','risk',v=>v+'%'],['slR','slV','sl',v=>v+' pips'],['tpR','tpV','tp',v=>v+' pips']].forEach(([rid,vid,key,fmt])=>{
   const r=document.getElementById(rid),v=document.getElementById(vid);
   r.addEventListener('input',()=>{S[key]=parseFloat(r.value);v.textContent=fmt(r.value);updSum();});
 });
@@ -455,7 +449,6 @@ function updSum(){
   document.getElementById('sMode').textContent=S.mode==='PAPER'?'Paper':'Live';
   document.getElementById('sPairs').textContent=pairLabels;
   document.getElementById('pairCount').textContent=pairCount+' pair'+(pairCount>1?'s':'');
-  document.getElementById('sMc').textContent=S.mc;
   document.getElementById('sRisk').textContent=S.risk+'%';
   document.getElementById('sSl').textContent=S.sl+' pips';
   document.getElementById('sTp').textContent=S.tp+' pips';
@@ -486,7 +479,6 @@ function buildConfig(){
     PAPER_TRADING:S.mode==='PAPER'?'true':'false',
     PAPER_BALANCE:String(S.bal),
     SCAN_SYMBOLS:S.pairs.join(','),
-    MAX_CONCURRENT:String(S.mc),
     RISK_PER_TRADE:(S.risk/100).toFixed(4), // fraction, not whole percent
     MIN_CONFIDENCE:'62',
     HTF_FILTER:S.htf?'true':'false',
