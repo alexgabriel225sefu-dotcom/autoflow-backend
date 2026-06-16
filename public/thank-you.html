@@ -42,6 +42,10 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
 .cta{display:block;text-align:center;background:var(--acc);color:#fff;font-weight:700;font-size:15px;padding:16px;border-radius:10px;text-decoration:none;transition:transform .2s var(--ease),background .2s}
 .cta:hover{background:var(--acc2)}
 .cta:active{transform:scale(.98)}
+.cta-row{display:grid;gap:10px}
+.cta-secondary{display:block;text-align:center;background:transparent;border:1px solid var(--line2);color:var(--t0);font-weight:600;font-size:13.5px;padding:13px;border-radius:10px;text-decoration:none;transition:border-color .2s,background .2s}
+.cta-secondary:hover{border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.03)}
+.cta-secondary:active{transform:scale(.98)}
 .steps{margin-top:26px;border-top:1px solid var(--line);padding-top:22px}
 .steps-label{font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t2);margin-bottom:14px}
 .step{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04)}
@@ -75,13 +79,18 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
           <div class="keyval" id="licenseKeyVal">—</div>
         </div>
         <p class="copyhint">We also emailed this to you, along with full setup instructions.</p>
-        <a class="cta" id="ctaBtn" href="#">Open Bot Configurator &rarr;</a>
+        <div class="cta-row">
+          <a class="cta" id="tgBtn" href="#" target="_blank" rel="noopener" style="display:none">Activate on Telegram &rarr;</a>
+          <a class="cta" id="ctaBtn" href="#" style="display:none">Open Bot Configurator &rarr;</a>
+          <a class="cta-secondary" id="deployBtn" href="#" target="_blank" rel="noopener">Deploy My Bot Now (Railway) &rarr;</a>
+        </div>
 
         <div class="steps">
           <div class="steps-label">What happens next</div>
-          <div class="step"><div class="stepn">1</div><div class="stepbody">Open the <b>Bot Configurator</b> above — your license key is already filled in.</div></div>
-          <div class="step"><div class="stepn">2</div><div class="stepbody">Choose how the bot should trade (pairs, risk level, strategy) and save your settings.</div></div>
-          <div class="step"><div class="stepn">3</div><div class="stepbody">Click <b>Deploy My Bot Now</b> to launch it on Railway — free hosting tier included, live in under 10 minutes.</div></div>
+          <div class="step" id="stepTg" style="display:none"><div class="stepn">1</div><div class="stepbody">Tap <b>Activate on Telegram</b> above to link your license and start setup right in the chat.</div></div>
+          <div class="step" id="step1"><div class="stepn" id="step1n">1</div><div class="stepbody">Open the <b>Bot Configurator</b> above — your license key is already filled in.</div></div>
+          <div class="step"><div class="stepn" id="step2n">2</div><div class="stepbody">Choose how the bot should trade (pairs, risk level, strategy) and save your settings.</div></div>
+          <div class="step"><div class="stepn" id="step3n">3</div><div class="stepbody">Click <b>Deploy My Bot Now</b> to launch it on Railway — free hosting tier included, live in under 10 minutes.</div></div>
         </div>
         <p class="email-note">Check your inbox (and spam folder) for the full setup email with this license key and step-by-step screenshots.</p>
       </div>
@@ -111,6 +120,9 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
 
   if (!sessionId) { show('stateError'); return; }
 
+  var botUsername = '';
+  fetch('/api/tg-config').then(function(r){ return r.json(); }).then(function(d){ botUsername = d.botUsername || ''; }).catch(function(){});
+
   var attempts = 0;
   var maxAttempts = 14; // ~35s of polling
 
@@ -120,10 +132,31 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (d.ready && d.licenseKey) {
-          document.getElementById('licenseKeyVal').textContent = d.licenseKey;
+          var key = d.licenseKey;
+          document.getElementById('licenseKeyVal').textContent = key;
           document.getElementById('readyTitle').textContent = isForex ? 'Your Forex bot is ready.' : 'Your bot is ready.';
-          var configuratorUrl = (isForex ? '/configurator-forex' : '/configurator') + '?key=' + encodeURIComponent(d.licenseKey);
+
+          var configuratorUrl = (isForex ? '/configurator-forex' : '/configurator') + '?key=' + encodeURIComponent(key);
+          var repo = isForex ? 'apex-forex-bot' : 'apex-trade-bot';
+          document.getElementById('deployBtn').href = 'https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/' + repo;
+
+          var showTg = !isForex && botUsername;
+          var stepNum = 1;
+          if (showTg) {
+            var tgBtn = document.getElementById('tgBtn');
+            tgBtn.href = 'https://t.me/' + botUsername + '?start=' + encodeURIComponent(key);
+            tgBtn.style.display = 'block';
+            document.getElementById('stepTg').style.display = 'flex';
+            document.getElementById('ctaBtn').textContent = 'Or use the web configurator instead';
+            document.getElementById('ctaBtn').className = 'cta-secondary';
+            stepNum = 2;
+          }
           document.getElementById('ctaBtn').href = configuratorUrl;
+          document.getElementById('ctaBtn').style.display = 'block';
+          document.getElementById('step1n').textContent = stepNum;
+          document.getElementById('step2n').textContent = stepNum + 1;
+          document.getElementById('step3n').textContent = stepNum + 2;
+
           show('stateReady');
           return;
         }
