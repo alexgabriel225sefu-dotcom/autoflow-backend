@@ -184,13 +184,13 @@ footer .wrap{max-width:1280px}
     <div class="card">
       <h2 style="font:600 13px/1 var(--m);margin:0 0 6px;color:var(--acc3);text-transform:uppercase;letter-spacing:.12em">Get paid</h2>
       <label for="dPmMethod">Payout method</label>
-      <select id="dPmMethod">
+      <select id="dPmMethod" onchange="updatePayoutFieldStyle()">
         <option value="paypal">PayPal</option>
         <option value="bank">Bank transfer (IBAN)</option>
         <option value="crypto">Crypto wallet</option>
       </select>
-      <label for="dPmDetails">Payout details</label>
-      <input id="dPmDetails" type="text" placeholder="PayPal email / IBAN / wallet address">
+      <label for="dPmDetails" id="dPmDetailsLabel">PayPal email</label>
+      <input id="dPmDetails" type="email" placeholder="you@example.com" autocomplete="off">
       <button class="copy-btn" style="width:100%;margin-top:14px" onclick="savePayout()">Save payout details</button>
       <div id="pmMsg" class="msg"></div>
       <button id="reqBtn" style="margin-top:14px" onclick="requestPayout()">Request payout</button>
@@ -321,6 +321,7 @@ function populate(d){
   // Payout method — only overwrite fields the user isn't actively editing.
   var mEl = document.getElementById('dPmMethod'), dEl = document.getElementById('dPmDetails');
   if (document.activeElement !== mEl && d.payoutMethod) mEl.value = d.payoutMethod;
+  updatePayoutFieldStyle();
   if (document.activeElement !== dEl) dEl.value = d.payoutDetails || '';
   // Request button + note state.
   var btn = document.getElementById('reqBtn'), note = document.getElementById('payoutNote');
@@ -339,6 +340,20 @@ function populate(d){
     note.textContent = '';
   }
   renderSales(d.sales);
+}
+
+var PAYOUT_FIELD = {
+  paypal: { label: 'PayPal email', type: 'email', placeholder: 'you@example.com' },
+  bank:   { label: 'IBAN', type: 'text', placeholder: 'RO49 AAAA 1B31 0075 9384 0000' },
+  crypto: { label: 'Wallet address', type: 'text', placeholder: 'USDT (TRC20) / BTC / ETH address' }
+};
+function updatePayoutFieldStyle(){
+  var method = document.getElementById('dPmMethod').value;
+  var cfg = PAYOUT_FIELD[method] || PAYOUT_FIELD.paypal;
+  document.getElementById('dPmDetailsLabel').textContent = cfg.label;
+  var input = document.getElementById('dPmDetails');
+  input.type = cfg.type;
+  input.placeholder = cfg.placeholder;
 }
 
 async function savePayout(){
