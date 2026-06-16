@@ -109,8 +109,8 @@ function validate() {
   const LIVE_VALIDATED = ['binance'];
   if (!cfg.PAPER_TRADING && !LIVE_VALIDATED.includes(cfg.EXCHANGE)
       && process.env.ALLOW_EXPERIMENTAL_LIVE !== 'true') {
-    console.warn(`⚠️  Live trading pe "${cfg.EXCHANGE}" nu e validat cu bani reali — trec pe PAPER TRADING.`);
-    console.warn('    Suportat live: Binance. Override (pe riscul tău): ALLOW_EXPERIMENTAL_LIVE=true');
+    console.warn(`⚠️  Live trading on "${cfg.EXCHANGE}" is not validated for real money — switching to PAPER TRADING.`);
+    console.warn('    Live supported: Binance. Override (at your own risk): ALLOW_EXPERIMENTAL_LIVE=true');
     cfg.PAPER_TRADING = true;
   }
 }
@@ -143,7 +143,7 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = settings.g
   // Pe spot live nu există short — un SELL ar vinde monede pe care clientul
   // nu le are (ordin respins) sau pe care le deținea deja (pierdere reală).
   if (side === 'SELL' && !cfg.PAPER_TRADING) {
-    logger.warn(`⛔ SELL pe spot LIVE blocat (${symbol}) — short doar în paper trading`);
+    logger.warn(`⛔ SELL on spot LIVE blocked (${symbol}) — short selling is paper-trading only`);
     return;
   }
   const quantity = await calcQuantity(price, balance, symbol, druckMult);
@@ -181,9 +181,9 @@ async function openTrade(side, price, balance, atrValue = 0, symbol = settings.g
       openPosition.hasProtection = true;
     } catch (e) {
       // Fără protecție server-side nu ținem poziție live deschisă — închidem imediat
-      logger.error(`❌ OCO eșuat (${e.message}) — închid poziția imediat, nu las trade live neprotejat`);
+      logger.error(`❌ OCO failed (${e.message}) — closing the position immediately; never leaving a live trade unprotected`);
       await exchange.placeOrder('SELL', fillQty, symbol).catch(err =>
-        logger.error(`‼️ Închiderea de siguranță a eșuat: ${err.message} — ÎNCHIDE MANUAL ${symbol}!`));
+        logger.error(`‼️ Safety close failed: ${err.message} — CLOSE ${symbol} MANUALLY on the exchange!`));
       openPosition = null;
       return;
     }
@@ -281,7 +281,7 @@ async function bestSymbol() {
 // ─── Loop principal ───────────────────────────────────────
 let ticking = false; // guard: AI-ul poate dura >interval → fără tick-uri suprapuse
 async function tick() {
-  if (ticking) { logger.warn('Tick anterior încă rulează — skip'); return; }
+  if (ticking) { logger.warn('Previous tick still running — skip'); return; }
   ticking = true;
   tickCount++;
   try {
@@ -295,7 +295,7 @@ async function tick() {
       const open = await exchange.getOpenOrders(openPosition.symbol).catch(() => null);
       if (Array.isArray(open) && open.length === 0) {
         const px = await exchange.getPrice(openPosition.symbol);
-        logger.warn(`🛡️ OCO executat la exchange (${openPosition.symbol}) — închid poziția în evidență`);
+        logger.warn(`🛡️ OCO executed on the exchange (${openPosition.symbol}) — closing the tracked position`);
         await closeTrade(px, 'EXCHANGE_SLTP', true);
       }
     }
@@ -326,7 +326,7 @@ async function tick() {
     dash.balance       = balance;
     dash.currentSymbol = symbol;
     dash.currentPrice  = price;
-    dash.lastTick      = new Date().toLocaleString('ro-RO');
+    dash.lastTick      = new Date().toLocaleString('en-US');
     if (openPosition) {
       const posPnl = openPosition.side === 'BUY'
         ? (price - openPosition.entryPrice) * openPosition.quantity
@@ -337,7 +337,7 @@ async function tick() {
     // Verifică SL/TP/Trailing
     const trigger = checkPosition(openPosition, price);
     if (trigger) {
-      logger.warn(`${trigger} atins la $${price} (SL curent: $${openPosition?.stopLoss?.toFixed(5)})`);
+      logger.warn(`${trigger} hit at $${price} (current SL: $${openPosition?.stopLoss?.toFixed(5)})`);
       await closeTrade(price, trigger);
       logger.printStats(await getBalance(), null, null);
       return;
@@ -359,7 +359,7 @@ async function tick() {
     if (stopCheck.stop) {
       logger.warn(`🛑 STRATEGY STOP: ${stopCheck.reasons.join(' | ')}`);
       if (openPosition) {
-        logger.warn('Poziție deschisă — o păstrăm până la SL/TP natural.');
+        logger.warn('Open position — keeping it until its natural SL/TP.');
       }
       // Trimite alertă Telegram maxim o dată la 30 minute (nu la fiecare tick)
       const now = Date.now();
@@ -373,7 +373,7 @@ async function tick() {
 
     // Logare structură de piață detectată
     if (stratData.livermore.trend !== 'NEUTRAL') {
-      logger.info(`📊 Livermore: ${stratData.livermore.trend} (${stratData.livermore.reason}) | Putere: ${(stratData.livermore.strength * 100).toFixed(0)}%`);
+      logger.info(`📊 Livermore: ${stratData.livermore.trend} (${stratData.livermore.reason}) | Strength: ${(stratData.livermore.strength * 100).toFixed(0)}%`);
     }
     if (stratData.turtle.signal) {
       logger.info(`🐢 Turtle: ${stratData.turtle.breakoutStr} breakout ${stratData.turtle.signal} | H20: ${stratData.turtle.high20} | L20: ${stratData.turtle.low20}`);
@@ -398,11 +398,11 @@ async function tick() {
     const volumeOk      = parseFloat(ind.volumeRatio) >= minVolume;
 
     if (tooLowBalance) {
-      logger.warn('Balanță prea mică ($' + balance.toFixed(2) + ') — stop trading');
+      logger.warn('Balance too low ($' + balance.toFixed(2) + ') — stop trading');
       return;
     }
     if (!volumeOk && !openPosition) {
-      logger.info(`⚠️ Volum insuficient (${ind.volumeRatio}× < ${minVolume}×) — HOLD, așteptăm confirmare volum`);
+      logger.info(`⚠️ Insufficient volume (${ind.volumeRatio}× < ${minVolume}×) — HOLD, waiting for volume confirmation`);
     }
 
     // Stan Druckenmiller: calculează multiplicatorul de poziție
@@ -437,7 +437,7 @@ async function tick() {
     const contraSide = liveTrend === 'BEARISH' && turtleSig === 'SELL' ? 'BUY'
                      : liveTrend === 'BULLISH' && turtleSig === 'BUY'  ? 'SELL' : null;
     if (!openPosition && liveSTR >= 0.8 && signal.action === contraSide) {
-      logger.warn(`⚡ Signal filtrat: ${contraSide} contra Livermore ${liveTrend} ${(liveSTR*100).toFixed(0)}% + Turtle STRONG ${turtleSig} — HOLD forțat (PTJ: play defense)`);
+      logger.warn(`⚡ Signal filtered: ${contraSide} against Livermore ${liveTrend} ${(liveSTR*100).toFixed(0)}% + Turtle STRONG ${turtleSig} — forced HOLD (PTJ: play defense)`);
       tg.alertFiltered(contraSide, `${liveTrend} ${(liveSTR*100).toFixed(0)}%`, `STRONG ${turtleSig}`);
       signal.action = 'HOLD';
     }
@@ -445,7 +445,7 @@ async function tick() {
     // ─── Seykota: cooldown după pierdere — fără revenge trading ──
     const cdMin = strategies.cooldownRemaining(cfg.COOLDOWN_AFTER_LOSS_MIN);
     if (!openPosition && cdMin > 0 && (signal.action === 'BUY' || signal.action === 'SELL')) {
-      logger.info(`⏸️ Cooldown după pierdere: mai aștept ${cdMin} min înainte de re-intrare`);
+      logger.info(`⏸️ Post-loss cooldown: waiting ${cdMin} more min before re-entry`);
       signal.action = 'HOLD';
     }
 
@@ -453,14 +453,14 @@ async function tick() {
     if (cfg.HTF_FILTER && !openPosition && (signal.action === 'BUY' || signal.action === 'SELL')) {
       const htf = strategies.htfTrend(await exchange.getCandles(symbol, cfg.HTF_TIMEFRAME, 60).catch(() => null));
       if ((signal.action === 'BUY' && htf === 'BEARISH') || (signal.action === 'SELL' && htf === 'BULLISH')) {
-        logger.warn(`⚡ Filtru ${cfg.HTF_TIMEFRAME}: ${signal.action} contra trend ${htf} — HOLD (trade with the tape)`);
+        logger.warn(`⚡ Filter ${cfg.HTF_TIMEFRAME}: ${signal.action} against ${htf} trend — HOLD (trade with the tape)`);
         signal.action = 'HOLD';
       }
     }
 
     // Execuție
     if (signal.action === 'HOLD' || signal.confidence < settings.get('MIN_CONFIDENCE') || !criteriaOk || (!volumeOk && !openPosition)) {
-      logger.info(`HOLD — confidence: ${signal.confidence}% | criterii: ${signal.criteriaScore ?? '?'}/5 | volum: ${ind.volumeRatio}×`);
+      logger.info(`HOLD — confidence: ${signal.confidence}% | criteria: ${signal.criteriaScore ?? '?'}/5 | volume: ${ind.volumeRatio}×`);
     } else if (signal.action === 'CLOSE' && openPosition) {
       await closeTrade(price, 'AI_CLOSE');
     } else if (signal.action === 'BUY' && !openPosition) {
