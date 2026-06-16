@@ -1194,7 +1194,7 @@ app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
   const cleanEmail = email.toLowerCase().trim();
   try {
     const { data: existing } = await supabase.from('affiliates').select('code').eq('email', cleanEmail).maybeSingle();
-    if (existing?.code) return res.json({ code: existing.code, link: `https://aicashsystem.space/apex-bot.html?ref=${existing.code}` });
+    if (existing?.code) return res.json({ code: existing.code, link: `https://aicashsystem.space/?ref=${existing.code}` });
 
     let code;
     for (let attempts = 0; attempts < 5; attempts++) {
@@ -1207,7 +1207,7 @@ app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
     }]);
     if (error) return res.status(500).json({ error: error.message });
     addLog(`New affiliate: ${cleanEmail} — code ${code}`, 'affiliate', 'success');
-    res.json({ code, link: `https://aicashsystem.space/apex-bot.html?ref=${code}` });
+    res.json({ code, link: `https://aicashsystem.space/?ref=${code}` });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
