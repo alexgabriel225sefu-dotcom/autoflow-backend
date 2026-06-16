@@ -1181,6 +1181,11 @@ function verifyLicenseKeyHmac(key) {
 }
 
 // ── AFFILIATE / REFERRAL SYSTEM ──────────────────────────────────────────────
+// Program policy. Bump TERMS_VERSION whenever the affiliate terms change so we
+// can tell who accepted which version.
+const AFFILIATE_TERMS_VERSION = '2026-06-16';
+const REFUND_WINDOW_DAYS = 14;   // commission only matures (becomes payable) after this
+const MIN_PAYOUT_CENTS   = 5000; // $50 minimum before a payout can be requested
 function _generateAffiliateCode(name) {
   const slug = (name || 'creator').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 10) || 'creator';
   return `${slug}${crypto.randomBytes(2).toString('hex')}`;
@@ -1245,13 +1250,15 @@ function _validateCustomCode(raw) {
   return { ok: true, code };
 }
 
-// POST /api/affiliates/signup — { name, email, password, code, tiktokHandle } -> { token, code, link }
+// POST /api/affiliates/signup — { name, email, password, code, tiktokHandle, acceptTerms } -> { token, code, link }
 app.post('/api/affiliates/signup', _authLimiter, async (req, res) => {
-  const { name, email, password, tiktokHandle, code: wantCode } = req.body || {};
+  const { name, email, password, tiktokHandle, code: wantCode, acceptTerms } = req.body || {};
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
   if (!password || String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  if (acceptTerms !== true) return res.status(400).json({ error: 'You must accept the Affiliate Program Terms to continue.' });
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
   const cleanEmail = email.toLowerCase().trim();
+  const nowIso = new Date().toISOString();
   // The affiliate chooses their own link name; fall back to an auto code if none given.
   let customCode = null;
   if (wantCode != null && String(wantCode).trim() !== '') {
@@ -1265,7 +1272,7 @@ app.post('/api/affiliates/signup', _authLimiter, async (req, res) => {
     if (existing?.code) {
       if (existing.password_hash) return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
       // Claim a pre-existing (passwordless) affiliate row created before auth existed.
-      await supabase.from('affiliates').update({ password_hash: pwHash, name: name || '', tiktok_handle: tiktokHandle || '' }).eq('code', existing.code);
+      await supabase.from('affiliates').update({ password_hash: pwHash, name: name || '', tiktok_handle: tiktokHandle || '', terms_accepted_at: nowIso, terms_version: AFFILIATE_TERMS_VERSION }).eq('code', existing.code);
       addLog(`Affiliate claimed account: ${cleanEmail} — code ${existing.code}`, 'affiliate', 'success');
       return res.json({ token: createToken({ id: existing.code, email: cleanEmail }), code: existing.code, link: _affiliateLink(existing.code) });
     }
@@ -1282,7 +1289,8 @@ app.post('/api/affiliates/signup', _authLimiter, async (req, res) => {
       }
     }
     const { error } = await supabase.from('affiliates').insert([{
-      code, email: cleanEmail, name: name || '', tiktok_handle: tiktokHandle || '', status: 'active', password_hash: pwHash
+      code, email: cleanEmail, name: name || '', tiktok_handle: tiktokHandle || '', status: 'active', password_hash: pwHash,
+      terms_accepted_at: nowIso, terms_version: AFFILIATE_TERMS_VERSION
     }]);
     if (error) {
       if (String(error.message || '').toLowerCase().includes('duplicate')) return res.status(409).json({ error: 'That link name is already taken — please choose another.' });
@@ -1321,19 +1329,37 @@ app.get('/api/affiliates/me', async (req, res) => {
   try {
     const { data: affiliate } = await supabase.from('affiliates').select('code,name,email,commission_percent,status').eq('code', code).maybeSingle();
     if (!affiliate) return res.status(404).json({ error: 'Affiliate not found' });
-    const { data } = await supabase.from('referral_sales').select('amount,commission_amount,paid,product,created_at').eq('affiliate_code', code).order('created_at', { ascending: false });
+    const { data } = await supabase.from('referral_sales').select('amount,commission_amount,paid,refunded,product,created_at').eq('affiliate_code', code).order('created_at', { ascending: false });
     const rows = data || [];
-    const totalCommission = rows.reduce((s, r) => s + r.commission_amount, 0);
-    const paidCommission  = rows.filter(r => r.paid).reduce((s, r) => s + r.commission_amount, 0);
+    const now = Date.now();
+    const windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    // Commission lifecycle: pending (inside refund window) -> available (matured, payable)
+    // -> paid. A refund/chargeback flips the sale to refunded and the commission is clawed back.
+    let availableCents = 0, pendingCents = 0, paidCents = 0, refundedCents = 0, validCount = 0;
+    const sales = rows.map(r => {
+      let status;
+      if (r.refunded) { status = 'refunded'; refundedCents += r.commission_amount; }
+      else {
+        validCount++;
+        if (r.paid) { status = 'paid'; paidCents += r.commission_amount; }
+        else if (new Date(r.created_at).getTime() + windowMs <= now) { status = 'available'; availableCents += r.commission_amount; }
+        else { status = 'pending'; pendingCents += r.commission_amount; }
+      }
+      return { amount: r.amount, commission: r.commission_amount, paid: r.paid, refunded: !!r.refunded, status, product: r.product, date: r.created_at };
+    });
     res.json({
       code: affiliate.code, name: affiliate.name, email: affiliate.email,
       commissionPercent: affiliate.commission_percent, status: affiliate.status,
       link: _affiliateLink(affiliate.code),
-      totalSales: rows.length,
-      totalCommissionCents: totalCommission,
-      paidCommissionCents: paidCommission,
-      unpaidCommissionCents: totalCommission - paidCommission,
-      sales: rows.map(r => ({ amount: r.amount, commission: r.commission_amount, paid: r.paid, product: r.product, date: r.created_at }))
+      totalSales: validCount,
+      availableCommissionCents: availableCents,
+      pendingCommissionCents: pendingCents,
+      paidCommissionCents: paidCents,
+      refundedCommissionCents: refundedCents,
+      totalCommissionCents: availableCents + pendingCents + paidCents,
+      minPayoutCents: MIN_PAYOUT_CENTS,
+      refundWindowDays: REFUND_WINDOW_DAYS,
+      sales
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1436,6 +1462,19 @@ async function handleStripeWebhook(req, res) {
       const session = event.data.object;
       const ref = (session.client_reference_id || '').toLowerCase().trim();
       if (ref && session.payment_intent) _pendingRefs.set(session.payment_intent, ref);
+      return res.json({ received: true });
+    }
+
+    // ── AFFILIATE CLAWBACK ── refund or chargeback cancels the commission.
+    if (event.type === 'charge.refunded' || event.type === 'charge.dispute.created') {
+      const obj = event.data.object; // charge or dispute — both carry payment_intent
+      const piId = obj.payment_intent;
+      if (piId && supabase) {
+        const { data: updated } = await supabase.from('referral_sales')
+          .update({ refunded: true, refunded_at: new Date().toISOString() })
+          .eq('payment_intent_id', piId).select('affiliate_code');
+        if (updated && updated.length) addLog(`Affiliate commission clawed back (${event.type}) for ${updated[0].affiliate_code} — PI ${piId}`, 'affiliate', 'warn');
+      }
       return res.json({ received: true });
     }
 
@@ -1842,7 +1881,7 @@ app.post('/api/heygen/photo-generate', async (req, res) => {
 
 // Explicit HTML page routes
 // Public pages — no auth required
-const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','apex-bot','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','affiliate'];
+const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','apex-bot','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','affiliate','affiliate-terms'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));

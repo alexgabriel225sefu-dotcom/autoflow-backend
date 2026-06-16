@@ -52,6 +52,9 @@ button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
 .msg{margin-top:16px;font:400 14px/1.5 var(--f);padding:12px 14px;border-radius:10px;display:none}
 .msg.ok{display:block;background:rgba(39,196,106,.1);border:1px solid rgba(39,196,106,.3);color:var(--up)}
 .msg.err{display:block;background:var(--accdim);border:1px solid rgba(255,45,79,.3);color:var(--acc3)}
+.terms-row{display:flex;align-items:flex-start;gap:10px;margin-top:20px;font:400 13px/1.55 var(--f);color:var(--t1);cursor:pointer}
+.terms-row input{width:auto;margin:2px 0 0;flex-shrink:0;accent-color:var(--acc);width:17px;height:17px}
+.terms-row a{color:var(--acc3);text-decoration:underline}
 .hint{font:400 13px/1.5 var(--f);color:var(--t2);margin-top:14px;text-align:center}
 .hint a{color:var(--acc3);cursor:pointer}
 .link-box{display:flex;gap:8px;margin-top:8px}
@@ -76,8 +79,10 @@ button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
 .sales td{font:400 13px/1.4 var(--f);color:var(--t0);padding:12px 14px;border-bottom:1px solid var(--line)}
 .sales tr:last-child td{border-bottom:none}
 .sales td .pay{font:500 11px/1 var(--m);padding:4px 8px;border-radius:100px;white-space:nowrap}
-.pay.unpaid{background:var(--accdim);color:var(--acc3)}
+.pay.unpaid{background:rgba(255,255,255,.06);color:var(--t1)}
+.pay.avail{background:rgba(39,196,106,.12);color:var(--up)}
 .pay.paid{background:rgba(39,196,106,.12);color:var(--up)}
+.pay.refunded{background:var(--accdim);color:var(--acc3)}
 .empty{text-align:center;color:var(--t2);font:400 14px/1.6 var(--f);padding:26px 14px}
 .spin{display:none;text-align:center;color:var(--t1);font:400 14px/1 var(--f);padding:40px 0}
 footer{border-top:1px solid var(--line);padding:34px 0;font:400 12px/1.7 var(--f);color:var(--t2)}
@@ -141,6 +146,7 @@ footer .wrap{max-width:1280px}
         <input id="suPass" type="password" placeholder="At least 6 characters" autocomplete="new-password">
         <label for="suTiktok">TikTok handle (optional)</label>
         <input id="suTiktok" type="text" placeholder="@yourhandle">
+        <label class="terms-row"><input id="suTerms" type="checkbox"><span>I agree to the <a href="/affiliate-terms" target="_blank" rel="noopener">Affiliate Program Terms</a> — including that commissions are paid only after the 14-day refund window passes and are cancelled on refunds or chargebacks.</span></label>
         <button type="submit" id="suBtn">Create my account</button>
         <div id="suMsg" class="msg"></div>
         <div class="hint">Already have an account? <a onclick="switchTab('login')">Log in here</a></div>
@@ -167,11 +173,12 @@ footer .wrap{max-width:1280px}
     <div class="card">
       <h2 style="font:600 13px/1 var(--m);margin:0 0 4px;color:var(--acc3);text-transform:uppercase;letter-spacing:.12em">Earnings</h2>
       <div class="stats-grid">
-        <div class="stat"><div class="label">Sales</div><div class="value" id="dSales">0</div></div>
-        <div class="stat accent"><div class="label">Commission</div><div class="value" id="dPct">30%</div></div>
-        <div class="stat"><div class="label">Total earned</div><div class="value" id="dTotal">$0</div></div>
-        <div class="stat up"><div class="label">Unpaid</div><div class="value" id="dUnpaid">$0</div></div>
+        <div class="stat up"><div class="label">Available now</div><div class="value" id="dAvail">$0</div></div>
+        <div class="stat"><div class="label">Pending</div><div class="value" id="dPending">$0</div></div>
+        <div class="stat"><div class="label">Paid out</div><div class="value" id="dPaid">$0</div></div>
+        <div class="stat accent"><div class="label">Sales · Rate</div><div class="value"><span id="dSales">0</span> · <span id="dPct">30%</span></div></div>
       </div>
+      <p class="hint" id="dRules" style="text-align:left;margin-top:14px"></p>
     </div>
 
     <div class="card">
@@ -216,13 +223,15 @@ async function doSignup(e){
   var code = cleanCode(document.getElementById('suCode').value);
   var password = document.getElementById('suPass').value;
   var tiktokHandle = document.getElementById('suTiktok').value.trim();
+  var acceptTerms = document.getElementById('suTerms').checked;
   var btn = document.getElementById('suBtn'), msg = document.getElementById('suMsg');
   if (!email || !email.includes('@')) { showMsg(msg, 'Please enter a valid email.', false); return false; }
   if (!code || code.length < 3) { showMsg(msg, 'Choose a link name (at least 3 characters: letters, numbers, - or _).', false); return false; }
   if (!password || password.length < 6) { showMsg(msg, 'Password must be at least 6 characters.', false); return false; }
+  if (!acceptTerms) { showMsg(msg, 'Please accept the Affiliate Program Terms to continue.', false); return false; }
   btn.disabled = true; btn.textContent = 'Creating…';
   try {
-    var r = await fetch('/api/affiliates/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, email, code, password, tiktokHandle }) });
+    var r = await fetch('/api/affiliates/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, email, code, password, tiktokHandle, acceptTerms }) });
     var d = await r.json();
     if (d.error) { showMsg(msg, d.error, false); btn.disabled=false; btn.textContent='Create my account'; return false; }
     setToken(d.token);
@@ -259,11 +268,18 @@ function copyLink(){ var el = document.getElementById('dLink'); el.select(); doc
 function renderSales(sales){
   var wrap = document.getElementById('dSalesWrap');
   if (!sales || !sales.length) { wrap.innerHTML = '<div class="empty">No sales yet. Share your link and your sales will show up here.</div>'; return; }
+  var badge = {
+    refunded: '<span class="pay refunded">Refunded</span>',
+    paid: '<span class="pay paid">Paid</span>',
+    available: '<span class="pay avail">Available</span>',
+    pending: '<span class="pay unpaid">Pending</span>'
+  };
   var rows = sales.map(function(s){
     var prod = s.product === 'apex-forex' ? 'Forex $497' : (s.product === 'apex-bot' ? 'Crypto $297' : (s.product || '—'));
     var date = s.date ? new Date(s.date).toLocaleDateString() : '—';
-    var pay = s.paid ? '<span class="pay paid">Paid</span>' : '<span class="pay unpaid">Unpaid</span>';
-    return '<tr><td>'+date+'</td><td>'+prod+'</td><td>'+money(s.commission)+'</td><td>'+pay+'</td></tr>';
+    var st = badge[s.status] || badge.pending;
+    var cut = s.status === 'refunded' ? '<span style="text-decoration:line-through;color:var(--t2)">'+money(s.commission)+'</span>' : money(s.commission);
+    return '<tr><td>'+date+'</td><td>'+prod+'</td><td>'+cut+'</td><td>'+st+'</td></tr>';
   }).join('');
   wrap.innerHTML = '<div class="sales"><table><thead><tr><th>Date</th><th>Product</th><th>Your cut</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
@@ -275,8 +291,14 @@ function populate(d){
   document.getElementById('dLink').value = d.link;
   document.getElementById('dSales').textContent = d.totalSales;
   document.getElementById('dPct').textContent = d.commissionPercent + '%';
-  document.getElementById('dTotal').textContent = money(d.totalCommissionCents);
-  document.getElementById('dUnpaid').textContent = money(d.unpaidCommissionCents);
+  document.getElementById('dAvail').textContent = money(d.availableCommissionCents);
+  document.getElementById('dPending').textContent = money(d.pendingCommissionCents);
+  document.getElementById('dPaid').textContent = money(d.paidCommissionCents);
+  var min = money(d.minPayoutCents), days = d.refundWindowDays;
+  document.getElementById('dRules').innerHTML =
+    'Commissions become <b style="color:var(--up)">Available</b> ' + days + ' days after the sale (refund window). ' +
+    'Minimum payout: <b>' + min + '</b>.' +
+    (d.refundedCommissionCents > 0 ? ' <span style="color:var(--acc3)">' + money(d.refundedCommissionCents) + ' was cancelled by refunds/chargebacks.</span>' : '');
   renderSales(d.sales);
 }
 // Silent refresh — pulls fresh numbers without flipping back to the loading view.

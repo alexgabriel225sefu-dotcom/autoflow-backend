@@ -32,3 +32,11 @@ UPDATE affiliates SET commission_percent = 30 WHERE commission_percent = 20;
 
 -- Affiliate login: password (scrypt salt:hash, set on signup or account claim).
 ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
+-- Affiliate terms acceptance (proof of consent for the affiliate program).
+ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ;
+ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS terms_version TEXT;
+
+-- Commission clawback: a refunded/charged-back sale cancels the commission.
+ALTER TABLE referral_sales ADD COLUMN IF NOT EXISTS refunded BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE referral_sales ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
