@@ -1331,8 +1331,9 @@ app.get('/api/affiliates/me', async (req, res) => {
   const code = _affiliateFromAuth(req);
   if (!code) return res.status(401).json({ error: 'Not authenticated' });
   try {
-    const { data: affiliate } = await supabase.from('affiliates').select('code,name,email,commission_percent,status,payout_method,payout_details').eq('code', code).maybeSingle();
-    if (!affiliate) return res.status(404).json({ error: 'Affiliate not found' });
+    const { data: affiliate, error: affErr } = await supabase.from('affiliates').select('code,name,email,commission_percent,status,payout_method,payout_details').eq('code', code).maybeSingle();
+    if (affErr) { addLog(`Affiliate /me lookup error for code "${code}": ${affErr.message}`, 'affiliate', 'error'); return res.status(500).json({ error: affErr.message }); }
+    if (!affiliate) { addLog(`Affiliate /me: no row found for code "${code}"`, 'affiliate', 'warn'); return res.status(404).json({ error: `Affiliate not found (code: ${code})` }); }
     const { data: pendingReq } = await supabase.from('payout_requests').select('amount_cents,requested_at').eq('affiliate_code', code).eq('status', 'requested').order('requested_at', { ascending: false }).maybeSingle();
     const { data } = await supabase.from('referral_sales').select('amount,commission_amount,paid,refunded,product,created_at').eq('affiliate_code', code).order('created_at', { ascending: false });
     const rows = data || [];
