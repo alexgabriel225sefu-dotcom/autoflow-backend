@@ -239,7 +239,7 @@ async function doLogin(e){
   return false;
 }
 
-function logout(){ clearToken(); show('authView'); switchTab('login'); }
+function logout(){ if (_pollTimer) clearInterval(_pollTimer); clearToken(); show('authView'); switchTab('login'); }
 
 function copyLink(){ var el = document.getElementById('dLink'); el.select(); document.execCommand('copy'); }
 
@@ -255,26 +255,40 @@ function renderSales(sales){
   wrap.innerHTML = '<div class="sales"><table><thead><tr><th>Date</th><th>Product</th><th>Your cut</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
+var _pollTimer = null;
+function populate(d){
+  document.getElementById('dWho').textContent = (d.name && d.name.trim()) ? d.name : d.email;
+  document.getElementById('dCode').textContent = 'Code: ' + d.code;
+  document.getElementById('dLink').value = d.link;
+  document.getElementById('dSales').textContent = d.totalSales;
+  document.getElementById('dPct').textContent = d.commissionPercent + '%';
+  document.getElementById('dTotal').textContent = money(d.totalCommissionCents);
+  document.getElementById('dUnpaid').textContent = money(d.unpaidCommissionCents);
+  renderSales(d.sales);
+}
+// Silent refresh — pulls fresh numbers without flipping back to the loading view.
+async function refreshDashboard(){
+  if (!token()) return false;
+  try {
+    var r = await fetch('/api/affiliates/me', { headers: { 'Authorization': 'Bearer ' + token() } });
+    if (r.status === 401) { return false; }
+    var d = await r.json();
+    if (d.error) return false;
+    populate(d);
+    return true;
+  } catch (err) { return null; } // null = network hiccup, keep session
+}
 async function loadDashboard(){
   if (!token()) { show('authView'); switchTab('login'); return; }
   show('loadView');
-  try {
-    var r = await fetch('/api/affiliates/me', { headers: { 'Authorization': 'Bearer ' + token() } });
-    if (r.status === 401) { clearToken(); show('authView'); switchTab('login'); return; }
-    var d = await r.json();
-    if (d.error) { clearToken(); show('authView'); switchTab('login'); return; }
-    document.getElementById('dWho').textContent = (d.name && d.name.trim()) ? d.name : d.email;
-    document.getElementById('dCode').textContent = 'Code: ' + d.code;
-    document.getElementById('dLink').value = d.link;
-    document.getElementById('dSales').textContent = d.totalSales;
-    document.getElementById('dPct').textContent = d.commissionPercent + '%';
-    document.getElementById('dTotal').textContent = money(d.totalCommissionCents);
-    document.getElementById('dUnpaid').textContent = money(d.unpaidCommissionCents);
-    renderSales(d.sales);
-    show('dashView');
-  } catch (err) {
-    show('authView'); switchTab('login');
-  }
+  var ok = await refreshDashboard();
+  if (ok === false) { clearToken(); show('authView'); switchTab('login'); return; }
+  show('dashView');
+  if (_pollTimer) clearInterval(_pollTimer);
+  // Live updates: re-pull every 20s while the tab is open and visible.
+  _pollTimer = setInterval(function(){
+    if (!document.hidden && document.getElementById('dashView').style.display === 'block') refreshDashboard();
+  }, 20000);
 }
 
 // Boot: if a token exists, try the dashboard; otherwise show the auth card.
