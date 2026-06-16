@@ -1272,7 +1272,11 @@ app.post('/api/affiliates/signup', _authLimiter, async (req, res) => {
     if (existing?.code) {
       if (existing.password_hash) return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
       // Claim a pre-existing (passwordless) affiliate row created before auth existed.
-      await supabase.from('affiliates').update({ password_hash: pwHash, name: name || '', tiktok_handle: tiktokHandle || '', terms_accepted_at: nowIso, terms_version: AFFILIATE_TERMS_VERSION }).eq('code', existing.code);
+      const { data: claimed, error: claimErr } = await supabase.from('affiliates')
+        .update({ password_hash: pwHash, name: name || '', tiktok_handle: tiktokHandle || '', terms_accepted_at: nowIso, terms_version: AFFILIATE_TERMS_VERSION })
+        .eq('code', existing.code).select('code,password_hash');
+      if (claimErr) return res.status(500).json({ error: claimErr.message });
+      if (!claimed || !claimed.length || !claimed[0].password_hash) return res.status(500).json({ error: 'Could not save your password. Please try again or contact support.' });
       addLog(`Affiliate claimed account: ${cleanEmail} — code ${existing.code}`, 'affiliate', 'success');
       return res.json({ token: createToken({ id: existing.code, email: cleanEmail }), code: existing.code, link: _affiliateLink(existing.code) });
     }
