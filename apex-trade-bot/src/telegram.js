@@ -6,9 +6,22 @@ const axios    = require('axios');
 const cfg      = require('./config');
 const settings = require('./settings');
 
-const TOKEN         = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
-const CHAT_ID       = (process.env.TELEGRAM_CHAT_ID   || '').trim();
+// TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are also settable from the configurator
+// (see configurator.html cfg.TELEGRAM_BOT_TOKEN/CHAT_ID) and only land in
+// process.env after cfg.loadRemote() resolves in main() — this module is
+// required at the top of index.js, before that. `let` + refreshFromConfig()
+// (called from main() right after loadRemote) keeps these live instead of
+// freezing them at require-time as '', which would silently disable Telegram
+// for any customer who configured the bot token via the web configurator
+// instead of a Railway env var.
+let TOKEN         = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+let CHAT_ID       = (process.env.TELEGRAM_CHAT_ID   || '').trim();
 const DASHBOARD_URL = (process.env.DASHBOARD_URL       || '').trim();
+
+function refreshFromConfig() {
+  TOKEN   = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  CHAT_ID = (process.env.TELEGRAM_CHAT_ID   || '').trim();
+}
 
 // ─── TradingView URL ──────────────────────────────────────
 const TV_EX = { binance:'BINANCE', bybit:'BYBIT', okx:'OKX', kraken:'KRAKEN', kucoin:'KUCOIN', mexc:'MEXC', coinbase:'COINBASE', bitget:'BITGET' };
@@ -399,5 +412,5 @@ async function alertHeartbeat(tickCount, balance, openPosition, currentPrice) {
 
 module.exports = {
   alertOpen, alertClose, alertStop, alertFiltered, alertStart, alertHeartbeat,
-  startPolling, miniChart,
+  startPolling, miniChart, refreshFromConfig,
 };

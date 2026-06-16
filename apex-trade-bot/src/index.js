@@ -487,6 +487,7 @@ async function main() {
   await cfg.loadRemote();
   exchange = require('./exchange'); // after loadRemote: cfg.EXCHANGE/TESTNET flags are final
   settings.refreshFromConfig(); // after loadRemote: pull the configurator's risk/SL/TP/confidence/symbol
+  tg.refreshFromConfig(); // after loadRemote: pull the configurator's TELEGRAM_BOT_TOKEN/CHAT_ID
   validate();
 
   // Re-sync paper balance from the (now loaded) remote config. `paperBalance`

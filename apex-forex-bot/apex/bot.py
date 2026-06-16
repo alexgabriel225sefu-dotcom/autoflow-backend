@@ -613,6 +613,7 @@ def main():
     _load_runtime_config()  # Telegram-saved overrides take precedence
     broker = get_broker()   # re-init with the now-loaded settings
     dash["broker"] = broker_label()  # dash dict was built at import time, before load_remote()
+    tg.refresh_from_config()  # tg.TOKEN/CHAT_ID were also frozen at import time, before load_remote()
     validate()
     paper_balance = cfg.PAPER_BALANCE  # re-sync after remote config loaded
 

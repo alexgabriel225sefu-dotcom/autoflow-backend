@@ -17,6 +17,19 @@ TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 CHAT_ID = (cfg.TELEGRAM_CHAT_ID or "").strip()
 DASHBOARD_URL = cfg.DASHBOARD_URL
 _API = f"https://api.telegram.org/bot{TOKEN}"
+
+
+def refresh_from_config():
+    # TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are also settable from the web
+    # configurator (configurator-forex.html cfg.TELEGRAM_BOT_TOKEN/CHAT_ID)
+    # and only land on cfg after load_remote() resolves in main(). This
+    # module is imported at the top of bot.py, before that — without a
+    # refresh, a customer who set their Telegram token via the configurator
+    # (instead of a Railway env var) would silently get no Telegram bot at all.
+    global TOKEN, CHAT_ID, _API
+    TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
+    CHAT_ID = (cfg.TELEGRAM_CHAT_ID or "").strip()
+    _API = f"https://api.telegram.org/bot{TOKEN}"
 _RUNTIME = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "runtime.json")
 
 _get_dash = lambda: None
