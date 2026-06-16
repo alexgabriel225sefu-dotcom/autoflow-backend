@@ -1071,7 +1071,8 @@ app.get('/api/logout', (req, res) => {
 // POST /create-payment-intent — Stripe
 const VALID_AMOUNTS = [3700, 9700, 19700, 29700, 49700]; // $37 starter, $97 pro, $197 legacy, $297 crypto, $497 forex (in cents)
 app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
-  const { amount, currency, email, name, product } = req.body;
+  const { amount, currency, email, name, product, ref } = req.body;
+  const affCode = (ref || '').toString().trim().toLowerCase().slice(0, 40);
   const safeAmount = VALID_AMOUNTS.includes(Number(amount)) ? Number(amount) : 3700;
   // Enforce product/amount consistency
   if (product === 'apex-bot'   && safeAmount !== 29700) return res.status(400).json({ error: 'Invalid amount for apex-bot' });
@@ -1094,7 +1095,8 @@ app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
       metadata: {
         product: product || (safeAmount === 29700 ? 'apex-bot' : safeAmount === 49700 ? 'apex-forex' : 'course'),
         email: email || '',
-        name: name || ''
+        name: name || '',
+        ref: affCode
       }
     });
 
@@ -1173,6 +1175,63 @@ function verifyLicenseKeyHmac(key) {
   }
   return { valid: false, product: null };
 }
+
+// ── AFFILIATE / REFERRAL SYSTEM ──────────────────────────────────────────────
+function _generateAffiliateCode(name) {
+  const slug = (name || 'creator').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 10) || 'creator';
+  return `${slug}${crypto.randomBytes(2).toString('hex')}`;
+}
+
+// POST /api/affiliates/apply — { name, email, tiktokHandle } -> { code, link }
+app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
+  const { name, email, tiktokHandle } = req.body || {};
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const cleanEmail = email.toLowerCase().trim();
+  try {
+    const { data: existing } = await supabase.from('affiliates').select('code').eq('email', cleanEmail).maybeSingle();
+    if (existing?.code) return res.json({ code: existing.code, link: `https://aicashsystem.space/apex-bot.html?ref=${existing.code}` });
+
+    let code;
+    for (let attempts = 0; attempts < 5; attempts++) {
+      code = _generateAffiliateCode(name);
+      const { data: clash } = await supabase.from('affiliates').select('code').eq('code', code).maybeSingle();
+      if (!clash) break;
+    }
+    const { error } = await supabase.from('affiliates').insert([{
+      code, email: cleanEmail, name: name || '', tiktok_handle: tiktokHandle || '', status: 'active'
+    }]);
+    if (error) return res.status(500).json({ error: error.message });
+    addLog(`New affiliate: ${cleanEmail} — code ${code}`, 'affiliate', 'success');
+    res.json({ code, link: `https://aicashsystem.space/apex-bot.html?ref=${code}` });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/affiliates/:code/stats — sales + commission summary for one affiliate
+app.get('/api/affiliates/:code/stats', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const code = (req.params.code || '').toLowerCase().trim();
+  try {
+    const { data: affiliate } = await supabase.from('affiliates').select('code,name,commission_percent,status').eq('code', code).maybeSingle();
+    if (!affiliate) return res.status(404).json({ error: 'Affiliate code not found' });
+    const { data } = await supabase.from('referral_sales').select('amount,commission_amount,paid,created_at').eq('affiliate_code', code).order('created_at', { ascending: false });
+    const rows = data || [];
+    const totalCommission  = rows.reduce((s, r) => s + r.commission_amount, 0);
+    const paidCommission   = rows.filter(r => r.paid).reduce((s, r) => s + r.commission_amount, 0);
+    res.json({
+      code: affiliate.code, name: affiliate.name, commissionPercent: affiliate.commission_percent, status: affiliate.status,
+      totalSales: rows.length,
+      totalCommissionCents: totalCommission,
+      paidCommissionCents: paidCommission,
+      unpaidCommissionCents: totalCommission - paidCommission,
+      sales: rows.map(r => ({ amount: r.amount, commission: r.commission_amount, paid: r.paid, date: r.created_at }))
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // GET /api/owner-license — generate a license key for the owner (requires BOT_EMAIL_SECRET)
 // ?product=apex-bot (default) or ?product=apex-forex
@@ -1282,6 +1341,22 @@ async function handleStripeWebhook(req, res) {
           if (error) addLog(`License activate DB error: ${error.message}`, 'license', 'error');
         }
         addLog(`License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
+
+        // ── Affiliate commission attribution ──
+        const refCode = (pi.metadata?.ref || '').toLowerCase().trim();
+        if (refCode && supabase) {
+          try {
+            const { data: aff } = await supabase.from('affiliates').select('code,commission_percent,status').eq('code', refCode).maybeSingle();
+            if (aff && aff.status === 'active') {
+              const commission = Math.round(pi.amount * aff.commission_percent / 100);
+              await supabase.from('referral_sales').upsert([{
+                affiliate_code: aff.code, license_key: licenseKey, payment_intent_id: pi.id,
+                product, amount: pi.amount, commission_amount: commission
+              }], { onConflict: 'payment_intent_id' });
+              addLog(`Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}`, 'affiliate', 'success');
+            }
+          } catch (e) { addLog(`Affiliate attribution error: ${e.message}`, 'affiliate', 'error'); }
+        }
 
         if (email) {
           const html = isForex

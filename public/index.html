@@ -902,7 +902,8 @@ async function submitApexPayment(){
   var btn=document.getElementById('amBtn'),spin=document.getElementById('amSpinner'),txt=document.getElementById('amBtnTxt');
   btn.disabled=true;spin.style.display='block';txt.textContent='Processing...';
   try{
-    var r=await fetch('/create-payment-intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:29700,currency:'usd',email,name,product:'apex-bot'})});
+    var _refCode=sessionStorage.getItem('rfrsn_ref')||'';
+    var r=await fetch('/create-payment-intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:29700,currency:'usd',email,name,product:'apex-bot',ref:_refCode})});
     var d=await r.json();
     if(d.error){err.classList.add('err');err.textContent=d.error;btn.disabled=false;spin.style.display='none';txt.textContent='Try again';return}
     var _pendingKey=d.pendingKey||'';
