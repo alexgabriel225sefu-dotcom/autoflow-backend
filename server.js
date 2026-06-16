@@ -226,6 +226,10 @@ try {
 
 // ── PENDING LICENSES (payment_intent_id → key) — cleared after 2h ──
 const _pendingLicenses = new Map();
+// ── PENDING AFFILIATE REFS (payment_intent_id → ref code) — set by checkout.session.completed,
+// consumed by payment_intent.succeeded, since Stripe Payment Links don't copy client_reference_id
+// onto the Payment Intent's own metadata. ──
+const _pendingRefs = new Map();
 
 // ── IN-MEMORY LOGS ──
 const logs = [];
@@ -1301,6 +1305,13 @@ async function handleStripeWebhook(req, res) {
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     const event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
 
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const ref = (session.client_reference_id || '').toLowerCase().trim();
+      if (ref && session.payment_intent) _pendingRefs.set(session.payment_intent, ref);
+      return res.json({ received: true });
+    }
+
     if (event.type === 'payment_intent.succeeded') {
       const pi = event.data.object;
       // Payment Link buyers may not populate receipt_email — check charge billing details too
@@ -1343,7 +1354,8 @@ async function handleStripeWebhook(req, res) {
         addLog(`License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
 
         // ── Affiliate commission attribution ──
-        const refCode = (pi.metadata?.ref || '').toLowerCase().trim();
+        const refCode = (pi.metadata?.ref || _pendingRefs.get(pi.id) || '').toLowerCase().trim();
+        _pendingRefs.delete(pi.id);
         if (refCode && supabase) {
           try {
             const { data: aff } = await supabase.from('affiliates').select('code,commission_percent,status').eq('code', refCode).maybeSingle();
