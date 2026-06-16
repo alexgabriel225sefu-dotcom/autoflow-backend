@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS affiliates (
   email               TEXT NOT NULL,
   name                TEXT,
   tiktok_handle       TEXT,
-  commission_percent  INTEGER NOT NULL DEFAULT 20,
+  commission_percent  INTEGER NOT NULL DEFAULT 30,
   status              TEXT NOT NULL DEFAULT 'active', -- active | suspended
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
