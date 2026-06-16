@@ -1327,8 +1327,9 @@ app.get('/api/affiliates/me', async (req, res) => {
   const code = _affiliateFromAuth(req);
   if (!code) return res.status(401).json({ error: 'Not authenticated' });
   try {
-    const { data: affiliate } = await supabase.from('affiliates').select('code,name,email,commission_percent,status').eq('code', code).maybeSingle();
+    const { data: affiliate } = await supabase.from('affiliates').select('code,name,email,commission_percent,status,payout_method,payout_details').eq('code', code).maybeSingle();
     if (!affiliate) return res.status(404).json({ error: 'Affiliate not found' });
+    const { data: pendingReq } = await supabase.from('payout_requests').select('amount_cents,requested_at').eq('affiliate_code', code).eq('status', 'requested').order('requested_at', { ascending: false }).maybeSingle();
     const { data } = await supabase.from('referral_sales').select('amount,commission_amount,paid,refunded,product,created_at').eq('affiliate_code', code).order('created_at', { ascending: false });
     const rows = data || [];
     const now = Date.now();
@@ -1359,11 +1360,133 @@ app.get('/api/affiliates/me', async (req, res) => {
       totalCommissionCents: availableCents + pendingCents + paidCents,
       minPayoutCents: MIN_PAYOUT_CENTS,
       refundWindowDays: REFUND_WINDOW_DAYS,
+      payoutMethod: affiliate.payout_method || '',
+      payoutDetails: affiliate.payout_details || '',
+      pendingPayout: pendingReq ? { amountCents: pendingReq.amount_cents, requestedAt: pendingReq.requested_at } : null,
       sales
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// Compute an affiliate's available (matured, unpaid, non-refunded) commission in cents.
+function _availableFromSales(rows) {
+  const now = Date.now();
+  const windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  let available = 0;
+  (rows || []).forEach(r => {
+    if (!r.refunded && !r.paid && new Date(r.created_at).getTime() + windowMs <= now) available += r.commission_amount;
+  });
+  return available;
+}
+function _validatePayout(method, details) {
+  const m = String(method || '').toLowerCase().trim();
+  if (!['paypal', 'bank', 'crypto'].includes(m)) return { ok: false, error: 'Choose a payout method: PayPal, bank or crypto.' };
+  const d = String(details || '').trim();
+  if (d.length < 3 || d.length > 200) return { ok: false, error: 'Enter valid payout details (3–200 characters).' };
+  return { ok: true, method: m, details: d };
+}
+
+// POST /api/affiliates/payout-method — save where the affiliate wants to be paid
+app.post('/api/affiliates/payout-method', _authLimiter, async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const code = _affiliateFromAuth(req);
+  if (!code) return res.status(401).json({ error: 'Not authenticated' });
+  const v = _validatePayout(req.body?.method, req.body?.details);
+  if (!v.ok) return res.status(400).json({ error: v.error });
+  try {
+    const { error } = await supabase.from('affiliates').update({ payout_method: v.method, payout_details: v.details }).eq('code', code);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, method: v.method, details: v.details });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/affiliates/request-payout — request payment of the current available balance
+app.post('/api/affiliates/request-payout', _authLimiter, async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const code = _affiliateFromAuth(req);
+  if (!code) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    const { data: aff } = await supabase.from('affiliates').select('payout_method,payout_details,status').eq('code', code).maybeSingle();
+    if (!aff) return res.status(404).json({ error: 'Affiliate not found' });
+    if (aff.status !== 'active') return res.status(403).json({ error: 'This account is suspended.' });
+    if (!aff.payout_method || !aff.payout_details) return res.status(400).json({ error: 'Add your payout method first.' });
+    const { data: pending } = await supabase.from('payout_requests').select('id').eq('affiliate_code', code).eq('status', 'requested').maybeSingle();
+    if (pending) return res.status(409).json({ error: 'You already have a payout request pending.' });
+    const { data: sales } = await supabase.from('referral_sales').select('commission_amount,paid,refunded,created_at').eq('affiliate_code', code);
+    const available = _availableFromSales(sales);
+    if (available < MIN_PAYOUT_CENTS) return res.status(400).json({ error: `You need at least $${(MIN_PAYOUT_CENTS / 100).toFixed(0)} available to request a payout.` });
+    const { error } = await supabase.from('payout_requests').insert([{ affiliate_code: code, amount_cents: available, method: aff.payout_method, details: aff.payout_details, status: 'requested' }]);
+    if (error) return res.status(500).json({ error: error.message });
+    addLog(`Payout requested: ${code} — $${(available / 100).toFixed(2)} via ${aff.payout_method}`, 'affiliate', 'info');
+    res.json({ ok: true, amountCents: available });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── OWNER PAYOUT ADMIN (protected by BOT_EMAIL_SECRET) ──
+function _ownerSecretOk(req) {
+  const secret = req.query.secret || req.headers['x-owner-secret'];
+  return process.env.BOT_EMAIL_SECRET && secret === process.env.BOT_EMAIL_SECRET;
+}
+function _csvCell(v) { const s = (v == null ? '' : String(v)).replace(/"/g, '""'); return /[",\n]/.test(s) ? `"${s}"` : s; }
+
+// GET /api/admin/payout-requests.csv?secret=... — export payout requests for the accountant
+app.get('/api/admin/payout-requests.csv', async (req, res) => {
+  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const { data: reqs } = await supabase.from('payout_requests').select('*').order('requested_at', { ascending: false });
+  const { data: affs } = await supabase.from('affiliates').select('code,name,email');
+  const map = {}; (affs || []).forEach(a => { map[a.code] = a; });
+  const header = ['id', 'requested_at', 'affiliate_code', 'name', 'email', 'amount_usd', 'method', 'details', 'status', 'processed_at', 'note'];
+  const lines = [header.join(',')];
+  (reqs || []).forEach(r => {
+    const a = map[r.affiliate_code] || {};
+    lines.push([r.id, r.requested_at, r.affiliate_code, a.name || '', a.email || '', (r.amount_cents / 100).toFixed(2), r.method || '', r.details || '', r.status, r.processed_at || '', r.note || ''].map(_csvCell).join(','));
+  });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="payout-requests.csv"');
+  res.send(lines.join('\n'));
+});
+
+// GET /api/admin/sales.csv?secret=... — export every referral sale for the accountant
+app.get('/api/admin/sales.csv', async (req, res) => {
+  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const { data } = await supabase.from('referral_sales').select('created_at,affiliate_code,product,amount,commission_amount,paid,refunded,payment_intent_id').order('created_at', { ascending: false });
+  const header = ['date', 'affiliate_code', 'product', 'sale_usd', 'commission_usd', 'paid', 'refunded', 'payment_intent_id'];
+  const lines = [header.join(',')];
+  (data || []).forEach(r => {
+    lines.push([r.created_at, r.affiliate_code, r.product || '', (r.amount / 100).toFixed(2), (r.commission_amount / 100).toFixed(2), r.paid ? 'yes' : 'no', r.refunded ? 'yes' : 'no', r.payment_intent_id || ''].map(_csvCell).join(','));
+  });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="affiliate-sales.csv"');
+  res.send(lines.join('\n'));
+});
+
+// POST /api/admin/payouts/:id/paid?secret=... — mark a payout request paid + settle the sales
+app.post('/api/admin/payouts/:id/paid', async (req, res) => {
+  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  try {
+    const { data: pr } = await supabase.from('payout_requests').select('*').eq('id', req.params.id).maybeSingle();
+    if (!pr) return res.status(404).json({ error: 'Payout request not found' });
+    if (pr.status === 'paid') return res.json({ ok: true, already: true });
+    // Settle matured, unpaid, non-refunded sales oldest-first until the paid amount is covered.
+    const { data: sales } = await supabase.from('referral_sales').select('id,commission_amount,created_at')
+      .eq('affiliate_code', pr.affiliate_code).eq('paid', false).eq('refunded', false).order('created_at', { ascending: true });
+    const now = Date.now(); const windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    let acc = 0; const ids = [];
+    for (const s of (sales || [])) {
+      if (new Date(s.created_at).getTime() + windowMs > now) continue;
+      ids.push(s.id); acc += s.commission_amount;
+      if (acc >= pr.amount_cents) break;
+    }
+    if (ids.length) await supabase.from('referral_sales').update({ paid: true }).in('id', ids);
+    await supabase.from('payout_requests').update({ status: 'paid', processed_at: new Date().toISOString() }).eq('id', pr.id);
+    addLog(`Payout marked paid: ${pr.affiliate_code} — $${(pr.amount_cents / 100).toFixed(2)} (${ids.length} sales settled)`, 'affiliate', 'success');
+    res.json({ ok: true, settledSales: ids.length, amountCents: acc });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // GET /api/affiliates/:code/stats — sales + commission summary for one affiliate

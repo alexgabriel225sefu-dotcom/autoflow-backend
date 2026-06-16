@@ -40,3 +40,22 @@ ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS terms_version TEXT;
 -- Commission clawback: a refunded/charged-back sale cancels the commission.
 ALTER TABLE referral_sales ADD COLUMN IF NOT EXISTS refunded BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE referral_sales ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
+
+-- Where the affiliate wants to be paid (PayPal email / IBAN / crypto wallet).
+ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS payout_method TEXT;
+ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS payout_details TEXT;
+
+-- Payout requests raised by affiliates, settled manually by the owner.
+CREATE TABLE IF NOT EXISTS payout_requests (
+  id              BIGSERIAL PRIMARY KEY,
+  affiliate_code  TEXT NOT NULL REFERENCES affiliates(code),
+  amount_cents    INTEGER NOT NULL,
+  method          TEXT,
+  details         TEXT,
+  status          TEXT NOT NULL DEFAULT 'requested', -- requested | paid | rejected
+  requested_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  processed_at    TIMESTAMPTZ,
+  note            TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_payout_requests_affiliate ON payout_requests(affiliate_code);
+CREATE INDEX IF NOT EXISTS idx_payout_requests_status ON payout_requests(status);

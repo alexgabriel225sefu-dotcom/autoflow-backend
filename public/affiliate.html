@@ -43,8 +43,8 @@ p.sub{color:var(--t1);font:400 15px/1.7 var(--f);max-width:480px;margin-bottom:3
 .tab:hover{color:var(--t0)}
 .tab.active{background:var(--panel2);color:var(--t0);box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
 label{display:block;font:500 13px/1 var(--f);color:var(--t1);margin-bottom:6px;margin-top:16px}
-input{width:100%;padding:13px 14px;background:var(--bg1);border:1px solid var(--line2);border-radius:10px;color:var(--t0);font:400 15px/1 var(--f)}
-input:focus{outline:none;border-color:var(--acc)}
+input,select{width:100%;padding:13px 14px;background:var(--bg1);border:1px solid var(--line2);border-radius:10px;color:var(--t0);font:400 15px/1 var(--f)}
+input:focus,select:focus{outline:none;border-color:var(--acc)}
 input::placeholder{color:var(--t2)}
 button{width:100%;margin-top:22px;padding:14px;border:none;border-radius:12px;background:var(--acc);color:#fff;font:600 15px/1 var(--f);cursor:pointer;transition:all .25s var(--ease)}
 button:hover{background:var(--acc2);box-shadow:0 14px 44px var(--accglow)}
@@ -182,6 +182,23 @@ footer .wrap{max-width:1280px}
     </div>
 
     <div class="card">
+      <h2 style="font:600 13px/1 var(--m);margin:0 0 6px;color:var(--acc3);text-transform:uppercase;letter-spacing:.12em">Get paid</h2>
+      <label for="dPmMethod">Payout method</label>
+      <select id="dPmMethod">
+        <option value="paypal">PayPal</option>
+        <option value="bank">Bank transfer (IBAN)</option>
+        <option value="crypto">Crypto wallet</option>
+      </select>
+      <label for="dPmDetails">Payout details</label>
+      <input id="dPmDetails" type="text" placeholder="PayPal email / IBAN / wallet address">
+      <button class="copy-btn" style="width:100%;margin-top:14px" onclick="savePayout()">Save payout details</button>
+      <div id="pmMsg" class="msg"></div>
+      <button id="reqBtn" style="margin-top:14px" onclick="requestPayout()">Request payout</button>
+      <div id="reqMsg" class="msg"></div>
+      <p class="hint" id="payoutNote" style="text-align:left;margin-top:12px"></p>
+    </div>
+
+    <div class="card">
       <h2 style="font:600 13px/1 var(--m);margin:0 0 16px;color:var(--acc3);text-transform:uppercase;letter-spacing:.12em">Recent sales</h2>
       <div id="dSalesWrap"></div>
     </div>
@@ -285,7 +302,9 @@ function renderSales(sales){
 }
 
 var _pollTimer = null;
+var _last = null; // last dashboard payload, for the payout logic
 function populate(d){
+  _last = d;
   document.getElementById('dWho').textContent = (d.name && d.name.trim()) ? d.name : d.email;
   document.getElementById('dCode').textContent = 'Code: ' + d.code;
   document.getElementById('dLink').value = d.link;
@@ -299,7 +318,53 @@ function populate(d){
     'Commissions become <b style="color:var(--up)">Available</b> ' + days + ' days after the sale (refund window). ' +
     'Minimum payout: <b>' + min + '</b>.' +
     (d.refundedCommissionCents > 0 ? ' <span style="color:var(--acc3)">' + money(d.refundedCommissionCents) + ' was cancelled by refunds/chargebacks.</span>' : '');
+  // Payout method — only overwrite fields the user isn't actively editing.
+  var mEl = document.getElementById('dPmMethod'), dEl = document.getElementById('dPmDetails');
+  if (document.activeElement !== mEl && d.payoutMethod) mEl.value = d.payoutMethod;
+  if (document.activeElement !== dEl) dEl.value = d.payoutDetails || '';
+  // Request button + note state.
+  var btn = document.getElementById('reqBtn'), note = document.getElementById('payoutNote');
+  if (d.pendingPayout) {
+    btn.disabled = true; btn.textContent = 'Payout requested';
+    note.innerHTML = '<b style="color:var(--up)">Payout requested:</b> ' + money(d.pendingPayout.amountCents) +
+      ' on ' + new Date(d.pendingPayout.requestedAt).toLocaleDateString() + ' — we\'ll send it to your payout method.';
+  } else if (d.availableCommissionCents < d.minPayoutCents) {
+    btn.disabled = true; btn.textContent = 'Request payout';
+    note.textContent = 'You can request a payout once you have at least ' + money(d.minPayoutCents) + ' available.';
+  } else if (!d.payoutMethod || !d.payoutDetails) {
+    btn.disabled = true; btn.textContent = 'Request payout';
+    note.textContent = 'Save your payout details above, then you can request your ' + money(d.availableCommissionCents) + '.';
+  } else {
+    btn.disabled = false; btn.textContent = 'Request payout (' + money(d.availableCommissionCents) + ')';
+    note.textContent = '';
+  }
   renderSales(d.sales);
+}
+
+async function savePayout(){
+  var method = document.getElementById('dPmMethod').value;
+  var details = document.getElementById('dPmDetails').value.trim();
+  var msg = document.getElementById('pmMsg');
+  if (!details || details.length < 3) { showMsg(msg, 'Enter your payout details.', false); return; }
+  try {
+    var r = await fetch('/api/affiliates/payout-method', { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token()}, body: JSON.stringify({ method, details }) });
+    var d = await r.json();
+    if (d.error) { showMsg(msg, d.error, false); return; }
+    showMsg(msg, 'Payout details saved.', true);
+    refreshDashboard();
+  } catch (e) { showMsg(msg, 'Error: ' + e.message, false); }
+}
+
+async function requestPayout(){
+  var msg = document.getElementById('reqMsg'), btn = document.getElementById('reqBtn');
+  btn.disabled = true; btn.textContent = 'Requesting…';
+  try {
+    var r = await fetch('/api/affiliates/request-payout', { method:'POST', headers:{'Authorization':'Bearer '+token()} });
+    var d = await r.json();
+    if (d.error) { showMsg(msg, d.error, false); btn.disabled = false; btn.textContent = 'Request payout'; return; }
+    showMsg(msg, 'Payout requested: ' + money(d.amountCents) + '. We\'ll send it to your payout method.', true);
+    refreshDashboard();
+  } catch (e) { showMsg(msg, 'Error: ' + e.message, false); btn.disabled = false; btn.textContent = 'Request payout'; }
 }
 // Silent refresh — pulls fresh numbers without flipping back to the loading view.
 async function refreshDashboard(){
