@@ -1233,13 +1233,32 @@ app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
   }
 });
 
-// POST /api/affiliates/signup — { name, email, password, tiktokHandle } -> { token, code, link }
+// Reserved codes that must never become an affiliate handle (they collide with
+// real query-string flags or look like system values).
+const _RESERVED_CODES = new Set(['ref','admin','api','www','direct','intro','affiliate','login','signup','apex','forex','crypto']);
+// Validate a user-chosen affiliate handle. Returns { ok, code } or { ok:false, error }.
+// Pattern is also Stripe client_reference_id-safe (letters, numbers, _ and -).
+function _validateCustomCode(raw) {
+  const code = String(raw || '').toLowerCase().trim();
+  if (!/^[a-z0-9_-]{3,20}$/.test(code)) return { ok: false, error: 'Your link name must be 3–20 characters: letters, numbers, - or _ only (no spaces).' };
+  if (_RESERVED_CODES.has(code)) return { ok: false, error: 'That name is reserved — please choose another.' };
+  return { ok: true, code };
+}
+
+// POST /api/affiliates/signup — { name, email, password, code, tiktokHandle } -> { token, code, link }
 app.post('/api/affiliates/signup', _authLimiter, async (req, res) => {
-  const { name, email, password, tiktokHandle } = req.body || {};
+  const { name, email, password, tiktokHandle, code: wantCode } = req.body || {};
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
   if (!password || String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
   const cleanEmail = email.toLowerCase().trim();
+  // The affiliate chooses their own link name; fall back to an auto code if none given.
+  let customCode = null;
+  if (wantCode != null && String(wantCode).trim() !== '') {
+    const v = _validateCustomCode(wantCode);
+    if (!v.ok) return res.status(400).json({ error: v.error });
+    customCode = v.code;
+  }
   try {
     const { data: existing } = await supabase.from('affiliates').select('code,password_hash').eq('email', cleanEmail).maybeSingle();
     const pwHash = _hashPassword(password);
@@ -1251,15 +1270,24 @@ app.post('/api/affiliates/signup', _authLimiter, async (req, res) => {
       return res.json({ token: createToken({ id: existing.code, email: cleanEmail }), code: existing.code, link: _affiliateLink(existing.code) });
     }
     let code;
-    for (let attempts = 0; attempts < 5; attempts++) {
-      code = _generateAffiliateCode(name);
-      const { data: clash } = await supabase.from('affiliates').select('code').eq('code', code).maybeSingle();
-      if (!clash) break;
+    if (customCode) {
+      const { data: clash } = await supabase.from('affiliates').select('code').eq('code', customCode).maybeSingle();
+      if (clash) return res.status(409).json({ error: 'That link name is already taken — please choose another.' });
+      code = customCode;
+    } else {
+      for (let attempts = 0; attempts < 5; attempts++) {
+        code = _generateAffiliateCode(name);
+        const { data: clash } = await supabase.from('affiliates').select('code').eq('code', code).maybeSingle();
+        if (!clash) break;
+      }
     }
     const { error } = await supabase.from('affiliates').insert([{
       code, email: cleanEmail, name: name || '', tiktok_handle: tiktokHandle || '', status: 'active', password_hash: pwHash
     }]);
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      if (String(error.message || '').toLowerCase().includes('duplicate')) return res.status(409).json({ error: 'That link name is already taken — please choose another.' });
+      return res.status(500).json({ error: error.message });
+    }
     addLog(`New affiliate signup: ${cleanEmail} — code ${code}`, 'affiliate', 'success');
     res.json({ token: createToken({ id: code, email: cleanEmail }), code, link: _affiliateLink(code) });
   } catch (e) {

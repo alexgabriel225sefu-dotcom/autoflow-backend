@@ -134,6 +134,9 @@ footer .wrap{max-width:1280px}
         <input id="suName" type="text" placeholder="Your name" autocomplete="name">
         <label for="suEmail">Email</label>
         <input id="suEmail" type="email" placeholder="you@example.com" autocomplete="email">
+        <label for="suCode">Your link name</label>
+        <input id="suCode" type="text" placeholder="e.g. cryptoking" autocomplete="off" maxlength="20">
+        <div style="font:400 12px/1.5 var(--f);color:var(--t2);margin-top:6px">Your link will be <span id="linkPreview" style="color:var(--acc3);font-family:var(--m)">aicashsystem.space/?ref=…</span></div>
         <label for="suPass">Password</label>
         <input id="suPass" type="password" placeholder="At least 6 characters" autocomplete="new-password">
         <label for="suTiktok">TikTok handle (optional)</label>
@@ -198,18 +201,28 @@ function switchTab(which){
   document.getElementById('signupForm').style.display = login ? 'none' : 'block';
 }
 
+function cleanCode(v){ return (v||'').toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,20); }
+// Live preview + sanitise the chosen link name as the user types.
+document.getElementById('suCode').addEventListener('input', function(){
+  var c = cleanCode(this.value);
+  if (this.value !== c) this.value = c;
+  document.getElementById('linkPreview').textContent = 'aicashsystem.space/?ref=' + (c || '…');
+});
+
 async function doSignup(e){
   e.preventDefault();
   var name = document.getElementById('suName').value.trim();
   var email = document.getElementById('suEmail').value.trim();
+  var code = cleanCode(document.getElementById('suCode').value);
   var password = document.getElementById('suPass').value;
   var tiktokHandle = document.getElementById('suTiktok').value.trim();
   var btn = document.getElementById('suBtn'), msg = document.getElementById('suMsg');
   if (!email || !email.includes('@')) { showMsg(msg, 'Please enter a valid email.', false); return false; }
+  if (!code || code.length < 3) { showMsg(msg, 'Choose a link name (at least 3 characters: letters, numbers, - or _).', false); return false; }
   if (!password || password.length < 6) { showMsg(msg, 'Password must be at least 6 characters.', false); return false; }
   btn.disabled = true; btn.textContent = 'Creating…';
   try {
-    var r = await fetch('/api/affiliates/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, email, password, tiktokHandle }) });
+    var r = await fetch('/api/affiliates/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, email, code, password, tiktokHandle }) });
     var d = await r.json();
     if (d.error) { showMsg(msg, d.error, false); btn.disabled=false; btn.textContent='Create my account'; return false; }
     setToken(d.token);
