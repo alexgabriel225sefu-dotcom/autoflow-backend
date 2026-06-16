@@ -519,6 +519,7 @@ async function main() {
   const isTestnet = cfg.BYBIT_TESTNET || isBinanceTestnet;
   const mode = cfg.PAPER_TRADING ? '📝 PAPER TRADING' : isTestnet ? '🧪 TESTNET' : '🔴 LIVE';
   dash.mode = mode.replace(/[📝🧪🔴]/g, '').trim();
+  dash.exchange = cfg.EXCHANGE.toUpperCase(); // was frozen at module-load (pre-loadRemote) — always showed BINANCE
   tg.alertStart(settings.get('SYMBOL'), cfg.TIMEFRAME, balance, mode);
 
   // ─── Dashboard HTTP server (auth cu DASHBOARD_TOKEN) ──────
