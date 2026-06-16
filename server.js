@@ -1642,7 +1642,7 @@ async function handleStripeWebhook(req, res) {
         }
         if (supabase) {
           const { error } = await supabase.from('licenses')
-            .upsert([{ key: licenseKey, active: true, activated_at: new Date().toISOString(), email: email || '', name: buyerName, product }], { onConflict: 'key' });
+            .upsert([{ key: licenseKey, active: true, activated_at: new Date().toISOString(), email: email || '', name: buyerName, product, payment_intent_id: pi.id }], { onConflict: 'key' });
           if (error) addLog(`License activate DB error: ${error.message}`, 'license', 'error');
         }
         addLog(`License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
@@ -1718,6 +1718,28 @@ async function handleStripeWebhook(req, res) {
 }
 app.post('/stripe-webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 app.post('/webhook',        express.raw({ type: 'application/json' }), handleStripeWebhook);
+
+// ── ORDER STATUS — polled by the thank-you page right after Stripe checkout.
+// Stripe redirects the buyer here before our webhook may have finished processing,
+// so this looks up the session's payment_intent and reports whether the license is ready yet. ──
+app.get('/api/order-status', async (req, res) => {
+  const sessionId = String(req.query.session_id || '').trim();
+  if (!sessionId) return res.status(400).json({ error: 'Missing session_id' });
+  if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe not configured' });
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const piId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+    if (!piId) return res.json({ ready: false });
+    if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+    const { data: lic } = await supabase.from('licenses')
+      .select('key,product,email').eq('payment_intent_id', piId).maybeSingle();
+    if (!lic?.key) return res.json({ ready: false });
+    res.json({ ready: true, licenseKey: lic.key, product: lic.product, email: lic.email || session.customer_details?.email || '' });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
 
 // ════════════════════════════════════════
 // VIDEO DOWNLOAD ROUTES (Veo 3 generated)
@@ -2009,7 +2031,7 @@ app.post('/api/heygen/photo-generate', async (req, res) => {
 
 // Explicit HTML page routes
 // Public pages — no auth required
-const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','apex-bot','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','affiliate','affiliate-terms'];
+const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','apex-bot','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','affiliate','affiliate-terms','thank-you'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
