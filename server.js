@@ -2878,6 +2878,73 @@ app.get('/api/bot-config', async (req, res) => {
 });
 
 // ════════════════════════════════════════
+// RAILWAY AUTO-DEPLOY — client provides their Railway token,
+// we create project + service + variables + deploy for them.
+// ════════════════════════════════════════
+app.post('/api/railway-deploy', async (req, res) => {
+  const { railwayToken, licenseKey, product } = req.body || {};
+  if (!railwayToken || !licenseKey) return res.status(400).json({ error: 'railwayToken and licenseKey required' });
+
+  const RAILWAY_API = 'https://backboard.railway.com/graphql/v2';
+  const image = product === 'apex-forex'
+    ? 'ghcr.io/alexgabriel225sefu-dotcom/apex-forex-bot:latest'
+    : 'ghcr.io/alexgabriel225sefu-dotcom/apex-trade-bot:latest';
+  const projectName = product === 'apex-forex' ? 'apex-forex-bot' : 'apex-trade-bot';
+
+  async function gql(query, variables) {
+    const r = await fetch(RAILWAY_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${railwayToken}` },
+      body: JSON.stringify({ query, variables }),
+    });
+    const t = await r.text();
+    try { return JSON.parse(t); } catch { return { parseError: t.slice(0, 500) }; }
+  }
+
+  try {
+    // 1) Create project
+    const proj = await gql(
+      `mutation($name:String!){ projectCreate(input:{name:$name}){ id environments{ edges{ node{ id } } } } }`,
+      { name: projectName }
+    );
+    const projectId = proj?.data?.projectCreate?.id;
+    const envId = proj?.data?.projectCreate?.environments?.edges?.[0]?.node?.id;
+    if (!projectId || !envId) return res.status(500).json({ error: 'Failed to create Railway project', detail: JSON.stringify(proj).slice(0,300) });
+
+    // 2) Create service with Docker image
+    const svc = await gql(
+      `mutation($projectId:String!,$input:ServiceCreateInput!){ serviceCreate(projectId:$projectId, input:$input){ id } }`,
+      { projectId, input: { name: projectName, source: { image } } }
+    );
+    const serviceId = svc?.data?.serviceCreate?.id;
+    if (!serviceId) return res.status(500).json({ error: 'Failed to create Railway service', detail: JSON.stringify(svc).slice(0,300) });
+
+    // 3) Set variables
+    const vars = [
+      { name: 'LICENSE_KEY', value: licenseKey },
+      { name: 'PORT', value: '3000' },
+      { name: 'PAPER_TRADING', value: 'true' },
+    ];
+    for (const v of vars) {
+      await gql(`mutation($input:VariableUpsertInput!){ variableUpsert(input:$input) }`,
+        { input: { projectId, environmentId: envId, serviceId, name: v.name, value: v.value } });
+    }
+
+    // 4) Create public domain
+    await gql(`mutation($input:ServiceDomainCreateInput!){ serviceDomainCreate(input:$input){ domain } }`,
+      { input: { environmentId: envId, serviceId, targetPort: 3000 } });
+
+    // 5) Deploy
+    await gql(`mutation($serviceId:String!,$environmentId:String!){ serviceInstanceDeploy(serviceId:$serviceId, environmentId:$environmentId) }`,
+      { serviceId, environmentId: envId });
+
+    res.json({ ok: true, projectId, serviceId, message: 'Bot deployed! Check Railway dashboard for your URL in ~2 minutes.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Deploy failed: ' + e.message });
+  }
+});
+
+// ════════════════════════════════════════
 // CATCH-ALL 404  (must be after ALL routes)
 // ════════════════════════════════════════
 app.use((req, res) => {
