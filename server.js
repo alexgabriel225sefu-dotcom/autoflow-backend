@@ -2904,12 +2904,19 @@ app.post('/api/railway-deploy', async (req, res) => {
   try {
     // 1) Create project
     const proj = await gql(
-      `mutation($name:String!){ projectCreate(input:{name:$name}){ id environments{ edges{ node{ id } } } } }`,
+      `mutation($name:String!){ projectCreate(input:{name:$name}){ id } }`,
       { name: projectName }
     );
     const projectId = proj?.data?.projectCreate?.id;
-    const envId = proj?.data?.projectCreate?.environments?.edges?.[0]?.node?.id;
-    if (!projectId || !envId) return res.status(500).json({ error: 'Failed to create Railway project', detail: JSON.stringify(proj).slice(0,300) });
+    if (!projectId) return res.status(500).json({ error: 'Failed to create Railway project', detail: JSON.stringify(proj).slice(0,500) });
+
+    // 1b) Fetch environment ID separately (Railway does not return it inline at creation)
+    const envRes = await gql(
+      `query($id:String!){ project(id:$id){ environments{ edges{ node{ id name } } } } }`,
+      { id: projectId }
+    );
+    const envId = envRes?.data?.project?.environments?.edges?.[0]?.node?.id;
+    if (!envId) return res.status(500).json({ error: 'Failed to get Railway environment', detail: JSON.stringify(envRes).slice(0,500) });
 
     // 2) Create service (name only — Docker image set separately via serviceInstanceUpdate)
     const svc = await gql(
