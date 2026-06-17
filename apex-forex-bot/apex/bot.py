@@ -181,6 +181,9 @@ def verify_license():
         data = res.json()
         if not data.get("valid"):
             print(f"\n❌  License invalid: {data.get('message')}\n")
+            if os.getenv("BYPASS_LICENSE") == "true":
+                print("⚠️  BYPASS_LICENSE=true — continuing in owner/dev mode despite invalid key.")
+                return
             sys.exit(1)
         print(f"✅  Forex license verified — welcome, {data.get('email', 'trader')}!")
     except Exception as e:

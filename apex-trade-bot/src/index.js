@@ -68,6 +68,10 @@ async function verifyLicense() {
     if (!data.valid) {
       console.error(`\n❌  License invalid: ${data.message}`);
       console.error('    Make sure LICENSE_KEY in Variables matches the key from your email.\n');
+      if (process.env.BYPASS_LICENSE === 'true') {
+        console.warn('⚠️  BYPASS_LICENSE=true — continuing in owner/dev mode despite invalid key.');
+        return;
+      }
       process.exit(1);
     }
     console.log(`✅  License verified — welcome, ${data.email || 'trader'}!`);
