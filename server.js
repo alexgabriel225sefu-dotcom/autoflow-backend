@@ -118,23 +118,21 @@ app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
       return res.json({ reply: resp.content[0]?.text || staticFallback(message) });
     }
     const groqKey = process.env.GROQ_API_KEY;
-    if (groqKey) {
-      const msgs = [{ role:'system', content: SETUP_SYSTEM },
-        ...history.slice(-6), { role:'user', content: message }];
-      const gr = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST', headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: msgs, max_tokens: 300 })
-      });
-      const gd = await gr.json();
-      const reply = gd.choices?.[0]?.message?.content;
-      if (reply) return res.json({ reply });
-    }
-    // No AI key configured — use smart static fallback
-    return res.json({ reply: staticFallback(message) });
+    if (!groqKey) return res.json({ reply: '[DEBUG] GROQ_API_KEY not set on server.' });
+    const msgs = [{ role:'system', content: SETUP_SYSTEM },
+      ...history.slice(-6), { role:'user', content: message }];
+    const gr = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST', headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: msgs, max_tokens: 300 })
+    });
+    const gd = await gr.json();
+    const reply = gd.choices?.[0]?.message?.content;
+    if (reply) return res.json({ reply });
+    // Groq responded but no content — show raw response for debugging
+    return res.json({ reply: '[DEBUG] Groq response: ' + JSON.stringify(gd).slice(0, 200) });
   } catch(e) {
     console.error('[SETUP-CHAT] error:', e.message);
-    // Even on error — return helpful static response
-    return res.json({ reply: staticFallback(message) });
+    return res.json({ reply: '[DEBUG] Error: ' + e.message });
   }
 });
 app.get('/api/stripe-config', auth, async (req, res) => {
