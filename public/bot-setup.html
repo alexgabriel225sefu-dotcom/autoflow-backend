@@ -182,10 +182,15 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
     </div>
     <div class="sc-body" id="sb1">
       <div class="rw-card">
-        <p>Railway runs your bot 24/7 in the cloud — free to start. You deploy the bot using a pre-built Docker image (no coding needed).</p>
+        <p>Railway runs your bot 24/7 in the cloud — <b>free to start, no credit card required</b>. You deploy the bot using a pre-built image (no coding needed).</p>
       </div>
 
-      <a href="https://railway.com" target="_blank" class="btn-secondary" style="margin-bottom:18px">Don't have Railway? Create free account first →</a>
+      <div style="margin-top:14px;margin-bottom:18px">
+        <div style="font:700 10px/1 var(--m);color:var(--t2);letter-spacing:.15em;text-transform:uppercase;margin-bottom:10px">First time? Create your Railway account:</div>
+        <div class="inst" style="margin-bottom:8px"><div class="in">→</div><div class="it">Go to <a href="https://railway.com" target="_blank"><b>railway.com</b></a> → click <b>Login</b> → <b>Login with GitHub</b> (fastest) or email</div></div>
+        <div class="inst" style="margin-bottom:8px"><div class="in">→</div><div class="it">Verify your email if asked → you'll land on the <b>Projects</b> page</div></div>
+        <div class="inst"><div class="in">→</div><div class="it">Railway gives you <b>$5 free credit</b> to start. No card needed until you upgrade.</div></div>
+      </div>
 
       <div class="inst">
         <div class="in">1</div>
@@ -337,9 +342,34 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
       </div>
       <div class="inst">
         <div class="in">3</div>
-        <div class="it">If you see an error, check your <b>API Key</b> is correct in Railway Variables. Most issues are a typo in an env var.</div>
+        <div class="it">See the bot restart a few times? <b>That's completely normal.</b> Railway automatically restarts it — it stabilizes within 1–2 minutes.</div>
       </div>
-      <div class="ok-box">✅ The bot scans markets every 5 minutes. It will only open a trade when all conditions are met — this can take hours. That's normal.</div>
+
+      <div style="background:var(--panel2);border:1px solid var(--ln2);border-radius:14px;padding:14px 16px;margin-top:14px">
+        <div style="font:700 10px/1 var(--m);color:var(--t2);letter-spacing:.15em;text-transform:uppercase;margin-bottom:12px">Common issues — don't panic</div>
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:start">
+            <span style="font:600 10px/1 var(--m);color:#f87171;white-space:nowrap;padding-top:2px">Invalid license key</span>
+            <span style="font:400 12px/1.5 var(--f);color:var(--t1)">You skipped Step 3. Open the configurator, enter your key and save — then restart Railway.</span>
+          </div>
+          <div style="height:1px;background:var(--ln)"></div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:start">
+            <span style="font:600 10px/1 var(--m);color:#f87171;white-space:nowrap;padding-top:2px">No AI key found</span>
+            <span style="font:400 12px/1.5 var(--f);color:var(--t1)">Add <code style="font:500 11px var(--m);color:var(--a3);background:rgba(255,255,255,.05);padding:1px 5px;border-radius:4px">GROQ_API_KEY</code> to Railway Variables → restart.</span>
+          </div>
+          <div style="height:1px;background:var(--ln)"></div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:start">
+            <span style="font:600 10px/1 var(--m);color:#fbbf24;white-space:nowrap;padding-top:2px">No exchange API key</span>
+            <span style="font:400 12px/1.5 var(--f);color:var(--t1)">Bot switches to Paper Trading automatically — no real funds at risk. This is fine for testing.</span>
+          </div>
+          <div style="height:1px;background:var(--ln)"></div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:start">
+            <span style="font:600 10px/1 var(--m);color:#fbbf24;white-space:nowrap;padding-top:2px">Bot is paused</span>
+            <span style="font:400 12px/1.5 var(--f);color:var(--t1)">Set up Telegram (Step 2) and send <code style="font:500 11px var(--m);color:var(--a3);background:rgba(255,255,255,.05);padding:1px 5px;border-radius:4px">/resume</code> to activate trading.</span>
+          </div>
+        </div>
+      </div>
+      <div class="ok-box" style="margin-top:12px">✅ The bot scans markets every 5 minutes. It only opens a trade when all conditions align — this can take hours. That's normal, not a bug.</div>
       <button class="mark-done" onclick="showDone()">✓ Bot is running — done!</button>
     </div>
   </div>
