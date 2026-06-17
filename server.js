@@ -67,10 +67,37 @@ PAPER TRADING: Simulated mode, no real funds. Safe to test. Switch to live via c
 SUPPORT EMAIL: supportaicashsystem@gmail.com`;
 
 app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
-  console.log('[SETUP-CHAT] POST received, message:', (req.body || {}).message?.slice(0, 50));
   const { message, history = [] } = req.body || {};
   if (!message || typeof message !== 'string' || message.length > 500)
     return res.status(400).json({ error: 'Invalid message.' });
+
+  // Smart static fallback — always available regardless of AI keys
+  function staticFallback(msg) {
+    const m = msg.toLowerCase();
+    if (m.includes('license') || m.includes('licenta') || m.includes('key') || m.includes('cheie'))
+      return 'LICENSE_KEY-ul l-ai primit pe email dupa cumparare. Daca nu l-ai primit, verifica folderul Spam sau scrie la supportaicashsystem@gmail.com.';
+    if (m.includes('groq') || m.includes('ai key') || m.includes('llama'))
+      return 'GROQ_API_KEY e gratuit: mergi la console.groq.com → Sign up → API Keys → Create a new API key. Nu necesita card bancar.';
+    if (m.includes('paused') || m.includes('pause') || m.includes('start') || m.includes('pornit') || m.includes('resume'))
+      return 'Botul porneste in modul PAUSED din siguranta. Ca sa-l pornesti, trimite comanda /resume pe Telegram. Trebuie sa ai configurat TELEGRAM_BOT_TOKEN si TELEGRAM_CHAT_ID in Railway.';
+    if (m.includes('invalid') || m.includes('403') || m.includes('license error'))
+      return 'Eroarea "Invalid license key" apare cand cheia nu e salvata in sistem. Mergi la aicashsystem.space/configurator, introdu LICENSE_KEY-ul si apasa Save Config. Dupa, reporneste serviciul in Railway.';
+    if (m.includes('telegram') || m.includes('bot token') || m.includes('botfather'))
+      return 'Setup Telegram: 1) @BotFather pe Telegram → /newbot → copiaza tokenul. 2) @userinfobot → trimite orice mesaj → copiaza ID-ul. 3) Adauga TELEGRAM_BOT_TOKEN si TELEGRAM_CHAT_ID in Railway Variables.';
+    if (m.includes('binance') || m.includes('exchange') || m.includes('api key') || m.includes('trading'))
+      return 'Cheia Binance: Profile → API Management → Create API → activeaza doar "Spot Trading", lasa Withdrawals dezactivat. Adauga BINANCE_API_KEY si BINANCE_SECRET in Railway Variables.';
+    if (m.includes('paper') || m.includes('real') || m.includes('live') || m.includes('bani reali'))
+      return 'Fara cheia Binance, botul ruleaza automat in Paper Trading (bani virtuali, zero risc). Ca sa treci pe live, adauga cheile Binance in Railway si reconfigureaza in aicashsystem.space/configurator.';
+    if (m.includes('railway') || m.includes('deploy') || m.includes('docker') || m.includes('image'))
+      return 'Pe Railway: New Project → New Service → Docker Image → lipeste: ghcr.io/alexgabriel225sefu-dotcom/apex-crypto:latest → Deploy. Dupa, adauga Variables: LICENSE_KEY si GROQ_API_KEY.';
+    if (m.includes('crash') || m.includes('restart') || m.includes('loop') || m.includes('eroare'))
+      return 'Daca botul tot restarteaza: 1) Verifica ca LICENSE_KEY e corect. 2) Verifica ca GROQ_API_KEY e adaugat in Railway Variables. 3) Asteapta 2 minute — primele deploy-uri pot restart de 2-3 ori.';
+    if (m.includes('hello') || m.includes('hi') || m.includes('salut') || m.includes('buna') || m.includes('help'))
+      return 'Salut! Sunt asistentul Apex Trade Bot. Te pot ajuta cu: setup Railway, configurare Telegram, erori de pornire, chei API. Ce problema ai?';
+    if (m.includes('support') || m.includes('contact') || m.includes('email'))
+      return 'Suport direct: supportaicashsystem@gmail.com. Descrie problema si include screenshot-uri cu erorile din Railway Logs.';
+    return 'Pentru aceasta intrebare, contacteaza suportul la supportaicashsystem@gmail.com. Pot ajuta cu: erori Railway, Telegram setup, license key, Groq API, Binance API.';
+  }
 
   try {
     const ANTHROPIC_KEY_LOCAL = process.env.ANTHROPIC_API_KEY;
@@ -81,21 +108,26 @@ app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
         model: 'claude-haiku-4-5-20251001', max_tokens: 300,
         system: SETUP_SYSTEM, messages: msgs
       });
-      return res.json({ reply: resp.content[0]?.text || 'Sorry, try again.' });
+      return res.json({ reply: resp.content[0]?.text || staticFallback(message) });
     }
     const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) return res.status(503).json({ error: 'AI not configured on server.' });
-    const msgs = [{ role:'system', content: SETUP_SYSTEM },
-      ...history.slice(-6), { role:'user', content: message }];
-    const gr = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST', headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: msgs, max_tokens: 300 })
-    });
-    const gd = await gr.json();
-    return res.json({ reply: gd.choices?.[0]?.message?.content || 'Sorry, try again.' });
+    if (groqKey) {
+      const msgs = [{ role:'system', content: SETUP_SYSTEM },
+        ...history.slice(-6), { role:'user', content: message }];
+      const gr = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST', headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: msgs, max_tokens: 300 })
+      });
+      const gd = await gr.json();
+      const reply = gd.choices?.[0]?.message?.content;
+      if (reply) return res.json({ reply });
+    }
+    // No AI key configured — use smart static fallback
+    return res.json({ reply: staticFallback(message) });
   } catch(e) {
     console.error('[SETUP-CHAT] error:', e.message);
-    res.status(500).json({ error: 'AI error — try again.' });
+    // Even on error — return helpful static response
+    return res.json({ reply: staticFallback(message) });
   }
 });
 app.get('/api/stripe-config', auth, async (req, res) => {
