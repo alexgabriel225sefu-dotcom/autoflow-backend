@@ -1,0 +1,20 @@
+name: Railway Inspect
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/arcads-external-api-gExX7]
+    paths:
+      - scripts/railway-inspect.js
+      - .github/workflows/railway-inspect.yml
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Inspect Railway template
+        run: node scripts/railway-inspect.js
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
