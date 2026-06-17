@@ -528,7 +528,12 @@ async function main() {
   tg.alertStart(settings.get('SYMBOL'), cfg.TIMEFRAME, balance, mode);
 
   // ─── Dashboard HTTP server (auth cu DASHBOARD_TOKEN) ──────
-  buildDashboard.serve(() => ({ ...dash, tickCount }), logger);
+  const controls = {
+    set:      (key, value) => settings.set(key, value),
+    pause:    ()           => settings.set('PAUSED', true),
+    resume:   ()           => settings.set('PAUSED', false),
+  };
+  buildDashboard.serve(() => ({ ...dash, tickCount, settings: settings.snapshot() }), logger, controls);
 
   tg.startPolling(() => dash, exchange);
 
