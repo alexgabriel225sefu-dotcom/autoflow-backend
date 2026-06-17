@@ -121,6 +121,10 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
 .mock-k{background:#070709;border:1px solid rgba(74,222,128,.18);border-radius:6px;padding:7px 9px;font:600 10.5px/1 var(--m);color:#4ade80}.mock-v{background:#070709;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:7px 9px;font:500 10.5px/1 var(--m);color:#f59e0b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mock-log{background:#04040a;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:11px 13px;font:500 10px/1.75 var(--m);margin-top:6px}
 .mock-log .g{color:#4ade80}.mock-log .d{color:#444}.mock-log .w{color:#f59e0b}.mock-log .b{color:#60a5fa}
+/* Real screenshots */
+.ss-wrap{position:relative;border-radius:14px;overflow:hidden;margin:12px 0 6px;border:1px solid rgba(255,255,255,.08)}
+.ss{width:100%;display:block}
+.ss-tag{position:absolute;background:rgba(255,45,79,.95);color:#fff;font:700 11px/1 var(--m);padding:5px 12px;border-radius:20px;white-space:nowrap;pointer-events:none;box-shadow:0 2px 10px rgba(255,45,79,.5);z-index:2}
 
 /* AI Chat Widget */
 #chat-btn{position:fixed;bottom:24px;right:24px;z-index:999;width:54px;height:54px;border-radius:50%;background:var(--a);border:none;cursor:pointer;box-shadow:0 8px 32px var(--aglow);display:flex;align-items:center;justify-content:center;transition:all .3s var(--e)}
@@ -188,15 +192,9 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
         <div class="in">1</div>
         <div class="it">Go to <b>railway.com</b> → click <b>New Project</b> → <b>New Service</b> → select <b>"Docker Image"</b></div>
       </div>
-      <div class="mock">
-        <div class="mock-bar"><b>railway.com</b> · New Service</div>
-        <div class="mock-body">
-          <div style="font:500 11px/1 var(--f);color:#555;margin-bottom:9px">What can we help with?</div>
-          <div class="mock-opt"><div class="mi">⚙</div>GitHub Repo</div>
-          <div class="mock-opt"><div class="mi">📋</div>Template</div>
-          <div class="mock-opt"><div class="mi">🗄</div>Database</div>
-          <div class="mock-opt sel"><div class="mi">🐳</div>Docker Image &nbsp;<span style="color:#7c6fd0;font-size:.85em">← tap this</span></div>
-        </div>
+      <div class="ss-wrap">
+        <img src="/img/rail-1-new-project.jpg" alt="Railway New Project — select Docker Image" class="ss">
+        <div class="ss-tag" style="top:38%;left:50%;transform:translateX(-50%)">▼ tap Docker Image</div>
       </div>
       <div class="inst">
         <div class="in">2</div>
@@ -207,31 +205,30 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
           </div>
         </div>
       </div>
-      <div class="mock">
-        <div class="mock-bar"><b>railway.com</b> · New Service · Image name</div>
-        <div class="mock-body">
-          <div class="mock-inp-row">
-            <div class="mock-inp">ghcr.io/alexgabriel225sefu-dotcom/apex-crypto:latest</div>
-            <div class="mock-btn">Deploy →</div>
-          </div>
-        </div>
+      <div class="ss-wrap">
+        <img src="/img/rail-3-paste-image.jpg" alt="Paste Docker image URL in Railway" class="ss">
+        <div class="ss-tag" style="top:21%;left:10%">▼ tap the suggestion</div>
+      </div>
+      <div class="ss-wrap" style="margin-top:8px">
+        <img src="/img/rail-6-active.jpg" alt="Railway deployment successful" class="ss">
+        <div class="ss-tag" style="top:63%;left:50%;transform:translateX(-50%)">▲ Deployment successful ✓</div>
       </div>
       <div class="inst">
         <div class="in">3</div>
         <div class="it">In your Railway service → <b>Variables</b> tab → add these two variables:
         </div>
       </div>
-      <div class="mock">
-        <div class="mock-bar"><b>apex-crypto</b> · Variables</div>
-        <div class="mock-body">
-          <div class="mock-vars">
-            <div class="mock-var"><div class="mock-k">LICENSE_KEY</div><div class="mock-v" id="licInStep">APEX-XXXX-XXXX-XXXX</div></div>
-            <div class="mock-var"><div class="mock-k">GROQ_API_KEY</div><div class="mock-v">gsk_xxxxxxxxxxxxxxxxxxxxxxxx</div></div>
-          </div>
-          <div style="margin-top:8px;display:flex;gap:6px">
-            <button onclick="copyLicToClipboard()" style="background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);color:#4ade80;border-radius:6px;padding:6px 12px;cursor:pointer;font:600 11px var(--f)">Copy LICENSE_KEY</button>
-          </div>
-        </div>
+      <div style="margin-top:8px;margin-bottom:6px">
+        <button onclick="copyLicToClipboard()" style="background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);color:#4ade80;border-radius:8px;padding:9px 14px;cursor:pointer;font:600 12px var(--f);width:100%">Copy LICENSE_KEY to clipboard</button>
+      </div>
+      <div class="ss-wrap">
+        <img src="/img/rail-7-license-key.jpg" alt="Adding LICENSE_KEY in Railway Variables" class="ss">
+        <div class="ss-tag" style="top:11%;left:50%;transform:translateX(-50%)">▼ tap Variables tab</div>
+      </div>
+      <div class="warn-box" style="margin-top:4px">⚠ When pasting LICENSE_KEY — make sure there's <b>no space before or after it</b>. Railway shows a warning if there is one.</div>
+      <div class="ss-wrap" style="margin-top:8px">
+        <img src="/img/rail-8-groq-key.jpg" alt="Adding GROQ_API_KEY in Railway Variables" class="ss">
+        <div class="ss-tag" style="top:19%;left:50%;transform:translateX(-50%)">▼ add GROQ_API_KEY here</div>
       </div>
       <div style="font:400 11.5px/1.6 var(--f);color:var(--t2);margin-top:6px">Get a free Groq key at <a href="https://console.groq.com" target="_blank" style="color:var(--a3)">console.groq.com</a> → API Keys → Create API Key</div>
       <div class="ok-box">✓ The bot loads all settings automatically using your license key. After adding variables, Railway restarts and the bot goes live.</div>
@@ -321,16 +318,12 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
         <div class="in">2</div>
         <div class="it">You should see these lines in the logs — that means everything is working:</div>
       </div>
-      <div class="mock">
-        <div class="mock-bar"><b>apex-crypto</b> · Deployment Logs</div>
-        <div class="mock-log">
-          <span class="d">[APEX BOT] Starting... Node v20.20.2</span><br>
-          <span class="g">✅  License verified — welcome, trader!</span><br>
-          <span class="g">🚀 APEX TRADE BOT — AI Powered Trading</span><br>
-          <span class="d">&nbsp;&nbsp;Symbol: SOLUSDT | Mode: 📝 PAPER TRADING</span><br>
-          <span class="b">📊 Dashboard: https://your-service.railway.app</span><br>
-          <span class="d">⏱️  Analyzing every 5 minutes.</span>
-        </div>
+      <div class="ss-wrap">
+        <img src="/img/rail-9-logs-start.jpg" alt="Bot startup logs in Railway" class="ss">
+      </div>
+      <div class="ss-wrap" style="margin-top:6px">
+        <img src="/img/rail-10-logs-verified.jpg" alt="License verified and bot paused" class="ss">
+        <div class="ss-tag" style="top:12%;left:10%">▼ this means it's working</div>
       </div>
       <div class="inst">
         <div class="in">3</div>
