@@ -261,6 +261,9 @@ async function closeTrade(price, reason, alreadyClosed = false) {
 
 // ─── Selectează cel mai bun simbol (scanner) ──────────────
 async function bestSymbol() {
+  // Dashboard manual override takes priority over the auto-scanner
+  if (settings.get('SYMBOL_MANUAL')) return settings.get('SYMBOL');
+
   if (!cfg.MULTI_SYMBOL || cfg.SCAN_SYMBOLS.length <= 1) return settings.get('SYMBOL');
 
   const results = await Promise.all(cfg.SCAN_SYMBOLS.map(async sym => {
@@ -529,9 +532,13 @@ async function main() {
 
   // ─── Dashboard HTTP server (auth cu DASHBOARD_TOKEN) ──────
   const controls = {
-    set:      (key, value) => settings.set(key, value),
-    pause:    ()           => settings.set('PAUSED', true),
-    resume:   ()           => settings.set('PAUSED', false),
+    set: (key, value) => {
+      settings.set(key, value);
+      // Mark SYMBOL as manually chosen so the auto-scanner doesn't override it
+      if (key === 'SYMBOL') settings.set('SYMBOL_MANUAL', true);
+    },
+    pause:  () => settings.set('PAUSED', true),
+    resume: () => settings.set('PAUSED', false),
   };
   buildDashboard.serve(() => ({ ...dash, tickCount, settings: settings.snapshot() }), logger, controls);
 
