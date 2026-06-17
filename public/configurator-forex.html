@@ -374,18 +374,23 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
                 <code id="imgDisplay" style="flex:1;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#00cfff;font-size:.78rem;word-break:break-all">ghcr.io/alexgabriel225sefu-dotcom/apex-forex-bot:latest</code>
                 <button id="cpyImgBtn" onclick="copyImg()" style="background:#00cfff20;border:1px solid #00cfff40;color:#00cfff;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:.82rem">Copy</button>
               </div>
-              <div style="margin-bottom:10px">
-                <div style="font-size:.82rem;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Railway Token — <a href="https://railway.com/account/tokens" target="_blank" style="color:#00cfff;text-transform:none;letter-spacing:0;font-weight:400">Get it here →</a> (free account)</div>
-                <input id="railwayTokenInput" type="password" placeholder="Paste your Railway API token here…" style="width:100%;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#fff;font-size:.88rem;outline:none;box-sizing:border-box" />
+              <!-- Env vars pre-filled -->
+              <div style="margin-bottom:14px">
+                <div style="font-size:.82rem;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Environment Variables (copy these)</div>
+                <pre style="background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:12px;color:#00ff88;font-size:.78rem;line-height:1.7;overflow-x:auto;white-space:pre-wrap;margin:0">LICENSE_KEY=<span id="envLicKey">—</span>
+PAPER_TRADING=true
+BROKER=td
+MULTI_SYMBOL=false
+PORT=3000</pre>
+                <button onclick="copyEnvVars()" style="margin-top:6px;background:#00ff8820;border:1px solid #00ff8840;color:#00ff88;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:.82rem;width:100%">Copy Environment Variables</button>
               </div>
-              <button id="autoDeployBtn" onclick="autoDeploy()" style="display:block;width:100%;text-align:center;background:linear-gradient(135deg,#00ff88,#00cfff);color:#052e16;font-weight:800;font-size:1.05rem;padding:16px;border-radius:10px;cursor:pointer;border:none;margin-bottom:10px">🚀 Deploy My Bot Automatically →</button>
-              <div id="deployStatus" style="display:none;text-align:center;padding:10px;border-radius:8px;font-size:.85rem"></div>
+              <!-- Deploy buttons -->
+              <a href="https://railway.com/new" target="_blank" style="display:block;width:100%;text-align:center;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-weight:800;font-size:1rem;padding:15px;border-radius:10px;cursor:pointer;border:none;margin-bottom:8px;text-decoration:none;box-sizing:border-box">Deploy on Railway (Free) &rarr;</a>
               <div class="dsteps">
-                <div class="dstep"><div class="dn">1</div><span>Create a free Railway account at <a href="https://railway.com" target="_blank" style="color:#00cfff">railway.com</a></span></div>
-                <div class="dstep"><div class="dn">2</div><span>Go to <a href="https://railway.com/account/tokens" target="_blank" style="color:#00cfff">railway.com/account/tokens</a> → create a token → paste above</span></div>
-                <div class="dstep"><div class="dn">3</div><span>Click Deploy — bot is set up automatically in 30 seconds ✓</span></div>
+                <div class="dstep"><div class="dn">1</div><span>Click Deploy on Railway above &rarr; create free account at <a href="https://railway.com" target="_blank" style="color:#00cfff">railway.com</a></span></div>
+                <div class="dstep"><div class="dn">2</div><span>New Project &rarr; Deploy a Docker Image &rarr; paste the image above</span></div>
+                <div class="dstep"><div class="dn">3</div><span>Go to Variables &rarr; paste the environment variables above &rarr; Deploy &#10003;</span></div>
               </div>
-              <div style="margin-top:12px;text-align:center;color:#6b7280;font-size:.78rem">Your token is used only to deploy your bot and is never stored on our servers.</div>
             </div>
             <!-- Manual fallback -->
             <div id="deployManual" style="display:none">
@@ -523,6 +528,7 @@ document.getElementById('genBtn').addEventListener('click',async()=>{
       document.getElementById('deploySuccess').style.display='block';
       document.getElementById('deployManual').style.display='none';
       document.getElementById('licDisplay').textContent=lk;
+      if(document.getElementById('envLicKey'))document.getElementById('envLicKey').textContent=lk;
       document.getElementById('privNote').textContent='Config encrypted & saved. Your bot loads it automatically on startup.';
       btn.textContent='✓ Config saved!';btn.style.background='var(--up)';btn.style.color='#052e16';
     } else {
@@ -548,6 +554,13 @@ function showManual(lk){
   document.getElementById('eout').style.display='block';
   document.getElementById('deploySuccess').style.display='none';
   document.getElementById('deployManual').style.display='block';
+}
+function copyEnvVars(){
+  const lk=(document.getElementById('licDisplay').textContent||'').trim();
+  const txt='LICENSE_KEY='+lk+'\nPAPER_TRADING=true\nBROKER=td\nMULTI_SYMBOL=false\nPORT=3000';
+  navigator.clipboard.writeText(txt).then(()=>{
+    const b=event.target;const orig=b.textContent;b.textContent='✓ Copied!';setTimeout(()=>{b.textContent=orig;},2000);
+  });
 }
 function copyLic(){
   navigator.clipboard.writeText(document.getElementById('licDisplay').textContent).then(()=>{
