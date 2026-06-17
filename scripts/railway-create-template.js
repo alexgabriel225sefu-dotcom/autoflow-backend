@@ -19,7 +19,17 @@ async function upsert(name, value){
 }
 
 async function main(){
-  // Redeploy only — picks up the latest Docker image from ghcr.io
+  // Force update to specific SHA tag to bypass Railway's :latest cache
+  const SHA = process.env.GITHUB_SHA || 'f60747b6c45c667ca4da0aaeadc42a2d23bed0f8';
+  const image = `ghcr.io/alexgabriel225sefu-dotcom/apex-forex-bot:${SHA}`;
+  out('Forcing image: ' + image);
+
+  const upd = await gql(`
+    mutation($serviceId:String!,$environmentId:String!,$input:ServiceInstanceUpdateInput!){
+      serviceInstanceUpdate(serviceId:$serviceId, environmentId:$environmentId, input:$input)
+    }`, { serviceId: SERVICE_ID, environmentId: ENV_ID, input: { dockerImage: image } });
+  out('image update: ' + JSON.stringify(upd).slice(0,200));
+
   const dep = await gql(`mutation($serviceId:String!,$environmentId:String!){ serviceInstanceDeploy(serviceId:$serviceId, environmentId:$environmentId) }`,
     { serviceId: SERVICE_ID, environmentId: ENV_ID });
   out('redeploy: ' + JSON.stringify(dep).slice(0,200));
