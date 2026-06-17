@@ -1,0 +1,10 @@
+# Root-level nixpacks config for Railway apex-forex-bot deployment
+# This handles the case where Root Directory is NOT set in Railway UI
+[phases.setup]
+nixPkgs = ["python311"]
+
+[phases.install]
+cmds = ["pip install -r apex-forex-bot/requirements.txt"]
+
+[start]
+cmd = "cd apex-forex-bot && python main.py"
