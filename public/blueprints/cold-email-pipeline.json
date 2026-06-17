@@ -1,0 +1,120 @@
+{
+  "name": "AI Cash Systems — Cold Email Pipeline (Module 7)",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-sheets:searchRows",
+      "version": 1,
+      "parameters": {
+        "spreadsheetId": "YOUR_PROSPECTS_SPREADSHEET_ID",
+        "sheetId": "Prospects",
+        "limit": 10
+      },
+      "mapper": {
+        "filter": {
+          "condition": "{{item.Status}} = Pending"
+        }
+      },
+      "metadata": {
+        "designer": { "x": 0, "y": 0, "name": "Google Sheets — Get Pending Prospects" }
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:iterator",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "array": "{{1.rows}}"
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0, "name": "Iterator — Process Each Prospect" }
+      }
+    },
+    {
+      "id": 3,
+      "module": "openai-gpt-3:CreateChatCompletion",
+      "version": 1,
+      "parameters": {
+        "model": "gpt-4o",
+        "temperature": 0.8,
+        "max_tokens": 350
+      },
+      "mapper": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "You write ultra-personalized cold email opening lines (1-2 sentences max) for a B2B outreach campaign. The email is from an AI automation agency. Focus on a specific, genuine observation about the prospect's business. Be natural, not salesy. Never use generic openers like 'I hope this email finds you well'."
+          },
+          {
+            "role": "user",
+            "content": "Write a personalized opening line for this prospect:\nCompany: {{2.value.Company}}\nIndustry: {{2.value.Industry}}\nLocation: {{2.value.City}}, {{2.value.Country}}\nContact: {{2.value.FirstName}} {{2.value.LastName}}, {{2.value.Title}}\nCompany size: {{2.value.Employees}} employees\n\nThen write the full cold email (under 120 words total) pitching AI automation services that save time on customer replies and lead follow-up. Subject line included."
+          }
+        ]
+      },
+      "metadata": {
+        "designer": { "x": 600, "y": 0, "name": "GPT-4o — Personalize Email" }
+      }
+    },
+    {
+      "id": 4,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": { "handleErrors": false },
+      "mapper": {
+        "url": "https://api.instantly.ai/api/v1/lead/add",
+        "method": "POST",
+        "headers": [
+          { "name": "Content-Type", "value": "application/json" }
+        ],
+        "body": "{\"api_key\":\"YOUR_INSTANTLY_API_KEY\",\"campaign_id\":\"YOUR_CAMPAIGN_ID\",\"skip_if_in_workspace\":true,\"leads\":[{\"email\":\"{{2.value.Email}}\",\"first_name\":\"{{2.value.FirstName}}\",\"last_name\":\"{{2.value.LastName}}\",\"company_name\":\"{{2.value.Company}}\",\"personalization\":\"{{3.choices[].message.content}}\"}]}",
+        "bodyType": "raw"
+      },
+      "metadata": {
+        "designer": { "x": 900, "y": 0, "name": "Instantly.ai — Add Lead to Campaign" }
+      }
+    },
+    {
+      "id": 5,
+      "module": "google-sheets:updateRow",
+      "version": 1,
+      "parameters": {
+        "spreadsheetId": "YOUR_PROSPECTS_SPREADSHEET_ID",
+        "sheetId": "Prospects"
+      },
+      "mapper": {
+        "rowNumber": "{{2.value.__ROW_NUMBER__}}",
+        "values": {
+          "Status": "Sent",
+          "SentDate": "{{formatDate(now; 'DD/MM/YYYY')}}"
+        }
+      },
+      "metadata": {
+        "designer": { "x": 1200, "y": 0, "name": "Sheets — Mark as Sent" }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "eu2.make.com",
+    "scheduling": {
+      "type": "cron",
+      "interval": 1440,
+      "time": "09:00"
+    },
+    "notes": "SETUP: 1) Export prospects from Apollo.io as CSV, upload to Google Sheets with columns: Company, Industry, City, Country, FirstName, LastName, Title, Email, Employees, Status (set all to 'Pending'), SentDate 2) Get API key from Instantly.ai and create a campaign 3) Replace YOUR_INSTANTLY_API_KEY and YOUR_CAMPAIGN_ID 4) Schedule this scenario to run daily at 9am — it will process 10 prospects per run (50 emails/5 runs per day)"
+  }
+}

@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Forex Bot Configurator — Apex Forex Bot</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060608;--bg1:#0b0b0e;--panel:#111115;--panel2:#18181d;--hov:#1e1e23;
+  --ln:rgba(255,255,255,.07);--ln2:rgba(255,255,255,.13);
+  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
+  --a:#ff2d4f;--a2:#ff5c74;--a3:#ff97a8;
+  --adim:rgba(255,45,79,.12);--aglow:rgba(255,45,79,.4);
+  --up:#27c46a;--dn:#ff2d4f;
+  --d:'Clash Display',system-ui,sans-serif;
+  --f:'Satoshi',system-ui,sans-serif;
+  --m:'JetBrains Mono',monospace;
+  --e:cubic-bezier(.32,.72,0,1)
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;min-height:100dvh}
+a{color:var(--a3)}
+input,button,textarea,select{font-family:var(--f)}
+
+/* Gate */
+#gate{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:20px}
+.gc{width:100%;max-width:440px;background:var(--panel);border:1px solid var(--ln2);border-radius:28px;padding:40px 36px;text-align:center}
+.gc .brand{font:700 17px/1 var(--d);letter-spacing:-.3px;margin-bottom:30px}
+.gc .brand b{color:var(--a)}
+.gc h2{font:700 23px/1.1 var(--d);letter-spacing:-.5px;margin-bottom:8px}
+.gc p{font:400 14px/1.65 var(--f);color:var(--t1);margin-bottom:26px}
+.gi{width:100%;background:var(--bg1);border:2px solid var(--ln2);border-radius:14px;color:var(--t0);font:600 14px/1 var(--m);padding:16px;outline:none;letter-spacing:.08em;transition:border-color .2s;text-align:center}
+.gi:focus{border-color:var(--a)}
+.gi::placeholder{color:var(--t2);font-weight:400;letter-spacing:.02em}
+.gb{margin-top:12px;width:100%;background:var(--a);color:#fff;font:700 15px/1 var(--f);border:none;border-radius:14px;padding:17px;cursor:pointer;transition:all .25s var(--e)}
+.gb:hover{background:var(--a2);box-shadow:0 12px 36px var(--aglow)}
+.gb:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.ge{margin-top:10px;font:500 12.5px var(--f);color:var(--a);min-height:18px}
+.gl{margin-top:20px;font:400 13px var(--f);color:var(--t2)}
+.gl a{color:var(--a3);border-bottom:1px dotted rgba(255,151,168,.4)}
+
+/* Nav */
+nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,3vw,40px);background:rgba(6,6,8,.88);backdrop-filter:blur(20px);border-bottom:1px solid var(--ln)}
+.nbrand{font:700 16px/1 var(--d);letter-spacing:-.3px}
+.nbrand b{color:var(--a)}
+.ntag{font:600 11px/1 var(--m);color:var(--t2);background:var(--panel);border:1px solid var(--ln2);border-radius:99px;padding:6px 12px;letter-spacing:.05em}
+
+/* Layout */
+.wrap{max-width:1200px;margin:0 auto;padding:36px clamp(16px,3vw,40px) 80px}
+.ew{display:inline-flex;align-items:center;gap:8px;background:var(--adim);border:1px solid rgba(255,45,79,.24);color:var(--a3);border-radius:100px;padding:6px 14px;font:600 11px/1 var(--m);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
+.ew i{width:6px;height:6px;border-radius:50%;background:var(--a);box-shadow:0 0 9px var(--a);display:block;flex-shrink:0}
+.ph h1{font:600 clamp(26px,3vw,38px)/1.08 var(--d);letter-spacing:-.04em;margin-bottom:10px}
+.ph p{font:400 14px/1.7 var(--f);color:var(--t1);max-width:580px;margin-bottom:32px}
+.cols{display:grid;grid-template-columns:1fr 336px;gap:24px;align-items:start}
+@media(max-width:900px){.cols{grid-template-columns:1fr}.side{position:static!important}}
+
+/* Section cards */
+.sec{background:var(--panel);border:1px solid var(--ln);border-radius:20px;overflow:hidden;margin-bottom:18px}
+.sh{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--ln);background:var(--bg1)}
+.sn{width:26px;height:26px;border-radius:9px;background:var(--adim);color:var(--a);font:700 12px/1 var(--m);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sh strong{font:600 15px/1 var(--d);letter-spacing:-.02em}
+.sh em{font:400 12px var(--f);color:var(--t2);margin-left:auto;font-style:normal}
+.sb{padding:22px}
+
+/* Broker grid */
+.bkg{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:8px}
+.bkc{background:var(--bg1);border:1px solid var(--ln);border-radius:14px;padding:16px;cursor:pointer;transition:border-color .2s,background .2s;user-select:none}
+.bkc:hover{border-color:var(--ln2)}
+.bkc.on{border-color:var(--a);background:var(--adim)}
+.bkc strong{font:600 13.5px/1 var(--d);display:block;margin-bottom:5px}
+.bkc span{font:400 12px/1.55 var(--f);color:var(--t1)}
+.bkc .btag{font:600 9.5px/1 var(--m);text-transform:uppercase;letter-spacing:.06em;margin-top:7px;padding:3px 8px;border-radius:5px;display:inline-block;background:rgba(39,196,106,.14);color:#4ade80}
+.bkc .btag.api{background:rgba(255,45,79,.12);color:var(--a3)}
+
+/* Pairs/chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{font:600 12.5px/1 var(--m);padding:9px 14px;border-radius:99px;border:1px solid var(--ln);background:var(--bg1);color:var(--t2);cursor:pointer;transition:all .2s;user-select:none}
+.chip:hover{border-color:var(--ln2);color:var(--t1)}
+.chip.on{border-color:var(--a);color:var(--a3);background:var(--adim)}
+
+/* Mode cards */
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.mc{background:var(--bg1);border:1px solid var(--ln);border-radius:14px;padding:14px;cursor:pointer;transition:border-color .2s,background .2s;user-select:none}
+.mc:hover{border-color:var(--ln2)}
+.mc.on{border-color:var(--a);background:var(--adim)}
+.mc.onL{border-color:#f43f5e;background:rgba(244,63,94,.07)}
+.mc strong{font:600 13.5px/1 var(--d);display:block;margin-bottom:6px}
+.mc span{font:400 12px/1.55 var(--f);color:var(--t1)}
+.warn{background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);border-radius:12px;padding:12px 15px;font:400 12px/1.6 var(--f);color:#fca5a5;margin-top:12px;display:none}
+.info{background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:12px;padding:12px 15px;font:400 12px/1.6 var(--f);color:#93c5fd;margin-top:12px;display:none}
+
+/* Sliders */
+.row{margin-bottom:22px}.row:last-child{margin-bottom:0}
+.rl{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px}
+.rl label{font:600 13px/1 var(--f);color:var(--t1)}
+.rv{font:700 14px/1 var(--m);color:var(--a3)}
+input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:4px;background:var(--panel2);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--a);border:3px solid var(--bg);box-shadow:0 0 0 1px var(--a);cursor:pointer;transition:transform .15s}
+input[type=range]::-webkit-slider-thumb:active{transform:scale(1.18)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--a);border:3px solid var(--bg);cursor:pointer}
+.hn{font:400 12px/1.55 var(--f);color:var(--t2);margin-top:5px}
+.hn b{color:var(--t0);font-weight:600}
+
+/* Toggles */
+.trow{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-top:1px solid var(--ln)}
+.trow:first-child{border-top:none;padding-top:0}
+.tt strong{font:600 13px/1.2 var(--d);display:block;margin-bottom:4px}
+.tt span{font:400 12px/1.55 var(--f);color:var(--t2)}
+.tgl{margin-left:auto;flex-shrink:0;width:44px;height:25px;border-radius:99px;background:var(--panel2);border:1px solid var(--ln2);position:relative;cursor:pointer;transition:background .2s}
+.tgl::after{content:'';position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:var(--t2);transition:transform .2s,background .2s}
+.tgl.on{background:var(--a);border-color:var(--a)}
+.tgl.on::after{transform:translateX(19px);background:#060608}
+
+/* Inputs */
+.inp{width:100%;background:var(--bg1);border:1px solid var(--ln2);border-radius:12px;color:var(--t0);font:500 13px var(--m);padding:12px 14px;outline:none;transition:border-color .2s;margin-top:7px;display:block}
+.inp:focus{border-color:var(--a)}
+.inp::placeholder{color:var(--t2)}
+.ilbl{font:600 12.5px/1 var(--f);color:var(--t1);margin-top:18px;display:block}
+.ilbl:first-child{margin-top:0}
+
+/* MT5 steps */
+.steps{margin-top:12px;display:none}
+.step{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--ln)}
+.step:last-child{border-bottom:none}
+.stepn{width:22px;height:22px;border-radius:7px;background:var(--adim);color:var(--a3);font:700 11px/1 var(--m);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step p{font:400 12px/1.6 var(--f);color:var(--t2)}
+.step p b{color:var(--t0);font-weight:600}
+
+/* AI tabs */
+.aitabs{display:flex;gap:8px;margin-top:8px}
+.aitab{flex:1;background:var(--bg1);border:1px solid var(--ln);border-radius:11px;padding:11px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;font:600 12.5px/1 var(--d)}
+.aitab:hover{border-color:var(--ln2)}
+.aitab.on{border-color:var(--a);background:var(--adim);color:var(--a3)}
+
+/* Summary */
+.side{position:sticky;top:72px}
+.sum{background:var(--panel);border:1px solid var(--ln2);border-radius:20px;overflow:hidden}
+.smh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--ln);background:var(--bg1)}
+.smh strong{font:600 14px/1 var(--d)}
+.sbadge{font:700 10px/1 var(--m);letter-spacing:.1em;text-transform:uppercase;border-radius:7px;padding:5px 10px}
+.bPaper{background:rgba(59,130,246,.12);color:#93c5fd;border:1px solid rgba(59,130,246,.22)}
+.bLive2{background:rgba(244,63,94,.12);color:#fca5a5;border:1px solid rgba(244,63,94,.22)}
+.srows{padding:12px 20px}
+.sr{display:flex;align-items:baseline;justify-content:space-between;padding:7.5px 0;border-bottom:1px solid var(--ln)}
+.sr:last-child{border-bottom:none}
+.sk{font:400 12.5px var(--f);color:var(--t1)}
+.sv{font:600 13px var(--m)}
+.rrw{padding:4px 20px 14px}
+.rrl{display:flex;justify-content:space-between;font:400 11px var(--m);color:var(--t2);margin-bottom:6px}
+.rrt{height:7px;border-radius:99px;background:var(--panel2);display:flex;overflow:hidden}
+.rrd{height:100%;background:var(--dn);transition:width .3s}
+.rru{height:100%;background:var(--up);transition:width .3s}
+.pnl{padding:12px 20px 16px;border-top:1px solid var(--ln);display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pc{background:var(--bg1);border-radius:12px;padding:13px 14px}
+.pck{font:400 11px var(--f);color:var(--t2);margin-bottom:6px}
+.pcv{font:700 16px var(--m)}
+.loss{color:#fca5a5}.gain{color:#86efac}
+.gw{padding:16px 20px;border-top:1px solid var(--ln)}
+.genbtn{width:100%;background:var(--a);color:#fff;font:700 15px/1 var(--f);border:none;border-radius:14px;padding:16px;cursor:pointer;transition:all .25s var(--e);display:flex;align-items:center;justify-content:center;gap:9px}
+.genbtn:hover{background:var(--a2);box-shadow:0 12px 36px var(--aglow)}
+.eout{display:none;margin-top:12px}
+.eout textarea{width:100%;background:var(--bg1);border:1px solid var(--ln2);border-radius:12px;color:#86efac;font:400 11.5px/1.7 var(--m);padding:13px 14px;resize:vertical;min-height:200px;outline:none}
+.cpybtn{margin-top:8px;width:100%;background:var(--hov);color:var(--t0);font:600 13px/1 var(--f);border:1px solid var(--ln2);border-radius:11px;padding:11px;cursor:pointer;transition:all .2s}
+.cpybtn:hover{background:var(--panel2)}
+.cpybtn.ok{color:var(--up)}
+.snote{padding:0 20px 16px;font:400 11px/1.55 var(--f);color:var(--t2);text-align:center}
+.dsteps{margin-top:14px;background:var(--bg1);border:1px solid var(--ln2);border-radius:12px;overflow:hidden}
+.dstep{display:flex;align-items:flex-start;gap:10px;padding:9px 13px;border-bottom:1px solid var(--ln);font:400 12px/1.55 var(--f);color:var(--t1)}
+.dstep:last-child{border-bottom:none}
+.dn{width:18px;height:18px;border-radius:6px;background:var(--adim);color:var(--a3);font:700 10px/1 var(--m);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.dstep b{color:var(--t0);font-weight:600}
+.railbtn{display:flex;align-items:center;justify-content:center;gap:7px;margin:8px 13px;background:var(--panel2);border:1px solid var(--ln2);border-radius:11px;padding:11px;font:600 13px/1 var(--f);color:var(--t0);text-decoration:none;transition:border-color .2s,background .2s}
+.railbtn:hover{border-color:var(--up);color:var(--up)}
+</style>
+</head>
+<body>
+
+<!-- License Gate -->
+<div id="gate">
+  <div class="gc">
+    <div class="brand"><b>Apex</b> Forex Bot</div>
+    <h2>Customer Portal</h2>
+    <p>Enter your license key to access<br>the forex bot configurator.</p>
+    <input id="gk" class="gi" type="text" placeholder="APEX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+    <button id="gBtn" class="gb">Verify License →</button>
+    <div id="gErr" class="ge"></div>
+    <div class="gl">No license yet? <a href="/apex-bot">Purchase Apex Forex Bot →</a></div>
+  </div>
+</div>
+
+<!-- Nav -->
+<nav>
+  <div class="nbrand"><b>Apex</b> Forex Bot</div>
+  <div class="ntag">FOREX CONFIGURATOR</div>
+</nav>
+
+<div class="wrap">
+  <div class="ph">
+    <div class="ew"><i></i>Forex Bot · OANDA · MT5 Bridge</div>
+    <h1>Configure Your Forex Bot</h1>
+    <p>Set your broker, instruments, risk, and exit strategy. The summary updates live. Your keys never leave this page.</p>
+  </div>
+
+  <div class="cols">
+    <div id="lcol">
+
+      <!-- 1 · Broker & Mode -->
+      <div class="sec">
+        <div class="sh"><div class="sn">1</div><strong>Broker & Mode</strong><em>connection type</em></div>
+        <div class="sb">
+          <div class="rl" style="margin-bottom:10px"><label>Broker Connection</label></div>
+          <div class="bkg">
+            <div class="bkc on" id="bkOanda">
+              <strong>OANDA</strong>
+              <span>Direct REST API — trade directly from the bot. No software needed on your end.</span>
+              <div class="btag">API DIRECT</div>
+            </div>
+            <div class="bkc" id="bkMt5">
+              <strong>MT5 Bridge</strong>
+              <span>IC Markets, Pepperstone, XM, or any MT5 broker via the ApexBridge EA.</span>
+              <div class="btag api">EA BRIDGE</div>
+            </div>
+          </div>
+          <div id="mt5Steps" class="steps">
+            <p class="hn" style="margin-bottom:8px">MT5 Bridge setup — one-time, ~15 minutes:</p>
+            <div class="step"><div class="stepn">1</div><p>Deploy the bot on Railway with your OANDA or placeholder credentials first.</p></div>
+            <div class="step"><div class="stepn">2</div><p>On your Windows PC or VPS, install <b>MetaTrader 5</b> and log in to your MT5 broker account.</p></div>
+            <div class="step"><div class="stepn">3</div><p>In MT5, open <b>Tools → Options → Expert Advisors</b>. Enable "Allow WebRequest" and add your Railway URL.</p></div>
+            <div class="step"><div class="stepn">4</div><p>Copy <b>ApexBridge.mq5</b> (included in the source code) to your MT5 <b>MQL5/Experts</b> folder and compile it.</p></div>
+            <div class="step"><div class="stepn">5</div><p>Attach the EA to a chart of your instrument. Set <b>ServerURL</b> = your Railway URL, <b>SecretKey</b> = your DASHBOARD_TOKEN.</p></div>
+            <div class="step"><div class="stepn">6</div><p>The EA syncs every 10s. Signals generated by the bot are executed by the EA on your MT5 account.</p></div>
+          </div>
+          <div class="modes">
+            <div class="mc on" id="mPaper"><strong>📄 Paper Trading</strong><span>Simulated positions. No real funds moved. Recommended first 1–2 weeks.</span></div>
+            <div class="mc" id="mLive"><strong>🔴 Live Trading</strong><span>Real positions on your broker account. Activate only after paper validation.</span></div>
+          </div>
+          <div id="liveWarn" class="warn">⚠ Live trading uses real funds. Forex losses can exceed your deposit due to leverage. Start with a small account.</div>
+        </div>
+      </div>
+
+      <!-- 2 · Instruments -->
+      <div class="sec">
+        <div class="sh"><div class="sn">2</div><strong>Instruments</strong><em>forex pairs to scan</em></div>
+        <div class="sb">
+          <div class="rl"><label>Select pairs to trade</label><span class="rv" id="pairCount">1 pair</span></div>
+          <div class="chips" id="pairChips"></div>
+          <p class="hn" style="margin-top:12px">The bot scans all selected pairs and enters on the best signal. <b>NZD/USD is the backtested optimal pair.</b> Adding more pairs increases trade frequency but requires validation.</p>
+        </div>
+      </div>
+
+      <!-- 3 · Risk & Sizing -->
+      <div class="sec">
+        <div class="sh"><div class="sn">3</div><strong>Risk & Position Sizing</strong><em>per-trade risk</em></div>
+        <div class="sb">
+          <div class="row">
+            <div class="rl"><label>Account balance (USD) — reference</label><span class="rv" id="balV">$1,000</span></div>
+            <input type="range" id="balR" min="10" max="50000" step="10" value="1000">
+            <p class="hn">Set your real balance — even $10 works. Used only to calculate estimated P&amp;L below.</p>
+          </div>
+          <div class="row">
+            <div class="rl"><label>Risk per trade (%)</label><span class="rv" id="riskV">2%</span></div>
+            <input type="range" id="riskR" min="0.5" max="5" step="0.5" value="2">
+            <p class="hn">Account % risked per trade. <b>2% recommended for forex.</b></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 · Exit Strategy -->
+      <div class="sec">
+        <div class="sh"><div class="sn">4</div><strong>Exit Strategy</strong><em>stop loss · take profit in pips</em></div>
+        <div class="sb">
+          <div class="row">
+            <div class="rl"><label>Stop Loss (pips)</label><span class="rv" id="slV">20 pips</span></div>
+            <input type="range" id="slR" min="5" max="80" step="1" value="20">
+            <p class="hn">Distance from entry to SL. <b>Backtested optimal: 20 pips.</b> Smaller SL = tighter but more noise.</p>
+          </div>
+          <div class="row">
+            <div class="rl"><label>Take Profit (pips)</label><span class="rv" id="tpV">40 pips</span></div>
+            <input type="range" id="tpR" min="10" max="160" step="1" value="40">
+            <p class="hn">Distance from entry to TP. Default gives 1:2 R:R. <b>Backtested optimal: 40 pips.</b></p>
+          </div>
+          <div class="trow">
+            <div class="tt"><strong>Trailing Stop</strong><span>SL moves in your favour as the trade profits. Off by default — clean TP exits performed better in backtests.</span></div>
+            <div class="tgl" id="trailT"></div>
+          </div>
+          <div class="trow">
+            <div class="tt"><strong>1h Trend Filter (HTF)</strong><span>Only trade in the 1h trend direction. Reduces counter-trend entries significantly.</span></div>
+            <div class="tgl on" id="htfT"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 · Connections -->
+      <div class="sec">
+        <div class="sh"><div class="sn">5</div><strong>Connections</strong><em>broker · AI · Telegram</em></div>
+        <div class="sb">
+          <div id="oandaFields">
+            <div class="ilbl" style="margin-top:0">OANDA API Credentials</div>
+            <input id="oaAcc" class="inp" type="text" placeholder="Account ID — from OANDA account settings" autocomplete="off" spellcheck="false">
+            <input id="oaTok" class="inp" type="text" placeholder="API Token — from OANDA → My Services → API Access" autocomplete="off" spellcheck="false">
+            <p class="hn" style="margin-top:6px">Use a <b>Practice account</b> for paper mode, <b>Live account</b> for live trading. Generate tokens at <b>oanda.com → My Account → My Services</b>.</p>
+          </div>
+          <div id="mt5Fields" style="display:none">
+            <div class="ilbl" style="margin-top:0">MT5 Bridge — OANDA for signals (optional)</div>
+            <input id="oaAcc2" class="inp" type="text" placeholder="OANDA Account ID (for AI signal data — optional)" autocomplete="off" spellcheck="false">
+            <input id="oaTok2" class="inp" type="text" placeholder="OANDA API Token (for AI signal data — optional)" autocomplete="off" spellcheck="false">
+            <p class="hn" style="margin-top:6px">The MT5 EA executes trades on your broker. OANDA credentials here are optional — used for market data feed only if you have an OANDA account.</p>
+          </div>
+          <div class="ilbl">AI Provider</div>
+          <div class="aitabs">
+            <div class="aitab on" id="aiGroq">Groq — free</div>
+            <div class="aitab" id="aiAnth">Anthropic</div>
+          </div>
+          <input id="aiKey" class="inp" type="text" placeholder="Groq API key — console.groq.com" autocomplete="off" spellcheck="false">
+          <p class="hn" style="margin-top:5px">Groq is free and fast — ideal for starting. Get a key at <b>console.groq.com</b>.</p>
+          <div class="ilbl">Telegram <span style="color:var(--t2);font-weight:400">(optional — highly recommended)</span></div>
+          <input id="tgTok" class="inp" type="text" placeholder="Bot Token — from @BotFather" autocomplete="off" spellcheck="false">
+          <input id="tgCid" class="inp" type="text" placeholder="Chat ID — from @userinfobot" autocomplete="off" spellcheck="false">
+          <p class="hn" style="margin-top:5px">Get trade alerts + control via /stop, /pause, /status.</p>
+          <div class="ilbl">Dashboard Token <span style="color:var(--t2);font-weight:400">(optional)</span></div>
+          <input id="dtok" class="inp" type="text" placeholder="Password to protect your dashboard URL" autocomplete="off" spellcheck="false">
+          <div class="ilbl">Your License Key</div>
+          <input id="licK" class="inp" type="text" placeholder="APEX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+
+    </div><!-- lcol -->
+
+    <!-- Sticky Summary -->
+    <div class="side">
+      <div class="sum">
+        <div class="smh"><strong>Live Summary</strong><span class="sbadge bPaper" id="modeBadge">PAPER</span></div>
+        <div class="srows">
+          <div class="sr"><span class="sk">Bot</span><span class="sv">Forex</span></div>
+          <div class="sr"><span class="sk">Broker</span><span class="sv" id="sBk">OANDA</span></div>
+          <div class="sr"><span class="sk">Mode</span><span class="sv" id="sMode">Paper</span></div>
+          <div class="sr"><span class="sk">Pairs</span><span class="sv" id="sPairs">NZD/USD</span></div>
+          <div class="sr"><span class="sk">Risk / trade</span><span class="sv" id="sRisk">2%</span></div>
+          <div class="sr"><span class="sk">Stop Loss</span><span class="sv" id="sSl">20 pips</span></div>
+          <div class="sr"><span class="sk">Take Profit</span><span class="sv" id="sTp">40 pips</span></div>
+          <div class="sr"><span class="sk">R:R Ratio</span><span class="sv" id="sRr">1 : 2.0</span></div>
+          <div class="sr"><span class="sk">Trend filter</span><span class="sv" id="sTrend">ON</span></div>
+        </div>
+        <div class="rrw">
+          <div class="rrl"><span id="rlSl">SL 20 pips</span><span>R:R Bar</span><span id="rlTp">TP 40 pips</span></div>
+          <div class="rrt"><div class="rrd" id="rrSl"></div><div class="rru" id="rrTp"></div></div>
+        </div>
+        <div class="pnl">
+          <div class="pc"><div class="pck">Risk / trade</div><div class="pcv loss" id="pLoss">−$20</div></div>
+          <div class="pc"><div class="pck">Target / trade</div><div class="pcv gain" id="pGain">+$40</div></div>
+        </div>
+        <div class="gw">
+          <button class="genbtn" id="genBtn">🚀 Save Config &amp; Deploy →</button>
+          <div class="eout" id="eout" style="display:none">
+            <!-- Deploy success -->
+            <div id="deploySuccess" style="display:none">
+              <div style="background:#052e16;border:1px solid #00ff8840;border-radius:10px;padding:16px;margin-bottom:12px">
+                <div style="color:#00ff88;font-weight:700;margin-bottom:8px">✅ Config saved on server!</div>
+                <div style="color:#9ca3af;font-size:.83rem;line-height:1.6">Your settings are stored. Deploy your bot — it will auto-load your config on startup using just your license key.</div>
+              </div>
+              <div style="font-size:.82rem;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Your License Key</div>
+              <div style="display:flex;gap:8px;margin-bottom:16px">
+                <code id="licDisplay" style="flex:1;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#00ff88;font-size:.9rem;letter-spacing:.1em">—</code>
+                <button id="cpyLicBtn" onclick="copyLic()" style="background:#00ff8820;border:1px solid #00ff8840;color:#00ff88;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:.82rem">Copy</button>
+              </div>
+              <div style="font-size:.82rem;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Docker Image</div>
+              <div style="display:flex;gap:8px;margin-bottom:16px">
+                <code id="imgDisplay" style="flex:1;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#00cfff;font-size:.78rem;word-break:break-all">ghcr.io/alexgabriel225sefu-dotcom/apex-forex-bot:latest</code>
+                <button id="cpyImgBtn" onclick="copyImg()" style="background:#00cfff20;border:1px solid #00cfff40;color:#00cfff;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:.82rem">Copy</button>
+              </div>
+              <div style="margin-bottom:10px">
+                <div style="font-size:.82rem;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Railway Token — <a href="https://railway.com/account/tokens" target="_blank" style="color:#00cfff;text-transform:none;letter-spacing:0;font-weight:400">Get it here →</a> (free account)</div>
+                <input id="railwayTokenInput" type="password" placeholder="Paste your Railway API token here…" style="width:100%;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#fff;font-size:.88rem;outline:none;box-sizing:border-box" />
+              </div>
+              <button id="autoDeployBtn" onclick="autoDeploy()" style="display:block;width:100%;text-align:center;background:linear-gradient(135deg,#00ff88,#00cfff);color:#052e16;font-weight:800;font-size:1.05rem;padding:16px;border-radius:10px;cursor:pointer;border:none;margin-bottom:10px">🚀 Deploy My Bot Automatically →</button>
+              <div id="deployStatus" style="display:none;text-align:center;padding:10px;border-radius:8px;font-size:.85rem"></div>
+              <div class="dsteps">
+                <div class="dstep"><div class="dn">1</div><span>Create a free Railway account at <a href="https://railway.com" target="_blank" style="color:#00cfff">railway.com</a></span></div>
+                <div class="dstep"><div class="dn">2</div><span>Go to <a href="https://railway.com/account/tokens" target="_blank" style="color:#00cfff">railway.com/account/tokens</a> → create a token → paste above</span></div>
+                <div class="dstep"><div class="dn">3</div><span>Click Deploy — bot is set up automatically in 30 seconds ✓</span></div>
+              </div>
+              <div style="margin-top:12px;text-align:center;color:#6b7280;font-size:.78rem">Your token is used only to deploy your bot and is never stored on our servers.</div>
+            </div>
+            <!-- Manual fallback -->
+            <div id="deployManual" style="display:none">
+              <textarea id="etxt" readonly></textarea>
+              <button class="cpybtn" id="cpyBtn">Copy to clipboard</button>
+            </div>
+          </div>
+          <div id="savingMsg" style="display:none;text-align:center;color:#6b7280;font-size:.85rem;padding:12px">Saving config…</div>
+          <div id="saveErr" style="display:none;background:#2d1515;border:1px solid #ff446640;border-radius:8px;padding:12px;color:#ff9999;font-size:.82rem;margin-top:8px"></div>
+        </div>
+        <div class="snote" id="privNote">Keys are encrypted and stored securely on our server.<br>Only your bot can access them using your license key.</div>
+      </div>
+    </div>
+
+  </div><!-- .cols -->
+</div><!-- .wrap -->
+
+<script>
+// State
+const S={broker:'OANDA',mode:'PAPER',bal:1000,risk:2,sl:20,tp:40,trail:false,htf:true,ai:'GROQ',pairs:['NZD_USD']};
+
+// Pair chips
+const PAIRS=[{id:'NZD_USD',label:'NZD/USD'},{id:'EUR_USD',label:'EUR/USD'},{id:'GBP_USD',label:'GBP/USD'},{id:'USD_JPY',label:'USD/JPY'},{id:'AUD_USD',label:'AUD/USD'},{id:'USD_CAD',label:'USD/CAD'},{id:'EUR_GBP',label:'EUR/GBP'}];
+const chips=document.getElementById('pairChips');
+PAIRS.forEach(p=>{
+  const c=document.createElement('div');c.className='chip'+(p.id==='NZD_USD'?' on':'');c.dataset.id=p.id;c.textContent=p.label;
+  c.addEventListener('click',()=>{c.classList.toggle('on');S.pairs=Array.from(document.querySelectorAll('.chip.on')).map(x=>x.dataset.id);if(!S.pairs.length){c.classList.add('on');S.pairs=['NZD_USD'];}updSum();});
+  chips.appendChild(c);
+});
+
+// Broker
+['bkOanda','bkMt5'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',()=>{
+    ['bkOanda','bkMt5'].forEach(i=>document.getElementById(i).classList.remove('on'));
+    document.getElementById(id).classList.add('on');
+    S.broker=id==='bkOanda'?'OANDA':'MT5';
+    document.getElementById('mt5Steps').style.display=S.broker==='MT5'?'block':'none';
+    document.getElementById('oandaFields').style.display=S.broker==='OANDA'?'block':'none';
+    document.getElementById('mt5Fields').style.display=S.broker==='MT5'?'block':'none';
+    updSum();
+  });
+});
+
+// Mode
+document.getElementById('mPaper').addEventListener('click',()=>{S.mode='PAPER';document.getElementById('mPaper').className='mc on';document.getElementById('mLive').className='mc';document.getElementById('liveWarn').style.display='none';updSum();});
+document.getElementById('mLive').addEventListener('click',()=>{S.mode='LIVE';document.getElementById('mLive').className='mc onL';document.getElementById('mPaper').className='mc';document.getElementById('liveWarn').style.display='block';updSum();});
+
+// Sliders
+[['balR','balV','bal',v=>'$'+Number(v).toLocaleString()],['riskR','riskV','risk',v=>v+'%'],['slR','slV','sl',v=>v+' pips'],['tpR','tpV','tp',v=>v+' pips']].forEach(([rid,vid,key,fmt])=>{
+  const r=document.getElementById(rid),v=document.getElementById(vid);
+  r.addEventListener('input',()=>{S[key]=parseFloat(r.value);v.textContent=fmt(r.value);updSum();});
+});
+
+// Toggles
+[['trailT','trail',false],['htfT','htf',true]].forEach(([id,k,init])=>{
+  const el=document.getElementById(id);if(init)el.classList.add('on');
+  el.addEventListener('click',()=>{S[k]=!S[k];el.classList.toggle('on',S[k]);updSum();});
+});
+
+// AI tabs
+['aiGroq','aiAnth'].forEach(id=>{document.getElementById(id).addEventListener('click',()=>{['aiGroq','aiAnth'].forEach(i=>document.getElementById(i).classList.remove('on'));document.getElementById(id).classList.add('on');S.ai=id==='aiGroq'?'GROQ':'ANTHROPIC';document.getElementById('aiKey').placeholder=S.ai==='GROQ'?'Groq API key — console.groq.com':'Anthropic key — console.anthropic.com';});});
+
+// Summary
+function updSum(){
+  const rr=(S.tp/S.sl).toFixed(1),tot=S.sl+S.tp;
+  const riskAmt=(S.bal*S.risk/100).toFixed(0);
+  const gainAmt=(S.bal*S.risk/100*rr).toFixed(0);
+  const pairLabels=S.pairs.map(p=>p.replace('_','/')).join(', ');
+  const pairCount=S.pairs.length;
+  document.getElementById('sBk').textContent=S.broker==='MT5'?'MT5 Bridge':'OANDA';
+  document.getElementById('sMode').textContent=S.mode==='PAPER'?'Paper':'Live';
+  document.getElementById('sPairs').textContent=pairLabels;
+  document.getElementById('pairCount').textContent=pairCount+' pair'+(pairCount>1?'s':'');
+  document.getElementById('sRisk').textContent=S.risk+'%';
+  document.getElementById('sSl').textContent=S.sl+' pips';
+  document.getElementById('sTp').textContent=S.tp+' pips';
+  document.getElementById('sRr').textContent='1 : '+rr;
+  document.getElementById('sTrend').textContent=S.htf?'ON':'OFF';
+  document.getElementById('pLoss').textContent='−$'+riskAmt;
+  document.getElementById('pGain').textContent='+$'+gainAmt;
+  document.getElementById('rlSl').textContent='SL '+S.sl+' pips';
+  document.getElementById('rlTp').textContent='TP '+S.tp+' pips';
+  const b=document.getElementById('modeBadge');b.textContent=S.mode;b.className='sbadge '+(S.mode==='PAPER'?'bPaper':'bLive2');
+  document.getElementById('rrSl').style.width=(S.sl/tot*100).toFixed(1)+'%';
+  document.getElementById('rrTp').style.width=(S.tp/tot*100).toFixed(1)+'%';
+}
+updSum();
+
+// Build the config object the bot loads from the server (env-var names as keys)
+function buildConfig(){
+  const oaAcc=(document.getElementById('oaAcc').value||document.getElementById('oaAcc2').value).trim();
+  const oaTok=(document.getElementById('oaTok').value||document.getElementById('oaTok2').value).trim();
+  const aiKv=document.getElementById('aiKey').value.trim();
+  const tgT=document.getElementById('tgTok').value.trim();
+  const tgC=document.getElementById('tgCid').value.trim();
+  const dt=document.getElementById('dtok').value.trim();
+  const cfg={
+    BROKER:S.broker==='MT5'?'mt':'oanda',
+    // practice = demo money · live = your real OANDA account (set by mode)
+    OANDA_ENV:S.mode==='LIVE'?'live':'practice',
+    PAPER_TRADING:S.mode==='PAPER'?'true':'false',
+    PAPER_BALANCE:String(S.bal),
+    SCAN_SYMBOLS:S.pairs.join(','),
+    RISK_PER_TRADE:(S.risk/100).toFixed(4), // fraction, not whole percent
+    MIN_CONFIDENCE:'62',
+    HTF_FILTER:S.htf?'true':'false',
+    STOP_LOSS_PIPS:String(S.sl),
+    TAKE_PROFIT_PIPS:String(S.tp),
+    TRAILING_STOP:S.trail?'true':'false',
+  };
+  if(oaAcc)cfg.OANDA_ACCOUNT_ID=oaAcc;
+  if(oaTok)cfg.OANDA_API_TOKEN=oaTok;
+  if(aiKv){if(S.ai==='GROQ')cfg.GROQ_API_KEY=aiKv;else cfg.ANTHROPIC_API_KEY=aiKv;}
+  if(tgT)cfg.TELEGRAM_BOT_TOKEN=tgT;
+  if(tgC)cfg.TELEGRAM_CHAT_ID=tgC;
+  if(dt)cfg.DASHBOARD_TOKEN=dt;
+  if(S.broker==='MT5'&&dt)cfg.MT_BRIDGE_SECRET=dt; // EA's BRIDGE_SECRET must match
+  return cfg;
+}
+
+// Save config to server → show Railway deploy button
+document.getElementById('genBtn').addEventListener('click',async()=>{
+  const lk=document.getElementById('licK').value.trim()||sessionStorage.getItem('apx_lic')||'';
+  if(!lk){document.getElementById('saveErr').textContent='Enter your license key first.';document.getElementById('saveErr').style.display='block';return;}
+  document.getElementById('saveErr').style.display='none';
+  const btn=document.getElementById('genBtn');
+  btn.disabled=true;btn.textContent='Saving…';
+  document.getElementById('savingMsg').style.display='block';
+  try{
+    const r=await fetch('/api/save-bot-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:lk,config:buildConfig()})});
+    const data=await r.json();
+    document.getElementById('savingMsg').style.display='none';
+    if(data.success){
+      document.getElementById('eout').style.display='block';
+      document.getElementById('deploySuccess').style.display='block';
+      document.getElementById('deployManual').style.display='none';
+      document.getElementById('licDisplay').textContent=lk;
+      document.getElementById('privNote').textContent='Config encrypted & saved. Your bot loads it automatically on startup.';
+      btn.textContent='✓ Config saved!';btn.style.background='var(--up)';btn.style.color='#052e16';
+    } else {
+      showManual(lk);
+      btn.textContent='🚀 Save Config & Deploy →';btn.disabled=false;
+      document.getElementById('saveErr').textContent=(data.error||'Server error')+(data.detail?' — '+data.detail:'');
+      document.getElementById('saveErr').style.display='block';
+    }
+  }catch(e){
+    document.getElementById('savingMsg').style.display='none';
+    showManual(lk);
+    btn.textContent='🚀 Save Config & Deploy →';btn.disabled=false;
+  }
+});
+
+// Manual .env fallback if the server save fails
+function showManual(lk){
+  const cfg=buildConfig();
+  let env=`# Apex Forex Bot — Railway Environment Variables\n# Generated: ${new Date().toISOString().slice(0,10)}\n\nLICENSE_KEY=${lk}\n`;
+  for(const[k,v] of Object.entries(cfg))env+=`${k}=${v}\n`;
+  if(S.broker==='MT5')env+=`\n# MT5 Bridge: set BRIDGE_SECRET on your EA to match MT_BRIDGE_SECRET above.`;
+  document.getElementById('etxt').value=env;
+  document.getElementById('eout').style.display='block';
+  document.getElementById('deploySuccess').style.display='none';
+  document.getElementById('deployManual').style.display='block';
+}
+function copyLic(){
+  navigator.clipboard.writeText(document.getElementById('licDisplay').textContent).then(()=>{
+    const b=document.getElementById('cpyLicBtn');b.textContent='✓';setTimeout(()=>{b.textContent='Copy';},2000);
+  });
+}
+async function autoDeploy(){
+  const token=(document.getElementById('railwayTokenInput').value||'').trim();
+  const licKey=(document.getElementById('licDisplay').textContent||'').trim();
+  const btn=document.getElementById('autoDeployBtn');
+  const status=document.getElementById('deployStatus');
+  if(!token){status.style.display='block';status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='⚠️ Please paste your Railway token first.';return;}
+  btn.disabled=true;btn.textContent='⏳ Deploying…';
+  status.style.display='block';status.style.background='#1a2a1a';status.style.color='#9ca3af';status.textContent='Setting up your forex bot on Railway…';
+  try{
+    const r=await fetch('/api/railway-deploy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({railwayToken:token,licenseKey:licKey,product:'apex-forex'})});
+    const d=await r.json();
+    if(d.ok){status.style.background='#052e16';status.style.color='#00ff88';status.textContent='✅ Bot deployed! Check railway.com/dashboard for your bot URL (ready in ~2 min).';btn.textContent='✅ Deployed!';}
+    else{status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='❌ '+(d.error||'Deploy failed');btn.disabled=false;btn.textContent='🚀 Deploy My Bot Automatically →';}
+  }catch(e){status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='❌ Network error — try again';btn.disabled=false;btn.textContent='🚀 Deploy My Bot Automatically →';}
+}
+function copyImg(){
+  navigator.clipboard.writeText(document.getElementById('imgDisplay').textContent).then(()=>{
+    const b=document.getElementById('cpyImgBtn');b.textContent='✓';setTimeout(()=>{b.textContent='Copy';},2000);
+  });
+}
+document.getElementById('cpyBtn').addEventListener('click',()=>{
+  navigator.clipboard.writeText(document.getElementById('etxt').value).then(()=>{
+    const b=document.getElementById('cpyBtn');b.textContent='✓ Copied!';b.classList.add('ok');
+    setTimeout(()=>{b.textContent='Copy to clipboard';b.classList.remove('ok');},2500);
+  });
+});
+
+// License gate
+const gate=document.getElementById('gate');
+async function checkLic(k){try{const r=await fetch('/api/verify-license',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k})});return await r.json();}catch(e){return{valid:false,message:'Network error — try again'};}}
+async function tryAuto(){
+  const k=new URLSearchParams(location.search).get('key')||sessionStorage.getItem('apx_lic');
+  if(!k)return;
+  const btn=document.getElementById('gBtn');btn.disabled=true;btn.textContent='Verifying…';
+  const r=await checkLic(k);
+  if(r.valid){sessionStorage.setItem('apx_lic',k);document.getElementById('licK').value=k;gate.style.display='none';}
+  else{btn.disabled=false;btn.textContent='Verify License →';}
+}
+document.getElementById('gBtn').addEventListener('click',async()=>{
+  const k=document.getElementById('gk').value.trim();
+  if(!k){document.getElementById('gErr').textContent='Enter your license key.';return;}
+  document.getElementById('gErr').textContent='';
+  const btn=document.getElementById('gBtn');btn.disabled=true;btn.textContent='Verifying…';
+  const r=await checkLic(k);
+  if(r.valid){sessionStorage.setItem('apx_lic',k);document.getElementById('licK').value=k;gate.style.display='none';}
+  else{document.getElementById('gErr').textContent=r.message||'Invalid license key.';btn.disabled=false;btn.textContent='Verify License →';}
+});
+document.getElementById('gk').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('gBtn').click();});
+tryAuto();
+</script>
+</body>
+</html>

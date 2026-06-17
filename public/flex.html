@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flex</title>
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@700,800&f[]=satoshi@400,500,600,700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#000;overflow:hidden}
+
+#stage{
+  position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%) scale(var(--s,1));
+  transform-origin:center center;
+  width:390px;height:844px;
+  overflow:hidden;background:#000;
+}
+
+/* ── Photo with cinematic grade ── */
+.bg{
+  position:absolute;inset:-20px;
+  background:url('/bmw-flex.jpg') center 40%/cover no-repeat;
+  filter:contrast(1.18) saturate(0.78) brightness(0.82);
+  transform:scale(1);
+  animation:slowzoom 18s ease-in-out infinite alternate;
+}
+@keyframes slowzoom{
+  0%{transform:scale(1) translate(0,0)}
+  100%{transform:scale(1.12) translate(-1%,1%)}
+}
+
+/* ── Film grain ── */
+.grain{
+  position:absolute;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity:.04;
+  animation:grain 0.08s steps(1) infinite;
+  pointer-events:none;z-index:90;
+}
+@keyframes grain{
+  0%{transform:translate(0,0)}10%{transform:translate(-2%,-1%)}20%{transform:translate(1%,2%)}
+  30%{transform:translate(-1%,1%)}40%{transform:translate(2%,-2%)}50%{transform:translate(-2%,1%)}
+  60%{transform:translate(1%,-1%)}70%{transform:translate(-1%,2%)}80%{transform:translate(2%,0)}
+  90%{transform:translate(0,-2%)}100%{transform:translate(-2%,2%)}
+}
+
+/* ── Dark layers ── */
+.ov1{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.65) 0%,transparent 30%)}
+.ov2{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.9) 0%,rgba(0,0,0,.3) 45%,transparent 70%)}
+.ov3{position:absolute;inset:0;background:radial-gradient(ellipse 70% 60% at 50% 110%,rgba(255,45,79,.22) 0%,transparent 65%)}
+
+/* vignette */
+.vignette{
+  position:absolute;inset:0;
+  box-shadow:inset 0 0 120px rgba(0,0,0,.85);
+  pointer-events:none;
+}
+
+/* ── Flash overlay ── */
+#flash{
+  position:absolute;inset:0;background:#fff;
+  opacity:0;pointer-events:none;z-index:80;
+  transition:opacity 0s;
+}
+
+/* ── Scenes ── */
+.scene{position:absolute;inset:0;opacity:0;transition:opacity .12s ease;pointer-events:none}
+.scene.in{opacity:1;pointer-events:auto}
+
+/* ── Top area ── */
+.top-area{position:absolute;top:0;left:0;right:0;padding:56px 22px 0}
+
+/* Status bar fake */
+.status-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:20px;
+}
+.sb-left{font:600 14px/1 'Satoshi',sans-serif;color:rgba(255,255,255,.7)}
+.sb-right{display:flex;gap:5px;align-items:center}
+.sb-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.4)}
+.sb-dot.on{background:#27c46a}
+
+/* Live chip */
+.live-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(39,196,106,.12);
+  border:1px solid rgba(39,196,106,.3);
+  border-radius:20px;padding:5px 12px;
+}
+.live-dot{
+  width:6px;height:6px;border-radius:50%;background:#27c46a;
+  animation:blink .9s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.live-label{font:700 10px/1 'Satoshi',sans-serif;letter-spacing:2.5px;text-transform:uppercase;color:#27c46a}
+
+/* ── Notification cards ── */
+#notif-container{
+  position:absolute;top:110px;left:16px;right:16px;
+  z-index:70;
+}
+.notif{
+  display:flex;align-items:center;gap:12px;
+  background:rgba(20,20,26,.88);
+  backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:16px;padding:13px 16px;
+  margin-bottom:10px;
+  transform:translateY(-20px) scale(.96);
+  opacity:0;
+  transition:all .45s cubic-bezier(.32,.72,0,1);
+}
+.notif.show{transform:translateY(0) scale(1);opacity:1}
+.notif.exit{transform:translateY(-10px) scale(.97);opacity:0;transition:all .3s ease}
+.notif-icon{
+  width:36px;height:36px;border-radius:10px;
+  background:#ff2d4f;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  font-size:16px;
+}
+.notif-body{flex:1;min-width:0}
+.notif-app{font:600 10px/1 'Satoshi',sans-serif;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:4px}
+.notif-text{font:600 14px/1.35 'Satoshi',sans-serif;color:#fff}
+.notif-time{font:500 11px/1 'Satoshi',sans-serif;color:rgba(255,255,255,.3);flex-shrink:0;align-self:flex-start;margin-top:2px}
+.notif-pnl{font:700 14px/1 'Satoshi',sans-serif;color:#27c46a;flex-shrink:0}
+
+/* ── Bottom content ── */
+.bottom{
+  position:absolute;bottom:0;left:0;right:0;
+  padding:0 22px 64px;
+}
+
+/* POV line */
+.pov{
+  font:600 11px/1 'Satoshi',sans-serif;
+  letter-spacing:3px;text-transform:uppercase;
+  color:rgba(255,255,255,.4);
+  margin-bottom:14px;
+  opacity:0;transform:translateY(10px);
+  transition:all .5s cubic-bezier(.32,.72,0,1) .05s;
+}
+
+.headline{
+  font:800 46px/1.0 'Clash Display',sans-serif;
+  letter-spacing:-.5px;color:#fff;
+  margin-bottom:8px;
+  opacity:0;transform:translateY(24px);
+  transition:all .6s cubic-bezier(.32,.72,0,1) .12s;
+}
+.headline em{color:#ff2d4f;font-style:normal;display:block}
+
+.sub{
+  font:500 15px/1.65 'Satoshi',sans-serif;
+  color:rgba(255,255,255,.55);
+  margin-bottom:26px;
+  opacity:0;transform:translateY(14px);
+  transition:all .55s cubic-bezier(.32,.72,0,1) .22s;
+}
+.sub b{color:rgba(255,255,255,.88)}
+
+/* Stat row */
+.stat-row{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+  margin-bottom:20px;
+  opacity:0;transform:translateY(12px);
+  transition:all .55s cubic-bezier(.32,.72,0,1) .28s;
+}
+.sr{
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;padding:12px 8px;text-align:center;
+}
+.sr .v{font:700 22px/1 'Clash Display',sans-serif;color:#fff;letter-spacing:-.3px}
+.sr .k{font:500 9px/1 'Satoshi',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.32);margin-top:5px}
+.sr.g .v{color:#27c46a}
+.sr.r .v{color:#ff2d4f}
+
+/* Big number scene */
+.big-block{
+  opacity:0;transform:translateY(20px) scale(.97);
+  transition:all .65s cubic-bezier(.32,.72,0,1) .1s;
+}
+.big-label{font:600 10px/1 'Satoshi',sans-serif;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:10px}
+.big-num{
+  font:800 72px/1 'Clash Display',sans-serif;
+  letter-spacing:-2px;color:#27c46a;
+  text-shadow:0 0 60px rgba(39,196,106,.6),0 0 120px rgba(39,196,106,.3);
+  margin-bottom:6px;
+}
+.big-period{font:500 13px/1 'Satoshi',sans-serif;color:rgba(255,255,255,.35);letter-spacing:.05em}
+
+/* CTA button */
+.cta-wrap{
+  opacity:0;transform:translateY(12px);
+  transition:all .55s cubic-bezier(.32,.72,0,1) .32s;
+}
+.cta{
+  display:block;background:#ff2d4f;
+  color:#fff;font:700 16px/1 'Satoshi',sans-serif;
+  border-radius:14px;padding:19px;text-align:center;
+  letter-spacing:.1px;
+}
+.cta-fine{text-align:center;font:500 11px/1.5 'Satoshi',sans-serif;color:rgba(255,255,255,.27);margin-top:10px}
+
+/* Red accent line */
+.accent-line{
+  width:36px;height:3px;border-radius:2px;
+  background:#ff2d4f;margin:0 0 20px;
+  opacity:0;
+  transition:all .4s cubic-bezier(.32,.72,0,1) .08s;
+}
+
+/* Reveal when scene .in */
+.scene.in .pov,
+.scene.in .headline,
+.scene.in .sub,
+.scene.in .stat-row,
+.scene.in .big-block,
+.scene.in .accent-line,
+.scene.in .cta-wrap{
+  opacity:1;transform:none;
+}
+
+/* ── Glitch effect ── */
+@keyframes glitch{
+  0%{text-shadow:0 0 60px rgba(39,196,106,.6),0 0 120px rgba(39,196,106,.3)}
+  2%{text-shadow:-3px 0 #ff2d4f,3px 0 rgba(39,196,106,.8)}
+  4%{text-shadow:0 0 60px rgba(39,196,106,.6),0 0 120px rgba(39,196,106,.3)}
+  96%{text-shadow:0 0 60px rgba(39,196,106,.6),0 0 120px rgba(39,196,106,.3)}
+  98%{text-shadow:3px 0 #ff2d4f,-3px 0 rgba(39,196,106,.8)}
+  100%{text-shadow:0 0 60px rgba(39,196,106,.6),0 0 120px rgba(39,196,106,.3)}
+}
+.glitch-active{animation:glitch 2.5s ease-in-out infinite}
+
+/* ── Progress bar ── */
+#progress{
+  position:absolute;bottom:0;left:0;height:2px;
+  background:#ff2d4f;width:0%;transition:width linear;
+  opacity:.7;z-index:100;
+}
+
+/* ── Watermark ── */
+.wm{
+  position:absolute;top:54px;left:22px;
+  font:700 12px/1 'Clash Display',sans-serif;
+  letter-spacing:-.1px;color:rgba(255,255,255,.5);
+}
+.wm b{color:#ff2d4f}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="bg"></div>
+  <div class="ov1"></div>
+  <div class="ov2"></div>
+  <div class="ov3"></div>
+  <div class="vignette"></div>
+  <div class="grain"></div>
+
+  <!-- Flash transition overlay -->
+  <div id="flash"></div>
+
+  <!-- Progress bar -->
+  <div id="progress"></div>
+
+  <!-- Notifications layer (always visible during s2) -->
+  <div id="notif-container"></div>
+
+  <!-- ══ SCENE 1 — POV Hook ══ -->
+  <div class="scene in" id="s1">
+    <div class="wm"><b>APEX</b> BOT</div>
+    <div class="bottom">
+      <div class="pov">POV</div>
+      <div class="headline">The bot<br>traded<br><em>all night.</em></div>
+      <div class="accent-line"></div>
+      <div class="sub">I didn't touch my phone.<br><b>Not even once.</b></div>
+    </div>
+  </div>
+
+  <!-- ══ SCENE 2 — Live Notifications ══ -->
+  <div class="scene" id="s2">
+    <div class="wm"><b>APEX</b> BOT</div>
+    <div class="bottom">
+      <div class="pov">While I was here</div>
+      <div class="headline">Signals.<br><em>Not alarms.</em></div>
+      <div class="accent-line"></div>
+      <div class="sub">Crypto + Forex. 24/7.<br><b>Full autopilot.</b></div>
+    </div>
+  </div>
+
+  <!-- ══ SCENE 3 — Big Number ══ -->
+  <div class="scene" id="s3">
+    <div class="wm"><b>APEX</b> BOT</div>
+    <div class="bottom">
+      <div class="big-block">
+        <div class="big-label">30-day P&L</div>
+        <div class="big-num" id="bignum">+$0</div>
+        <div class="big-period">while I was sleeping</div>
+      </div>
+      <br>
+      <div class="stat-row">
+        <div class="sr g"><div class="v">68%</div><div class="k">Win Rate</div></div>
+        <div class="sr"><div class="v">134</div><div class="k">Trades</div></div>
+        <div class="sr r"><div class="v">1.81</div><div class="k">Prof. Factor</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SCENE 4 — CTA ══ -->
+  <div class="scene" id="s4">
+    <div class="wm"><b>APEX</b> BOT</div>
+    <div class="bottom">
+      <div class="pov">You can build this</div>
+      <div class="headline">Your bot.<br><em>Your rules.</em></div>
+      <div class="accent-line"></div>
+      <div class="sub">Source code + setup guide.<br><b>One-time. Own it forever.</b></div>
+      <div class="cta-wrap">
+        <div class="cta">aicashsystem.space</div>
+        <div class="cta-fine">⚠️ Not financial advice · Educational only</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Scale
+function resize(){
+  var s=Math.min(window.innerWidth/390,window.innerHeight/844);
+  document.getElementById('stage').style.setProperty('--s',s);
+}
+resize();window.addEventListener('resize',resize);
+
+// Notifications data
+var notifs=[
+  {icon:'🤖',pair:'BTC/USDT',dir:'LONG',pnl:'+$83.40',time:'1h ago'},
+  {icon:'🤖',pair:'ETH/USDT',dir:'SHORT',pnl:'+$47.20',time:'3h ago'},
+  {icon:'🤖',pair:'SOL/USDT',dir:'LONG',pnl:'+$31.80',time:'6h ago'},
+  {icon:'🤖',pair:'XAU/USD',dir:'BUY',pnl:'+$124.60',time:'9h ago'},
+  {icon:'🤖',pair:'EUR/USD',dir:'SELL',pnl:'+$58.90',time:'14h ago'},
+];
+
+var nc=document.getElementById('notif-container');
+
+function spawnNotif(data){
+  var el=document.createElement('div');
+  el.className='notif';
+  el.innerHTML=`
+    <div class="notif-icon">${data.icon}</div>
+    <div class="notif-body">
+      <div class="notif-app">Apex Bot · Trade closed</div>
+      <div class="notif-text">${data.pair} · ${data.dir}</div>
+    </div>
+    <div class="notif-pnl">${data.pnl}</div>
+    <div class="notif-time">${data.time}</div>
+  `;
+  nc.appendChild(el);
+  // trigger show
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){el.classList.add('show')});
+  });
+  // auto remove after 2.8s
+  setTimeout(function(){
+    el.classList.remove('show');
+    el.classList.add('exit');
+    setTimeout(function(){nc.removeChild(el)},350);
+  },2800);
+}
+
+// Flash transition
+var flash=document.getElementById('flash');
+function doFlash(cb){
+  flash.style.transition='opacity 0s';
+  flash.style.opacity='0.6';
+  setTimeout(function(){
+    flash.style.transition='opacity 0.35s ease';
+    flash.style.opacity='0';
+    if(cb)cb();
+  },60);
+}
+
+// Scenes
+var scenes=['s1','s2','s3','s4'];
+var durations=[3500,4200,4000,5000];
+var cur=0;
+var prog=document.getElementById('progress');
+var progTimer=null;
+
+function startProgress(dur){
+  prog.style.transition='none';
+  prog.style.width='0%';
+  requestAnimationFrame(function(){
+    prog.style.transition='width '+dur+'ms linear';
+    prog.style.width='100%';
+  });
+}
+
+function goScene(i){
+  doFlash(function(){
+    document.getElementById(scenes[cur]).classList.remove('in');
+    cur=i;
+    var el=document.getElementById(scenes[cur]);
+    el.classList.add('in');
+    startProgress(durations[cur]);
+    // scene-specific
+    if(cur===1) runNotifScene();
+    if(cur===2) runNumberScene();
+    // schedule next
+    var next=(cur+1)%scenes.length;
+    setTimeout(function(){goScene(next)},durations[cur]);
+  });
+}
+
+// Notif scene — fire 3 notifs with stagger
+function runNotifScene(){
+  var toShow=[notifs[0],notifs[1],notifs[2]];
+  toShow.forEach(function(n,i){
+    setTimeout(function(){spawnNotif(n)},i*1100+300);
+  });
+}
+
+// Number count-up with glitch
+function runNumberScene(){
+  var el=document.getElementById('bignum');
+  el.classList.remove('glitch-active');
+  var start=performance.now();
+  var dur=2200;
+  var target=4183;
+  function frame(now){
+    var p=Math.min((now-start)/dur,1);
+    var ease=1-Math.pow(1-p,3);
+    el.textContent='+$'+Math.round(ease*target).toLocaleString();
+    if(p<1)requestAnimationFrame(frame);
+    else{
+      el.textContent='+$4,183';
+      el.classList.add('glitch-active');
+    }
+  }
+  setTimeout(function(){requestAnimationFrame(frame)},400);
+}
+
+// Kick off
+startProgress(durations[0]);
+setTimeout(function(){goScene(1)},durations[0]);
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Order Confirmed — Apex Trading Suite</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://api.fontshare.com"><link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060608;--bg1:#0b0b0e;--panel:#0a0d18;--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.13);
+  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
+  --acc:#ff2d4f;--acc2:#ff5c74;--accdim:rgba(255,45,79,.12);
+  --gold:#f59e0b;--up:#22c55e;
+  --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
+  --ease:cubic-bezier(.32,.72,0,1);
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t0);font-family:var(--f);min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:32px 16px;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:560px;width:100%}
+.eyebrow{text-align:center;font-size:11px;font-weight:700;letter-spacing:3.5px;text-transform:uppercase;color:var(--t2);margin-bottom:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.accent{height:3px;background:linear-gradient(90deg,var(--acc),#c9193a)}
+.inner{padding:40px 36px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:20px;padding:6px 16px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--up);margin-bottom:22px}
+h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-spacing:-.01em;line-height:1.15;margin-bottom:10px}
+.sub{color:var(--t1);font-size:14.5px;line-height:1.7;margin-bottom:28px}
+.state{display:none}
+.state.active{display:block}
+.spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--line2);border-top-color:var(--acc);animation:spin 1s linear infinite;margin:0 auto 18px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.wait-text{text-align:center;color:var(--t1);font-size:13.5px;line-height:1.7}
+.keybox{background:#000;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px 14px;text-align:center;margin-bottom:8px}
+.keylabel{font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--acc);margin-bottom:10px}
+.keyval{font-family:var(--m);font-size:clamp(16px,4vw,20px);font-weight:700;color:#fff;letter-spacing:2px;word-break:break-all}
+.copyhint{text-align:center;font-size:11.5px;color:var(--t2);margin-bottom:26px}
+.cta{display:block;text-align:center;background:var(--acc);color:#fff;font-weight:700;font-size:15px;padding:16px;border-radius:10px;text-decoration:none;transition:transform .2s var(--ease),background .2s}
+.cta:hover{background:var(--acc2)}
+.cta:active{transform:scale(.98)}
+.cta-row{display:grid;gap:10px}
+.cta-secondary{display:block;text-align:center;background:transparent;border:1px solid var(--line2);color:var(--t0);font-weight:600;font-size:13.5px;padding:13px;border-radius:10px;text-decoration:none;transition:border-color .2s,background .2s}
+.cta-secondary:hover{border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.03)}
+.cta-secondary:active{transform:scale(.98)}
+.steps{margin-top:26px;border-top:1px solid var(--line);padding-top:22px}
+.steps-label{font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t2);margin-bottom:14px}
+.step{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.step:last-child{border-bottom:none}
+.stepn{flex:0 0 22px;height:22px;border-radius:6px;background:var(--acc);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.stepbody{font-size:13px;color:var(--t1);line-height:1.6}
+.stepbody b{color:var(--t0)}
+.email-note{margin-top:24px;text-align:center;font-size:12.5px;color:var(--t2);line-height:1.7}
+.err{color:var(--acc2);text-align:center;font-size:13.5px;line-height:1.7}
+.retry{display:block;margin:16px auto 0;background:transparent;border:1px solid var(--line2);color:var(--t0);font-size:13px;font-weight:600;padding:10px 20px;border-radius:8px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Apex Trading Suite &nbsp;&bull;&nbsp; Order Confirmation</p>
+  <div class="card">
+    <div class="accent"></div>
+    <div class="inner">
+
+      <div class="state active" id="stateLoading">
+        <div class="spinner"></div>
+        <p class="wait-text">Confirming your payment and generating your license key&hellip;<br>This usually takes a few seconds.</p>
+      </div>
+
+      <div class="state" id="stateReady">
+        <span class="chip">&#10003; Payment confirmed</span>
+        <h1 id="readyTitle">Your bot is ready.</h1>
+        <p class="sub">Save your license key below — you'll need it to deploy and activate your bot.</p>
+        <div class="keybox">
+          <div class="keylabel">Your License Key</div>
+          <div class="keyval" id="licenseKeyVal">—</div>
+        </div>
+        <p class="copyhint">We also emailed this to you, along with full setup instructions.</p>
+        <div class="cta-row">
+          <a class="cta" id="ctaBtn" href="#" style="display:none">Open Bot Configurator &rarr;</a>
+          <a class="cta-secondary" id="deployBtn" href="#" target="_blank" rel="noopener">Deploy My Bot Now (Railway) &rarr;</a>
+        </div>
+
+        <div class="steps">
+          <div class="steps-label">What happens next</div>
+          <div class="step" id="step1"><div class="stepn" id="step1n">1</div><div class="stepbody">Open the <b>Bot Configurator</b> above — your license key is already filled in.</div></div>
+          <div class="step"><div class="stepn" id="step2n">2</div><div class="stepbody">Choose how the bot should trade (pairs, risk level, strategy) and save your settings.</div></div>
+          <div class="step"><div class="stepn" id="step3n">3</div><div class="stepbody">Click <b>Deploy My Bot Now</b> to launch it on Railway — free hosting tier included, live in under 10 minutes.</div></div>
+          <div class="step" id="stepTg"><div class="stepn" id="step4n">4</div><div class="stepbody">Optional: add your own <b>Telegram bot token</b> in Railway's variables (steps in your email) — your bot will then message you directly and you can control it with <b>/menu</b>, <b>/status</b>, <b>/pause</b> and more, right from the chat.</div></div>
+        </div>
+        <p class="email-note">Check your inbox (and spam folder) for the full setup email with this license key and step-by-step screenshots.</p>
+      </div>
+
+      <div class="state" id="stateError">
+        <span class="chip" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:var(--gold)">&#9888; Almost there</span>
+        <h1>We're still processing your order.</h1>
+        <p class="err">This can happen if the payment confirmation is taking a bit longer than usual. Your license key and setup email are on the way — check your inbox in a minute or two.</p>
+        <button class="retry" onclick="location.reload()">Check again</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var params = new URLSearchParams(location.search);
+  var sessionId = params.get('session_id');
+  var product = params.get('product') || 'apex-bot';
+  var isForex = product === 'apex-forex';
+
+  function show(id){
+    ['stateLoading','stateReady','stateError'].forEach(function(s){
+      document.getElementById(s).classList.toggle('active', s === id);
+    });
+  }
+
+  if (!sessionId) { show('stateError'); return; }
+
+  var attempts = 0;
+  var maxAttempts = 14; // ~35s of polling
+
+  function poll(){
+    attempts++;
+    fetch('/api/order-status?session_id=' + encodeURIComponent(sessionId))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ready && d.licenseKey) {
+          var key = d.licenseKey;
+          document.getElementById('licenseKeyVal').textContent = key;
+          document.getElementById('readyTitle').textContent = isForex ? 'Your Forex bot is ready.' : 'Your bot is ready.';
+
+          var configuratorUrl = (isForex ? '/configurator-forex' : '/configurator') + '?key=' + encodeURIComponent(key);
+          var repo = isForex ? 'apex-forex-bot' : 'apex-trade-bot';
+          document.getElementById('deployBtn').href = 'https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/' + repo;
+
+          document.getElementById('ctaBtn').href = configuratorUrl;
+          document.getElementById('ctaBtn').style.display = 'block';
+          document.getElementById('stepTg').style.display = isForex ? 'none' : 'flex';
+
+          show('stateReady');
+          return;
+        }
+        if (attempts >= maxAttempts) { show('stateError'); return; }
+        setTimeout(poll, 2500);
+      })
+      .catch(function(){
+        if (attempts >= maxAttempts) { show('stateError'); return; }
+        setTimeout(poll, 2500);
+      });
+  }
+  poll();
+})();
+</script>
+</body>
+</html>

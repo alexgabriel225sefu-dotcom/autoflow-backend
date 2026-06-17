@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apex Trade Bot — Profile Picture</title>
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@600,700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:32px;font-family:sans-serif}
+.hint{color:#666;font-size:14px;text-align:center}
+canvas{border-radius:50%;box-shadow:0 0 60px rgba(255,45,79,.35)}
+button{background:#ff2d4f;color:#fff;border:none;border-radius:10px;padding:14px 32px;font-size:16px;font-weight:700;cursor:pointer}
+button:hover{background:#ff5c74}
+</style>
+</head>
+<body>
+<div class="hint">Profile picture for TikTok / Instagram · 1000×1000px</div>
+<canvas id="c" width="1000" height="1000"></canvas>
+<button onclick="download()">⬇ Download PNG</button>
+<script>
+var F=new FontFace('ClashDisplay','url(https://api.fontshare.com/v2/fonts/files/clash-display/ClashDisplay-Bold.woff2)',{weight:'700'});
+F.load().then(function(f){document.fonts.add(f);draw()}).catch(draw);
+
+function draw(){
+  var c=document.getElementById('c'),x=c.getContext('2d');
+  var W=1000,H=1000;
+
+  /* ── background ── */
+  x.fillStyle='#060608';x.fillRect(0,0,W,H);
+
+  /* ── aurora glow top-right ── */
+  var g1=x.createRadialGradient(780,200,10,780,200,480);
+  g1.addColorStop(0,'rgba(255,45,79,.28)');g1.addColorStop(1,'rgba(255,45,79,0)');
+  x.fillStyle=g1;x.fillRect(0,0,W,H);
+
+  /* ── aurora glow bottom-left ── */
+  var g2=x.createRadialGradient(200,800,10,200,800,360);
+  g2.addColorStop(0,'rgba(255,45,79,.14)');g2.addColorStop(1,'rgba(255,45,79,0)');
+  x.fillStyle=g2;x.fillRect(0,0,W,H);
+
+  /* ── 3D grid (perspective lines) ── */
+  x.save();
+  x.globalAlpha=0.18;
+  x.strokeStyle='#ff2d4f';x.lineWidth=1;
+  var gsize=64,rows=16,cols=16;
+  for(var i=0;i<=cols;i++){
+    var px=i*(W/cols);
+    x.beginPath();x.moveTo(px,H*.55);x.lineTo(W/2,H*.85);x.stroke();
+  }
+  for(var j=0;j<=rows;j++){
+    var frac=j/rows;
+    var lx=frac*W,rx=W-lx;
+    var y=H*.55+frac*(H*.3);
+    x.beginPath();x.moveTo(lx+(rx-lx)*.0,y);x.lineTo(rx-(rx-lx)*.0,y);x.stroke();
+  }
+  x.restore();
+
+  /* ── fade mask over grid ── */
+  var gm=x.createLinearGradient(0,H*.5,0,H);
+  gm.addColorStop(0,'rgba(6,6,8,0)');gm.addColorStop(1,'rgba(6,6,8,.85)');
+  x.fillStyle=gm;x.fillRect(0,H*.5,W,H*.5);
+
+  /* ── outer ring ── */
+  x.save();
+  x.strokeStyle='rgba(255,45,79,.35)';x.lineWidth=3;
+  x.beginPath();x.arc(W/2,H/2,488,0,Math.PI*2);x.stroke();
+  x.restore();
+
+  /* ── logo bars ── */
+  var barW=68,barR=30,gap=28;
+  var heights=[165,232,300];
+  var totalW=barW*3+gap*2;
+  var bx=W/2-totalW/2,by=340;
+
+  heights.forEach(function(h,i){
+    var bLeft=bx+i*(barW+gap);
+    var bTop=by-h;
+    /* glow */
+    var bg=x.createLinearGradient(bLeft,bTop,bLeft,by);
+    bg.addColorStop(0,'rgba(255,92,116,0.9)');bg.addColorStop(1,'rgba(255,45,79,0.9)');
+    /* shadow */
+    x.save();
+    x.shadowColor='rgba(255,45,79,.8)';x.shadowBlur=40;
+    x.fillStyle=bg;
+    rr(x,bLeft,bTop,barW,h,barR);x.fill();
+    x.restore();
+  });
+
+  /* ── dot accent ── */
+  var dotX=bx+totalW-barW/2+14,dotY=by-300-30;
+  x.save();
+  x.shadowColor='rgba(255,92,116,.9)';x.shadowBlur=30;
+  var dg=x.createRadialGradient(dotX-6,dotY-6,2,dotX,dotY,32);
+  dg.addColorStop(0,'#ffb3bf');dg.addColorStop(1,'#ff5c74');
+  x.fillStyle=dg;
+  x.beginPath();x.arc(dotX,dotY,30,0,Math.PI*2);x.fill();
+  x.restore();
+
+  /* ── APEX text ── */
+  x.save();
+  x.font='700 140px ClashDisplay, system-ui, sans-serif';
+  x.textAlign='center';x.textBaseline='middle';
+  var tg=x.createLinearGradient(W/2-200,0,W/2+200,0);
+  tg.addColorStop(0,'#ff2d4f');tg.addColorStop(1,'#ff97a8');
+  x.fillStyle=tg;
+  x.shadowColor='rgba(255,45,79,.6)';x.shadowBlur=30;
+  x.fillText('APEX',W/2,590);
+  x.restore();
+
+  /* ── TRADE BOT text ── */
+  x.save();
+  x.font='600 52px ClashDisplay, system-ui, sans-serif';
+  x.textAlign='center';x.textBaseline='middle';
+  x.fillStyle='rgba(245,245,247,.75)';
+  x.letterSpacing='6px';
+  x.fillText('TRADE BOT',W/2,680);
+  x.restore();
+
+  /* ── AI label ── */
+  drawPill(x,W/2,770,'AI Crypto Trading',24,
+    'rgba(255,45,79,.15)','rgba(255,45,79,.35)','#ff97a8');
+}
+
+function rr(c,x,y,w,h,r){
+  c.beginPath();c.moveTo(x+r,y);
+  c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();
+}
+
+function drawPill(x,cx,cy,text,fs,bg,border,color){
+  x.save();
+  x.font='500 '+fs+'px system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';
+  var tw=x.measureText(text).width;
+  var pw=tw+60,ph=fs*2.2;
+  x.beginPath();x.roundRect(cx-pw/2,cy-ph/2,pw,ph,ph/2);
+  x.fillStyle=bg;x.fill();
+  x.strokeStyle=border;x.lineWidth=1.5;x.stroke();
+  x.fillStyle=color;x.fillText(text,cx,cy);
+  x.restore();
+}
+
+function download(){
+  var a=document.createElement('a');
+  a.download='apex-trade-bot-profile.png';
+  a.href=document.getElementById('c').toDataURL('image/png');
+  a.click();
+}
+</script>
+</body>
+</html>

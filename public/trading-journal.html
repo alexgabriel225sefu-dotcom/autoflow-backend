@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Trading Journal">
+<link rel="manifest" href="/trading-journal-manifest.json">
+<title>Trading Journal</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;}
+:root{
+  --bg:#070710;
+  --bg2:#0f0f1a;
+  --bg3:#16162a;
+  --border:#1e1e35;
+  --gold:#f59e0b;
+  --green:#22c55e;
+  --red:#ef4444;
+  --blue:#3b82f6;
+  --text:#f1f5f9;
+  --muted:#64748b;
+  --card:#0d0d1f;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;overflow:hidden;}
+body{display:flex;flex-direction:column;height:100dvh;}
+
+/* SAFE AREAS */
+.safe-top{height:env(safe-area-inset-top,44px);background:var(--bg);}
+.safe-bot{height:env(safe-area-inset-bottom,16px);background:var(--bg);}
+
+/* TOP BAR */
+.topbar{padding:10px 18px 8px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.acct-name{font-size:13px;font-weight:600;color:var(--muted);}
+.live-badge{display:flex;align-items:center;gap:5px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:20px;padding:4px 10px;}
+.live-dot{width:6px;height:6px;background:var(--green);border-radius:50%;animation:blink 1.3s ease infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.live-txt{font-size:11px;font-weight:700;color:var(--green);letter-spacing:.5px;}
+
+/* BALANCE SECTION */
+.balance-section{padding:6px 18px 10px;flex-shrink:0;}
+.balance-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
+.balance-amount{font-size:48px;font-weight:800;letter-spacing:-1.5px;line-height:1;color:var(--text);}
+.balance-amount span{color:var(--gold);}
+.balance-sub{display:flex;gap:16px;margin-top:6px;}
+.bal-sub-item{display:flex;align-items:center;gap:5px;}
+.bal-sub-val{font-size:13px;font-weight:600;}
+.bal-sub-val.pos{color:var(--green);}
+.bal-sub-val.neg{color:var(--red);}
+.bal-sub-lbl{font-size:11px;color:var(--muted);}
+
+/* CHALLENGE BAR */
+.challenge-wrap{margin:0 18px 12px;flex-shrink:0;}
+.challenge-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.challenge-from{font-size:12px;color:var(--muted);}
+.challenge-target{font-size:12px;font-weight:700;color:var(--gold);}
+.challenge-badge{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;color:var(--gold);letter-spacing:.3px;}
+.progress-track{height:7px;background:var(--bg3);border-radius:10px;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,#f59e0b,#fbbf24);border-radius:10px;transition:width .8s cubic-bezier(.4,0,.2,1);}
+.progress-pct{font-size:11px;color:var(--muted);margin-top:5px;text-align:right;}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 18px 12px;flex-shrink:0;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;}
+.stat-card-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
+.stat-card-val{font-size:17px;font-weight:800;color:var(--text);}
+.stat-card-val.green{color:var(--green);}
+.stat-card-val.gold{color:var(--gold);}
+
+/* SECTION HEADER */
+.section-hdr{display:flex;justify-content:space-between;align-items:center;padding:0 18px 8px;flex-shrink:0;}
+.section-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+.section-count{font-size:12px;color:var(--muted);}
+
+/* TRADE LIST */
+.trade-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 18px;}
+.trade-list::-webkit-scrollbar{display:none;}
+
+.trade-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;transition:border-color .3s;}
+.trade-card.new-in{animation:slideIn .4s ease;}
+@keyframes slideIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+.trade-card.win{border-color:rgba(34,197,94,.25);}
+.trade-card.loss{border-color:rgba(239,68,68,.2);}
+
+.tc-left{}
+.tc-sym{font-size:14px;font-weight:700;}
+.tc-meta{font-size:11px;color:var(--muted);margin-top:3px;}
+.tc-type{display:inline-block;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:5px;letter-spacing:.4px;}
+.tc-type.buy{background:rgba(34,197,94,.15);color:var(--green);}
+.tc-type.sell{background:rgba(239,68,68,.15);color:var(--red);}
+
+.tc-right{text-align:right;}
+.tc-profit{font-size:16px;font-weight:800;}
+.tc-profit.pos{color:var(--green);}
+.tc-profit.neg{color:var(--red);}
+.tc-time{font-size:10px;color:var(--muted);margin-top:3px;}
+
+/* MILESTONE POPUP */
+.milestone-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99;align-items:center;justify-content:center;flex-direction:column;gap:0;}
+.milestone-overlay.show{display:flex;animation:fadeIn .3s ease;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.milestone-box{background:var(--bg2);border:1px solid rgba(245,158,11,.4);border-radius:24px;padding:36px 28px;text-align:center;max-width:300px;width:90%;}
+.milestone-emoji{font-size:56px;margin-bottom:12px;}
+.milestone-title{font-size:22px;font-weight:800;color:var(--gold);margin-bottom:8px;}
+.milestone-sub{font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:24px;}
+.milestone-amount{font-size:42px;font-weight:900;color:var(--text);margin-bottom:20px;letter-spacing:-1px;}
+.milestone-btn{background:var(--gold);color:#000;font-weight:800;font-size:15px;border:none;border-radius:12px;padding:14px 28px;cursor:pointer;width:100%;font-family:inherit;}
+
+/* SETTINGS OVERLAY */
+.cfg-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;align-items:flex-end;}
+.cfg-overlay.open{display:flex;}
+.cfg-sheet{background:#0f0f1a;border:1px solid var(--border);border-radius:20px 20px 0 0;padding:22px 20px;width:100%;padding-bottom:env(safe-area-inset-bottom,24px);}
+.cfg-title{font-size:16px;font-weight:700;text-align:center;margin-bottom:20px;color:var(--gold);}
+.cfg-row{margin-bottom:14px;}
+.cfg-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.cfg-inp{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:12px;font-size:16px;font-family:inherit;}
+.cfg-inp:focus{outline:none;border-color:var(--gold);}
+.milestones-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:16px;}
+.ms-btn{background:var(--bg3);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 4px;font-size:12px;font-weight:600;cursor:pointer;text-align:center;font-family:inherit;transition:all .15s;}
+.ms-btn.active{background:rgba(245,158,11,.15);border-color:var(--gold);color:var(--gold);}
+.cfg-btn{width:100%;background:var(--gold);border:none;color:#000;font-size:16px;font-weight:800;padding:14px;border-radius:12px;cursor:pointer;font-family:inherit;}
+.cfg-cancel{width:100%;background:transparent;border:none;color:var(--muted);font-size:14px;padding:10px;cursor:pointer;font-family:inherit;margin-top:4px;}
+
+/* SETTINGS GEAR */
+.gear-btn{position:fixed;bottom:calc(env(safe-area-inset-bottom,16px) + 16px);right:18px;width:44px;height:44px;background:var(--bg2);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;}
+</style>
+</head>
+<body>
+
+<div class="safe-top"></div>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div>
+    <div class="acct-name" id="acctName">Alex · Personal Account</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:1px;" id="acctNum">#52917935 · ICMarketsEU</div>
+  </div>
+  <div class="live-badge">
+    <div class="live-dot"></div>
+    <span class="live-txt">LIVE</span>
+  </div>
+</div>
+
+<!-- BALANCE -->
+<div class="balance-section">
+  <div class="balance-label">Account Balance</div>
+  <div class="balance-amount"><span>$</span><span id="balDisplay">1,000.00</span></div>
+  <div class="balance-sub">
+    <div class="bal-sub-item">
+      <span class="bal-sub-val pos" id="todayPL">+$0.00</span>
+      <span class="bal-sub-lbl">today</span>
+    </div>
+    <div class="bal-sub-item">
+      <span class="bal-sub-val pos" id="totalPL">+$0.00</span>
+      <span class="bal-sub-lbl">total profit</span>
+    </div>
+    <div class="bal-sub-item">
+      <span class="bal-sub-val gold" id="equity">$1,000.00</span>
+      <span class="bal-sub-lbl">equity</span>
+    </div>
+  </div>
+</div>
+
+<!-- CHALLENGE BAR -->
+<div class="challenge-wrap">
+  <div class="challenge-header">
+    <span class="challenge-from" id="chalFrom">Challenge: $1,000 → $2,000</span>
+    <span class="challenge-badge" id="chalBadge">DOUBLING CHALLENGE</span>
+  </div>
+  <div class="progress-track">
+    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+  </div>
+  <div class="progress-pct" id="progressPct">0% complete → target: <strong id="targetAmt">$2,000.00</strong></div>
+</div>
+
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-card-label">Win Rate</div>
+    <div class="stat-card-val green" id="statWR">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-label">Trades</div>
+    <div class="stat-card-val" id="statTrades">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-label">Best Trade</div>
+    <div class="stat-card-val gold" id="statBest">—</div>
+  </div>
+</div>
+
+<!-- TRADES SECTION -->
+<div class="section-hdr">
+  <span class="section-title">Trade History</span>
+  <span class="section-count" id="tradeCount">0 trades</span>
+</div>
+
+<div class="trade-list" id="tradeList">
+  <div style="text-align:center;color:var(--muted);padding:40px 20px;font-size:13px;">
+    Waiting for first trade...<br>
+    <div style="font-size:32px;margin-top:12px;opacity:.3;">📊</div>
+  </div>
+</div>
+
+<!-- SETTINGS GEAR -->
+<div class="gear-btn" onclick="openCfg()">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="3" stroke="#64748b" stroke-width="1.5"/>
+    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="#64748b" stroke-width="1.5"/>
+  </svg>
+</div>
+
+<div class="safe-bot"></div>
+
+<!-- MILESTONE POPUP -->
+<div class="milestone-overlay" id="milestoneOverlay">
+  <div class="milestone-box">
+    <div class="milestone-emoji">🎯</div>
+    <div class="milestone-title">TARGET REACHED!</div>
+    <div class="milestone-amount" id="milestoneAmt">$2,000</div>
+    <div class="milestone-sub" id="milestoneSub">Challenge complete! Balance doubled successfully. Setting new target...</div>
+    <button class="milestone-btn" onclick="closeMilestone()">Continue Challenge →</button>
+  </div>
+</div>
+
+<!-- CONFIG SHEET -->
+<div class="cfg-overlay" id="cfgOverlay" onclick="closeCfgOutside(event)">
+  <div class="cfg-sheet">
+    <div class="cfg-title">⚙️ Challenge Setup</div>
+    <div class="cfg-row">
+      <div class="cfg-lbl">Current Balance (USD)</div>
+      <input class="cfg-inp" type="number" id="cfgBalance" value="1000" placeholder="e.g. 1000">
+    </div>
+    <div class="cfg-row">
+      <div class="cfg-lbl">Quick Milestones</div>
+      <div class="milestones-row">
+        <button class="ms-btn active" onclick="setMilestone(this,1000)">$1K</button>
+        <button class="ms-btn" onclick="setMilestone(this,2000)">$2K</button>
+        <button class="ms-btn" onclick="setMilestone(this,4000)">$4K</button>
+        <button class="ms-btn" onclick="setMilestone(this,8000)">$8K</button>
+        <button class="ms-btn" onclick="setMilestone(this,16000)">$16K</button>
+        <button class="ms-btn" onclick="setMilestone(this,32000)">$32K</button>
+        <button class="ms-btn" onclick="setMilestone(this,64000)">$64K</button>
+        <button class="ms-btn" onclick="setMilestone(this,128000)">$128K</button>
+      </div>
+    </div>
+    <div class="cfg-row">
+      <div class="cfg-lbl">Account Name</div>
+      <input class="cfg-inp" type="text" id="cfgName" value="Alex · Personal Account">
+    </div>
+    <button class="cfg-btn" onclick="applyCfg()">Start Challenge</button>
+    <button class="cfg-cancel" onclick="closeCfg()">Cancel</button>
+  </div>
+</div>
+
+<script>
+// ── PAIRS ──────────────────────────────────────────────────────────
+const PAIRS = [
+  {sym:'EUR/USD',digits:5,lotVal:10},{sym:'GBP/USD',digits:5,lotVal:10},
+  {sym:'USD/JPY',digits:3,lotVal:9},{sym:'AUD/USD',digits:5,lotVal:10},
+  {sym:'USD/CAD',digits:5,lotVal:10},{sym:'NZD/USD',digits:5,lotVal:10},
+  {sym:'EUR/GBP',digits:5,lotVal:10},{sym:'EUR/JPY',digits:3,lotVal:10},
+  {sym:'XAU/USD',digits:2,lotVal:1},{sym:'GBP/JPY',digits:3,lotVal:10},
+];
+const LOTS = [0.01,0.02,0.05,0.10,0.20];
+
+// ── STATE ──────────────────────────────────────────────────────────
+let balance     = parseFloat(localStorage.getItem('tj_bal')   || '1000');
+let startBal    = balance;
+let target      = balance * 2;
+let totalWins   = 0, totalLoss = 0;
+let bestTrade   = 0;
+let trades      = [];
+let todayProfit = 0;
+let acctName    = localStorage.getItem('tj_name') || 'Alex · Personal Account';
+
+// ── FORMAT ─────────────────────────────────────────────────────────
+function fmtD(n){ return '$' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+function fmtS(n){ return (n>=0?'+':'-') + fmtD(n); }
+function rnd(a,b){ return Math.random()*(b-a)+a; }
+function rndInt(a,b){ return Math.floor(rnd(a,b+1)); }
+function nowStr(){
+  const d=new Date();
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────
+function render(){
+  // balance
+  document.getElementById('balDisplay').textContent = balance.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+  document.getElementById('todayPL').textContent = fmtS(todayProfit);
+  document.getElementById('todayPL').className = 'bal-sub-val ' + (todayProfit>=0?'pos':'neg');
+  const totalPL = balance - startBal;
+  document.getElementById('totalPL').textContent = fmtS(totalPL);
+  document.getElementById('totalPL').className = 'bal-sub-val ' + (totalPL>=0?'pos':'neg');
+  document.getElementById('equity').textContent = fmtD(balance);
+
+  // challenge bar
+  const pct = Math.min(100, Math.max(0, (balance - startBal) / (target - startBal) * 100));
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').innerHTML = pct.toFixed(1) + '% complete → target: <strong id="targetAmt">' + fmtD(target) + '</strong>';
+  document.getElementById('chalFrom').textContent = 'Challenge: ' + fmtD(startBal) + ' → ' + fmtD(target);
+
+  // stats
+  const total = totalWins + totalLoss;
+  document.getElementById('statWR').textContent = total ? Math.round(totalWins/total*100)+'%' : '—';
+  document.getElementById('statTrades').textContent = total;
+  document.getElementById('statBest').textContent = bestTrade > 0 ? fmtD(bestTrade) : '—';
+  document.getElementById('tradeCount').textContent = trades.length + ' trades';
+  document.getElementById('acctName').textContent = acctName;
+
+  // trade list
+  renderTrades();
+}
+
+function renderTrades(){
+  const list = document.getElementById('tradeList');
+  if(trades.length === 0){
+    list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px 20px;font-size:13px;">Waiting for first trade...<br><div style="font-size:32px;margin-top:12px;opacity:.3">📊</div></div>';
+    return;
+  }
+  list.innerHTML = trades.slice(0,40).map((t,i) => `
+    <div class="trade-card ${t.profit>=0?'win':'loss'}${i===0?' new-in':''}">
+      <div class="tc-left">
+        <div class="tc-sym">${t.sym} <span class="tc-type ${t.type.toLowerCase()}">${t.type}</span></div>
+        <div class="tc-meta">Vol ${t.lot} · ${t.pips>0?'+':''}${t.pips} pips</div>
+      </div>
+      <div class="tc-right">
+        <div class="tc-profit ${t.profit>=0?'pos':'neg'}">${fmtS(t.profit)}</div>
+        <div class="tc-time">${t.time}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── TRADE ENGINE ───────────────────────────────────────────────────
+function executeTrade(){
+  const pair  = PAIRS[rndInt(0,PAIRS.length-1)];
+  const type  = Math.random() > .45 ? 'BUY' : 'SELL';
+  const lot   = LOTS[rndInt(0,3)];
+  const isWin = Math.random() > .27;
+
+  // profit based on balance size for realism
+  const scale = Math.min(5, balance / 500);
+  let profit;
+  if(isWin){
+    profit = rnd(balance*0.008, balance*0.045) * scale * .3;
+    profit = Math.min(profit, balance * 0.08);
+  } else {
+    profit = -rnd(balance*0.005, balance*0.025) * scale * .25;
+    profit = Math.max(profit, -balance * 0.04);
+  }
+  profit = Math.round(profit * 100) / 100;
+  const pips = Math.round(profit / (lot * pair.lotVal));
+
+  balance    += profit;
+  todayProfit+= profit;
+  if(profit>=0){ totalWins++; if(profit>bestTrade) bestTrade=profit; }
+  else totalLoss++;
+
+  trades.unshift({sym:pair.sym, type, lot, profit, pips, time:nowStr()});
+  if(trades.length > 80) trades.pop();
+
+  render();
+
+  // milestone check
+  if(balance >= target){
+    setTimeout(showMilestone, 400);
+  }
+}
+
+// ── MILESTONE ──────────────────────────────────────────────────────
+function showMilestone(){
+  document.getElementById('milestoneAmt').textContent = fmtD(balance);
+  const next = target * 2;
+  document.getElementById('milestoneSub').textContent =
+    `🎉 You doubled your account! Balance: ${fmtD(balance)}. New target: ${fmtD(next)}`;
+  document.getElementById('milestoneOverlay').classList.add('show');
+}
+
+function closeMilestone(){
+  document.getElementById('milestoneOverlay').classList.remove('show');
+  startBal = target;
+  target   = startBal * 2;
+  localStorage.setItem('tj_bal', balance);
+  render();
+}
+
+// ── ADAPTIVE TRADE SPEED ───────────────────────────────────────────
+let tradeTimer;
+function scheduleNext(){
+  const delay = rndInt(2200, 5500);
+  tradeTimer = setTimeout(()=>{ executeTrade(); scheduleNext(); }, delay);
+}
+
+// ── CONFIG ─────────────────────────────────────────────────────────
+let cfgSelectedMs = 1000;
+function openCfg(){
+  document.getElementById('cfgBalance').value = balance.toFixed(0);
+  document.getElementById('cfgName').value    = acctName;
+  document.getElementById('cfgOverlay').classList.add('open');
+}
+function closeCfg(){ document.getElementById('cfgOverlay').classList.remove('open'); }
+function closeCfgOutside(e){ if(e.target===document.getElementById('cfgOverlay')) closeCfg(); }
+function setMilestone(btn, val){
+  document.querySelectorAll('.ms-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('cfgBalance').value = val;
+  cfgSelectedMs = val;
+}
+function applyCfg(){
+  balance     = parseFloat(document.getElementById('cfgBalance').value) || 1000;
+  acctName    = document.getElementById('cfgName').value || 'Alex · Personal Account';
+  startBal    = balance;
+  target      = balance * 2;
+  trades      = [];
+  totalWins   = 0; totalLoss = 0; bestTrade = 0; todayProfit = 0;
+  localStorage.setItem('tj_bal',  balance);
+  localStorage.setItem('tj_name', acctName);
+  closeCfg();
+  render();
+  clearTimeout(tradeTimer);
+  setTimeout(()=>{ executeTrade(); scheduleNext(); }, 1500);
+}
+
+// ── INIT ────────────────────────────────────────────────────────────
+target = startBal * 2;
+render();
+setTimeout(()=>{ executeTrade(); scheduleNext(); }, 2000);
+</script>
+</body>
+</html>

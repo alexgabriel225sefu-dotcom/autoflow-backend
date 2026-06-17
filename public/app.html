@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blueprint Studio</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#090909;--card:#111;--border:#1e1e1e;--border2:#2a2a2a;--t1:#f5f5f5;--t2:#aaa;--t3:#666;--red:#E53E2E;--red2:#c93426;--green:#4ADE80}
+body{background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+
+/* LOGIN */
+#screen-login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px 32px}
+.login-logo{font-size:13px;font-weight:700;letter-spacing:2px;color:var(--red);text-transform:uppercase;margin-bottom:8px}
+.login-title{font-size:26px;font-weight:700;margin-bottom:4px}
+.login-sub{font-size:14px;color:var(--t3);margin-bottom:32px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;color:var(--t2);margin-bottom:6px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.field input{width:100%;background:#0d0d0d;border:1px solid var(--border2);border-radius:10px;padding:12px 14px;color:var(--t1);font-size:15px;outline:none;transition:border-color .2s}
+.field input:focus{border-color:var(--red)}
+.login-btn{width:100%;background:var(--red);color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .2s}
+.login-btn:hover{background:var(--red2)}
+.login-btn:disabled{opacity:.5;cursor:default}
+#loginError{color:#f87171;font-size:13px;margin-top:12px;text-align:center;display:none}
+
+/* STUDIO */
+#screen-studio{min-height:100vh;display:flex;flex-direction:column}
+.app-header{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(9,9,9,.95);backdrop-filter:blur(10px);z-index:100}
+.app-logo{font-size:11px;font-weight:800;letter-spacing:2.5px;color:var(--red);text-transform:uppercase}
+.logout-btn{background:transparent;border:1px solid var(--border2);color:var(--t3);border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s}
+.logout-btn:hover{border-color:var(--red);color:var(--red)}
+.studio-main{flex:1;padding:40px 24px 80px;max-width:680px;margin:0 auto;width:100%}
+
+/* HERO */
+.studio-hero{margin-bottom:32px;text-align:center}
+.studio-badge{display:inline-block;background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.3);color:var(--red);font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 14px;border-radius:20px;margin-bottom:16px}
+.studio-title{font-size:clamp(26px,5vw,38px);font-weight:800;line-height:1.2;margin-bottom:10px}
+.studio-title span{background:linear-gradient(135deg,#E53E2E 0%,#ff6b5b 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.studio-sub{font-size:15px;color:var(--t3);line-height:1.6}
+
+/* INPUT CARD */
+.studio-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:24px;position:relative}
+.studio-card::before{content:'';position:absolute;inset:0;border-radius:16px;padding:1px;background:linear-gradient(135deg,rgba(229,62,46,.4),transparent 60%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.studio-label{display:block;font-size:12px;color:var(--t2);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px}
+.studio-textarea{width:100%;min-height:120px;background:#0d0d0d;border:1px solid var(--border2);border-radius:10px;padding:14px;color:var(--t1);font-size:15px;line-height:1.6;resize:vertical;outline:none;font-family:inherit;transition:border-color .2s}
+.studio-textarea:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(229,62,46,.08)}
+.studio-textarea::placeholder{color:var(--t3)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.chip{background:#111;border:1px solid var(--border2);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--t2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.chip:hover{border-color:var(--red);color:var(--red);background:rgba(229,62,46,.05)}
+.gen-btn{width:100%;background:linear-gradient(135deg,#E53E2E 0%,#c93426 100%);color:#fff;border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:.3px;box-shadow:0 4px 28px rgba(229,62,46,.3);transition:all .2s;margin-top:4px}
+.gen-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 32px rgba(229,62,46,.4)}
+.gen-btn:disabled{opacity:.6;cursor:default;transform:none}
+
+/* OUTPUT */
+.output-wrap{display:none}
+
+/* BLUEPRINT READY CARD */
+.ready-card{background:linear-gradient(135deg,#0d1f0d 0%,#0d0d0d 100%);border:1px solid rgba(74,222,128,.3);border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;margin-bottom:20px;animation:fadeUp .4s ease}
+.ready-icon{flex-shrink:0;width:48px;height:48px}
+.check-circle{stroke-dasharray:126;stroke-dashoffset:126;animation:drawCircle .6s .1s ease forwards}
+.check-mark{stroke-dasharray:28;stroke-dashoffset:28;animation:drawCheck .4s .6s ease forwards}
+@keyframes drawCircle{to{stroke-dashoffset:0}}
+@keyframes drawCheck{to{stroke-dashoffset:0}}
+.ready-info{flex:1;min-width:0}
+.ready-label{font-size:11px;color:var(--green);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+.ready-name{font-size:14px;font-weight:600;color:var(--t1)}
+.ready-btns{display:flex;gap:10px;flex-shrink:0}
+.ready-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;text-decoration:none;transition:all .2s;cursor:pointer;white-space:nowrap}
+.ready-btn-dl{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);color:var(--green)}
+.ready-btn-dl:hover{background:rgba(74,222,128,.2)}
+.ready-btn-make{background:linear-gradient(135deg,#E53E2E,#c93426);color:#fff;border:none}
+.ready-btn-make:hover{filter:brightness(1.1)}
+
+/* GUIDE */
+.guide-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:16px}
+.guide-steps{display:flex;gap:10px;margin-bottom:28px;overflow-x:auto;padding-bottom:4px}
+.guide-step{flex:1;min-width:90px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.guide-svg-wrap{width:52px;height:52px;background:#141414;border:1px solid var(--border2);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.guide-svg{width:40px;height:40px}
+.guide-num{font-size:10px;color:var(--red);font-weight:700}
+.guide-text{font-size:11px;color:var(--t3);line-height:1.4}
+.guide-text strong{color:var(--t2)}
+
+/* OUT SECTIONS */
+.out-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:12px}
+.out-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px}
+.out-value{font-size:14px;color:var(--t1);line-height:1.7;white-space:pre-wrap}
+.out-price-val{font-size:28px;font-weight:800;color:var(--red)}
+.out-price-sub{font-size:12px;color:var(--t3);margin-top:2px}
+.copy-btn{float:right;background:transparent;border:1px solid var(--border2);color:var(--t3);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;transition:all .15s}
+.copy-btn:hover{border-color:var(--red);color:var(--red)}
+.proposal-btn{width:100%;background:transparent;border:1px solid var(--border2);color:var(--t2);border-radius:12px;padding:14px;font-size:14px;font-weight:600;cursor:pointer;margin-top:16px;transition:all .2s}
+.proposal-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* SVG ANIMATIONS */
+@keyframes dlBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@keyframes makePulse{0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes menuFade{0%,40%{opacity:0;transform:translateY(-4px)}60%,100%{opacity:1;transform:translateY(0)}}
+@keyframes dash{to{stroke-dashoffset:-20}}
+@keyframes toggleOn{0%,49%{transform:translateX(0)}50%,100%{transform:translateX(14px)}}
+@keyframes liveGlow{0%,100%{opacity:.4}50%{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.dl-arrow{animation:dlBounce 1.5s ease-in-out infinite}
+.make-m{animation:makePulse 2s ease-in-out infinite}
+.import-menu{animation:menuFade 2.5s ease-in-out infinite}
+.connect-line{stroke-dasharray:6 4;animation:dash 1.2s linear infinite}
+.toggle-thumb{animation:toggleOn 3s ease-in-out infinite}
+.live-dot{animation:liveGlow 1.5s ease-in-out infinite}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;display:none;align-items:center;justify-content:center;padding:24px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:20px}
+.modal-field{margin-bottom:14px}
+.modal-field label{display:block;font-size:12px;color:var(--t2);margin-bottom:6px;font-weight:500}
+.modal-field input{width:100%;background:#0d0d0d;border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--t1);font-size:14px;outline:none}
+.modal-field input:focus{border-color:var(--red)}
+.modal-output{background:#0d0d0d;border:1px solid var(--border2);border-radius:8px;padding:16px;font-size:13px;color:var(--t1);line-height:1.7;white-space:pre-wrap;max-height:300px;overflow-y:auto;margin-top:16px}
+.modal-btns{display:flex;gap:10px;margin-top:16px}
+.modal-btn{flex:1;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.modal-btn-primary{background:var(--red);color:#fff;border:none}
+.modal-btn-primary:hover{background:var(--red2)}
+.modal-btn-secondary{background:transparent;border:1px solid var(--border2);color:var(--t2)}
+.modal-btn-secondary:hover{border-color:var(--t2);color:var(--t1)}
+
+/* SETUP GUIDE */
+.setup-guide{margin-top:32px;padding-top:28px;border-top:1px solid var(--border)}
+.sguide-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.sguide-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3)}
+.platform-section{margin-bottom:20px}
+.platform-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:12px}
+.badge-make{background:rgba(229,62,46,.12);border:1px solid rgba(229,62,46,.35);color:var(--red)}
+.badge-360{background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa}
+.sguide-steps{display:flex;flex-direction:column;gap:10px}
+.sguide-step{background:#0d0d0d;border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;transition:border-color .2s}
+.sguide-step:hover{border-color:var(--border2)}
+.snum{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px}
+.snum-make{background:rgba(229,62,46,.15);color:var(--red);border:1px solid rgba(229,62,46,.3)}
+.snum-360{background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.25)}
+.snum-live{background:rgba(74,222,128,.1);color:var(--green);border:1px solid rgba(74,222,128,.25)}
+.snum-meta{background:rgba(99,102,241,.15);color:#818cf8;border:1px solid rgba(99,102,241,.3)}
+.snum-google{background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.25)}
+.snum-stripe{background:rgba(99,102,241,.15);color:#a78bfa;border:1px solid rgba(99,102,241,.3)}
+.badge-meta{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);color:#818cf8}
+.badge-google{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);color:#fbbf24}
+.badge-stripe{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);color:#a78bfa}
+.sstep-body{flex:1;min-width:0}
+.sstep-title{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:3px}
+.sstep-desc{font-size:12px;color:var(--t3);line-height:1.6}
+.sstep-desc strong{color:var(--t2)}
+.sstep-desc code{background:#1a1a1a;border:1px solid var(--border2);border-radius:4px;padding:1px 6px;font-size:11px;color:var(--red);font-family:monospace}
+.sstep-tip{background:#141414;border:1px solid var(--border2);border-radius:6px;padding:7px 10px;font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5}
+.sstep-tip strong{color:var(--t2)}
+.sicon{width:36px;height:36px;background:#141414;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+/* LANG TOGGLE */
+.lang-toggle{display:flex;align-items:center;gap:4px;background:#141414;border:1px solid var(--border2);border-radius:8px;padding:3px}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1a1a;border:1px solid var(--border2);color:var(--t1);padding:12px 20px;border-radius:10px;font-size:14px;font-weight:500;z-index:9999;transition:transform .3s ease;white-space:nowrap;pointer-events:none}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#toast.success{border-color:var(--green);color:var(--green)}
+#toast.error{border-color:#f87171;color:#f87171}
+
+@media(max-width:520px){
+  .ready-card{flex-wrap:wrap}
+  .ready-btns{width:100%}
+  .ready-btn{flex:1;justify-content:center}
+  .login-card{padding:28px 20px}
+  .outputs-strip{grid-template-columns:1fr 1fr}
+  .plat-row{gap:6px}
+}
+/* ── OUTPUTS STRIP ── */
+.outputs-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+.out-pill{background:#111;border:1px solid var(--border2);border-radius:12px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.out-pill-icon{width:36px;height:36px;background:#0d0d0d;border:1px solid var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.out-pill-label{font-size:9px;font-weight:700;color:var(--t2);letter-spacing:.3px;line-height:1.4}
+.out-pill-sub{font-size:8px;color:var(--t3);line-height:1.3}
+/* ── PLATFORM ROW ── */
+.plat-row{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 4px}
+.plat-chip{display:flex;align-items:center;gap:5px;background:#0d0d0d;border:1px solid var(--border2);border-radius:16px;padding:4px 10px;font-size:10px;font-weight:600;color:var(--t3);cursor:default;transition:all .15s}
+.plat-chip:hover{border-color:rgba(229,62,46,.25);color:var(--t2)}
+/* ── SVG ANIMS ── */
+@keyframes svg-pulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.1)}}
+@keyframes svg-flow{to{stroke-dashoffset:-10}}
+@keyframes svg-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes svg-draw{from{stroke-dashoffset:30}to{stroke-dashoffset:0}}
+.s-pulse{animation:svg-pulse 2s ease-in-out infinite}
+.s-flow{stroke-dasharray:4 3;animation:svg-flow .9s linear infinite}
+.s-blink{animation:svg-blink 1s step-end infinite}
+.s-draw{stroke-dasharray:30;stroke-dashoffset:30;animation:svg-draw 1s ease forwards}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="screen-login">
+  <div class="login-card">
+    <div class="login-logo">⚡ Blueprint Studio</div>
+    <div class="login-title" id="loginTitle">Blueprint Studio</div>
+    <div class="login-sub" id="loginSub">Sign in to access your workspace</div>
+    <div class="field">
+      <label id="emailLbl">Email</label>
+      <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label id="codeLbl">Access Code</label>
+      <input type="password" id="loginCode" placeholder="Enter your code" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Sign In</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<!-- STUDIO -->
+<div id="screen-studio" style="display:none">
+  <header class="app-header">
+    <div class="app-logo">⚡ Blueprint Studio</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="lang-toggle">
+        <button class="lang-btn active" id="langCurrent" onclick="openLangModal()" style="display:flex;align-items:center;gap:5px;padding:4px 12px">
+          <span id="langFlag">🇬🇧</span><span id="langCode">EN</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M2 3l3 4 3-4"/></svg>
+        </button>
+      </div>
+      <button class="logout-btn" id="logoutBtn" onclick="doLogout()">Sign out</button>
+    </div>
+  </header>
+
+  <main class="studio-main">
+
+    <div class="studio-hero">
+      <div class="studio-badge" id="studioBadge">⚡ Blueprint Studio</div>
+      <div class="studio-title" id="studioTitle">What do you want<br><span>to automate?</span></div>
+      <div class="studio-sub" id="studioSub">Not a ChatGPT answer — a real <strong style="color:var(--t2)">Make.com .json blueprint</strong> you import with one click, plus your selling price and outreach message.</div>
+    </div>
+
+    <!-- What you get strip -->
+    <div class="outputs-strip">
+      <div class="out-pill">
+        <div class="out-pill-icon">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <rect x="2" y="1" width="13" height="17" rx="2" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+            <rect x="4.5" y="5" width="5" height="1" rx=".5" fill="#4ADE80" class="s-draw"/>
+            <rect x="4.5" y="7.5" width="8" height="1" rx=".5" fill="#444" class="s-draw" style="animation-delay:.2s"/>
+            <rect x="4.5" y="10" width="6" height="1" rx=".5" fill="#444" class="s-draw" style="animation-delay:.4s"/>
+            <rect x="4.5" y="12.5" width="7" height="1" rx=".5" fill="#444" class="s-draw" style="animation-delay:.6s"/>
+            <circle cx="17" cy="17" r="4" fill="#E53E2E" class="s-pulse"/>
+            <text x="17" y="19.5" text-anchor="middle" font-size="5.5" fill="#fff" font-weight="800" font-family="monospace">{}</text>
+          </svg>
+        </div>
+        <div class="out-pill-label">.json Blueprint</div>
+        <div class="out-pill-sub">Import in Make.com instantly</div>
+      </div>
+      <div class="out-pill">
+        <div class="out-pill-icon">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <circle cx="11" cy="11" r="8" stroke="rgba(229,62,46,.2)" stroke-width="1"/>
+            <circle cx="11" cy="11" r="5" stroke="#E53E2E" stroke-width="1" stroke-dasharray="3 2" class="s-flow"/>
+            <text x="11" y="14" text-anchor="middle" font-size="7" fill="#E53E2E" font-weight="900" font-family="Arial">$</text>
+          </svg>
+        </div>
+        <div class="out-pill-label">Selling Price</div>
+        <div class="out-pill-sub">$300–$1,000 calculated</div>
+      </div>
+      <div class="out-pill">
+        <div class="out-pill-icon">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <rect x="1" y="4" width="20" height="14" rx="2.5" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+            <path d="M2 5l9 7 9-7" stroke="#E53E2E" stroke-width="1" stroke-linecap="round" fill="none" class="s-draw"/>
+            <rect x="4" y="10" width="5" height="1" rx=".5" fill="#444"/>
+            <rect x="4" y="12.5" width="8" height="1" rx=".5" fill="#333"/>
+            <rect x="12" y="14" width="6" height="2" rx="1" fill="rgba(229,62,46,.2)" stroke="#E53E2E" stroke-width=".5"/>
+          </svg>
+        </div>
+        <div class="out-pill-label">Outreach Message</div>
+        <div class="out-pill-sub">Copy-paste to prospect</div>
+      </div>
+      <div class="out-pill">
+        <div class="out-pill-icon">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <rect x="2" y="3" width="7" height="7" rx="1.5" fill="#1a1a1a" stroke="#E53E2E" stroke-width="1" class="s-pulse"/>
+            <rect x="13" y="3" width="7" height="7" rx="1.5" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+            <rect x="2" y="13" width="7" height="7" rx="1.5" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+            <rect x="13" y="13" width="7" height="7" rx="1.5" fill="#1a1a1a" stroke="#4ADE80" stroke-width="1" class="s-pulse" style="animation-delay:.7s"/>
+            <line x1="9" y1="6.5" x2="13" y2="6.5" stroke="#E53E2E" stroke-width=".8" stroke-dasharray="2 1" class="s-flow"/>
+            <line x1="5.5" y1="10" x2="5.5" y2="13" stroke="#333" stroke-width=".8" stroke-dasharray="2 1"/>
+            <line x1="16.5" y1="10" x2="16.5" y2="13" stroke="#4ADE80" stroke-width=".8" stroke-dasharray="2 1" class="s-flow" style="animation-delay:.4s"/>
+          </svg>
+        </div>
+        <div class="out-pill-label">Setup Guide</div>
+        <div class="out-pill-sub">Step-by-step per platform</div>
+      </div>
+    </div>
+
+    <div class="studio-card">
+      <label class="studio-label" id="descLbl">Describe your automation</label>
+      <textarea class="studio-textarea" id="wDesc"
+        placeholder="e.g. When a new lead fills my Google Form, use AI to write a personalized follow-up email and send it via Gmail automatically. Log everything in Google Sheets."></textarea>
+
+      <div class="chips">
+        <button class="chip" onclick="useChip(this)" data-val="When someone messages on WhatsApp, use GPT-4 to reply automatically with information about our services, prices, and booking.">WhatsApp AI Bot</button>
+        <button class="chip" onclick="useChip(this)" data-val="When a new lead fills my contact form, AI writes a personalized follow-up email and sends it via Gmail. Log everything in Google Sheets.">Lead Follow-Up</button>
+        <button class="chip" onclick="useChip(this)" data-val="Every morning pull 20 new leads from Google Sheets, use AI to write a personalized cold email for each one, and send them automatically.">Cold Email Pipeline</button>
+        <button class="chip" onclick="useChip(this)" data-val="Reply automatically to Instagram DMs using AI. Handle pricing questions, booking requests, and general inquiries 24/7.">Instagram DM Bot</button>
+        <button class="chip" onclick="useChip(this)" data-val="When a Stripe subscription is created, email a welcome message. When payment fails, send a recovery email automatically.">Stripe Billing</button>
+      </div>
+
+      <div class="plat-row">
+        <div class="plat-chip"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="5" fill="#25D366"/><path d="M7.8 6.7c-.09-.08-.64-.32-.73-.36s-.17-.04-.25.09-.3.37-.37.44-.12.08-.24.03a3 3 0 01-1.44-1.27c-.11-.19.11-.18.3-.58.04-.09.02-.17-.01-.23s-.27-.66-.37-.88c-.09-.19-.18-.16-.26-.16h-.27c-.07 0-.2.03-.31.16a1.37 1.37 0 00-.43 1.01c0 .6.44 1.18.5 1.26.07.08.87 1.32 2.1 1.84.8.34 1.1.37 1.5.31.24-.04.75-.31.86-.61.1-.3.1-.55.07-.61z" fill="#fff"/></svg>WhatsApp</div>
+        <div class="plat-chip"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x=".5" y=".5" width="10" height="10" rx="2.5" fill="url(#ig2)"/><defs><linearGradient id="ig2" x1="0" y1="11" x2="11" y2="0"><stop offset="0%" stop-color="#f09433"/><stop offset="50%" stop-color="#dc2743"/><stop offset="100%" stop-color="#bc1888"/></linearGradient></defs><circle cx="5.5" cy="5.5" r="2.2" stroke="#fff" stroke-width=".9" fill="none"/><circle cx="8" cy="3" r=".5" fill="#fff"/></svg>Instagram</div>
+        <div class="plat-chip"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x=".5" y="1.5" width="10" height="8" rx="1.5" fill="#fff" stroke="#ddd" stroke-width=".5"/><path d="M1 2.5L5.5 6l4.5-3.5" stroke="#EA4335" stroke-width=".9" fill="none" stroke-linecap="round"/></svg>Gmail</div>
+        <div class="plat-chip"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="5" fill="#E53E2E"/><text x="5.5" y="8" text-anchor="middle" font-size="6.5" fill="#fff" font-weight="900" font-family="Arial">M</text></svg>Make.com</div>
+        <div class="plat-chip"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x=".5" y=".5" width="10" height="10" rx="2" fill="#635BFF"/><path d="M5.5 2.5c-1 0-1.6.45-1.6 1.15 0 1.35 2.3 1 2.3 1.7 0 .27-.27.45-.72.45-.72 0-1.35-.27-1.8-.63v1.26c.45.27 1.08.45 1.8.45 1.08 0 1.71-.54 1.71-1.26 0-1.35-2.3-1.08-2.3-1.7 0-.27.27-.36.63-.36.63 0 1.17.18 1.62.54V2.95C6.6 2.68 6.05 2.5 5.5 2.5z" fill="#fff"/></svg>Stripe</div>
+        <div class="plat-chip"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x=".5" y=".5" width="10" height="10" rx="1.5" fill="#34A853"/><rect x="2" y="3" width="7" height="1" rx=".3" fill="#fff" opacity=".85"/><rect x="2" y="5" width="7" height="1" rx=".3" fill="#fff" opacity=".85"/><rect x="2" y="7" width="5" height="1" rx=".3" fill="#fff" opacity=".85"/></svg>Sheets</div>
+        <div class="plat-chip"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="5" fill="#1877F2"/><path d="M5.5 2A3.5 3.5 0 002 5.5c0 1.5.93 2.8 2.27 3.3V7.2H3.5V5.8h.77V4.95c0-.96.57-1.5 1.44-1.5.42 0 .85.07.85.07v.94h-.48c-.47 0-.62.3-.62.6v.74h1.05l-.17 1.4H5.46v1.8A3.5 3.5 0 005.5 2z" fill="#fff"/></svg>360dialog</div>
+      </div>
+      <button class="gen-btn" id="genBtn" onclick="generateAutomation()">⚡ Generate My Automation</button>
+    </div>
+
+    <!-- OUTPUT -->
+    <div class="output-wrap" id="outputWrap">
+
+      <!-- Blueprint ready -->
+      <div class="ready-card">
+        <div class="ready-icon">
+          <svg viewBox="0 0 52 52" fill="none">
+            <circle cx="26" cy="26" r="24" stroke="#4ADE80" stroke-width="2" class="check-circle"/>
+            <path d="M15 26l7 7 15-15" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="check-mark"/>
+          </svg>
+        </div>
+        <div class="ready-info">
+          <div class="ready-label">Blueprint Ready</div>
+          <div class="ready-name" id="bpName">Your Automation Blueprint</div>
+        </div>
+        <div class="ready-btns">
+          <a id="dlBtn" href="#" download="automation.json" class="ready-btn ready-btn-dl">⬇ Download .json</a>
+          <a href="https://www.make.com" target="_blank" rel="noopener noreferrer" class="ready-btn ready-btn-make">Open Make.com →</a>
+        </div>
+      </div>
+
+      <!-- 5-step guide -->
+      <div class="guide-title">How to import in 5 steps</div>
+      <div class="guide-steps">
+
+        <div class="guide-step">
+          <div class="guide-svg-wrap">
+            <svg class="guide-svg" viewBox="0 0 44 44" fill="none">
+              <rect x="8" y="4" width="20" height="26" rx="3" fill="#1a1a1a" stroke="#333" stroke-width="1.5"/>
+              <rect x="11" y="9" width="10" height="1.5" rx=".75" fill="#333"/>
+              <rect x="11" y="13" width="14" height="1.5" rx=".75" fill="#333"/>
+              <rect x="11" y="17" width="12" height="1.5" rx=".75" fill="#333"/>
+              <line x1="18" y1="30" x2="18" y2="38" stroke="#4ADE80" stroke-width="1.5" stroke-linecap="round" class="dl-arrow"/>
+              <polyline points="14,36 18,40 22,36" stroke="#4ADE80" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="dl-arrow"/>
+            </svg>
+          </div>
+          <div class="guide-num">1</div>
+          <div class="guide-text"><strong>Download</strong> the .json file</div>
+        </div>
+
+        <div class="guide-step">
+          <div class="guide-svg-wrap">
+            <svg class="guide-svg" viewBox="0 0 44 44" fill="none">
+              <rect x="4" y="8" width="36" height="28" rx="5" fill="#1a1a1a" stroke="#333" stroke-width="1.5"/>
+              <rect x="4" y="8" width="36" height="8" rx="5" fill="#1e1e1e" stroke="#333" stroke-width="1.5"/>
+              <circle cx="22" cy="26" r="7" fill="#1a1a1a" stroke="#E53E2E" stroke-width="1.5" class="make-m"/>
+              <text x="19" y="30" font-size="7" fill="#E53E2E" font-weight="bold" font-family="Arial" class="make-m">M</text>
+            </svg>
+          </div>
+          <div class="guide-num">2</div>
+          <div class="guide-text">make.com → <strong>Scenarios</strong> → click <strong>+</strong> Create new</div>
+        </div>
+
+        <div class="guide-step">
+          <div class="guide-svg-wrap">
+            <svg class="guide-svg" viewBox="0 0 44 44" fill="none">
+              <rect x="4" y="8" width="36" height="28" rx="5" fill="#1a1a1a" stroke="#333" stroke-width="1.5"/>
+              <circle cx="32" cy="14" r="1.5" fill="#888"/>
+              <circle cx="36" cy="14" r="1.5" fill="#888"/>
+              <circle cx="40" cy="14" r="1.5" fill="#888"/>
+              <rect x="26" y="18" width="16" height="14" rx="3" fill="#222" stroke="#333" class="import-menu"/>
+              <rect x="28" y="21" width="12" height="1.5" rx=".75" fill="#555" class="import-menu"/>
+              <rect x="28" y="25" width="10" height="1.5" rx=".75" fill="#E53E2E" class="import-menu"/>
+              <rect x="28" y="29" width="11" height="1.5" rx=".75" fill="#555" class="import-menu"/>
+            </svg>
+          </div>
+          <div class="guide-num">3</div>
+          <div class="guide-text">Bottom-left toolbar → <strong>···</strong> → <strong style="color:#E53E2E">Import Blueprint</strong> → upload .json</div>
+        </div>
+
+        <div class="guide-step">
+          <div class="guide-svg-wrap">
+            <svg class="guide-svg" viewBox="0 0 44 44" fill="none">
+              <rect x="4" y="14" width="12" height="16" rx="3" fill="#1a1a1a" stroke="#333" stroke-width="1.5"/>
+              <text x="7" y="25" font-size="6" fill="#aaa" font-family="Arial" font-weight="bold">W</text>
+              <line x1="16" y1="22" x2="28" y2="22" stroke="#E53E2E" stroke-width="1.5" stroke-dasharray="3 2" class="connect-line"/>
+              <rect x="28" y="14" width="12" height="16" rx="3" fill="#1a1a1a" stroke="#333" stroke-width="1.5"/>
+              <text x="30" y="25" font-size="6" fill="#aaa" font-family="Arial" font-weight="bold">AI</text>
+              <circle cx="16" cy="22" r="2" fill="#4ADE80"/>
+              <circle cx="28" cy="22" r="2" fill="#4ADE80"/>
+            </svg>
+          </div>
+          <div class="guide-num">4</div>
+          <div class="guide-text"><strong>Connect</strong> your apps</div>
+        </div>
+
+        <div class="guide-step">
+          <div class="guide-svg-wrap">
+            <svg class="guide-svg" viewBox="0 0 44 44" fill="none">
+              <rect x="6" y="16" width="26" height="12" rx="6" fill="#1a1a1a" stroke="#4ADE80" stroke-width="1.5"/>
+              <rect x="20" y="18" width="8" height="8" rx="4" fill="#4ADE80" class="toggle-thumb"/>
+              <text x="7" y="36" font-size="6" fill="#4ADE80" font-weight="bold" font-family="Arial" class="live-dot">● LIVE</text>
+            </svg>
+          </div>
+          <div class="guide-num">5</div>
+          <div class="guide-text"><strong>Turn ON</strong> — live!</div>
+        </div>
+
+      </div>
+
+      <!-- What gets built -->
+      <div class="out-section" id="secWhat" style="display:none">
+        <div class="out-label">What gets built</div>
+        <div class="out-value" id="outWhat"></div>
+      </div>
+
+      <!-- Price -->
+      <div class="out-section" id="secPrice" style="display:none">
+        <div class="out-label">Your price to client</div>
+        <div class="out-price-val" id="outPrice"></div>
+        <div class="out-price-sub" id="outPriceSub"></div>
+      </div>
+
+      <!-- Outreach -->
+      <div class="out-section" id="secOutreach" style="display:none">
+        <div class="out-label">
+          Outreach message
+          <button class="copy-btn" onclick="copyText('outOutreach')">Copy</button>
+        </div>
+        <div class="out-value" id="outOutreach"></div>
+      </div>
+
+      <button class="proposal-btn" id="proposalBtn" onclick="openProposal()" style="display:none">
+        📄 Generate Client Proposal
+      </button>
+
+      <!-- SETUP GUIDE (dynamic) -->
+      <div class="setup-guide" id="setupGuide" style="display:none">
+        <div id="setupGuideInner"></div>
+      </div><!-- /setup-guide -->
+
+    </div><!-- /output-wrap -->
+  </main>
+</div>
+
+<!-- PROPOSAL MODAL -->
+<div class="modal-overlay" id="proposalModal">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">📄 Client Proposal</div>
+    <div class="modal-field"><label>Client Name</label><input type="text" id="propClient" placeholder="e.g. Salon Bella Roma"></div>
+    <div class="modal-field"><label>Your Name</label><input type="text" id="propYourName" placeholder="e.g. Alex"></div>
+    <div class="modal-field"><label>Your Contact (optional)</label><input type="text" id="propContact" placeholder="phone / email / website"></div>
+    <div class="modal-btns">
+      <button class="modal-btn modal-btn-secondary" onclick="closeProposal()">Cancel</button>
+      <button class="modal-btn modal-btn-primary" id="propGenBtn" onclick="generateProposal()">Generate</button>
+    </div>
+    <div class="modal-output" id="propOutput" style="display:none"></div>
+    <div class="modal-btns" id="propCopyBtns" style="display:none">
+      <button class="modal-btn modal-btn-secondary" onclick="copyProposal()">Copy</button>
+      <button class="modal-btn modal-btn-secondary" onclick="closeProposal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API='';
+let token='';
+let lastData={};
+let currentBlob=null;
+
+// Blueprint templates
+var BP_TYPES=[
+  {keys:['whatsapp'],file:'whatsapp-bot.json',label:'WhatsApp AI Bot'},
+  {keys:['instagram','dm'],file:'instagram-dm-bot.json',label:'Instagram DM Bot'},
+  {keys:['cold email','outreach','cold'],file:'cold-email-pipeline.json',label:'Cold Email Pipeline'},
+  {keys:['lead','form','follow-up','followup','contact form'],file:'lead-followup-system.json',label:'Lead Follow-Up System'},
+  {keys:['stripe','invoice','payment','billing'],file:'stripe-billing-automation.json',label:'Billing Automation'},
+  {keys:['proposal','quote'],file:'ai-proposal-generator.json',label:'AI Proposal Generator'},
+];
+
+var BP_DATA={
+"whatsapp-bot.json":{"name":"WhatsApp AI Bot","flow":[{"id":1,"module":"gateway:CustomWebHook","version":1,"parameters":{"hook":"YOUR_MAKE_WEBHOOK_URL","maxResults":1},"mapper":{},"metadata":{"designer":{"x":0,"y":0,"name":"Webhook — Incoming Message"}}},{"id":2,"module":"builtin:BasicFeeder","version":1,"parameters":{},"mapper":{"condition":"{{1.entry[].changes[].value.messages[].type}} = text"},"metadata":{"designer":{"x":300,"y":0,"name":"Filter — Text Only"}}},{"id":3,"module":"openai-gpt-3:CreateChatCompletion","version":1,"parameters":{"model":"gpt-4o","temperature":0.6,"max_tokens":300},"mapper":{"messages":[{"role":"system","content":"You are a helpful WhatsApp assistant for [BUSINESS NAME]. Answer questions about [PRODUCTS/SERVICES]. Be friendly, concise (under 100 words), reply in the same language as the customer."},{"role":"user","content":"{{1.entry[].changes[].value.messages[].text.body}}"}]},"metadata":{"designer":{"x":600,"y":0,"name":"GPT-4o — Reply"}}},{"id":4,"module":"http:ActionSendData","version":3,"parameters":{"handleErrors":false},"mapper":{"url":"https://waba.360dialog.io/v1/messages","method":"POST","headers":[{"name":"D360-API-KEY","value":"YOUR_360DIALOG_API_KEY"},{"name":"Content-Type","value":"application/json"}],"body":"{\"messaging_product\":\"whatsapp\",\"to\":\"{{1.entry[].changes[].value.messages[].from}}\",\"type\":\"text\",\"text\":{\"body\":\"{{3.choices[].message.content}}\"}}","bodyType":"raw"},"metadata":{"designer":{"x":900,"y":0,"name":"Send Reply"}}},{"id":5,"module":"google-sheets:addRow","version":1,"parameters":{"spreadsheetId":"YOUR_SPREADSHEET_ID","sheetId":"WhatsApp Logs"},"mapper":{"values":{"A":"{{formatDate(now; 'DD/MM/YYYY HH:mm')}}","B":"{{1.entry[].changes[].value.messages[].from}}","C":"{{1.entry[].changes[].value.messages[].text.body}}","D":"{{3.choices[].message.content}}"}},"metadata":{"designer":{"x":1200,"y":0,"name":"Log to Sheets"}}}],"metadata":{"instant":true,"version":1,"zone":"eu2.make.com","notes":"SETUP: 1) Create CustomWebHook in Make.com 2) In 360dialog set webhook URL 3) Replace YOUR_360DIALOG_API_KEY 4) Customize system prompt 5) Create Google Sheet: Date, Phone, Message, Reply"}},
+"instagram-dm-bot.json":{"name":"Instagram DM Bot","flow":[{"id":1,"module":"gateway:CustomWebHook","version":1,"parameters":{"hook":"YOUR_MAKE_WEBHOOK_URL","maxResults":1},"mapper":{},"metadata":{"designer":{"x":0,"y":0,"name":"Instagram Webhook"}}},{"id":2,"module":"builtin:BasicFeeder","version":1,"parameters":{},"mapper":{"condition":"{{1.object}} = instagram AND {{1.entry[].messaging[].message.text}} != null"},"metadata":{"designer":{"x":300,"y":0,"name":"Filter — DMs Only"}}},{"id":3,"module":"openai-gpt-3:CreateChatCompletion","version":1,"parameters":{"model":"gpt-4o","temperature":0.65,"max_tokens":250},"mapper":{"messages":[{"role":"system","content":"You are the social media assistant for [BRAND NAME] on Instagram. Reply to DMs in a friendly tone. Keep replies under 80 words. Reply in the same language as the customer."},{"role":"user","content":"Instagram DM: {{1.entry[].messaging[].message.text}}"}]},"metadata":{"designer":{"x":600,"y":0,"name":"GPT-4o — DM Reply"}}},{"id":4,"module":"http:ActionSendData","version":3,"parameters":{"handleErrors":false},"mapper":{"url":"https://graph.facebook.com/v18.0/me/messages","method":"POST","headers":[{"name":"Content-Type","value":"application/json"}],"qs":[{"name":"access_token","value":"YOUR_PAGE_ACCESS_TOKEN"}],"body":"{\"recipient\":{\"id\":\"{{1.entry[].messaging[].sender.id}}\"},\"message\":{\"text\":\"{{3.choices[].message.content}}\"}}","bodyType":"raw"},"metadata":{"designer":{"x":900,"y":0,"name":"Send DM Reply"}}}],"metadata":{"instant":true,"version":1,"zone":"eu2.make.com","notes":"SETUP: 1) Create Facebook App at developers.facebook.com 2) Get long-lived Page Access Token 3) Set webhook for instagram_manage_messages 4) Register Make.com webhook in Facebook App settings 5) Replace YOUR_PAGE_ACCESS_TOKEN"}},
+"cold-email-pipeline.json":{"name":"Cold Email Pipeline","flow":[{"id":1,"module":"google-sheets:searchRows","version":1,"parameters":{"spreadsheetId":"YOUR_PROSPECTS_SPREADSHEET_ID","sheetId":"Prospects","limit":10},"mapper":{"filter":{"condition":"{{item.Status}} = Pending"}},"metadata":{"designer":{"x":0,"y":0,"name":"Sheets — Get Pending Prospects"}}},{"id":2,"module":"builtin:iterator","version":1,"parameters":{},"mapper":{"array":"{{1.rows}}"},"metadata":{"designer":{"x":300,"y":0,"name":"Iterator"}}},{"id":3,"module":"openai-gpt-3:CreateChatCompletion","version":1,"parameters":{"model":"gpt-4o","temperature":0.8,"max_tokens":350},"mapper":{"messages":[{"role":"system","content":"You write personalized cold emails for a B2B AI automation agency. Be natural, not salesy. Under 120 words."},{"role":"user","content":"Prospect: {{2.value.Company}}, {{2.value.Industry}}, {{2.value.FirstName}} {{2.value.LastName}}, {{2.value.Title}}\n\nWrite a cold email pitching AI automation. Include subject line."}]},"metadata":{"designer":{"x":600,"y":0,"name":"GPT-4o — Write Email"}}},{"id":4,"module":"gmail:ActionSendEmail","version":1,"parameters":{},"mapper":{"to":"{{2.value.Email}}","subject":"AI automation for {{2.value.Company}}","content":"{{3.choices[].message.content}}","contentType":"text"},"metadata":{"designer":{"x":900,"y":0,"name":"Gmail — Send"}}},{"id":5,"module":"google-sheets:updateRow","version":1,"parameters":{"spreadsheetId":"YOUR_PROSPECTS_SPREADSHEET_ID","sheetId":"Prospects"},"mapper":{"rowNumber":"{{2.value.__ROW_NUMBER__}}","values":{"Status":"Sent","SentDate":"{{formatDate(now; 'DD/MM/YYYY')}}"}},"metadata":{"designer":{"x":1200,"y":0,"name":"Sheets — Mark Sent"}}}],"metadata":{"instant":false,"version":1,"zone":"eu2.make.com","notes":"SETUP: 1) Google Sheet columns: Company, Industry, FirstName, LastName, Title, Email, Status (set Pending), SentDate 2) Connect Gmail 3) Schedule daily at 9am — processes 10 per run"}},
+"lead-followup-system.json":{"name":"Lead Follow-Up System","flow":[{"id":1,"module":"google-forms:watchResponses","version":1,"parameters":{"formId":"YOUR_GOOGLE_FORM_ID"},"mapper":{},"metadata":{"designer":{"x":0,"y":0,"name":"Google Form — New Lead"}}},{"id":2,"module":"openai-gpt-3:CreateChatCompletion","version":1,"parameters":{"model":"gpt-4o","temperature":0.7,"max_tokens":400},"mapper":{"messages":[{"role":"system","content":"Write a warm, personalized follow-up email for a new lead inquiry. Be concise (under 150 words) with a clear call to action."},{"role":"user","content":"Name: {{1.responses.name}}\nEmail: {{1.responses.email}}\nService: {{1.responses.service}}\nMessage: {{1.responses.message}}\n\nWrite the follow-up email."}]},"metadata":{"designer":{"x":300,"y":0,"name":"GPT-4o — Write Email"}}},{"id":3,"module":"gmail:ActionSendEmail","version":1,"parameters":{},"mapper":{"to":"{{1.responses.email}}","subject":"Re: Your inquiry — we'll be in touch shortly","content":"{{2.choices[].message.content}}","contentType":"text"},"metadata":{"designer":{"x":600,"y":0,"name":"Gmail — Send Follow-Up"}}},{"id":4,"module":"google-sheets:addRow","version":1,"parameters":{"spreadsheetId":"YOUR_SPREADSHEET_ID","sheetId":"Leads"},"mapper":{"values":{"A":"{{formatDate(now; 'DD/MM/YYYY HH:mm')}}","B":"{{1.responses.name}}","C":"{{1.responses.email}}","D":"{{1.responses.service}}","E":"{{1.responses.message}}","F":"Sent"}},"metadata":{"designer":{"x":900,"y":0,"name":"Sheets — Log Lead"}}}],"metadata":{"instant":true,"version":1,"zone":"eu2.make.com","notes":"SETUP: 1) Connect Google Forms (form must have: name, email, service, message fields) 2) Connect OpenAI 3) Connect Gmail 4) Create Leads sheet: Date, Name, Email, Service, Message, Status"}},
+"stripe-billing-automation.json":{"name":"Stripe Billing Automation","flow":[{"id":1,"module":"gateway:CustomWebHook","version":1,"parameters":{"hook":"YOUR_MAKE_WEBHOOK_URL","maxResults":1},"mapper":{},"metadata":{"designer":{"x":0,"y":0,"name":"Stripe Webhook"}}},{"id":2,"module":"builtin:RouterModule","version":1,"parameters":{},"mapper":{},"metadata":{"designer":{"x":300,"y":0,"name":"Router"}},"routes":[{"label":"subscription.created","filter":"{{1.type}} = customer.subscription.created","flow":[{"id":3,"module":"gmail:ActionSendEmail","version":1,"parameters":{},"mapper":{"to":"{{1.data.object.customer_email}}","subject":"Welcome — your subscription is active","content":"Your subscription is now active. I'll start building within 24 hours.\n\n[YOUR NAME]","contentType":"text"},"metadata":{"designer":{"x":600,"y":-100,"name":"Welcome Email"}}}]},{"label":"payment.failed","filter":"{{1.type}} = invoice.payment_failed","flow":[{"id":4,"module":"gmail:ActionSendEmail","version":1,"parameters":{},"mapper":{"to":"{{1.data.object.customer_email}}","subject":"Action required — payment failed","content":"We couldn't process your payment. Please update your card:\n[STRIPE PORTAL LINK]\n\n[YOUR NAME]","contentType":"text"},"metadata":{"designer":{"x":600,"y":100,"name":"Failed Payment Email"}}}]}]}],"metadata":{"instant":true,"version":1,"zone":"eu2.make.com","notes":"SETUP: 1) Create Make.com webhook 2) In Stripe: Developers → Webhooks → Add endpoint, select: customer.subscription.created, invoice.payment_failed 3) Replace email addresses and portal link"}},
+"ai-proposal-generator.json":{"name":"AI Proposal Generator","flow":[{"id":1,"module":"google-forms:watchResponses","version":1,"parameters":{"formId":"YOUR_POST_CALL_FORM_ID"},"mapper":{},"metadata":{"designer":{"x":0,"y":0,"name":"Google Form — Post-Call Notes"}}},{"id":2,"module":"openai-gpt-3:CreateChatCompletion","version":1,"parameters":{"model":"gpt-4o","temperature":0.5,"max_tokens":1200},"mapper":{"messages":[{"role":"system","content":"Write professional, high-converting business proposals for an AI automation agency. Structure: Executive Summary, Proposed Solution, Investment, Timeline, Next Steps. Under 400 words."},{"role":"user","content":"Client: {{1.responses.clientName}}\nBusiness: {{1.responses.businessName}}\nProblem: {{1.responses.mainProblem}}\nAutomation: {{1.responses.automationRequested}}\nSetup fee: {{1.responses.setupFee}}\nMonthly: {{1.responses.monthlyFee}}\nEmail: {{1.responses.clientEmail}}\n\nWrite the proposal."}]},"metadata":{"designer":{"x":300,"y":0,"name":"GPT-4o — Proposal"}}},{"id":3,"module":"gmail:ActionSendEmail","version":1,"parameters":{},"mapper":{"to":"{{1.responses.clientEmail}}","subject":"Your AI Automation Proposal — {{1.responses.businessName}}","content":"Hi {{1.responses.clientName}},\n\nAs discussed, here's your proposal:\n\n{{2.choices[].message.content}}\n\nBest,\n[YOUR NAME]","contentType":"text"},"metadata":{"designer":{"x":600,"y":0,"name":"Gmail — Send Proposal"}}},{"id":4,"module":"google-sheets:addRow","version":1,"parameters":{"spreadsheetId":"YOUR_PROPOSALS_SPREADSHEET_ID","sheetId":"Proposals"},"mapper":{"values":{"A":"{{formatDate(now; 'DD/MM/YYYY')}}","B":"{{1.responses.clientName}}","C":"{{1.responses.clientEmail}}","D":"{{1.responses.automationRequested}}","E":"Sent"}},"metadata":{"designer":{"x":900,"y":0,"name":"Sheets — Log"}}}],"metadata":{"instant":true,"version":1,"zone":"eu2.make.com","notes":"SETUP: 1) Create Google Form with: clientName, businessName, mainProblem, automationRequested, setupFee, monthlyFee, clientEmail 2) Fill after every discovery call — proposal emails automatically"}}
+};
+
+
+function authHeaders(){ return{'Content-Type':'application/json','Authorization':'Bearer '+token}; }
+
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const code=document.getElementById('loginCode').value.trim();
+  if(!email||!code){ showErr('Enter your email and code.'); return; }
+  const btn=document.getElementById('loginBtn');
+  btn.disabled=true; btn.textContent='Signing in…';
+  try{
+    const r=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,code})});
+    const d=await r.json();
+    if(d.token){ token=d.token; try{localStorage.setItem('af_token',token);}catch(e){} showStudio(); }
+    else showErr(d.error||'Invalid email or code.');
+  }catch(e){ showErr('Connection error. Try again.'); }
+  btn.disabled=false; btn.textContent='Sign In';
+}
+
+function doLogout(){
+  token='';
+  try{localStorage.removeItem('af_token');}catch(e){}
+  document.getElementById('screen-studio').style.display='none';
+  document.getElementById('screen-login').style.display='flex';
+  document.getElementById('outputWrap').style.display='none';
+  document.getElementById('wDesc').value='';
+}
+
+function showErr(msg){ const e=document.getElementById('loginError'); e.textContent=msg; e.style.display='block'; }
+function showStudio(){ document.getElementById('screen-login').style.display='none'; document.getElementById('screen-studio').style.display='flex'; }
+function useChip(btn){ document.getElementById('wDesc').value=btn.dataset.val; document.getElementById('wDesc').focus(); }
+
+async function generateAutomation(){
+  const T=UI[lang]||UI.en;
+  const desc=document.getElementById('wDesc').value.trim();
+  if(desc.length<20){ notify(T.minChars,'error'); return; }
+  const btn=document.getElementById('genBtn');
+  btn.disabled=true; btn.textContent=T.generating;
+  const resetBtn=function(){ btn.disabled=false; btn.textContent=T.genBtn; };
+  const controller=new AbortController();
+  // Wake up server first (Render free tier sleeps), then generate
+  const pingTimer=setTimeout(function(){
+    btn.textContent='🔄 Starting server…';
+  },5000);
+  const timeout=setTimeout(function(){ controller.abort(); },90000);
+  try{
+    // Quick ping to wake server before heavy AI call
+    try{ await fetch(API+'/ping',{signal:controller.signal,method:'GET'}); }catch(_){}
+    clearTimeout(pingTimer);
+    btn.textContent=T.generating;
+    const r=await fetch(API+'/api/ai/generate',{
+      method:'POST',
+      headers:authHeaders(),
+      signal:controller.signal,
+      body:JSON.stringify({
+        jsonMode:true,
+        prompt:`You are an expert Make.com automation consultant. Analyze this request and return a complete plan.
+
+AUTOMATION REQUEST: "${desc}"
+
+RULES:
+- Build time in HOURS (e.g. "3–5")
+- Setup price $200–$2000
+- Monthly retainer minimum $150/month
+- Outreach: human, specific, 3-4 sentences, NOT generic
+- AI prompt: complete, ready to paste into OpenAI module in Make.com
+
+Return ONLY valid JSON, no markdown:
+{
+  "what": "3-4 sentences: what this automation does and what problem it solves",
+  "prompt": "Complete AI system prompt for the OpenAI module, specific to this automation",
+  "setupPrice": "$XXX–$XXX",
+  "monthlyPrice": "$XXX/month",
+  "buildTime": "X–X",
+  "outreach": "Personalized cold outreach message, 3-4 sentences, human tone"
+}`
+      })
+    });
+    if(r.status===401){ notify(T.expired,'error'); doLogout(); resetBtn(); return; }
+    const d=await r.json();
+    let data={};
+    try{
+      let raw=d.output||'';
+      try{ data=JSON.parse(raw); }catch(_){
+        raw=raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+        try{ data=JSON.parse(raw); }catch(_2){
+          const s=raw.indexOf('{'),e2=raw.lastIndexOf('}');
+          if(s!==-1&&e2>s) data=JSON.parse(raw.slice(s,e2+1));
+        }
+      }
+    }catch(e){ data={}; }
+    lastData=data;
+    showOutput(data);
+    buildBlueprint(desc, data.prompt||'');
+    notify(T.generated,'success');
+  }catch(e){
+    if(e.name==='AbortError') notify(T.timeout,'error');
+    else notify(T.failed,'error');
+  }finally{
+    clearTimeout(pingTimer);
+    clearTimeout(timeout);
+    resetBtn();
+  }
+}
+
+function showOutput(data){
+  // Reset all sections before populating to avoid stale content from previous generation
+  document.getElementById('secWhat').style.display='none';
+  document.getElementById('secPrice').style.display='none';
+  document.getElementById('secOutreach').style.display='none';
+  document.getElementById('proposalBtn').style.display='none';
+  document.getElementById('outputWrap').style.display='block';
+  setTimeout(()=>document.getElementById('outputWrap').scrollIntoView({behavior:'smooth',block:'start'}),100);
+  if(data.what){ document.getElementById('outWhat').textContent=data.what; document.getElementById('secWhat').style.display='block'; }
+  if(data.setupPrice){ document.getElementById('outPrice').textContent=data.setupPrice; document.getElementById('outPriceSub').textContent='Setup · Retainer: '+(data.monthlyPrice||''); document.getElementById('secPrice').style.display='block'; }
+  if(data.outreach){ document.getElementById('outOutreach').textContent=data.outreach; document.getElementById('secOutreach').style.display='block'; }
+  document.getElementById('proposalBtn').style.display='block';
+  showSetupGuide();
+}
+
+// ── Language system ──────────────────────────────────────────
+var lang='en';
+var LANGS={
+  en:{flag:'🇬🇧',code:'EN'},ro:{flag:'🇷🇴',code:'RO'},es:{flag:'🇪🇸',code:'ES'},
+  fr:{flag:'🇫🇷',code:'FR'},it:{flag:'🇮🇹',code:'IT'},de:{flag:'🇩🇪',code:'DE'},pt:{flag:'🇵🇹',code:'PT'}
+};
+var UI={
+  en:{loginTitle:'Blueprint Studio',loginSub:'Sign in to access your workspace',emailLbl:'Email',codeLbl:'Access Code',emailPh:'your@email.com',codePh:'Enter your code',signIn:'Sign In',signingIn:'Signing in…',signOut:'Sign out',studioBadge:'⚡ Blueprint Studio',studioTitle:'What do you want<br><span>to automate?</span>',studioSub:'Not a ChatGPT answer — a real Make.com .json blueprint + selling price + outreach message.',descLbl:'Describe your automation',descPh:'e.g. When a new lead fills my Google Form, use AI to write a personalized follow-up email and send it via Gmail automatically.',genBtn:'⚡ Generate My Automation',generating:'⏳ Generating…',bpReady:'Blueprint Ready',dlBtn:'⬇ Download .json',makeBtn:'Open Make.com →',guideStrip:'How to import in 5 steps',whatLbl:'What gets built',priceLbl:'Your price to client',outreachLbl:'Outreach message',proposalBtn:'📄 Generate Client Proposal',setupGuideTitle:'Complete Setup Guide',propTitle:'📄 Client Proposal',clientLbl:'Client Name',yourLbl:'Your Name',contactLbl:'Your Contact (optional)',cancel:'Cancel',generate:'Generate',copy:'Copy',close:'Close',copyBtn:'Copy',errFields:'Enter your email and code.',errInvalid:'Invalid email or code.',errConn:'Connection error. Try again.',minChars:'Please describe your automation (at least 20 characters).',timeout:'Timeout — AI is slow right now. Try again.',failed:'Generation failed. Check your connection.',generated:'Automation generated! ✓',copied:'Copied ✓',expired:'Session expired. Please sign in again.'},
+  ro:{loginTitle:'Blueprint Studio',loginSub:'Conectează-te pentru a accesa studio-ul',emailLbl:'Email',codeLbl:'Cod de acces',emailPh:'email@tau.com',codePh:'Introdu codul tău',signIn:'Conectează-te',signingIn:'Se conectează…',signOut:'Ieși',studioBadge:'⚡ Blueprint Studio',studioTitle:'Ce vrei să<br><span>automatizezi?</span>',studioSub:'Nu un răspuns ChatGPT — un fișier .json real pentru Make.com + prețul tău + mesaj de outreach.',descLbl:'Descrie automatizarea ta',descPh:'ex: Când un lead completează formularul, AI scrie un email personalizat și îl trimite automat.',genBtn:'⚡ Generează Automatizarea',generating:'⏳ Se generează…',bpReady:'Blueprint Gata',dlBtn:'⬇ Descarcă .json',makeBtn:'Deschide Make.com →',guideStrip:'Cum importi în 5 pași',whatLbl:'Ce se construiește',priceLbl:'Prețul tău pentru client',outreachLbl:'Mesaj de promovare',proposalBtn:'📄 Generează Propunere',setupGuideTitle:'Ghid Complet de Instalare',propTitle:'📄 Propunere Client',clientLbl:'Numele Clientului',yourLbl:'Numele Tău',contactLbl:'Contactul Tău (opțional)',cancel:'Anulează',generate:'Generează',copy:'Copiază',close:'Închide',copyBtn:'Copiază',errFields:'Introdu emailul și codul.',errInvalid:'Email sau cod invalid.',errConn:'Eroare de conexiune. Încearcă din nou.',minChars:'Descrie automatizarea (minim 20 caractere).',timeout:'Timeout — AI-ul e lent. Încearcă din nou.',failed:'Generare eșuată. Verifică conexiunea.',generated:'Automatizare generată! ✓',copied:'Copiat ✓',expired:'Sesiune expirată. Reconectează-te.'},
+  es:{loginTitle:'Blueprint Studio',loginSub:'Inicia sesión para acceder a tu espacio de trabajo',emailLbl:'Email',codeLbl:'Código de acceso',emailPh:'tu@email.com',codePh:'Ingresa tu código',signIn:'Iniciar sesión',signingIn:'Iniciando…',signOut:'Salir',studioBadge:'⚡ Blueprint Studio',studioTitle:'¿Qué quieres<br><span>automatizar?</span>',studioSub:'No es ChatGPT — es un .json real para Make.com + tu precio de venta + mensaje de prospección.',descLbl:'Describe tu automatización',descPh:'ej: Cuando un lead completa mi formulario, usa IA para escribir un email personalizado y enviarlo por Gmail automáticamente.',genBtn:'⚡ Generar mi Automatización',generating:'⏳ Generando…',bpReady:'Blueprint Listo',dlBtn:'⬇ Descargar .json',makeBtn:'Abrir Make.com →',guideStrip:'Cómo importar en 5 pasos',whatLbl:'Qué se construye',priceLbl:'Tu precio al cliente',outreachLbl:'Mensaje de captación',proposalBtn:'📄 Generar Propuesta',setupGuideTitle:'Guía de Configuración Completa',propTitle:'📄 Propuesta de Cliente',clientLbl:'Nombre del Cliente',yourLbl:'Tu Nombre',contactLbl:'Tu Contacto (opcional)',cancel:'Cancelar',generate:'Generar',copy:'Copiar',close:'Cerrar',copyBtn:'Copiar',errFields:'Ingresa tu email y código.',errInvalid:'Email o código no válido.',errConn:'Error de conexión. Intenta de nuevo.',minChars:'Describe tu automatización (mínimo 20 caracteres).',timeout:'Tiempo agotado — la IA está lenta. Intenta de nuevo.',failed:'Generación fallida. Verifica tu conexión.',generated:'¡Automatización generada! ✓',copied:'Copiado ✓',expired:'Sesión expirada. Inicia sesión de nuevo.'},
+  fr:{loginTitle:'Blueprint Studio',loginSub:'Connectez-vous pour accéder à votre espace de travail',emailLbl:'Email',codeLbl:"Code d'accès",emailPh:'votre@email.com',codePh:'Entrez votre code',signIn:'Se connecter',signingIn:'Connexion…',signOut:'Déconnexion',studioBadge:'⚡ Blueprint Studio',studioTitle:'Que voulez-vous<br><span>automatiser ?</span>',studioSub:'Pas ChatGPT — un vrai fichier .json Make.com + votre prix de vente + message de prospection.',descLbl:'Décrivez votre automatisation',descPh:'ex : Quand un prospect remplit mon formulaire, utiliser l\'IA pour écrire un email personnalisé et l\'envoyer via Gmail.',genBtn:'⚡ Générer mon Automatisation',generating:'⏳ Génération…',bpReady:'Blueprint Prêt',dlBtn:'⬇ Télécharger .json',makeBtn:'Ouvrir Make.com →',guideStrip:'Comment importer en 5 étapes',whatLbl:'Ce qui sera construit',priceLbl:'Votre prix au client',outreachLbl:'Message de prospection',proposalBtn:'📄 Générer une Proposition',setupGuideTitle:'Guide de Configuration Complet',propTitle:'📄 Proposition Client',clientLbl:'Nom du Client',yourLbl:'Votre Nom',contactLbl:'Votre Contact (optionnel)',cancel:'Annuler',generate:'Générer',copy:'Copier',close:'Fermer',copyBtn:'Copier',errFields:'Entrez votre email et code.',errInvalid:'Email ou code invalide.',errConn:'Erreur de connexion. Réessayez.',minChars:'Décrivez votre automatisation (min. 20 caractères).',timeout:"Délai dépassé — l'IA est lente. Réessayez.",failed:'Échec de génération. Vérifiez votre connexion.',generated:'Automatisation générée ! ✓',copied:'Copié ✓',expired:'Session expirée. Reconnectez-vous.'},
+  it:{loginTitle:'Blueprint Studio',loginSub:'Accedi al tuo spazio di lavoro',emailLbl:'Email',codeLbl:'Codice di accesso',emailPh:'tua@email.com',codePh:'Inserisci il tuo codice',signIn:'Accedi',signingIn:'Accesso…',signOut:'Esci',studioBadge:'⚡ Blueprint Studio',studioTitle:'Cosa vuoi<br><span>automatizzare?</span>',studioSub:'Non è ChatGPT — un vero file .json per Make.com + il tuo prezzo + messaggio di prospecting.',descLbl:'Descrivi la tua automazione',descPh:'es: Quando un lead compila il mio modulo, usa l\'IA per scrivere un\'email personalizzata e inviarla via Gmail automaticamente.',genBtn:'⚡ Genera la mia Automazione',generating:'⏳ Generazione…',bpReady:'Blueprint Pronto',dlBtn:'⬇ Scarica .json',makeBtn:'Apri Make.com →',guideStrip:'Come importare in 5 passaggi',whatLbl:'Cosa viene costruito',priceLbl:'Il tuo prezzo al cliente',outreachLbl:'Messaggio di acquisizione',proposalBtn:'📄 Genera Proposta',setupGuideTitle:'Guida Completa alla Configurazione',propTitle:'📄 Proposta Cliente',clientLbl:'Nome del Cliente',yourLbl:'Il Tuo Nome',contactLbl:'Il Tuo Contatto (opzionale)',cancel:'Annulla',generate:'Genera',copy:'Copia',close:'Chiudi',copyBtn:'Copia',errFields:'Inserisci email e codice.',errInvalid:'Email o codice non valido.',errConn:'Errore di connessione. Riprova.',minChars:'Descrivi la tua automazione (min. 20 caratteri).',timeout:"Timeout — l'IA è lenta. Riprova.",failed:'Generazione fallita. Controlla la connessione.',generated:'Automazione generata! ✓',copied:'Copiato ✓',expired:'Sessione scaduta. Accedi di nuovo.'},
+  de:{loginTitle:'Blueprint Studio',loginSub:'Melde dich an, um auf deinen Arbeitsbereich zuzugreifen',emailLbl:'E-Mail',codeLbl:'Zugangscode',emailPh:'deine@email.com',codePh:'Gib deinen Code ein',signIn:'Anmelden',signingIn:'Anmeldung…',signOut:'Abmelden',studioBadge:'⚡ Blueprint Studio',studioTitle:'Was möchtest du<br><span>automatisieren?</span>',studioSub:'Kein ChatGPT — eine echte .json-Datei für Make.com + dein Verkaufspreis + Outreach-Nachricht.',descLbl:'Beschreibe deine Automatisierung',descPh:'z.B.: Wenn ein Lead mein Formular ausfüllt, schreibt die KI eine personalisierte E-Mail und sendet sie automatisch über Gmail.',genBtn:'⚡ Automatisierung generieren',generating:'⏳ Generiere…',bpReady:'Blueprint fertig',dlBtn:'⬇ .json herunterladen',makeBtn:'Make.com öffnen →',guideStrip:'In 5 Schritten importieren',whatLbl:'Was wird gebaut',priceLbl:'Dein Preis für den Kunden',outreachLbl:'Akquise-Nachricht',proposalBtn:'📄 Angebot erstellen',setupGuideTitle:'Vollständige Einrichtungsanleitung',propTitle:'📄 Kundenangebot',clientLbl:'Kundenname',yourLbl:'Dein Name',contactLbl:'Dein Kontakt (optional)',cancel:'Abbrechen',generate:'Generieren',copy:'Kopieren',close:'Schließen',copyBtn:'Kopieren',errFields:'Gib E-Mail und Code ein.',errInvalid:'Ungültige E-Mail oder Code.',errConn:'Verbindungsfehler. Versuche es erneut.',minChars:'Beschreibe deine Automatisierung (min. 20 Zeichen).',timeout:'Timeout — KI ist langsam. Versuche es erneut.',failed:'Generierung fehlgeschlagen. Überprüfe deine Verbindung.',generated:'Automatisierung generiert! ✓',copied:'Kopiert ✓',expired:'Sitzung abgelaufen. Melde dich erneut an.'},
+  pt:{loginTitle:'Blueprint Studio',loginSub:'Inicia sessão para aceder ao teu espaço de trabalho',emailLbl:'Email',codeLbl:'Código de acesso',emailPh:'teu@email.com',codePh:'Insere o teu código',signIn:'Entrar',signingIn:'A entrar…',signOut:'Sair',studioBadge:'⚡ Blueprint Studio',studioTitle:'O que queres<br><span>automatizar?</span>',studioSub:'Não é ChatGPT — um ficheiro .json real para Make.com + o teu preço de venda + mensagem de prospeção.',descLbl:'Descreve a tua automatização',descPh:'ex: Quando um lead preenche o meu formulário, usa IA para escrever um email personalizado e enviá-lo via Gmail automaticamente.',genBtn:'⚡ Gerar a minha Automatização',generating:'⏳ A gerar…',bpReady:'Blueprint Pronto',dlBtn:'⬇ Transferir .json',makeBtn:'Abrir Make.com →',guideStrip:'Como importar em 5 passos',whatLbl:'O que é construído',priceLbl:'O teu preço ao cliente',outreachLbl:'Mensagem de prospeção',proposalBtn:'📄 Gerar Proposta',setupGuideTitle:'Guia Completo de Configuração',propTitle:'📄 Proposta de Cliente',clientLbl:'Nome do Cliente',yourLbl:'O Teu Nome',contactLbl:'O Teu Contacto (opcional)',cancel:'Cancelar',generate:'Gerar',copy:'Copiar',close:'Fechar',copyBtn:'Copiar',errFields:'Introduz email e código.',errInvalid:'Email ou código inválido.',errConn:'Erro de ligação. Tenta novamente.',minChars:'Descreve a automatização (mín. 20 caracteres).',timeout:'Tempo esgotado — IA lenta. Tenta novamente.',failed:'Falha na geração. Verifica a ligação.',generated:'Automatização gerada! ✓',copied:'Copiado ✓',expired:'Sessão expirada. Inicia sessão novamente.'}
+};
+
+// Guide content — EN & RO, other langs fallback to EN
+var GMAKE={
+  en:[
+    {t:'Download blueprint & open Make.com',d:'Click <strong>⬇ Download .json</strong> above, then go to <strong>make.com</strong> → Sign up (free) or Sign in.',tip:null},
+    {t:'Create a new scenario',d:'Click <strong>Scenarios</strong> in the left menu → <strong>+ Create a new scenario</strong> button (top right).',tip:null},
+    {t:'Import the blueprint',d:'On the blank scenario canvas: <strong>bottom-left toolbar</strong> → click <code>···</code> (three dots) → <strong style="color:#E53E2E">Import Blueprint</strong> → select the downloaded <code>.json</code> file.',tip:'⚠️ If you don\'t see <strong>···</strong>, right-click on the canvas or look for the three-line button in the bottom bar.'},
+    {t:'Configure the Webhook module',d:'Click the <strong>Webhook</strong> module (first module, lightning icon) → <strong>Add</strong> → give it a name → <strong>Save</strong>.<br><br>Make.com auto-generates the webhook URL — <strong>copy it</strong>, you\'ll use it in the next platform step.',tip:'💡 The URL looks like: <code>https://hook.eu1.make.com/xxxxx</code>'},
+    {t:'Configure the AI module',d:'Click the <strong>AI / OpenAI</strong> module → <strong>Add</strong> at Connection → enter your <strong>OpenAI API key</strong> → <strong>Save</strong>.<br><br>The system prompt is already pre-filled by Blueprint Studio — edit it as needed.',tip:'🔑 OpenAI API key at: <strong>platform.openai.com → API Keys</strong>'}
+  ],
+  ro:[
+    {t:'Descarcă blueprint-ul & deschide Make.com',d:'Apasă <strong>⬇ Descarcă .json</strong> de sus, apoi mergi la <strong>make.com</strong> → Sign up (gratuit) sau Sign in.',tip:null},
+    {t:'Creează un scenariu nou',d:'Click pe <strong>Scenarios</strong> în meniu stânga → butonul <strong>+ Create a new scenario</strong> (dreapta sus).',tip:null},
+    {t:'Importă blueprint-ul',d:'Pe canvas-ul gol: <strong>bara stânga-jos</strong> → click pe <code>···</code> (trei puncte) → <strong style="color:#E53E2E">Import Blueprint</strong> → selectezi fișierul <code>.json</code> descărcat.',tip:'⚠️ Dacă nu găsești <strong>···</strong>, click-dreapta pe canvas sau caută butonul cu trei liniuțe în bara de jos.'},
+    {t:'Configurează modulul Webhook',d:'Click pe modulul <strong>Webhook</strong> (primul modul) → <strong>Add</strong> → dă-i un nume → <strong>Save</strong>.<br><br>Make.com generează automat URL-ul webhook — <strong>copiază-l</strong>, îl vei folosi la platforma următoare.',tip:'💡 URL-ul arată ca: <code>https://hook.eu1.make.com/xxxxx</code>'},
+    {t:'Configurează modulul AI',d:'Click pe modulul <strong>AI / OpenAI</strong> → <strong>Add</strong> la Connection → introdu <strong>API key OpenAI</strong> → <strong>Save</strong>.<br><br>Promptul sistemului este deja completat de Blueprint Studio — editează-l după nevoie.',tip:'🔑 API key OpenAI de la: <strong>platform.openai.com → API Keys</strong>'}
+  ]
+};
+
+var GEXTRA={
+  whatsapp:{
+    badge:'badge-360',nclass:'snum-360',
+    en:{label:'📱 360dialog — WhatsApp',steps:[
+      {t:'Create a 360dialog account',d:'Go to <strong>app.360dialog.com</strong> → Sign up → choose <strong>"Direct API Access for Developers"</strong>.',tip:null},
+      {t:'Connect your WhatsApp Business number',d:'Click <strong>Add Number</strong> → enter your <strong>WhatsApp Business</strong> number (not personal) → follow the SMS verification steps.',tip:'📱 You need a dedicated business number — it cannot be used at the same time in the normal WhatsApp app.'},
+      {t:'Set the Webhook URL',d:'In 360dialog dashboard → click your <strong>number</strong> → tab <strong>Configuration</strong> → <strong>Webhook URL</strong> field → paste the URL copied from Make.com step 4.',tip:'💡 The webhook URL from Make.com looks like: <code>https://hook.eu1.make.com/...</code>'}
+    ]},
+    ro:{label:'📱 360dialog — WhatsApp',steps:[
+      {t:'Creează cont 360dialog',d:'Mergi la <strong>app.360dialog.com</strong> → Sign up → alege <strong>"Direct API Access for Developers"</strong>.',tip:null},
+      {t:'Conectează numărul WhatsApp Business',d:'Click <strong>Add Number</strong> → introdu numărul tău de <strong>WhatsApp Business</strong> (nu cel personal) → urmează pașii de verificare prin SMS.',tip:'📱 Ai nevoie de un număr dedicat pentru business — nu poate fi folosit simultan în aplicația WhatsApp normală.'},
+      {t:'Setează Webhook URL',d:'În dashboard 360dialog → click pe <strong>numărul tău</strong> → tab <strong>Configuration</strong> → câmpul <strong>Webhook URL</strong> → lipești URL-ul copiat din Make.com pasul 4.',tip:'💡 URL-ul webhook din Make.com arată ca: <code>https://hook.eu1.make.com/...</code>'}
+    ]}
+  },
+  instagram:{
+    badge:'badge-meta',nclass:'snum-meta',
+    en:{label:'📸 Meta — Instagram',steps:[
+      {t:'Create a Meta Developer App',d:'Go to <strong>developers.facebook.com</strong> → My Apps → <strong>Create App</strong> → type: Business → follow the steps.',tip:'📌 You need a Facebook page connected to your Instagram Business account.'},
+      {t:'Get your Page Access Token',d:'In your App → <strong>Messenger → Settings</strong> → Add your Facebook page → <strong>Generate Token</strong>. Copy and save it — generate a long-lived token so it doesn\'t expire.',tip:null},
+      {t:'Configure the Instagram webhook',d:'App → <strong>Webhooks</strong> → Instagram → Subscribe to: <strong>messages</strong> → Callback URL = Make.com webhook URL (from step 4) → Verify Token = any string you choose.',tip:null}
+    ]},
+    ro:{label:'📸 Meta — Instagram',steps:[
+      {t:'Creează o aplicație Meta Developer',d:'Mergi la <strong>developers.facebook.com</strong> → My Apps → <strong>Create App</strong> → tip: Business → urmează pașii.',tip:'📌 Ai nevoie de o pagină Facebook conectată la contul Instagram Business.'},
+      {t:'Obține Page Access Token',d:'În aplicația ta → <strong>Messenger → Settings</strong> → Adaugă pagina ta Facebook → <strong>Generate Token</strong>. Copiază-l — generează un long-lived token să nu expire.',tip:null},
+      {t:'Configurează webhook-ul Instagram',d:'App → <strong>Webhooks</strong> → Instagram → Subscribe: <strong>messages</strong> → Callback URL = URL webhook Make.com (din pasul 4) → Verify Token = orice șir de caractere.',tip:null}
+    ]}
+  },
+  cold:{
+    badge:'badge-google',nclass:'snum-google',
+    en:{label:'📊 Google Workspace',steps:[
+      {t:'Create the prospects spreadsheet',d:'In <strong>Google Sheets</strong> create a new file with columns: <strong>Company, Industry, FirstName, LastName, Title, Email, Status, SentDate</strong> → set Status = <code>Pending</code> for each prospect.',tip:'💡 Copy the Spreadsheet ID from the URL: docs.google.com/spreadsheets/d/<strong>[ID HERE]</strong>/edit'},
+      {t:'Connect Gmail in Make.com',d:'Click the <strong>Gmail module</strong> → <strong>Add</strong> → authorize your Google account. The scenario sends 10 cold emails per run, daily at 9am.',tip:'🔑 Use the same Google account that owns the spreadsheet.'}
+    ]},
+    ro:{label:'📊 Google Workspace',steps:[
+      {t:'Creează tabelul de prospecți',d:'În <strong>Google Sheets</strong> creează un fișier cu coloanele: <strong>Company, Industry, FirstName, LastName, Title, Email, Status, SentDate</strong> → setează Status = <code>Pending</code> pentru fiecare prospect.',tip:'💡 Copiază Spreadsheet ID din URL: docs.google.com/spreadsheets/d/<strong>[ID AICI]</strong>/edit'},
+      {t:'Conectează Gmail în Make.com',d:'Click pe <strong>modulul Gmail</strong> → <strong>Add</strong> → autorizezi contul Google. Scenariul trimite 10 emailuri reci pe rulare, zilnic la 9:00.',tip:'🔑 Folosește același cont Google care deține tabelul.'}
+    ]}
+  },
+  lead:{
+    badge:'badge-google',nclass:'snum-google',
+    en:{label:'📋 Google Workspace',steps:[
+      {t:'Configure your Google Form',d:'Create a Google Form with fields: <strong>name, email, service, message</strong>. In Make.com → Google Forms module → Add → authorize Google → select your form.',tip:'💡 Field names must match exactly: name, email, service, message (lowercase).'},
+      {t:'Connect Gmail & Google Sheets',d:'Click the <strong>Gmail module</strong> → Add → authorize. Click the <strong>Google Sheets module</strong> → Add → authorize → select or create a sheet named <strong>Leads</strong>.',tip:'📋 Sheet columns needed: Date, Name, Email, Service, Message, Status'}
+    ]},
+    ro:{label:'📋 Google Workspace',steps:[
+      {t:'Configurează Google Form',d:'Creează un Google Form cu câmpurile: <strong>name, email, service, message</strong>. În Make.com → modulul Google Forms → Add → autorizezi Google → selectezi formularul.',tip:'💡 Numele câmpurilor trebuie să fie exact: name, email, service, message (litere mici).'},
+      {t:'Conectează Gmail & Google Sheets',d:'Click pe <strong>modulul Gmail</strong> → Add → autorizezi. Click pe <strong>modulul Google Sheets</strong> → Add → autorizezi → selectezi sau creezi un tabel numit <strong>Leads</strong>.',tip:'📋 Coloane necesare în tabel: Date, Name, Email, Service, Message, Status'}
+    ]}
+  },
+  stripe:{
+    badge:'badge-stripe',nclass:'snum-stripe',
+    en:{label:'💳 Stripe',steps:[
+      {t:'Copy the Make.com webhook URL',d:'From Make.com step 4, you already have the webhook URL. This is the URL Stripe will call when events happen.',tip:'💡 Format: <code>https://hook.eu1.make.com/xxxxx</code>'},
+      {t:'Add the webhook endpoint in Stripe',d:'Stripe Dashboard → <strong>Developers → Webhooks</strong> → <strong>Add endpoint</strong> → paste the Make.com URL → select events: <code>customer.subscription.created</code> and <code>invoice.payment_failed</code> → Add endpoint.',tip:'✅ After adding, Stripe sends a test event — check Make.com run history to confirm receipt.'}
+    ]},
+    ro:{label:'💳 Stripe',steps:[
+      {t:'Copiază URL-ul webhook din Make.com',d:'Din pasul 4 Make.com, ai deja URL-ul webhook. Stripe va apela acest URL când apar evenimente.',tip:'💡 Format: <code>https://hook.eu1.make.com/xxxxx</code>'},
+      {t:'Adaugă webhook endpoint în Stripe',d:'Stripe Dashboard → <strong>Developers → Webhooks</strong> → <strong>Add endpoint</strong> → lipești URL-ul Make.com → selectezi evenimentele: <code>customer.subscription.created</code> și <code>invoice.payment_failed</code> → Add endpoint.',tip:'✅ Stripe trimite un event de test — verifică istoricul Make.com că a ajuns.'}
+    ]}
+  },
+  proposal:{
+    badge:'badge-google',nclass:'snum-google',
+    en:{label:'📋 Google Workspace',steps:[
+      {t:'Create the post-call Google Form',d:'Create a Google Form with fields: <strong>clientName, businessName, mainProblem, automationRequested, setupFee, monthlyFee, clientEmail</strong>. Fill it after every discovery call.',tip:'💡 This form triggers the automated proposal generation and email delivery.'},
+      {t:'Connect Gmail in Make.com',d:'Click the <strong>Gmail module</strong> → <strong>Add</strong> → authorize your Google account. The proposal will be emailed to the client automatically.',tip:null}
+    ]},
+    ro:{label:'📋 Google Workspace',steps:[
+      {t:'Creează Google Form post-call',d:'Creează un Google Form cu câmpurile: <strong>clientName, businessName, mainProblem, automationRequested, setupFee, monthlyFee, clientEmail</strong>. Completează-l după fiecare apel de discovery.',tip:'💡 Acest formular declanșează generarea automată și trimiterea propunerii pe email.'},
+      {t:'Conectează Gmail în Make.com',d:'Click pe <strong>modulul Gmail</strong> → <strong>Add</strong> → autorizezi contul Google. Propunerea va fi trimisă automat clientului.',tip:null}
+    ]}
+  }
+};
+
+var LIVE_STEP={
+  en:{t:'Turn ON the scenario — LIVE!',d:'In Make.com, in the <strong>bottom-left corner</strong> of the scenario, toggle it <strong style="color:var(--green)">ON</strong>. Your automation is active!',tip:'🎉 Test it immediately: trigger your automation and check Make.com run history for confirmation.'},
+  ro:{t:'Pornește scenariul — LIVE!',d:'În Make.com, în colțul <strong>stânga-jos</strong> al scenariului, dai toggle-ul pe <strong style="color:var(--green)">ON</strong>. Automatizarea ta este activă!',tip:'🎉 Testează imediat: declanșează automatizarea și verifică istoricul de rulări în Make.com.'}
+};
+
+function getL(obj){return obj[lang]||obj['en']||obj;}
+
+function detectGuideType(desc){
+  var d=desc.toLowerCase();
+  if(d.includes('whatsapp')||d.includes('whats app')) return 'whatsapp';
+  if(d.includes('instagram')||d.includes(' dm')) return 'instagram';
+  if(d.includes('cold email')||d.includes('cold')||d.includes('outreach')) return 'cold';
+  if(d.includes('lead')||d.includes('follow-up')||d.includes('followup')||d.includes('form')) return 'lead';
+  if(d.includes('stripe')||d.includes('billing')||d.includes('payment')||d.includes('invoice')) return 'stripe';
+  if(d.includes('proposal')||d.includes('quote')) return 'proposal';
+  return null;
+}
+
+function mkStepHTML(num,data,numClass,iconColor){
+  iconColor=iconColor||'#E53E2E';
+  return'<div class="sguide-step"><div class="snum '+numClass+'">'+num+'</div>'+
+    '<div class="sstep-body"><div class="sstep-title">'+data.t+'</div>'+
+    '<div class="sstep-desc">'+data.d+'</div>'+
+    (data.tip?'<div class="sstep-tip">'+data.tip+'</div>':'')+
+    '</div></div>';
+}
+
+function buildGuideHTML(desc){
+  var makeSteps=getL(GMAKE);
+  var T=getL(UI);
+  var liveData=getL(LIVE_STEP);
+  var type=detectGuideType(desc||'');
+  var extra=type?GEXTRA[type]:null;
+  var extraData=extra?(getL({en:extra.en,ro:extra.ro})):null;
+
+  var html='<div class="sguide-header"><div class="sguide-title">'+T.setupGuideTitle+'</div></div>';
+
+  // Make.com steps
+  html+='<div class="platform-section">';
+  html+='<div class="platform-badge badge-make">⚡ Make.com</div>';
+  html+='<div class="sguide-steps">';
+  for(var i=0;i<makeSteps.length;i++) html+=mkStepHTML(i+1,makeSteps[i],'snum-make');
+  html+='</div></div>';
+
+  // Platform-specific steps
+  if(extra&&extraData){
+    var baseNum=makeSteps.length+1;
+    html+='<div class="platform-section">';
+    html+='<div class="platform-badge '+extra.badge+'">'+extraData.label+'</div>';
+    html+='<div class="sguide-steps">';
+    for(var j=0;j<extraData.steps.length;j++) html+=mkStepHTML(baseNum+j,extraData.steps[j],extra.nclass);
+    html+='</div></div>';
+  }
+
+  // Go live
+  var liveNum=(extra&&extraData)?makeSteps.length+extraData.steps.length+1:makeSteps.length+1;
+  html+='<div class="sguide-steps"><div class="sguide-step" style="border-color:rgba(74,222,128,.25);background:rgba(74,222,128,.04)">'+
+    '<div class="snum snum-live">'+liveNum+'</div>'+
+    '<div class="sstep-body"><div class="sstep-title" style="color:var(--green)">'+liveData.t+'</div>'+
+    '<div class="sstep-desc">'+liveData.d+'</div>'+
+    '<div class="sstep-tip">'+liveData.tip+'</div>'+
+    '</div></div></div>';
+
+  return html;
+}
+
+function showSetupGuide(){
+  var desc=document.getElementById('wDesc').value||'';
+  document.getElementById('setupGuideInner').innerHTML=buildGuideHTML(desc);
+  document.getElementById('setupGuide').style.display='block';
+}
+
+// ── Language application ──────────────────────────────────────
+function applyLang(){
+  var T=UI[lang]||UI.en;
+  var L=LANGS[lang]||LANGS.en;
+  // Lang button
+  document.getElementById('langFlag').textContent=L.flag;
+  document.getElementById('langCode').textContent=L.code;
+  // Login
+  setTxt('loginTitle',T.loginTitle);
+  setTxt('loginSub',T.loginSub);
+  setTxt('emailLbl',T.emailLbl);
+  setTxt('codeLbl',T.codeLbl);
+  setAttr('loginEmail','placeholder',T.emailPh);
+  setAttr('loginCode','placeholder',T.codePh);
+  var lb=document.getElementById('loginBtn'); if(lb&&lb.textContent!==T.signingIn)lb.textContent=T.signIn;
+  // Studio
+  setTxt('logoutBtn',T.signOut);
+  setTxt('studioBadge',T.studioBadge);
+  setHTML('studioTitle',T.studioTitle);
+  setTxt('studioSub',T.studioSub);
+  setTxt('descLbl',T.descLbl);
+  setAttr('wDesc','placeholder',T.descPh);
+  setTxt('genBtn', document.getElementById('genBtn').disabled ? T.generating : T.genBtn);
+  // Guide strip title
+  var gs=document.querySelector('.guide-title');
+  if(gs)gs.textContent=T.guideStrip;
+  // Output labels
+  setTxtQ('.out-label',0,T.whatLbl);
+  setTxtQ('.out-label',1,T.priceLbl);
+  // Outreach label
+  var outLbls=document.querySelectorAll('.out-label');
+  if(outLbls[2])outLbls[2].childNodes[0].textContent=T.outreachLbl+' ';
+  var copyBtns=document.querySelectorAll('.copy-btn');
+  copyBtns.forEach(function(b){b.textContent=T.copyBtn;});
+  setTxt('proposalBtn',T.proposalBtn);
+  // Modal
+  setHTML('modalTitle',T.propTitle||T.proposalBtn);
+  // Rebuild guide if visible
+  if(document.getElementById('setupGuide').style.display!=='none') showSetupGuide();
+}
+
+function setTxt(id,val){var e=document.getElementById(id);if(e)e.textContent=val;}
+function setHTML(id,val){var e=document.getElementById(id);if(e)e.innerHTML=val;}
+function setAttr(id,attr,val){var e=document.getElementById(id);if(e)e.setAttribute(attr,val);}
+function setTxtQ(sel,idx,val){var els=document.querySelectorAll(sel);if(els[idx])els[idx].textContent=val;}
+
+// Init
+(function(){
+  try{
+    token=localStorage.getItem('af_token')||'';
+    lang=localStorage.getItem('af_lang')||'en';
+    if(token)showStudio();
+    document.documentElement.lang=lang;
+    applyLang();
+  }catch(e){ token=''; }
+})();
+
+function detectType(desc){
+  var d=desc.toLowerCase();
+  for(var i=0;i<BP_TYPES.length;i++){
+    for(var j=0;j<BP_TYPES[i].keys.length;j++){
+      if(d.includes(BP_TYPES[i].keys[j])) return BP_TYPES[i];
+    }
+  }
+  return{file:'whatsapp-bot.json',label:'AI Automation Bot'};
+}
+
+function buildBlueprint(desc,systemPrompt){
+  try{
+    var type=detectType(desc);
+    var template=BP_DATA[type.file];
+    if(!template) throw new Error('not found');
+    var bp=JSON.parse(JSON.stringify(template));
+    bp.name=type.label;
+    if(systemPrompt&&systemPrompt.length>20){
+      var cleaned=systemPrompt.replace(/^SYSTEM:\s*/i,'').trim();
+      for(var i=0;i<bp.flow.length;i++){
+        var mod=bp.flow[i];
+        if(mod.module&&mod.module.includes('openai')&&mod.mapper&&mod.mapper.messages){
+          for(var j=0;j<mod.mapper.messages.length;j++){
+            if(mod.mapper.messages[j].role==='system'){ mod.mapper.messages[j].content=cleaned; break; }
+          }
+          break;
+        }
+      }
+    }
+    if(currentBlob) URL.revokeObjectURL(currentBlob);
+    var url=URL.createObjectURL(new Blob([JSON.stringify(bp,null,2)],{type:'application/json'}));
+    currentBlob=url;
+    var fname=type.label.replace(/[^a-z0-9]/gi,'-').toLowerCase()+'.json';
+    document.getElementById('bpName').textContent=type.label+' — Ready';
+    document.getElementById('dlBtn').href=url;
+    document.getElementById('dlBtn').download=fname;
+  }catch(e){ document.getElementById('bpName').textContent='Blueprint generated — download above'; }
+}
+
+function copyText(id){ navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>notify('Copied ✓','success')).catch(()=>notify('Copy failed','error')); }
+
+function openProposal(){ document.getElementById('propOutput').style.display='none'; document.getElementById('propCopyBtns').style.display='none'; document.getElementById('proposalModal').classList.add('open'); }
+function closeProposal(){ document.getElementById('proposalModal').classList.remove('open'); }
+function copyProposal(){ navigator.clipboard.writeText(document.getElementById('propOutput').textContent).then(()=>notify('Copied ✓','success')).catch(()=>notify('Copy failed','error')); }
+
+async function generateProposal(){
+  var client=document.getElementById('propClient').value.trim()||'Client';
+  var name=document.getElementById('propYourName').value.trim()||'Blueprint Studio';
+  var contact=document.getElementById('propContact').value.trim();
+  var today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
+  var btn=document.getElementById('propGenBtn');
+  btn.disabled=true; btn.textContent='Generating…';
+  try{
+    const r=await fetch(API+'/api/ai/generate',{
+      method:'POST',headers:authHeaders(),
+      body:JSON.stringify({prompt:'Write a professional client proposal. Plain text only, no markdown.\n\nAutomation: '+(lastData.what||document.getElementById('wDesc').value)+'\nClient: '+client+'\nDate: '+today+'\nFrom: '+name+(contact?' | '+contact:'')+'\nSetup: '+(lastData.setupPrice||'TBD')+'\nMonthly: '+(lastData.monthlyPrice||'TBD')+'\n\nWrite exactly this structure:\n---\nAUTOMATION PROPOSAL\nFor: '+client+'\nDate: '+today+'\nFrom: '+name+(contact?' | '+contact:'')+'\n---\n\nWHAT WE BUILD\n[2-3 sentences]\n\nTHE PROBLEM IT SOLVES\n[2 sentences]\n\nHOW IT WORKS\n[3 bullet points]\n\nINVESTMENT\nSetup: '+(lastData.setupPrice||'Custom')+'\nMonthly: '+(lastData.monthlyPrice||'Custom')+'\nDelivery: 3-5 business days\n\nNEXT STEPS\nReply to confirm and we schedule a free 15-min call.\n\n'+name+(contact?'\n'+contact:'')+'\n---\n\nOnly the proposal text, nothing else.'})
+    });
+    const d=await r.json();
+    document.getElementById('propOutput').textContent=d.output||'Error generating proposal.';
+    document.getElementById('propOutput').style.display='block';
+    document.getElementById('propCopyBtns').style.display='flex';
+  }catch(e){ notify('Failed to generate proposal.','error'); }
+  btn.disabled=false; btn.textContent='Generate';
+}
+
+var _toastTimer;
+function notify(msg,type){
+  var el=document.getElementById('toast');
+  el.textContent=msg; el.className='show '+(type||'');
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>{ el.className=''; },3000);
+}
+</script>
+<script src="/lang.js"></script>
+</body>
+</html>

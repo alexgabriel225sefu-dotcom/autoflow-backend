@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Apex Trade Bot — Ad</title>
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* exact site tokens */
+  --bg:#060608;--bg1:#0b0b0e;--panel:#111115;
+  --line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.13);
+  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
+  --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;
+  --accdim:rgba(255,45,79,.12);--accglow:rgba(255,45,79,.45);
+  --up:#27c46a;--down:#ff2d4f;
+  --d:'Clash Display',system-ui,sans-serif;
+  --f:'Satoshi',system-ui,sans-serif;
+  --m:'JetBrains Mono',monospace;
+  --e:cubic-bezier(.32,.72,0,1);
+  --eo:cubic-bezier(.34,1.56,.64,1);
+}
+html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var(--f);-webkit-font-smoothing:antialiased}
+
+#stage{
+  position:fixed;top:50%;left:50%;
+  width:1080px;height:1920px;
+  transform:translate(-50%,-50%) scale(var(--s,.36));
+  transform-origin:center center;
+  background:var(--bg);overflow:hidden;color:var(--t0);
+}
+
+/* ── 3D grid (matches site hero) ── */
+#grid3d{position:absolute;left:-25%;right:-25%;bottom:0;height:55%;z-index:0;pointer-events:none;perspective:420px;opacity:.6}
+#grid3d::after{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,45,79,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(255,45,79,.14) 1px,transparent 1px);
+  background-size:72px 72px;transform:rotateX(70deg);transform-origin:bottom center;
+  animation:grid 5s linear infinite;
+  -webkit-mask-image:linear-gradient(transparent,#000 55%,transparent);
+  mask-image:linear-gradient(transparent,#000 55%,transparent)}
+@keyframes grid{from{background-position-y:0}to{background-position-y:72px}}
+
+/* ── aurora glow (matches site) ── */
+.aurora{position:absolute;pointer-events:none;z-index:0;
+  background:radial-gradient(closest-side,rgba(255,45,79,.22),rgba(255,45,79,.06) 58%,transparent);
+  filter:blur(50px);animation:aur 9s ease-in-out infinite}
+@keyframes aur{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
+.aur1{width:800px;height:800px;top:-200px;right:-150px}
+.aur2{width:600px;height:600px;bottom:-100px;left:-100px;animation-delay:-4s}
+
+.scene{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:0 88px;opacity:0;visibility:hidden;z-index:10;
+  transition:opacity .6s var(--e),transform .6s var(--e),filter .6s var(--e)
+}
+.scene.in{opacity:1;visibility:visible;transform:none;filter:none}
+.scene.out{opacity:0;transform:translateY(-50px);filter:blur(14px);visibility:hidden}
+.scene.pre{transform:translateY(50px);filter:blur(14px)}
+
+.rv{opacity:0;transform:translateY(36px);filter:blur(8px);
+  transition:opacity .7s var(--e),transform .7s var(--e),filter .7s var(--e)}
+.in .rv{opacity:1;transform:none;filter:none}
+.in .rv.d1{transition-delay:.1s}.in .rv.d2{transition-delay:.22s}
+.in .rv.d3{transition-delay:.34s}.in .rv.d4{transition-delay:.46s}
+.in .rv.d5{transition-delay:.60s}.in .rv.d6{transition-delay:.74s}
+
+/* ── eyebrow pill (matches site) ── */
+.eyebrow{display:inline-flex;align-items:center;gap:10px;
+  background:var(--accdim);border:1px solid rgba(255,45,79,.24);
+  color:var(--acc3);border-radius:100px;padding:10px 22px;
+  font:500 24px/1 var(--m);letter-spacing:.1em;text-transform:uppercase}
+.eyebrow b{width:10px;height:10px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);flex:none}
+
+/* ═══════════════════════════════════════
+   SCENE 1 · HOOK
+   ═══════════════════════════════════════ */
+.s1-q{font-family:var(--d);font-weight:700;font-size:98px;
+  letter-spacing:-.03em;line-height:1.05;text-align:center;color:var(--t1)}
+.s1-q em{color:var(--t0);font-style:normal;background:linear-gradient(115deg,var(--acc),var(--acc3));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.s1-divider{width:130px;height:4px;border-radius:2px;
+  background:linear-gradient(90deg,var(--acc),var(--acc2));margin:56px auto}
+.s1-answer-lbl{font:700 30px/1 var(--m);letter-spacing:.18em;text-transform:uppercase;color:var(--acc);margin-bottom:24px}
+.s1-amount{font-family:var(--d);font-weight:700;font-size:210px;
+  letter-spacing:-.06em;line-height:.88;color:var(--up);
+  text-shadow:0 0 80px rgba(39,196,106,.45)}
+.s1-suffix{font-size:52px;color:var(--t1);margin-top:22px}
+.s1-tag{margin-top:64px;padding:24px 56px;border-radius:999px;
+  background:var(--accdim);border:1px solid rgba(255,45,79,.3);
+  font:700 40px/1 var(--f);color:var(--acc2)}
+
+/* ═══════════════════════════════════════
+   SCENE 2 · 3 AM
+   ═══════════════════════════════════════ */
+.s2-time{font-family:var(--m);font-weight:700;font-size:200px;
+  letter-spacing:-.03em;color:var(--t0);text-align:center;
+  text-shadow:0 0 60px rgba(255,45,79,.2)}
+.s2-colon{animation:blink .85s step-start infinite;color:var(--acc)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.s2-am{font:700 64px/1 var(--m);color:var(--acc2);margin-left:10px;vertical-align:middle}
+.s2-headline{font-family:var(--d);font-weight:700;font-size:100px;
+  letter-spacing:-.03em;text-align:center;line-height:1.0;margin-top:40px}
+.s2-headline .acc{background:linear-gradient(115deg,var(--acc),var(--acc3));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.s2-sub{font-size:44px;color:var(--t1);text-align:center;margin-top:24px}
+/* trade ticker */
+.ticker{width:100%;margin-top:52px;border-radius:24px;overflow:hidden;
+  background:var(--panel);border:1px solid var(--line2)}
+.ticker-head{display:flex;align-items:center;justify-content:space-between;
+  padding:30px 44px;border-bottom:1px solid var(--line);background:var(--bg1)}
+.t-pair{font-family:var(--d);font-weight:700;font-size:46px}
+.t-live{display:flex;align-items:center;gap:12px;font:700 26px/1 var(--m);color:var(--acc);
+  padding:10px 22px;border-radius:999px;border:1px solid rgba(255,45,79,.32);
+  background:var(--accdim)}
+.live-dot{width:12px;height:12px;border-radius:50%;background:var(--acc);flex:none;
+  box-shadow:0 0 0 0 var(--accglow);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,45,79,.5)}70%{box-shadow:0 0 0 18px rgba(255,45,79,0)}100%{box-shadow:0 0 0 0 rgba(255,45,79,0)}}
+.t-row{display:flex;align-items:center;justify-content:space-between;
+  padding:26px 44px;border-bottom:1px solid var(--line)}
+.t-row:last-child{border-bottom:none}
+.t-name{font:700 36px/1 var(--f)}.t-type{font:400 26px/1 var(--m);color:var(--t1);margin-top:4px}
+.t-profit{font:700 44px/1 var(--m);color:var(--up)}
+.t-profit.flash{animation:flash .4s var(--eo)}
+@keyframes flash{0%{transform:scale(1.25);opacity:0}100%{transform:scale(1);opacity:1}}
+.t-tag{display:inline-block;font:600 20px/1 var(--m);letter-spacing:.06em;text-transform:uppercase;
+  padding:4px 12px;border-radius:6px;margin-left:10px;vertical-align:middle}
+.t-tag.crypto{background:rgba(255,45,79,.12);color:var(--acc2);border:1px solid rgba(255,45,79,.2)}
+.t-tag.gold{background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.25)}
+.t-tag.forex{background:rgba(42,171,238,.12);color:#2aabee;border:1px solid rgba(42,171,238,.22)}
+
+/* ═══════════════════════════════════════
+   SCENE 3 · BIG NUMBER
+   ═══════════════════════════════════════ */
+.s3-lbl{font:700 30px/1 var(--m);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--acc);margin-bottom:16px}
+.s3-since{font-size:36px;color:var(--t1);margin-bottom:60px}
+.s3-profit{font-family:var(--d);font-weight:700;font-size:240px;
+  letter-spacing:-.06em;line-height:.88;color:var(--up);
+  text-shadow:0 0 100px rgba(39,196,106,.45),0 0 200px rgba(39,196,106,.2)}
+.s3-grid{display:flex;width:100%;margin-top:56px}
+.sg{flex:1;text-align:center;padding:42px 20px;background:var(--panel);border:1px solid var(--line)}
+.sg:first-child{border-radius:20px 0 0 20px}.sg:last-child{border-radius:0 20px 20px 0}
+.sg .gv{font-family:var(--d);font-weight:700;font-size:80px;letter-spacing:-.03em}
+.sg .gl{font-size:28px;color:var(--t1);margin-top:8px}
+.s3-quote{font-size:40px;color:var(--t1);text-align:center;margin-top:60px;
+  line-height:1.55;font-style:italic;max-width:860px}
+.s3-quote strong{color:var(--t0);font-style:normal}
+
+/* ═══════════════════════════════════════
+   SCENE 4 · HOW IT WORKS
+   ═══════════════════════════════════════ */
+.s4-h{font-family:var(--d);font-weight:700;font-size:110px;
+  letter-spacing:-.04em;text-align:center;line-height:.95}
+.s4-h .acc{background:linear-gradient(115deg,var(--acc),var(--acc3));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 4px 30px rgba(255,45,79,.4))}
+.s4-sub{font-size:44px;color:var(--t1);text-align:center;margin:26px 0 64px}
+.step{display:flex;align-items:flex-start;gap:36px;width:100%;margin-bottom:28px;
+  padding:40px 44px;border-radius:22px;background:var(--panel);border:1px solid var(--line2);
+  opacity:0;transform:translateX(-28px);transition:opacity .55s var(--e),transform .55s var(--e)}
+.in .step.show{opacity:1;transform:none}
+.step-num{flex:none;width:78px;height:78px;border-radius:18px;
+  background:var(--acc);display:flex;align-items:center;justify-content:center;
+  font:700 40px/1 var(--d);color:#fff;box-shadow:0 0 40px var(--accglow);margin-top:2px}
+.step-h{font:700 50px/1.1 var(--d);letter-spacing:-.01em}
+.step-p{font-size:32px;color:var(--t1);margin-top:6px}
+.s4-close{margin-top:44px;width:100%;padding:40px 50px;border-radius:22px;
+  background:var(--accdim);border:1px solid rgba(255,45,79,.28);
+  text-align:center;font:700 48px/1 var(--d);
+  background:linear-gradient(135deg,rgba(255,45,79,.15),rgba(255,45,79,.04));
+  color:var(--acc2)}
+
+/* ═══════════════════════════════════════
+   SCENE 5 · CTA
+   ═══════════════════════════════════════ */
+.s5-eye{margin-bottom:54px}
+.s5-name{font-family:var(--d);font-weight:700;font-size:124px;
+  letter-spacing:-.04em;text-align:center;line-height:.92}
+.s5-name .grad{background:linear-gradient(115deg,var(--acc),var(--acc3));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 4px 40px rgba(255,45,79,.4))}
+.s5-tag{font-size:44px;color:var(--t1);text-align:center;margin-top:28px}
+.price-row{display:flex;gap:24px;width:100%;margin-top:60px}
+.pc{flex:1;border-radius:26px;padding:48px 40px;text-align:center}
+.pc.main{background:linear-gradient(145deg,rgba(255,45,79,.18),rgba(255,45,79,.05));
+  border:1.5px solid rgba(255,45,79,.45);box-shadow:0 0 60px rgba(255,45,79,.12)}
+.pc.sec{background:var(--panel);border:1px solid var(--line2)}
+.pc-type{font:700 26px/1 var(--m);letter-spacing:.18em;text-transform:uppercase;color:var(--acc);margin-bottom:14px}
+.pc.sec .pc-type{color:var(--t1)}
+.pc-price{font-family:var(--d);font-weight:700;font-size:100px;letter-spacing:-.04em;line-height:1}
+.pc-note{font-size:26px;color:var(--t1);margin-top:10px}
+/* scene 2 total */
+.s2-headline{font-family:var(--d);font-weight:700;font-size:88px;letter-spacing:-.03em;text-align:center;line-height:1}
+.s2-sub{font-size:40px;color:var(--t1);text-align:center;margin-top:20px;margin-bottom:44px}
+.s2-total{width:100%;margin-top:20px;padding:28px 40px;border-radius:20px;
+  background:rgba(39,196,106,.07);border:1px solid rgba(39,196,106,.2);
+  font:700 40px/1 var(--m);display:flex;justify-content:space-between;align-items:center}
+
+/* scene 5 contrast */
+.contrast-headline{font-family:var(--d);font-weight:700;font-size:100px;
+  letter-spacing:-.03em;text-align:center;line-height:1.0;margin-bottom:14px}
+.contrast-sub{font-size:48px;color:var(--t1);text-align:center;margin-bottom:52px}
+.contrast-cards{display:flex;gap:20px;width:100%}
+.cc{flex:1;border-radius:26px;padding:44px 38px}
+.cc-you{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1)}
+.cc-bot{background:linear-gradient(145deg,rgba(39,196,106,.12),rgba(39,196,106,.04));
+  border:1.5px solid rgba(39,196,106,.35);box-shadow:0 0 50px rgba(39,196,106,.1)}
+.cc-lbl{font:700 28px/1 var(--m);letter-spacing:.14em;text-transform:uppercase;color:var(--t1);margin-bottom:12px}
+.cc-bot .cc-lbl{color:var(--up)}
+.cc-val{font-family:var(--d);font-weight:700;font-size:86px;letter-spacing:-.04em;line-height:1;margin-bottom:28px}
+.cc-val.red-val{color:var(--acc)}
+.cc-items{display:flex;flex-direction:column;gap:14px}
+.cc-item{font-size:30px;padding:12px 16px;border-radius:12px;line-height:1.3}
+.cc-item.bad{background:rgba(255,45,79,.08);color:var(--t1)}
+.cc-item.good{background:rgba(39,196,106,.08);color:#7ee8a2}
+.stop-line{font-family:var(--d);font-weight:700;font-size:62px;
+  text-align:center;margin-top:44px;color:var(--t0);letter-spacing:-.02em}
+
+.cta-features{width:100%;margin-top:56px;display:flex;flex-direction:column;gap:20px}
+.cf{display:flex;align-items:center;gap:22px;font-family:var(--d);font-weight:600;font-size:46px;
+  padding:28px 40px;border-radius:20px;background:var(--panel);border:1px solid var(--line2);
+  letter-spacing:-.01em}
+.cf-icon{color:var(--up);font-size:40px;flex:none;width:48px;text-align:center}
+.s5-url{font-family:var(--m);font-weight:700;font-size:58px;color:var(--acc2);margin-top:44px;letter-spacing:.02em}
+.s5-bio{font-size:34px;color:var(--t1);margin-top:14px}
+.s5-badge{margin-top:54px;display:inline-flex;align-items:center;gap:14px;
+  padding:22px 44px;border-radius:999px;
+  background:rgba(39,196,106,.08);border:1px solid rgba(39,196,106,.25);
+  font:600 30px/1 var(--f);color:var(--up)}
+.s5-badge .dot{width:12px;height:12px;border-radius:50%;background:var(--up);
+  animation:pulse2 1.6s infinite}
+@keyframes pulse2{0%{box-shadow:0 0 0 0 rgba(39,196,106,.5)}70%{box-shadow:0 0 0 16px rgba(39,196,106,0)}100%{box-shadow:0 0 0 0 rgba(39,196,106,0)}}
+
+/* ── controls ── */
+#ui{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+  display:flex;gap:12px;z-index:300}
+#ui button{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.16);
+  border-radius:999px;padding:12px 22px;font:600 15px/1 var(--f);cursor:pointer;
+  backdrop-filter:blur(12px);transition:background .2s}
+#ui button:hover{background:rgba(255,255,255,.18)}
+#hint{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:300;
+  color:#50505e;font:500 13px/1.5 var(--f);text-align:center}
+.clean #ui,.clean #hint{display:none}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="hint">▶ Play · <b>C</b> = clean mode for recording · Space = restart</div>
+
+<div id="stage">
+  <div id="grid3d"></div>
+  <div class="aurora aur1"></div>
+  <div class="aurora aur2"></div>
+
+  <!-- ══ 1 · HOOK ══ -->
+  <section class="scene" data-dur="4200" id="s1">
+    <div class="s1-q rv">
+      How much did <em>you</em><br>make today?
+    </div>
+    <div class="s1-divider rv d2"></div>
+    <div class="s1-answer-lbl rv d3">The bot made</div>
+    <div class="s1-amount rv d3" id="s1cnt">$0</div>
+    <div class="s1-suffix rv d4">while you were sleeping</div>
+    <div class="s1-tag rv d5">Without touching a single button.</div>
+  </section>
+
+  <!-- ══ 2 · LIVE TRADES ══ -->
+  <section class="scene" data-dur="5000" id="s2">
+    <div class="s2-headline rv">
+      The bot never <span class="acc">stops.</span>
+    </div>
+    <div class="s2-sub rv d1">Crypto & Forex · Running right now.</div>
+    <div class="ticker rv d2">
+      <div class="ticker-head">
+        <span class="t-pair">Live Positions</span>
+        <span class="t-live"><span class="live-dot"></span>LIVE</span>
+      </div>
+      <div class="t-row">
+        <div>
+          <div class="t-name">BTC / USDT <span class="t-tag crypto">Crypto</span></div>
+          <div class="t-type">Long · 2x · Binance</div>
+        </div>
+        <div class="t-profit">+$84.20</div>
+      </div>
+      <div class="t-row">
+        <div>
+          <div class="t-name">EUR / USD <span class="t-tag forex">Forex · MT5</span></div>
+          <div class="t-type">Buy · 1 lot · MT5</div>
+        </div>
+        <div class="t-profit" id="eur-v">+$47.80</div>
+      </div>
+      <div class="t-row">
+        <div>
+          <div class="t-name">ETH / USDT <span class="t-tag crypto">Crypto</span></div>
+          <div class="t-type">Long · 1.5x · Binance</div>
+        </div>
+        <div class="t-profit" id="eth-v">+$38.60</div>
+      </div>
+      <div class="t-row" style="border-bottom:none">
+        <div>
+          <div class="t-name">SOL / USDT <span class="t-tag crypto">Crypto</span></div>
+          <div class="t-type">Long · 2x · Binance</div>
+        </div>
+        <div class="t-profit" id="sol-v">+$21.40</div>
+      </div>
+    </div>
+    <div class="s2-total rv d3">
+      Total open P&amp;L &nbsp;<span id="s2total" style="color:var(--up)">+$191.80</span>
+    </div>
+  </section>
+
+  <!-- ══ 3 · PROFIT ══ -->
+  <section class="scene" data-dur="4800" id="s3">
+    <div class="s3-lbl rv">30-Day Results</div>
+    <div class="s3-since rv d1">Starting capital: $1,000</div>
+    <div class="s3-profit rv d2" id="s3cnt">$0</div>
+    <div class="s3-grid rv d3">
+      <div class="sg"><div class="gv up" id="s3wr">0%</div><div class="gl">Win rate</div></div>
+      <div class="sg"><div class="gv" style="color:var(--acc2)" id="s3tr">0</div><div class="gl">Trades</div></div>
+      <div class="sg"><div class="gv" style="color:var(--t0)">$0</div><div class="gl">Monthly fee</div></div>
+    </div>
+    <div class="s3-quote rv d4">
+      &ldquo;Woke up to <strong>+$284</strong> more than the night before.<br>I didn't do a thing.&rdquo;
+    </div>
+  </section>
+
+  <!-- ══ 4 · YOURS TO BUILD ══ -->
+  <section class="scene" data-dur="4800" id="s4">
+    <div class="s4-h rv">
+      Your bot.<br><span class="acc">Your rules.</span>
+    </div>
+    <div class="s4-sub rv d1">Full source code. Customize everything. Own it forever.</div>
+    <div class="step" data-at="350">
+      <div class="step-num">1</div>
+      <div><div class="step-h">Get the full source code</div><div class="step-p">Python · Crypto on Binance/Bybit · Forex via MT5</div></div>
+    </div>
+    <div class="step" data-at="1050">
+      <div class="step-num">2</div>
+      <div><div class="step-h">Customize your strategy</div><div class="step-p">Change pairs, risk levels, signals — it's your code</div></div>
+    </div>
+    <div class="step" data-at="1750">
+      <div class="step-num">3</div>
+      <div><div class="step-h">Deploy in 10 minutes</div><div class="step-p">Runs 24/7 on your server — no monthly fee, ever</div></div>
+    </div>
+    <div class="s4-close rv" style="transition-delay:.64s">
+      Not a subscription. You own it forever.
+    </div>
+  </section>
+
+  <!-- ══ 5 · CONTRAST CTA ══ -->
+  <section class="scene" data-dur="6000" id="s5">
+    <div class="contrast-headline rv">
+      The market ran<br><span class="acc">168 hours</span> this week.
+    </div>
+    <div class="contrast-sub rv d1">How many did you trade?</div>
+    <div class="contrast-cards rv d2">
+      <div class="cc cc-you">
+        <div class="cc-lbl">You</div>
+        <div class="cc-val red-val">~8h</div>
+        <div class="cc-items">
+          <div class="cc-item bad">Missed signals at 2AM</div>
+          <div class="cc-item bad">Emotions. Hesitation.</div>
+          <div class="cc-item bad">Sleeping. Working.</div>
+        </div>
+      </div>
+      <div class="cc cc-bot">
+        <div class="cc-lbl">The Bot</div>
+        <div class="cc-val up">168h</div>
+        <div class="cc-items">
+          <div class="cc-item good">Every signal. Every entry.</div>
+          <div class="cc-item good">No emotions. No sleep.</div>
+          <div class="cc-item good">Crypto + Forex. Always on.</div>
+        </div>
+      </div>
+    </div>
+    <div class="stop-line rv d3">Stop leaving money on the table.</div>
+    <div class="s5-url rv d4">aicashsystem.space</div>
+    <div class="s5-bio rv d5">Link in bio · One-time payment</div>
+  </section>
+</div>
+
+<div id="ui">
+  <button onclick="play()">▶ Play</button>
+  <button onclick="toggleClean()">Clean (C)</button>
+  <button onclick="document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()">⛶ Full</button>
+</div>
+
+<script>
+/* ── fit to viewport ── */
+function fit(){
+  var s=Math.min(window.innerWidth/1080,window.innerHeight/1920);
+  document.getElementById('stage').style.setProperty('--s',s);
+}
+addEventListener('resize',fit);fit();
+
+/* ── scene engine ── */
+var scenes=[...document.querySelectorAll('.scene')],timers=[];
+function clearT(){timers.forEach(clearTimeout);timers=[]}
+function T(fn,ms){timers.push(setTimeout(fn,ms))}
+
+function resetScene(sc){
+  sc.classList.remove('in','out');sc.classList.add('pre');
+  sc.querySelectorAll('.step').forEach(e=>e.classList.remove('show'));
+}
+function runScene(i){
+  if(i>=scenes.length){T(play,1200);return;}
+  var sc=scenes[i],dur=+sc.dataset.dur||4200;
+  scenes.forEach((s,j)=>{if(j!==i){s.classList.remove('in');s.classList.add(j<i?'out':'pre');}});
+  resetScene(sc);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    sc.classList.remove('pre');sc.classList.add('in');
+    var id=sc.id;
+    if(id==='s1')animS1();
+    if(id==='s2')animS2();
+    if(id==='s3')animS3();
+    sc.querySelectorAll('[data-at]').forEach(el=>{
+      var at=+el.dataset.at;
+      if(el.classList.contains('step')) T(()=>el.classList.add('show'),at);
+    });
+  }));
+  T(()=>runScene(i+1),dur);
+}
+function play(){clearT();scenes.forEach(s=>s.classList.add('pre'));T(()=>runScene(0),200);}
+
+/* ── count-up util ── */
+function cu(id,to,ms,fmt){
+  var el=document.getElementById(id);if(!el)return;
+  var st=performance.now();
+  (function f(n){
+    var p=Math.min(1,(n-st)/ms),e=1-Math.pow(1-p,3);
+    el.textContent=fmt(to*e);
+    if(p<1)requestAnimationFrame(f);
+  })(performance.now());
+}
+
+function animS1(){
+  cu('s1cnt',284,2400,v=>'+$'+Math.round(v));
+}
+
+function animS2(){
+  var tickers=[
+    {id:'eur-v', steps:[52.30,61.80,74.20,88.40]},
+    {id:'eth-v', steps:[44.10,53.70,62.30,71.90]},
+    {id:'sol-v', steps:[28.60,37.40,47.80,58.10]}
+  ];
+  var totals=[191.80,212.40,238.70,264.10,297.30,318.60];
+  var ti=0;
+  function tickTotal(){
+    if(ti>=totals.length)return;
+    var el=document.getElementById('s2total');
+    if(el){el.textContent='+$'+totals[ti].toFixed(2);el.classList.remove('flash');requestAnimationFrame(function(){el.classList.add('flash')});}
+    ti++;T(tickTotal,Math.random()*600+400);
+  }
+  T(tickTotal,1800);
+  tickers.forEach(function(t){
+    var el=document.getElementById(t.id);if(!el)return;
+    var i=0;
+    function tick(){
+      if(i>=t.steps.length)return;
+      el.textContent='+$'+t.steps[i].toFixed(2);
+      el.classList.remove('flash');
+      requestAnimationFrame(function(){el.classList.add('flash')});
+      i++;T(tick,Math.random()*700+500);
+    }
+    T(tick,Math.random()*1000+600);
+  });
+}
+
+function animS3(){
+  cu('s3cnt',2847,2400,v=>'$'+Math.round(v).toLocaleString());
+  cu('s3wr',68,2400,v=>Math.round(v)+'%');
+  cu('s3tr',134,2400,v=>Math.round(v)+'');
+}
+
+function toggleClean(){document.body.classList.toggle('clean')}
+addEventListener('keydown',e=>{
+  if(e.key==='c'||e.key==='C')toggleClean();
+  if(e.key===' '){e.preventDefault();play();}
+});
+
+scenes.forEach(s=>s.classList.add('pre'));
+T(play,400);
+</script>
+</body>
+</html>

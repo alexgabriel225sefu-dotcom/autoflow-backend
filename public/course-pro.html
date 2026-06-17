@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AI Cash Systems — PRO Course</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#f5f5f5;font-family:'Inter',sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#E53E2E;border-radius:2px}
+nav{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid rgba(229,62,46,.08);background:rgba(8,8,8,.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.logo{font-family:'Inter',sans-serif;font-size:18px;font-weight:700;color:#E53E2E}
+.nav-badge{display:flex;align-items:center;gap:8px;font-size:13px;color:#999999}
+.nav-bp{display:flex;align-items:center;gap:8px;padding:7px 16px;border:1px solid rgba(229,62,46,.2);border-radius:6px;color:#E53E2E;font-size:12px;text-decoration:none;font-family:'Inter',sans-serif;transition:all .2s}
+.nav-bp:hover{background:rgba(229,62,46,.08);border-color:#E53E2E}
+.badge-dot{width:8px;height:8px;border-radius:50%;background:#E53E2E;box-shadow:0 0 8px #E53E2E;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.hero{padding:48px 32px 32px;max-width:900px;margin:0 auto;animation:fadeUp .7s ease both}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(229,62,46,.2),rgba(229,62,46,.08));border:1px solid rgba(229,62,46,.4);border-radius:100px;padding:6px 16px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#E53E2E;margin-bottom:20px}
+.hero h1{font-family:'Inter',sans-serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:1.05;margin-bottom:14px}
+.hero h1 em{font-style:italic;color:#E53E2E}
+.hero p{font-size:15px;color:#999999;max-width:560px;line-height:1.7}
+.progress-bar-wrap{max-width:900px;margin:24px auto 0;padding:0 32px}
+.progress-meta{display:flex;justify-content:space-between;font-size:12px;color:#999999;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
+.progress-track{height:3px;background:#161616;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,#B52318,#FF5544);border-radius:2px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.container{max-width:900px;margin:40px auto;padding:0 32px 80px;display:grid;gap:16px}
+.section-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#E53E2E;padding:0 4px;margin-top:8px;margin-bottom:4px}
+.module{background:#111111;border:1px solid rgba(229,62,46,.08);border-radius:12px;overflow:hidden}
+.module.pro-module{border-color:rgba(229,62,46,.15)}
+.module-header{display:flex;align-items:center;gap:16px;padding:20px 24px;cursor:pointer;user-select:none;transition:background .2s}
+.module-header:hover{background:#161616}
+.module-num{font-family:'Inter',sans-serif;font-size:32px;font-weight:300;color:rgba(229,62,46,.4);min-width:36px;line-height:1}
+.module.pro-module .module-num{color:rgba(229,62,46,.7)}
+.module-info{flex:1}
+.module-title{font-family:'Inter',sans-serif;font-size:20px;font-weight:600;color:#f5f5f5;margin-bottom:4px}
+.module-meta-text{font-size:12px;color:#999999;letter-spacing:1px;text-transform:uppercase}
+.module-toggle{width:32px;height:32px;border-radius:50%;border:1px solid rgba(229,62,46,.2);display:flex;align-items:center;justify-content:center;color:#E53E2E;font-size:18px;transition:transform .3s,background .2s;flex-shrink:0}
+.module.open .module-toggle{transform:rotate(45deg);background:rgba(229,62,46,.1)}
+.lessons{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1)}
+.module.open .lessons{max-height:600px;border-top:1px solid rgba(229,62,46,.08)}
+.lesson{display:flex;align-items:flex-start;gap:16px;padding:18px 24px;border-bottom:1px solid rgba(229,62,46,.05);cursor:pointer;transition:background .2s;text-decoration:none;color:inherit}
+.lesson:last-child{border-bottom:none}
+.lesson:hover{background:rgba(229,62,46,.04)}
+.lesson-icon{width:36px;height:36px;border-radius:8px;background:#161616;border:1px solid rgba(229,62,46,.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+.lesson.done .lesson-icon{background:rgba(229,62,46,.12);border-color:rgba(229,62,46,.3)}
+.lesson-body{flex:1}
+.lesson-title{font-size:15px;font-weight:500;color:#f5f5f5;margin-bottom:5px}
+.lesson-desc{font-size:13px;color:#999999;line-height:1.6}
+.lesson-tag-badge{display:inline-block;margin-top:8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:100px;background:#161616;border:1px solid rgba(229,62,46,.12);color:#999999}
+.lesson-arrow{color:rgba(229,62,46,.4);font-size:18px;margin-top:6px;flex-shrink:0;transition:all .2s}
+.lesson:hover .lesson-arrow{transform:translateX(4px);color:#E53E2E}
+.pro-badge-inline{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(229,62,46,.2),rgba(229,62,46,.08));border:1px solid rgba(229,62,46,.3);border-radius:100px;padding:2px 10px;font-size:10px;letter-spacing:1px;color:#E53E2E;margin-left:8px;vertical-align:middle}
+@media(max-width:600px){nav{padding:16px 20px}.hero,.progress-bar-wrap,.container{padding-left:20px;padding-right:20px}}
+.lang-btn{display:flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid rgba(229,62,46,.2);border-radius:6px;background:none;color:#E53E2E;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s}
+.lang-btn:hover{background:rgba(229,62,46,.08)}
+.lang-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;align-items:center;justify-content:center}
+.lang-modal.open{display:flex}
+.lang-modal-box{background:#111;border:1px solid rgba(229,62,46,.2);border-radius:12px;padding:20px;width:min(90vw,480px);max-height:72vh;display:flex;flex-direction:column;gap:10px}
+.lang-search{background:#161616;border:1px solid rgba(229,62,46,.15);border-radius:6px;padding:8px 12px;color:#f5f5f5;font-size:14px;width:100%;outline:none;font-family:'Inter',sans-serif}
+.lang-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:6px;overflow-y:auto}
+.lang-opt{padding:7px 10px;border-radius:6px;border:1px solid rgba(229,62,46,.1);background:#161616;cursor:pointer;font-size:12px;color:#f5f5f5;text-align:left;font-family:'Inter',sans-serif}
+.lang-opt:hover,.lang-opt.active{background:rgba(229,62,46,.12);border-color:rgba(229,62,46,.4)}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">AI Cash Systems</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <button class="lang-btn" onclick="openLangModal()"><span id="langFlag">🇬🇧</span> <span id="langCode">EN</span></button>
+    <a href="/app" class="nav-bp" style="background:rgba(229,62,46,.1);border-color:#E53E2E">⚡ Blueprint Studio</a>
+    <a href="/blueprints.html" class="nav-bp">↓ Blueprints</a>
+    <div class="nav-badge"><div class="badge-dot"></div>PRO Program</div>
+  </div>
+</nav>
+
+
+<div class="hero">
+  <div class="hero-tag">⚡ PRO Program — $97</div>
+  <h1>The Complete <em>AI Agency</em><br>Blueprint</h1>
+  <p>14 modules, 42 lessons — everything from your first WhatsApp bot to voice AI agents, enterprise clients, and $10K/month. All tools, all systems, all secrets.</p>
+</div>
+
+<div style="max-width:900px;margin:0 auto 0;padding:0 32px">
+  <div style="background:linear-gradient(135deg,rgba(229,62,46,.12),rgba(229,62,46,.04));border:1px solid rgba(229,62,46,.3);border-radius:14px;padding:24px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#E53E2E;margin-bottom:8px;font-weight:700">⚡ PRO Exclusive</div>
+      <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-.3px">Blueprint Studio — Included in your plan</div>
+      <div style="font-size:13px;color:#999;line-height:1.6;max-width:480px">Blueprint Generator, AI Prompt Builder, Proposal Generator, ROI Calculator and more. Sign in with your email + the same access code you used here.</div>
+    </div>
+    <a href="/app" style="flex-shrink:0;display:inline-flex;align-items:center;gap:8px;background:#E53E2E;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;padding:13px 24px;border-radius:10px;text-decoration:none;letter-spacing:.3px;white-space:nowrap;transition:all .2s" onmouseover="this.style.background='#FF5544'" onmouseout="this.style.background='#E53E2E'">Launch App →</a>
+  </div>
+</div>
+
+<div class="progress-bar-wrap">
+  <div class="progress-meta"><span>Your Progress</span><span id="prog-label">0 / 42 lessons</span></div>
+  <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+</div>
+
+<div class="container">
+
+  <div class="section-label">✦ Starter Modules — Included</div>
+
+  <!-- MODULE 1 -->
+  <div class="module" id="mod-1">
+    <div class="module-header" onclick="toggleModule('mod-1')">
+      <div class="module-num">01</div>
+      <div class="module-info"><div class="module-title">The AI Automation Opportunity</div><div class="module-meta-text">3 Lessons · Foundation · ~45 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module1.html#lesson1" class="lesson" onclick="markDone('1-1')"><div class="lesson-icon">📈</div><div class="lesson-body"><div class="lesson-title">Why AI Automation is the #1 Skill Right Now</div><div class="lesson-desc">The market gap nobody talks about — and how to position yourself to fill it.</div><div class="lesson-tag-badge">Foundation</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module1.html#lesson2" class="lesson" onclick="markDone('1-2')"><div class="lesson-icon">📐</div><div class="lesson-body"><div class="lesson-title">How the Business Works — The Simple Model</div><div class="lesson-desc">Find, build, sell. No technical background needed.</div><div class="lesson-tag-badge">Business Model</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module1.html#lesson3" class="lesson" onclick="markDone('1-3')"><div class="lesson-icon">🎯</div><div class="lesson-body"><div class="lesson-title">Picking Your Niche &amp; First Target Industry</div><div class="lesson-desc">Why going deep beats going wide — the 4 best industries.</div><div class="lesson-tag-badge">Strategy</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 2 -->
+  <div class="module" id="mod-2">
+    <div class="module-header" onclick="toggleModule('mod-2')">
+      <div class="module-num">02</div>
+      <div class="module-info"><div class="module-title">Building Your First Automation</div><div class="module-meta-text">3 Lessons · Hands-On Build · ~90 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module2.html#lesson1" class="lesson" onclick="markDone('2-1')"><div class="lesson-icon">⚙️</div><div class="lesson-body"><div class="lesson-title">Make.com Setup — Your Automation Hub</div><div class="lesson-desc">Create your account and build your first scenario.</div><div class="lesson-tag-badge">Tool Setup</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module2.html#lesson2" class="lesson" onclick="markDone('2-2')"><div class="lesson-icon">🔄</div><div class="lesson-body"><div class="lesson-title">Build a Lead Follow-Up System</div><div class="lesson-desc">Google Form → OpenAI → Gmail. Working in 45 minutes.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module2.html#lesson3" class="lesson" onclick="markDone('2-3')"><div class="lesson-icon">🚀</div><div class="lesson-body"><div class="lesson-title">Test Your Automation &amp; Make It Live</div><div class="lesson-desc">Run once, fix errors, activate scheduling.</div><div class="lesson-tag-badge">Launch</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 3 -->
+  <div class="module" id="mod-3">
+    <div class="module-header" onclick="toggleModule('mod-3')">
+      <div class="module-num">03</div>
+      <div class="module-info"><div class="module-title">Getting Your First Client</div><div class="module-meta-text">3 Lessons · Client Acquisition · ~60 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module3.html#lesson1" class="lesson" onclick="markDone('3-1')"><div class="lesson-icon">🔍</div><div class="lesson-body"><div class="lesson-title">Finding Businesses That Need You Right Now</div><div class="lesson-desc">Google Maps, Instagram, LinkedIn — 10 prospects in 10 minutes.</div><div class="lesson-tag-badge">Prospecting</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module3.html#lesson2" class="lesson" onclick="markDone('3-2')"><div class="lesson-icon">✉️</div><div class="lesson-body"><div class="lesson-title">The Outreach Message That Gets Replies</div><div class="lesson-desc">Copy-paste templates for WhatsApp, Instagram DM and Email.</div><div class="lesson-tag-badge">Outreach</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module3.html#lesson3" class="lesson" onclick="markDone('3-3')"><div class="lesson-icon">💰</div><div class="lesson-body"><div class="lesson-title">Closing the Deal &amp; Setting Your Price</div><div class="lesson-desc">The 15-minute call script that closes every deal.</div><div class="lesson-tag-badge">Sales</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 4 -->
+  <div class="module" id="mod-4">
+    <div class="module-header" onclick="toggleModule('mod-4')">
+      <div class="module-num">04</div>
+      <div class="module-info"><div class="module-title">Scaling to $3K/Month</div><div class="module-meta-text">3 Lessons · Growth · ~60 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module4.html#lesson1" class="lesson" onclick="markDone('4-1')"><div class="lesson-icon">📈</div><div class="lesson-body"><div class="lesson-title">Building a Recurring Revenue Stack</div><div class="lesson-desc">The retainer math to $3K/month systematically.</div><div class="lesson-tag-badge">Scaling</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module4.html#lesson2" class="lesson" onclick="markDone('4-2')"><div class="lesson-icon">🏗️</div><div class="lesson-body"><div class="lesson-title">Systemizing Your Agency</div><div class="lesson-desc">Automate your own agency to manage 10+ clients easily.</div><div class="lesson-tag-badge">Operations</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module4.html#lesson3" class="lesson" onclick="markDone('4-3')"><div class="lesson-icon">📋</div><div class="lesson-body"><div class="lesson-title">Your 30-Day Action Plan</div><div class="lesson-desc">Exact week-by-week plan to your first paying client.</div><div class="lesson-tag-badge">Action Plan</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 5 -->
+  <div class="module" id="mod-5">
+    <div class="module-header" onclick="toggleModule('mod-5')">
+      <div class="module-num">05</div>
+      <div class="module-info"><div class="module-title">WhatsApp Bot — Automated Replies 24/7</div><div class="module-meta-text">3 Lessons · WhatsApp · ~90 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module5.html#lesson1" class="lesson" onclick="markDone('5-1')"><div class="lesson-icon">📱</div><div class="lesson-body"><div class="lesson-title">WhatsApp Business API Setup with 360dialog</div><div class="lesson-desc">Account, number verification, API key setup.</div><div class="lesson-tag-badge">Setup</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module5.html#lesson2" class="lesson" onclick="markDone('5-2')"><div class="lesson-icon">🤖</div><div class="lesson-body"><div class="lesson-title">Build the Bot — Make.com + GPT-4o + WhatsApp</div><div class="lesson-desc">Webhook → OpenAI → HTTP send. Complete in 2 hours.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module5.html#lesson3" class="lesson" onclick="markDone('5-3')"><div class="lesson-icon">💰</div><div class="lesson-body"><div class="lesson-title">How to Sell for $500–$2,000</div><div class="lesson-desc">The live demo script that closes deals in real time.</div><div class="lesson-tag-badge">Sales</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 6 -->
+  <div class="module" id="mod-6">
+    <div class="module-header" onclick="toggleModule('mod-6')">
+      <div class="module-num">06</div>
+      <div class="module-info"><div class="module-title">Instagram Auto-Reply — AI DM Bot</div><div class="module-meta-text">3 Lessons · Instagram · ~90 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module6.html#lesson1" class="lesson" onclick="markDone('6-1')"><div class="lesson-icon">📸</div><div class="lesson-body"><div class="lesson-title">Instagram Graph API — Complete Setup</div><div class="lesson-desc">Facebook App, access token, long-lived token.</div><div class="lesson-tag-badge">Setup</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module6.html#lesson2" class="lesson" onclick="markDone('6-2')"><div class="lesson-icon">💬</div><div class="lesson-body"><div class="lesson-title">Build the DM Bot</div><div class="lesson-desc">Webhook → OpenAI → Instagram reply. Live in 2 hours.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module6.html#lesson3" class="lesson" onclick="markDone('6-3')"><div class="lesson-icon">⭐</div><div class="lesson-body"><div class="lesson-title">Advanced Strategies + Sell for $600–$1,200</div><div class="lesson-desc">Comment auto-reply, keyword filters, full package.</div><div class="lesson-tag-badge">Advanced</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 7 -->
+  <div class="module" id="mod-7">
+    <div class="module-header" onclick="toggleModule('mod-7')">
+      <div class="module-num">07</div>
+      <div class="module-info"><div class="module-title">Cold Email Automation — 50 Emails/Day</div><div class="module-meta-text">3 Lessons · Cold Outreach · ~75 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module7.html#lesson1" class="lesson" onclick="markDone('7-1')"><div class="lesson-icon">🔍</div><div class="lesson-body"><div class="lesson-title">Apollo.io — 100 Verified Prospects in 10 Minutes</div><div class="lesson-desc">Free account, filters, CSV export.</div><div class="lesson-tag-badge">Prospecting</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module7.html#lesson2" class="lesson" onclick="markDone('7-2')"><div class="lesson-icon">📧</div><div class="lesson-body"><div class="lesson-title">Instantly.ai — Send 50 Personalized Emails/Day</div><div class="lesson-desc">Email warmup, campaign creation, templates.</div><div class="lesson-tag-badge">Sending</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module7.html#lesson3" class="lesson" onclick="markDone('7-3')"><div class="lesson-icon">⚡</div><div class="lesson-body"><div class="lesson-title">Connect Apollo + Instantly + Make.com</div><div class="lesson-desc">Full automated pipeline — GPT personalizes every email.</div><div class="lesson-tag-badge">Full System</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 8 -->
+  <div class="module" id="mod-8">
+    <div class="module-header" onclick="toggleModule('mod-8')">
+      <div class="module-num">08</div>
+      <div class="module-info"><div class="module-title">Google Sheets CRM — Client Management</div><div class="module-meta-text">3 Lessons · CRM · ~60 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module8.html#lesson1" class="lesson" onclick="markDone('8-1')"><div class="lesson-icon">📊</div><div class="lesson-body"><div class="lesson-title">Build a Mini-CRM in Google Sheets</div><div class="lesson-desc">10-column structure, dropdowns, color coding.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module8.html#lesson2" class="lesson" onclick="markDone('8-2')"><div class="lesson-icon">🔗</div><div class="lesson-body"><div class="lesson-title">Connect All Sources</div><div class="lesson-desc">Form + WhatsApp + Instagram → one CRM automatically.</div><div class="lesson-tag-badge">Integration</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module8.html#lesson3" class="lesson" onclick="markDone('8-3')"><div class="lesson-icon">📈</div><div class="lesson-body"><div class="lesson-title">Automated Weekly AI Report</div><div class="lesson-desc">Every Monday at 9am — GPT writes the report.</div><div class="lesson-tag-badge">Retention</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <div class="section-label">⚡ PRO Exclusive Modules</div>
+
+  <!-- MODULE 9 -->
+  <div class="module pro-module" id="mod-9">
+    <div class="module-header" onclick="toggleModule('mod-9')">
+      <div class="module-num">09</div>
+      <div class="module-info"><div class="module-title">Blueprint Studio Full Access <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Platform · ~45 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module9.html#lesson1" class="lesson" onclick="markDone('9-1')"><div class="lesson-icon">📊</div><div class="lesson-body"><div class="lesson-title">Blueprint Studio Overview</div><div class="lesson-desc">All 5 sections and how to use them daily.</div><div class="lesson-tag-badge">PRO Tool</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module9.html#lesson2" class="lesson" onclick="markDone('9-2')"><div class="lesson-icon">⚡</div><div class="lesson-body"><div class="lesson-title">Using the App in Your Daily Workflow</div><div class="lesson-desc">Sales calls, proposals, client delivery — all faster.</div><div class="lesson-tag-badge">Workflow</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module9.html#lesson3" class="lesson" onclick="markDone('9-3')"><div class="lesson-icon">💰</div><div class="lesson-body"><div class="lesson-title">Sell App Access to Clients</div><div class="lesson-desc">$49–$197/month passive income per client.</div><div class="lesson-tag-badge">Revenue</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 10 -->
+  <div class="module pro-module" id="mod-10">
+    <div class="module-header" onclick="toggleModule('mod-10')">
+      <div class="module-num">10</div>
+      <div class="module-info"><div class="module-title">Voice AI Agent — Phone Calls on Autopilot <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Voice AI · ~90 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module10.html#lesson1" class="lesson" onclick="markDone('10-1')"><div class="lesson-icon">📞</div><div class="lesson-body"><div class="lesson-title">Twilio + ElevenLabs Setup</div><div class="lesson-desc">Phone number, AI voice, API keys — complete setup.</div><div class="lesson-tag-badge">Setup</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module10.html#lesson2" class="lesson" onclick="markDone('10-2')"><div class="lesson-icon">🗣️</div><div class="lesson-body"><div class="lesson-title">Build the Voice Agent</div><div class="lesson-desc">Complete code, Render deploy, Twilio connection.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module10.html#lesson3" class="lesson" onclick="markDone('10-3')"><div class="lesson-icon">💰</div><div class="lesson-body"><div class="lesson-title">Sell for $1,500–$3,000</div><div class="lesson-desc">Demo script that closes on every call.</div><div class="lesson-tag-badge">Sales</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 11 -->
+  <div class="module pro-module" id="mod-11">
+    <div class="module-header" onclick="toggleModule('mod-11')">
+      <div class="module-num">11</div>
+      <div class="module-info"><div class="module-title">Webhook Mastery <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Advanced Technical · ~75 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module11.html#lesson1" class="lesson" onclick="markDone('11-1')"><div class="lesson-icon">🔗</div><div class="lesson-body"><div class="lesson-title">How Webhooks Work</div><div class="lesson-desc">Complete technical understanding — JSON, flows, inspection.</div><div class="lesson-tag-badge">Technical</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module11.html#lesson2" class="lesson" onclick="markDone('11-2')"><div class="lesson-icon">⚙️</div><div class="lesson-body"><div class="lesson-title">Advanced Webhook Patterns</div><div class="lesson-desc">Router, verification, response with data.</div><div class="lesson-tag-badge">Advanced</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module11.html#lesson3" class="lesson" onclick="markDone('11-3')"><div class="lesson-icon">🔧</div><div class="lesson-body"><div class="lesson-title">Debug &amp; Troubleshoot</div><div class="lesson-desc">5-step process that solves 95% of webhook problems.</div><div class="lesson-tag-badge">Debugging</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 12 -->
+  <div class="module pro-module" id="mod-12">
+    <div class="module-header" onclick="toggleModule('mod-12')">
+      <div class="module-num">12</div>
+      <div class="module-info"><div class="module-title">AI Proposal Generator <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Agency Ops · ~60 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module12.html#lesson1" class="lesson" onclick="markDone('12-1')"><div class="lesson-icon">📋</div><div class="lesson-body"><div class="lesson-title">The Proposal System That Closes More Deals</div><div class="lesson-desc">What every winning proposal includes and why.</div><div class="lesson-tag-badge">Strategy</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module12.html#lesson2" class="lesson" onclick="markDone('12-2')"><div class="lesson-icon">⚡</div><div class="lesson-body"><div class="lesson-title">Build the AI Proposal Generator</div><div class="lesson-desc">Post-call form → GPT → professional proposal in 60 seconds.</div><div class="lesson-tag-badge">Build</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module12.html#lesson3" class="lesson" onclick="markDone('12-3')"><div class="lesson-icon">🔄</div><div class="lesson-body"><div class="lesson-title">Track &amp; Follow Up Automatically</div><div class="lesson-desc">Day 3 and Day 7 follow-ups sent automatically.</div><div class="lesson-tag-badge">Automation</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 13 -->
+  <div class="module pro-module" id="mod-13">
+    <div class="module-header" onclick="toggleModule('mod-13')">
+      <div class="module-num">13</div>
+      <div class="module-info"><div class="module-title">Stripe Recurring Billing <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Business Ops · ~60 min</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module13.html#lesson1" class="lesson" onclick="markDone('13-1')"><div class="lesson-icon">💳</div><div class="lesson-body"><div class="lesson-title">Stripe Setup — Professional Billing System</div><div class="lesson-desc">Account, products, API keys — complete setup.</div><div class="lesson-tag-badge">Setup</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module13.html#lesson2" class="lesson" onclick="markDone('13-2')"><div class="lesson-icon">🔁</div><div class="lesson-body"><div class="lesson-title">Create Monthly Subscriptions</div><div class="lesson-desc">Payment Links and Checkout Sessions — clients pay once, you collect forever.</div><div class="lesson-tag-badge">Billing</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module13.html#lesson3" class="lesson" onclick="markDone('13-3')"><div class="lesson-icon">⚡</div><div class="lesson-body"><div class="lesson-title">Automate All Billing Workflows</div><div class="lesson-desc">Welcome, failed payment recovery, cancellation handling.</div><div class="lesson-tag-badge">Automation</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+  <!-- MODULE 14 -->
+  <div class="module pro-module" id="mod-14">
+    <div class="module-header" onclick="toggleModule('mod-14')">
+      <div class="module-num">14</div>
+      <div class="module-info"><div class="module-title">Agency Website + Enterprise Growth <span class="pro-badge-inline">PRO</span></div><div class="module-meta-text">3 Lessons · Growth · ~75 min — FINAL</div></div>
+      <div class="module-toggle">+</div>
+    </div>
+    <div class="lessons">
+      <a href="/module14.html#lesson1" class="lesson" onclick="markDone('14-1')"><div class="lesson-icon">🌐</div><div class="lesson-body"><div class="lesson-title">Build Your Agency Website in One Day</div><div class="lesson-desc">6 sections every agency site needs — built on Carrd.co free.</div><div class="lesson-tag-badge">Website</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module14.html#lesson2" class="lesson" onclick="markDone('14-2')"><div class="lesson-icon">📈</div><div class="lesson-body"><div class="lesson-title">Scale to $10K/Month</div><div class="lesson-desc">Pricing strategy, referral system, industry specialization.</div><div class="lesson-tag-badge">Growth</div></div><div class="lesson-arrow">→</div></a>
+      <a href="/module14.html#lesson3" class="lesson" onclick="markDone('14-3')"><div class="lesson-icon">🏢</div><div class="lesson-body"><div class="lesson-title">Landing Enterprise Clients — $5K–$20K Projects</div><div class="lesson-desc">Proposals, SLAs, pilot approach, LinkedIn strategy.</div><div class="lesson-tag-badge">Enterprise</div></div><div class="lesson-arrow">→</div></a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── ACCESS GUARD ──
+(function(){
+  var plan = localStorage.getItem('acs_plan');
+  if (plan !== 'pro') { window.location.replace('/access.html'); }
+})();
+
+var done = JSON.parse(localStorage.getItem('pro_lessons') || '[]');
+function updateProgress(){
+  var pct = (done.length / 42) * 100;
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-label').textContent = done.length + ' / 42 lessons';
+  done.forEach(function(id){
+    var rows = document.querySelectorAll('.lesson');
+    rows.forEach(function(r){ if(r.getAttribute('onclick') && r.getAttribute('onclick').includes("'"+id+"'")) r.classList.add('done'); });
+  });
+}
+function markDone(id){
+  if(done.indexOf(id)===-1){ done.push(id); localStorage.setItem('pro_lessons', JSON.stringify(done)); }
+}
+function toggleModule(id){
+  var mod = document.getElementById(id);
+  var isOpen = mod.classList.contains('open');
+  document.querySelectorAll('.module').forEach(function(m){ m.classList.remove('open'); });
+  if(!isOpen) mod.classList.add('open');
+}
+updateProgress();
+document.getElementById('mod-1').classList.add('open');
+
+</script>
+<script src="/lang.js"></script>
+</body>
+</html>

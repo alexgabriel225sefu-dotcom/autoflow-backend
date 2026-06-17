@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AI Cash Systems — Access Your Course</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#fff;font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;-webkit-font-smoothing:antialiased}
+:root{--r:#E53E2E;--r2:#FF5544}
+
+.card{background:#0f0f0f;border:1px solid #1a1a1a;border-radius:16px;padding:44px 36px;width:100%;max-width:400px}
+
+.logo{display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:36px}
+.logo-tri{width:20px;height:20px;background:var(--r);clip-path:polygon(50% 0%,100% 100%,0% 100%)}
+.logo-text{font-size:13px;font-weight:800;letter-spacing:.5px;color:#fff}
+
+h1{font-size:26px;font-weight:900;letter-spacing:-1px;text-align:center;margin-bottom:8px;color:#fff}
+.sub{font-size:13px;color:#555;text-align:center;margin-bottom:32px;line-height:1.65}
+
+.divider{height:1px;background:#161616;margin-bottom:28px}
+
+.label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#444;margin-bottom:8px;display:block}
+input{width:100%;background:#111;border:1px solid #1e1e1e;border-radius:8px;padding:14px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;letter-spacing:4px;text-transform:uppercase;outline:none;text-align:center;transition:border-color .2s;margin-bottom:20px}
+input:focus{border-color:var(--r)}
+input::placeholder{letter-spacing:1px;text-transform:none;font-weight:400;font-size:13px;color:#333}
+
+.btn{width:100%;padding:14px;background:var(--r);border:none;border-radius:8px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;cursor:pointer;transition:all .2s;margin-bottom:12px}
+.btn:hover{background:var(--r2);transform:translateY(-1px)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+.err{background:rgba(229,62,46,.08);border:1px solid rgba(229,62,46,.2);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--r);text-align:center;margin-bottom:16px;display:none}
+.err.show{display:block}
+.succ{background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.18);border-radius:8px;padding:11px 14px;font-size:12px;color:#4ade80;text-align:center;margin-bottom:16px;display:none}
+.succ.show{display:block}
+
+.loading{display:none;text-align:center;padding:8px 0;margin-bottom:16px}
+.spin{width:18px;height:18px;border:2px solid rgba(229,62,46,.2);border-top-color:var(--r);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.secure{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:#333;margin-top:4px}
+.back{display:block;text-align:center;margin-top:20px;font-size:12px;color:#444;text-decoration:none;transition:color .2s}
+.back:hover{color:#888}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-tri"></div>
+    <span class="logo-text">AI CASH SYSTEMS</span>
+  </div>
+
+  <h1>Access Your Course</h1>
+  <p class="sub">Enter the access code from your purchase email.</p>
+  <div class="divider"></div>
+
+  <div class="err" id="err">Invalid code. Check your email and try again.</div>
+  <div class="succ" id="succ">✓ Verified! Redirecting to your course...</div>
+  <div class="loading" id="loading"><div class="spin"></div></div>
+
+  <label class="label">Access Code</label>
+  <input type="text" id="codeInput" placeholder="Enter your code" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false"/>
+
+  <button class="btn" id="accessBtn" onclick="checkCode()">Access My Course →</button>
+  <div class="secure">🔒 Secured · Tied to your purchase</div>
+  <a href="/" class="back">← Back to homepage</a>
+</div>
+
+<script>
+async function checkCode(){
+  const code = document.getElementById('codeInput').value.trim().toUpperCase();
+  const btn = document.getElementById('accessBtn');
+  const err = document.getElementById('err');
+  const succ = document.getElementById('succ');
+  const load = document.getElementById('loading');
+
+  err.classList.remove('show');
+  succ.classList.remove('show');
+
+  if(!code || code.length < 6){
+    err.textContent = 'Please enter your access code.';
+    err.classList.add('show');
+    return;
+  }
+
+  btn.disabled = true;
+  load.style.display = 'block';
+
+  try {
+    const response = await fetch('/api/verify-code', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({code})
+    });
+    const data = await response.json();
+    if(data.valid || data.success){
+      succ.classList.add('show');
+      localStorage.setItem('acs_code', code);
+      localStorage.setItem('acs_plan', data.plan || 'starter');
+      setTimeout(() => {
+        window.location.href = data.plan === 'pro' ? '/course-pro.html' : '/course-starter.html';
+      }, 1400);
+    } else {
+      err.textContent = data.error || 'Invalid access code. Please check your email.';
+      err.classList.add('show');
+      btn.disabled = false;
+      load.style.display = 'none';
+    }
+  } catch(e) {
+    err.textContent = 'Connection error. Please try again.';
+    err.classList.add('show');
+    btn.disabled = false;
+    load.style.display = 'none';
+  }
+}
+
+document.getElementById('codeInput').addEventListener('keypress', e => { if(e.key === 'Enter') checkCode(); });
+document.getElementById('codeInput').addEventListener('input', function(){ this.value = this.value.toUpperCase(); });
+</script>
+<script src="/lang.js"></script>
+</body>
+</html>

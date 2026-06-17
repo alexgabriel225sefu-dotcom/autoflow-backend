@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HeyGen — Foto Avatar</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#060606;color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px 16px 80px;max-width:560px;margin:0 auto}
+h1{font-size:20px;font-weight:900;color:#2aabee;margin-bottom:3px}
+.sub{font-size:11px;color:#444;margin-bottom:24px}
+.lbl{font-size:10px;color:#444;letter-spacing:2px;text-transform:uppercase;margin:22px 0 10px}
+
+/* STEP CARD */
+.step-card{background:#0d0d0d;border:1.5px solid #1a1a1a;border-radius:14px;padding:18px 16px;margin-bottom:16px}
+.step-card h2{font-size:13px;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.step-num{background:#2aabee;color:#000;font-size:10px;font-weight:900;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-card p{font-size:11px;color:#555;line-height:1.6;margin-bottom:12px}
+
+/* INPUTS */
+.inp{background:#080808;border:1.5px solid #1a1a1a;border-radius:10px;padding:11px 14px;color:#e0e0e0;font-size:12px;outline:none;width:100%;font-family:monospace}
+.inp:focus{border-color:rgba(42,171,238,.4)}
+.inp::placeholder{color:#333}
+.ta{min-height:110px;resize:vertical;line-height:1.7;font-family:inherit}
+.wc{font-size:10px;color:#333;text-align:right;margin-top:4px}
+
+/* PHOTO UPLOAD */
+.photo-drop{
+  border:2px dashed #1a1a1a;border-radius:12px;
+  padding:28px 16px;text-align:center;cursor:pointer;
+  transition:border-color .2s;position:relative;
+  background:#080808;
+}
+.photo-drop:hover,.photo-drop.drag{border-color:rgba(42,171,238,.4);background:rgba(42,171,238,.03)}
+.photo-drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.photo-icon{font-size:32px;margin-bottom:8px}
+.photo-drop p{font-size:12px;color:#444;line-height:1.6}
+.photo-drop strong{color:#2aabee}
+.photo-preview{display:none;width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-top:10px}
+
+/* VOICE SELECT */
+.voice-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.voice-card{background:#080808;border:1.5px solid #1a1a1a;border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .2s}
+.voice-card.sel{border-color:#2aabee;background:rgba(42,171,238,.05)}
+.voice-name{font-size:12px;font-weight:700;color:#e0e0e0}
+.voice-lang{font-size:10px;color:#444;margin-top:2px}
+
+/* SCRIPTS */
+.sc-card{background:#0d0d0d;border:1px solid #1a1a1a;border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .2s}
+.sc-card.sel{border-color:rgba(42,171,238,.5);background:#050d12}
+.sc-badge{display:inline-block;background:rgba(42,171,238,.1);border:1px solid rgba(42,171,238,.2);color:#2aabee;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;margin-bottom:5px}
+.sc-title{font-size:12px;font-weight:700;color:#e0e0e0}
+
+/* BUTTON */
+.gen-btn{width:100%;background:linear-gradient(135deg,#2aabee,#1a8fc9);color:#fff;border:none;border-radius:13px;padding:17px;font-size:15px;font-weight:900;cursor:pointer;margin-top:20px;box-shadow:0 4px 28px rgba(42,171,238,.3);letter-spacing:.3px;transition:opacity .2s}
+.gen-btn:disabled{opacity:.3;cursor:default}
+
+/* STATUS */
+.status-box{margin-top:16px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:12px;padding:16px;display:none}
+.s-row{display:flex;align-items:center;gap:12px}
+.s-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#F59E0B;animation:blink 1.2s ease infinite}
+.s-dot.done{background:#4ADE80;animation:none}
+.s-dot.err{background:#f87171;animation:none}
+@keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+.s-txt{font-size:13px;font-weight:700}
+.s-sub{font-size:11px;color:#444;margin-top:2px}
+.prog-bg{height:3px;background:#111;border-radius:3px;overflow:hidden;margin-top:10px}
+.prog{height:100%;background:linear-gradient(90deg,#2aabee,#7dd3f9);border-radius:3px;transition:width 4s ease}
+
+/* RESULT */
+.result-box{margin-top:16px;display:none}
+.result-box video{width:100%;border-radius:12px;border:1px solid #1a1a1a;background:#000}
+.dl-row{display:flex;gap:8px;margin-top:10px}
+.dl-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:13px;background:#4ADE80;color:#000;border:none;border-radius:11px;font-size:13px;font-weight:900;cursor:pointer;text-decoration:none}
+
+/* TIPS */
+.tips{background:#0a0a0a;border:1px solid #111;border-radius:10px;padding:12px 14px;margin-top:20px}
+.tips-title{font-size:9px;color:#2a2a2a;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px}
+.tip{font-size:11px;color:#333;line-height:1.7;padding:1px 0}
+.tip strong{color:#484848}
+
+.alert-box{background:rgba(42,171,238,.06);border:1px solid rgba(42,171,238,.15);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:11px;color:#4a9ec0;line-height:1.7}
+.alert-box a{color:#2aabee;text-decoration:none}
+</style>
+</head>
+<body>
+
+<h1>📸 Foto Avatar Video</h1>
+<p class="sub">HeyGen — trimite o poză, generează video cu fața ta vorbind</p>
+
+<div class="alert-box">
+  Ai nevoie de un cont <strong>HeyGen Creator</strong> (~$29/lună) cu trial gratuit de 1 credit.<br>
+  <a href="https://www.heygen.com" target="_blank" rel="noopener">→ Creează cont gratuit pe heygen.com</a>
+</div>
+
+<!-- STEP 1: API KEY -->
+<div class="step-card" id="step-key">
+  <h2><div class="step-num">1</div> Cheie API HeyGen</h2>
+  <p>heygen.com → Settings → API → copiază cheia</p>
+  <input class="inp" id="hk-input" type="password" placeholder="Bearer eyJhbGci...">
+  <button onclick="saveKey()" style="width:100%;background:rgba(42,171,238,.15);border:1px solid rgba(42,171,238,.25);color:#2aabee;border-radius:8px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;margin-top:8px">Salvează →</button>
+  <div id="key-ok" style="display:none;font-size:11px;color:#4ade80;text-align:center;margin-top:6px">✅ Cheie salvată!</div>
+</div>
+
+<!-- STEP 2: PHOTO -->
+<div class="step-card">
+  <h2><div class="step-num">2</div> Poza ta</h2>
+  <p>Față clară, lumină bună, privire spre cameră. JPG sau PNG, min 512px.</p>
+  <div class="photo-drop" id="photo-drop">
+    <input type="file" accept="image/jpeg,image/png,image/webp" onchange="onPhoto(this)">
+    <div class="photo-icon">📷</div>
+    <p>Apasă sau trage poza aici<br><strong>JPG / PNG / WEBP</strong></p>
+    <img class="photo-preview" id="photo-preview">
+  </div>
+  <div id="photo-status" style="font-size:11px;color:#444;margin-top:8px;text-align:center"></div>
+</div>
+
+<!-- STEP 3: SCRIPT -->
+<div class="step-card">
+  <h2><div class="step-num">3</div> Script (ce vei spune)</h2>
+  <p>Alege unul sau scrie propria versiune. Max 90 cuvinte.</p>
+
+  <div class="sc-card sel" id="sc0" onclick="pickScript(0)">
+    <div class="sc-badge">⭐ UGC #1</div>
+    <div class="sc-title">"Verificam telefonul la 3 dimineața"</div>
+  </div>
+  <div class="sc-card" id="sc1" onclick="pickScript(1)">
+    <div class="sc-badge">UGC #2</div>
+    <div class="sc-title">"Eu muncesc 8 ore. Botul muncește 24."</div>
+  </div>
+  <div class="sc-card" id="sc2" onclick="pickScript(2)">
+    <div class="sc-badge">UGC #3</div>
+    <div class="sc-title">"Crypto nu se oprește când dormi"</div>
+  </div>
+
+  <div class="lbl" style="margin-top:14px">Script (editabil)</div>
+  <textarea class="inp ta" id="script-ta" oninput="updateWC()" spellcheck="false"></textarea>
+  <div class="wc" id="wc">0 / 90 cuvinte</div>
+</div>
+
+<!-- STEP 4: VOICE -->
+<div class="step-card">
+  <h2><div class="step-num">4</div> Voce</h2>
+  <p>Selectează vocea pentru video. Recomandat: engleză pentru reach maxim pe TikTok.</p>
+  <div class="voice-grid" id="voice-grid">
+    <div class="voice-card sel" onclick="pickVoice(this,'2d5b0e6cf36f460aa7fc47e3eee4ba54')">
+      <div class="voice-name">Ryan</div>
+      <div class="voice-lang">Engleză • Casual</div>
+    </div>
+    <div class="voice-card" onclick="pickVoice(this,'1bd001e7e50f421d891986aad5158bc8')">
+      <div class="voice-name">Josh</div>
+      <div class="voice-lang">Engleză • Confident</div>
+    </div>
+    <div class="voice-card" onclick="pickVoice(this,'en-US-TonyNeural')">
+      <div class="voice-name">Tony</div>
+      <div class="voice-lang">Engleză • Friendly</div>
+    </div>
+    <div class="voice-card" onclick="pickVoice(this,'en-US-GuyNeural')">
+      <div class="voice-name">Guy</div>
+      <div class="voice-lang">Engleză • Natural</div>
+    </div>
+  </div>
+</div>
+
+<!-- GENERATE -->
+<button class="gen-btn" id="gen-btn" onclick="generate()">⚡ Generează Video cu Fața Mea</button>
+
+<!-- STATUS -->
+<div class="status-box" id="status-box">
+  <div class="s-row">
+    <div class="s-dot" id="s-dot"></div>
+    <div>
+      <div class="s-txt" id="s-txt">Se procesează…</div>
+      <div class="s-sub" id="s-sub">HeyGen randează (2–5 minute)</div>
+    </div>
+  </div>
+  <div class="prog-bg"><div class="prog" id="prog" style="width:5%"></div></div>
+</div>
+
+<!-- RESULT -->
+<div class="result-box" id="result-box">
+  <video id="rv" controls playsinline></video>
+  <div class="dl-row">
+    <a class="dl-btn" id="dl-btn" download="apex-bot-ugc.mp4">⬇️ Descarcă</a>
+  </div>
+</div>
+
+<!-- TIPS -->
+<div class="tips">
+  <div class="tips-title">💡 Tips pentru poze bune</div>
+  <div class="tip"><strong>Lumina:</strong> Stai cu fața la fereastră, nu cu spatele</div>
+  <div class="tip"><strong>Unghi:</strong> La nivelul ochilor, nu de jos în sus</div>
+  <div class="tip"><strong>Fundal:</strong> Simplu — un perete alb sau gri</div>
+  <div class="tip"><strong>Expresie:</strong> Neutru sau ușor zâmbet, nu grimasă</div>
+  <div class="tip"><strong>Rezoluție:</strong> Min 512×512px, ideal 1024px+</div>
+</div>
+
+<script>
+const SCRIPTS=[
+`I was checking my phone every hour at night because I was scared I'd miss a trade.
+
+I tried signals groups. Paid fifty dollars a month. Still had to be there to press the button myself.
+
+Then I set up this bot. It connects to Bybit, runs on its own, and trades while I sleep.
+
+Last week I woke up and it had made nine trades overnight. Was up a hundred and eighty three dollars before I even had coffee.
+
+One-time thing, like three hundred dollars. Link's below.`,
+
+`I work nine to six. The crypto market moves at three AM. That's not a schedule I can compete with manually.
+
+So I set up a trading bot. One time setup, runs twenty four seven on its own server. I just check the results in the morning.
+
+Link in bio.`,
+
+`I've missed so many big crypto moves because I was asleep.
+
+ETH pumped overnight. BTC dropped and recovered while I was at work.
+
+I stopped trading manually and set up a bot. It watches the market all day, all night.
+
+Link in bio if you're tired of missing moves.`
+];
+
+let selScript=0, selVoice='2d5b0e6cf36f460aa7fc47e3eee4ba54';
+let heyKey='', photoFile=null, pollTimer=null;
+
+/* key */
+function saveKey(){
+  const k=document.getElementById('hk-input').value.trim();
+  if(!k){alert('Introdu cheia API din HeyGen.');return;}
+  localStorage.setItem('heygen_key',k);
+  heyKey=k;
+  document.getElementById('key-ok').style.display='block';
+  setTimeout(()=>document.getElementById('key-ok').style.display='none',2000);
+}
+function loadKey(){
+  heyKey=localStorage.getItem('heygen_key')||'';
+  if(heyKey) document.getElementById('hk-input').value='••••••••••••';
+}
+
+/* photo */
+function onPhoto(input){
+  const f=input.files[0];
+  if(!f)return;
+  photoFile=f;
+  const url=URL.createObjectURL(f);
+  const prev=document.getElementById('photo-preview');
+  prev.src=url;prev.style.display='block';
+  document.getElementById('photo-status').textContent='✅ Poză selectată: '+f.name;
+}
+
+/* script */
+function pickScript(idx){
+  document.querySelectorAll('.sc-card').forEach((c,i)=>c.classList.toggle('sel',i===idx));
+  selScript=idx;
+  document.getElementById('script-ta').value=SCRIPTS[idx];
+  updateWC();
+}
+function updateWC(){
+  const t=document.getElementById('script-ta').value.trim();
+  const w=t?t.split(/\s+/).length:0;
+  const el=document.getElementById('wc');
+  el.textContent=`${w} / 90 cuvinte`;
+  el.style.color=w>90?'#f87171':'#333';
+}
+
+/* voice */
+function pickVoice(el,id){
+  document.querySelectorAll('.voice-card').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  selVoice=id;
+}
+
+/* generate */
+async function generate(){
+  if(!heyKey){alert('Salvează cheia API HeyGen mai întâi.');return;}
+  if(!photoFile){alert('Selectează o poză mai întâi.');return;}
+  const script=document.getElementById('script-ta').value.trim();
+  if(!script||script.split(/\s+/).length<5){alert('Scriptul e prea scurt.');return;}
+
+  const btn=document.getElementById('gen-btn');
+  btn.disabled=true;btn.textContent='Se procesează…';
+
+  const sb=document.getElementById('status-box');
+  sb.style.display='block';
+  setStatus('proc','Se încarcă poza pe HeyGen…','Creează avatar din fața ta');
+  setProgress(10);
+
+  try{
+    // 1. Convert photo to base64 then send as JSON
+    const b64=await new Promise((ok,fail)=>{
+      const fr=new FileReader();
+      fr.onload=e=>ok(e.target.result.split(',')[1]);
+      fr.onerror=fail;
+      fr.readAsDataURL(photoFile);
+    });
+
+    const resp=await fetch('/api/heygen/photo-generate',{
+      method:'POST',
+      headers:{'X-HeyGen-Key':heyKey,'Content-Type':'application/json'},
+      body:JSON.stringify({image_b64:b64,mime_type:photoFile.type,script,voice_id:selVoice})
+    });
+    if(!resp.ok){
+      const e=await resp.json().catch(()=>({}));
+      throw new Error(e.error||'Eroare server '+resp.status);
+    }
+    const data=await resp.json();
+    const vid_id=data.video_id;
+    if(!vid_id)throw new Error('Nu s-a primit video_id de la HeyGen');
+
+    setStatus('proc','Video în curs de randare…','HeyGen procesează (2–5 minute)');
+    setProgress(30);
+    pollStatus(vid_id);
+
+  }catch(err){
+    setStatus('err','Eroare: '+err.message,'Verifică cheia API și poza');
+    btn.disabled=false;btn.textContent='⚡ Generează Video cu Fața Mea';
+  }
+}
+
+function setStatus(type,txt,sub){
+  const dot=document.getElementById('s-dot');
+  dot.className='s-dot'+(type==='done'?' done':type==='err'?' err':'');
+  document.getElementById('s-txt').textContent=txt;
+  document.getElementById('s-sub').textContent=sub;
+}
+function setProgress(p){
+  document.getElementById('prog').style.width=p+'%';
+}
+
+async function pollStatus(vid_id){
+  let attempts=0;
+  const check=async()=>{
+    attempts++;
+    try{
+      const r=await fetch(`/api/heygen/status/${vid_id}`,{
+        headers:{'X-HeyGen-Key':heyKey}
+      });
+      const d=await r.json();
+      const status=d.status||d.video_status;
+      const pct=Math.min(30+attempts*8,90);
+      setProgress(pct);
+
+      if(status==='completed'||status==='success'){
+        const url=d.video_url||d.url;
+        setStatus('done','Video gata!','Descarcă și postează pe TikTok');
+        setProgress(100);
+        showResult(url);
+        return;
+      }
+      if(status==='failed'||status==='error'){
+        throw new Error('HeyGen a raportat eroare: '+(d.error||status));
+      }
+      pollTimer=setTimeout(check,6000);
+    }catch(e){
+      if(attempts<25){
+        pollTimer=setTimeout(check,8000);
+      }else{
+        setStatus('err','Timeout — verifică HeyGen dashboard','Video poate fi gata în dashboard');
+      }
+    }
+  };
+  check();
+}
+
+function showResult(url){
+  const rb=document.getElementById('result-box');
+  rb.style.display='block';
+  const v=document.getElementById('rv');
+  v.src=url;v.load();
+  document.getElementById('dl-btn').href=url;
+  document.getElementById('gen-btn').disabled=false;
+  document.getElementById('gen-btn').textContent='⚡ Generează alt video';
+}
+
+// init
+loadKey();
+pickScript(0);
+
+// drag-drop visual
+const drop=document.getElementById('photo-drop');
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag')});
+drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
+drop.addEventListener('drop',e=>{
+  e.preventDefault();drop.classList.remove('drag');
+  const f=e.dataTransfer.files[0];
+  if(f&&f.type.startsWith('image/')){photoFile=f;const u=URL.createObjectURL(f);document.getElementById('photo-preview').src=u;document.getElementById('photo-preview').style.display='block';document.getElementById('photo-status').textContent='✅ '+f.name;}
+});
+</script>
+</body>
+</html>

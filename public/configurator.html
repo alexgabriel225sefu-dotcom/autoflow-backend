@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crypto Bot Configurator — Apex Trade Bot</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060608;--bg1:#0b0b0e;--panel:#111115;--panel2:#18181d;--hov:#1e1e23;
+  --ln:rgba(255,255,255,.07);--ln2:rgba(255,255,255,.13);
+  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
+  --a:#ff2d4f;--a2:#ff5c74;--a3:#ff97a8;
+  --adim:rgba(255,45,79,.12);--aglow:rgba(255,45,79,.4);
+  --up:#27c46a;--dn:#ff2d4f;
+  --d:'Clash Display',system-ui,sans-serif;
+  --f:'Satoshi',system-ui,sans-serif;
+  --m:'JetBrains Mono',monospace;
+  --e:cubic-bezier(.32,.72,0,1)
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;min-height:100dvh}
+a{color:var(--a3)}
+input,button,textarea,select{font-family:var(--f)}
+
+/* Gate */
+#gate{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:20px}
+.gc{width:100%;max-width:440px;background:var(--panel);border:1px solid var(--ln2);border-radius:28px;padding:40px 36px;text-align:center}
+.gc .brand{font:700 17px/1 var(--d);letter-spacing:-.3px;margin-bottom:30px}
+.gc .brand b{color:var(--a)}
+.gc h2{font:700 23px/1.1 var(--d);letter-spacing:-.5px;margin-bottom:8px}
+.gc p{font:400 14px/1.65 var(--f);color:var(--t1);margin-bottom:26px}
+.gi{width:100%;background:var(--bg1);border:2px solid var(--ln2);border-radius:14px;color:var(--t0);font:600 14px/1 var(--m);padding:16px;outline:none;letter-spacing:.08em;transition:border-color .2s;text-align:center}
+.gi:focus{border-color:var(--a)}
+.gi::placeholder{color:var(--t2);font-weight:400;letter-spacing:.02em}
+.gb{margin-top:12px;width:100%;background:var(--a);color:#fff;font:700 15px/1 var(--f);border:none;border-radius:14px;padding:17px;cursor:pointer;transition:all .25s var(--e)}
+.gb:hover{background:var(--a2);box-shadow:0 12px 36px var(--aglow)}
+.gb:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.ge{margin-top:10px;font:500 12.5px var(--f);color:var(--a);min-height:18px}
+.gl{margin-top:20px;font:400 13px var(--f);color:var(--t2)}
+.gl a{color:var(--a3);border-bottom:1px dotted rgba(255,151,168,.4)}
+
+/* Nav */
+nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,3vw,40px);background:rgba(6,6,8,.88);backdrop-filter:blur(20px);border-bottom:1px solid var(--ln)}
+.nbrand{font:700 16px/1 var(--d);letter-spacing:-.3px;display:flex;align-items:center;gap:10px}
+.nbrand b{color:var(--a)}
+.ntag{font:600 11px/1 var(--m);color:var(--t2);background:var(--panel);border:1px solid var(--ln2);border-radius:99px;padding:6px 12px;letter-spacing:.05em}
+
+/* Layout */
+.wrap{max-width:1200px;margin:0 auto;padding:36px clamp(16px,3vw,40px) 80px}
+.ew{display:inline-flex;align-items:center;gap:8px;background:var(--adim);border:1px solid rgba(255,45,79,.24);color:var(--a3);border-radius:100px;padding:6px 14px;font:600 11px/1 var(--m);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
+.ew i{width:6px;height:6px;border-radius:50%;background:var(--a);box-shadow:0 0 9px var(--a);display:block;flex-shrink:0}
+.ph h1{font:600 clamp(26px,3vw,38px)/1.08 var(--d);letter-spacing:-.04em;margin-bottom:10px}
+.ph p{font:400 14px/1.7 var(--f);color:var(--t1);max-width:580px;margin-bottom:32px}
+
+/* Two columns */
+.cols{display:grid;grid-template-columns:1fr 336px;gap:24px;align-items:start}
+@media(max-width:900px){.cols{grid-template-columns:1fr}.side{position:static!important}}
+
+/* Section cards */
+.sec{background:var(--panel);border:1px solid var(--ln);border-radius:20px;overflow:hidden;margin-bottom:18px}
+.sh{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--ln);background:var(--bg1)}
+.sn{width:26px;height:26px;border-radius:9px;background:var(--adim);color:var(--a);font:700 12px/1 var(--m);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sh strong{font:600 15px/1 var(--d);letter-spacing:-.02em}
+.sh em{font:400 12px var(--f);color:var(--t2);margin-left:auto;font-style:normal}
+.sb{padding:22px}
+
+/* Exchange grid */
+.exg{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:8px}
+@media(max-width:600px){.exg{grid-template-columns:repeat(2,1fr)}}
+.exc{background:var(--bg1);border:1px solid var(--ln);border-radius:14px;padding:13px 8px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;user-select:none}
+.exc:hover{border-color:var(--ln2)}
+.exc.on{border-color:var(--a);background:var(--adim)}
+.xi{font:700 13px/1 var(--m);color:var(--a3);margin-bottom:6px;letter-spacing:.05em}
+.xn{font:600 12px/1 var(--d)}
+.xb{font:600 9.5px/1 var(--m);text-transform:uppercase;letter-spacing:.07em;margin-top:5px;padding:3px 7px;border-radius:5px;display:inline-block}
+.bLv{background:rgba(39,196,106,.14);color:#4ade80}
+.bBt{background:rgba(255,255,255,.05);color:var(--t2)}
+
+/* Mode cards */
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.mc{background:var(--bg1);border:1px solid var(--ln);border-radius:14px;padding:14px;cursor:pointer;transition:border-color .2s,background .2s;user-select:none}
+.mc:hover{border-color:var(--ln2)}
+.mc.on{border-color:var(--a);background:var(--adim)}
+.mc.onL{border-color:#f43f5e;background:rgba(244,63,94,.07)}
+.mc strong{font:600 13.5px/1 var(--d);display:block;margin-bottom:6px}
+.mc span{font:400 12px/1.55 var(--f);color:var(--t1)}
+.warn{background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);border-radius:12px;padding:12px 15px;font:400 12px/1.6 var(--f);color:#fca5a5;margin-top:12px;display:none}
+
+/* Slider rows */
+.row{margin-bottom:22px}.row:last-child{margin-bottom:0}
+.rl{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px}
+.rl label{font:600 13px/1 var(--f);color:var(--t1)}
+.rv{font:700 14px/1 var(--m);color:var(--a3)}
+input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:4px;background:var(--panel2);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--a);border:3px solid var(--bg);box-shadow:0 0 0 1px var(--a);cursor:pointer;transition:transform .15s}
+input[type=range]::-webkit-slider-thumb:active{transform:scale(1.18)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--a);border:3px solid var(--bg);cursor:pointer}
+.hn{font:400 12px/1.55 var(--f);color:var(--t2);margin-top:5px}
+.hn b{color:var(--t0);font-weight:600}
+
+/* Toggle rows */
+.trow{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-top:1px solid var(--ln)}
+.trow:first-child{border-top:none;padding-top:0}
+.tt strong{font:600 13px/1.2 var(--d);display:block;margin-bottom:4px}
+.tt span{font:400 12px/1.55 var(--f);color:var(--t2)}
+.tgl{margin-left:auto;flex-shrink:0;width:44px;height:25px;border-radius:99px;background:var(--panel2);border:1px solid var(--ln2);position:relative;cursor:pointer;transition:background .2s}
+.tgl::after{content:'';position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:var(--t2);transition:transform .2s,background .2s}
+.tgl.on{background:var(--a);border-color:var(--a)}
+.tgl.on::after{transform:translateX(19px);background:#060608}
+
+/* Text inputs */
+.inp{width:100%;background:var(--bg1);border:1px solid var(--ln2);border-radius:12px;color:var(--t0);font:500 13px var(--m);padding:12px 14px;outline:none;transition:border-color .2s;margin-top:7px;display:block}
+.inp:focus{border-color:var(--a)}
+.inp::placeholder{color:var(--t2)}
+.ilbl{font:600 12.5px/1 var(--f);color:var(--t1);margin-top:18px;display:block}
+.ilbl:first-child{margin-top:0}
+
+/* AI tabs */
+.aitabs{display:flex;gap:8px;margin-top:8px}
+.aitab{flex:1;background:var(--bg1);border:1px solid var(--ln);border-radius:11px;padding:11px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;font:600 12.5px/1 var(--d)}
+.aitab:hover{border-color:var(--ln2)}
+.aitab.on{border-color:var(--a);background:var(--adim);color:var(--a3)}
+
+/* Summary */
+.side{position:sticky;top:72px}
+.sum{background:var(--panel);border:1px solid var(--ln2);border-radius:20px;overflow:hidden}
+.smh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--ln);background:var(--bg1)}
+.smh strong{font:600 14px/1 var(--d)}
+.sbadge{font:700 10px/1 var(--m);letter-spacing:.1em;text-transform:uppercase;border-radius:7px;padding:5px 10px}
+.bPaper{background:rgba(59,130,246,.12);color:#93c5fd;border:1px solid rgba(59,130,246,.22)}
+.bLive2{background:rgba(244,63,94,.12);color:#fca5a5;border:1px solid rgba(244,63,94,.22)}
+.srows{padding:12px 20px}
+.sr{display:flex;align-items:baseline;justify-content:space-between;padding:7.5px 0;border-bottom:1px solid var(--ln)}
+.sr:last-child{border-bottom:none}
+.sk{font:400 12.5px var(--f);color:var(--t1)}
+.sv{font:600 13px var(--m)}
+.rrw{padding:4px 20px 14px}
+.rrl{display:flex;justify-content:space-between;font:400 11px var(--m);color:var(--t2);margin-bottom:6px}
+.rrt{height:7px;border-radius:99px;background:var(--panel2);display:flex;overflow:hidden}
+.rrd{height:100%;background:var(--dn);transition:width .3s}
+.rru{height:100%;background:var(--up);transition:width .3s}
+.pnl{padding:12px 20px 16px;border-top:1px solid var(--ln);display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pc{background:var(--bg1);border-radius:12px;padding:13px 14px}
+.pck{font:400 11px var(--f);color:var(--t2);margin-bottom:6px}
+.pcv{font:700 16px var(--m)}
+.loss{color:#fca5a5}.gain{color:#86efac}
+.gw{padding:16px 20px;border-top:1px solid var(--ln)}
+.genbtn{width:100%;background:var(--a);color:#fff;font:700 15px/1 var(--f);border:none;border-radius:14px;padding:16px;cursor:pointer;transition:all .25s var(--e);display:flex;align-items:center;justify-content:center;gap:9px}
+.genbtn:hover{background:var(--a2);box-shadow:0 12px 36px var(--aglow)}
+.eout{display:none;margin-top:12px}
+.eout textarea{width:100%;background:var(--bg1);border:1px solid var(--ln2);border-radius:12px;color:#86efac;font:400 11.5px/1.7 var(--m);padding:13px 14px;resize:vertical;min-height:200px;outline:none}
+.cpybtn{margin-top:8px;width:100%;background:var(--hov);color:var(--t0);font:600 13px/1 var(--f);border:1px solid var(--ln2);border-radius:11px;padding:11px;cursor:pointer;transition:all .2s}
+.cpybtn:hover{background:var(--panel2)}
+.cpybtn.ok{color:var(--up)}
+.snote{padding:0 20px 16px;font:400 11px/1.55 var(--f);color:var(--t2);text-align:center}
+.dsteps{margin-top:14px;background:var(--bg1);border:1px solid var(--ln2);border-radius:12px;overflow:hidden}
+.dstep{display:flex;align-items:flex-start;gap:10px;padding:9px 13px;border-bottom:1px solid var(--ln);font:400 12px/1.55 var(--f);color:var(--t1)}
+.dstep:last-child{border-bottom:none}
+.dn{width:18px;height:18px;border-radius:6px;background:var(--adim);color:var(--a3);font:700 10px/1 var(--m);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.dstep b{color:var(--t0);font-weight:600}
+.railbtn{display:flex;align-items:center;justify-content:center;gap:7px;margin:8px 13px;background:var(--panel2);border:1px solid var(--ln2);border-radius:11px;padding:11px;font:600 13px/1 var(--f);color:var(--t0);text-decoration:none;transition:border-color .2s,background .2s}
+.railbtn:hover{border-color:var(--up);color:var(--up)}
+</style>
+</head>
+<body>
+
+<!-- License Gate -->
+<div id="gate">
+  <div class="gc">
+    <div class="brand"><b>Apex</b> Trade Bot</div>
+    <h2>Customer Portal</h2>
+    <p>Enter your license key to access<br>the crypto bot configurator.</p>
+    <input id="gk" class="gi" type="text" placeholder="APEX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+    <button id="gBtn" class="gb">Verify License →</button>
+    <div id="gErr" class="ge"></div>
+    <div class="gl">No license yet? <a href="/apex-bot">Purchase Apex Trade Bot →</a></div>
+  </div>
+</div>
+
+<!-- Nav -->
+<nav>
+  <div class="nbrand"><b>Apex</b> Trade Bot</div>
+  <div class="ntag">CRYPTO CONFIGURATOR</div>
+</nav>
+
+<div class="wrap">
+  <div class="ph">
+    <div class="ew"><i></i>Crypto Bot · 8 Exchanges</div>
+    <h1>Configure Your Trading Bot</h1>
+    <p>Set what to trade, how much to risk, when to enter and exit. The summary updates in real time. Your keys never leave this page.</p>
+  </div>
+
+  <div class="cols">
+    <div id="lcol">
+
+      <!-- 1 · Exchange & Mode -->
+      <div class="sec">
+        <div class="sh"><div class="sn">1</div><strong>Exchange & Mode</strong><em>where to trade</em></div>
+        <div class="sb">
+          <div class="rl" style="margin-bottom:10px"><label>Select Exchange</label></div>
+          <div class="exg" id="exg"></div>
+          <p class="hn" id="exHint" style="margin-top:10px"></p>
+          <div class="modes" id="modeRow">
+            <div class="mc on" id="mPaper"><strong>📄 Paper Trading</strong><span>Simulated. No real funds. Recommended for the first 1–2 weeks.</span></div>
+            <div class="mc" id="mLive"><strong>🔴 Live Trading</strong><span>Real account. Only activate after validating on paper mode.</span></div>
+          </div>
+          <div id="liveWarn" class="warn">⚠ Live trading uses real funds from your exchange account. Losses are possible and can be total. Start small.</div>
+        </div>
+      </div>
+
+      <!-- 2 · Portfolio & Risk -->
+      <div class="sec">
+        <div class="sh"><div class="sn">2</div><strong>Portfolio & Risk</strong><em>sizing per trade</em></div>
+        <div class="sb">
+          <div class="row">
+            <div class="rl"><label>Account balance (USD) — reference</label><span class="rv" id="balV">$1,000</span></div>
+            <input type="range" id="balR" min="10" max="50000" step="10" value="1000">
+            <p class="hn">Set your real balance — even $10 works. Used only to calculate estimated P&amp;L below.</p>
+          </div>
+          <div class="row">
+            <div class="rl"><label>Risk per trade (%)</label><span class="rv" id="riskV">1%</span></div>
+            <input type="range" id="riskR" min="0.5" max="5" step="0.5" value="1">
+            <p class="hn">Account % risked per trade. <b>1–2% recommended for most accounts.</b></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 · Entry Conditions -->
+      <div class="sec">
+        <div class="sh"><div class="sn">3</div><strong>Entry Conditions</strong><em>how selective the bot is</em></div>
+        <div class="sb">
+          <div class="row">
+            <div class="rl"><label>AI confidence minimum</label><span class="rv" id="confV">0.70</span></div>
+            <input type="range" id="confR" min="0.50" max="0.95" step="0.05" value="0.70">
+            <p class="hn">Minimum AI confidence to open a trade. Higher = fewer, more selective entries. <b>Backtested: 0.70.</b></p>
+          </div>
+          <div class="row">
+            <div class="rl"><label>Min criteria met (of 5)</label><span class="rv" id="critV">5 / 5</span></div>
+            <input type="range" id="critR" min="3" max="5" step="1" value="5">
+            <p class="hn">Trend · RSI · MACD · Volume · Structure. <b>Backtested at 5/5.</b></p>
+          </div>
+          <div class="trow">
+            <div class="tt"><strong>1h Trend Filter (HTF)</strong><span>Only enter trades in the 1h trend direction. Significantly reduces counter-trend losses.</span></div>
+            <div class="tgl on" id="htfT"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 · Exit Strategy -->
+      <div class="sec">
+        <div class="sh"><div class="sn">4</div><strong>Exit Strategy</strong><em>stop loss · take profit</em></div>
+        <div class="sb">
+          <div class="row">
+            <div class="rl"><label>Stop Loss (%)</label><span class="rv" id="slV">1.6%</span></div>
+            <input type="range" id="slR" min="0.5" max="5" step="0.1" value="1.6">
+            <p class="hn">Max loss before the bot exits the trade. <b>Backtested optimal: 1.6%.</b></p>
+          </div>
+          <div class="row">
+            <div class="rl"><label>Take Profit (%)</label><span class="rv" id="tpV">3.2%</span></div>
+            <input type="range" id="tpR" min="1" max="10" step="0.1" value="3.2">
+            <p class="hn">Target exit price. Default is 1:2 R:R. <b>Backtested optimal: 3.2%.</b></p>
+          </div>
+          <div class="trow">
+            <div class="tt"><strong>Trailing Stop</strong><span>SL follows price upward. Off by default — clean TP exits outperformed on volatile crypto in backtests.</span></div>
+            <div class="tgl" id="trailT"></div>
+          </div>
+          <div class="trow">
+            <div class="tt"><strong>Breakeven Stop</strong><span>At +1R, move SL to entry. Locks in break-even once the trade is in profit.</span></div>
+            <div class="tgl" id="beT"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 · Connections -->
+      <div class="sec">
+        <div class="sh"><div class="sn">5</div><strong>Connections</strong><em>exchange · AI · Telegram</em></div>
+        <div class="sb">
+          <div class="ilbl" id="exKeyTitle" style="margin-top:0">Binance API Keys</div>
+          <input id="k1" class="inp" type="text" placeholder="API Key" autocomplete="off" spellcheck="false">
+          <input id="k2" class="inp" type="text" placeholder="Secret Key" autocomplete="off" spellcheck="false">
+          <p class="hn" id="exKeyHint" style="margin-top:6px">Create on <b>binance.com → API Management</b>. Enable Spot trading only — no Withdrawals. For paper trading, leave empty.</p>
+          <div class="ilbl">AI Provider</div>
+          <div class="aitabs">
+            <div class="aitab on" id="aiGroq">Groq — free</div>
+            <div class="aitab" id="aiAnth">Anthropic</div>
+          </div>
+          <input id="aiKey" class="inp" type="text" placeholder="Groq API key — console.groq.com" autocomplete="off" spellcheck="false">
+          <p class="hn" style="margin-top:5px">Groq is free and fast — ideal to start. Get a key at <b>console.groq.com</b>.</p>
+          <div class="ilbl">Telegram <span style="color:var(--t2);font-weight:400">(optional — highly recommended)</span></div>
+          <input id="tgTok" class="inp" type="text" placeholder="Bot Token — from @BotFather" autocomplete="off" spellcheck="false">
+          <input id="tgCid" class="inp" type="text" placeholder="Chat ID — from @userinfobot" autocomplete="off" spellcheck="false">
+          <p class="hn" style="margin-top:5px">Get trade alerts + control via /stop, /pause, /status, /risk.</p>
+          <div class="ilbl">Dashboard Token <span style="color:var(--t2);font-weight:400">(optional)</span></div>
+          <input id="dtok" class="inp" type="text" placeholder="Password to protect your Railway dashboard URL" autocomplete="off" spellcheck="false">
+          <div class="ilbl">Your License Key</div>
+          <input id="licK" class="inp" type="text" placeholder="APEX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+
+    </div><!-- lcol -->
+
+    <!-- Sticky Summary -->
+    <div class="side">
+      <div class="sum">
+        <div class="smh"><strong>Live Summary</strong><span class="sbadge bPaper" id="modeBadge">PAPER</span></div>
+        <div class="srows">
+          <div class="sr"><span class="sk">Bot</span><span class="sv">Crypto</span></div>
+          <div class="sr"><span class="sk">Exchange</span><span class="sv" id="sEx">Binance</span></div>
+          <div class="sr"><span class="sk">Mode</span><span class="sv" id="sMode">Paper</span></div>
+          <div class="sr"><span class="sk">Risk / trade</span><span class="sv" id="sRisk">1%</span></div>
+          <div class="sr"><span class="sk">Stop Loss</span><span class="sv" id="sSl">1.6%</span></div>
+          <div class="sr"><span class="sk">Take Profit</span><span class="sv" id="sTp">3.2%</span></div>
+          <div class="sr"><span class="sk">R:R Ratio</span><span class="sv" id="sRr">1 : 2.0</span></div>
+          <div class="sr"><span class="sk">AI confidence</span><span class="sv" id="sConf">≥ 0.70</span></div>
+          <div class="sr"><span class="sk">Trend filter</span><span class="sv" id="sTrend">ON</span></div>
+        </div>
+        <div class="rrw">
+          <div class="rrl"><span id="rlSl">SL 1.6%</span><span>R:R Bar</span><span id="rlTp">TP 3.2%</span></div>
+          <div class="rrt"><div class="rrd" id="rrSl"></div><div class="rru" id="rrTp"></div></div>
+        </div>
+        <div class="pnl">
+          <div class="pc"><div class="pck">Max loss / trade</div><div class="pcv loss" id="pLoss">−$16</div></div>
+          <div class="pc"><div class="pck">Target gain / trade</div><div class="pcv gain" id="pGain">+$32</div></div>
+        </div>
+        <div class="gw">
+          <button class="genbtn" id="genBtn">🚀 Save Config &amp; Deploy →</button>
+          <div class="eout" id="eout" style="display:none">
+            <!-- Deploy success -->
+            <div id="deploySuccess" style="display:none">
+              <div style="background:#052e16;border:1px solid #00ff8840;border-radius:10px;padding:16px;margin-bottom:12px">
+                <div style="color:#00ff88;font-weight:700;margin-bottom:8px">✅ Config saved on server!</div>
+                <div style="color:#9ca3af;font-size:.83rem;line-height:1.6">Your settings are stored. Deploy your bot — it will auto-load your config on startup using just your license key.</div>
+              </div>
+              <div style="font-size:.82rem;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">1 · Your License Key</div>
+              <div style="display:flex;gap:8px;margin-bottom:16px">
+                <code id="licDisplay" style="flex:1;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#00ff88;font-size:.9rem;letter-spacing:.1em">—</code>
+                <button id="cpyLicBtn" onclick="copyLic()" style="background:#00ff8820;border:1px solid #00ff8840;color:#00ff88;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:.82rem">Copy</button>
+              </div>
+              <div style="font-size:.82rem;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">2 · Docker Image</div>
+              <div style="display:flex;gap:8px;margin-bottom:16px">
+                <code id="imgDisplay" style="flex:1;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#00cfff;font-size:.82rem;word-break:break-all">—</code>
+                <button id="cpyImgBtn" onclick="copyImg()" style="background:#00cfff20;border:1px solid #00cfff40;color:#00cfff;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:.82rem">Copy</button>
+              </div>
+              <div style="margin-bottom:10px">
+                <div style="font-size:.82rem;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">3 · Railway Token <span style="font-weight:400;text-transform:none;letter-spacing:0">— <a href="https://railway.com/account/tokens" target="_blank" style="color:#00cfff">Get it here →</a> (free account)</span></div>
+                <input id="railwayTokenInput" type="password" placeholder="Paste your Railway API token here…" style="width:100%;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#fff;font-size:.88rem;outline:none;box-sizing:border-box" />
+              </div>
+              <button id="autoDeployBtn" onclick="autoDeploy()" style="display:block;width:100%;text-align:center;background:linear-gradient(135deg,#00ff88,#00cfff);color:#052e16;font-weight:800;font-size:1.05rem;padding:16px;border-radius:10px;cursor:pointer;border:none;margin-bottom:10px">🚀 Deploy My Bot Automatically →</button>
+              <div id="deployStatus" style="display:none;text-align:center;padding:10px;border-radius:8px;font-size:.85rem"></div>
+              <div class="dsteps">
+                <div class="dstep"><div class="dn">1</div><span>Create a free Railway account at <a href="https://railway.com" target="_blank" style="color:#00cfff">railway.com</a></span></div>
+                <div class="dstep"><div class="dn">2</div><span>Go to <a href="https://railway.com/account/tokens" target="_blank" style="color:#00cfff">railway.com/account/tokens</a> → create a token → paste above</span></div>
+                <div class="dstep"><div class="dn">3</div><span>Click Deploy — bot is set up automatically in 30 seconds ✓</span></div>
+              </div>
+              <div style="margin-top:12px;text-align:center;color:#6b7280;font-size:.78rem">Your token is used only to deploy your bot and is never stored on our servers.</div>
+            </div>
+            <!-- Manual fallback -->
+            <div id="deployManual">
+              <textarea id="etxt" readonly></textarea>
+              <button class="cpybtn" id="cpyBtn">Copy to clipboard</button>
+              <div style="text-align:center;margin-top:8px"><button id="switchToAuto" style="background:none;border:none;color:#60a5fa;cursor:pointer;font-size:.8rem;text-decoration:underline">← Save config to server instead (recommended)</button></div>
+            </div>
+          </div>
+          <div id="savingMsg" style="display:none;text-align:center;color:#6b7280;font-size:.85rem;padding:12px">Saving config…</div>
+          <div id="saveErr" style="display:none;background:#2d1515;border:1px solid #ff446640;border-radius:8px;padding:12px;color:#ff9999;font-size:.82rem;margin-top:8px"></div>
+        </div>
+        <div class="snote" id="privNote">API keys are encrypted and stored securely on our server.<br>Only your bot can access them using your license key.</div>
+      </div>
+    </div>
+
+  </div><!-- .cols -->
+</div><!-- .wrap -->
+
+<script>
+// State
+const S={ex:'BINANCE',mode:'PAPER',bal:1000,risk:1,conf:.70,crit:5,htf:true,sl:1.6,tp:3.2,trail:false,be:false,ai:'GROQ'};
+
+// Exchange data
+const EX={
+  BINANCE:{n:'Binance',  ab:'BN',tag:'LIVE',live:true, k1:'API Key',    k2:'Secret Key',  where:'binance.com → API Management', hint:'Enable Spot trading only — no Withdrawals. For paper mode, leave empty.'},
+  BYBIT:  {n:'Bybit',   ab:'BY',tag:'BETA',live:false,k1:'API Key',    k2:'API Secret',  where:'bybit.com → Account → API',    hint:'Spot Read + Trade. No Withdraw.'},
+  OKX:    {n:'OKX',     ab:'OX',tag:'BETA',live:false,k1:'API Key',    k2:'Secret Key',  where:'okx.com → Trade → API',        hint:'Use Passphrase if required.'},
+  KRAKEN: {n:'Kraken',  ab:'KR',tag:'BETA',live:false,k1:'API Key',    k2:'Private Key', where:'kraken.com → Security → API',  hint:'Enable Query Funds + Create Orders.'},
+  KUCOIN: {n:'KuCoin',  ab:'KC',tag:'BETA',live:false,k1:'API Key',    k2:'API Secret',  where:'kucoin.com → My Account → API','hint':'No Withdraw permission.'},
+  COINBASE:{n:'Coinbase',ab:'CB',tag:'BETA',live:false,k1:'API Key',   k2:'API Secret',  where:'coinbase.com → Settings → API','hint':'Requires Advanced Trade account.'},
+  BITGET: {n:'Bitget',  ab:'BG',tag:'BETA',live:false,k1:'API Key',    k2:'Secret Key',  where:'bitget.com → Personal Center → API','hint':'Spot Read + Trade.'},
+  MEXC:   {n:'MEXC',    ab:'MX',tag:'BETA',live:false,k1:'API Key',    k2:'Secret Key',  where:'mexc.com → Account → API Management', hint:'Enable Spot Read + Trade. No Withdraw.'},
+};
+const EK={BINANCE:['BINANCE_API_KEY','BINANCE_API_SECRET'],BYBIT:['BYBIT_API_KEY','BYBIT_API_SECRET'],OKX:['OKX_API_KEY','OKX_API_SECRET'],KRAKEN:['KRAKEN_API_KEY','KRAKEN_API_SECRET'],KUCOIN:['KUCOIN_API_KEY','KUCOIN_API_SECRET'],COINBASE:['COINBASE_API_KEY','COINBASE_API_SECRET'],BITGET:['BITGET_API_KEY','BITGET_API_SECRET'],MEXC:['MEXC_API_KEY','MEXC_API_SECRET']};
+
+// Build exchange grid
+const exg=document.getElementById('exg');
+Object.entries(EX).forEach(([id,e])=>{
+  const d=document.createElement('div');
+  d.className='exc'+(id==='BINANCE'?' on':'');d.dataset.id=id;
+  d.innerHTML=`<div class="xi">${e.ab}</div><div class="xn">${e.n}</div><div class="xb ${e.live?'bLv':'bBt'}">${e.tag}</div>`;
+  d.addEventListener('click',()=>{document.querySelectorAll('.exc').forEach(x=>x.classList.remove('on'));d.classList.add('on');S.ex=id;updExFields();updSum();});
+  exg.appendChild(d);
+});
+function updExFields(){
+  const e=EX[S.ex];
+  document.getElementById('exKeyTitle').textContent=e.n+' API Keys';
+  document.getElementById('k1').placeholder=e.k1;
+  document.getElementById('k2').placeholder=e.k2;
+  document.getElementById('exKeyHint').innerHTML=`Create on <b>${e.where}</b>. ${e.hint}`;
+  document.getElementById('exHint').textContent=e.live?'':'⚠ '+e.n+' is in beta — paper mode recommended until fully validated.';
+}
+updExFields();
+
+// Mode
+document.getElementById('mPaper').addEventListener('click',()=>{S.mode='PAPER';document.getElementById('mPaper').className='mc on';document.getElementById('mLive').className='mc';document.getElementById('liveWarn').style.display='none';updSum();});
+document.getElementById('mLive').addEventListener('click',()=>{S.mode='LIVE';document.getElementById('mLive').className='mc onL';document.getElementById('mPaper').className='mc';document.getElementById('liveWarn').style.display='block';updSum();});
+
+// Sliders
+[['balR','balV','bal',v=>'$'+Number(v).toLocaleString()],['riskR','riskV','risk',v=>v+'%'],['confR','confV','conf',v=>parseFloat(v).toFixed(2)],['critR','critV','crit',v=>v+' / 5'],['slR','slV','sl',v=>parseFloat(v).toFixed(1)+'%'],['tpR','tpV','tp',v=>parseFloat(v).toFixed(1)+'%']].forEach(([rid,vid,key,fmt])=>{
+  const r=document.getElementById(rid),v=document.getElementById(vid);
+  r.addEventListener('input',()=>{S[key]=parseFloat(r.value);v.textContent=fmt(r.value);updSum();});
+});
+
+// Toggles
+[['htfT','htf',true],['trailT','trail',false],['beT','be',false]].forEach(([id,k,init])=>{
+  const el=document.getElementById(id);if(init)el.classList.add('on');
+  el.addEventListener('click',()=>{S[k]=!S[k];el.classList.toggle('on',S[k]);updSum();});
+});
+
+// AI tabs
+['aiGroq','aiAnth'].forEach(id=>{document.getElementById(id).addEventListener('click',()=>{['aiGroq','aiAnth'].forEach(i=>document.getElementById(i).classList.remove('on'));document.getElementById(id).classList.add('on');S.ai=id==='aiGroq'?'GROQ':'ANTHROPIC';document.getElementById('aiKey').placeholder=S.ai==='GROQ'?'Groq API key — console.groq.com':'Anthropic key — console.anthropic.com';});});
+
+// Summary
+function updSum(){
+  const rr=(S.tp/S.sl).toFixed(1),tot=S.sl+S.tp;
+  document.getElementById('sEx').textContent=EX[S.ex].n;
+  document.getElementById('sMode').textContent=S.mode==='PAPER'?'Paper':'Live';
+  document.getElementById('sRisk').textContent=S.risk+'%';
+  document.getElementById('sSl').textContent=S.sl.toFixed(1)+'%';
+  document.getElementById('sTp').textContent=S.tp.toFixed(1)+'%';
+  document.getElementById('sRr').textContent='1 : '+rr;
+  document.getElementById('sConf').textContent='≥ '+S.conf.toFixed(2);
+  document.getElementById('sTrend').textContent=S.htf?'ON':'OFF';
+  document.getElementById('pLoss').textContent='−$'+(S.bal*S.sl/100).toFixed(0);
+  document.getElementById('pGain').textContent='+$'+(S.bal*S.tp/100).toFixed(0);
+  document.getElementById('rlSl').textContent='SL '+S.sl.toFixed(1)+'%';
+  document.getElementById('rlTp').textContent='TP '+S.tp.toFixed(1)+'%';
+  const b=document.getElementById('modeBadge');b.textContent=S.mode;b.className='sbadge '+(S.mode==='PAPER'?'bPaper':'bLive2');
+  document.getElementById('rrSl').style.width=(S.sl/tot*100).toFixed(1)+'%';
+  document.getElementById('rrTp').style.width=(S.tp/tot*100).toFixed(1)+'%';
+}
+updSum();
+
+// Build config object (env-var keys)
+function buildConfig(){
+  const k1v=document.getElementById('k1').value.trim();
+  const k2v=document.getElementById('k2').value.trim();
+  const aiKv=document.getElementById('aiKey').value.trim();
+  const tgT=document.getElementById('tgTok').value.trim();
+  const tgC=document.getElementById('tgCid').value.trim();
+  const dt=document.getElementById('dtok').value.trim();
+  const [ek1,ek2]=EK[S.ex];
+  const cfg={
+    EXCHANGE:S.ex.toLowerCase(),
+    PAPER_TRADING:S.mode==='PAPER'?'true':'false',
+    // Connect to the REAL Binance account (not the fake testnet). Without this
+    // the bot defaults to testnet.binance.vision and trades fake money even in
+    // "Live" mode — so a client's real API keys would never actually trade.
+    // Paper mode also benefits: it simulates against real market prices.
+    BINANCE_TESTNET:'false',
+    PAPER_BALANCE:String(S.bal),
+    MIN_CONFIDENCE:String(Math.round(S.conf*100)),
+    MIN_CRITERIA:String(S.crit),
+    HTF_FILTER:S.htf?'true':'false',
+    STOP_LOSS_PCT:(S.sl/100).toFixed(4),
+    TAKE_PROFIT_PCT:(S.tp/100).toFixed(4),
+    TRAILING_STOP:S.trail?'true':'false',
+    BREAKEVEN_AT_R:S.be?'1':'0',
+    RISK_PER_TRADE:(S.risk/100).toFixed(4),
+  };
+  if(k1v)cfg[ek1]=k1v;
+  if(k2v)cfg[ek2]=k2v;
+  if(aiKv){if(S.ai==='GROQ')cfg.GROQ_API_KEY=aiKv;else cfg.ANTHROPIC_API_KEY=aiKv;}
+  if(tgT)cfg.TELEGRAM_BOT_TOKEN=tgT;
+  if(tgC)cfg.TELEGRAM_CHAT_ID=tgC;
+  if(dt)cfg.DASHBOARD_TOKEN=dt;
+  return cfg;
+}
+
+// Save config to server → show Railway deploy steps
+document.getElementById('genBtn').addEventListener('click',async()=>{
+  const lk=document.getElementById('licK').value.trim()||sessionStorage.getItem('apx_lic')||'';
+  if(!lk){document.getElementById('saveErr').textContent='Enter your license key first.';document.getElementById('saveErr').style.display='block';return;}
+  document.getElementById('saveErr').style.display='none';
+  const btn=document.getElementById('genBtn');
+  btn.disabled=true;btn.textContent='Saving…';
+  document.getElementById('savingMsg').style.display='block';
+  try{
+    const r=await fetch('/api/save-bot-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:lk,config:buildConfig()})});
+    const data=await r.json();
+    document.getElementById('savingMsg').style.display='none';
+    if(data.success){
+      document.getElementById('eout').style.display='block';
+      document.getElementById('deploySuccess').style.display='block';
+      document.getElementById('deployManual').style.display='none';
+      document.getElementById('licDisplay').textContent=lk;
+      document.getElementById('imgDisplay').textContent=dockerImage(lk);
+      document.getElementById('privNote').textContent='Config encrypted & saved. Your bot loads it automatically on startup.';
+      btn.textContent='✓ Config saved!';btn.style.background='var(--up)';btn.style.color='#052e16';
+    } else {
+      // Fallback to manual .env
+      showManual(lk);
+      btn.textContent='🚀 Save Config & Deploy →';btn.disabled=false;
+      document.getElementById('saveErr').textContent=(data.error||'Server error')+(data.detail?' — '+data.detail:'');
+      document.getElementById('saveErr').style.display='block';
+    }
+  }catch(e){
+    document.getElementById('savingMsg').style.display='none';
+    showManual(lk);
+    btn.textContent='🚀 Save Config & Deploy →';btn.disabled=false;
+  }
+});
+
+function showManual(lk){
+  const [ek1,ek2]=EK[S.ex];
+  const cfg=buildConfig();
+  let env=`# Apex Trade Bot — Environment Variables\n# Generated: ${new Date().toISOString().slice(0,10)}\n\nLICENSE_KEY=${lk}\n`;
+  for(const[k,v] of Object.entries(cfg))env+=`${k}=${v}\n`;
+  document.getElementById('etxt').value=env;
+  document.getElementById('eout').style.display='block';
+  document.getElementById('deploySuccess').style.display='none';
+  document.getElementById('deployManual').style.display='block';
+}
+
+// Customer-facing Docker image on GitHub Container Registry, picked by key prefix.
+function dockerImage(lk){
+  const slug = lk.startsWith('FORX-') ? 'apex-forex-bot' : 'apex-trade-bot';
+  return `ghcr.io/alexgabriel225sefu-dotcom/${slug}:latest`;
+}
+
+function copyImg(){
+  navigator.clipboard.writeText(document.getElementById('imgDisplay').textContent).then(()=>{
+    const b=document.getElementById('cpyImgBtn');b.textContent='✓';
+    setTimeout(()=>{b.textContent='Copy';},2000);
+  });
+}
+
+document.getElementById('cpyBtn').addEventListener('click',()=>{
+  navigator.clipboard.writeText(document.getElementById('etxt').value).then(()=>{
+    const b=document.getElementById('cpyBtn');b.textContent='✓ Copied!';b.classList.add('ok');
+    setTimeout(()=>{b.textContent='Copy to clipboard';b.classList.remove('ok');},2500);
+  });
+});
+
+function copyLic(){
+  navigator.clipboard.writeText(document.getElementById('licDisplay').textContent).then(()=>{
+    const b=document.getElementById('cpyLicBtn');b.textContent='✓ Copied!';
+    setTimeout(()=>b.textContent='Copy',2000);
+  });
+}
+
+async function autoDeploy(){
+  const token = (document.getElementById('railwayTokenInput').value||'').trim();
+  const licKey = (document.getElementById('licDisplay').textContent||'').trim();
+  const btn = document.getElementById('autoDeployBtn');
+  const status = document.getElementById('deployStatus');
+  if(!token){ status.style.display='block';status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='⚠️ Please paste your Railway token first.';return; }
+  btn.disabled=true; btn.textContent='⏳ Deploying…';
+  status.style.display='block'; status.style.background='#1a2a1a'; status.style.color='#9ca3af'; status.textContent='Setting up your bot on Railway…';
+  try {
+    const r = await fetch('/api/railway-deploy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({railwayToken:token,licenseKey:licKey,product:'apex-bot'})});
+    const d = await r.json();
+    if(d.ok){ status.style.background='#052e16';status.style.color='#00ff88';status.textContent='✅ Bot deployed! Check railway.com/dashboard for your bot URL (ready in ~2 min).'; btn.textContent='✅ Deployed!';}
+    else { status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='❌ '+(d.error||'Deploy failed');btn.disabled=false;btn.textContent='🚀 Deploy My Bot Automatically →'; }
+  } catch(e){ status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='❌ Network error — try again';btn.disabled=false;btn.textContent='🚀 Deploy My Bot Automatically →'; }
+}
+
+document.getElementById('switchToAuto').addEventListener('click',()=>{
+  document.getElementById('deployManual').style.display='none';
+  document.getElementById('eout').style.display='none';
+  document.getElementById('genBtn').disabled=false;
+  document.getElementById('genBtn').textContent='🚀 Save Config & Deploy →';
+  document.getElementById('genBtn').style.background='';document.getElementById('genBtn').style.color='';
+});
+
+// License gate
+const gate=document.getElementById('gate');
+async function checkLic(k){try{const r=await fetch('/api/verify-license',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k})});return await r.json();}catch(e){return{valid:false,message:'Network error — try again'};}}
+async function tryAuto(){
+  const k=new URLSearchParams(location.search).get('key')||sessionStorage.getItem('apx_lic');
+  if(!k)return;
+  const btn=document.getElementById('gBtn');btn.disabled=true;btn.textContent='Verifying…';
+  const r=await checkLic(k);
+  if(r.valid){sessionStorage.setItem('apx_lic',k);document.getElementById('licK').value=k;gate.style.display='none';}
+  else{btn.disabled=false;btn.textContent='Verify License →';}
+}
+document.getElementById('gBtn').addEventListener('click',async()=>{
+  const k=document.getElementById('gk').value.trim();
+  if(!k){document.getElementById('gErr').textContent='Enter your license key.';return;}
+  document.getElementById('gErr').textContent='';
+  const btn=document.getElementById('gBtn');btn.disabled=true;btn.textContent='Verifying…';
+  const r=await checkLic(k);
+  if(r.valid){sessionStorage.setItem('apx_lic',k);document.getElementById('licK').value=k;gate.style.display='none';}
+  else{document.getElementById('gErr').textContent=r.message||'Invalid license key.';btn.disabled=false;btn.textContent='Verify License →';}
+});
+document.getElementById('gk').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('gBtn').click();});
+tryAuto();
+</script>
+</body>
+</html>

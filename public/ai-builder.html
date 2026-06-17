@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AI Business Builder — PRO Exclusive</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#f5f5f5;font-family:'Inter',sans-serif;min-height:100vh}
+nav{display:flex;align-items:center;justify-content:space-between;padding:18px 32px;border-bottom:1px solid rgba(229,62,46,.1);background:rgba(8,8,8,.95)}
+.logo{font-family:'Inter',sans-serif;font-size:17px;font-weight:700;color:#E53E2E;text-decoration:none}
+.pro-badge{background:linear-gradient(135deg,#8A6A2E,#E8CB8A);color:#080808;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:4px 12px;border-radius:100px}
+.wrap{max-width:720px;margin:0 auto;padding:48px 24px 80px}
+
+/* STEPS */
+.step{display:none}
+.step.active{display:block}
+.step-tag{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#E53E2E;margin-bottom:16px}
+.step h1{font-family:'Inter',sans-serif;font-size:clamp(28px,5vw,44px);font-weight:900;line-height:1.1;margin-bottom:12px}
+.step h1 em{font-style:italic;color:#E53E2E}
+.step-sub{font-size:15px;color:#999999;line-height:1.7;margin-bottom:36px;max-width:520px}
+
+/* PROGRESS */
+.progress{display:flex;gap:6px;margin-bottom:48px}
+.progress-dot{height:3px;border-radius:2px;background:rgba(229,62,46,.15);flex:1;transition:background .3s}
+.progress-dot.done{background:#E53E2E}
+
+/* INPUTS */
+.field{margin-bottom:20px}
+.field label{display:block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#999999;margin-bottom:8px}
+.field input,.field textarea,.field select{width:100%;background:#111;border:1px solid rgba(229,62,46,.12);border-radius:10px;padding:14px 16px;color:#f5f5f5;font-family:'Inter',sans-serif;font-size:14px;outline:none;transition:border-color .2s;resize:none}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:#E53E2E}
+.field select option{background:#111}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.choice{background:#111;border:1px solid rgba(229,62,46,.12);border-radius:10px;padding:14px 16px;cursor:pointer;font-size:13px;transition:all .2s;text-align:left}
+.choice:hover{border-color:rgba(229,62,46,.35)}
+.choice.selected{border-color:#E53E2E;background:rgba(229,62,46,.08)}
+.choice .choice-icon{font-size:20px;margin-bottom:6px;display:block}
+.choice .choice-label{font-weight:600;display:block;margin-bottom:2px}
+.choice .choice-desc{font-size:11px;color:#7A7060}
+
+/* BUTTONS */
+.btn-next{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);border:none;border-radius:8px;color:#080808;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s;margin-top:8px}
+.btn-next:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(229,62,46,.3)}
+.btn-back{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid rgba(229,62,46,.15);border-radius:8px;color:#999999;font-family:'Inter',sans-serif;font-size:13px;padding:12px 24px;cursor:pointer;margin-top:8px}
+.btn-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+/* LOADING */
+#step-loading{text-align:center;padding:60px 0}
+.loader-ring{width:64px;height:64px;border:2px solid rgba(229,62,46,.1);border-top-color:#E53E2E;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 24px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-steps{display:flex;flex-direction:column;gap:10px;max-width:320px;margin:32px auto 0;text-align:left}
+.loader-step{display:flex;align-items:center;gap:10px;font-size:13px;color:#7A7060;padding:8px 0}
+.loader-step.active{color:#E53E2E}
+.loader-step.done{color:#6A8A5E}
+.loader-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* RESULTS */
+#step-results{animation:fadeIn .4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.result-hero{background:linear-gradient(135deg,rgba(138,106,46,.15),rgba(229,62,46,.06));border:1px solid rgba(229,62,46,.2);border-radius:16px;padding:32px;margin-bottom:24px;text-align:center}
+.result-hero h2{font-family:'Inter',sans-serif;font-size:32px;font-weight:900;color:#E53E2E;margin-bottom:6px}
+.result-hero p{font-size:13px;color:#999999}
+.section{background:#111;border:1px solid rgba(229,62,46,.08);border-radius:14px;padding:28px;margin-bottom:16px}
+.section-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#E53E2E;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.section-title::before{content:"";width:14px;height:1px;background:#E53E2E}
+.kv{display:flex;flex-direction:column;gap:10px}
+.kv-row{display:flex;gap:12px;align-items:flex-start}
+.kv-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#7A7060;min-width:120px;padding-top:2px}
+.kv-val{font-size:14px;color:#f5f5f5;line-height:1.6;flex:1}
+.income-pill{display:inline-block;background:rgba(106,138,94,.15);border:1px solid rgba(106,138,94,.3);color:#8AB87A;font-size:12px;font-weight:700;padding:3px 12px;border-radius:100px}
+.day-grid{display:flex;flex-direction:column;gap:10px}
+.day-row{display:flex;gap:12px;align-items:flex-start}
+.day-num{font-family:'Inter',sans-serif;font-size:22px;font-weight:900;color:rgba(229,62,46,.3);min-width:36px;line-height:1}
+.day-content{flex:1}
+.day-focus{font-size:12px;font-weight:700;color:#E53E2E;margin-bottom:4px;letter-spacing:.5px}
+.day-tasks{list-style:none;display:flex;flex-direction:column;gap:3px}
+.day-tasks li{font-size:12px;color:#999999;display:flex;gap:6px}
+.day-tasks li::before{content:"·";color:#E53E2E}
+.hook-card{background:#161616;border:1px solid rgba(229,62,46,.06);border-radius:10px;padding:16px;margin-bottom:10px}
+.hook-platform{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#E53E2E;margin-bottom:8px}
+.hook-text{font-size:14px;font-weight:700;color:#f5f5f5;margin-bottom:8px;line-height:1.4}
+.hook-script{font-size:12px;color:#7A7060;line-height:1.6}
+.copy-btn{display:inline-flex;align-items:center;gap:5px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#E53E2E;background:transparent;border:1px solid rgba(229,62,46,.18);border-radius:6px;padding:4px 10px;cursor:pointer;margin-top:10px;font-family:'Inter',sans-serif}
+.copy-btn:hover{background:rgba(229,62,46,.08)}
+.routine-row{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid rgba(229,62,46,.06)}
+.routine-row:last-child{border-bottom:none}
+.routine-time{font-size:11px;color:#E53E2E;font-weight:700;min-width:70px}
+.routine-dur{font-size:10px;color:#7A7060;min-width:60px}
+.routine-task{font-size:13px;color:#f5f5f5;flex:1}
+.ad-box{background:#161616;border-radius:10px;padding:20px}
+.ad-headline{font-family:'Inter',sans-serif;font-size:20px;font-weight:700;color:#f5f5f5;margin-bottom:10px}
+.ad-body{font-size:13px;color:#999999;line-height:1.7;margin-bottom:14px}
+.ad-cta{display:inline-block;background:linear-gradient(135deg,#8A6A2E,#E8CB8A);color:#080808;font-size:12px;font-weight:700;padding:8px 20px;border-radius:6px}
+
+/* LOGO */
+.logo-section{text-align:center;padding:20px 0}
+.logo-img{max-width:280px;border-radius:12px;border:1px solid rgba(229,62,46,.15);margin:0 auto 16px;display:block}
+.btn-gen-logo{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:transparent;border:1px solid rgba(229,62,46,.3);border-radius:8px;color:#E53E2E;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-gen-logo:hover{background:rgba(229,62,46,.08)}
+.logo-note{font-size:11px;color:#7A7060;margin-top:8px}
+.error-box{background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.2);border-radius:8px;padding:12px 16px;color:#e74c3c;font-size:13px;margin-top:8px}
+
+/* BRAND COLORS */
+.brand-colors{display:flex;gap:10px;margin-top:8px}
+.brand-swatch{width:32px;height:32px;border-radius:6px;border:1px solid rgba(255,255,255,.1)}
+
+@media(max-width:600px){.choices{grid-template-columns:1fr}.kv-row{flex-direction:column;gap:2px}.kv-label{min-width:unset}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/index.html" class="logo">AI Cash Systems</a>
+  <div class="pro-badge">⚡ PRO Exclusive</div>
+  <button class="af-lang-btn" onclick="AF_openLang()"><span id="langFlag">🌐</span> <span id="langCode">EN</span></button>
+</nav>
+
+<div class="wrap">
+
+  <!-- PROGRESS BAR -->
+  <div class="progress" id="progress">
+    <div class="progress-dot done" id="pd1"></div>
+    <div class="progress-dot" id="pd2"></div>
+    <div class="progress-dot" id="pd3"></div>
+  </div>
+
+  <!-- STEP 1: NAME + PASSION -->
+  <div class="step active" id="step-1">
+    <div class="step-tag">Step 1 of 3</div>
+    <h1>Let's build your<br><em>online business.</em></h1>
+    <p class="step-sub">Answer 3 quick questions. The AI will create your business model, brand, 7-day plan, content hooks, ads, and daily routine — in under 60 seconds.</p>
+    <div class="field">
+      <label>Your first name</label>
+      <input type="text" id="inp-name" placeholder="e.g. Alex" maxlength="40"/>
+    </div>
+    <div class="field">
+      <label>What are you good at or passionate about?</label>
+      <textarea id="inp-passions" rows="3" placeholder="e.g. fitness, cooking, social media, cars, helping people, graphic design, gaming..."></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn-next" onclick="goStep(2)">Continue →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: HOURS + BUDGET -->
+  <div class="step" id="step-2">
+    <div class="step-tag">Step 2 of 3</div>
+    <h1>How much time<br><em>and money</em> do you have?</h1>
+    <p class="step-sub">Be honest — the AI will build a plan that actually fits your situation. No judgment.</p>
+    <div class="field">
+      <label>Hours available per week</label>
+      <div class="choices">
+        <div class="choice" onclick="selectChoice(this,'hours','1-3h')"><span class="choice-icon">⚡</span><span class="choice-label">1–3 hours</span><span class="choice-desc">Side hustle level</span></div>
+        <div class="choice" onclick="selectChoice(this,'hours','5-10h')"><span class="choice-icon">🔥</span><span class="choice-label">5–10 hours</span><span class="choice-desc">Serious part-time</span></div>
+        <div class="choice" onclick="selectChoice(this,'hours','15-20h')"><span class="choice-icon">💪</span><span class="choice-label">15–20 hours</span><span class="choice-desc">All-in mode</span></div>
+        <div class="choice" onclick="selectChoice(this,'hours','full-time')"><span class="choice-icon">🚀</span><span class="choice-label">Full-time</span><span class="choice-desc">I'm ready to go</span></div>
+      </div>
+    </div>
+    <div class="field" style="margin-top:20px">
+      <label>Starting budget</label>
+      <div class="choices">
+        <div class="choice" onclick="selectChoice(this,'budget','$0 — completely free tools only')"><span class="choice-icon">🎯</span><span class="choice-label">$0</span><span class="choice-desc">Free tools only</span></div>
+        <div class="choice" onclick="selectChoice(this,'budget','$50–$100/month')"><span class="choice-icon">💰</span><span class="choice-label">$50–$100</span><span class="choice-desc">Small investment</span></div>
+        <div class="choice" onclick="selectChoice(this,'budget','$200–$500/month')"><span class="choice-icon">💎</span><span class="choice-label">$200–$500</span><span class="choice-desc">Grow faster</span></div>
+        <div class="choice" onclick="selectChoice(this,'budget','$500+ for ads and tools')"><span class="choice-icon">🏆</span><span class="choice-label">$500+</span><span class="choice-desc">Accelerate</span></div>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:24px">
+      <button class="btn-back" onclick="goStep(1)">← Back</button>
+      <button class="btn-next" onclick="goStep(3)">Continue →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: CONFIRM -->
+  <div class="step" id="step-3">
+    <div class="step-tag">Step 3 of 3</div>
+    <h1>Ready to build<br><em>your business.</em></h1>
+    <p class="step-sub">The AI will now generate everything in one shot: business model, brand, 7-day plan, 5 content hooks, ad copy, and your daily routine.</p>
+    <div class="section" style="margin-bottom:24px">
+      <div class="section-title">Your profile summary</div>
+      <div class="kv">
+        <div class="kv-row"><div class="kv-label">Name</div><div class="kv-val" id="summary-name">—</div></div>
+        <div class="kv-row"><div class="kv-label">Passions</div><div class="kv-val" id="summary-passions">—</div></div>
+        <div class="kv-row"><div class="kv-label">Hours/week</div><div class="kv-val" id="summary-hours">—</div></div>
+        <div class="kv-row"><div class="kv-label">Budget</div><div class="kv-val" id="summary-budget">—</div></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-back" onclick="goStep(2)">← Back</button>
+      <button class="btn-next" onclick="generate()">🤖 Build My Business</button>
+    </div>
+    <div id="gen-error" class="error-box" style="display:none"></div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="step" id="step-loading">
+    <div class="loader-ring"></div>
+    <h2 style="font-family:'Inter',sans-serif;font-size:24px;margin-bottom:8px">Building your business...</h2>
+    <p style="font-size:13px;color:#7A7060">GPT-4o is working. This takes about 20–30 seconds.</p>
+    <div class="loader-steps">
+      <div class="loader-step active" id="ls1"><div class="loader-dot"></div> Analyzing your profile</div>
+      <div class="loader-step" id="ls2"><div class="loader-dot"></div> Selecting business model</div>
+      <div class="loader-step" id="ls3"><div class="loader-dot"></div> Creating your brand</div>
+      <div class="loader-step" id="ls4"><div class="loader-dot"></div> Building 7-day plan</div>
+      <div class="loader-step" id="ls5"><div class="loader-dot"></div> Writing content hooks</div>
+      <div class="loader-step" id="ls6"><div class="loader-dot"></div> Finalizing everything</div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="step" id="step-results">
+    <div class="result-hero">
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#E53E2E;margin-bottom:10px">Your AI Business Plan</div>
+      <h2 id="r-brand-name">Brand Name</h2>
+      <p id="r-brand-tagline" style="font-style:italic;margin-bottom:6px">Tagline here</p>
+      <p id="r-income" class="income-pill" style="display:inline-block;margin-top:8px">Income potential</p>
+    </div>
+
+    <!-- BUSINESS MODEL -->
+    <div class="section">
+      <div class="section-title">Business Model</div>
+      <div class="kv">
+        <div class="kv-row"><div class="kv-label">Model</div><div class="kv-val" id="r-model" style="font-weight:700;color:#E53E2E"></div></div>
+        <div class="kv-row"><div class="kv-label">What you do</div><div class="kv-val" id="r-desc"></div></div>
+        <div class="kv-row"><div class="kv-label">Why it fits you</div><div class="kv-val" id="r-why"></div></div>
+        <div class="kv-row"><div class="kv-label">Target audience</div><div class="kv-val" id="r-audience"></div></div>
+      </div>
+    </div>
+
+    <!-- 7-DAY PLAN -->
+    <div class="section">
+      <div class="section-title">7-Day Launch Plan</div>
+      <div class="day-grid" id="r-days"></div>
+    </div>
+
+    <!-- CONTENT HOOKS -->
+    <div class="section">
+      <div class="section-title">5 Content Hooks (TikTok &amp; Instagram)</div>
+      <div id="r-hooks"></div>
+    </div>
+
+    <!-- AD COPY -->
+    <div class="section">
+      <div class="section-title">Ad Copy</div>
+      <div class="ad-box">
+        <div class="ad-headline" id="r-ad-headline"></div>
+        <div class="ad-body" id="r-ad-body"></div>
+        <div class="ad-cta" id="r-ad-cta"></div>
+      </div>
+      <button class="copy-btn" style="margin-top:14px" onclick="copyAd()">📋 Copy Ad</button>
+    </div>
+
+    <!-- DAILY ROUTINE -->
+    <div class="section">
+      <div class="section-title">Daily Routine</div>
+      <div id="r-routine"></div>
+    </div>
+
+    <!-- LOGO -->
+    <div class="section">
+      <div class="section-title">Brand Logo</div>
+      <div class="logo-section">
+        <div id="logo-placeholder">
+          <button class="btn-gen-logo" onclick="generateLogo()" id="btn-logo">✨ Generate Logo with AI</button>
+          <p class="logo-note">Uses DALL-E 3 · Takes ~10 seconds</p>
+        </div>
+        <img id="logo-img" class="logo-img" style="display:none" alt="Brand logo"/>
+        <div id="logo-loading" style="display:none;color:#E53E2E;font-size:13px;padding:16px 0">Generating logo...</div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:32px;padding-top:24px;border-top:1px solid rgba(229,62,46,.08)">
+      <p style="font-size:13px;color:#7A7060;margin-bottom:16px">Save this page or screenshot your plan before leaving.</p>
+      <button class="btn-next" onclick="window.print()">🖨 Print / Save PDF</button>
+      <button class="btn-back" style="margin-left:12px" onclick="restart()">← Start Over</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var state = { name: '', passions: '', hours: '', budget: '' };
+var planData = null;
+
+function goStep(n) {
+  if (n === 2) {
+    state.name = document.getElementById('inp-name').value.trim();
+    state.passions = document.getElementById('inp-passions').value.trim();
+    if (!state.passions) { alert('Please describe your passions or skills.'); return; }
+  }
+  if (n === 3) {
+    if (!state.hours) { alert('Please select your available hours.'); return; }
+    if (!state.budget) { alert('Please select your starting budget.'); return; }
+    document.getElementById('summary-name').textContent = state.name || 'Not provided';
+    document.getElementById('summary-passions').textContent = state.passions;
+    document.getElementById('summary-hours').textContent = state.hours;
+    document.getElementById('summary-budget').textContent = state.budget;
+  }
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-' + n).classList.add('active');
+  updateProgress(n);
+}
+
+function updateProgress(n) {
+  for (var i = 1; i <= 3; i++) {
+    document.getElementById('pd' + i).classList.toggle('done', i <= n);
+  }
+}
+
+function selectChoice(el, field, val) {
+  var parent = el.parentElement;
+  parent.querySelectorAll('.choice').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state[field] = val;
+}
+
+var loaderInterval;
+function startLoaderAnimation() {
+  var steps = ['ls1','ls2','ls3','ls4','ls5','ls6'];
+  var idx = 0;
+  document.getElementById('ls1').classList.add('active');
+  loaderInterval = setInterval(function() {
+    if (idx < steps.length - 1) {
+      document.getElementById(steps[idx]).classList.remove('active');
+      document.getElementById(steps[idx]).classList.add('done');
+      idx++;
+      document.getElementById(steps[idx]).classList.add('active');
+    }
+  }, 4000);
+}
+
+async function generate() {
+  document.getElementById('gen-error').style.display = 'none';
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-loading').style.display = 'block';
+  updateProgress(3);
+  startLoaderAnimation();
+
+  try {
+    const res = await fetch('/api/builder/plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: state.name, passions: state.passions, hours: state.hours, budget: state.budget })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Generation failed');
+    planData = data;
+    clearInterval(loaderInterval);
+    renderResults(data);
+  } catch (e) {
+    clearInterval(loaderInterval);
+    document.getElementById('step-loading').style.display = 'none';
+    document.getElementById('step-3').classList.add('active');
+    document.getElementById('gen-error').style.display = 'block';
+    document.getElementById('gen-error').textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderResults(d) {
+  // Hero
+  document.getElementById('r-brand-name').textContent = d.brand?.name || '—';
+  document.getElementById('r-brand-tagline').textContent = d.brand?.tagline || '';
+  document.getElementById('r-income').textContent = d.business?.income_potential || '';
+
+  // Business
+  document.getElementById('r-model').textContent = d.business?.model || '';
+  document.getElementById('r-desc').textContent = d.business?.description || '';
+  document.getElementById('r-why').textContent = d.business?.why_perfect || '';
+  document.getElementById('r-audience').textContent = d.brand?.target_audience || '';
+
+  // 7-day plan
+  var daysEl = document.getElementById('r-days');
+  daysEl.innerHTML = '';
+  (d.seven_day_plan || []).forEach(function(day) {
+    var tasksHtml = (day.tasks || []).map(t => '<li>' + t + '</li>').join('');
+    daysEl.innerHTML += '<div class="day-row"><div class="day-num">0' + day.day + '</div><div class="day-content"><div class="day-focus">' + day.focus + '</div><ul class="day-tasks">' + tasksHtml + '</ul></div></div>';
+  });
+
+  // Content hooks
+  var hooksEl = document.getElementById('r-hooks');
+  hooksEl.innerHTML = '';
+  (d.content_hooks || []).forEach(function(h, i) {
+    var scriptId = 'script-' + i;
+    hooksEl.innerHTML += '<div class="hook-card"><div class="hook-platform">' + h.platform + '</div><div class="hook-text">"' + h.hook + '"</div><div class="hook-script" id="' + scriptId + '">' + h.script + '</div><button class="copy-btn" onclick="copyText(\'' + scriptId + '\')">📋 Copy</button></div>';
+  });
+
+  // Ad copy
+  document.getElementById('r-ad-headline').textContent = d.ad_copy?.headline || '';
+  document.getElementById('r-ad-body').textContent = d.ad_copy?.body || '';
+  document.getElementById('r-ad-cta').textContent = d.ad_copy?.cta || '';
+
+  // Routine
+  var routineEl = document.getElementById('r-routine');
+  routineEl.innerHTML = '';
+  (d.daily_routine || []).forEach(function(r) {
+    routineEl.innerHTML += '<div class="routine-row"><div class="routine-time">' + r.time + '</div><div class="routine-dur">' + r.duration + '</div><div class="routine-task">' + r.task + '</div></div>';
+  });
+
+  document.getElementById('step-loading').style.display = 'none';
+  document.getElementById('step-results').classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+async function generateLogo() {
+  if (!planData) return;
+  document.getElementById('btn-logo').style.display = 'none';
+  document.getElementById('logo-loading').style.display = 'block';
+  try {
+    const res = await fetch('/api/builder/logo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: planData.logo_prompt || 'Minimalist professional logo for ' + planData.brand?.name })
+    });
+    const data = await res.json();
+    if (data.url) {
+      document.getElementById('logo-loading').style.display = 'none';
+      var img = document.getElementById('logo-img');
+      img.src = data.url;
+      img.style.display = 'block';
+      document.getElementById('logo-placeholder').style.display = 'none';
+    } else {
+      throw new Error(data.error || 'Failed');
+    }
+  } catch(e) {
+    document.getElementById('logo-loading').style.display = 'none';
+    document.getElementById('btn-logo').style.display = 'inline-flex';
+    alert('Logo generation failed: ' + e.message);
+  }
+}
+
+function copyText(id) {
+  var el = document.getElementById(id);
+  navigator.clipboard.writeText(el.textContent).then(function() {
+    alert('Copied!');
+  });
+}
+
+function copyAd() {
+  var h = document.getElementById('r-ad-headline').textContent;
+  var b = document.getElementById('r-ad-body').textContent;
+  var c = document.getElementById('r-ad-cta').textContent;
+  navigator.clipboard.writeText(h + '\n\n' + b + '\n\n[CTA: ' + c + ']').then(function() { alert('Ad copy copied!'); });
+}
+
+function restart() {
+  state = { name: '', passions: '', hours: '', budget: '' };
+  planData = null;
+  document.getElementById('inp-name').value = '';
+  document.getElementById('inp-passions').value = '';
+  document.querySelectorAll('.choice').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-loading').style.display = 'none';
+  document.getElementById('step-1').classList.add('active');
+  updateProgress(1);
+  window.scrollTo(0, 0);
+}
+</script>
+<script src="/lang.js"></script>
+</body>
+</html>

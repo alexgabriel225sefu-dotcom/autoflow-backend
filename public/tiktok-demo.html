@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<title>Blueprint Studio — Demo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif}
+
+/* ═══ PHONE SHELL ═══ */
+#wrap{display:flex;align-items:center;justify-content:center;width:100vw;height:100vh}
+#phone{
+  width:390px;height:844px;
+  background:#000;
+  border-radius:54px;
+  border:2px solid #2a2a2a;
+  box-shadow:
+    0 0 0 6px #111,
+    0 0 0 7px #1c1c1e,
+    0 50px 120px rgba(0,0,0,.95),
+    inset 0 0 0 1px rgba(255,255,255,.04);
+  position:relative;overflow:hidden;
+}
+/* Dynamic island */
+#phone::before{
+  content:'';position:absolute;
+  top:12px;left:50%;transform:translateX(-50%);
+  width:126px;height:37px;
+  background:#000;border-radius:20px;z-index:300;
+  box-shadow:0 0 0 1px rgba(255,255,255,.06);
+}
+/* Side buttons */
+#phone::after{
+  content:'';position:absolute;
+  top:120px;right:-8px;
+  width:4px;height:80px;
+  background:#1c1c1e;border-radius:0 3px 3px 0;
+  box-shadow:0 90px 0 #1c1c1e;
+}
+
+/* ═══ STATUS BAR ═══ */
+.sb{
+  position:absolute;top:0;left:0;right:0;height:59px;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  padding:0 30px 10px;z-index:200;
+}
+.sb-time{font-size:15px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.sb-right{display:flex;align-items:center;gap:6px}
+
+/* ═══ SCENES ═══ */
+.scene{
+  position:absolute;inset:0;
+  opacity:0;
+  transition:opacity .6s ease;
+  pointer-events:none;
+}
+.scene.active{opacity:1;pointer-events:all}
+
+/* ════════════════════════════
+   SCENE 1 — LOCK SCREEN
+════════════════════════════ */
+#s1{
+  background:linear-gradient(175deg,#0a0a14 0%,#000 60%);
+  display:flex;flex-direction:column;align-items:center;
+}
+.s1-time{
+  font-size:80px;font-weight:100;color:#fff;
+  letter-spacing:-4px;margin-top:100px;
+  font-variant-numeric:tabular-nums;
+}
+.s1-date{font-size:17px;color:rgba(255,255,255,.45);margin-top:4px;letter-spacing:.2px}
+
+/* Notification pill */
+.notif{
+  position:absolute;left:14px;right:14px;
+  background:rgba(28,28,30,.88);
+  backdrop-filter:blur(40px) saturate(180%);
+  -webkit-backdrop-filter:blur(40px) saturate(180%);
+  border-radius:20px;padding:14px 16px;
+  display:flex;gap:12px;align-items:flex-start;
+  border:1px solid rgba(255,255,255,.08);
+  opacity:0;transform:translateY(-16px) scale(.97);
+  transition:all .55s cubic-bezier(0.34,1.4,0.64,1);
+}
+.notif.show{opacity:1;transform:translateY(0) scale(1)}
+.n-icon{
+  width:38px;height:38px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;flex-shrink:0;
+}
+.n-app{font-size:11px;color:rgba(255,255,255,.38);font-weight:600;letter-spacing:.3px;margin-bottom:3px}
+.n-title{font-size:14px;color:#fff;font-weight:600;margin-bottom:2px}
+.n-body{font-size:13px;color:rgba(255,255,255,.5);line-height:1.4}
+.n-time{font-size:11px;color:rgba(255,255,255,.28);flex-shrink:0;white-space:nowrap}
+
+/* Big money reveal */
+.money-reveal{
+  position:absolute;bottom:170px;
+  left:0;right:0;text-align:center;
+  opacity:0;transform:translateY(18px) scale(.92);
+  transition:all .7s cubic-bezier(0.34,1.2,0.64,1);
+}
+.money-reveal.show{opacity:1;transform:translateY(0) scale(1)}
+.money-amount{
+  font-size:90px;font-weight:900;color:#fff;
+  letter-spacing:-5px;line-height:1;
+  text-shadow:0 0 60px rgba(74,222,128,.2);
+}
+.money-tag{
+  font-size:14px;color:rgba(255,255,255,.35);
+  letter-spacing:1px;margin-top:8px;text-transform:uppercase;
+}
+
+.lock-caption{
+  position:absolute;bottom:70px;left:20px;right:20px;
+  text-align:center;font-size:20px;font-weight:800;color:#fff;
+  text-shadow:0 2px 20px rgba(0,0,0,.8);
+  opacity:0;transition:opacity .5s ease;line-height:1.35;
+}
+.lock-caption.show{opacity:1}
+
+/* ════════════════════════════
+   SCENE 2 — BLUEPRINT STUDIO
+════════════════════════════ */
+#s2{background:#060606;flex-direction:column;display:flex}
+#s2::after{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:260px;
+  background:radial-gradient(ellipse 90% 40% at 50% -5%,rgba(229,62,46,.09),transparent 65%);
+  pointer-events:none;
+}
+
+.app-nav{
+  padding:62px 20px 14px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:relative;z-index:10;flex-shrink:0;
+}
+.app-logo-w{display:flex;align-items:center;gap:8px}
+.app-logo-icon{
+  width:32px;height:32px;
+  background:linear-gradient(135deg,#E53E2E,#c93426);
+  border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:900;color:#fff;
+  box-shadow:0 4px 14px rgba(229,62,46,.35);
+}
+.app-logo-txt{font-size:13px;font-weight:800;color:#f0f0f0;letter-spacing:.3px}
+.app-cta-pill{
+  background:rgba(229,62,46,.12);border:1px solid rgba(229,62,46,.3);
+  color:#E53E2E;font-size:10px;font-weight:700;
+  padding:5px 12px;border-radius:20px;letter-spacing:.3px;
+}
+
+/* Scrollable content */
+#s2-body{flex:1;overflow:hidden;position:relative}
+#s2-inner{
+  position:absolute;top:0;left:0;right:0;
+  padding:0 18px 40px;
+  transition:transform .8s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* Headline */
+.s2-headline{text-align:center;padding:8px 0 18px;position:relative;z-index:1}
+.s2-tag{
+  display:inline-block;
+  background:rgba(229,62,46,.08);border:1px solid rgba(229,62,46,.2);
+  color:#E53E2E;font-size:9px;font-weight:700;letter-spacing:2px;
+  text-transform:uppercase;padding:4px 12px;border-radius:20px;margin-bottom:10px;
+}
+.s2-h1{font-size:24px;font-weight:900;line-height:1.2;color:#f5f5f5;margin-bottom:5px}
+.s2-h1 em{
+  font-style:normal;
+  background:linear-gradient(135deg,#E53E2E,#ff7f6e);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.s2-sub{font-size:12px;color:#3a3a3a;line-height:1.5}
+
+/* Input card */
+.inp-card{
+  background:#0d0d0d;border:1px solid #1a1a1a;
+  border-radius:16px;padding:16px;margin-bottom:12px;
+  position:relative;overflow:hidden;
+}
+.inp-card::before{
+  content:'';position:absolute;inset:0;border-radius:16px;padding:1px;
+  background:linear-gradient(135deg,rgba(229,62,46,.3),transparent 50%);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;
+}
+.inp-lbl{font-size:10px;color:#3a3a3a;font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px}
+.inp-box{
+  background:#080808;border:1.5px solid #181818;
+  border-radius:10px;padding:12px 14px;
+  min-height:80px;
+  font-size:13px;color:#e0e0e0;line-height:1.7;
+  position:relative;
+  transition:border-color .3s;
+}
+.inp-box.typing{border-color:rgba(229,62,46,.4);box-shadow:0 0 0 3px rgba(229,62,46,.04)}
+.inp-cursor{
+  display:inline-block;width:2px;height:14px;
+  background:#E53E2E;margin-left:1px;vertical-align:middle;
+  animation:blink .9s step-end infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.inp-cursor.hide{display:none}
+
+.gen-btn{
+  width:100%;
+  background:linear-gradient(135deg,#E53E2E,#c93426);
+  color:#fff;border:none;border-radius:12px;
+  padding:15px;font-size:14px;font-weight:800;
+  cursor:pointer;margin-top:10px;
+  box-shadow:0 6px 24px rgba(229,62,46,.32);
+  transition:transform .15s,box-shadow .15s;
+  letter-spacing:.3px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.gen-btn.press{transform:scale(.97);box-shadow:0 2px 12px rgba(229,62,46,.2)}
+.btn-icon{font-size:16px}
+
+/* Loading steps */
+.loading-sec{display:none;padding:12px 0}
+.load-bar-w{height:3px;background:#111;border-radius:3px;overflow:hidden;margin-bottom:16px}
+.load-bar{height:100%;background:linear-gradient(90deg,#E53E2E,#ff7f6e);border-radius:3px;width:0;transition:width .8s ease}
+.load-step{
+  display:flex;align-items:center;gap:11px;
+  padding:7px 0;opacity:.2;transition:opacity .3s;
+}
+.load-step.on{opacity:1}
+.load-step.done{opacity:.5}
+.ls-icon{
+  width:28px;height:28px;border-radius:8px;
+  background:#111;border:1px solid #1e1e1e;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;flex-shrink:0;transition:all .3s;
+}
+.load-step.on .ls-icon{background:rgba(229,62,46,.1);border-color:rgba(229,62,46,.3)}
+.load-step.done .ls-icon{background:rgba(74,222,128,.06);border-color:rgba(74,222,128,.2)}
+.ls-txt{font-size:12px;color:#555;transition:color .3s}
+.load-step.on .ls-txt{color:#f0f0f0}
+.ls-spin{
+  width:13px;height:13px;border:2px solid rgba(229,62,46,.12);
+  border-top-color:#E53E2E;border-radius:50%;
+  animation:spin .65s linear infinite;margin-left:auto;
+}
+.load-step:not(.on) .ls-spin,.load-step.done .ls-spin{display:none}
+.ls-chk{margin-left:auto;color:#4ADE80;font-size:13px;display:none}
+.load-step.done .ls-chk{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Results */
+.results-sec{display:none;flex-direction:column;gap:10px}
+.res-card{
+  background:#0d0d0d;border:1px solid #1a1a1a;
+  border-radius:12px;padding:14px 16px;
+  animation:slideUp .4s ease both;
+}
+@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.res-lbl{font-size:9px;color:#333;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+.res-val{font-size:13px;color:#ccc;line-height:1.6}
+.res-price{
+  font-size:36px;font-weight:900;
+  background:linear-gradient(135deg,#E53E2E,#F5A623);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:-1px;
+}
+.res-price-sub{font-size:11px;color:#333;margin-top:2px}
+
+/* Locked card */
+.lock-card{
+  background:#0d0d0d;border:1px solid #1a1a1a;
+  border-radius:12px;padding:14px 16px;
+  position:relative;overflow:hidden;
+  animation:slideUp .4s ease .15s both;
+}
+.lk-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.lk-lbl{font-size:9px;color:#333;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.lk-badge{
+  background:rgba(229,62,46,.08);border:1px solid rgba(229,62,46,.2);
+  color:#E53E2E;font-size:9px;font-weight:700;
+  padding:2px 8px;border-radius:5px;
+  animation:glowBadge 2s ease-in-out infinite;
+}
+@keyframes glowBadge{0%,100%{box-shadow:none}50%{box-shadow:0 0 10px rgba(229,62,46,.2)}}
+.lk-blur{
+  filter:blur(3.5px);font-family:'SF Mono',monospace;
+  font-size:10px;color:#2a2a2a;line-height:1.8;
+}
+.lk-overlay{
+  position:absolute;inset:0;
+  background:rgba(6,6,6,.5);
+  backdrop-filter:blur(1px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+}
+.lk-ico{font-size:22px;animation:lockShake 4s ease-in-out infinite}
+@keyframes lockShake{0%,80%,100%{transform:rotate(0)}82%{transform:rotate(-10deg)}84%{transform:rotate(10deg)}86%{transform:rotate(-5deg)}88%{transform:rotate(0)}}
+.lk-msg{font-size:12px;color:#999;font-weight:600;text-align:center;line-height:1.5}
+.lk-msg strong{color:#E53E2E}
+
+/* CTA card */
+.cta-card{
+  background:linear-gradient(135deg,#100404,#080808);
+  border:1px solid rgba(229,62,46,.18);
+  border-radius:14px;padding:18px;
+  position:relative;overflow:hidden;
+  animation:slideUp .4s ease .3s both;
+}
+.cta-card::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(229,62,46,.07),transparent 60%);
+}
+.cta-tag{
+  display:inline-block;
+  background:rgba(229,62,46,.1);border:1px solid rgba(229,62,46,.25);
+  color:#E53E2E;font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  padding:3px 10px;border-radius:20px;margin-bottom:10px;position:relative;z-index:1;
+}
+.cta-h{
+  font-size:19px;font-weight:900;color:#f5f5f5;
+  line-height:1.25;margin-bottom:5px;position:relative;z-index:1;
+}
+.cta-h span{
+  background:linear-gradient(135deg,#E53E2E,#ff7f6e);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.cta-sub{font-size:11px;color:#555;line-height:1.5;margin-bottom:14px;position:relative;z-index:1}
+.price-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;position:relative;z-index:1}
+.price-old{font-size:16px;color:#333;text-decoration:line-through}
+.price-new{font-size:34px;font-weight:900;color:#f5f5f5;letter-spacing:-1.5px}
+.price-new sup{font-size:17px;vertical-align:top;margin-top:6px;color:#E53E2E}
+.price-save{
+  background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);
+  color:#4ADE80;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;
+}
+.cta-btn{
+  width:100%;background:linear-gradient(135deg,#E53E2E,#c93426);
+  color:#fff;border:none;border-radius:12px;padding:16px;
+  font-size:15px;font-weight:800;cursor:pointer;
+  box-shadow:0 6px 30px rgba(229,62,46,.4);
+  animation:ctaPulse 2.5s ease-in-out infinite;
+  position:relative;z-index:1;letter-spacing:.3px;
+}
+@keyframes ctaPulse{0%,100%{box-shadow:0 6px 30px rgba(229,62,46,.4)}50%{box-shadow:0 6px 50px rgba(229,62,46,.6)}}
+.cta-proof{
+  display:flex;align-items:center;justify-content:center;
+  gap:8px;margin-top:9px;font-size:10px;color:#333;
+  position:relative;z-index:1;
+}
+.cta-dot{width:5px;height:5px;background:#4ADE80;border-radius:50%;animation:dp 1.5s ease-in-out infinite}
+@keyframes dp{0%,100%{opacity:.4}50%{opacity:1}}
+</style>
+</head>
+<body>
+<div id="wrap">
+<div id="phone">
+
+  <!-- Status Bar -->
+  <div class="sb">
+    <span class="sb-time">9:41</span>
+    <div class="sb-right">
+      <svg width="17" height="12" viewBox="0 0 17 12" fill="#fff" opacity=".9"><rect x="0" y="3" width="3" height="9" rx="1"/><rect x="5" y="2" width="3" height="10" rx="1"/><rect x="10" y="0" width="3" height="12" rx="1"/><rect x="15" y="1" width="2" height="11" rx="1" opacity=".25"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="#fff" opacity=".9"><path d="M8 2.5C10.5 2.5 12.8 3.5 14.4 5.1L15.8 3.7C13.8 1.8 11.1.7 8 .7S2.2 1.8.2 3.7L1.6 5.1C3.2 3.5 5.5 2.5 8 2.5Z" opacity=".35"/><path d="M8 5.5c1.6 0 3 .6 4.1 1.6l1.4-1.4C11.9 4.2 10 3.5 8 3.5S4.1 4.2 2.5 5.7l1.4 1.4C5 6.1 6.4 5.5 8 5.5Z" opacity=".7"/><path d="M8 8.5c.9 0 1.7.3 2.3.9l1.4-1.4C10.5 7 9.3 6.5 8 6.5S5.5 7 4.3 8l1.4 1.4C6.3 8.8 7.1 8.5 8 8.5Z"/><circle cx="8" cy="11" r="1.5"/></svg>
+      <svg width="28" height="13" viewBox="0 0 28 13" fill="none" opacity=".9"><rect x=".5" y=".5" width="23" height="12" rx="3.5" stroke="#fff" stroke-opacity=".3"/><rect x="1.5" y="1.5" width="20" height="10" rx="2.5" fill="#fff"/><path d="M25 4.5v4c1-.3 1.7-1.1 1.7-2s-.7-1.7-1.7-2Z" fill="#fff" opacity=".4"/></svg>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 1: LOCK ═══ -->
+  <div class="scene active" id="s1">
+    <div class="s1-time">9:41</div>
+    <div class="s1-date">Wednesday, 21 May</div>
+
+    <div class="notif" id="n1" style="top:148px">
+      <div class="n-icon" style="background:#1a7f4b">💸</div>
+      <div style="flex:1">
+        <div class="n-app">PayPal</div>
+        <div class="n-title">Payment received</div>
+        <div class="n-body">Marco's Restaurant sent you <strong style="color:#4ADE80">€840.00</strong></div>
+      </div>
+      <div class="n-time">now</div>
+    </div>
+
+    <div class="notif" id="n2" style="top:258px">
+      <div class="n-icon" style="background:#0a84ff">💬</div>
+      <div style="flex:1">
+        <div class="n-app">Messages</div>
+        <div class="n-title">Marco — Restaurant Owner</div>
+        <div class="n-body">"Bot saved us 4hrs/day. Incredible work 🙏"</div>
+      </div>
+      <div class="n-time">2m ago</div>
+    </div>
+
+    <div class="money-reveal" id="money-big">
+      <div class="money-amount">€840</div>
+      <div class="money-tag">one client · zero code · 60 seconds</div>
+    </div>
+    <div class="lock-caption" id="cap1">Here's the tool that built it 👇</div>
+  </div>
+
+  <!-- ═══ SCENE 2: BLUEPRINT STUDIO ═══ -->
+  <div class="scene" id="s2">
+    <div class="app-nav">
+      <div class="app-logo-w">
+        <div class="app-logo-icon">⚡</div>
+        <div class="app-logo-txt">Blueprint Studio</div>
+      </div>
+      <div class="app-cta-pill">$97 Access</div>
+    </div>
+
+    <div id="s2-body">
+      <div id="s2-inner">
+        <!-- Headline -->
+        <div class="s2-headline">
+          <div class="s2-tag">⚡ AI Automation Generator</div>
+          <h1 class="s2-h1">Describe it.<br><em>Sell it for $800–$1,200.</em></h1>
+          <p class="s2-sub">Type any automation in plain English.<br>Get the full blueprint, price & client pitch.</p>
+        </div>
+
+        <!-- Input -->
+        <div class="inp-card">
+          <div class="inp-lbl">Describe the automation</div>
+          <div class="inp-box" id="inp-box">
+            <span id="inp-txt"></span><span class="inp-cursor" id="inp-cur"></span>
+          </div>
+          <button class="gen-btn" id="gen-btn">
+            <span class="btn-icon">⚡</span> Generate Blueprint
+          </button>
+        </div>
+
+        <!-- Loading -->
+        <div class="loading-sec" id="loading-sec">
+          <div class="load-bar-w"><div class="load-bar" id="load-bar"></div></div>
+          <div class="load-step" id="ls1">
+            <div class="ls-icon">🔍</div>
+            <div class="ls-txt">Analysing automation type…</div>
+            <div class="ls-spin"></div><div class="ls-chk">✓</div>
+          </div>
+          <div class="load-step" id="ls2">
+            <div class="ls-icon">⚙️</div>
+            <div class="ls-txt">Building Make.com workflow…</div>
+            <div class="ls-spin"></div><div class="ls-chk">✓</div>
+          </div>
+          <div class="load-step" id="ls3">
+            <div class="ls-icon">💰</div>
+            <div class="ls-txt">Calculating market price…</div>
+            <div class="ls-spin"></div><div class="ls-chk">✓</div>
+          </div>
+          <div class="load-step" id="ls4">
+            <div class="ls-icon">📨</div>
+            <div class="ls-txt">Writing client pitch…</div>
+            <div class="ls-spin"></div><div class="ls-chk">✓</div>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-sec" id="results-sec">
+          <div class="res-card" style="animation-delay:.0s">
+            <div class="res-lbl">Automation Stack</div>
+            <div class="res-val">WhatsApp Order Bot<br><span style="color:#4ADE80;font-size:11px">Make.com + GPT-4o + Twilio API</span></div>
+          </div>
+          <div class="res-card" style="animation-delay:.08s">
+            <div class="res-lbl">Charge the Client</div>
+            <div class="res-price">$900</div>
+            <div class="res-price-sub">one-time setup + $200/mo maintenance</div>
+          </div>
+          <div class="res-card" style="animation-delay:.16s">
+            <div class="res-lbl">Client Pitch Message</div>
+            <div class="res-val" style="font-size:12px;color:#888">"Hey [name], noticed your restaurant handles orders manually. I can automate that for $900. Interested?"</div>
+          </div>
+          <div class="lock-card" style="animation-delay:.24s">
+            <div class="lk-row">
+              <div class="lk-lbl">Full Technical Blueprint</div>
+              <div class="lk-badge">🔒 LOCKED</div>
+            </div>
+            <div class="lk-blur">webhook_url: https://hook.make.com/xxx&#10;gpt_prompt: "Respond as a..."&#10;twilio_sid: ACxxxxx&#10;flow_steps: [receive, parse, reply]&#10;error_handling: retry_3x</div>
+            <div class="lk-overlay">
+              <div class="lk-ico">🔒</div>
+              <div class="lk-msg">Unlock with full access<br><strong>aicashsystem.space</strong></div>
+            </div>
+          </div>
+          <div class="cta-card">
+            <div class="cta-tag">🔥 Limited — Early Access</div>
+            <h2 class="cta-h">Start selling AI<br><span>to local businesses</span></h2>
+            <p class="cta-sub">Full blueprints, pricing, pitch scripts.<br>No coding. No experience needed.</p>
+            <div class="price-row">
+              <span class="price-old">$297</span>
+              <span class="price-new"><sup>$</sup>97</span>
+              <span class="price-save">SAVE $200</span>
+            </div>
+            <button class="cta-btn" onclick="window.open('https://aicashsystem.space/try','_blank')">Get Instant Access →</button>
+            <div class="cta-proof">
+              <div class="cta-dot"></div>
+              No coding · Instant access · Works in any country
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+</div><!-- /wrap -->
+
+<script>
+/* ══════════════════════════════════
+   SEQUENCER
+══════════════════════════════════ */
+const $ = id => document.getElementById(id);
+
+function delay(ms){ return new Promise(r => setTimeout(r, ms)) }
+
+async function run(){
+  await delay(1200);
+
+  /* ─── SCENE 1: LOCK SCREEN ─── */
+  await delay(800);
+  $('n1').classList.add('show');
+  await delay(1100);
+  $('n2').classList.add('show');
+  await delay(1600);
+  $('money-big').classList.add('show');
+  await delay(1400);
+  $('cap1').classList.add('show');
+  await delay(2200);
+
+  /* transition to scene 2 */
+  $('s1').classList.remove('active');
+  await delay(300);
+  $('s2').classList.add('active');
+  await delay(800);
+
+  /* ─── SCENE 2: TYPING ─── */
+  const text = "Coffee shop needs WhatsApp bot to auto-confirm orders";
+  const inp = $('inp-txt');
+  const cur = $('inp-cur');
+  const box = $('inp-box');
+  box.classList.add('typing');
+  for(let i = 0; i <= text.length; i++){
+    inp.textContent = text.slice(0, i);
+    await delay(38 + Math.random() * 28);
+  }
+  await delay(400);
+  cur.classList.add('hide');
+  box.classList.remove('typing');
+
+  await delay(300);
+  const btn = $('gen-btn');
+  btn.classList.add('press');
+  await delay(200);
+  btn.classList.remove('press');
+  await delay(200);
+
+  /* show loading */
+  btn.style.display = 'none';
+  $('loading-sec').style.display = 'block';
+
+  const steps = ['ls1','ls2','ls3','ls4'];
+  const barPcts = [25, 50, 75, 100];
+  for(let i = 0; i < steps.length; i++){
+    $(steps[i]).classList.add('on');
+    $('load-bar').style.width = barPcts[i] + '%';
+    await delay(900);
+    $(steps[i]).classList.remove('on');
+    $(steps[i]).classList.add('done');
+  }
+  await delay(300);
+
+  /* show results */
+  $('loading-sec').style.display = 'none';
+  $('results-sec').style.display = 'flex';
+
+  /* scroll down to show CTA */
+  await delay(2200);
+  $('s2-inner').style.transform = 'translateY(-290px)';
+
+  /* loop back after 6s */
+  await delay(6000);
+  restart();
+}
+
+function restart(){
+  /* reset s1 */
+  $('n1').classList.remove('show');
+  $('n2').classList.remove('show');
+  $('money-big').classList.remove('show');
+  $('cap1').classList.remove('show');
+  /* reset s2 */
+  $('inp-txt').textContent = '';
+  $('inp-cur').classList.remove('hide');
+  $('inp-box').classList.remove('typing');
+  $('gen-btn').style.display = '';
+  $('loading-sec').style.display = 'none';
+  $('results-sec').style.display = 'none';
+  $('s2-inner').style.transform = 'translateY(0)';
+  $('load-bar').style.width = '0';
+  ['ls1','ls2','ls3','ls4'].forEach(id => {
+    $(id).classList.remove('on','done');
+  });
+  /* switch scenes */
+  $('s2').classList.remove('active');
+  $('s1').classList.add('active');
+  run();
+}
+
+run();
+</script>
+</body>
+</html>

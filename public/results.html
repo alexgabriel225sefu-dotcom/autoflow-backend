@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bot Results</title>
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060608;--panel:#0f0f13;--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.13);
+  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
+  --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;--accdim:rgba(255,45,79,.12);
+  --up:#27c46a;
+  --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
+  --e:cubic-bezier(.32,.72,0,1);--eo:cubic-bezier(.34,1.56,.64,1);
+}
+html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var(--f);-webkit-font-smoothing:antialiased}
+#stage{
+  position:fixed;top:50%;left:50%;width:1080px;height:1920px;
+  transform:translate(-50%,-50%) scale(var(--s,.36));transform-origin:center center;
+  background:var(--bg);overflow:hidden;color:var(--t0);
+}
+.aur{position:absolute;border-radius:50%;pointer-events:none;z-index:0;filter:blur(80px);animation:aur 10s ease-in-out infinite}
+@keyframes aur{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
+
+/* scene system */
+.scene{position:absolute;inset:0;opacity:0;visibility:hidden;z-index:10;transition:opacity .6s var(--e),filter .6s var(--e)}
+.scene.in{opacity:1;visibility:visible;filter:none}
+.scene.out{opacity:0;filter:blur(10px);visibility:hidden}
+.scene.pre{opacity:0}
+.rv{opacity:0;transform:translateY(28px);filter:blur(6px);transition:opacity .65s var(--e),transform .65s var(--e),filter .65s var(--e)}
+.in .rv{opacity:1;transform:none;filter:none}
+.in .rv.d1{transition-delay:.1s}.in .rv.d2{transition-delay:.22s}.in .rv.d3{transition-delay:.34s}
+.in .rv.d4{transition-delay:.46s}.in .rv.d5{transition-delay:.58s}
+
+/* ═══ SCENE 1 · INTRO ═══ */
+.s1{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 80px}
+.s1-eye{font:700 28px/1 var(--m);letter-spacing:.28em;text-transform:uppercase;color:var(--acc);margin-bottom:44px}
+.s1-h{font-family:var(--d);font-weight:700;font-size:110px;letter-spacing:-.04em;line-height:1.0;text-align:center}
+.s1-h em{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-style:normal;filter:drop-shadow(0 4px 30px rgba(255,45,79,.4))}
+.s1-sub{font-size:44px;color:var(--t1);text-align:center;margin-top:26px;line-height:1.55}
+.s1-badge{margin-top:64px;display:inline-flex;align-items:center;gap:14px;padding:22px 44px;border-radius:999px;background:var(--accdim);border:1px solid rgba(255,45,79,.3);font:700 34px/1 var(--m);color:var(--acc2)}
+.s1-badge .dot{width:12px;height:12px;border-radius:50%;background:var(--acc);flex:none;animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,45,79,.5)}70%{box-shadow:0 0 0 18px rgba(255,45,79,0)}100%{box-shadow:0 0 0 0 rgba(255,45,79,0)}}
+
+/* ═══ SCENES 2-4 · IMAGE + STATS ═══ */
+.img-scene{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 56px}
+
+/* screenshot box */
+.ss-wrap{width:100%;position:relative;border-radius:20px;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(255,255,255,.1),0 30px 80px rgba(0,0,0,.7);
+  animation:none}
+.ss-wrap img{width:100%;height:auto;display:block;border-radius:20px}
+/* glow border on image */
+.ss-wrap::after{content:'';position:absolute;inset:0;border-radius:20px;
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.14);pointer-events:none}
+
+/* top label above image */
+.img-label{width:100%;display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.il-left{font:700 26px/1 var(--m);color:var(--t2);letter-spacing:.1em;text-transform:uppercase}
+.il-right{font:700 26px/1 var(--m);color:var(--acc);padding:8px 18px;border-radius:8px;background:var(--accdim);border:1px solid rgba(255,45,79,.25)}
+
+/* headline above image */
+.img-headline{font-family:var(--d);font-weight:700;font-size:86px;letter-spacing:-.03em;line-height:1.0;text-align:center;margin-bottom:24px}
+.img-headline .up{color:var(--up);text-shadow:0 0 40px rgba(39,196,106,.5)}
+.img-headline .acc{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+/* stat pills below image */
+.pills{display:flex;gap:16px;width:100%;margin-top:24px}
+.pill{flex:1;border-radius:18px;padding:26px 16px;text-align:center}
+.pill.g{background:rgba(39,196,106,.12);border:1px solid rgba(39,196,106,.3)}
+.pill.r{background:rgba(255,45,79,.1);border:1px solid rgba(255,45,79,.25)}
+.pill.a{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25)}
+.pill .pv{font-family:var(--d);font-weight:700;font-size:54px;letter-spacing:-.03em}
+.pill .pv.up{color:var(--up)}.pill .pv.acc{color:var(--acc2)}.pill .pv.amber{color:#fbbf24}
+.pill .pl{font:500 23px/1 var(--f);color:var(--t1);margin-top:6px}
+
+/* extra stat grid */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%;margin-top:20px}
+.sg{border-radius:16px;padding:24px 28px;background:var(--panel);border:1px solid var(--line)}
+.sg .sv{font-family:var(--d);font-weight:700;font-size:56px;letter-spacing:-.03em}
+.sg .sl{font:500 24px/1 var(--f);color:var(--t1);margin-top:4px}
+.sv.up{color:var(--up)}.sv.acc{color:var(--acc2)}.sv.dn{color:#ef4444}.sv.nt{color:var(--t0)}
+
+/* ═══ SCENE 5 · CTA ═══ */
+.s5{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 80px}
+.s5-h{font-family:var(--d);font-weight:700;font-size:108px;letter-spacing:-.04em;text-align:center;line-height:.95}
+.s5-h .acc{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 30px rgba(255,45,79,.4))}
+.s5-sub{font-size:44px;color:var(--t1);text-align:center;margin:24px 0 52px;line-height:1.5}
+.feats{width:100%;display:flex;flex-direction:column;gap:16px}
+.feat{display:flex;align-items:center;gap:24px;padding:28px 38px;border-radius:18px;background:rgba(255,255,255,.04);border:1px solid var(--line2);font:600 42px/1 var(--d);letter-spacing:-.01em}
+.feat-ic{width:50px;height:50px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:24px;flex:none;background:rgba(39,196,106,.12);border:1px solid rgba(39,196,106,.25);color:var(--up)}
+.s5-url{font-family:var(--m);font-weight:700;font-size:56px;color:var(--acc2);margin-top:52px;letter-spacing:.02em}
+.s5-bio{font-size:34px;color:var(--t1);margin-top:12px}
+.disc{font-size:21px;color:var(--t2);margin-top:32px;text-align:center;line-height:1.7;max-width:860px}
+
+/* controls */
+#ui{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:300}
+#ui button{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:12px 22px;font:600 15px/1 var(--f);cursor:pointer;backdrop-filter:blur(12px);transition:background .2s}
+#ui button:hover{background:rgba(255,255,255,.2)}
+#hint{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:300;color:#50505e;font:500 13px/1.5 var(--f);text-align:center}
+.clean #ui,.clean #hint{display:none}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="hint">▶ Play · C = clean · Space = restart</div>
+
+<div id="stage">
+  <div class="aur" style="width:900px;height:900px;top:-300px;right:-200px;background:radial-gradient(closest-side,rgba(255,45,79,.18),rgba(255,45,79,.04) 60%,transparent)"></div>
+  <div class="aur" style="width:700px;height:700px;bottom:-200px;left:-100px;background:radial-gradient(closest-side,rgba(39,196,106,.14),rgba(39,196,106,.03) 60%,transparent);animation-delay:-5s"></div>
+
+  <!-- ══ 1 · INTRO ══ -->
+  <section class="scene s1" data-dur="3600" id="s1">
+    <div class="s1-eye rv">My Bot · Real Results</div>
+    <div class="s1-h rv d1">
+      I built it.<br>I configured it.<br>It made <em>this.</em>
+    </div>
+    <div class="s1-sub rv d2">MT5 Strategy Tester · XAUUSD<br>No edits. No fake numbers.</div>
+    <div class="s1-badge rv d3"><span class="dot"></span>3,310 bars · 1,653 automated trades</div>
+  </section>
+
+  <!-- ══ 2 · FULL SCREENSHOT + NET PROFIT ══ -->
+  <section class="scene img-scene" data-dur="4800" id="s2">
+    <div class="img-headline rv">
+      Total profit: <span class="up" id="s2cnt">$0</span>
+    </div>
+    <div class="img-label rv d1">
+      <span class="il-left">XAUUSD · MT5 Backtest</span>
+      <span class="il-right">REAL RESULTS</span>
+    </div>
+    <div class="ss-wrap rv d1">
+      <img src="/mt5-results.jpg" alt="MT5 Backtest Results">
+    </div>
+    <div class="pills rv d2">
+      <div class="pill g"><div class="pv up">58%</div><div class="pl">Win Rate</div></div>
+      <div class="pill a"><div class="pv amber">1.74</div><div class="pl">Profit Factor</div></div>
+      <div class="pill r"><div class="pv acc">15.65%</div><div class="pl">Max Drawdown</div></div>
+    </div>
+  </section>
+
+  <!-- ══ 3 · SCREENSHOT + TRADE STATS ══ -->
+  <section class="scene img-scene" data-dur="4800" id="s3">
+    <div class="img-headline rv">
+      <span class="acc">1,653 trades.</span> Zero manual.
+    </div>
+    <div class="ss-wrap rv d1">
+      <img src="/mt5-results.jpg" alt="MT5 Backtest Results">
+    </div>
+    <div class="stat-grid rv d2">
+      <div class="sg"><div class="sv up">$437K</div><div class="sl">Gross Profit</div></div>
+      <div class="sg"><div class="sv dn">-$251K</div><div class="sl">Gross Loss</div></div>
+      <div class="sg"><div class="sv up">$17,346</div><div class="sl">Largest Win</div></div>
+      <div class="sg"><div class="sv acc">6.47</div><div class="sl">Recovery Factor</div></div>
+    </div>
+  </section>
+
+  <!-- ══ 4 · SCREENSHOT + CONFIGURE MSG ══ -->
+  <section class="scene img-scene" data-dur="4800" id="s4">
+    <div class="img-headline rv" style="font-size:78px">
+      I configured every<br>setting <span class="up">myself.</span>
+    </div>
+    <div class="ss-wrap rv d1">
+      <img src="/mt5-results.jpg" alt="MT5 Backtest Results">
+    </div>
+    <div class="pills rv d2">
+      <div class="pill g"><div class="pv up">13</div><div class="pl">Max wins row</div></div>
+      <div class="pill a"><div class="pv amber">$455</div><div class="pl">Avg win $</div></div>
+      <div class="pill r"><div class="pv acc">$112</div><div class="pl">Exp. Payoff</div></div>
+    </div>
+    <div class="rv d3" style="width:100%;margin-top:20px;padding:34px 40px;border-radius:20px;
+      background:linear-gradient(135deg,rgba(255,45,79,.14),rgba(255,45,79,.04));
+      border:1px solid rgba(255,45,79,.3);text-align:center;
+      font:700 48px/1 var(--d);color:var(--acc2)">
+      You can configure yours the same way.
+    </div>
+  </section>
+
+  <!-- ══ 5 · CTA ══ -->
+  <section class="scene s5" data-dur="6000" id="s5">
+    <div class="s5-h rv">Get the<br><span class="acc">same bot.</span></div>
+    <div class="s5-sub rv d1">Full source code.<br>Configure it your way. Run it forever.</div>
+    <div class="feats rv d2">
+      <div class="feat"><div class="feat-ic">✓</div>Full Python source code — yours forever</div>
+      <div class="feat"><div class="feat-ic">✓</div>Crypto · Binance / Bybit</div>
+      <div class="feat"><div class="feat-ic">✓</div>Forex via MT5 · XAUUSD · EURUSD</div>
+      <div class="feat"><div class="feat-ic">✓</div>One-time payment · No subscription ever</div>
+    </div>
+    <div class="s5-url rv d3">aicashsystem.space</div>
+    <div class="s5-bio rv d4">Link in bio</div>
+    <div class="disc rv d5">MT5 backtest results. Past performance does not guarantee future results.</div>
+  </section>
+</div>
+
+<div id="ui">
+  <button onclick="play()">▶ Play</button>
+  <button onclick="toggleClean()">Clean (C)</button>
+  <button onclick="document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()">⛶ Full</button>
+</div>
+
+<script>
+function fit(){var s=Math.min(window.innerWidth/1080,window.innerHeight/1920);document.getElementById('stage').style.setProperty('--s',s)}
+addEventListener('resize',fit);fit();
+
+var scenes=[...document.querySelectorAll('.scene')],timers=[];
+function clearT(){timers.forEach(clearTimeout);timers=[]}
+function T(fn,ms){timers.push(setTimeout(fn,ms))}
+
+function resetScene(sc){sc.classList.remove('in','out');sc.classList.add('pre')}
+function runScene(i){
+  if(i>=scenes.length){T(play,1400);return;}
+  var sc=scenes[i],dur=+sc.dataset.dur||4200;
+  scenes.forEach((s,j)=>{if(j!==i){s.classList.remove('in');s.classList.add(j<i?'out':'pre');}});
+  resetScene(sc);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    sc.classList.remove('pre');sc.classList.add('in');
+    if(sc.id==='s2')animS2();
+  }));
+  T(()=>runScene(i+1),dur);
+}
+function play(){clearT();scenes.forEach(s=>s.classList.add('pre'));T(()=>runScene(0),200);}
+
+function animS2(){
+  var el=document.getElementById('s2cnt');if(!el)return;
+  var st=performance.now(),to=186082,ms=2800;
+  (function f(n){var p=Math.min(1,(n-st)/ms),e=1-Math.pow(1-p,3);
+    el.textContent='$'+Math.round(to*e).toLocaleString();
+    if(p<1)requestAnimationFrame(f)})(performance.now());
+}
+
+function toggleClean(){document.body.classList.toggle('clean')}
+addEventListener('keydown',e=>{
+  if(e.key==='c'||e.key==='C')toggleClean();
+  if(e.key===' '){e.preventDefault();play();}
+});
+scenes.forEach(s=>s.classList.add('pre'));
+T(play,400);
+</script>
+</body>
+</html>
