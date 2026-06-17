@@ -30,7 +30,7 @@ function resetDailyIfNeeded() {
     session.dailyPnL    = 0;
     session.dailyPnLPct = 0;
     session.lastResetDay = today;
-    console.log('[STRATEGY] 🌅 Zi nouă — contoare reset.');
+    console.log('[STRATEGY] 🌅 New day — counters reset.');
   }
 }
 
@@ -49,31 +49,31 @@ function shouldStop(balance, startBalance) {
   // Rule 1 — Ed Seykota: Stop after 3 consecutive losses
   // "A loss is a loss. Three in a row = wrong market condition. Wait."
   if (session.consecutiveLosses >= 3) {
-    reasons.push(`3 pierderi consecutive — condiții nefavorabile (regula Seykota)`);
+    reasons.push(`3 consecutive losses — unfavorable conditions (Seykota rule)`);
   }
 
   // Rule 2 — Paul Tudor Jones: Max 3% daily loss
   // "I'm always thinking about losing money rather than making money."
   const dailyDrawdownPct = (session.dailyPnL / startBalance) * 100;
   if (dailyDrawdownPct < -3) {
-    reasons.push(`Pierdere zilnică depășit -3% ($${Math.abs(session.dailyPnL).toFixed(2)}) — PTJ daily stop`);
+    reasons.push(`Daily loss exceeded -3% ($${Math.abs(session.dailyPnL).toFixed(2)}) — PTJ daily stop`);
   }
 
   // Rule 3: Max drawdown from peak -20%
   const peakDrawdown = ((balance - session.peakBalance) / session.peakBalance) * 100;
   if (peakDrawdown < -20) {
-    reasons.push(`Drawdown de la peak: ${peakDrawdown.toFixed(1)}% — stop protecție capital`);
+    reasons.push(`Drawdown from peak: ${peakDrawdown.toFixed(1)}% — capital protection stop`);
   }
 
   // Rule 4 — Turtle: Max 10 trades per day (avoid overtrading)
   // "More trades ≠ more profit. Quality over quantity." — Dennis
   if (session.dailyTrades >= 10) {
-    reasons.push(`Limita de 10 tranzacții/zi atinsă — Turtle rule`);
+    reasons.push(`10 trades/day limit reached — Turtle rule`);
   }
 
   // Rule 5: Balance too low to be meaningful
   if (balance < 1) {
-    reasons.push(`Balanță sub $1 — imposibil de tranzacționat`);
+    reasons.push(`Balance below $1 — cannot trade`);
   }
 
   return { stop: reasons.length > 0, reasons };
@@ -202,7 +202,7 @@ function recordTrade(won, pnlAmount, startBalance) {
   }
 
   const icon = won ? '✅' : '❌';
-  console.log(`[STRATEGY] ${icon} Streak: ${session.consecutiveLosses} pierderi / ${session.consecutiveWins} câștiguri consecutive | Azi: ${session.dailyTrades} tranzacții | PnL zilnic: ${session.dailyPnL >= 0 ? '+' : ''}$${session.dailyPnL.toFixed(4)}`);
+  console.log(`[STRATEGY] ${icon} Streak: ${session.consecutiveLosses} losses / ${session.consecutiveWins} wins in a row | Today: ${session.dailyTrades} trades | Daily PnL: ${session.dailyPnL >= 0 ? '+' : ''}$${session.dailyPnL.toFixed(4)}`);
 }
 
 // ─── Ed Seykota: cooldown after a loss ───────────────────────
@@ -253,7 +253,7 @@ function restoreSession(saved) {
   // Restaurează doar dacă e din aceeași zi — peste zi se resetează oricum
   if (saved.lastResetDay !== new Date().toDateString()) return;
   Object.assign(session, saved);
-  console.log(`[STRATEGY] ♻️ Sesiune restaurată: ${session.consecutiveLosses} pierderi consecutive, ${session.dailyTrades} tranzacții azi`);
+  console.log(`[STRATEGY] ♻️ Session restored: ${session.consecutiveLosses} consecutive losses, ${session.dailyTrades} trades today`);
 }
 
 module.exports = { shouldStop, analyze, druckenmillerMultiplier, recordTrade, turtleBreakout, livermoreStructure, sorosMomentum, cooldownRemaining, htfTrend, session, sessionSnapshot, restoreSession };

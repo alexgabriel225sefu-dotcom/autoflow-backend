@@ -229,7 +229,7 @@ async function closeTrade(price, reason, alreadyClosed = false) {
   price = fillPrice;
 
   logger.printTrade(closeSide, symbol, price, quantity, pnl);
-  logger.info(`Motivul: ${reason} | PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}`);
+  logger.info(`Reason: ${reason} | PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}`);
   strategies.recordTrade(pnl > 0, pnl, startBalance || cfg.PAPER_BALANCE);
   const bal = await getBalance();
   tg.alertClose(reason, symbol, side, entryPrice, price, pnl, bal);

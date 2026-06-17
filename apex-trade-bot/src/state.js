@@ -16,7 +16,7 @@ function save(paperBalance, openPosition, session = null) {
       savedAt: new Date().toISOString(),
     }, null, 2));
   } catch (err) {
-    console.warn('[STATE] Nu pot salva starea:', err.message);
+    console.warn('[STATE] Could not save state:', err.message);
   }
 }
 
@@ -28,16 +28,16 @@ function load(defaultBalance) {
     const age  = Date.now() - new Date(data.savedAt).getTime();
     // Ignoră starea dacă e mai veche de 24h (poziția ar fi expirat oricum)
     if (age > 24 * 60 * 60 * 1000) {
-      console.log('[STATE] Stare veche (>24h) — ignorată, start curat.');
+      console.log('[STATE] Saved state is older than 24h — ignoring, clean start.');
       return null;
     }
-    console.log(`[STATE] ♻️  Stare restaurată din ${data.savedAt}`);
+    console.log(`[STATE] ♻️  State restored from ${data.savedAt}`);
     if (data.openPosition) {
-      console.log(`[STATE] 📌 Poziție recuperată: ${data.openPosition.side} ${data.openPosition.symbol} @ $${data.openPosition.entryPrice}`);
+      console.log(`[STATE] 📌 Position recovered: ${data.openPosition.side} ${data.openPosition.symbol} @ $${data.openPosition.entryPrice}`);
     }
     return data;
   } catch (err) {
-    console.warn('[STATE] Nu pot citi starea:', err.message);
+    console.warn('[STATE] Could not read state:', err.message);
     return null;
   }
 }
