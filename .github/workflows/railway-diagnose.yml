@@ -1,0 +1,21 @@
+name: Railway Diagnose & Force Redeploy
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/arcads-external-api-gExX7]
+    paths:
+      - scripts/railway-diagnose.js
+      - .github/workflows/railway-diagnose.yml
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Diagnose and force redeploy
+        run: node scripts/railway-diagnose.js
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          GITHUB_STEP_SUMMARY: ${{ env.GITHUB_STEP_SUMMARY }}
