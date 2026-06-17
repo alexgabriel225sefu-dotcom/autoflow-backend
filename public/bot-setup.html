@@ -85,9 +85,6 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
 .ok-box{background:rgba(39,196,106,.06);border:1px solid rgba(39,196,106,.2);border-radius:12px;padding:12px 14px;font:400 12px/1.6 var(--f);color:#86efac;margin-top:12px}
 
 /* Big buttons */
-.btn-deploy{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:18px;background:var(--a);color:#fff;font:700 16px/1 var(--f);border:none;border-radius:14px;padding:18px;cursor:pointer;text-decoration:none;transition:all .3s var(--e)}
-.btn-deploy:hover{background:var(--a2);box-shadow:0 14px 40px var(--aglow);transform:translateY(-1px)}
-.btn-deploy:active{transform:scale(.98)}
 .btn-config{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:18px;background:var(--a);color:#fff;font:700 16px/1 var(--f);border:none;border-radius:14px;padding:18px;cursor:pointer;text-decoration:none;transition:all .3s var(--e)}
 .btn-config:hover{background:var(--a2);box-shadow:0 14px 40px var(--aglow);transform:translateY(-1px)}
 .btn-secondary{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;background:var(--panel2);color:var(--t1);font:600 13px/1 var(--f);border:1px solid var(--ln2);border-radius:12px;padding:13px;text-decoration:none;transition:all .2s}
@@ -97,51 +94,46 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
 
 /* Railway deploy card */
 .rw-card{background:var(--bg1);border:1px solid var(--ln2);border-radius:14px;padding:16px 18px;margin-top:16px}
-.rw-card p{font:400 12.5px/1.65 var(--f);color:var(--t1)}
-.rw-card p b{color:var(--t0);font-weight:600}
-
+.rw-card p{font:400 12.5px/1.65 var(--f);color:var(--t1)}.rw-card p b{color:var(--t0);font-weight:600}
 /* Keys table */
-.kgroup{margin-top:16px}
-.kgroup-lbl{font:600 12px/1 var(--f);color:var(--t2);margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.kgroup{margin-top:16px}.kgroup-lbl{font:600 12px/1 var(--f);color:var(--t2);margin-bottom:8px;display:flex;align-items:center;gap:7px}
 .kgroup-lbl::after{content:'';flex:1;height:1px;background:var(--ln)}
-.krow{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg1);border:1px solid var(--ln);border-radius:10px;margin-bottom:6px}
-.krow:last-child{margin-bottom:0}
-.kk{font:600 12px/1 var(--m);color:var(--a3);min-width:140px;flex-shrink:0}
-.kv{font:400 11.5px/1.4 var(--f);color:var(--t2);flex:1}
-.kv b{color:var(--t1);font-weight:600}
-
+.krow{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg1);border:1px solid var(--ln);border-radius:10px;margin-bottom:6px}.krow:last-child{margin-bottom:0}
+.kk{font:600 12px/1 var(--m);color:var(--a3);min-width:140px;flex-shrink:0}.kv{font:400 11.5px/1.4 var(--f);color:var(--t2);flex:1}.kv b{color:var(--t1);font-weight:600}
 /* Done card */
 .done-card{background:var(--panel);border:1px solid rgba(39,196,106,.3);border-radius:20px;padding:28px 24px;text-align:center;margin-top:8px}
-.done-icon{font-size:36px;margin-bottom:14px}
-.done-card h2{font:700 22px/1.1 var(--d);letter-spacing:-.03em;margin-bottom:8px}
+.done-icon{font-size:36px;margin-bottom:14px}.done-card h2{font:700 22px/1.1 var(--d);letter-spacing:-.03em;margin-bottom:8px}
 .done-card p{font:400 13px/1.7 var(--f);color:var(--t1);margin-bottom:18px;max-width:420px;margin-left:auto;margin-right:auto}
-.done-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
-.dg{background:var(--bg1);border:1px solid var(--ln);border-radius:12px;padding:14px}
-.dg strong{font:600 13px/1 var(--d);display:block;margin-bottom:4px}
-.dg span{font:400 12px/1.55 var(--f);color:var(--t2)}
+.done-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.dg{background:var(--bg1);border:1px solid var(--ln);border-radius:12px;padding:14px}
+.dg strong{font:600 13px/1 var(--d);display:block;margin-bottom:4px}.dg span{font:400 12px/1.55 var(--f);color:var(--t2)}
 
 .support{margin-top:32px;text-align:center;font:400 12.5px/1.6 var(--f);color:var(--t2)}
 .support a{color:var(--a3)}
 
 /* Railway UI mockups */
 .mock{background:#0d0d10;border:1px solid rgba(255,255,255,.09);border-radius:12px;overflow:hidden;margin:12px 0 6px}
-.mock-bar{background:#09090c;padding:7px 12px;font:500 10px/1 var(--m);color:#444;border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:.03em}
-.mock-bar b{color:#666}
-.mock-body{padding:12px}
-.mock-opt{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.07);margin-bottom:5px;font:500 12px/1 var(--f);color:#888}
-.mock-opt:last-child{margin-bottom:0}
-.mock-opt.sel{background:rgba(123,97,255,.12);border-color:rgba(123,97,255,.35);color:#c4b5fd}
-.mock-opt .mi{width:26px;height:26px;border-radius:6px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
-.mock-opt.sel .mi{background:rgba(123,97,255,.2)}
-.mock-inp-row{display:flex;gap:7px;align-items:center}
-.mock-inp{flex:1;background:#070709;border:1px solid rgba(123,97,255,.45);border-radius:7px;padding:9px 10px;font:500 10.5px/1 var(--m);color:#a78bfa;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mock-bar{background:#09090c;padding:7px 12px;font:500 10px/1 var(--m);color:#444;border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:.03em}.mock-bar b{color:#666}
+.mock-body{padding:12px}.mock-inp-row{display:flex;gap:7px;align-items:center}.mock-vars{display:flex;flex-direction:column;gap:5px}.mock-var{display:grid;grid-template-columns:130px 1fr;gap:6px}
+.mock-opt{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.07);margin-bottom:5px;font:500 12px/1 var(--f);color:#888}.mock-opt:last-child{margin-bottom:0}
+.mock-opt.sel{background:rgba(123,97,255,.12);border-color:rgba(123,97,255,.35);color:#c4b5fd}.mock-opt .mi{width:26px;height:26px;border-radius:6px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}.mock-opt.sel .mi{background:rgba(123,97,255,.2)}
+.mock-inp{flex:1;background:#070709;border:1px solid rgba(123,97,255,.45);border-radius:7px;padding:9px 10px;font:500 .78rem/1 var(--m);color:#a78bfa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mock-btn{background:#7B61FF;color:#fff;border:none;border-radius:7px;padding:9px 14px;font:600 11px/1 var(--f);white-space:nowrap;cursor:default}
-.mock-vars{display:flex;flex-direction:column;gap:5px}
-.mock-var{display:grid;grid-template-columns:130px 1fr;gap:6px}
-.mock-k{background:#070709;border:1px solid rgba(74,222,128,.18);border-radius:6px;padding:7px 9px;font:600 10.5px/1 var(--m);color:#4ade80}
-.mock-v{background:#070709;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:7px 9px;font:500 10.5px/1 var(--m);color:#f59e0b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mock-k{background:#070709;border:1px solid rgba(74,222,128,.18);border-radius:6px;padding:7px 9px;font:600 10.5px/1 var(--m);color:#4ade80}.mock-v{background:#070709;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:7px 9px;font:500 10.5px/1 var(--m);color:#f59e0b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mock-log{background:#04040a;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:11px 13px;font:500 10px/1.75 var(--m);margin-top:6px}
 .mock-log .g{color:#4ade80}.mock-log .d{color:#444}.mock-log .w{color:#f59e0b}.mock-log .b{color:#60a5fa}
+
+/* AI Chat Widget */
+#chat-btn{position:fixed;bottom:24px;right:24px;z-index:999;width:54px;height:54px;border-radius:50%;background:var(--a);border:none;cursor:pointer;box-shadow:0 8px 32px var(--aglow);display:flex;align-items:center;justify-content:center;transition:all .3s var(--e)}
+#chat-btn:hover{transform:scale(1.08)}#chat-btn svg{width:24px;height:24px;fill:#fff}
+#chat-panel{position:fixed;bottom:90px;right:24px;z-index:998;width:320px;height:440px;background:var(--panel);border:1px solid var(--ln2);border-radius:20px;display:none;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+#chat-panel.open{display:flex}#chat-hdr{padding:14px 16px;border-bottom:1px solid var(--ln);display:flex;align-items:center;gap:10px}
+#chat-hdr strong{font:600 13px/1 var(--d);flex:1}#chat-hdr span{font:400 10px/1 var(--m);color:var(--up)}#chat-close{background:none;border:none;color:var(--t2);font-size:18px;cursor:pointer;padding:0;line-height:1}
+#chat-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.cm{max-width:85%;font:400 12.5px/1.55 var(--f);padding:9px 12px;border-radius:12px;word-break:break-word}
+.cm.u{align-self:flex-end;background:var(--a);color:#fff;border-bottom-right-radius:4px}.cm.a{align-self:flex-start;background:var(--panel2);color:var(--t1);border-bottom-left-radius:4px}.cm.typing{color:var(--t2);font-style:italic}
+#chat-form{padding:10px 12px;border-top:1px solid var(--ln);display:flex;gap:8px}
+#chat-input{flex:1;background:var(--bg1);border:1px solid var(--ln2);border-radius:10px;padding:9px 11px;font:400 12.5px/1 var(--f);color:var(--t0);outline:none}#chat-input:focus{border-color:rgba(255,45,79,.4)}
+#chat-send{background:var(--a);border:none;border-radius:10px;padding:9px 13px;color:#fff;font:700 12px/1 var(--f);cursor:pointer}
 </style>
 </head>
 <body>
@@ -393,6 +385,25 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
 
 </div><!-- .wrap -->
 
+<!-- AI Chat Widget -->
+<button id="chat-btn" onclick="toggleChat()" title="Ask AI for help">
+  <svg viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2.05 21.34a.75.75 0 0 0 .962.962l4.172-1.388A9.953 9.953 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
+</button>
+<div id="chat-panel">
+  <div id="chat-hdr">
+    <strong>Apex Support AI</strong>
+    <span>● online</span>
+    <button id="chat-close" onclick="toggleChat()">✕</button>
+  </div>
+  <div id="chat-msgs">
+    <div class="cm a">Hi! I can help you set up your bot. Ask me anything — errors, Railway steps, Telegram, Binance API setup.</div>
+  </div>
+  <form id="chat-form" onsubmit="sendChat(event)">
+    <input id="chat-input" type="text" placeholder="Type your question..." autocomplete="off" maxlength="300">
+    <button id="chat-send" type="submit">↑</button>
+  </form>
+</div>
+
 <script>
 // Read license key from URL
 const params = new URLSearchParams(location.search);
@@ -444,6 +455,50 @@ function markDone(cur, next) {
     ns.classList.add('open');
     ns.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+}
+
+// AI Chat
+const chatHistory = [];
+function toggleChat() {
+  document.getElementById('chat-panel').classList.toggle('open');
+  if (document.getElementById('chat-panel').classList.contains('open'))
+    document.getElementById('chat-input').focus();
+}
+function addMsg(text, role) {
+  const el = document.createElement('div');
+  el.className = 'cm ' + role;
+  el.textContent = text;
+  const msgs = document.getElementById('chat-msgs');
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
+  return el;
+}
+async function sendChat(e) {
+  e.preventDefault();
+  const inp = document.getElementById('chat-input');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = '';
+  document.getElementById('chat-send').disabled = true;
+  addMsg(msg, 'u');
+  const typing = addMsg('Typing…', 'a typing');
+  chatHistory.push({ role: 'user', content: msg });
+  try {
+    const r = await fetch('/api/setup-chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, history: chatHistory.slice(-6) })
+    });
+    const d = await r.json();
+    const reply = d.reply || d.error || 'Sorry, try again.';
+    typing.remove();
+    addMsg(reply, 'a');
+    chatHistory.push({ role: 'assistant', content: reply });
+  } catch {
+    typing.textContent = 'Connection error — try again.';
+    typing.classList.remove('typing');
+  }
+  document.getElementById('chat-send').disabled = false;
+  document.getElementById('chat-input').focus();
 }
 
 // Show done
