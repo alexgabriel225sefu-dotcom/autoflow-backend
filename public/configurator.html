@@ -337,16 +337,22 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
                 <div style="color:#00ff88;font-weight:700;margin-bottom:8px">✅ Config saved on server!</div>
                 <div style="color:#9ca3af;font-size:.83rem;line-height:1.6">Your settings are stored. Deploy your bot — it will auto-load your config on startup using just your license key.</div>
               </div>
-              <div style="font-size:.82rem;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Your License Key</div>
+              <div style="font-size:.82rem;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">1 · Your License Key</div>
               <div style="display:flex;gap:8px;margin-bottom:16px">
                 <code id="licDisplay" style="flex:1;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#00ff88;font-size:.9rem;letter-spacing:.1em">—</code>
                 <button id="cpyLicBtn" onclick="copyLic()" style="background:#00ff8820;border:1px solid #00ff8840;color:#00ff88;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:.82rem">Copy</button>
               </div>
-              <a id="deployBtn" href="https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" target="_blank" rel="noopener" style="display:block;text-align:center;background:linear-gradient(135deg,#00ff88,#00cfff);color:#052e16;font-weight:800;font-size:1.05rem;padding:16px;border-radius:10px;text-decoration:none;margin-bottom:14px">🚀 Deploy My Bot Now →</a>
+              <div style="font-size:.82rem;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">2 · Docker Image</div>
+              <div style="display:flex;gap:8px;margin-bottom:16px">
+                <code id="imgDisplay" style="flex:1;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#00cfff;font-size:.82rem;word-break:break-all">—</code>
+                <button id="cpyImgBtn" onclick="copyImg()" style="background:#00cfff20;border:1px solid #00cfff40;color:#00cfff;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:.82rem">Copy</button>
+              </div>
+              <a id="deployBtn" href="https://railway.com/new" target="_blank" rel="noopener" style="display:block;text-align:center;background:linear-gradient(135deg,#00ff88,#00cfff);color:#052e16;font-weight:800;font-size:1.05rem;padding:16px;border-radius:10px;text-decoration:none;margin-bottom:14px">🚀 Deploy My Bot on Railway →</a>
               <div class="dsteps">
                 <div class="dstep"><div class="dn">1</div><span>The button opens Railway — sign in (free, no card)</span></div>
-                <div class="dstep"><div class="dn">2</div><span>It asks for ONE thing: paste your <code>LICENSE_KEY</code> from above</span></div>
-                <div class="dstep"><div class="dn">3</div><span>Click <b>Apply</b> — bot installs &amp; starts automatically ✓</span></div>
+                <div class="dstep"><div class="dn">2</div><span>Click <b>Deploy a Docker Image</b> and paste the <b>Docker Image</b> above</span></div>
+                <div class="dstep"><div class="dn">3</div><span>Open <b>Variables</b>, add <code>LICENSE_KEY</code> = your key from step 1</span></div>
+                <div class="dstep"><div class="dn">4</div><span>Click <b>Deploy</b> — bot starts &amp; auto-loads your settings ✓</span></div>
               </div>
               <div style="margin-top:12px;text-align:center;color:#6b7280;font-size:.78rem">All your settings (exchange, API keys, strategy) load automatically — you only enter the license key.</div>
             </div>
@@ -496,11 +502,8 @@ document.getElementById('genBtn').addEventListener('click',async()=>{
       document.getElementById('deploySuccess').style.display='block';
       document.getElementById('deployManual').style.display='none';
       document.getElementById('licDisplay').textContent=lk;
+      document.getElementById('imgDisplay').textContent=dockerImage(lk);
       document.getElementById('privNote').textContent='Config encrypted & saved. Your bot loads it automatically on startup.';
-      // Pre-fill LICENSE_KEY in the Railway deploy URL so user doesn't have to type it
-      const isForex = lk.startsWith('FORX-');
-      const repoSlug = isForex ? 'apex-forex-bot' : 'apex-trade-bot';
-      document.getElementById('deployBtn').href = `https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/${repoSlug}&envs=LICENSE_KEY&LICENSE_KEYDesc=Your+bot+license+key+(pre-filled+from+configurator)&LICENSE_KEYDefault=${encodeURIComponent(lk)}`;
       btn.textContent='✓ Config saved!';btn.style.background='var(--up)';btn.style.color='#052e16';
     } else {
       // Fallback to manual .env
@@ -525,10 +528,19 @@ function showManual(lk){
   document.getElementById('eout').style.display='block';
   document.getElementById('deploySuccess').style.display='none';
   document.getElementById('deployManual').style.display='block';
-  // Also update deploy button with pre-filled key
-  const isForex = lk.startsWith('FORX-');
-  const repoSlug = isForex ? 'apex-forex-bot' : 'apex-trade-bot';
-  document.getElementById('deployBtn').href = `https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/${repoSlug}&envs=LICENSE_KEY&LICENSE_KEYDesc=Your+bot+license+key&LICENSE_KEYDefault=${encodeURIComponent(lk)}`;
+}
+
+// Customer-facing Docker image on GitHub Container Registry, picked by key prefix.
+function dockerImage(lk){
+  const slug = lk.startsWith('FORX-') ? 'apex-forex-bot' : 'apex-trade-bot';
+  return `ghcr.io/alexgabriel225sefu-dotcom/${slug}:latest`;
+}
+
+function copyImg(){
+  navigator.clipboard.writeText(document.getElementById('imgDisplay').textContent).then(()=>{
+    const b=document.getElementById('cpyImgBtn');b.textContent='✓';
+    setTimeout(()=>{b.textContent='Copy';},2000);
+  });
 }
 
 document.getElementById('cpyBtn').addEventListener('click',()=>{
