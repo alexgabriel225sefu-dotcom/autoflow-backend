@@ -12,3 +12,6 @@ build/
 .next/
 public/
 web/
+__pycache__/
+*.pyc
+*.pyo
