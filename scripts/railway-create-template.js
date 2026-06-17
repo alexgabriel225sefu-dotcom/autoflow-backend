@@ -1,6 +1,5 @@
-// Deploy the forex bot Docker image into the EXISTING empty "apex-trade" project,
-// avoiding the free-plan "new project" limit. Creates a service from the image
-// with LICENSE_KEY + BYPASS_LICENSE, then deploys it.
+// Force a fresh redeploy of the existing forex service so it picks up the
+// newly-saved variables (GROQ_API_KEY, BROKER=td, TWELVE_DATA_KEY).
 // Env: RAILWAY_TOKEN (required)
 const API = 'https://backboard.railway.com/graphql/v2';
 const TOKEN = process.env.RAILWAY_TOKEN;
@@ -12,40 +11,26 @@ async function gql(query, variables){
   const t = await r.text(); try{return JSON.parse(t);}catch{return {parseError:t.slice(0,2000)};}
 }
 
-const IMAGE = 'ghcr.io/alexgabriel225sefu-dotcom/apex-forex-bot:latest';
-// Existing empty project "apex-trade" + its production environment.
-const PROJECT_ID = '82186fe2-60ea-47ea-8767-6be58ae717fa';
+const SERVICE_ID = 'bf56d162-43fb-42b0-99f0-bfaf778a041d';
 const ENV_ID = 'fdc10f11-f4b2-4773-87a0-7e9f66cd8a55';
-const VARIABLES = { LICENSE_KEY: 'FORX-RZNN-FPCN-UJ9N', BYPASS_LICENSE: 'true' };
+const PROJECT_ID = '82186fe2-60ea-47ea-8767-6be58ae717fa';
 
 async function main(){
-  const svc = await gql(`
-    mutation($input: ServiceCreateInput!){
-      serviceCreate(input:$input){ id name }
-    }`, {
-    input: {
-      projectId: PROJECT_ID,
-      environmentId: ENV_ID,
-      name: 'apex-forex-bot',
-      source: { image: IMAGE },
-      variables: VARIABLES,
-    },
-  });
-  out('=== serviceCreate ===');
-  out(JSON.stringify(svc, null, 2).slice(0, 3000));
-  const serviceId = svc?.data?.serviceCreate?.id;
-  if (!serviceId) { out('No service created — see errors above.'); process.exit(1); }
+  // Show which variable NAMES are set on the service (values are not printed).
+  const vars = await gql(`
+    query($projectId:String!,$environmentId:String!,$serviceId:String!){
+      variables(projectId:$projectId, environmentId:$environmentId, serviceId:$serviceId)
+    }`, { projectId: PROJECT_ID, environmentId: ENV_ID, serviceId: SERVICE_ID });
+  const names = vars?.data?.variables ? Object.keys(vars.data.variables) : null;
+  out('=== variable names on service ===');
+  out(names ? names.join(', ') : JSON.stringify(vars).slice(0,500));
 
   const dep = await gql(`
     mutation($serviceId:String!, $environmentId:String!){
       serviceInstanceDeploy(serviceId:$serviceId, environmentId:$environmentId)
-    }`, { serviceId, environmentId: ENV_ID });
+    }`, { serviceId: SERVICE_ID, environmentId: ENV_ID });
   out('=== serviceInstanceDeploy ===');
-  out(JSON.stringify(dep).slice(0, 1500));
-
-  out('');
-  out('=== RESULT ===');
-  out(`serviceId=${serviceId}`);
+  out(JSON.stringify(dep).slice(0, 1000));
   out(`Project URL: https://railway.com/project/${PROJECT_ID}`);
 }
 main().catch(e => { out('FATAL: ' + e.message); process.exit(1); });
