@@ -19,9 +19,7 @@ async function upsert(name, value){
 }
 
 async function main(){
-  await upsert('BROKER', 'td');
-  await upsert('MULTI_SYMBOL', 'false');  // single pair only — stay under 8 credits/min
-
+  // Redeploy only — picks up the latest Docker image from ghcr.io
   const dep = await gql(`mutation($serviceId:String!,$environmentId:String!){ serviceInstanceDeploy(serviceId:$serviceId, environmentId:$environmentId) }`,
     { serviceId: SERVICE_ID, environmentId: ENV_ID });
   out('redeploy: ' + JSON.stringify(dep).slice(0,200));
