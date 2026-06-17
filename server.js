@@ -2974,7 +2974,7 @@ const SETUP_SYSTEM = `You are a concise support assistant for Apex Trade Bot —
 Help users set up their bot. Be short and direct (2-4 sentences max). No markdown headers. Use plain text.
 
 SETUP STEPS:
-1. Railway → New Project → New Service → Docker Image → paste: ghcr.io/alexgabriel225sefu-dotcom/apex-trade-bot:latest
+1. Railway → New Project → New Service → Docker Image → paste: ghcr.io/alexgabriel225sefu-dotcom/apex-crypto:latest
 2. Add 2 Variables: LICENSE_KEY (from their email) and GROQ_API_KEY (free from console.groq.com → API Keys)
 3. Go to aicashsystem.space/configurator → enter license key + Groq key + exchange → Save Config
 4. Set up Telegram (optional): @BotFather for token, @userinfobot for chat ID → add TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to Railway → send /resume

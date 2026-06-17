@@ -22,9 +22,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: apex-forex-bot
+          - name: apex-forex
             context: apex-forex-bot
-          - name: apex-trade-bot
+          - name: apex-crypto
             context: apex-trade-bot
     steps:
       - uses: actions/checkout@v4
