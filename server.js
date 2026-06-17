@@ -1521,9 +1521,15 @@ app.get('/api/owner-license', async (req, res) => {
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
   const product = req.query.product === 'apex-forex' ? 'apex-forex' : 'apex-bot';
   const key = product === 'apex-forex' ? generateForexKey() : generateLicenseKey();
-  const { error } = await supabase.from('licenses').insert([{ key, email: 'owner@aicashsystem.space', name: 'Owner', active: true, product }]);
-  if (error) return res.status(500).json({ error: error.message, hint: error.hint });
-  res.json({ key, product, message: `Add this as LICENSE_KEY for your ${product} bot`, supabase: 'inserted ok' });
+  let dbStatus = 'skipped';
+  try {
+    const { error: dbErr } = await supabase.from('licenses').insert([{ key, email: 'owner@aicashsystem.space', name: 'Owner', active: true, product }]);
+    dbStatus = dbErr ? `warn: ${dbErr.message}` : 'inserted ok';
+  } catch (e) {
+    dbStatus = `warn: ${e.message}`;
+  }
+  // Key is HMAC-signed — valid without Supabase. Return it regardless of DB status.
+  res.json({ key, product, message: `Add this as LICENSE_KEY for your ${product} bot`, supabase: dbStatus });
 });
 
 // POST /api/verify-license — called by the bot on every startup
