@@ -1,5 +1,4 @@
-// Introspect Railway GraphQL Mutation for template-related operations + their inputs.
-// Env: RAILWAY_TOKEN (required)
+// Introspect inputs needed to create a project + service (docker image) + variables.
 const API = 'https://backboard.railway.com/graphql/v2';
 const TOKEN = process.env.RAILWAY_TOKEN;
 const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY;
@@ -13,21 +12,25 @@ async function inputFields(name){
   const res = await gql(`query($n:String!){ __type(name:$n){ name inputFields{ name type{ name kind ofType{ name kind ofType{ name kind } } } } } }`,{n:name});
   return res?.data?.__type;
 }
+function tn(t){ return t.name || t.ofType?.name || t.ofType?.ofType?.name || t.kind; }
 async function main(){
+  // who am I / workspaces
+  const me = await gql(`query{ me{ id email workspaces{ id name } } }`);
+  out('=== ME ===');
+  out(JSON.stringify(me?.data?.me||me, null, 2).slice(0,2000));
+
   const mut = await gql(`query{ __type(name:"Mutation"){ fields{ name args{ name type{ name kind ofType{ name kind } } } } } }`);
-  const fields = (mut?.data?.__type?.fields||[]).filter(f=>/template/i.test(f.name));
-  out('=== TEMPLATE MUTATIONS ===');
+  const fields = (mut?.data?.__type?.fields||[]).filter(f=>/^(projectCreate|serviceCreate|serviceInstanceUpdate|serviceInstanceDeploy|variableUpsert|variableCollectionUpsert|deploymentRedeploy|environmentCreate)$/i.test(f.name));
+  out('');
+  out('=== KEY MUTATIONS ===');
   for(const f of fields){
-    const args = f.args.map(a=>{
-      const t=a.type; const tn=t.name||t.ofType?.name||t.kind; return `${a.name}:${tn}`;
-    }).join(', ');
-    out(`- ${f.name}(${args})`);
+    out(`- ${f.name}(${f.args.map(a=>`${a.name}:${tn(a.type)}`).join(', ')})`);
   }
   out('');
-  for(const n of ['TemplateGenerateInput','TemplateCloneInput','TemplateServiceCreateInput','TemplatePublishInput']){
+  for(const n of ['ProjectCreateInput','ServiceCreateInput','ServiceSourceInput','VariableUpsertInput','VariableCollectionUpsertInput']){
     const t = await inputFields(n);
     out(`=== ${n} ===`);
-    if(t&&t.inputFields){ for(const f of t.inputFields){ const tn=f.type.name||f.type.ofType?.name||f.type.kind; out(`  ${f.name}: ${tn}`);} }
+    if(t&&t.inputFields){ for(const f of t.inputFields){ out(`  ${f.name}: ${tn(f.type)}`);} }
     else out('  (not found)');
   }
 }
