@@ -537,6 +537,15 @@ async function main() {
   await tick();
   setInterval(tick, cfg.LOOP_INTERVAL_MS);
   logger.info(`⏱️  Analyzing every ${cfg.LOOP_INTERVAL_MS / 60000} minutes.`);
+
+  // Reload configurator settings every 30 min so client changes apply without restart
+  setInterval(async () => {
+    try {
+      await cfg.loadRemote();
+      settings.applyRemoteToActive();
+      logger.info('🔄 Config refreshed from configurator.');
+    } catch(e) { logger.warn('Config refresh failed: ' + e.message); }
+  }, 30 * 60 * 1000);
 }
 
 main().catch(err => { logger.error('Fatal: ' + err.message); process.exit(1); });

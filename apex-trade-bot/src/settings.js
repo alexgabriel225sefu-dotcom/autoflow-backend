@@ -66,4 +66,20 @@ function snapshot() {
   return { ..._s };
 }
 
-module.exports = { get, set, reset, snapshot, refreshFromConfig, DEFAULTS };
+// Force-apply remote config to active settings (used by periodic refresh)
+function applyRemoteToActive() {
+  const fresh = {
+    RISK_PER_TRADE:  cfg.RISK_PER_TRADE,
+    STOP_LOSS_PCT:   cfg.STOP_LOSS_PCT,
+    TAKE_PROFIT_PCT: cfg.TAKE_PROFIT_PCT,
+    MIN_CONFIDENCE:  cfg.MIN_CONFIDENCE,
+    SYMBOL:          cfg.SYMBOL,
+  };
+  for (const [key, value] of Object.entries(fresh)) {
+    DEFAULTS[key] = value;
+    _s[key] = value;
+  }
+  _save();
+}
+
+module.exports = { get, set, reset, snapshot, refreshFromConfig, applyRemoteToActive, DEFAULTS };
