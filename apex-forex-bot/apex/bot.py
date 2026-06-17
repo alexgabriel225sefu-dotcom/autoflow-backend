@@ -162,6 +162,7 @@ dash = {
     "mode": "PAPER" if cfg.PAPER_TRADING else cfg.OANDA_ENV.upper(),
     "broker": broker_label(),
     "marketOpen": True,
+    "candles": [],
 }
 
 
@@ -444,6 +445,7 @@ def tick():
         dash["currentSymbol"] = symbol
         dash["currentPrice"] = price
         dash["lastTick"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        dash["candles"] = candles[-150:] if candles else []
         if open_position:
             pos_pnl = forex.pnl_usd(open_position["side"], open_position["entryPrice"],
                                     price, open_position["quantity"], symbol)
@@ -603,9 +605,17 @@ def _start_dashboard_server():
                 self.wfile.write(b"Unauthorized - open with ?token=YOUR_DASHBOARD_TOKEN")
                 return
             if self.path.startswith("/api/status"):
-                body = json.dumps({**dash, "tickCount": tick_count}).encode()
+                body = json.dumps({**dash, "tickCount": tick_count, "candles": []}).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(body)
+            elif self.path.startswith("/api/candles"):
+                body = json.dumps({"candles": dash.get("candles", []), "symbol": dash["currentSymbol"], "timeframe": cfg.TIMEFRAME}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(body)
             else:
