@@ -156,21 +156,43 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
       <div class="sc-num" id="sn1">1</div>
       <div class="sc-title">
         <strong>Deploy bot to Railway</strong>
-        <span>~2 minutes · one click</span>
+        <span>~5 minutes · 3 steps</span>
       </div>
       <span class="sc-arr">▾</span>
     </div>
     <div class="sc-body" id="sb1">
       <div class="rw-card">
-        <p>Railway is the cloud server that runs your bot 24/7 — it never sleeps, so your bot keeps trading around the clock. Click the button below to deploy automatically — Railway handles everything, no technical knowledge needed.</p>
+        <p>Railway runs your bot 24/7 in the cloud — free to start. You deploy the bot using a pre-built Docker image (no coding needed).</p>
       </div>
-      <a id="deployBtn" href="https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/apex-trade-bot" target="_blank" class="btn-deploy">
-        🚀 Deploy Bot to Railway →
-      </a>
-      <a href="https://railway.app" target="_blank" class="btn-secondary">Don't have Railway? Create a free account first →</a>
-      <div class="ok-box">✓ New Railway accounts get $5 free trial credit — then about $5/month for 24/7 always-on.</div>
-      <div class="warn-box">⚠ After deploying, don't add API keys yet — do that in Step 3 using the configurator.</div>
-      <button class="mark-done" onclick="markDone(1,2)">✓ Bot deployed — go to Step 2</button>
+
+      <a href="https://railway.com" target="_blank" class="btn-secondary" style="margin-bottom:18px">Don't have Railway? Create free account first →</a>
+
+      <div class="inst">
+        <div class="in">1</div>
+        <div class="it">Go to <b>railway.com</b> → click <b>New Project</b> → select <b>"Deploy a Docker Image"</b></div>
+      </div>
+      <div class="inst">
+        <div class="in">2</div>
+        <div class="it">Paste this image URL and click <b>Deploy</b>:
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <code id="imgUrl" style="flex:1;background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:10px 12px;color:#00cfff;font-size:.8rem;word-break:break-all">ghcr.io/alexgabriel225sefu-dotcom/apex-trade-bot:latest</code>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('imgUrl').textContent).then(()=>{event.target.textContent='✓';setTimeout(()=>event.target.textContent='Copy',1500)})" style="background:rgba(0,207,255,.15);border:1px solid rgba(0,207,255,.3);color:#00cfff;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:.8rem;white-space:nowrap">Copy</button>
+          </div>
+        </div>
+      </div>
+      <div class="inst">
+        <div class="in">3</div>
+        <div class="it">In your Railway service → <b>Variables</b> tab → add ONE variable:
+          <div style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;margin-top:8px;font-family:monospace;font-size:.85rem">
+            <span style="color:#9ca3af">NAME</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color:#9ca3af">VALUE</span><br>
+            <span style="color:#00ff88">LICENSE_KEY</span> &nbsp; <span id="licInStep" style="color:#f59e0b;letter-spacing:.05em">— (copy from above)</span>
+          </div>
+          <button onclick="copyLicToClipboard()" style="margin-top:6px;background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.25);color:#00ff88;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:.82rem">Copy License Key</button>
+        </div>
+      </div>
+      <div class="ok-box">✓ That's it! The bot loads all your settings automatically from our server using your license key. No other variables needed.</div>
+      <div class="warn-box">⚠ Railway free tier: ~$5/month after $5 free trial. The bot uses ~0.5 vCPU and 256MB RAM.</div>
+      <button class="mark-done" onclick="markDone(1,2)">✓ Bot deployed on Railway — go to Step 2</button>
     </div>
   </div>
 
@@ -227,11 +249,7 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
       </div>
       <div class="inst">
         <div class="in">3</div>
-        <div class="it">Click <b>Generate Config →</b> — copy the output, paste into your Railway service under <b>Variables → Raw Editor</b>, click Save.</div>
-      </div>
-      <div class="inst">
-        <div class="in">4</div>
-        <div class="it">Railway redeploys automatically in ~1 minute. Your bot is now configured.</div>
+        <div class="it">Click <b>Save Config &amp; Deploy →</b> — your settings are saved on our server. The bot loads them automatically on startup using your license key. <b>No copy-paste into Railway needed.</b></div>
       </div>
       <a id="configBtn" href="/configurator" target="_blank" class="btn-config">
         ⚙️ Open Bot Configurator →
@@ -295,6 +313,19 @@ if (licKey) {
   document.getElementById('keyDisplay').textContent = licKey;
   // Pre-fill configurator link with license key
   document.getElementById('configBtn').href = '/configurator?key=' + encodeURIComponent(licKey);
+  // Show license key in Step 1 variable block
+  const licInStep = document.getElementById('licInStep');
+  if (licInStep) licInStep.textContent = licKey;
+}
+
+// Copy license key to clipboard (used in Step 1 variable block)
+function copyLicToClipboard() {
+  const k = document.getElementById('keyDisplay').textContent;
+  if (!k || k === '—') return;
+  navigator.clipboard.writeText(k).then(() => {
+    event.target.textContent = '✓ Copied!';
+    setTimeout(() => event.target.textContent = 'Copy License Key', 2000);
+  });
 }
 
 // Copy license key
