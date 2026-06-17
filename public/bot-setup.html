@@ -122,6 +122,26 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
 
 .support{margin-top:32px;text-align:center;font:400 12.5px/1.6 var(--f);color:var(--t2)}
 .support a{color:var(--a3)}
+
+/* Railway UI mockups */
+.mock{background:#0d0d10;border:1px solid rgba(255,255,255,.09);border-radius:12px;overflow:hidden;margin:12px 0 6px}
+.mock-bar{background:#09090c;padding:7px 12px;font:500 10px/1 var(--m);color:#444;border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:.03em}
+.mock-bar b{color:#666}
+.mock-body{padding:12px}
+.mock-opt{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.07);margin-bottom:5px;font:500 12px/1 var(--f);color:#888}
+.mock-opt:last-child{margin-bottom:0}
+.mock-opt.sel{background:rgba(123,97,255,.12);border-color:rgba(123,97,255,.35);color:#c4b5fd}
+.mock-opt .mi{width:26px;height:26px;border-radius:6px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
+.mock-opt.sel .mi{background:rgba(123,97,255,.2)}
+.mock-inp-row{display:flex;gap:7px;align-items:center}
+.mock-inp{flex:1;background:#070709;border:1px solid rgba(123,97,255,.45);border-radius:7px;padding:9px 10px;font:500 10.5px/1 var(--m);color:#a78bfa;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mock-btn{background:#7B61FF;color:#fff;border:none;border-radius:7px;padding:9px 14px;font:600 11px/1 var(--f);white-space:nowrap;cursor:default}
+.mock-vars{display:flex;flex-direction:column;gap:5px}
+.mock-var{display:grid;grid-template-columns:130px 1fr;gap:6px}
+.mock-k{background:#070709;border:1px solid rgba(74,222,128,.18);border-radius:6px;padding:7px 9px;font:600 10.5px/1 var(--m);color:#4ade80}
+.mock-v{background:#070709;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:7px 9px;font:500 10.5px/1 var(--m);color:#f59e0b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mock-log{background:#04040a;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:11px 13px;font:500 10px/1.75 var(--m);margin-top:6px}
+.mock-log .g{color:#4ade80}.mock-log .d{color:#444}.mock-log .w{color:#f59e0b}.mock-log .b{color:#60a5fa}
 </style>
 </head>
 <body>
@@ -169,7 +189,17 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
 
       <div class="inst">
         <div class="in">1</div>
-        <div class="it">Go to <b>railway.com</b> → click <b>New Project</b> → select <b>"Deploy a Docker Image"</b></div>
+        <div class="it">Go to <b>railway.com</b> → click <b>New Project</b> → <b>New Service</b> → select <b>"Docker Image"</b></div>
+      </div>
+      <div class="mock">
+        <div class="mock-bar"><b>railway.com</b> · New Service</div>
+        <div class="mock-body">
+          <div style="font:500 11px/1 var(--f);color:#555;margin-bottom:9px">What can we help with?</div>
+          <div class="mock-opt"><div class="mi">⚙</div>GitHub Repo</div>
+          <div class="mock-opt"><div class="mi">📋</div>Template</div>
+          <div class="mock-opt"><div class="mi">🗄</div>Database</div>
+          <div class="mock-opt sel"><div class="mi">🐳</div>Docker Image &nbsp;<span style="color:#7c6fd0;font-size:.85em">← tap this</span></div>
+        </div>
       </div>
       <div class="inst">
         <div class="in">2</div>
@@ -180,17 +210,34 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
           </div>
         </div>
       </div>
-      <div class="inst">
-        <div class="in">3</div>
-        <div class="it">In your Railway service → <b>Variables</b> tab → add ONE variable:
-          <div style="background:#0d1117;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;margin-top:8px;font-family:monospace;font-size:.85rem">
-            <span style="color:#9ca3af">NAME</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color:#9ca3af">VALUE</span><br>
-            <span style="color:#00ff88">LICENSE_KEY</span> &nbsp; <span id="licInStep" style="color:#f59e0b;letter-spacing:.05em">— (copy from above)</span>
+      <div class="mock">
+        <div class="mock-bar"><b>railway.com</b> · New Service · Image name</div>
+        <div class="mock-body">
+          <div class="mock-inp-row">
+            <div class="mock-inp">ghcr.io/alexgabriel225sefu-dotcom/apex-trade-bot:latest</div>
+            <div class="mock-btn">Deploy →</div>
           </div>
-          <button onclick="copyLicToClipboard()" style="margin-top:6px;background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.25);color:#00ff88;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:.82rem">Copy License Key</button>
         </div>
       </div>
-      <div class="ok-box">✓ That's it! The bot loads all your settings automatically from our server using your license key. No other variables needed.</div>
+      <div class="inst">
+        <div class="in">3</div>
+        <div class="it">In your Railway service → <b>Variables</b> tab → add these two variables:
+        </div>
+      </div>
+      <div class="mock">
+        <div class="mock-bar"><b>apex-trade-bot</b> · Variables</div>
+        <div class="mock-body">
+          <div class="mock-vars">
+            <div class="mock-var"><div class="mock-k">LICENSE_KEY</div><div class="mock-v" id="licInStep">APEX-XXXX-XXXX-XXXX</div></div>
+            <div class="mock-var"><div class="mock-k">GROQ_API_KEY</div><div class="mock-v">gsk_xxxxxxxxxxxxxxxxxxxxxxxx</div></div>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:6px">
+            <button onclick="copyLicToClipboard()" style="background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);color:#4ade80;border-radius:6px;padding:6px 12px;cursor:pointer;font:600 11px var(--f)">Copy LICENSE_KEY</button>
+          </div>
+        </div>
+      </div>
+      <div style="font:400 11.5px/1.6 var(--f);color:var(--t2);margin-top:6px">Get a free Groq key at <a href="https://console.groq.com" target="_blank" style="color:var(--a3)">console.groq.com</a> → API Keys → Create API Key</div>
+      <div class="ok-box">✓ The bot loads all settings automatically using your license key. After adding variables, Railway restarts and the bot goes live.</div>
       <div class="warn-box">⚠ Railway free tier: ~$5/month after $5 free trial. The bot uses ~0.5 vCPU and 256MB RAM.</div>
       <button class="mark-done" onclick="markDone(1,2)">✓ Bot deployed on Railway — go to Step 2</button>
     </div>
@@ -275,7 +322,18 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
       </div>
       <div class="inst">
         <div class="in">2</div>
-        <div class="it">You should see: <code>✓ License valid</code> then <code>Bot started — scanning markets</code>. If you set up Telegram, you'll get a message too.</div>
+        <div class="it">You should see these lines in the logs — that means everything is working:</div>
+      </div>
+      <div class="mock">
+        <div class="mock-bar"><b>apex-trade-bot</b> · Deployment Logs</div>
+        <div class="mock-log">
+          <span class="d">[APEX BOT] Starting... Node v20.20.2</span><br>
+          <span class="g">✅  License verified — welcome, trader!</span><br>
+          <span class="g">🚀 APEX TRADE BOT — AI Powered Trading</span><br>
+          <span class="d">&nbsp;&nbsp;Symbol: SOLUSDT | Mode: 📝 PAPER TRADING</span><br>
+          <span class="b">📊 Dashboard: https://your-service.railway.app</span><br>
+          <span class="d">⏱️  Analyzing every 5 minutes.</span>
+        </div>
       </div>
       <div class="inst">
         <div class="in">3</div>
