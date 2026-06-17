@@ -374,14 +374,18 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
                 <code id="imgDisplay" style="flex:1;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#00cfff;font-size:.78rem;word-break:break-all">ghcr.io/alexgabriel225sefu-dotcom/apex-forex-bot:latest</code>
                 <button id="cpyImgBtn" onclick="copyImg()" style="background:#00cfff20;border:1px solid #00cfff40;color:#00cfff;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:.82rem">Copy</button>
               </div>
-              <a href="https://railway.com/new" target="_blank" rel="noopener" style="display:block;text-align:center;background:linear-gradient(135deg,#00ff88,#00cfff);color:#052e16;font-weight:800;font-size:1.05rem;padding:16px;border-radius:10px;text-decoration:none;margin-bottom:14px">🚀 Deploy My Bot on Railway →</a>
-              <div class="dsteps">
-                <div class="dstep"><div class="dn">1</div><span>Button opens Railway — sign in free (no card needed)</span></div>
-                <div class="dstep"><div class="dn">2</div><span>Choose <b>Deploy a Docker Image</b> → paste the <b>Docker Image</b> above</span></div>
-                <div class="dstep"><div class="dn">3</div><span>Go to <b>Variables</b> → add <code>LICENSE_KEY</code> = your key from above</span></div>
-                <div class="dstep"><div class="dn">4</div><span>Click <b>Deploy</b> — bot starts &amp; auto-loads all your settings ✓</span></div>
+              <div style="margin-bottom:10px">
+                <div style="font-size:.82rem;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Railway Token — <a href="https://railway.com/account/tokens" target="_blank" style="color:#00cfff;text-transform:none;letter-spacing:0;font-weight:400">Get it here →</a> (free account)</div>
+                <input id="railwayTokenInput" type="password" placeholder="Paste your Railway API token here…" style="width:100%;background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:10px 12px;color:#fff;font-size:.88rem;outline:none;box-sizing:border-box" />
               </div>
-              <div style="margin-top:12px;text-align:center;color:#6b7280;font-size:.78rem">All your settings (broker, OANDA keys, strategy) load automatically — you only enter the license key.</div>
+              <button id="autoDeployBtn" onclick="autoDeploy()" style="display:block;width:100%;text-align:center;background:linear-gradient(135deg,#00ff88,#00cfff);color:#052e16;font-weight:800;font-size:1.05rem;padding:16px;border-radius:10px;cursor:pointer;border:none;margin-bottom:10px">🚀 Deploy My Bot Automatically →</button>
+              <div id="deployStatus" style="display:none;text-align:center;padding:10px;border-radius:8px;font-size:.85rem"></div>
+              <div class="dsteps">
+                <div class="dstep"><div class="dn">1</div><span>Create a free Railway account at <a href="https://railway.com" target="_blank" style="color:#00cfff">railway.com</a></span></div>
+                <div class="dstep"><div class="dn">2</div><span>Go to <a href="https://railway.com/account/tokens" target="_blank" style="color:#00cfff">railway.com/account/tokens</a> → create a token → paste above</span></div>
+                <div class="dstep"><div class="dn">3</div><span>Click Deploy — bot is set up automatically in 30 seconds ✓</span></div>
+              </div>
+              <div style="margin-top:12px;text-align:center;color:#6b7280;font-size:.78rem">Your token is used only to deploy your bot and is never stored on our servers.</div>
             </div>
             <!-- Manual fallback -->
             <div id="deployManual" style="display:none">
@@ -549,6 +553,21 @@ function copyLic(){
   navigator.clipboard.writeText(document.getElementById('licDisplay').textContent).then(()=>{
     const b=document.getElementById('cpyLicBtn');b.textContent='✓';setTimeout(()=>{b.textContent='Copy';},2000);
   });
+}
+async function autoDeploy(){
+  const token=(document.getElementById('railwayTokenInput').value||'').trim();
+  const licKey=(document.getElementById('licDisplay').textContent||'').trim();
+  const btn=document.getElementById('autoDeployBtn');
+  const status=document.getElementById('deployStatus');
+  if(!token){status.style.display='block';status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='⚠️ Please paste your Railway token first.';return;}
+  btn.disabled=true;btn.textContent='⏳ Deploying…';
+  status.style.display='block';status.style.background='#1a2a1a';status.style.color='#9ca3af';status.textContent='Setting up your forex bot on Railway…';
+  try{
+    const r=await fetch('/api/railway-deploy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({railwayToken:token,licenseKey:licKey,product:'apex-forex'})});
+    const d=await r.json();
+    if(d.ok){status.style.background='#052e16';status.style.color='#00ff88';status.textContent='✅ Bot deployed! Check railway.com/dashboard for your bot URL (ready in ~2 min).';btn.textContent='✅ Deployed!';}
+    else{status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='❌ '+(d.error||'Deploy failed');btn.disabled=false;btn.textContent='🚀 Deploy My Bot Automatically →';}
+  }catch(e){status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='❌ Network error — try again';btn.disabled=false;btn.textContent='🚀 Deploy My Bot Automatically →';}
 }
 function copyImg(){
   navigator.clipboard.writeText(document.getElementById('imgDisplay').textContent).then(()=>{
