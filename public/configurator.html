@@ -497,6 +497,10 @@ document.getElementById('genBtn').addEventListener('click',async()=>{
       document.getElementById('deployManual').style.display='none';
       document.getElementById('licDisplay').textContent=lk;
       document.getElementById('privNote').textContent='Config encrypted & saved. Your bot loads it automatically on startup.';
+      // Pre-fill LICENSE_KEY in the Railway deploy URL so user doesn't have to type it
+      const isForex = lk.startsWith('FORX-');
+      const repoSlug = isForex ? 'apex-forex-bot' : 'apex-trade-bot';
+      document.getElementById('deployBtn').href = `https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/${repoSlug}&envs=LICENSE_KEY&LICENSE_KEYDesc=Your+bot+license+key+(pre-filled+from+configurator)&LICENSE_KEYDefault=${encodeURIComponent(lk)}`;
       btn.textContent='✓ Config saved!';btn.style.background='var(--up)';btn.style.color='#052e16';
     } else {
       // Fallback to manual .env
@@ -521,6 +525,10 @@ function showManual(lk){
   document.getElementById('eout').style.display='block';
   document.getElementById('deploySuccess').style.display='none';
   document.getElementById('deployManual').style.display='block';
+  // Also update deploy button with pre-filled key
+  const isForex = lk.startsWith('FORX-');
+  const repoSlug = isForex ? 'apex-forex-bot' : 'apex-trade-bot';
+  document.getElementById('deployBtn').href = `https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/${repoSlug}&envs=LICENSE_KEY&LICENSE_KEYDesc=Your+bot+license+key&LICENSE_KEYDefault=${encodeURIComponent(lk)}`;
 }
 
 document.getElementById('cpyBtn').addEventListener('click',()=>{
