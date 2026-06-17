@@ -573,7 +573,7 @@ async function autoDeploy(){
     const r = await fetch('/api/railway-deploy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({railwayToken:token,licenseKey:licKey,product:'apex-bot'})});
     const d = await r.json();
     if(d.ok){ status.style.background='#052e16';status.style.color='#00ff88';status.textContent='✅ Bot deployed! Check railway.com/dashboard for your bot URL (ready in ~2 min).'; btn.textContent='✅ Deployed!';}
-    else { status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='❌ '+(d.error||'Deploy failed');btn.disabled=false;btn.textContent='🚀 Deploy My Bot Automatically →'; }
+    else { status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='❌ '+(d.error||'Deploy failed')+(d.detail?' — '+d.detail:'');btn.disabled=false;btn.textContent='🚀 Deploy My Bot Automatically →'; }
   } catch(e){ status.style.background='#2d1515';status.style.color='#ff9999';status.textContent='❌ Network error — try again';btn.disabled=false;btn.textContent='🚀 Deploy My Bot Automatically →'; }
 }
 
