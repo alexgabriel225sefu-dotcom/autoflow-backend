@@ -39,7 +39,65 @@ app.get('/health', async (req, res) => {
   }
   res.json({ ok: true, db, node: process.version, time: new Date().toISOString() });
 });
-app.get('/ping', (req, res) => res.json({ ok: true, version: 'v8-audit-fixes', time: new Date().toISOString() }));
+app.get('/ping', (req, res) => res.json({ ok: true, version: 'v9-chat-fix', time: new Date().toISOString() }));
+
+// ── SETUP CHAT (early registration — must come before any catch-all) ──────────
+const _setupChatLimiter = rateLimit({ windowMs: 60*1000, max: 15, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Too many messages — please wait a minute.' } });
+
+const SETUP_SYSTEM = `You are a concise support assistant for Apex Trade Bot — a crypto trading bot deployed on Railway.
+Help users set up their bot. Be short and direct (2-4 sentences max). No markdown headers. Use plain text.
+
+SETUP STEPS:
+1. Railway → New Project → New Service → Docker Image → paste: ghcr.io/alexgabriel225sefu-dotcom/apex-crypto:latest
+2. Add 2 Variables: LICENSE_KEY (from their email) and GROQ_API_KEY (free from console.groq.com → API Keys)
+3. Go to aicashsystem.space/configurator → enter license key + Groq key + exchange → Save Config
+4. Set up Telegram (optional): @BotFather for token, @userinfobot for chat ID → add TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to Railway → send /resume
+
+COMMON ERRORS:
+- "Invalid license key" → They must go to the configurator (aicashsystem.space/configurator) and save settings first, then restart Railway.
+- "No AI key found" → Add GROQ_API_KEY to Railway Variables. Get it free at console.groq.com.
+- "No exchange API key" → Bot auto-switches to Paper Trading (safe, no real funds). Normal for first setup.
+- "Bot is paused" → Needs Telegram /resume command. Set up Telegram first.
+- Bot restarting in loop → Normal during first deploy. Stabilizes in 1-2 min after variables are added.
+
+BINANCE API: Profile → API Management → Create API → enable Spot Trading only, Withdrawals OFF.
+GROQ: console.groq.com → Sign up free → API Keys → Create Key. No credit card.
+PAPER TRADING: Simulated mode, no real funds. Safe to test. Switch to live via configurator.
+SUPPORT EMAIL: supportaicashsystem@gmail.com`;
+
+app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
+  console.log('[SETUP-CHAT] POST received, message:', (req.body || {}).message?.slice(0, 50));
+  const { message, history = [] } = req.body || {};
+  if (!message || typeof message !== 'string' || message.length > 500)
+    return res.status(400).json({ error: 'Invalid message.' });
+
+  try {
+    const ANTHROPIC_KEY_LOCAL = process.env.ANTHROPIC_API_KEY;
+    if (ANTHROPIC_KEY_LOCAL) {
+      const client = new Anthropic({ apiKey: ANTHROPIC_KEY_LOCAL });
+      const msgs = [...history.slice(-6), { role: 'user', content: message }];
+      const resp = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 300,
+        system: SETUP_SYSTEM, messages: msgs
+      });
+      return res.json({ reply: resp.content[0]?.text || 'Sorry, try again.' });
+    }
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) return res.status(503).json({ error: 'AI not configured on server.' });
+    const msgs = [{ role:'system', content: SETUP_SYSTEM },
+      ...history.slice(-6), { role:'user', content: message }];
+    const gr = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST', headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: msgs, max_tokens: 300 })
+    });
+    const gd = await gr.json();
+    return res.json({ reply: gd.choices?.[0]?.message?.content || 'Sorry, try again.' });
+  } catch(e) {
+    console.error('[SETUP-CHAT] error:', e.message);
+    res.status(500).json({ error: 'AI error — try again.' });
+  }
+});
 app.get('/api/stripe-config', auth, async (req, res) => {
   const key = process.env.STRIPE_SECRET_KEY || '';
   const isLive = key.startsWith('sk_live_');
@@ -2964,63 +3022,6 @@ app.post('/api/railway-deploy', async (req, res) => {
   }
 });
 
-// ════════════════════════════════════════
-// SETUP CHAT — AI support for bot-setup.html
-// ════════════════════════════════════════
-const _setupChatLimiter = rateLimit({ windowMs: 60*1000, max: 15, standardHeaders: true, legacyHeaders: false,
-  message: { error: 'Too many messages — please wait a minute.' } });
-
-const SETUP_SYSTEM = `You are a concise support assistant for Apex Trade Bot — a crypto trading bot deployed on Railway.
-Help users set up their bot. Be short and direct (2-4 sentences max). No markdown headers. Use plain text.
-
-SETUP STEPS:
-1. Railway → New Project → New Service → Docker Image → paste: ghcr.io/alexgabriel225sefu-dotcom/apex-crypto:latest
-2. Add 2 Variables: LICENSE_KEY (from their email) and GROQ_API_KEY (free from console.groq.com → API Keys)
-3. Go to aicashsystem.space/configurator → enter license key + Groq key + exchange → Save Config
-4. Set up Telegram (optional): @BotFather for token, @userinfobot for chat ID → add TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to Railway → send /resume
-
-COMMON ERRORS:
-- "Invalid license key" → They must go to the configurator (aicashsystem.space/configurator) and save settings first, then restart Railway.
-- "No AI key found" → Add GROQ_API_KEY to Railway Variables. Get it free at console.groq.com.
-- "No exchange API key" → Bot auto-switches to Paper Trading (safe, no real funds). Normal for first setup.
-- "Bot is paused" → Needs Telegram /resume command. Set up Telegram first.
-- Bot restarting in loop → Normal during first deploy. Stabilizes in 1-2 min after variables are added.
-
-BINANCE API: Profile → API Management → Create API → enable Spot Trading only, Withdrawals OFF.
-GROQ: console.groq.com → Sign up free → API Keys → Create Key. No credit card.
-PAPER TRADING: Simulated mode, no real funds. Safe to test. Switch to live via configurator.
-SUPPORT EMAIL: supportaicashsystem@gmail.com`;
-
-app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
-  const { message, history = [] } = req.body || {};
-  if (!message || typeof message !== 'string' || message.length > 500)
-    return res.status(400).json({ error: 'Invalid message.' });
-
-  try {
-    if (ANTHROPIC_KEY) {
-      const client = new Anthropic({ apiKey: ANTHROPIC_KEY });
-      const msgs = [...history.slice(-6), { role: 'user', content: message }];
-      const resp = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 300,
-        system: SETUP_SYSTEM, messages: msgs
-      });
-      return res.json({ reply: resp.content[0]?.text || 'Sorry, try again.' });
-    }
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) return res.status(503).json({ error: 'AI not configured.' });
-    const msgs = [{ role:'system', content: SETUP_SYSTEM },
-      ...history.slice(-6), { role:'user', content: message }];
-    const gr = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST', headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: msgs, max_tokens: 300 })
-    });
-    const gd = await gr.json();
-    return res.json({ reply: gd.choices?.[0]?.message?.content || 'Sorry, try again.' });
-  } catch(e) {
-    console.error('setup-chat error:', e.message);
-    res.status(500).json({ error: 'AI error — try again.' });
-  }
-});
 
 // ════════════════════════════════════════
 // CATCH-ALL 404  (must be after ALL routes)
