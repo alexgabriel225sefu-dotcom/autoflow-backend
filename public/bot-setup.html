@@ -269,47 +269,17 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
     </div>
   </div>
 
-  <!-- Step 3: Configure -->
+  <!-- Step 3: Verify -->
   <div class="sc" id="s3">
     <div class="sc-head" onclick="toggle(3)">
       <div class="sc-num" id="sn3">3</div>
-      <div class="sc-title">
-        <strong>Configure your settings</strong>
-        <span>~5 minutes · web configurator</span>
-      </div>
-      <span class="sc-arr">▾</span>
-    </div>
-    <div class="sc-body" id="sb3">
-      <div class="inst">
-        <div class="in">1</div>
-        <div class="it">Open the configurator below. Your license key is pre-filled.</div>
-      </div>
-      <div class="inst">
-        <div class="in">2</div>
-        <div class="it">Select your exchange, choose <b>Paper Trading</b> to start (no real funds), paste your API keys and Groq key.</div>
-      </div>
-      <div class="inst">
-        <div class="in">3</div>
-        <div class="it">Click <b>Save Config &amp; Deploy →</b> — your settings are saved on our server. The bot loads them automatically on startup using your license key. <b>No copy-paste into Railway needed.</b></div>
-      </div>
-      <a id="configBtn" href="/configurator" target="_blank" class="btn-config">
-        ⚙️ Open Bot Configurator →
-      </a>
-      <button class="mark-done" onclick="markDone(3,4)">✓ Settings saved — go to Step 4</button>
-    </div>
-  </div>
-
-  <!-- Step 4: Verify -->
-  <div class="sc" id="s4">
-    <div class="sc-head" onclick="toggle(4)">
-      <div class="sc-num" id="sn4">4</div>
       <div class="sc-title">
         <strong>Verify bot is running</strong>
         <span>~1 minute · Railway logs</span>
       </div>
       <span class="sc-arr">▾</span>
     </div>
-    <div class="sc-body" id="sb4">
+    <div class="sc-body" id="sb3">
       <div class="inst">
         <div class="in">1</div>
         <div class="it">In Railway, click your <b>apex-crypto</b> service → <b>Deployments</b> → <b>View Logs</b>.</div>
@@ -327,7 +297,7 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
       </div>
       <div class="inst">
         <div class="in">3</div>
-        <div class="it">See the bot restart a few times? <b>That's completely normal.</b> Railway automatically restarts it — it stabilizes within 1–2 minutes.</div>
+        <div class="it">See the bot restart a few times? <b>That's completely normal.</b> It stabilizes within 1–2 minutes.</div>
       </div>
 
       <div style="background:var(--panel2);border:1px solid var(--ln2);border-radius:14px;padding:14px 16px;margin-top:14px">
@@ -335,7 +305,7 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
         <div style="display:flex;flex-direction:column;gap:9px">
           <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:start">
             <span style="font:600 10px/1 var(--m);color:#f87171;white-space:nowrap;padding-top:2px">Invalid license key</span>
-            <span style="font:400 12px/1.5 var(--f);color:var(--t1)">You skipped Step 3. Open the configurator, enter your key and save — then restart Railway.</span>
+            <span style="font:400 12px/1.5 var(--f);color:var(--t1)">Your LICENSE_KEY is wrong or has a space in it. Re-copy it and re-add it in Railway Variables.</span>
           </div>
           <div style="height:1px;background:var(--ln)"></div>
           <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:start">
@@ -365,7 +335,7 @@ nav{position:sticky;top:0;z-index:300;height:60px;display:flex;align-items:cente
     <h2>You're live.</h2>
     <p>Your Apex Trade Bot is running 24/7 on Railway, scanning markets and executing trades based on your settings.</p>
     <div class="done-grid">
-      <div class="dg"><strong>Change settings</strong><span>Open the configurator anytime to adjust risk, SL/TP, or switch to live trading.</span></div>
+      <div class="dg"><strong>Change settings</strong><span>Contact support to adjust risk, SL/TP, or switch to live trading.</span></div>
       <div class="dg"><strong>Control via Telegram</strong><span>/stop, /pause, /status, /balance — from anywhere.</span></div>
       <div class="dg"><strong>View trades</strong><span>Railway Dashboard → your service → open the /dashboard URL.</span></div>
       <div class="dg"><strong>Switch to live</strong><span>Run paper mode for 1–2 weeks first. Validate before using real funds.</span></div>
@@ -403,9 +373,6 @@ const params = new URLSearchParams(location.search);
 const licKey = params.get('key') || params.get('license') || '';
 if (licKey) {
   document.getElementById('keyDisplay').textContent = licKey;
-  // Pre-fill configurator link with license key
-  document.getElementById('configBtn').href = '/configurator?key=' + encodeURIComponent(licKey);
-  // Show license key in Step 1 variable block
   const licInStep = document.getElementById('licInStep');
   if (licInStep) licInStep.textContent = licKey;
 }
