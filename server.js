@@ -2902,10 +2902,17 @@ app.post('/api/railway-deploy', async (req, res) => {
   }
 
   try {
-    // 1) Create project
+    // 0) Validate token + get teamId (needed for team Railway accounts)
+    const meRes = await gql(`query{ me{ id teams{ edges{ node{ id } } } } }`, {});
+    const userId = meRes?.data?.me?.id;
+    if (!userId) return res.status(400).json({ error: 'Invalid Railway token — generate one at railway.com/account/tokens', detail: JSON.stringify(meRes).slice(0,300) });
+    const teamId = meRes?.data?.me?.teams?.edges?.[0]?.node?.id;
+
+    // 1) Create project (include teamId if team account)
+    const projInput = teamId ? { name: projectName, teamId } : { name: projectName };
     const proj = await gql(
-      `mutation($name:String!){ projectCreate(input:{name:$name}){ id } }`,
-      { name: projectName }
+      `mutation($input:ProjectCreateInput!){ projectCreate(input:$input){ id } }`,
+      { input: projInput }
     );
     const projectId = proj?.data?.projectCreate?.id;
     if (!projectId) return res.status(500).json({ error: 'Failed to create Railway project', detail: JSON.stringify(proj).slice(0,500) });
