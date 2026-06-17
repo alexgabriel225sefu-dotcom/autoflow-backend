@@ -2911,15 +2911,21 @@ app.post('/api/railway-deploy', async (req, res) => {
     const envId = proj?.data?.projectCreate?.environments?.edges?.[0]?.node?.id;
     if (!projectId || !envId) return res.status(500).json({ error: 'Failed to create Railway project', detail: JSON.stringify(proj).slice(0,300) });
 
-    // 2) Create service with Docker image
+    // 2) Create service (name only — Docker image set separately via serviceInstanceUpdate)
     const svc = await gql(
       `mutation($projectId:String!,$input:ServiceCreateInput!){ serviceCreate(projectId:$projectId, input:$input){ id } }`,
-      { projectId, input: { name: projectName, source: { image } } }
+      { projectId, input: { name: projectName } }
     );
     const serviceId = svc?.data?.serviceCreate?.id;
     if (!serviceId) return res.status(500).json({ error: 'Failed to create Railway service', detail: JSON.stringify(svc).slice(0,300) });
 
-    // 3) Set variables
+    // 3) Set Docker image via serviceInstanceUpdate
+    await gql(
+      `mutation($serviceId:String!,$environmentId:String!,$input:ServiceInstanceUpdateInput!){ serviceInstanceUpdate(serviceId:$serviceId, environmentId:$environmentId, input:$input) }`,
+      { serviceId, environmentId: envId, input: { dockerImage: image } }
+    );
+
+    // 4) Set variables
     const vars = [
       { name: 'LICENSE_KEY', value: licenseKey },
       { name: 'PORT', value: '3000' },
@@ -2930,11 +2936,11 @@ app.post('/api/railway-deploy', async (req, res) => {
         { input: { projectId, environmentId: envId, serviceId, name: v.name, value: v.value } });
     }
 
-    // 4) Create public domain
+    // 5) Create public domain
     await gql(`mutation($input:ServiceDomainCreateInput!){ serviceDomainCreate(input:$input){ domain } }`,
       { input: { environmentId: envId, serviceId, targetPort: 3000 } });
 
-    // 5) Deploy
+    // 6) Deploy
     await gql(`mutation($serviceId:String!,$environmentId:String!){ serviceInstanceDeploy(serviceId:$serviceId, environmentId:$environmentId) }`,
       { serviceId, environmentId: envId });
 
