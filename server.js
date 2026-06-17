@@ -2965,20 +2965,6 @@ app.post('/api/railway-deploy', async (req, res) => {
 });
 
 // ════════════════════════════════════════
-// CATCH-ALL 404  (must be after ALL routes)
-// ════════════════════════════════════════
-app.use((req, res) => {
-  res.status(404).json({ error: 'route not found', path: req.path, method: req.method });
-});
-
-// GLOBAL ERROR HANDLER — catches any unhandled async throws
-app.use((err, req, res, next) => {
-  console.error('EXPRESS ERROR:', err.stack || err.message || err);
-  if (res.headersSent) return next(err);
-  res.status(500).json({ error: 'Internal server error' });
-});
-
-// ════════════════════════════════════════
 // SETUP CHAT — AI support for bot-setup.html
 // ════════════════════════════════════════
 const _setupChatLimiter = rateLimit({ windowMs: 60*1000, max: 15, standardHeaders: true, legacyHeaders: false,
@@ -3011,7 +2997,6 @@ app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Invalid message.' });
 
   try {
-    // Try Anthropic first
     if (ANTHROPIC_KEY) {
       const client = new Anthropic({ apiKey: ANTHROPIC_KEY });
       const msgs = [...history.slice(-6), { role: 'user', content: message }];
@@ -3021,7 +3006,6 @@ app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
       });
       return res.json({ reply: resp.content[0]?.text || 'Sorry, try again.' });
     }
-    // Fallback: Groq via fetch
     const groqKey = process.env.GROQ_API_KEY;
     if (!groqKey) return res.status(503).json({ error: 'AI not configured.' });
     const msgs = [{ role:'system', content: SETUP_SYSTEM },
@@ -3036,6 +3020,20 @@ app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
     console.error('setup-chat error:', e.message);
     res.status(500).json({ error: 'AI error — try again.' });
   }
+});
+
+// ════════════════════════════════════════
+// CATCH-ALL 404  (must be after ALL routes)
+// ════════════════════════════════════════
+app.use((req, res) => {
+  res.status(404).json({ error: 'route not found', path: req.path, method: req.method });
+});
+
+// GLOBAL ERROR HANDLER — catches any unhandled async throws
+app.use((err, req, res, next) => {
+  console.error('EXPRESS ERROR:', err.stack || err.message || err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // ════════════════════════════════════════
