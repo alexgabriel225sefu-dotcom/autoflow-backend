@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.claude-flow/
+tests/
+docs/
+*.md
+.env
+.env.*
+!.env.example
+runtime.json
+state.json
+*.log
