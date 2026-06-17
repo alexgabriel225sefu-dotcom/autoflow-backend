@@ -85,15 +85,14 @@ function buildDashboard(dash) {
 <title>Apex Trade Bot</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#050814;--card:#0b1120;--border:#1a2540;--text:#e5e7eb;--muted:#6b7280;--amber:#f59e0b;--green:#00e87a;--red:#ff4d6d;--blue:#60a5fa}
+:root{--bg:#060608;--card:#0b0b0e;--border:#1e1e26;--text:#e5e7eb;--muted:#6b7280;--acc:#ff2d4f;--green:#27c46a;--red:#ff2d4f;--blue:#60a5fa}
 body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',system-ui,sans-serif;min-height:100vh}
 .hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,#0b1120,#050814);position:sticky;top:0;z-index:99;backdrop-filter:blur(10px)}
-.logo{display:flex;align-items:center;gap:8px}
-.logo-icon{width:22px;height:22px;fill:none;stroke:var(--amber);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-.logo-text{font-weight:800;font-size:.95rem;letter-spacing:-.01em;color:#fff}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-text{font-weight:700;font-size:.95rem;letter-spacing:-.01em;color:#fff;font-family:'Clash Display',system-ui,sans-serif}
 .hdr-right{display:flex;align-items:center;gap:8px}
-.status-badge{display:flex;align-items:center;gap:6px;background:rgba(0,232,122,.08);border:1px solid rgba(0,232,122,.2);border-radius:20px;padding:4px 10px;font-size:.68rem;font-weight:700;color:var(--green);letter-spacing:.04em}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 2s infinite}
+.status-badge{display:flex;align-items:center;gap:6px;background:rgba(255,45,79,.08);border:1px solid rgba(255,45,79,.2);border-radius:20px;padding:4px 10px;font-size:.68rem;font-weight:700;color:var(--acc);letter-spacing:.04em}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--acc);animation:blink 2s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)}
 .m{background:var(--card);padding:12px 10px;text-align:center}
@@ -116,7 +115,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',syste
 .pi-v{font-weight:700;font-size:.83rem;color:#fff}
 .prog-wrap{margin-top:2px}
 .prog-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:4px}
-.prog-fill{height:100%;background:linear-gradient(90deg,var(--red),var(--amber),var(--green));border-radius:2px;transition:width .5s}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--red),#ff7c45,var(--green));border-radius:2px;transition:width .5s}
 .prog-labels{display:flex;justify-content:space-between;font-size:.6rem;font-weight:700}
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:.74rem}
@@ -129,9 +128,9 @@ tr.win td{color:#d1fae5}tr.loss td{color:#fee2e2}
 .ctrl-label{font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px}
 .ctrl-row{display:flex;align-items:center;gap:8px}
 .ctrl-inp,.ctrl-sel{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:.82rem;font-family:inherit;outline:none;min-width:0}
-.ctrl-inp:focus,.ctrl-sel:focus{border-color:var(--amber)}
-.apply-btn{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:var(--amber);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:.75rem;font-weight:700;white-space:nowrap}
-.apply-btn:hover{background:rgba(245,158,11,.25)}
+.ctrl-inp:focus,.ctrl-sel:focus{border-color:var(--acc)}
+.apply-btn{background:rgba(255,45,79,.12);border:1px solid rgba(255,45,79,.3);color:var(--acc);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:.75rem;font-weight:700;white-space:nowrap}
+.apply-btn:hover{background:rgba(255,45,79,.25)}
 .fb{font-size:.67rem;min-width:54px;height:16px}
 .fb.ok{color:var(--green)}.fb.err{color:var(--red)}
 .ctrl-hint{font-size:.6rem;color:var(--muted);margin-top:2px}
@@ -150,18 +149,25 @@ tr.win td{color:#d1fae5}tr.loss td{color:#fee2e2}
 
 <header class="hdr">
   <div class="logo">
-    <svg class="logo-icon" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-    <span class="logo-text">Apex Trade Bot</span>
+    <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+      <defs><linearGradient id="lg" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#7a1020"/><stop offset="1" stop-color="#ff5c74"/></linearGradient></defs>
+      <rect x="3" y="19" width="5" height="10" rx="2.5" fill="url(#lg)" opacity=".45"/>
+      <rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="url(#lg)" opacity=".72"/>
+      <rect x="20" y="6" width="5" height="23" rx="2.5" fill="url(#lg)"/>
+      <circle cx="22.5" cy="5" r="3.1" fill="#ff5c74"/>
+    </svg>
+    <span class="logo-text">Apex&nbsp;Bot</span>
   </div>
   <div class="hdr-right">
-    <div class="status-badge"><span class="dot"></span>${paused ? '<span style="color:var(--amber)">PAUSED</span>' : 'LIVE'} · ${mode}</div>
+    <div class="status-badge"><span class="dot"></span>${paused ? '<span style="color:#ff7c45">PAUSED</span>' : 'LIVE'} · ${mode}</div>
   </div>
 </header>
 
 <div class="metrics">
   <div class="m"><div class="m-l">Balance</div><div class="m-v green">$${bal}</div></div>
   <div class="m"><div class="m-l">Total PnL</div><div class="m-v ${pnlClass}">${pnlSign}${pnlPct}%</div></div>
-  <div class="m"><div class="m-l">Win Rate</div><div class="m-v amber">${winRate}</div></div>
+  <div class="m"><div class="m-l">Win Rate</div><div class="m-v" style="color:var(--acc)">${winRate}</div></div>
   <div class="m"><div class="m-l">Trades</div><div class="m-v blue">${total}</div></div>
   <div class="m"><div class="m-l">W / L</div><div class="m-v white">${wins} / ${losses}</div></div>
   <div class="m"><div class="m-l">${sym}</div><div class="m-v white">${price}</div></div>
