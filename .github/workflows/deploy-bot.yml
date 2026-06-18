@@ -1,0 +1,44 @@
+name: Deploy Apex Trade Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      vm_ip:
+        description: 'Oracle Cloud VM IP address'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s' "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ github.event.inputs.vm_ip }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Upload .env to VM
+        run: |
+          cat > /tmp/bot.env <<'ENVEOF'
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+          MASTER_KEY=${{ secrets.MASTER_KEY }}
+          NODE_ENV=production
+          ENVEOF
+          scp -i ~/.ssh/deploy_key /tmp/bot.env \
+            opc@${{ github.event.inputs.vm_ip }}:/tmp/bot.env
+
+      - name: Install and start bot
+        run: |
+          ssh -i ~/.ssh/deploy_key opc@${{ github.event.inputs.vm_ip }} \
+            'bash -s' < apex-trade-bot/deploy.sh
+
+      - name: Copy .env to final location
+        run: |
+          ssh -i ~/.ssh/deploy_key opc@${{ github.event.inputs.vm_ip }} \
+            'sudo cp /tmp/bot.env /opt/apex-bot/apex-trade-bot/.env && sudo pkill -f index-server.js; sudo bash -c "cd /opt/apex-bot/apex-trade-bot && nohup node src/index-server.js >> /var/log/apex-bot.log 2>&1 &" && sleep 2 && pgrep -f index-server.js && echo "BOT RUNNING OK"'
