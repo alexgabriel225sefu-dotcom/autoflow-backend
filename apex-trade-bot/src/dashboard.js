@@ -35,6 +35,31 @@ function buildDashboard(dash) {
   const confDisp  = s.MIN_CONFIDENCE || 70;
   const critDisp  = s.MIN_CRITERIA !== undefined ? s.MIN_CRITERIA : 3;
 
+  // ── Last Signal ───────────────────────────────────────────
+  const ls = dash.lastSignal;
+  let sigHtml = `<div class="pos-empty">⏳ Waiting for first AI analysis...</div>`;
+  if (ls) {
+    const ac = ls.action;
+    const acColor = ac === 'BUY' ? 'green' : ac === 'SELL' ? 'red' : 'muted';
+    const acIcon  = ac === 'BUY' ? '▲' : ac === 'SELL' ? '▼' : '⏸';
+    const conf    = ls.confidence ?? 0;
+    const crit    = ls.criteriaScore ?? 0;
+    const confColor = conf >= 70 ? 'green' : conf >= 55 ? 'amber' : 'red';
+    sigHtml = `
+<div class="sig-card">
+  <div class="sig-row">
+    <span class="sig-action ${acColor}">${acIcon} ${ac}</span>
+    <span class="muted" style="font-size:.65rem">${ls.time || ''}</span>
+  </div>
+  <div class="sig-meta">
+    <span>Confidence: <b class="${confColor}">${conf}%</b></span>
+    <span>Criteria: <b>${crit}/5</b></span>
+    <span>Volume: <b>${dash.lastVolume ? dash.lastVolume + '×' : '—'}</b></span>
+  </div>
+  <div class="sig-reason">"${ls.reasoning || '—'}"</div>
+</div>`;
+  }
+
   // ── Active Position ───────────────────────────────────────
   let posHtml = `<div class="pos-empty">⏳ No open position — waiting for signal...</div>`;
   if (dash.openPosition) {
@@ -141,6 +166,14 @@ tr.win td{color:#d1fae5}tr.loss td{color:#fee2e2}
 .btn-pause:hover{background:rgba(255,77,109,.2)}
 .btn-resume{background:rgba(0,232,122,.08);border-color:rgba(0,232,122,.2);color:var(--green)}
 .btn-resume:hover{background:rgba(0,232,122,.2)}
+/* Last signal */
+.sig-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.sig-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sig-action{font-weight:800;font-size:.95rem}
+.sig-meta{display:flex;gap:14px;font-size:.72rem;color:var(--muted);margin-bottom:8px}
+.sig-meta b{color:var(--text)}
+.sig-reason{font-size:.72rem;color:var(--muted);font-style:italic;line-height:1.4;border-top:1px solid var(--border);padding-top:8px;margin-top:2px}
+.amber{color:#f59e0b}
 .footer{padding:10px 16px;font-size:.65rem;color:var(--muted);text-align:center}
 @media(max-width:480px){.metrics{grid-template-columns:repeat(2,1fr)}.chart-wrap iframe{height:340px}}
 </style>
@@ -176,6 +209,11 @@ tr.win td{color:#d1fae5}tr.loss td{color:#fee2e2}
 
 <div class="chart-wrap">
   <iframe src="https://www.tradingview.com/widgetembed/?frameElementId=tv&symbol=${tvSym}&interval=5&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&hide_side_toolbar=0&allow_symbol_change=0&save_image=0&studies=RSI%401%2CMASimple%401%2CMACD%40tv-basicstudies&calendar=0&support_host=https%3A%2F%2Fwww.tradingview.com" allowtransparency="true" scrolling="no"></iframe>
+</div>
+
+<div class="sec">
+  <div class="sec-title">◈ Last AI Signal</div>
+  ${sigHtml}
 </div>
 
 <div class="sec">

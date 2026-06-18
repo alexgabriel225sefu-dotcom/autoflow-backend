@@ -37,6 +37,7 @@ const dash = {
   openPosition:  null,
   trades:        [], // max 50 trades history
   lastTick:      null,
+  lastSignal:    null, // { action, confidence, criteriaScore, reasoning, blocked }
   mode:          cfg.PAPER_TRADING ? 'PAPER' : cfg.BYBIT_TESTNET || cfg.BINANCE_TESTNET ? 'TESTNET' : 'LIVE',
   exchange:      cfg.EXCHANGE.toUpperCase(),
 };
@@ -396,11 +397,15 @@ async function tick() {
     // AI signal (cu context strategie)
     const signal = await ai.getSignal(ind, balance, openPosition, stratData);
     logger.printSignal(signal, ind);
+    dash.lastSignal  = { action: signal.action, confidence: signal.confidence,
+      criteriaScore: signal.criteriaScore, reasoning: signal.reasoning,
+      time: new Date().toLocaleTimeString('en-US') };
+    dash.lastVolume  = parseFloat(ind.volumeRatio).toFixed(2);
 
     // Filtre de calitate
     const tooLowBalance = balance < 1;
     const minCriteria   = parseInt(process.env.MIN_CRITERIA   || String(settings.get('MIN_CRITERIA') ?? 3));
-    const minVolume     = parseFloat(process.env.MIN_VOLUME_RATIO || '0.7'); // 0.7× default (era 1.0)
+    const minVolume     = parseFloat(process.env.MIN_VOLUME_RATIO || '0.7');
     const criteriaOk    = (signal.criteriaScore ?? 0) >= minCriteria;
     const volumeOk      = parseFloat(ind.volumeRatio) >= minVolume;
 

@@ -107,7 +107,11 @@ module.exports = {
   COMPOUND:      process.env.COMPOUND !== 'false', // reinvestește profiturile
 
   // ─── Intervale ──────────────────────────────────────────
-  LOOP_INTERVAL_MS: parseInt(process.env.LOOP_INTERVAL_MS || String(5 * 60 * 1000)),
+  LOOP_INTERVAL_MS: parseInt(process.env.LOOP_INTERVAL_MS || String(
+    (process.env.PAPER_TRADING !== 'false' && !process.env.BINANCE_API_KEY && !process.env.BYBIT_API_KEY)
+      ? 60 * 1000        // paper mode: every 1 minute
+      : 5 * 60 * 1000    // live/testnet: every 5 minutes
+  )),
 
   // ─── Paper Trading ──────────────────────────────────────
   PAPER_TRADING: PAPER,
