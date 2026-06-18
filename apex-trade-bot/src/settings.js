@@ -9,6 +9,7 @@ const DEFAULTS = {
   STOP_LOSS_PCT:   cfg.STOP_LOSS_PCT,
   TAKE_PROFIT_PCT: cfg.TAKE_PROFIT_PCT,
   MIN_CONFIDENCE:  cfg.MIN_CONFIDENCE,
+  MIN_CRITERIA:    3,            // min AI criteria score (0-5) to open a trade
   SYMBOL:          cfg.SYMBOL,   // trading pair — changeable via /symbol
   PAUSED:          true,         // start PAUSED — client must press Start after setup
 };

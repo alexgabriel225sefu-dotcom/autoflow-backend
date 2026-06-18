@@ -32,7 +32,8 @@ function buildDashboard(dash) {
   const riskDisp = ((s.RISK_PER_TRADE || 0.02) * 100).toFixed(1);
   const slDisp   = ((s.STOP_LOSS_PCT  || 0.015) * 100).toFixed(1);
   const tpDisp   = ((s.TAKE_PROFIT_PCT|| 0.03)  * 100).toFixed(1);
-  const confDisp = s.MIN_CONFIDENCE || 70;
+  const confDisp  = s.MIN_CONFIDENCE || 70;
+  const critDisp  = s.MIN_CRITERIA !== undefined ? s.MIN_CRITERIA : 3;
 
   // ── Active Position ───────────────────────────────────────
   let posHtml = `<div class="pos-empty">⏳ No open position — waiting for signal...</div>`;
@@ -245,6 +246,15 @@ tr.win td{color:#d1fae5}tr.loss td{color:#fee2e2}
         <span id="fb-CONF" class="fb"></span>
       </div>
     </div>
+    <div>
+      <label class="ctrl-label">Min Criteria Score (1–5)</label>
+      <div class="ctrl-row">
+        <input id="inp-CRIT" type="number" step="1" min="1" max="5" value="${critDisp}" class="ctrl-inp">
+        <button class="apply-btn" onclick="applyNum('MIN_CRITERIA','inp-CRIT','fb-CRIT')">Apply</button>
+        <span id="fb-CRIT" class="fb"></span>
+      </div>
+      <div class="ctrl-hint">3 = relaxed (mai multe trade-uri) | 5 = strict (calitate maximă)</div>
+    </div>
   </div>
   <div class="pause-row">
     <button id="pauseBtn" class="ctrl-btn ${paused ? 'btn-resume' : 'btn-pause'}"
@@ -332,6 +342,7 @@ const CTRL_VALIDATORS = {
   STOP_LOSS_PCT:   v => typeof v === 'number' && v > 0 && v <= 0.5,
   TAKE_PROFIT_PCT: v => typeof v === 'number' && v > 0 && v <= 1.0,
   MIN_CONFIDENCE:  v => typeof v === 'number' && v >= 50 && v <= 99,
+  MIN_CRITERIA:    v => typeof v === 'number' && v >= 1 && v <= 5,
 };
 
 function readBody(req) {

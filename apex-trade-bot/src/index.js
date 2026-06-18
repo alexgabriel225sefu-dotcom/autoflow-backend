@@ -399,7 +399,7 @@ async function tick() {
 
     // Filtre de calitate
     const tooLowBalance = balance < 1;
-    const minCriteria   = parseInt(process.env.MIN_CRITERIA   || '5');   // 5/5 — tuning r3: mc5 dă 40% WR vs 24% la mc4
+    const minCriteria   = parseInt(process.env.MIN_CRITERIA   || String(settings.get('MIN_CRITERIA') ?? 3));
     const minVolume     = parseFloat(process.env.MIN_VOLUME_RATIO || '0.7'); // 0.7× default (era 1.0)
     const criteriaOk    = (signal.criteriaScore ?? 0) >= minCriteria;
     const volumeOk      = parseFloat(ind.volumeRatio) >= minVolume;
