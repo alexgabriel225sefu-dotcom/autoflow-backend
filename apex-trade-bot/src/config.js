@@ -94,7 +94,7 @@ module.exports = {
   RUNNER_TRAIL_DIST: parseFloat(process.env.RUNNER_TRAIL_DIST || '0.005'), // 0.5% trail în runner mode
 
   // ─── Entry filters (anti-chop) ───────────────────────────
-  HTF_FILTER:    process.env.HTF_FILTER !== 'false',                       // nu intra contra trendului mare
+  HTF_FILTER:    process.env.HTF_FILTER === 'true',                        // opt-in: nu intra contra trendului mare
   HTF_TIMEFRAME: process.env.HTF_TIMEFRAME || '1h',
   COOLDOWN_AFTER_LOSS_MIN: parseInt(process.env.COOLDOWN_AFTER_LOSS_MIN || '15'),
 
