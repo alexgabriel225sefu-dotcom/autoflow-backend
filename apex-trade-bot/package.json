@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start":    "node src/index.js",
+    "server":   "node src/index-server.js",
     "test":     "node --test tests/*.js",
     "paper":    "PAPER_TRADING=true node src/index.js",
     "testnet":  "BYBIT_TESTNET=true node src/index.js",
