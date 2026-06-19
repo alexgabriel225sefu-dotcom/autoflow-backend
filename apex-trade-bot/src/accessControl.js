@@ -20,8 +20,14 @@ const FILE = path.join(DIR, '_access.json');
 if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
 
 function _read() {
-  try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); }
-  catch { return { admins: [], allowed: [] }; }
+  try {
+    const d = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+    d.admins        = d.admins        || [];
+    d.allowed       = d.allowed       || [];
+    d.claimedTokens = d.claimedTokens || {};  // token → chatId (prevents reuse)
+    return d;
+  }
+  catch { return { admins: [], allowed: [], claimedTokens: {} }; }
 }
 
 function _write(d) {
@@ -91,7 +97,19 @@ function listAdmins() {
   return [..._envAdmins(), ..._read().admins];
 }
 
+// ── Paid-token claims (one activation link = one use) ──
+function isTokenClaimed(token) {
+  return Boolean(_read().claimedTokens[String(token)]);
+}
+
+function claimToken(token, chatId) {
+  const d = _read();
+  d.claimedTokens[String(token)] = String(chatId);
+  _write(d);
+}
+
 module.exports = {
   isAdmin, isAllowed, hasAnyAdmin, claimAdmin,
   grant, revoke, listAllowed, listAdmins,
+  isTokenClaimed, claimToken,
 };

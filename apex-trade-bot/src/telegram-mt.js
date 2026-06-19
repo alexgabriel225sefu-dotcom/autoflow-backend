@@ -7,6 +7,7 @@ const axios     = require('axios');
 const userStore = require('./userStore');
 const botMgr    = require('./botManager');
 const access    = require('./accessControl');
+const payments  = require('./payments');
 
 const TOKEN = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
 const NEEDS_PASS = new Set(['okx', 'kucoin', 'bitget', 'coinbase']);
@@ -388,6 +389,28 @@ async function _handle(u) {
   // Admin-only whitelist commands
   if (access.isAdmin(chatId) && ['/grant', '/revoke', '/users', '/admin'].includes(cmd)) {
     return handleAdminCmd(chatId, cmd, parts.slice(1));
+  }
+
+  // Auto-activation: client arrives via paid deep-link  /start <token>
+  if (!access.isAllowed(chatId) && cmd === '/start' && parts[1] && payments.enabled()) {
+    const token = parts[1].trim();
+    if (access.isTokenClaimed(token)) {
+      return send(chatId, `⚠️ This activation link was already used on another account. Contact the owner if this is a mistake.`);
+    }
+    await send(chatId, `⏳ Verifying your payment…`);
+    const paid = await payments.verifyPaidToken(token);
+    if (paid) {
+      access.grant(chatId);
+      access.claimToken(token, chatId);
+      await send(chatId, `✅ <b>Payment confirmed — access activated!</b>\n\nWelcome aboard. 🚀`);
+      // fall through to normal /start setup below
+    } else {
+      return send(chatId,
+        `❌ <b>Couldn't confirm payment yet.</b>\n\n` +
+        `If you just paid, wait ~1 minute and tap the activation link again.\n\n` +
+        `If the problem persists, send this ID to the owner: <code>${chatId}</code>`
+      );
+    }
   }
 
   // Block everyone not on the whitelist
