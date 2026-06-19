@@ -21,18 +21,24 @@ const EXCHANGE_URLS = {
   coinbase: 'https://www.coinbase.com/advanced-trade/spot',
 };
 
+const _bnTestnet = (process.env.BINANCE_TESTNET || '').toLowerCase().trim() !== 'false';
+
 function kbExchangeLink(exchange, symbol, label) {
   if (!exchange) return undefined;
   const ex = exchange.toLowerCase();
-  let url = EXCHANGE_URLS[ex];
-  if (!url) return undefined;
-  // Binance: link directly to the traded pair chart (always loads, no login required)
+  if (!EXCHANGE_URLS[ex]) return undefined;
+  let url;
   if (ex === 'binance' && symbol) {
     const pair = symbol.replace(/(USDT|BTC|ETH|BNB)$/, '_$1');
-    url = `https://www.binance.com/en/trade/${pair}?type=spot`;
+    // Route to testnet or live depending on server config (default: testnet)
+    url = _bnTestnet
+      ? `https://testnet.binance.vision/en/trade/${pair}`
+      : `https://www.binance.com/en/trade/${pair}?type=spot`;
+  } else {
+    url = EXCHANGE_URLS[ex];
   }
   return { reply_markup: JSON.stringify({ inline_keyboard: [[
-    { text: label || `📊 View on ${exchange.toUpperCase()}`, url }
+    { text: label || `📊 View on ${_bnTestnet && ex === 'binance' ? 'BINANCE TESTNET' : exchange.toUpperCase()}`, url }
   ]] }) };
 }
 
