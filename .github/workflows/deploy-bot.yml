@@ -40,7 +40,7 @@ jobs:
             -o ConnectTimeout=30 \
             opc@${{ github.event.inputs.vm_ip }} "echo SSH_OK"
 
-      - name: Install Node.js on VM (binary, ~30s)
+      - name: Install Node.js on VM (binary, ~30s) and symlink
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -55,7 +55,10 @@ jobs:
             curl -fsSL https://nodejs.org/dist/v20.19.2/node-v20.19.2-linux-x64.tar.gz \
               | sudo tar -xz -C /usr/local --strip-components=1
           fi
-          echo "Node: $(node --version)"
+          # Symlink into /usr/bin so sudo (restricted PATH) can find it
+          sudo ln -sf /usr/local/bin/node /usr/bin/node
+          sudo ln -sf /usr/local/bin/npm /usr/bin/npm
+          echo "Node: $(/usr/bin/node --version)"
           sudo mkdir -p /opt/apex-bot/apex-trade-bot
           REMOTE
 
@@ -111,7 +114,7 @@ jobs:
           sudo pkill -f index-server.js 2>/dev/null || true
           sleep 1
           cd /opt/apex-bot/apex-trade-bot
-          sudo bash -c 'nohup node src/index-server.js >> /var/log/apex-bot.log 2>&1 &'
-          sleep 3
+          sudo bash -c 'nohup /usr/local/bin/node src/index-server.js >> /var/log/apex-bot.log 2>&1 &'
+          sleep 4
           pgrep -f index-server.js && echo 'SUCCESS: Bot is running!' || (echo 'ERROR: Bot failed' && tail -30 /var/log/apex-bot.log && exit 1)
           REMOTE
