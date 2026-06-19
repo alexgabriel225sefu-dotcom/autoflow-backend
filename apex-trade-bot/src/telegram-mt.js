@@ -97,6 +97,8 @@ function makeAlertFn(chatId) {
       await send(chatId,
         `🚨 <b>STRATEGY STOP</b>\n${data.reasons.map(r => `• ${r}`).join('\n')}\n\n<i>/resume when conditions improve.</i>`
       );
+    } else if (type === 'groq_error') {
+      await send(chatId, data.msg);
     }
   };
 }
@@ -262,6 +264,21 @@ async function handleCmd(chatId, cmd, args) {
   };
 
   switch (cmd) {
+    case '/groq': {
+      const key = args[0]?.trim();
+      if (!key || !key.startsWith('gsk_')) {
+        return send(chatId,
+          `🤖 <b>Set your Groq API Key</b>\n\n` +
+          `Get a free key at <b>console.groq.com</b> → API Keys → Create Key\n\n` +
+          `Then send: <code>/groq gsk_YOUR_KEY_HERE</code>\n\n` +
+          `<i>Your key is stored encrypted and used only for YOUR trades.</i>`
+        );
+      }
+      u.groqKey = userStore.encrypt(key);
+      userStore.save(chatId, u);
+      if (ctx) ctx.userData.groqKeyDec = key;
+      return send(chatId, `✅ <b>Groq key saved!</b> AI signals are now powered by your personal key.`);
+    }
     case '/menu': case '/m':
       return send(chatId, `📲 <b>APEX BOT — Control Panel</b>`, kbMenu(u.settings.PAUSED, u.settings.SYMBOL));
     case '/status': case '/s':
@@ -308,7 +325,8 @@ async function handleCmd(chatId, cmd, args) {
         `<b>Navigation:</b>\n/menu · /status · /config · /trades\n\n` +
         `<b>Symbol & Strategy:</b>\n/symbol BTCUSDT\n/method auto|turtle|livermore|soros|ptj|druckenmiller\n\n` +
         `<b>Risk Settings:</b>\n/risk 5 — % per trade\n/sl 1.6 — stop loss %\n/tp 3.2 — take profit %\n/confidence 70 — min AI confidence\n\n` +
-        `<b>Control:</b>\n/pause · /resume`
+        `<b>Control:</b>\n/pause · /resume\n\n` +
+        `<b>AI Key (free):</b>\n/groq gsk_YOUR_KEY — set personal Groq key\nGet free key: console.groq.com`
       );
     default:
       return send(chatId, `❓ Unknown command. Use /menu or /help.`);

@@ -156,7 +156,19 @@ async function tick(ctx) {
     const stratData = strategies.analyze(candles);
     stratData.session = { ...state.session };
 
-    const signal = await ai.getSignal(ind, state.paperBalance, state.openPosition, stratData);
+    const userGroqKey = ctx.userData?.groqKeyDec || null;
+    let signal;
+    try {
+      signal = await ai.getSignal(ind, state.paperBalance, state.openPosition, stratData, userGroqKey);
+    } catch (e) {
+      if (e.userKey) {
+        const msg = e.message === 'GROQ_KEY_INVALID'
+          ? `⚠️ <b>Your Groq API key is invalid.</b>\nGet a new free key at <b>console.groq.com</b> → API Keys, then send /groq gsk_NEW_KEY`
+          : `⚠️ <b>Your Groq API key hit the free limit.</b>\nGet a new free key at <b>console.groq.com</b> → API Keys, then send /groq gsk_NEW_KEY`;
+        ctx.alertFn('groq_error', { msg });
+        signal = ai.ruleBasedFallback(ind, state.openPosition);
+      } else throw e;
+    }
     state.lastSignal = {
       action: signal.action, confidence: signal.confidence,
       criteriaScore: signal.criteriaScore, reasoning: signal.reasoning,
@@ -203,11 +215,14 @@ async function tick(ctx) {
 }
 
 function createContext(userId, userData, exchange, alertFn) {
+  const userStore = require('./userStore');
+  const groqKeyDec = userData.groqKey ? userStore.decrypt(userData.groqKey) : null;
   return {
     userId,
     exchange,
     settings: userData.settings,
     state:    userData.state,
+    userData: { groqKeyDec },
     ticking:  false,
     alertFn,
   };

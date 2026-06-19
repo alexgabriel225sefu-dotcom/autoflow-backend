@@ -15,26 +15,27 @@ function getAnthropic() {
 }
 
 // ─── Groq (free fallback) ────────────────────────────────
-async function callGroq(prompt) {
-  const key = process.env.GROQ_API_KEY || '';
+async function callGroq(prompt, userKey) {
+  const key = userKey || process.env.GROQ_API_KEY || '';
   if (!key) throw new Error('GROQ_API_KEY missing');
 
-  const { data } = await axios.post(
-    'https://api.groq.com/openai/v1/chat/completions',
-    {
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 400,
-      temperature: 0,
-    },
-    {
-      headers: {
-        'Authorization': `Bearer ${key}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 15000,
+  let data;
+  try {
+    ({ data } = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      { model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], max_tokens: 400, temperature: 0 },
+      { headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' }, timeout: 15000 }
+    ));
+  } catch (e) {
+    const status = e.response?.status;
+    // 401 = invalid key, 429 = rate limit/quota exceeded
+    if (userKey && (status === 401 || status === 429)) {
+      const err = new Error(status === 401 ? 'GROQ_KEY_INVALID' : 'GROQ_KEY_QUOTA');
+      err.userKey = true;
+      throw err;
     }
-  );
+    throw e;
+  }
   const text  = data.choices[0].message.content.trim();
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('No JSON in Groq response');
@@ -114,7 +115,7 @@ function ruleBasedSignal(ind, openPosition) {
   return { action: 'HOLD', confidence: 40, criteriaScore, reasoning: 'Rule-based: no clear signal (' + factors.join(', ') + ')', riskLevel: 'HIGH', keyFactors: factors };
 }
 
-async function _fetchSignal(indicators, balance, openPosition, strategyData) {
+async function _fetchSignal(indicators, balance, openPosition, strategyData, userGroqKey) {
   const rsi   = parseFloat(indicators.rsi);
   const srsiK = parseFloat(indicators.stochRsiK);
   const macdH = parseFloat(indicators.macdHist);
@@ -189,9 +190,9 @@ ${legendarySection}
 Respond ONLY with valid JSON:
 {"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 sentences>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}`;
 
-  // Try Anthropic first, fall back to Groq (free)
+  // Try Anthropic first, fall back to Groq (user key → system key)
   try { return sanitize(await callAnthropic(prompt)); } catch {}
-  try { return sanitize(await callGroq(prompt)); } catch (err) {
+  try { return sanitize(await callGroq(prompt, userGroqKey)); } catch (err) {
     console.error('[AI ❌] Groq failed:', err.message);
   }
 
@@ -200,24 +201,25 @@ Respond ONLY with valid JSON:
   return ruleBasedSignal(indicators, openPosition);
 }
 
-// Public entry point — caches signal per symbol for ~55s.
-// 100 clients on BTCUSDT → 1 Groq call/min, not 100.
-async function getSignal(indicators, balance, openPosition, strategyData = null) {
+// Public entry point.
+// If client provided their own Groq key → call directly (no cache needed, their quota).
+// Otherwise → cache per symbol so 100 clients on BTC share 1 Groq call/min.
+async function getSignal(indicators, balance, openPosition, strategyData = null, userGroqKey = null) {
+  // Client has own key — call directly, no shared cache
+  if (userGroqKey) {
+    return _fetchSignal(indicators, balance, openPosition, strategyData, userGroqKey);
+  }
+
   const symbol = String(indicators.symbol || cfg.SYMBOL || 'UNKNOWN');
   const now    = Date.now();
 
   const cached = _signalCache.get(symbol);
   if (cached) {
-    // Re-use in-flight promise (prevents stampede when many clients tick simultaneously)
     if (cached.promise) return cached.promise;
-    // Re-use recent result
-    if (now - cached.ts < CACHE_TTL_MS) {
-      return cached.signal;
-    }
+    if (now - cached.ts < CACHE_TTL_MS) return cached.signal;
   }
 
-  // Start a new fetch and cache the promise so concurrent callers await the same one
-  const promise = _fetchSignal(indicators, balance, openPosition, strategyData)
+  const promise = _fetchSignal(indicators, balance, openPosition, strategyData, null)
     .then(signal => {
       _signalCache.set(symbol, { signal, ts: Date.now(), promise: null });
       return signal;
@@ -253,4 +255,4 @@ function sanitize(raw) {
   };
 }
 
-module.exports = { getSignal, sanitize };
+module.exports = { getSignal, sanitize, ruleBasedFallback: ruleBasedSignal };
