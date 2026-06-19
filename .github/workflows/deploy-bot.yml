@@ -11,7 +11,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
             -o ConnectTimeout=30 \
             opc@${{ github.event.inputs.vm_ip }} "echo SSH_OK"
 
-      - name: Install Node.js and clone repo on VM
+      - name: Install deps, clone and start bot
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -41,34 +41,42 @@ jobs:
             -o ServerAliveCountMax=10 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
-          if ! command -v node &>/dev/null; then
-            echo "[1/3] Installing Node.js 20..."
-            curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-            sudo dnf install -y nodejs git
-          else
-            echo "[1/3] Node.js already installed: $(node --version)"
-          fi
-          node --version
 
-          echo "[2/3] Cloning repo..."
+          # Install Node.js 20 via binary (fast: ~30 seconds)
+          if ! command -v node &>/dev/null; then
+            echo ">>> Installing Node.js 20..."
+            curl -fsSL https://nodejs.org/dist/v20.19.2/node-v20.19.2-linux-x64.tar.gz \
+              | sudo tar -xz -C /usr/local --strip-components=1
+          fi
+          echo "Node: $(node --version)"
+
+          # Install git if missing
+          if ! command -v git &>/dev/null; then
+            echo ">>> Installing git..."
+            sudo dnf install -y git
+          fi
+          echo "Git: $(git --version)"
+
+          # Clone repo
+          echo ">>> Cloning repo..."
           sudo rm -rf /opt/apex-bot
           sudo git clone --depth 1 -b claude/arcads-external-api-gExX7 \
             https://github.com/alexgabriel225sefu-dotcom/autoflow-backend.git /opt/apex-bot
 
-          echo "[3/3] Installing npm dependencies..."
+          # Install npm deps
+          echo ">>> npm install..."
           cd /opt/apex-bot/apex-trade-bot
           sudo npm install --production
-          echo "Done."
+
+          echo ">>> All done."
           REMOTE
 
-      - name: Write .env and start bot
+      - name: Write .env file
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
             -o ConnectTimeout=30 \
-            -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=5 \
             opc@${{ github.event.inputs.vm_ip }} \
             "sudo tee /opt/apex-bot/apex-trade-bot/.env > /dev/null" << 'ENVEOF'
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -83,8 +91,6 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
             -o ConnectTimeout=30 \
-            -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=5 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           sudo pkill -f index-server.js 2>/dev/null || true
           sleep 1
