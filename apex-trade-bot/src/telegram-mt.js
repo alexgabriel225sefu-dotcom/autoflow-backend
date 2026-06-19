@@ -25,7 +25,7 @@ function kbExchangeLink(exchange, label) {
   const url = exchange && EXCHANGE_URLS[exchange.toLowerCase()];
   if (!url) return undefined;
   return { reply_markup: JSON.stringify({ inline_keyboard: [[
-    { text: label || `📊 View on ${exchange.toUpperCase()}`, web_app: { url } }
+    { text: label || `📊 View on ${exchange.toUpperCase()}`, url }
   ]] }) };
 }
 
@@ -231,7 +231,7 @@ async function handleSetupCb(chatId, data) {
     };
     const guideUrl = apiKeyGuides[ex];
     const kb = guideUrl
-      ? { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: `🔑 Open ${ex.toUpperCase()} → Create API Key`, web_app: { url: guideUrl } }]] }) }
+      ? { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: `🔑 Open ${ex.toUpperCase()} → Create API Key`, url: guideUrl }]] }) }
       : undefined;
     return send(chatId,
       `✅ Exchange: <b>${ex.toUpperCase()}</b>\n\n` +
