@@ -6,6 +6,7 @@
 const axios     = require('axios');
 const userStore = require('./userStore');
 const botMgr    = require('./botManager');
+const access    = require('./accessControl');
 
 const TOKEN = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
 const NEEDS_PASS = new Set(['okx', 'kucoin', 'bitget', 'coinbase']);
@@ -21,6 +22,15 @@ async function send(chatId, text, extra = {}) {
 
 async function answerCb(id) {
   try { await axios.post(`https://api.telegram.org/bot${TOKEN}/answerCallbackQuery`, { callback_query_id: id }, { timeout: 5000 }); } catch {}
+}
+
+// Shown to anyone not on the whitelist.
+async function sendNoAccess(chatId) {
+  return send(chatId,
+    `🔒 <b>Private Trading Bot</b>\n\nThis bot is for paying members only.\n\n` +
+    `Your ID: <code>${chatId}</code>\n\n` +
+    `Send this ID to the owner to get access. 💎`
+  );
 }
 
 // ─── Keyboards ─────────────────────────────────────────────────
@@ -184,6 +194,41 @@ async function handleSetupInput(chatId, text) {
   }
 }
 
+// ─── Admin commands (whitelist control) ───────────────────────
+async function handleAdminCmd(chatId, cmd, args) {
+  if (cmd === '/users') {
+    const clients = access.listAllowed();
+    const admins  = access.listAdmins();
+    return send(chatId,
+      `👥 <b>ACCESS LIST</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `👑 Admins: ${admins.map(a => `<code>${a}</code>`).join(', ') || '—'}\n\n` +
+      `✅ Paying clients (${clients.length}):\n` +
+      (clients.map(a => `• <code>${a}</code>`).join('\n') || '— none yet —') +
+      `\n\n<i>/grant ID — give access\n/revoke ID — remove access</i>`
+    );
+  }
+
+  if (cmd === '/grant') {
+    if (!args[0]) return send(chatId, `Usage: <code>/grant 123456789</code>\n(the client's ID, shown when they message the bot)`);
+    const id = args[0].trim();
+    const ok = access.grant(id);
+    if (ok) { try { await send(id, `✅ <b>Access granted!</b>\n\nSend /start to set up your trading bot. 🚀`); } catch {} }
+    return send(chatId, ok ? `✅ Granted access to <code>${id}</code>` : `ℹ️ <code>${id}</code> already has access.`);
+  }
+
+  if (cmd === '/revoke') {
+    if (!args[0]) return send(chatId, `Usage: <code>/revoke 123456789</code>`);
+    const id = args[0].trim();
+    const ok = access.revoke(id);
+    if (ok) { try { await botMgr.stop(id); } catch {} try { await send(id, `🚫 Your access has been removed. Contact the owner to renew.`); } catch {} }
+    return send(chatId, ok ? `🚫 Revoked <code>${id}</code> (bot stopped).` : `ℹ️ <code>${id}</code> was not in the list.`);
+  }
+
+  if (cmd === '/admin') {
+    return send(chatId, `👑 <b>ADMIN PANEL</b>\n\n/users — list access\n/grant ID — add paying client\n/revoke ID — remove client`);
+  }
+}
+
 // ─── Commands ──────────────────────────────────────────────────
 async function handleCmd(chatId, cmd, args) {
   const u   = userStore.load(chatId);
@@ -317,7 +362,9 @@ async function _handle(u) {
   if (u.callback_query) {
     const chatId = String(u.callback_query.message?.chat?.id || '');
     await answerCb(u.callback_query.id);
-    if (chatId) await handleCb(chatId, u.callback_query.data || '');
+    if (!chatId) return;
+    if (!access.isAllowed(chatId)) return sendNoAccess(chatId);
+    await handleCb(chatId, u.callback_query.data || '');
     return;
   }
 
@@ -325,9 +372,28 @@ async function _handle(u) {
   const chatId = String(u.message?.chat?.id || '');
   if (!raw || !chatId) return;
 
-  const user  = userStore.load(chatId);
   const parts = raw.split(/\s+/);
   const cmd   = parts[0].toLowerCase();
+
+  // ── Access control gate ──
+  // Bootstrap: the very first user to message becomes the admin/owner.
+  if (!access.hasAnyAdmin()) {
+    access.claimAdmin(chatId);
+    await send(chatId,
+      `👑 <b>You are now the OWNER of this bot.</b>\nYour ID: <code>${chatId}</code>\n\n` +
+      `Give clients access with <code>/grant THEIR_ID</code>\nList them with /users · remove with /revoke ID`
+    );
+  }
+
+  // Admin-only whitelist commands
+  if (access.isAdmin(chatId) && ['/grant', '/revoke', '/users', '/admin'].includes(cmd)) {
+    return handleAdminCmd(chatId, cmd, parts.slice(1));
+  }
+
+  // Block everyone not on the whitelist
+  if (!access.isAllowed(chatId)) return sendNoAccess(chatId);
+
+  const user = userStore.load(chatId);
 
   // During setup, route free text to setup input handler
   if (user.setupStep !== 'done' && user.setupStep !== 'start' && !raw.startsWith('/')) {
