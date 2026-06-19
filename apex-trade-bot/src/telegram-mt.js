@@ -115,10 +115,15 @@ function buildStatus(user, ctx) {
     const p = s.openPosition;
     pos = `${p.side === 'BUY' ? '🟢' : '🔴'} ${p.side} <b>${p.symbol}</b>\n  Entry: $${p.entryPrice}  PnL: <b>${p.currentPnl >= 0 ? '+' : ''}$${p.currentPnl?.toFixed(4) ?? '—'}</b>`;
   }
+  const sig = s.lastSignal;
+  const sigLine = sig
+    ? `🤖 Last AI signal: <b>${sig.action}</b>  ${sig.confidence}% conf  ${sig.criteriaScore}/5 criteria\n   <i>${sig.reasoning?.slice(0, 90) || '—'}</i>\n`
+    : `🤖 AI signal: <i>waiting for first tick…</i>\n`;
   return (
     `⚡ <b>APEX TRADE BOT</b>  📝 PAPER  ${paused}\n━━━━━━━━━━━━━━━━━━━━\n` +
     `💰 Balance: <b>$${s.paperBalance.toFixed(2)}</b>  (${parseFloat(pct) >= 0 ? '+' : ''}${pct}%)\n\n` +
     `${pos}\n\n` +
+    `${sigLine}\n` +
     `📈 ${tot} trades · ${wins}W/${tot - wins}L · WR: ${wr}\n` +
     `🎯 Symbol: <b>${set.SYMBOL}</b>  ⏱️ Last tick: ${s.lastTick || 'never'}`
   );
