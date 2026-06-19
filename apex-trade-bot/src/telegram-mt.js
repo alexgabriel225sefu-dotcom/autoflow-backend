@@ -144,24 +144,50 @@ function buildConfig(user, ctx) {
   );
 }
 
-// ─── Setup flow ────────────────────────────────────────────────
-async function handleSetupCb(chatId, data) {
+// ─── Completes setup after all steps (including optional Groq key) ─
+async function finishSetup(chatId) {
   const u = userStore.load(chatId);
-
-  if (data === 'setup:paper') {
-    u.usePaper = true; u.setupStep = 'done'; u.active = false;
-    u.state.startBalance = 100; u.state.paperBalance = 100;
-    userStore.save(chatId, u);
+  u.setupStep = 'done'; u.active = false;
+  userStore.save(chatId, u);
+  if (u.pendingMode === 'paper') {
     return send(chatId,
       `✅ <b>Paper Account Ready!</b>\n💰 Virtual balance: <b>$100</b>\n📊 Symbol: <b>${u.settings.SYMBOL}</b>\n\n` +
       `Press <b>▶️ Start Trading</b> when ready.\n<i>Paper mode = real market data, zero real money risk.</i>`,
       kbMenu(true, u.settings.SYMBOL)
     );
   }
+  return send(chatId,
+    `✅ <b>Setup Complete!</b>\n\nExchange: <b>${u.exchange?.toUpperCase()}</b>\n` +
+    `<i>Press ▶️ Start Trading when ready!</i>`,
+    kbMenu(true, u.settings.SYMBOL)
+  );
+}
+
+// ─── Setup flow ────────────────────────────────────────────────
+async function handleSetupCb(chatId, data) {
+  const u = userStore.load(chatId);
+
+  if (data === 'setup:paper') {
+    u.usePaper = true; u.state.startBalance = 100; u.state.paperBalance = 100;
+    u.pendingMode = 'paper'; u.setupStep = 'groq';
+    userStore.save(chatId, u);
+    return send(chatId,
+      `✅ Paper mode selected!\n\n` +
+      `🤖 <b>Last step — AI Key (free)</b>\n\n` +
+      `The bot uses Groq AI to analyze the market.\n` +
+      `Get your <b>free key</b> at <b>console.groq.com</b> → API Keys → Create Key\n\n` +
+      `Then paste it here, or tap Skip to use basic signals.`,
+      { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: '⏭ Skip for now', callback_data: 'setup:skipgroq' }]] }) }
+    );
+  }
 
   if (data === 'setup:live') {
     u.setupStep = 'exchange'; userStore.save(chatId, u);
     return send(chatId, `🔴 <b>Real Trading Setup</b>\n\nWhich exchange do you use?`, KB_EXCHANGE);
+  }
+
+  if (data === 'setup:skipgroq') {
+    return finishSetup(chatId);
   }
 
   if (data.startsWith('ex:')) {
@@ -178,6 +204,18 @@ async function handleSetupCb(chatId, data) {
 async function handleSetupInput(chatId, text) {
   const u = userStore.load(chatId);
 
+  if (u.setupStep === 'groq') {
+    const key = text.trim();
+    if (key.startsWith('gsk_') && key.length > 20) {
+      u.groqKey = userStore.encrypt(key);
+      userStore.save(chatId, u);
+      await send(chatId, `✅ <b>Groq key saved!</b> AI-powered signals activated.`);
+    } else {
+      await send(chatId, `⚠️ That doesn't look like a valid Groq key (should start with <code>gsk_</code>). Skipping for now — you can add it later with /groq`);
+    }
+    return finishSetup(chatId);
+  }
+
   if (u.setupStep === 'apikey') {
     u.apiKeyEnc = userStore.encrypt(text.trim());
     u.setupStep = 'apisecret';
@@ -191,18 +229,24 @@ async function handleSetupInput(chatId, text) {
       u.setupStep = 'passphrase'; userStore.save(chatId, u);
       return send(chatId, `✅ API Secret saved.\n\nNow send your <b>Passphrase</b> (required for ${u.exchange.toUpperCase()}):`);
     }
-    u.setupStep = 'done'; u.active = false; userStore.save(chatId, u);
+    u.pendingMode = 'live'; u.setupStep = 'groq'; userStore.save(chatId, u);
     return send(chatId,
-      `✅ <b>Setup Complete!</b>\n\nExchange: <b>${u.exchange?.toUpperCase()}</b>\n` +
-      `<i>Note: Live trading starts in paper mode. Press ▶️ Start!</i>`,
-      kbMenu(true, u.settings.SYMBOL)
+      `✅ Exchange keys saved!\n\n` +
+      `🤖 <b>Last step — AI Key (free)</b>\n\n` +
+      `Get your free key at <b>console.groq.com</b> → API Keys → Create Key\n\nPaste it here or tap Skip.`,
+      { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: '⏭ Skip for now', callback_data: 'setup:skipgroq' }]] }) }
     );
   }
 
   if (u.setupStep === 'passphrase') {
     u.apiPassEnc = userStore.encrypt(text.trim());
-    u.setupStep  = 'done'; u.active = false; userStore.save(chatId, u);
-    return send(chatId, `✅ <b>Setup Complete!</b>\nPress <b>▶️ Start</b> when ready!`, kbMenu(true, u.settings.SYMBOL));
+    u.pendingMode = 'live'; u.setupStep = 'groq'; userStore.save(chatId, u);
+    return send(chatId,
+      `✅ Passphrase saved!\n\n` +
+      `🤖 <b>Last step — AI Key (free)</b>\n\n` +
+      `Get your free key at <b>console.groq.com</b> → API Keys → Create Key\n\nPaste it here or tap Skip.`,
+      { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: '⏭ Skip for now', callback_data: 'setup:skipgroq' }]] }) }
+    );
   }
 }
 
