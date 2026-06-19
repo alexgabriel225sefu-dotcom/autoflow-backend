@@ -32,7 +32,7 @@ function kbExchangeLink(exchange, symbol, label) {
     const pair = symbol.replace(/(USDT|BTC|ETH|BNB)$/, '_$1');
     // Route to testnet or live depending on server config (default: testnet)
     url = _bnTestnet
-      ? `https://testnet.binance.vision/en/trade/${pair}`
+      ? `https://testnet.binance.vision`
       : `https://www.binance.com/en/trade/${pair}?type=spot`;
   } else {
     url = EXCHANGE_URLS[ex];
