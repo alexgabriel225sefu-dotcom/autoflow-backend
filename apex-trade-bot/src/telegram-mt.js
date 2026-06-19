@@ -11,7 +11,7 @@ const payments  = require('./payments');
 
 // Deep links for each exchange — "View on Exchange" button after trades
 const EXCHANGE_URLS = {
-  binance:  'https://www.binance.com/en/my/orders/exchange/tradehistory',
+  binance:  'https://www.binance.com/en/my/orders/spot-order',
   bybit:    'https://www.bybit.com/en/user/assets/order/spot-open-order',
   okx:      'https://www.okx.com/trade-history/spot',
   kraken:   'https://pro.kraken.com/app/history/trades',
