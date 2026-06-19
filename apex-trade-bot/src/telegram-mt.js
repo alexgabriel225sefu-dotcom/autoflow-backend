@@ -53,11 +53,15 @@ const KB_SYMBOLS = { reply_markup: JSON.stringify({ inline_keyboard: [
   [{ text: '⬡ BNB',  callback_data: 'sym:BNBUSDT'  }, { text: '☀ AVAX', callback_data: 'sym:AVAXUSDT' }],
 ] }) };
 
-function kbMenu(paused) {
+const SITE_URL = process.env.SITE_URL || 'https://aicashsystem.space';
+
+function kbMenu(paused, symbol = 'BTCUSDT') {
+  const chartUrl = `${SITE_URL}/chart?s=${encodeURIComponent(symbol)}`;
   return { reply_markup: JSON.stringify({ inline_keyboard: [
     [{ text: '📊 Status',  callback_data: 'c:status' }, { text: '📋 Trades', callback_data: 'c:trades' }],
     [{ text: '💎 Symbol',  callback_data: 'c:symbol' }, { text: '⚙️ Config', callback_data: 'c:config' }],
     [{ text: '🎯 Method',  callback_data: 'c:method' }, { text: '❓ Help',   callback_data: 'c:help'   }],
+    [{ text: '📈 Live Chart', web_app: { url: chartUrl } }],
     [paused
       ? { text: '▶️ Start Trading', callback_data: 'c:resume' }
       : { text: '⏸ Pause Bot',     callback_data: 'c:pause'  }],
@@ -144,7 +148,7 @@ async function handleSetupCb(chatId, data) {
     return send(chatId,
       `✅ <b>Paper Account Ready!</b>\n💰 Virtual balance: <b>$100</b>\n📊 Symbol: <b>${u.settings.SYMBOL}</b>\n\n` +
       `Press <b>▶️ Start Trading</b> when ready.\n<i>Paper mode = real market data, zero real money risk.</i>`,
-      kbMenu(true)
+      kbMenu(true, u.settings.SYMBOL)
     );
   }
 
@@ -184,14 +188,14 @@ async function handleSetupInput(chatId, text) {
     return send(chatId,
       `✅ <b>Setup Complete!</b>\n\nExchange: <b>${u.exchange?.toUpperCase()}</b>\n` +
       `<i>Note: Live trading starts in paper mode. Press ▶️ Start!</i>`,
-      kbMenu(true)
+      kbMenu(true, u.settings.SYMBOL)
     );
   }
 
   if (u.setupStep === 'passphrase') {
     u.apiPassEnc = userStore.encrypt(text.trim());
     u.setupStep  = 'done'; u.active = false; userStore.save(chatId, u);
-    return send(chatId, `✅ <b>Setup Complete!</b>\nPress <b>▶️ Start</b> when ready!`, kbMenu(true));
+    return send(chatId, `✅ <b>Setup Complete!</b>\nPress <b>▶️ Start</b> when ready!`, kbMenu(true, u.settings.SYMBOL));
   }
 }
 
@@ -236,7 +240,7 @@ async function handleCmd(chatId, cmd, args) {
   const ctx = botMgr.getCtx(chatId);
 
   if (cmd === '/start' || cmd === '/setup') {
-    if (u.setupStep === 'done') return send(chatId, `⚡ <b>APEX TRADE BOT</b> — your bot is ready!`, kbMenu(u.settings.PAUSED));
+    if (u.setupStep === 'done') return send(chatId, `⚡ <b>APEX TRADE BOT</b> — your bot is ready!`, kbMenu(u.settings.PAUSED, u.settings.SYMBOL));
     userStore.save(chatId, { ...u, setupStep: 'start' });
     return send(chatId,
       `⚡ <b>Welcome to APEX TRADE BOT!</b>\n\nAI + legendary trader strategies. Automatic crypto trading.\n\nHow do you want to start?`,
@@ -254,7 +258,7 @@ async function handleCmd(chatId, cmd, args) {
 
   switch (cmd) {
     case '/menu': case '/m':
-      return send(chatId, `📲 <b>APEX BOT — Control Panel</b>`, kbMenu(u.settings.PAUSED));
+      return send(chatId, `📲 <b>APEX BOT — Control Panel</b>`, kbMenu(u.settings.PAUSED, u.settings.SYMBOL));
     case '/status': case '/s':
       return send(chatId, buildStatus(u, ctx));
     case '/config': case '/c':
@@ -291,7 +295,7 @@ async function handleCmd(chatId, cmd, args) {
         u.active = true; userStore.save(chatId, u);
         await botMgr.start(chatId, makeAlertFn(chatId));
       }
-      return send(chatId, `▶️ <b>Bot ACTIVE</b> — trading every minute! 🚀`, kbMenu(false));
+      return send(chatId, `▶️ <b>Bot ACTIVE</b> — trading every minute! 🚀`, kbMenu(false, u.settings.SYMBOL));
     }
     case '/help':
       return send(chatId,
@@ -318,7 +322,7 @@ async function handleCb(chatId, data) {
     u.settings.SYMBOL = sym;
     if (ctx) ctx.settings.SYMBOL = sym;
     userStore.save(chatId, u);
-    return send(chatId, `💎 Symbol → <b>${sym}</b>`, kbMenu(u.settings.PAUSED));
+    return send(chatId, `💎 Symbol → <b>${sym}</b>`, kbMenu(u.settings.PAUSED, u.settings.SYMBOL));
   }
 
   const upd = (key, val) => { u.settings[key] = val; if (ctx) ctx.settings[key] = val; userStore.save(chatId, u); };
@@ -338,11 +342,11 @@ async function handleCb(chatId, data) {
       return handleCmd(chatId, '/help', []);
     case 'c:pause':
       upd('PAUSED', true);
-      return send(chatId, `⏸️ <b>Bot PAUSED</b>`, kbMenu(true));
+      return send(chatId, `⏸️ <b>Bot PAUSED</b>`, kbMenu(true, u.settings.SYMBOL));
     case 'c:resume':
       upd('PAUSED', false);
       if (!botMgr.isRunning(chatId)) { u.active = true; userStore.save(chatId, u); await botMgr.start(chatId, makeAlertFn(chatId)); }
-      return send(chatId, `▶️ <b>Bot ACTIVE</b> — trading every minute! 🚀`, kbMenu(false));
+      return send(chatId, `▶️ <b>Bot ACTIVE</b> — trading every minute! 🚀`, kbMenu(false, u.settings.SYMBOL));
   }
 }
 
