@@ -193,7 +193,76 @@ async function getTicker24h(symbol = cfg.SYMBOL) {
   return data;
 }
 
+// Per-user connector — same BASE_URL/testnet flag, but uses caller's own API keys.
+// Shared public functions (getPrice, getCandles, etc.) are reused as-is.
+function createConnector(apiKey, apiSecret) {
+  function _sign(params) {
+    const qs = new URLSearchParams(params).toString();
+    return `${qs}&signature=${crypto.createHmac('sha256', apiSecret).update(qs).digest('hex')}`;
+  }
+  const _hdrs = () => ({ 'X-MBX-APIKEY': apiKey });
+
+  return {
+    getPrice, getCandles, getTicker24h, applyFilters, getSymbolInfo,
+    async getBalance(asset = cfg.QUOTE_ASSET) {
+      const p = { timestamp: Date.now() };
+      const { data } = await client.get(`/account?${_sign(p)}`, { headers: _hdrs() });
+      const b = data.balances.find(b => b.asset === asset);
+      return b ? parseFloat(b.free) : 0;
+    },
+    async placeOrder(side, quantity, symbol = cfg.SYMBOL) {
+      const price = await getPrice(symbol).catch(() => null);
+      const { qtyStr } = await normalizeQty(symbol, quantity, price);
+      const p = { symbol, side, type: 'MARKET', quantity: qtyStr, newOrderRespType: 'FULL', timestamp: Date.now() };
+      const { data } = await client.post(`/order?${_sign(p)}`, null, { headers: _hdrs() });
+      if (Array.isArray(data.fills) && data.fills.length) {
+        let cost = 0, qty = 0, fee = 0;
+        for (const f of data.fills) {
+          cost += parseFloat(f.price) * parseFloat(f.qty);
+          qty  += parseFloat(f.qty);
+          if (f.commissionAsset === cfg.QUOTE_ASSET) fee += parseFloat(f.commission);
+        }
+        data.avgPrice = qty > 0 ? cost / qty : null;
+        data.executedQty = qty;
+        data.quoteFee = fee;
+      }
+      return data;
+    },
+    async placeProtection(symbol, qty, stopLoss, takeProfit) {
+      const info = await getSymbolInfo(symbol);
+      const tickSize = parseFloat(info.filters.find(f => f.filterType === 'PRICE_FILTER').tickSize);
+      const pDec = Math.max(0, (String(tickSize).split('.')[1] || '').length);
+      const round = v => (Math.round(v / tickSize) * tickSize).toFixed(pDec);
+      const { qtyStr } = await normalizeQty(symbol, qty, null);
+      const p = {
+        symbol, side: 'SELL', quantity: qtyStr,
+        aboveType: 'LIMIT_MAKER',     abovePrice: round(takeProfit),
+        belowType: 'STOP_LOSS_LIMIT', belowStopPrice: round(stopLoss),
+        belowPrice: round(stopLoss * 0.997), belowTimeInForce: 'GTC',
+        timestamp: Date.now(),
+      };
+      const { data } = await client.post(`/orderList/oco?${_sign(p)}`, null, { headers: _hdrs() });
+      return data;
+    },
+    async cancelAllOrders(symbol = cfg.SYMBOL) {
+      const p = { symbol, timestamp: Date.now() };
+      try {
+        const { data } = await client.delete(`/openOrders?${_sign(p)}`, { headers: _hdrs() });
+        return data;
+      } catch (e) {
+        if (e.response?.data?.code === -2011) return null;
+        throw e;
+      }
+    },
+    async getOpenOrders(symbol = cfg.SYMBOL) {
+      const p = { symbol, timestamp: Date.now() };
+      const { data } = await client.get(`/openOrders?${_sign(p)}`, { headers: _hdrs() });
+      return data;
+    },
+  };
+}
+
 module.exports = {
   getPrice, getCandles, getBalance, placeOrder, getSymbolInfo, getTicker24h,
-  placeProtection, cancelAllOrders, getOpenOrders, applyFilters,
+  placeProtection, cancelAllOrders, getOpenOrders, applyFilters, createConnector,
 };

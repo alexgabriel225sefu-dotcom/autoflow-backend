@@ -1,6 +1,7 @@
 /**
  * BotManager — manages per-user trading loops.
  * Each active user gets their own interval + context; isolated state.
+ * Routes to real exchange (testnet/live) or paper based on user setup.
  */
 const userStore = require('./userStore');
 const runner    = require('./runner');
@@ -9,9 +10,26 @@ const paper     = require('./paperExchange');
 const _loops = new Map(); // userId → { intervalId, ctx }
 
 function _save(ctx) {
-  const u     = userStore.load(ctx.userId);
-  u.state     = ctx.state;
+  const u = userStore.load(ctx.userId);
+  u.state = ctx.state;
   userStore.save(ctx.userId, u);
+}
+
+// Returns the right exchange connector for this user.
+// Paper mode → internal simulator. Real mode → live API with user's own keys.
+function _makeExchange(user) {
+  if (user.usePaper !== false) return paper;
+  if (!user.exchange || !user.apiKeyEnc) return paper;
+  const { apiKey, apiSecret } = userStore.getApiKeys(user.userId);
+  if (!apiKey || !apiSecret) return paper;
+  try {
+    if (user.exchange === 'binance') {
+      return require('./binance').createConnector(apiKey, apiSecret);
+    }
+  } catch (e) {
+    console.warn(`[BotMgr:${user.userId}] Exchange init failed:`, e.message);
+  }
+  return paper;
 }
 
 async function start(userId, alertFn) {
@@ -20,7 +38,22 @@ async function start(userId, alertFn) {
   const user = userStore.load(userId);
   if (!user.active) return;
 
-  const ctx = runner.createContext(userId, user, paper, alertFn);
+  const exchange = _makeExchange(user);
+  const ctx = runner.createContext(userId, user, exchange, alertFn);
+
+  // Sync real balance for live/testnet trading on first start
+  if (user.usePaper === false && exchange !== paper) {
+    try {
+      const realBal = await exchange.getBalance('USDT');
+      if (realBal > 0) {
+        ctx.state.paperBalance = realBal;
+        if (!ctx.state.startBalance || ctx.state.startBalance <= 100) ctx.state.startBalance = realBal;
+        console.log(`[BotMgr:${userId}] 💰 Balance synced from exchange: $${realBal.toFixed(2)} USDT`);
+      }
+    } catch (e) {
+      console.warn(`[BotMgr:${userId}] Balance sync failed (using stored):`, e.message);
+    }
+  }
 
   await runner.tick(ctx);
   _save(ctx);
@@ -28,10 +61,10 @@ async function start(userId, alertFn) {
   const id = setInterval(async () => {
     try   { await runner.tick(ctx); _save(ctx); }
     catch (e) { console.error(`[BotMgr:${userId}]`, e.message); }
-  }, 60 * 1000); // 1 min ticks for paper trading
+  }, 60 * 1000);
 
   _loops.set(userId, { id, ctx });
-  console.log(`[BotMgr] Started bot for user ${userId}`);
+  console.log(`[BotMgr] Started bot for user ${userId} on ${user.usePaper ? 'paper' : user.exchange}`);
 }
 
 async function stop(userId) {
