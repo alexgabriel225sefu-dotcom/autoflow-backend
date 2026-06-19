@@ -1,0 +1,59 @@
+name: Deploy Apex Trade Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      vm_ip:
+        description: 'Oracle Cloud VM IP address'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ github.event.inputs.vm_ip }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Install Node.js and clone repo on VM
+        run: |
+          ssh -i ~/.ssh/deploy_key opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
+          set -e
+          echo "[1/3] Installing Node.js 20..."
+          curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash - > /dev/null 2>&1
+          sudo dnf install -y nodejs git > /dev/null 2>&1
+          node --version
+
+          echo "[2/3] Cloning repo..."
+          sudo rm -rf /opt/apex-bot
+          sudo git clone --depth 1 -b claude/arcads-external-api-gExX7 \
+            https://github.com/alexgabriel225sefu-dotcom/autoflow-backend.git /opt/apex-bot
+
+          echo "[3/3] Installing npm dependencies..."
+          cd /opt/apex-bot/apex-trade-bot
+          sudo npm install --production
+          echo "Done."
+          REMOTE
+
+      - name: Write .env and start bot
+        run: |
+          ssh -i ~/.ssh/deploy_key opc@${{ github.event.inputs.vm_ip }} \
+            "sudo tee /opt/apex-bot/apex-trade-bot/.env > /dev/null << 'ENVEOF'
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+          MASTER_KEY=${{ secrets.MASTER_KEY }}
+          NODE_ENV=production
+          ENVEOF
+          sudo pkill -f index-server.js 2>/dev/null || true
+          sleep 1
+          cd /opt/apex-bot/apex-trade-bot
+          sudo bash -c 'nohup node src/index-server.js >> /var/log/apex-bot.log 2>&1 &'
+          sleep 3
+          pgrep -f index-server.js && echo 'SUCCESS: Bot is running!' || (echo 'ERROR: Bot failed' && tail -20 /var/log/apex-bot.log && exit 1)"
