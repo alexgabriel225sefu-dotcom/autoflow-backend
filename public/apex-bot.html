@@ -845,8 +845,13 @@ document.querySelectorAll('.feat').forEach(function(el,i){el.style.transitionDel
     </div>
     <div class="am-success" id="amSuccess">
       <div class="am-success-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
-      <h3>Access Granted</h3>
-      <p>Redirecting to your setup page...<br/><br/>Your license key and bot configurator are ready.</p>
+      <h3>Payment Confirmed ✅</h3>
+      <p>Tap the button below to activate your bot in Telegram.<br/>Your access turns on automatically — no setup, no keys.</p>
+      <a id="amTgBtn" href="#" target="_blank" rel="noopener"
+         style="display:inline-block;margin-top:22px;padding:15px 30px;border-radius:10px;font:700 15px/1 var(--d);background:linear-gradient(135deg,#229ED9,#27a7e7);color:#fff;text-decoration:none;">
+        🚀 Activate Bot in Telegram
+      </a>
+      <p style="margin-top:16px;font-size:12px;color:var(--t1)">A backup copy was also sent to your email.</p>
     </div>
   </div>
 </div>
@@ -918,8 +923,12 @@ async function submitApexPayment(){
         var _rOrder={id:result.paymentIntent.id,items:[{sku:'APEX-BOT-297',name:'Apex Trade Bot License',price:297,quantity:1}],customer:{email:email,first_name:name.split(' ')[0]||name,last_name:name.split(' ').slice(1).join(' ')||''}};
         window.rfrsn.push('trackOrder',_rOrder);
       }
-      var redirect='/configurator'+(_pendingKey?'?key='+encodeURIComponent(_pendingKey):'');
-      setTimeout(function(){window.location.href=redirect},2000);
+      // Auto-activation: open the bot in Telegram with the paid token.
+      // The bot verifies the token with Stripe and grants access automatically.
+      var BOT_USERNAME='ApexTradeBot_official_bot';
+      var tgLink='https://t.me/'+BOT_USERNAME+(_pendingKey?'?start='+encodeURIComponent(_pendingKey):'');
+      var tgBtn=document.getElementById('amTgBtn');
+      if(tgBtn) tgBtn.href=tgLink;
     }
   }catch(e){err.classList.add('err');err.textContent='Error: '+e.message;btn.disabled=false;spin.style.display='none';txt.textContent='Try again'}
 }

@@ -22,8 +22,9 @@ function enabled() { return !!STRIPE_KEY; }
  */
 async function verifyPaidToken(token) {
   if (!STRIPE_KEY || !token) return false;
-  // Only accept hex-like tokens we generate (defensive against injection).
-  if (!/^[a-zA-Z0-9]{8,80}$/.test(token)) return false;
+  // Only accept tokens shaped like our license keys (defensive against injection).
+  // License keys look like APEX-XXXX-XXXX-XXXX / FORX-XXXX-XXXX-XXXX.
+  if (!/^[A-Za-z0-9_-]{8,80}$/.test(token)) return false;
 
   try {
     const query = `metadata['pendingKey']:'${token}' AND status:'succeeded'`;

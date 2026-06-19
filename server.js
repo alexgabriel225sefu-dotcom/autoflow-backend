@@ -1180,6 +1180,13 @@ app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
   try {
     if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe not configured' });
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+    // Pre-generate the license key BEFORE creating the intent so it can be stored
+    // in the PaymentIntent metadata. The Telegram bot grants access by searching
+    // Stripe for a succeeded payment whose metadata['pendingKey'] matches.
+    let pendingKey = null;
+    if (isBotProduct) pendingKey = isApexForex ? generateForexKey() : generateLicenseKey();
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: safeAmount,
       currency: currency || 'usd',
@@ -1189,14 +1196,13 @@ app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
         product: product || (safeAmount === 29700 ? 'apex-bot' : safeAmount === 49700 ? 'apex-forex' : 'course'),
         email: email || '',
         name: name || '',
-        ref: affCode
+        ref: affCode,
+        ...(pendingKey ? { pendingKey } : {})
       }
     });
 
-    // Pre-generate license key for bot products so buyer gets it immediately on success
-    let pendingKey = null;
+    // Store pending license so buyer gets it immediately on success
     if (isBotProduct) {
-      pendingKey = isApexForex ? generateForexKey() : generateLicenseKey();
       _pendingLicenses.set(paymentIntent.id, { key: pendingKey, email: email || '', name: name || '', product: isApexForex ? 'apex-forex' : 'apex-bot' });
       setTimeout(() => _pendingLicenses.delete(paymentIntent.id), 2 * 3600 * 1000);
       if (supabase) {
