@@ -152,6 +152,7 @@ async function tick(ctx) {
     if (state.paperBalance < 1) return;
 
     const ind       = indicators.analyze(candles);
+    ind.symbol      = symbol; // needed for per-symbol signal cache
     const stratData = strategies.analyze(candles);
     stratData.session = { ...state.session };
 

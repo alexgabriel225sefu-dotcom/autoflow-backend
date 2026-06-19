@@ -2,6 +2,11 @@ const Anthropic = require('@anthropic-ai/sdk');
 const axios     = require('axios');
 const cfg       = require('./config');
 
+// ─── Signal cache — one AI call per symbol per minute ─────
+// If 100 clients all trade BTCUSDT, we call Groq once, share the result.
+const _signalCache = new Map(); // symbol → { signal, ts, promise }
+const CACHE_TTL_MS = 55 * 1000; // 55s — slightly under 1 min tick interval
+
 // ─── Anthropic client (lazy) ──────────────────────────────
 let anthropicClient = null;
 function getAnthropic() {
@@ -109,7 +114,7 @@ function ruleBasedSignal(ind, openPosition) {
   return { action: 'HOLD', confidence: 40, criteriaScore, reasoning: 'Rule-based: no clear signal (' + factors.join(', ') + ')', riskLevel: 'HIGH', keyFactors: factors };
 }
 
-async function getSignal(indicators, balance, openPosition, strategyData = null) {
+async function _fetchSignal(indicators, balance, openPosition, strategyData) {
   const rsi   = parseFloat(indicators.rsi);
   const srsiK = parseFloat(indicators.stochRsiK);
   const macdH = parseFloat(indicators.macdHist);
@@ -193,6 +198,37 @@ Respond ONLY with valid JSON:
   // Rule-based fallback — works with zero API keys
   console.warn('[AI ⚠️] All AI sources failed — using rule-based fallback');
   return ruleBasedSignal(indicators, openPosition);
+}
+
+// Public entry point — caches signal per symbol for ~55s.
+// 100 clients on BTCUSDT → 1 Groq call/min, not 100.
+async function getSignal(indicators, balance, openPosition, strategyData = null) {
+  const symbol = String(indicators.symbol || cfg.SYMBOL || 'UNKNOWN');
+  const now    = Date.now();
+
+  const cached = _signalCache.get(symbol);
+  if (cached) {
+    // Re-use in-flight promise (prevents stampede when many clients tick simultaneously)
+    if (cached.promise) return cached.promise;
+    // Re-use recent result
+    if (now - cached.ts < CACHE_TTL_MS) {
+      return cached.signal;
+    }
+  }
+
+  // Start a new fetch and cache the promise so concurrent callers await the same one
+  const promise = _fetchSignal(indicators, balance, openPosition, strategyData)
+    .then(signal => {
+      _signalCache.set(symbol, { signal, ts: Date.now(), promise: null });
+      return signal;
+    })
+    .catch(err => {
+      _signalCache.delete(symbol);
+      throw err;
+    });
+
+  _signalCache.set(symbol, { signal: null, ts: 0, promise });
+  return promise;
 }
 
 // Validare strictă a JSON-ului de la LLM. Fără asta, "confidence":"high"
