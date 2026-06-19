@@ -9,6 +9,26 @@ const botMgr    = require('./botManager');
 const access    = require('./accessControl');
 const payments  = require('./payments');
 
+// Deep links for each exchange — "View on Exchange" button after trades
+const EXCHANGE_URLS = {
+  binance:  'https://www.binance.com/en/my/orders/exchange/tradehistory',
+  bybit:    'https://www.bybit.com/en/user/assets/order/spot-open-order',
+  okx:      'https://www.okx.com/trade-history/spot',
+  kraken:   'https://pro.kraken.com/app/history/trades',
+  kucoin:   'https://www.kucoin.com/orders/trade',
+  bitget:   'https://www.bitget.com/en/spot/order-history',
+  mexc:     'https://www.mexc.com/en-US/orders/spot',
+  coinbase: 'https://www.coinbase.com/advanced-trade/spot',
+};
+
+function kbExchangeLink(exchange, label) {
+  const url = exchange && EXCHANGE_URLS[exchange.toLowerCase()];
+  if (!url) return undefined;
+  return { reply_markup: JSON.stringify({ inline_keyboard: [[
+    { text: label || `📊 View on ${exchange.toUpperCase()}`, web_app: { url } }
+  ]] }) };
+}
+
 const TOKEN = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
 const NEEDS_PASS = new Set(['okx', 'kucoin', 'bitget', 'coinbase']);
 
@@ -71,13 +91,18 @@ function kbMenu(paused, symbol = 'BTCUSDT') {
 // ─── Alert dispatcher ──────────────────────────────────────────
 function makeAlertFn(chatId) {
   return async (type, data) => {
+    const u = userStore.load(chatId);
+    const exch = u?.exchange;
+    const exchKb = kbExchangeLink(exch);
+
     if (type === 'trade_open') {
       const dir = data.side === 'BUY' ? '🟢 LONG' : '🔴 SHORT';
       const mult = data.druckMult !== 1.0 ? `\n📐 Druckenmiller: ×${data.druckMult.toFixed(2)}` : '';
       await send(chatId,
         `${dir} <b>OPENED — ${data.symbol}</b>\n` +
         `💰 Entry: $${data.price.toFixed(4)}  Qty: ${data.qty}\n` +
-        `🛡 SL: $${data.stopLoss.toFixed(4)}  🎯 TP: $${data.takeProfit.toFixed(4)}${mult}`
+        `🛡 SL: $${data.stopLoss.toFixed(4)}  🎯 TP: $${data.takeProfit.toFixed(4)}${mult}`,
+        exchKb
       );
     } else if (type === 'trade_close') {
       const pnlStr  = `${data.pnl >= 0 ? '+' : ''}$${data.pnl.toFixed(4)}`;
@@ -85,7 +110,8 @@ function makeAlertFn(chatId) {
       await send(chatId,
         `${data.pnl > 0 ? '✅' : '❌'} <b>${icons[data.reason] || data.reason} — ${data.symbol}</b>\n` +
         `$${data.entryPrice.toFixed(4)} → $${data.exitPrice.toFixed(4)}\n` +
-        `PnL: <b>${pnlStr}</b>  💼 Balance: $${data.balance.toFixed(2)}`
+        `PnL: <b>${pnlStr}</b>  💼 Balance: $${data.balance.toFixed(2)}`,
+        exchKb
       );
     } else if (type === 'heartbeat') {
       const p = data.openPosition;
@@ -193,10 +219,25 @@ async function handleSetupCb(chatId, data) {
   if (data.startsWith('ex:')) {
     const ex = data.replace('ex:', '');
     u.exchange = ex; u.setupStep = 'apikey'; userStore.save(chatId, u);
+    const apiKeyGuides = {
+      binance:  'https://www.binance.com/en/my/settings/api-management',
+      bybit:    'https://www.bybit.com/en/user/api-management',
+      okx:      'https://www.okx.com/account/my-api',
+      kraken:   'https://pro.kraken.com/app/settings/api',
+      kucoin:   'https://www.kucoin.com/account/api',
+      bitget:   'https://www.bitget.com/en/account/newapi',
+      mexc:     'https://www.mexc.com/en-US/user/openapi',
+      coinbase: 'https://www.coinbase.com/settings/api',
+    };
+    const guideUrl = apiKeyGuides[ex];
+    const kb = guideUrl
+      ? { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: `🔑 Open ${ex.toUpperCase()} → Create API Key`, web_app: { url: guideUrl } }]] }) }
+      : undefined;
     return send(chatId,
       `✅ Exchange: <b>${ex.toUpperCase()}</b>\n\n` +
-      `Now send me your <b>API Key</b>.\n\n` +
-      `<i>⚠️ Enable Read + Spot Trading only.\nNEVER enable Withdrawals.</i>`
+      `Open the button below to create your API Key, then paste it here.\n\n` +
+      `<i>⚠️ Enable <b>Read + Spot Trading only</b>.\nNEVER enable Withdrawals.</i>`,
+      kb
     );
   }
 }
