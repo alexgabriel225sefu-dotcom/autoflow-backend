@@ -117,7 +117,7 @@ jobs:
           NODE_ENV=production
           ENVEOF
 
-      - name: Install systemd service & start bot
+      - name: Kill orphan processes & start fresh
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -127,6 +127,17 @@ jobs:
             -o ServerAliveCountMax=5 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
+
+          # Stop systemd service if it exists
+          sudo systemctl stop apex-bot 2>/dev/null || true
+
+          # Kill ANY lingering node processes (old nohup, orphan workers, etc.)
+          sudo pkill -9 -f 'index-server.js' 2>/dev/null || true
+          sudo pkill -9 -f 'node src/' 2>/dev/null || true
+          sleep 2
+
+          echo "All node processes stopped. Running processes:"
+          ps aux | grep node | grep -v grep || echo "(none)"
 
           # Write systemd unit — auto-restarts on crash, starts on VM boot
           sudo tee /etc/systemd/system/apex-bot.service > /dev/null << 'UNIT'
@@ -152,10 +163,10 @@ jobs:
 
           sudo systemctl daemon-reload
           sudo systemctl enable apex-bot
-          sudo systemctl restart apex-bot
-          sleep 4
+          sudo systemctl start apex-bot
+          sleep 5
 
           # Verify it started
           sudo systemctl is-active apex-bot && echo "SUCCESS: apex-bot service is running!" \
-            || (echo "ERROR: service failed to start" && sudo journalctl -u apex-bot -n 30 --no-pager && exit 1)
+            || (echo "ERROR: service failed to start" && sudo journalctl -u apex-bot -n 50 --no-pager && exit 1)
           REMOTE
