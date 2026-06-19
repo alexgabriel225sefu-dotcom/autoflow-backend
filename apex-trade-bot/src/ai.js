@@ -65,6 +65,50 @@ async function callAnthropic(prompt) {
   throw new Error('Anthropic unavailable');
 }
 
+// Pure technical fallback — no API needed
+function ruleBasedSignal(ind, openPosition) {
+  const rsi    = parseFloat(ind.rsi)    || 50;
+  const macdH  = parseFloat(ind.macdHist) || 0;
+  const price  = parseFloat(ind.price)  || 0;
+  const ema20  = parseFloat(ind.ema20)  || price;
+  const ema50  = parseFloat(ind.ema50)  || price;
+  const volR   = parseFloat(ind.volumeRatio) || 0;
+
+  if (openPosition) {
+    return { action: 'HOLD', confidence: 50, reasoning: 'Rule-based: holding position', riskLevel: 'MEDIUM', keyFactors: [], criteriaScore: 2 };
+  }
+
+  let score = 0;
+  const factors = [];
+
+  // RSI signals
+  if (rsi < 35) { score += 2; factors.push(`RSI oversold (${rsi.toFixed(0)})`); }
+  else if (rsi > 65) { score -= 2; factors.push(`RSI overbought (${rsi.toFixed(0)})`); }
+
+  // MACD histogram direction
+  if (macdH > 0) { score += 1; factors.push('MACD bullish'); }
+  else if (macdH < 0) { score -= 1; factors.push('MACD bearish'); }
+
+  // EMA trend
+  if (price > ema20 && ema20 > ema50) { score += 1; factors.push('Price above EMAs'); }
+  else if (price < ema20 && ema20 < ema50) { score -= 1; factors.push('Price below EMAs'); }
+
+  // Volume confirmation
+  if (volR >= 1.2) { score = score > 0 ? score + 1 : score - 1; factors.push(`Volume spike (${volR.toFixed(1)}x)`); }
+
+  const absScore = Math.abs(score);
+  const confidence = Math.min(85, 45 + absScore * 8);
+  const criteriaScore = Math.min(5, absScore);
+
+  if (score >= 3) {
+    return { action: 'BUY',  confidence, criteriaScore, reasoning: 'Rule-based BUY: ' + factors.join(', '), riskLevel: 'MEDIUM', keyFactors: factors };
+  }
+  if (score <= -3) {
+    return { action: 'SELL', confidence, criteriaScore, reasoning: 'Rule-based SELL: ' + factors.join(', '), riskLevel: 'MEDIUM', keyFactors: factors };
+  }
+  return { action: 'HOLD', confidence: 40, criteriaScore, reasoning: 'Rule-based: no clear signal (' + factors.join(', ') + ')', riskLevel: 'HIGH', keyFactors: factors };
+}
+
 async function getSignal(indicators, balance, openPosition, strategyData = null) {
   const rsi   = parseFloat(indicators.rsi);
   const srsiK = parseFloat(indicators.stochRsiK);
@@ -146,8 +190,9 @@ Respond ONLY with valid JSON:
     console.error('[AI ❌] Groq failed:', err.message);
   }
 
-  console.error('[AI ❌] All AI sources failed — HOLD');
-  return { action: 'HOLD', confidence: 0, reasoning: 'AI error', riskLevel: 'HIGH', keyFactors: [], criteriaScore: 0 };
+  // Rule-based fallback — works with zero API keys
+  console.warn('[AI ⚠️] All AI sources failed — using rule-based fallback');
+  return ruleBasedSignal(indicators, openPosition);
 }
 
 // Validare strictă a JSON-ului de la LLM. Fără asta, "confidence":"high"
