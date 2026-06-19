@@ -40,7 +40,7 @@ jobs:
             -o ConnectTimeout=30 \
             opc@${{ github.event.inputs.vm_ip }} "echo SSH_OK"
 
-      - name: Install Node.js on VM (binary, ~30s) and prep dirs
+      - name: Install Node.js, swap & prep dirs
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -50,6 +50,17 @@ jobs:
             -o ServerAliveCountMax=5 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
+          # 2GB swap so the 1GB micro VM never runs out of memory (keeps SSH alive)
+          if ! sudo swapon --show | grep -q '/swapfile'; then
+            echo "Creating 2GB swap..."
+            sudo fallocate -l 2G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+            grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+          fi
+          echo "Memory:"; free -h
+
           if ! command -v node &>/dev/null; then
             echo "Installing Node.js 20 binary..."
             curl -fsSL https://nodejs.org/dist/v20.19.2/node-v20.19.2-linux-x64.tar.gz \
@@ -59,7 +70,6 @@ jobs:
           sudo ln -sf /usr/local/bin/npm /usr/bin/npm
           echo "Node: $(/usr/bin/node --version)"
           sudo mkdir -p /opt/apex-bot/apex-trade-bot
-          # Persistent data dir — survives reboots AND redeploys (never wiped)
           sudo mkdir -p /var/lib/apex-bot
           REMOTE
 
