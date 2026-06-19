@@ -11,10 +11,19 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout bot branch (with full code)
+        uses: actions/checkout@v4
+        with:
+          ref: claude/arcads-external-api-gExX7
+
+      - name: npm install on runner (fast internet)
+        run: |
+          cd apex-trade-bot
+          npm install --production
+          echo "node_modules size: $(du -sh node_modules | cut -f1)"
 
       - name: Setup SSH key
         run: |
@@ -31,44 +40,50 @@ jobs:
             -o ConnectTimeout=30 \
             opc@${{ github.event.inputs.vm_ip }} "echo SSH_OK"
 
-      - name: Install deps, clone and start bot
+      - name: Install Node.js on VM (binary, ~30s)
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
             -o ConnectTimeout=60 \
             -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=10 \
+            -o ServerAliveCountMax=5 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
-
-          # Install Node.js 20 via binary (fast: ~30 seconds)
           if ! command -v node &>/dev/null; then
-            echo ">>> Installing Node.js 20..."
+            echo "Installing Node.js 20 binary..."
             curl -fsSL https://nodejs.org/dist/v20.19.2/node-v20.19.2-linux-x64.tar.gz \
               | sudo tar -xz -C /usr/local --strip-components=1
           fi
           echo "Node: $(node --version)"
+          sudo mkdir -p /opt/apex-bot/apex-trade-bot
+          REMOTE
 
-          # Install git if missing
-          if ! command -v git &>/dev/null; then
-            echo ">>> Installing git..."
-            sudo dnf install -y git
-          fi
-          echo "Git: $(git --version)"
+      - name: Bundle and copy bot to VM (no npm on VM!)
+        run: |
+          echo "Bundling bot files..."
+          tar czf /tmp/apex-bot.tar.gz -C apex-trade-bot .
+          echo "Bundle size: $(du -sh /tmp/apex-bot.tar.gz | cut -f1)"
 
-          # Clone repo
-          echo ">>> Cloning repo..."
-          sudo rm -rf /opt/apex-bot
-          sudo git clone --depth 1 -b claude/arcads-external-api-gExX7 \
-            https://github.com/alexgabriel225sefu-dotcom/autoflow-backend.git /opt/apex-bot
+          echo "Copying to VM..."
+          scp -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            /tmp/apex-bot.tar.gz \
+            opc@${{ github.event.inputs.vm_ip }}:/tmp/apex-bot.tar.gz
 
-          # Install npm deps
-          echo ">>> npm install..."
-          cd /opt/apex-bot/apex-trade-bot
-          sudo npm install --production
-
-          echo ">>> All done."
+          echo "Extracting on VM..."
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
+          set -e
+          sudo rm -rf /opt/apex-bot/apex-trade-bot
+          sudo mkdir -p /opt/apex-bot/apex-trade-bot
+          sudo tar xzf /tmp/apex-bot.tar.gz -C /opt/apex-bot/apex-trade-bot/
+          rm /tmp/apex-bot.tar.gz
+          echo "Files ready: $(ls /opt/apex-bot/apex-trade-bot/src/)"
           REMOTE
 
       - name: Write .env file
@@ -92,10 +107,11 @@ jobs:
             -o BatchMode=yes \
             -o ConnectTimeout=30 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
+          set -e
           sudo pkill -f index-server.js 2>/dev/null || true
           sleep 1
           cd /opt/apex-bot/apex-trade-bot
           sudo bash -c 'nohup node src/index-server.js >> /var/log/apex-bot.log 2>&1 &'
           sleep 3
-          pgrep -f index-server.js && echo 'SUCCESS: Bot is running!' || (echo 'ERROR: Bot failed' && tail -20 /var/log/apex-bot.log && exit 1)
+          pgrep -f index-server.js && echo 'SUCCESS: Bot is running!' || (echo 'ERROR: Bot failed' && tail -30 /var/log/apex-bot.log && exit 1)
           REMOTE
