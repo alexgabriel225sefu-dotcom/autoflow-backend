@@ -50,7 +50,7 @@ jobs:
             -o ServerAliveCountMax=5 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
-          # 2GB swap so the 1GB micro VM never runs out of memory (keeps SSH alive)
+          # 2GB swap so the 1GB micro VM never runs out of memory
           if ! sudo swapon --show | grep -q '/swapfile'; then
             echo "Creating 2GB swap..."
             sudo fallocate -l 2G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
@@ -117,18 +117,45 @@ jobs:
           NODE_ENV=production
           ENVEOF
 
-      - name: Start bot
+      - name: Install systemd service & start bot
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
             -o ConnectTimeout=30 \
+            -o ServerAliveInterval=20 \
+            -o ServerAliveCountMax=5 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
-          sudo pkill -f index-server.js 2>/dev/null || true
-          sleep 1
-          cd /opt/apex-bot/apex-trade-bot
-          sudo bash -c 'nohup /usr/local/bin/node src/index-server.js >> /var/log/apex-bot.log 2>&1 &'
+
+          # Write systemd unit — auto-restarts on crash, starts on VM boot
+          sudo tee /etc/systemd/system/apex-bot.service > /dev/null << 'UNIT'
+          [Unit]
+          Description=Apex Trade Bot
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          WorkingDirectory=/opt/apex-bot/apex-trade-bot
+          ExecStart=/usr/local/bin/node src/index-server.js
+          Restart=always
+          RestartSec=5
+          EnvironmentFile=/opt/apex-bot/apex-trade-bot/.env
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=apex-bot
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable apex-bot
+          sudo systemctl restart apex-bot
           sleep 4
-          pgrep -f index-server.js && echo 'SUCCESS: Bot is running!' || (echo 'ERROR: Bot failed' && tail -30 /var/log/apex-bot.log && exit 1)
+
+          # Verify it started
+          sudo systemctl is-active apex-bot && echo "SUCCESS: apex-bot service is running!" \
+            || (echo "ERROR: service failed to start" && sudo journalctl -u apex-bot -n 30 --no-pager && exit 1)
           REMOTE
