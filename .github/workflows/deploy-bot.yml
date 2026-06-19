@@ -40,7 +40,7 @@ jobs:
             -o ConnectTimeout=30 \
             opc@${{ github.event.inputs.vm_ip }} "echo SSH_OK"
 
-      - name: Install Node.js on VM (binary, ~30s) and symlink
+      - name: Install Node.js on VM (binary, ~30s) and prep dirs
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -55,11 +55,12 @@ jobs:
             curl -fsSL https://nodejs.org/dist/v20.19.2/node-v20.19.2-linux-x64.tar.gz \
               | sudo tar -xz -C /usr/local --strip-components=1
           fi
-          # Symlink into /usr/bin so sudo (restricted PATH) can find it
           sudo ln -sf /usr/local/bin/node /usr/bin/node
           sudo ln -sf /usr/local/bin/npm /usr/bin/npm
           echo "Node: $(/usr/bin/node --version)"
           sudo mkdir -p /opt/apex-bot/apex-trade-bot
+          # Persistent data dir — survives reboots AND redeploys (never wiped)
+          sudo mkdir -p /var/lib/apex-bot
           REMOTE
 
       - name: Bundle and copy bot to VM (no npm on VM!)
@@ -100,6 +101,8 @@ jobs:
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
           MASTER_KEY=${{ secrets.MASTER_KEY }}
+          ADMIN_CHAT_ID=${{ secrets.ADMIN_CHAT_ID }}
+          USER_DATA_DIR=/var/lib/apex-bot
           NODE_ENV=production
           ENVEOF
 
