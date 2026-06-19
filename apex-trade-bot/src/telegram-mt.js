@@ -21,9 +21,16 @@ const EXCHANGE_URLS = {
   coinbase: 'https://www.coinbase.com/advanced-trade/spot',
 };
 
-function kbExchangeLink(exchange, label) {
-  const url = exchange && EXCHANGE_URLS[exchange.toLowerCase()];
+function kbExchangeLink(exchange, symbol, label) {
+  if (!exchange) return undefined;
+  const ex = exchange.toLowerCase();
+  let url = EXCHANGE_URLS[ex];
   if (!url) return undefined;
+  // Binance: link directly to the traded pair chart (always loads, no login required)
+  if (ex === 'binance' && symbol) {
+    const pair = symbol.replace(/(USDT|BTC|ETH|BNB)$/, '_$1');
+    url = `https://www.binance.com/en/trade/${pair}?type=spot`;
+  }
   return { reply_markup: JSON.stringify({ inline_keyboard: [[
     { text: label || `📊 View on ${exchange.toUpperCase()}`, url }
   ]] }) };
@@ -93,7 +100,6 @@ function makeAlertFn(chatId) {
   return async (type, data) => {
     const u = userStore.load(chatId);
     const exch = u?.exchange;
-    const exchKb = kbExchangeLink(exch);
 
     if (type === 'trade_open') {
       const dir = data.side === 'BUY' ? '🟢 LONG' : '🔴 SHORT';
@@ -102,7 +108,7 @@ function makeAlertFn(chatId) {
         `${dir} <b>OPENED — ${data.symbol}</b>\n` +
         `💰 Entry: $${data.price.toFixed(4)}  Qty: ${data.qty}\n` +
         `🛡 SL: $${data.stopLoss.toFixed(4)}  🎯 TP: $${data.takeProfit.toFixed(4)}${mult}`,
-        exchKb
+        kbExchangeLink(exch, data.symbol)
       );
     } else if (type === 'trade_close') {
       const pnlStr  = `${data.pnl >= 0 ? '+' : ''}$${data.pnl.toFixed(4)}`;
@@ -111,7 +117,7 @@ function makeAlertFn(chatId) {
         `${data.pnl > 0 ? '✅' : '❌'} <b>${icons[data.reason] || data.reason} — ${data.symbol}</b>\n` +
         `$${data.entryPrice.toFixed(4)} → $${data.exitPrice.toFixed(4)}\n` +
         `PnL: <b>${pnlStr}</b>  💼 Balance: $${data.balance.toFixed(2)}`,
-        exchKb
+        kbExchangeLink(exch, data.symbol)
       );
     } else if (type === 'heartbeat') {
       const p = data.openPosition;
