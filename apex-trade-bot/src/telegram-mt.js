@@ -350,8 +350,25 @@ async function handleAdminCmd(chatId, cmd, args) {
     return send(chatId, ok ? `🚫 Revoked <code>${id}</code> (bot stopped).` : `ℹ️ <code>${id}</code> was not in the list.`);
   }
 
+  if (cmd === '/deploy') {
+    await send(chatId, `🔄 <b>Deploying latest code...</b>\n<i>This takes ~30 seconds.</i>`);
+    const { exec } = require('child_process');
+    exec(
+      `cd /opt/apex-bot && sudo git fetch origin claude/arcads-external-api-gExX7 && sudo git reset --hard origin/claude/arcads-external-api-gExX7 && cd apex-trade-bot && sudo npm install --production --silent && sudo systemctl restart apex-bot`,
+      { timeout: 120000 },
+      (err, stdout, stderr) => {
+        if (err) {
+          send(chatId, `❌ <b>Deploy failed:</b>\n<code>${(stderr || err.message).slice(0, 500)}</code>`);
+        } else {
+          send(chatId, `✅ <b>Deploy successful!</b> Bot restarted with latest code.\n\nPress ▶️ Start Trading when ready.`);
+        }
+      }
+    );
+    return;
+  }
+
   if (cmd === '/admin') {
-    return send(chatId, `👑 <b>ADMIN PANEL</b>\n\n/users — list access\n/grant ID — add paying client\n/revoke ID — remove client\n/usage ID — client usage report (Stripe evidence)`);
+    return send(chatId, `👑 <b>ADMIN PANEL</b>\n\n/users — list access\n/grant ID — add paying client\n/revoke ID — remove client\n/usage ID — client usage report (Stripe evidence)\n/deploy — update bot code without SSH`);
   }
 
   if (cmd === '/usage') {
@@ -577,7 +594,7 @@ async function _handle(u) {
   }
 
   // Admin-only whitelist commands
-  if (access.isAdmin(chatId) && ['/grant', '/revoke', '/users', '/admin', '/usage'].includes(cmd)) {
+  if (access.isAdmin(chatId) && ['/grant', '/revoke', '/users', '/admin', '/usage', '/deploy'].includes(cmd)) {
     return handleAdminCmd(chatId, cmd, parts.slice(1));
   }
 
