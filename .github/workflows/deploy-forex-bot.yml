@@ -91,8 +91,9 @@ jobs:
           echo "[deploy] Code ready."
           REMOTE
 
-      - name: Write .env
+      - name: Write .env files
         run: |
+          # Forex bot .env
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
@@ -109,10 +110,23 @@ jobs:
           OANDA_ENV=practice
           TRADE_SYMBOL=EUR_USD
           PORT=3001
-          NODE_ENV=production
           ENVEOF
+          # Affiliate bot .env
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            opc@${{ github.event.inputs.vm_ip }} \
+            "sudo tee /opt/apex-forex/apex-affiliate-bot/.env > /dev/null" << 'AFENV'
+          AFFILIATE_BOT_TOKEN=${{ secrets.AFFILIATE_BOT_TOKEN }}
+          ADMIN_CHAT_ID=${{ secrets.FOREX_TELEGRAM_CHAT_ID }}
+          SITE_URL=https://aicashsystem.space
+          WEBHOOK_SECRET=${{ secrets.AFFILIATE_WEBHOOK_SECRET }}
+          COMMISSION_PCT=0.30
+          AFFILIATE_PORT=3002
+          AFENV
 
-      - name: Setup systemd service + start bot
+      - name: Setup systemd services + start bots
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -123,32 +137,56 @@ jobs:
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
 
-          sudo pkill -f "python3.*main.py" 2>/dev/null || true
-          sleep 2
+          # ── Install affiliate bot deps ──────────────────
+          cd /opt/apex-forex/apex-affiliate-bot
+          sudo python3 -m pip install -q --prefer-binary --ignore-installed -r requirements.txt
 
+          # ── Forex Bot service ───────────────────────────
           sudo tee /etc/systemd/system/apex-forex.service > /dev/null << 'SERVICE'
-          [Unit]
-          Description=Apex Forex Bot
-          After=network.target
-          StartLimitIntervalSec=0
+[Unit]
+Description=Apex Forex Bot
+After=network.target
+StartLimitIntervalSec=0
 
-          [Service]
-          Type=simple
-          WorkingDirectory=/opt/apex-forex/apex-forex-bot
-          ExecStart=/usr/bin/python3 main.py
-          Restart=always
-          RestartSec=10
-          StandardOutput=append:/var/log/apex-forex.log
-          StandardError=append:/var/log/apex-forex.log
-          Environment=PYTHONUNBUFFERED=1
+[Service]
+Type=simple
+WorkingDirectory=/opt/apex-forex/apex-forex-bot
+ExecStart=/usr/bin/python3 main.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/apex-forex.log
+StandardError=append:/var/log/apex-forex.log
+Environment=PYTHONUNBUFFERED=1
 
-          [Install]
-          WantedBy=multi-user.target
-          SERVICE
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+          # ── Affiliate Bot service ───────────────────────
+          sudo tee /etc/systemd/system/apex-affiliate.service > /dev/null << 'SERVICE2'
+[Unit]
+Description=Apex Affiliate Bot
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/apex-forex/apex-affiliate-bot
+ExecStart=/usr/bin/python3 main.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/apex-affiliate.log
+StandardError=append:/var/log/apex-affiliate.log
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+SERVICE2
 
           sudo systemctl daemon-reload
-          sudo systemctl enable apex-forex
-          sudo systemctl restart apex-forex
+          sudo systemctl enable apex-forex apex-affiliate
+          sudo systemctl restart apex-forex apex-affiliate
           sleep 5
-          sudo systemctl is-active apex-forex && echo "SUCCESS: Forex Bot running!" || (echo "ERROR: Forex Bot failed" && tail -30 /var/log/apex-forex.log && exit 1)
+          sudo systemctl is-active apex-forex && echo "SUCCESS: Forex Bot running!" || (echo "ERROR: Forex Bot failed" && tail -20 /var/log/apex-forex.log && exit 1)
+          sudo systemctl is-active apex-affiliate && echo "SUCCESS: Affiliate Bot running!" || (echo "WARNING: Affiliate Bot not active" && tail -10 /var/log/apex-affiliate.log)
           REMOTE
