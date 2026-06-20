@@ -71,7 +71,8 @@ jobs:
           # ── 2. pip via get-pip.py (no dnf needed) ─────────────────
           if ! python3 -m pip --version &>/dev/null 2>&1; then
             echo "[install] Installing pip via get-pip.py..."
-            curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+            PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+            curl -sS "https://bootstrap.pypa.io/pip/${PY_VER}/get-pip.py" -o /tmp/get-pip.py
             sudo python3 /tmp/get-pip.py
             rm -f /tmp/get-pip.py
           fi
