@@ -23,13 +23,24 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ github.event.inputs.vm_ip }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Test SSH connection
+      - name: Test SSH connection (retry 5x)
         run: |
-          ssh -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o BatchMode=yes \
-            -o ConnectTimeout=30 \
-            opc@${{ github.event.inputs.vm_ip }} "echo SSH_OK"
+          for i in 1 2 3 4 5; do
+            if ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o BatchMode=yes \
+              -o ConnectTimeout=20 \
+              opc@${{ github.event.inputs.vm_ip }} "echo SSH_OK"; then
+              echo "SSH connected on attempt $i"
+              break
+            fi
+            echo "Attempt $i failed, waiting 20s..."
+            sleep 20
+            if [ $i -eq 5 ]; then
+              echo "ERROR: Could not connect after 5 attempts. Reboot the VM from Oracle Cloud Console."
+              exit 1
+            fi
+          done
 
       - name: Install Node.js and clone repo on VM
         run: |
