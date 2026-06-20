@@ -186,6 +186,9 @@ function buildConfig(user, ctx) {
 async function finishSetup(chatId) {
   const u = userStore.load(chatId);
   u.setupStep = 'done'; u.active = false;
+  u.usePaper = (u.pendingMode !== 'live'); // paper=true for paper mode, false for live/testnet
+  // Clear any leftover paper position when switching to live/testnet
+  if (!u.usePaper) { u.state.openPosition = null; u.state.paperBalance = 0; u.state.startBalance = 0; }
   userStore.save(chatId, u);
   if (u.pendingMode === 'paper') {
     return send(chatId,
@@ -353,6 +356,15 @@ async function handleCmd(chatId, cmd, args) {
   }
 
   if (u.setupStep !== 'done') return send(chatId, `⏳ Setup not complete. Send /start to begin.`);
+
+  // Auto-migrate: live users who set up before usePaper fix
+  if (u.pendingMode === 'live' && u.usePaper !== false && u.apiKeyEnc) {
+    u.usePaper = false;
+    u.state.openPosition = null;
+    if (!u.state.startBalance) { u.state.paperBalance = 0; u.state.startBalance = 0; }
+    userStore.save(chatId, u);
+    if (botMgr.isRunning(chatId)) await botMgr.restart(chatId, makeAlertFn(chatId));
+  }
 
   const upd = (key, val) => {
     u.settings[key] = val;
