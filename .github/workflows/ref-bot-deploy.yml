@@ -87,7 +87,7 @@ jobs:
           AFFILIATE_PORT=3002
           ENVEOF
 
-      - name: Setup systemd service + start affiliate bot
+      - name: Setup systemd + start affiliate bot
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
