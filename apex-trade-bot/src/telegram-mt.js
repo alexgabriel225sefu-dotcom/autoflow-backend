@@ -353,16 +353,17 @@ async function handleAdminCmd(chatId, cmd, args) {
   if (cmd === '/deploy') {
     await send(chatId, `🔄 <b>Deploying latest code...</b>\n<i>This takes ~30 seconds.</i>`);
     const { exec } = require('child_process');
-    // Run as root (systemd service runs as root) — no sudo needed, explicit PATH
+    // Use bash + export PATH to find git/npm wherever they are on the system
     const deployCmd = [
+      'export PATH=/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/bin:/sbin:$PATH',
       'cd /opt/apex-bot',
-      '/usr/bin/git fetch origin claude/arcads-external-api-gExX7',
-      '/usr/bin/git reset --hard origin/claude/arcads-external-api-gExX7',
+      'git fetch origin claude/arcads-external-api-gExX7',
+      'git reset --hard origin/claude/arcads-external-api-gExX7',
       'cd apex-trade-bot',
-      '/usr/bin/npm install --production --silent',
+      'npm install --production --silent',
       'systemctl restart apex-bot',
     ].join(' && ');
-    exec(deployCmd, { timeout: 120000, env: { ...process.env, PATH: '/usr/bin:/usr/local/bin:/bin:' + (process.env.PATH || '') } },
+    exec(deployCmd, { timeout: 120000, shell: '/bin/bash' },
       (err, stdout, stderr) => {
         if (err) {
           send(chatId, `❌ <b>Deploy failed:</b>\n<code>${(stderr || err.message).slice(0, 500)}</code>`);
