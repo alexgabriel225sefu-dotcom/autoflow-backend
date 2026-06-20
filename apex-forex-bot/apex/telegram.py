@@ -382,6 +382,33 @@ def _handle_symbol(chat_id, args):
     send_to(chat_id, f"💱 Currency pair set to <b>{sym}</b>.")
 
 
+def _handle_deploy(chat_id):
+    import subprocess
+    import threading
+    send_to(chat_id, "🔄 <b>Deploying latest code...</b>\n<i>This takes ~30 seconds.</i>")
+    pull_cmd = " && ".join([
+        "export PATH=/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/bin:/sbin:$PATH",
+        "cd /opt/apex-forex",
+        "git fetch origin claude/arcads-external-api-gExX7",
+        "git reset --hard origin/claude/arcads-external-api-gExX7",
+        "cd apex-forex-bot",
+        "pip3 install -q -r requirements.txt",
+    ])
+
+    def _run():
+        result = subprocess.run(pull_cmd, shell=True, executable="/bin/bash",
+                                capture_output=True, text=True, timeout=110)
+        if result.returncode != 0:
+            send_to(chat_id, f"❌ <b>Deploy failed:</b>\n<code>{(result.stderr or result.stdout)[:500]}</code>")
+            return
+        send_to(chat_id, "✅ <b>Deploy successful!</b> Restarting Forex Bot...\n\nSend /status when ready.")
+        import time
+        time.sleep(1)
+        subprocess.run("systemctl restart apex-forex", shell=True, executable="/bin/bash")
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def _handle_start(chat_id):
     if _bot_control.get("set_paused"):
         _bot_control["set_paused"](False)
@@ -529,7 +556,9 @@ def _poll_loop():
                 cmd_l = cmd.lower().split("@")[0]  # strip @botname suffix
                 args = args.split("\n")[0].strip()  # first line of args only
 
-                if cmd_l in ("/status", "/s"):
+                if cmd_l == "/deploy":
+                    _handle_deploy(chat_id)
+                elif cmd_l in ("/status", "/s"):
                     _handle_status(chat_id)
                 elif cmd_l == "/help":
                     send_to(chat_id, _HELP)

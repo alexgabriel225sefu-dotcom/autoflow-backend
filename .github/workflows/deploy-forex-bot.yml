@@ -1,0 +1,155 @@
+name: Deploy Apex Forex Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      vm_ip:
+        description: 'Oracle Cloud VM IP address'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/arcads-external-api-gExX7
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ github.event.inputs.vm_ip }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Wait for SSH (retry 5x)
+        run: |
+          for i in 1 2 3 4 5; do
+            if ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o BatchMode=yes \
+              -o ConnectTimeout=20 \
+              opc@${{ github.event.inputs.vm_ip }} "echo SSH_OK"; then
+              echo "SSH OK on attempt $i"
+              break
+            fi
+            echo "Attempt $i failed, waiting 20s..."
+            sleep 20
+            if [ $i -eq 5 ]; then
+              echo "ERROR: Cannot connect. Reboot the VM from Oracle Cloud Console."
+              exit 1
+            fi
+          done
+
+      - name: Install Python + clone repo
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            -o ConnectTimeout=120 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=10 \
+            opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
+          set -e
+
+          # ── 1. Swap (2GB) — prevents OOM crashes ──────────────────
+          if [ ! -f /swapfile ]; then
+            echo "[swap] Creating 2GB swap file..."
+            sudo fallocate -l 2G /swapfile
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+            echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+            echo "[swap] Done — $(free -h | grep Swap)"
+          else
+            echo "[swap] Already exists — $(free -h | grep Swap)"
+          fi
+
+          # ── 2. Python 3 + pip ──────────────────────────────────────
+          if ! command -v python3 &>/dev/null; then
+            echo "[python] Installing Python 3..."
+            sudo dnf install -y python3 python3-pip git
+          fi
+          echo "[python] $(python3 --version)"
+
+          # ── 3. Clone / update repo ─────────────────────────────────
+          if [ -d /opt/apex-forex ]; then
+            echo "[deploy] Updating existing clone..."
+            cd /opt/apex-forex
+            sudo git fetch origin claude/arcads-external-api-gExX7
+            sudo git reset --hard origin/claude/arcads-external-api-gExX7
+          else
+            echo "[deploy] Cloning repo..."
+            sudo git clone --depth 1 -b claude/arcads-external-api-gExX7 \
+              https://github.com/alexgabriel225sefu-dotcom/autoflow-backend.git /opt/apex-forex
+          fi
+
+          cd /opt/apex-forex/apex-forex-bot
+          sudo pip3 install -q -r requirements.txt
+          echo "[deploy] Code ready."
+          REMOTE
+
+      - name: Write .env
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            opc@${{ github.event.inputs.vm_ip }} \
+            "sudo tee /opt/apex-forex/apex-forex-bot/.env > /dev/null" << 'ENVEOF'
+          TELEGRAM_BOT_TOKEN=${{ secrets.FOREX_TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID=${{ secrets.FOREX_TELEGRAM_CHAT_ID }}
+          GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+          PAPER_TRADING=true
+          PAPER_BALANCE=1000
+          BYPASS_LICENSE=true
+          BROKER=oanda
+          OANDA_ENV=practice
+          TRADE_SYMBOL=EUR_USD
+          PORT=3001
+          NODE_ENV=production
+          ENVEOF
+
+      - name: Setup systemd service + start bot
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=5 \
+            opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
+          set -e
+
+          sudo pkill -f "python3.*main.py" 2>/dev/null || true
+          sleep 2
+
+          sudo tee /etc/systemd/system/apex-forex.service > /dev/null << 'SERVICE'
+          [Unit]
+          Description=Apex Forex Bot
+          After=network.target
+          StartLimitIntervalSec=0
+
+          [Service]
+          Type=simple
+          WorkingDirectory=/opt/apex-forex/apex-forex-bot
+          ExecStart=/usr/bin/python3 main.py
+          Restart=always
+          RestartSec=10
+          StandardOutput=append:/var/log/apex-forex.log
+          StandardError=append:/var/log/apex-forex.log
+          Environment=PYTHONUNBUFFERED=1
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable apex-forex
+          sudo systemctl restart apex-forex
+          sleep 5
+          sudo systemctl is-active apex-forex && echo "SUCCESS: Forex Bot running!" || (echo "ERROR: Forex Bot failed" && tail -30 /var/log/apex-forex.log && exit 1)
+          REMOTE
