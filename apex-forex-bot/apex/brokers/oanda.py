@@ -140,3 +140,124 @@ def get_open_trades():
                     "tp": float(t["takeProfitOrder"]["price"]) if t.get("takeProfitOrder") else None,
                     "openTime": t.get("openTime")})
     return out
+
+
+# ─── Per-user broker class ────────────────────────────────
+
+class OandaBroker:
+    """Wraps OANDA REST calls with per-user config (not global cfg)."""
+
+    def __init__(self, user_cfg):
+        self._c = user_cfg
+
+    def _base(self):
+        env = (getattr(self._c, "OANDA_ENV", "practice") or "practice").lower()
+        return ("https://api-fxtrade.oanda.com/v3" if env == "live"
+                else "https://api-fxpractice.oanda.com/v3")
+
+    def _headers(self):
+        return {**UA, "Authorization": f"Bearer {self._c.OANDA_API_TOKEN}",
+                "Content-Type": "application/json"}
+
+    def get_bid_ask(self, instrument=None):
+        instrument = instrument or self._c.SYMBOL
+        r = requests.get(f"{self._base()}/accounts/{self._c.OANDA_ACCOUNT_ID}/pricing",
+                         params={"instruments": instrument}, headers=self._headers(), timeout=8)
+        r.raise_for_status()
+        p = r.json()["prices"][0]
+        return float(p["bids"][0]["price"]), float(p["asks"][0]["price"])
+
+    def get_price(self, instrument=None):
+        bid, ask = self.get_bid_ask(instrument)
+        return round((bid + ask) / 2, 6)
+
+    def get_candles(self, instrument=None, interval=None, limit=None):
+        instrument = instrument or self._c.SYMBOL
+        gran = _GRANULARITY.get(interval or self._c.TIMEFRAME, "M5")
+        limit = min(limit or getattr(self._c, "CANDLES", 200), 500)
+        r = requests.get(f"{self._base()}/instruments/{instrument}/candles",
+                         params={"count": limit, "granularity": gran, "price": "M"},
+                         headers=self._headers(), timeout=10)
+        r.raise_for_status()
+        out = []
+        for c in r.json()["candles"]:
+            if not c.get("complete", True):
+                continue
+            mid = c["mid"]
+            out.append({"time": c["time"], "open": float(mid["o"]), "high": float(mid["h"]),
+                        "low": float(mid["l"]), "close": float(mid["c"]),
+                        "volume": float(c.get("volume", 0))})
+        return out
+
+    def get_balance(self):
+        if self._c.PAPER_TRADING:
+            return self._c.PAPER_BALANCE
+        r = requests.get(f"{self._base()}/accounts/{self._c.OANDA_ACCOUNT_ID}/summary",
+                         headers=self._headers(), timeout=10)
+        r.raise_for_status()
+        return float(r.json()["account"]["balance"])
+
+    def get_open_position(self, instrument=None):
+        """Return first open trade on this instrument as dict, or None."""
+        if self._c.PAPER_TRADING:
+            return None
+        try:
+            instrument = instrument or self._c.SYMBOL
+            r = requests.get(f"{self._base()}/accounts/{self._c.OANDA_ACCOUNT_ID}/openTrades",
+                             headers=self._headers(), timeout=10)
+            r.raise_for_status()
+            trades = [t for t in r.json().get("trades", [])
+                      if t["instrument"] == instrument]
+            if not trades:
+                return None
+            t = trades[0]
+            units = float(t["currentUnits"])
+            return {
+                "instrument": t["instrument"],
+                "side": "BUY" if units > 0 else "SELL",
+                "units": abs(int(units)),
+                "entryPrice": float(t["price"]),
+                "sl": float(t["stopLossOrder"]["price"]) if t.get("stopLossOrder") else None,
+                "tp": float(t["takeProfitOrder"]["price"]) if t.get("takeProfitOrder") else None,
+                "openTime": t.get("openTime"),
+            }
+        except Exception:
+            return None
+
+    def place_order(self, side, units, instrument=None, sl=None, tp=None):
+        instrument = instrument or self._c.SYMBOL
+        signed = int(units) if side == "BUY" else -int(units)
+        if self._c.PAPER_TRADING:
+            print(f"[PAPER][OANDA] {side} {units} {instrument}")
+            return {"orderId": "PAPER_" + str(int(time.time() * 1000)), "status": "FILLED"}
+        prec = _price_precision(instrument)
+        order = {"units": str(signed), "instrument": instrument,
+                 "type": "MARKET", "positionFill": "DEFAULT", "timeInForce": "FOK"}
+        if sl:
+            order["stopLossOnFill"] = {"price": f"{sl:.{prec}f}", "timeInForce": "GTC"}
+        if tp:
+            order["takeProfitOnFill"] = {"price": f"{tp:.{prec}f}", "timeInForce": "GTC"}
+        r = requests.post(f"{self._base()}/accounts/{self._c.OANDA_ACCOUNT_ID}/orders",
+                          json={"order": order}, headers=self._headers(), timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        if "orderRejectTransaction" in data:
+            reason = data["orderRejectTransaction"].get("rejectReason", "unknown")
+            return {"status": "REJECTED", "reason": reason}
+        tx = data.get("orderFillTransaction") or data.get("orderCreateTransaction") or {}
+        fill_price = float(tx["price"]) if tx.get("price") else None
+        return {"orderId": tx.get("id"), "status": "FILLED", "fillPrice": fill_price}
+
+    def close_position(self, instrument=None):
+        instrument = instrument or self._c.SYMBOL
+        if self._c.PAPER_TRADING:
+            return {"status": "FILLED"}
+        r = requests.put(
+            f"{self._base()}/accounts/{self._c.OANDA_ACCOUNT_ID}/positions/{instrument}/close",
+            json={"longUnits": "ALL", "shortUnits": "ALL"},
+            headers=self._headers(), timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        tx = data.get("longOrderFillTransaction") or data.get("shortOrderFillTransaction") or {}
+        fill_price = float(tx["price"]) if tx.get("price") else None
+        return {"orderId": tx.get("id"), "status": "FILLED", "fillPrice": fill_price}

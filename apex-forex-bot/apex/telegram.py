@@ -562,7 +562,7 @@ def _handle_buyer_start(chat_id, license_key):
         r = requests.post(_VERIFY_URL, json={"key": key}, timeout=8)
         valid = r.json().get("valid", False)
     except Exception:
-        valid = True  # server unreachable — key format already validated
+        valid = False  # server unreachable — deny access, nu grant automat
 
     if not valid:
         send_to(chat_id,
