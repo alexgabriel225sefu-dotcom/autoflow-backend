@@ -519,7 +519,7 @@ _DEPLOY_URL = "https://railway.app/new/template?template=https://github.com/alex
 
 
 def _handle_buyer_start(chat_id, license_key):
-    """Validate a new buyer's license key and send deployment instructions."""
+    """Validate license key and grant instant access to this bot."""
     key = license_key.strip().upper()
     if not re.match(r'^APEX-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$', key):
         send_to(chat_id,
@@ -544,21 +544,17 @@ def _handle_buyer_start(chat_id, license_key):
         )
         return
 
+    # Grant instant access
+    access.grant(str(chat_id))
     send_to(chat_id,
-        f"✅ <b>License validated!</b>\n\n"
-        f"Welcome to Apex Forex Bot.\n"
-        f"Your key: <code>{key}</code>\n\n"
-        f"<b>Deploy your bot in 1 click:</b>\n"
-        f'👉 <a href="{_DEPLOY_URL}">Deploy to Railway</a>\n'
-        f"(Root Directory: <code>apex-forex-bot</code>)\n\n"
-        f"<b>Add these variables in Railway:</b>\n"
-        f"• <code>TELEGRAM_BOT_TOKEN</code> — from @BotFather\n"
-        f"• <code>TELEGRAM_CHAT_ID</code> — from @userinfobot\n"
-        f"• <code>GROQ_API_KEY</code> — free at console.groq.com\n"
-        f"• <code>LICENSE_KEY</code> — <code>{key}</code>\n\n"
-        f"After deploying, send /setup to your new bot to connect OANDA.\n\n"
+        f"✅ <b>Access granted! Welcome to Apex Forex Bot.</b>\n\n"
+        f"⚡ EUR/USD | AI trading is now LIVE\n\n"
+        f"Send /status to see live trading snapshot.\n"
+        f"You'll receive alerts for every trade automatically.\n\n"
         f"Questions? supportaicashsystem@gmail.com"
     )
+    # Notify owner
+    send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id}</code>\nKey: <code>{key}</code>")
 
 
 def _poll_loop():
@@ -675,28 +671,37 @@ def start_polling(get_dash, broker, control=None):
 
 # ─── Outbound alerts ─────────────────────────────────────
 
+def _broadcast(text, extra=None):
+    """Send to owner + all granted clients."""
+    all_ids = set(access.list_admins() + access.list_clients())
+    if CHAT_ID:
+        all_ids.add(CHAT_ID)
+    for cid in all_ids:
+        send_to(cid, text, extra)
+
+
 def alert_open(side, symbol, price, units, stop_loss, take_profit, druck_mult=1.0):
     d = "🟢 LONG" if side == "BUY" else "🔴 SHORT"
     sl_pips = forex.to_pips(abs(price - stop_loss), symbol)
     tp_pips = forex.to_pips(abs(take_profit - price), symbol)
     mult = f"\n📐 <b>Druckenmiller:</b> ×{druck_mult:.2f}" if druck_mult != 1.0 else ""
-    send(f"{d} <b>OPENED — {symbol}</b>\n💰 @ {price}  Units: {units:,}\n"
-         f"🛡 SL: {stop_loss:.5f} ({sl_pips:.0f} pips)\n"
-         f"🎯 TP: {take_profit:.5f} ({tp_pips:.0f} pips){mult}", _dashboard_keyboard())
+    _broadcast(f"{d} <b>OPENED — {symbol}</b>\n💰 @ {price}  Units: {units:,}\n"
+               f"🛡 SL: {stop_loss:.5f} ({sl_pips:.0f} pips)\n"
+               f"🎯 TP: {take_profit:.5f} ({tp_pips:.0f} pips){mult}", _dashboard_keyboard())
 
 
 def alert_close(reason, symbol, side, entry_price, close_price, pnl, balance):
     icons = {"TAKE_PROFIT": "🎯 TAKE PROFIT", "STOP_LOSS": "🛑 STOP LOSS", "AI_CLOSE": "🤖 AI CLOSE"}
     d = "LONG" if side == "BUY" else "SHORT"
     pips = forex.to_pips(abs(close_price - entry_price), symbol)
-    send(f"{'✅' if pnl > 0 else '❌'} <b>{icons.get(reason, reason)} — {symbol}</b>\n"
-         f"📊 {d}  {entry_price} → {close_price} ({pips:.0f} pips)\n"
-         f"💵 PnL: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>\n💼 Balance: ${balance:.2f}",
-         _dashboard_keyboard())
+    _broadcast(f"{'✅' if pnl > 0 else '❌'} <b>{icons.get(reason, reason)} — {symbol}</b>\n"
+               f"📊 {d}  {entry_price} → {close_price} ({pips:.0f} pips)\n"
+               f"💵 PnL: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>\n💼 Balance: ${balance:.2f}",
+               _dashboard_keyboard())
 
 
 def alert_stop(reasons):
-    send("🚨 <b>STRATEGY STOP</b>\n" + "\n".join(f"• {r}" for r in reasons))
+    _broadcast("🚨 <b>STRATEGY STOP</b>\n" + "\n".join(f"• {r}" for r in reasons))
 
 
 def alert_filtered(action, livermore, turtle):
