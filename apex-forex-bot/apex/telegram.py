@@ -595,7 +595,13 @@ def _poll_loop():
                             f"List them with /users · remove with /revoke ID")
 
                 if not access.is_allowed(chat_id_str):
-                    send_to(chat_id, "⛔ <b>Access denied.</b>\nContact the bot owner to get access.")
+                    # Non-customers can activate with /start <license_key>
+                    first = raw.splitlines()[0].strip()
+                    ext_cmd, _, ext_args = first.partition(" ")
+                    if ext_cmd.lower().split("@")[0] == "/start" and ext_args.strip():
+                        _handle_buyer_start(chat_id, ext_args.strip())
+                    else:
+                        send_to(chat_id, "⛔ <b>Access denied.</b>\nPurchase Apex Forex Bot at https://aicashsystem.space")
                     continue
 
                 # Active wizard step takes priority over /commands
