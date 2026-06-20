@@ -1,0 +1,39 @@
+name: Check Forex Bot Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      vm_ip:
+        description: 'Oracle Cloud VM IP address'
+        required: true
+        type: string
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ github.event.inputs.vm_ip }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Check service status + last 60 log lines
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
+          echo "=== SERVICE STATUS ==="
+          sudo systemctl status apex-forex --no-pager
+          echo ""
+          echo "=== LAST 60 LINES OF LOG ==="
+          sudo tail -60 /var/log/apex-forex.log 2>/dev/null || echo "(no log file yet)"
+          echo ""
+          echo "=== MEMORY ==="
+          free -h
+          REMOTE
