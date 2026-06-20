@@ -68,14 +68,21 @@ jobs:
             echo "[swap] Already exists — $(free -h | grep Swap)"
           fi
 
-          # ── 2. Python 3 + pip + git (install whatever is missing) ──
-          PKGS=""
-          command -v python3 &>/dev/null || PKGS="$PKGS python3"
-          command -v pip3    &>/dev/null || PKGS="$PKGS python3-pip"
-          command -v git     &>/dev/null || PKGS="$PKGS git"
-          if [ -n "$PKGS" ]; then
-            echo "[install] Installing:$PKGS"
-            sudo dnf install -y $PKGS
+          # ── 2. Python 3 + git (install one at a time to avoid OOM) ──
+          if ! command -v python3 &>/dev/null; then
+            echo "[install] Installing python3..."
+            sudo dnf install -y --setopt=install_weak_deps=False python3
+          fi
+          if ! command -v git &>/dev/null; then
+            echo "[install] Installing git..."
+            sudo dnf install -y --setopt=install_weak_deps=False git
+          fi
+          # pip via get-pip.py — avoids heavy dnf dependency resolution
+          if ! command -v pip3 &>/dev/null; then
+            echo "[install] Installing pip3 via get-pip.py..."
+            curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+            sudo python3 /tmp/get-pip.py --quiet
+            rm -f /tmp/get-pip.py
           fi
           echo "[python] $(python3 --version) | git $(git --version)"
 
