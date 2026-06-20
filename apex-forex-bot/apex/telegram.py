@@ -13,6 +13,8 @@ import requests
 from apex import config as cfg
 from apex import forex
 from apex import access
+from apex import user_store
+from apex import user_loop
 
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 CHAT_ID = (cfg.TELEGRAM_CHAT_ID or "").strip()
@@ -179,9 +181,10 @@ def _build_status(dash, chart=""):
 
 
 def _handle_status(chat_id):
-    dash = _get_dash()
+    # Per-user dash if their loop is running, else global dash
+    dash = user_loop.get_dash(chat_id) or _get_dash()
     if not dash or not dash.get("broker"):
-        return send_to(chat_id, "⏳ Bot starting, please wait...")
+        return send_to(chat_id, "⏳ Bot not started yet. Send /start to begin trading.")
     chart = ""
     if _broker:
         try:
@@ -251,22 +254,32 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             _wizard["step"] = None
             d = dict(_wizard["data"])
 
-        updates: dict = {
-            "PAPER_TRADING": str(d.get("paper", True)).lower(),
-            "TRADE_SYMBOL": sym,
+        # Save per-user settings
+        user_data = {
+            "paper": d.get("paper", True),
+            "symbol": sym,
+            "active": False,
         }
         if d.get("keys"):
-            updates.update(d["keys"])
-        _save_runtime(updates)
-        for k, v in updates.items():
-            _apply(k, v)
-        if _bot_control.get("reload_broker"):
-            _bot_control["reload_broker"]()
+            user_data["oanda_token"]      = d["keys"].get("OANDA_API_TOKEN", "")
+            user_data["oanda_account_id"] = d["keys"].get("OANDA_ACCOUNT_ID", "")
+        user_store.update(chat_id, user_data)
+
+        # Also apply globally if admin (for owner's own bot)
+        if access.is_admin(str(chat_id)):
+            updates: dict = {"PAPER_TRADING": str(d.get("paper", True)).lower(), "TRADE_SYMBOL": sym}
+            if d.get("keys"):
+                updates.update(d["keys"])
+            _save_runtime(updates)
+            for k, v in updates.items():
+                _apply(k, v)
+            if _bot_control.get("reload_broker"):
+                _bot_control["reload_broker"]()
 
         paper_str = "ON (simulated)" if d.get("paper") else "OFF (live)"
         send_to(chat_id,
                 f"✅ <b>Setup complete!</b>\n\n"
-                f"Broker: <b>OANDA ({cfg.OANDA_ENV})</b>\n"
+                f"Broker: <b>OANDA (practice)</b>\n"
                 f"Pair: <b>{sym}</b>\n"
                 f"Paper mode: <b>{paper_str}</b>\n\n"
                 f"Send /start to begin trading.")
@@ -447,13 +460,28 @@ def _handle_users(chat_id):
 
 
 def _handle_start(chat_id):
-    if _bot_control.get("set_paused"):
-        _bot_control["set_paused"](False)
-    send_to(chat_id, "▶️ <b>Bot started.</b> Trading is now active.", _dashboard_keyboard())
+    user = user_store.load(chat_id)
+    # Check user has credentials set up
+    if not access.is_admin(str(chat_id)) and not user.get("oanda_token") and not user.get("paper"):
+        return send_to(chat_id,
+            "⚙️ <b>Setup required first!</b>\n\n"
+            "Send /setup to configure your OANDA account or enable paper trading.")
+    if user_loop.is_running(chat_id):
+        return send_to(chat_id, "▶️ Bot is already running. Send /status to check.")
+
+    def _alert(uid, result):
+        action = result.get("action", "")
+        send_to(uid, f"⚡ <b>{action}</b> — {result.get('symbol', cfg.SYMBOL)}\n"
+                     f"Confidence: {result.get('confidence', 0)}%")
+
+    user_loop.start(chat_id, alert_fn=_alert)
+    send_to(chat_id, "▶️ <b>Your bot started!</b> Trading is now active.\nSend /status to monitor.", _dashboard_keyboard())
 
 
 def _handle_stop(chat_id):
-    if _bot_control.get("set_paused"):
+    user_loop.stop(chat_id)
+    # Also pause global bot for admin
+    if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
         _bot_control["set_paused"](True)
     send_to(chat_id, "⏸️ <b>Bot paused.</b> No new trades will open.\nSend /start to resume.")
 
