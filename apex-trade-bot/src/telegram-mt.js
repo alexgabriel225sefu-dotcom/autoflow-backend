@@ -160,7 +160,7 @@ function buildStatus(user, ctx) {
     ? `🤖 Last AI signal: <b>${sig.action}</b>  ${sig.confidence}% conf  ${sig.criteriaScore}/5 criteria\n   <i>${sig.reasoning?.slice(0, 90) || '—'}</i>\n`
     : `🤖 AI signal: <i>waiting for first tick…</i>\n`;
   return (
-    `⚡ <b>APEX TRADE BOT</b>  📝 PAPER  ${paused}\n━━━━━━━━━━━━━━━━━━━━\n` +
+    `⚡ <b>APEX TRADE BOT</b>  ${user.usePaper !== false ? '📝 PAPER' : '🔴 LIVE TESTNET'}  ${paused}\n━━━━━━━━━━━━━━━━━━━━\n` +
     `💰 Balance: <b>$${s.paperBalance.toFixed(2)}</b>  (${parseFloat(pct) >= 0 ? '+' : ''}${pct}%)\n\n` +
     `${pos}\n\n` +
     `${sigLine}\n` +
@@ -207,6 +207,11 @@ async function finishSetup(chatId) {
 // ─── Setup flow ────────────────────────────────────────────────
 async function handleSetupCb(chatId, data) {
   const u = userStore.load(chatId);
+
+  // Don't re-trigger setup flow from old buttons if already configured
+  if (u.setupStep === 'done') {
+    return send(chatId, `⚡ <b>Already set up!</b> Use the menu below.`, kbMenu(u.settings.PAUSED, u.settings.SYMBOL));
+  }
 
   if (data === 'setup:paper') {
     u.usePaper = true; u.state.startBalance = 100; u.state.paperBalance = 100;
@@ -473,7 +478,14 @@ async function handleCb(chatId, data) {
     case 'c:method':
       return send(chatId, `🎯 Method (current: <b>${u.settings.STRATEGY_MODE}</b>)\n\n/method auto · turtle · livermore · soros · ptj · druckenmiller`);
     case 'c:help':
-      return handleCmd(chatId, '/help', []);
+      return send(chatId,
+        `📋 <b>APEX BOT COMMANDS</b>\n\n` +
+        `<b>Navigation:</b>\n/menu · /status · /config · /trades\n\n` +
+        `<b>Symbol & Strategy:</b>\n/symbol BTCUSDT\n/method auto|turtle|livermore|soros|ptj|druckenmiller\n\n` +
+        `<b>Risk Settings:</b>\n/risk 5 — % per trade\n/sl 1.6 — stop loss %\n/tp 3.2 — take profit %\n/confidence 70 — min AI confidence\n\n` +
+        `<b>Control:</b>\n/pause · /resume\n\n` +
+        `<b>AI Key (free):</b>\n/groq gsk_YOUR_KEY\nGet free key: console.groq.com`
+      );
     case 'c:pause':
       upd('PAUSED', true);
       return send(chatId, `⏸️ <b>Bot PAUSED</b>`, kbMenu(true, u.settings.SYMBOL));
