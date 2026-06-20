@@ -361,9 +361,11 @@ async function handleCmd(chatId, cmd, args) {
   if (u.pendingMode === 'live' && u.usePaper !== false && u.apiKeyEnc) {
     u.usePaper = false;
     u.state.openPosition = null;
-    if (!u.state.startBalance) { u.state.paperBalance = 0; u.state.startBalance = 0; }
+    u.state.paperBalance = 0; u.state.startBalance = 0;
     userStore.save(chatId, u);
-    if (botMgr.isRunning(chatId)) await botMgr.restart(chatId, makeAlertFn(chatId));
+    await botMgr.stop(chatId);
+    await send(chatId, `🔄 <b>Switched to LIVE TESTNET mode!</b>\n\nPress ▶️ <b>Start Trading</b> to connect to Binance testnet with your API keys.`, kbMenu(true, u.settings.SYMBOL));
+    return;
   }
 
   const upd = (key, val) => {
