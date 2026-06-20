@@ -1,7 +1,7 @@
 """Telegram alerts + full interactive config/control commands (Forex edition).
 
-Each client runs their own bot instance (self-hosted model) — the seller
-never sees client API tokens. All commands are restricted to TELEGRAM_CHAT_ID.
+Access model: owner bootstraps on first /start, then grants clients via /grant.
+All admin commands are owner-only. Clients get /status and /help.
 Polling runs in a background daemon thread.
 """
 import os
@@ -12,6 +12,7 @@ import threading
 import requests
 from apex import config as cfg
 from apex import forex
+from apex import access
 
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 CHAT_ID = (cfg.TELEGRAM_CHAT_ID or "").strip()
@@ -409,6 +410,42 @@ def _handle_deploy(chat_id):
     threading.Thread(target=_run, daemon=True).start()
 
 
+def _handle_grant(chat_id, args):
+    target = (args or "").strip()
+    if not target.lstrip("-").isdigit():
+        return send_to(chat_id, "❌ Usage: <code>/grant 123456789</code>")
+    if access.grant(target):
+        send_to(chat_id, f"✅ Access granted to <code>{target}</code>.")
+        send_to(target, "✅ <b>You now have access to Apex Forex Bot!</b>\nSend /status to check trading.")
+    else:
+        send_to(chat_id, f"ℹ️ <code>{target}</code> already has access.")
+
+
+def _handle_revoke(chat_id, args):
+    target = (args or "").strip()
+    if not target.lstrip("-").isdigit():
+        return send_to(chat_id, "❌ Usage: <code>/revoke 123456789</code>")
+    if access.revoke(target):
+        send_to(chat_id, f"✅ Access revoked for <code>{target}</code>.")
+        send_to(target, "⛔ Your access to Apex Forex Bot has been revoked.")
+    else:
+        send_to(chat_id, f"ℹ️ <code>{target}</code> not found or is an admin.")
+
+
+def _handle_users(chat_id):
+    admins  = access.list_admins()
+    clients = access.list_clients()
+    admin_lines  = "\n".join(f"👑 {a}" for a in admins) or "—"
+    client_lines = "\n".join(f"✅ {c}" for c in clients) or "— none yet —"
+    send_to(chat_id,
+            f"👥 <b>ACCESS LIST</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"<b>Admins:</b>\n{admin_lines}\n\n"
+            f"<b>Paying clients ({len(clients)}):</b>\n{client_lines}\n\n"
+            f"<code>/grant ID</code> — give access\n"
+            f"<code>/revoke ID</code> — remove access")
+
+
 def _handle_start(chat_id):
     if _bot_control.get("set_paused"):
         _bot_control["set_paused"](False)
@@ -444,25 +481,35 @@ def _handle_config(chat_id):
             f"🔑 {key_title} keys:\n{key_lines or '  (none set — use /setup)'}")
 
 
-_HELP = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
-         "━━━━━━━━━━━━━━━━━━━━\n"
-         "/setup — guided setup wizard\n"
-         "/config — show current settings\n"
-         "/status — live trading snapshot\n"
-         "━━━━━━━━━━━━━━━━━━━━\n"
-         "/broker oanda|mt — OANDA API or MetaTrader\n"
-         "/env practice|live — OANDA environment\n"
-         "/paper on|off — toggle paper mode\n"
-         "/risk &lt;0.5-10&gt; — risk % per trade\n"
-         "/sl &lt;pips&gt; — stop loss in pips\n"
-         "/tp &lt;pips&gt; — take profit in pips\n"
-         "/symbol &lt;PAIR&gt; — set pair (EUR_USD)\n"
-         "/setkeys KEY=val ... — set credentials\n"
-         "  (message is auto-deleted for safety)\n"
-         "━━━━━━━━━━━━━━━━━━━━\n"
-         "/start — resume trading\n"
-         "/stop — pause trading\n"
-         "/help — this list")
+_HELP_CLIENT = ("📋 <b>APEX FOREX BOT</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "/status — live trading snapshot\n"
+                "/help — this list")
+
+_HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "/status — live trading snapshot\n"
+               "/setup — guided setup wizard\n"
+               "/config — show current settings\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "/broker oanda|mt — OANDA API or MetaTrader\n"
+               "/env practice|live — OANDA environment\n"
+               "/paper on|off — toggle paper mode\n"
+               "/risk &lt;0.5-10&gt; — risk % per trade\n"
+               "/sl &lt;pips&gt; — stop loss in pips\n"
+               "/tp &lt;pips&gt; — take profit in pips\n"
+               "/symbol &lt;PAIR&gt; — set pair (EUR_USD)\n"
+               "/setkeys KEY=val ... — set credentials\n"
+               "  (message is auto-deleted for safety)\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "/start — resume trading\n"
+               "/stop — pause trading\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "👑 <b>Admin</b>\n"
+               "/grant &lt;id&gt; — give client access\n"
+               "/revoke &lt;id&gt; — remove access\n"
+               "/users — list clients\n"
+               "/help — this list")
 
 
 # ─── Poll loop ────────────────────────────────────────────
@@ -536,12 +583,19 @@ def _poll_loop():
                 msg_id = msg.get("message_id")
                 if not raw or chat_id is None:
                     continue
-                if str(chat_id) != str(CHAT_ID):
-                    # Allow new buyers to activate via /start <license_key>
-                    first = raw.splitlines()[0].strip()
-                    ext_cmd, _, ext_args = first.partition(" ")
-                    if ext_cmd.lower().split("@")[0] == "/start" and ext_args.strip():
-                        _handle_buyer_start(chat_id, ext_args.strip())
+                chat_id_str = str(chat_id)
+
+                # Bootstrap: first person to /start becomes owner
+                if not access.has_any_admin():
+                    access.claim_admin(chat_id_str)
+                    send_to(chat_id,
+                            f"👑 <b>You are now the OWNER of this bot.</b>\n"
+                            f"Your ID: <code>{chat_id_str}</code>\n\n"
+                            f"Give clients access with /grant THEIR_ID\n"
+                            f"List them with /users · remove with /revoke ID")
+
+                if not access.is_allowed(chat_id_str):
+                    send_to(chat_id, "⛔ <b>Access denied.</b>\nContact the bot owner to get access.")
                     continue
 
                 # Active wizard step takes priority over /commands
@@ -556,36 +610,46 @@ def _poll_loop():
                 cmd_l = cmd.lower().split("@")[0]  # strip @botname suffix
                 args = args.split("\n")[0].strip()  # first line of args only
 
-                if cmd_l == "/deploy":
+                is_adm = access.is_admin(chat_id_str)
+
+                if cmd_l == "/deploy" and is_adm:
                     _handle_deploy(chat_id)
                 elif cmd_l in ("/status", "/s"):
                     _handle_status(chat_id)
                 elif cmd_l == "/help":
-                    send_to(chat_id, _HELP)
-                elif cmd_l == "/setup":
+                    send_to(chat_id, _HELP_ADMIN if is_adm else _HELP_CLIENT)
+                elif cmd_l == "/users" and is_adm:
+                    _handle_users(chat_id)
+                elif cmd_l == "/grant" and is_adm:
+                    _handle_grant(chat_id, args)
+                elif cmd_l == "/revoke" and is_adm:
+                    _handle_revoke(chat_id, args)
+                elif cmd_l == "/setup" and is_adm:
                     _handle_setup(chat_id)
-                elif cmd_l == "/config":
+                elif cmd_l == "/config" and is_adm:
                     _handle_config(chat_id)
-                elif cmd_l == "/setkeys":
+                elif cmd_l == "/setkeys" and is_adm:
                     _handle_setkeys(chat_id, args, msg_id)
-                elif cmd_l == "/broker":
+                elif cmd_l == "/broker" and is_adm:
                     _handle_broker(chat_id, args)
-                elif cmd_l == "/env":
+                elif cmd_l == "/env" and is_adm:
                     _handle_env(chat_id, args)
-                elif cmd_l == "/paper":
+                elif cmd_l == "/paper" and is_adm:
                     _handle_paper(chat_id, args)
-                elif cmd_l == "/risk":
+                elif cmd_l == "/risk" and is_adm:
                     _handle_risk(chat_id, args)
-                elif cmd_l == "/sl":
+                elif cmd_l == "/sl" and is_adm:
                     _handle_sl(chat_id, args)
-                elif cmd_l == "/tp":
+                elif cmd_l == "/tp" and is_adm:
                     _handle_tp(chat_id, args)
-                elif cmd_l == "/symbol":
+                elif cmd_l == "/symbol" and is_adm:
                     _handle_symbol(chat_id, args)
                 elif cmd_l == "/start":
                     _handle_start(chat_id)
-                elif cmd_l == "/stop":
+                elif cmd_l == "/stop" and is_adm:
                     _handle_stop(chat_id)
+                elif not is_adm:
+                    pass  # clients silently ignore unknown commands
         except Exception as e:
             print(f"[TELEGRAM] Poll error: {e}")
         time.sleep(2)
@@ -593,14 +657,14 @@ def _poll_loop():
 
 def start_polling(get_dash, broker, control=None):
     global _get_dash, _broker, _bot_control
-    if not TOKEN or not CHAT_ID:
-        print(f"[TELEGRAM] Missing TOKEN={bool(TOKEN)} CHAT_ID={bool(CHAT_ID)} — polling disabled")
+    if not TOKEN:
+        print("[TELEGRAM] Missing TOKEN — polling disabled")
         return
     _get_dash = get_dash
     _broker = broker
     _bot_control = control or {}
     threading.Thread(target=_poll_loop, daemon=True).start()
-    print("[TELEGRAM] Polling started — /setup /start /stop /status /help")
+    print("[TELEGRAM] Polling started — /grant /revoke /users /status /help")
 
 
 # ─── Outbound alerts ─────────────────────────────────────
