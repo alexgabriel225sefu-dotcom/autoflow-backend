@@ -68,12 +68,16 @@ jobs:
             echo "[swap] Already exists — $(free -h | grep Swap)"
           fi
 
-          # ── 2. Python 3 + pip ──────────────────────────────────────
-          if ! command -v python3 &>/dev/null; then
-            echo "[python] Installing Python 3..."
-            sudo dnf install -y python3 python3-pip git
+          # ── 2. Python 3 + pip + git (install whatever is missing) ──
+          PKGS=""
+          command -v python3 &>/dev/null || PKGS="$PKGS python3"
+          command -v pip3    &>/dev/null || PKGS="$PKGS python3-pip"
+          command -v git     &>/dev/null || PKGS="$PKGS git"
+          if [ -n "$PKGS" ]; then
+            echo "[install] Installing:$PKGS"
+            sudo dnf install -y $PKGS
           fi
-          echo "[python] $(python3 --version)"
+          echo "[python] $(python3 --version) | git $(git --version)"
 
           # ── 3. Clone / update repo ─────────────────────────────────
           if [ -d /opt/apex-forex ]; then
