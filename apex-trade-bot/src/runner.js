@@ -99,6 +99,15 @@ async function closeTrade(ctx, price, reason) {
 
   recordTrade(state.session, pnl > 0, pnl);
 
+  // Increment usage trade counter
+  try {
+    const userStore = require('./userStore');
+    const u2 = userStore.load(ctx.userId);
+    if (!u2.usage) u2.usage = { totalTicks: 0, totalTrades: 0, lastActiveAt: null };
+    u2.usage.totalTrades++;
+    userStore.save(ctx.userId, u2);
+  } catch {}
+
   state.trades.unshift({
     time: new Date().toLocaleString('en-US'), symbol, side,
     entry: entryPrice, exit: fill, qty: quantity,
@@ -117,6 +126,14 @@ async function tick(ctx) {
   if (ctx.ticking) return;
   ctx.ticking = true;
   ctx.state.tickCount = (ctx.state.tickCount || 0) + 1;
+
+  // Usage tracking — evidence for Stripe dispute resolution
+  const userStore = require('./userStore');
+  const u = userStore.load(ctx.userId);
+  if (!u.usage) u.usage = { totalTicks: 0, totalTrades: 0, lastActiveAt: null };
+  u.usage.totalTicks++;
+  u.usage.lastActiveAt = new Date().toISOString();
+  userStore.save(ctx.userId, u);
 
   try {
     const { state, settings, exchange } = ctx;

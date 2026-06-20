@@ -35,6 +35,12 @@ function make(userId) {
     apiKeyEnc:    '', apiSecretEnc: '', apiPassEnc: '',
     usePaper:     true,
     active:       false,
+    activatedAt:  null,   // ISO timestamp when client completed setup
+    usage: {
+      totalTicks:   0,    // total bot ticks (minutes of service delivered)
+      totalTrades:  0,    // total trades executed (proof of service)
+      lastActiveAt: null, // ISO timestamp of last activity
+    },
     settings: {
       SYMBOL:          'SOLUSDT',
       STRATEGY_MODE:   'auto',

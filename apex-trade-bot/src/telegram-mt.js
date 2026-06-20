@@ -187,6 +187,7 @@ async function finishSetup(chatId) {
   const u = userStore.load(chatId);
   u.setupStep = 'done'; u.active = false;
   u.usePaper = (u.pendingMode !== 'live'); // paper=true for paper mode, false for live/testnet
+  if (!u.activatedAt) u.activatedAt = new Date().toISOString(); // first activation timestamp
   // Clear any leftover paper position when switching to live/testnet
   if (!u.usePaper) { u.state.openPosition = null; u.state.paperBalance = 0; u.state.startBalance = 0; }
   userStore.save(chatId, u);
@@ -350,7 +351,27 @@ async function handleAdminCmd(chatId, cmd, args) {
   }
 
   if (cmd === '/admin') {
-    return send(chatId, `👑 <b>ADMIN PANEL</b>\n\n/users — list access\n/grant ID — add paying client\n/revoke ID — remove client`);
+    return send(chatId, `👑 <b>ADMIN PANEL</b>\n\n/users — list access\n/grant ID — add paying client\n/revoke ID — remove client\n/usage ID — client usage report (Stripe evidence)`);
+  }
+
+  if (cmd === '/usage') {
+    const targetId = args[0]?.trim();
+    if (!targetId) return send(chatId, `Usage: <code>/usage CLIENT_ID</code>`);
+    const cu = userStore.load(targetId);
+    const activated = cu.activatedAt ? new Date(cu.activatedAt).toLocaleString('en-GB') : 'Unknown';
+    const lastActive = cu.usage?.lastActiveAt ? new Date(cu.usage.lastActiveAt).toLocaleString('en-GB') : 'Never';
+    const daysSince = cu.activatedAt ? Math.floor((Date.now() - new Date(cu.activatedAt)) / 86400000) : 0;
+    return send(chatId,
+      `📊 <b>USAGE REPORT</b> — Client <code>${targetId}</code>\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `📅 Activated: <b>${activated}</b>\n` +
+      `⏱ Days active: <b>${daysSince}</b>\n` +
+      `🔢 Total ticks (minutes): <b>${cu.usage?.totalTicks ?? 0}</b>\n` +
+      `📈 Total trades executed: <b>${cu.usage?.totalTrades ?? 0}</b>\n` +
+      `🕐 Last active: <b>${lastActive}</b>\n` +
+      `💰 Balance: <b>$${cu.state?.paperBalance?.toFixed(2) ?? 0}</b>\n` +
+      `📊 Mode: <b>${cu.usePaper !== false ? 'Paper' : cu.exchange?.toUpperCase() + ' Live'}</b>\n\n` +
+      `<i>Use this as evidence in Stripe dispute resolution.</i>`
+    );
   }
 }
 
@@ -556,7 +577,7 @@ async function _handle(u) {
   }
 
   // Admin-only whitelist commands
-  if (access.isAdmin(chatId) && ['/grant', '/revoke', '/users', '/admin'].includes(cmd)) {
+  if (access.isAdmin(chatId) && ['/grant', '/revoke', '/users', '/admin', '/usage'].includes(cmd)) {
     return handleAdminCmd(chatId, cmd, parts.slice(1));
   }
 
