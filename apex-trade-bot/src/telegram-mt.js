@@ -653,13 +653,15 @@ async function startPolling() {
 
   try { await axios.post(`https://api.telegram.org/bot${TOKEN}/deleteWebhook`, { drop_pending_updates: true }, { timeout: 5000 }); } catch {}
 
-  // Restore previously active users
+  // Restore previously active users — each wrapped so one bad user doesn't block others
   for (const uid of userStore.list()) {
-    const u = userStore.load(uid);
-    if (u.active && u.setupStep === 'done') {
-      console.log(`[TG-MT] Restoring bot for ${uid}`);
-      await botMgr.start(uid, makeAlertFn(uid));
-    }
+    try {
+      const u = userStore.load(uid);
+      if (u.active && u.setupStep === 'done') {
+        console.log(`[TG-MT] Restoring bot for ${uid}`);
+        await botMgr.start(uid, makeAlertFn(uid));
+      }
+    } catch (e) { console.warn(`[TG-MT] Failed to restore user ${uid}:`, e.message); }
   }
 
   console.log('[TG-MT] Polling started. Send your bot /start to begin!');
@@ -667,7 +669,11 @@ async function startPolling() {
   while (true) {
     try {
       const updates = await _poll();
-      for (const u of updates) await _handle(u);
+      // Each update isolated — one bad message never stops the poll loop
+      for (const upd of updates) {
+        try { await _handle(upd); }
+        catch (e) { console.warn('[TG-MT] Handle error (skipped):', e.message); }
+      }
     } catch (e) {
       if (e.response?.status === 409) {
         console.warn('[TG-MT] 409 — another instance polling, waiting 30s...');

@@ -13,6 +13,10 @@
 require('dotenv').config();
 process.stdout.write('[APEX SERVER] Starting multi-tenant bot server...\n');
 
+// Global safety net — log and survive instead of crashing
+process.on('uncaughtException',  err => console.error('[CRASH] uncaughtException:', err.message, err.stack));
+process.on('unhandledRejection', err => console.error('[CRASH] unhandledRejection:', err?.message || err));
+
 const tg = require('./telegram-mt');
 
 // ─── Validate required env vars ────────────────────────────────
