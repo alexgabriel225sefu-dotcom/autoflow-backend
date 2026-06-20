@@ -353,9 +353,16 @@ async function handleAdminCmd(chatId, cmd, args) {
   if (cmd === '/deploy') {
     await send(chatId, `🔄 <b>Deploying latest code...</b>\n<i>This takes ~30 seconds.</i>`);
     const { exec } = require('child_process');
-    exec(
-      `cd /opt/apex-bot && sudo git fetch origin claude/arcads-external-api-gExX7 && sudo git reset --hard origin/claude/arcads-external-api-gExX7 && cd apex-trade-bot && sudo npm install --production --silent && sudo systemctl restart apex-bot`,
-      { timeout: 120000 },
+    // Run as root (systemd service runs as root) — no sudo needed, explicit PATH
+    const deployCmd = [
+      'cd /opt/apex-bot',
+      '/usr/bin/git fetch origin claude/arcads-external-api-gExX7',
+      '/usr/bin/git reset --hard origin/claude/arcads-external-api-gExX7',
+      'cd apex-trade-bot',
+      '/usr/bin/npm install --production --silent',
+      'systemctl restart apex-bot',
+    ].join(' && ');
+    exec(deployCmd, { timeout: 120000, env: { ...process.env, PATH: '/usr/bin:/usr/local/bin:/bin:' + (process.env.PATH || '') } },
       (err, stdout, stderr) => {
         if (err) {
           send(chatId, `❌ <b>Deploy failed:</b>\n<code>${(stderr || err.message).slice(0, 500)}</code>`);
