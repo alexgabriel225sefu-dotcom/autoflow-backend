@@ -166,6 +166,73 @@ Respond ONLY with valid JSON:
         return _call_groq(prompt)
     except Exception as err:
         print(f"[AI ❌] Groq failed: {err}")
-    print("[AI ❌] All AI sources failed — HOLD")
-    return {"action": "HOLD", "confidence": 0, "reasoning": "AI error",
-            "riskLevel": "HIGH", "keyFactors": [], "criteriaScore": 0}
+    sig = rule_based_fallback(ind, open_position)
+    print(f"[AI] Rule-based fallback: {sig['action']} {sig['confidence']}%")
+    return sig
+
+
+def rule_based_fallback(ind, open_position=None):
+    """Deterministic signal when all AI sources are unavailable."""
+    def fnum(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return 0.0
+
+    rsi_v   = fnum(ind.get("rsi", 50))
+    macd_h  = fnum(ind.get("macdHist"))
+    vol_r   = fnum(ind.get("volumeRatio", 1.0))
+    price   = fnum(ind.get("price"))
+    ema20   = fnum(ind.get("ema20"))
+    ema50   = fnum(ind.get("ema50"))
+
+    score = 0
+    factors = []
+
+    # RSI — extreme levels get stronger weight
+    if rsi_v < 25:
+        score += 3; factors.append(f"RSI extreme oversold ({rsi_v:.0f})")
+    elif rsi_v < 38:
+        score += 2; factors.append(f"RSI oversold ({rsi_v:.0f})")
+    elif rsi_v > 75:
+        score -= 3; factors.append(f"RSI extreme overbought ({rsi_v:.0f})")
+    elif rsi_v > 62:
+        score -= 2; factors.append(f"RSI overbought ({rsi_v:.0f})")
+
+    # MACD histogram direction
+    if macd_h > 0:
+        score += 1; factors.append("MACD bullish")
+    elif macd_h < 0:
+        score -= 1; factors.append("MACD bearish")
+
+    # EMA trend — context-aware: amplifies the existing bias, doesn't override it
+    above_emas = price > ema20 > ema50 if (ema20 and ema50) else False
+    below_emas = price < ema20 < ema50 if (ema20 and ema50) else False
+    if score >= 0 and above_emas:
+        score += 1; factors.append("Price above EMAs")
+    elif score >= 0 and below_emas:
+        score -= 1; factors.append("Price below EMAs (bearish)")
+    elif score < 0 and above_emas:
+        score -= 1; factors.append("Price overextended above EMAs")
+    elif score < 0 and below_emas:
+        score += 1; factors.append("Price at discount below EMAs")
+
+    # Volume amplifies the existing direction
+    if vol_r >= 1.3 and score != 0 and ind.get("hasVolume", True):
+        score += 1 if score > 0 else -1
+        factors.append(f"Volume spike ({vol_r:.1f}x)")
+
+    abs_score = abs(score)
+    confidence    = min(85, 52 + abs_score * 8)
+    criteria_score = min(5, abs_score + 1)
+
+    if score >= 2:
+        return {"action": "BUY",  "confidence": confidence, "criteriaScore": criteria_score,
+                "reasoning": f"Rule-based: {', '.join(factors)}", "riskLevel": "MEDIUM",
+                "keyFactors": factors}
+    if score <= -2:
+        return {"action": "SELL", "confidence": confidence, "criteriaScore": criteria_score,
+                "reasoning": f"Rule-based: {', '.join(factors)}", "riskLevel": "MEDIUM",
+                "keyFactors": factors}
+    return {"action": "HOLD", "confidence": 42, "criteriaScore": max(0, abs_score),
+            "reasoning": "Rule-based: no clear signal", "riskLevel": "LOW", "keyFactors": factors}
