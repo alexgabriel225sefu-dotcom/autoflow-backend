@@ -15,6 +15,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: claude/arcads-external-api-gExX7
 
       - name: Setup SSH key
         run: |
@@ -23,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ github.event.inputs.vm_ip }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Test SSH connection (retry 5x)
+      - name: Wait for SSH (retry 5x)
         run: |
           for i in 1 2 3 4 5; do
             if ssh -i ~/.ssh/deploy_key \
@@ -31,49 +33,65 @@ jobs:
               -o BatchMode=yes \
               -o ConnectTimeout=20 \
               opc@${{ github.event.inputs.vm_ip }} "echo SSH_OK"; then
-              echo "SSH connected on attempt $i"
+              echo "SSH OK on attempt $i"
               break
             fi
             echo "Attempt $i failed, waiting 20s..."
             sleep 20
             if [ $i -eq 5 ]; then
-              echo "ERROR: Could not connect after 5 attempts. Reboot the VM from Oracle Cloud Console."
+              echo "ERROR: Cannot connect. Reboot the VM from Oracle Cloud Console."
               exit 1
             fi
           done
 
-      - name: Install Node.js and clone repo on VM
+      - name: Add swap + install Node.js + clone repo
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
-            -o ConnectTimeout=60 \
+            -o ConnectTimeout=120 \
             -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=5 \
+            -o ServerAliveCountMax=10 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
-          echo "[1/3] Installing Node.js 20..."
-          curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-          sudo dnf install -y nodejs git
-          node --version
-          echo "[2/3] Cloning repo..."
+
+          # ── 1. Swap (2GB) — prevents OOM crashes ──────────────────
+          if [ ! -f /swapfile ]; then
+            echo "[swap] Creating 2GB swap file..."
+            sudo fallocate -l 2G /swapfile
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+            echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+            echo "[swap] Done — $(free -h | grep Swap)"
+          else
+            echo "[swap] Already exists — $(free -h | grep Swap)"
+          fi
+
+          # ── 2. Node.js (only if not installed) ───────────────────
+          if ! command -v node &>/dev/null; then
+            echo "[node] Installing Node.js 20..."
+            curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+            sudo dnf install -y nodejs git
+          fi
+          echo "[node] $(node --version)"
+
+          # ── 3. Clone repo ──────────────────────────────────────────
+          echo "[deploy] Cloning latest code..."
           sudo rm -rf /opt/apex-bot
           sudo git clone --depth 1 -b claude/arcads-external-api-gExX7 \
             https://github.com/alexgabriel225sefu-dotcom/autoflow-backend.git /opt/apex-bot
-          echo "[3/3] Installing npm dependencies..."
           cd /opt/apex-bot/apex-trade-bot
           sudo npm install --production
-          echo "Done."
+          echo "[deploy] Code ready."
           REMOTE
 
-      - name: Write .env and start bot
+      - name: Write .env
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
             -o ConnectTimeout=30 \
-            -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=5 \
             opc@${{ github.event.inputs.vm_ip }} \
             "sudo tee /opt/apex-bot/apex-trade-bot/.env > /dev/null" << 'ENVEOF'
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -83,7 +101,7 @@ jobs:
           NODE_ENV=production
           ENVEOF
 
-      - name: Start bot
+      - name: Setup systemd service + start bot
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -92,10 +110,36 @@ jobs:
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=5 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
+          set -e
+
+          # Kill any old nohup processes
           sudo pkill -f index-server.js 2>/dev/null || true
-          sleep 1
-          cd /opt/apex-bot/apex-trade-bot
-          sudo bash -c 'nohup node src/index-server.js >> /var/log/apex-bot.log 2>&1 &'
-          sleep 3
-          pgrep -f index-server.js && echo 'SUCCESS: Bot is running!' || (echo 'ERROR: Bot failed' && tail -20 /var/log/apex-bot.log && exit 1)
+          sleep 2
+
+          # Create systemd service (auto-restart on crash)
+          sudo tee /etc/systemd/system/apex-bot.service > /dev/null << 'SERVICE'
+          [Unit]
+          Description=Apex Trade Bot
+          After=network.target
+          StartLimitIntervalSec=0
+
+          [Service]
+          Type=simple
+          WorkingDirectory=/opt/apex-bot/apex-trade-bot
+          ExecStart=/usr/bin/node src/index-server.js
+          Restart=always
+          RestartSec=10
+          StandardOutput=append:/var/log/apex-bot.log
+          StandardError=append:/var/log/apex-bot.log
+          Environment=NODE_ENV=production
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable apex-bot
+          sudo systemctl restart apex-bot
+          sleep 5
+          sudo systemctl is-active apex-bot && echo "SUCCESS: Bot running via systemd!" || (echo "ERROR: Bot failed to start" && tail -30 /var/log/apex-bot.log && exit 1)
           REMOTE
