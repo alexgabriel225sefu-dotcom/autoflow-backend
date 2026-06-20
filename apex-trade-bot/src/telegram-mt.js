@@ -272,7 +272,9 @@ async function handleSetupInput(chatId, text) {
   const u = userStore.load(chatId);
 
   if (u.setupStep === 'groq') {
-    const key = text.trim();
+    // Strip /groq prefix if user sends it as command during setup
+    const raw = text.trim().replace(/^\/groq\s*/i, '');
+    const key = raw.replace(/\s+/g, ''); // strip all whitespace (copy-paste artefacts)
     if (key.startsWith('gsk_') && key.length > 20) {
       u.groqKey = userStore.encrypt(key);
       userStore.save(chatId, u);
@@ -284,14 +286,14 @@ async function handleSetupInput(chatId, text) {
   }
 
   if (u.setupStep === 'apikey') {
-    u.apiKeyEnc = userStore.encrypt(text.trim());
+    u.apiKeyEnc = userStore.encrypt(text.trim().replace(/\s+/g, ''));
     u.setupStep = 'apisecret';
     userStore.save(chatId, u);
     return send(chatId, `✅ API Key saved.\n\nNow send your <b>API Secret</b>:`);
   }
 
   if (u.setupStep === 'apisecret') {
-    u.apiSecretEnc = userStore.encrypt(text.trim());
+    u.apiSecretEnc = userStore.encrypt(text.trim().replace(/\s+/g, ''));
     if (NEEDS_PASS.has(u.exchange)) {
       u.setupStep = 'passphrase'; userStore.save(chatId, u);
       return send(chatId, `✅ API Secret saved.\n\nNow send your <b>Passphrase</b> (required for ${u.exchange.toUpperCase()}):`);
@@ -586,9 +588,16 @@ async function _handle(u) {
   const user = userStore.load(chatId);
 
   // During setup, route free text to setup input handler
-  if (user.setupStep !== 'done' && user.setupStep !== 'start' && !raw.startsWith('/')) {
-    await handleSetupInput(chatId, raw);
-    return;
+  // Exception: /groq during groq step — treat as plain text key entry
+  if (user.setupStep !== 'done' && user.setupStep !== 'start') {
+    if (!raw.startsWith('/')) {
+      await handleSetupInput(chatId, raw);
+      return;
+    }
+    if (user.setupStep === 'groq' && raw.toLowerCase().startsWith('/groq ')) {
+      await handleSetupInput(chatId, raw);
+      return;
+    }
   }
 
   await handleCmd(chatId, cmd, parts.slice(1));
