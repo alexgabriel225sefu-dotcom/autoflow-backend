@@ -194,7 +194,7 @@ async function tick(ctx) {
 
     const confOk = signal.confidence >= (settings.MIN_CONFIDENCE ?? 62);
     const critOk = (signal.criteriaScore ?? 0) >= (settings.MIN_CRITERIA ?? 3);
-    const volOk  = parseFloat(ind.volumeRatio) >= 0.7;
+    const volOk  = parseFloat(ind.volumeRatio) >= 0.4; // relaxed — 0.7 blocked too many valid setups
 
     const druckMult = !state.openPosition
       ? strategies.druckenmillerMultiplier(signal.confidence, signal.criteriaScore, stratData.livermore, stratData.turtle)

@@ -87,33 +87,41 @@ function ruleBasedSignal(ind, openPosition) {
   let score = 0;
   const factors = [];
 
-  // RSI signals
-  if (rsi < 35) { score += 2; factors.push(`RSI oversold (${rsi.toFixed(0)})`); }
-  else if (rsi > 65) { score -= 2; factors.push(`RSI overbought (${rsi.toFixed(0)})`); }
+  // RSI — extreme levels get stronger weight
+  if      (rsi < 25) { score += 3; factors.push(`RSI extreme oversold (${rsi.toFixed(0)})`); }
+  else if (rsi < 38) { score += 2; factors.push(`RSI oversold (${rsi.toFixed(0)})`); }
+  else if (rsi > 75) { score -= 3; factors.push(`RSI extreme overbought (${rsi.toFixed(0)})`); }
+  else if (rsi > 62) { score -= 2; factors.push(`RSI overbought (${rsi.toFixed(0)})`); }
 
   // MACD histogram direction
-  if (macdH > 0) { score += 1; factors.push('MACD bullish'); }
+  if (macdH > 0)      { score += 1; factors.push('MACD bullish'); }
   else if (macdH < 0) { score -= 1; factors.push('MACD bearish'); }
 
-  // EMA trend
-  if (price > ema20 && ema20 > ema50) { score += 1; factors.push('Price above EMAs'); }
-  else if (price < ema20 && ema20 < ema50) { score -= 1; factors.push('Price below EMAs'); }
+  // EMA trend — context-aware: price above EMAs amplifies SELL when RSI is bearish
+  const aboveEmas = price > ema20 && ema20 > ema50;
+  const belowEmas = price < ema20 && ema20 < ema50;
+  if (score >= 0 && aboveEmas)  { score += 1; factors.push('Price above EMAs (trend confirmation)'); }
+  else if (score >= 0 && belowEmas) { score -= 1; factors.push('Price below EMAs (bearish)'); }
+  else if (score < 0 && aboveEmas)  { score -= 1; factors.push('Price overextended above EMAs'); }
+  else if (score < 0 && belowEmas)  { score += 1; factors.push('Price at discount below EMAs'); }
 
-  // Volume confirmation
-  if (volR >= 1.2) { score = score > 0 ? score + 1 : score - 1; factors.push(`Volume spike (${volR.toFixed(1)}x)`); }
+  // Volume — amplifies existing signal direction
+  if (volR >= 1.3 && score !== 0) {
+    score += score > 0 ? 1 : -1;
+    factors.push(`Volume spike (${volR.toFixed(1)}x)`);
+  }
 
   const absScore = Math.abs(score);
-  // confidence: score 2 → 65%, score 3 → 73%, score 4+ → 85%
-  const confidence = Math.min(85, 55 + absScore * 10);
-  const criteriaScore = Math.min(5, absScore + 1); // +1 so score=2 gives criteria=3
+  const confidence    = Math.min(88, 55 + absScore * 9);
+  const criteriaScore = Math.min(5, absScore + 1);
 
   if (score >= 2) {
-    return { action: 'BUY',  confidence, criteriaScore, reasoning: 'Rule-based BUY: ' + factors.join(', '), riskLevel: 'MEDIUM', keyFactors: factors };
+    return { action: 'BUY',  confidence, criteriaScore, reasoning: 'Rule-based BUY: '  + factors.join(', '), riskLevel: absScore >= 4 ? 'LOW' : 'MEDIUM', keyFactors: factors };
   }
   if (score <= -2) {
-    return { action: 'SELL', confidence, criteriaScore, reasoning: 'Rule-based SELL: ' + factors.join(', '), riskLevel: 'MEDIUM', keyFactors: factors };
+    return { action: 'SELL', confidence, criteriaScore, reasoning: 'Rule-based SELL: ' + factors.join(', '), riskLevel: absScore >= 4 ? 'LOW' : 'MEDIUM', keyFactors: factors };
   }
-  return { action: 'HOLD', confidence: 45, criteriaScore: Math.max(0, criteriaScore - 1), reasoning: 'Rule-based: no clear signal (' + factors.join(', ') + ')', riskLevel: 'HIGH', keyFactors: factors };
+  return { action: 'HOLD', confidence: 42, criteriaScore: Math.max(0, absScore), reasoning: 'Rule-based: mixed signals (' + factors.join(', ') + ')', riskLevel: 'HIGH', keyFactors: factors };
 }
 
 async function _fetchSignal(indicators, balance, openPosition, strategyData, userGroqKey) {
