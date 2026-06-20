@@ -353,23 +353,25 @@ async function handleAdminCmd(chatId, cmd, args) {
   if (cmd === '/deploy') {
     await send(chatId, `🔄 <b>Deploying latest code...</b>\n<i>This takes ~30 seconds.</i>`);
     const { exec } = require('child_process');
-    // Use bash + export PATH to find git/npm wherever they are on the system
-    const deployCmd = [
+    // Pull + install first, then notify, then restart (restart kills this process so notify must come before)
+    const pullCmd = [
       'export PATH=/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/bin:/sbin:$PATH',
       'cd /opt/apex-bot',
       'git fetch origin claude/arcads-external-api-gExX7',
       'git reset --hard origin/claude/arcads-external-api-gExX7',
       'cd apex-trade-bot',
       'npm install --production --silent',
-      'systemctl restart apex-bot',
     ].join(' && ');
-    exec(deployCmd, { timeout: 120000, shell: '/bin/bash' },
-      (err, stdout, stderr) => {
+    exec(pullCmd, { timeout: 110000, shell: '/bin/bash' },
+      async (err, stdout, stderr) => {
         if (err) {
-          send(chatId, `❌ <b>Deploy failed:</b>\n<code>${(stderr || err.message).slice(0, 500)}</code>`);
-        } else {
-          send(chatId, `✅ <b>Deploy successful!</b> Bot restarted with latest code.\n\nPress ▶️ Start Trading when ready.`);
+          await send(chatId, `❌ <b>Deploy failed:</b>\n<code>${(stderr || err.message).slice(0, 500)}</code>`);
+          return;
         }
+        // Send success BEFORE restarting — restart kills this process
+        await send(chatId, `✅ <b>Deploy successful!</b> Restarting bot now...\n\nPress ▶️ Start Trading when ready.`);
+        // Small delay to ensure message is delivered before process dies
+        setTimeout(() => exec('systemctl restart apex-bot', { shell: '/bin/bash' }), 1500);
       }
     );
     return;
