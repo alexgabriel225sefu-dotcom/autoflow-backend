@@ -103,16 +103,17 @@ function ruleBasedSignal(ind, openPosition) {
   if (volR >= 1.2) { score = score > 0 ? score + 1 : score - 1; factors.push(`Volume spike (${volR.toFixed(1)}x)`); }
 
   const absScore = Math.abs(score);
-  const confidence = Math.min(85, 45 + absScore * 8);
-  const criteriaScore = Math.min(5, absScore);
+  // confidence: score 2 → 65%, score 3 → 73%, score 4+ → 85%
+  const confidence = Math.min(85, 55 + absScore * 10);
+  const criteriaScore = Math.min(5, absScore + 1); // +1 so score=2 gives criteria=3
 
-  if (score >= 3) {
+  if (score >= 2) {
     return { action: 'BUY',  confidence, criteriaScore, reasoning: 'Rule-based BUY: ' + factors.join(', '), riskLevel: 'MEDIUM', keyFactors: factors };
   }
-  if (score <= -3) {
+  if (score <= -2) {
     return { action: 'SELL', confidence, criteriaScore, reasoning: 'Rule-based SELL: ' + factors.join(', '), riskLevel: 'MEDIUM', keyFactors: factors };
   }
-  return { action: 'HOLD', confidence: 40, criteriaScore, reasoning: 'Rule-based: no clear signal (' + factors.join(', ') + ')', riskLevel: 'HIGH', keyFactors: factors };
+  return { action: 'HOLD', confidence: 45, criteriaScore: Math.max(0, criteriaScore - 1), reasoning: 'Rule-based: no clear signal (' + factors.join(', ') + ')', riskLevel: 'HIGH', keyFactors: factors };
 }
 
 async function _fetchSignal(indicators, balance, openPosition, strategyData, userGroqKey) {

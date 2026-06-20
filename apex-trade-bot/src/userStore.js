@@ -42,13 +42,13 @@ function make(userId) {
       lastActiveAt: null, // ISO timestamp of last activity
     },
     settings: {
-      SYMBOL:          'SOLUSDT',
+      SYMBOL:          'BTCUSDT',
       STRATEGY_MODE:   'auto',
       RISK_PER_TRADE:  0.05,
       STOP_LOSS_PCT:   0.016,
       TAKE_PROFIT_PCT: 0.032,
-      MIN_CONFIDENCE:  62,
-      MIN_CRITERIA:    3,
+      MIN_CONFIDENCE:  55,
+      MIN_CRITERIA:    2,
       PAUSED:          true,
     },
     state: {
