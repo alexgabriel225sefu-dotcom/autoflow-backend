@@ -86,7 +86,7 @@ jobs:
           echo "[deploy] Code downloaded."
 
           cd /opt/apex-forex/apex-forex-bot
-          sudo python3 -m pip install -q -r requirements.txt
+          sudo python3 -m pip install -q --prefer-binary -r requirements.txt
           echo "[deploy] Code ready."
           REMOTE
 
