@@ -44,7 +44,7 @@ jobs:
             fi
           done
 
-      - name: Install Python + clone repo
+      - name: Install pip + deploy code
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -68,38 +68,25 @@ jobs:
             echo "[swap] Already exists — $(free -h | grep Swap)"
           fi
 
-          # ── 2. Python 3 + git (install one at a time to avoid OOM) ──
-          if ! command -v python3 &>/dev/null; then
-            echo "[install] Installing python3..."
-            sudo dnf install -y --setopt=install_weak_deps=False python3
-          fi
-          if ! command -v git &>/dev/null; then
-            echo "[install] Installing git..."
-            sudo dnf install -y --setopt=install_weak_deps=False git
-          fi
-          # pip via get-pip.py — avoids heavy dnf dependency resolution
-          if ! command -v pip3 &>/dev/null; then
-            echo "[install] Installing pip3 via get-pip.py..."
+          # ── 2. pip via get-pip.py (no dnf needed) ─────────────────
+          if ! python3 -m pip --version &>/dev/null 2>&1; then
+            echo "[install] Installing pip via get-pip.py..."
             curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
-            sudo python3 /tmp/get-pip.py --quiet
+            sudo python3 /tmp/get-pip.py
             rm -f /tmp/get-pip.py
           fi
-          echo "[python] $(python3 --version) | git $(git --version)"
+          echo "[python] $(python3 --version)"
 
-          # ── 3. Clone / update repo ─────────────────────────────────
-          if [ -d /opt/apex-forex ]; then
-            echo "[deploy] Updating existing clone..."
-            cd /opt/apex-forex
-            sudo git fetch origin claude/arcads-external-api-gExX7
-            sudo git reset --hard origin/claude/arcads-external-api-gExX7
-          else
-            echo "[deploy] Cloning repo..."
-            sudo git clone --depth 1 -b claude/arcads-external-api-gExX7 \
-              https://github.com/alexgabriel225sefu-dotcom/autoflow-backend.git /opt/apex-forex
-          fi
+          # ── 3. Download repo via curl (no git install needed) ──────
+          echo "[deploy] Downloading latest code..."
+          sudo rm -rf /opt/apex-forex
+          sudo mkdir -p /opt/apex-forex
+          curl -sL "https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/archive/refs/heads/claude/arcads-external-api-gExX7.tar.gz" \
+            | sudo tar xz -C /opt/apex-forex --strip-components=1
+          echo "[deploy] Code downloaded."
 
           cd /opt/apex-forex/apex-forex-bot
-          sudo pip3 install -q -r requirements.txt
+          sudo python3 -m pip install -q -r requirements.txt
           echo "[deploy] Code ready."
           REMOTE
 
