@@ -402,6 +402,7 @@ async function handleAdminCmd(chatId, cmd, args) {
 
 // ─── Commands ──────────────────────────────────────────────────
 async function handleCmd(chatId, cmd, args) {
+  try {
   const u   = userStore.load(chatId);
   const ctx = botMgr.getCtx(chatId);
 
@@ -512,10 +513,15 @@ async function handleCmd(chatId, cmd, args) {
     default:
       return send(chatId, `❓ Unknown command. Use /menu or /help.`);
   }
+  } catch (e) {
+    console.error(`[TG-MT:${chatId}] Command error (${cmd}):`, e.message);
+    try { await send(chatId, `⚠️ Command error: <code>${e.message.slice(0, 200)}</code>\n\nTry /menu`); } catch {}
+  }
 }
 
 // ─── Callbacks ─────────────────────────────────────────────────
 async function handleCb(chatId, data) {
+  try {
   const u   = userStore.load(chatId);
   const ctx = botMgr.getCtx(chatId);
 
@@ -558,6 +564,10 @@ async function handleCb(chatId, data) {
       upd('PAUSED', false);
       if (!botMgr.isRunning(chatId)) { u.active = true; userStore.save(chatId, u); await botMgr.start(chatId, makeAlertFn(chatId)); }
       return send(chatId, `▶️ <b>Bot ACTIVE</b> — trading every minute! 🚀`, kbMenu(false, u.settings.SYMBOL));
+  }
+  } catch (e) {
+    console.error(`[TG-MT:${chatId}] Button error (${data}):`, e.message);
+    try { await send(chatId, `⚠️ Button error: <code>${e.message.slice(0, 200)}</code>\n\nTry /menu`); } catch {}
   }
 }
 
