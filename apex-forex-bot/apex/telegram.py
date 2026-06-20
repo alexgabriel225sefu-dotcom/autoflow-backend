@@ -15,6 +15,7 @@ from apex import forex
 from apex import access
 from apex import user_store
 from apex import user_loop
+from apex import affiliate_store
 
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 CHAT_ID = (cfg.TELEGRAM_CHAT_ID or "").strip()
