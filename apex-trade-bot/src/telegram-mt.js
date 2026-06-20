@@ -358,12 +358,23 @@ async function handleCmd(chatId, cmd, args) {
   const ctx = botMgr.getCtx(chatId);
 
   if (cmd === '/start' || cmd === '/setup') {
-    if (u.setupStep === 'done') return send(chatId, `⚡ <b>APEX TRADE BOT</b> — your bot is ready!`, kbMenu(u.settings.PAUSED, u.settings.SYMBOL));
+    if (u.setupStep === 'done') return send(chatId, `⚡ <b>APEX TRADE BOT</b> — your bot is ready!\n\n<i>To update your API keys use /keys</i>`, kbMenu(u.settings.PAUSED, u.settings.SYMBOL));
     userStore.save(chatId, { ...u, setupStep: 'start' });
     return send(chatId,
       `⚡ <b>Welcome to APEX TRADE BOT!</b>\n\nAI + legendary trader strategies. Automatic crypto trading.\n\nHow do you want to start?`,
       KB_START
     );
+  }
+
+  if (cmd === '/keys') {
+    await botMgr.stop(chatId);
+    u.setupStep = 'apikey'; u.apiKeyEnc = ''; u.apiSecretEnc = ''; u.apiPassEnc = '';
+    userStore.save(chatId, u);
+    const isTestnet = u.exchange === 'binance' && _bnTestnet;
+    const note = isTestnet
+      ? `\n\n⚠️ Use keys from <b>testnet.binance.vision</b> (NOT binance.com)\nLog in with GitHub → API Management → Generate Key`
+      : '';
+    return send(chatId, `🔑 <b>Update API Keys</b>\n\nExchange: <b>${(u.exchange || 'binance').toUpperCase()}${isTestnet ? ' TESTNET' : ''}</b>${note}\n\nSend your new <b>API Key</b>:`);
   }
 
   if (u.setupStep !== 'done') return send(chatId, `⏳ Setup not complete. Send /start to begin.`);
