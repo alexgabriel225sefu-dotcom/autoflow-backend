@@ -68,6 +68,7 @@ jobs:
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
           MASTER_KEY=${{ secrets.MASTER_KEY }}
+          BINANCE_TESTNET=true
           NODE_ENV=production
           ENVEOF
 

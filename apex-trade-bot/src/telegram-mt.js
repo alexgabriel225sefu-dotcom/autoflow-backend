@@ -239,8 +239,11 @@ async function handleSetupCb(chatId, data) {
   if (data.startsWith('ex:')) {
     const ex = data.replace('ex:', '');
     u.exchange = ex; u.setupStep = 'apikey'; userStore.save(chatId, u);
+
+    // On testnet mode, Binance keys must come from testnet.binance.vision (separate site/account)
+    const isBinanceTestnet = ex === 'binance' && _bnTestnet;
     const apiKeyGuides = {
-      binance:  'https://www.binance.com/en/my/settings/api-management',
+      binance:  isBinanceTestnet ? 'https://testnet.binance.vision' : 'https://www.binance.com/en/my/settings/api-management',
       bybit:    'https://www.bybit.com/en/user/api-management',
       okx:      'https://www.okx.com/account/my-api',
       kraken:   'https://pro.kraken.com/app/settings/api',
@@ -250,13 +253,16 @@ async function handleSetupCb(chatId, data) {
       coinbase: 'https://www.coinbase.com/settings/api',
     };
     const guideUrl = apiKeyGuides[ex];
+    const btnLabel = isBinanceTestnet ? '🔑 Open BINANCE TESTNET → Create API Key' : `🔑 Open ${ex.toUpperCase()} → Create API Key`;
     const kb = guideUrl
-      ? { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: `🔑 Open ${ex.toUpperCase()} → Create API Key`, url: guideUrl }]] }) }
+      ? { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: btnLabel, url: guideUrl }]] }) }
       : undefined;
+    const extraNote = isBinanceTestnet
+      ? `\n\n⚠️ <b>IMPORTANT:</b> You need keys from <b>testnet.binance.vision</b> (NOT regular binance.com).\n1. Open the link → Log in with GitHub\n2. Go to API Management → Create Key\n3. Copy the key and secret here`
+      : `\n\n<i>⚠️ Enable <b>Read + Spot Trading only</b>.\nNEVER enable Withdrawals.</i>`;
     return send(chatId,
-      `✅ Exchange: <b>${ex.toUpperCase()}</b>\n\n` +
-      `Open the button below to create your API Key, then paste it here.\n\n` +
-      `<i>⚠️ Enable <b>Read + Spot Trading only</b>.\nNEVER enable Withdrawals.</i>`,
+      `✅ Exchange: <b>${isBinanceTestnet ? 'BINANCE TESTNET' : ex.toUpperCase()}</b>\n\n` +
+      `Open the button below to create your API Key, then paste it here.${extraNote}`,
       kb
     );
   }
