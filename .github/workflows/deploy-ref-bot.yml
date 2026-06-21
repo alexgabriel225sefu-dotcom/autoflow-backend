@@ -84,6 +84,24 @@ jobs:
           AFFILIATE_BOT_SECRET=${{ secrets.AFFILIATE_BOT_SECRET }}
           ENVEOF
 
+      - name: Verify .env and test token against Telegram
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
+          echo "=== .env content (token masked) ==="
+          TOKEN_VAL=$(sudo grep ^AFFILIATE_BOT_TOKEN /opt/apex-forex/apex-affiliate-bot/.env | cut -d= -f2-)
+          echo "TOKEN len=${#TOKEN_VAL} prefix=${TOKEN_VAL:0:18}"
+          sudo grep -v AFFILIATE_BOT_TOKEN /opt/apex-forex/apex-affiliate-bot/.env || true
+
+          echo ""
+          echo "=== Live Telegram getMe test ==="
+          curl -s "https://api.telegram.org/bot${TOKEN_VAL}/getMe" | head -c 300
+          echo ""
+          REMOTE
+
       - name: Setup systemd service + start affiliate bot
         run: |
           ssh -i ~/.ssh/deploy_key \
