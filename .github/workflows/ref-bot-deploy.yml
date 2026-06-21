@@ -55,6 +55,10 @@ jobs:
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
 
+          echo "[deploy] Updating CA certificates..."
+          sudo yum install -y ca-certificates 2>/dev/null || true
+          sudo update-ca-trust 2>/dev/null || true
+
           echo "[deploy] Downloading latest code..."
           sudo rm -rf /opt/apex-forex/apex-affiliate-bot
           sudo mkdir -p /opt/apex-forex/apex-affiliate-bot
@@ -68,6 +72,7 @@ jobs:
 
           cd /opt/apex-forex/apex-affiliate-bot
           sudo python3 -m pip install -q --prefer-binary --ignore-installed -r requirements.txt
+          sudo python3 -m pip install -q --upgrade certifi
           echo "[deploy] Affiliate bot code ready."
           REMOTE
 
