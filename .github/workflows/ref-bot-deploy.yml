@@ -19,14 +19,17 @@ jobs:
           ref: claude/arcads-external-api-gExX7
 
       - name: Test token from GitHub runner
+        env:
+          RAW_TOKEN: ${{ secrets.AFFILIATE_BOT_TOKEN }}
         run: |
-          echo "Testing Telegram token validity from GitHub infrastructure..."
-          RESP=$(curl -s "https://api.telegram.org/bot${{ secrets.AFFILIATE_BOT_TOKEN }}/getMe")
+          CLEAN=$(printf '%s' "$RAW_TOKEN" | tr -d '\n\r\t ')
+          echo "Token len after strip: ${#CLEAN}, prefix: ${CLEAN:0:18}"
+          RESP=$(curl -s --max-time 10 "https://api.telegram.org/bot${CLEAN}/getMe")
           echo "$RESP"
           if echo "$RESP" | grep -q '"ok":true'; then
             echo "TOKEN IS VALID"
           else
-            echo "TOKEN IS INVALID - check the AFFILIATE_BOT_TOKEN secret value"
+            echo "TOKEN IS INVALID - regenerate in BotFather"
           fi
 
       - name: Setup SSH key
@@ -50,7 +53,7 @@ jobs:
             echo "Attempt $i failed, waiting 20s..."
             sleep 20
             if [ $i -eq 5 ]; then
-              echo "ERROR: Cannot connect. Reboot the VM from Oracle Cloud Console."
+              echo "ERROR: Cannot connect."
               exit 1
             fi
           done
@@ -65,35 +68,30 @@ jobs:
             -o ServerAliveCountMax=10 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
-
-          echo "[deploy] Downloading latest code..."
           sudo rm -rf /opt/apex-forex/apex-affiliate-bot
-          sudo mkdir -p /opt/apex-forex/apex-affiliate-bot
-          sudo mkdir -p /tmp/apex-deploy
-
+          sudo mkdir -p /opt/apex-forex/apex-affiliate-bot /tmp/apex-deploy
           curl -sL "https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/archive/refs/heads/claude/arcads-external-api-gExX7.tar.gz" \
             | sudo tar xz -C /tmp/apex-deploy --strip-components=1
-
           sudo cp -r /tmp/apex-deploy/apex-affiliate-bot/. /opt/apex-forex/apex-affiliate-bot/
           sudo rm -rf /tmp/apex-deploy
-
-          cd /opt/apex-forex/apex-affiliate-bot
-          sudo python3 -m pip install -q --prefer-binary -r requirements.txt
-          echo "[deploy] Affiliate bot code ready."
+          sudo python3 -m pip install -q --prefer-binary -r /opt/apex-forex/apex-affiliate-bot/requirements.txt
+          echo "[deploy] Code ready."
           REMOTE
 
       - name: Write .env to VM
+        env:
+          RAW_TOKEN: ${{ secrets.AFFILIATE_BOT_TOKEN }}
+          BOT_SECRET: ${{ secrets.AFFILIATE_BOT_SECRET }}
         run: |
+          CLEAN_TOKEN=$(printf '%s' "$RAW_TOKEN" | tr -d '\n\r\t ')
+          printf 'AFFILIATE_BOT_TOKEN=%s\nSITE_URL=https://aicashsystem.space\nAFFILIATE_BOT_SECRET=%s\n' \
+            "$CLEAN_TOKEN" "$BOT_SECRET" | \
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
             -o ConnectTimeout=30 \
             opc@${{ github.event.inputs.vm_ip }} \
-            "sudo tee /opt/apex-forex/apex-affiliate-bot/.env > /dev/null" << 'ENVEOF'
-          AFFILIATE_BOT_TOKEN=${{ secrets.AFFILIATE_BOT_TOKEN }}
-          SITE_URL=https://aicashsystem.space
-          AFFILIATE_BOT_SECRET=${{ secrets.AFFILIATE_BOT_SECRET }}
-          ENVEOF
+            "sudo tee /opt/apex-forex/apex-affiliate-bot/.env > /dev/null"
 
       - name: Start affiliate bot
         run: |
@@ -105,15 +103,13 @@ jobs:
             -o ServerAliveCountMax=5 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
-
           printf '[Unit]\nDescription=Apex Affiliate Bot\nAfter=network.target\nStartLimitIntervalSec=0\n\n[Service]\nType=simple\nWorkingDirectory=/opt/apex-forex/apex-affiliate-bot\nExecStart=/usr/bin/python3 main.py\nRestart=always\nRestartSec=10\nStandardOutput=append:/var/log/apex-affiliate.log\nStandardError=append:/var/log/apex-affiliate.log\nEnvironment=PYTHONUNBUFFERED=1\n\n[Install]\nWantedBy=multi-user.target\n' | sudo tee /etc/systemd/system/apex-affiliate.service > /dev/null
-
           sudo systemctl daemon-reload
           sudo systemctl enable apex-affiliate
           sudo systemctl restart apex-affiliate
           sleep 5
-          sudo systemctl is-active apex-affiliate && echo "SUCCESS: Affiliate Bot running!" || \
-            (echo "ERROR: Affiliate Bot failed" && tail -30 /var/log/apex-affiliate.log && exit 1)
+          sudo systemctl is-active apex-affiliate && echo "SUCCESS" || \
+            (tail -20 /var/log/apex-affiliate.log && exit 1)
           REMOTE
 
       - name: Show logs
