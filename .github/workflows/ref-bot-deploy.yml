@@ -78,11 +78,16 @@ jobs:
             -o BatchMode=yes \
             -o ConnectTimeout=30 \
             opc@${{ github.event.inputs.vm_ip }} \
-            "sudo tee /opt/apex-forex/apex-affiliate-bot/.env > /dev/null" << 'ENVEOF'
-          AFFILIATE_BOT_TOKEN=${{ secrets.AFFILIATE_BOT_TOKEN }}
-          SITE_URL=https://aicashsystem.space
-          AFFILIATE_BOT_SECRET=${{ secrets.AFFILIATE_BOT_SECRET }}
-          ENVEOF
+            "sudo bash -c 'printf \"AFFILIATE_BOT_TOKEN=${{ secrets.AFFILIATE_BOT_TOKEN }}\\nSITE_URL=https://aicashsystem.space\\nAFFILIATE_BOT_SECRET=${{ secrets.AFFILIATE_BOT_SECRET }}\\n\" > /opt/apex-forex/apex-affiliate-bot/.env'"
+
+      - name: Verify .env written correctly
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            opc@${{ github.event.inputs.vm_ip }} \
+            "sudo grep -c 'AFFILIATE_BOT_TOKEN' /opt/apex-forex/apex-affiliate-bot/.env && echo 'ENV OK' || echo 'ENV MISSING'"
 
       - name: Setup systemd + start affiliate bot
         run: |
@@ -109,10 +114,10 @@ jobs:
 
       - name: Show bot startup logs
         run: |
-          sleep 5
+          sleep 8
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
             -o ConnectTimeout=20 \
             opc@${{ github.event.inputs.vm_ip }} \
-            "sudo tail -30 /var/log/apex-affiliate.log 2>/dev/null || echo '(no log yet)'"
+            "sudo tail -20 /var/log/apex-affiliate.log 2>/dev/null || echo '(no log yet)'"
