@@ -53,15 +53,19 @@ def _api_stats(chat_id):
 def _welcome(chat_id, name, link):
     first = (name or "").split(" ")[0] or "creator"
     _send(chat_id,
-          f"🎉 <b>You're connected, {first}!</b>\n\n"
-          f"Here is your referral link — share it anywhere:\n\n"
+          f"👋 <b>Welcome to the Apex Affiliate Program, {first}!</b>\n\n"
+          f"You're all set up and ready to earn. 🚀\n\n"
+          f"Here is your <b>personal referral link</b> — share it anywhere:\n\n"
           f"🔗 <code>{link}</code>\n\n"
-          f"Anyone who buys the crypto ($297) or forex ($497) bot through it counts as your sale, "
-          f"and you earn <b>30%</b> commission.\n\n"
-          f"I'll ping you the moment someone buys. Check anytime:\n"
-          f"• /stats — your earnings\n"
+          f"Every time someone buys through your link, you earn <b>30% commission</b>:\n"
+          f"• <b>$89.10</b> on the Crypto bot ($297)\n"
+          f"• <b>$149.10</b> on the Forex bot ($497)\n\n"
+          f"💸 I'll ping you the <b>moment</b> someone buys, so you never miss a sale.\n\n"
+          f"Anytime you want, just send:\n"
+          f"• /stats — your live earnings\n"
           f"• /link — your referral link\n"
-          f"• /help")
+          f"• /help — all commands\n\n"
+          f"Let's get you paid, {first}. 💰")
 
 
 def _show_stats(chat_id):
