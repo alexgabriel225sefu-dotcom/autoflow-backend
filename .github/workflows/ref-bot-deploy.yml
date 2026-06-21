@@ -18,6 +18,17 @@ jobs:
         with:
           ref: claude/arcads-external-api-gExX7
 
+      - name: Test token from GitHub runner
+        run: |
+          echo "Testing Telegram token validity from GitHub infrastructure..."
+          RESP=$(curl -s "https://api.telegram.org/bot${{ secrets.AFFILIATE_BOT_TOKEN }}/getMe")
+          echo "$RESP"
+          if echo "$RESP" | grep -q '"ok":true'; then
+            echo "TOKEN IS VALID"
+          else
+            echo "TOKEN IS INVALID - check the AFFILIATE_BOT_TOKEN secret value"
+          fi
+
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
@@ -83,22 +94,6 @@ jobs:
           SITE_URL=https://aicashsystem.space
           AFFILIATE_BOT_SECRET=${{ secrets.AFFILIATE_BOT_SECRET }}
           ENVEOF
-
-      - name: Verify token + curl getMe test
-        run: |
-          ssh -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o BatchMode=yes \
-            -o ConnectTimeout=30 \
-            opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
-          TOKEN_VAL=$(sudo grep ^AFFILIATE_BOT_TOKEN /opt/apex-forex/apex-affiliate-bot/.env | cut -d= -f2-)
-          echo "TOKEN len=${#TOKEN_VAL} prefix=${TOKEN_VAL:0:18}"
-          sudo grep -v AFFILIATE_BOT_TOKEN /opt/apex-forex/apex-affiliate-bot/.env || true
-          echo ""
-          echo "=== Telegram getMe ==="
-          curl -s "https://api.telegram.org/bot${TOKEN_VAL}/getMe"
-          echo ""
-          REMOTE
 
       - name: Start affiliate bot
         run: |
