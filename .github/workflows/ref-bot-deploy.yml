@@ -11,7 +11,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -55,10 +55,6 @@ jobs:
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
 
-          echo "[deploy] Updating CA certificates..."
-          sudo yum install -y ca-certificates 2>/dev/null || true
-          sudo update-ca-trust 2>/dev/null || true
-
           echo "[deploy] Downloading latest code..."
           sudo rm -rf /opt/apex-forex/apex-affiliate-bot
           sudo mkdir -p /opt/apex-forex/apex-affiliate-bot
@@ -71,9 +67,8 @@ jobs:
           sudo rm -rf /tmp/apex-deploy
 
           cd /opt/apex-forex/apex-affiliate-bot
-          sudo python3 -m pip install -q --prefer-binary --ignore-installed -r requirements.txt
-          sudo python3 -m pip install -q --upgrade certifi
-          echo "[deploy] Affiliate bot code ready."
+          sudo pip3 install -q requests python-dotenv certifi
+          echo "[deploy] Code ready. Certifi: $(python3 -c 'import certifi; print(certifi.where())')"
           REMOTE
 
       - name: Write affiliate bot .env
@@ -100,7 +95,9 @@ jobs:
             opc@${{ github.event.inputs.vm_ip }} bash << 'REMOTE'
           set -e
 
-          printf '[Unit]\nDescription=Apex Affiliate Bot\nAfter=network.target\nStartLimitIntervalSec=0\n\n[Service]\nType=simple\nWorkingDirectory=/opt/apex-forex/apex-affiliate-bot\nExecStart=/usr/bin/python3 main.py\nRestart=always\nRestartSec=10\nStandardOutput=append:/var/log/apex-affiliate.log\nStandardError=append:/var/log/apex-affiliate.log\nEnvironment=PYTHONUNBUFFERED=1\n\n[Install]\nWantedBy=multi-user.target\n' | sudo tee /etc/systemd/system/apex-affiliate.service > /dev/null
+          CERTIFI_PATH=$(python3 -c 'import certifi; print(certifi.where())' 2>/dev/null || echo '')
+
+          printf '[Unit]\nDescription=Apex Affiliate Bot\nAfter=network.target\nStartLimitIntervalSec=0\n\n[Service]\nType=simple\nWorkingDirectory=/opt/apex-forex/apex-affiliate-bot\nExecStart=/usr/bin/python3 main.py\nRestart=always\nRestartSec=10\nStandardOutput=append:/var/log/apex-affiliate.log\nStandardError=append:/var/log/apex-affiliate.log\nEnvironment=PYTHONUNBUFFERED=1\nEnvironment=REQUESTS_CA_BUNDLE=%s\n\n[Install]\nWantedBy=multi-user.target\n' "$CERTIFI_PATH" | sudo tee /etc/systemd/system/apex-affiliate.service > /dev/null
 
           sudo systemctl daemon-reload
           sudo systemctl enable apex-affiliate
@@ -112,9 +109,10 @@ jobs:
 
       - name: Show bot startup logs
         run: |
+          sleep 5
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
             -o ConnectTimeout=20 \
             opc@${{ github.event.inputs.vm_ip }} \
-            "sudo tail -40 /var/log/apex-affiliate.log 2>/dev/null || echo '(no log yet)'"
+            "sudo tail -30 /var/log/apex-affiliate.log 2>/dev/null || echo '(no log yet)'"
