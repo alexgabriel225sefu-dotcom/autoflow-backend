@@ -180,10 +180,26 @@ def _poll_once():
         time.sleep(3)
 
 
+def _clear_webhook():
+    """Remove any stale webhook so getUpdates (long polling) works.
+
+    The previous affiliate bot ran in webhook mode on the same token. If that
+    webhook is still registered, Telegram blocks getUpdates with a 409 and the
+    bot silently receives nothing. Deleting it on startup makes polling work.
+    """
+    try:
+        r = requests.get(f"{_API}/deleteWebhook",
+                         params={"drop_pending_updates": "false"}, timeout=10)
+        print(f"[BOT] deleteWebhook -> {r.json()}")
+    except Exception as e:
+        print(f"[BOT] deleteWebhook error: {e}")
+
+
 def run():
     if not TOKEN:
         print("[BOT] AFFILIATE_BOT_TOKEN missing — bot disabled.")
         return
+    _clear_webhook()
     print(f"[APEX AFFILIATE BOT] Polling started. Site: {SITE_URL}")
     while True:
         _poll_once()
