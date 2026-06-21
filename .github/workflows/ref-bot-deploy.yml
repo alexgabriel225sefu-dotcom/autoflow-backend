@@ -25,9 +25,9 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ github.event.inputs.vm_ip }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Wait for SSH (retry 5x)
+      - name: Wait for SSH (retry 8x)
         run: |
-          for i in 1 2 3 4 5; do
+          for i in 1 2 3 4 5 6 7 8; do
             if ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
               -o BatchMode=yes \
@@ -38,7 +38,7 @@ jobs:
             fi
             echo "Attempt $i failed, waiting 20s..."
             sleep 20
-            if [ $i -eq 5 ]; then
+            if [ $i -eq 8 ]; then
               echo "ERROR: Cannot connect. Reboot the VM from Oracle Cloud Console."
               exit 1
             fi
@@ -67,8 +67,8 @@ jobs:
           sudo rm -rf /tmp/apex-deploy
 
           cd /opt/apex-forex/apex-affiliate-bot
-          sudo pip3 install -q requests python-dotenv certifi
-          echo "[deploy] Code ready. Certifi: $(python3 -c 'import certifi; print(certifi.where())')"
+          sudo python3 -m pip install -q requests python-dotenv certifi 2>/dev/null || true
+          echo "[deploy] Code ready."
           REMOTE
 
       - name: Write affiliate bot .env
@@ -95,7 +95,7 @@ jobs:
             opc@${{ github.event.inputs.vm_ip }} bash << 'REMOTE'
           set -e
 
-          CERTIFI_PATH=$(python3 -c 'import certifi; print(certifi.where())' 2>/dev/null || echo '')
+          CERTIFI_PATH=$(python3 -c 'import certifi; print(certifi.where())' 2>/dev/null || echo '/etc/ssl/certs/ca-bundle.crt')
 
           printf '[Unit]\nDescription=Apex Affiliate Bot\nAfter=network.target\nStartLimitIntervalSec=0\n\n[Service]\nType=simple\nWorkingDirectory=/opt/apex-forex/apex-affiliate-bot\nExecStart=/usr/bin/python3 main.py\nRestart=always\nRestartSec=10\nStandardOutput=append:/var/log/apex-affiliate.log\nStandardError=append:/var/log/apex-affiliate.log\nEnvironment=PYTHONUNBUFFERED=1\nEnvironment=REQUESTS_CA_BUNDLE=%s\n\n[Install]\nWantedBy=multi-user.target\n' "$CERTIFI_PATH" | sudo tee /etc/systemd/system/apex-affiliate.service > /dev/null
 
