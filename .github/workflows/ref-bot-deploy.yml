@@ -78,6 +78,13 @@ jobs:
           AFFILIATE_BOT_SECRET=${{ secrets.AFFILIATE_BOT_SECRET }}
           ENVEOF
 
+      - name: Verify token in bot.env
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20 \
+            opc@${{ github.event.inputs.vm_ip }} \
+            "sudo python3 -c \"import pathlib; c=pathlib.Path('/opt/apex-forex/apex-affiliate-bot/bot.env').read_text(); lines=c.strip().split(chr(10)); [print('TOKEN len='+str(len(l.split('=',1)[1]))+' prefix='+l.split('=',1)[1][:15]) if 'TOKEN' in l else print(l) for l in lines]\""
+
       - name: Start bot
         run: |
           ssh -i ~/.ssh/deploy_key \
@@ -105,4 +112,4 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20 \
             opc@${{ github.event.inputs.vm_ip }} \
-            "sudo tail -12 /var/log/apex-affiliate.log 2>/dev/null || echo '(no log)'"
+            "sudo tail -8 /var/log/apex-affiliate.log 2>/dev/null || echo '(no log)'"
