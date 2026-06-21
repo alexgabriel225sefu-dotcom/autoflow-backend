@@ -39,12 +39,15 @@ jobs:
             echo "Attempt $i failed, waiting 20s..."
             sleep 20
             if [ $i -eq 8 ]; then
-              echo "ERROR: Cannot connect. Reboot the VM from Oracle Cloud Console."
+              echo "ERROR: Cannot connect."
               exit 1
             fi
           done
 
-      - name: Deploy affiliate bot code
+      - name: Deploy + configure + start bot
+        env:
+          BOT_TOKEN: ${{ secrets.AFFILIATE_BOT_TOKEN }}
+          BOT_SECRET: ${{ secrets.AFFILIATE_BOT_SECRET }}
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -54,68 +57,43 @@ jobs:
             -o ServerAliveCountMax=10 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
-          echo "[deploy] Downloading latest code..."
+
+          echo "[1] Downloading code..."
           sudo rm -rf /opt/apex-forex/apex-affiliate-bot
-          sudo mkdir -p /opt/apex-forex/apex-affiliate-bot
-          sudo mkdir -p /tmp/apex-deploy
+          sudo mkdir -p /opt/apex-forex/apex-affiliate-bot /tmp/apex-deploy
           curl -sL "https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/archive/refs/heads/claude/arcads-external-api-gExX7.tar.gz" \
             | sudo tar xz -C /tmp/apex-deploy --strip-components=1
           sudo cp -r /tmp/apex-deploy/apex-affiliate-bot/. /opt/apex-forex/apex-affiliate-bot/
           sudo rm -rf /tmp/apex-deploy
           sudo python3 -m pip install -q requests python-dotenv certifi 2>/dev/null || true
-          echo "[deploy] Code ready."
+
+          echo "[2] Writing env file..."
+          CERTIFI=$(python3 -c 'import certifi; print(certifi.where())' 2>/dev/null || echo '/etc/ssl/certs/ca-bundle.crt')
+          echo "Certifi: $CERTIFI"
           REMOTE
 
-      - name: Write env file + start bot
-        run: |
-          CERTIFI=$(ssh -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20 \
-            opc@${{ github.event.inputs.vm_ip }} \
-            "python3 -c 'import certifi; print(certifi.where())' 2>/dev/null || echo '/etc/ssl/certs/ca-bundle.crt'")
-          echo "Certifi path: $CERTIFI"
-
+          # Pass secrets as SSH env vars — no file needed, no parsing issues
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
             -o ConnectTimeout=30 \
-            -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=5 \
-            opc@${{ github.event.inputs.vm_ip }} bash -s << REMOTE
+            -o SendEnv=BOT_TOKEN \
+            -o SendEnv=BOT_SECRET \
+            opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE2'
           set -e
 
-          # Write env file with NO indentation (systemd EnvironmentFile format)
-          sudo tee /opt/apex-forex/apex-affiliate-bot/bot.env > /dev/null << 'ENVEOF'
-AFFILIATE_BOT_TOKEN=${{ secrets.AFFILIATE_BOT_TOKEN }}
-SITE_URL=https://aicashsystem.space
-AFFILIATE_BOT_SECRET=${{ secrets.AFFILIATE_BOT_SECRET }}
-REQUESTS_CA_BUNDLE=$CERTIFI
-ENVEOF
+          CERTIFI=$(python3 -c 'import certifi; print(certifi.where())' 2>/dev/null || echo '/etc/ssl/certs/ca-bundle.crt')
 
-          echo "--- ENV FILE ---"
-          sudo grep -v TOKEN /opt/apex-forex/apex-affiliate-bot/bot.env || true
-          echo "TOKEN line exists: \$(sudo grep -c AFFILIATE_BOT_TOKEN /opt/apex-forex/apex-affiliate-bot/bot.env)"
+          printf 'AFFILIATE_BOT_TOKEN=%s\nSITE_URL=https://aicashsystem.space\nAFFILIATE_BOT_SECRET=%s\nREQUESTS_CA_BUNDLE=%s\n' \
+            "$BOT_TOKEN" "$BOT_SECRET" "$CERTIFI" \
+            | sudo tee /opt/apex-forex/apex-affiliate-bot/bot.env > /dev/null
 
-          # Systemd service using EnvironmentFile (bypasses python-dotenv entirely)
-          sudo tee /etc/systemd/system/apex-affiliate.service > /dev/null << 'SERVICE'
-[Unit]
-Description=Apex Affiliate Bot
-After=network.target
-StartLimitIntervalSec=0
+          echo "TOKEN line count: $(sudo grep -c AFFILIATE_BOT_TOKEN /opt/apex-forex/apex-affiliate-bot/bot.env)"
+          echo "Other vars:"
+          sudo grep -v TOKEN /opt/apex-forex/apex-affiliate-bot/bot.env
 
-[Service]
-Type=simple
-WorkingDirectory=/opt/apex-forex/apex-affiliate-bot
-EnvironmentFile=/opt/apex-forex/apex-affiliate-bot/bot.env
-ExecStart=/usr/bin/python3 main.py
-Restart=always
-RestartSec=10
-StandardOutput=append:/var/log/apex-affiliate.log
-StandardError=append:/var/log/apex-affiliate.log
-Environment=PYTHONUNBUFFERED=1
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
+          printf '[Unit]\nDescription=Apex Affiliate Bot\nAfter=network.target\nStartLimitIntervalSec=0\n\n[Service]\nType=simple\nWorkingDirectory=/opt/apex-forex/apex-affiliate-bot\nEnvironmentFile=/opt/apex-forex/apex-affiliate-bot/bot.env\nExecStart=/usr/bin/python3 main.py\nRestart=always\nRestartSec=10\nStandardOutput=append:/var/log/apex-affiliate.log\nStandardError=append:/var/log/apex-affiliate.log\nEnvironment=PYTHONUNBUFFERED=1\n\n[Install]\nWantedBy=multi-user.target\n' \
+            | sudo tee /etc/systemd/system/apex-affiliate.service > /dev/null
 
           sudo systemctl daemon-reload
           sudo systemctl enable apex-affiliate
@@ -123,7 +101,7 @@ SERVICE
           sleep 8
           sudo systemctl is-active apex-affiliate && echo "SUCCESS: Bot running!" || \
             (echo "FAILED" && sudo tail -20 /var/log/apex-affiliate.log && exit 1)
-          REMOTE
+          REMOTE2
 
       - name: Show bot logs
         run: |
