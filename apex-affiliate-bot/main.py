@@ -6,7 +6,8 @@ needed anymore.
 """
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()            # reads .env if present
+load_dotenv('bot.env', override=True)  # bot.env takes precedence (workflow may write either)
 
 import bot as affiliate_bot
 
