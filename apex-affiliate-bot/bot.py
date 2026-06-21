@@ -1,18 +1,21 @@
-"""Apex Affiliate Bot — Telegram polling + commands."""
+"""Apex Affiliate Bot — Telegram front-end for the affiliate program.
+
+Affiliates sign up on the site (name + email) and are handed off here via a
+signed deep-link. This bot links their Telegram chat to their affiliate account
+on the main server, hands them their referral link, and shows live earnings.
+All data lives on the main server (Supabase) — this bot is just the front-end.
+"""
 import os
-import json
 import time
-import threading
 import requests
-import store
 
 TOKEN = os.getenv("AFFILIATE_BOT_TOKEN", "").strip()
-ADMIN_IDS = [s.strip() for s in os.getenv("ADMIN_CHAT_ID", "").split(",") if s.strip()]
-SITE_URL = os.getenv("SITE_URL", "https://aicashsystem.space")
-COMMISSION_PCT = float(os.getenv("COMMISSION_PCT", "0.30"))
+SITE_URL = os.getenv("SITE_URL", "https://aicashsystem.space").rstrip("/")
+SECRET = os.getenv("AFFILIATE_BOT_SECRET", "apex-affiliate-bridge")
 
 _API = f"https://api.telegram.org/bot{TOKEN}"
 _update_id = 0
+SIGNUP = f"{SITE_URL}/affiliate.html"
 
 
 def _send(chat_id, text, extra=None):
@@ -21,230 +24,166 @@ def _send(chat_id, text, extra=None):
     try:
         requests.post(f"{_API}/sendMessage",
                       json={"chat_id": chat_id, "text": text,
-                            "parse_mode": "HTML", **(extra or {})},
-                      timeout=6)
+                            "parse_mode": "HTML", "disable_web_page_preview": True,
+                            **(extra or {})},
+                      timeout=8)
     except Exception as e:
-        print(f"[BOT] Send error: {e}")
+        print(f"[BOT] send error: {e}")
 
 
-def _is_admin(chat_id):
-    return str(chat_id) in ADMIN_IDS
-
-
-# ─── Handlers ─────────────────────────────────────────────
-
-def _handle_start(chat_id, username):
-    data, is_new = store.register(chat_id, username)
-    link = f"{SITE_URL}/?ref={data['ref_code']}"
-    if is_new:
-        _send(chat_id,
-              f"🎉 <b>Bun venit în programul de afiliat Apex Bot!</b>\n\n"
-              f"Câștigă <b>{int(COMMISSION_PCT*100)}% comision</b> pe fiecare vânzare.\n\n"
-              f"🔗 <b>Link-ul tău unic:</b>\n<code>{link}</code>\n\n"
-              f"Distribuie-l pe TikTok, Instagram, YouTube și câștigă automat.\n\n"
-              f"📊 /stats — statisticile tale\n"
-              f"💸 /payout — solicită plata\n"
-              f"❓ /help — ajutor")
-    else:
-        _send(chat_id,
-              f"👋 <b>Ești deja înregistrat!</b>\n\n"
-              f"🔗 Link-ul tău:\n<code>{link}</code>\n\n"
-              f"📊 /stats — statisticile tale")
-
-
-def _handle_link(chat_id):
-    data = store.get(chat_id)
-    if not data:
-        return _send(chat_id, "❌ Nu ești înregistrat. Trimite /start.")
-    link = f"{SITE_URL}/?ref={data['ref_code']}"
-    _send(chat_id,
-          f"🔗 <b>Link-ul tău de afiliat:</b>\n\n"
-          f"<code>{link}</code>\n\n"
-          f"Copiază și distribuie-l. Când cineva cumpără prin el, primești "
-          f"<b>{int(COMMISSION_PCT*100)}% comision</b> automat.")
-
-
-def _handle_stats(chat_id):
-    data = store.get(chat_id)
-    if not data:
-        return _send(chat_id, "❌ Nu ești înregistrat. Trimite /start.")
-    sales = data.get("sales", [])
-    total_sales = len(sales)
-    total_vol = sum(s.get("amount", 0) for s in sales)
-    earned = data.get("total_earned", 0.0)
-    paid = data.get("total_paid", 0.0)
-    pending = round(earned - paid, 2)
-    clicks = data.get("clicks", 0)
-    cr = f"{total_sales/clicks*100:.1f}%" if clicks > 0 else "—"
-    link = f"{SITE_URL}/?ref={data['ref_code']}"
-
-    recent = ""
-    for s in sorted(sales, key=lambda x: x["time"], reverse=True)[:5]:
-        t = time.strftime("%d %b %H:%M", time.localtime(s["time"]))
-        recent += f"\n  • {t} — ${s['amount']:.0f} → <b>+${s['commission']:.2f}</b>"
-
-    _send(chat_id,
-          f"📊 <b>STATISTICILE TALE</b>\n"
-          f"━━━━━━━━━━━━━━━━━━━━\n"
-          f"🔗 Cod: <code>{data['ref_code']}</code>\n"
-          f"👁 Clicuri: <b>{clicks}</b>\n"
-          f"🛒 Vânzări: <b>{total_sales}</b>  (CR: {cr})\n"
-          f"💰 Volum total: <b>${total_vol:.2f}</b>\n\n"
-          f"✅ Total câștigat: <b>${earned:.2f}</b>\n"
-          f"💸 Plătit: <b>${paid:.2f}</b>\n"
-          f"⏳ De primit: <b>${pending:.2f}</b>\n"
-          + (f"\n📋 <b>Ultimele vânzări:</b>{recent}" if recent else "\n<i>Nicio vânzare încă.</i>") +
-          f"\n\n🔗 <code>{link}</code>")
-
-
-def _handle_payout(chat_id, args):
-    data = store.get(chat_id)
-    if not data:
-        return _send(chat_id, "❌ Nu ești înregistrat. Trimite /start.")
-    pending = round(data.get("total_earned", 0) - data.get("total_paid", 0), 2)
-    if not args:
-        _send(chat_id,
-              f"💸 <b>Solicită plata</b>\n\n"
-              f"De primit: <b>${pending:.2f}</b>\n"
-              f"Minim: <b>$10</b>\n\n"
-              f"Trimite:\n"
-              f"<code>/payout paypal email@tau.com</code>\n"
-              f"<code>/payout usdt adresa_wallet</code>\n"
-              f"<code>/payout btc adresa_wallet</code>")
-        return
-    parts = args.strip().split(None, 1)
-    if len(parts) < 2:
-        return _send(chat_id, "❌ Format: <code>/payout paypal email@tau.com</code>")
-    method, address = parts[0].lower(), parts[1]
-    result = store.request_payout(chat_id, method, address)
-    if isinstance(result, dict) and result.get("error") == "minimum":
-        return _send(chat_id,
-                     f"❌ Minim $10 pentru plată. Ai acum <b>${result['pending']:.2f}</b>.")
-    if isinstance(result, dict) and result.get("error"):
-        return _send(chat_id, "❌ Eroare. Încearcă din nou.")
-    _send(chat_id,
-          f"✅ <b>Cerere de plată trimisă!</b>\n\n"
-          f"Sumă: <b>${result['amount']:.2f}</b>\n"
-          f"Metodă: <b>{method.upper()}</b>\n"
-          f"Adresă: <code>{address}</code>\n\n"
-          f"Plata se procesează în 24-48h. Vei primi confirmare.")
-    # Notifică admin
-    for adm in ADMIN_IDS:
-        _send(adm,
-              f"💸 <b>CERERE PLATĂ AFILIAT</b>\n"
-              f"ID: <code>{chat_id}</code>\n"
-              f"Sumă: <b>${result['amount']:.2f}</b>\n"
-              f"Metodă: {method.upper()} → <code>{address}</code>\n\n"
-              f"/markpaid {chat_id} {result['amount']:.2f}")
-
-
-def _handle_top(chat_id):
-    if not _is_admin(chat_id):
-        return _send(chat_id, "❌ Doar adminii pot vedea topul.")
-    affiliates = store.all_affiliates()
-    if not affiliates:
-        return _send(chat_id, "📊 Niciun afiliat înregistrat.")
-    lines = []
-    for i, a in enumerate(affiliates[:15], 1):
-        lines.append(f"{i}. @{a.get('username') or a['chat_id']} — "
-                     f"{len(a.get('sales',[]))} vânzări · ${a.get('total_earned',0):.2f} câștigat")
-    _send(chat_id, "🏆 <b>TOP AFILIAȚI</b>\n━━━━━━━━━━━━━━\n" + "\n".join(lines))
-
-
-def _handle_markpaid(chat_id, args):
-    if not _is_admin(chat_id):
-        return _send(chat_id, "❌ Doar adminii.")
-    parts = (args or "").strip().split()
-    if len(parts) < 2:
-        return _send(chat_id, "Format: <code>/markpaid CHAT_ID SUMA</code>")
-    target_id, amount = parts[0], parts[1]
+def _money(cents):
     try:
-        amount = float(amount)
-    except ValueError:
-        return _send(chat_id, "❌ Sumă invalidă.")
-    if store.mark_paid(target_id, amount):
-        _send(chat_id, f"✅ Marcat ca plătit: ${amount:.2f} pentru <code>{target_id}</code>.")
-        _send(target_id, f"✅ <b>Plata de ${amount:.2f} a fost procesată!</b>\nMulțumim!")
-    else:
-        _send(chat_id, "❌ Afiliat negăsit.")
+        return f"${cents / 100:.2f}"
+    except Exception:
+        return "$0.00"
 
 
-def _handle_help(chat_id):
-    is_adm = _is_admin(chat_id)
-    text = ("📋 <b>APEX AFFILIATE BOT</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "/start — înregistrare + link-ul tău\n"
-            "/link — vezi link-ul tău unic\n"
-            "/stats — clicuri, vânzări, comision câștigat\n"
-            "/payout — solicită plata comisionului\n"
-            "/help — această listă\n")
-    if is_adm:
-        text += ("━━━━━━━━━━━━━━━━━━━━\n"
-                 "👑 <b>Admin</b>\n"
-                 "/top — top afiliați\n"
-                 "/markpaid ID SUMA — confirmă plată")
-    _send(chat_id, text)
+def _api_link(token, chat_id):
+    r = requests.post(f"{SITE_URL}/api/affiliates/telegram-link",
+                      json={"token": token, "chatId": chat_id, "secret": SECRET}, timeout=12)
+    return r.json()
 
 
-# ─── Poll loop ────────────────────────────────────────────
-
-def _poll():
-    global _update_id
-    print(f"[AFFILIATE BOT] Polling... TOKEN={'set' if TOKEN else 'MISSING'}")
-    while True:
-        try:
-            r = requests.get(f"{_API}/getUpdates",
-                             params={"offset": _update_id, "timeout": 10,
-                                     "allowed_updates": json.dumps(["message"])},
-                             timeout=15)
-            data = r.json()
-            if not data.get("ok"):
-                time.sleep(10)
-                continue
-            for u in data.get("result", []):
-                _update_id = u["update_id"] + 1
-                msg = u.get("message", {})
-                raw = (msg.get("text") or "").strip()
-                chat_id = msg.get("chat", {}).get("id")
-                username = msg.get("from", {}).get("username", "")
-                if not raw or chat_id is None:
-                    continue
-                first_line = raw.splitlines()[0].strip()
-                cmd, _, args = first_line.partition(" ")
-                cmd_l = cmd.lower().split("@")[0]
-                if cmd_l == "/start":
-                    _handle_start(chat_id, username)
-                elif cmd_l == "/link":
-                    _handle_link(chat_id)
-                elif cmd_l in ("/stats", "/earnings"):
-                    _handle_stats(chat_id)
-                elif cmd_l == "/payout":
-                    _handle_payout(chat_id, args)
-                elif cmd_l == "/top":
-                    _handle_top(chat_id)
-                elif cmd_l == "/markpaid":
-                    _handle_markpaid(chat_id, args)
-                elif cmd_l == "/help":
-                    _handle_help(chat_id)
-        except Exception as e:
-            print(f"[AFFILIATE BOT] Poll error: {e}")
-        time.sleep(2)
+def _api_stats(chat_id):
+    r = requests.post(f"{SITE_URL}/api/affiliates/telegram-stats",
+                      json={"chatId": chat_id, "secret": SECRET}, timeout=12)
+    return r.json()
 
 
-def notify_sale(chat_id, amount, commission, product):
-    """Called by webhook when a sale is recorded."""
+def _welcome(chat_id, name, link):
+    first = (name or "").split(" ")[0] or "creator"
     _send(chat_id,
-          f"🎉 <b>VÂNZARE NOUĂ!</b>\n\n"
-          f"Produs: <b>{product}</b>\n"
-          f"Valoare: <b>${amount:.2f}</b>\n"
-          f"Comisionul tău (30%): <b>+${commission:.2f}</b> 💰\n\n"
-          f"Vezi toate vânzările cu /stats")
+          f"🎉 <b>You're connected, {first}!</b>\n\n"
+          f"Here is your referral link — share it anywhere:\n\n"
+          f"🔗 <code>{link}</code>\n\n"
+          f"Anyone who buys the crypto ($297) or forex ($497) bot through it counts as your sale, "
+          f"and you earn <b>30%</b> commission.\n\n"
+          f"I'll ping you the moment someone buys. Check anytime:\n"
+          f"• /stats — your earnings\n"
+          f"• /link — your referral link\n"
+          f"• /help")
 
 
-def start():
-    if not TOKEN:
-        print("[AFFILIATE BOT] AFFILIATE_BOT_TOKEN not set — bot disabled.")
+def _show_stats(chat_id):
+    try:
+        d = _api_stats(chat_id)
+    except Exception as e:
+        _send(chat_id, f"⚠️ Couldn't reach the server. Try again in a moment.\n<code>{e}</code>")
         return
-    t = threading.Thread(target=_poll, daemon=True)
-    t.start()
-    print("[AFFILIATE BOT] Started.")
+    if d.get("error"):
+        _send(chat_id, "⚠️ Something went wrong. Try again shortly.")
+        return
+    if not d.get("linked"):
+        _send(chat_id, f"You're not connected yet. Sign up here, then tap the Telegram button:\n{SIGNUP}")
+        return
+    avail, pend, paid = d.get("availableCents", 0), d.get("pendingCents", 0), d.get("paidCents", 0)
+    recent = d.get("recent", [])
+    lines = [
+        "📊 <b>Your earnings</b>",
+        "━━━━━━━━━━━━━━━━━━━━",
+        f"💸 Sales: <b>{d.get('totalSales', 0)}</b>  ·  Rate: <b>{d.get('commissionPercent', 30)}%</b>",
+        f"🟢 Available: <b>{_money(avail)}</b>",
+        f"⏳ Pending: <b>{_money(pend)}</b>  <i>(matures after {d.get('refundWindowDays', 14)} days)</i>",
+        f"✅ Paid out: <b>{_money(paid)}</b>",
+    ]
+    if recent:
+        lines.append("\n<b>Recent sales</b>")
+        for s in recent:
+            prod = "Forex $497" if s.get("product") == "apex-forex" else "Crypto $297"
+            tag = "↩️ refunded" if s.get("refunded") else ("✅ paid" if s.get("paid") else "⏳ pending")
+            lines.append(f"• {prod} — <b>{_money(s.get('commission', 0))}</b>  {tag}")
+    lines.append(f"\n🔗 <code>{d.get('link')}</code>")
+    lines.append(f"\n<i>Minimum payout {_money(d.get('minPayoutCents', 5000))}. Request payouts from the site.</i>")
+    _send(chat_id, "\n".join(lines))
+
+
+def _show_link(chat_id):
+    try:
+        d = _api_stats(chat_id)
+    except Exception:
+        _send(chat_id, "⚠️ Couldn't reach the server. Try again shortly.")
+        return
+    if not d.get("linked"):
+        _send(chat_id, f"You're not connected yet. Sign up here first:\n{SIGNUP}")
+        return
+    _send(chat_id, f"🔗 Your referral link:\n\n<code>{d.get('link')}</code>\n\nShare it anywhere — you earn 30% on every sale.")
+
+
+def _handle(msg):
+    chat_id = msg["chat"]["id"]
+    text = (msg.get("text") or "").strip()
+    low = text.lower()
+
+    if low.startswith("/start"):
+        parts = text.split(maxsplit=1)
+        token = parts[1].strip() if len(parts) > 1 else ""
+        if token:
+            try:
+                d = _api_link(token, chat_id)
+            except Exception as e:
+                _send(chat_id, f"⚠️ Couldn't connect right now. Try again.\n<code>{e}</code>")
+                return
+            if d.get("ok"):
+                _welcome(chat_id, d.get("name", ""), d.get("link", ""))
+            elif d.get("error") == "invalid token":
+                _send(chat_id, f"That link looks invalid or expired. Sign up again here:\n{SIGNUP}")
+            else:
+                _send(chat_id, f"Couldn't connect your account. Sign up here first:\n{SIGNUP}")
+        else:
+            try:
+                d = _api_stats(chat_id)
+            except Exception:
+                d = {}
+            if d.get("linked"):
+                _welcome(chat_id, d.get("name", ""), d.get("link", ""))
+            else:
+                _send(chat_id,
+                      "👋 <b>Apex Affiliate</b>\n\nTo get your referral link and track sales, "
+                      f"sign up here, then tap the Telegram button:\n{SIGNUP}")
+        return
+
+    if low.startswith("/stats") or low.startswith("/earnings"):
+        _show_stats(chat_id); return
+    if low.startswith("/link"):
+        _show_link(chat_id); return
+    if low.startswith("/help"):
+        _send(chat_id,
+              "🤖 <b>Apex Affiliate Bot</b>\n\n"
+              "• /stats — your earnings & recent sales\n"
+              "• /link — your referral link\n"
+              "• /help — this message\n\n"
+              f"Not connected yet? Sign up: {SIGNUP}")
+        return
+
+    _send(chat_id, "Send /stats for your earnings or /link for your referral link. /help for more.")
+
+
+def _poll_once():
+    global _update_id
+    try:
+        r = requests.get(f"{_API}/getUpdates",
+                         params={"offset": _update_id + 1, "timeout": 25}, timeout=30)
+        for upd in r.json().get("result", []):
+            _update_id = upd["update_id"]
+            msg = upd.get("message") or upd.get("edited_message")
+            if msg and "text" in msg:
+                try:
+                    _handle(msg)
+                except Exception as e:
+                    print(f"[BOT] handle error: {e}")
+    except Exception as e:
+        print(f"[BOT] poll error: {e}")
+        time.sleep(3)
+
+
+def run():
+    if not TOKEN:
+        print("[BOT] AFFILIATE_BOT_TOKEN missing — bot disabled.")
+        return
+    print(f"[APEX AFFILIATE BOT] Polling started. Site: {SITE_URL}")
+    while True:
+        _poll_once()
+
+
+if __name__ == "__main__":
+    run()

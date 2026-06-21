@@ -1384,6 +1384,69 @@ app.post('/api/affiliates/start', _authLimiter, async (req, res) => {
   }
 });
 
+// Notify an affiliate on Telegram when one of their referrals buys.
+async function _notifyAffiliateSale(code, product, commissionCents) {
+  const botToken = process.env.AFFILIATE_BOT_TOKEN;
+  if (!botToken || !supabase) return;
+  try {
+    const { data: aff } = await supabase.from('affiliates').select('telegram_chat_id').eq('code', code).maybeSingle();
+    if (!aff || !aff.telegram_chat_id) return;
+    const prod = product === 'apex-forex' ? 'Forex bot ($497)' : 'Crypto bot ($297)';
+    const text = `🎉 New sale! You just earned $${(commissionCents / 100).toFixed(2)} on the ${prod}.\n\nSend /stats to see your totals.`;
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: aff.telegram_chat_id, text })
+    });
+  } catch (e) { addLog(`Affiliate TG notify error: ${e.message}`, 'affiliate', 'warn'); }
+}
+
+// POST /api/affiliates/telegram-link — bot links a Telegram chat to an affiliate.
+// Body: { token, chatId, secret }. Returns { code, name, link }.
+app.post('/api/affiliates/telegram-link', async (req, res) => {
+  const { token, chatId, secret } = req.body || {};
+  if (secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
+  if (!supabase) return res.status(500).json({ error: 'not configured' });
+  const code = _affCodeFromToken(token);
+  if (!code) return res.status(400).json({ error: 'invalid token' });
+  try {
+    const { data: aff } = await supabase.from('affiliates').select('code,name').eq('code', code).maybeSingle();
+    if (!aff) return res.status(404).json({ error: 'affiliate not found' });
+    await supabase.from('affiliates').update({ telegram_chat_id: String(chatId) }).eq('code', code);
+    addLog(`Affiliate linked Telegram: ${code} -> chat ${chatId}`, 'affiliate', 'success');
+    res.json({ ok: true, code, name: aff.name || '', link: _affiliateLink(code) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/affiliates/telegram-stats — bot fetches a linked affiliate's stats.
+// Body: { chatId, secret }. Returns earnings + recent sales (or { linked:false }).
+app.post('/api/affiliates/telegram-stats', async (req, res) => {
+  const { chatId, secret } = req.body || {};
+  if (secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
+  if (!supabase) return res.status(500).json({ error: 'not configured' });
+  try {
+    const { data: aff } = await supabase.from('affiliates').select('code,name,commission_percent').eq('telegram_chat_id', String(chatId)).maybeSingle();
+    if (!aff) return res.json({ linked: false });
+    const { data } = await supabase.from('referral_sales').select('commission_amount,paid,refunded,created_at,product').eq('affiliate_code', aff.code).order('created_at', { ascending: false });
+    const rows = data || [];
+    const now = Date.now(), windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    let available = 0, pending = 0, paid = 0, sales = 0;
+    rows.forEach(r => {
+      if (r.refunded) return;
+      sales++;
+      if (r.paid) paid += r.commission_amount;
+      else if (new Date(r.created_at).getTime() + windowMs <= now) available += r.commission_amount;
+      else pending += r.commission_amount;
+    });
+    res.json({
+      linked: true, code: aff.code, name: aff.name || '', link: _affiliateLink(aff.code),
+      commissionPercent: aff.commission_percent, totalSales: sales,
+      availableCents: available, pendingCents: pending, paidCents: paid,
+      minPayoutCents: MIN_PAYOUT_CENTS, refundWindowDays: REFUND_WINDOW_DAYS,
+      recent: rows.slice(0, 5).map(r => ({ product: r.product, commission: r.commission_amount, paid: r.paid, refunded: !!r.refunded, date: r.created_at }))
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Reserved codes that must never become an affiliate handle (they collide with
 // real query-string flags or look like system values).
 const _RESERVED_CODES = new Set(['ref','admin','api','www','direct','intro','affiliate','login','signup','apex','forex','crypto']);
@@ -1812,6 +1875,7 @@ async function handleStripeWebhook(req, res) {
                 product, amount: pi.amount, commission_amount: commission
               }], { onConflict: 'payment_intent_id' });
               addLog(`Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}`, 'affiliate', 'success');
+              _notifyAffiliateSale(aff.code, product, commission);  // ping the affiliate's Telegram bot
             }
           } catch (e) { addLog(`Affiliate attribution error: ${e.message}`, 'affiliate', 'error'); }
         }

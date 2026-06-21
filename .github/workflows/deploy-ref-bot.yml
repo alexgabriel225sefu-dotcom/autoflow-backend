@@ -80,11 +80,8 @@ jobs:
             opc@${{ github.event.inputs.vm_ip }} \
             "sudo tee /opt/apex-forex/apex-affiliate-bot/.env > /dev/null" << 'ENVEOF'
           AFFILIATE_BOT_TOKEN=${{ secrets.AFFILIATE_BOT_TOKEN }}
-          ADMIN_CHAT_ID=${{ secrets.FOREX_TELEGRAM_CHAT_ID }}
           SITE_URL=https://aicashsystem.space
-          WEBHOOK_SECRET=${{ secrets.AFFILIATE_WEBHOOK_SECRET }}
-          COMMISSION_PCT=0.30
-          AFFILIATE_PORT=3002
+          AFFILIATE_BOT_SECRET=${{ secrets.AFFILIATE_BOT_SECRET }}
           ENVEOF
 
       - name: Setup systemd service + start affiliate bot
