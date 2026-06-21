@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Affiliate Portal — Apex Trading Suite</title>
-<meta name="description" content="Promote Apex Trading Suite and earn a 30% commission on every sale that comes through your link.">
+<title>Become an Affiliate — Apex Trading Suite</title>
+<meta name="description" content="Promote Apex Trading Suite and earn a 30% commission on every sale. Sign up and track everything from Telegram.">
 <link rel="canonical" href="https://aicashsystem.space/affiliate.html">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" href="/favicon.svg">
@@ -19,7 +19,7 @@
   --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
   --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;
   --accdim:rgba(255,45,79,.12);--accglow:rgba(255,45,79,.45);
-  --up:#27c46a;
+  --up:#27c46a;--tgc:#27a7e7;
   --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
   --ease:cubic-bezier(.32,.72,0,1);--r:16px;
 }
@@ -38,13 +38,10 @@ main{padding:56px 0 40px}
 h1{font:600 clamp(28px,4vw,40px)/1.06 var(--d);letter-spacing:-.025em;margin-bottom:12px}
 p.sub{color:var(--t1);font:400 15px/1.7 var(--f);max-width:480px;margin-bottom:36px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:28px;margin-bottom:24px}
-.tabs{display:flex;gap:6px;background:var(--bg1);border:1px solid var(--line);border-radius:12px;padding:5px;margin-bottom:24px}
-.tab{flex:1;padding:11px;border:none;background:transparent;color:var(--t1);font:600 14px/1 var(--f);border-radius:8px;cursor:pointer;transition:all .25s var(--ease);margin:0}
-.tab:hover{color:var(--t0)}
-.tab.active{background:var(--panel2);color:var(--t0);box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
 label{display:block;font:500 13px/1 var(--f);color:var(--t1);margin-bottom:6px;margin-top:16px}
-input,select{width:100%;padding:13px 14px;background:var(--bg1);border:1px solid var(--line2);border-radius:10px;color:var(--t0);font:400 15px/1 var(--f)}
-input:focus,select:focus{outline:none;border-color:var(--acc)}
+label:first-child{margin-top:0}
+input{width:100%;padding:13px 14px;background:var(--bg1);border:1px solid var(--line2);border-radius:10px;color:var(--t0);font:400 15px/1 var(--f)}
+input:focus{outline:none;border-color:var(--acc)}
 input::placeholder{color:var(--t2)}
 button{width:100%;margin-top:22px;padding:14px;border:none;border-radius:12px;background:var(--acc);color:#fff;font:600 15px/1 var(--f);cursor:pointer;transition:all .25s var(--ease)}
 button:hover{background:var(--acc2);box-shadow:0 14px 44px var(--accglow)}
@@ -55,35 +52,24 @@ button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
 .terms-row{display:flex;align-items:flex-start;gap:10px;margin-top:20px;font:400 13px/1.55 var(--f);color:var(--t1);cursor:pointer}
 .terms-row input{width:auto;margin:2px 0 0;flex-shrink:0;accent-color:var(--acc);width:17px;height:17px}
 .terms-row a{color:var(--acc3);text-decoration:underline}
-.hint{font:400 13px/1.5 var(--f);color:var(--t2);margin-top:14px;text-align:center}
-.hint a{color:var(--acc3);cursor:pointer}
-.link-box{display:flex;gap:8px;margin-top:8px}
-.link-box input{font-family:var(--m);font-size:13px}
-.copy-btn{width:auto;padding:0 18px;white-space:nowrap;margin-top:0;background:var(--panel2);color:var(--t0);border:1px solid var(--line2)}
-.copy-btn:hover{background:var(--hover);box-shadow:none}
-.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
-.stat{background:var(--bg1);border:1px solid var(--line);border-radius:10px;padding:16px}
-.stat .label{font:500 11px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.08em}
-.stat .value{font:600 22px/1 var(--d);margin-top:8px;color:var(--t0)}
-.stat.accent .value{color:var(--acc3)}
-.stat.up .value{color:var(--up)}
-.dash-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-.dash-head .who{font:400 14px/1.5 var(--f);color:var(--t1)}
-.dash-head .who b{color:var(--t0);font-weight:600}
-.code-pill{display:inline-block;font:600 13px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.24);border-radius:8px;padding:6px 10px;margin-top:8px}
-.logout{width:auto;margin:0;padding:9px 14px;background:transparent;border:1px solid var(--line2);color:var(--t1);font:500 13px/1 var(--f);border-radius:9px}
-.logout:hover{background:var(--hover);color:var(--t0);box-shadow:none}
-.sales{margin-top:8px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.sales table{width:100%;border-collapse:collapse}
-.sales th{font:500 11px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.08em;text-align:left;padding:12px 14px;background:var(--bg1);border-bottom:1px solid var(--line)}
-.sales td{font:400 13px/1.4 var(--f);color:var(--t0);padding:12px 14px;border-bottom:1px solid var(--line)}
-.sales tr:last-child td{border-bottom:none}
-.sales td .pay{font:500 11px/1 var(--m);padding:4px 8px;border-radius:100px;white-space:nowrap}
-.pay.unpaid{background:rgba(255,255,255,.06);color:var(--t1)}
-.pay.avail{background:rgba(39,196,106,.12);color:var(--up)}
-.pay.paid{background:rgba(39,196,106,.12);color:var(--up)}
-.pay.refunded{background:var(--accdim);color:var(--acc3)}
-.empty{text-align:center;color:var(--t2);font:400 14px/1.6 var(--f);padding:26px 14px}
+/* Telegram CTA */
+.tg-btn{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;margin-top:6px;padding:16px;border-radius:13px;
+  background:linear-gradient(135deg,#29a9ea,#1f8fd1);color:#fff;font:600 16px/1 var(--f);box-shadow:0 14px 44px rgba(34,158,217,.34);transition:all .25s var(--ease)}
+.tg-btn:hover{transform:translateY(-2px);box-shadow:0 20px 56px rgba(34,158,217,.45)}
+.tg-btn svg{width:24px;height:24px;flex-shrink:0}
+.ok-badge{display:inline-flex;align-items:center;gap:8px;color:var(--up);font:600 14px/1 var(--f);background:rgba(39,196,106,.1);border:1px solid rgba(39,196,106,.3);border-radius:100px;padding:8px 14px;margin-bottom:18px}
+.code-pill{display:inline-block;font:600 13px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.24);border-radius:8px;padding:7px 11px}
+.note{font:400 13px/1.6 var(--f);color:var(--t2);margin-top:16px;text-align:center}
+.note a{color:var(--tgc);cursor:pointer}
+/* How it works */
+.steps{margin-top:8px}
+.step{display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-top:1px solid var(--line)}
+.step:first-child{border-top:none}
+.step .n{flex:0 0 28px;width:28px;height:28px;border-radius:50%;background:var(--accdim);border:1px solid rgba(255,45,79,.24);color:var(--acc3);font:700 13px/28px var(--m);text-align:center}
+.step .tx{font:400 14px/1.55 var(--f);color:var(--t1)}
+.step .tx b{color:var(--t0);font-weight:600}
+.payouts{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{font:500 12px/1 var(--m);color:var(--t1);background:var(--bg1);border:1px solid var(--line);border-radius:100px;padding:8px 12px}
 .spin{display:none;text-align:center;color:var(--t1);font:400 14px/1 var(--f);padding:40px 0}
 footer{border-top:1px solid var(--line);padding:34px 0;font:400 12px/1.7 var(--f);color:var(--t2)}
 footer .wrap{max-width:1280px}
@@ -94,7 +80,7 @@ footer .wrap{max-width:1280px}
 <nav>
   <a href="/" class="brand">
     <svg class="logo" viewBox="0 0 32 32" fill="none">
-      <defs><linearGradient id="cg" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse"><stop class="lg1"/><stop offset="1" class="lg2"/></linearGradient></defs>
+      <defs><linearGradient id="cg" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse"><stop stop-color="#ff2d4f"/><stop offset="1" stop-color="#ff97a8"/></linearGradient></defs>
       <rect x="3" y="19" width="5" height="10" rx="2.5" fill="url(#cg)" opacity=".45"/>
       <rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="url(#cg)" opacity=".72"/>
       <rect x="20" y="6" width="5" height="23" rx="2.5" fill="url(#cg)"/>
@@ -106,315 +92,83 @@ footer .wrap{max-width:1280px}
 </nav>
 
 <main class="wrap">
+  <span class="eyebrow">Affiliate Program</span>
+  <h1>Earn 30% on every sale</h1>
+  <p class="sub">Promote Apex Trading Suite and earn a 30% commission on every sale through your link — <b style="color:var(--t0)">$89.10</b> on the $297 crypto bot, <b style="color:var(--t0)">$149.10</b> on the $497 forex bot. Sign up, then track everything from Telegram.</p>
 
-  <!-- LOADING -->
-  <div id="loadView" class="spin" style="display:block">Loading…</div>
-
-  <!-- AUTH (login / signup) -->
-  <div id="authView" style="display:none">
-    <span class="eyebrow">Affiliate Program</span>
-    <h1>Earn 30% on every sale</h1>
-    <p class="sub">Promote Apex Trading Suite to your audience and earn a 30% commission on every sale through your link — $89.10 on the $297 crypto bot, $149.10 on the $497 forex bot. Create an account to get your link and track your earnings.</p>
-
-    <div class="card">
-      <div class="tabs">
-        <button class="tab active" id="tabLogin" onclick="switchTab('login')">Log in</button>
-        <button class="tab" id="tabSignup" onclick="switchTab('signup')">Sign up</button>
-      </div>
-
-      <!-- LOGIN -->
-      <form id="loginForm" onsubmit="return doLogin(event)">
-        <label for="liEmail">Email</label>
-        <input id="liEmail" type="email" placeholder="you@example.com" autocomplete="email">
-        <label for="liPass">Password</label>
-        <input id="liPass" type="password" placeholder="Your password" autocomplete="current-password">
-        <button type="submit" id="liBtn">Log in</button>
-        <div id="liMsg" class="msg"></div>
-        <div class="hint">No account yet? <a onclick="switchTab('signup')">Sign up here</a></div>
-      </form>
-
-      <!-- SIGNUP -->
-      <form id="signupForm" style="display:none" onsubmit="return doSignup(event)">
-        <label for="suName">Your name</label>
-        <input id="suName" type="text" placeholder="Your name" autocomplete="name">
-        <label for="suEmail">Email</label>
-        <input id="suEmail" type="email" placeholder="you@example.com" autocomplete="email">
-        <label for="suCode">Your link name</label>
-        <input id="suCode" type="text" placeholder="e.g. cryptoking" autocomplete="off" maxlength="20">
-        <div style="font:400 12px/1.5 var(--f);color:var(--t2);margin-top:6px">Your link will be <span id="linkPreview" style="color:var(--acc3);font-family:var(--m)">aicashsystem.space/?ref=…</span></div>
-        <label for="suPass">Password</label>
-        <input id="suPass" type="password" placeholder="At least 6 characters" autocomplete="new-password">
-        <label for="suTiktok">TikTok handle (optional)</label>
-        <input id="suTiktok" type="text" placeholder="@yourhandle">
-        <label class="terms-row"><input id="suTerms" type="checkbox"><span>I agree to the <a href="/affiliate-terms" target="_blank" rel="noopener">Affiliate Program Terms</a> — including that commissions are paid only after the 14-day refund window passes and are cancelled on refunds or chargebacks.</span></label>
-        <button type="submit" id="suBtn">Create my account</button>
-        <div id="suMsg" class="msg"></div>
-        <div class="hint">Already have an account? <a onclick="switchTab('login')">Log in here</a></div>
-      </form>
-    </div>
+  <!-- STEP 1: name + email -->
+  <div class="card" id="signupCard">
+    <form id="joinForm" onsubmit="return doJoin(event)">
+      <label for="jName">Your name</label>
+      <input id="jName" type="text" placeholder="Your name" autocomplete="name">
+      <label for="jEmail">Email</label>
+      <input id="jEmail" type="email" placeholder="you@example.com" autocomplete="email">
+      <label class="terms-row"><input id="jTerms" type="checkbox"><span>I agree to the <a href="/affiliate-terms" target="_blank" rel="noopener">Affiliate Program Terms</a> — commissions are paid after the 14-day refund window and are cancelled on refunds or chargebacks.</span></label>
+      <button type="submit" id="jBtn">Continue →</button>
+      <div id="jMsg" class="msg"></div>
+    </form>
   </div>
 
-  <!-- DASHBOARD -->
-  <div id="dashView" style="display:none">
-    <span class="eyebrow">Affiliate Dashboard</span>
-    <div class="card">
-      <div class="dash-head">
-        <div class="who">Signed in as <b id="dWho">—</b><br><span class="code-pill" id="dCode">—</span></div>
-        <button class="logout" onclick="logout()">Log out</button>
-      </div>
-      <label style="margin-top:22px">Your referral link</label>
-      <div class="link-box">
-        <input id="dLink" type="text" readonly>
-        <button class="copy-btn" onclick="copyLink()">Copy</button>
-      </div>
-      <p class="hint" style="text-align:left;margin-top:10px">Share this link anywhere. Whoever buys the crypto ($297) or forex ($497) bot through it counts as your sale.</p>
-    </div>
-
-    <div class="card">
-      <h2 style="font:600 13px/1 var(--m);margin:0 0 4px;color:var(--acc3);text-transform:uppercase;letter-spacing:.12em">Earnings</h2>
-      <div class="stats-grid">
-        <div class="stat up"><div class="label">Available now</div><div class="value" id="dAvail">$0</div></div>
-        <div class="stat"><div class="label">Pending</div><div class="value" id="dPending">$0</div></div>
-        <div class="stat"><div class="label">Paid out</div><div class="value" id="dPaid">$0</div></div>
-        <div class="stat accent"><div class="label">Sales · Rate</div><div class="value"><span id="dSales">0</span> · <span id="dPct">30%</span></div></div>
-      </div>
-      <p class="hint" id="dRules" style="text-align:left;margin-top:14px"></p>
-    </div>
-
-    <div class="card">
-      <h2 style="font:600 13px/1 var(--m);margin:0 0 6px;color:var(--acc3);text-transform:uppercase;letter-spacing:.12em">Get paid</h2>
-      <label for="dPmMethod">Payout method</label>
-      <select id="dPmMethod" onchange="updatePayoutFieldStyle()">
-        <option value="paypal">PayPal</option>
-        <option value="bank">Bank transfer (IBAN)</option>
-        <option value="crypto">Crypto wallet</option>
-      </select>
-      <label for="dPmDetails" id="dPmDetailsLabel">PayPal email</label>
-      <input id="dPmDetails" type="email" placeholder="you@example.com" autocomplete="off">
-      <button class="copy-btn" style="width:100%;margin-top:14px" onclick="savePayout()">Save payout details</button>
-      <div id="pmMsg" class="msg"></div>
-      <button id="reqBtn" style="margin-top:14px" onclick="requestPayout()">Request payout</button>
-      <div id="reqMsg" class="msg"></div>
-      <p class="hint" id="payoutNote" style="text-align:left;margin-top:12px"></p>
-    </div>
-
-    <div class="card">
-      <h2 style="font:600 13px/1 var(--m);margin:0 0 16px;color:var(--acc3);text-transform:uppercase;letter-spacing:.12em">Recent sales</h2>
-      <div id="dSalesWrap"></div>
-    </div>
+  <!-- STEP 2: open telegram -->
+  <div class="card" id="tgCard" style="display:none">
+    <span class="ok-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Account ready</span>
+    <p style="font:400 15px/1.65 var(--f);color:var(--t1);margin-bottom:20px">You're in, <b id="tgName" style="color:var(--t0)">creator</b>. Open your <b style="color:var(--t0)">tracking bot on Telegram</b> — it generates your referral link and pings you the moment someone buys.</p>
+    <a id="tgBtn" class="tg-btn" href="#" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.94 4.6 18.9 19.06c-.23 1.01-.83 1.26-1.68.78l-4.64-3.42-2.24 2.16c-.25.25-.46.46-.94.46l.33-4.73 8.6-7.77c.37-.33-.08-.52-.58-.19L7.43 13.2l-4.57-1.43c-.99-.31-1.01-.99.21-1.47l17.86-6.89c.83-.3 1.55.2 1.28 1.45z"/></svg>
+      Open my tracking bot
+    </a>
+    <p class="note">Didn't open? Search <b style="color:var(--t0)">@AICASHSYSTEM_REF_BOT</b> on Telegram and press <b style="color:var(--t0)">Start</b>.<br>Your link name: <span class="code-pill" id="tgCode" style="margin-top:8px">—</span></p>
   </div>
 
+  <!-- HOW IT WORKS -->
+  <div class="card">
+    <h2 style="font:600 13px/1 var(--m);margin:0 0 6px;color:var(--acc3);text-transform:uppercase;letter-spacing:.12em">How it works</h2>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><span class="tx"><b>Sign up</b> with your name and email above.</span></div>
+      <div class="step"><span class="n">2</span><span class="tx"><b>Open the bot</b> on Telegram — it links to your account instantly.</span></div>
+      <div class="step"><span class="n">3</span><span class="tx">The bot <b>generates your referral link</b> — share it anywhere.</span></div>
+      <div class="step"><span class="n">4</span><span class="tx">Get a <b style="color:var(--up)">ping on every sale</b> and check your earnings any time with <b style="color:var(--t0)">/stats</b>.</span></div>
+    </div>
+    <div class="payouts">
+      <span class="chip">30% commission</span><span class="chip">PayPal · Bank · Crypto</span><span class="chip">$50 min payout</span>
+    </div>
+  </div>
 </main>
 
 <footer><div class="wrap">© Apex Trading Suite · Algorithmic Trading Software</div></footer>
 
 <script>
-var TOKEN_KEY = 'apex_aff_token';
-function token(){ return localStorage.getItem(TOKEN_KEY) || ''; }
-function setToken(t){ localStorage.setItem(TOKEN_KEY, t); }
-function clearToken(){ localStorage.removeItem(TOKEN_KEY); }
-function show(id){ ['loadView','authView','dashView'].forEach(function(v){ document.getElementById(v).style.display = (v===id?'block':'none'); }); }
 function showMsg(el, text, ok){ el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err'); }
-function money(c){ return '$' + (c/100).toFixed(2); }
 
-function switchTab(which){
-  var login = which === 'login';
-  document.getElementById('tabLogin').classList.toggle('active', login);
-  document.getElementById('tabSignup').classList.toggle('active', !login);
-  document.getElementById('loginForm').style.display = login ? 'block' : 'none';
-  document.getElementById('signupForm').style.display = login ? 'none' : 'block';
-}
-
-function cleanCode(v){ return (v||'').toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,20); }
-// Live preview + sanitise the chosen link name as the user types.
-document.getElementById('suCode').addEventListener('input', function(){
-  var c = cleanCode(this.value);
-  if (this.value !== c) this.value = c;
-  document.getElementById('linkPreview').textContent = 'aicashsystem.space/?ref=' + (c || '…');
-});
-
-async function doSignup(e){
+async function doJoin(e){
   e.preventDefault();
-  var name = document.getElementById('suName').value.trim();
-  var email = document.getElementById('suEmail').value.trim();
-  var code = cleanCode(document.getElementById('suCode').value);
-  var password = document.getElementById('suPass').value;
-  var tiktokHandle = document.getElementById('suTiktok').value.trim();
-  var acceptTerms = document.getElementById('suTerms').checked;
-  var btn = document.getElementById('suBtn'), msg = document.getElementById('suMsg');
-  if (!email || !email.includes('@')) { showMsg(msg, 'Please enter a valid email.', false); return false; }
-  if (!code || code.length < 3) { showMsg(msg, 'Choose a link name (at least 3 characters: letters, numbers, - or _).', false); return false; }
-  if (!password || password.length < 6) { showMsg(msg, 'Password must be at least 6 characters.', false); return false; }
-  if (!acceptTerms) { showMsg(msg, 'Please accept the Affiliate Program Terms to continue.', false); return false; }
-  btn.disabled = true; btn.textContent = 'Creating…';
+  var name = document.getElementById('jName').value.trim();
+  var email = document.getElementById('jEmail').value.trim();
+  var accept = document.getElementById('jTerms').checked;
+  var btn = document.getElementById('jBtn'), msg = document.getElementById('jMsg');
+  if (!name || name.length < 2) { showMsg(msg, 'Please enter your name.', false); return false; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showMsg(msg, 'Please enter a valid email.', false); return false; }
+  if (!accept) { showMsg(msg, 'Please accept the Affiliate Program Terms to continue.', false); return false; }
+  btn.disabled = true; btn.textContent = 'Creating your account…';
   try {
-    var r = await fetch('/api/affiliates/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, email, code, password, tiktokHandle, acceptTerms }) });
+    var r = await fetch('/api/affiliates/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, email }) });
     var d = await r.json();
-    if (d.error) { showMsg(msg, d.error, false); btn.disabled=false; btn.textContent='Create my account'; return false; }
-    setToken(d.token);
-    loadDashboard();
+    if (d.error) { showMsg(msg, d.error, false); btn.disabled=false; btn.textContent='Continue →'; return false; }
+    // Switch to the Telegram step
+    document.getElementById('signupCard').style.display = 'none';
+    document.getElementById('tgName').textContent = name.split(' ')[0] || 'creator';
+    document.getElementById('tgCode').textContent = d.code;
+    var tg = document.getElementById('tgBtn');
+    tg.href = d.telegramUrl;
+    document.getElementById('tgCard').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // auto-open the bot for convenience
+    setTimeout(function(){ try { window.open(d.telegramUrl, '_blank'); } catch(_){} }, 500);
   } catch (err) {
-    showMsg(msg, 'Error: ' + err.message, false); btn.disabled=false; btn.textContent='Create my account';
+    showMsg(msg, 'Error: ' + err.message, false); btn.disabled=false; btn.textContent='Continue →';
   }
   return false;
 }
-
-async function doLogin(e){
-  e.preventDefault();
-  var email = document.getElementById('liEmail').value.trim();
-  var password = document.getElementById('liPass').value;
-  var btn = document.getElementById('liBtn'), msg = document.getElementById('liMsg');
-  if (!email || !password) { showMsg(msg, 'Enter your email and password.', false); return false; }
-  btn.disabled = true; btn.textContent = 'Logging in…';
-  try {
-    var r = await fetch('/api/affiliates/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) });
-    var d = await r.json();
-    if (d.error) { showMsg(msg, d.error, false); btn.disabled=false; btn.textContent='Log in'; return false; }
-    setToken(d.token);
-    loadDashboard();
-  } catch (err) {
-    showMsg(msg, 'Error: ' + err.message, false); btn.disabled=false; btn.textContent='Log in';
-  }
-  return false;
-}
-
-function logout(){ if (_pollTimer) clearInterval(_pollTimer); clearToken(); show('authView'); switchTab('login'); }
-
-function copyLink(){ var el = document.getElementById('dLink'); el.select(); document.execCommand('copy'); }
-
-function renderSales(sales){
-  var wrap = document.getElementById('dSalesWrap');
-  if (!sales || !sales.length) { wrap.innerHTML = '<div class="empty">No sales yet. Share your link and your sales will show up here.</div>'; return; }
-  var badge = {
-    refunded: '<span class="pay refunded">Refunded</span>',
-    paid: '<span class="pay paid">Paid</span>',
-    available: '<span class="pay avail">Available</span>',
-    pending: '<span class="pay unpaid">Pending</span>'
-  };
-  var rows = sales.map(function(s){
-    var prod = s.product === 'apex-forex' ? 'Forex $497' : (s.product === 'apex-bot' ? 'Crypto $297' : (s.product || '—'));
-    var date = s.date ? new Date(s.date).toLocaleDateString() : '—';
-    var st = badge[s.status] || badge.pending;
-    var cut = s.status === 'refunded' ? '<span style="text-decoration:line-through;color:var(--t2)">'+money(s.commission)+'</span>' : money(s.commission);
-    return '<tr><td>'+date+'</td><td>'+prod+'</td><td>'+cut+'</td><td>'+st+'</td></tr>';
-  }).join('');
-  wrap.innerHTML = '<div class="sales"><table><thead><tr><th>Date</th><th>Product</th><th>Your cut</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
-}
-
-var _pollTimer = null;
-var _last = null; // last dashboard payload, for the payout logic
-function populate(d){
-  _last = d;
-  document.getElementById('dWho').textContent = (d.name && d.name.trim()) ? d.name : d.email;
-  document.getElementById('dCode').textContent = 'Code: ' + d.code;
-  document.getElementById('dLink').value = d.link;
-  document.getElementById('dSales').textContent = d.totalSales;
-  document.getElementById('dPct').textContent = d.commissionPercent + '%';
-  document.getElementById('dAvail').textContent = money(d.availableCommissionCents);
-  document.getElementById('dPending').textContent = money(d.pendingCommissionCents);
-  document.getElementById('dPaid').textContent = money(d.paidCommissionCents);
-  var min = money(d.minPayoutCents), days = d.refundWindowDays;
-  document.getElementById('dRules').innerHTML =
-    'Commissions become <b style="color:var(--up)">Available</b> ' + days + ' days after the sale (refund window). ' +
-    'Minimum payout: <b>' + min + '</b>.' +
-    (d.refundedCommissionCents > 0 ? ' <span style="color:var(--acc3)">' + money(d.refundedCommissionCents) + ' was cancelled by refunds/chargebacks.</span>' : '');
-  // Payout method — only overwrite fields the user isn't actively editing.
-  var mEl = document.getElementById('dPmMethod'), dEl = document.getElementById('dPmDetails');
-  if (document.activeElement !== mEl && d.payoutMethod) mEl.value = d.payoutMethod;
-  updatePayoutFieldStyle();
-  if (document.activeElement !== dEl) dEl.value = d.payoutDetails || '';
-  // Request button + note state.
-  var btn = document.getElementById('reqBtn'), note = document.getElementById('payoutNote');
-  if (d.pendingPayout) {
-    btn.disabled = true; btn.textContent = 'Payout requested';
-    note.innerHTML = '<b style="color:var(--up)">Payout requested:</b> ' + money(d.pendingPayout.amountCents) +
-      ' on ' + new Date(d.pendingPayout.requestedAt).toLocaleDateString() + ' — we\'ll send it to your payout method.';
-  } else if (d.availableCommissionCents < d.minPayoutCents) {
-    btn.disabled = true; btn.textContent = 'Request payout';
-    note.textContent = 'You can request a payout once you have at least ' + money(d.minPayoutCents) + ' available.';
-  } else if (!d.payoutMethod || !d.payoutDetails) {
-    btn.disabled = true; btn.textContent = 'Request payout';
-    note.textContent = 'Save your payout details above, then you can request your ' + money(d.availableCommissionCents) + '.';
-  } else {
-    btn.disabled = false; btn.textContent = 'Request payout (' + money(d.availableCommissionCents) + ')';
-    note.textContent = '';
-  }
-  renderSales(d.sales);
-}
-
-var PAYOUT_FIELD = {
-  paypal: { label: 'PayPal email', type: 'email', placeholder: 'you@example.com' },
-  bank:   { label: 'IBAN', type: 'text', placeholder: 'RO49 AAAA 1B31 0075 9384 0000' },
-  crypto: { label: 'Wallet address', type: 'text', placeholder: 'USDT (TRC20) / BTC / ETH address' }
-};
-function updatePayoutFieldStyle(){
-  var method = document.getElementById('dPmMethod').value;
-  var cfg = PAYOUT_FIELD[method] || PAYOUT_FIELD.paypal;
-  document.getElementById('dPmDetailsLabel').textContent = cfg.label;
-  var input = document.getElementById('dPmDetails');
-  input.type = cfg.type;
-  input.placeholder = cfg.placeholder;
-}
-
-async function savePayout(){
-  var method = document.getElementById('dPmMethod').value;
-  var details = document.getElementById('dPmDetails').value.trim();
-  var msg = document.getElementById('pmMsg');
-  if (!details || details.length < 3) { showMsg(msg, 'Enter your payout details.', false); return; }
-  try {
-    var r = await fetch('/api/affiliates/payout-method', { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token()}, body: JSON.stringify({ method, details }) });
-    var d = await r.json();
-    if (d.error) { showMsg(msg, d.error, false); return; }
-    showMsg(msg, 'Payout details saved.', true);
-    refreshDashboard();
-  } catch (e) { showMsg(msg, 'Error: ' + e.message, false); }
-}
-
-async function requestPayout(){
-  var msg = document.getElementById('reqMsg'), btn = document.getElementById('reqBtn');
-  btn.disabled = true; btn.textContent = 'Requesting…';
-  try {
-    var r = await fetch('/api/affiliates/request-payout', { method:'POST', headers:{'Authorization':'Bearer '+token()} });
-    var d = await r.json();
-    if (d.error) { showMsg(msg, d.error, false); btn.disabled = false; btn.textContent = 'Request payout'; return; }
-    showMsg(msg, 'Payout requested: ' + money(d.amountCents) + '. We\'ll send it to your payout method.', true);
-    refreshDashboard();
-  } catch (e) { showMsg(msg, 'Error: ' + e.message, false); btn.disabled = false; btn.textContent = 'Request payout'; }
-}
-// Silent refresh — pulls fresh numbers without flipping back to the loading view.
-// Returns: true = ok, 'unauthorized' = bad/expired token (log out), or an error string (keep session, just show it).
-async function refreshDashboard(){
-  if (!token()) return 'unauthorized';
-  try {
-    var r = await fetch('/api/affiliates/me', { headers: { 'Authorization': 'Bearer ' + token() } });
-    if (r.status === 401) return 'unauthorized';
-    var d = await r.json();
-    if (d.error) return d.error;
-    populate(d);
-    return true;
-  } catch (err) { return null; } // null = network hiccup, keep session
-}
-async function loadDashboard(){
-  if (!token()) { show('authView'); switchTab('login'); return; }
-  show('loadView');
-  var ok = await refreshDashboard();
-  if (ok === 'unauthorized') { clearToken(); show('authView'); switchTab('login'); return; }
-  if (ok !== true) {
-    show('authView'); switchTab('login');
-    showMsg(document.getElementById('liMsg'), 'Could not load your account: ' + (ok || 'unknown error') + '. Please log in again.', false);
-    return;
-  }
-  show('dashView');
-  if (_pollTimer) clearInterval(_pollTimer);
-  // Live updates: re-pull every 20s while the tab is open and visible.
-  _pollTimer = setInterval(function(){
-    if (!document.hidden && document.getElementById('dashView').style.display === 'block') refreshDashboard();
-  }, 20000);
-}
-
-// Boot: if a token exists, try the dashboard; otherwise show the auth card.
-if (token()) loadDashboard();
-else { show('authView'); switchTab('login'); }
 </script>
 </body>
 </html>

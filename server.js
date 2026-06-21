@@ -1333,6 +1333,57 @@ app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
   }
 });
 
+// ── Telegram tracking-bot bridge ─────────────────────────────────────────────
+// Affiliates sign up on the site (name+email) and then open the Telegram bot,
+// which generates their link and tracks sales. The deep-link carries a signed
+// connect token = hmac12(code) + code, so the bot can prove which affiliate it is.
+const AFFILIATE_BOT_USERNAME = process.env.AFFILIATE_BOT_USERNAME || 'AICASHSYSTEM_REF_BOT';
+const AFFILIATE_BOT_SECRET   = process.env.AFFILIATE_BOT_SECRET || process.env.JWT_SECRET || 'apex-affiliate-bridge';
+function _affConnectSig(code) {
+  return crypto.createHmac('sha256', AFFILIATE_BOT_SECRET).update(String(code)).digest('hex').slice(0, 12);
+}
+function _affConnectToken(code) { return _affConnectSig(code) + code; }
+function _affCodeFromToken(token) {
+  const t = String(token || '');
+  if (t.length < 15) return null;            // 12 sig + >=3 code
+  const sig = t.slice(0, 12), code = t.slice(12);
+  return _affConnectSig(code) === sig ? code : null;
+}
+function _affTelegramUrl(code) {
+  return `https://t.me/${AFFILIATE_BOT_USERNAME}?start=${_affConnectToken(code)}`;
+}
+
+// POST /api/affiliates/start — { name, email } -> { code, telegramUrl }
+// Creates (or re-uses) the affiliate, then hands off to the Telegram bot.
+app.post('/api/affiliates/start', _authLimiter, async (req, res) => {
+  const { name, email } = req.body || {};
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
+  if (!supabase) return res.status(500).json({ error: 'Affiliate system is not configured yet. Please try again later.' });
+  const cleanEmail = email.toLowerCase().trim();
+  try {
+    let code;
+    const { data: existing } = await supabase.from('affiliates').select('code').eq('email', cleanEmail).maybeSingle();
+    if (existing?.code) {
+      code = existing.code;
+    } else {
+      for (let attempts = 0; attempts < 5; attempts++) {
+        code = _generateAffiliateCode(name);
+        const { data: clash } = await supabase.from('affiliates').select('code').eq('code', code).maybeSingle();
+        if (!clash) break;
+      }
+      const { error } = await supabase.from('affiliates').insert([{
+        code, email: cleanEmail, name: name || '', status: 'active',
+        terms_accepted_at: new Date().toISOString(), terms_version: AFFILIATE_TERMS_VERSION
+      }]);
+      if (error) return res.status(500).json({ error: error.message });
+      addLog(`New affiliate (Telegram flow): ${cleanEmail} — code ${code}`, 'affiliate', 'success');
+    }
+    res.json({ code, telegramUrl: _affTelegramUrl(code), botUsername: AFFILIATE_BOT_USERNAME });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Reserved codes that must never become an affiliate handle (they collide with
 // real query-string flags or look like system values).
 const _RESERVED_CODES = new Set(['ref','admin','api','www','direct','intro','affiliate','login','signup','apex','forex','crypto']);
