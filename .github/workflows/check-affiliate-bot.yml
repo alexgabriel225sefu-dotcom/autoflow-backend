@@ -1,0 +1,41 @@
+name: Check Affiliate Bot Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      vm_ip:
+        description: 'Oracle Cloud VM IP address'
+        required: true
+        type: string
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ github.event.inputs.vm_ip }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Check bot status and logs
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
+          echo "=== SYSTEMD STATUS ==="
+          sudo systemctl status apex-affiliate --no-pager || true
+
+          echo ""
+          echo "=== LAST 60 LINES OF LOG ==="
+          sudo tail -60 /var/log/apex-affiliate.log 2>/dev/null || echo "(no log file)"
+
+          echo ""
+          echo "=== ENV FILE (token masked) ==="
+          sudo grep -v TOKEN /opt/apex-forex/apex-affiliate-bot/.env 2>/dev/null || echo "(no .env)"
+          REMOTE
