@@ -80,11 +80,8 @@ jobs:
             opc@${{ github.event.inputs.vm_ip }} \
             "sudo tee /opt/apex-forex/apex-affiliate-bot/.env > /dev/null" << 'ENVEOF'
           AFFILIATE_BOT_TOKEN=${{ secrets.AFFILIATE_BOT_TOKEN }}
-          ADMIN_CHAT_ID=${{ secrets.FOREX_TELEGRAM_CHAT_ID }}
           SITE_URL=https://aicashsystem.space
-          WEBHOOK_SECRET=${{ secrets.AFFILIATE_WEBHOOK_SECRET }}
-          COMMISSION_PCT=0.30
-          AFFILIATE_PORT=3002
+          AFFILIATE_BOT_SECRET=${{ secrets.AFFILIATE_BOT_SECRET }}
           ENVEOF
 
       - name: Setup systemd + start affiliate bot
@@ -105,5 +102,14 @@ jobs:
           sudo systemctl restart apex-affiliate
           sleep 5
           sudo systemctl is-active apex-affiliate && echo "SUCCESS: Affiliate Bot running!" || \
-            (echo "ERROR: Affiliate Bot failed" && tail -30 /var/log/apex-affiliate.log && exit 1)
+            (echo "ERROR: Affiliate Bot failed" && sudo tail -30 /var/log/apex-affiliate.log && exit 1)
           REMOTE
+
+      - name: Show bot startup logs
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            opc@${{ github.event.inputs.vm_ip }} \
+            "sudo tail -40 /var/log/apex-affiliate.log 2>/dev/null || echo '(no log yet)'"
