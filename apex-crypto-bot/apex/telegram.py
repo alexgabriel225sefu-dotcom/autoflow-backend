@@ -219,6 +219,16 @@ def _handle_command(chat_id, text):
     s = _settings(chat_id)
 
     if cmd in ("/start", "/menu", "/m"):
+        u = user_loop._ensure_user(chat_id)
+        # First run (or never chose a mode): ask paper vs real before trading.
+        if cmd == "/start" and not u.get("setup_done"):
+            return send_to(chat_id,
+                           "✅ <b>Welcome to APEX TRADE BOT!</b>\n\n"
+                           "Choose how you want to trade:\n\n"
+                           "📝 <b>Paper</b> — $100 virtual, real market prices, zero risk.\n"
+                           "🔴 <b>Real Binance</b> — trade your own account.\n\n"
+                           "<i>You can switch any time from the menu.</i>",
+                           _kb_start())
         _ensure_running(chat_id)
         return send_to(chat_id, "⚡ <b>APEX TRADE BOT — Control Panel</b>\n"
                                 "Your AI bot is active and trading automatically. 🚀",
@@ -365,6 +375,7 @@ def _activate(chat_id):
 def _start_paper(chat_id):
     u = user_loop._ensure_user(chat_id)
     u["paper"] = True
+    u["setup_done"] = True
     u["settings"]["PAUSED"] = False
     user_store.save(chat_id, u)
     _ensure_running(chat_id)
@@ -397,6 +408,7 @@ def _finish_live_setup(chat_id, text, msg_id):
         return send_to(chat_id, "❌ Send both in one message:\n<code>API_KEY=xxx API_SECRET=yyy</code>")
     u = user_loop._ensure_user(chat_id)
     u["paper"] = False
+    u["setup_done"] = True
     u["api_key"] = pairs["API_KEY"]
     u["api_secret"] = pairs["API_SECRET"]
     u["settings"]["PAUSED"] = False
