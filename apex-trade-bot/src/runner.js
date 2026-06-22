@@ -168,14 +168,30 @@ async function tick(ctx) {
 
     const stop = shouldStop(state.session, state.paperBalance, state.startBalance);
     if (stop.stop) {
-      // Throttle: alert at most once per 30 min so a latched stop doesn't spam
-      // the user every minute. /resume clears the stop via botManager.resetSession.
-      const now = Date.now();
-      if (!state.session.stopAlertedAt || now - state.session.stopAlertedAt > 30 * 60 * 1000) {
+      // Self-healing stop. A strategy stop must NEVER latch forever: once it
+      // fires the tick returns before trading, so the bot can never get a win
+      // to clear the loss counter on its own. Instead we alert ONCE, pause
+      // silently for a cooldown, then auto-reset the counters and resume.
+      const now        = Date.now();
+      const COOLDOWN_MS = 60 * 60 * 1000; // 60 min
+
+      if (!state.session.stopStartedAt) {
+        state.session.stopStartedAt = now;
         ctx.alertFn('strategy_stop', { reasons: stop.reasons });
-        state.session.stopAlertedAt = now;
+        return;
       }
-      return;
+      if (now - state.session.stopStartedAt < COOLDOWN_MS) {
+        return; // within cooldown — stay silent, don't trade
+      }
+      // Cooldown elapsed → self-heal: clear counters and resume trading.
+      state.session.consecutiveLosses = 0;
+      state.session.consecutiveWins   = 0;
+      state.session.dailyTrades       = 0;
+      state.session.dailyPnL          = 0;
+      state.session.peakBalance       = state.paperBalance;
+      state.session.stopStartedAt     = 0;
+      ctx.alertFn('strategy_resume', {});
+      // fall through and trade normally this tick
     }
     if (state.paperBalance < 1) return;
 

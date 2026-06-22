@@ -95,7 +95,7 @@ function resetSession(userId) {
     consecutiveLosses: 0, consecutiveWins: 0,
     dailyTrades: 0, dailyPnL: 0,
     lastLossAt: 0, lastResetDay: new Date().toDateString(),
-    stopAlertedAt: 0,
+    stopAlertedAt: 0, stopStartedAt: 0,
   };
   const loop = _loops.get(userId);
   if (loop) {

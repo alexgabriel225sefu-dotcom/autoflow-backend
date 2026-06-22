@@ -133,8 +133,11 @@ function makeAlertFn(chatId) {
       await send(chatId, `💓 Tick #${data.tickCount}  💼 $${data.balance.toFixed(2)}\n${pos}\n<i>/menu for controls</i>`);
     } else if (type === 'strategy_stop') {
       await send(chatId,
-        `🚨 <b>STRATEGY STOP</b>\n${data.reasons.map(r => `• ${r}`).join('\n')}\n\n<i>/resume when conditions improve.</i>`
+        `🛡️ <b>Risk pause</b> — protecting your capital.\n${data.reasons.map(r => `• ${r}`).join('\n')}\n\n` +
+        `<i>Auto-resumes in 60 min, or tap ▶️ Start Trading to resume now.</i>`
       );
+    } else if (type === 'strategy_resume') {
+      await send(chatId, `▶️ <b>Trading resumed</b> — risk pause over, scanning the market again. 🚀`);
     } else if (type === 'groq_error') {
       await send(chatId, data.msg);
     }
