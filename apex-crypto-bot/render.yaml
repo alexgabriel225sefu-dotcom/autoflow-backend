@@ -1,0 +1,20 @@
+services:
+  # 'web' (not 'background') so it works on Render's FREE plan.
+  # The bot binds $PORT for a health check + self-pings to stay awake 24/7.
+  - type: web
+    name: apex-crypto-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    plan: free
+    autoDeploy: true
+    envVars:
+      # Required: bot token from @BotFather + a free Groq key (console.groq.com).
+      # Owner gets /grant /revoke /users; everyone else is a paying client,
+      # activated instantly when they open the Telegram deep link.
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
