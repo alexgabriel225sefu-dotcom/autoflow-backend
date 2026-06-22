@@ -161,7 +161,7 @@ async function _fetchSignal(indicators, balance, openPosition, strategyData, use
 
   const prompt = `You are a professional trader with 20 years of experience. Apply the rules of legendary traders: Turtle breakout, Livermore structure, Soros momentum, PTJ defense. Analyze ALL data and give a precise signal.
 
-## MARKET DATA — ${cfg.SYMBOL} (${cfg.TIMEFRAME})
+## MARKET DATA — ${indicators.symbol || cfg.SYMBOL} (${indicators.timeframe || cfg.TIMEFRAME})
 ### Price & Trend
 - Current price: $${indicators.price}
 - EMA 20: ${indicators.ema20} | EMA 50: ${indicators.ema50} | EMA 200: ${indicators.ema200}

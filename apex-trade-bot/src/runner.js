@@ -157,7 +157,9 @@ async function tick(ctx) {
       state.openPosition.pnlPct     = parseFloat(((pnl / (state.openPosition.entryPrice * state.openPosition.quantity)) * 100).toFixed(2));
     }
 
-    if (ctx.state.tickCount % 6 === 0) {
+    // Heartbeat ONLY while a position is open (live PnL is useful). Skip the
+    // repetitive "No position" pings — they made the bot feel spammy/dumb.
+    if (state.openPosition && ctx.state.tickCount % 6 === 0) {
       ctx.alertFn('heartbeat', { tickCount: ctx.state.tickCount, balance: state.paperBalance, openPosition: state.openPosition, symbol });
     }
 
@@ -179,6 +181,7 @@ async function tick(ctx) {
 
     const ind       = indicators.analyze(candles);
     ind.symbol      = symbol; // needed for per-symbol signal cache
+    ind.timeframe   = TIMEFRAME; // so the AI prompt labels the right timeframe
     const stratData = strategies.analyze(candles);
     stratData.session = { ...state.session };
 
