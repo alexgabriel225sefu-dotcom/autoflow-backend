@@ -1,5 +1,0 @@
-requests>=2.31
-python-dotenv>=1.0
-anthropic>=0.39
-PyJWT>=2.8
-cryptography>=42.0
