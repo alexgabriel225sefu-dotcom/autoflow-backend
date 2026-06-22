@@ -7,15 +7,19 @@ All data lives on the main server (Supabase) — this bot is just the front-end.
 """
 import os
 import time
+import threading
 import requests
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 TOKEN = os.getenv("AFFILIATE_BOT_TOKEN", "").strip()
 SITE_URL = os.getenv("SITE_URL", "https://aicashsystem.space").rstrip("/")
 SECRET = os.getenv("AFFILIATE_BOT_SECRET", "apex-affiliate-bridge")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "7585109158").strip()
 KEEPALIVE = os.getenv("KEEPALIVE", "1").strip() not in ("0", "false", "no", "off")
+PORT = int(os.getenv("PORT", "0"))           # Render sets PORT; 0 = skip HTTP server
+RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")  # auto-set by Render
 
-BOT_VERSION = "v6"   # bump this to confirm new code is running
+BOT_VERSION = "v8"   # bump this to confirm new code is running
 
 _API = f"https://api.telegram.org/bot{TOKEN}"
 _update_id = 0
@@ -281,11 +285,62 @@ def _start_keepalive():
         print(f"[BOT] keepalive failed: {e}")
 
 
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+    def log_message(self, *args):
+        pass  # silence access logs
+
+
+def _start_http_server():
+    """Bind the HTTP health-check server Render requires on $PORT."""
+    if not PORT:
+        return
+    try:
+        server = HTTPServer(("0.0.0.0", PORT), _HealthHandler)
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+        print(f"[BOT] HTTP health server listening on port {PORT}.")
+    except Exception as e:
+        print(f"[BOT] HTTP server error: {e}")
+
+
+def _self_ping_loop():
+    """Hit our own URL every 10 min so Render's free tier never sleeps."""
+    if not RENDER_URL:
+        return
+    url = f"{RENDER_URL}/"
+    while True:
+        time.sleep(600)
+        try:
+            requests.get(url, timeout=10)
+            print(f"[BOT] self-ping OK -> {url}")
+        except Exception as e:
+            print(f"[BOT] self-ping failed: {e}")
+
+
+def _start_self_ping():
+    if not RENDER_URL:
+        return
+    t = threading.Thread(target=_self_ping_loop, daemon=True)
+    t.start()
+    print(f"[BOT] self-ping thread started (every 10 min) -> {RENDER_URL}/")
+
+
 def run():
     if not TOKEN:
         print("[BOT] AFFILIATE_BOT_TOKEN missing — bot disabled.")
         return
-    _start_keepalive()
+    if PORT:
+        # Running on Render: start HTTP health server + self-ping anti-sleep
+        _start_http_server()
+        _start_self_ping()
+    else:
+        # Running on Oracle VM: CPU keepalive to prevent idle shutdown
+        _start_keepalive()
     _clear_webhook()
     print(f"[APEX AFFILIATE BOT] {BOT_VERSION} Polling started. Site: {SITE_URL}")
     while True:
