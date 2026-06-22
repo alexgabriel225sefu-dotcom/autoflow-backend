@@ -610,23 +610,20 @@ def _poll_loop():
                     continue
                 chat_id_str = str(chat_id)
 
-                # Bootstrap: first person to /start becomes owner
-                if not access.has_any_admin():
-                    access.claim_admin(chat_id_str)
-                    send_to(chat_id,
-                            f"👑 <b>You are now the OWNER of this bot.</b>\n"
-                            f"Your ID: <code>{chat_id_str}</code>\n\n"
-                            f"Give clients access with /grant THEIR_ID\n"
-                            f"List them with /users · remove with /revoke ID")
+                # Owner is set via the ADMIN_CHAT_ID env var — no first-message
+                # bootstrap, so a customer can never become the owner.
 
                 if not access.is_allowed(chat_id_str):
-                    # Non-customers can activate with /start <license_key>
-                    first = raw.splitlines()[0].strip()
-                    ext_cmd, _, ext_args = first.partition(" ")
-                    if ext_cmd.lower().split("@")[0] == "/start" and ext_args.strip():
-                        _handle_buyer_start(chat_id, ext_args.strip())
-                    else:
-                        send_to(chat_id, "⛔ <b>Access denied.</b>\nPurchase Apex Forex Bot at https://aicashsystem.space")
+                    # No license keys: the activation link is only handed out
+                    # after payment (purchase email + thank-you page), so anyone
+                    # who reaches the bot is a paying customer. Grant on contact.
+                    access.grant(chat_id_str)
+                    send_to(chat_id,
+                            "✅ <b>Welcome to Apex Forex Bot!</b>\n\n"
+                            "Your bot is now active. 🚀\n\n"
+                            "Send /setup to connect your OANDA account, "
+                            "then /status to see the live snapshot.")
+                    send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id_str}</code>")
                     continue
 
                 # Active wizard step takes priority over /commands

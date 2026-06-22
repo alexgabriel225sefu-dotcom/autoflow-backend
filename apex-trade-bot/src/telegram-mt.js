@@ -603,45 +603,17 @@ async function _handle(u) {
   const parts = raw.split(/\s+/);
   const cmd   = parts[0].toLowerCase();
 
-  // ── Access control gate ──
-  // Bootstrap: the very first user to message becomes the admin/owner.
-  if (!access.hasAnyAdmin()) {
-    access.claimAdmin(chatId);
-    await send(chatId,
-      `👑 <b>You are now the OWNER of this bot.</b>\nYour ID: <code>${chatId}</code>\n\n` +
-      `Give clients access with <code>/grant THEIR_ID</code>\nList them with /users · remove with /revoke ID`
-    );
-  }
-
-  // Admin-only whitelist commands
+  // ── Access gate (open, no license keys) ──
+  // Owner is set via the ADMIN_CHAT_ID env var. We do NOT auto-promote the
+  // first messenger to owner — otherwise a customer would become owner.
   if (access.isAdmin(chatId) && ['/grant', '/revoke', '/users', '/admin', '/usage', '/deploy'].includes(cmd)) {
     return handleAdminCmd(chatId, cmd, parts.slice(1));
   }
 
-  // Auto-activation: client arrives via paid deep-link  /start <token>
-  if (!access.isAllowed(chatId) && cmd === '/start' && parts[1] && payments.enabled()) {
-    const token = parts[1].trim();
-    if (access.isTokenClaimed(token)) {
-      return send(chatId, `⚠️ This activation link was already used on another account. Contact the owner if this is a mistake.`);
-    }
-    await send(chatId, `⏳ Verifying your payment…`);
-    const paid = await payments.verifyPaidToken(token);
-    if (paid) {
-      access.grant(chatId);
-      access.claimToken(token, chatId);
-      await send(chatId, `✅ <b>Payment confirmed — access activated!</b>\n\nWelcome aboard. 🚀`);
-      // fall through to normal /start setup below
-    } else {
-      return send(chatId,
-        `❌ <b>Couldn't confirm payment yet.</b>\n\n` +
-        `If you just paid, wait ~1 minute and tap the activation link again.\n\n` +
-        `If the problem persists, send this ID to the owner: <code>${chatId}</code>`
-      );
-    }
-  }
-
-  // Block everyone not on the whitelist
-  if (!access.isAllowed(chatId)) return sendNoAccess(chatId);
+  // No keys: the activation link is only handed out after payment (purchase
+  // email + thank-you page), so anyone who reaches the bot is a paying
+  // customer. Grant access on first contact and continue straight to setup.
+  if (!access.isAllowed(chatId)) access.grant(chatId);
 
   const user = userStore.load(chatId);
 

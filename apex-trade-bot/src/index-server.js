@@ -39,6 +39,26 @@ if (!process.env.MASTER_KEY) {
 
 console.log(`✅  AI: ${hasAnthropic ? 'Anthropic' : ''}${hasAnthropic && hasGroq ? ' + ' : ''}${hasGroq ? 'Groq (fallback)' : ''}`);
 console.log(`✅  Telegram token: ...${process.env.TELEGRAM_BOT_TOKEN.slice(-6)}`);
+
+// ─── HTTP health server (Render requires an open port) ─────────
+// Render marks a Web Service "live" only when it binds $PORT. We also use this
+// endpoint for the self-ping below so the free tier never sleeps the bot.
+const http = require('http');
+const PORT = parseInt(process.env.PORT || '0', 10);
+if (PORT) {
+  http.createServer((req, res) => { res.writeHead(200); res.end('OK'); })
+      .listen(PORT, '0.0.0.0', () => console.log(`✅  Health server on :${PORT}`));
+
+  // Self-ping every 10 min so Render's free tier keeps the bot awake 24/7.
+  const RENDER_URL = (process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '');
+  if (RENDER_URL) {
+    setInterval(() => {
+      http.get(RENDER_URL + '/', r => r.resume()).on('error', () => {});
+    }, 10 * 60 * 1000);
+    console.log(`✅  Self-ping every 10 min → ${RENDER_URL}/`);
+  }
+}
+
 console.log('🚀  Starting Telegram polling...\n');
 
 tg.startPolling().catch(e => {
