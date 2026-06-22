@@ -67,31 +67,23 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
 
       <div class="state active" id="stateLoading">
         <div class="spinner"></div>
-        <p class="wait-text">Confirming your payment and generating your license key&hellip;<br>This usually takes a few seconds.</p>
+        <p class="wait-text">Confirming your payment&hellip;<br>This usually takes a few seconds.</p>
       </div>
 
       <div class="state" id="stateReady">
         <span class="chip">&#10003; Payment confirmed</span>
         <h1 id="readyTitle">Your bot is ready.</h1>
-        <p class="sub">Save your license key below — you'll need it to deploy and activate your bot.</p>
-        <div class="keybox">
-          <div class="keylabel">Your License Key</div>
-          <div class="keyval" id="licenseKeyVal">—</div>
-        </div>
-        <p class="copyhint">We also emailed this to you, along with full setup instructions.</p>
-        <div class="cta-row">
-          <a class="cta" id="ctaBtn" href="#" style="display:none">Open Bot Configurator &rarr;</a>
-          <a class="cta-secondary" id="deployBtn" href="#" target="_blank" rel="noopener">Deploy My Bot Now (Railway) &rarr;</a>
-        </div>
+        <p class="sub" id="readySub">Tap the button below — Telegram opens and your bot activates automatically. No setup required.</p>
+        <a class="cta" id="tgBtn" href="#" target="_blank" rel="noopener" style="font-size:17px;padding:20px;border-radius:12px;margin-bottom:10px;display:block">&#128640; Open your Bot on Telegram &rarr;</a>
+        <p class="copyhint">We also emailed you the same link in case you need it later.</p>
 
         <div class="steps">
-          <div class="steps-label">What happens next</div>
-          <div class="step" id="step1"><div class="stepn" id="step1n">1</div><div class="stepbody">Open the <b>Bot Configurator</b> above — your license key is already filled in.</div></div>
-          <div class="step"><div class="stepn" id="step2n">2</div><div class="stepbody">Choose how the bot should trade (pairs, risk level, strategy) and save your settings.</div></div>
-          <div class="step"><div class="stepn" id="step3n">3</div><div class="stepbody">Click <b>Deploy My Bot Now</b> to launch it on Railway — free hosting tier included, live in under 10 minutes.</div></div>
-          <div class="step" id="stepTg"><div class="stepn" id="step4n">4</div><div class="stepbody">Optional: add your own <b>Telegram bot token</b> in Railway's variables (steps in your email) — your bot will then message you directly and you can control it with <b>/menu</b>, <b>/status</b>, <b>/pause</b> and more, right from the chat.</div></div>
+          <div class="steps-label">How it works</div>
+          <div class="step"><div class="stepn">1</div><div class="stepbody">Press the button above &mdash; the bot sends you a <b>welcome message</b> instantly.</div></div>
+          <div class="step"><div class="stepn">2</div><div class="stepbody">Send <b>/settings</b> in the chat to enter your exchange API keys and configure trading.</div></div>
+          <div class="step"><div class="stepn">3</div><div class="stepbody">Send <b>/start</b> to begin trading. Starts in <b>paper mode</b> by default &mdash; safe simulated money.</div></div>
         </div>
-        <p class="email-note">Check your inbox (and spam folder) for the full setup email with this license key and step-by-step screenshots.</p>
+        <p class="email-note">Check your inbox for the setup email with the same Telegram link.</p>
       </div>
 
       <div class="state" id="stateError">
@@ -129,16 +121,11 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
       .then(function(d){
         if (d.ready && d.licenseKey) {
           var key = d.licenseKey;
-          document.getElementById('licenseKeyVal').textContent = key;
-          document.getElementById('readyTitle').textContent = isForex ? 'Your Forex bot is ready.' : 'Your bot is ready.';
-
-          var configuratorUrl = (isForex ? '/configurator-forex' : '/configurator') + '?key=' + encodeURIComponent(key);
-          var repo = isForex ? 'apex-forex-bot' : 'apex-trade-bot';
-          document.getElementById('deployBtn').href = 'https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/' + repo;
-
-          document.getElementById('ctaBtn').href = configuratorUrl;
-          document.getElementById('ctaBtn').style.display = 'block';
-          document.getElementById('stepTg').style.display = isForex ? 'none' : 'flex';
+          var botUsername = isForex ? 'FOREX_APEX_BOT' : 'ApexTradeBot_official_bot';
+          var tgLink = 'https://t.me/' + botUsername + '?start=' + encodeURIComponent(key);
+          document.getElementById('readyTitle').textContent = isForex ? 'Your Forex bot is ready.' : 'Your Crypto bot is ready.';
+          document.getElementById('readySub').textContent = 'Tap the button below — Telegram opens and your ' + (isForex ? 'Forex' : 'Crypto') + ' bot activates automatically. No setup required.';
+          document.getElementById('tgBtn').href = tgLink;
 
           show('stateReady');
           return;
