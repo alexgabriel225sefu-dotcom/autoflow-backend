@@ -7,6 +7,10 @@ on:
         description: 'Oracle Cloud VM IP address'
         required: true
         type: string
+      bot_token:
+        description: 'Telegram bot token (paste here to bypass the GitHub secret)'
+        required: false
+        type: string
 
 jobs:
   deploy:
@@ -18,18 +22,25 @@ jobs:
         with:
           ref: claude/arcads-external-api-gExX7
 
-      - name: Test token from GitHub runner
+      - name: Resolve + test token
+        id: token
         env:
-          RAW_TOKEN: ${{ secrets.AFFILIATE_BOT_TOKEN }}
+          INPUT_TOKEN: ${{ github.event.inputs.bot_token }}
+          SECRET_TOKEN: ${{ secrets.AFFILIATE_BOT_TOKEN }}
         run: |
-          CLEAN=$(printf '%s' "$RAW_TOKEN" | tr -d '\n\r\t ')
-          echo "Token len after strip: ${#CLEAN}, prefix: ${CLEAN:0:18}"
+          # Prefer the UI input; fall back to the secret. Strip all whitespace.
+          RAW="$INPUT_TOKEN"
+          if [ -z "$RAW" ]; then RAW="$SECRET_TOKEN"; fi
+          CLEAN=$(printf '%s' "$RAW" | tr -d '\n\r\t ')
+          echo "Token len: ${#CLEAN}, prefix: ${CLEAN:0:18}"
           RESP=$(curl -s --max-time 10 "https://api.telegram.org/bot${CLEAN}/getMe")
           echo "$RESP"
           if echo "$RESP" | grep -q '"ok":true'; then
             echo "TOKEN IS VALID"
+            echo "value=$CLEAN" >> "$GITHUB_OUTPUT"
           else
-            echo "TOKEN IS INVALID - regenerate in BotFather"
+            echo "TOKEN IS INVALID - paste a fresh token in the bot_token field"
+            exit 1
           fi
 
       - name: Setup SSH key
@@ -80,12 +91,13 @@ jobs:
 
       - name: Write .env to VM
         env:
-          RAW_TOKEN: ${{ secrets.AFFILIATE_BOT_TOKEN }}
+          CLEAN_TOKEN: ${{ steps.token.outputs.value }}
           BOT_SECRET: ${{ secrets.AFFILIATE_BOT_SECRET }}
         run: |
-          CLEAN_TOKEN=$(printf '%s' "$RAW_TOKEN" | tr -d '\n\r\t ')
+          SEC="$BOT_SECRET"
+          if [ -z "$SEC" ]; then SEC="apex-affiliate-bridge"; fi
           printf 'AFFILIATE_BOT_TOKEN=%s\nSITE_URL=https://aicashsystem.space\nAFFILIATE_BOT_SECRET=%s\n' \
-            "$CLEAN_TOKEN" "$BOT_SECRET" | \
+            "$CLEAN_TOKEN" "$SEC" | \
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
