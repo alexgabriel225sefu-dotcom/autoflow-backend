@@ -1413,8 +1413,9 @@ app.post('/api/affiliates/telegram-link', async (req, res) => {
     if (!aff) return res.status(404).json({ error: 'affiliate not found' });
     const { data: updated, error: updateErr } = await supabase
       .from('affiliates').update({ telegram_chat_id: String(chatId) }).eq('code', code).select('code');
+    console.log(`[tg-link] code=${code} chatId=${chatId} updated=${JSON.stringify(updated)} err=${updateErr?.message}`);
     if (updateErr) return res.status(500).json({ error: 'link failed: ' + updateErr.message });
-    if (!updated || updated.length === 0) return res.status(500).json({ error: 'link failed: no rows updated — check Supabase RLS policy for affiliates UPDATE' });
+    if (!updated || updated.length === 0) return res.status(500).json({ error: 'link failed: no rows updated' });
     addLog(`Affiliate linked Telegram: ${code} -> chat ${chatId}`, 'affiliate', 'success');
     res.json({ ok: true, code, name: aff.name || '', link: _affiliateLink(code) });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1428,6 +1429,7 @@ app.post('/api/affiliates/telegram-stats', async (req, res) => {
   if (!supabase) return res.status(500).json({ error: 'not configured' });
   try {
     const { data: aff } = await supabase.from('affiliates').select('code,name,commission_percent').eq('telegram_chat_id', String(chatId)).maybeSingle();
+    console.log(`[tg-stats] chatId=${chatId} found=${!!aff} code=${aff?.code}`);
     if (!aff) return res.json({ linked: false });
     const { data } = await supabase.from('referral_sales').select('commission_amount,paid,refunded,created_at,product').eq('affiliate_code', aff.code).order('created_at', { ascending: false });
     const rows = data || [];
