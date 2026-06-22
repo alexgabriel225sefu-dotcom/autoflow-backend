@@ -13,6 +13,8 @@ TOKEN = os.getenv("AFFILIATE_BOT_TOKEN", "").strip()
 SITE_URL = os.getenv("SITE_URL", "https://aicashsystem.space").rstrip("/")
 SECRET = os.getenv("AFFILIATE_BOT_SECRET", "apex-affiliate-bridge")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "7585109158").strip()
+# Keep the Oracle "Always Free" VM from being reclaimed as idle (default on).
+KEEPALIVE = os.getenv("KEEPALIVE", "1").strip() not in ("0", "false", "no", "off")
 
 _API = f"https://api.telegram.org/bot{TOKEN}"
 _update_id = 0
@@ -246,10 +248,43 @@ def _clear_webhook():
         print(f"[BOT] deleteWebhook error: {e}")
 
 
+def _cpu_keepalive():
+    """Light CPU duty-cycle so Oracle doesn't reclaim the Always Free VM.
+
+    Oracle stops an "Always Free" instance whose 95th-percentile CPU stays
+    under ~20% for 7 days. This bot only long-polls Telegram, so it barely
+    touches the CPU and the VM keeps getting shut down. This runs in a SEPARATE
+    process (not a thread — a Python busy-loop would hold the GIL and stall the
+    poller) at the lowest priority, so it never steals time from the bot.
+    """
+    try:
+        os.nice(19)
+    except Exception:
+        pass
+    while True:
+        end = time.time() + 30      # ~30s busy …
+        x = 0
+        while time.time() < end:
+            x = (x + 1) & 0xFFFFFFFF
+        time.sleep(30)              # … then 30s idle  → ~50% on one core
+
+
+def _start_keepalive():
+    if not KEEPALIVE:
+        return
+    try:
+        import multiprocessing
+        multiprocessing.Process(target=_cpu_keepalive, daemon=True).start()
+        print("[BOT] keepalive process started (anti-idle).")
+    except Exception as e:
+        print(f"[BOT] keepalive failed: {e}")
+
+
 def run():
     if not TOKEN:
         print("[BOT] AFFILIATE_BOT_TOKEN missing — bot disabled.")
         return
+    _start_keepalive()
     _clear_webhook()
     print(f"[APEX AFFILIATE BOT] Polling started. Site: {SITE_URL}")
     while True:
