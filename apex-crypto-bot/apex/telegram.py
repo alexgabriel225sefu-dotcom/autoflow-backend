@@ -167,6 +167,7 @@ _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━
          "<b>Settings:</b>\n/symbol BTCUSDT\n/method auto|turtle|livermore|soros|ptj|druckenmiller\n"
          "/risk 5 — % per trade\n/sl 1.6 — stop loss %\n/tp 3.2 — take profit %\n/confidence 70 — min AI confidence\n\n"
          "<b>Run:</b>\n/pause · /resume\n\n"
+         "<b>Account:</b>\n/setup — switch paper ↔ real, re-run onboarding\n\n"
          "<b>Free AI key:</b>\n/groq gsk_YOUR_KEY (get one at console.groq.com)")
 
 
@@ -220,6 +221,15 @@ def _handle_command(chat_id, text):
     is_adm = access.is_admin(str(chat_id))
     s = _settings(chat_id)
 
+    if cmd == "/setup":
+        u = user_loop._ensure_user(chat_id)
+        u["setup_done"] = False
+        user_store.save(chat_id, u)
+        return send_to(chat_id,
+                       "🔄 <b>Setup reset.</b>\n\nChoose how you want to trade:\n\n"
+                       "📝 <b>Paper</b> — $100 virtual, real market prices, zero risk.\n"
+                       "🔴 <b>Real Binance</b> — trade your own account.",
+                       _kb_start())
     if cmd in ("/start", "/menu", "/m"):
         u = user_loop._ensure_user(chat_id)
         # First run (or never chose a mode): ask paper vs real before trading.
@@ -474,7 +484,6 @@ def _poll_loop():
         requests.post(f"{_API}/deleteWebhook", json={"drop_pending_updates": False}, timeout=5)
     except Exception:
         pass
-    user_loop.start_all(None)  # restore previously active users (alert wired per-user below)
     for uid in user_store.all_active():
         user_loop.start(uid, make_alert(uid))
     print(f"[TG] Poll loop started. TOKEN={bool(TOKEN)}")
