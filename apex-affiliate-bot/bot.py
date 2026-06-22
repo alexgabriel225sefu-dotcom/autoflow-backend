@@ -55,8 +55,6 @@ def _welcome(chat_id, name, link):
     _send(chat_id,
           f"👋 <b>Welcome to the Apex Affiliate Program, {first}!</b>\n\n"
           f"You're all set up and ready to earn. 🚀\n\n"
-          f"Here is your <b>personal referral link</b> — share it anywhere:\n\n"
-          f"🔗 <code>{link}</code>\n\n"
           f"Every time someone buys through your link, you earn <b>30% commission</b>:\n"
           f"• <b>$89.10</b> on the Crypto bot ($297)\n"
           f"• <b>$149.10</b> on the Forex bot ($497)\n\n"
@@ -66,6 +64,8 @@ def _welcome(chat_id, name, link):
           f"• /link — your referral link\n"
           f"• /help — all commands\n\n"
           f"Let's get you paid, {first}. 💰")
+    # Send link as a separate message so it's easy to copy on mobile
+    _send(chat_id, f"🔗 <b>Your referral link</b> (hold to copy):\n\n{link}")
 
 
 def _show_stats(chat_id):
@@ -96,9 +96,9 @@ def _show_stats(chat_id):
             prod = "Forex $497" if s.get("product") == "apex-forex" else "Crypto $297"
             tag = "↩️ refunded" if s.get("refunded") else ("✅ paid" if s.get("paid") else "⏳ pending")
             lines.append(f"• {prod} — <b>{_money(s.get('commission', 0))}</b>  {tag}")
-    lines.append(f"\n🔗 <code>{d.get('link')}</code>")
     lines.append(f"\n<i>Minimum payout {_money(d.get('minPayoutCents', 5000))}. Request payouts from the site.</i>")
     _send(chat_id, "\n".join(lines))
+    _send(chat_id, f"🔗 Your link (hold to copy):\n\n{d.get('link')}")
 
 
 def _show_link(chat_id):
@@ -110,7 +110,7 @@ def _show_link(chat_id):
     if not d.get("linked"):
         _send(chat_id, f"You're not connected yet. Sign up here first:\n{SIGNUP}")
         return
-    _send(chat_id, f"🔗 Your referral link:\n\n<code>{d.get('link')}</code>\n\nShare it anywhere — you earn 30% on every sale.")
+    _send(chat_id, f"🔗 Your referral link (hold to copy):\n\n{d.get('link')}\n\nShare it anywhere — you earn 30% on every sale.")
 
 
 def _handle(msg):
