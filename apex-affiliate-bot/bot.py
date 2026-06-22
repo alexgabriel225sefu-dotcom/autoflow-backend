@@ -13,8 +13,9 @@ TOKEN = os.getenv("AFFILIATE_BOT_TOKEN", "").strip()
 SITE_URL = os.getenv("SITE_URL", "https://aicashsystem.space").rstrip("/")
 SECRET = os.getenv("AFFILIATE_BOT_SECRET", "apex-affiliate-bridge")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "7585109158").strip()
-# Keep the Oracle "Always Free" VM from being reclaimed as idle (default on).
 KEEPALIVE = os.getenv("KEEPALIVE", "1").strip() not in ("0", "false", "no", "off")
+
+BOT_VERSION = "v6"   # bump this to confirm new code is running
 
 _API = f"https://api.telegram.org/bot{TOKEN}"
 _update_id = 0
@@ -286,7 +287,7 @@ def run():
         return
     _start_keepalive()
     _clear_webhook()
-    print(f"[APEX AFFILIATE BOT] Polling started. Site: {SITE_URL}")
+    print(f"[APEX AFFILIATE BOT] {BOT_VERSION} Polling started. Site: {SITE_URL}")
     while True:
         _poll_once()
 

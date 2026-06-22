@@ -111,7 +111,7 @@ jobs:
             "sudo tee /opt/apex-forex/apex-affiliate-bot/.env > /dev/null"
           echo "[deploy] .env written."
 
-      - name: Install + restart service
+      - name: Write service file + hard stop
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -131,8 +131,8 @@ Type=simple
 WorkingDirectory=/opt/apex-forex/apex-affiliate-bot
 ExecStart=/usr/bin/python3 main.py
 Restart=always
-RestartSec=10
-TimeoutStopSec=15
+RestartSec=5
+TimeoutStopSec=10
 KillMode=mixed
 StandardOutput=append:/var/log/apex-affiliate.log
 StandardError=append:/var/log/apex-affiliate.log
@@ -145,12 +145,30 @@ SERVICE
           sudo systemctl daemon-reload
           sudo systemctl enable apex-affiliate
 
-          # Force-kill old process immediately so restart doesn't hang
-          sudo systemctl kill --signal=SIGKILL apex-affiliate 2>/dev/null || true
-          sleep 3
+          # Stop with the new 10s timeout — guaranteed kill
+          sudo systemctl stop apex-affiliate 2>/dev/null || true
+          echo "[deploy] Service stopped."
+          REMOTE
+
+      - name: Start service + verify version
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
+          set -e
+
           sudo systemctl start apex-affiliate
-          sleep 8
+          sleep 12
           sudo systemctl is-active apex-affiliate && echo "SUCCESS: Affiliate Bot running!" || \
-            echo "WARN: Service may still be starting — check logs below"
-          sudo tail -20 /var/log/apex-affiliate.log || true
+            (echo "ERROR: Service failed to start" && sudo journalctl -u apex-affiliate -n 30 --no-pager && exit 1)
+
+          echo ""
+          echo "=== Last log lines (version check) ==="
+          sudo tail -10 /var/log/apex-affiliate.log || true
+
+          echo ""
+          echo "=== bot.py version line ==="
+          grep "BOT_VERSION" /opt/apex-forex/apex-affiliate-bot/bot.py || echo "NOT FOUND - old code!"
           REMOTE
