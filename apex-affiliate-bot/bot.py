@@ -201,7 +201,7 @@ def _handle(msg):
         if ADMIN_CHAT_ID and str(chat_id) == ADMIN_CHAT_ID:
             _show_admin(chat_id)
         else:
-            _send(chat_id, "⛔ Not authorised.")
+            _send(chat_id, f"⛔ Not authorised.\nYour ID: <code>{chat_id}</code>\nExpected: <code>{ADMIN_CHAT_ID}</code>")
         return
     if low.startswith("/help"):
         _send(chat_id,

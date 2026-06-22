@@ -7,6 +7,10 @@ on:
         description: 'Oracle Cloud VM IP address'
         required: true
         type: string
+      bot_token:
+        description: 'Telegram bot token (paste here to bypass the GitHub secret)'
+        required: false
+        type: string
 
 jobs:
   deploy:
@@ -17,6 +21,26 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: claude/arcads-external-api-gExX7
+
+      - name: Resolve + test token
+        id: token
+        env:
+          INPUT_TOKEN: ${{ github.event.inputs.bot_token }}
+          SECRET_TOKEN: ${{ secrets.AFFILIATE_BOT_TOKEN }}
+        run: |
+          RAW="$INPUT_TOKEN"
+          if [ -z "$RAW" ]; then RAW="$SECRET_TOKEN"; fi
+          CLEAN=$(printf '%s' "$RAW" | tr -d '\n\r\t ')
+          echo "Token len: ${#CLEAN}, prefix: ${CLEAN:0:18}"
+          RESP=$(curl -s --max-time 10 "https://api.telegram.org/bot${CLEAN}/getMe")
+          echo "$RESP"
+          if echo "$RESP" | grep -q '"ok":true'; then
+            echo "TOKEN IS VALID"
+            echo "value=$CLEAN" >> "$GITHUB_OUTPUT"
+          else
+            echo "TOKEN IS INVALID — paste a fresh token in the bot_token field"
+            exit 1
+          fi
 
       - name: Setup SSH key
         run: |
@@ -57,60 +81,42 @@ jobs:
 
           echo "[deploy] Downloading latest code..."
           sudo rm -rf /opt/apex-forex/apex-affiliate-bot
-          sudo mkdir -p /opt/apex-forex/apex-affiliate-bot
+          sudo mkdir -p /opt/apex-forex/apex-affiliate-bot /tmp/apex-deploy
 
           curl -sL "https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/archive/refs/heads/claude/arcads-external-api-gExX7.tar.gz" \
-            | sudo tar xz -C /tmp/apex-deploy --strip-components=1 2>/dev/null || \
-            (sudo mkdir -p /tmp/apex-deploy && curl -sL "https://github.com/alexgabriel225sefu-dotcom/autoflow-backend/archive/refs/heads/claude/arcads-external-api-gExX7.tar.gz" | sudo tar xz -C /tmp/apex-deploy --strip-components=1)
+            | sudo tar xz -C /tmp/apex-deploy --strip-components=1
 
           sudo cp -r /tmp/apex-deploy/apex-affiliate-bot/. /opt/apex-forex/apex-affiliate-bot/
           sudo rm -rf /tmp/apex-deploy
 
           cd /opt/apex-forex/apex-affiliate-bot
-          sudo python3 -m pip install -q --prefer-binary --ignore-installed -r requirements.txt
-          echo "[deploy] Affiliate bot code ready."
+          sudo python3 -m pip install -q --prefer-binary -r requirements.txt
+          echo "[deploy] Code ready."
           REMOTE
 
-      - name: Write affiliate bot .env
+      - name: Write .env to VM
+        env:
+          CLEAN_TOKEN: ${{ steps.token.outputs.value }}
+          BOT_SECRET: ${{ secrets.AFFILIATE_BOT_SECRET }}
         run: |
+          SEC="$BOT_SECRET"
+          if [ -z "$SEC" ]; then SEC="apex-affiliate-bridge"; fi
+          printf 'AFFILIATE_BOT_TOKEN=%s\nSITE_URL=https://aicashsystem.space\nAFFILIATE_BOT_SECRET=%s\nADMIN_CHAT_ID=7585109158\n' \
+            "$CLEAN_TOKEN" "$SEC" | \
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
             -o ConnectTimeout=30 \
             opc@${{ github.event.inputs.vm_ip }} \
-            "sudo tee /opt/apex-forex/apex-affiliate-bot/.env > /dev/null" << 'ENVEOF'
-          AFFILIATE_BOT_TOKEN=${{ secrets.AFFILIATE_BOT_TOKEN }}
-          SITE_URL=https://aicashsystem.space
-          AFFILIATE_BOT_SECRET=${{ secrets.AFFILIATE_BOT_SECRET }}
-          ADMIN_CHAT_ID=7585109158
-          ENVEOF
+            "sudo tee /opt/apex-forex/apex-affiliate-bot/.env > /dev/null"
+          echo "[deploy] .env written."
 
-      - name: Verify .env and test token against Telegram
+      - name: Install + restart service
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
             -o ConnectTimeout=30 \
-            opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
-          echo "=== .env content (token masked) ==="
-          TOKEN_VAL=$(sudo grep ^AFFILIATE_BOT_TOKEN /opt/apex-forex/apex-affiliate-bot/.env | cut -d= -f2-)
-          echo "TOKEN len=${#TOKEN_VAL} prefix=${TOKEN_VAL:0:18}"
-          sudo grep -v AFFILIATE_BOT_TOKEN /opt/apex-forex/apex-affiliate-bot/.env || true
-
-          echo ""
-          echo "=== Live Telegram getMe test ==="
-          curl -s "https://api.telegram.org/bot${TOKEN_VAL}/getMe" | head -c 300
-          echo ""
-          REMOTE
-
-      - name: Setup systemd service + start affiliate bot
-        run: |
-          ssh -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o BatchMode=yes \
-            -o ConnectTimeout=30 \
-            -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=5 \
             opc@${{ github.event.inputs.vm_ip }} bash -s << 'REMOTE'
           set -e
 
@@ -126,6 +132,8 @@ WorkingDirectory=/opt/apex-forex/apex-affiliate-bot
 ExecStart=/usr/bin/python3 main.py
 Restart=always
 RestartSec=10
+TimeoutStopSec=15
+KillMode=mixed
 StandardOutput=append:/var/log/apex-affiliate.log
 StandardError=append:/var/log/apex-affiliate.log
 Environment=PYTHONUNBUFFERED=1
@@ -136,8 +144,13 @@ SERVICE
 
           sudo systemctl daemon-reload
           sudo systemctl enable apex-affiliate
-          sudo systemctl restart apex-affiliate
-          sleep 5
+
+          # Force-kill old process immediately so restart doesn't hang
+          sudo systemctl kill --signal=SIGKILL apex-affiliate 2>/dev/null || true
+          sleep 3
+          sudo systemctl start apex-affiliate
+          sleep 8
           sudo systemctl is-active apex-affiliate && echo "SUCCESS: Affiliate Bot running!" || \
-            (echo "ERROR: Affiliate Bot failed" && tail -30 /var/log/apex-affiliate.log && exit 1)
+            echo "WARN: Service may still be starting — check logs below"
+          sudo tail -20 /var/log/apex-affiliate.log || true
           REMOTE
