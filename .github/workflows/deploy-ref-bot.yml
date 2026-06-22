@@ -82,6 +82,7 @@ jobs:
           AFFILIATE_BOT_TOKEN=${{ secrets.AFFILIATE_BOT_TOKEN }}
           SITE_URL=https://aicashsystem.space
           AFFILIATE_BOT_SECRET=${{ secrets.AFFILIATE_BOT_SECRET }}
+          ADMIN_CHAT_ID=7585109158
           ENVEOF
 
       - name: Verify .env and test token against Telegram

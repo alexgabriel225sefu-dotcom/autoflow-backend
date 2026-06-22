@@ -12,6 +12,7 @@ import requests
 TOKEN = os.getenv("AFFILIATE_BOT_TOKEN", "").strip()
 SITE_URL = os.getenv("SITE_URL", "https://aicashsystem.space").rstrip("/")
 SECRET = os.getenv("AFFILIATE_BOT_SECRET", "apex-affiliate-bridge")
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "").strip()
 
 _API = f"https://api.telegram.org/bot{TOKEN}"
 _update_id = 0
@@ -47,6 +48,12 @@ def _api_link(token, chat_id):
 def _api_stats(chat_id):
     r = requests.post(f"{SITE_URL}/api/affiliates/telegram-stats",
                       json={"chatId": chat_id, "secret": SECRET}, timeout=12)
+    return r.json()
+
+
+def _api_admin_list(chat_id):
+    r = requests.post(f"{SITE_URL}/api/affiliates/admin-list",
+                      json={"chatId": chat_id, "secret": SECRET}, timeout=15)
     return r.json()
 
 
@@ -113,6 +120,44 @@ def _show_link(chat_id):
     _send(chat_id, f"🔗 Your referral link (hold to copy):\n\n{d.get('link')}\n\nShare it anywhere — you earn 30% on every sale.")
 
 
+def _show_admin(chat_id):
+    try:
+        d = _api_admin_list(chat_id)
+    except Exception as e:
+        _send(chat_id, f"⚠️ Couldn't reach the server.\n<code>{e}</code>")
+        return
+    if d.get("error") == "not admin":
+        _send(chat_id, "⛔ Not authorised.")
+        return
+    if d.get("error"):
+        _send(chat_id, f"⚠️ Server error: {d['error']}")
+        return
+    affs = d.get("affiliates", [])
+    total_affiliates = len(affs)
+    total_sales = sum(a["sales"]["total"] for a in affs)
+    total_paid = sum(a["sales"]["paid"] for a in affs)
+    total_pending = sum(a["sales"]["pending"] for a in affs)
+    lines = [
+        "🛡️ <b>Admin Panel</b>",
+        "━━━━━━━━━━━━━━━━━━━━",
+        f"👥 Affiliates: <b>{total_affiliates}</b>  |  📦 Sales: <b>{total_sales}</b>",
+        f"💸 Paid out: <b>{_money(total_paid)}</b>  |  ⏳ Pending: <b>{_money(total_pending)}</b>",
+        "",
+    ]
+    for a in affs[:20]:
+        s = a["sales"]
+        status_icon = "🟢" if a.get("status") == "active" else "🔴"
+        name = (a.get("name") or a.get("email") or a.get("code") or "?")[:24]
+        line = (f"{status_icon} <b>{name}</b> — {s['total']} sale(s)"
+                f"  💵 {_money(s['paid'])} paid  ⏳ {_money(s['pending'])} pend")
+        if s.get("refunded"):
+            line += f"  ↩️ {s['refunded']} refund(s)"
+        lines.append(line)
+    if total_affiliates > 20:
+        lines.append(f"\n<i>…and {total_affiliates - 20} more. Full list on the site.</i>")
+    _send(chat_id, "\n".join(lines))
+
+
 def _handle(msg):
     chat_id = msg["chat"]["id"]
     text = (msg.get("text") or "").strip()
@@ -150,6 +195,12 @@ def _handle(msg):
         _show_stats(chat_id); return
     if low.startswith("/link"):
         _show_link(chat_id); return
+    if low.startswith("/admin"):
+        if ADMIN_CHAT_ID and str(chat_id) == ADMIN_CHAT_ID:
+            _show_admin(chat_id)
+        else:
+            _send(chat_id, "⛔ Not authorised.")
+        return
     if low.startswith("/help"):
         _send(chat_id,
               "🤖 <b>Apex Affiliate Bot</b>\n\n"

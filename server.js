@@ -1447,6 +1447,30 @@ app.post('/api/affiliates/telegram-stats', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/affiliates/admin-list — bot fetches all affiliates + their sales for admin view.
+// Body: { chatId, secret }. chatId must match ADMIN_TELEGRAM_CHAT_ID env var.
+app.post('/api/affiliates/admin-list', async (req, res) => {
+  const { chatId, secret } = req.body || {};
+  if (secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
+  if (!supabase) return res.status(500).json({ error: 'not configured' });
+  const adminId = process.env.ADMIN_TELEGRAM_CHAT_ID;
+  if (!adminId || String(chatId) !== adminId) return res.status(403).json({ error: 'not admin' });
+  try {
+    const { data: affs } = await supabase.from('affiliates').select('code,name,email,status,commission_percent,created_at').order('created_at', { ascending: false });
+    const { data: sales } = await supabase.from('referral_sales').select('affiliate_code,commission_amount,paid,refunded,product');
+    const salesByCode = {};
+    (sales || []).forEach(s => {
+      if (!salesByCode[s.affiliate_code]) salesByCode[s.affiliate_code] = { total: 0, paid: 0, pending: 0, refunded: 0 };
+      const b = salesByCode[s.affiliate_code];
+      if (s.refunded) { b.refunded++; return; }
+      b.total++;
+      if (s.paid) b.paid += s.commission_amount;
+      else b.pending += s.commission_amount;
+    });
+    res.json({ ok: true, affiliates: (affs || []).map(a => ({ ...a, sales: salesByCode[a.code] || { total: 0, paid: 0, pending: 0, refunded: 0 } })) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Reserved codes that must never become an affiliate handle (they collide with
 // real query-string flags or look like system values).
 const _RESERVED_CODES = new Set(['ref','admin','api','www','direct','intro','affiliate','login','signup','apex','forex','crypto']);
