@@ -501,6 +501,7 @@ async function handleCmd(chatId, cmd, args) {
         u.active = true; userStore.save(chatId, u);
         await botMgr.start(chatId, makeAlertFn(chatId));
       }
+      botMgr.resetSession(chatId);  // clear any latched strategy-stop
       return send(chatId, `▶️ <b>Bot ACTIVE</b> — trading every minute! 🚀`, kbMenu(false, u.settings.SYMBOL));
     }
     case '/help':
@@ -565,6 +566,7 @@ async function handleCb(chatId, data) {
     case 'c:resume':
       upd('PAUSED', false);
       if (!botMgr.isRunning(chatId)) { u.active = true; userStore.save(chatId, u); await botMgr.start(chatId, makeAlertFn(chatId)); }
+      botMgr.resetSession(chatId);  // clear any latched strategy-stop
       return send(chatId, `▶️ <b>Bot ACTIVE</b> — trading every minute! 🚀`, kbMenu(false, u.settings.SYMBOL));
   }
   } catch (e) {

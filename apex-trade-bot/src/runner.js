@@ -165,7 +165,16 @@ async function tick(ctx) {
     if (exit) { await closeTrade(ctx, price, exit); return; }
 
     const stop = shouldStop(state.session, state.paperBalance, state.startBalance);
-    if (stop.stop) { ctx.alertFn('strategy_stop', { reasons: stop.reasons }); return; }
+    if (stop.stop) {
+      // Throttle: alert at most once per 30 min so a latched stop doesn't spam
+      // the user every minute. /resume clears the stop via botManager.resetSession.
+      const now = Date.now();
+      if (!state.session.stopAlertedAt || now - state.session.stopAlertedAt > 30 * 60 * 1000) {
+        ctx.alertFn('strategy_stop', { reasons: stop.reasons });
+        state.session.stopAlertedAt = now;
+      }
+      return;
+    }
     if (state.paperBalance < 1) return;
 
     const ind       = indicators.analyze(candles);

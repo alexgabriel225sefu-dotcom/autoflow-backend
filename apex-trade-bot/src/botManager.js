@@ -86,10 +86,35 @@ async function restart(userId, alertFn) {
   await start(userId, alertFn);
 }
 
+// Clear all strategy-stop conditions so a manual /resume restarts trading.
+// Without this, 3 consecutive losses (or a daily-loss / drawdown / trade-cap
+// stop) latches forever: the tick returns before trading, so the bot never
+// gets a win to reset the counter and spams "STRATEGY STOP" every minute.
+function resetSession(userId) {
+  const fresh = {
+    consecutiveLosses: 0, consecutiveWins: 0,
+    dailyTrades: 0, dailyPnL: 0,
+    lastLossAt: 0, lastResetDay: new Date().toDateString(),
+    stopAlertedAt: 0,
+  };
+  const loop = _loops.get(userId);
+  if (loop) {
+    const s = loop.ctx.state;
+    s.session = { ...s.session, ...fresh, peakBalance: s.paperBalance };
+    _save(loop.ctx);
+  } else {
+    const u = userStore.load(userId);
+    if (u.state && u.state.session) {
+      u.state.session = { ...u.state.session, ...fresh, peakBalance: u.state.paperBalance };
+      userStore.save(userId, u);
+    }
+  }
+}
+
 function isRunning(userId) { return _loops.has(userId); }
 
 function getCtx(userId) { return _loops.get(userId)?.ctx ?? null; }
 
 function allRunning() { return [..._loops.keys()]; }
 
-module.exports = { start, stop, restart, isRunning, getCtx, allRunning };
+module.exports = { start, stop, restart, resetSession, isRunning, getCtx, allRunning };
