@@ -12,7 +12,7 @@ import requests
 TOKEN = os.getenv("AFFILIATE_BOT_TOKEN", "").strip()
 SITE_URL = os.getenv("SITE_URL", "https://aicashsystem.space").rstrip("/")
 SECRET = os.getenv("AFFILIATE_BOT_SECRET", "apex-affiliate-bridge")
-ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "").strip()
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "7585109158").strip()
 
 _API = f"https://api.telegram.org/bot{TOKEN}"
 _update_id = 0
