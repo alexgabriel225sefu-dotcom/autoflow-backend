@@ -66,12 +66,14 @@ def _delete_message(chat_id, message_id):
 
 # ─── Keyboards ────────────────────────────────────────────
 def _kb_menu(paused, symbol="BTCUSDT"):
-    chart_url = f"{cfg.SITE_URL}/chart?s={symbol}"
+    # Live Chart is a callback (not a baked web_app URL) so it always opens the
+    # CURRENT symbol — a baked URL freezes whatever symbol was set when the
+    # message was sent, which is why old menus opened the wrong coin.
     rows = [
         [{"text": "📊 Status", "callback_data": "c:status"}, {"text": "📋 Trades", "callback_data": "c:trades"}],
         [{"text": "💎 Symbol", "callback_data": "c:symbol"}, {"text": "⚙️ Config", "callback_data": "c:config"}],
         [{"text": "🎯 Method", "callback_data": "c:method"}, {"text": "❓ Help", "callback_data": "c:help"}],
-        [{"text": "📈 Live Chart", "web_app": {"url": chart_url}}],
+        [{"text": "📈 Live Chart", "callback_data": "c:chart"}],
         [{"text": "▶️ Start Trading" if paused else "⏸ Pause Bot",
           "callback_data": "c:resume" if paused else "c:pause"}],
     ]
@@ -328,6 +330,15 @@ def _handle_callback(chat_id, data):
         return _start_paper(chat_id)
     if data == "setup:live":
         return _start_live_setup(chat_id)
+    if data == "groq:skip":
+        _wizard.pop(str(chat_id), None)
+        return _ready(chat_id)
+    if data == "c:chart":
+        sym = s["SYMBOL"]
+        url = f"{cfg.SITE_URL}/chart?s={sym}"
+        return send_to(chat_id, f"📈 <b>{sym}</b> — live chart",
+                       {"reply_markup": json.dumps({"inline_keyboard": [[
+                           {"text": f"📈 Open {sym} chart", "web_app": {"url": url}}]]})})
     if data.startswith("sym:"):
         sym = data[4:]
         _upd(chat_id, "SYMBOL", sym)
@@ -376,13 +387,10 @@ def _start_paper(chat_id):
     u = user_loop._ensure_user(chat_id)
     u["paper"] = True
     u["setup_done"] = True
-    u["settings"]["PAUSED"] = False
+    u["settings"]["PAUSED"] = True   # wait for explicit Start after the Groq step
     user_store.save(chat_id, u)
-    _ensure_running(chat_id)
-    send_to(chat_id,
-            "✅ <b>Paper account ready!</b>\n💰 $100 virtual · real market data · zero risk.\n\n"
-            "Your bot is now trading automatically. 🚀\nWatch it work — tap 📈 Live Chart or 📊 Status.",
-            _kb_menu(False, u["settings"]["SYMBOL"]))
+    send_to(chat_id, "✅ <b>Paper account ready!</b>\n💰 $100 virtual · real market data · zero risk.")
+    _ask_groq(chat_id)
 
 
 def _start_live_setup(chat_id):
@@ -411,15 +419,53 @@ def _finish_live_setup(chat_id, text, msg_id):
     u["setup_done"] = True
     u["api_key"] = pairs["API_KEY"]
     u["api_secret"] = pairs["API_SECRET"]
-    u["settings"]["PAUSED"] = False
+    u["settings"]["PAUSED"] = True   # wait for explicit Start after the Groq step
     user_store.save(chat_id, u)
-    _wizard.pop(str(chat_id), None)
-    _ensure_running(chat_id)
     safety = "🧪 Testnet (safe)" if cfg.BINANCE_TESTNET else "🔴 LIVE — real funds"
+    send_to(chat_id, f"✅ <b>Binance connected!</b>\nMode: <b>{safety}</b>")
+    _ask_groq(chat_id)
+
+
+def _ask_groq(chat_id):
+    """Onboarding step: collect the client's free Groq key (or skip to shared)."""
+    u = user_loop._ensure_user(chat_id)
+    if u.get("groq_key"):   # already have one — go straight to the ready screen
+        return _ready(chat_id)
+    _wizard[str(chat_id)] = "GROQ"
     send_to(chat_id,
-            f"✅ <b>Binance connected!</b>\nMode: <b>{safety}</b>\n\n"
-            "Your bot is now trading your account automatically. Watch it on 📊 Status / 📈 Live Chart.",
-            _kb_menu(False, u["settings"]["SYMBOL"]))
+            "🧠 <b>Last step — your free AI key</b>\n\n"
+            "The bot's brain runs on <b>Groq</b> (free, ~14,400 signals/day). Grab a key in 30s, "
+            "then send it here:\n<code>gsk_your_key</code>\n\n"
+            "Or tap <b>Use shared AI</b> to start right now.",
+            {"reply_markup": json.dumps({"inline_keyboard": [
+                [{"text": "🔑 Get free Groq key", "url": "https://console.groq.com/keys"}],
+                [{"text": "⚡ Use shared AI — skip", "callback_data": "groq:skip"}],
+            ]})})
+
+
+def _finish_groq(chat_id, key, msg_id):
+    _delete_message(chat_id, msg_id)
+    user_store.update(chat_id, {"groq_key": key.strip()})
+    _wizard.pop(str(chat_id), None)
+    send_to(chat_id, "✅ <b>Groq key saved!</b> Unlimited personal AI. 🧠")
+    _ready(chat_id)
+
+
+def _ready(chat_id):
+    """Setup complete — bot is paused; user presses ▶️ Start Trading to begin."""
+    u = user_loop._ensure_user(chat_id)
+    u["settings"]["PAUSED"] = True
+    user_store.save(chat_id, u)
+    _ensure_running(chat_id)   # thread runs but stays idle until resumed
+    s = u["settings"]
+    send_to(chat_id,
+            "🎉 <b>All set — ready to trade!</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"Mode: <b>{'📝 PAPER ($100)' if u.get('paper', True) else '🔴 REAL Binance'}</b>\n"
+            f"Symbol: <b>{s['SYMBOL']}</b>   Method: <b>{s['STRATEGY_MODE']}</b>\n"
+            f"AI: <b>{'your Groq key' if u.get('groq_key') else 'shared (free)'}</b>\n\n"
+            "Tap <b>▶️ Start Trading</b> below to begin. Change the coin, risk or strategy any time.",
+            _kb_menu(True, s["SYMBOL"]))
 
 
 def _poll_loop():
@@ -467,11 +513,18 @@ def _poll_loop():
                     _activate(chat_id)  # deep-link /start TOKEN lands here too
                     continue
                 # Real-account setup: capture the API key message (not a command)
-                if _wizard.get(str(chat_id)) == "KEYS" and not text.startswith("/"):
+                step = _wizard.get(str(chat_id))
+                if step == "KEYS" and not text.startswith("/"):
                     try:
                         _finish_live_setup(chat_id, text, msg_id)
                     except Exception as e:
                         print(f"[TG] keys error: {e}")
+                    continue
+                if step == "GROQ" and text.startswith("gsk_"):
+                    try:
+                        _finish_groq(chat_id, text.split()[0], msg_id)
+                    except Exception as e:
+                        print(f"[TG] groq error: {e}")
                     continue
                 try:
                     _handle_command(chat_id, text)
