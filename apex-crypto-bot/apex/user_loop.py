@@ -89,17 +89,27 @@ def _pos_pnl(pos, price):
     return (pos["entryPrice"] - price) * pos["quantity"]
 
 
-def _open_trade(u, state, settings, side, price, druck_mult, alert):
+def _open_trade(u, state, settings, side, price, druck_mult, alert, exchange=None):
     symbol = settings["SYMBOL"]
     risk = settings["RISK_PER_TRADE"] * druck_mult
     qty = round((state["paperBalance"] * risk) / price, 6)
     if qty <= 0:
         return
-    fee = price * qty * cfg.FEE_PCT
-    if side == "BUY":
-        state["paperBalance"] -= price * qty + fee
+    # Live: place a real market order and use the actual fill price/qty.
+    if exchange is not None:
+        try:
+            order = exchange.place_order(side, qty, symbol)
+            price = order.get("avgPrice") or price
+            qty = order.get("executedQty") or qty
+        except Exception as e:
+            print(f"[UserLoop] live order failed ({e}) — skipping entry")
+            return
     else:
-        state["paperBalance"] += price * qty - fee
+        fee = price * qty * cfg.FEE_PCT
+        if side == "BUY":
+            state["paperBalance"] -= price * qty + fee
+        else:
+            state["paperBalance"] += price * qty - fee
     sl, tp = _calc_sltp(side, price, settings)
     state["openPosition"] = {
         "symbol": symbol, "side": side, "entryPrice": price, "quantity": qty,
@@ -109,17 +119,25 @@ def _open_trade(u, state, settings, side, price, druck_mult, alert):
                    "stopLoss": sl, "takeProfit": tp, "druckMult": druck_mult})
 
 
-def _close_trade(u, state, settings, price, reason, alert):
+def _close_trade(u, state, settings, price, reason, alert, exchange=None):
     pos = state["openPosition"]
     if not pos:
         return
     side, entry, qty, symbol = pos["side"], pos["entryPrice"], pos["quantity"], pos["symbol"]
+    # Live: close with a real market order in the opposite direction.
+    if exchange is not None:
+        try:
+            order = exchange.place_order("SELL" if side == "BUY" else "BUY", qty, symbol)
+            price = order.get("avgPrice") or price
+        except Exception as e:
+            print(f"[UserLoop] live close failed ({e})")
     fee_both = (entry + price) * qty * cfg.FEE_PCT
     pnl = (price - entry if side == "BUY" else entry - price) * qty - fee_both
-    if side == "BUY":
-        state["paperBalance"] += price * qty * (1 - cfg.FEE_PCT)
-    else:
-        state["paperBalance"] -= price * qty * (1 + cfg.FEE_PCT)
+    if exchange is None:
+        if side == "BUY":
+            state["paperBalance"] += price * qty * (1 - cfg.FEE_PCT)
+        else:
+            state["paperBalance"] -= price * qty * (1 + cfg.FEE_PCT)
     strategies.record_trade(state["session"], pnl > 0, pnl)
     state["trades"].insert(0, {
         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "symbol": symbol, "side": side,
@@ -147,6 +165,22 @@ def _tick(user_id, alert):
         return
     price = binance.get_price(symbol)
 
+    # Live exchange (real account) when the user finished real setup; else None
+    # (paper simulation). Falls back to paper for this tick if keys/API fail.
+    exchange = None
+    if not u.get("paper", True) and u.get("api_key") and u.get("api_secret"):
+        try:
+            exchange = binance.LiveExchange(u["api_key"], u["api_secret"], testnet=cfg.BINANCE_TESTNET)
+            if not state.get("openPosition"):
+                real_bal = exchange.get_balance("USDT")
+                if real_bal > 0:
+                    state["paperBalance"] = real_bal
+                    if state["startBalance"] <= cfg.PAPER_BALANCE:
+                        state["startBalance"] = real_bal
+        except Exception as e:
+            print(f"[UserLoop:{user_id}] live sync failed ({e}) — paper this tick")
+            exchange = None
+
     dash = _loops.get(user_id, {}).get("dash", {})
     dash.update({"balance": state["paperBalance"], "startBalance": state["startBalance"],
                  "currentSymbol": symbol, "currentPrice": price,
@@ -169,7 +203,7 @@ def _tick(user_id, alert):
     # Exit check first
     trigger = _check_exit(pos, price)
     if trigger:
-        _close_trade(u, state, settings, price, trigger, alert)
+        _close_trade(u, state, settings, price, trigger, alert, exchange)
         user_store.save(user_id, u)
         return
 
@@ -247,9 +281,9 @@ def _tick(user_id, alert):
             signal["action"] = "HOLD"
 
     if signal["action"] == "CLOSE" and pos:
-        _close_trade(u, state, settings, price, "AI_CLOSE", alert)
+        _close_trade(u, state, settings, price, "AI_CLOSE", alert, exchange)
     elif signal["action"] in ("BUY", "SELL") and not pos and conf_ok and crit_ok and vol_ok:
-        _open_trade(u, state, settings, signal["action"], price, druck, alert)
+        _open_trade(u, state, settings, signal["action"], price, druck, alert, exchange)
 
     user_store.save(user_id, u)
 

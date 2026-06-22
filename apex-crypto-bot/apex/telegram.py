@@ -15,6 +15,7 @@ from apex import access, user_store, user_loop, binance
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 _API = f"https://api.telegram.org/bot{TOKEN}"
 _update_id = 0
+_wizard = {}   # chat_id → step (e.g. "KEYS") for the real-account setup flow
 
 SYMBOLS = [
     [("₿ BTC", "BTCUSDT"), ("⟠ ETH", "ETHUSDT")],
@@ -55,16 +56,43 @@ def _answer_cb(cb_id):
         pass
 
 
+def _delete_message(chat_id, message_id):
+    try:
+        requests.post(f"{_API}/deleteMessage",
+                      json={"chat_id": chat_id, "message_id": message_id}, timeout=5)
+    except Exception:
+        pass
+
+
 # ─── Keyboards ────────────────────────────────────────────
-def _kb_menu(paused):
+def _kb_menu(paused, symbol="BTCUSDT"):
+    chart_url = f"{cfg.SITE_URL}/chart?s={symbol}"
     rows = [
         [{"text": "📊 Status", "callback_data": "c:status"}, {"text": "📋 Trades", "callback_data": "c:trades"}],
         [{"text": "💎 Symbol", "callback_data": "c:symbol"}, {"text": "⚙️ Config", "callback_data": "c:config"}],
         [{"text": "🎯 Method", "callback_data": "c:method"}, {"text": "❓ Help", "callback_data": "c:help"}],
+        [{"text": "📈 Live Chart", "web_app": {"url": chart_url}}],
         [{"text": "▶️ Start Trading" if paused else "⏸ Pause Bot",
           "callback_data": "c:resume" if paused else "c:pause"}],
     ]
     return {"reply_markup": json.dumps({"inline_keyboard": rows})}
+
+
+def _kb_start():
+    """First-run choice: paper (training) or real Binance account."""
+    return {"reply_markup": json.dumps({"inline_keyboard": [
+        [{"text": "📝 Paper Trading (no risk)", "callback_data": "setup:paper"}],
+        [{"text": "🔴 Real Binance Account", "callback_data": "setup:live"}],
+    ]})}
+
+
+_BINANCE_KEYS_URL = "https://www.binance.com/en/my/settings/api-management"
+
+
+def _kb_binance():
+    return {"reply_markup": json.dumps({"inline_keyboard": [
+        [{"text": "🔑 Open Binance API page", "url": _BINANCE_KEYS_URL}],
+    ]})}
 
 
 def _kb_symbols():
@@ -194,9 +222,9 @@ def _handle_command(chat_id, text):
         _ensure_running(chat_id)
         return send_to(chat_id, "⚡ <b>APEX TRADE BOT — Control Panel</b>\n"
                                 "Your AI bot is active and trading automatically. 🚀",
-                       _kb_menu(s.get("PAUSED", False)))
+                       _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
     if cmd in ("/status", "/s"):
-        return send_to(chat_id, _build_status(chat_id), _kb_menu(s.get("PAUSED", False)))
+        return send_to(chat_id, _build_status(chat_id), _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
     if cmd in ("/config", "/c"):
         return send_to(chat_id, _build_config(chat_id))
     if cmd in ("/trades", "/t"):
@@ -211,7 +239,7 @@ def _handle_command(chat_id, text):
             return send_to(chat_id, f"❌ <b>{sym}</b> is not a valid Binance pair. Example: <code>/symbol BTCUSDT</code>")
         _upd(chat_id, "SYMBOL", sym)
         user_loop.reset_risk(chat_id)
-        return send_to(chat_id, f"💎 Symbol → <b>{sym}</b>", _kb_menu(s.get("PAUSED", False)))
+        return send_to(chat_id, f"💎 Symbol → <b>{sym}</b>", _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
     if cmd == "/method":
         if not args or args[0].lower() not in METHODS:
             return send_to(chat_id, f"🎯 Method (current: <b>{s['STRATEGY_MODE']}</b>)\nChoose:", _kb_methods())
@@ -286,16 +314,20 @@ def _handle_command(chat_id, text):
 
 def _handle_callback(chat_id, data):
     s = _settings(chat_id)
+    if data == "setup:paper":
+        return _start_paper(chat_id)
+    if data == "setup:live":
+        return _start_live_setup(chat_id)
     if data.startswith("sym:"):
         sym = data[4:]
         _upd(chat_id, "SYMBOL", sym)
         user_loop.reset_risk(chat_id)
-        return send_to(chat_id, f"💎 Symbol → <b>{sym}</b>", _kb_menu(s.get("PAUSED", False)))
+        return send_to(chat_id, f"💎 Symbol → <b>{sym}</b>", _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
     if data.startswith("m:"):
         _upd(chat_id, "STRATEGY_MODE", data[2:])
         return send_to(chat_id, f"🎯 Method → <b>{data[2:]}</b>")
     if data == "c:status":
-        return send_to(chat_id, _build_status(chat_id), _kb_menu(s.get("PAUSED", False)))
+        return send_to(chat_id, _build_status(chat_id), _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
     if data == "c:config":
         return send_to(chat_id, _build_config(chat_id))
     if data == "c:trades":
@@ -318,16 +350,64 @@ def _handle_callback(chat_id, data):
 
 # ─── Poll loop ────────────────────────────────────────────
 def _activate(chat_id):
-    """Keyless instant activation — grant + welcome + start the loop."""
+    """Keyless instant activation — grant + welcome + ask paper vs real."""
     access.grant(str(chat_id))
-    _ensure_running(chat_id)
     send_to(chat_id,
             "✅ <b>Welcome to APEX TRADE BOT!</b>\n\n"
-            "Your AI crypto bot is now <b>active</b> and trading automatically on paper "
-            "(real prices, zero risk). 🚀\n\n"
-            "Tap below to control it — change the coin, risk, or strategy any time.",
-            _kb_menu(False))
+            "Your AI crypto bot is ready. First, choose how you want to trade:\n\n"
+            "📝 <b>Paper</b> — practice with $100 virtual, real market prices, zero risk.\n"
+            "🔴 <b>Real Binance</b> — trade your own Binance account.\n\n"
+            "<i>You can switch any time from the menu.</i>",
+            _kb_start())
     _broadcast_owner(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id}</code>")
+
+
+def _start_paper(chat_id):
+    u = user_loop._ensure_user(chat_id)
+    u["paper"] = True
+    u["settings"]["PAUSED"] = False
+    user_store.save(chat_id, u)
+    _ensure_running(chat_id)
+    send_to(chat_id,
+            "✅ <b>Paper account ready!</b>\n💰 $100 virtual · real market data · zero risk.\n\n"
+            "Your bot is now trading automatically. 🚀\nWatch it work — tap 📈 Live Chart or 📊 Status.",
+            _kb_menu(False, u["settings"]["SYMBOL"]))
+
+
+def _start_live_setup(chat_id):
+    _wizard[str(chat_id)] = "KEYS"
+    send_to(chat_id,
+            "🔴 <b>Connect your real Binance account</b>\n\n"
+            "1. Tap <b>Open Binance API page</b> below\n"
+            "2. Create an API key — enable <b>Spot &amp; Margin Trading</b>\n"
+            "3. Send the key + secret here in ONE message:\n"
+            "<code>API_KEY=your_key API_SECRET=your_secret</code>\n\n"
+            "🔒 <i>Your message is deleted instantly after I read it.</i>",
+            _kb_binance())
+
+
+def _finish_live_setup(chat_id, text, msg_id):
+    _delete_message(chat_id, msg_id)
+    pairs = {}
+    for part in text.replace("\n", " ").split():
+        if "=" in part:
+            k, _, v = part.partition("=")
+            pairs[k.strip().upper()] = v.strip()
+    if "API_KEY" not in pairs or "API_SECRET" not in pairs:
+        return send_to(chat_id, "❌ Send both in one message:\n<code>API_KEY=xxx API_SECRET=yyy</code>")
+    u = user_loop._ensure_user(chat_id)
+    u["paper"] = False
+    u["api_key"] = pairs["API_KEY"]
+    u["api_secret"] = pairs["API_SECRET"]
+    u["settings"]["PAUSED"] = False
+    user_store.save(chat_id, u)
+    _wizard.pop(str(chat_id), None)
+    _ensure_running(chat_id)
+    safety = "🧪 Testnet (safe)" if cfg.BINANCE_TESTNET else "🔴 LIVE — real funds"
+    send_to(chat_id,
+            f"✅ <b>Binance connected!</b>\nMode: <b>{safety}</b>\n\n"
+            "Your bot is now trading your account automatically. Watch it on 📊 Status / 📈 Live Chart.",
+            _kb_menu(False, u["settings"]["SYMBOL"]))
 
 
 def _poll_loop():
@@ -368,10 +448,18 @@ def _poll_loop():
                 msg = u.get("message", {})
                 text = (msg.get("text") or "").strip()
                 chat_id = msg.get("chat", {}).get("id")
+                msg_id = msg.get("message_id")
                 if not text or chat_id is None:
                     continue
                 if not access.is_allowed(str(chat_id)):
                     _activate(chat_id)  # deep-link /start TOKEN lands here too
+                    continue
+                # Real-account setup: capture the API key message (not a command)
+                if _wizard.get(str(chat_id)) == "KEYS" and not text.startswith("/"):
+                    try:
+                        _finish_live_setup(chat_id, text, msg_id)
+                    except Exception as e:
+                        print(f"[TG] keys error: {e}")
                     continue
                 try:
                     _handle_command(chat_id, text)
