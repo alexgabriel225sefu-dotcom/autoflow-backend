@@ -2349,148 +2349,58 @@ a{text-decoration:none}
       <td style="padding:22px 24px">
         <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#ff2d4f;font-family:Arial,sans-serif">YOUR LICENSE KEY &mdash; KEEP THIS SAFE</p>
         <p class="key-mono" style="margin:0 0 14px;font-family:'Courier New',Courier,monospace;font-size:24px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px 12px;word-break:break-all">${licenseKey}</p>
-        <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Add this to Railway environment variables as ${code('LICENSE_KEY')}</p>
+        <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Save this key &mdash; you may need it for support</p>
       </td>
     </tr>
   </table>
 </td></tr>
 
-<!-- ── PRIMARY CTA ── -->
+<!-- ── PRIMARY CTA: TELEGRAM ── -->
 <tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:4px 32px 32px;text-align:center">
-  <a href="https://aicashsystem.space/configurator?key=${licenseKey}" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:900;padding:16px 42px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">Open Bot Configurator &rarr;</a>
-  <p style="margin:14px 0 0;font-size:12px;color:#374151;font-family:Arial,sans-serif">Click above to configure and deploy your bot</p>
+  <a href="https://t.me/ApexTradeBot_official_bot?start=${licenseKey}" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:900;padding:18px 48px;border-radius:12px;text-decoration:none;letter-spacing:0.3px">&#128640; Open your Crypto Bot &rarr;</a>
+  <p style="margin:14px 0 0;font-size:12px;color:#374151;font-family:Arial,sans-serif">Tap the button above &mdash; Telegram opens and the bot activates automatically</p>
 </td></tr>
 
-<!-- ── SECTION DIVIDER: GETTING STARTED ── -->
+<!-- ── SECTION DIVIDER ── -->
 <tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 24px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
     <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
-    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#1e293b;font-family:Arial,sans-serif">SETUP GUIDE</td>
+    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#1e293b;font-family:Arial,sans-serif">HOW IT WORKS</td>
     <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
   </tr></table>
 </td></tr>
 
-<!-- ── STEP 1: DEPLOY TO RAILWAY ── -->
+<!-- ── STEPS ── -->
 <tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 16px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
     <tr><td style="padding:22px 24px">
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
-        <tr>
-          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">1</td>
-          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:0.2px">Deploy bot to Railway (3 steps, under 2 min)</td>
-        </tr>
-      </table>
-      <p style="margin:0 0 14px;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Railway runs your bot 24/7 in the cloud — no server, no laptop needed. New accounts get $5 free credit. Follow the 3 steps below:</p>
-      <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr><td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
-          <p style="margin:0;font-size:12px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">&#10122; Create a free Railway account</p>
-          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">Go to <a href="https://railway.app" style="color:#f59e0b;text-decoration:none;font-weight:700">railway.app</a> &rarr; Sign up with GitHub (free)</p>
-        </td></tr>
-        <tr><td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
-          <p style="margin:0;font-size:12px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">&#10123; Create a new project from GitHub</p>
-          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">Dashboard &rarr; <strong style="color:#e2e8f0">New Project</strong> &rarr; <strong style="color:#e2e8f0">Deploy from GitHub repo</strong> &rarr; search <strong style="color:#f59e0b">apex-trade-bot</strong> &rarr; Deploy Now</p>
-        </td></tr>
-        <tr><td style="padding:8px 0;vertical-align:top">
-          <p style="margin:0;font-size:12px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">&#10124; Add your environment variables (Step 4 below)</p>
-          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">In Railway: your project &rarr; <strong style="color:#e2e8f0">Variables</strong> tab &rarr; paste all keys from Step 4</p>
-        </td></tr>
-      </table>
-      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px">
-        <tr><td style="text-align:center">
-          <a href="https://railway.app/new" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:900;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">&#128640; Open Railway &rarr;</a>
-        </td></tr>
-      </table>
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px"><tr>
+        <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#fff;font-family:Arial,sans-serif">1</td>
+        <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#fff;font-family:Arial,sans-serif">Press the button above</td>
+      </tr></table>
+      <p style="margin:0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Telegram opens automatically. The bot sends you a welcome message and activates your account instantly &mdash; no copy-pasting, no setup steps.</p>
     </td></tr>
   </table>
 </td></tr>
-
-<!-- ── STEP 2: BINANCE API ── -->
 <tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px 16px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
     <tr><td style="padding:22px 24px">
-      <!-- step header -->
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
-        <tr>
-          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">2</td>
-          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:0.2px">Get your Binance API keys</td>
-        </tr>
-      </table>
-      <!-- sub-steps -->
-      <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr><td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
-          <p style="margin:0;font-size:13px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">Create a Binance account</p>
-          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">binance.com &rarr; Sign up &rarr; Complete ID verification to unlock spot trading</p>
-        </td></tr>
-        <tr><td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
-          <p style="margin:0;font-size:13px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">Open API Management</p>
-          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">Profile icon &rarr; API Management &rarr; Create API &rarr; System generated</p>
-        </td></tr>
-        <tr><td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">
-          <p style="margin:0;font-size:13px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">Set permissions correctly</p>
-          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">Enable: <strong style="color:#e2e8f0">Reading</strong> + <strong style="color:#e2e8f0">Spot &amp; Margin Trading</strong> &mdash; leave Withdrawals <strong style="color:#f87171">OFF</strong>. IP restriction: unrestricted.</p>
-        </td></tr>
-        <tr><td style="padding:8px 0;vertical-align:top">
-          <p style="margin:0;font-size:13px;font-weight:700;color:#e2e8f0;font-family:Arial,sans-serif">Save both keys immediately</p>
-          <p style="margin:3px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.7">Copy API Key + Secret Key now. <span style="color:#f87171;font-weight:700">The Secret is shown only once.</span></p>
-        </td></tr>
-      </table>
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px"><tr>
+        <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#fff;font-family:Arial,sans-serif">2</td>
+        <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#fff;font-family:Arial,sans-serif">Configure your exchange via Telegram</td>
+      </tr></table>
+      <p style="margin:0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Send <code style="font-size:11px">/settings</code> in the bot. Enter your Binance API key + secret. The bot guides you step by step &mdash; everything stays private in your chat.</p>
     </td></tr>
   </table>
 </td></tr>
-
-<!-- ── STEP 3: FREE GROQ KEY ── -->
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
-    <tr><td style="padding:22px 24px">
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px">
-        <tr>
-          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">3</td>
-          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">Get your free Groq AI key</td>
-        </tr>
-      </table>
-      <p style="margin:0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Go to <a href="https://console.groq.com" style="color:#f59e0b;font-weight:700">console.groq.com</a> &rarr; Sign up (free) &rarr; API Keys &rarr; Create Key. <strong style="color:#e2e8f0">No credit card required.</strong> This powers the AI signal engine.</p>
-    </td></tr>
-  </table>
-</td></tr>
-
-<!-- ── STEP 4: RAILWAY ENV VARS ── -->
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
-    <tr><td style="padding:22px 24px">
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px">
-        <tr>
-          <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif">4</td>
-          <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif">Set environment variables in Railway</td>
-        </tr>
-      </table>
-      <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        ${envRow('LICENSE_KEY', `Your key &mdash; ${pill(licenseKey)}`)}
-        ${envRow('EXCHANGE', `Set to ${pill('binance')}`)}
-        ${envRow('BINANCE_API_KEY', 'API Key from Step 1')}
-        ${envRow('BINANCE_API_SECRET', 'Secret Key from Step 1 &mdash; <strong style="color:#e2e8f0">shown only once</strong>')}
-        ${envRow('GROQ_API_KEY', 'Free AI key from Step 2')}
-        ${envRow('PAPER_TRADING', `Start with ${pill('true','#22c55e','rgba(34,197,94,0.1)','rgba(34,197,94,0.25)')} (sim money). Change to ${pill('false')} when ready to go live.`)}
-        ${envRow('PAPER_BALANCE', `Simulated balance. Default: ${pill('10')} (= $10 USDT)`)}
-        ${envRow('TRADE_SYMBOL', `Optional. E.g. ${pill('DOGEUSDT')}. Leave empty &mdash; AI picks best coin.`)}
-        <tr>
-          <td style="padding:9px 14px 0 0;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">TELEGRAM_BOT_TOKEN</td>
-          <td style="padding:9px 0 0;font-size:12px;color:#94a3b8;font-family:Arial,sans-serif;vertical-align:top">Optional &mdash; token from @BotFather &rarr; <code style="font-size:11px">/newbot</code></td>
-        </tr>
-        <tr>
-          <td style="padding:6px 14px 0 0;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top">TELEGRAM_CHAT_ID</td>
-          <td style="padding:6px 0 0;font-size:12px;color:#94a3b8;font-family:Arial,sans-serif;vertical-align:top">Optional &mdash; your ID from @userinfobot &rarr; send it <code style="font-size:11px">/start</code></td>
-        </tr>
-      </table>
-      <p style="margin:14px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Add both Telegram variables and your bot will message you directly &mdash; full control with <code style="font-size:11px">/menu</code>, <code style="font-size:11px">/status</code>, <code style="font-size:11px">/pause</code> and more, right from the chat.</p>
-    </td></tr>
-  </table>
-</td></tr>
-
-<!-- ── START WITH PAPER TRADING REMINDER ── -->
 <tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px 28px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(34,197,94,0.04);border:1px solid rgba(34,197,94,0.18);border-radius:10px">
-    <tr><td style="padding:16px 20px">
-      <p style="margin:0;font-size:12px;color:#94a3b8;font-family:Arial,sans-serif;line-height:1.8"><strong style="color:#22c55e">&#10003; Start with Paper Trading.</strong> Keep ${code('PAPER_TRADING=true')} for at least 14 days. Watch the signals, verify performance, then switch to live funds only when you're confident.</p>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
+    <tr><td style="padding:22px 24px">
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px"><tr>
+        <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#fff;font-family:Arial,sans-serif">3</td>
+        <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#fff;font-family:Arial,sans-serif">Start trading (paper mode first)</td>
+      </tr></table>
+      <p style="margin:0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Send <code style="font-size:11px">/start</code> to begin. The bot starts in paper trading mode by default &mdash; simulated money, real signals. Run it for 7-14 days before switching to live funds.</p>
     </td></tr>
   </table>
 </td></tr>
@@ -2550,30 +2460,29 @@ function _buildForexEmailHtml(safeName, safeEmail, licenseKey = 'FORX-XXXX-XXXX-
     <td style="padding:22px 24px">
       <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#2aabee;font-family:Arial,sans-serif">YOUR FOREX LICENSE KEY &mdash; KEEP THIS SAFE</p>
       <p style="margin:0 0 14px;font-family:'Courier New',Courier,monospace;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px 12px;word-break:break-all">${licenseKey}</p>
-      <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Add this to Railway environment variables as ${code('LICENSE_KEY')}</p>
+      <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Save this key &mdash; you may need it for support</p>
     </td>
   </tr></table>
 </td></tr>
 
 <tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:4px 32px 32px;text-align:center">
-  <a href="https://aicashsystem.space/configurator-forex?key=${licenseKey}" style="display:inline-block;background:#2aabee;color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:900;padding:16px 42px;border-radius:10px;text-decoration:none;letter-spacing:0.3px">Open Forex Configurator &rarr;</a>
-  <p style="margin:14px 0 0;font-size:12px;color:#374151;font-family:Arial,sans-serif">Click above to configure your broker and deploy</p>
+  <a href="https://t.me/FOREX_APEX_BOT?start=${licenseKey}" style="display:inline-block;background:#2aabee;color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:900;padding:18px 48px;border-radius:12px;text-decoration:none;letter-spacing:0.3px">&#128640; Open your Forex Bot &rarr;</a>
+  <p style="margin:14px 0 0;font-size:12px;color:#374151;font-family:Arial,sans-serif">Tap the button above &mdash; Telegram opens and the bot activates automatically</p>
 </td></tr>
 
 <tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 24px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
     <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
-    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#1e293b;font-family:Arial,sans-serif">SETUP GUIDE</td>
+    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#1e293b;font-family:Arial,sans-serif">HOW IT WORKS</td>
     <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
   </tr></table>
 </td></tr>
 
 <tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 16px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    ${step(1, 'Open OANDA and create an API key', 'Login to OANDA → Manage Funds → API Access → Generate Token. Keep the token and your Account ID ready.')}
-    ${step(2, 'Configure your bot', 'Click the "Open Forex Configurator" button above. Paste your OANDA credentials, choose PAPER mode to start, set your risk (1-2% recommended).')}
-    ${step(3, 'Deploy to Railway', 'Click "Save Config &amp; Deploy" in the configurator. The bot starts automatically with just your LICENSE_KEY — all settings are stored securely.')}
-    ${step(4, 'Start with Paper Trading', `Keep ${code('PAPER_TRADING=true')} for at least 7 days. Verify signals match your strategy before going live.`)}
+    ${step(1, 'Press the button above', 'Telegram opens automatically. The bot sends you a welcome message and activates your account instantly &mdash; no copy-pasting, no setup steps.')}
+    ${step(2, 'Configure your OANDA account via Telegram', 'Send /settings in the bot. Enter your OANDA API token and Account ID. Choose PAPER mode to start &mdash; the bot guides you step by step.')}
+    ${step(3, 'Start trading (paper mode first)', 'Send /start to begin. The bot runs in paper trading mode by default &mdash; simulated money, real signals. Run it 7-14 days before switching to live funds.')}
   </table>
 </td></tr>
 
