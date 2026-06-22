@@ -1411,7 +1411,10 @@ app.post('/api/affiliates/telegram-link', async (req, res) => {
   try {
     const { data: aff } = await supabase.from('affiliates').select('code,name').eq('code', code).maybeSingle();
     if (!aff) return res.status(404).json({ error: 'affiliate not found' });
-    await supabase.from('affiliates').update({ telegram_chat_id: String(chatId) }).eq('code', code);
+    const { data: updated, error: updateErr } = await supabase
+      .from('affiliates').update({ telegram_chat_id: String(chatId) }).eq('code', code).select('code');
+    if (updateErr) return res.status(500).json({ error: 'link failed: ' + updateErr.message });
+    if (!updated || updated.length === 0) return res.status(500).json({ error: 'link failed: no rows updated — check Supabase RLS policy for affiliates UPDATE' });
     addLog(`Affiliate linked Telegram: ${code} -> chat ${chatId}`, 'affiliate', 'success');
     res.json({ ok: true, code, name: aff.name || '', link: _affiliateLink(code) });
   } catch (e) { res.status(500).json({ error: e.message }); }
