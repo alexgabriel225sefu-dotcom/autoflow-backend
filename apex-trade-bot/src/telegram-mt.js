@@ -478,6 +478,7 @@ async function handleCmd(chatId, cmd, args) {
     case '/symbol':
       if (!args[0]) return send(chatId, `💎 <b>Choose trading pair:</b>\nCurrent: <b>${u.settings.SYMBOL}</b>`, KB_SYMBOLS);
       upd('SYMBOL', args[0].toUpperCase());
+      botMgr.resetSession(chatId);  // fresh counters on new symbol
       return send(chatId, `💎 Symbol → <b>${args[0].toUpperCase()}</b>`);
     case '/method': {
       const VALID = ['auto','turtle','livermore','soros','ptj','druckenmiller'];
@@ -535,6 +536,7 @@ async function handleCb(chatId, data) {
     u.settings.SYMBOL = sym;
     if (ctx) ctx.settings.SYMBOL = sym;
     userStore.save(chatId, u);
+    botMgr.resetSession(chatId);  // fresh counters on new symbol — avoids instant strategy-stop
     return send(chatId, `💎 Symbol → <b>${sym}</b>`, kbMenu(u.settings.PAUSED, u.settings.SYMBOL));
   }
 
