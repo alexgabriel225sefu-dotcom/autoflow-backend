@@ -353,6 +353,60 @@ def reset_risk(user_id):
     user_store.save(user_id, u)
 
 
+def force_trade(user_id, side, symbol=None, alert_fn=None):
+    """Manual trade entry called by the AI assistant."""
+    user_id = str(user_id)
+    u = _ensure_user(user_id)
+    settings, state = u["settings"], u["state"]
+    if symbol:
+        settings["SYMBOL"] = symbol.upper()
+    sym = settings["SYMBOL"]
+    if state.get("openPosition"):
+        return {"ok": False, "error": "Position already open"}
+    price = binance.get_price(sym)
+    if not price:
+        return {"ok": False, "error": "Could not fetch price"}
+    alert = alert_fn or (lambda *a: None)
+    exchange = None
+    if u.get("api_key") and u.get("api_secret"):
+        try:
+            exchange = binance.LiveExchange(u["api_key"], u["api_secret"], testnet=u.get("paper", True))
+        except Exception:
+            pass
+    _open_trade(u, state, settings, side.upper(), price, 1.0, alert, exchange)
+    user_store.save(user_id, u)
+    pos = state.get("openPosition")
+    if pos:
+        return {"ok": True, "side": side, "symbol": sym, "price": round(price, 6),
+                "stopLoss": round(pos["stopLoss"], 6), "takeProfit": round(pos["takeProfit"], 6)}
+    return {"ok": False, "error": "Order did not fill"}
+
+
+def force_close(user_id, alert_fn=None):
+    """Manual position close called by the AI assistant."""
+    user_id = str(user_id)
+    u = _ensure_user(user_id)
+    settings, state = u["settings"], u["state"]
+    if not state.get("openPosition"):
+        return {"ok": False, "error": "No open position"}
+    sym = state["openPosition"]["symbol"]
+    price = binance.get_price(sym) or state["openPosition"]["entryPrice"]
+    alert = alert_fn or (lambda *a: None)
+    exchange = None
+    if u.get("api_key") and u.get("api_secret"):
+        try:
+            exchange = binance.LiveExchange(u["api_key"], u["api_secret"], testnet=u.get("paper", True))
+        except Exception:
+            pass
+    _close_trade(u, state, settings, price, "MANUAL_CLOSE", alert, exchange)
+    user_store.save(user_id, u)
+    trades = state.get("trades", [])
+    if trades:
+        t = trades[0]
+        return {"ok": True, "symbol": sym, "pnl": t["pnl"], "pnlPct": t["pnlPct"]}
+    return {"ok": True, "symbol": sym}
+
+
 def start_all(alert_fn=None):
     for uid in user_store.all_active():
         start(uid, alert_fn)

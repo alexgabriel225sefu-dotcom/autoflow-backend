@@ -10,7 +10,7 @@ import time
 import threading
 import requests
 from apex import config as cfg
-from apex import access, user_store, user_loop, binance, ai
+from apex import access, user_store, user_loop, binance, ai, assistant
 
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 _API = f"https://api.telegram.org/bot{TOKEN}"
@@ -52,6 +52,14 @@ def _broadcast_owner(text):
 def _answer_cb(cb_id):
     try:
         requests.post(f"{_API}/answerCallbackQuery", json={"callback_query_id": cb_id}, timeout=5)
+    except Exception:
+        pass
+
+
+def _send_typing(chat_id):
+    try:
+        requests.post(f"{_API}/sendChatAction",
+                      json={"chat_id": chat_id, "action": "typing"}, timeout=3)
     except Exception:
         pass
 
@@ -642,6 +650,15 @@ def _poll_loop():
                         _finish_groq(chat_id, text.split()[0], msg_id)
                     except Exception as e:
                         print(f"[TG] groq error: {e}")
+                    continue
+                # Free text (non-command) → AI assistant
+                if not text.startswith("/"):
+                    _send_typing(chat_id)
+                    assistant.chat(
+                        chat_id, text,
+                        send_fn=lambda reply, cid=chat_id: send_to(cid, reply),
+                        send_status=lambda status, cid=chat_id: send_to(cid, status),
+                    )
                     continue
                 try:
                     _handle_command(chat_id, text, msg_id)
