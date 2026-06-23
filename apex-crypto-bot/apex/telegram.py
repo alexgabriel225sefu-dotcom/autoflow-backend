@@ -183,8 +183,9 @@ _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━
          "<b>Run:</b>\n/pause · /resume\n\n"
          "<b>Account:</b>\n/setup — switch paper ↔ real, re-run onboarding\n\n"
          "<b>💬 Smart assistant:</b>\nJust talk to me! \"analyze BTC\", \"buy ETH\", \"close position\"\n"
-         "/claude sk-ant-KEY — unlock full chat + trade execution (console.anthropic.com)\n\n"
-         "<b>Free AI key:</b>\n/groq gsk_YOUR_KEY (get one at console.groq.com)")
+         "/claude sk-ant-KEY — full chat + trade execution (console.anthropic.com)\n"
+         "/gemini AIza-KEY — FREE chat + analysis, 1500/day (aistudio.google.com)\n"
+         "/groq gsk_KEY — free fast chat (console.groq.com)")
 
 
 # ─── Alerts (per-user callback) ───────────────────────────
@@ -365,6 +366,25 @@ def _handle_command(chat_id, text, msg_id=None):
                        "✅ <b>Claude key verified &amp; saved!</b>\n"
                        "Now just talk to me naturally — I'll analyze markets and execute trades for you. 🧠⚡\n"
                        "Try: <i>\"analyze BTC\"</i> or <i>\"should I buy ETH now?\"</i>")
+    if cmd == "/gemini":
+        if msg_id:   # delete so the secret key doesn't linger in chat
+            _delete_message(chat_id, msg_id)
+        if not args or not args[0].startswith("AIza"):
+            return send_to(chat_id,
+                           "❌ Usage: <code>/gemini AIza_YOUR_KEY</code>\n"
+                           "Get a FREE key at aistudio.google.com → Get API key.\n"
+                           "Most generous free tier: 1,500 messages/day for chat + analysis.")
+        send_to(chat_id, "🔍 Testing your Gemini key…")
+        ok, why = assistant.test_gemini_key(args[0])
+        if not ok:
+            return send_to(chat_id, f"❌ <b>Key not working:</b> {why}\n"
+                                    "Get a fresh key at aistudio.google.com → Get API key.")
+        user_store.update(chat_id, {"gemini_key": args[0]})
+        assistant.clear_history(chat_id)
+        return send_to(chat_id,
+                       "✅ <b>Gemini key verified &amp; saved!</b> 🆓\n"
+                       "Free chat + market analysis on YOUR own quota (1,500/day).\n"
+                       "For real trade execution, add a Claude key with /claude.")
     if cmd == "/pause":
         _upd(chat_id, "PAUSED", True)
         return send_to(chat_id, "⏸️ <b>Bot paused.</b>", _kb_menu(True))

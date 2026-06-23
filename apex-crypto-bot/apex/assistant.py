@@ -383,13 +383,90 @@ def _chat_groq(user_id: str, message: str) -> str:
         return f"⚠️ Eroare asistent: {e}"
 
 
+_GEMINI_MODEL = "gemini-2.0-flash"
+_GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    f"{_GEMINI_MODEL}:generateContent"
+)
+
+
+def test_gemini_key(key: str):
+    """Quick liveness check for a Gemini key. Returns (ok, message)."""
+    import requests
+    if not key or not key.startswith("AIza"):
+        return False, "Key must start with AIza"
+    try:
+        r = requests.post(
+            _GEMINI_URL, params={"key": key},
+            json={"contents": [{"role": "user", "parts": [{"text": "Reply with the single word OK."}]}],
+                  "generationConfig": {"maxOutputTokens": 5}},
+            timeout=12,
+        )
+        if r.status_code in (400, 403):
+            return False, "Key rejected — copy it again from aistudio.google.com"
+        if r.status_code == 429:
+            return False, "Key is valid but rate-limited right now"
+        r.raise_for_status()
+        return True, "Key works"
+    except Exception as e:
+        return False, f"Could not verify key ({e})"
+
+
+def _chat_gemini(user_id: str, message: str, key: str) -> str:
+    """Gemini conversational path (free tier, generous daily limit, no tools)."""
+    import requests
+    context = _build_context(user_id)
+    system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
+
+    with _lock:
+        history = list(_conv.get(user_id, []))
+    history.append({"role": "user", "content": message})
+
+    # Map our history to Gemini's contents format (role "model" not "assistant")
+    contents = []
+    for m in history[-_MAX_HISTORY:]:
+        role = "model" if m["role"] == "assistant" else "user"
+        contents.append({"role": role, "parts": [{"text": m["content"]}]})
+
+    try:
+        r = requests.post(
+            _GEMINI_URL, params={"key": key},
+            json={"system_instruction": {"parts": [{"text": system}]},
+                  "contents": contents,
+                  "generationConfig": {"maxOutputTokens": 500, "temperature": 0.3}},
+            timeout=15,
+        )
+        if r.status_code == 429:
+            return ("⏳ <b>Gemini limita zilnica atinsa.</b> Se reseteaza maine.\n"
+                    "Sfat: adauga o cheie Claude cu <code>/claude</code> pentru executie de trade-uri.")
+        r.raise_for_status()
+        data = r.json()
+        cands = data.get("candidates", [])
+        if not cands:
+            return "⚠️ Gemini nu a returnat raspuns. Incearca din nou."
+        parts = cands[0].get("content", {}).get("parts", [])
+        reply = "".join(p.get("text", "") for p in parts).strip()
+        if not reply:
+            return "⚠️ Gemini a returnat un raspuns gol. Incearca din nou."
+        with _lock:
+            conv = list(_conv.get(user_id, []))
+            conv.append({"role": "user", "content": message})
+            conv.append({"role": "assistant", "content": reply})
+            _conv[user_id] = conv[-_MAX_HISTORY:]
+        return reply
+    except requests.HTTPError:
+        return "⚠️ Asistent (Gemini) indisponibil momentan. Incearca din nou."
+    except Exception as e:
+        return f"⚠️ Eroare asistent: {e}"
+
+
 def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
-    """Main entry: route to Claude (with tools) or Groq fallback, send reply.
+    """Main entry: route to the best available AI per user, send reply.
 
     Key priority (per user, so each client pays for their own usage):
-      1. User's own Anthropic key  → Claude with full trade execution
-      2. Owner's shared Anthropic  → Claude with full trade execution
-      3. Groq (user or shared)     → conversational only, no execution
+      1. Anthropic key (user or shared) → Claude with full trade EXECUTION
+      2. Gemini key (user)              → free chat + analysis (no execution)
+      3. Groq key (user or shared)      → free chat + analysis (no execution)
     """
     send_status = send_status or (lambda _: None)
     user_id = str(user_id)
@@ -399,8 +476,11 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
             from apex import user_loop
             u = user_loop._ensure_user(user_id)
             anthropic_key = u.get("anthropic_key") or cfg.ANTHROPIC_API_KEY
+            gemini_key = u.get("gemini_key")
             if anthropic_key:
                 reply = _chat_anthropic(user_id, message, anthropic_key, send_fn, send_status)
+            elif gemini_key:
+                reply = _chat_gemini(user_id, message, gemini_key)
             else:
                 reply = _chat_groq(user_id, message)
             if reply:
