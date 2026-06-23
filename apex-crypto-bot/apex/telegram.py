@@ -10,7 +10,7 @@ import time
 import threading
 import requests
 from apex import config as cfg
-from apex import access, user_store, user_loop, binance
+from apex import access, user_store, user_loop, binance, ai
 
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 _API = f"https://api.telegram.org/bot{TOKEN}"
@@ -319,8 +319,12 @@ def _handle_command(chat_id, text):
     if cmd == "/groq":
         if not args or not args[0].startswith("gsk_"):
             return send_to(chat_id, "❌ Usage: <code>/groq gsk_YOUR_KEY</code>\nGet a free key at console.groq.com")
+        send_to(chat_id, "🔍 Testing your Groq key…")
+        ok, why = ai.test_key(args[0])
+        if not ok:
+            return send_to(chat_id, f"❌ <b>Key not working:</b> {why}\nGet a fresh key at console.groq.com → API Keys.")
         user_store.update(chat_id, {"groq_key": args[0]})
-        return send_to(chat_id, "✅ <b>Groq key saved!</b> Your AI signals now use your personal key.")
+        return send_to(chat_id, "✅ <b>Groq key verified &amp; saved!</b> Your AI signals now run on YOUR personal quota. 🧠")
     if cmd == "/pause":
         _upd(chat_id, "PAUSED", True)
         return send_to(chat_id, "⏸️ <b>Bot paused.</b>", _kb_menu(True))
@@ -482,9 +486,20 @@ def _ask_groq(chat_id):
 
 def _finish_groq(chat_id, key, msg_id):
     _delete_message(chat_id, msg_id)
-    user_store.update(chat_id, {"groq_key": key.strip()})
+    key = key.strip()
+    send_to(chat_id, "🔍 Testing your Groq key…")
+    ok, why = ai.test_key(key)
+    if not ok:
+        return send_to(chat_id,
+                       f"❌ <b>Key not working:</b> {why}\n\n"
+                       "Send a valid key (<code>gsk_...</code>) or tap <b>Use shared AI — skip</b>.",
+                       {"reply_markup": json.dumps({"inline_keyboard": [
+                           [{"text": "🔑 Get free Groq key", "url": "https://console.groq.com/keys"}],
+                           [{"text": "⚡ Use shared AI — skip", "callback_data": "groq:skip"}],
+                       ]})})
+    user_store.update(chat_id, {"groq_key": key})
     _wizard.pop(str(chat_id), None)
-    send_to(chat_id, "✅ <b>Groq key saved!</b> Unlimited personal AI. 🧠")
+    send_to(chat_id, "✅ <b>Groq key verified &amp; saved!</b> Your bot now runs on YOUR own AI quota. 🧠")
     _ready(chat_id)
 
 

@@ -147,10 +147,14 @@ Respond ONLY with valid JSON:
 
 def _fetch(ind, balance, open_position, strategy_data, symbol, timeframe, user_key):
     prompt = _build_prompt(ind, balance, open_position, strategy_data, symbol, timeframe)
-    try:
-        return sanitize(_call_anthropic(prompt))
-    except Exception:
-        pass
+    # Anthropic is only worth trying when a key is actually configured — otherwise
+    # we'd burn ~1-2s on a guaranteed failure every single tick. The client's own
+    # Groq key (or the shared one) is the real brain.
+    if cfg.ANTHROPIC_API_KEY:
+        try:
+            return sanitize(_call_anthropic(prompt))
+        except Exception:
+            pass
     try:
         return sanitize(_call_groq(prompt, user_key))
     except Exception as err:
@@ -158,6 +162,28 @@ def _fetch(ind, balance, open_position, strategy_data, symbol, timeframe, user_k
             raise
         print(f"[AI ❌] Groq failed: {err}")
     return rule_based_fallback(ind, open_position)
+
+
+def test_key(key):
+    """Quick liveness check for a client's Groq key. Returns (ok, message)."""
+    if not key or not key.startswith("gsk_"):
+        return False, "Key must start with gsk_"
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={"model": "llama-3.3-70b-versatile",
+                  "messages": [{"role": "user", "content": "Reply with the single word OK."}],
+                  "max_tokens": 5, "temperature": 0},
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            timeout=12)
+        if r.status_code == 401:
+            return False, "Key rejected (401) — copy it again from console.groq.com"
+        if r.status_code == 429:
+            return False, "Key is valid but already rate-limited (429)"
+        r.raise_for_status()
+        return True, "Key works"
+    except Exception as e:
+        return False, f"Could not reach Groq ({e})"
 
 
 def get_signal(ind, balance, open_position, strategy_data=None,
