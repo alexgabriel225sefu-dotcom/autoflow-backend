@@ -160,10 +160,11 @@ def _tick(user_id, alert):
 
     symbol = (state["openPosition"] or {}).get("symbol") or settings["SYMBOL"]
     timeframe = settings["TIMEFRAME"]
-    candles = binance.get_candles(symbol, timeframe, cfg.CANDLES)
+    ex_name = u.get("exchange", "binance")
+    candles = binance.get_candles(symbol, timeframe, cfg.CANDLES, exchange=ex_name)
     if not candles:
         return
-    price = binance.get_price(symbol)
+    price = binance.get_price(symbol, exchange=ex_name)
 
     # Both paper (testnet) and real use LiveExchange.
     # paper=True → Binance Testnet (virtual USDT, real market prices)
@@ -173,7 +174,8 @@ def _tick(user_id, alert):
     if u.get("api_key") and u.get("api_secret"):
         is_testnet = u.get("paper", True)
         try:
-            exchange = binance.LiveExchange(u["api_key"], u["api_secret"], testnet=is_testnet)
+            exchange = binance.LiveExchange(u["api_key"], u["api_secret"],
+                                            testnet=is_testnet, exchange=u.get("exchange", "binance"))
             if not state.get("openPosition"):
                 real_bal = exchange.get_balance("USDT")
                 if real_bal > 0:
@@ -363,14 +365,16 @@ def force_trade(user_id, side, symbol=None, alert_fn=None):
     sym = settings["SYMBOL"]
     if state.get("openPosition"):
         return {"ok": False, "error": "Position already open"}
-    price = binance.get_price(sym)
+    ex_name = u.get("exchange", "binance")
+    price = binance.get_price(sym, exchange=ex_name)
     if not price:
         return {"ok": False, "error": "Could not fetch price"}
     alert = alert_fn or (lambda *a: None)
     exchange = None
     if u.get("api_key") and u.get("api_secret"):
         try:
-            exchange = binance.LiveExchange(u["api_key"], u["api_secret"], testnet=u.get("paper", True))
+            exchange = binance.LiveExchange(u["api_key"], u["api_secret"],
+                                            testnet=u.get("paper", True), exchange=ex_name)
         except Exception:
             pass
     _open_trade(u, state, settings, side.upper(), price, 1.0, alert, exchange)
@@ -390,12 +394,14 @@ def force_close(user_id, alert_fn=None):
     if not state.get("openPosition"):
         return {"ok": False, "error": "No open position"}
     sym = state["openPosition"]["symbol"]
-    price = binance.get_price(sym) or state["openPosition"]["entryPrice"]
+    ex_name = u.get("exchange", "binance")
+    price = binance.get_price(sym, exchange=ex_name) or state["openPosition"]["entryPrice"]
     alert = alert_fn or (lambda *a: None)
     exchange = None
     if u.get("api_key") and u.get("api_secret"):
         try:
-            exchange = binance.LiveExchange(u["api_key"], u["api_secret"], testnet=u.get("paper", True))
+            exchange = binance.LiveExchange(u["api_key"], u["api_secret"],
+                                            testnet=u.get("paper", True), exchange=ex_name)
         except Exception:
             pass
     _close_trade(u, state, settings, price, "MANUAL_CLOSE", alert, exchange)

@@ -172,8 +172,9 @@ def _build_context(user_id: str) -> str:
     trades = state.get("trades", [])
 
     symbol = settings.get("SYMBOL", "BTCUSDT")
+    ex_name = u.get("exchange", "binance")
     try:
-        live_price = binance.get_price(symbol)
+        live_price = binance.get_price(symbol, exchange=ex_name)
     except Exception:
         live_price = None
 
@@ -182,7 +183,7 @@ def _build_context(user_id: str) -> str:
     indi = None
     try:
         from apex import indicators
-        candles = binance.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES)
+        candles = binance.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES, exchange=ex_name)
         if candles:
             indi = indicators.analyze(candles)
     except Exception:
@@ -236,11 +237,12 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
         symbol = inp.get("symbol", "BTCUSDT").upper()
         send_status(f"🔍 Analyzing <b>{symbol}</b>…")
         try:
-            candles = binance.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES)
+            u = user_loop._ensure_user(user_id)
+            ex_name = u.get("exchange", "binance")
+            candles = binance.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES, exchange=ex_name)
             if not candles:
                 return json.dumps({"error": "No market data"})
             ind = indicators.analyze(candles)
-            u = user_loop._ensure_user(user_id)
             strat = strategies.analyze(candles, u["state"].get("session", {}))
             signal = ai.get_signal(
                 ind, u["state"].get("paperBalance", 100),

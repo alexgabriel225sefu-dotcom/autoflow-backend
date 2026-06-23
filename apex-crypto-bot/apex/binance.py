@@ -40,10 +40,10 @@ def _base(testnet=False):
     return _TESTNET if testnet else _PUBLIC
 
 
-def _get_json(path, params, timeout=10):
+def _get_json(path, params, timeout=10, hosts=None):
     """Try each data host in order; return parsed JSON or raise last error."""
     last_err = None
-    for host in _DATA_HOSTS:
+    for host in (hosts or _DATA_HOSTS):
         try:
             r = requests.get(f"{host}{path}", params=params, timeout=timeout)
             r.raise_for_status()
@@ -54,9 +54,9 @@ def _get_json(path, params, timeout=10):
     raise last_err
 
 
-def get_candles(symbol, timeframe="5m", limit=200):
+def get_candles(symbol, timeframe="5m", limit=200, exchange="binance"):
     """Return list of {open,high,low,close,volume} dicts (oldest→newest), or []."""
-    key = (symbol, timeframe)
+    key = (symbol, timeframe, exchange)
     now = time.time()
     cached = _kline_cache.get(key)
     if cached and now - cached["ts"] < _KLINE_TTL:
@@ -64,7 +64,8 @@ def get_candles(symbol, timeframe="5m", limit=200):
     try:
         interval = _INTERVAL.get(timeframe, "5m")
         rows = _get_json("/api/v3/klines",
-                         {"symbol": symbol, "interval": interval, "limit": limit})
+                         {"symbol": symbol, "interval": interval, "limit": limit},
+                         hosts=data_hosts_for(exchange))
         candles = [{
             "open": float(k[1]), "high": float(k[2]), "low": float(k[3]),
             "close": float(k[4]), "volume": float(k[5]),
@@ -77,15 +78,17 @@ def get_candles(symbol, timeframe="5m", limit=200):
         return []
 
 
-def get_price(symbol):
+def get_price(symbol, exchange="binance"):
+    key = (symbol, exchange)
     now = time.time()
-    cached = _price_cache.get(symbol)
+    cached = _price_cache.get(key)
     if cached and now - cached["ts"] < _PRICE_TTL:
         return cached["price"]
     try:
-        data = _get_json("/api/v3/ticker/price", {"symbol": symbol}, timeout=8)
+        data = _get_json("/api/v3/ticker/price", {"symbol": symbol}, timeout=8,
+                         hosts=data_hosts_for(exchange))
         price = float(data["price"])
-        _price_cache[symbol] = {"ts": now, "price": price}
+        _price_cache[key] = {"ts": now, "price": price}
         return price
     except Exception as e:
         print(f"[Binance] get_price({symbol}) failed all hosts: {e}")
@@ -101,12 +104,30 @@ def valid_symbol(symbol):
         return False
 
 
+# Per-exchange API hosts. binance.us is a separate entity for US clients.
+_EXCHANGE_HOSTS = {
+    "binance":   "https://api.binance.com",   # global (blocked in US)
+    "binanceus": "https://api.binance.us",     # US only
+}
+
+
+def data_hosts_for(exchange="binance"):
+    """Market-data hosts to try, ordered, for a given exchange."""
+    if exchange == "binanceus":
+        return ["https://api.binance.us"]
+    return _DATA_HOSTS
+
+
 # ─── Signed (live) trading — user's own keys, testnet by default ──
 class LiveExchange:
-    def __init__(self, api_key, api_secret, testnet=True):
+    def __init__(self, api_key, api_secret, testnet=True, exchange="binance"):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.base = _base(testnet)
+        self.exchange = exchange
+        if testnet:
+            self.base = _TESTNET
+        else:
+            self.base = _EXCHANGE_HOSTS.get(exchange, _EXCHANGE_HOSTS["binance"])
 
     def _signed(self, method, path, params):
         params["timestamp"] = int(time.time() * 1000)

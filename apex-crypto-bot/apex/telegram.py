@@ -439,6 +439,9 @@ def _handle_callback(chat_id, data):
         return _start_paper(chat_id)
     if data == "setup:live":
         return _start_live_setup(chat_id)
+    if data == "ex:binance" or data == "ex:binanceus":
+        user_store.update(chat_id, {"exchange": data[3:]})
+        return _ask_live_keys(chat_id)
     if data == "groq:skip":
         _wizard.pop(str(chat_id), None)
         return _ready(chat_id)
@@ -560,19 +563,39 @@ def _start_paper(chat_id):
 
 
 def _start_live_setup(chat_id):
-    """Real trading = real Binance account."""
-    _wizard[str(chat_id)] = "KEYS"
+    """Real trading — first pick the exchange (global vs US)."""
     u = user_loop._ensure_user(chat_id)
     u["paper"] = False
     user_store.save(chat_id, u)
     send_to(chat_id,
-            "🔴 <b>Connect your real Binance account</b>\n\n"
-            "1️⃣ Tap <b>Open Binance API Settings</b> below\n"
-            "2️⃣ Create an API key — enable <b>Spot &amp; Margin Trading</b>\n"
+            "🌍 <b>Which exchange is your account on?</b>\n\n"
+            "🟡 <b>Binance.com</b> — global (Europe, Asia, LatAm, most countries)\n"
+            "🇺🇸 <b>Binance.US</b> — for United States clients\n\n"
+            "<i>Pick the one where your account &amp; funds are.</i>",
+            {"reply_markup": json.dumps({"inline_keyboard": [
+                [{"text": "🟡 Binance.com (Global)", "callback_data": "ex:binance"}],
+                [{"text": "🇺🇸 Binance.US", "callback_data": "ex:binanceus"}],
+            ]})})
+
+
+def _ask_live_keys(chat_id):
+    """Show API-key instructions for the chosen exchange."""
+    _wizard[str(chat_id)] = "KEYS"
+    u = user_loop._ensure_user(chat_id)
+    is_us = u.get("exchange") == "binanceus"
+    url = "https://www.binance.us/usercenter/settings/api-management" if is_us \
+        else _BINANCE_KEYS_URL
+    name = "Binance.US" if is_us else "Binance.com"
+    send_to(chat_id,
+            f"🔴 <b>Connect your {name} account</b>\n\n"
+            "1️⃣ Tap <b>Open API Settings</b> below\n"
+            "2️⃣ Create an API key — enable <b>Spot Trading</b>\n"
             "3️⃣ Send both keys here in ONE message:\n"
             "<code>API_KEY=your_key API_SECRET=your_secret</code>\n\n"
             "🔒 <i>Message deleted instantly after reading.</i>",
-            _kb_binance())
+            {"reply_markup": json.dumps({"inline_keyboard": [
+                [{"text": f"🔑 Open {name} API page", "url": url}],
+            ]})})
 
 
 def _finish_live_setup(chat_id, text, msg_id):
@@ -586,11 +609,13 @@ def _finish_live_setup(chat_id, text, msg_id):
         return send_to(chat_id, "❌ Send both in one message:\n<code>API_KEY=xxx API_SECRET=yyy</code>")
     u = user_loop._ensure_user(chat_id)
     is_testnet = u.get("paper", True)
+    exchange = u.get("exchange", "binance")
 
     # Validate the keys against Binance BEFORE saving — fail fast with a clear reason.
     send_to(chat_id, "🔍 Verifying your Binance keys…")
     try:
-        ex = binance.LiveExchange(pairs["API_KEY"], pairs["API_SECRET"], testnet=is_testnet)
+        ex = binance.LiveExchange(pairs["API_KEY"], pairs["API_SECRET"],
+                                  testnet=is_testnet, exchange=exchange)
         ok, why, usdt = ex.verify()
     except Exception as e:
         ok, why, usdt = False, str(e), 0.0
