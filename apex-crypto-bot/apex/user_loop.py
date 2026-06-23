@@ -9,7 +9,7 @@ import time
 import threading
 from datetime import datetime
 from apex import config as cfg
-from apex import user_store, indicators, ai, strategies, binance, dca as dca_mod
+from apex import user_store, indicators, ai, strategies, binance, dca as dca_mod, grid as grid_mod
 
 # Symbols auto-scanned in "auto" mode (highest-volume, best liquidity)
 _AUTO_SYMBOLS = [
@@ -35,6 +35,7 @@ def _default_settings():
         "PAUSED": False,
     }
     s.update(dca_mod.default_settings())
+    s.update(grid_mod.default_settings())
     return s
 
 
@@ -183,6 +184,76 @@ def _find_best_signal(exchange_name, timeframe, session):
     return best_sym, best_sig
 
 
+def _tick_grid(u, settings, state, candles, price, alert, exchange):
+    """Run one Grid tick.  Returns True if grid is active (skip strategy entry)."""
+    deal = state.get("grid_deal")
+
+    if not deal:
+        if not settings.get("grid_enabled"):
+            return False
+        # Auto-range: use last 50 candles high/low if user didn't set range
+        lower = settings.get("grid_lower", 0)
+        upper = settings.get("grid_upper", 0)
+        if lower <= 0 or upper <= lower:
+            highs = [c["high"] for c in candles[-50:]]
+            lows  = [c["low"]  for c in candles[-50:]]
+            lower = round(min(lows) * 0.999, 6)
+            upper = round(max(highs) * 1.001, 6)
+        sym = settings["SYMBOL"]
+        deal = grid_mod.create_grid(sym, lower, upper,
+                                    settings.get("grid_levels", 10),
+                                    state["paperBalance"],
+                                    settings.get("grid_order_pct", 2.0))
+        if not deal:
+            return False
+        deal = grid_mod.setup_orders(deal, price)
+        state["grid_deal"] = deal
+        alert("grid_start", {
+            "symbol": sym, "lower": lower, "upper": upper,
+            "levels": settings.get("grid_levels", 10), "step": deal["step"],
+        })
+        return True
+
+    deal, events = grid_mod.tick_grid(deal, price)
+    for ev in events:
+        if ev["type"] == "sell":
+            # Live: place real sell order
+            if exchange:
+                try:
+                    exchange.place_order("SELL", ev["qty"], deal["symbol"])
+                except Exception as e:
+                    print(f"[Grid] sell failed: {e}")
+            alert("grid_fill", {
+                "type": "SELL", "symbol": deal["symbol"],
+                "price": ev["price"], "qty": ev["qty"],
+                "pnl": ev.get("pnl", 0), "round_trips": deal["round_trips"],
+                "total_pnl": deal["total_pnl"],
+            })
+            state["paperBalance"] = round(
+                state["paperBalance"] + ev["price"] * ev["qty"] * (1 - cfg.FEE_PCT), 4)
+        elif ev["type"] == "buy":
+            if exchange:
+                try:
+                    exchange.place_order("BUY", ev["qty"], deal["symbol"])
+                except Exception as e:
+                    print(f"[Grid] buy failed: {e}")
+            state["paperBalance"] = round(
+                state["paperBalance"] - ev["price"] * ev["qty"] * (1 + cfg.FEE_PCT), 4)
+
+    # Check if price left the grid range — stop the grid
+    if price < deal["lower"] * 0.97 or price > deal["upper"] * 1.03:
+        alert("grid_out_of_range", {
+            "symbol": deal["symbol"], "price": price,
+            "lower": deal["lower"], "upper": deal["upper"],
+            "total_pnl": deal["total_pnl"], "round_trips": deal["round_trips"],
+        })
+        state["grid_deal"] = None
+        return False
+
+    state["grid_deal"] = deal
+    return True
+
+
 def _tick_dca(u, settings, state, price, alert, exchange):
     """Run one DCA tick. Returns True if DCA handled the tick (skip strategy)."""
     deal = state.get("dca_deal")
@@ -324,6 +395,14 @@ def _tick(user_id, alert):
         alert("heartbeat", {"tickCount": tick, "balance": state["paperBalance"], "openPosition": pos})
     elif not pos and tick % 30 == 0 and tick > 0:
         alert("scan", {"tickCount": tick, "balance": state["paperBalance"], "symbol": symbol})
+
+    # Grid mode runs alongside strategy (handles range-trading, saves result)
+    if settings.get("grid_enabled") or state.get("grid_deal"):
+        _tick_grid(u, settings, state, candles, price, alert, exchange)
+        user_store.save(user_id, u)
+        # Grid doesn't block strategy exit check — still close open strategy positions
+        if not state.get("openPosition"):
+            return  # flat + grid running = no need for strategy entry this tick
 
     # Exit check first
     trigger = _check_exit(pos, price)

@@ -10,7 +10,7 @@ import time
 import threading
 import requests
 from apex import config as cfg
-from apex import access, user_store, user_loop, binance, ai, assistant, dca
+from apex import access, user_store, user_loop, binance, ai, assistant, dca, grid
 
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 _API = f"https://api.telegram.org/bot{TOKEN}"
@@ -199,6 +199,12 @@ _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━
          "/dca base 5 — base order % · /dca safety 3 — safety order %\n"
          "/dca step 2.5 — % drop per safety · /dca tp 2 — take profit %\n"
          "/dca max 3 — max safety orders\n\n"
+         "<b>📊 Grid Bot (passive income):</b>\n"
+         "/grid — show grid status &amp; settings\n"
+         "/grid on · /grid off — enable/disable\n"
+         "/grid lower 95000 · /grid upper 105000 — set price range\n"
+         "/grid levels 10 — number of grid lines · /grid step 2 — order size %\n"
+         "/grid stop — cancel active grid\n\n"
          "<b>Manual trading:</b>\n/buy XRPUSDT — open LONG\n/sell ETHUSDT — open SHORT\n/close — close open position\n\n"
          "<b>Run:</b>\n/pause · /resume\n\n"
          "<b>Account:</b>\n/setup — switch paper ↔ real, re-run onboarding\n\n"
@@ -252,6 +258,26 @@ def make_alert(chat_id):
                     f"🔍 <b>Best setup found: {data['symbol']}</b>\n"
                     f"{icon} Signal: <b>{data['action']}</b>  Confidence: {data['confidence']:.0f}%\n"
                     f"<i>{data.get('reasoning', '')}</i>")
+        elif kind == "grid_start":
+            send_to(chat_id,
+                    f"📊 <b>Grid Bot started — {data['symbol']}</b>\n"
+                    f"Range: ${data['lower']:.4f} – ${data['upper']:.4f}  ({data['levels']} levels)\n"
+                    f"Grid step: ${data['step']:.4f}  Profit per round-trip: ~${data['step']:.4f}/unit")
+        elif kind == "grid_fill":
+            sign = "+" if data["pnl"] >= 0 else ""
+            send_to(chat_id,
+                    f"💹 <b>Grid {data['type']}</b> — {data['symbol']} @ ${data['price']:.4f}\n"
+                    f"Trip #{data['round_trips']}  Profit: <b>{sign}${data['pnl']:.4f}</b>  "
+                    f"Total: ${data['total_pnl']:.4f}")
+        elif kind == "grid_out_of_range":
+            sign = "+" if data["total_pnl"] >= 0 else ""
+            send_to(chat_id,
+                    f"⚠️ <b>Grid stopped — price left range</b>\n"
+                    f"{data['symbol']} @ ${data['price']:.4f}  "
+                    f"(range was ${data['lower']:.4f}–${data['upper']:.4f})\n"
+                    f"Total P&L: <b>{sign}${data['total_pnl']:.4f}</b>  "
+                    f"Round-trips: {data['round_trips']}\n"
+                    f"/grid on — restart with new auto-range")
         elif kind == "dca_open":
             side_icon = "🟢 LONG" if data["side"] == "BUY" else "🔴 SHORT"
             safety_prices = "  |  ".join(f"${p:.2f}" for p in data["safety_orders"])
@@ -458,6 +484,83 @@ def _handle_command(chat_id, text, msg_id=None):
                        f"SL: <b>{s2.get('dca_stop_loss_pct', 10):g}%</b>"
                        f"{deal_line}\n\n"
                        "<i>/dca on · /dca off · /dca base 5 · /dca safety 3 · /dca step 2.5 · /dca tp 2 · /dca max 3</i>")
+    if cmd == "/grid":
+        u = user_loop._ensure_user(chat_id)
+        s2 = u["settings"]
+        if args and args[0] == "on":
+            _upd(chat_id, "grid_enabled", True)
+            lower = s2.get("grid_lower", 0)
+            upper = s2.get("grid_upper", 0)
+            range_note = (f"Range: <b>${lower:,.2f} – ${upper:,.2f}</b>"
+                          if lower and upper else
+                          "Range: <b>auto</b> (set from last 50 candles)")
+            return send_to(chat_id,
+                           "📊 <b>Grid Bot ENABLED</b>\n"
+                           "Passive income on sideways markets — profits on every price bounce.\n\n"
+                           f"{range_note}\n"
+                           f"Levels: <b>{s2.get('grid_levels', 10)}</b>  "
+                           f"Order size: <b>{s2.get('grid_order_pct', 2):g}%</b> each\n\n"
+                           "<i>Adjust: /grid lower 95000 · /grid upper 105000 · "
+                           "/grid levels 10 · /grid step 2 · /grid off</i>")
+        if args and args[0] == "off":
+            _upd(chat_id, "grid_enabled", False)
+            return send_to(chat_id, "⏹ <b>Grid Bot disabled.</b>")
+        if args and args[0] == "stop":
+            u2 = user_loop._ensure_user(chat_id)
+            st = u2.get("state", {})
+            if st.get("grid_deal"):
+                st["grid_deal"] = None
+                user_store.update(chat_id, {"state": st})
+                return send_to(chat_id, "⏹ <b>Active grid stopped.</b> All virtual orders cancelled.")
+            return send_to(chat_id, "ℹ️ No active grid to stop.")
+        if args and args[0] == "lower":
+            try:
+                v = float(args[1]); assert v > 0
+            except (IndexError, ValueError, AssertionError):
+                return send_to(chat_id, "❌ /grid lower 95000  (price in $)")
+            _upd(chat_id, "grid_lower", v)
+            return send_to(chat_id, f"✅ Grid lower bound → <b>${v:,.2f}</b>")
+        if args and args[0] == "upper":
+            try:
+                v = float(args[1]); assert v > 0
+            except (IndexError, ValueError, AssertionError):
+                return send_to(chat_id, "❌ /grid upper 105000  (price in $)")
+            _upd(chat_id, "grid_upper", v)
+            return send_to(chat_id, f"✅ Grid upper bound → <b>${v:,.2f}</b>")
+        if args and args[0] == "levels":
+            try:
+                v = int(args[1]); assert 3 <= v <= 50
+            except (IndexError, ValueError, AssertionError):
+                return send_to(chat_id, "❌ /grid levels 10  (3–50)")
+            _upd(chat_id, "grid_levels", v)
+            return send_to(chat_id, f"✅ Grid levels → <b>{v}</b>")
+        if args and args[0] == "step":
+            try:
+                v = float(args[1]); assert 0.5 <= v <= 20
+            except (IndexError, ValueError, AssertionError):
+                return send_to(chat_id, "❌ /grid step 2  (0.5–20% of balance per order)")
+            _upd(chat_id, "grid_order_pct", v)
+            return send_to(chat_id, f"✅ Grid order size → <b>{v:g}%</b> per level")
+        # Show current grid status
+        enabled = s2.get("grid_enabled", False)
+        deal = u.get("state", {}).get("grid_deal")
+        deal_line = ""
+        if deal:
+            price = binance.get_price(deal["symbol"])
+            deal_line = f"\n\n<b>Active grid:</b>\n{grid.grid_status(deal, price)}" if price else ""
+        lower = s2.get("grid_lower", 0)
+        upper = s2.get("grid_upper", 0)
+        range_str = (f"${lower:,.2f} – ${upper:,.2f}"
+                     if lower and upper else "auto (last 50 candles)")
+        return send_to(chat_id,
+                       f"📊 <b>Grid Bot</b> — {'✅ ON' if enabled else '⏹ OFF'}\n"
+                       f"━━━━━━━━━━━━━━━━━━━━\n"
+                       f"Range: <b>{range_str}</b>\n"
+                       f"Levels: <b>{s2.get('grid_levels', 10)}</b>  "
+                       f"Order size: <b>{s2.get('grid_order_pct', 2):g}%</b> each"
+                       f"{deal_line}\n\n"
+                       "<i>/grid on · /grid off · /grid stop · /grid lower 95000 · "
+                       "/grid upper 105000 · /grid levels 10 · /grid step 2</i>")
     if cmd == "/groq":
         if msg_id:   # delete the message so the secret key doesn't linger in chat
             _delete_message(chat_id, msg_id)
