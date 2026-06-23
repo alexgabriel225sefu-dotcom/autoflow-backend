@@ -52,13 +52,13 @@ def _start_health_server():
     if render_url:
         def _ping():
             while True:
-                time.sleep(600)
+                time.sleep(240)  # every 4 min — safe margin under Render's 15-min sleep
                 try:
                     requests.get(f"{render_url}/", timeout=10)
                 except Exception:
                     pass
         threading.Thread(target=_ping, daemon=True).start()
-        print(f"✅  Self-ping every 10 min → {render_url}/")
+        print(f"✅  Self-ping every 4 min → {render_url}/")
 
 
 def main():
