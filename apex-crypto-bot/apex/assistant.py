@@ -451,9 +451,23 @@ def test_gemini_key(key: str):
         return False, f"Could not verify key ({e})"
 
 
-def _chat_gemini(user_id: str, message: str, key: str) -> str:
-    """Gemini conversational path (free tier, generous daily limit, no tools)."""
+def _to_gemini_tools():
+    """Convert our Anthropic-style _TOOLS to Gemini function_declarations."""
+    decls = []
+    for t in _TOOLS:
+        decl = {"name": t["name"], "description": t["description"]}
+        schema = t.get("input_schema") or {}
+        # Gemini rejects empty parameter objects — omit params for no-arg tools.
+        if schema.get("properties"):
+            decl["parameters"] = schema
+        decls.append(decl)
+    return [{"function_declarations": decls}]
+
+
+def _chat_gemini(user_id: str, message: str, key: str, send_status=None) -> str:
+    """Gemini path with function calling — FREE chat + real trade execution."""
     import requests
+    send_status = send_status or (lambda _: None)
     context = _build_context(user_id)
     system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
 
@@ -466,40 +480,62 @@ def _chat_gemini(user_id: str, message: str, key: str) -> str:
         role = "model" if m["role"] == "assistant" else "user"
         contents.append({"role": role, "parts": [{"text": m["content"]}]})
 
-    try:
-        r = requests.post(
-            _GEMINI_URL, params={"key": key},
-            json={"system_instruction": {"parts": [{"text": system}]},
-                  "contents": contents,
-                  "generationConfig": {"maxOutputTokens": 500, "temperature": 0.3}},
-            timeout=15,
-        )
-        if r.status_code == 429:
-            return ("⏳ <b>Gemini limita zilnica atinsa.</b> Se reseteaza maine.\n"
-                    "Sfat: adauga o cheie Claude cu <code>/claude</code> pentru executie de trade-uri.")
-        r.raise_for_status()
+    tools = _to_gemini_tools()
+
+    for _ in range(5):  # tool-use loop
+        try:
+            r = requests.post(
+                _GEMINI_URL, params={"key": key},
+                json={"system_instruction": {"parts": [{"text": system}]},
+                      "contents": contents,
+                      "tools": tools,
+                      "generationConfig": {"maxOutputTokens": 600, "temperature": 0.3}},
+                timeout=20,
+            )
+            if r.status_code == 429:
+                return ("⏳ <b>Gemini limita zilnica atinsa.</b> Se reseteaza maine (1500/zi gratis).")
+            r.raise_for_status()
+        except requests.HTTPError:
+            return "⚠️ Asistent (Gemini) indisponibil momentan. Incearca din nou."
+        except Exception as e:
+            return f"⚠️ Eroare asistent: {e}"
+
         data = r.json()
         cands = data.get("candidates", [])
         if not cands:
             return "⚠️ Gemini nu a returnat raspuns. Incearca din nou."
         parts = cands[0].get("content", {}).get("parts", [])
-        reply = "".join(p.get("text", "") for p in parts).strip()
-        if not reply:
-            return "⚠️ Gemini a returnat un raspuns gol. Incearca din nou."
-        _save_exchange(user_id, message, reply)
-        return reply
-    except requests.HTTPError:
-        return "⚠️ Asistent (Gemini) indisponibil momentan. Incearca din nou."
-    except Exception as e:
-        return f"⚠️ Eroare asistent: {e}"
+
+        # Collect any function calls Gemini wants to make
+        fcalls = [p["functionCall"] for p in parts if "functionCall" in p]
+        if not fcalls:
+            reply = "".join(p.get("text", "") for p in parts).strip()
+            if not reply:
+                return "⚠️ Gemini a returnat un raspuns gol. Incearca din nou."
+            _save_exchange(user_id, message, reply)
+            return reply
+
+        # Echo the model's function-call turn, then append our results
+        contents.append({"role": "model", "parts": parts})
+        resp_parts = []
+        for fc in fcalls:
+            name = fc.get("name", "")
+            args = fc.get("args", {}) or {}
+            result = _run_tool(name, args, user_id, send_status)
+            resp_parts.append({
+                "functionResponse": {"name": name, "response": {"result": result}}
+            })
+        contents.append({"role": "user", "parts": resp_parts})
+
+    return "⚠️ Nu am putut finaliza cererea. Incearca din nou."
 
 
 def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
     """Main entry: route to the best available AI per user, send reply.
 
-    Key priority (per user, so each client pays for their own usage):
-      1. Anthropic key (user or shared) → Claude with full trade EXECUTION
-      2. Gemini key (user)              → free chat + analysis (no execution)
+    Priority (owner's shared key covers ALL clients — clients need nothing):
+      1. Anthropic key (user or shared) → Claude, full trade EXECUTION
+      2. Gemini key (user or shared)    → FREE, full trade EXECUTION (function calling)
       3. Groq key (user or shared)      → free chat + analysis (no execution)
     """
     send_status = send_status or (lambda _: None)
@@ -514,7 +550,7 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
             if anthropic_key:
                 reply = _chat_anthropic(user_id, message, anthropic_key, send_fn, send_status)
             elif gemini_key:
-                reply = _chat_gemini(user_id, message, gemini_key)
+                reply = _chat_gemini(user_id, message, gemini_key, send_status)
             else:
                 reply = _chat_groq(user_id, message)
             if reply:
