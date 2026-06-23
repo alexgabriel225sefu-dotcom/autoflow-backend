@@ -209,9 +209,7 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
     if name == "set_symbol":
         symbol = inp.get("symbol", "BTCUSDT").upper()
         try:
-            user_loop._ensure_user(user_id)["settings"]["SYMBOL"] = symbol
             from apex import user_store
-            user_store.update(user_id, {})
             u = user_loop._ensure_user(user_id)
             u["settings"]["SYMBOL"] = symbol
             user_store.save(user_id, u)
@@ -221,9 +219,9 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
 
     if name == "pause_trading":
         try:
+            from apex import user_store
             u = user_loop._ensure_user(user_id)
             u["settings"]["PAUSED"] = True
-            from apex import user_store
             user_store.save(user_id, u)
             return json.dumps({"ok": True, "status": "paused"})
         except Exception as e:
@@ -231,8 +229,9 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
 
     if name == "resume_trading":
         try:
-            user_loop.reset_risk(user_id)
-            user_loop._ensure_running(str(user_id)) if hasattr(user_loop, "_ensure_running") else None
+            user_loop.reset_risk(user_id)  # clears pause + risk counters
+            if not user_loop.is_running(user_id):
+                user_loop.start(user_id)
             return json.dumps({"ok": True, "status": "active"})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
@@ -283,8 +282,7 @@ def _chat_anthropic(user_id: str, message: str, send_fn, send_status) -> str:
                     "content": result,
                 })
 
-        # Build next messages with tool results
-        asst_content = [b.__dict__ if hasattr(b, "__dict__") else b for b in response.content]
+        # Build next messages with tool results (raw blocks passed back to the API)
         messages.append({"role": "assistant", "content": response.content})
         messages.append({"role": "user", "content": tool_results})
 
