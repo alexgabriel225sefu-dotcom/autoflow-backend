@@ -147,13 +147,32 @@ def _build_context(user_id: str) -> str:
     except Exception:
         live_price = None
 
+    # Live technical indicators so the assistant talks with REAL numbers
+    # (works for both Claude and the Groq fallback, no tool call needed).
+    indi = None
+    try:
+        from apex import indicators
+        candles = binance.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES)
+        if candles:
+            indi = indicators.analyze(candles)
+    except Exception:
+        indi = None
+
     lines = [
         f"Balance: ${balance:.2f} USDT (start: ${start_bal:.2f}, P&L: {pnl_pct:+.1f}%)",
         f"Symbol: {symbol}",
-        f"Live price: ${live_price:.4f}" if live_price else f"Live price: unavailable",
+        f"Live price: ${live_price:.4f}" if live_price else "Live price: unavailable",
         f"Auto-trading: {'PAUSED' if settings.get('PAUSED') else 'ACTIVE'}",
         f"Mode: {'Paper (testnet)' if u.get('paper', True) else 'LIVE'}",
     ]
+    if indi:
+        macd_h = float(indi.get("macdHist") or 0)
+        lines.append(
+            f"Live indicators ({cfg.TIMEFRAME}): RSI(14)={indi.get('rsi')}, "
+            f"MACD={'bullish' if macd_h > 0 else 'bearish'} ({indi.get('macdHist')}), "
+            f"EMA trend={indi.get('emaTrend')}, "
+            f"volume ratio={indi.get('volumeRatio')}x, ATR={indi.get('atrPct')}%"
+        )
     if pos:
         try:
             price = binance.get_price(pos["symbol"])
