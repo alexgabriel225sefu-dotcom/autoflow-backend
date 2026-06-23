@@ -759,8 +759,26 @@ def _poll_loop():
                     _activate(chat_id)  # deep-link /start TOKEN lands here too
                     continue
                 _auto_restore(chat_id)
-                # Real-account setup: capture the API key message (not a command)
+                # SECURITY: any message that looks like API keys is deleted
+                # instantly and NEVER reaches the AI assistant or chat history.
+                low = text.lower()
+                looks_like_keys = ("api_key=" in low and "api_secret=" in low) or \
+                                  (len(text) > 40 and text.count("=") >= 2 and " " not in text.strip() and "_" in text)
                 step = _wizard.get(str(chat_id))
+                if looks_like_keys:
+                    _delete_message(chat_id, msg_id)
+                    if step == "KEYS":
+                        try:
+                            _finish_live_setup(chat_id, text, msg_id)
+                        except Exception as e:
+                            print(f"[TG] keys error: {e}")
+                    else:
+                        send_to(chat_id,
+                                "🔒 <b>Keys detected &amp; deleted for your safety.</b>\n"
+                                "To connect an account, start setup with /setup → Real Binance, "
+                                "then send your keys when asked.")
+                    continue
+                # Real-account setup: capture the API key message (not a command)
                 if step == "KEYS" and not text.startswith("/"):
                     try:
                         _finish_live_setup(chat_id, text, msg_id)
