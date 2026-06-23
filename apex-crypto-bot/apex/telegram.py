@@ -369,9 +369,9 @@ def _handle_command(chat_id, text, msg_id=None):
     if cmd == "/gemini":
         if msg_id:   # delete so the secret key doesn't linger in chat
             _delete_message(chat_id, msg_id)
-        if not args or not args[0].startswith("AIza"):
+        if not args:
             return send_to(chat_id,
-                           "❌ Usage: <code>/gemini AIza_YOUR_KEY</code>\n"
+                           "❌ Usage: <code>/gemini YOUR_KEY</code>\n"
                            "Get a FREE key at aistudio.google.com → Get API key.\n"
                            "Most generous free tier: 1,500 messages/day for chat + analysis.")
         gkey = args[0].strip()

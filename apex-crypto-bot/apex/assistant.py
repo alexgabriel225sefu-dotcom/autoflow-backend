@@ -394,8 +394,8 @@ def test_gemini_key(key: str):
     """Quick liveness check for a Gemini key. Returns (ok, message)."""
     import requests
     key = (key or "").strip()
-    if not key.startswith("AIza"):
-        return False, "Key must start with AIza"
+    if len(key) < 20:
+        return False, "That doesn't look like a full API key — copy the whole thing from aistudio.google.com/apikey"
     try:
         r = requests.post(
             _GEMINI_URL, params={"key": key},
