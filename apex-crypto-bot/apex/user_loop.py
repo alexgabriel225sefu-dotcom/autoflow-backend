@@ -9,7 +9,7 @@ import time
 import threading
 from datetime import datetime
 from apex import config as cfg
-from apex import user_store, indicators, ai, strategies, binance
+from apex import user_store, indicators, ai, strategies, binance, dca as dca_mod
 
 
 _loops = {}   # user_id → {"running": bool, "thread": Thread, "dash": dict}
@@ -17,7 +17,7 @@ _lock = threading.Lock()
 
 
 def _default_settings():
-    return {
+    s = {
         "SYMBOL": cfg.SYMBOL,
         "TIMEFRAME": cfg.TIMEFRAME,
         "STRATEGY_MODE": cfg.STRATEGY_MODE,
@@ -28,6 +28,8 @@ def _default_settings():
         "MIN_CRITERIA": cfg.MIN_CRITERIA,
         "PAUSED": False,
     }
+    s.update(dca_mod.default_settings())
+    return s
 
 
 def _ensure_user(user_id):
@@ -149,6 +151,72 @@ def _close_trade(u, state, settings, price, reason, alert, exchange=None):
     state["openPosition"] = None
     alert("close", {"side": side, "symbol": symbol, "entryPrice": entry, "exitPrice": price,
                     "pnl": pnl, "balance": state["paperBalance"], "reason": reason})
+
+
+def _tick_dca(u, settings, state, price, alert, exchange):
+    """Run one DCA tick. Returns True if DCA handled the tick (skip strategy)."""
+    deal = state.get("dca_deal")
+
+    if deal:
+        deal, filled, reason = dca_mod.tick_deal(deal, price)
+        for i in filled:
+            so = deal["safety_orders"][i]
+            # Live: place real safety order
+            if exchange:
+                try:
+                    exchange.place_order(deal["side"], so["qty"], deal["symbol"])
+                except Exception as e:
+                    print(f"[DCA] safety order {i} failed: {e}")
+            pnl_pct = dca_mod.deal_pnl_pct(deal, price)
+            sign = "+" if pnl_pct >= 0 else ""
+            alert("dca_safety", {
+                "index": i + 1,
+                "symbol": deal["symbol"],
+                "price": so["price"],
+                "qty": so["qty"],
+                "avg_entry": deal["avg_entry"],
+                "take_profit_price": deal["take_profit_price"],
+                "safety_filled": deal["safety_filled"],
+                "max_safety": len(deal["safety_orders"]),
+                "pnl_pct": pnl_pct,
+            })
+        if reason:
+            pnl = dca_mod.deal_pnl(deal, price)
+            pnl_pct = dca_mod.deal_pnl_pct(deal, price)
+            # Live: close the full position
+            if exchange:
+                try:
+                    close_side = "SELL" if deal["side"] == "BUY" else "BUY"
+                    exchange.place_order(close_side, deal["total_qty"], deal["symbol"])
+                except Exception as e:
+                    print(f"[DCA] close order failed: {e}")
+            if deal["side"] == "BUY":
+                state["paperBalance"] = round(state["paperBalance"] + price * deal["total_qty"] * (1 - cfg.FEE_PCT), 4)
+            else:
+                state["paperBalance"] = round(state["paperBalance"] - price * deal["total_qty"] * (1 + cfg.FEE_PCT), 4)
+            strategies.record_trade(state["session"], pnl > 0, pnl)
+            state["trades"].insert(0, {
+                "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "symbol": deal["symbol"], "side": deal["side"],
+                "entry": deal["avg_entry"], "exit": round(price, 6),
+                "qty": deal["total_qty"], "pnl": round(pnl, 4),
+                "pnlPct": pnl_pct, "reason": f"DCA_{reason}", "win": pnl > 0,
+            })
+            state["trades"] = state["trades"][:50]
+            state["dca_deal"] = None
+            alert("dca_close", {
+                "symbol": deal["symbol"], "reason": reason,
+                "avg_entry": deal["avg_entry"], "exit_price": round(price, 6),
+                "pnl": round(pnl, 4), "pnl_pct": pnl_pct,
+                "safety_filled": deal["safety_filled"],
+                "balance": state["paperBalance"],
+            })
+        else:
+            state["dca_deal"] = deal
+        return True
+
+    # No active DCA deal — open one on BUY signal if DCA enabled
+    return False
 
 
 def _tick(user_id, alert):
@@ -287,6 +355,37 @@ def _tick(user_id, alert):
     if not pos and signal["action"] in ("BUY", "SELL"):
         if strategies.cooldown_remaining(session, cfg.COOLDOWN_AFTER_LOSS_MIN) > 0:
             signal["action"] = "HOLD"
+
+    # DCA mode: hand off to DCA engine if enabled
+    if settings.get("dca_enabled") and not pos:
+        if state.get("dca_deal"):
+            _tick_dca(u, settings, state, price, alert, exchange)
+        elif signal["action"] in ("BUY", "SELL") and conf_ok and crit_ok and vol_ok:
+            deal = dca_mod.open_deal(symbol, signal["action"], price,
+                                     state["paperBalance"], settings)
+            if deal:
+                # Deduct base order from paper balance
+                if exchange is None:
+                    cost = deal["base_price"] * deal["base_qty"] * (1 + cfg.FEE_PCT)
+                    state["paperBalance"] = round(state["paperBalance"] - cost, 4)
+                else:
+                    try:
+                        exchange.place_order(signal["action"], deal["base_qty"], symbol)
+                    except Exception as e:
+                        print(f"[DCA] base order failed: {e}")
+                        deal = None
+            if deal:
+                state["dca_deal"] = deal
+                alert("dca_open", {
+                    "side": deal["side"], "symbol": symbol,
+                    "base_price": deal["base_price"], "base_qty": deal["base_qty"],
+                    "take_profit_price": deal["take_profit_price"],
+                    "stop_loss_price": deal["stop_loss_price"],
+                    "safety_orders": [s["price"] for s in deal["safety_orders"]],
+                    "tp_pct": deal["tp_pct"], "step_pct": deal["step_pct"],
+                })
+        user_store.save(user_id, u)
+        return
 
     if signal["action"] == "CLOSE" and pos:
         _close_trade(u, state, settings, price, "AI_CLOSE", alert, exchange)

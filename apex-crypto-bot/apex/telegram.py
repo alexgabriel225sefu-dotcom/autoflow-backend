@@ -10,7 +10,7 @@ import time
 import threading
 import requests
 from apex import config as cfg
-from apex import access, user_store, user_loop, binance, ai, assistant
+from apex import access, user_store, user_loop, binance, ai, assistant, dca
 
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 _API = f"https://api.telegram.org/bot{TOKEN}"
@@ -145,16 +145,21 @@ def _build_status(user_id):
     total = len(trades)
     wr = f"{wins / total * 100:.0f}%" if total else "—"
     pos = st.get("openPosition")
-    if pos:
+    dca_deal = st.get("dca_deal")
+    if dca_deal:
+        price = binance.get_price(dca_deal["symbol"])
+        pos_line = dca.deal_summary(dca_deal, price or dca_deal["avg_entry"])
+    elif pos:
         d = "🟢 LONG" if pos["side"] == "BUY" else "🔴 SHORT"
         p = pos.get("currentPnl", 0)
         pos_line = (f"{d} <b>{pos['symbol']}</b>\n  Entry: ${pos['entryPrice']:.4f}  "
                     f"PnL: <b>{'+' if p >= 0 else ''}${p:.4f}</b>")
     else:
         pos_line = "📭 No open position"
+    dca_flag = "  🤖 DCA" if s.get("dca_enabled") else ""
     sig = st.get("lastSignal")
     sig_line = (f"🤖 Signal: <b>{sig['action']}</b> ({sig['confidence']:.0f}%)" if sig else "🤖 Signal: scanning…")
-    return (f"⚡ <b>APEX TRADE BOT</b>  {'PAPER' if u.get('paper', True) else 'LIVE'}\n"
+    return (f"⚡ <b>APEX TRADE BOT</b>  {'PAPER' if u.get('paper', True) else 'LIVE'}{dca_flag}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"💰 Balance: <b>${bal:.2f}</b>  ({'+' if pnl_pct >= 0 else ''}{pnl_pct:.2f}%)\n\n"
             f"{pos_line}\n\n{sig_line}\n"
@@ -188,6 +193,12 @@ _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━
          "<b>Controls:</b>\n/menu · /status · /signal · /config · /trades\n\n"
          "<b>Settings:</b>\n/symbol BTCUSDT\n/method auto|turtle|livermore|soros|ptj|druckenmiller\n"
          "/risk 5 — % per trade\n/sl 1.6 — stop loss %\n/tp 3.2 — take profit %\n/confidence 70 — min AI confidence\n\n"
+         "<b>🤖 DCA Bot (3Commas-style):</b>\n"
+         "/dca — show DCA status &amp; settings\n"
+         "/dca on · /dca off — enable/disable\n"
+         "/dca base 5 — base order % · /dca safety 3 — safety order %\n"
+         "/dca step 2.5 — % drop per safety · /dca tp 2 — take profit %\n"
+         "/dca max 3 — max safety orders\n\n"
          "<b>Run:</b>\n/pause · /resume\n\n"
          "<b>Account:</b>\n/setup — switch paper ↔ real, re-run onboarding\n\n"
          "<b>💬 Smart assistant:</b>\nJust talk to me! \"analyze BTC\", \"buy ETH\", \"close position\"\n"
@@ -234,6 +245,32 @@ def make_alert(chat_id):
             else:
                 send_to(chat_id, "⚠️ <b>Groq key invalid.</b> Get a new free key at console.groq.com → API Keys, "
                                  "then send /groq gsk_NEW_KEY")
+        elif kind == "dca_open":
+            side_icon = "🟢 LONG" if data["side"] == "BUY" else "🔴 SHORT"
+            safety_prices = "  |  ".join(f"${p:.2f}" for p in data["safety_orders"])
+            send_to(chat_id,
+                    f"🤖 <b>DCA Deal opened</b> — {side_icon} <b>{data['symbol']}</b>\n"
+                    f"Base entry: ${data['base_price']:.4f}  Qty: {data['base_qty']}\n"
+                    f"Take profit: ${data['take_profit_price']:.4f}  (+{data['tp_pct']:.1f}%)\n"
+                    f"Safety levels: {safety_prices}\n"
+                    + (f"Stop loss: ${data['stop_loss_price']:.4f}" if data.get("stop_loss_price") else ""))
+        elif kind == "dca_safety":
+            sign = "+" if data["pnl_pct"] >= 0 else ""
+            send_to(chat_id,
+                    f"🔄 <b>DCA Safety #{data['index']}</b> triggered — <b>{data['symbol']}</b>\n"
+                    f"Filled @ ${data['price']:.4f}  New avg: ${data['avg_entry']:.4f}\n"
+                    f"New TP: ${data['take_profit_price']:.4f}  "
+                    f"Safety: {data['safety_filled']}/{data['max_safety']}\n"
+                    f"PnL so far: {sign}{data['pnl_pct']:.2f}%")
+        elif kind == "dca_close":
+            sign = "+" if data["pnl"] >= 0 else ""
+            icon = {"TAKE_PROFIT": "✅", "STOP_LOSS": "🛑"}.get(data["reason"], "🔵")
+            send_to(chat_id,
+                    f"{icon} <b>DCA Deal closed — {data['symbol']}</b>\n"
+                    f"Avg entry: ${data['avg_entry']:.4f} → Exit: ${data['exit_price']:.4f}\n"
+                    f"Safety fills: {data['safety_filled']}  "
+                    f"PnL: <b>{sign}${data['pnl']:.4f} ({sign}{data['pnl_pct']:.2f}%)</b>\n"
+                    f"Balance: ${data['balance']:.2f}")
     return alert
 
 
@@ -344,6 +381,76 @@ def _handle_command(chat_id, text, msg_id=None):
             return send_to(chat_id, "❌ Usage: <code>/confidence 70</code>  (40–95)")
         _upd(chat_id, "MIN_CONFIDENCE", v)
         return send_to(chat_id, f"🧠 Min confidence → <b>{v}%</b>")
+    if cmd == "/dca":
+        u = user_loop._ensure_user(chat_id)
+        s2 = u["settings"]
+        if args and args[0] == "on":
+            _upd(chat_id, "dca_enabled", True)
+            return send_to(chat_id,
+                           "🤖 <b>DCA Bot ENABLED</b>\n"
+                           "Instead of single orders, the bot will open DCA deals with safety orders.\n\n"
+                           f"Settings:\n"
+                           f"• Base order: <b>{s2.get('dca_base_order_pct', 5):g}%</b> of balance\n"
+                           f"• Safety order: <b>{s2.get('dca_safety_order_pct', 3):g}%</b> (×{s2.get('dca_safety_scale', 1.5):g} each)\n"
+                           f"• Max safeties: <b>{s2.get('dca_max_safety_orders', 3)}</b>  Step: <b>{s2.get('dca_safety_step_pct', 2.5):g}%</b>\n"
+                           f"• Take profit: <b>{s2.get('dca_take_profit_pct', 2):g}%</b> from avg entry\n\n"
+                           "<i>Adjust: /dca base 5 · /dca safety 3 · /dca step 2.5 · /dca tp 2 · /dca max 3</i>")
+        if args and args[0] == "off":
+            _upd(chat_id, "dca_enabled", False)
+            return send_to(chat_id, "⏹ <b>DCA Bot disabled.</b> Back to single-order strategy mode.")
+        if args and args[0] == "base":
+            try:
+                v = float(args[1]); assert 1 <= v <= 50
+            except (IndexError, ValueError, AssertionError):
+                return send_to(chat_id, "❌ /dca base 5  (1–50%)")
+            _upd(chat_id, "dca_base_order_pct", v)
+            return send_to(chat_id, f"✅ DCA base order → <b>{v:g}%</b> of balance")
+        if args and args[0] == "safety":
+            try:
+                v = float(args[1]); assert 1 <= v <= 50
+            except (IndexError, ValueError, AssertionError):
+                return send_to(chat_id, "❌ /dca safety 3  (1–50%)")
+            _upd(chat_id, "dca_safety_order_pct", v)
+            return send_to(chat_id, f"✅ DCA safety order → <b>{v:g}%</b> of balance")
+        if args and args[0] == "step":
+            try:
+                v = float(args[1]); assert 0.5 <= v <= 20
+            except (IndexError, ValueError, AssertionError):
+                return send_to(chat_id, "❌ /dca step 2.5  (0.5–20%)")
+            _upd(chat_id, "dca_safety_step_pct", v)
+            return send_to(chat_id, f"✅ DCA safety step → <b>{v:g}%</b> per level")
+        if args and args[0] == "tp":
+            try:
+                v = float(args[1]); assert 0.3 <= v <= 20
+            except (IndexError, ValueError, AssertionError):
+                return send_to(chat_id, "❌ /dca tp 2  (0.3–20%)")
+            _upd(chat_id, "dca_take_profit_pct", v)
+            return send_to(chat_id, f"✅ DCA take profit → <b>{v:g}%</b> from avg entry")
+        if args and args[0] == "max":
+            try:
+                v = int(args[1]); assert 1 <= v <= 8
+            except (IndexError, ValueError, AssertionError):
+                return send_to(chat_id, "❌ /dca max 3  (1–8 orders)")
+            _upd(chat_id, "dca_max_safety_orders", v)
+            return send_to(chat_id, f"✅ DCA max safety orders → <b>{v}</b>")
+        # Show current DCA status
+        enabled = s2.get("dca_enabled", False)
+        deal = u.get("state", {}).get("dca_deal")
+        deal_line = ""
+        if deal:
+            price = binance.get_price(deal["symbol"])
+            deal_line = f"\n\n<b>Active deal:</b>\n{dca.deal_summary(deal, price)}" if price else ""
+        return send_to(chat_id,
+                       f"🤖 <b>DCA Bot</b> — {'✅ ON' if enabled else '⏹ OFF'}\n"
+                       f"━━━━━━━━━━━━━━━━━━━━\n"
+                       f"Base order: <b>{s2.get('dca_base_order_pct', 5):g}%</b>  "
+                       f"Safety: <b>{s2.get('dca_safety_order_pct', 3):g}%</b> ×{s2.get('dca_safety_scale', 1.5):g}\n"
+                       f"Max orders: <b>{s2.get('dca_max_safety_orders', 3)}</b>  "
+                       f"Step: <b>{s2.get('dca_safety_step_pct', 2.5):g}%</b>\n"
+                       f"Take profit: <b>{s2.get('dca_take_profit_pct', 2):g}%</b>  "
+                       f"SL: <b>{s2.get('dca_stop_loss_pct', 10):g}%</b>"
+                       f"{deal_line}\n\n"
+                       "<i>/dca on · /dca off · /dca base 5 · /dca safety 3 · /dca step 2.5 · /dca tp 2 · /dca max 3</i>")
     if cmd == "/groq":
         if msg_id:   # delete the message so the secret key doesn't linger in chat
             _delete_message(chat_id, msg_id)
