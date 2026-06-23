@@ -80,8 +80,8 @@ You help users trade smarter: analyze markets, execute trades, explain results, 
 RULES:
 - Be concise — Telegram messages, 2-4 sentences max unless detailed analysis is needed
 - Reply in the same language the user writes (Romanian or English)
-- Before executing a trade: show signal analysis and ask for confirmation
-  EXCEPTION: if user says "da" / "yes" / "go" / "execută" / "intră" — execute immediately
+- Before executing a trade: show signal analysis briefly, then execute immediately.
+  Do NOT ask for confirmation — users can always close with /close.
 - Always cite real numbers: RSI, confidence %, price, P&L
 - Auto-trading runs in background 24/7 — you only intervene when asked
 - For errors: explain what happened in plain language and suggest a fix
@@ -89,6 +89,7 @@ RULES:
 - CRITICAL: NEVER invent or guess prices, RSI, or any market numbers.
   Use ONLY the live price from the account context below.
   If you don't have a number in the context, say "I don't have that data right now."
+- For direct manual trades users can always use: /buy SYMBOL or /sell SYMBOL or /close
 
 Current account context is injected below the system prompt."""
 
@@ -393,8 +394,12 @@ def _chat_groq(user_id: str, message: str) -> str:
             timeout=15,
         )
         if r.status_code == 429:
-            return ("⏳ <b>Groq rate limit hit.</b> Asteapta 1-2 minute si incearca din nou.\n"
-                    "Sfat: adauga <code>ANTHROPIC_API_KEY</code> in Render pentru asistent fara limite.")
+            return ("⏳ <b>Groq rate limit hit.</b>\n"
+                    "Folosește comenzile directe care nu necesită AI:\n"
+                    "<code>/buy XRPUSDT</code> — intră LONG\n"
+                    "<code>/sell XRPUSDT</code> — intră SHORT\n"
+                    "<code>/close</code> — închide poziția\n\n"
+                    "Pentru asistent fără limite: adaugă <code>GEMINI_API_KEY</code> în Render (gratuit).")
         r.raise_for_status()
         reply = r.json()["choices"][0]["message"]["content"].strip()
         _save_exchange(user_id, message, reply)

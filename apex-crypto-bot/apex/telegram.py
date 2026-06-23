@@ -199,6 +199,7 @@ _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━
          "/dca base 5 — base order % · /dca safety 3 — safety order %\n"
          "/dca step 2.5 — % drop per safety · /dca tp 2 — take profit %\n"
          "/dca max 3 — max safety orders\n\n"
+         "<b>Manual trading:</b>\n/buy XRPUSDT — open LONG\n/sell ETHUSDT — open SHORT\n/close — close open position\n\n"
          "<b>Run:</b>\n/pause · /resume\n\n"
          "<b>Account:</b>\n/setup — switch paper ↔ real, re-run onboarding\n\n"
          "<b>💬 Smart assistant:</b>\nJust talk to me! \"analyze BTC\", \"buy ETH\", \"close position\"\n"
@@ -512,6 +513,27 @@ def _handle_command(chat_id, text, msg_id=None):
                        f"▶️ <b>Bot ACTIVE</b> — scanning <b>{sym}</b> every 60s.\n"
                        "You'll get a ping every 30 min + all trade alerts.",
                        _kb_menu(False, sym))
+    if cmd in ("/buy", "/sell", "/close"):
+        _ensure_running(chat_id)
+        alert = make_alert(chat_id)
+        if cmd == "/close":
+            res = user_loop.force_close(chat_id, alert)
+            if res.get("ok"):
+                sign = "+" if res.get("pnl", 0) >= 0 else ""
+                return send_to(chat_id,
+                               f"✅ <b>Position closed.</b>\n"
+                               f"PnL: <b>{sign}${res.get('pnl', 0):.4f} ({sign}{res.get('pnlPct', 0):.2f}%)</b>")
+            return send_to(chat_id, f"❌ {res.get('error', 'No open position')}")
+        side = "BUY" if cmd == "/buy" else "SELL"
+        symbol = args[0].upper() if args else None
+        res = user_loop.force_trade(chat_id, side, symbol, alert)
+        if res.get("ok"):
+            sym = res["symbol"]
+            icon = "🟢 LONG" if side == "BUY" else "🔴 SHORT"
+            return send_to(chat_id,
+                           f"{icon} <b>{sym}</b> @ ${res['price']:.4f}\n"
+                           f"SL: ${res['stopLoss']:.4f}  TP: ${res['takeProfit']:.4f}")
+        return send_to(chat_id, f"❌ {res.get('error', 'Could not open trade')}")
 
     # ── Admin ──
     if cmd == "/grant" and is_adm and args:
