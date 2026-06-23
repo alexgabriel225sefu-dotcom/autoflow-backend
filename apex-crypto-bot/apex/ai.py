@@ -11,7 +11,9 @@ from apex import config as cfg
 
 _anthropic_client = None
 _signal_cache = {}      # symbol → {ts, signal}
-_CACHE_TTL = 55         # seconds (under the 60s tick)
+_CACHE_TTL = 240        # 4 min — reduces shared-key Groq calls ~4x vs 55s
+_groq_backoff = {}      # key_tail → unblock_at timestamp (after 429)
+_GROQ_BACKOFF_SEC = 600 # 10-min cooldown after rate-limit hit
 
 
 def _get_anthropic():
@@ -33,6 +35,11 @@ def _call_groq(prompt, user_key=None):
     key = user_key or cfg.GROQ_API_KEY
     if not key:
         raise RuntimeError("GROQ_API_KEY missing")
+    # Respect 10-min backoff after a 429 — don't spam a rate-limited key every tick.
+    tail = key[-12:]
+    unblock = _groq_backoff.get(tail, 0)
+    if time.time() < unblock:
+        raise RuntimeError("GROQ_BACKOFF")  # no .user_key → falls to rule_based silently
     try:
         r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -44,12 +51,15 @@ def _call_groq(prompt, user_key=None):
         r.raise_for_status()
     except requests.HTTPError as e:
         status = e.response.status_code if e.response is not None else None
+        if status == 429:
+            _groq_backoff[tail] = time.time() + _GROQ_BACKOFF_SEC
         if user_key and status in (401, 429):
             err = RuntimeError("GROQ_KEY_INVALID" if status == 401 else "GROQ_KEY_QUOTA")
             err.user_key = True
             raise err
         raise
     text = r.json()["choices"][0]["message"]["content"].strip()
+    _groq_backoff.pop(tail, None)  # clear backoff on success
     print("[AI] ✅ Groq — signal generated")
     return _extract_json(text)
 

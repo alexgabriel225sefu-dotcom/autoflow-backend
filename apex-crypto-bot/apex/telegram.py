@@ -208,8 +208,13 @@ def make_alert(chat_id):
                        if sig else "🤖 Scanning for setups…")
             send_to(chat_id, f"⚡ <b>Bot active</b> — ${data['balance']:.2f} · {data['symbol']} · tick #{data['tickCount']}\n{sig_txt}")
         elif kind == "groq_error":
-            send_to(chat_id, "⚠️ <b>Your Groq key is invalid or hit its limit.</b>\n"
-                             "Get a new free key at console.groq.com → API Keys, then send /groq gsk_NEW_KEY")
+            reason = data.get("reason", "")
+            if reason == "GROQ_KEY_QUOTA":
+                send_to(chat_id, "⏳ <b>Groq rate limit hit.</b> Bot retries automatically in 10 min.\n"
+                                 "Rule-based signals active in the meantime — no action needed.")
+            else:
+                send_to(chat_id, "⚠️ <b>Groq key invalid.</b> Get a new free key at console.groq.com → API Keys, "
+                                 "then send /groq gsk_NEW_KEY")
     return alert
 
 
