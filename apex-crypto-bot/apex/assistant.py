@@ -393,7 +393,8 @@ _GEMINI_URL = (
 def test_gemini_key(key: str):
     """Quick liveness check for a Gemini key. Returns (ok, message)."""
     import requests
-    if not key or not key.startswith("AIza"):
+    key = (key or "").strip()
+    if not key.startswith("AIza"):
         return False, "Key must start with AIza"
     try:
         r = requests.post(
@@ -402,10 +403,27 @@ def test_gemini_key(key: str):
                   "generationConfig": {"maxOutputTokens": 5}},
             timeout=12,
         )
-        if r.status_code in (400, 403):
-            return False, "Key rejected — copy it again from aistudio.google.com"
         if r.status_code == 429:
-            return False, "Key is valid but rate-limited right now"
+            return False, "Key is valid but rate-limited right now — try again in a minute"
+        if r.status_code >= 400:
+            # Surface Google's real reason so we know exactly what's wrong
+            try:
+                err = r.json().get("error", {})
+                reason = ""
+                for d in err.get("details", []):
+                    if d.get("reason"):
+                        reason = d["reason"]
+                        break
+                msg = err.get("message", "")
+            except Exception:
+                reason, msg = "", r.text[:120]
+            if reason == "API_KEY_INVALID":
+                return False, "Google says the key is invalid. Recreate it at aistudio.google.com/apikey and copy the WHOLE key (starts with AIza, ~39 chars)."
+            if reason in ("SERVICE_DISABLED", "PERMISSION_DENIED"):
+                return False, "The Generative Language API isn't enabled for this key's project. Create the key in a NEW project at aistudio.google.com/apikey."
+            if reason == "FAILED_PRECONDITION":
+                return False, "Gemini API isn't available for your account's country/billing setup yet."
+            return False, f"Google rejected the key: {msg or reason or r.status_code}"
         r.raise_for_status()
         return True, "Key works"
     except Exception as e:

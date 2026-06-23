@@ -374,12 +374,12 @@ def _handle_command(chat_id, text, msg_id=None):
                            "❌ Usage: <code>/gemini AIza_YOUR_KEY</code>\n"
                            "Get a FREE key at aistudio.google.com → Get API key.\n"
                            "Most generous free tier: 1,500 messages/day for chat + analysis.")
+        gkey = args[0].strip()
         send_to(chat_id, "🔍 Testing your Gemini key…")
-        ok, why = assistant.test_gemini_key(args[0])
+        ok, why = assistant.test_gemini_key(gkey)
         if not ok:
-            return send_to(chat_id, f"❌ <b>Key not working:</b> {why}\n"
-                                    "Get a fresh key at aistudio.google.com → Get API key.")
-        user_store.update(chat_id, {"gemini_key": args[0]})
+            return send_to(chat_id, f"❌ <b>Key not working:</b> {why}")
+        user_store.update(chat_id, {"gemini_key": gkey})
         assistant.clear_history(chat_id)
         return send_to(chat_id,
                        "✅ <b>Gemini key verified &amp; saved!</b> 🆓\n"
