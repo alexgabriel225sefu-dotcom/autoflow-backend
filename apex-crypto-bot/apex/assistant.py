@@ -93,6 +93,36 @@ RULES:
 Current account context is injected below the system prompt."""
 
 
+def _load_history(user_id: str):
+    """Return conversation history, restoring from persistent store on first use."""
+    with _lock:
+        if user_id in _conv:
+            return list(_conv[user_id])
+    try:
+        from apex import user_store
+        hist = user_store.load_chat(user_id)
+    except Exception:
+        hist = []
+    with _lock:
+        _conv[user_id] = list(hist)
+    return list(hist)
+
+
+def _save_exchange(user_id: str, user_msg: str, assistant_msg: str):
+    """Append a user+assistant turn to memory AND persist it (survives redeploys)."""
+    with _lock:
+        conv = list(_conv.get(user_id, []))
+        conv.append({"role": "user", "content": user_msg})
+        conv.append({"role": "assistant", "content": assistant_msg})
+        conv = conv[-_MAX_HISTORY:]
+        _conv[user_id] = conv
+    try:
+        from apex import user_store
+        user_store.save_chat(user_id, conv)
+    except Exception:
+        pass
+
+
 def _get_client(api_key: str):
     """Cache one Anthropic client per distinct API key (per-user keys supported)."""
     with _lock:
@@ -290,8 +320,7 @@ def _chat_anthropic(user_id: str, message: str, api_key: str, send_fn, send_stat
     context = _build_context(user_id)
     system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
 
-    with _lock:
-        history = list(_conv.get(user_id, []))
+    history = _load_history(user_id)
     history.append({"role": "user", "content": message})
 
     messages = history[-_MAX_HISTORY:]
@@ -309,11 +338,7 @@ def _chat_anthropic(user_id: str, message: str, api_key: str, send_fn, send_stat
         if response.stop_reason != "tool_use":
             # Final text response
             text = "".join(b.text for b in response.content if hasattr(b, "text")).strip()
-            with _lock:
-                conv = list(_conv.get(user_id, []))
-                conv.append({"role": "user", "content": message})
-                conv.append({"role": "assistant", "content": text})
-                _conv[user_id] = conv[-_MAX_HISTORY:]
+            _save_exchange(user_id, message, text)
             return text
 
         # Execute all tool calls
@@ -352,8 +377,7 @@ def _chat_groq(user_id: str, message: str) -> str:
     context = _build_context(user_id)
     system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
 
-    with _lock:
-        history = list(_conv.get(user_id, []))
+    history = _load_history(user_id)
     history.append({"role": "user", "content": message})
 
     messages = [{"role": "system", "content": system}] + history[-_MAX_HISTORY:]
@@ -371,11 +395,7 @@ def _chat_groq(user_id: str, message: str) -> str:
                     "Sfat: adauga <code>ANTHROPIC_API_KEY</code> in Render pentru asistent fara limite.")
         r.raise_for_status()
         reply = r.json()["choices"][0]["message"]["content"].strip()
-        with _lock:
-            conv = list(_conv.get(user_id, []))
-            conv.append({"role": "user", "content": message})
-            conv.append({"role": "assistant", "content": reply})
-            _conv[user_id] = conv[-_MAX_HISTORY:]
+        _save_exchange(user_id, message, reply)
         return reply
     except requests.HTTPError as e:
         return f"⚠️ Asistent indisponibil momentan. Incearca din nou."
@@ -437,8 +457,7 @@ def _chat_gemini(user_id: str, message: str, key: str) -> str:
     context = _build_context(user_id)
     system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
 
-    with _lock:
-        history = list(_conv.get(user_id, []))
+    history = _load_history(user_id)
     history.append({"role": "user", "content": message})
 
     # Map our history to Gemini's contents format (role "model" not "assistant")
@@ -467,11 +486,7 @@ def _chat_gemini(user_id: str, message: str, key: str) -> str:
         reply = "".join(p.get("text", "") for p in parts).strip()
         if not reply:
             return "⚠️ Gemini a returnat un raspuns gol. Incearca din nou."
-        with _lock:
-            conv = list(_conv.get(user_id, []))
-            conv.append({"role": "user", "content": message})
-            conv.append({"role": "assistant", "content": reply})
-            _conv[user_id] = conv[-_MAX_HISTORY:]
+        _save_exchange(user_id, message, reply)
         return reply
     except requests.HTTPError:
         return "⚠️ Asistent (Gemini) indisponibil momentan. Incearca din nou."
@@ -495,7 +510,7 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
             from apex import user_loop
             u = user_loop._ensure_user(user_id)
             anthropic_key = u.get("anthropic_key") or cfg.ANTHROPIC_API_KEY
-            gemini_key = u.get("gemini_key")
+            gemini_key = u.get("gemini_key") or cfg.GEMINI_API_KEY
             if anthropic_key:
                 reply = _chat_anthropic(user_id, message, anthropic_key, send_fn, send_status)
             elif gemini_key:
@@ -512,5 +527,11 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
 
 
 def clear_history(user_id: str) -> None:
+    user_id = str(user_id)
     with _lock:
-        _conv.pop(str(user_id), None)
+        _conv.pop(user_id, None)
+    try:
+        from apex import user_store
+        user_store.clear_chat(user_id)
+    except Exception:
+        pass

@@ -96,6 +96,49 @@ def update(user_id, updates):
     save(user_id, d)
 
 
+def save_chat(user_id, messages):
+    """Persist a user's assistant conversation (survives redeploys)."""
+    user_id = str(user_id)
+    payload = json.dumps(messages)
+    if _USE_REDIS:
+        _redis_set(f"apex:chat:{user_id}", payload)
+        return
+    try:
+        with open(_path(user_id) + ".chat", "w") as f:
+            f.write(payload)
+    except Exception as e:
+        print(f"[Store] save_chat failed: {e}")
+
+
+def load_chat(user_id):
+    """Load a user's persisted conversation, or [] if none."""
+    user_id = str(user_id)
+    if _USE_REDIS:
+        raw = _redis_get(f"apex:chat:{user_id}")
+    else:
+        try:
+            raw = open(_path(user_id) + ".chat").read()
+        except Exception:
+            raw = None
+    if raw:
+        try:
+            return json.loads(raw)
+        except Exception:
+            pass
+    return []
+
+
+def clear_chat(user_id):
+    user_id = str(user_id)
+    if _USE_REDIS:
+        _redis(["DEL", f"apex:chat:{user_id}"])
+        return
+    try:
+        os.remove(_path(user_id) + ".chat")
+    except Exception:
+        pass
+
+
 def all_active():
     """Return list of user_ids that have active=True."""
     if _USE_REDIS:

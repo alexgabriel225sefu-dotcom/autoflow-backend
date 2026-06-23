@@ -9,8 +9,11 @@ def _truthy(v: str) -> bool:
     return (v or "").strip().lower() in ("true", "1", "yes", "on")
 
 
-# ─── AI providers ───────────────────────────────────────
+# ─── AI providers (OWNER sets one shared key — clients never need their own) ──
+# Priority for the assistant: Anthropic (executes trades) > Gemini (free 1500/day)
+# > Groq (free, fast). Set ONE of these in Render and every client uses it.
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # ─── Telegram ───────────────────────────────────────────
