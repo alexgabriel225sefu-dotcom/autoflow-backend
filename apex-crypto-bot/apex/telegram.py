@@ -246,6 +246,12 @@ def make_alert(chat_id):
             else:
                 send_to(chat_id, "⚠️ <b>Groq key invalid.</b> Get a new free key at console.groq.com → API Keys, "
                                  "then send /groq gsk_NEW_KEY")
+        elif kind == "auto_symbol":
+            icon = "🟢" if data["action"] == "BUY" else "🔴"
+            send_to(chat_id,
+                    f"🔍 <b>Best setup found: {data['symbol']}</b>\n"
+                    f"{icon} Signal: <b>{data['action']}</b>  Confidence: {data['confidence']:.0f}%\n"
+                    f"<i>{data.get('reasoning', '')}</i>")
         elif kind == "dca_open":
             side_icon = "🟢 LONG" if data["side"] == "BUY" else "🔴 SHORT"
             safety_prices = "  |  ".join(f"${p:.2f}" for p in data["safety_orders"])

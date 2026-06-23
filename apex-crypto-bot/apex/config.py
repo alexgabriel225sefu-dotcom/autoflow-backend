@@ -44,7 +44,7 @@ STRATEGY_MODE = (os.getenv("STRATEGY_MODE") or "auto").lower()
 RISK_PER_TRADE = float(os.getenv("RISK_PER_TRADE") or 0.05)     # 5% of balance per trade
 STOP_LOSS_PCT = float(os.getenv("STOP_LOSS_PCT") or 0.016)      # 1.6%
 TAKE_PROFIT_PCT = float(os.getenv("TAKE_PROFIT_PCT") or 0.032)  # 3.2% (R:R 2)
-MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 58)
+MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 52)
 MIN_CRITERIA = int(os.getenv("MIN_CRITERIA") or 2)
 FEE_PCT = float(os.getenv("FEE_PCT") or 0.001)                  # 0.1% taker
 

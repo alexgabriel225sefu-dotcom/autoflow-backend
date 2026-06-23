@@ -11,6 +11,12 @@ from datetime import datetime
 from apex import config as cfg
 from apex import user_store, indicators, ai, strategies, binance, dca as dca_mod
 
+# Symbols auto-scanned in "auto" mode (highest-volume, best liquidity)
+_AUTO_SYMBOLS = [
+    "BTCUSDT", "ETHUSDT", "XRPUSDT", "BNBUSDT",
+    "SOLUSDT", "AVAXUSDT", "DOTUSDT", "ADAUSDT",
+]
+
 
 _loops = {}   # user_id → {"running": bool, "thread": Thread, "dash": dict}
 _lock = threading.Lock()
@@ -153,6 +159,30 @@ def _close_trade(u, state, settings, price, reason, alert, exchange=None):
                     "pnl": pnl, "balance": state["paperBalance"], "reason": reason})
 
 
+def _find_best_signal(exchange_name, timeframe, session):
+    """Scan all AUTO_SYMBOLS and return (symbol, signal) with the strongest setup.
+    Uses only rule_based_fallback + legendary strategies — no AI key required.
+    """
+    best_sym, best_sig, best_score = None, None, 0
+    for sym in _AUTO_SYMBOLS:
+        try:
+            candles = binance.get_candles(sym, timeframe, 60, exchange=exchange_name)
+            if not candles:
+                continue
+            ind = indicators.analyze(candles)
+            strat = strategies.analyze(candles, session)
+            sig = ai.rule_based_fallback(ind, None, strat)
+            if sig["action"] not in ("BUY", "SELL"):
+                continue
+            # Score = confidence × criteria — weights both quality and multi-factor alignment
+            score = sig["confidence"] * sig.get("criteriaScore", 0)
+            if score > best_score:
+                best_score, best_sym, best_sig = score, sym, sig
+        except Exception as e:
+            print(f"[AutoScan] {sym} failed: {e}")
+    return best_sym, best_sig
+
+
 def _tick_dca(u, settings, state, price, alert, exchange):
     """Run one DCA tick. Returns True if DCA handled the tick (skip strategy)."""
     deal = state.get("dca_deal")
@@ -226,9 +256,28 @@ def _tick(user_id, alert):
         return
     state["tickCount"] = state.get("tickCount", 0) + 1
 
-    symbol = (state["openPosition"] or {}).get("symbol") or settings["SYMBOL"]
-    timeframe = settings["TIMEFRAME"]
+    pos = state.get("openPosition")
     ex_name = u.get("exchange", "binance")
+    timeframe = settings["TIMEFRAME"]
+
+    # Auto-mode + no open position: scan all symbols and trade the best setup.
+    # This is what makes the bot truly autonomous — it finds the opportunity itself.
+    if not pos and settings.get("STRATEGY_MODE", "auto") == "auto":
+        session = state.get("session", {})
+        best_sym, best_sig = _find_best_signal(ex_name, timeframe, session)
+        if best_sym and best_sig and best_sig["action"] in ("BUY", "SELL"):
+            conf_ok = best_sig["confidence"] >= settings["MIN_CONFIDENCE"]
+            crit_ok = best_sig.get("criteriaScore", 0) >= settings["MIN_CRITERIA"]
+            if conf_ok and crit_ok:
+                if best_sym != settings["SYMBOL"]:
+                    settings["SYMBOL"] = best_sym
+                    alert("auto_symbol", {"symbol": best_sym,
+                                          "action": best_sig["action"],
+                                          "confidence": best_sig["confidence"],
+                                          "reasoning": best_sig.get("reasoning", "")})
+                # Fall through to normal tick with the best symbol selected
+        # Always use the (possibly updated) symbol for this tick
+    symbol = (state.get("openPosition") or {}).get("symbol") or settings["SYMBOL"]
     candles = binance.get_candles(symbol, timeframe, cfg.CANDLES, exchange=ex_name)
     if not candles:
         return
@@ -260,7 +309,7 @@ def _tick(user_id, alert):
                  "lastTick": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                  "trades": state["trades"], "mode": "PAPER" if u.get("paper", True) else "LIVE"})
 
-    pos = state["openPosition"]
+    pos = state.get("openPosition")
     if pos:
         pnl = _pos_pnl(pos, price)
         pos["currentPnl"] = round(pnl, 4)
