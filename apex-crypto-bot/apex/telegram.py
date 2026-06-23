@@ -534,33 +534,29 @@ def _show_mode_choice(chat_id):
     """Step 2: choose Paper or Real."""
     send_to(chat_id,
             "⚙️ <b>How do you want to trade?</b>\n\n"
-            "🧪 <b>Paper Trading</b> — trade with FREE virtual USDT on Binance Testnet.\n"
-            "Real market prices, real orders, zero risk. You'll need a free testnet account.\n\n"
+            "🧪 <b>Paper Trading</b> — practice with $100 virtual USDT and REAL market "
+            "prices. No keys, no signup, starts instantly. Zero risk.\n\n"
             "🔴 <b>Real Binance</b> — connect your real Binance account and trade with real funds.\n\n"
             "<i>You can switch any time with /setup.</i>",
             _kb_mode())
 
 
 def _start_paper(chat_id):
-    """Paper trading = Binance Testnet with free virtual USDT."""
-    _wizard[str(chat_id)] = "KEYS"
+    """Paper trading = instant internal simulation with REAL market prices (no keys)."""
     u = user_loop._ensure_user(chat_id)
     u["paper"] = True
     u["setup_done"] = True
+    # Keyless paper: clear any old keys so the loop uses internal simulation.
+    u.pop("api_key", None)
+    u.pop("api_secret", None)
     u["settings"]["PAUSED"] = True
     user_store.save(chat_id, u)
     send_to(chat_id,
-            "🧪 <b>Paper Trading — Binance Testnet</b>\n\n"
-            "You'll get <b>FREE virtual USDT</b> to trade with. Real market prices, zero risk.\n\n"
-            "1️⃣ Tap <b>Open Binance Testnet</b> below\n"
-            "2️⃣ Register (GitHub login) — takes 30 seconds\n"
-            "3️⃣ Go to <b>API Management</b> → create API key (enable Spot trading)\n"
-            "4️⃣ Send your keys here in ONE message:\n"
-            "<code>API_KEY=your_key API_SECRET=your_secret</code>\n\n"
-            "🔒 <i>Message deleted instantly after reading.</i>",
-            {"reply_markup": json.dumps({"inline_keyboard": [
-                [{"text": "🧪 Open Binance Testnet", "url": "https://testnet.binance.vision"}],
-            ]})})
+            "🧪 <b>Paper Trading ready!</b>\n\n"
+            "You're starting with <b>$100 virtual USDT</b> and REAL live market prices.\n"
+            "No keys, no signup — the bot trades a simulation so you can test risk-free.\n\n"
+            "Next: set up the AI brain 👇")
+    _ask_groq(chat_id)
 
 
 def _start_live_setup(chat_id):

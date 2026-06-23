@@ -4,6 +4,9 @@ services:
   - type: web
     name: apex-crypto-bot
     env: python
+    # Frankfurt (EU) — Binance geo-blocks trading from US regions (Oregon/Ohio/
+    # Virginia return "restricted location"). EU/Asia regions can place orders.
+    region: frankfurt
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     plan: free
