@@ -313,6 +313,9 @@ def _chat_groq(user_id: str, message: str) -> str:
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             timeout=15,
         )
+        if r.status_code == 429:
+            return ("⏳ <b>Groq rate limit hit.</b> Asteapta 1-2 minute si incearca din nou.\n"
+                    "Sfat: adauga <code>ANTHROPIC_API_KEY</code> in Render pentru asistent fara limite.")
         r.raise_for_status()
         reply = r.json()["choices"][0]["message"]["content"].strip()
         with _lock:
@@ -321,8 +324,10 @@ def _chat_groq(user_id: str, message: str) -> str:
             conv.append({"role": "assistant", "content": reply})
             _conv[user_id] = conv[-_MAX_HISTORY:]
         return reply
+    except requests.HTTPError as e:
+        return f"⚠️ Asistent indisponibil momentan. Incearca din nou."
     except Exception as e:
-        return f"⚠️ Assistant unavailable ({e})"
+        return f"⚠️ Eroare asistent: {e}"
 
 
 def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
