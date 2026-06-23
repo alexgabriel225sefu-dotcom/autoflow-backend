@@ -86,6 +86,9 @@ RULES:
 - Auto-trading runs in background 24/7 — you only intervene when asked
 - For errors: explain what happened in plain language and suggest a fix
 - Use HTML for Telegram: <b>bold</b>, numbers, no markdown asterisks
+- CRITICAL: NEVER invent or guess prices, RSI, or any market numbers.
+  Use ONLY the live price from the account context below.
+  If you don't have a number in the context, say "I don't have that data right now."
 
 Current account context is injected below the system prompt."""
 
@@ -112,9 +115,16 @@ def _build_context(user_id: str) -> str:
     sig = state.get("lastSignal")
     trades = state.get("trades", [])
 
+    symbol = settings.get("SYMBOL", "BTCUSDT")
+    try:
+        live_price = binance.get_price(symbol)
+    except Exception:
+        live_price = None
+
     lines = [
         f"Balance: ${balance:.2f} USDT (start: ${start_bal:.2f}, P&L: {pnl_pct:+.1f}%)",
-        f"Symbol: {settings.get('SYMBOL', 'BTCUSDT')}",
+        f"Symbol: {symbol}",
+        f"Live price: ${live_price:.4f}" if live_price else f"Live price: unavailable",
         f"Auto-trading: {'PAUSED' if settings.get('PAUSED') else 'ACTIVE'}",
         f"Mode: {'Paper (testnet)' if u.get('paper', True) else 'LIVE'}",
     ]
