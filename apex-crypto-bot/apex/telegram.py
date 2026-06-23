@@ -438,34 +438,48 @@ def _show_mode_choice(chat_id):
     """Step 2: choose Paper or Real."""
     send_to(chat_id,
             "⚙️ <b>How do you want to trade?</b>\n\n"
-            "📝 <b>Paper Trading</b> — $100 virtual balance, real market prices, zero risk. Great for testing.\n\n"
-            "🔴 <b>Real Binance</b> — connect your Binance account and trade with real funds.\n\n"
+            "🧪 <b>Paper Trading</b> — trade with FREE virtual USDT on Binance Testnet.\n"
+            "Real market prices, real orders, zero risk. You'll need a free testnet account.\n\n"
+            "🔴 <b>Real Binance</b> — connect your real Binance account and trade with real funds.\n\n"
             "<i>You can switch any time with /setup.</i>",
             _kb_mode())
 
 
 def _start_paper(chat_id):
+    """Paper trading = Binance Testnet with free virtual USDT."""
+    _wizard[str(chat_id)] = "KEYS"
     u = user_loop._ensure_user(chat_id)
     u["paper"] = True
     u["setup_done"] = True
     u["settings"]["PAUSED"] = True
     user_store.save(chat_id, u)
     send_to(chat_id,
-            "✅ <b>Paper Trading selected!</b>\n"
-            "💰 $100 virtual · real market data · zero risk.\n\n"
-            "One last step — set up your AI brain:")
-    _ask_groq(chat_id)
+            "🧪 <b>Paper Trading — Binance Testnet</b>\n\n"
+            "You'll get <b>FREE virtual USDT</b> to trade with. Real market prices, zero risk.\n\n"
+            "1️⃣ Tap <b>Open Binance Testnet</b> below\n"
+            "2️⃣ Register (GitHub login) — takes 30 seconds\n"
+            "3️⃣ Go to <b>API Management</b> → create API key (enable Spot trading)\n"
+            "4️⃣ Send your keys here in ONE message:\n"
+            "<code>API_KEY=your_key API_SECRET=your_secret</code>\n\n"
+            "🔒 <i>Message deleted instantly after reading.</i>",
+            {"reply_markup": json.dumps({"inline_keyboard": [
+                [{"text": "🧪 Open Binance Testnet", "url": "https://testnet.binance.vision"}],
+            ]})})
 
 
 def _start_live_setup(chat_id):
+    """Real trading = real Binance account."""
     _wizard[str(chat_id)] = "KEYS"
+    u = user_loop._ensure_user(chat_id)
+    u["paper"] = False
+    user_store.save(chat_id, u)
     send_to(chat_id,
             "🔴 <b>Connect your real Binance account</b>\n\n"
-            "1. Tap <b>Open Binance API page</b> below\n"
-            "2. Create an API key — enable <b>Spot &amp; Margin Trading</b>\n"
-            "3. Send the key + secret here in ONE message:\n"
+            "1️⃣ Tap <b>Open Binance API Settings</b> below\n"
+            "2️⃣ Create an API key — enable <b>Spot &amp; Margin Trading</b>\n"
+            "3️⃣ Send both keys here in ONE message:\n"
             "<code>API_KEY=your_key API_SECRET=your_secret</code>\n\n"
-            "🔒 <i>Your message is deleted instantly after I read it.</i>",
+            "🔒 <i>Message deleted instantly after reading.</i>",
             _kb_binance())
 
 
@@ -479,14 +493,13 @@ def _finish_live_setup(chat_id, text, msg_id):
     if "API_KEY" not in pairs or "API_SECRET" not in pairs:
         return send_to(chat_id, "❌ Send both in one message:\n<code>API_KEY=xxx API_SECRET=yyy</code>")
     u = user_loop._ensure_user(chat_id)
-    u["paper"] = False
     u["setup_done"] = True
     u["api_key"] = pairs["API_KEY"]
     u["api_secret"] = pairs["API_SECRET"]
-    u["settings"]["PAUSED"] = True   # wait for explicit Start after the Groq step
+    u["settings"]["PAUSED"] = True
     user_store.save(chat_id, u)
-    safety = "🧪 Testnet (safe)" if cfg.BINANCE_TESTNET else "🔴 LIVE — real funds"
-    send_to(chat_id, f"✅ <b>Binance connected!</b>\nMode: <b>{safety}</b>")
+    mode_label = "🧪 Binance Testnet (virtual USDT)" if u.get("paper") else "🔴 Real Binance (live funds)"
+    send_to(chat_id, f"✅ <b>Binance connected!</b>\nMode: <b>{mode_label}</b>")
     _ask_groq(chat_id)
 
 

@@ -165,12 +165,15 @@ def _tick(user_id, alert):
         return
     price = binance.get_price(symbol)
 
-    # Live exchange (real account) when the user finished real setup; else None
-    # (paper simulation). Falls back to paper for this tick if keys/API fail.
+    # Both paper (testnet) and real use LiveExchange.
+    # paper=True → Binance Testnet (virtual USDT, real market prices)
+    # paper=False → real Binance mainnet
+    # Falls back to internal simulation if user has no API keys yet.
     exchange = None
-    if not u.get("paper", True) and u.get("api_key") and u.get("api_secret"):
+    if u.get("api_key") and u.get("api_secret"):
+        is_testnet = u.get("paper", True)
         try:
-            exchange = binance.LiveExchange(u["api_key"], u["api_secret"], testnet=cfg.BINANCE_TESTNET)
+            exchange = binance.LiveExchange(u["api_key"], u["api_secret"], testnet=is_testnet)
             if not state.get("openPosition"):
                 real_bal = exchange.get_balance("USDT")
                 if real_bal > 0:
@@ -178,7 +181,7 @@ def _tick(user_id, alert):
                     if state["startBalance"] <= cfg.PAPER_BALANCE:
                         state["startBalance"] = real_bal
         except Exception as e:
-            print(f"[UserLoop:{user_id}] live sync failed ({e}) — paper this tick")
+            print(f"[UserLoop:{user_id}] exchange sync failed ({e}) — internal simulation this tick")
             exchange = None
 
     dash = _loops.get(user_id, {}).get("dash", {})
