@@ -522,6 +522,22 @@ def _ready(chat_id):
             _kb_menu(True, s["SYMBOL"]))
 
 
+def _auto_restore(chat_id):
+    """Silently restart a user's trading thread after a server restart.
+
+    On Render free tier the container is wiped on every deploy, so
+    user files (and the 'active' flag) are gone after a redeploy.
+    Any interaction from a setup-and-unpaused user should bring their
+    thread back without requiring them to press ▶️ Start Trading again.
+    """
+    if user_loop.is_running(chat_id):
+        return
+    u = user_loop._ensure_user(chat_id)
+    if u.get("setup_done") and not u["settings"].get("PAUSED", True):
+        user_loop.start(chat_id, make_alert(chat_id))
+        print(f"[TG] Auto-restored thread for user {chat_id}")
+
+
 def _poll_loop():
     global _update_id
     try:
@@ -551,6 +567,7 @@ def _poll_loop():
                     if not access.is_allowed(str(chat_id)):
                         _activate(chat_id)
                         continue
+                    _auto_restore(chat_id)
                     try:
                         _handle_callback(chat_id, cb.get("data", ""))
                     except Exception as e:
@@ -565,6 +582,7 @@ def _poll_loop():
                 if not access.is_allowed(str(chat_id)):
                     _activate(chat_id)  # deep-link /start TOKEN lands here too
                     continue
+                _auto_restore(chat_id)
                 # Real-account setup: capture the API key message (not a command)
                 step = _wizard.get(str(chat_id))
                 if step == "KEYS" and not text.startswith("/"):
