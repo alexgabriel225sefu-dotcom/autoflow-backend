@@ -404,7 +404,8 @@ def test_gemini_key(key: str):
             timeout=12,
         )
         if r.status_code == 429:
-            return False, "Key is valid but rate-limited right now — try again in a minute"
+            # A 429 only happens AFTER auth succeeds — the key is valid, save it.
+            return True, "Key valid (was briefly rate-limited, that's fine)"
         if r.status_code >= 400:
             # Surface Google's real reason so we know exactly what's wrong
             try:
