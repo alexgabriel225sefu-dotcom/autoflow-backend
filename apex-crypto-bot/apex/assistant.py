@@ -9,7 +9,7 @@ import time
 import threading
 from apex import config as cfg
 
-_client = None
+_clients: dict = {}     # api_key → anthropic.Anthropic client (cached per key)
 _conv: dict = {}        # user_id → [{"role", "content"}]
 _MAX_HISTORY = 12
 _lock = threading.Lock()
@@ -93,12 +93,38 @@ RULES:
 Current account context is injected below the system prompt."""
 
 
-def _get_client():
-    global _client
-    if _client is None:
+def _get_client(api_key: str):
+    """Cache one Anthropic client per distinct API key (per-user keys supported)."""
+    with _lock:
+        client = _clients.get(api_key)
+    if client is None:
         import anthropic
-        _client = anthropic.Anthropic(api_key=cfg.ANTHROPIC_API_KEY)
-    return _client
+        client = anthropic.Anthropic(api_key=api_key)
+        with _lock:
+            _clients[api_key] = client
+    return client
+
+
+def test_key(key: str):
+    """Quick liveness check for a client's Anthropic key. Returns (ok, message)."""
+    if not key or not key.startswith("sk-ant-"):
+        return False, "Key must start with sk-ant-"
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=key)
+        client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=5,
+            messages=[{"role": "user", "content": "Reply with the single word OK."}],
+        )
+        return True, "Key works"
+    except Exception as e:
+        status = getattr(e, "status_code", None)
+        if status == 401:
+            return False, "Key rejected (401) — copy it again from console.anthropic.com"
+        if status == 429:
+            return False, "Key is valid but out of credits/rate-limited"
+        return False, f"Could not verify key ({e})"
 
 
 def _build_context(user_id: str) -> str:
@@ -239,9 +265,9 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
     return json.dumps({"error": f"Unknown tool: {name}"})
 
 
-def _chat_anthropic(user_id: str, message: str, send_fn, send_status) -> str:
+def _chat_anthropic(user_id: str, message: str, api_key: str, send_fn, send_status) -> str:
     """Full Claude tool-use conversation loop."""
-    client = _get_client()
+    client = _get_client(api_key)
     context = _build_context(user_id)
     system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
 
@@ -339,14 +365,23 @@ def _chat_groq(user_id: str, message: str) -> str:
 
 
 def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
-    """Main entry: route to Claude (with tools) or Groq fallback, send reply."""
+    """Main entry: route to Claude (with tools) or Groq fallback, send reply.
+
+    Key priority (per user, so each client pays for their own usage):
+      1. User's own Anthropic key  → Claude with full trade execution
+      2. Owner's shared Anthropic  → Claude with full trade execution
+      3. Groq (user or shared)     → conversational only, no execution
+    """
     send_status = send_status or (lambda _: None)
     user_id = str(user_id)
 
     def _run():
         try:
-            if cfg.ANTHROPIC_API_KEY:
-                reply = _chat_anthropic(user_id, message, send_fn, send_status)
+            from apex import user_loop
+            u = user_loop._ensure_user(user_id)
+            anthropic_key = u.get("anthropic_key") or cfg.ANTHROPIC_API_KEY
+            if anthropic_key:
+                reply = _chat_anthropic(user_id, message, anthropic_key, send_fn, send_status)
             else:
                 reply = _chat_groq(user_id, message)
             if reply:

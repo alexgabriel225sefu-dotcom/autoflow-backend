@@ -182,6 +182,8 @@ _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━
          "/risk 5 — % per trade\n/sl 1.6 — stop loss %\n/tp 3.2 — take profit %\n/confidence 70 — min AI confidence\n\n"
          "<b>Run:</b>\n/pause · /resume\n\n"
          "<b>Account:</b>\n/setup — switch paper ↔ real, re-run onboarding\n\n"
+         "<b>💬 Smart assistant:</b>\nJust talk to me! \"analyze BTC\", \"buy ETH\", \"close position\"\n"
+         "/claude sk-ant-KEY — unlock full chat + trade execution (console.anthropic.com)\n\n"
          "<b>Free AI key:</b>\n/groq gsk_YOUR_KEY (get one at console.groq.com)")
 
 
@@ -344,6 +346,25 @@ def _handle_command(chat_id, text, msg_id=None):
             return send_to(chat_id, f"❌ <b>Key not working:</b> {why}\nGet a fresh key at console.groq.com → API Keys.")
         user_store.update(chat_id, {"groq_key": args[0]})
         return send_to(chat_id, "✅ <b>Groq key verified &amp; saved!</b> Your AI signals now run on YOUR personal quota. 🧠")
+    if cmd == "/claude":
+        if msg_id:   # delete so the secret key doesn't linger in chat
+            _delete_message(chat_id, msg_id)
+        if not args or not args[0].startswith("sk-ant-"):
+            return send_to(chat_id,
+                           "❌ Usage: <code>/claude sk-ant-YOUR_KEY</code>\n"
+                           "Get a free key at console.anthropic.com → API Keys.\n"
+                           "This unlocks the smart assistant: natural chat + real trade execution.")
+        send_to(chat_id, "🔍 Testing your Claude key…")
+        ok, why = assistant.test_key(args[0])
+        if not ok:
+            return send_to(chat_id, f"❌ <b>Key not working:</b> {why}\n"
+                                    "Get a fresh key at console.anthropic.com → API Keys.")
+        user_store.update(chat_id, {"anthropic_key": args[0]})
+        assistant.clear_history(chat_id)
+        return send_to(chat_id,
+                       "✅ <b>Claude key verified &amp; saved!</b>\n"
+                       "Now just talk to me naturally — I'll analyze markets and execute trades for you. 🧠⚡\n"
+                       "Try: <i>\"analyze BTC\"</i> or <i>\"should I buy ETH now?\"</i>")
     if cmd == "/pause":
         _upd(chat_id, "PAUSED", True)
         return send_to(chat_id, "⏸️ <b>Bot paused.</b>", _kb_menu(True))
