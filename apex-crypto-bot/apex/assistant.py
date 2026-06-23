@@ -403,11 +403,11 @@ def _chat_groq(user_id: str, message: str) -> str:
         return f"⚠️ Eroare asistent: {e}"
 
 
-_GEMINI_MODEL = "gemini-2.0-flash"
-_GEMINI_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    f"{_GEMINI_MODEL}:generateContent"
-)
+def _gemini_url():
+    """Build the Gemini endpoint from the configured model (default 2.5-flash)."""
+    model = getattr(cfg, "GEMINI_MODEL", "") or "gemini-2.5-flash"
+    return ("https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model}:generateContent")
 
 
 def test_gemini_key(key: str):
@@ -418,7 +418,7 @@ def test_gemini_key(key: str):
         return False, "That doesn't look like a full API key — copy the whole thing from aistudio.google.com/apikey"
     try:
         r = requests.post(
-            _GEMINI_URL, params={"key": key},
+            _gemini_url(), params={"key": key},
             json={"contents": [{"role": "user", "parts": [{"text": "Reply with the single word OK."}]}],
                   "generationConfig": {"maxOutputTokens": 5}},
             timeout=12,
@@ -485,7 +485,7 @@ def _chat_gemini(user_id: str, message: str, key: str, send_status=None) -> str:
     for _ in range(5):  # tool-use loop
         try:
             r = requests.post(
-                _GEMINI_URL, params={"key": key},
+                _gemini_url(), params={"key": key},
                 json={"system_instruction": {"parts": [{"text": system}]},
                       "contents": contents,
                       "tools": tools,

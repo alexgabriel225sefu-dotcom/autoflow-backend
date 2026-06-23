@@ -16,6 +16,12 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
+# Smartest free brain by default. Free tier (1500/day):
+#   gemini-2.5-flash → smart + fast (recommended)
+#   gemini-2.5-pro   → smartest, lower free daily limit
+#   gemini-2.0-flash → older, fastest
+GEMINI_MODEL = (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash").strip()
+
 # ─── Telegram ───────────────────────────────────────────
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
