@@ -219,7 +219,7 @@ def _upd(chat_id, key, value):
     user_store.save(chat_id, u)
 
 
-def _handle_command(chat_id, text):
+def _handle_command(chat_id, text, msg_id=None):
     parts = text.strip().split()
     cmd = parts[0].lower().split("@")[0]
     args = parts[1:]
@@ -317,6 +317,8 @@ def _handle_command(chat_id, text):
         _upd(chat_id, "MIN_CONFIDENCE", v)
         return send_to(chat_id, f"🧠 Min confidence → <b>{v}%</b>")
     if cmd == "/groq":
+        if msg_id:   # delete the message so the secret key doesn't linger in chat
+            _delete_message(chat_id, msg_id)
         if not args or not args[0].startswith("gsk_"):
             return send_to(chat_id, "❌ Usage: <code>/groq gsk_YOUR_KEY</code>\nGet a free key at console.groq.com")
         send_to(chat_id, "🔍 Testing your Groq key…")
@@ -578,7 +580,7 @@ def _poll_loop():
                         print(f"[TG] groq error: {e}")
                     continue
                 try:
-                    _handle_command(chat_id, text)
+                    _handle_command(chat_id, text, msg_id)
                 except Exception as e:
                     print(f"[TG] command error: {e}")
         except Exception as e:
