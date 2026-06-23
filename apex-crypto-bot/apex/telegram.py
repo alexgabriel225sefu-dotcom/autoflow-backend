@@ -422,6 +422,10 @@ def _handle_command(chat_id, text, msg_id=None):
 def _handle_callback(chat_id, data):
     s = _settings(chat_id)
     if data == "setup:activate":   # tap on the first welcome button
+        return _show_disclaimer(chat_id)
+    if data == "setup:accept":     # accepted the risk disclaimer
+        from datetime import datetime as _dt
+        user_store.update(chat_id, {"disclaimer_accepted": _dt.utcnow().isoformat()})
         return _show_mode_choice(chat_id)
     if data == "setup:paper":
         return _start_paper(chat_id)
@@ -478,7 +482,7 @@ def _handle_callback(chat_id, data):
 
 # ─── Poll loop ────────────────────────────────────────────
 def _activate(chat_id):
-    """Step 1: brand new user — show welcome + single Activate button."""
+    """Step 1: brand new user — show welcome + risk disclaimer (must accept)."""
     access.grant(str(chat_id))
     send_to(chat_id,
             "👋 <b>Welcome to APEX TRADE BOT!</b>\n\n"
@@ -486,6 +490,29 @@ def _activate(chat_id):
             "Tap below to activate and set it up in 2 minutes.",
             _kb_activate())
     _broadcast_owner(f"🆕 <b>New client!</b>\nID: <code>{chat_id}</code>")
+
+
+_DISCLAIMER = (
+    "⚠️ <b>Risk Disclaimer — please read</b>\n"
+    "━━━━━━━━━━━━━━━━━━━━\n"
+    "APEX TRADE BOT is a <b>trading tool</b>. <b>You</b> choose the symbol, "
+    "strategy, risk and settings — and <b>you</b> control when it trades.\n\n"
+    "• Crypto trading carries risk. You can lose money.\n"
+    "• This is NOT financial advice and NOT a profit guarantee.\n"
+    "• Past or simulated results don't predict future results.\n"
+    "• <b>You are solely responsible</b> for your own trades, settings and funds.\n"
+    "• Only trade with money you can afford to lose.\n\n"
+    "By tapping <b>I Understand &amp; Accept</b> you agree you use this tool at "
+    "your own risk and the seller is not liable for any losses."
+)
+
+
+def _show_disclaimer(chat_id):
+    """Mandatory risk disclaimer — must accept before any setup (legal shield)."""
+    send_to(chat_id, _DISCLAIMER,
+            {"reply_markup": json.dumps({"inline_keyboard": [
+                [{"text": "✅ I Understand & Accept", "callback_data": "setup:accept"}],
+            ]})})
 
 
 def _show_mode_choice(chat_id):
