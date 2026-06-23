@@ -82,15 +82,15 @@ def _kb_menu(paused, symbol="BTCUSDT"):
 def _kb_activate():
     """Single button shown on very first contact."""
     return {"reply_markup": json.dumps({"inline_keyboard": [
-        [{"text": "🚀 Activează Botul", "callback_data": "setup:activate"}],
+        [{"text": "🚀 Activate Bot", "callback_data": "setup:activate"}],
     ]})}
 
 
 def _kb_mode():
     """Paper vs Real choice."""
     return {"reply_markup": json.dumps({"inline_keyboard": [
-        [{"text": "📝 Paper Trading — $100 virtual, fără risc", "callback_data": "setup:paper"}],
-        [{"text": "🔴 Real Binance — contul tău real",          "callback_data": "setup:live"}],
+        [{"text": "📝 Paper Trading — $100 virtual, no risk", "callback_data": "setup:paper"}],
+        [{"text": "🔴 Real Binance — live account",           "callback_data": "setup:live"}],
     ]})}
 
 
@@ -99,7 +99,7 @@ _BINANCE_KEYS_URL = "https://www.binance.com/en/my/settings/api-management"
 
 def _kb_binance():
     return {"reply_markup": json.dumps({"inline_keyboard": [
-        [{"text": "🔑 Deschide pagina Binance API", "url": _BINANCE_KEYS_URL}],
+        [{"text": "🔑 Open Binance API page", "url": _BINANCE_KEYS_URL}],
     ]})}
 
 
@@ -237,23 +237,22 @@ def _handle_command(chat_id, text, msg_id=None):
         u["setup_done"] = False
         user_store.save(chat_id, u)
         return send_to(chat_id,
-                       "🔄 <b>Resetare setup.</b>\n\nCum vrei să tranzacționezi?",
+                       "🔄 <b>Setup reset.</b>\n\nHow do you want to trade?",
                        _kb_mode())
     if cmd in ("/start", "/menu", "/m"):
         u = user_loop._ensure_user(chat_id)
         if cmd == "/start" and not u.get("setup_done"):
-            # First /start — show welcome + single Activate button
             return send_to(chat_id,
-                           "👋 <b>Bine ai venit la APEX TRADE BOT!</b>\n\n"
-                           "Bot-ul tău AI de tranzacționare crypto este gata.\n"
-                           "Apasă butonul de mai jos pentru a-l activa.",
+                           "👋 <b>Welcome to APEX TRADE BOT!</b>\n\n"
+                           "Your AI-powered crypto trading bot is ready.\n"
+                           "Tap below to activate and configure it in 2 minutes.",
                            _kb_activate())
         _ensure_running(chat_id)
         paused = u["settings"].get("PAUSED", False)
-        status = "⏸ PAUZAT" if paused else "▶️ ACTIV"
+        status = "⏸ PAUSED" if paused else "▶️ ACTIVE"
         return send_to(chat_id,
                        f"⚡ <b>APEX TRADE BOT</b> — {status}\n"
-                       f"Monedă: <b>{u['settings']['SYMBOL']}</b>  Mod: <b>{u['settings']['STRATEGY_MODE']}</b>",
+                       f"Symbol: <b>{u['settings']['SYMBOL']}</b>  Strategy: <b>{u['settings']['STRATEGY_MODE']}</b>",
                        _kb_menu(paused, u["settings"]["SYMBOL"]))
     if cmd in ("/signal", "/sig"):
         st = user_loop._ensure_user(chat_id)["state"]
@@ -341,8 +340,8 @@ def _handle_command(chat_id, text, msg_id=None):
         _ensure_running(chat_id)
         sym = s["SYMBOL"]
         return send_to(chat_id,
-                       f"▶️ <b>Bot ACTIV</b> — scanează <b>{sym}</b> la fiecare 60s.\n"
-                       "Vei primi ping la 30 min + toate alertele de trade.",
+                       f"▶️ <b>Bot ACTIVE</b> — scanning <b>{sym}</b> every 60s.\n"
+                       "You'll get a ping every 30 min + all trade alerts.",
                        _kb_menu(False, sym))
 
     # ── Admin ──
@@ -407,9 +406,8 @@ def _handle_callback(chat_id, data):
         _upd(chat_id, "PAUSED", True)
         u = user_loop._ensure_user(chat_id)
         return send_to(chat_id,
-                       f"⏸ <b>Bot pauzat.</b>\n"
-                       f"Monedă: <b>{u['settings']['SYMBOL']}</b> · Balanță: activă\n"
-                       f"Apasă <b>▶️ Start</b> pentru a relua.",
+                       f"⏸ <b>Bot paused.</b>\n"
+                       f"Symbol: <b>{u['settings']['SYMBOL']}</b> — tap ▶️ Start to resume.",
                        _kb_menu(True))
     if data == "c:resume":
         _upd(chat_id, "PAUSED", False)
@@ -419,8 +417,8 @@ def _handle_callback(chat_id, data):
         sym = u["settings"]["SYMBOL"]
         mode = u["settings"]["STRATEGY_MODE"]
         return send_to(chat_id,
-                       f"▶️ <b>Bot ACTIV</b> — scanează <b>{sym}</b> la fiecare 60s.\n"
-                       f"Strategie: <b>{mode}</b> · Vei primi ping la 30 min + toate alertele de trade.",
+                       f"▶️ <b>Bot ACTIVE</b> — scanning <b>{sym}</b> every 60s.\n"
+                       f"Strategy: <b>{mode}</b> · You'll get a ping every 30 min + all trade alerts.",
                        _kb_menu(False, sym))
 
 
@@ -429,20 +427,20 @@ def _activate(chat_id):
     """Step 1: brand new user — show welcome + single Activate button."""
     access.grant(str(chat_id))
     send_to(chat_id,
-            "👋 <b>Bine ai venit la APEX TRADE BOT!</b>\n\n"
-            "Bot-ul tău AI de tranzacționare crypto este gata.\n"
-            "Apasă butonul de mai jos pentru a-l activa și a-l configura în 2 minute.",
+            "👋 <b>Welcome to APEX TRADE BOT!</b>\n\n"
+            "Your AI-powered crypto trading bot is ready.\n"
+            "Tap below to activate and set it up in 2 minutes.",
             _kb_activate())
-    _broadcast_owner(f"🆕 <b>Client nou!</b>\nID: <code>{chat_id}</code>")
+    _broadcast_owner(f"🆕 <b>New client!</b>\nID: <code>{chat_id}</code>")
 
 
 def _show_mode_choice(chat_id):
     """Step 2: choose Paper or Real."""
     send_to(chat_id,
-            "⚙️ <b>Cum vrei să tranzacționezi?</b>\n\n"
-            "📝 <b>Paper Trading</b> — $100 virtuali, prețuri reale, zero risc. Perfect pentru testare.\n\n"
-            "🔴 <b>Real Binance</b> — conectezi contul tău Binance și tranzacționezi bani reali.\n\n"
-            "<i>Poți schimba oricând din meniu cu /setup.</i>",
+            "⚙️ <b>How do you want to trade?</b>\n\n"
+            "📝 <b>Paper Trading</b> — $100 virtual balance, real market prices, zero risk. Great for testing.\n\n"
+            "🔴 <b>Real Binance</b> — connect your Binance account and trade with real funds.\n\n"
+            "<i>You can switch any time with /setup.</i>",
             _kb_mode())
 
 
@@ -453,9 +451,9 @@ def _start_paper(chat_id):
     u["settings"]["PAUSED"] = True
     user_store.save(chat_id, u)
     send_to(chat_id,
-            "✅ <b>Paper Trading activat!</b>\n"
-            "💰 $100 virtuali · date reale de piață · risc zero.\n\n"
-            "Acum hai să configurăm AI-ul botului.")
+            "✅ <b>Paper Trading selected!</b>\n"
+            "💰 $100 virtual · real market data · zero risk.\n\n"
+            "One last step — set up your AI brain:")
     _ask_groq(chat_id)
 
 
@@ -499,15 +497,15 @@ def _ask_groq(chat_id):
         return _ready(chat_id)
     _wizard[str(chat_id)] = "GROQ"
     send_to(chat_id,
-            "🧠 <b>Pasul final — cheia AI gratuită</b>\n\n"
-            "Creierul botului rulează pe <b>Groq</b> (gratuit, ~14.400 semnale/zi, quota personală).\n\n"
-            "1️⃣ Apasă <b>Obține cheie gratuită</b> → creezi cont gratuit\n"
-            "2️⃣ Copiezi cheia (începe cu <code>gsk_</code>)\n"
-            "3️⃣ O trimiți direct aici în chat\n\n"
-            "Sau apasă <b>Sari peste</b> pentru a folosi AI-ul partajat (limitat).",
+            "🧠 <b>Set up your free AI key</b>\n\n"
+            "The bot's brain runs on <b>Groq</b> (free, ~14,400 signals/day, your own personal quota).\n\n"
+            "1️⃣ Tap <b>Get free Groq key</b> → create free account\n"
+            "2️⃣ Copy your key (starts with <code>gsk_</code>)\n"
+            "3️⃣ Send it here in this chat\n\n"
+            "Or tap <b>Skip</b> to use the shared AI (limited quota).",
             {"reply_markup": json.dumps({"inline_keyboard": [
-                [{"text": "🔑 Obține cheie gratuită Groq", "url": "https://console.groq.com/keys"}],
-                [{"text": "⚡ Sari peste — folosește AI partajat", "callback_data": "groq:skip"}],
+                [{"text": "🔑 Get free Groq key", "url": "https://console.groq.com/keys"}],
+                [{"text": "⚡ Skip — use shared AI", "callback_data": "groq:skip"}],
             ]})})
 
 
@@ -518,11 +516,11 @@ def _finish_groq(chat_id, key, msg_id):
     ok, why = ai.test_key(key)
     if not ok:
         return send_to(chat_id,
-                       f"❌ <b>Cheie invalidă:</b> {why}\n\n"
-                       "Trimite o cheie validă (<code>gsk_...</code>) sau sari peste.",
+                       f"❌ <b>Key not working:</b> {why}\n\n"
+                       "Send a valid key (<code>gsk_...</code>) or skip.",
                        {"reply_markup": json.dumps({"inline_keyboard": [
-                           [{"text": "🔑 Obține cheie gratuită Groq", "url": "https://console.groq.com/keys"}],
-                           [{"text": "⚡ Sari peste — AI partajat", "callback_data": "groq:skip"}],
+                           [{"text": "🔑 Get free Groq key", "url": "https://console.groq.com/keys"}],
+                           [{"text": "⚡ Skip — use shared AI", "callback_data": "groq:skip"}],
                        ]})})
     user_store.update(chat_id, {"groq_key": key})
     _wizard.pop(str(chat_id), None)
@@ -531,22 +529,25 @@ def _finish_groq(chat_id, key, msg_id):
 
 
 def _ready(chat_id):
-    """Setup complete — show summary + Start/Pause buttons. Bot starts when user taps Start."""
+    """Setup complete — AUTO-START the bot and show the control panel."""
     u = user_loop._ensure_user(chat_id)
-    u["settings"]["PAUSED"] = True
+    # Auto-start: don't make the user press Start after onboarding.
+    u["settings"]["PAUSED"] = False
     user_store.save(chat_id, u)
-    _ensure_running(chat_id)   # thread ready but idle until user taps Start
+    _ensure_running(chat_id)
     s = u["settings"]
-    ai_info = "cheia ta Groq ✅" if u.get("groq_key") else "AI partajat (recomandat: adaugă cheie Groq)"
+    ai_info = "your Groq key ✅" if u.get("groq_key") else "shared AI (add /groq key for better signals)"
+    # Message 1: confirmation that bot is live
     send_to(chat_id,
-            "🎉 <b>Totul e configurat!</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"Mod: <b>{'📝 PAPER ($100 virtuali)' if u.get('paper', True) else '🔴 REAL Binance'}</b>\n"
-            f"Monedă: <b>{s['SYMBOL']}</b>   Strategie: <b>{s['STRATEGY_MODE']}</b>\n"
+            f"⚡ <b>Bot is LIVE and trading!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Mode: <b>{'📝 PAPER ($100 virtual)' if u.get('paper', True) else '🔴 REAL Binance'}</b>\n"
+            f"Symbol: <b>{s['SYMBOL']}</b>   Strategy: <b>{s['STRATEGY_MODE']}</b>\n"
             f"AI: <b>{ai_info}</b>\n\n"
-            "Apasă <b>▶️ Start</b> pentru a porni tranzacționarea automată.\n"
-            "Poți schimba moneda, riscul sau strategia oricând din meniu.",
-            _kb_menu(True, s["SYMBOL"]))
+            "Scanning markets every 60s. You'll get an alert on every trade.\n"
+            "Use the buttons below to control the bot any time.")
+    # Message 2: control panel (separate so buttons are always visible)
+    send_to(chat_id, "🎛 <b>Control Panel</b>", _kb_menu(False, s["SYMBOL"]))
 
 
 def _auto_restore(chat_id):
