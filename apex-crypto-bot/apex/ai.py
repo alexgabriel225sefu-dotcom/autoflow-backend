@@ -171,7 +171,7 @@ def _fetch(ind, balance, open_position, strategy_data, symbol, timeframe, user_k
         if getattr(err, "user_key", False):
             raise
         print(f"[AI ❌] Groq failed: {err}")
-    return rule_based_fallback(ind, open_position)
+    return rule_based_fallback(ind, open_position, strategy_data)
 
 
 def test_key(key):
@@ -237,7 +237,7 @@ def sanitize(raw):
     }
 
 
-def rule_based_fallback(ind, open_position=None):
+def rule_based_fallback(ind, open_position=None, strategy_data=None):
     def fnum(v):
         try:
             return float(v)
@@ -276,9 +276,32 @@ def rule_based_fallback(ind, open_position=None):
     if vol_r >= 1.3 and score != 0:
         score += 1 if score > 0 else -1
         factors.append(f"Volume spike ({vol_r:.1f}x)")
+    # Legendary strategy signals — give the rule engine real directional context
+    # when AI (Groq/Claude) is unavailable or rate-limited.
+    if strategy_data:
+        turtle = strategy_data.get("turtle", {})
+        lv = strategy_data.get("livermore", {})
+        so = strategy_data.get("soros", {})
+        if turtle.get("signal") == "BUY":
+            score += 2; factors.append("Turtle 20-period breakout: BUY")
+        elif turtle.get("signal") == "SELL":
+            score -= 2; factors.append("Turtle 20-period breakout: SELL")
+        elif turtle.get("nearSignal") == "BUY":
+            score += 1; factors.append("Near Turtle high (approaching breakout)")
+        elif turtle.get("nearSignal") == "SELL":
+            score -= 1; factors.append("Near Turtle low (approaching breakdown)")
+        lv_strength = lv.get("strength") or 0
+        if lv.get("trend") == "BULLISH" and lv_strength >= 0.5:
+            score += 1; factors.append(f"Livermore BULLISH — {lv.get('reason', 'HH+HL')}")
+        elif lv.get("trend") == "BEARISH" and lv_strength >= 0.5:
+            score -= 1; factors.append(f"Livermore BEARISH — {lv.get('reason', 'LH+LL')}")
+        if so.get("direction") == "BULLISH":
+            score += 1; factors.append("Soros momentum: bullish")
+        elif so.get("direction") == "BEARISH":
+            score -= 1; factors.append("Soros momentum: bearish")
     abs_s = abs(score)
-    conf = min(85, 50 + abs_s * 9)   # score 1 → 59%, score 2 → 68%, score 3 → 77%
-    crit = min(5, abs_s + 1)          # score 1 → crit 2, score 2 → crit 3
+    conf = min(88, 50 + abs_s * 8)   # score 1→58%, 2→66%, 3→74%, 4→82%
+    crit = min(5, abs_s + 1)          # score 1→crit 2, 2→3, 3→4
     if score >= 1:
         return {"action": "BUY", "confidence": conf, "criteriaScore": crit,
                 "reasoning": f"Rule-based: {', '.join(factors)}", "riskLevel": "MEDIUM", "keyFactors": factors}

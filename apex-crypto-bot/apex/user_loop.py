@@ -246,10 +246,10 @@ def _tick(user_id, alert):
     except Exception as e:
         if getattr(e, "user_key", False):
             alert("groq_error", {"reason": str(e)})
-            signal = ai.rule_based_fallback(ind, pos)
+            signal = ai.rule_based_fallback(ind, pos, strat)
         else:
             print(f"[UserLoop:{user_id}] AI error: {e}")
-            signal = ai.rule_based_fallback(ind, pos)
+            signal = ai.rule_based_fallback(ind, pos, strat)
 
     state["lastSignal"] = {"action": signal["action"], "confidence": signal["confidence"],
                            "criteriaScore": signal.get("criteriaScore", 0),
