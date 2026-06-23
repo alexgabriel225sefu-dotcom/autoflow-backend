@@ -252,7 +252,7 @@ def _tick(user_id, alert):
 
     conf_ok = signal["confidence"] >= settings["MIN_CONFIDENCE"]
     crit_ok = signal.get("criteriaScore", 0) >= settings["MIN_CRITERIA"]
-    vol_ok = float(ind.get("volumeRatio") or 0) >= 0.4
+    vol_ok = float(ind.get("volumeRatio") or 0) >= 0.2
 
     druck = (strategies.druckenmiller_multiplier(signal["confidence"], signal.get("criteriaScore", 0),
                                                  strat["livermore"], strat["turtle"]) if not pos else 1.0)
@@ -265,7 +265,7 @@ def _tick(user_id, alert):
             (mode == "turtle" and not tu.get("signal")) or
             (mode == "livermore" and not ((lv["trend"] == "BULLISH" and signal["action"] == "BUY") or (lv["trend"] == "BEARISH" and signal["action"] == "SELL"))) or
             (mode == "soros" and not ((so["direction"] == "BULLISH" and signal["action"] == "BUY") or (so["direction"] == "BEARISH" and signal["action"] == "SELL"))) or
-            (mode == "ptj" and (signal["confidence"] < 85 or signal.get("criteriaScore", 0) < 4))
+            (mode == "ptj" and (signal["confidence"] < 72 or signal.get("criteriaScore", 0) < 3))
         )
         if blocked:
             signal["action"] = "HOLD"

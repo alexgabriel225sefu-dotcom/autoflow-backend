@@ -11,13 +11,17 @@ import hashlib
 import requests
 from urllib.parse import urlencode
 
-# api.binance.com is geo-blocked from most cloud servers (US/EU). The testnet
-# host (testnet.binance.vision) is NOT geo-blocked and serves real-tracking
-# market data — this is the same default the proven Node bot uses on Render.
-# Override with BINANCE_TESTNET=false only if your region can reach mainnet.
+# Try mainnet first (works from Render US), fall back to public mirror, then testnet.
 _USE_TESTNET = (os.getenv("BINANCE_TESTNET") or "true").lower() != "false"
-_PUBLIC = "https://testnet.binance.vision" if _USE_TESTNET else "https://api.binance.com"
 _TESTNET = "https://testnet.binance.vision"
+_PUBLIC = "https://testnet.binance.vision" if _USE_TESTNET else "https://api.binance.com"
+
+# Ordered list of public data hosts to try on each call (most reliable first).
+_DATA_HOSTS = [
+    "https://api.binance.com",
+    "https://data-api.binance.vision",
+    "https://testnet.binance.vision",
+]
 
 # Binance kline interval mapping (our timeframes → Binance codes)
 _INTERVAL = {
@@ -36,27 +40,41 @@ def _base(testnet=False):
     return _TESTNET if testnet else _PUBLIC
 
 
+def _get_json(path, params, timeout=10):
+    """Try each data host in order; return parsed JSON or raise last error."""
+    last_err = None
+    for host in _DATA_HOSTS:
+        try:
+            r = requests.get(f"{host}{path}", params=params, timeout=timeout)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            last_err = e
+            print(f"[Binance] {host} failed: {e}")
+    raise last_err
+
+
 def get_candles(symbol, timeframe="5m", limit=200):
-    """Return list of {open,high,low,close,volume} dicts (oldest→newest)."""
+    """Return list of {open,high,low,close,volume} dicts (oldest→newest), or []."""
     key = (symbol, timeframe)
     now = time.time()
     cached = _kline_cache.get(key)
     if cached and now - cached["ts"] < _KLINE_TTL:
         return cached["candles"]
-
-    interval = _INTERVAL.get(timeframe, "5m")
-    r = requests.get(f"{_PUBLIC}/api/v3/klines",
-                     params={"symbol": symbol, "interval": interval, "limit": limit},
-                     timeout=10)
-    r.raise_for_status()
-    rows = r.json()
-    candles = [{
-        "open": float(k[1]), "high": float(k[2]), "low": float(k[3]),
-        "close": float(k[4]), "volume": float(k[5]),
-        "time": int(k[0]),
-    } for k in rows]
-    _kline_cache[key] = {"ts": now, "candles": candles}
-    return candles
+    try:
+        interval = _INTERVAL.get(timeframe, "5m")
+        rows = _get_json("/api/v3/klines",
+                         {"symbol": symbol, "interval": interval, "limit": limit})
+        candles = [{
+            "open": float(k[1]), "high": float(k[2]), "low": float(k[3]),
+            "close": float(k[4]), "volume": float(k[5]),
+            "time": int(k[0]),
+        } for k in rows]
+        _kline_cache[key] = {"ts": now, "candles": candles}
+        return candles
+    except Exception as e:
+        print(f"[Binance] get_candles({symbol}) failed all hosts: {e}")
+        return []
 
 
 def get_price(symbol):
@@ -64,12 +82,14 @@ def get_price(symbol):
     cached = _price_cache.get(symbol)
     if cached and now - cached["ts"] < _PRICE_TTL:
         return cached["price"]
-    r = requests.get(f"{_PUBLIC}/api/v3/ticker/price",
-                     params={"symbol": symbol}, timeout=8)
-    r.raise_for_status()
-    price = float(r.json()["price"])
-    _price_cache[symbol] = {"ts": now, "price": price}
-    return price
+    try:
+        data = _get_json("/api/v3/ticker/price", {"symbol": symbol}, timeout=8)
+        price = float(data["price"])
+        _price_cache[symbol] = {"ts": now, "price": price}
+        return price
+    except Exception as e:
+        print(f"[Binance] get_price({symbol}) failed all hosts: {e}")
+        return cached["price"] if cached else 0.0
 
 
 def valid_symbol(symbol):
