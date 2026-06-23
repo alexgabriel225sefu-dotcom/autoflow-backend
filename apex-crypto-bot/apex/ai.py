@@ -241,13 +241,13 @@ def rule_based_fallback(ind, open_position=None):
         score += 1 if score > 0 else -1
         factors.append(f"Volume spike ({vol_r:.1f}x)")
     abs_s = abs(score)
-    conf = min(85, 52 + abs_s * 8)
-    crit = min(5, abs_s + 1)
-    if score >= 2:
+    conf = min(85, 50 + abs_s * 9)   # score 1 → 59%, score 2 → 68%, score 3 → 77%
+    crit = min(5, abs_s + 1)          # score 1 → crit 2, score 2 → crit 3
+    if score >= 1:
         return {"action": "BUY", "confidence": conf, "criteriaScore": crit,
                 "reasoning": f"Rule-based: {', '.join(factors)}", "riskLevel": "MEDIUM", "keyFactors": factors}
-    if score <= -2:
+    if score <= -1:
         return {"action": "SELL", "confidence": conf, "criteriaScore": crit,
                 "reasoning": f"Rule-based: {', '.join(factors)}", "riskLevel": "MEDIUM", "keyFactors": factors}
-    return {"action": "HOLD", "confidence": 42, "criteriaScore": max(0, abs_s),
+    return {"action": "HOLD", "confidence": 40, "criteriaScore": 0,
             "reasoning": "Rule-based: no clear signal", "riskLevel": "LOW", "keyFactors": factors}

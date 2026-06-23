@@ -196,9 +196,12 @@ def _tick(user_id, alert):
     else:
         dash["openPosition"] = None
 
-    # Heartbeat only while a position is open (live PnL is useful; skip spam).
-    if pos and state["tickCount"] % 6 == 0:
-        alert("heartbeat", {"tickCount": state["tickCount"], "balance": state["paperBalance"], "openPosition": pos})
+    # Heartbeat: every 6 ticks when in a position (live PnL), every 30 ticks when flat (bot-alive ping).
+    tick = state["tickCount"]
+    if pos and tick % 6 == 0:
+        alert("heartbeat", {"tickCount": tick, "balance": state["paperBalance"], "openPosition": pos})
+    elif not pos and tick % 30 == 0 and tick > 0:
+        alert("scan", {"tickCount": tick, "balance": state["paperBalance"], "symbol": symbol})
 
     # Exit check first
     trigger = _check_exit(pos, price)

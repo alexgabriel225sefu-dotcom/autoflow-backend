@@ -163,7 +163,7 @@ def _build_trades(user_id):
 
 _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━━━━━━━\n"
          "Your AI bot trades crypto automatically. Just set it and watch.\n\n"
-         "<b>Controls:</b>\n/menu · /status · /config · /trades\n\n"
+         "<b>Controls:</b>\n/menu · /status · /signal · /config · /trades\n\n"
          "<b>Settings:</b>\n/symbol BTCUSDT\n/method auto|turtle|livermore|soros|ptj|druckenmiller\n"
          "/risk 5 — % per trade\n/sl 1.6 — stop loss %\n/tp 3.2 — take profit %\n/confidence 70 — min AI confidence\n\n"
          "<b>Run:</b>\n/pause · /resume\n\n"
@@ -196,6 +196,11 @@ def make_alert(chat_id):
                              + f"\n\n<i>Auto-resumes in {cfg.RISK_PAUSE_MIN} min, or tap ▶️ Start Trading to resume now.</i>")
         elif kind == "risk_resume":
             send_to(chat_id, "▶️ <b>Trading resumed</b> — risk pause over, scanning the market again. 🚀")
+        elif kind == "scan":
+            sig = user_loop._ensure_user(chat_id).get("state", {}).get("lastSignal")
+            sig_txt = (f"🤖 Last signal: <b>{sig['action']}</b> ({sig['confidence']:.0f}% conf)"
+                       if sig else "🤖 Scanning for setups…")
+            send_to(chat_id, f"⚡ <b>Bot active</b> — ${data['balance']:.2f} · {data['symbol']} · tick #{data['tickCount']}\n{sig_txt}")
         elif kind == "groq_error":
             send_to(chat_id, "⚠️ <b>Your Groq key is invalid or hit its limit.</b>\n"
                              "Get a new free key at console.groq.com → API Keys, then send /groq gsk_NEW_KEY")
@@ -245,6 +250,18 @@ def _handle_command(chat_id, text):
         return send_to(chat_id, "⚡ <b>APEX TRADE BOT — Control Panel</b>\n"
                                 "Your AI bot is active and trading automatically. 🚀",
                        _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
+    if cmd in ("/signal", "/sig"):
+        st = user_loop._ensure_user(chat_id)["state"]
+        sig = st.get("lastSignal")
+        if not sig:
+            return send_to(chat_id, "🤖 No signal yet — bot hasn't scanned yet. Try again in 1 minute.")
+        factors = "\n".join(f"  • {f}" for f in sig.get("keyFactors", []))
+        return send_to(chat_id,
+                       f"🤖 <b>Last signal — {s['SYMBOL']}</b>\n"
+                       f"Action: <b>{sig['action']}</b>  Confidence: <b>{sig['confidence']:.0f}%</b>\n"
+                       f"Criteria: {sig.get('criteriaScore', 0)}/5  Risk: {sig.get('riskLevel', '—')}\n"
+                       f"Reasoning: <i>{sig.get('reasoning', '—')}</i>\n"
+                       + (f"\nFactors:\n{factors}" if factors else ""))
     if cmd in ("/status", "/s"):
         return send_to(chat_id, _build_status(chat_id), _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
     if cmd in ("/config", "/c"):
@@ -311,7 +328,11 @@ def _handle_command(chat_id, text):
         _upd(chat_id, "PAUSED", False)
         user_loop.reset_risk(chat_id)
         _ensure_running(chat_id)
-        return send_to(chat_id, "▶️ <b>Bot ACTIVE</b> — trading every minute! 🚀", _kb_menu(False))
+        sym = s["SYMBOL"]
+        return send_to(chat_id,
+                       f"▶️ <b>Bot ACTIVE</b> — scanning <b>{sym}</b> every 60s.\n"
+                       "You'll get a ping every 30 min + all trade alerts.",
+                       _kb_menu(False, sym))
 
     # ── Admin ──
     if cmd == "/grant" and is_adm and args:
@@ -376,7 +397,13 @@ def _handle_callback(chat_id, data):
         _upd(chat_id, "PAUSED", False)
         user_loop.reset_risk(chat_id)
         _ensure_running(chat_id)
-        return send_to(chat_id, "▶️ <b>Bot ACTIVE</b> — trading every minute! 🚀", _kb_menu(False))
+        u = user_loop._ensure_user(chat_id)
+        sym = u["settings"]["SYMBOL"]
+        mode = u["settings"]["STRATEGY_MODE"]
+        return send_to(chat_id,
+                       f"▶️ <b>Bot ACTIVE</b> — scanning <b>{sym}</b> every 60s.\n"
+                       f"Strategy: <b>{mode}</b> · You'll get a ping every 30 min + all trade alerts.",
+                       _kb_menu(False, sym))
 
 
 # ─── Poll loop ────────────────────────────────────────────
