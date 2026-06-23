@@ -24,6 +24,14 @@ SYMBOLS = [
     [("⬡ BNB", "BNBUSDT"), ("☀ AVAX", "AVAXUSDT")],
 ]
 METHODS = ["auto", "turtle", "livermore", "soros", "ptj", "druckenmiller"]
+METHOD_DESC = {
+    "auto":          "🤖 <b>Auto</b> — AI blends all strategies. Best for hands-off trading.",
+    "turtle":        "🐢 <b>Turtle</b> — buys breakouts of recent highs. Trend-following.",
+    "livermore":     "📐 <b>Livermore</b> — follows market structure &amp; strong trends.",
+    "soros":         "💡 <b>Soros</b> — rides momentum, enters on strong directional moves.",
+    "ptj":           "🛡 <b>PTJ</b> — defensive; only high-confidence setups (fewer trades).",
+    "druckenmiller": "📈 <b>Druckenmiller</b> — scales position size up on the best setups.",
+}
 
 
 def refresh_from_config():
@@ -446,8 +454,11 @@ def _handle_callback(chat_id, data):
         user_loop.reset_risk(chat_id)
         return send_to(chat_id, f"💎 Symbol → <b>{sym}</b>", _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
     if data.startswith("m:"):
-        _upd(chat_id, "STRATEGY_MODE", data[2:])
-        return send_to(chat_id, f"🎯 Method → <b>{data[2:]}</b>")
+        method = data[2:]
+        _upd(chat_id, "STRATEGY_MODE", method)
+        desc = METHOD_DESC.get(method, "")
+        return send_to(chat_id, f"🎯 Strategy set → {desc or f'<b>{method}</b>'}",
+                       _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
     if data == "c:status":
         return send_to(chat_id, _build_status(chat_id), _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
     if data == "c:config":
@@ -457,7 +468,11 @@ def _handle_callback(chat_id, data):
     if data == "c:symbol":
         return send_to(chat_id, f"💎 Choose trading pair:\nCurrent: <b>{s['SYMBOL']}</b>", _kb_symbols())
     if data == "c:method":
-        return send_to(chat_id, f"🎯 Method (current: <b>{s['STRATEGY_MODE']}</b>):", _kb_methods())
+        guide = "\n".join(METHOD_DESC[m] for m in METHODS)
+        return send_to(chat_id,
+                       f"🎯 <b>Choose your strategy</b>\nCurrent: <b>{s['STRATEGY_MODE']}</b>\n"
+                       f"━━━━━━━━━━━━━━━━━━━━\n{guide}",
+                       _kb_methods())
     if data == "c:help":
         return send_to(chat_id, _HELP)
     if data == "c:pause":
@@ -574,13 +589,31 @@ def _finish_live_setup(chat_id, text, msg_id):
     if "API_KEY" not in pairs or "API_SECRET" not in pairs:
         return send_to(chat_id, "❌ Send both in one message:\n<code>API_KEY=xxx API_SECRET=yyy</code>")
     u = user_loop._ensure_user(chat_id)
+    is_testnet = u.get("paper", True)
+
+    # Validate the keys against Binance BEFORE saving — fail fast with a clear reason.
+    send_to(chat_id, "🔍 Verifying your Binance keys…")
+    try:
+        ex = binance.LiveExchange(pairs["API_KEY"], pairs["API_SECRET"], testnet=is_testnet)
+        ok, why, usdt = ex.verify()
+    except Exception as e:
+        ok, why, usdt = False, str(e), 0.0
+    if not ok:
+        return send_to(chat_id,
+                       f"❌ <b>Connection failed:</b> {why}\n\n"
+                       "Fix the API key and send both again:\n"
+                       "<code>API_KEY=xxx API_SECRET=yyy</code>")
+
     u["setup_done"] = True
     u["api_key"] = pairs["API_KEY"]
     u["api_secret"] = pairs["API_SECRET"]
     u["settings"]["PAUSED"] = True
     user_store.save(chat_id, u)
-    mode_label = "🧪 Binance Testnet (virtual USDT)" if u.get("paper") else "🔴 Real Binance (live funds)"
-    send_to(chat_id, f"✅ <b>Binance connected!</b>\nMode: <b>{mode_label}</b>")
+    mode_label = "🧪 Binance Testnet (virtual USDT)" if is_testnet else "🔴 Real Binance (live funds)"
+    send_to(chat_id,
+            f"✅ <b>Binance connected &amp; verified!</b>\n"
+            f"Mode: <b>{mode_label}</b>\n"
+            f"💰 Balance: <b>${usdt:.2f} USDT</b>")
     _ask_groq(chat_id)
 
 

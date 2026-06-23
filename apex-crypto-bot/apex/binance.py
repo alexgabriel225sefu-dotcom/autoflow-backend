@@ -125,6 +125,31 @@ class LiveExchange:
                 return float(b["free"])
         return 0.0
 
+    def verify(self):
+        """Validate keys + permissions. Returns (ok, message, usdt_balance)."""
+        try:
+            data = self._signed("GET", "/api/v3/account", {})
+        except requests.HTTPError as e:
+            code = e.response.status_code if e.response is not None else None
+            body = ""
+            try:
+                body = e.response.json().get("msg", "")
+            except Exception:
+                pass
+            if code in (401, 403) or "Invalid API-key" in body or "signature" in body.lower():
+                return False, "Keys rejected — check they're copied correctly and not IP-restricted.", 0.0
+            return False, f"Binance error: {body or code}", 0.0
+        except Exception as e:
+            return False, f"Could not reach Binance ({e}).", 0.0
+        if not data.get("canTrade", False):
+            return False, "Keys valid but TRADING is not enabled — enable Spot Trading on the API key.", 0.0
+        usdt = 0.0
+        for b in data.get("balances", []):
+            if b["asset"] == "USDT":
+                usdt = float(b["free"])
+                break
+        return True, "Connected", usdt
+
     def place_order(self, side, qty, symbol):
         data = self._signed("POST", "/api/v3/order", {
             "symbol": symbol, "side": side, "type": "MARKET", "quantity": qty,
