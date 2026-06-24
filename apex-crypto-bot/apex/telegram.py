@@ -247,8 +247,14 @@ def make_alert(chat_id):
         elif kind == "groq_error":
             reason = data.get("reason", "")
             if reason == "GROQ_KEY_QUOTA":
-                send_to(chat_id, "⏳ <b>Groq rate limit hit.</b> Bot retries automatically in 10 min.\n"
-                                 "Rule-based signals active in the meantime — no action needed.")
+                send_to(chat_id,
+                        "⏳ <b>Groq daily limit reached.</b> The bot keeps trading on its "
+                        "rule-based engine (Turtle + Livermore + Soros) — no action needed.\n\n"
+                        "💡 <b>Want unlimited AI chat?</b> Add a free Gemini key — 1,500/day, "
+                        "no per-minute limits:\n"
+                        "1. aistudio.google.com → <i>Get API key</i>\n"
+                        "2. Send <code>/gemini YOUR_KEY</code> here\n\n"
+                        "<i>(You'll only see this message once every ~30 min.)</i>")
             else:
                 send_to(chat_id, "⚠️ <b>Groq key invalid.</b> Get a new free key at console.groq.com → API Keys, "
                                  "then send /groq gsk_NEW_KEY")

@@ -389,12 +389,14 @@ def _tick(user_id, alert):
     else:
         dash["openPosition"] = None
 
-    # Heartbeat: every 6 ticks when in a position (live PnL), every 30 ticks when flat (bot-alive ping).
+    # Heartbeat: a single calm ping every 30 ticks (~30 min) whether in a
+    # position or flat. No more per-tick spam — trade alerts cover the action.
     tick = state["tickCount"]
-    if pos and tick % 6 == 0:
-        alert("heartbeat", {"tickCount": tick, "balance": state["paperBalance"], "openPosition": pos})
-    elif not pos and tick % 30 == 0 and tick > 0:
-        alert("scan", {"tickCount": tick, "balance": state["paperBalance"], "symbol": symbol})
+    if tick % 30 == 0 and tick > 0:
+        if pos:
+            alert("heartbeat", {"tickCount": tick, "balance": state["paperBalance"], "openPosition": pos})
+        else:
+            alert("scan", {"tickCount": tick, "balance": state["paperBalance"], "symbol": symbol})
 
     # Grid mode runs alongside strategy (handles range-trading, saves result)
     if settings.get("grid_enabled") or state.get("grid_deal"):
@@ -441,7 +443,12 @@ def _tick(user_id, alert):
                                symbol=symbol, timeframe=timeframe, user_key=user_key)
     except Exception as e:
         if getattr(e, "user_key", False):
-            alert("groq_error", {"reason": str(e)})
+            # Notify at most once every 30 ticks (~30 min) — the rule-based
+            # fallback keeps trading silently in between, so no spam.
+            last_alert = state.get("lastGroqAlertTick", -999)
+            if state["tickCount"] - last_alert >= 30:
+                alert("groq_error", {"reason": str(e)})
+                state["lastGroqAlertTick"] = state["tickCount"]
             signal = ai.rule_based_fallback(ind, pos, strat)
         else:
             print(f"[UserLoop:{user_id}] AI error: {e}")

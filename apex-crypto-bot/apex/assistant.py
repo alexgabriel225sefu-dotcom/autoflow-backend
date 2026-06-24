@@ -362,6 +362,45 @@ def _chat_anthropic(user_id: str, message: str, api_key: str, send_fn, send_stat
     return "⚠️ Could not complete request. Please try again."
 
 
+def _local_status_answer(user_id: str) -> str:
+    """Rule-based reply built from REAL state — works with zero AI quota.
+
+    Used whenever every AI provider is rate-limited so the user still gets a
+    truthful answer about their position instead of a canned error.
+    """
+    from apex import user_loop, binance
+    u = user_loop._ensure_user(user_id)
+    state = u.get("state", {})
+    settings = u.get("settings", {})
+    balance = state.get("paperBalance", 0)
+    start_bal = state.get("startBalance", 100)
+    pnl_pct = ((balance - start_bal) / start_bal * 100) if start_bal else 0
+    pos = state.get("openPosition")
+    sig = state.get("lastSignal")
+
+    lines = [f"💼 <b>Cont:</b> ${balance:.2f} (start ${start_bal:.2f}, {pnl_pct:+.1f}%)"]
+    if pos:
+        try:
+            price = binance.get_price(pos["symbol"])
+            entry = pos["entryPrice"]
+            chg = ((price - entry) / entry * 100) * (1 if pos["side"] == "BUY" else -1)
+            sign = "+" if chg >= 0 else ""
+            lines.append(
+                f"📈 <b>Poziție deschisă:</b> {pos['side']} {pos['symbol']}\n"
+                f"Intrare: ${entry:.4f} → Acum: ${price:.4f} ({sign}{chg:.2f}%)\n"
+                f"🛡 SL: ${pos['stopLoss']:.4f}  🎯 TP: ${pos['takeProfit']:.4f}"
+            )
+        except Exception:
+            lines.append(f"📈 <b>Poziție:</b> {pos['side']} {pos['symbol']}")
+        lines.append("<i>Închizi oricând cu</i> <code>/close</code>")
+    else:
+        lines.append("📭 <b>Nicio poziție deschisă.</b> Botul scanează automat.")
+        lines.append("<i>Forțezi o intrare:</i> <code>/buy BTCUSDT</code> · <code>/sell BTCUSDT</code>")
+    if sig:
+        lines.append(f"🤖 Ultimul semnal: <b>{sig['action']}</b> ({sig['confidence']:.0f}%)")
+    return "\n".join(lines)
+
+
 def _chat_groq(user_id: str, message: str) -> str:
     """Simple Groq chat fallback (no tool execution — conversational only)."""
     import requests
@@ -394,12 +433,10 @@ def _chat_groq(user_id: str, message: str) -> str:
             timeout=15,
         )
         if r.status_code == 429:
-            return ("⏳ <b>Groq rate limit hit.</b>\n"
-                    "Folosește comenzile directe care nu necesită AI:\n"
-                    "<code>/buy XRPUSDT</code> — intră LONG\n"
-                    "<code>/sell XRPUSDT</code> — intră SHORT\n"
-                    "<code>/close</code> — închide poziția\n\n"
-                    "Pentru asistent fără limite: adaugă <code>GEMINI_API_KEY</code> în Render (gratuit).")
+            # Groq quota gone — still answer from REAL state, no AI needed.
+            return (_local_status_answer(user_id) +
+                    "\n\n💡 <i>Pentru chat AI nelimitat: adaugă o cheie Gemini gratuită — "
+                    "aistudio.google.com → Get API key → trimite</i> <code>/gemini CHEIE</code>")
         r.raise_for_status()
         reply = r.json()["choices"][0]["message"]["content"].strip()
         _save_exchange(user_id, message, reply)
