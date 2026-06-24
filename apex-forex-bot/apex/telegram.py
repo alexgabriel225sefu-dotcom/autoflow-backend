@@ -201,23 +201,51 @@ def _handle_status(chat_id):
 def _handle_setup(chat_id):
     with _lock:
         _wizard.clear()
-        _wizard["step"] = "KEYS"
+        _wizard["step"] = "MODE"
         _wizard["data"] = {}
     send_to(chat_id,
             "🛠️ <b>APEX FOREX BOT SETUP</b>\n\n"
-            "1/6 — Enter your <b>OANDA</b> credentials in one message:\n\n"
-            "  <code>OANDA_API_TOKEN=your_token</code>\n"
-            "  <code>OANDA_ACCOUNT_ID=001-001-1234567-001</code>\n\n"
-            "Get them free at <a href=\"https://www.oanda.com\">oanda.com</a> → "
-            "create a <b>practice account</b> → Manage API Access.\n\n"
-            "🔒 <i>Your message is deleted immediately after reading.</i>")
+            "1/5 — <b>How do you want to trade?</b>\n\n"
+            "Reply <code>1</code> or <code>2</code>:\n"
+            "  <code>1</code> — 🧪 <b>Paper</b> (simulated $1000, real prices from "
+            "Yahoo Finance). <b>No account, no keys, starts instantly. Zero risk.</b>\n"
+            "  <code>2</code> — 🔴 <b>Live OANDA</b> (real account, real funds — needs "
+            "OANDA API keys).\n\n"
+            "<i>Most people start with 1 (paper).</i>")
 
 
 def _handle_wizard_reply(chat_id, raw, msg_id):
     with _lock:
         step = _wizard.get("step")
 
-    if step == "KEYS":
+    if step == "MODE":
+        choice = raw.strip()
+        if choice not in ("1", "2"):
+            return send_to(chat_id, "❌ Reply <code>1</code> (paper) or <code>2</code> (live OANDA).")
+        if choice == "1":
+            # Paper — Yahoo data, no OANDA needed, skip straight to the pair
+            with _lock:
+                _wizard["data"]["paper"] = True
+                _wizard["step"] = "SYMBOL"
+            send_to(chat_id,
+                    "🧪 <b>Paper mode</b> — free Yahoo Finance prices, no account.\n\n"
+                    "2/5 — <b>Which pair do YOU want to trade?</b>\n\n"
+                    "e.g. <code>EUR_USD</code>, <code>GBP_USD</code>, <code>USD_JPY</code>.\n\n"
+                    "Reply with the pair. <i>You choose — the bot only trades what you pick.</i>")
+        else:
+            # Live — collect OANDA credentials next
+            with _lock:
+                _wizard["data"]["paper"] = False
+                _wizard["step"] = "KEYS"
+            send_to(chat_id,
+                    "🔴 <b>Live OANDA</b> — enter your credentials in one message:\n\n"
+                    "  <code>OANDA_API_TOKEN=your_token</code>\n"
+                    "  <code>OANDA_ACCOUNT_ID=001-001-1234567-001</code>\n\n"
+                    "Get them at <a href=\"https://www.oanda.com\">oanda.com</a> → "
+                    "Manage API Access.\n\n"
+                    "🔒 <i>Your message is deleted immediately after reading.</i>")
+
+    elif step == "KEYS":
         _delete_message(chat_id, msg_id)
         pairs = {}
         for part in raw.replace("\n", " ").split():
@@ -230,20 +258,10 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                            "<code>OANDA_API_TOKEN=... OANDA_ACCOUNT_ID=...</code>")
         with _lock:
             _wizard["data"]["keys"] = pairs
-            _wizard["step"] = "PAPER"
-        send_to(chat_id,
-                "✅ Credentials saved.\n\n"
-                "2/3 — Enable <b>paper trading</b> (simulated balance, zero risk)?\n\n"
-                "Reply <code>yes</code> or <code>no</code>.\n"
-                "<i>Either way, your OANDA practice account is used for market data.</i>")
-
-    elif step == "PAPER":
-        paper = raw.strip().lower() in ("yes", "y", "true", "on", "1")
-        with _lock:
-            _wizard["data"]["paper"] = paper
             _wizard["step"] = "SYMBOL"
         send_to(chat_id,
-                "3/6 — <b>Which pair do YOU want to trade?</b>\n\n"
+                "✅ Credentials saved.\n\n"
+                "2/5 — <b>Which pair do YOU want to trade?</b>\n\n"
                 "e.g. <code>EUR_USD</code>, <code>GBP_USD</code>, <code>USD_JPY</code>.\n\n"
                 "Reply with the pair. <i>You choose — the bot only trades what you pick.</i>")
 
@@ -256,7 +274,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             _wizard["step"] = "RISK"
         send_to(chat_id,
                 f"✅ Pair: <b>{sym}</b>\n\n"
-                "4/6 — <b>How much do YOU want to risk per trade?</b>\n\n"
+                "3/5 — <b>How much do YOU want to risk per trade?</b>\n\n"
                 "Reply <code>1</code>, <code>2</code> or <code>3</code>:\n"
                 "  <code>1</code> — 🟢 Conservative (0.5% of balance per trade)\n"
                 "  <code>2</code> — 🟡 Balanced (1% per trade)\n"
@@ -272,7 +290,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             _wizard["data"]["risk"] = risk_map[choice]
             _wizard["step"] = "STYLE"
         send_to(chat_id,
-                "5/6 — <b>How should the bot trade?</b>\n\n"
+                "4/5 — <b>How should the bot trade?</b>\n\n"
                 "Reply <code>1</code>, <code>2</code> or <code>3</code>:\n"
                 "  <code>1</code> — 🛡 Defensive — only the strongest setups (fewer trades)\n"
                 "  <code>2</code> — ⚖️ Balanced — standard selectivity\n"
@@ -290,7 +308,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             d = dict(_wizard["data"])
         risk_pct = d.get("risk", 0.005) * 100
         send_to(chat_id,
-                "6/6 — ⚠️ <b>Risk acknowledgment</b>\n\n"
+                "5/5 — ⚠️ <b>Risk acknowledgment</b>\n\n"
                 "Forex trading carries a real risk of loss. <b>You alone</b> chose:\n"
                 f"  • Pair: <b>{d.get('symbol')}</b>\n"
                 f"  • Risk per trade: <b>{risk_pct:g}%</b>\n"
@@ -332,6 +350,10 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             }
             if d.get("keys"):
                 updates.update(d["keys"])
+                updates["BROKER"] = "oanda"
+            else:
+                # Paper with no OANDA keys → free Yahoo Finance data globally too
+                updates["BROKER"] = "yahoo"
             _save_runtime(updates)
             for k, v in updates.items():
                 _apply(k, v)

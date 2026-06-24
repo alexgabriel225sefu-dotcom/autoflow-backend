@@ -15,16 +15,22 @@ _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
 
 
 def _make_broker(user):
-    """Create per-user OANDA broker with isolated config."""
+    """Create the per-user broker with isolated config.
+
+    Paper mode with no OANDA token → Yahoo Finance data (free, no account).
+    Live mode (or OANDA token present) → OANDA broker.
+    """
     import types
+    paper = user.get("paper", True)
+    oanda_token = user.get("oanda_token", "")
     fake_cfg = types.SimpleNamespace(
-        OANDA_API_TOKEN  = user.get("oanda_token", ""),
+        OANDA_API_TOKEN  = oanda_token,
         OANDA_ACCOUNT_ID = user.get("oanda_account_id", ""),
         OANDA_ENV        = user.get("oanda_env", "practice"),
         SYMBOL           = user.get("symbol", "EUR_USD"),
         TIMEFRAME        = user.get("timeframe", "5m"),
         CANDLES          = 200,
-        PAPER_TRADING    = user.get("paper", True),
+        PAPER_TRADING    = paper,
         PAPER_BALANCE    = float(user.get("paper_balance", 1000)),
         STOP_LOSS_PIPS   = float(user.get("sl_pips", 20)),
         TAKE_PROFIT_PIPS = float(user.get("tp_pips", 40)),
@@ -34,6 +40,10 @@ def _make_broker(user):
         MAX_SPREAD_PIPS  = 3.0,
         MIN_CONFIDENCE   = int(user.get("min_confidence", 62)),
     )
+    # Paper + no OANDA token → free Yahoo Finance data, zero signup.
+    if paper and not oanda_token:
+        from apex.brokers import yahoo
+        return yahoo, fake_cfg
     return OandaBroker(fake_cfg), fake_cfg
 
 
