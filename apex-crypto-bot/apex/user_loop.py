@@ -630,8 +630,42 @@ def reset_risk(user_id):
     user_store.save(user_id, u)
 
 
-def force_trade(user_id, side, symbol=None, alert_fn=None):
-    """Manual trade entry called by the AI assistant."""
+def _open_trade_fixed(u, state, settings, side, price, amount_usd, alert, exchange=None):
+    """Like _open_trade but sizes by exact dollar amount instead of risk %."""
+    symbol = settings["SYMBOL"]
+    fee_rate = _fee_pct(u)
+    qty = round(amount_usd / price, 6)
+    if qty <= 0:
+        return
+    if exchange is not None:
+        try:
+            order = exchange.place_order(side, qty, symbol)
+            price = order.get("avgPrice") or price
+            qty = order.get("executedQty") or qty
+        except Exception as e:
+            print(f"[UserLoop] live order failed ({e}) — skipping entry")
+            return
+    else:
+        fee = price * qty * fee_rate
+        if side == "BUY":
+            state["paperBalance"] -= price * qty + fee
+        else:
+            state["paperBalance"] += price * qty - fee
+    sl, tp = _calc_sltp(side, price, settings)
+    state["openPosition"] = {
+        "symbol": symbol, "side": side, "entryPrice": price, "quantity": qty,
+        "stopLoss": sl, "takeProfit": tp, "openedAt": datetime.utcnow().isoformat(), "pnlPct": 0,
+    }
+    alert("open", {"side": side, "symbol": symbol, "price": price, "qty": qty,
+                   "stopLoss": sl, "takeProfit": tp, "amountUsd": round(amount_usd, 2)})
+
+
+def force_trade(user_id, side, symbol=None, alert_fn=None, amount_usd=None):
+    """Manual trade entry called by the AI assistant or /buy /sell commands.
+
+    amount_usd — if set, use this exact dollar amount instead of the risk %
+    setting. Lets users say "enter with $60" and get exactly that exposure.
+    """
     user_id = str(user_id)
     u = _ensure_user(user_id)
     settings, state = u["settings"], u["state"]
@@ -652,11 +686,19 @@ def force_trade(user_id, side, symbol=None, alert_fn=None):
                                             testnet=u.get("paper", True), exchange=ex_name)
         except Exception:
             pass
-    _open_trade(u, state, settings, side.upper(), price, 1.0, alert, exchange)
+
+    if amount_usd and float(amount_usd) > 0:
+        # User specified an exact dollar amount — override risk % sizing.
+        _open_trade_fixed(u, state, settings, side.upper(), price, float(amount_usd), alert, exchange)
+    else:
+        _open_trade(u, state, settings, side.upper(), price, 1.0, alert, exchange)
+
     user_store.save(user_id, u)
     pos = state.get("openPosition")
     if pos:
         return {"ok": True, "side": side, "symbol": sym, "price": round(price, 6),
+                "quantity": round(pos["quantity"], 6),
+                "amountUsd": round(pos["quantity"] * price, 2),
                 "stopLoss": round(pos["stopLoss"], 6), "takeProfit": round(pos["takeProfit"], 6)}
     return {"ok": False, "error": "Order did not fill"}
 

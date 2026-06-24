@@ -34,13 +34,16 @@ _TOOLS = [
         "description": (
             "Open a BUY or SELL position. "
             "Only call AFTER the user explicitly confirms they want to trade. "
-            "Confirmation can be in ANY language (e.g. yes, da, sí, oui, ja, evet, نعم, да, go)."
+            "Confirmation can be in ANY language (e.g. yes, da, sí, oui, ja, evet, نعم, да, go, intru). "
+            "If the user says an exact dollar amount (e.g. 'cu $60', 'cu 50 dolari', 'with $100'), "
+            "pass it as amount_usd. Otherwise omit it and the default risk % is used."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "side":   {"type": "string", "enum": ["BUY", "SELL"]},
-                "symbol": {"type": "string", "description": "e.g. BTCUSDT"},
+                "side":       {"type": "string", "enum": ["BUY", "SELL"]},
+                "symbol":     {"type": "string", "description": "e.g. BTCUSDT"},
+                "amount_usd": {"type": "number", "description": "Exact USD to trade (optional). Use ONLY when user specifies a dollar amount."},
             },
             "required": ["side", "symbol"],
         },
@@ -83,8 +86,10 @@ RULES:
   EXACT same language — Romanian, English, Spanish, French, German, Arabic,
   Hindi, Turkish, Portuguese, Russian, or ANY other. Mirror the user perfectly.
   Never default to a fixed language; match whatever they wrote in this message.
-- Before executing a trade: show signal analysis briefly, then execute immediately.
+- Before executing a trade: show signal analysis briefly (1-2 lines), then execute immediately.
   Do NOT ask for confirmation — users can always close with /close.
+- If the user says an amount (e.g. "cu 60 dolari", "with $50", "100 USDT"), extract it as
+  amount_usd and pass it to execute_trade. Execute right away without asking "are you sure?".
 - Always cite real numbers: RSI, confidence %, price, P&L
 - Auto-trading runs in background 24/7 — you only intervene when asked
 - For errors: explain what happened in plain language and suggest a fix
@@ -272,9 +277,11 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
     if name == "execute_trade":
         side = inp.get("side", "BUY").upper()
         symbol = inp.get("symbol", "BTCUSDT").upper()
-        send_status(f"⚡ Executing <b>{side} {symbol}</b>…")
+        amount_usd = inp.get("amount_usd")
+        amt_label = f" ${amount_usd:.0f}" if amount_usd else ""
+        send_status(f"⚡ Executing <b>{side} {symbol}{amt_label}</b>…")
         try:
-            result = user_loop.force_trade(user_id, side, symbol)
+            result = user_loop.force_trade(user_id, side, symbol, amount_usd=amount_usd)
             return json.dumps(result)
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
