@@ -1,11 +1,45 @@
-"""Owner bootstrap + client grant/revoke access control."""
+"""Owner bootstrap + client grant/revoke access control.
+
+Dual-backend: Upstash Redis (survives redeploys) when UPSTASH_REDIS_REST_URL +
+UPSTASH_REDIS_REST_TOKEN are set, else a local JSON file (wiped on redeploy).
+"""
 import json
 import os
 
+import requests as _req
+
 _FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "access.json")
+
+_UPD_URL   = (os.getenv("UPSTASH_REDIS_REST_URL")   or "").rstrip("/")
+_UPD_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
+_USE_REDIS = bool(_UPD_URL and _UPD_TOKEN)
+
+_ACCESS_KEY = "forex:access"   # Redis key holding the {admins, allowed} JSON blob
+
+
+def _redis(cmd_parts):
+    try:
+        url = f"{_UPD_URL}/{'/'.join(str(p) for p in cmd_parts)}"
+        r = _req.get(url, headers={"Authorization": f"Bearer {_UPD_TOKEN}"}, timeout=8)
+        r.raise_for_status()
+        return r.json().get("result")
+    except Exception as e:
+        print(f"[ACCESS:Redis] command failed {cmd_parts[0]}: {e}")
+        return None
 
 
 def _read():
+    if _USE_REDIS:
+        raw = _redis(["GET", _ACCESS_KEY])
+        if raw:
+            try:
+                d = json.loads(raw)
+                d.setdefault("admins", [])
+                d.setdefault("allowed", [])
+                return d
+            except Exception:
+                pass
+        return {"admins": [], "allowed": []}
     try:
         d = json.loads(open(_FILE).read())
         d.setdefault("admins", [])
@@ -16,6 +50,9 @@ def _read():
 
 
 def _write(d):
+    if _USE_REDIS:
+        _redis(["SET", _ACCESS_KEY, json.dumps(d)])
+        return
     try:
         with open(_FILE, "w") as f:
             json.dump(d, f, indent=2)
