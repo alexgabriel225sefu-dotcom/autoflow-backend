@@ -142,7 +142,6 @@ def get_signal(ind, balance, open_position, strategy_data=None):
 
 ### Last 5 candles
 {recent}
-{_legendary_section(strategy_data)}
 ## ACCOUNT
 - Balance: ${balance:.2f} USD | Leverage: 1:{cfg.LEVERAGE:g}
 - Open position: {pos}
