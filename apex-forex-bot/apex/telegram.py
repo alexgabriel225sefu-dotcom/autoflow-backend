@@ -259,7 +259,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
         user_data = {
             "paper": d.get("paper", True),
             "symbol": sym,
-            "active": False,
+            "active": True,
         }
         if d.get("keys"):
             user_data["oanda_token"]      = d["keys"].get("OANDA_API_TOKEN", "")
@@ -277,13 +277,19 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             if _bot_control.get("reload_broker"):
                 _bot_control["reload_broker"]()
 
+        # Auto-start trading immediately — no manual /start needed
+        _auto_start_user(chat_id)
+
         paper_str = "ON (simulated)" if d.get("paper") else "OFF (live)"
         send_to(chat_id,
-                f"✅ <b>Setup complete!</b>\n\n"
+                f"✅ <b>Setup complete — bot is LIVE!</b>\n\n"
                 f"Broker: <b>OANDA (practice)</b>\n"
                 f"Pair: <b>{sym}</b>\n"
                 f"Paper mode: <b>{paper_str}</b>\n\n"
-                f"Send /start to begin trading.")
+                f"⚡ Trading is active now. You'll get an alert on every trade,\n"
+                f"plus a heartbeat so you always know the bot is awake.\n"
+                f"Send /status to check · /stop to pause.",
+                _dashboard_keyboard())
 
 
 # ─── Individual command handlers ──────────────────────────
@@ -460,6 +466,45 @@ def _handle_users(chat_id):
             f"<code>/revoke ID</code> — remove access")
 
 
+def _user_alert(uid, result):
+    """Per-user trade/heartbeat/error alert — module-level so setup auto-start,
+    /start and auto-restore all share the same notification formatting."""
+    action = result.get("action", "")
+    sym = result.get("symbol", cfg.SYMBOL)
+    if action == "HEARTBEAT":
+        send_to(uid,
+                f"💓 <b>Bot alive</b> — {sym}\n"
+                f"Price: <b>{result.get('price', '—')}</b> | "
+                f"Balance: <b>${result.get('balance', 0):.2f}</b>"
+                f"{result.get('posInfo', '')}")
+    elif action == "AI_ERROR":
+        send_to(uid,
+                f"⚠️ <b>AI temporarily unavailable</b>\n"
+                f"Bot continues with rule-based signals — trading is not interrupted.\n"
+                f"<i>{result.get('reason', '')[:120]}</i>")
+    elif action == "STOP":
+        reasons = ", ".join(result.get("reasons", ["risk limit"]))
+        send_to(uid, f"🛑 <b>Trading paused — risk limit hit</b>\n{reasons}")
+    elif action in ("BUY", "SELL"):
+        send_to(uid,
+                f"⚡ <b>{action}</b> — {sym}\n"
+                f"Price: <b>{result.get('price', '—')}</b> | "
+                f"Confidence: <b>{result.get('confidence', 0)}%</b>")
+    elif action == "CLOSE":
+        send_to(uid,
+                f"🔒 <b>Position closed</b> — {sym}\n"
+                f"Price: <b>{result.get('price', '—')}</b>")
+    else:
+        send_to(uid, f"⚡ <b>{action}</b> — {sym}")
+
+
+def _auto_start_user(chat_id):
+    """Start a user's trading loop with the shared alert function."""
+    if user_loop.is_running(chat_id):
+        return False
+    return user_loop.start(chat_id, alert_fn=_user_alert)
+
+
 def _handle_start(chat_id):
     user = user_store.load(chat_id)
     # Check user has credentials set up
@@ -470,36 +515,7 @@ def _handle_start(chat_id):
     if user_loop.is_running(chat_id):
         return send_to(chat_id, "▶️ Bot is already running. Send /status to check.")
 
-    def _alert(uid, result):
-        action = result.get("action", "")
-        sym = result.get("symbol", cfg.SYMBOL)
-        if action == "HEARTBEAT":
-            send_to(uid,
-                    f"💓 <b>Bot alive</b> — {sym}\n"
-                    f"Price: <b>{result.get('price', '—')}</b> | "
-                    f"Balance: <b>${result.get('balance', 0):.2f}</b>"
-                    f"{result.get('posInfo', '')}")
-        elif action == "AI_ERROR":
-            send_to(uid,
-                    f"⚠️ <b>AI temporarily unavailable</b>\n"
-                    f"Bot continues with rule-based signals — trading is not interrupted.\n"
-                    f"<i>{result.get('reason', '')[:120]}</i>")
-        elif action == "STOP":
-            reasons = ", ".join(result.get("reasons", ["risk limit"]))
-            send_to(uid, f"🛑 <b>Trading paused — risk limit hit</b>\n{reasons}")
-        elif action in ("BUY", "SELL"):
-            send_to(uid,
-                    f"⚡ <b>{action}</b> — {sym}\n"
-                    f"Price: <b>{result.get('price', '—')}</b> | "
-                    f"Confidence: <b>{result.get('confidence', 0)}%</b>")
-        elif action == "CLOSE":
-            send_to(uid,
-                    f"🔒 <b>Position closed</b> — {sym}\n"
-                    f"Price: <b>{result.get('price', '—')}</b>")
-        else:
-            send_to(uid, f"⚡ <b>{action}</b> — {sym}")
-
-    user_loop.start(chat_id, alert_fn=_alert)
+    _auto_start_user(chat_id)
     send_to(chat_id, "▶️ <b>Your bot started!</b> Trading is now active.\nSend /status to monitor.", _dashboard_keyboard())
 
 
@@ -650,6 +666,14 @@ def _poll_loop():
                     send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id_str}</code>")
                     continue
 
+                # Auto-restore: if this user was active but their loop died
+                # (e.g. server restart), silently bring it back on interaction.
+                try:
+                    if user_store.load(chat_id_str).get("active") and not user_loop.is_running(chat_id_str):
+                        _auto_start_user(chat_id_str)
+                except Exception as e:
+                    print(f"[TELEGRAM] auto-restore-on-msg error: {e}")
+
                 # Active wizard step takes priority over /commands
                 with _lock:
                     in_wizard = bool(_wizard.get("step")) and not raw.startswith("/")
@@ -716,6 +740,12 @@ def start_polling(get_dash, broker, control=None):
     _broker = broker
     _bot_control = control or {}
     threading.Thread(target=_poll_loop, daemon=True).start()
+    # Auto-restore: restart trading loops for everyone who was active before
+    # the server restarted (Render free tier wipes the container on redeploy).
+    try:
+        user_loop.start_all(alert_fn=_user_alert)
+    except Exception as e:
+        print(f"[TELEGRAM] auto-restore error: {e}")
     print("[TELEGRAM] Polling started — /grant /revoke /users /status /help")
 
 
