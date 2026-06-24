@@ -619,8 +619,8 @@ def _handle_command(chat_id, text, msg_id=None):
         assistant.clear_history(chat_id)
         return send_to(chat_id,
                        "✅ <b>Gemini key verified &amp; saved!</b> 🆓\n"
-                       "Free chat + market analysis on YOUR own quota (1,500/day).\n"
-                       "For real trade execution, add a Claude key with /claude.")
+                       "Smart chat + market analysis on YOUR own quota (1,500/day).\n"
+                       "The bot trades automatically 24/7 — no extra key needed. 🤖")
     if cmd == "/pause":
         _upd(chat_id, "PAUSED", True)
         return send_to(chat_id, "⏸️ <b>Bot paused.</b>", _kb_menu(True))
@@ -1016,13 +1016,13 @@ def _ready(chat_id):
     _ensure_running(chat_id)
     s = u["settings"]
     if u.get("anthropic_key"):
-        ai_info = "Claude (yours) ✅ — smart chat + trade execution"
+        ai_info = "Claude (yours) ✅ — smart chat + voice trade commands"
     elif u.get("gemini_key"):
         ai_info = "Gemini (yours) ✅ — unlimited smart chat"
     elif u.get("groq_key"):
-        ai_info = "Groq (yours) ✅"
+        ai_info = "Groq (yours) ✅ — unlimited smart chat"
     else:
-        ai_info = "shared AI — add your own free key for unlimited chat (tap /ai)"
+        ai_info = "rule-based engine (add a free AI key via /ai for smart chat)"
     # Message 1: confirmation that bot is live
     send_to(chat_id,
             f"⚡ <b>Bot is LIVE and trading!</b>\n"
@@ -1030,7 +1030,8 @@ def _ready(chat_id):
             f"Mode: <b>{'📝 PAPER ($100 virtual)' if u.get('paper', True) else '🔴 REAL Binance'}</b>\n"
             f"Symbol: <b>{s['SYMBOL']}</b>   Strategy: <b>{s['STRATEGY_MODE']}</b>\n"
             f"AI: <b>{ai_info}</b>\n\n"
-            "Scanning markets every 60s. You'll get an alert on every trade.\n"
+            "📡 Market data: live from Binance (free, no key needed).\n"
+            "🤖 Trading: automatic 24/7 — rule-based engine, zero quota.\n"
             "Use the buttons below to control the bot any time.")
     # Message 2: control panel (separate so buttons are always visible)
     send_to(chat_id, "🎛 <b>Control Panel</b>", _kb_menu(False, s["SYMBOL"]))
