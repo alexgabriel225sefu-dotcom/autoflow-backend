@@ -450,7 +450,7 @@ def _chat_groq(user_id: str, message: str) -> str:
     try:
         r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
-            json={"model": "llama-3.3-70b-versatile", "messages": messages,
+            json={"model": "llama-3.1-8b-instant", "messages": messages,
                   "max_tokens": 400, "temperature": 0.3},
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             timeout=15,
@@ -646,10 +646,11 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
                     continue
 
             if not reply:
-                reply = (_local_status_answer(user_id) +
-                         "\n\n🧠 <i>AI is at its limit right now (resets in a few hours). "
-                         "Trading keeps running on the strategy engine. For your own "
-                         "unlimited chat, send</i> <code>/ai</code> <i>and add a free key.</i>")
+                reply = _local_status_answer(user_id)
+                if chain:  # had keys but all rate-limited
+                    reply += ("\n\n🧠 <i>AI la limită momentan (se resetează în câteva ore). "
+                              "Trading-ul continuă pe motorul de reguli. "
+                              "Adaugă propria cheie cu</i> <code>/ai</code><i>.</i>")
             send_fn(reply)
         except Exception as e:
             print(f"[Assistant:{user_id}] error: {e}")

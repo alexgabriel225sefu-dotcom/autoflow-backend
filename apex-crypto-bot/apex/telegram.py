@@ -6,6 +6,7 @@ reaches the bot is a paying customer → granted on contact. Owner is set via
 ADMIN_CHAT_ID. Polling runs in a background daemon thread.
 """
 import json
+import re
 import time
 import threading
 import requests
@@ -72,6 +73,139 @@ def _send_typing(chat_id):
                       json={"chat_id": chat_id, "action": "typing"}, timeout=3)
     except Exception:
         pass
+
+
+# ── Pattern-based trade intent detection ─────────────────────────────────────
+# Catches explicit trade commands in any language BEFORE hitting the AI quota.
+# Trade execution should never depend on AI availability.
+
+_RE_AMOUNT = re.compile(
+    r"(?:cu\s+|with\s+|de\s+|pentru\s+|)(\d+(?:[.,]\d+)?)\s*(?:\$|usd|usdt|dolari?|bucks?)?",
+    re.IGNORECASE,
+)
+_RE_BUY = re.compile(
+    r"\b(intr[aă]|intr[aă]-?[oO]|cumpăr[aă]?|cumpara|buy|long|intru)\b",
+    re.IGNORECASE,
+)
+_RE_SELL = re.compile(
+    r"\b(vinde|vânz[iă]|short|sell)\b",
+    re.IGNORECASE,
+)
+_RE_CLOSE = re.compile(
+    r"\b(inchide|închide|close|exit|iesi|ieși|stop.?poziti|sell.?all)\b",
+    re.IGNORECASE,
+)
+_RE_ALL_IN = re.compile(
+    r"\ball.?in\b|toat[aă]\s+suma|tot\s+balant|full\s+balance",
+    re.IGNORECASE,
+)
+_RE_CLOSE_MATH = re.compile(
+    r"(inchide|close|iesi|exit|dac[aă]).{0,30}(cât|cat|cati|câți|rămâne|ramane|profit|lose|pierd)",
+    re.IGNORECASE,
+)
+
+
+def _handle_trade_intent(chat_id, text) -> bool:
+    """Return True if the message was a trade command handled directly (no AI needed)."""
+    t = text.strip()
+
+    # "if I close now, how much would I have?" → calculate from live price
+    if _RE_CLOSE_MATH.search(t):
+        u = user_loop._ensure_user(str(chat_id))
+        pos = u["state"].get("openPosition")
+        if not pos:
+            send_to(chat_id, "📭 No open position right now.")
+            return True
+        sym = pos["symbol"]
+        ex = u.get("exchange", "binance")
+        price = binance.get_price(sym, exchange=ex) or pos["entryPrice"]
+        entry, qty, side = pos["entryPrice"], pos["quantity"], pos["side"]
+        pnl = (price - entry) * qty if side == "BUY" else (entry - price) * qty
+        _fee_map = {"binance": 0.001, "binanceus": 0.001, "coinbase": 0.006,
+                    "kraken": 0.0026, "bybit": 0.001, "okx": 0.001}
+        fee_rate = _fee_map.get((u.get("exchange") or "binance").lower(), 0.001)
+        fee = price * qty * fee_rate
+        net = pnl - fee
+        bal = u["state"].get("paperBalance", 0) + net
+        sign = "+" if net >= 0 else ""
+        send_to(chat_id,
+                f"📊 <b>Dacă închizi acum:</b>\n"
+                f"Preț curent: <b>${price:.4f}</b>\n"
+                f"P&amp;L brut: <b>{sign}${pnl:.2f}</b>\n"
+                f"Taxă: <b>−${fee:.2f}</b>\n"
+                f"Net: <b>{sign}${net:.2f}</b>\n"
+                f"Balanță după: <b>${bal:.2f}</b>\n\n"
+                f"<i>Folosește</i> <code>/close</code> <i>pentru a închide efectiv.</i>")
+        return True
+
+    # Close intent
+    if _RE_CLOSE.search(t) and not _RE_BUY.search(t):
+        u = user_loop._ensure_user(str(chat_id))
+        if not u["state"].get("openPosition"):
+            send_to(chat_id, "📭 No open position to close.")
+            return True
+        _handle_command(chat_id, "/close")
+        return True
+
+    # All-in intent
+    if _RE_ALL_IN.search(t):
+        u = user_loop._ensure_user(str(chat_id))
+        bal = u["state"].get("paperBalance", 0)
+        sym = u["settings"].get("SYMBOL", "BTCUSDT")
+        price = binance.get_price(sym, exchange=u.get("exchange", "binance")) or 1
+        amount = round(bal * 0.98, 2)  # leave 2% for fees
+        send_to(chat_id, f"⚡ <b>ALL IN</b> — entering BUY {sym} with <b>${amount:.2f}</b>…")
+        result = user_loop.force_trade(str(chat_id), "BUY", sym, amount_usd=amount)
+        _send_trade_result(chat_id, result, sym)
+        return True
+
+    # BUY intent (with or without amount)
+    if _RE_BUY.search(t):
+        u = user_loop._ensure_user(str(chat_id))
+        sym = u["settings"].get("SYMBOL", "BTCUSDT")
+        # Extract symbol if mentioned (e.g. "intra in BTC", "buy ETH")
+        sym_match = re.search(r"\b([A-Z]{2,5})USDT?\b|\b(BTC|ETH|SOL|BNB|ADA|DOT|AVAX|MATIC|LINK|XRP)\b",
+                               t.upper())
+        if sym_match:
+            raw_sym = (sym_match.group(1) or sym_match.group(2) or "").upper()
+            sym = raw_sym + ("USDT" if not raw_sym.endswith("USDT") else "")
+        # Extract amount
+        amt_match = _RE_AMOUNT.search(t)
+        amount_usd = float(amt_match.group(1).replace(",", ".")) if amt_match else None
+        if amount_usd:
+            send_to(chat_id, f"⚡ BUY <b>{sym}</b> cu <b>${amount_usd:.0f}</b>…")
+        else:
+            send_to(chat_id, f"⚡ BUY <b>{sym}</b>…")
+        result = user_loop.force_trade(str(chat_id), "BUY", sym, amount_usd=amount_usd)
+        _send_trade_result(chat_id, result, sym)
+        return True
+
+    # SELL/SHORT intent
+    if _RE_SELL.search(t):
+        u = user_loop._ensure_user(str(chat_id))
+        sym = u["settings"].get("SYMBOL", "BTCUSDT")
+        amt_match = _RE_AMOUNT.search(t)
+        amount_usd = float(amt_match.group(1).replace(",", ".")) if amt_match else None
+        send_to(chat_id, f"⚡ SELL <b>{sym}</b>…")
+        result = user_loop.force_trade(str(chat_id), "SELL", sym, amount_usd=amount_usd)
+        _send_trade_result(chat_id, result, sym)
+        return True
+
+    return False
+
+
+def _send_trade_result(chat_id, result, sym):
+    if result.get("ok"):
+        pos = result
+        send_to(chat_id,
+                f"✅ <b>{result['side']} {sym}</b> deschis\n"
+                f"Preț: <b>${result['price']:.4f}</b>\n"
+                f"Sumă: <b>${result.get('amountUsd', '—')}</b>  Qty: {result.get('quantity', '—')}\n"
+                f"SL: ${result['stopLoss']:.4f} | TP: ${result['takeProfit']:.4f}\n"
+                f"<i>Închide cu</i> <code>/close</code>")
+    else:
+        err = result.get("error", "unknown error")
+        send_to(chat_id, f"❌ Nu am putut deschide tranzacția: <i>{err}</i>")
 
 
 def _delete_message(chat_id, message_id):
@@ -1163,14 +1297,16 @@ def _poll_loop():
                     except Exception as e:
                         print(f"[TG] ai-key error: {e}")
                     continue
-                # Free text (non-command) → AI assistant
+                # Free text (non-command) → intent check first, then AI
                 if not text.startswith("/"):
-                    _send_typing(chat_id)
-                    assistant.chat(
-                        chat_id, text,
-                        send_fn=lambda reply, cid=chat_id: send_to(cid, reply),
-                        send_status=lambda status, cid=chat_id: send_to(cid, status),
-                    )
+                    handled = _handle_trade_intent(chat_id, text)
+                    if not handled:
+                        _send_typing(chat_id)
+                        assistant.chat(
+                            chat_id, text,
+                            send_fn=lambda reply, cid=chat_id: send_to(cid, reply),
+                            send_status=lambda status, cid=chat_id: send_to(cid, status),
+                        )
                     continue
                 try:
                     _handle_command(chat_id, text, msg_id)
