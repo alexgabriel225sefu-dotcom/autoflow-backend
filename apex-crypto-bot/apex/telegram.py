@@ -19,10 +19,11 @@ _wizard = {}        # chat_id → step (e.g. "KEYS") for the real-account setup 
 _pending_key = {}   # chat_id → raw key waiting for provider confirmation
 
 SYMBOLS = [
-    [("₿ BTC", "BTCUSDT"), ("⟠ ETH", "ETHUSDT")],
-    [("◎ SOL", "SOLUSDT"), ("✕ XRP", "XRPUSDT")],
-    [("Ð DOGE", "DOGEUSDT"), ("△ ADA", "ADAUSDT")],
-    [("⬡ BNB", "BNBUSDT"), ("☀ AVAX", "AVAXUSDT")],
+    [("₿ BTC", "BTCUSDT"), ("⟠ ETH", "ETHUSDT"), ("◎ SOL", "SOLUSDT")],
+    [("✕ XRP", "XRPUSDT"), ("Ð DOGE", "DOGEUSDT"), ("△ ADA", "ADAUSDT")],
+    [("⬡ BNB", "BNBUSDT"), ("☀ AVAX", "AVAXUSDT"), ("🔗 LINK", "LINKUSDT")],
+    [("◆ TON", "TONUSDT"), ("🐕 SHIB", "SHIBUSDT"), ("🐸 PEPE", "PEPEUSDT")],
+    [("Ξ MATIC", "MATICUSDT"), ("🦄 UNI", "UNIUSDT"), ("⬢ DOT", "DOTUSDT")],
 ]
 METHODS = ["auto", "turtle", "livermore", "soros", "ptj", "druckenmiller"]
 METHOD_DESC = {
@@ -406,7 +407,10 @@ def _handle_command(chat_id, text, msg_id=None):
         return send_to(chat_id, _HELP)
     if cmd == "/symbol":
         if not args:
-            return send_to(chat_id, f"💎 <b>Choose trading pair:</b>\nCurrent: <b>{s['SYMBOL']}</b>", _kb_symbols())
+            return send_to(chat_id,
+                           f"💎 <b>Choose trading pair:</b>\nCurrent: <b>{s['SYMBOL']}</b>\n\n"
+                           f"💡 <i>Tap a coin below, or type <code>/symbol PEPEUSDT</code> — "
+                           f"<b>ANY</b> Binance pair works (600+ coins).</i>", _kb_symbols())
         sym = args[0].upper()
         if not binance.valid_symbol(sym):
             return send_to(chat_id, f"❌ <b>{sym}</b> is not a valid Binance pair. Example: <code>/symbol BTCUSDT</code>")
