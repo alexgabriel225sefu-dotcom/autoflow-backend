@@ -205,7 +205,7 @@ def _handle_setup(chat_id):
         _wizard["data"] = {}
     send_to(chat_id,
             "🛠️ <b>APEX FOREX BOT SETUP</b>\n\n"
-            "1/3 — Enter your <b>OANDA</b> credentials in one message:\n\n"
+            "1/6 — Enter your <b>OANDA</b> credentials in one message:\n\n"
             "  <code>OANDA_API_TOKEN=your_token</code>\n"
             "  <code>OANDA_ACCOUNT_ID=001-001-1234567-001</code>\n\n"
             "Get them free at <a href=\"https://www.oanda.com\">oanda.com</a> → "
@@ -243,8 +243,9 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             _wizard["data"]["paper"] = paper
             _wizard["step"] = "SYMBOL"
         send_to(chat_id,
-                "3/3 — Currency pair (e.g. <code>EUR_USD</code>, <code>GBP_USD</code>, "
-                "<code>USD_JPY</code>).\n\nReply with the pair.")
+                "3/6 — <b>Which pair do YOU want to trade?</b>\n\n"
+                "e.g. <code>EUR_USD</code>, <code>GBP_USD</code>, <code>USD_JPY</code>.\n\n"
+                "Reply with the pair. <i>You choose — the bot only trades what you pick.</i>")
 
     elif step == "SYMBOL":
         sym = raw.strip().upper().replace("/", "_").replace("-", "_")
@@ -252,13 +253,68 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             return send_to(chat_id, "❌ Invalid pair. Example: <code>EUR_USD</code>")
         with _lock:
             _wizard["data"]["symbol"] = sym
+            _wizard["step"] = "RISK"
+        send_to(chat_id,
+                f"✅ Pair: <b>{sym}</b>\n\n"
+                "4/6 — <b>How much do YOU want to risk per trade?</b>\n\n"
+                "Reply <code>1</code>, <code>2</code> or <code>3</code>:\n"
+                "  <code>1</code> — 🟢 Conservative (0.5% of balance per trade)\n"
+                "  <code>2</code> — 🟡 Balanced (1% per trade)\n"
+                "  <code>3</code> — 🔴 Aggressive (2% per trade)\n\n"
+                "<i>You decide the risk. Smaller = safer.</i>")
+
+    elif step == "RISK":
+        choice = raw.strip()
+        risk_map = {"1": 0.005, "2": 0.01, "3": 0.02}
+        if choice not in risk_map:
+            return send_to(chat_id, "❌ Reply <code>1</code>, <code>2</code> or <code>3</code>.")
+        with _lock:
+            _wizard["data"]["risk"] = risk_map[choice]
+            _wizard["step"] = "STYLE"
+        send_to(chat_id,
+                "5/6 — <b>How should the bot trade?</b>\n\n"
+                "Reply <code>1</code>, <code>2</code> or <code>3</code>:\n"
+                "  <code>1</code> — 🛡 Defensive — only the strongest setups (fewer trades)\n"
+                "  <code>2</code> — ⚖️ Balanced — standard selectivity\n"
+                "  <code>3</code> — ⚡ Active — more trades, lower bar\n\n"
+                "<i>You set the style — this controls how often it enters.</i>")
+
+    elif step == "STYLE":
+        choice = raw.strip()
+        conf_map = {"1": 70, "2": 62, "3": 55}
+        if choice not in conf_map:
+            return send_to(chat_id, "❌ Reply <code>1</code>, <code>2</code> or <code>3</code>.")
+        with _lock:
+            _wizard["data"]["min_confidence"] = conf_map[choice]
+            _wizard["step"] = "DISCLAIMER"
+            d = dict(_wizard["data"])
+        risk_pct = d.get("risk", 0.005) * 100
+        send_to(chat_id,
+                "6/6 — ⚠️ <b>Risk acknowledgment</b>\n\n"
+                "Forex trading carries a real risk of loss. <b>You alone</b> chose:\n"
+                f"  • Pair: <b>{d.get('symbol')}</b>\n"
+                f"  • Risk per trade: <b>{risk_pct:g}%</b>\n"
+                f"  • Mode: <b>{'paper (simulated)' if d.get('paper') else 'LIVE funds'}</b>\n\n"
+                "By continuing you confirm that <b>you are solely responsible</b> for all "
+                "trades and any losses. The bot and its provider are not liable.\n\n"
+                "Reply <code>ACCEPT</code> to activate, or /cancel to abort.")
+
+    elif step == "DISCLAIMER":
+        if raw.strip().upper() != "ACCEPT":
+            return send_to(chat_id,
+                           "Type <code>ACCEPT</code> (in capitals) to activate, or /cancel to abort.")
+        with _lock:
             _wizard["step"] = None
             d = dict(_wizard["data"])
+        sym = d.get("symbol", "EUR_USD")
 
-        # Save per-user settings
+        # Save per-user settings — every risk parameter was chosen by the client
         user_data = {
             "paper": d.get("paper", True),
             "symbol": sym,
+            "risk": d.get("risk", 0.005),
+            "min_confidence": d.get("min_confidence", 62),
+            "accepted_risk": True,
             "active": True,
         }
         if d.get("keys"):
@@ -268,7 +324,12 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
 
         # Also apply globally if admin (for owner's own bot)
         if access.is_admin(str(chat_id)):
-            updates: dict = {"PAPER_TRADING": str(d.get("paper", True)).lower(), "TRADE_SYMBOL": sym}
+            updates: dict = {
+                "PAPER_TRADING": str(d.get("paper", True)).lower(),
+                "TRADE_SYMBOL": sym,
+                "RISK_PER_TRADE": str(d.get("risk", 0.005)),
+                "MIN_CONFIDENCE": str(d.get("min_confidence", 62)),
+            }
             if d.get("keys"):
                 updates.update(d["keys"])
             _save_runtime(updates)
@@ -281,14 +342,16 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
         _auto_start_user(chat_id)
 
         paper_str = "ON (simulated)" if d.get("paper") else "OFF (live)"
+        risk_pct = d.get("risk", 0.005) * 100
         send_to(chat_id,
                 f"✅ <b>Setup complete — bot is LIVE!</b>\n\n"
                 f"Broker: <b>OANDA (practice)</b>\n"
-                f"Pair: <b>{sym}</b>\n"
+                f"Pair: <b>{sym}</b>  (your choice)\n"
+                f"Risk/trade: <b>{risk_pct:g}%</b>  (your choice)\n"
                 f"Paper mode: <b>{paper_str}</b>\n\n"
                 f"⚡ Trading is active now. You'll get an alert on every trade,\n"
                 f"plus a heartbeat so you always know the bot is awake.\n"
-                f"Send /status to check · /stop to pause.",
+                f"Change anything with /setup · /status to check · /stop to pause.",
                 _dashboard_keyboard())
 
 

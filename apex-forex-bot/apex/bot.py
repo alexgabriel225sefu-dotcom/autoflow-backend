@@ -625,6 +625,24 @@ def _start_dashboard_server():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     logger.info(f"📊 Dashboard: http://localhost:{port}")
 
+    # Self-ping keeps Render's free tier awake 24/7. Without this the service
+    # spins down after ~15 min of no inbound HTTP, the Telegram poll loop stops,
+    # and the bot stops responding to every command (the "dead bot" symptom).
+    render_url = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+    if render_url:
+        def _keepalive():
+            while True:
+                time.sleep(60)  # every 1 min — never let the idle timer fire
+                try:
+                    requests.get(f"{render_url}/health", timeout=10)
+                except Exception:
+                    pass
+        threading.Thread(target=_keepalive, daemon=True).start()
+        logger.info(f"✅ Self-ping every 1 min → {render_url}/health")
+    else:
+        logger.warn("⚠️  RENDER_EXTERNAL_URL not set — self-ping disabled. "
+                    "On Render free tier the bot may sleep and stop responding.")
+
 
 def main():
     global start_balance, paper_balance, open_position, broker
