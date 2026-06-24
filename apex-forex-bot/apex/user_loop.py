@@ -285,3 +285,119 @@ def start_all(alert_fn=None):
     """Restart loops for all previously active users (after server reboot)."""
     for uid in user_store.all_active():
         start(uid, alert_fn)
+
+
+def force_trade(user_id, side, symbol=None):
+    """Open a manual trade immediately (called from AI assistant or /buy /sell commands)."""
+    user_id = str(user_id)
+    user = user_store.load(user_id)
+    broker, cfg = _make_broker(user)
+    sym = (symbol or cfg.SYMBOL).upper()
+    try:
+        candles = broker.get_candles(sym, cfg.TIMEFRAME, 5)
+        price = candles[-1]["close"] if candles else 0.0
+    except Exception:
+        price = 0.0
+    if not price:
+        return {"ok": False, "error": "Could not fetch price"}
+
+    try:
+        bid, ask = broker.get_bid_ask(sym)
+        spread = forex.spread_pips(bid, ask, sym)
+    except Exception:
+        spread = 0.0
+
+    pip = forex.pip_size(sym)
+    sl_price = (price - cfg.STOP_LOSS_PIPS * pip if side == "BUY"
+                else price + cfg.STOP_LOSS_PIPS * pip)
+    tp_price = (price + cfg.TAKE_PROFIT_PIPS * pip if side == "BUY"
+                else price - cfg.TAKE_PROFIT_PIPS * pip)
+
+    balance = user.get("paper_balance") or cfg.PAPER_BALANCE
+    dash = get_dash(user_id)
+    if dash:
+        balance = dash.get("balance", balance)
+
+    units = forex.calc_units(balance, cfg.RISK_PER_TRADE, cfg.STOP_LOSS_PIPS, sym, price)
+    units = max(int(units), 1000)
+
+    try:
+        broker.place_order(side, units, sym, sl=sl_price, tp=tp_price)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    open_pos = {"side": side, "entryPrice": price, "symbol": sym,
+                "units": units, "stopLoss": sl_price, "takeProfit": tp_price,
+                "entrySpreadPips": spread, "openedAt": now_str}
+
+    with _lock:
+        loop_data = _loops.get(user_id, {})
+    if loop_data:
+        dash = loop_data.get("dash", {})
+        dash["openPosition"] = open_pos
+        result = {"action": side, "symbol": sym, "confidence": 99,
+                  "price": price, "spreadPips": round(spread, 1), "time": now_str}
+        trades = dash.get("trades", [])
+        trades.insert(0, result)
+        dash["trades"] = trades[:50]
+
+    return {"ok": True, "side": side, "symbol": sym, "price": price,
+            "units": units, "spread": round(spread, 1),
+            "sl": round(sl_price, 5), "tp": round(tp_price, 5)}
+
+
+def force_close(user_id):
+    """Close the open position immediately (called from AI assistant or /close command)."""
+    user_id = str(user_id)
+    user = user_store.load(user_id)
+    broker, cfg = _make_broker(user)
+
+    with _lock:
+        dash = _loops.get(user_id, {}).get("dash", {})
+    open_pos = dash.get("openPosition")
+    if not open_pos:
+        return {"ok": False, "error": "No open position to close"}
+
+    sym = open_pos.get("symbol", cfg.SYMBOL)
+    try:
+        candles = broker.get_candles(sym, cfg.TIMEFRAME, 5)
+        price = candles[-1]["close"] if candles else 0.0
+    except Exception:
+        price = 0.0
+
+    try:
+        broker.close_position(sym)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+    gross = cost_usd = net = 0.0
+    if cfg.PAPER_TRADING and open_pos and price:
+        units_ = open_pos.get("units", 1000)
+        gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"], price, units_, sym)
+        pv = forex.pip_value_per_unit(sym, price)
+        cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+        net = gross - cost_usd
+
+    with _lock:
+        loop_data = _loops.get(user_id, {})
+    if loop_data:
+        d = loop_data.get("dash", {})
+        old_bal = d.get("balance", cfg.PAPER_BALANCE)
+        new_bal = round(old_bal + net, 2)
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        result = {"action": "CLOSE", "symbol": sym, "price": price,
+                  "entryPrice": open_pos.get("entryPrice"),
+                  "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
+                  "netPnl": round(net, 2), "balance": new_bal,
+                  "openedAt": open_pos.get("openedAt"), "time": now_str}
+        _log_trade(user_id, result)
+        d["openPosition"] = None
+        d["balance"] = new_bal
+        trades = d.get("trades", [])
+        trades.insert(0, result)
+        d["trades"] = trades[:50]
+
+    return {"ok": True, "symbol": sym, "price": price,
+            "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
+            "netPnl": round(net, 2)}

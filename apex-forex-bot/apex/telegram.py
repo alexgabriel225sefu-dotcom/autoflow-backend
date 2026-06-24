@@ -15,6 +15,7 @@ from apex import forex
 from apex import access
 from apex import user_store
 from apex import user_loop
+from apex import assistant
 from apex import affiliate_store
 
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
@@ -488,6 +489,54 @@ def _handle_symbol(chat_id, args):
     send_to(chat_id, f"💱 Currency pair set to <b>{sym}</b>.")
 
 
+def _handle_buy(chat_id, args):
+    sym = (args or "").strip().upper().replace("/", "_").replace("-", "_")
+    if not sym:
+        user = user_store.load(chat_id)
+        sym = user.get("symbol", cfg.SYMBOL)
+    send_to(chat_id, f"⚡ Opening <b>BUY {sym}</b>…")
+    result = user_loop.force_trade(str(chat_id), "BUY", sym)
+    if result.get("ok"):
+        send_to(chat_id,
+                f"✅ <b>BUY {sym}</b> entered\n"
+                f"Price: <b>{result['price']:.5f}</b> | Units: {result['units']}\n"
+                f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
+                f"Spread: {result['spread']}p")
+    else:
+        send_to(chat_id, f"❌ Could not open trade: {result.get('error', '?')}")
+
+
+def _handle_sell(chat_id, args):
+    sym = (args or "").strip().upper().replace("/", "_").replace("-", "_")
+    if not sym:
+        user = user_store.load(chat_id)
+        sym = user.get("symbol", cfg.SYMBOL)
+    send_to(chat_id, f"⚡ Opening <b>SELL {sym}</b>…")
+    result = user_loop.force_trade(str(chat_id), "SELL", sym)
+    if result.get("ok"):
+        send_to(chat_id,
+                f"✅ <b>SELL {sym}</b> entered\n"
+                f"Price: <b>{result['price']:.5f}</b> | Units: {result['units']}\n"
+                f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
+                f"Spread: {result['spread']}p")
+    else:
+        send_to(chat_id, f"❌ Could not open trade: {result.get('error', '?')}")
+
+
+def _handle_close(chat_id):
+    result = user_loop.force_close(str(chat_id))
+    if result.get("ok"):
+        net = result.get("netPnl", 0)
+        icon = "✅" if net >= 0 else "❌"
+        send_to(chat_id,
+                f"🔒 <b>Position closed</b>\n"
+                f"Price: <b>{result.get('price', '—')}</b>\n"
+                f"{icon} Net P&amp;L: <b>{'+' if net >= 0 else ''}${net:.2f}</b> "
+                f"<i>(gross ${result.get('grossPnl', 0):.2f} − cost ${result.get('costUsd', 0):.2f})</i>")
+    else:
+        send_to(chat_id, f"❌ {result.get('error', 'No open position')}")
+
+
 def _handle_deploy(chat_id):
     import subprocess
     import threading
@@ -683,13 +732,23 @@ _HELP_CLIENT = ("📋 <b>APEX FOREX BOT</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "/status — live trading snapshot\n"
                 "/report — trade journal + net P&amp;L (for taxes)\n"
-                "/help — this list")
+                "/buy EUR_USD — open a BUY manually\n"
+                "/sell EUR_USD — open a SELL manually\n"
+                "/close — close current position\n"
+                "/help — this list\n\n"
+                "💬 <i>Or just talk to me in any language!</i>\n"
+                "<i>Example: \"enter now\", \"intru acum\", \"analyzeaza EUR_USD\"</i>")
 
 _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "/status — live trading snapshot\n"
                "/setup — guided setup wizard\n"
                "/config — show current settings\n"
+               "/report — trade journal + net P&amp;L\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "/buy &lt;PAIR&gt; — open BUY manually\n"
+               "/sell &lt;PAIR&gt; — open SELL manually\n"
+               "/close — close current position\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "/broker oanda|mt — OANDA API or MetaTrader\n"
                "/env practice|live — OANDA environment\n"
@@ -708,7 +767,8 @@ _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "/grant &lt;id&gt; — give client access\n"
                "/revoke &lt;id&gt; — remove access\n"
                "/users — list clients\n"
-               "/help — this list")
+               "/help — this list\n\n"
+               "💬 <i>Free text → AI assistant (any language)</i>")
 
 
 # ─── Poll loop ────────────────────────────────────────────
@@ -870,12 +930,28 @@ def _poll_loop():
                     _handle_tp(chat_id, args)
                 elif cmd_l == "/symbol" and is_adm:
                     _handle_symbol(chat_id, args)
+                elif cmd_l == "/buy":
+                    _handle_buy(chat_id, args)
+                elif cmd_l == "/sell":
+                    _handle_sell(chat_id, args)
+                elif cmd_l == "/close":
+                    _handle_close(chat_id)
                 elif cmd_l == "/start":
                     _handle_start(chat_id)
                 elif cmd_l == "/stop" and is_adm:
                     _handle_stop(chat_id)
-                elif not is_adm:
-                    pass  # clients silently ignore unknown commands
+                elif not raw.startswith("/"):
+                    # Free-text → AI assistant (any language, any client)
+                    def _typing_reply(reply, cid=chat_id):
+                        send_to(cid, reply)
+                    def _typing_status(status, cid=chat_id):
+                        send_to(cid, status)
+                    assistant.chat(
+                        chat_id, raw,
+                        send_fn=_typing_reply,
+                        send_status=_typing_status,
+                    )
+                # Unknown /commands → silently ignored
         except Exception as e:
             print(f"[TELEGRAM] Poll error: {e}")
         time.sleep(2)
