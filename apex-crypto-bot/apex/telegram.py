@@ -15,7 +15,8 @@ from apex import access, user_store, user_loop, binance, ai, assistant, dca, gri
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 _API = f"https://api.telegram.org/bot{TOKEN}"
 _update_id = 0
-_wizard = {}   # chat_id → step (e.g. "KEYS") for the real-account setup flow
+_wizard = {}        # chat_id → step (e.g. "KEYS") for the real-account setup flow
+_pending_key = {}   # chat_id → raw key waiting for provider confirmation
 
 SYMBOLS = [
     [("₿ BTC", "BTCUSDT"), ("⟠ ETH", "ETHUSDT")],
@@ -692,6 +693,39 @@ def _handle_callback(chat_id, data):
         return _ask_live_keys(chat_id)
     if data == "groq:skip":
         _wizard.pop(str(chat_id), None)
+        _pending_key.pop(str(chat_id), None)
+        return _ready(chat_id)
+    if data.startswith("kk:"):
+        # User confirmed which provider their unknown-format key belongs to
+        kind = data[3:]  # "gemini" | "groq" | "claude"
+        key = _pending_key.pop(str(chat_id), None)
+        if not key:
+            return send_to(chat_id, "⚠️ Key session expired. Please paste your key again.")
+        _wizard.pop(str(chat_id), None)
+        label = {"claude": "Claude", "groq": "Groq", "gemini": "Gemini"}.get(kind, kind)
+        send_to(chat_id, f"🔍 Testing your {label} key…")
+        if kind == "claude":
+            ok, why = assistant.test_key(key)
+            field = "anthropic_key"
+        elif kind == "gemini":
+            ok, why = assistant.test_gemini_key(key)
+            field = "gemini_key"
+        else:
+            ok, why = ai.test_key(key)
+            field = "groq_key"
+        _retry_kb = {"reply_markup": json.dumps({"inline_keyboard": [
+            [{"text": "🥇 Get free Gemini key", "url": "https://aistudio.google.com/apikey"}],
+            [{"text": "🥈 Get free Groq key", "url": "https://console.groq.com/keys"}],
+            [{"text": "⚡ Skip — use shared AI", "callback_data": "groq:skip"}],
+        ]})}
+        if not ok:
+            return send_to(chat_id,
+                           f"❌ <b>{label} key not working:</b> {why}\n\n"
+                           "Paste a different key or skip.", _retry_kb)
+        user_store.update(chat_id, {field: key})
+        assistant.clear_history(chat_id)
+        send_to(chat_id, f"✅ <b>{label} key verified &amp; saved!</b> "
+                         "Smart signals + unlimited chat now run on YOUR own quota. 🧠")
         return _ready(chat_id)
     if data == "c:chart":
         sym = s["SYMBOL"]
@@ -919,8 +953,10 @@ def _detect_key_kind(key):
         return "claude"
     if k.startswith("gsk_"):
         return "groq"
-    if k.startswith("AIza") or (len(k) >= 30 and "-" not in k and "_" not in k):
+    # Google AI Studio Gemini keys: AIza prefix OR any long key without provider prefix
+    if k.startswith("AIza") or k.startswith("AIzaSy"):
         return "gemini"
+    # Fallback: long alphanumeric key — likely Gemini (but ask user to confirm)
     return None
 
 
@@ -935,10 +971,17 @@ def _finish_groq(chat_id, key, msg_id):
         [{"text": "⚡ Skip — use shared AI", "callback_data": "groq:skip"}],
     ]})}
     if kind is None:
+        # Unknown prefix — store key and ask user to confirm provider
+        _pending_key[str(chat_id)] = key
+        _wizard[str(chat_id)] = "KEY_KIND"
         return send_to(chat_id,
-                       "❌ <b>Didn't recognise that key.</b>\n"
-                       "Gemini (<code>AIza…</code>), Groq (<code>gsk_…</code>) or "
-                       "Claude (<code>sk-ant-…</code>). Paste again or skip.", _retry_kb)
+                       "🤔 <b>Which provider is this key for?</b>",
+                       {"reply_markup": json.dumps({"inline_keyboard": [
+                           [{"text": "🥇 Gemini (Google AI Studio)", "callback_data": "kk:gemini"}],
+                           [{"text": "🥈 Groq", "callback_data": "kk:groq"}],
+                           [{"text": "🥉 Claude (Anthropic)", "callback_data": "kk:claude"}],
+                           [{"text": "❌ Cancel", "callback_data": "groq:skip"}],
+                       ]})})
 
     label = {"claude": "Claude", "groq": "Groq", "gemini": "Gemini"}[kind]
     send_to(chat_id, f"🔍 Testing your {label} key…")
