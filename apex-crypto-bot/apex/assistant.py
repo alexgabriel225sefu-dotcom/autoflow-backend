@@ -539,7 +539,11 @@ def _chat_gemini(user_id: str, message: str, key: str, send_status=None) -> str:
                 timeout=20,
             )
             if r.status_code == 429:
-                return ("⏳ <b>Gemini limita zilnica atinsa.</b> Se reseteaza maine (1500/zi gratis).")
+                # Daily Gemini quota exhausted — still answer from real state,
+                # and nudge the user to add their OWN free key for more headroom.
+                return (_local_status_answer(user_id) +
+                        "\n\n⏳ <i>Limita Gemini de azi atinsă (resetează mâine). Pentru cotă "
+                        "proprie nelimitată: trimite</i> <code>/ai</code> <i>și pune cheia ta.</i>")
             r.raise_for_status()
         except requests.HTTPError:
             return "⚠️ Asistent (Gemini) indisponibil momentan. Incearca din nou."

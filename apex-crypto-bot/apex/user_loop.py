@@ -437,22 +437,34 @@ def _tick(user_id, alert):
 
     ind = indicators.analyze(candles)
     strat = strategies.analyze(candles, session)
+
+    # ── Trading brain = rule-based legendary-strategy engine, BY DEFAULT ──
+    # It scores Turtle + Livermore + Soros + RSI/MACD/EMA confluence on every
+    # tick using ZERO API quota and never rate-limits — so trading runs 24/7
+    # non-stop, and the AI key stays 100% reserved for the chat (where a human
+    # actually needs it: 1,500 Gemini msgs/day >> any real conversation).
+    #
+    # Per-tick AI signals are OPT-IN: only when the client added their OWN Groq
+    # key (their own ~14,400/day quota). We never burn the shared chat key on
+    # the 1,440-ticks/day loop.
     user_key = u.get("groq_key") or None
-    try:
-        signal = ai.get_signal(ind, state["paperBalance"], pos, strat,
-                               symbol=symbol, timeframe=timeframe, user_key=user_key)
-    except Exception as e:
-        if getattr(e, "user_key", False):
-            # Notify at most once every 30 ticks (~30 min) — the rule-based
-            # fallback keeps trading silently in between, so no spam.
-            last_alert = state.get("lastGroqAlertTick", -999)
-            if state["tickCount"] - last_alert >= 30:
-                alert("groq_error", {"reason": str(e)})
-                state["lastGroqAlertTick"] = state["tickCount"]
+    if user_key:
+        try:
+            signal = ai.get_signal(ind, state["paperBalance"], pos, strat,
+                                   symbol=symbol, timeframe=timeframe, user_key=user_key)
+        except Exception as e:
+            if getattr(e, "user_key", False):
+                # Their Groq key is rate-limited — fall back silently, but
+                # remind them at most once every ~30 min (no spam).
+                last_alert = state.get("lastGroqAlertTick", -999)
+                if state["tickCount"] - last_alert >= 30:
+                    alert("groq_error", {"reason": str(e)})
+                    state["lastGroqAlertTick"] = state["tickCount"]
+            else:
+                print(f"[UserLoop:{user_id}] AI error: {e}")
             signal = ai.rule_based_fallback(ind, pos, strat)
-        else:
-            print(f"[UserLoop:{user_id}] AI error: {e}")
-            signal = ai.rule_based_fallback(ind, pos, strat)
+    else:
+        signal = ai.rule_based_fallback(ind, pos, strat)
 
     state["lastSignal"] = {"action": signal["action"], "confidence": signal["confidence"],
                            "criteriaScore": signal.get("criteriaScore", 0),
