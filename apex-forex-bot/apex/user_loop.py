@@ -137,7 +137,7 @@ def _loop(user_id, alert_fn):
                         "symbol": cfg.SYMBOL,
                     })
                     last_ai_error_tick = tick
-                signal = ai.rule_based_fallback(ind, open_pos)
+                signal = ai.mean_reversion_signal(ind, open_pos)
 
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)

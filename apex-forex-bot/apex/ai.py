@@ -117,7 +117,7 @@ def get_signal(ind, balance, open_position, strategy_data=None):
                 else "- Volume: N/A (this data source has no forex tick volume — judge on price action, do NOT treat as low liquidity)")
     vol_crit = "tick volume>1.2x" if has_volume else "Stoch RSI K aligned with direction"
 
-    prompt = f"""You are a professional FOREX trader with 20 years of experience applying the rules of the great traders: Turtle breakout, Livermore structure, Soros momentum, PTJ defense. Analyze ALL the data and give a precise signal.
+    prompt = f"""You are a professional FOREX trader with 20 years of experience. Forex ranges far more than it trends, so your PRIMARY edge is MEAN REVERSION: fade overbought/oversold extremes back to the mean (RSI + Bollinger Bands), and only ride a move when the higher-timeframe trend is genuinely strong. This is the opposite of a crypto breakout bot. Analyze ALL the data and give a precise signal.
 
 ## MARKET DATA — {cfg.SYMBOL} ({cfg.TIMEFRAME})
 - Active sessions: {sessions} (liquidity is best when London/New York overlap)
@@ -147,13 +147,14 @@ def get_signal(ind, balance, open_position, strategy_data=None):
 - Balance: ${balance:.2f} USD | Leverage: 1:{cfg.LEVERAGE:g}
 - Open position: {pos}
 
-## ENTRY RULES
+## ENTRY RULES — MEAN REVERSION FIRST
 - SL: {cfg.STOP_LOSS_PIPS:g} pips | TP: {cfg.TAKE_PROFIT_PIPS:g} pips | Risk: {cfg.RISK_PER_TRADE * 100:g}% per trade
 - Minimum confidence: {cfg.MIN_CONFIDENCE}%
-- BUY criteria (min 3/5): bullish trend, RSI<50 or bullish div, MACD up, {vol_crit}, price below EMA20
-- SELL criteria (min 3/5): bearish trend, RSI>50 or bearish div, MACD down, {vol_crit}, price above EMA20
-- BONUS +1 criterion if Turtle=STRONG BUY/SELL OR Livermore confirms direction OR Soros momentum aligned
-- Do not trade against Livermore trend with strength >0.8
+- BUY (fade oversold dip, min 3/5): price in lower BB (<30%), RSI≤35 or bullish divergence, Stoch RSI K low, price stretched below EMA20, no strong downtrend
+- SELL (fade overbought spike, min 3/5): price in upper BB (>70%), RSI≥65 or bearish divergence, Stoch RSI K high, price stretched above EMA20, no strong uptrend
+- CLOSE when price reverts to the BB mid (the mean = your target)
+- TREND GUARD: in a strong trend (EMA50 vs EMA200 widely separated) do NOT fade against it — only buy dips in an uptrend / sell rallies in a downtrend, else HOLD
+- Leverage is 1:{cfg.LEVERAGE:g} — size for stability, not for chasing volatility
 
 Respond ONLY with valid JSON:
 {{"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 sentences>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}}"""
@@ -166,8 +167,8 @@ Respond ONLY with valid JSON:
         return _call_groq(prompt)
     except Exception as err:
         print(f"[AI ❌] Groq failed: {err}")
-    sig = rule_based_fallback(ind, open_position)
-    print(f"[AI] Rule-based fallback: {sig['action']} {sig['confidence']}%")
+    sig = mean_reversion_signal(ind, open_position)
+    print(f"[AI] Mean-reversion fallback: {sig['action']} {sig['confidence']}%")
     return sig
 
 
@@ -236,3 +237,111 @@ def rule_based_fallback(ind, open_position=None):
                 "keyFactors": factors}
     return {"action": "HOLD", "confidence": 42, "criteriaScore": max(0, abs_score),
             "reasoning": "Rule-based: no clear signal", "riskLevel": "LOW", "keyFactors": factors}
+
+
+def mean_reversion_signal(ind, open_position=None):
+    """FOREX-specific MEAN REVERSION engine (the real Crypto↔Forex difference).
+
+    Forex ranges far more than it trends, so this fades extremes back to the
+    mean instead of chasing breakouts like the crypto trend-following engine:
+      • BUY  an oversold dip at the lower Bollinger Band (RSI/StochRSI low)
+      • SELL an overbought spike at the upper band (RSI/StochRSI high)
+      • EXIT when price reverts to the BB midline (target reached)
+      • SKIP counter-trend fades when the market is strongly trending
+    """
+    def fnum(v, d=0.0):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return d
+
+    rsi_v  = fnum(ind.get("rsi"), 50)
+    bb_pos = fnum(ind.get("bb_position"), 50)   # 0 = lower band, 100 = upper band
+    srsi_k = fnum(ind.get("stochRsiK"), 50)
+    price  = fnum(ind.get("price"))
+    ema50  = fnum(ind.get("ema50"))
+    ema200 = fnum(ind.get("ema200"))
+    bw     = fnum(ind.get("bb_bandwidth"), 0)
+    div    = (ind.get("divergence") or "NONE").upper()
+
+    # Already in a trade → exit once price has reverted to the mean (the target).
+    if open_position:
+        side = open_position.get("side")
+        if side == "BUY" and bb_pos >= 50:
+            return {"action": "CLOSE", "confidence": 70, "criteriaScore": 3,
+                    "reasoning": "Mean reversion: price reverted to BB mid — take profit",
+                    "riskLevel": "LOW", "keyFactors": ["reverted to mean"]}
+        if side == "SELL" and bb_pos <= 50:
+            return {"action": "CLOSE", "confidence": 70, "criteriaScore": 3,
+                    "reasoning": "Mean reversion: price reverted to BB mid — take profit",
+                    "riskLevel": "LOW", "keyFactors": ["reverted to mean"]}
+        return {"action": "HOLD", "confidence": 50, "criteriaScore": 1,
+                "reasoning": "Holding mean-reversion trade, waiting for reversion to the mean",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    # Flat bands = no edge; don't fade noise.
+    if bw < 0.05:
+        return {"action": "HOLD", "confidence": 40, "criteriaScore": 0,
+                "reasoning": "Bollinger bands too tight — no mean-reversion edge",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    score = 0
+    factors = []
+
+    # Distance from the mean (Bollinger position) — the core of the strategy.
+    if bb_pos <= 15:
+        score += 2; factors.append(f"price at/below lower BB ({bb_pos:.0f}%)")
+    elif bb_pos <= 30:
+        score += 1; factors.append(f"price near lower BB ({bb_pos:.0f}%)")
+    elif bb_pos >= 85:
+        score -= 2; factors.append(f"price at/above upper BB ({bb_pos:.0f}%)")
+    elif bb_pos >= 70:
+        score -= 1; factors.append(f"price near upper BB ({bb_pos:.0f}%)")
+
+    # RSI extreme confirms the stretch.
+    if rsi_v <= 30:
+        score += 2; factors.append(f"RSI oversold ({rsi_v:.0f})")
+    elif rsi_v <= 40:
+        score += 1; factors.append(f"RSI low ({rsi_v:.0f})")
+    elif rsi_v >= 70:
+        score -= 2; factors.append(f"RSI overbought ({rsi_v:.0f})")
+    elif rsi_v >= 60:
+        score -= 1; factors.append(f"RSI high ({rsi_v:.0f})")
+
+    # Stoch RSI as a faster confirmation.
+    if srsi_k <= 20:
+        score += 1; factors.append("Stoch RSI oversold")
+    elif srsi_k >= 80:
+        score -= 1; factors.append("Stoch RSI overbought")
+
+    # Divergence confirms an imminent reversal.
+    if div == "BULLISH" and score > 0:
+        score += 1; factors.append("bullish divergence")
+    elif div == "BEARISH" and score < 0:
+        score -= 1; factors.append("bearish divergence")
+
+    abs_score = abs(score)
+    confidence = min(85, 50 + abs_score * 7)
+    crit = min(5, abs_score)
+
+    # Strong-trend guard: fading a strong trend is how mean-reversion bots blow up.
+    # Only fade in the trend's direction (buy dips in an uptrend, sell rallies in a downtrend).
+    trend_sep = abs(ema50 - ema200) / price * 100 if price else 0
+    if trend_sep > 0.5:
+        uptrend = ema50 > ema200
+        if not ((score >= 3 and uptrend) or (score <= -3 and not uptrend)):
+            return {"action": "HOLD", "confidence": 45, "criteriaScore": crit,
+                    "reasoning": f"Strong trend — skipping counter-trend fade ({', '.join(factors) or 'neutral'})",
+                    "riskLevel": "MEDIUM", "keyFactors": factors}
+
+    if score >= 3:
+        return {"action": "BUY", "confidence": confidence, "criteriaScore": crit,
+                "reasoning": f"Mean reversion BUY: {', '.join(factors)}",
+                "riskLevel": "MEDIUM", "keyFactors": factors}
+    if score <= -3:
+        return {"action": "SELL", "confidence": confidence, "criteriaScore": crit,
+                "reasoning": f"Mean reversion SELL: {', '.join(factors)}",
+                "riskLevel": "MEDIUM", "keyFactors": factors}
+    return {"action": "HOLD", "confidence": 42, "criteriaScore": crit,
+            "reasoning": f"No mean-reversion extreme ({', '.join(factors) or 'neutral'})",
+            "riskLevel": "LOW", "keyFactors": factors}
