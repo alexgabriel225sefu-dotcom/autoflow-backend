@@ -168,27 +168,22 @@ dash = {
 
 # ─── License ──────────────────────────────────────────────
 def verify_license():
+    """License checks are disabled — the bot always starts. Access is controlled
+    via Telegram (ADMIN_CHAT_ID + grant-on-contact), not a license server."""
     key, server = cfg.LICENSE_KEY, cfg.LICENSE_SERVER
     if not key:
-        if os.getenv("BYPASS_LICENSE") == "true":
-            print("⚠️  LICENSE_KEY not set — running in owner/dev mode (BYPASS_LICENSE=true).")
-            return
-        print("\n❌  LICENSE_KEY is not set.")
-        print("    Add your license key from your purchase email.")
-        print("    Purchase at: https://aicashsystem.space\n")
-        sys.exit(1)
+        print("ℹ️  No LICENSE_KEY — running open (access controlled via Telegram).")
+        return
+    # If a key is present, verify it for telemetry, but NEVER exit on failure.
     try:
         res = requests.post(f"{server}/api/verify-license", json={"key": key, "product": "apex-forex"}, timeout=10)
         data = res.json()
-        if not data.get("valid"):
-            print(f"\n❌  License invalid: {data.get('message')}\n")
-            if os.getenv("BYPASS_LICENSE") == "true":
-                print("⚠️  BYPASS_LICENSE=true — continuing in owner/dev mode despite invalid key.")
-                return
-            sys.exit(1)
-        print(f"✅  Forex license verified — welcome, {data.get('email', 'trader')}!")
+        if data.get("valid"):
+            print(f"✅  Forex license verified — welcome, {data.get('email', 'trader')}!")
+        else:
+            print(f"⚠️  License not valid ({data.get('message')}) — continuing anyway.")
     except Exception as e:
-        print(f"⚠️   License server unreachable ({e}) — starting in grace mode.")
+        print(f"⚠️   License server unreachable ({e}) — continuing anyway.")
 
 
 def validate():
@@ -210,15 +205,16 @@ def validate():
         cfg.PAPER_TRADING = True
     if cfg.BROKER == "mt":
         if not cfg.MT_BRIDGE_SECRET:
-            print("❌ BROKER=mt requires MT_BRIDGE_SECRET (same value as in the EA).")
-            sys.exit(1)
-        print("🔗 MetaTrader bridge mode — waiting for the ApexBridge EA to sync.")
+            print("⚠️  BROKER=mt needs MT_BRIDGE_SECRET — falling back to OANDA so the bot still starts.")
+            cfg.BROKER = "oanda"
+        else:
+            print("🔗 MetaTrader bridge mode — waiting for the ApexBridge EA to sync.")
     elif cfg.BROKER == "td":
         if not cfg.TWELVE_DATA_KEY:
-            print("❌ BROKER=td requires TWELVE_DATA_KEY.")
-            print("    Get a free key at: https://twelvedata.com (800 calls/day, no CC)")
-            sys.exit(1)
-        print("📡 Twelve Data mode — paper trading with live forex prices.")
+            print("⚠️  BROKER=td needs TWELVE_DATA_KEY — falling back to OANDA so the bot still starts.")
+            cfg.BROKER = "oanda"
+        else:
+            print("📡 Twelve Data mode — paper trading with live forex prices.")
         if cfg.MULTI_SYMBOL and len(cfg.SCAN_SYMBOLS) > 3:
             print(f"⚠️  MULTI_SYMBOL with {len(cfg.SCAN_SYMBOLS)} pairs needs "
                   f"{len(cfg.SCAN_SYMBOLS) + 3}+ TD calls/cycle — the free tier allows 8/min.")
