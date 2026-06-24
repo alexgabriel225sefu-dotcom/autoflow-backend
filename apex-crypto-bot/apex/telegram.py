@@ -189,9 +189,35 @@ def _build_trades(user_id):
     return f"📋 <b>LAST {len(lst)} TRADES</b>\n━━━━━━━━━━━━━━━━━━━━\n" + "\n".join(rows)
 
 
+def _build_report(user_id):
+    st = user_loop._ensure_user(user_id)["state"]
+    lst = st.get("trades", [])
+    if not lst:
+        return ("📒 <b>No closed trades yet.</b>\n"
+                "Your tax journal fills up as the bot closes positions.")
+    net = sum(t.get("pnl", 0) or 0 for t in lst)
+    gross = sum(t.get("grossPnl", t.get("pnl", 0)) or 0 for t in lst)
+    fees = sum(t.get("feeUsd", 0) or 0 for t in lst)
+    wins = sum(1 for t in lst if t.get("win"))
+    n = len(lst)
+    wr = wins / n * 100 if n else 0
+    rows = [f"{'✅' if t.get('win') else '❌'} {t.get('side')} <b>{t.get('symbol')}</b> "
+            f"${t.get('entry')}→${t.get('exit')} <b>{'+' if t.get('pnl',0) >= 0 else ''}${t.get('pnl')}</b> "
+            f"<i>{(t.get('time') or '')[:16]}</i>" for t in lst[:10]]
+    return (f"📒 <b>Trade Journal &amp; Tax Report</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Closed trades: <b>{n}</b>   Win rate: <b>{wr:.0f}%</b>\n"
+            f"Gross P&amp;L: <b>${gross:.2f}</b>\n"
+            f"Fees (maker/taker): <b>−${fees:.2f}</b>\n"
+            f"<b>NET P&amp;L: {'+' if net >= 0 else ''}${net:.2f}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"<b>Last {min(10, n)} trades:</b>\n" + "\n".join(rows) + "\n"
+            f"<i>Each trade is logged with entry, exit, fees and net P&amp;L for taxes.</i>")
+
+
 _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━━━━━━━\n"
          "Your AI bot trades crypto automatically. Just set it and watch.\n\n"
-         "<b>Controls:</b>\n/menu · /status · /signal · /config · /trades\n\n"
+         "<b>Controls:</b>\n/menu · /status · /signal · /config · /trades · /report\n\n"
          "<b>Settings:</b>\n/symbol BTCUSDT\n/method auto|turtle|livermore|soros|ptj|druckenmiller\n"
          "/risk 5 — % per trade\n/sl 1.6 — stop loss %\n/tp 3.2 — take profit %\n/confidence 70 — min AI confidence\n\n"
          "<b>🤖 DCA Bot (3Commas-style):</b>\n"
@@ -374,6 +400,8 @@ def _handle_command(chat_id, text, msg_id=None):
         return send_to(chat_id, _build_config(chat_id))
     if cmd in ("/trades", "/t"):
         return send_to(chat_id, _build_trades(chat_id))
+    if cmd == "/report":
+        return send_to(chat_id, _build_report(chat_id))
     if cmd == "/help":
         return send_to(chat_id, _HELP)
     if cmd == "/symbol":

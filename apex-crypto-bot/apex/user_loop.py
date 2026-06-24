@@ -98,8 +98,34 @@ def _pos_pnl(pos, price):
     return (pos["entryPrice"] - price) * pos["quantity"]
 
 
+# Standard spot TAKER fee per exchange. Real-time per-pair fees need account
+# API keys; these public rates are used for paper P&L and break-even math.
+_FEE_BY_EXCHANGE = {
+    "binance":   0.001,    # 0.10%
+    "binanceus": 0.001,    # 0.10%
+    "coinbase":  0.006,    # 0.60% retail taker
+    "kraken":    0.0026,   # 0.26%
+    "bybit":     0.001,    # 0.10%
+    "okx":       0.001,    # 0.10%
+}
+
+
+def _fee_pct(u):
+    """Taker fee for this user's exchange (differentiates between exchanges)."""
+    ex = (u.get("exchange") or cfg.EXCHANGE or "binance").lower()
+    return _FEE_BY_EXCHANGE.get(ex, cfg.FEE_PCT)
+
+
 def _open_trade(u, state, settings, side, price, druck_mult, alert, exchange=None):
     symbol = settings["SYMBOL"]
+    fee_rate = _fee_pct(u)
+    # Break-even guard: the target must clear a round-trip fee plus a safety
+    # margin, else the fees eat the profit (critical for tight/scalping configs).
+    breakeven = fee_rate * 2
+    if settings["TAKE_PROFIT_PCT"] <= breakeven * 1.5:
+        print(f"[UserLoop] skip entry — TP {settings['TAKE_PROFIT_PCT']*100:.2f}% "
+              f"doesn't clear round-trip fees {breakeven*100:.2f}%")
+        return
     risk = settings["RISK_PER_TRADE"] * druck_mult
     qty = round((state["paperBalance"] * risk) / price, 6)
     if qty <= 0:
@@ -114,7 +140,7 @@ def _open_trade(u, state, settings, side, price, druck_mult, alert, exchange=Non
             print(f"[UserLoop] live order failed ({e}) — skipping entry")
             return
     else:
-        fee = price * qty * cfg.FEE_PCT
+        fee = price * qty * fee_rate
         if side == "BUY":
             state["paperBalance"] -= price * qty + fee
         else:
@@ -140,17 +166,20 @@ def _close_trade(u, state, settings, price, reason, alert, exchange=None):
             price = order.get("avgPrice") or price
         except Exception as e:
             print(f"[UserLoop] live close failed ({e})")
-    fee_both = (entry + price) * qty * cfg.FEE_PCT
-    pnl = (price - entry if side == "BUY" else entry - price) * qty - fee_both
+    fee_rate = _fee_pct(u)
+    fee_both = (entry + price) * qty * fee_rate
+    gross = (price - entry if side == "BUY" else entry - price) * qty
+    pnl = gross - fee_both    # net of maker/taker fees
     if exchange is None:
         if side == "BUY":
-            state["paperBalance"] += price * qty * (1 - cfg.FEE_PCT)
+            state["paperBalance"] += price * qty * (1 - fee_rate)
         else:
-            state["paperBalance"] -= price * qty * (1 + cfg.FEE_PCT)
+            state["paperBalance"] -= price * qty * (1 + fee_rate)
     strategies.record_trade(state["session"], pnl > 0, pnl)
     state["trades"].insert(0, {
         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "symbol": symbol, "side": side,
         "entry": round(entry, 6), "exit": round(price, 6), "qty": qty,
+        "grossPnl": round(gross, 4), "feeUsd": round(fee_both, 4),
         "pnl": round(pnl, 4), "pnlPct": round(pnl / (entry * qty) * 100, 2) if entry and qty else 0,
         "reason": reason, "win": pnl > 0,
     })
