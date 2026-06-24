@@ -96,6 +96,41 @@ def update(user_id, updates):
     save(user_id, d)
 
 
+def append_trade(user_id, record):
+    """Append a closed-trade record to the user's tax journal (keeps last 500)."""
+    user_id = str(user_id)
+    trades = load_trades(user_id)
+    trades.append(record)
+    trades = trades[-500:]
+    payload = json.dumps(trades)
+    if _USE_REDIS:
+        _redis_set(f"forex:trades:{user_id}", payload)
+        return
+    try:
+        with open(_path(user_id) + ".trades", "w") as f:
+            f.write(payload)
+    except Exception as e:
+        print(f"[Store] append_trade failed: {e}")
+
+
+def load_trades(user_id):
+    """Load the user's closed-trade journal, or [] if none."""
+    user_id = str(user_id)
+    if _USE_REDIS:
+        raw = _redis_get(f"forex:trades:{user_id}")
+    else:
+        try:
+            raw = open(_path(user_id) + ".trades").read()
+        except Exception:
+            raw = None
+    if raw:
+        try:
+            return json.loads(raw)
+        except Exception:
+            pass
+    return []
+
+
 def all_active():
     """Return list of user_ids that have active=True."""
     if _USE_REDIS:

@@ -571,16 +571,60 @@ def _user_alert(uid, result):
         reasons = ", ".join(result.get("reasons", ["risk limit"]))
         send_to(uid, f"🛑 <b>Trading paused — risk limit hit</b>\n{reasons}")
     elif action in ("BUY", "SELL"):
+        spread = result.get("spreadPips")
+        spread_line = f" | Spread: {spread}p" if spread is not None else ""
         send_to(uid,
                 f"⚡ <b>{action}</b> — {sym}\n"
                 f"Price: <b>{result.get('price', '—')}</b> | "
-                f"Confidence: <b>{result.get('confidence', 0)}%</b>")
+                f"Confidence: <b>{result.get('confidence', 0)}%</b>{spread_line}")
     elif action == "CLOSE":
-        send_to(uid,
-                f"🔒 <b>Position closed</b> — {sym}\n"
-                f"Price: <b>{result.get('price', '—')}</b>")
+        net = result.get("netPnl")
+        if net is not None:
+            icon = "✅" if net >= 0 else "❌"
+            send_to(uid,
+                    f"🔒 <b>Position closed</b> — {sym}\n"
+                    f"Exit: <b>{result.get('price', '—')}</b>\n"
+                    f"{icon} Net P&amp;L: <b>{'+' if net >= 0 else ''}${net:.2f}</b> "
+                    f"<i>(gross ${result.get('grossPnl', 0):.2f} − cost ${result.get('costUsd', 0):.2f})</i>\n"
+                    f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>")
+        else:
+            send_to(uid,
+                    f"🔒 <b>Position closed</b> — {sym}\n"
+                    f"Price: <b>{result.get('price', '—')}</b>")
     else:
         send_to(uid, f"⚡ <b>{action}</b> — {sym}")
+
+
+def _handle_report(chat_id):
+    """Trade journal summary — net P&L, costs, win rate. For tax reporting."""
+    trades = user_store.load_trades(chat_id)
+    if not trades:
+        return send_to(chat_id,
+                       "📒 <b>No closed trades yet.</b>\n"
+                       "Your tax journal fills up as the bot closes positions.")
+    total_net = sum(t.get("netPnl", 0) or 0 for t in trades)
+    total_cost = sum(t.get("costUsd", 0) or 0 for t in trades)
+    total_gross = sum(t.get("grossPnl", 0) or 0 for t in trades)
+    wins = sum(1 for t in trades if (t.get("netPnl", 0) or 0) > 0)
+    n = len(trades)
+    win_rate = wins / n * 100 if n else 0
+    lines = []
+    for t in trades[-10:][::-1]:
+        net = t.get("netPnl", 0) or 0
+        icon = "✅" if net >= 0 else "❌"
+        lines.append(f"{icon} {t.get('symbol','?')}  {t.get('entry','?')}→{t.get('exit','?')}  "
+                     f"<b>{'+' if net >= 0 else ''}${net:.2f}</b>  <i>{(t.get('time') or '')[:16]}</i>")
+    send_to(chat_id,
+            f"📒 <b>Trade Journal &amp; Tax Report</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Closed trades: <b>{n}</b>   Win rate: <b>{win_rate:.0f}%</b>\n"
+            f"Gross P&amp;L: <b>${total_gross:.2f}</b>\n"
+            f"Costs (spread): <b>−${total_cost:.2f}</b>\n"
+            f"<b>NET P&amp;L: {'+' if total_net >= 0 else ''}${total_net:.2f}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"<b>Last {min(10, n)} trades:</b>\n" + "\n".join(lines) + "\n"
+            f"<i>Every closed trade is logged with entry, exit, fees and net P&amp;L "
+            f"for your tax records.</i>")
 
 
 def _auto_start_user(chat_id):
@@ -638,6 +682,7 @@ def _handle_config(chat_id):
 _HELP_CLIENT = ("📋 <b>APEX FOREX BOT</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "/status — live trading snapshot\n"
+                "/report — trade journal + net P&amp;L (for taxes)\n"
                 "/help — this list")
 
 _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
@@ -795,6 +840,8 @@ def _poll_loop():
                     _handle_deploy(chat_id)
                 elif cmd_l in ("/status", "/s"):
                     _handle_status(chat_id)
+                elif cmd_l == "/report":
+                    _handle_report(chat_id)
                 elif cmd_l == "/help":
                     send_to(chat_id, _HELP_ADMIN if is_adm else _HELP_CLIENT)
                 elif cmd_l == "/users" and is_adm:

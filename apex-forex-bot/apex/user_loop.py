@@ -14,6 +14,25 @@ _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
 
 
+def _log_trade(user_id, record):
+    """Persist a closed trade to the per-user tax journal (date, entry, exit,
+    fees/spread cost, gross & net PnL) — exportable for tax reporting."""
+    try:
+        user_store.append_trade(user_id, {
+            "time":      record.get("time"),
+            "symbol":    record.get("symbol"),
+            "entry":     record.get("entryPrice"),
+            "exit":      record.get("price"),
+            "grossPnl":  record.get("grossPnl"),
+            "costUsd":   record.get("costUsd"),
+            "netPnl":    record.get("netPnl"),
+            "balance":   record.get("balance"),
+            "openedAt":  record.get("openedAt"),
+        })
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] trade-log failed: {e}")
+
+
 def _make_broker(user):
     """Create the per-user broker with isolated config.
 
@@ -142,7 +161,25 @@ def _loop(user_id, alert_fn):
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)
 
-            if action in ("BUY", "SELL") and not open_pos and confidence >= cfg.MIN_CONFIDENCE:
+            entry_ok = action in ("BUY", "SELL") and not open_pos and confidence >= cfg.MIN_CONFIDENCE
+            if entry_ok:
+                # ── Cost control: the spread is forex's hidden fee. Skip a too-wide
+                #    spread and refuse trades whose target can't clear a round-trip
+                #    spread plus a safety margin (break-even guard). ──
+                try:
+                    bid, ask = broker.get_bid_ask(cfg.SYMBOL)
+                    spread = forex.spread_pips(bid, ask, cfg.SYMBOL)
+                except Exception:
+                    spread = 0.0
+                max_spread = getattr(cfg, "MAX_SPREAD_PIPS", 3.0)
+                if spread > max_spread:
+                    print(f"[UserLoop:{user_id}] skip entry — spread {spread:.1f}p > {max_spread}p limit")
+                    entry_ok = False
+                elif cfg.TAKE_PROFIT_PIPS <= spread * 1.5:
+                    print(f"[UserLoop:{user_id}] skip entry — TP {cfg.TAKE_PROFIT_PIPS:g}p doesn't clear spread {spread:.1f}p")
+                    entry_ok = False
+
+            if entry_ok:
                 pip = forex.pip_size(cfg.SYMBOL)
                 sl_price = (price - cfg.STOP_LOSS_PIPS * pip
                             if action == "BUY"
@@ -150,21 +187,24 @@ def _loop(user_id, alert_fn):
                 tp_price = (price + cfg.TAKE_PROFIT_PIPS * pip
                             if action == "BUY"
                             else price - cfg.TAKE_PROFIT_PIPS * pip)
-                units = int(paper_balance * cfg.RISK_PER_TRADE * cfg.LEVERAGE)
-                units = max(units, 1000)
+                # Risk-based sizing: never risk more than RISK_PER_TRADE of balance.
+                units = forex.calc_units(paper_balance, cfg.RISK_PER_TRADE,
+                                         cfg.STOP_LOSS_PIPS, cfg.SYMBOL, price)
+                units = max(int(units), 1000)
 
                 broker.place_order(action, units, cfg.SYMBOL, sl=sl_price, tp=tp_price)
 
                 if cfg.PAPER_TRADING:
                     open_pos = {"side": action, "entryPrice": price,
                                 "symbol": cfg.SYMBOL, "units": units,
-                                "quantity": units, "stopLoss": sl_price, "takeProfit": tp_price}
+                                "quantity": units, "stopLoss": sl_price, "takeProfit": tp_price,
+                                "entrySpreadPips": spread, "openedAt": now_str}
                 else:
                     open_pos = broker.get_open_position(cfg.SYMBOL)
 
                 dash["openPosition"] = open_pos
                 result = {"action": action, "symbol": cfg.SYMBOL, "confidence": confidence,
-                          "price": price, "time": now_str}
+                          "price": price, "spreadPips": round(spread, 1), "time": now_str}
                 dash["trades"].insert(0, result)
                 dash["trades"] = dash["trades"][:50]
                 if alert_fn:
@@ -172,14 +212,25 @@ def _loop(user_id, alert_fn):
 
             elif action == "CLOSE" and open_pos:
                 broker.close_position(cfg.SYMBOL)
+                gross = cost_usd = net = 0.0
                 if cfg.PAPER_TRADING and open_pos:
-                    pnl = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
-                                        price, open_pos.get("units", 1000), cfg.SYMBOL)
-                    paper_balance += pnl
+                    units_ = open_pos.get("units", 1000)
+                    gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
+                                          price, units_, cfg.SYMBOL)
+                    # Net profit = gross minus the spread cost (forex's real fee).
+                    pv = forex.pip_value_per_unit(cfg.SYMBOL, price)
+                    cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                    net = gross - cost_usd
+                    paper_balance += net
+                result = {"action": "CLOSE", "symbol": cfg.SYMBOL, "price": price,
+                          "entryPrice": open_pos.get("entryPrice"),
+                          "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
+                          "netPnl": round(net, 2), "balance": round(paper_balance, 2),
+                          "openedAt": open_pos.get("openedAt"), "time": now_str}
+                _log_trade(user_id, result)
                 open_pos = None
                 dash["openPosition"] = None
                 dash["balance"] = paper_balance
-                result = {"action": "CLOSE", "symbol": cfg.SYMBOL, "price": price, "time": now_str}
                 dash["trades"].insert(0, result)
                 dash["trades"] = dash["trades"][:50]
                 if alert_fn:
