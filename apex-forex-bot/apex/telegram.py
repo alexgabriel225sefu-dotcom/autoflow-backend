@@ -46,6 +46,158 @@ _bot_control = {}  # callbacks: {set_paused, get_paused, reload_broker}
 
 _PAIR_RE = re.compile(r"^[A-Z]{3}_[A-Z]{3}$")
 
+# ─── Trade intent patterns (work without any AI key) ─────
+_RE_AMOUNT_FX = re.compile(
+    r"(?:cu\s+|with\s+|de\s+|pentru\s+)(\d+(?:[.,]\d+)?)\s*(?:\$|usd|dolari?|bucks?)?",
+    re.IGNORECASE,
+)
+_RE_BUY_FX = re.compile(
+    r"\b(intr[aă]|intr[aă]-?[oO]|cumpăr[aă]?|cumpara|buy|long|intru)\b",
+    re.IGNORECASE,
+)
+_RE_SELL_FX = re.compile(
+    r"\b(vinde|vânz[iă]|short|sell)\b",
+    re.IGNORECASE,
+)
+_RE_CLOSE_FX = re.compile(
+    r"\b(inchide|închide|close|exit|iesi|ieși)\b",
+    re.IGNORECASE,
+)
+_RE_ALL_IN_FX = re.compile(
+    r"\ball.?in\b|toat[aă]\s+suma|tot\s+balant|full\s+balance",
+    re.IGNORECASE,
+)
+_RE_CLOSE_MATH_FX = re.compile(
+    r"(inchide|close|iesi|exit|dac[aă]).{0,30}(cât|cat|cati|câți|rămâne|ramane|profit|pierd|lose)",
+    re.IGNORECASE,
+)
+_RE_PAIR_FX = re.compile(r"\b([A-Z]{3})[/_]([A-Z]{3})\b|\b(XAU|XAG|EUR|GBP|USD|JPY|AUD|CAD|CHF|NZD)\b")
+
+
+def _user_symbol(chat_id) -> str:
+    dash = user_loop.get_dash(chat_id)
+    if dash and dash.get("symbol"):
+        return dash["symbol"]
+    user = user_store.load(chat_id)
+    return user.get("symbol", cfg.SYMBOL)
+
+
+def _handle_trade_intent_fx(chat_id, text) -> bool:
+    """Return True if the message was a direct trade command — no AI needed."""
+    t = text.strip()
+
+    # "if I close now, how much would I have?"
+    if _RE_CLOSE_MATH_FX.search(t):
+        dash = user_loop.get_dash(chat_id) or {}
+        open_pos = dash.get("openPosition")
+        if not open_pos:
+            send_to(chat_id, "📭 Nicio poziție deschisă momentan.")
+            return True
+        from apex.brokers import yahoo
+        from apex.brokers.oanda import OandaBroker
+        import types as _types
+        user = user_store.load(chat_id)
+        sym = open_pos.get("symbol", _user_symbol(chat_id))
+        try:
+            paper = user.get("paper", True)
+            fake_cfg = _types.SimpleNamespace(
+                OANDA_API_TOKEN=user.get("oanda_token", ""),
+                OANDA_ACCOUNT_ID=user.get("oanda_account_id", ""),
+                OANDA_ENV="practice", SYMBOL=sym, TIMEFRAME="5m", CANDLES=5,
+                PAPER_TRADING=paper, PAPER_BALANCE=1000,
+                STOP_LOSS_PIPS=20.0, TAKE_PROFIT_PIPS=40.0,
+                RISK_PER_TRADE=0.005, LEVERAGE=30.0, MARGIN_CAP=0.5,
+                MAX_SPREAD_PIPS=3.0, MIN_CONFIDENCE=62,
+            )
+            broker = yahoo if (paper and not user.get("oanda_token")) else OandaBroker(fake_cfg)
+            candles = broker.get_candles(sym, "5m", 5)
+            price = candles[-1]["close"] if candles else open_pos["entryPrice"]
+        except Exception:
+            price = open_pos["entryPrice"]
+        entry = open_pos["entryPrice"]
+        units = open_pos.get("units", 1000)
+        side = open_pos["side"]
+        gross = forex.pnl_usd(side, entry, price, units, sym)
+        pv = forex.pip_value_per_unit(sym, price)
+        cost = open_pos.get("entrySpreadPips", 0.0) * pv * units
+        net = gross - cost
+        bal = dash.get("balance", 1000.0) + net
+        sign = "+" if net >= 0 else ""
+        send_to(chat_id,
+                f"📊 <b>Dacă închizi acum:</b>\n"
+                f"Preț curent: <b>{price:.5f}</b>\n"
+                f"P&amp;L brut: <b>{sign}${gross:.2f}</b>\n"
+                f"Cost spread: <b>−${cost:.2f}</b>\n"
+                f"Net: <b>{sign}${net:.2f}</b>\n"
+                f"Balanță după: <b>${bal:.2f}</b>\n\n"
+                f"<i>Folosește</i> <code>/close</code> <i>pentru a închide efectiv.</i>")
+        return True
+
+    # Close intent
+    if _RE_CLOSE_FX.search(t) and not _RE_BUY_FX.search(t):
+        dash = user_loop.get_dash(chat_id) or {}
+        if not dash.get("openPosition"):
+            send_to(chat_id, "📭 Nicio poziție deschisă.")
+            return True
+        _handle_close(chat_id)
+        return True
+
+    # All-in
+    if _RE_ALL_IN_FX.search(t):
+        sym = _user_symbol(chat_id)
+        dash = user_loop.get_dash(chat_id) or {}
+        bal = dash.get("balance", 1000.0)
+        send_to(chat_id, f"⚡ <b>ALL IN</b> — BUY <b>{sym}</b> cu <b>${bal * 0.98:.0f}</b>…")
+        result = user_loop.force_trade(str(chat_id), "BUY", sym)
+        _send_fx_trade_result(chat_id, result, sym)
+        return True
+
+    # BUY intent
+    if _RE_BUY_FX.search(t):
+        sym = _user_symbol(chat_id)
+        # detect pair in message
+        pm = _RE_PAIR_FX.search(t.upper())
+        if pm:
+            raw = pm.group(0).replace("/", "_").replace("-", "_")
+            if "_" not in raw:
+                raw = raw + "_USD"
+            if _PAIR_RE.match(raw):
+                sym = raw
+        send_to(chat_id, f"⚡ Deschid <b>BUY {sym}</b>…")
+        result = user_loop.force_trade(str(chat_id), "BUY", sym)
+        _send_fx_trade_result(chat_id, result, sym)
+        return True
+
+    # SELL/SHORT intent
+    if _RE_SELL_FX.search(t):
+        sym = _user_symbol(chat_id)
+        pm = _RE_PAIR_FX.search(t.upper())
+        if pm:
+            raw = pm.group(0).replace("/", "_").replace("-", "_")
+            if "_" not in raw:
+                raw = raw + "_USD"
+            if _PAIR_RE.match(raw):
+                sym = raw
+        send_to(chat_id, f"⚡ Deschid <b>SELL {sym}</b>…")
+        result = user_loop.force_trade(str(chat_id), "SELL", sym)
+        _send_fx_trade_result(chat_id, result, sym)
+        return True
+
+    return False
+
+
+def _send_fx_trade_result(chat_id, result, sym):
+    if result.get("ok"):
+        send_to(chat_id,
+                f"✅ <b>{result['side']} {sym}</b> deschis\n"
+                f"Preț: <b>{result['price']:.5f}</b> | Unități: {result.get('units', '—')}\n"
+                f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
+                f"Spread: {result.get('spread', '—')}p\n"
+                f"<i>Închide cu</i> <code>/close</code>")
+    else:
+        err = result.get("error", "unknown error")
+        send_to(chat_id, f"❌ Nu am putut deschide tranzacția: <i>{err}</i>")
+
 
 # ─── Telegram API helpers ─────────────────────────────────
 
@@ -183,8 +335,26 @@ def _build_status(dash, chart=""):
 
 
 def _handle_status(chat_id):
-    # Per-user dash if their loop is running, else global dash
-    dash = user_loop.get_dash(chat_id) or _get_dash()
+    dash = user_loop.get_dash(chat_id)
+    # If user's loop hasn't ticked yet, build a minimal dash from their settings
+    if not dash or not dash.get("broker"):
+        user = user_store.load(chat_id)
+        if user.get("symbol") or user.get("paper") is not None:
+            sym = user.get("symbol", cfg.SYMBOL)
+            bal = float(user.get("paper_balance", cfg.PAPER_BALANCE))
+            paper = user.get("paper", True)
+            is_open = forex.is_market_open()
+            mode_label = "Paper" if paper else "Live OANDA"
+            send_to(chat_id,
+                    f"💱 <b>APEX FOREX BOT</b>  {mode_label}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 Balance: <b>${bal:.2f}</b>\n"
+                    f"💱 Pair: <b>{sym}</b> | "
+                    f"{'🟢 OPEN' if is_open else '🔴 CLOSED (weekend)'}\n\n"
+                    f"📭 No open position. Bot is scanning automatically.\n"
+                    f"<i>Force entry:</i> <code>/buy {sym}</code> or <code>/sell {sym}</code>")
+            return
+        dash = _get_dash()
     if not dash or not dash.get("broker"):
         return send_to(chat_id, "⏳ Bot not started yet. Send /start to begin trading.")
     chart = ""
@@ -941,16 +1111,19 @@ def _poll_loop():
                 elif cmd_l == "/stop" and is_adm:
                     _handle_stop(chat_id)
                 elif not raw.startswith("/"):
-                    # Free-text → AI assistant (any language, any client)
-                    def _typing_reply(reply, cid=chat_id):
-                        send_to(cid, reply)
-                    def _typing_status(status, cid=chat_id):
-                        send_to(cid, status)
-                    assistant.chat(
-                        chat_id, raw,
-                        send_fn=_typing_reply,
-                        send_status=_typing_status,
-                    )
+                    # Intent detection first (works with zero AI key)
+                    handled = _handle_trade_intent_fx(chat_id, raw)
+                    if not handled:
+                        # Fall through to AI assistant
+                        def _typing_reply(reply, cid=chat_id):
+                            send_to(cid, reply)
+                        def _typing_status(status, cid=chat_id):
+                            send_to(cid, status)
+                        assistant.chat(
+                            chat_id, raw,
+                            send_fn=_typing_reply,
+                            send_status=_typing_status,
+                        )
                 # Unknown /commands → silently ignored
         except Exception as e:
             print(f"[TELEGRAM] Poll error: {e}")
