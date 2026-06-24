@@ -34,7 +34,7 @@ _TOOLS = [
         "description": (
             "Open a BUY or SELL position. "
             "Only call AFTER the user explicitly confirms they want to trade. "
-            "Romanian confirmations: da, intră, execută, go."
+            "Confirmation can be in ANY language (e.g. yes, da, sí, oui, ja, evet, نعم, да, go)."
         ),
         "input_schema": {
             "type": "object",
@@ -79,7 +79,10 @@ You help users trade smarter: analyze markets, execute trades, explain results, 
 
 RULES:
 - Be concise — Telegram messages, 2-4 sentences max unless detailed analysis is needed
-- Reply in the same language the user writes (Romanian or English)
+- LANGUAGE: Detect the language of the user's message and ALWAYS reply in that
+  EXACT same language — Romanian, English, Spanish, French, German, Arabic,
+  Hindi, Turkish, Portuguese, Russian, or ANY other. Mirror the user perfectly.
+  Never default to a fixed language; match whatever they wrote in this message.
 - Before executing a trade: show signal analysis briefly, then execute immediately.
   Do NOT ask for confirmation — users can always close with /close.
 - Always cite real numbers: RSI, confidence %, price, P&L
@@ -317,6 +320,11 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
     return json.dumps({"error": f"Unknown tool: {name}"})
 
 
+class _ProviderDown(Exception):
+    """Raised when an AI provider is rate-limited/unavailable so the chat
+    fallback chain can transparently try the next provider."""
+
+
 def _chat_anthropic(user_id: str, message: str, api_key: str, send_fn, send_status) -> str:
     """Full Claude tool-use conversation loop."""
     client = _get_client(api_key)
@@ -330,13 +338,17 @@ def _chat_anthropic(user_id: str, message: str, api_key: str, send_fn, send_stat
     max_loops = 5
 
     for _ in range(max_loops):
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=600,
-            system=system,
-            messages=messages,
-            tools=_TOOLS,
-        )
+        try:
+            response = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=600,
+                system=system,
+                messages=messages,
+                tools=_TOOLS,
+            )
+        except Exception as e:
+            # Rate-limited / overloaded / no credit → let the chain fall through.
+            raise _ProviderDown(f"claude: {e}")
 
         if response.stop_reason != "tool_use":
             # Final text response
@@ -378,7 +390,9 @@ def _local_status_answer(user_id: str) -> str:
     pos = state.get("openPosition")
     sig = state.get("lastSignal")
 
-    lines = [f"💼 <b>Cont:</b> ${balance:.2f} (start ${start_bal:.2f}, {pnl_pct:+.1f}%)"]
+    # Universal/English wording: this only shows in the rare all-AI-down state,
+    # where we can't translate dynamically. It's mostly numbers + symbols anyway.
+    lines = [f"💼 <b>Account:</b> ${balance:.2f} (start ${start_bal:.2f}, {pnl_pct:+.1f}%)"]
     if pos:
         try:
             price = binance.get_price(pos["symbol"])
@@ -386,18 +400,18 @@ def _local_status_answer(user_id: str) -> str:
             chg = ((price - entry) / entry * 100) * (1 if pos["side"] == "BUY" else -1)
             sign = "+" if chg >= 0 else ""
             lines.append(
-                f"📈 <b>Poziție deschisă:</b> {pos['side']} {pos['symbol']}\n"
-                f"Intrare: ${entry:.4f} → Acum: ${price:.4f} ({sign}{chg:.2f}%)\n"
+                f"📈 <b>Open position:</b> {pos['side']} {pos['symbol']}\n"
+                f"Entry: ${entry:.4f} → Now: ${price:.4f} ({sign}{chg:.2f}%)\n"
                 f"🛡 SL: ${pos['stopLoss']:.4f}  🎯 TP: ${pos['takeProfit']:.4f}"
             )
         except Exception:
-            lines.append(f"📈 <b>Poziție:</b> {pos['side']} {pos['symbol']}")
-        lines.append("<i>Închizi oricând cu</i> <code>/close</code>")
+            lines.append(f"📈 <b>Position:</b> {pos['side']} {pos['symbol']}")
+        lines.append("<i>Close anytime with</i> <code>/close</code>")
     else:
-        lines.append("📭 <b>Nicio poziție deschisă.</b> Botul scanează automat.")
-        lines.append("<i>Forțezi o intrare:</i> <code>/buy BTCUSDT</code> · <code>/sell BTCUSDT</code>")
+        lines.append("📭 <b>No open position.</b> The bot is scanning automatically.")
+        lines.append("<i>Force an entry:</i> <code>/buy BTCUSDT</code> · <code>/sell BTCUSDT</code>")
     if sig:
-        lines.append(f"🤖 Ultimul semnal: <b>{sig['action']}</b> ({sig['confidence']:.0f}%)")
+        lines.append(f"🤖 Last signal: <b>{sig['action']}</b> ({sig['confidence']:.0f}%)")
     return "\n".join(lines)
 
 
@@ -415,8 +429,8 @@ def _chat_groq(user_id: str, message: str) -> str:
 
     if not key:
         return (_local_status_answer(user_id) +
-                "\n\n🧠 <i>Pentru chat AI (întrebări, analize, comenzi în limbaj natural) "
-                "adaugă o cheie gratuită — trimite</i> <code>/ai</code> <i>și alege Gemini, Groq sau Claude.</i>")
+                "\n\n🧠 <i>For AI chat (questions, analysis, natural-language commands) "
+                "add a free key — send</i> <code>/ai</code> <i>and pick Gemini, Groq or Claude.</i>")
 
     context = _build_context(user_id)
     system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
@@ -435,18 +449,18 @@ def _chat_groq(user_id: str, message: str) -> str:
             timeout=15,
         )
         if r.status_code == 429:
-            # Groq quota gone — still answer from REAL state, no AI needed.
-            return (_local_status_answer(user_id) +
-                    "\n\n💡 <i>Pentru chat AI nelimitat: adaugă o cheie Gemini gratuită — "
-                    "aistudio.google.com → Get API key → trimite</i> <code>/gemini CHEIE</code>")
+            # Groq quota gone → fall through to the next provider / local answer.
+            raise _ProviderDown("groq quota")
         r.raise_for_status()
         reply = r.json()["choices"][0]["message"]["content"].strip()
         _save_exchange(user_id, message, reply)
         return reply
+    except _ProviderDown:
+        raise
     except requests.HTTPError as e:
-        return f"⚠️ Asistent indisponibil momentan. Incearca din nou."
+        raise _ProviderDown(f"groq http {e}")
     except Exception as e:
-        return f"⚠️ Eroare asistent: {e}"
+        raise _ProviderDown(f"groq {e}")
 
 
 def _gemini_url():
@@ -539,21 +553,20 @@ def _chat_gemini(user_id: str, message: str, key: str, send_status=None) -> str:
                 timeout=20,
             )
             if r.status_code == 429:
-                # Daily Gemini quota exhausted — still answer from real state,
-                # and nudge the user to add their OWN free key for more headroom.
-                return (_local_status_answer(user_id) +
-                        "\n\n⏳ <i>Limita Gemini de azi atinsă (resetează mâine). Pentru cotă "
-                        "proprie nelimitată: trimite</i> <code>/ai</code> <i>și pune cheia ta.</i>")
+                # Daily Gemini quota exhausted → fall through to the next provider.
+                raise _ProviderDown("gemini quota")
             r.raise_for_status()
-        except requests.HTTPError:
-            return "⚠️ Asistent (Gemini) indisponibil momentan. Incearca din nou."
+        except _ProviderDown:
+            raise
+        except requests.HTTPError as e:
+            raise _ProviderDown(f"gemini http {e}")
         except Exception as e:
-            return f"⚠️ Eroare asistent: {e}"
+            raise _ProviderDown(f"gemini {e}")
 
         data = r.json()
         cands = data.get("candidates", [])
         if not cands:
-            return "⚠️ Gemini nu a returnat raspuns. Incearca din nou."
+            raise _ProviderDown("gemini empty response")
         parts = cands[0].get("content", {}).get("parts", [])
 
         # Collect any function calls Gemini wants to make
@@ -561,7 +574,7 @@ def _chat_gemini(user_id: str, message: str, key: str, send_status=None) -> str:
         if not fcalls:
             reply = "".join(p.get("text", "") for p in parts).strip()
             if not reply:
-                return "⚠️ Gemini a returnat un raspuns gol. Incearca din nou."
+                raise _ProviderDown("gemini empty text")
             _save_exchange(user_id, message, reply)
             return reply
 
@@ -577,7 +590,7 @@ def _chat_gemini(user_id: str, message: str, key: str, send_status=None) -> str:
             })
         contents.append({"role": "user", "parts": resp_parts})
 
-    return "⚠️ Nu am putut finaliza cererea. Incearca din nou."
+    return "⚠️ Could not complete the request. Please try again."
 
 
 def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
@@ -597,17 +610,46 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
             u = user_loop._ensure_user(user_id)
             anthropic_key = u.get("anthropic_key") or cfg.ANTHROPIC_API_KEY
             gemini_key = u.get("gemini_key") or cfg.GEMINI_API_KEY
+            groq_key = u.get("groq_key") or cfg.GROQ_API_KEY
+
+            # Fallback CHAIN: try every available provider in order of capability.
+            # When one is rate-limited/down it raises _ProviderDown and we slide to
+            # the next. If ALL are exhausted we still answer from real state — so the
+            # chat is NEVER fully silent, and (separately) trading never stops since
+            # it runs on the rule-based engine, not on any AI key.
+            chain = []
             if anthropic_key:
-                reply = _chat_anthropic(user_id, message, anthropic_key, send_fn, send_status)
-            elif gemini_key:
-                reply = _chat_gemini(user_id, message, gemini_key, send_status)
-            else:
-                reply = _chat_groq(user_id, message)
-            if reply:
-                send_fn(reply)
+                chain.append(("Claude", lambda: _chat_anthropic(user_id, message, anthropic_key, send_fn, send_status)))
+            if gemini_key:
+                chain.append(("Gemini", lambda: _chat_gemini(user_id, message, gemini_key, send_status)))
+            if groq_key:
+                chain.append(("Groq", lambda: _chat_groq(user_id, message)))
+
+            reply = None
+            for name, prov in chain:
+                try:
+                    reply = prov()
+                    if reply:
+                        break
+                except _ProviderDown as e:
+                    print(f"[Assistant:{user_id}] {name} down ({e}) → next provider")
+                    continue
+                except Exception as e:
+                    print(f"[Assistant:{user_id}] {name} error ({e}) → next provider")
+                    continue
+
+            if not reply:
+                reply = (_local_status_answer(user_id) +
+                         "\n\n🧠 <i>AI is at its limit right now (resets in a few hours). "
+                         "Trading keeps running on the strategy engine. For your own "
+                         "unlimited chat, send</i> <code>/ai</code> <i>and add a free key.</i>")
+            send_fn(reply)
         except Exception as e:
             print(f"[Assistant:{user_id}] error: {e}")
-            send_fn("⚠️ Assistant error. Please try again.")
+            try:
+                send_fn(_local_status_answer(user_id))
+            except Exception:
+                send_fn("⚠️ Assistant error. Please try again.")
 
     threading.Thread(target=_run, daemon=True).start()
 
