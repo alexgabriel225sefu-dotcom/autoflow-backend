@@ -209,9 +209,10 @@ _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━
          "<b>Run:</b>\n/pause · /resume\n\n"
          "<b>Account:</b>\n/setup — switch paper ↔ real, re-run onboarding\n\n"
          "<b>💬 Smart assistant:</b>\nJust talk to me! \"analyze BTC\", \"buy ETH\", \"close position\"\n"
-         "/claude sk-ant-KEY — full chat + trade execution (console.anthropic.com)\n"
+         "/ai — connect your own FREE AI key (Gemini / Groq / Claude) for unlimited chat\n"
          "/gemini AIza-KEY — FREE chat + analysis, 1500/day (aistudio.google.com)\n"
-         "/groq gsk_KEY — free fast chat (console.groq.com)")
+         "/groq gsk_KEY — free fast chat (console.groq.com)\n"
+         "/claude sk-ant-KEY — full chat + trade execution (console.anthropic.com)")
 
 
 # ─── Alerts (per-user callback) ───────────────────────────
@@ -567,6 +568,9 @@ def _handle_command(chat_id, text, msg_id=None):
                        f"{deal_line}\n\n"
                        "<i>/grid on · /grid off · /grid stop · /grid lower 95000 · "
                        "/grid upper 105000 · /grid levels 10 · /grid step 2</i>")
+    if cmd == "/ai":
+        # Let a client (re)connect their own free AI key any time.
+        return _ask_groq(chat_id)
     if cmd == "/groq":
         if msg_id:   # delete the message so the secret key doesn't linger in chat
             _delete_message(chat_id, msg_id)
@@ -883,40 +887,80 @@ def _finish_live_setup(chat_id, text, msg_id):
 
 
 def _ask_groq(chat_id):
-    """Onboarding step 3: collect the client's free Groq key (or skip)."""
+    """Onboarding step 3: collect ANY free AI key (Gemini / Claude / Groq) or skip."""
     u = user_loop._ensure_user(chat_id)
-    if u.get("groq_key"):
+    if u.get("groq_key") or u.get("gemini_key") or u.get("anthropic_key"):
         return _ready(chat_id)
     _wizard[str(chat_id)] = "GROQ"
     send_to(chat_id,
-            "🧠 <b>Set up your free AI key</b>\n\n"
-            "The bot's brain runs on <b>Groq</b> (free, ~14,400 signals/day, your own personal quota).\n\n"
-            "1️⃣ Tap <b>Get free Groq key</b> → create free account\n"
-            "2️⃣ Copy your key (starts with <code>gsk_</code>)\n"
-            "3️⃣ Send it here in this chat\n\n"
-            "Or tap <b>Skip</b> to use the shared AI (limited quota).",
+            "🧠 <b>Activate your AI brain (free)</b>\n\n"
+            "Your bot already trades on its built-in rule engine — but a free AI key "
+            "unlocks <b>smart signals + unlimited chat</b> (\"how's my trade?\", \"buy ETH\", etc.).\n\n"
+            "Pick ONE — all free, takes 1 minute:\n\n"
+            "🥇 <b>Gemini</b> — best free option, 1,500/day, no limits.\n"
+            "   → aistudio.google.com → <i>Get API key</i>\n"
+            "🥈 <b>Groq</b> — fast, ~14,400/day.\n"
+            "   → console.groq.com/keys (key starts <code>gsk_</code>)\n"
+            "🥉 <b>Claude</b> — smartest, executes trades from chat.\n"
+            "   → console.anthropic.com (key starts <code>sk-ant-</code>)\n\n"
+            "📋 <b>Just paste the key here</b> — I auto-detect which one it is.\n"
+            "Or tap <b>Skip</b> to ride the shared AI (may hit limits).",
             {"reply_markup": json.dumps({"inline_keyboard": [
-                [{"text": "🔑 Get free Groq key", "url": "https://console.groq.com/keys"}],
+                [{"text": "🥇 Get free Gemini key", "url": "https://aistudio.google.com/apikey"}],
+                [{"text": "🥈 Get free Groq key", "url": "https://console.groq.com/keys"}],
                 [{"text": "⚡ Skip — use shared AI", "callback_data": "groq:skip"}],
             ]})})
 
 
+def _detect_key_kind(key):
+    """Return 'claude' | 'groq' | 'gemini' from a pasted key, or None if unknown."""
+    k = (key or "").strip()
+    if k.startswith("sk-ant-"):
+        return "claude"
+    if k.startswith("gsk_"):
+        return "groq"
+    if k.startswith("AIza") or (len(k) >= 30 and "-" not in k and "_" not in k):
+        return "gemini"
+    return None
+
+
 def _finish_groq(chat_id, key, msg_id):
+    """Verify & save ANY supported AI key, auto-detecting the provider."""
     _delete_message(chat_id, msg_id)
     key = key.strip()
-    send_to(chat_id, "🔍 Testing your Groq key…")
-    ok, why = ai.test_key(key)
+    kind = _detect_key_kind(key)
+    _retry_kb = {"reply_markup": json.dumps({"inline_keyboard": [
+        [{"text": "🥇 Get free Gemini key", "url": "https://aistudio.google.com/apikey"}],
+        [{"text": "🥈 Get free Groq key", "url": "https://console.groq.com/keys"}],
+        [{"text": "⚡ Skip — use shared AI", "callback_data": "groq:skip"}],
+    ]})}
+    if kind is None:
+        return send_to(chat_id,
+                       "❌ <b>Didn't recognise that key.</b>\n"
+                       "Gemini (<code>AIza…</code>), Groq (<code>gsk_…</code>) or "
+                       "Claude (<code>sk-ant-…</code>). Paste again or skip.", _retry_kb)
+
+    label = {"claude": "Claude", "groq": "Groq", "gemini": "Gemini"}[kind]
+    send_to(chat_id, f"🔍 Testing your {label} key…")
+    if kind == "claude":
+        ok, why = assistant.test_key(key)
+        field = "anthropic_key"
+    elif kind == "gemini":
+        ok, why = assistant.test_gemini_key(key)
+        field = "gemini_key"
+    else:
+        ok, why = ai.test_key(key)
+        field = "groq_key"
+
     if not ok:
         return send_to(chat_id,
-                       f"❌ <b>Key not working:</b> {why}\n\n"
-                       "Send a valid key (<code>gsk_...</code>) or skip.",
-                       {"reply_markup": json.dumps({"inline_keyboard": [
-                           [{"text": "🔑 Get free Groq key", "url": "https://console.groq.com/keys"}],
-                           [{"text": "⚡ Skip — use shared AI", "callback_data": "groq:skip"}],
-                       ]})})
-    user_store.update(chat_id, {"groq_key": key})
+                       f"❌ <b>{label} key not working:</b> {why}\n\n"
+                       "Paste a different key or skip.", _retry_kb)
+    user_store.update(chat_id, {field: key})
+    assistant.clear_history(chat_id)
     _wizard.pop(str(chat_id), None)
-    send_to(chat_id, "✅ <b>Groq key verified &amp; saved!</b> Your bot now runs on YOUR own AI quota. 🧠")
+    send_to(chat_id, f"✅ <b>{label} key verified &amp; saved!</b> "
+                     "Smart signals + unlimited chat now run on YOUR own quota. 🧠")
     _ready(chat_id)
 
 
@@ -928,7 +972,14 @@ def _ready(chat_id):
     user_store.save(chat_id, u)
     _ensure_running(chat_id)
     s = u["settings"]
-    ai_info = "your Groq key ✅" if u.get("groq_key") else "shared AI (add /groq key for better signals)"
+    if u.get("anthropic_key"):
+        ai_info = "Claude (yours) ✅ — smart chat + trade execution"
+    elif u.get("gemini_key"):
+        ai_info = "Gemini (yours) ✅ — unlimited smart chat"
+    elif u.get("groq_key"):
+        ai_info = "Groq (yours) ✅"
+    else:
+        ai_info = "shared AI — add your own free key for unlimited chat (tap /ai)"
     # Message 1: confirmation that bot is live
     send_to(chat_id,
             f"⚡ <b>Bot is LIVE and trading!</b>\n"
@@ -1029,11 +1080,12 @@ def _poll_loop():
                     except Exception as e:
                         print(f"[TG] keys error: {e}")
                     continue
-                if step == "GROQ" and text.startswith("gsk_"):
+                if step == "GROQ" and not text.startswith("/"):
+                    # Accept any pasted AI key (Gemini / Groq / Claude) — auto-detected.
                     try:
                         _finish_groq(chat_id, text.split()[0], msg_id)
                     except Exception as e:
-                        print(f"[TG] groq error: {e}")
+                        print(f"[TG] ai-key error: {e}")
                     continue
                 # Free text (non-command) → AI assistant
                 if not text.startswith("/"):

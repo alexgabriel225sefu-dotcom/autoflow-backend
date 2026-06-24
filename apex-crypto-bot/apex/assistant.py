@@ -414,7 +414,9 @@ def _chat_groq(user_id: str, message: str) -> str:
         pass
 
     if not key:
-        return "⚠️ No AI key configured. Add ANTHROPIC_API_KEY or GROQ_API_KEY to enable the assistant."
+        return (_local_status_answer(user_id) +
+                "\n\n🧠 <i>Pentru chat AI (întrebări, analize, comenzi în limbaj natural) "
+                "adaugă o cheie gratuită — trimite</i> <code>/ai</code> <i>și alege Gemini, Groq sau Claude.</i>")
 
     context = _build_context(user_id)
     system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
