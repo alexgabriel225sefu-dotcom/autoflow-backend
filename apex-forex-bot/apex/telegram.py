@@ -472,8 +472,32 @@ def _handle_start(chat_id):
 
     def _alert(uid, result):
         action = result.get("action", "")
-        send_to(uid, f"⚡ <b>{action}</b> — {result.get('symbol', cfg.SYMBOL)}\n"
-                     f"Confidence: {result.get('confidence', 0)}%")
+        sym = result.get("symbol", cfg.SYMBOL)
+        if action == "HEARTBEAT":
+            send_to(uid,
+                    f"💓 <b>Bot alive</b> — {sym}\n"
+                    f"Price: <b>{result.get('price', '—')}</b> | "
+                    f"Balance: <b>${result.get('balance', 0):.2f}</b>"
+                    f"{result.get('posInfo', '')}")
+        elif action == "AI_ERROR":
+            send_to(uid,
+                    f"⚠️ <b>AI temporarily unavailable</b>\n"
+                    f"Bot continues with rule-based signals — trading is not interrupted.\n"
+                    f"<i>{result.get('reason', '')[:120]}</i>")
+        elif action == "STOP":
+            reasons = ", ".join(result.get("reasons", ["risk limit"]))
+            send_to(uid, f"🛑 <b>Trading paused — risk limit hit</b>\n{reasons}")
+        elif action in ("BUY", "SELL"):
+            send_to(uid,
+                    f"⚡ <b>{action}</b> — {sym}\n"
+                    f"Price: <b>{result.get('price', '—')}</b> | "
+                    f"Confidence: <b>{result.get('confidence', 0)}%</b>")
+        elif action == "CLOSE":
+            send_to(uid,
+                    f"🔒 <b>Position closed</b> — {sym}\n"
+                    f"Price: <b>{result.get('price', '—')}</b>")
+        else:
+            send_to(uid, f"⚡ <b>{action}</b> — {sym}")
 
     user_loop.start(chat_id, alert_fn=_alert)
     send_to(chat_id, "▶️ <b>Your bot started!</b> Trading is now active.\nSend /status to monitor.", _dashboard_keyboard())

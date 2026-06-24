@@ -195,12 +195,9 @@ def validate():
     has_anthropic = bool(cfg.ANTHROPIC_API_KEY)
     has_groq = bool(cfg.GROQ_API_KEY)
     if not has_anthropic and not has_groq:
-        if os.getenv("BYPASS_LICENSE") == "true":
-            print("⚠️  No AI key — running in demo mode (HOLD-only signals).")
-        else:
-            print("❌ No AI key found! Add ANTHROPIC_API_KEY or GROQ_API_KEY.")
-            sys.exit(1)
-    if not has_anthropic and has_groq:
+        print("⚠️  No AI key — using rule-based signals (RSI/MACD/EMA). "
+              "Add ANTHROPIC_API_KEY or GROQ_API_KEY for AI-enhanced signals.")
+    elif not has_anthropic and has_groq:
         print("ℹ️  ANTHROPIC_API_KEY missing — using Groq (free).")
     # Live trading e validat doar pe OANDA (SL/TP server-side + reconciliere).
     # MT bridge / altele: paper până la override explicit.

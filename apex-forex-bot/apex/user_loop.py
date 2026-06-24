@@ -10,6 +10,8 @@ _loops = {}   # user_id → {"thread": Thread, "running": bool, "dash": dict}
 _lock  = threading.Lock()
 
 _LOOP_INTERVAL = 300  # 5 minutes between ticks
+_HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
+_AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
 
 
 def _make_broker(user):
@@ -41,6 +43,8 @@ def _loop(user_id, alert_fn):
 
     paper_balance = cfg.PAPER_BALANCE
     open_pos = None  # tracked locally for paper mode
+    tick = 0
+    last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
 
     dash = {
         "broker": f"OANDA ({cfg.OANDA_ENV})",
@@ -69,6 +73,7 @@ def _loop(user_id, alert_fn):
                 time.sleep(30)
                 continue
 
+            tick += 1
             price = candles[-1]["close"]
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             dash["currentPrice"] = price
@@ -97,7 +102,33 @@ def _loop(user_id, alert_fn):
                 time.sleep(_LOOP_INTERVAL)
                 continue
 
-            signal = ai.get_signal(ind, paper_balance, open_pos, strat_data)
+            # Heartbeat — let user know bot is alive even during quiet markets
+            if tick % _HEARTBEAT_TICKS == 0 and alert_fn:
+                pos_info = (f" | Position: {open_pos['side']} @ {open_pos['entryPrice']}"
+                            if open_pos else " | No open position")
+                alert_fn(user_id, {
+                    "action": "HEARTBEAT",
+                    "symbol": cfg.SYMBOL,
+                    "price": price,
+                    "balance": paper_balance,
+                    "tick": tick,
+                    "posInfo": pos_info,
+                })
+
+            # AI signal with rule-based fallback
+            try:
+                signal = ai.get_signal(ind, paper_balance, open_pos, strat_data)
+            except Exception as e:
+                print(f"[UserLoop:{user_id}] AI error: {e}")
+                if tick - last_ai_error_tick >= _AI_ERROR_THROTTLE and alert_fn:
+                    alert_fn(user_id, {
+                        "action": "AI_ERROR",
+                        "reason": str(e),
+                        "symbol": cfg.SYMBOL,
+                    })
+                    last_ai_error_tick = tick
+                signal = ai.rule_based_fallback(ind, open_pos)
+
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)
 
