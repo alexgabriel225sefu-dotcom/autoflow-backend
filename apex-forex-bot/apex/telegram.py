@@ -691,6 +691,24 @@ def _handle_buyer_start(chat_id, license_key):
 
 def _poll_loop():
     global _update_id
+    # Clear any webhook — getUpdates returns 409 while a webhook is active,
+    # which silently stops the bot from ever seeing messages.
+    try:
+        wr = requests.post(f"{_API}/deleteWebhook",
+                           json={"drop_pending_updates": False}, timeout=5)
+        print(f"[TELEGRAM] deleteWebhook → {wr.json()}")
+    except Exception as e:
+        print(f"[TELEGRAM] deleteWebhook failed: {e}")
+    # Confirm the token is valid so the cause is obvious in the logs
+    try:
+        me = requests.get(f"{_API}/getMe", timeout=8).json()
+        if me.get("ok"):
+            print(f"[TELEGRAM] Bot identity OK → @{me['result'].get('username')}")
+        else:
+            print(f"[TELEGRAM] getMe FAILED → {me.get('description')} "
+                  f"(check TELEGRAM_BOT_TOKEN)")
+    except Exception as e:
+        print(f"[TELEGRAM] getMe error: {e}")
     print(f"[TELEGRAM] Poll loop started. TOKEN={bool(TOKEN)} CHAT_ID={CHAT_ID}")
     while True:
         try:
