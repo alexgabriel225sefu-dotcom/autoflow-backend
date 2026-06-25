@@ -62,9 +62,13 @@ candles = make_candles([100 + i * 0.1 for i in range(240)])
 ind = indicators.analyze(candles)
 strat = strategies.analyze(candles)
 sig = ai.get_signal(ind, 1000.0, None, strat)
-check("returns HOLD", sig["action"] == "HOLD", sig)
-check("confidence 0 (never trades on error)", sig["confidence"] == 0, sig)
-check("riskLevel HIGH", sig["riskLevel"] == "HIGH", sig)
+# When every AI provider is down the bot does NOT freeze — it falls back to a
+# deterministic mean-reversion signal. On this steady uptrend it must refuse to
+# fade the trend (HOLD), and always return a well-formed, in-range signal.
+check("returns a valid action", sig["action"] in ("BUY", "SELL", "HOLD", "CLOSE"), sig)
+check("does not fade a strong trend (HOLD)", sig["action"] == "HOLD", sig)
+check("confidence in range 0-100", 0 <= sig["confidence"] <= 100, sig)
+check("riskLevel is valid", sig["riskLevel"] in ("LOW", "MEDIUM", "HIGH"), sig)
 
 ai._call_anthropic, ai._call_groq = _orig_anthropic, _orig_groq
 
@@ -96,8 +100,11 @@ def _capture(prompt):
 ai._call_anthropic = _capture
 ai.get_signal(ind, 1234.56, None, strat)
 p = captured["prompt"]
-for section in ("Turtle Trading", "Jesse Livermore", "George Soros",
-                "Mean Reversion", "Ed Seykota", "RSI (14)", "MACD Histogram",
+# The forex signal layer is a dedicated MEAN-REVERSION strategy (fade BB/RSI
+# extremes) — not the crypto bot's "legendary traders" framing. Assert the
+# real prompt contract so the test reflects what actually ships.
+for section in ("MEAN REVERSION", "Bollinger Bands", "Stoch RSI", "TREND GUARD",
+                "RSI (14)", "MACD Histogram",
                 "$1234.56", "FOREX", "Active sessions", "pips"):
     check(f"prompt mentions {section!r}", section in p)
 ai._call_anthropic = _orig_anthropic
@@ -109,12 +116,6 @@ ai.get_signal(ind, 1000.0,
 check("position rendered in prompt", "BUY @ 1.0855" in captured["prompt"]
       and "12.3 pips" in captured["prompt"])
 ai._call_anthropic = _orig_anthropic
-
-# ─── Legendary section robustness ─────────────────────────
-print("\n6. _legendary_section edge cases")
-check("empty strategy data → empty string", ai._legendary_section(None) == "")
-sec = ai._legendary_section(strat)
-check("renders without crashing", "LEGENDARY TRADERS ANALYSIS" in sec)
 
 # ─── Result ───────────────────────────────────────────────
 print("\n" + "=" * 50)

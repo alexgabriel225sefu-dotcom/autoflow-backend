@@ -56,45 +56,6 @@ def _call_anthropic(prompt):
     raise RuntimeError("Anthropic unavailable")
 
 
-def _legendary_section(strategy_data):
-    if not strategy_data:
-        return ""
-    t = strategy_data["turtle"]
-    lv = strategy_data["livermore"]
-    so = strategy_data["soros"]
-    mr = strategy_data.get("meanReversion", {})
-    se = strategy_data["session"]
-    lv_strength = f"{lv['strength'] * 100:.0f}%" if lv.get("strength") is not None else "N/A"
-    so_mom = f"{so['momentum'] * 100:.0f}%" if so.get("momentum") is not None else "N/A"
-    so_vel = f"{so['velocity']:.3f}%" if so.get("velocity") is not None else "N/A"
-    return f"""
-## LEGENDARY TRADERS ANALYSIS
-### 🐢 Turtle Trading (Richard Dennis / Eckhardt)
-- Breakout signal: {t.get('signal') or 'NONE'} | Strength: {t.get('breakoutStr')}
-- 20-period High: {t.get('high20')} | 20-period Low: {t.get('low20')}
-- Near breakout: {t.get('nearSignal') or 'NO'}
-
-### 📐 Jesse Livermore (Pivot Structure)
-- Trend structure: {lv.get('trend')} ({lv.get('reason', 'N/A')})
-- Signal strength: {lv_strength}
-- Rule: if trend=BULLISH confirm BUY; if BEARISH confirm SELL; NEUTRAL be cautious
-
-### 💡 George Soros (Reflexivity / Momentum)
-- Momentum direction: {so.get('direction')}
-- Bullish candles: {so_mom} of last 8
-- Price velocity: {so_vel}
-
-### 📉 Mean Reversion (Z-score vs SMA20)
-- Z-score: {mr.get('zscore', 0)} | Stretched: {'YES — price extended, expect snap-back' if mr.get('stretched') else 'no'}
-- Reversion signal: {mr.get('signal') or 'NONE'}
-
-### 📊 Current session (Ed Seykota rules)
-- Consecutive losses: {se.get('consecutiveLosses')} (stop at 3)
-- Consecutive wins: {se.get('consecutiveWins')}
-- Trades today: {se.get('dailyTrades')}/10
-- Daily PnL: {'+' if se.get('dailyPnL', 0) >= 0 else ''}${se.get('dailyPnL', 0):.4f}"""
-
-
 def get_signal(ind, balance, open_position, strategy_data=None):
     def fnum(v):
         try:

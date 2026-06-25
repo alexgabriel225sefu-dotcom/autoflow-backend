@@ -1867,7 +1867,20 @@ async function handleStripeWebhook(req, res) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       const ref = (session.client_reference_id || '').toLowerCase().trim();
-      if (ref && session.payment_intent) _pendingRefs.set(session.payment_intent, ref);
+      const piId = session.payment_intent;
+      if (ref && piId) _pendingRefs.set(piId, ref);
+      // Stripe Payment Links (forex $497) carry the buyer's email/name ONLY on the
+      // Checkout Session, not on the Payment Intent. Stash them so payment_intent.succeeded
+      // can actually email the FORX- license — otherwise the key is generated but never delivered.
+      if (piId) {
+        const cEmail = session.customer_details?.email || session.customer_email || '';
+        const cName = session.customer_details?.name || '';
+        if (cEmail || cName) {
+          const prev = _pendingLicenses.get(piId) || {};
+          _pendingLicenses.set(piId, { ...prev, email: prev.email || cEmail, name: prev.name || cName });
+          setTimeout(() => { const e = _pendingLicenses.get(piId); if (e && !e.key) _pendingLicenses.delete(piId); }, 2 * 3600 * 1000);
+        }
+      }
       return res.json({ received: true });
     }
 
@@ -1886,8 +1899,12 @@ async function handleStripeWebhook(req, res) {
 
     if (event.type === 'payment_intent.succeeded') {
       const pi = event.data.object;
-      // Payment Link buyers may not populate receipt_email — check charge billing details too
+      // Carry-over from checkout.session.completed (Payment Link path stashes email/name here).
+      const pending = _pendingLicenses.get(pi.id);
+      // Payment Link buyers may not populate receipt_email — fall back to the Checkout Session
+      // details captured earlier, then charge billing details.
       const email = pi.metadata?.email || pi.receipt_email
+        || pending?.email
         || pi.charges?.data?.[0]?.billing_details?.email || '';
       // Detect product from metadata (inline checkout) or amount (Payment Link)
       const product = pi.metadata?.product === 'apex-forex' || pi.amount === 49700
@@ -1895,12 +1912,11 @@ async function handleStripeWebhook(req, res) {
         : (pi.metadata?.product === 'apex-bot' || pi.amount === 29700)
           ? 'apex-bot'
           : (pi.metadata?.product || 'course');
-      const buyerName = pi.metadata?.name || 'there';
+      const buyerName = pi.metadata?.name || pending?.name || 'there';
 
       // ── BOT LICENSE DELIVERY (crypto + forex) ──
       if (product === 'apex-bot' || product === 'apex-forex') {
         const isForex = product === 'apex-forex';
-        const pending = _pendingLicenses.get(pi.id);
         let licenseKey;
 
         if (pending?.key) {
@@ -2310,7 +2326,7 @@ app.post('/api/heygen/photo-generate', async (req, res) => {
 
 // Explicit HTML page routes
 // Public pages — no auth required
-const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','apex-bot','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','affiliate','affiliate-terms','thank-you','chart'];
+const publicPages = ['index','access','privacy','terms','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','apex-bot','forex','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','affiliate','affiliate-terms','thank-you','chart'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
