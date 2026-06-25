@@ -990,41 +990,54 @@ _VERIFY_URL = "https://aicashsystem.space/api/verify-license"
 _DEPLOY_URL = "https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/autoflow-backend"
 
 
-def _handle_buyer_start(chat_id, license_key):
-    """Validate license key and grant instant access to this bot."""
-    key = license_key.strip().upper()
-    if not re.match(r'^APEX-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$', key):
-        send_to(chat_id,
-            "❌ <b>Invalid license key.</b>\n\n"
-            "Purchase Apex Forex Bot at:\n"
-            "https://aicashsystem.space"
-        )
-        return
+def _license_ok(chat_id, text):
+    """Validate the buyer's license before granting access to the bot.
 
-    valid = False
+    The activation deep link from the purchase email is `/start FORX-...`.
+    Returns True if access should be granted. FAIL-OPEN: if our verify server
+    is unreachable we still let a real-looking key through, so a server hiccup
+    never locks out a paying customer. Only a server that actively says
+    "invalid" (or a malformed/missing key) is refused.
+    """
+    cid = str(chat_id)
+    # Returning customer whose access store was wiped (e.g. a redeploy) — they
+    # already validated once and we kept their key. Let them straight back in.
     try:
-        r = requests.post(_VERIFY_URL, json={"key": key}, timeout=8)
-        valid = r.json().get("valid", False)
+        if user_store.load(cid).get("license_key"):
+            return True
     except Exception:
-        valid = False  # server unreachable — deny access, nu grant automat
+        pass
 
-    if not valid:
+    first = (text or "").splitlines()[0].strip()
+    cmd, _, karg = first.partition(" ")
+    key = karg.strip().upper()
+    if cmd.lower().split("@")[0] != "/start" or not key:
         send_to(chat_id,
-            "❌ <b>License not found.</b>\n\n"
-            "Use the key from your purchase email.\n\n"
-            "Need help? supportaicashsystem@gmail.com"
-        )
-        return
-
-    # Grant instant access
-    access.grant(str(chat_id))
-    send_to(chat_id,
-        f"✅ <b>Access granted! Welcome to Apex Forex Bot.</b>\n\n"
-        f"⚡ EUR/USD | AI trading is now LIVE\n\n"
-        f"Send /status to see live trading snapshot.\n"
-        f"You'll receive alerts for every trade automatically.\n\n"
-        f"Questions? supportaicashsystem@gmail.com"
-    )
+            "🔒 <b>Activation required</b>\n\n"
+            "Open the activation link from your purchase email to unlock the bot.\n\n"
+            "Don't have Apex Forex Bot yet? Get it at https://aicashsystem.space")
+        return False
+    if not re.match(r'^FORX-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$', key):
+        send_to(chat_id,
+            "❌ <b>That doesn't look like a valid key.</b>\n\n"
+            "Use the <code>FORX-XXXX-XXXX-XXXX</code> key from your purchase email, "
+            "or buy at https://aicashsystem.space")
+        return False
+    try:
+        r = requests.post(_VERIFY_URL, json={"key": key, "product": "apex-forex"}, timeout=8)
+        data = r.json()
+        if not data.get("valid"):
+            send_to(chat_id,
+                f"❌ <b>{data.get('message', 'License not found.')}</b>\n\n"
+                "Need help? supportaicashsystem@gmail.com")
+            return False
+    except Exception as e:
+        print(f"[TELEGRAM] verify-license unreachable ({e}) — fail-open grant for {key}")
+    try:
+        user_store.update(cid, {"license_key": key})
+    except Exception:
+        pass
+    return True
     # Notify owner
     send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id}</code>\nKey: <code>{key}</code>")
 
@@ -1075,14 +1088,16 @@ def _poll_loop():
                 # bootstrap, so a customer can never become the owner.
 
                 if not access.is_allowed(chat_id_str):
-                    # No license keys: the activation link is only handed out
-                    # after payment (purchase email + thank-you page), so anyone
-                    # who reaches the bot is a paying customer. Grant on contact.
+                    # Gate access behind a valid purchase license (fail-open on
+                    # server errors). Admins are already is_allowed, so they skip
+                    # this. _license_ok sends the prompt/error on refusal.
+                    if not _license_ok(chat_id, raw):
+                        continue
                     access.grant(chat_id_str)
                     send_to(chat_id,
                             "✅ <b>Welcome to Apex Forex Bot!</b>\n\n"
                             "Your bot is now active. 🚀\n\n"
-                            "Send /setup to connect your OANDA account, "
+                            "Send /setup to choose paper/live, your pair and risk, "
                             "then /status to see the live snapshot.")
                     send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id_str}</code>")
                     continue

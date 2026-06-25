@@ -952,6 +952,59 @@ def _handle_callback(chat_id, data):
 
 
 # ─── Poll loop ────────────────────────────────────────────
+_VERIFY_URL = f"{cfg.LICENSE_SERVER.rstrip('/')}/api/verify-license"
+
+
+def _license_ok(chat_id, text):
+    """Validate the buyer's license before granting access to the bot.
+
+    The activation deep link from the purchase email is `/start APEX-...`.
+    Returns True if access should be granted. FAIL-OPEN: if our verify server
+    is unreachable we still let a real-looking key through, so a server hiccup
+    never locks out a paying customer. Only a server that actively says
+    "invalid" (or a malformed/missing key) is refused.
+    """
+    cid = str(chat_id)
+    # Returning customer whose access store was wiped (e.g. a redeploy) — they
+    # already validated once and we kept their key. Let them straight back in.
+    try:
+        if user_store.load(cid).get("license_key"):
+            return True
+    except Exception:
+        pass
+
+    first = (text or "").splitlines()[0].strip()
+    cmd, _, karg = first.partition(" ")
+    key = karg.strip().upper()
+    if cmd.lower().split("@")[0] != "/start" or not key:
+        send_to(chat_id,
+                "🔒 <b>Activation required</b>\n\n"
+                "Open the activation link from your purchase email to unlock the bot.\n\n"
+                "Don't have Apex Trade Bot yet? Get it at https://aicashsystem.space")
+        return False
+    if not re.match(r'^APEX-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$', key):
+        send_to(chat_id,
+                "❌ <b>That doesn't look like a valid key.</b>\n\n"
+                "Use the <code>APEX-XXXX-XXXX-XXXX</code> key from your purchase email, "
+                "or buy at https://aicashsystem.space")
+        return False
+    try:
+        r = requests.post(_VERIFY_URL, json={"key": key, "product": "apex-bot"}, timeout=8)
+        data = r.json()
+        if not data.get("valid"):
+            send_to(chat_id,
+                    f"❌ <b>{data.get('message', 'License not found.')}</b>\n\n"
+                    "Need help? supportaicashsystem@gmail.com")
+            return False
+    except Exception as e:
+        print(f"[TG] verify-license unreachable ({e}) — fail-open grant for {key}")
+    try:
+        user_store.update(cid, {"license_key": key})
+    except Exception:
+        pass
+    return True
+
+
 def _activate(chat_id):
     """Step 1: brand new user — show welcome + risk disclaimer (must accept)."""
     access.grant(str(chat_id))
@@ -1251,7 +1304,7 @@ def _poll_loop():
                     chat_id = cb["message"]["chat"]["id"]
                     _answer_cb(cb["id"])
                     if not access.is_allowed(str(chat_id)):
-                        _activate(chat_id)
+                        _license_ok(chat_id, "")  # button press w/o a key → prompt for activation
                         continue
                     _auto_restore(chat_id)
                     try:
@@ -1266,7 +1319,11 @@ def _poll_loop():
                 if not text or chat_id is None:
                     continue
                 if not access.is_allowed(str(chat_id)):
-                    _activate(chat_id)  # deep-link /start TOKEN lands here too
+                    # Gate access behind a valid purchase license (fail-open on
+                    # server errors). Admins are already is_allowed, so they skip
+                    # this. The deep-link /start APEX-... key lands here.
+                    if _license_ok(chat_id, text):
+                        _activate(chat_id)
                     continue
                 _auto_restore(chat_id)
                 # SECURITY: any message that looks like API keys is deleted
