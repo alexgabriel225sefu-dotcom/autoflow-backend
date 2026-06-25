@@ -509,6 +509,13 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
         if d.get("keys"):
             user_data["oanda_token"]      = d["keys"].get("OANDA_API_TOKEN", "")
             user_data["oanda_account_id"] = d["keys"].get("OANDA_ACCOUNT_ID", "")
+            # Live branch → point this user at OANDA's real fxtrade endpoint.
+            # Without this, oanda_env stays "practice" and "live" trades silently
+            # execute on the practice server. Default to the live host they asked
+            # for; they can flip back with /env practice if it's a demo token.
+            user_data["oanda_env"]        = d.get("oanda_env", "live")
+        else:
+            user_data["oanda_env"]        = "practice"
         user_store.update(chat_id, user_data)
 
         # Also apply globally if admin (for owner's own bot)
@@ -531,14 +538,21 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             if _bot_control.get("reload_broker"):
                 _bot_control["reload_broker"]()
 
-        # Auto-start trading immediately — no manual /start needed
+        # Auto-start trading immediately — no manual /start needed.
+        # Restart first so a re-run of /setup applies the new broker/env/keys
+        # even if the loop was already running.
+        _restart_user_loop(chat_id)
         _auto_start_user(chat_id)
 
         paper_str = "ON (simulated)" if d.get("paper") else "OFF (live)"
         risk_pct = d.get("risk", 0.005) * 100
+        if d.get("paper"):
+            broker_str = "Yahoo data (paper)"
+        else:
+            broker_str = f"OANDA ({user_data.get('oanda_env', 'live')})"
         send_to(chat_id,
                 f"✅ <b>Setup complete — bot is LIVE!</b>\n\n"
-                f"Broker: <b>OANDA (practice)</b>\n"
+                f"Broker: <b>{broker_str}</b>\n"
                 f"Pair: <b>{sym}</b>  (your choice)\n"
                 f"Risk/trade: <b>{risk_pct:g}%</b>  (your choice)\n"
                 f"Paper mode: <b>{paper_str}</b>\n\n"
@@ -595,10 +609,16 @@ def _handle_env(chat_id, args):
     env = (args or "").strip().lower()
     if env not in ("practice", "live"):
         return send_to(chat_id, "❌ Usage: <code>/env practice</code> or <code>/env live</code>")
-    _save_runtime({"OANDA_ENV": env})
-    _apply("OANDA_ENV", env)
-    if _bot_control.get("reload_broker"):
-        _bot_control["reload_broker"]()
+    # Per-user: the multi-user loop builds each broker from the user record, so the
+    # env MUST be stored there or the change never reaches the running loop.
+    user_store.update(chat_id, {"oanda_env": env})
+    _restart_user_loop(chat_id)
+    # Admin: also flip the global runtime config for the owner's own engine.
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"OANDA_ENV": env})
+        _apply("OANDA_ENV", env)
+        if _bot_control.get("reload_broker"):
+            _bot_control["reload_broker"]()
     icon = "🧪" if env == "practice" else "🔴"
     send_to(chat_id, f"{icon} OANDA environment set to <b>{env.upper()}</b>.\n"
                      f"<i>Make sure your token matches this environment.</i>")
@@ -850,6 +870,19 @@ def _auto_start_user(chat_id):
     """Start a user's trading loop with the shared alert function."""
     if user_loop.is_running(chat_id):
         return False
+    return user_loop.start(chat_id, alert_fn=_user_alert)
+
+
+def _restart_user_loop(chat_id):
+    """Restart a running loop so it rebuilds the broker from the user record.
+
+    The loop reads the user record + builds the broker ONCE at start
+    (user_loop._loop), so config changes like oanda_env only take effect on a
+    fresh loop. No-op if the user isn't currently trading.
+    """
+    if not user_loop.is_running(chat_id):
+        return False
+    user_loop.stop(chat_id)
     return user_loop.start(chat_id, alert_fn=_user_alert)
 
 

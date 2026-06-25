@@ -6,9 +6,11 @@ own keys (testnet by default for safety).
 """
 import os
 import time
+import math
 import hmac
 import hashlib
 import requests
+from decimal import Decimal
 from urllib.parse import urlencode
 
 # Try mainnet first (works from Render US), fall back to public mirror, then testnet.
@@ -104,6 +106,78 @@ def valid_symbol(symbol):
         return False
 
 
+# ─── Symbol trading filters (LOT_SIZE / MIN_NOTIONAL) ─────────────
+# Binance rejects orders whose quantity isn't a multiple of the symbol's
+# stepSize, is below minQty, or whose value is below minNotional. We MUST round
+# to these before sending a live order or it comes back -1013 LOT_SIZE and the
+# entry is silently skipped. Cached 1h — filters change very rarely.
+_filters_cache = {}   # (exchange, symbol) → {stepSize, minQty, minNotional, ts}
+_FILTERS_TTL = 3600
+
+
+def get_symbol_filters(symbol, exchange="binance"):
+    """Return {'stepSize','minQty','minNotional'} for a symbol, or None on failure."""
+    key = (exchange, symbol)
+    now = time.time()
+    cached = _filters_cache.get(key)
+    if cached and now - cached["ts"] < _FILTERS_TTL:
+        return cached
+    try:
+        data = _get_json("/api/v3/exchangeInfo", {"symbol": symbol},
+                         hosts=data_hosts_for(exchange))
+        syms = data.get("symbols") or []
+        if not syms:
+            return None
+        step = min_qty = min_notional = 0.0
+        for f in syms[0].get("filters", []):
+            t = f.get("filterType")
+            if t == "LOT_SIZE":
+                step = float(f.get("stepSize", 0) or 0)
+                min_qty = float(f.get("minQty", 0) or 0)
+            elif t in ("NOTIONAL", "MIN_NOTIONAL"):
+                min_notional = float(f.get("minNotional", 0) or 0)
+        result = {"stepSize": step, "minQty": min_qty,
+                  "minNotional": min_notional, "ts": now}
+        _filters_cache[key] = result
+        return result
+    except Exception as e:
+        print(f"[Binance] exchangeInfo({symbol}) failed: {e}")
+        return None
+
+
+def _step_precision(step):
+    """Decimal places implied by a stepSize like 0.00001 → 5, 1 → 0."""
+    if step <= 0:
+        return 6
+    exp = Decimal(str(step)).normalize().as_tuple().exponent
+    return max(0, -exp)
+
+
+def round_qty(symbol, qty, price=0.0, exchange="binance"):
+    """Round qty DOWN to the symbol's stepSize and validate against minQty /
+    minNotional. Returns (rounded_qty, error_or_None). error is a human-readable
+    string when the order would be rejected (caller should skip + tell the user).
+    """
+    filt = get_symbol_filters(symbol, exchange)
+    if not filt:
+        # Couldn't fetch filters — fall back to a conservative 6-dp round so we
+        # at least don't send absurd precision. Better than guessing a step.
+        return round(qty, 6), None
+    step = filt["stepSize"]
+    if step > 0:
+        rq = math.floor(qty / step) * step
+        rq = round(rq, _step_precision(step))
+    else:
+        rq = round(qty, 6)
+    if filt["minQty"] and rq < filt["minQty"]:
+        return 0.0, (f"quantity {rq:g} is below Binance's minimum "
+                     f"{filt['minQty']:g} for {symbol}")
+    if filt["minNotional"] and price > 0 and rq * price < filt["minNotional"]:
+        return 0.0, (f"order value ${rq * price:.2f} is below Binance's minimum "
+                     f"${filt['minNotional']:.2f} for {symbol} — increase the amount")
+    return rq, None
+
+
 # Per-exchange API hosts. binance.us is a separate entity for US clients.
 _EXCHANGE_HOSTS = {
     "binance":   "https://api.binance.com",   # global (blocked in US)
@@ -172,6 +246,12 @@ class LiveExchange:
         return True, "Connected", usdt
 
     def place_order(self, side, qty, symbol):
+        # Round to the symbol's LOT_SIZE/minQty so Binance accepts the order.
+        # Raises ValueError when below the minimum so callers fail loud, not silent.
+        rq, err = round_qty(symbol, qty, exchange=self.exchange)
+        if err:
+            raise ValueError(err)
+        qty = rq
         data = self._signed("POST", "/api/v3/order", {
             "symbol": symbol, "side": side, "type": "MARKET", "quantity": qty,
         })

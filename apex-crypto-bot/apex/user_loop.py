@@ -132,12 +132,22 @@ def _open_trade(u, state, settings, side, price, druck_mult, alert, exchange=Non
         return
     # Live: place a real market order and use the actual fill price/qty.
     if exchange is not None:
+        # Round to Binance LOT_SIZE / MIN_NOTIONAL first; skip loudly if too small.
+        rq, err = binance.round_qty(symbol, qty, price, exchange=exchange.exchange)
+        if err:
+            print(f"[UserLoop] entry rejected — {err}")
+            state["_lastError"] = err
+            alert("error", {"message": err, "symbol": symbol})
+            return
+        qty = rq
         try:
             order = exchange.place_order(side, qty, symbol)
             price = order.get("avgPrice") or price
             qty = order.get("executedQty") or qty
         except Exception as e:
             print(f"[UserLoop] live order failed ({e}) — skipping entry")
+            state["_lastError"] = f"Binance rejected the order: {e}"
+            alert("error", {"message": str(e), "symbol": symbol})
             return
     else:
         fee = price * qty * fee_rate
@@ -638,12 +648,23 @@ def _open_trade_fixed(u, state, settings, side, price, amount_usd, alert, exchan
     if qty <= 0:
         return
     if exchange is not None:
+        # Validate/round against Binance's LOT_SIZE + MIN_NOTIONAL before sending,
+        # so we can tell the user exactly why instead of silently skipping.
+        rq, err = binance.round_qty(symbol, qty, price, exchange=exchange.exchange)
+        if err:
+            print(f"[UserLoop] entry rejected — {err}")
+            state["_lastError"] = err
+            alert("error", {"message": err, "symbol": symbol})
+            return
+        qty = rq
         try:
             order = exchange.place_order(side, qty, symbol)
             price = order.get("avgPrice") or price
             qty = order.get("executedQty") or qty
         except Exception as e:
             print(f"[UserLoop] live order failed ({e}) — skipping entry")
+            state["_lastError"] = f"Binance rejected the order: {e}"
+            alert("error", {"message": str(e), "symbol": symbol})
             return
     else:
         fee = price * qty * fee_rate
@@ -679,6 +700,7 @@ def force_trade(user_id, side, symbol=None, alert_fn=None, amount_usd=None):
     if not price:
         return {"ok": False, "error": "Could not fetch price"}
     alert = alert_fn or (lambda *a: None)
+    state.pop("_lastError", None)   # clear any stale error before this attempt
     exchange = None
     if u.get("api_key") and u.get("api_secret"):
         try:
@@ -700,7 +722,7 @@ def force_trade(user_id, side, symbol=None, alert_fn=None, amount_usd=None):
                 "quantity": round(pos["quantity"], 6),
                 "amountUsd": round(pos["quantity"] * price, 2),
                 "stopLoss": round(pos["stopLoss"], 6), "takeProfit": round(pos["takeProfit"], 6)}
-    return {"ok": False, "error": "Order did not fill"}
+    return {"ok": False, "error": state.pop("_lastError", None) or "Order did not fill"}
 
 
 def force_close(user_id, alert_fn=None):

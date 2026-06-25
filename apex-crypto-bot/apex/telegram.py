@@ -473,6 +473,11 @@ def make_alert(chat_id):
                     f"Safety fills: {data['safety_filled']}  "
                     f"PnL: <b>{sign}${data['pnl']:.4f} ({sign}{data['pnl_pct']:.2f}%)</b>\n"
                     f"Balance: ${data['balance']:.2f}")
+        elif kind == "error":
+            sym = data.get("symbol", "")
+            send_to(chat_id,
+                    f"⚠️ <b>Order not placed{f' — {sym}' if sym else ''}</b>\n"
+                    f"{data.get('message', 'unknown error')}")
     return alert
 
 
