@@ -223,7 +223,7 @@ def _kb_menu(paused, symbol="BTCUSDT"):
         [{"text": "📊 Status", "callback_data": "c:status"}, {"text": "📋 Trades", "callback_data": "c:trades"}],
         [{"text": "💎 Symbol", "callback_data": "c:symbol"}, {"text": "⚙️ Config", "callback_data": "c:config"}],
         [{"text": "🎯 Method", "callback_data": "c:method"}, {"text": "❓ Help", "callback_data": "c:help"}],
-        [{"text": "📈 Live Chart", "callback_data": "c:chart"}],
+        [{"text": "🔄 Paper / Real", "callback_data": "c:mode"}, {"text": "📈 Live Chart", "callback_data": "c:chart"}],
         [
             {"text": "▶️ Start" + (" ✅" if not paused else ""), "callback_data": "c:resume"},
             {"text": "⏸ Pause" + (" ✅" if paused else ""),    "callback_data": "c:pause"},
@@ -247,6 +247,11 @@ def _kb_mode():
 
 
 _BINANCE_KEYS_URL = "https://www.binance.com/en/my/settings/api-management"
+_BINANCEUS_KEYS_URL = "https://www.binance.us/usercenter/settings/api-management"
+# Your Binance referral link — new clients who don't have an account yet open
+# this to sign up (and you earn the referral commission). Code: CPA_00IH1SQY0U
+_BINANCE_SIGNUP_URL = "https://www.binance.com/activity/referral-entry/CPA?ref=CPA_00IH1SQY0U"
+_BINANCE_REF_CODE = "CPA_00IH1SQY0U"
 
 
 def _kb_binance():
@@ -257,6 +262,8 @@ def _kb_binance():
 
 def _kb_symbols():
     rows = [[{"text": label, "callback_data": f"sym:{sym}"} for label, sym in row] for row in SYMBOLS]
+    # Make it explicit that ANY of the 600+ Binance pairs works, not just these.
+    rows.append([{"text": "✏️ Type any other coin…", "callback_data": "sym:custom"}])
     return {"reply_markup": json.dumps({"inline_keyboard": rows})}
 
 
@@ -353,8 +360,12 @@ def _build_report(user_id):
 _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━━━━━━━\n"
          "Your AI bot trades crypto automatically. Just set it and watch.\n\n"
          "<b>Controls:</b>\n/menu · /status · /signal · /config · /trades · /report\n\n"
-         "<b>Settings:</b>\n/symbol BTCUSDT\n/method auto|turtle|livermore|soros|ptj|druckenmiller\n"
+         "<b>Settings (you choose everything):</b>\n"
+         "/symbol BTCUSDT — <b>ANY</b> of 600+ Binance pairs (PEPEUSDT, WIFUSDT, …)\n"
+         "/method auto|turtle|livermore|soros|ptj|druckenmiller\n"
          "/risk 5 — % per trade\n/sl 1.6 — stop loss %\n/tp 3.2 — take profit %\n/confidence 70 — min AI confidence\n\n"
+         "<b>🔄 Switch Paper ↔ Real:</b>\n/pause first, then /setup → pick the mode. "
+         "Paper and real are fully separate.\n\n"
          "<b>🤖 DCA Bot (3Commas-style):</b>\n"
          "/dca — show DCA status &amp; settings\n"
          "/dca on · /dca off — enable/disable\n"
@@ -906,6 +917,14 @@ def _handle_callback(chat_id, data):
                            {"text": f"📈 Open {sym} chart", "web_app": {"url": url}}]]})})
     if data.startswith("sym:"):
         sym = data[4:]
+        if sym == "custom":
+            return send_to(chat_id,
+                           "✏️ <b>Type any Binance pair you want to trade.</b>\n\n"
+                           "Just send <code>/symbol PEPEUSDT</code> (or any of the 600+ "
+                           "pairs — <code>FETUSDT</code>, <code>WIFUSDT</code>, "
+                           "<code>JUPUSDT</code>, …).\n\n"
+                           "<i>You're not limited to the coins on the buttons — the bot "
+                           "trades whatever you choose.</i>")
         _upd(chat_id, "SYMBOL", sym)
         user_loop.reset_risk(chat_id)
         return send_to(chat_id, f"💎 Symbol → <b>{sym}</b>", _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
@@ -931,6 +950,31 @@ def _handle_callback(chat_id, data):
                        _kb_methods())
     if data == "c:help":
         return send_to(chat_id, _HELP)
+    if data == "c:mode":
+        u = user_loop._ensure_user(chat_id)
+        cur = "📝 PAPER ($100 virtual)" if u.get("paper", True) else "🔴 REAL Binance (live funds)"
+        return send_to(chat_id,
+                       "🔄 <b>Paper ↔ Real — switch any time</b>\n"
+                       "━━━━━━━━━━━━━━━━━━━━\n"
+                       f"You're currently in: <b>{cur}</b>\n\n"
+                       "<b>To switch safely:</b>\n"
+                       "1️⃣ Tap <b>⏸ Pause</b> (or send /pause) to stop the current mode "
+                       "and let any open position close first.\n"
+                       "2️⃣ Send /setup and pick the mode you want:\n"
+                       "   • 📝 <b>Paper</b> — practice, $100 virtual, no keys.\n"
+                       "   • 🔴 <b>Real Binance</b> — your account &amp; real funds.\n"
+                       "3️⃣ The bot restarts in the new mode and auto-resumes.\n\n"
+                       "<i>Paper and real are fully separate — switching never touches "
+                       "your real funds unless you choose Real and connect your keys.</i>",
+                       {"reply_markup": json.dumps({"inline_keyboard": [
+                           [{"text": "⏸ Pause first", "callback_data": "c:pause"}],
+                           [{"text": "🔄 Switch mode (/setup)", "callback_data": "setup:reset"}],
+                       ]})})
+    if data == "setup:reset":
+        u = user_loop._ensure_user(chat_id)
+        u["setup_done"] = False
+        user_store.save(chat_id, u)
+        return send_to(chat_id, "🔄 <b>Switch mode</b> — how do you want to trade?", _kb_mode())
     if data == "c:pause":
         _upd(chat_id, "PAUSED", True)
         u = user_loop._ensure_user(chat_id)
@@ -1044,9 +1088,11 @@ def _show_mode_choice(chat_id):
     send_to(chat_id,
             "⚙️ <b>How do you want to trade?</b>\n\n"
             "🧪 <b>Paper Trading</b> — practice with $100 virtual USDT and REAL market "
-            "prices. No keys, no signup, starts instantly. Zero risk.\n\n"
-            "🔴 <b>Real Binance</b> — connect your real Binance account and trade with real funds.\n\n"
-            "<i>You can switch any time with /setup.</i>",
+            "prices. No keys, no signup, starts instantly. Zero risk.\n"
+            "   → Pick <b>any</b> coin (600+ pairs), any strategy, your own risk.\n\n"
+            "🔴 <b>Real Binance</b> — connect your real Binance account and trade with real funds.\n"
+            "   → No Binance account yet? I'll give you the signup link in the next step.\n\n"
+            "<i>You can switch between paper and real any time with /setup.</i>",
             _kb_mode())
 
 
@@ -1077,8 +1123,12 @@ def _start_live_setup(chat_id):
             "🌍 <b>Which exchange is your account on?</b>\n\n"
             "🟡 <b>Binance.com</b> — global (Europe, Asia, LatAm, most countries)\n"
             "🇺🇸 <b>Binance.US</b> — for United States clients\n\n"
+            "🆕 <b>No Binance account yet?</b> Tap <b>Create Binance account</b> "
+            "below to sign up first (takes ~3 minutes), then come back and pick "
+            "your exchange.\n\n"
             "<i>Pick the one where your account &amp; funds are.</i>",
             {"reply_markup": json.dumps({"inline_keyboard": [
+                [{"text": "🆕 Create Binance account", "url": _BINANCE_SIGNUP_URL}],
                 [{"text": "🟡 Binance.com (Global)", "callback_data": "ex:binance"}],
                 [{"text": "🇺🇸 Binance.US", "callback_data": "ex:binanceus"}],
             ]})})
@@ -1089,18 +1139,21 @@ def _ask_live_keys(chat_id):
     _wizard[str(chat_id)] = "KEYS"
     u = user_loop._ensure_user(chat_id)
     is_us = u.get("exchange") == "binanceus"
-    url = "https://www.binance.us/usercenter/settings/api-management" if is_us \
-        else _BINANCE_KEYS_URL
+    url = _BINANCEUS_KEYS_URL if is_us else _BINANCE_KEYS_URL
     name = "Binance.US" if is_us else "Binance.com"
     send_to(chat_id,
             f"🔴 <b>Connect your {name} account</b>\n\n"
-            "1️⃣ Tap <b>Open API Settings</b> below\n"
-            "2️⃣ Create an API key — enable <b>Spot Trading</b>\n"
-            "3️⃣ Send both keys here in ONE message:\n"
+            "1️⃣ Tap <b>Open API page</b> below (log in to Binance)\n"
+            "2️⃣ Create an API key — enable <b>Spot &amp; Margin Trading</b>, "
+            "leave <b>withdrawals OFF</b> (the bot only needs trade access)\n"
+            "3️⃣ Copy the <b>API Key</b> and <b>Secret Key</b> Binance shows you\n"
+            "4️⃣ Send both here in ONE message:\n"
             "<code>API_KEY=your_key API_SECRET=your_secret</code>\n\n"
-            "🔒 <i>Message deleted instantly after reading.</i>",
+            "🔒 <i>Your message is deleted instantly after reading — keys are stored "
+            "encrypted and can never withdraw your funds.</i>",
             {"reply_markup": json.dumps({"inline_keyboard": [
                 [{"text": f"🔑 Open {name} API page", "url": url}],
+                [{"text": "🆕 No account yet? Create Binance", "url": _BINANCE_SIGNUP_URL}],
             ]})})
 
 

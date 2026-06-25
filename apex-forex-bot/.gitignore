@@ -1,5 +1,9 @@
 .env
 runtime.json
+# Per-client runtime data — stores OANDA tokens & AI keys, must NEVER be committed
+users/
+access.json
+trades/
 __pycache__/
 *.pyc
 *.pyo

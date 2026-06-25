@@ -426,9 +426,9 @@ def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None) -> 
     return "⚠️ Could not complete the request. Please try again."
 
 
-def _chat_groq(user_id: str, message: str) -> str:
+def _chat_groq(user_id: str, message: str, api_key: str = "") -> str:
     import requests
-    key = cfg.GROQ_API_KEY
+    key = api_key or cfg.GROQ_API_KEY
     if not key:
         raise _ProviderDown("no groq key")
 
@@ -498,9 +498,16 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
 
     def _run():
         try:
-            anthropic_key = cfg.ANTHROPIC_API_KEY
-            gemini_key = cfg.GEMINI_API_KEY
-            groq_key = cfg.GROQ_API_KEY
+            # Per-user keys (the client pasted their own) take priority over the
+            # shared admin keys, so every client can run AI chat on their own quota.
+            from apex import user_store
+            try:
+                u = user_store.load(user_id)
+            except Exception:
+                u = {}
+            anthropic_key = u.get("anthropic_key") or cfg.ANTHROPIC_API_KEY
+            gemini_key = u.get("gemini_key") or cfg.GEMINI_API_KEY
+            groq_key = u.get("groq_key") or cfg.GROQ_API_KEY
 
             chain = []
             if anthropic_key:
@@ -508,7 +515,7 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
             if gemini_key:
                 chain.append(("Gemini", lambda: _chat_gemini(user_id, message, gemini_key, send_status)))
             if groq_key:
-                chain.append(("Groq", lambda: _chat_groq(user_id, message)))
+                chain.append(("Groq", lambda: _chat_groq(user_id, message, groq_key)))
 
             reply = None
             for name, prov in chain:
@@ -525,8 +532,13 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
 
             if not reply:
                 reply = (_local_status(user_id) +
-                         "\n\n🧠 <i>AI chat needs an API key. "
-                         "Ask the admin to configure GEMINI_API_KEY or GROQ_API_KEY in Render.</i>")
+                         "\n\n🧠 <b>Want AI chat to help you trade?</b>\n"
+                         "It needs an API key — <b>your choice</b>, free or paid:\n"
+                         "🥇 <b>Gemini</b> (free, 1,500/day) → aistudio.google.com/apikey\n"
+                         "🥈 <b>Groq</b> (free, fast) → console.groq.com/keys\n"
+                         "🥉 <b>Claude</b> (paid, smartest) → console.anthropic.com\n"
+                         "Then send <code>/ai</code> and paste your key. "
+                         "<i>Trading runs fine without it — this only powers the chat.</i>")
             send_fn(reply)
         except Exception as e:
             print(f"[ForexAssistant:{user_id}] error: {e}")
@@ -536,6 +548,92 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
                 send_fn("⚠️ Assistant error. Please try again.")
 
     threading.Thread(target=_run, daemon=True).start()
+
+
+def _gemini_url() -> str:
+    model = getattr(cfg, "GEMINI_MODEL", "") or "gemini-2.5-flash"
+    return (f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model}:generateContent")
+
+
+def test_key(key: str):
+    """Quick liveness check for a client's Anthropic key. Returns (ok, message)."""
+    if not key or not key.startswith("sk-ant-"):
+        return False, "Key must start with sk-ant-"
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=key)
+        client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=5,
+            messages=[{"role": "user", "content": "Reply with the single word OK."}],
+        )
+        return True, "Key works"
+    except Exception as e:
+        status = getattr(e, "status_code", None)
+        if status == 401:
+            return False, "Key rejected (401) — copy it again from console.anthropic.com"
+        if status == 429:
+            return False, "Key is valid but out of credits/rate-limited"
+        return False, f"Could not verify key ({e})"
+
+
+def test_groq_key(key: str):
+    """Quick liveness check for a Groq key. Returns (ok, message)."""
+    import requests
+    key = (key or "").strip()
+    if not key.startswith("gsk_"):
+        return False, "Groq keys start with gsk_ — copy it from console.groq.com/keys"
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={"model": "llama-3.3-70b-versatile",
+                  "messages": [{"role": "user", "content": "Reply with the single word OK."}],
+                  "max_tokens": 5},
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            timeout=12,
+        )
+        if r.status_code == 401:
+            return False, "Key rejected — recreate it at console.groq.com/keys"
+        if r.status_code == 429:
+            return True, "Key valid (was briefly rate-limited, that's fine)"
+        r.raise_for_status()
+        return True, "Key works"
+    except Exception as e:
+        return False, f"Could not verify key ({e})"
+
+
+def test_gemini_key(key: str):
+    """Quick liveness check for a Gemini key. Returns (ok, message)."""
+    import requests
+    key = (key or "").strip()
+    if len(key) < 20:
+        return False, "That doesn't look like a full API key — copy the whole thing from aistudio.google.com/apikey"
+    try:
+        r = requests.post(
+            _gemini_url(), params={"key": key},
+            json={"contents": [{"role": "user", "parts": [{"text": "Reply with the single word OK."}]}],
+                  "generationConfig": {"maxOutputTokens": 5}},
+            timeout=12,
+        )
+        if r.status_code == 429:
+            return True, "Key valid (was briefly rate-limited, that's fine)"
+        if r.status_code >= 400:
+            try:
+                err = r.json().get("error", {})
+                reason = next((d["reason"] for d in err.get("details", []) if d.get("reason")), "")
+                msg = err.get("message", "")
+            except Exception:
+                reason, msg = "", r.text[:120]
+            if reason == "API_KEY_INVALID":
+                return False, "Google says the key is invalid. Recreate it at aistudio.google.com/apikey and copy the WHOLE key (starts with AIza)."
+            if reason in ("SERVICE_DISABLED", "PERMISSION_DENIED"):
+                return False, "The Generative Language API isn't enabled for this key's project. Create the key in a NEW project at aistudio.google.com/apikey."
+            return False, f"Google rejected the key: {msg or reason or r.status_code}"
+        r.raise_for_status()
+        return True, "Key works"
+    except Exception as e:
+        return False, f"Could not verify key ({e})"
 
 
 def clear_history(user_id: str) -> None:

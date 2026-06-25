@@ -412,12 +412,23 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                 w["data"]["paper"] = False
                 w["step"] = "KEYS"
             send_to(chat_id,
-                    "🔴 <b>Live OANDA</b> — enter your credentials in one message:\n\n"
+                    "🔴 <b>Live OANDA — connect your real account</b>\n\n"
+                    "🆕 <b>No OANDA account yet?</b> Tap <b>Create OANDA account</b> "
+                    "below, open a live (fxTrade) account and fund it first.\n\n"
+                    "<b>Get your API keys from OANDA:</b>\n"
+                    "1️⃣ Log in at oanda.com → <b>Manage API Access</b> "
+                    "→ <b>Generate</b> a personal access token\n"
+                    "2️⃣ Find your <b>Account ID</b> under <b>Manage Funds</b> "
+                    "(looks like <code>001-001-1234567-001</code>)\n"
+                    "3️⃣ Send <b>both</b> here in ONE message:\n\n"
                     "  <code>OANDA_API_TOKEN=your_token</code>\n"
                     "  <code>OANDA_ACCOUNT_ID=001-001-1234567-001</code>\n\n"
-                    "Get them at <a href=\"https://www.oanda.com\">oanda.com</a> → "
-                    "Manage API Access.\n\n"
-                    "🔒 <i>Your message is deleted immediately after reading.</i>")
+                    "🔒 <i>Your message is deleted immediately after reading. Keys are "
+                    "trade-only and stored encrypted.</i>",
+                    {"reply_markup": json.dumps({"inline_keyboard": [
+                        [{"text": "🆕 Create OANDA account", "url": "https://www.oanda.com/account/login"}],
+                        [{"text": "🔑 Open API token page", "url": "https://www.oanda.com/account/tpa/personal_token"}],
+                    ]})})
 
     elif step == "KEYS":
         _delete_message(chat_id, msg_id)
@@ -561,7 +572,9 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                 f"Paper mode: <b>{paper_str}</b>\n\n"
                 f"⚡ Trading is active now. You'll get an alert on every trade,\n"
                 f"plus a heartbeat so you always know the bot is awake.\n"
-                f"Change anything with /setup · /status to check · /stop to pause.",
+                f"Change anything with /setup · /status to check · /stop to pause.\n\n"
+                f"🧠 <b>Want AI chat to help you trade?</b> Send /ai to connect a free "
+                f"Gemini/Groq key (or paid Claude) — your choice.",
                 _dashboard_keyboard())
 
 
@@ -583,6 +596,74 @@ def _handle_setkeys(chat_id, args_text, msg_id):
         _bot_control["reload_broker"]()
     masked = "\n".join(f"  {k} = {_mask(v)}" for k, v in pairs.items())
     send_to(chat_id, f"🔑 <b>{len(pairs)} credential(s) updated:</b>\n<code>{masked}</code>")
+
+
+_AI_KB = {"reply_markup": json.dumps({"inline_keyboard": [
+    [{"text": "🥇 Get free Gemini key", "url": "https://aistudio.google.com/apikey"}],
+    [{"text": "🥈 Get free Groq key", "url": "https://console.groq.com/keys"}],
+]})}
+
+
+def _handle_ai_setup(chat_id):
+    """Explain the AI-chat key options — client connects their OWN free/paid key."""
+    u = user_store.load(chat_id)
+    if u.get("groq_key") or u.get("gemini_key") or u.get("anthropic_key"):
+        return send_to(chat_id,
+                       "🧠 <b>AI chat is already connected</b> on your own key. ✅\n"
+                       "Just talk to me — \"analyze EUR_USD\", \"should I buy gold?\".\n"
+                       "Paste a different key any time to switch.")
+    send_to(chat_id,
+            "🧠 <b>Activate AI chat (helps you trade)</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Your bot already trades on its built-in rule engine. A free AI key adds "
+            "<b>smart chat</b> — ask it to analyze a pair, explain a trade, or enter for you.\n\n"
+            "⚠️ <b>AI chat needs a key — your choice, free or paid:</b>\n"
+            "🥇 <b>Gemini</b> — free, 1,500/day → aistudio.google.com/apikey\n"
+            "🥈 <b>Groq</b> — free, fast (key starts <code>gsk_</code>) → console.groq.com/keys\n"
+            "🥉 <b>Claude</b> — paid, smartest (key starts <code>sk-ant-</code>) → console.anthropic.com\n\n"
+            "📋 <b>Just paste your key here</b> — I auto-detect which one it is and verify it.\n"
+            "<i>Trading works fine without a key; this only powers the chat.</i>",
+            _AI_KB)
+
+
+def _detect_ai_key(key):
+    k = (key or "").strip()
+    if k.startswith("sk-ant-"):
+        return "claude"
+    if k.startswith("gsk_"):
+        return "groq"
+    if k.startswith("AIza"):
+        return "gemini"
+    return None
+
+
+def _handle_ai_key(chat_id, key, msg_id):
+    """Verify & save a pasted AI key (any provider, auto-detected)."""
+    _delete_message(chat_id, msg_id)
+    key = (key or "").strip().split()[0] if key else ""
+    kind = _detect_ai_key(key)
+    if kind is None:
+        return send_to(chat_id,
+                       "🤔 <b>I couldn't tell which provider that key is for.</b>\n"
+                       "Gemini keys start with <code>AIza</code>, Groq with <code>gsk_</code>, "
+                       "Claude with <code>sk-ant-</code>.\n"
+                       "Copy the full key again, or tap a button below to get a free one.",
+                       _AI_KB)
+    label = {"claude": "Claude", "groq": "Groq", "gemini": "Gemini"}[kind]
+    send_to(chat_id, f"🔍 Testing your {label} key…")
+    if kind == "claude":
+        ok, why = assistant.test_key(key); field = "anthropic_key"
+    elif kind == "groq":
+        ok, why = assistant.test_groq_key(key); field = "groq_key"
+    else:
+        ok, why = assistant.test_gemini_key(key); field = "gemini_key"
+    if not ok:
+        return send_to(chat_id, f"❌ <b>{label} key not working:</b> {why}\n\nPaste a different key.", _AI_KB)
+    user_store.update(chat_id, {field: key})
+    assistant.clear_history(chat_id)
+    send_to(chat_id,
+            f"✅ <b>{label} key verified &amp; saved!</b>\n"
+            "AI chat now runs on YOUR own quota. Try: <i>\"analyze EUR_USD\"</i> 🧠")
 
 
 def _handle_broker(chat_id, args):
@@ -944,11 +1025,17 @@ _HELP_CLIENT = ("📋 <b>APEX FOREX BOT</b>\n"
                 "/setup — choose paper/live, pair, risk (start here)\n"
                 "/status — live trading snapshot\n"
                 "/report — trade journal + net P&amp;L (for taxes)\n"
-                "/buy EUR_USD — open a BUY manually\n"
+                "/buy EUR_USD — open a BUY manually (any pair you want)\n"
                 "/sell EUR_USD — open a SELL manually\n"
                 "/close — close current position\n"
+                "/ai — connect your own free/paid AI key for smart chat\n"
                 "/stop — pause your bot · /cancel — abort setup\n"
                 "/help — this list\n\n"
+                "<b>🔄 Switch Paper ↔ Real:</b>\n"
+                "Send /stop, then /setup and pick Paper or Live OANDA. "
+                "Paper (simulated) and live (real funds) are fully separate — "
+                "switching never touches your real money unless you pick Live and "
+                "connect your OANDA keys.\n\n"
                 "💬 <i>Or just talk to me in any language!</i>\n"
                 "<i>Example: \"enter now\", \"intru acum\", \"analyzeaza EUR_USD\"</i>")
 
@@ -1176,7 +1263,16 @@ def _poll_loop():
                 elif cmd_l == "/stop":
                     # Per-user: stops only this client's loop (admin also pauses global).
                     _handle_stop(chat_id)
+                elif cmd_l == "/ai":
+                    _handle_ai_setup(chat_id)
+                elif cmd_l in ("/groq", "/gemini", "/claude", "/key"):
+                    # Explicit key command — the key is the argument.
+                    _handle_ai_key(chat_id, args, msg_id)
                 elif not raw.startswith("/"):
+                    # A bare pasted AI key → connect it (and keep it out of chat history).
+                    if _detect_ai_key(raw.strip()):
+                        _handle_ai_key(chat_id, raw.strip(), msg_id)
+                        continue
                     # Intent detection first (works with zero AI key)
                     handled = _handle_trade_intent_fx(chat_id, raw)
                     if not handled:
