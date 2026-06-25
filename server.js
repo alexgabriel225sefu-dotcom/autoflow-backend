@@ -1824,6 +1824,36 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
     if (claimedProduct && hmacResult.product && claimedProduct !== hmacResult.product) {
       return res.json({ valid: false, message: `Wrong license type. This key is for ${hmacResult.product}. Purchase the correct bot at aicashsystem.space` });
     }
+    // A valid signature is NOT proof of payment. /create-payment-intent hands the
+    // buyer a correctly-signed key BEFORE they pay and stores it active:false until
+    // the webhook flips it on payment_intent.succeeded. Without this gate, anyone
+    // could call create-payment-intent, read pendingKey from the JSON response and
+    // activate the bot for free. So: if the key exists in our DB as not-yet-paid,
+    // reject it — UNLESS Stripe confirms the payment actually succeeded (which also
+    // covers the race where the buyer taps the deep link before our webhook runs).
+    if (supabase) {
+      try {
+        const { data: row } = await supabase.from('licenses')
+          .select('active,payment_intent_id').eq('key', key).maybeSingle();
+        if (row && row.active === false) {
+          let paid = false;
+          if (row.payment_intent_id && process.env.STRIPE_SECRET_KEY) {
+            try {
+              const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+              const pi = await stripe.paymentIntents.retrieve(row.payment_intent_id);
+              paid = pi && pi.status === 'succeeded';
+            } catch (_) { paid = false; }
+          }
+          if (!paid) {
+            return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
+          }
+          // Just paid but the webhook hasn't run yet — activate now so the buyer gets in.
+          supabase.from('licenses').update({ active: true, activated_at: new Date().toISOString() })
+            .eq('key', key).then(() => {}).catch(() => {});
+        }
+        // row.active === true, or no row at all (legacy/manual key) → allow through.
+      } catch (_) { /* DB hiccup → fall through to fail-open allow below */ }
+    }
     if (supabase) {
       supabase.from('licenses')
         .upsert([{ key, active: true, activated_at: new Date().toISOString(), product: hmacResult.product }], { onConflict: 'key' })
@@ -1948,7 +1978,10 @@ async function handleStripeWebhook(req, res) {
           try {
             const { data: aff } = await supabase.from('affiliates').select('code,commission_percent,status').eq('code', refCode).maybeSingle();
             if (aff && aff.status === 'active') {
-              const commission = Math.round(pi.amount * aff.commission_percent / 100);
+              // Fall back to the documented 30% if the column default is missing —
+              // otherwise null * amount = 0 and the affiliate silently earns nothing.
+              const pct = Number(aff.commission_percent) > 0 ? Number(aff.commission_percent) : 30;
+              const commission = Math.round(pi.amount * pct / 100);
               await supabase.from('referral_sales').upsert([{
                 affiliate_code: aff.code, license_key: licenseKey, payment_intent_id: pi.id,
                 product, amount: pi.amount, commission_amount: commission
