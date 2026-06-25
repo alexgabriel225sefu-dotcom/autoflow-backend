@@ -4,7 +4,11 @@ services:
     env: node
     buildCommand: npm install
     startCommand: node server.js
-    plan: free
+    # Starter ($7/mo) — must be always-on: serves the sales site + receives
+    # Stripe webhooks (license delivery). On free tier the always-on bots
+    # exhaust the shared 750h pool and suspend this too, taking the site and
+    # webhook-based license delivery down with it.
+    plan: starter
     autoDeploy: true
     envVars:
       - key: NODE_ENV

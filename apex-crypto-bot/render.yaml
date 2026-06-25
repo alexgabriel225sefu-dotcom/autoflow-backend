@@ -1,6 +1,7 @@
 services:
-  # 'web' (not 'background') so it works on Render's FREE plan.
-  # The bot binds $PORT for a health check + self-pings to stay awake 24/7.
+  # 'web' (not 'background') with a $PORT health check. Starter ($7/mo) so the
+  # bot is always-on — a trading bot must run 24/7 to scan and trade, which
+  # blows past the free 750h pool. On Starter it no longer needs the self-ping.
   - type: web
     name: apex-crypto-bot
     env: python
@@ -9,7 +10,7 @@ services:
     region: frankfurt
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
-    plan: free
+    plan: starter
     autoDeploy: true
     envVars:
       # Required: bot token from @BotFather + a free Groq key (console.groq.com).

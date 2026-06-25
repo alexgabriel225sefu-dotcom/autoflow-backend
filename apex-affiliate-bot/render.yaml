@@ -1,14 +1,13 @@
 services:
-  # 'web' (not 'background') so it works on Render's FREE plan.
-  # bot.py binds $PORT for a health check and self-pings RENDER_EXTERNAL_URL
-  # every 10 min so the free instance never sleeps.
+  # 'web' (not 'background') with a $PORT health check. Starter ($7/mo) so the
+  # affiliate bot is always-on without burning the shared free 750h pool.
   - type: web
     name: apex-affiliate-bot
     env: python
     buildCommand: pip install -r requirements.txt
     # -u = unbuffered stdout so startup logs show in Render's log tab live
     startCommand: python -u main.py
-    plan: free
+    plan: starter
     autoDeploy: true
     envVars:
       - key: PYTHONUNBUFFERED
