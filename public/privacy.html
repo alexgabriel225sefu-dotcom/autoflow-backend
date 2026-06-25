@@ -59,10 +59,10 @@ a{color:#E53E2E}
   <h2>2a. Trading Bot Products (Apex Trade Bot / Apex Forex Bot)</h2>
   <p>If you purchase our trading bot software, the following applies in addition:</p>
   <ul>
-    <li><strong>Self-hosted software:</strong> the bots run entirely on your own server or computer. Your exchange/broker API keys, account balances, positions, and trading history are processed locally on your infrastructure and <strong>are never transmitted to our servers</strong>. We have no access to your exchange or broker accounts, your API keys, or your funds at any time.</li>
-    <li><strong>License verification:</strong> the bot software periodically verifies your license key against our server. This request contains <strong>only the license key</strong> — no trading data, no API keys, no balances.</li>
-    <li><strong>Third-party services you configure:</strong> if you choose to enable optional features, your bot communicates directly (from your server, with your own accounts) with: your chosen exchange/broker, AI providers (Anthropic or Groq) for signal generation, and Telegram for notifications. These connections use your own API keys and are governed by those providers' privacy policies, not ours.</li>
-    <li><strong>What we store about bot customers:</strong> your purchase email, your license key, and payment records (via Stripe) — nothing else.</li>
+    <li><strong>Hosted trading service:</strong> the bots are fully hosted — we run them 24/7 on our servers. To trade on your behalf you connect your own exchange (Binance) or broker (OANDA) account by providing API keys. These keys are <strong>stored encrypted</strong> and used solely to place the trades you configure. We never request withdrawal permissions and never have access to your funds; you can revoke the keys at your exchange/broker at any time.</li>
+    <li><strong>Trading data we process:</strong> to operate your bot we process your account balance, open positions, and trade history. This is used only to run and display your bot — it is never sold or shared for marketing.</li>
+    <li><strong>Third-party services the bot uses on your behalf:</strong> your chosen exchange/broker, AI providers (Anthropic, with Groq as fallback) for signal generation, and Telegram for notifications. These connections are governed by those providers' privacy policies in addition to ours.</li>
+    <li><strong>What we store about bot customers:</strong> your purchase email, your license key, payment records (via Stripe), your encrypted exchange/broker API keys, and your bot configuration (pairs, risk settings, paper balance).</li>
   </ul>
 
   <h2>3. Legal Basis for Processing (GDPR)</h2>
@@ -92,6 +92,8 @@ a{color:#E53E2E}
     <li><strong>Stripe, Inc.</strong> (USA) — payment processing. Stripe is certified under EU-US Data Privacy Framework. Privacy policy: stripe.com/privacy</li>
     <li><strong>Supabase, Inc.</strong> (USA) — database hosting. Data stored on EU servers where possible. Privacy policy: supabase.com/privacy</li>
     <li><strong>Brevo SAS</strong> (France) — transactional email delivery. EU-based processor. Privacy policy: brevo.com/legal/privacypolicy</li>
+    <li><strong>Anthropic, PBC</strong> (USA) — AI trading-signal generation for the hosted bots. Privacy policy: anthropic.com/legal/privacy</li>
+    <li><strong>Groq, Inc.</strong> (USA) — fallback AI signal generation for the hosted bots. Privacy policy: groq.com/privacy-policy</li>
     <li><strong>OpenAI, Inc.</strong> (USA) — AI features within the Blueprint Studio platform. Privacy policy: openai.com/privacy</li>
     <li><strong>Render Services, Inc.</strong> (USA) — hosting infrastructure. Privacy policy: render.com/privacy</li>
   </ul>
