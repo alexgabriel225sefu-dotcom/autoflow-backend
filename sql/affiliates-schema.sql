@@ -33,6 +33,13 @@ UPDATE affiliates SET commission_percent = 30 WHERE commission_percent = 20;
 -- Affiliate login: password (scrypt salt:hash, set on signup or account claim).
 ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
+-- Telegram binding: the affiliate's chat id, set when they open the ref bot via
+-- the signed deep link. Required by /api/affiliates/telegram-link,
+-- telegram-stats, and the real-time sale notifier — without this column those
+-- all fail with "column does not exist" and the bot can never show earnings.
+ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_affiliates_telegram_chat_id ON affiliates(telegram_chat_id);
+
 -- Affiliate terms acceptance (proof of consent for the affiliate program).
 ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ;
 ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS terms_version TEXT;

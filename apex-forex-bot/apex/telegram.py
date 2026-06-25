@@ -41,7 +41,9 @@ _get_dash = lambda: None
 _broker = None
 _update_id = 0
 _lock = threading.Lock()
-_wizard = {}       # wizard state: {step: str, data: dict}
+_wizards = {}      # per-chat wizard state: {chat_id: {step: str, data: dict}}
+                   # MUST be per-chat — many clients run /setup on the same shared
+                   # bot at once; a single global dict would clobber their flows.
 _bot_control = {}  # callbacks: {set_paused, get_paused, reload_broker}
 
 _PAIR_RE = re.compile(r"^[A-Z]{3}_[A-Z]{3}$")
@@ -371,9 +373,7 @@ def _handle_status(chat_id):
 
 def _handle_setup(chat_id):
     with _lock:
-        _wizard.clear()
-        _wizard["step"] = "MODE"
-        _wizard["data"] = {}
+        _wizards[chat_id] = {"step": "MODE", "data": {}}
     send_to(chat_id,
             "🛠️ <b>APEX FOREX BOT SETUP</b>\n\n"
             "1/5 — <b>How do you want to trade?</b>\n\n"
@@ -387,7 +387,10 @@ def _handle_setup(chat_id):
 
 def _handle_wizard_reply(chat_id, raw, msg_id):
     with _lock:
-        step = _wizard.get("step")
+        w = _wizards.get(chat_id)
+        step = w.get("step") if w else None
+    if not w:
+        return   # no active wizard for this chat
 
     if step == "MODE":
         choice = raw.strip()
@@ -396,8 +399,8 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
         if choice == "1":
             # Paper — Yahoo data, no OANDA needed, skip straight to the pair
             with _lock:
-                _wizard["data"]["paper"] = True
-                _wizard["step"] = "SYMBOL"
+                w["data"]["paper"] = True
+                w["step"] = "SYMBOL"
             send_to(chat_id,
                     "🧪 <b>Paper mode</b> — free Yahoo Finance prices, no account.\n\n"
                     "2/5 — <b>Which pair do YOU want to trade?</b>\n\n"
@@ -406,8 +409,8 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
         else:
             # Live — collect OANDA credentials next
             with _lock:
-                _wizard["data"]["paper"] = False
-                _wizard["step"] = "KEYS"
+                w["data"]["paper"] = False
+                w["step"] = "KEYS"
             send_to(chat_id,
                     "🔴 <b>Live OANDA</b> — enter your credentials in one message:\n\n"
                     "  <code>OANDA_API_TOKEN=your_token</code>\n"
@@ -428,8 +431,8 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                            "❌ I need both values. Send them in one message:\n"
                            "<code>OANDA_API_TOKEN=... OANDA_ACCOUNT_ID=...</code>")
         with _lock:
-            _wizard["data"]["keys"] = pairs
-            _wizard["step"] = "SYMBOL"
+            w["data"]["keys"] = pairs
+            w["step"] = "SYMBOL"
         send_to(chat_id,
                 "✅ Credentials saved.\n\n"
                 "2/5 — <b>Which pair do YOU want to trade?</b>\n\n"
@@ -441,8 +444,8 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
         if not _PAIR_RE.match(sym):
             return send_to(chat_id, "❌ Invalid pair. Example: <code>EUR_USD</code>")
         with _lock:
-            _wizard["data"]["symbol"] = sym
-            _wizard["step"] = "RISK"
+            w["data"]["symbol"] = sym
+            w["step"] = "RISK"
         send_to(chat_id,
                 f"✅ Pair: <b>{sym}</b>\n\n"
                 "3/5 — <b>How much do YOU want to risk per trade?</b>\n\n"
@@ -458,8 +461,8 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
         if choice not in risk_map:
             return send_to(chat_id, "❌ Reply <code>1</code>, <code>2</code> or <code>3</code>.")
         with _lock:
-            _wizard["data"]["risk"] = risk_map[choice]
-            _wizard["step"] = "STYLE"
+            w["data"]["risk"] = risk_map[choice]
+            w["step"] = "STYLE"
         send_to(chat_id,
                 "4/5 — <b>How should the bot trade?</b>\n\n"
                 "Reply <code>1</code>, <code>2</code> or <code>3</code>:\n"
@@ -474,9 +477,9 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
         if choice not in conf_map:
             return send_to(chat_id, "❌ Reply <code>1</code>, <code>2</code> or <code>3</code>.")
         with _lock:
-            _wizard["data"]["min_confidence"] = conf_map[choice]
-            _wizard["step"] = "DISCLAIMER"
-            d = dict(_wizard["data"])
+            w["data"]["min_confidence"] = conf_map[choice]
+            w["step"] = "DISCLAIMER"
+            d = dict(w["data"])
         risk_pct = d.get("risk", 0.005) * 100
         send_to(chat_id,
                 "5/5 — ⚠️ <b>Risk acknowledgment</b>\n\n"
@@ -493,8 +496,8 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             return send_to(chat_id,
                            "Type <code>ACCEPT</code> (in capitals) to activate, or /cancel to abort.")
         with _lock:
-            _wizard["step"] = None
-            d = dict(_wizard["data"])
+            d = dict(w["data"])
+            _wizards.pop(chat_id, None)
         sym = d.get("symbol", "EUR_USD")
 
         # Save per-user settings — every risk parameter was chosen by the client
@@ -938,11 +941,13 @@ def _handle_config(chat_id):
 
 _HELP_CLIENT = ("📋 <b>APEX FOREX BOT</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
+                "/setup — choose paper/live, pair, risk (start here)\n"
                 "/status — live trading snapshot\n"
                 "/report — trade journal + net P&amp;L (for taxes)\n"
                 "/buy EUR_USD — open a BUY manually\n"
                 "/sell EUR_USD — open a SELL manually\n"
                 "/close — close current position\n"
+                "/stop — pause your bot · /cancel — abort setup\n"
                 "/help — this list\n\n"
                 "💬 <i>Or just talk to me in any language!</i>\n"
                 "<i>Example: \"enter now\", \"intru acum\", \"analyzeaza EUR_USD\"</i>")
@@ -1092,7 +1097,7 @@ def _poll_loop():
 
                 # Active wizard step takes priority over /commands
                 with _lock:
-                    in_wizard = bool(_wizard.get("step")) and not raw.startswith("/")
+                    in_wizard = bool(_wizards.get(chat_id, {}).get("step")) and not raw.startswith("/")
                 if in_wizard:
                     _handle_wizard_reply(chat_id, raw, msg_id)
                     continue
@@ -1118,8 +1123,15 @@ def _poll_loop():
                     _handle_grant(chat_id, args)
                 elif cmd_l == "/revoke" and is_adm:
                     _handle_revoke(chat_id, args)
-                elif cmd_l == "/setup" and is_adm:
+                elif cmd_l == "/setup":
+                    # Every paying client self-configures their OWN trading via the
+                    # wizard (writes only their user record); admin extras apply
+                    # globally inside _handle_wizard_reply.
                     _handle_setup(chat_id)
+                elif cmd_l == "/cancel":
+                    with _lock:
+                        _had = _wizards.pop(chat_id, None)
+                    send_to(chat_id, "✖️ Setup cancelled." if _had else "Nothing to cancel.")
                 elif cmd_l == "/config" and is_adm:
                     _handle_config(chat_id)
                 elif cmd_l == "/setkeys" and is_adm:
@@ -1146,7 +1158,8 @@ def _poll_loop():
                     _handle_close(chat_id)
                 elif cmd_l == "/start":
                     _handle_start(chat_id)
-                elif cmd_l == "/stop" and is_adm:
+                elif cmd_l == "/stop":
+                    # Per-user: stops only this client's loop (admin also pauses global).
                     _handle_stop(chat_id)
                 elif not raw.startswith("/"):
                     # Intent detection first (works with zero AI key)
