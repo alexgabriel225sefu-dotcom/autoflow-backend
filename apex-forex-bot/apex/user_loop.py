@@ -135,6 +135,52 @@ def _loop(user_id, alert_fn):
             dash["balance"] = paper_balance
             dash["openPosition"] = open_pos
 
+            # ── Paper SL/TP enforcement ──
+            # In LIVE mode OANDA holds the stop/target server-side, so a hit
+            # closes the position and get_open_position() reflects it next tick.
+            # In PAPER mode nothing closes the trade unless we check the price
+            # ourselves — without this, stops are decorative and a losing paper
+            # trade runs forever (only an AI "CLOSE" would ever exit it).
+            if cfg.PAPER_TRADING and open_pos:
+                hi = candles[-1].get("high", price)
+                lo = candles[-1].get("low", price)
+                sl = open_pos.get("stopLoss")
+                tp = open_pos.get("takeProfit")
+                pside = open_pos.get("side")
+                hit = None
+                if pside == "BUY":
+                    if sl and lo <= sl:      hit = "STOP_LOSS"
+                    elif tp and hi >= tp:    hit = "TAKE_PROFIT"
+                else:  # SELL
+                    if sl and hi >= sl:      hit = "STOP_LOSS"
+                    elif tp and lo <= tp:    hit = "TAKE_PROFIT"
+                if hit:
+                    # Fill at the SL/TP level (realistic), not the candle close.
+                    exit_price = sl if hit == "STOP_LOSS" else tp
+                    units_ = open_pos.get("units", 1000)
+                    gross = forex.pnl_usd(pside, open_pos["entryPrice"],
+                                          exit_price, units_, cfg.SYMBOL)
+                    pv = forex.pip_value_per_unit(cfg.SYMBOL, exit_price)
+                    cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                    net = gross - cost_usd
+                    paper_balance += net
+                    result = {"action": "CLOSE", "symbol": cfg.SYMBOL,
+                              "price": exit_price, "entryPrice": open_pos.get("entryPrice"),
+                              "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
+                              "netPnl": round(net, 2), "balance": round(paper_balance, 2),
+                              "reason": hit, "openedAt": open_pos.get("openedAt"),
+                              "time": now_str}
+                    _log_trade(user_id, result)
+                    open_pos = None
+                    dash["openPosition"] = None
+                    dash["balance"] = paper_balance
+                    dash["trades"].insert(0, result)
+                    dash["trades"] = dash["trades"][:50]
+                    if alert_fn:
+                        alert_fn(user_id, result)
+                    time.sleep(_LOOP_INTERVAL)
+                    continue
+
             ind = indicators.analyze(candles)
             strat_data = strategies.analyze(candles)
 

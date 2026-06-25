@@ -818,10 +818,15 @@ def _user_alert(uid, result):
                 f"Confidence: <b>{result.get('confidence', 0)}%</b>{spread_line}")
     elif action == "CLOSE":
         net = result.get("netPnl")
+        _reason_lbl = {"STOP_LOSS": "🛑 Stop loss hit",
+                       "TAKE_PROFIT": "🎯 Take profit hit"}.get(result.get("reason"))
         if net is not None:
             icon = "✅" if net >= 0 else "❌"
+            head = f"🔒 <b>Position closed</b> — {sym}"
+            if _reason_lbl:
+                head = f"{_reason_lbl} — {sym}"
             send_to(uid,
-                    f"🔒 <b>Position closed</b> — {sym}\n"
+                    f"{head}\n"
                     f"Exit: <b>{result.get('price', '—')}</b>\n"
                     f"{icon} Net P&amp;L: <b>{'+' if net >= 0 else ''}${net:.2f}</b> "
                     f"<i>(gross ${result.get('grossPnl', 0):.2f} − cost ${result.get('costUsd', 0):.2f})</i>\n"
