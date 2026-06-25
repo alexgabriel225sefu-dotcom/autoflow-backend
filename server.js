@@ -2514,8 +2514,13 @@ a{text-decoration:none}
 </td></tr>
 
 <!-- ── RISK DISCLOSURE ── -->
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 18px">
   <p style="margin:0;font-size:11px;color:#1e293b;font-family:Arial,sans-serif;line-height:1.8;text-align:center"><strong style="color:#374151">Risk Disclosure</strong> &mdash; Crypto trading involves substantial risk of loss. Only invest what you can afford to lose. Apex Trade Bot is an automation tool, not financial advice. You are solely responsible for all trading decisions.</p>
+</td></tr>
+
+<!-- ── LEGAL / WITHDRAWAL WAIVER ── -->
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
+  <p style="margin:0;font-size:10px;color:#1e293b;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you expressly requested immediate supply of this digital product and acknowledged that you waive your 14-day right of withdrawal in accordance with Art. 16(m) of EU Directive 2011/83/EU. All sales are final once access is delivered. See our full <a href="https://aicashsystem.space/terms" style="color:#374151">Terms of Service</a>.</p>
 </td></tr>
 
 <!-- ── FOOTER ── -->
@@ -2594,8 +2599,12 @@ function _buildForexEmailHtml(safeName, safeEmail, licenseKey = 'FORX-XXXX-XXXX-
   </table>
 </td></tr>
 
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 18px">
   <p style="margin:0;font-size:11px;color:#1e293b;font-family:Arial,sans-serif;line-height:1.8;text-align:center"><strong style="color:#374151">Risk Disclosure</strong> &mdash; Forex trading involves substantial risk of loss. Only trade capital you can afford to lose. Apex Forex Bot is an automation tool, not financial advice.</p>
+</td></tr>
+
+<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
+  <p style="margin:0;font-size:10px;color:#1e293b;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you expressly requested immediate supply of this digital product and acknowledged that you waive your 14-day right of withdrawal in accordance with Art. 16(m) of EU Directive 2011/83/EU. All sales are final once access is delivered. See our full <a href="https://aicashsystem.space/terms" style="color:#374151">Terms of Service</a>.</p>
 </td></tr>
 
 <tr><td align="center" style="background:#0a0d18;border:1px solid rgba(255,255,255,0.07);border-top:1px solid rgba(255,255,255,0.05);border-radius:0 0 18px 18px;padding:24px 40px 28px">
