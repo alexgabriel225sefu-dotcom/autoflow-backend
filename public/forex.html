@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apex Forex Bot · AI Forex Trading — Controlled from Telegram</title>
+<meta name="description" content="A fully-hosted AI forex trading bot connected to your OANDA account, controlled entirely from Telegram. Nothing to install. One-time license — $497.">
+<meta property="og:title" content="Apex Forex Bot — AI Forex Trading System">
+<meta property="og:description" content="Runs 24/7. OANDA practice &amp; live. Paper trading to test risk-free. Fully hosted — control from Telegram. One-time $497.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060608;--bg1:#0b0b0e;--panel:#111115;--panel2:#18181d;--hover:#212128;
+  --line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.13);
+  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
+  --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;
+  --accdim:rgba(255,45,79,.12);--accglow:rgba(255,45,79,.45);
+  --up:#27c46a;--down:#ff2d4f;
+  --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
+  --ease:cubic-bezier(.32,.72,0,1);--r:16px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;letter-spacing:-.011em;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+#glow{position:fixed;top:0;left:0;width:680px;height:680px;border-radius:50%;background:radial-gradient(circle,rgba(255,45,79,.10),transparent 62%);pointer-events:none;z-index:1;transform:translate3d(-50%,-50%,0);opacity:0;transition:opacity .5s;will-change:transform}
+@media(hover:none){#glow{display:none}}
+nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,46px);background:rgba(6,6,8,.78);backdrop-filter:blur(20px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;transition:transform .3s var(--ease)}
+.brand:hover{transform:scale(1.06)}
+.logo{width:32px;height:32px;display:block;filter:drop-shadow(0 0 12px rgba(255,45,79,.5))}
+.brand-name{font:600 17px/1 var(--d);letter-spacing:-.01em}
+.nav-links{display:flex;gap:28px}
+.nav-links a{font:500 14px/1 var(--f);color:var(--t1);transition:color .2s}
+.nav-links a:hover{color:var(--t0)}
+.nav-cta{background:var(--acc);color:#fff;font:600 14px/1 var(--f);border-radius:10px;padding:11px 19px;transition:all .25s var(--ease);cursor:pointer;border:none}
+.nav-cta:hover{background:var(--acc2);box-shadow:0 6px 28px var(--accglow)}
+@media(max-width:880px){.nav-links{display:none}}
+.wrap{max-width:1280px;margin:0 auto;padding:0 clamp(16px,4vw,46px);position:relative;z-index:2}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--accdim);border:1px solid rgba(255,45,79,.24);color:var(--acc3);border-radius:100px;padding:6px 14px;font:500 11px/1 var(--m);letter-spacing:.1em;text-transform:uppercase}
+.eyebrow b{width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 9px var(--acc)}
+.h2{font:600 clamp(30px,3.9vw,52px)/1.03 var(--d);letter-spacing:-.025em}
+.lead{font:400 clamp(15px,1.4vw,17px)/1.7 var(--f);color:var(--t1);max-width:560px}
+.label{font:500 11px/1 var(--m);color:var(--acc);letter-spacing:.16em;text-transform:uppercase}
+#hero{position:relative;padding:clamp(54px,7vw,96px) 0 clamp(44px,5vw,64px);display:grid;grid-template-columns:1.05fr 1.25fr;gap:clamp(32px,4vw,56px);align-items:center;overflow:hidden}
+@media(max-width:980px){#hero{grid-template-columns:1fr;gap:36px}}
+.grid3d{position:absolute;left:-25%;right:-25%;bottom:-30%;height:90%;z-index:0;pointer-events:none;perspective:340px;opacity:.7}
+.grid3d::after{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,45,79,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(255,45,79,.14) 1px,transparent 1px);background-size:56px 56px;transform:rotateX(68deg);transform-origin:bottom center;animation:grid 6s linear infinite;-webkit-mask-image:linear-gradient(transparent,#000 55%,transparent);mask-image:linear-gradient(transparent,#000 55%,transparent)}
+@keyframes grid{from{background-position-y:0}to{background-position-y:56px}}
+.aurora{position:absolute;top:-15%;right:-8%;width:62%;height:120%;z-index:0;pointer-events:none;background:radial-gradient(closest-side,rgba(255,45,79,.20),rgba(255,45,79,.05) 58%,transparent);filter:blur(34px);will-change:transform;animation:aur 9s ease-in-out infinite}
+@keyframes aur{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-7%,5%) scale(1.14)}}
+.marquee{overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg);padding:24px 0;position:relative;z-index:2}
+.mq-track{display:inline-flex;align-items:center;white-space:nowrap;will-change:transform;animation:mq 30s linear infinite;font:600 clamp(30px,5.4vw,72px)/1 var(--d);letter-spacing:-.02em}
+.mq-track span{padding:0 .32em;color:var(--t0)}
+.mq-track .o{color:transparent;-webkit-text-stroke:1.2px var(--acc)}
+.mq-track .dot{color:var(--acc);-webkit-text-stroke:0}
+@keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+#hero h1{font:600 clamp(46px,6.4vw,84px)/.95 var(--d);letter-spacing:-.025em;margin:22px 0 18px}
+#hero h1 .grad{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 30px rgba(255,45,79,.35))}
+.hero-cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:30px 0 30px}
+.btn{display:inline-flex;align-items:center;gap:10px;font:600 15px/1 var(--f);border-radius:12px;padding:15px 24px;cursor:pointer;border:none;transition:all .3s var(--ease)}
+.btn-primary{background:var(--acc);color:#fff;box-shadow:0 8px 30px var(--accdim)}
+.btn-primary:hover{background:var(--acc2);box-shadow:0 14px 44px var(--accglow);transform:translateY(-1px)}
+.btn-ghost{background:var(--panel);color:var(--t0);border:1px solid var(--line2)}
+.btn-ghost:hover{background:var(--hover)}
+.hero-meta{display:flex;gap:30px;flex-wrap:wrap}
+.hm{display:flex;flex-direction:column;gap:5px}
+.hm b{font:600 22px/1 var(--m);color:var(--t0);letter-spacing:-.02em}
+.hm span{font:400 12px/1 var(--f);color:var(--t2)}
+.terminal{background:var(--panel);border:1px solid var(--line2);border-radius:18px;overflow:hidden;box-shadow:0 40px 90px rgba(0,0,0,.6),0 0 0 1px rgba(255,45,79,.08),0 0 60px rgba(255,45,79,.08);animation:float 7s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.term-top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--bg1)}
+.term-id{display:flex;align-items:center;gap:9px;font:500 12px/1 var(--m);color:var(--t1)}
+.term-id .dot{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc)}
+.term-live{font:500 10px/1 var(--m);color:var(--acc3);letter-spacing:.12em;border:1px solid rgba(255,45,79,.32);border-radius:5px;padding:4px 8px}
+.coin-row{display:flex;gap:6px;padding:10px 12px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--bg1);scrollbar-width:none}
+.coin-row::-webkit-scrollbar{display:none}
+.coin{flex-shrink:0;font:500 12px/1 var(--m);color:var(--t1);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;transition:all .2s}
+.coin:hover{color:var(--t0);border-color:var(--line2)}
+.coin.active{background:var(--accdim);border-color:var(--acc);color:var(--acc3)}
+.term-feed{min-height:58px;overflow:hidden;border-top:1px solid var(--line);background:var(--bg1);padding:9px 14px;display:flex;flex-direction:column;justify-content:center;gap:5px}
+.tf-row{display:flex;align-items:center;gap:7px;font:500 11px/1 var(--m);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transform:translateY(6px);animation:tfIn .3s cubic-bezier(.32,.72,0,1) forwards}
+@keyframes tfIn{to{opacity:1;transform:none}}
+.tf-buy{color:#27c46a}.tf-sell{color:#ff4a6a}.tf-scan{color:var(--acc3)}.tf-ok{color:#27c46a;opacity:.85}
+.tf-age{color:var(--t2);margin-left:auto;flex-shrink:0;font-size:10px}
+.term-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid var(--line);background:var(--bg1);flex-wrap:wrap}
+.term-foot .note{font:400 11px/1.5 var(--m);color:var(--t2)}
+.term-foot .note b{color:var(--t1);font-weight:500}
+.fx-price-area{padding:18px 14px;background:var(--bg)}
+.fx-main{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.fx-num{font:600 clamp(28px,4vw,42px)/1 var(--m);letter-spacing:-.02em;color:var(--t0)}
+.fx-chg{font:600 13px/1 var(--m);padding:3px 9px;border-radius:6px}
+.fx-chg.up{color:#27c46a;background:rgba(39,196,106,.12)}
+.fx-chg.dn{color:#ff2d4f;background:rgba(255,45,79,.12)}
+.fx-pos{background:rgba(39,196,106,.05);border:1px solid rgba(39,196,106,.18);border-radius:8px;padding:10px 13px}
+.fx-pos-lbl{font:600 10px/1 var(--m);color:#27c46a;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px}
+.fx-pos-info{font:400 12px/1.4 var(--m);color:var(--t1)}
+#trust{padding:26px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg1)}
+.trust-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.trust-lbl{font:400 12px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.1em}
+.trust-tag{font:600 14px/1 var(--f);color:var(--t1);letter-spacing:-.01em;opacity:.85;transition:color .2s,opacity .2s}
+.trust-tag:hover{color:var(--t0);opacity:1}
+.sec{padding:clamp(58px,7vw,96px) 0}
+.sec-head{max-width:620px;margin-bottom:44px}
+.sec-head .h2{margin:14px 0 14px}
+.center{text-align:center;margin-left:auto;margin-right:auto}
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:880px){.feat-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.feat-grid{grid-template-columns:1fr}}
+.feat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:26px;transition:border-color .25s,background .25s}
+.feat:hover{border-color:rgba(255,45,79,.3);background:var(--panel2)}
+.feat-ico{width:44px;height:44px;border-radius:12px;background:var(--accdim);border:1px solid rgba(255,45,79,.26);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+.feat-ico svg{width:22px;height:22px;stroke:var(--acc2);fill:none;stroke-width:1.7}
+.feat h3{font:600 17px/1.3 var(--f);margin-bottom:9px;letter-spacing:-.02em}
+.feat p{font:400 14px/1.7 var(--f);color:var(--t0);opacity:.75}
+.feat-badge{display:inline-flex;font:600 9px/1 var(--m);color:var(--acc2);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:4px;padding:3px 7px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel)}
+@media(max-width:680px){.stats{grid-template-columns:1fr 1fr}}
+.stat{padding:30px 24px;text-align:center;border-right:1px solid var(--line)}
+.stat:last-child{border-right:none}
+.stat b{display:block;font:600 clamp(28px,3.6vw,40px)/1 var(--m);letter-spacing:-.03em;background:linear-gradient(120deg,var(--t0),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.stat span{font:400 12px/1.4 var(--f);color:var(--t2)}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+@media(max-width:880px){.steps{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.steps{grid-template-columns:1fr}}
+.step{padding:28px 24px;border-right:1px solid var(--line);background:var(--panel)}
+.step:last-child{border-right:none}
+.step-n{font:500 13px/1 var(--m);color:var(--acc);margin-bottom:14px}
+.step h3{font:600 16px/1.3 var(--f);margin-bottom:8px;letter-spacing:-.02em}
+.step p{font:400 14px/1.7 var(--f);color:var(--t1)}
+.cmd-list{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px}
+@media(max-width:560px){.cmd-list{grid-template-columns:1fr}}
+.cmd{display:flex;gap:12px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;transition:border-color .2s,background .2s}
+.cmd:hover{border-color:rgba(255,45,79,.3);background:var(--panel2)}
+.cmd code{font:600 13px/1.2 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:6px;padding:3px 8px;white-space:nowrap;flex-shrink:0}
+.cmd span{font:400 13px/1.5 var(--f);color:var(--t1)}
+#pricing{background:var(--bg1);border-top:1px solid var(--line);border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+.price-wrap{display:grid;grid-template-columns:1fr 384px;gap:clamp(28px,4vw,52px);align-items:center}
+@media(max-width:880px){.price-wrap{grid-template-columns:1fr}}
+.price-list{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
+@media(max-width:560px){.price-list{grid-template-columns:1fr}}
+.price-list li{display:flex;align-items:flex-start;gap:10px;font:400 14px/1.5 var(--f);color:var(--t1)}
+.price-list li svg{width:18px;height:18px;stroke:var(--acc);fill:none;stroke-width:2.4;flex-shrink:0;margin-top:1px}
+.price-card{background:linear-gradient(165deg,var(--panel2),var(--panel));border:1px solid var(--line2);border-radius:20px;padding:34px;box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 50px rgba(255,45,79,.06);position:relative;overflow:hidden;animation:glow-pulse 4s ease-in-out infinite}
+.price-card::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:120%;background:radial-gradient(circle,rgba(255,45,79,.16),transparent 64%);pointer-events:none}
+.price-card::after{content:'';position:absolute;top:0;left:0;width:35%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent);animation:shimmer 3.5s ease-in-out infinite;pointer-events:none}
+@keyframes shimmer{0%{transform:translateX(-100%) skewX(-15deg)}100%{transform:translateX(200%) skewX(-15deg)}}
+@keyframes glow-pulse{0%,100%{box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 50px rgba(255,45,79,.06)}50%{box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 80px rgba(255,45,79,.18),0 0 0 1px rgba(255,45,79,.15)}}
+.price-badge{display:inline-flex;align-items:center;gap:6px;font:500 10px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.3);border-radius:100px;padding:5px 11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:18px;position:relative}
+.price-amt{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;position:relative}
+.price-amt .now{font:600 64px/1 var(--d);letter-spacing:-.03em}
+.price-sub{font:400 13px/1.5 var(--m);color:var(--t2);margin-bottom:24px;position:relative}
+.price-card .btn{width:100%;justify-content:center;font-size:16px;padding:16px;position:relative}
+.price-fine{font:400 11px/1.6 var(--m);color:var(--t2);text-align:center;margin-top:14px;position:relative}
+.faq{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.fq+.fq{border-top:1px solid var(--line)}
+.fq-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 24px;font:600 15px/1.4 var(--f);color:var(--t0);background:var(--panel);border:none;cursor:pointer;text-align:left;letter-spacing:-.01em;transition:color .2s}
+.fq-q:hover{color:var(--acc3)}
+.fq-ic{font:400 20px/1 var(--m);color:var(--t2);transition:transform .3s var(--ease);flex-shrink:0}
+.fq-q.open .fq-ic{transform:rotate(45deg);color:var(--acc)}
+.fq-a{display:none;padding:0 24px 22px;font:400 15px/1.75 var(--f);color:var(--t1);background:var(--panel)}
+.fq-a.open{display:block}
+#final{text-align:center;padding:clamp(64px,8vw,104px) 0;position:relative;overflow:hidden}
+#final .h2{font-size:clamp(32px,4vw,52px);margin-bottom:16px}
+#final p{font:400 16px/1.6 var(--f);color:var(--t1);max-width:480px;margin:0 auto 30px}
+footer{border-top:1px solid var(--line);padding:34px 0;font:400 12px/1.7 var(--f);color:var(--t2)}
+footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+footer .disc{max-width:560px}
+@media(max-width:480px){.price-card{padding:22px}}
+.rv{opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.rv.in{opacity:1;transform:none}
+.lg1{stop-color:#7a1020}.lg2{stop-color:#ff5c74}
+</style>
+</head>
+<body>
+
+<div id="glow"></div>
+
+<nav>
+  <a href="/" class="brand" aria-label="Home">
+    <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <defs><linearGradient id="cg" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse">
+        <stop class="lg1"/><stop offset="1" class="lg2"/></linearGradient></defs>
+      <rect x="3" y="19" width="5" height="10" rx="2.5" fill="url(#cg)" opacity=".45"/>
+      <rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="url(#cg)" opacity=".72"/>
+      <rect x="20" y="6" width="5" height="23" rx="2.5" fill="url(#cg)"/>
+      <circle cx="22.5" cy="5" r="3.1" fill="#ff5c74"/>
+    </svg>
+    <span class="brand-name">Apex&nbsp;Forex&nbsp;Bot</span>
+  </a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#setup">Setup</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/affiliate">Become an Affiliate</a>
+  </div>
+  <button class="nav-cta" onclick="gotoCheckout()">Get Access — $497</button>
+</nav>
+
+<!-- HERO -->
+<section class="wrap" id="hero">
+  <div class="grid3d"></div>
+  <div class="aurora"></div>
+  <div>
+    <span class="eyebrow rv"><b></b>AI Forex Bot · OANDA · Telegram Control</span>
+    <h1 class="rv">Trades forex 24/7.<br><span class="grad">Your account. Your rules.</span></h1>
+    <p class="lead rv">A fully-hosted AI forex trading bot that connects to <strong style="color:var(--t0);font-weight:500">your OANDA account</strong> and is controlled entirely from <strong style="color:var(--t0);font-weight:500">Telegram</strong>. Nothing to install — start in paper mode, switch to live when ready. <span style="color:var(--t2);font-size:.9em">Forex trading involves substantial risk of loss.</span></p>
+    <div class="hero-cta rv">
+      <button class="btn btn-primary" onclick="gotoCheckout()">Get Forex Bot — $497 →</button>
+      <a href="#features" class="btn btn-ghost">See what's included</a>
+    </div>
+    <div class="hero-meta rv">
+      <div class="hm"><b>24/7</b><span>Always on</span></div>
+      <div class="hm"><b>$0</b><span>Fee from us</span></div>
+      <div class="hm"><b>7</b><span>Telegram commands</span></div>
+      <div class="hm"><b>1×</b><span>Pay once</span></div>
+    </div>
+  </div>
+
+  <div class="terminal rv">
+    <div class="term-top">
+      <div class="term-id"><span class="dot"></span><span id="fx-sym">EUR / USD</span></div>
+      <span class="term-live">● PAPER</span>
+    </div>
+    <div class="coin-row" id="fx-pairs">
+      <div class="coin active" data-sym="EUR / USD" data-price="1.0847" data-chg="+0.32" data-pos="LONG @ 1.0842 · SL 1.0798 · TP 1.0896">EUR/USD</div>
+      <div class="coin" data-sym="GBP / USD" data-price="1.2634" data-chg="-0.18" data-pos="No open position">GBP/USD</div>
+      <div class="coin" data-sym="USD / JPY" data-price="157.42" data-chg="+0.54" data-pos="SHORT @ 157.55 · SL 157.90 · TP 156.80">USD/JPY</div>
+      <div class="coin" data-sym="AUD / USD" data-price="0.6521" data-chg="+0.11" data-pos="No open position">AUD/USD</div>
+    </div>
+    <div class="fx-price-area">
+      <div class="fx-main">
+        <span class="fx-num" id="fx-price">1.0847</span>
+        <span class="fx-chg up" id="fx-chg">+0.32%</span>
+      </div>
+      <div class="fx-pos">
+        <span class="fx-pos-lbl">Open Position (Paper)</span>
+        <span class="fx-pos-info" id="fx-pos">LONG @ 1.0842 · SL 1.0798 · TP 1.0896</span>
+      </div>
+    </div>
+    <div class="term-feed" id="fx-feed"></div>
+    <div class="term-foot">
+      <span class="note">OANDA paper mode · <b>zero real funds at risk</b></span>
+      <span class="note">Tracks <b>real market rates</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST BAR -->
+<div id="trust"><div class="wrap trust-inner rv">
+  <span class="trust-lbl">Broker</span>
+  <span class="trust-tag">OANDA</span>
+  <span class="trust-lbl">Pairs supported</span>
+  <span class="trust-tag">EUR/USD</span>
+  <span class="trust-tag">GBP/USD</span>
+  <span class="trust-tag">USD/JPY</span>
+  <span class="trust-tag">AUD/USD</span>
+  <span class="trust-tag">USD/CAD</span>
+  <span class="trust-tag">NZD/USD</span>
+</div></div>
+
+<!-- MARQUEE -->
+<div class="marquee" aria-hidden="true"><div class="mq-track">
+  <span>Forex Automation</span><span class="dot">✦</span><span class="o">OANDA Integration</span><span class="dot">✦</span><span>Your Rules</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Nothing to Install</span><span class="dot">✦</span>
+  <span>Forex Automation</span><span class="dot">✦</span><span class="o">OANDA Integration</span><span class="dot">✦</span><span>Your Rules</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Nothing to Install</span><span class="dot">✦</span>
+</div></div>
+
+<!-- FEATURES -->
+<section class="wrap sec" id="features">
+  <div class="sec-head rv">
+    <span class="label">What You Get</span>
+    <h2 class="h2">A real forex system — not a signal service.</h2>
+    <p class="lead">Fully hosted, AI signal detection, complete control from your phone. We run it 24/7 — you connect OANDA and manage every setting from Telegram.</p>
+  </div>
+  <div class="feat-grid">
+    <div class="feat rv">
+      <div class="feat-ico"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M8 8h5M8 16h3"/></svg></div>
+      <span class="feat-badge">OANDA</span>
+      <h3>OANDA practice &amp; live</h3>
+      <p>Connects to your own OANDA account — switch between paper practice and real live trading with a single Telegram command.</p>
+    </div>
+    <div class="feat rv">
+      <div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0-3 3 3 3 0 0 0 0 6 3 3 0 0 0 3 3v1a3 3 0 0 0 6 0v-1a3 3 0 0 0 3-3 3 3 0 0 0 0-6 3 3 0 0 0-3-3V5a3 3 0 0 0-3-3z"/></svg></div>
+      <span class="feat-badge">AI-POWERED</span>
+      <h3>AI signal detection</h3>
+      <p>Price action signals validated by an AI model before every trade. Configurable risk % per trade applied to every position automatically.</p>
+    </div>
+    <div class="feat rv">
+      <div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>
+      <span class="feat-badge">TELEGRAM CONTROL</span>
+      <h3>Controlled from Telegram</h3>
+      <p>Set up, adjust risk, change pairs, stop, restart — all from Telegram commands. No terminal, no dashboard, no code to touch.</p>
+    </div>
+    <div class="feat rv">
+      <div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <span class="feat-badge">RISK SHIELD</span>
+      <h3>Automatic SL &amp; TP</h3>
+      <p>Stop-loss and take-profit are placed at OANDA on every trade. Position size is calculated as a % of your balance — you set the number.</p>
+    </div>
+    <div class="feat rv">
+      <div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div>
+      <span class="feat-badge">ZERO RISK START</span>
+      <h3>Paper trading first</h3>
+      <p>Start on OANDA practice — zero real funds at risk. Watch the bot trade for days, then switch to live with one command when you're confident.</p>
+    </div>
+    <div class="feat rv">
+      <div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div>
+      <span class="feat-badge">FULLY HOSTED</span>
+      <h3>Nothing to install</h3>
+      <p>We host and run your bot 24/7 on always-on servers. No code to run, no machine to keep online — just Telegram and an OANDA account.</p>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="wrap sec" style="padding-top:0">
+  <div class="stats rv">
+    <div class="stat"><b>24/7</b><span>Always running</span></div>
+    <div class="stat"><b>6+</b><span>Forex pairs supported</span></div>
+    <div class="stat"><b>7</b><span>Telegram commands</span></div>
+    <div class="stat"><b>1×</b><span>Pay once, own forever</span></div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="wrap sec" id="setup">
+  <div class="sec-head rv center">
+    <span class="label">Setup</span>
+    <h2 class="h2">From purchase to first trade in 4 steps.</h2>
+    <p class="lead center">No programming. No server setup. Everything happens over Telegram.</p>
+  </div>
+  <div class="steps rv">
+    <div class="step">
+      <div class="step-n">01</div>
+      <h3>Purchase &amp; get your key</h3>
+      <p>Complete checkout and receive your <code style="font-family:var(--m);color:var(--acc3);font-size:12px">FORX-XXXX</code> license key by email — instantly after payment.</p>
+    </div>
+    <div class="step">
+      <div class="step-n">02</div>
+      <h3>Open the Telegram bot</h3>
+      <p>Start the bot on Telegram and paste your license key when prompted. It validates and links your account in seconds.</p>
+    </div>
+    <div class="step">
+      <div class="step-n">03</div>
+      <h3>Run /setup wizard</h3>
+      <p>Enter your OANDA API token, account ID, choose practice or live, select pairs, and set your risk %. Bot guides each step.</p>
+    </div>
+    <div class="step">
+      <div class="step-n">04</div>
+      <h3>Bot starts trading</h3>
+      <p>The bot scans your pairs immediately and sends a Telegram notification on every signal, trade open, close, and fill.</p>
+    </div>
+  </div>
+</section>
+
+<!-- TELEGRAM COMMANDS -->
+<section class="wrap sec" style="padding-top:0">
+  <div class="sec-head rv">
+    <span class="label">Commands</span>
+    <h2 class="h2">Full control from your phone.</h2>
+    <p class="lead">7 commands. Everything you need to start, stop, monitor, and configure from anywhere.</p>
+  </div>
+  <div class="cmd-list rv">
+    <div class="cmd"><code>/setup</code><span>Guided wizard — OANDA credentials, pairs, risk %</span></div>
+    <div class="cmd"><code>/status</code><span>Current status, open positions, paper balance</span></div>
+    <div class="cmd"><code>/balance</code><span>Show your OANDA account balance</span></div>
+    <div class="cmd"><code>/risk &lt;n&gt;</code><span>Set risk % per trade (e.g. /risk 2)</span></div>
+    <div class="cmd"><code>/env</code><span>Switch between OANDA practice and live</span></div>
+    <div class="cmd"><code>/stop</code><span>Pause all trading immediately</span></div>
+    <div class="cmd"><code>/cancel</code><span>Cancel the active setup wizard</span></div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" class="sec">
+  <div class="wrap price-wrap">
+    <div class="rv">
+      <span class="label">Pricing</span>
+      <h2 class="h2">One payment. No subscription.</h2>
+      <p class="lead" style="margin-top:14px">Everything included in one license. No recurring fees, no commission on trades, no upsells.</p>
+      <ul class="price-list" style="margin-top:28px">
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>OANDA practice &amp; live trading</li>
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>AI signal detection engine</li>
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Automatic SL/TP on every trade</li>
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Fully hosted 24/7 — nothing to run</li>
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Paper trading to test risk-free</li>
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Complete Telegram control (7 commands)</li>
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>FORX- license key, instant delivery</li>
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>6+ major forex pairs supported</li>
+      </ul>
+    </div>
+    <div class="price-card rv">
+      <div class="price-badge">
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        One-time license
+      </div>
+      <div class="price-amt">
+        <span class="now">$497</span>
+      </div>
+      <div class="price-sub">One-time · No subscription · Instant delivery</div>
+      <button class="btn btn-primary" onclick="gotoCheckout()" style="width:100%;justify-content:center;font-size:16px;padding:16px">Get Apex Forex Bot →</button>
+      <p class="price-fine">Secured by Stripe · License key emailed instantly<br>Forex trading involves risk — only trade what you can afford to lose.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="wrap sec">
+  <div class="sec-head rv center">
+    <span class="label">FAQ</span>
+    <h2 class="h2">Common questions.</h2>
+  </div>
+  <div class="faq rv">
+    <div class="fq">
+      <button class="fq-q" onclick="toggleFq(this)">What broker does the bot use? <span class="fq-ic">+</span></button>
+      <div class="fq-a">The bot connects exclusively to <strong>OANDA</strong>. OANDA offers both a free practice (paper) account and a live trading account. You'll need an OANDA account and an API token from their platform before running /setup.</div>
+    </div>
+    <div class="fq">
+      <button class="fq-q" onclick="toggleFq(this)">Do I need forex knowledge to use it? <span class="fq-ic">+</span></button>
+      <div class="fq-a">Basic familiarity with forex (what EUR/USD means, what a stop-loss is) is helpful. The bot handles all trade execution — you configure pairs and risk % once, and it runs from there.</div>
+    </div>
+    <div class="fq">
+      <button class="fq-q" onclick="toggleFq(this)">Can I test it before going live? <span class="fq-ic">+</span></button>
+      <div class="fq-a">Yes. The bot starts in paper trading mode by default, connected to your OANDA practice account. Paper trades follow real market prices with simulated funds. Switch to live with <code style="font-family:var(--m);color:var(--acc3)">/env live</code> when you're ready.</div>
+    </div>
+    <div class="fq">
+      <button class="fq-q" onclick="toggleFq(this)">Which pairs does it trade? <span class="fq-ic">+</span></button>
+      <div class="fq-a">The bot supports major pairs: EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CAD, and NZD/USD. You choose which to trade during the /setup wizard and can update your selection at any time.</div>
+    </div>
+    <div class="fq">
+      <button class="fq-q" onclick="toggleFq(this)">How does the license work? <span class="fq-ic">+</span></button>
+      <div class="fq-a">After purchase, your <code style="font-family:var(--m);color:var(--acc3)">FORX-XXXX</code> license key is emailed instantly. Paste it into the Telegram bot once — it's validated and linked to your Telegram account. One license per account.</div>
+    </div>
+    <div class="fq">
+      <button class="fq-q" onclick="toggleFq(this)">Is this financial advice? <span class="fq-ic">+</span></button>
+      <div class="fq-a">No. This is trading software, not financial advice. Forex trading carries significant risk of loss. Past performance in paper mode does not guarantee future results in live trading. Never trade more than you can afford to lose.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section id="final">
+  <div class="wrap">
+    <div class="aurora" style="opacity:.35"></div>
+    <span class="eyebrow rv" style="display:inline-flex;margin-bottom:20px"><b></b>Ready to start</span>
+    <h2 class="h2 rv">Automate your forex trading today.</h2>
+    <p class="rv">Set up in under 10 minutes. Start in paper mode at zero risk. Switch to live when you're confident.</p>
+    <div class="rv">
+      <button class="btn btn-primary" onclick="gotoCheckout()" style="font-size:17px;padding:17px 32px;margin-top:8px">Get Apex Forex Bot — $497 →</button>
+    </div>
+    <p class="rv" style="font:400 12px/1.6 var(--m);color:var(--t2);margin-top:16px">Secure checkout via Stripe · Instant license delivery · Forex trading involves risk of loss</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="disc">
+      <strong style="color:var(--t1)">Apex Trade Bot — Forex Edition</strong><br>
+      Risk Disclosure: Forex trading involves substantial risk of loss and is not suitable for all investors. The bot's performance depends entirely on market conditions and your configuration. Past results in paper mode do not guarantee future live performance. Never trade more than you can afford to lose. This is not financial advice.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+      <a href="/" style="color:var(--t1)">Crypto Bot ($297)</a>
+      <a href="/affiliate" style="color:var(--t1)">Become an Affiliate</a>
+      <a href="/terms" style="color:var(--t1)">Terms</a>
+      <a href="/privacy" style="color:var(--t1)">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Cursor glow
+(function(){
+  var g=document.getElementById('glow');
+  if(!g)return;
+  document.addEventListener('mousemove',function(e){
+    g.style.transform='translate3d('+(e.clientX-340)+'px,'+(e.clientY-340)+'px,0)';
+    g.style.opacity='1';
+  });
+})();
+
+// Affiliate ref capture + click beacon (same pattern as index.html)
+(function(){
+  var p=new URLSearchParams(window.location.search);
+  var code=p.get('ref')||p.get('r_id')||p.get('rfsn');
+  if(code) sessionStorage.setItem('rfrsn_ref',code);
+  if(code && !sessionStorage.getItem('ref_click_sent')){
+    sessionStorage.setItem('ref_click_sent','1');
+    try{ fetch('/api/affiliates/click?ref='+encodeURIComponent(code),{keepalive:true}).catch(function(){}); }catch(e){}
+  }
+})();
+
+// Payment Link redirect — appends client_reference_id for affiliate tracking
+function gotoCheckout(){
+  var ref=sessionStorage.getItem('rfrsn_ref')||'';
+  var url='https://buy.stripe.com/4gMeVdcnn7AX5Xp5TU2Ji01';
+  if(ref) url+='?client_reference_id='+encodeURIComponent(ref);
+  window.location.href=url;
+}
+
+// Scroll reveal
+(function(){
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});
+  },{threshold:.12});
+  document.querySelectorAll('.rv').forEach(function(el){io.observe(el);});
+})();
+
+// FAQ accordion
+function toggleFq(btn){
+  var isOpen=btn.classList.contains('open');
+  document.querySelectorAll('.fq-q.open').forEach(function(b){
+    b.classList.remove('open');
+    var a=b.parentElement.querySelector('.fq-a');
+    if(a)a.classList.remove('open');
+  });
+  if(!isOpen){
+    btn.classList.add('open');
+    var a=btn.parentElement.querySelector('.fq-a');
+    if(a)a.classList.add('open');
+  }
+}
+
+// Forex terminal
+(function(){
+  var symEl=document.getElementById('fx-sym');
+  var priceEl=document.getElementById('fx-price');
+  var chgEl=document.getElementById('fx-chg');
+  var posEl=document.getElementById('fx-pos');
+
+  document.querySelectorAll('#fx-pairs .coin').forEach(function(c){
+    c.addEventListener('click',function(){
+      document.querySelectorAll('#fx-pairs .coin').forEach(function(x){x.classList.remove('active');});
+      c.classList.add('active');
+      symEl.textContent=c.dataset.sym;
+      priceEl.textContent=parseFloat(c.dataset.price).toFixed(c.dataset.sym.indexOf('JPY')>-1?2:4);
+      var up=parseFloat(c.dataset.chg)>=0;
+      chgEl.textContent=(up?'+':'')+c.dataset.chg+'%';
+      chgEl.className='fx-chg '+(up?'up':'dn');
+      posEl.textContent=c.dataset.pos;
+    });
+  });
+
+  // Animated trade feed
+  var feed=document.getElementById('fx-feed');
+  var events=[
+    {cls:'tf-scan',t:'Scanning EUR/USD · 1H signal analysis'},
+    {cls:'tf-buy', t:'LONG EUR/USD @ 1.0842 · SL 1.0798 · TP 1.0896'},
+    {cls:'tf-scan',t:'Scanning GBP/USD · signal: neutral, skip'},
+    {cls:'tf-ok',  t:'EUR/USD · PnL +$8.40 · position running'},
+    {cls:'tf-buy', t:'TAKE PROFIT EUR/USD @ 1.0896 · +$18.40'},
+    {cls:'tf-scan',t:'Next cycle · USD/JPY 1H analysis'}
+  ];
+  var ei=0,started=false;
+  function addRow(){
+    var ev=events[ei++%events.length];
+    var row=document.createElement('div');
+    row.className='tf-row '+ev.cls;
+    row.textContent=ev.t;
+    var age=document.createElement('span');
+    age.className='tf-age';age.textContent='just now';
+    row.appendChild(age);
+    feed.appendChild(row);
+    while(feed.children.length>3)feed.removeChild(feed.firstChild);
+    setTimeout(addRow,2800);
+  }
+  new IntersectionObserver(function(en,o){
+    en.forEach(function(e){if(e.isIntersecting&&!started){started=true;addRow();o.disconnect();}});
+  },{threshold:.3}).observe(feed);
+
+  // Subtle price tick on active pair
+  setInterval(function(){
+    var active=document.querySelector('#fx-pairs .coin.active');
+    if(!active)return;
+    var cur=parseFloat(priceEl.textContent)||(parseFloat(active.dataset.price));
+    var tick=(Math.random()-.5)*(active.dataset.sym.indexOf('JPY')>-1?0.04:0.00025);
+    var dp=active.dataset.sym.indexOf('JPY')>-1?2:4;
+    priceEl.textContent=(cur+tick).toFixed(dp);
+  },2200);
+})();
+</script>
+</body>
+</html>
