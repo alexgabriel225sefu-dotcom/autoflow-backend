@@ -13,8 +13,6 @@
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://js.stripe.com/v3/"></script>
-<!-- Refersion affiliate tracking — replace pub_XXXXXXXXXXXXXXXX with your Merchant ID from Refersion Settings → Integration -->
-<script>!function(f,b,e,v,n,t,s){if(f.rfrsn)return;n=f.rfrsn={};n._c=[];n.push=function(){n._c.push(arguments)};if(!b.getElementById(e)){t=b.createElement(v);t.id=e;t.async=!0;t.src='https://cdn.refersion.com/refersion.js';s=b.getElementsByTagName(v)[0];s.parentNode.insertBefore(t,s)}}(window,document,'refersion-js','script');window.rfrsn.push('setMerchantId','pub_XXXXXXXXXXXXXXXX');</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -852,9 +850,6 @@ var apexStripe,apexCardNum,apexCardExp,apexCardCvc;
   var p=new URLSearchParams(window.location.search);
   var code=p.get('ref')||p.get('r_id')||p.get('rfsn');
   if(code) sessionStorage.setItem('rfrsn_ref',code);
-  if(window.rfrsn && sessionStorage.getItem('rfrsn_ref')){
-    window.rfrsn.push('setCreatorCode', sessionStorage.getItem('rfrsn_ref'));
-  }
   // Count the referral click once per session (fire-and-forget — never blocks the page).
   if(code && !sessionStorage.getItem('ref_click_sent')){
     sessionStorage.setItem('ref_click_sent','1');
@@ -910,11 +905,8 @@ async function submitApexPayment(){
     }else if(result.paymentIntent.status==='succeeded'){
       document.getElementById('amForm').style.display='none';
       document.getElementById('amSuccess').style.display='block';
-      // Refersion conversion — fire after confirmed payment
-      if(window.rfrsn){
-        var _rOrder={id:result.paymentIntent.id,items:[{sku:'APEX-BOT-297',name:'Apex Trade Bot License',price:297,quantity:1}],customer:{email:email,first_name:name.split(' ')[0]||name,last_name:name.split(' ').slice(1).join(' ')||''}};
-        window.rfrsn.push('trackOrder',_rOrder);
-      }
+      // Affiliate conversion is attributed server-side from the payment intent's
+      // ref metadata (our own affiliate system) — no third-party tracker needed.
       var redirect='/configurator'+(_pendingKey?'?key='+encodeURIComponent(_pendingKey):'');
       setTimeout(function(){window.location.href=redirect},2000);
     }
