@@ -8,7 +8,7 @@ services:
     # -u = unbuffered stdout so startup logs appear in Render's log tab in real time
     startCommand: python -u main.py
     plan: free
-    autoDeploy: false
+    autoDeploy: true
     envVars:
       # Unbuffered Python output — without this, print() is buffered and the
       # startup logs never show, making "the bot won't start" impossible to debug.
