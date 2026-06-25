@@ -98,14 +98,16 @@ a{color:#E53E2E}
     <li><strong>Render Services, Inc.</strong> (USA) — hosting infrastructure. Privacy policy: render.com/privacy</li>
   </ul>
 
-  <h2>6. Cookies and Local Storage</h2>
-  <p>We use only essential cookies and browser storage necessary for the platform to function:</p>
+  <h2 id="cookies">6. Cookies and Local Storage</h2>
+  <p>We use only strictly necessary cookies and browser storage. We do not use advertising, tracking, or profiling cookies.</p>
   <ul>
-    <li><strong>Access cookie (<code>af_access</code>):</strong> an HttpOnly, signed cookie that verifies your course purchase — required for access to course content</li>
-    <li><strong>localStorage tokens:</strong> short-lived session data stored locally in your browser to maintain app state — these are not cookies and are not transmitted to third parties</li>
+    <li><strong>Stripe payment cookies:</strong> Set by Stripe, Inc. when you interact with our checkout. These are strictly necessary to process payments securely and for Stripe's fraud-prevention systems. Stripe's cookie policy: <a href="https://stripe.com/privacy" target="_blank" rel="noopener">stripe.com/privacy</a>.</li>
+    <li><strong>Access cookie (<code>af_access</code>):</strong> An HttpOnly, signed cookie that verifies your course purchase — required for access to course content.</li>
+    <li><strong>Consent cookie (<code>ck_consent</code>):</strong> Stored in your browser's <code>localStorage</code> to remember whether you have acknowledged this cookie notice. Not a tracking cookie; never transmitted to any server.</li>
+    <li><strong>Session storage:</strong> Short-lived browser-side data (e.g. affiliate referral code) used to complete the current checkout. Not a cookie; cleared when your browser tab closes.</li>
   </ul>
-  <p>We do not use advertising cookies or tracking pixels. Page fonts are loaded from Google Fonts (fonts.googleapis.com), which may process your IP address as part of the request; no personal data beyond the IP is shared with Google for this purpose.</p>
-  <p>No cookie consent banner is required as we only use strictly necessary cookies.</p>
+  <p>Page fonts are loaded from Google Fonts and Fontshare (fonts.googleapis.com, api.fontshare.com), which may process your IP address as part of the font request; no personal data beyond the IP is shared with these services for advertising purposes.</p>
+  <p>Because we use only strictly necessary cookies (payment processing), no cookie consent is required under EU ePrivacy rules. The consent banner on our pages is informational — you can dismiss it at any time.</p>
 
   <h2>7. Data Retention</h2>
   <p>We retain your personal data as follows:</p>
@@ -161,5 +163,6 @@ a{color:#E53E2E}
   <p style="font-size:12px;color:#7A7060">© 2026 AI Cash Systems. All rights reserved. This Privacy Policy was last reviewed by our team on May 7, 2026.</p>
 </div>
 <script src="/lang.js"></script>
+<script src="/cookie-banner.js"></script>
 </body>
 </html>

@@ -820,7 +820,7 @@ document.querySelectorAll('.feat').forEach(function(el,i){el.style.transitionDel
         <div id="am-card-error" class="am-err"></div>
         <div class="am-checks">
           <label class="am-check"><input type="checkbox" id="ck1" onchange="updateBtn()"/><span>I accept the <strong>risk of loss</strong> — crypto trading involves significant financial risk.</span></label>
-          <label class="am-check"><input type="checkbox" id="ck2" onchange="updateBtn()"/><span>This is <strong>NOT financial advice</strong>. Sales are final after digital delivery.</span></label>
+          <label class="am-check"><input type="checkbox" id="ck2" onchange="updateBtn()"/><span>I expressly request <strong>immediate supply</strong> of this digital service and waive my 14-day right of withdrawal under EU Directive 2011/83/EU Art. 16(m). <strong>All sales are final</strong> once access is delivered. This is NOT financial advice.</span></label>
           <label class="am-check"><input type="checkbox" id="ck3" onchange="updateBtn()"/><span>I agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
         </div>
         <button id="amBtn" class="am-btn" disabled onclick="submitApexPayment()">
@@ -914,5 +914,6 @@ async function submitApexPayment(){
 }
 </script>
 <script src="/lang.js"></script>
+<script src="/cookie-banner.js"></script>
 </body>
 </html>
