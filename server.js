@@ -1834,7 +1834,13 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
     if (supabase) {
       try {
         const { data: row } = await supabase.from('licenses')
-          .select('active,payment_intent_id').eq('key', key).maybeSingle();
+          .select('active,refunded,payment_intent_id').eq('key', key).maybeSingle();
+        // Refunded / charged-back keys are revoked for good — a Stripe PaymentIntent
+        // stays status:'succeeded' after a refund, so we must gate on our own
+        // refunded flag here, not on Stripe's payment status.
+        if (row && row.refunded === true) {
+          return res.json({ valid: false, message: 'This license was refunded and is no longer active. Repurchase at aicashsystem.space' });
+        }
         if (row && row.active === false) {
           let paid = false;
           if (row.payment_intent_id && process.env.STRIPE_SECRET_KEY) {
@@ -1914,7 +1920,11 @@ async function handleStripeWebhook(req, res) {
       return res.json({ received: true });
     }
 
-    // ── AFFILIATE CLAWBACK ── refund or chargeback cancels the commission.
+    // ── REFUND / CHARGEBACK ── claws back the affiliate commission AND revokes the
+    // bot license, so a buyer who gets their money back also loses access. The bot
+    // re-checks /api/verify-license on first contact; a deactivated key (active:false
+    // with no succeeded payment) is rejected, and returning users are re-validated on
+    // the next redeploy. We only deactivate keys we actually issued (HMAC-valid).
     if (event.type === 'charge.refunded' || event.type === 'charge.dispute.created') {
       const obj = event.data.object; // charge or dispute — both carry payment_intent
       const piId = obj.payment_intent;
@@ -1923,6 +1933,14 @@ async function handleStripeWebhook(req, res) {
           .update({ refunded: true, refunded_at: new Date().toISOString() })
           .eq('payment_intent_id', piId).select('affiliate_code');
         if (updated && updated.length) addLog(`Affiliate commission clawed back (${event.type}) for ${updated[0].affiliate_code} — PI ${piId}`, 'affiliate', 'warn');
+
+        // Revoke the license tied to this payment.
+        const { data: revoked } = await supabase.from('licenses')
+          .update({ active: false, refunded: true, refunded_at: new Date().toISOString() })
+          .eq('payment_intent_id', piId).select('key,product');
+        if (revoked && revoked.length) {
+          addLog(`License revoked (${event.type}): ${revoked[0].key} (${revoked[0].product}) — PI ${piId}`, 'license', 'warn');
+        }
       }
       return res.json({ received: true });
     }

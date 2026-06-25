@@ -1125,8 +1125,56 @@ def _license_ok(chat_id, text):
     except Exception:
         pass
     return True
-    # Notify owner
-    send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id}</code>\nKey: <code>{key}</code>")
+
+
+_REVALIDATE_SEC = 12 * 3600  # re-check a granted client's license at most this often
+
+
+def _revalidate_license(chat_id):
+    """Periodically re-check a granted client's license so refunded/charged-back
+    keys lose access without waiting for a redeploy.
+
+    FAIL-OPEN: any network/parse error keeps access — a server hiccup must never
+    lock out a paying customer. Only an EXPLICIT {valid: false} from the server
+    (refund, chargeback, deactivated key) revokes. Returns False if access was
+    revoked, so the caller stops handling this update.
+    """
+    cid = str(chat_id)
+    if access.is_admin(cid):
+        return True
+    try:
+        u = user_store.load(cid)
+    except Exception:
+        return True
+    key = u.get("license_key")
+    if not key:
+        return True  # legacy grant with no stored key — nothing to re-check
+    if time.time() - u.get("license_checked_at", 0) < _REVALIDATE_SEC:
+        return True
+    try:
+        r = requests.post(_VERIFY_URL, json={"key": key, "product": "apex-forex"}, timeout=8)
+        data = r.json()
+    except Exception:
+        return True  # fail-open
+    if data.get("valid") is False:
+        try:
+            user_store.update(cid, {"license_key": None})
+        except Exception:
+            pass
+        access.revoke(cid)
+        try:
+            user_loop.stop(cid)
+        except Exception:
+            pass
+        send_to(chat_id,
+                f"⛔ <b>{data.get('message', 'Your license is no longer active.')}</b>\n"
+                "Questions? supportaicashsystem@gmail.com")
+        return False
+    try:
+        user_store.update(cid, {"license_checked_at": int(time.time())})
+    except Exception:
+        pass
+    return True
 
 
 def _poll_loop():
@@ -1187,6 +1235,10 @@ def _poll_loop():
                             "Send /setup to choose paper/live, your pair and risk, "
                             "then /status to see the live snapshot.")
                     send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id_str}</code>")
+                    continue
+
+                # Refunded/charged-back licenses lose access (fail-open re-check).
+                if not _revalidate_license(chat_id):
                     continue
 
                 # Auto-restore: if this user was active but their loop died
