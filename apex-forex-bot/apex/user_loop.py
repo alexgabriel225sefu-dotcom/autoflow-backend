@@ -115,6 +115,22 @@ def _loop(user_id, alert_fn):
                     paper_balance = broker.get_balance()
                 except Exception:
                     pass
+            else:
+                # Reconcile with manual trades (force_trade/force_close write to
+                # the shared dash via chat/commands). Adopt a manually-opened
+                # position the loop doesn't know about, and clear one closed by
+                # hand — otherwise the loop's local state clobbers it next tick.
+                dash_pos = dash.get("openPosition")
+                if dash_pos and not open_pos:
+                    open_pos = dash_pos
+                elif open_pos and dash_pos is None and dash.get("_manualClose"):
+                    open_pos = None
+                    dash["_manualClose"] = False
+                # Sync balance if a manual close adjusted it
+                dash_bal = dash.get("balance")
+                if dash_bal and dash_bal != paper_balance and dash.get("_manualBal"):
+                    paper_balance = dash_bal
+                    dash["_manualBal"] = False
 
             dash["balance"] = paper_balance
             dash["openPosition"] = open_pos
@@ -394,6 +410,8 @@ def force_close(user_id):
         _log_trade(user_id, result)
         d["openPosition"] = None
         d["balance"] = new_bal
+        d["_manualClose"] = True   # tell the loop this close was manual
+        d["_manualBal"] = True
         trades = d.get("trades", [])
         trades.insert(0, result)
         d["trades"] = trades[:50]
