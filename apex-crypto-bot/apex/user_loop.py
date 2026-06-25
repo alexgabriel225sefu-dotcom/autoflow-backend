@@ -413,6 +413,18 @@ def _tick(user_id, alert):
             print(f"[UserLoop:{user_id}] exchange sync failed ({e}) — internal simulation this tick")
             exchange = None
 
+    # Safety: a LIVE user (paper=False, keys set) whose exchange we couldn't reach
+    # this tick must NOT fall through to the internal paper simulation — that would
+    # book virtual trades while the dashboard says LIVE. Pause this cycle, tell the
+    # user, and never fake a real order.
+    if not u.get("paper", True) and u.get("api_key") and exchange is None:
+        if state.get("tickCount", 0) % 10 == 0:   # throttle so it's not spammy
+            alert("error", {"symbol": symbol,
+                            "message": "Live Binance connection failed (keys / region / "
+                            "network) — trading paused this cycle. No simulated trades placed."})
+        user_store.save(user_id, u)
+        return
+
     dash = _loops.get(user_id, {}).get("dash", {})
     dash.update({"balance": state["paperBalance"], "startBalance": state["startBalance"],
                  "currentSymbol": symbol, "currentPrice": price,
@@ -706,8 +718,13 @@ def force_trade(user_id, side, symbol=None, alert_fn=None, amount_usd=None):
         try:
             exchange = binance.LiveExchange(u["api_key"], u["api_secret"],
                                             testnet=u.get("paper", True), exchange=ex_name)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[UserLoop:{user_id}] live exchange build failed: {e}")
+            exchange = None
+    # Don't silently simulate a paper trade for a real-money user.
+    if not u.get("paper", True) and u.get("api_key") and exchange is None:
+        return {"ok": False, "error": "Live Binance connection failed — order NOT placed. "
+                                      "Check your API keys / region, then try again."}
 
     if amount_usd and float(amount_usd) > 0:
         # User specified an exact dollar amount — override risk % sizing.

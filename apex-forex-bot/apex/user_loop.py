@@ -171,6 +171,8 @@ def _loop(user_id, alert_fn):
                               "reason": hit, "openedAt": open_pos.get("openedAt"),
                               "time": now_str}
                     _log_trade(user_id, result)
+                    # Persist so the simulated balance survives a restart.
+                    user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                     open_pos = None
                     dash["openPosition"] = None
                     dash["balance"] = paper_balance
@@ -290,6 +292,9 @@ def _loop(user_id, alert_fn):
                           "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                           "openedAt": open_pos.get("openedAt"), "time": now_str}
                 _log_trade(user_id, result)
+                if cfg.PAPER_TRADING:
+                    # Persist so the simulated balance survives a restart.
+                    user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                 open_pos = None
                 dash["openPosition"] = None
                 dash["balance"] = paper_balance
@@ -454,6 +459,9 @@ def force_close(user_id):
                   "netPnl": round(net, 2), "balance": new_bal,
                   "openedAt": open_pos.get("openedAt"), "time": now_str}
         _log_trade(user_id, result)
+        if cfg.PAPER_TRADING:
+            # Persist so the simulated balance survives a restart.
+            user_store.update(user_id, {"paper_balance": new_bal})
         d["openPosition"] = None
         d["balance"] = new_bal
         d["_manualClose"] = True   # tell the loop this close was manual

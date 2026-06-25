@@ -45,6 +45,16 @@ ALTER TABLE referral_sales ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
 ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS payout_method TEXT;
 ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS payout_details TEXT;
 
+-- Referral link clicks — one row per visit to aicashsystem.space/?ref=CODE.
+-- Atomic inserts (no read-modify-write race), and gives a real click count +
+-- conversion rate (sales / clicks) in the affiliate's /stats.
+CREATE TABLE IF NOT EXISTS affiliate_clicks (
+  id              BIGSERIAL PRIMARY KEY,
+  affiliate_code  TEXT NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_affiliate_clicks_code ON affiliate_clicks(affiliate_code);
+
 -- Payout requests raised by affiliates, settled manually by the owner.
 CREATE TABLE IF NOT EXISTS payout_requests (
   id              BIGSERIAL PRIMARY KEY,

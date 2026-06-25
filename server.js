@@ -319,6 +319,10 @@ const _pendingLicenses = new Map();
 // consumed by payment_intent.succeeded, since Stripe Payment Links don't copy client_reference_id
 // onto the Payment Intent's own metadata. ──
 const _pendingRefs = new Map();
+// ── RECENT CLICK DEDUPE (ref|ip → ts) — collapse refreshes within 30 min so a
+// single visitor reloading the page doesn't inflate an affiliate's click count. ──
+const _recentClicks = new Map();
+const _CLICK_DEDUPE_MS = 30 * 60 * 1000;
 
 // ── IN-MEMORY LOGS ──
 const logs = [];
@@ -1306,6 +1310,29 @@ function _affiliateFromAuth(req) {
   return String(payload.id).toLowerCase().trim();
 }
 
+// GET /api/affiliates/click?ref=CODE — count a referral-link visit.
+// Fired by the landing page when it sees ?ref=. Validates the code exists, then
+// inserts one row (atomic, no lost updates). Deduped per visitor for 30 min.
+app.get('/api/affiliates/click', async (req, res) => {
+  const ref = String(req.query.ref || '').toLowerCase().trim().slice(0, 40);
+  if (!ref || !supabase) return res.json({ ok: false });
+  const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString().split(',')[0].trim();
+  const dedupeKey = `${ref}|${ip}`;
+  const now = Date.now();
+  const last = _recentClicks.get(dedupeKey);
+  if (last && now - last < _CLICK_DEDUPE_MS) return res.json({ ok: true, deduped: true });
+  _recentClicks.set(dedupeKey, now);
+  // Opportunistic cleanup so the map doesn't grow unbounded.
+  if (_recentClicks.size > 5000) {
+    for (const [k, t] of _recentClicks) if (now - t > _CLICK_DEDUPE_MS) _recentClicks.delete(k);
+  }
+  try {
+    const { data: aff } = await supabase.from('affiliates').select('code').eq('code', ref).maybeSingle();
+    if (aff) await supabase.from('affiliate_clicks').insert([{ affiliate_code: ref }]);
+  } catch (e) { /* clicks are best-effort analytics — never block the visitor */ }
+  res.json({ ok: true });
+});
+
 // POST /api/affiliates/apply — { name, email, tiktokHandle } -> { code, link }
 app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
   const { name, email, tiktokHandle } = req.body || {};
@@ -1442,9 +1469,18 @@ app.post('/api/affiliates/telegram-stats', async (req, res) => {
       else if (new Date(r.created_at).getTime() + windowMs <= now) available += r.commission_amount;
       else pending += r.commission_amount;
     });
+    // Link clicks + conversion rate (best-effort — table may not exist yet).
+    let clicks = 0;
+    try {
+      const { count } = await supabase.from('affiliate_clicks')
+        .select('id', { count: 'exact', head: true }).eq('affiliate_code', aff.code);
+      clicks = count || 0;
+    } catch (e) { /* clicks table optional */ }
+    const conversionPct = clicks > 0 ? Math.round((sales / clicks) * 1000) / 10 : 0;
     res.json({
       linked: true, code: aff.code, name: aff.name || '', link: _affiliateLink(aff.code),
       commissionPercent: aff.commission_percent, totalSales: sales,
+      clicks, conversionPct,
       availableCents: available, pendingCents: pending, paidCents: paid,
       minPayoutCents: MIN_PAYOUT_CENTS, refundWindowDays: REFUND_WINDOW_DAYS,
       recent: rows.slice(0, 5).map(r => ({ product: r.product, commission: r.commission_amount, paid: r.paid, refunded: !!r.refunded, date: r.created_at }))

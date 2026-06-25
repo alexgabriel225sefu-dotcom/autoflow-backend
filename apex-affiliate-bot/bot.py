@@ -96,10 +96,13 @@ def _show_stats(chat_id):
         return
     avail, pend, paid = d.get("availableCents", 0), d.get("pendingCents", 0), d.get("paidCents", 0)
     recent = d.get("recent", [])
+    clicks = d.get("clicks", 0)
+    conv = d.get("conversionPct", 0)
     lines = [
         "📊 <b>Your earnings</b>",
         "━━━━━━━━━━━━━━━━━━━━",
-        f"💸 Sales: <b>{d.get('totalSales', 0)}</b>  ·  Rate: <b>{d.get('commissionPercent', 30)}%</b>",
+        f"👆 Clicks: <b>{clicks}</b>  ·  Sales: <b>{d.get('totalSales', 0)}</b>  ·  Conv: <b>{conv}%</b>",
+        f"💸 Rate: <b>{d.get('commissionPercent', 30)}%</b>",
         f"🟢 Available: <b>{_money(avail)}</b>",
         f"⏳ Pending: <b>{_money(pend)}</b>  <i>(matures after {d.get('refundWindowDays', 14)} days)</i>",
         f"✅ Paid out: <b>{_money(paid)}</b>",
