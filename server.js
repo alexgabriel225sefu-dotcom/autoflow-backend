@@ -41,6 +41,51 @@ app.get('/health', async (req, res) => {
 });
 app.get('/ping', (req, res) => res.json({ ok: true, version: 'v9-chat-fix', time: new Date().toISOString() }));
 
+// /api/health — production readiness check. Reports true/false per integration.
+// Never exposes secret values — only whether each required env var is present.
+app.get('/api/health', async (req, res) => {
+  const has = (v) => !!(process.env[v] && String(process.env[v]).trim());
+  // Email is ready if ANY delivery path is fully configured.
+  const emailReady =
+    (has('RESEND_API_KEY') && has('RESEND_FROM')) ||
+    has('BREVO_API_KEY') ||
+    (has('BREVO_SMTP_USER') && has('BREVO_SMTP_PASS')) ||
+    (has('GMAIL_USER') && has('GMAIL_APP_PASSWORD'));
+
+  let dbConnect = false;
+  if (supabase) {
+    try { await supabase.from('licenses').select('*', { count: 'exact', head: true }); dbConnect = true; }
+    catch (e) { dbConnect = false; }
+  }
+
+  const checks = {
+    // CRITICAL — purchase → license → email flow cannot work without these
+    stripe_secret:        has('STRIPE_SECRET_KEY'),
+    stripe_webhook_secret: has('STRIPE_WEBHOOK_SECRET'),
+    license_signing_key:  has('BOT_EMAIL_SECRET'),
+    supabase_url:         has('SUPABASE_URL'),
+    supabase_key:         has('SUPABASE_SERVICE_KEY'),
+    supabase_connects:    dbConnect,
+    email_delivery:       emailReady,
+    // RECOMMENDED — degraded experience if missing, but sale still completes
+    ai_fallback:          has('GROQ_API_KEY') || has('ANTHROPIC_API_KEY') || has('GOOGLE_AI_API_KEY'),
+    affiliate_bot:        has('AFFILIATE_BOT_TOKEN'),
+    session_secrets:      has('JWT_SECRET') && has('COOKIE_SECRET'),
+  };
+
+  const critical = ['stripe_secret','stripe_webhook_secret','license_signing_key','supabase_url','supabase_key','supabase_connects','email_delivery'];
+  const missing = critical.filter(k => !checks[k]);
+  const saleReady = missing.length === 0;
+
+  res.status(saleReady ? 200 : 503).json({
+    sale_ready: saleReady,
+    missing_critical: missing,
+    checks,
+    env: process.env.NODE_ENV || 'unknown',
+    time: new Date().toISOString(),
+  });
+});
+
 // ── SETUP CHAT (early registration — must come before any catch-all) ──────────
 const _setupChatLimiter = rateLimit({ windowMs: 60*1000, max: 15, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many messages — please wait a minute.' } });
