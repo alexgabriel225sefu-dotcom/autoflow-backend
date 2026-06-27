@@ -11,7 +11,19 @@ def _truthy(v: str) -> bool:
 
 # ─── Broker ─────────────────────────────────────────────
 BROKER = (os.getenv("BROKER") or "oanda").lower()
-SUPPORTED_BROKERS = ["oanda", "mt", "td", "metaapi", "yahoo"]
+SUPPORTED_BROKERS = ["oanda", "mt", "td", "metaapi", "ctrader", "yahoo"]
+
+# ─── cTrader Open API (BROKER=ctrader) ──────────────────
+# App credentials (per business, once) from openapi.ctrader.com/apps:
+CTRADER_CLIENT_ID     = os.getenv("CTRADER_CLIENT_ID", "")
+CTRADER_CLIENT_SECRET = os.getenv("CTRADER_CLIENT_SECRET", "")
+# Per-client (set via OAuth onboarding / configurator):
+CTRADER_ACCESS_TOKEN  = os.getenv("CTRADER_ACCESS_TOKEN", "")
+CTRADER_REFRESH_TOKEN = os.getenv("CTRADER_REFRESH_TOKEN", "")
+CTRADER_ACCOUNT_ID    = os.getenv("CTRADER_ACCOUNT_ID", "")   # ctidTraderAccountId
+CTRADER_ENV           = (os.getenv("CTRADER_ENV") or "demo").lower()  # demo | live
+# Where cTrader redirects after the client authorizes (OAuth callback):
+CTRADER_REDIRECT_URI  = os.getenv("CTRADER_REDIRECT_URI", "")
 
 # ─── MetaTrader bridge (BROKER=mt) ──────────────────────
 MT_BRIDGE_SECRET = os.getenv("MT_BRIDGE_SECRET", "")
