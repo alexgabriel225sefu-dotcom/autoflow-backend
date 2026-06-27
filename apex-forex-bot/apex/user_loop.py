@@ -36,16 +36,24 @@ def _log_trade(user_id, record):
 def _make_broker(user):
     """Create the per-user broker with isolated config.
 
-    Paper mode with no OANDA token → Yahoo Finance data (free, no account).
-    Live mode (or OANDA token present) → OANDA broker.
+    Selection order:
+      • cTrader linked (token + account) → cTrader (free, international)
+      • OANDA token present or live mode  → OANDA
+      • paper + no broker linked          → Yahoo Finance data (free, no account)
     """
     import types
     paper = user.get("paper", True)
     oanda_token = user.get("oanda_token", "")
+    ct_token = user.get("ctrader_access_token", "")
+    ct_account = user.get("ctrader_account_id", "")
     fake_cfg = types.SimpleNamespace(
         OANDA_API_TOKEN  = oanda_token,
         OANDA_ACCOUNT_ID = user.get("oanda_account_id", ""),
         OANDA_ENV        = user.get("oanda_env", "practice"),
+        CTRADER_ACCESS_TOKEN  = ct_token,
+        CTRADER_REFRESH_TOKEN = user.get("ctrader_refresh_token", ""),
+        CTRADER_ACCOUNT_ID    = ct_account,
+        CTRADER_ENV           = user.get("ctrader_env", "demo"),
         SYMBOL           = user.get("symbol", "EUR_USD"),
         TIMEFRAME        = user.get("timeframe", "5m"),
         CANDLES          = 200,
@@ -59,11 +67,23 @@ def _make_broker(user):
         MAX_SPREAD_PIPS  = 3.0,
         MIN_CONFIDENCE   = int(user.get("min_confidence", 62)),
     )
-    # Paper + no OANDA token → free Yahoo Finance data, zero signup.
+    # cTrader linked → use it (paper uses its data; live places real orders worldwide).
+    if ct_token and ct_account:
+        from apex.brokers.ctrader import CtraderBroker
+        return CtraderBroker(fake_cfg), fake_cfg
+    # Paper + no broker linked → free Yahoo Finance data, zero signup.
     if paper and not oanda_token:
         from apex.brokers import yahoo
         return yahoo, fake_cfg
     return OandaBroker(fake_cfg), fake_cfg
+
+
+def _broker_label(user, cfg):
+    if user.get("ctrader_access_token") and user.get("ctrader_account_id"):
+        return f"cTrader ({getattr(cfg, 'CTRADER_ENV', 'demo')})"
+    if user.get("oanda_token") or not user.get("paper", True):
+        return f"OANDA ({cfg.OANDA_ENV})"
+    return "Yahoo (paper data)"
 
 
 def _loop(user_id, alert_fn):
@@ -76,7 +96,7 @@ def _loop(user_id, alert_fn):
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
 
     dash = {
-        "broker": f"OANDA ({cfg.OANDA_ENV})",
+        "broker": _broker_label(user, cfg),
         "balance": paper_balance,
         "startBalance": paper_balance,
         "symbol": cfg.SYMBOL,

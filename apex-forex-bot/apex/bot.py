@@ -591,6 +591,18 @@ def _start_dashboard_server():
                 self.end_headers()
                 self.wfile.write(b"ok")
                 return
+            # cTrader OAuth callback — no auth (state is HMAC-signed), public by design
+            if self.path.startswith("/api/ctrader/callback"):
+                from apex import ctrader_oauth
+                qs = parse_qs(urlparse(self.path).query)
+                status, html = ctrader_oauth.handle_callback(qs)
+                payload = html.encode("utf-8")
+                self.send_response(status)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
             if not self._authorized():
                 self.send_response(401)
                 self.send_header("Content-Type", "text/plain")

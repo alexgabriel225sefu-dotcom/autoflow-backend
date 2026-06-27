@@ -708,6 +708,57 @@ def _handle_env(chat_id, args):
                      f"<i>Make sure your token matches this environment.</i>")
 
 
+def _handle_ctrader(chat_id):
+    """Start the cTrader OAuth onboarding — sends the client an authorize link."""
+    from apex import ctrader_oauth
+    from apex.brokers import ctrader as ct
+    if not ct.is_configured():
+        return send_to(chat_id,
+            "⚠️ cTrader isn't available yet — the operator must set "
+            "CTRADER_CLIENT_ID and CTRADER_CLIENT_SECRET first.")
+    link = ctrader_oauth.authorize_link(chat_id)
+    if not link or "client_id=" not in link:
+        return send_to(chat_id,
+            "⚠️ cTrader redirect URL isn't configured (CTRADER_REDIRECT_URI / "
+            "RENDER_EXTERNAL_URL). Ask the operator to set it.")
+    send_to(chat_id,
+        "🟢 <b>Connect your cTrader account</b>\n\n"
+        "1. Tap the button below\n"
+        "2. Log in to cTrader and approve access\n"
+        "3. You'll be sent back here automatically\n\n"
+        "Works with any cTrader broker (IC Markets, Pepperstone, FxPro…). "
+        "Demo or live — your choice.\n\n"
+        "<i>The link is valid for 10 minutes.</i>",
+        extra={"reply_markup": {"inline_keyboard": [[
+            {"text": "🔗 Authorize cTrader", "url": link}]]}})
+
+
+def _handle_ctaccount(chat_id, args):
+    """Pick which cTrader trading account to trade when the client has several."""
+    want = (args or "").strip()
+    user = user_store.load(chat_id)
+    accounts = user.get("ctrader_accounts") or []
+    if not accounts:
+        return send_to(chat_id, "No cTrader accounts linked yet. Send /ctrader first.")
+    if not want:
+        lines = "\n".join(
+            f"• <code>{a['ctid']}</code> — {'LIVE 🔴' if a.get('live') else 'demo 🧪'}"
+            for a in accounts)
+        return send_to(chat_id, f"Your cTrader accounts:\n{lines}\n\n"
+                                "Pick one: <code>/ctaccount &lt;id&gt;</code>")
+    match = next((a for a in accounts if str(a["ctid"]) == want), None)
+    if not match:
+        return send_to(chat_id, f"❌ No linked account with id <code>{want}</code>.")
+    user_store.update(chat_id, {
+        "ctrader_account_id": match["ctid"],
+        "ctrader_env": "live" if match.get("live") else "demo",
+    })
+    _restart_user_loop(chat_id)
+    env = "LIVE 🔴" if match.get("live") else "demo 🧪"
+    send_to(chat_id, f"✅ Trading account set to <code>{match['ctid']}</code> ({env}).\n"
+                     "You're in paper mode by default — /env live when ready, /start to go.")
+
+
 def _handle_paper(chat_id, args):
     on = (args or "").strip().lower() in ("on", "true", "yes", "1")
     _save_runtime({"PAPER_TRADING": str(on).lower()})
@@ -1294,6 +1345,10 @@ def _poll_loop():
                     _handle_broker(chat_id, args)
                 elif cmd_l == "/env" and is_adm:
                     _handle_env(chat_id, args)
+                elif cmd_l == "/ctrader":
+                    _handle_ctrader(chat_id)
+                elif cmd_l == "/ctaccount":
+                    _handle_ctaccount(chat_id, args)
                 elif cmd_l == "/paper" and is_adm:
                     _handle_paper(chat_id, args)
                 elif cmd_l == "/risk" and is_adm:
