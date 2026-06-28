@@ -1005,6 +1005,10 @@ def _user_alert(uid, result):
     elif action == "STOP":
         reasons = ", ".join(result.get("reasons", ["risk limit"]))
         send_to(uid, f"🛑 <b>Trading paused — risk limit hit</b>\n{reasons}")
+    elif action == "SKIP_WARN":
+        send_to(uid, f"⚠️ <b>Holding off on {result.get('symbol', sym)}</b>\n"
+                     f"<i>{result.get('reason', 'market conditions are unfavourable right now')}.</i>\n"
+                     "I'll take the trade as soon as conditions normalise.")
     elif action == "SUGGEST":
         d = "🟢 BUY" if result.get("side") == "BUY" else "🔴 SELL"
         send_to(uid,

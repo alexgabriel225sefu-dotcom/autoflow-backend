@@ -564,10 +564,19 @@ def _tick(user_id, alert):
     # Don't fight strong Livermore structure
     lv_str = strat["livermore"].get("strength") or 0
     if not pos and lv_str >= 0.8:
+        _orig = signal["action"]
         if strat["livermore"]["trend"] == "BEARISH" and signal["action"] == "BUY":
             signal["action"] = "HOLD"
         if strat["livermore"]["trend"] == "BULLISH" and signal["action"] == "SELL":
             signal["action"] = "HOLD"
+        # Smart alert (throttled): explain WHY a tempting signal was held back.
+        if _orig in ("BUY", "SELL") and signal["action"] == "HOLD":
+            last_warn = state.get("lastSkipWarnTick", -999)
+            if state["tickCount"] - last_warn >= 30:
+                state["lastSkipWarnTick"] = state["tickCount"]
+                alert("skip_warn", {"symbol": symbol, "wanted": _orig,
+                                    "trend": strat["livermore"]["trend"],
+                                    "strength": int(lv_str * 100)})
 
     # Post-loss cooldown (Seykota — no revenge trading)
     if not pos and signal["action"] in ("BUY", "SELL"):

@@ -433,6 +433,12 @@ def make_alert(chat_id):
                              f"${data['entryPrice']:.4f} → ${data['exitPrice']:.4f}\n"
                              f"PnL: <b>{'+' if data['pnl'] >= 0 else ''}${data['pnl']:.4f}</b>  💼 ${data['balance']:.2f}"
                              + why)
+        elif kind == "skip_warn":
+            send_to(chat_id,
+                    f"⚠️ <b>Holding off on {data['symbol']}</b>\n"
+                    f"<i>A {data['wanted']} setup appeared, but the {data['trend'].lower()} structure is "
+                    f"strong ({data['strength']}%) — trading against it is low-probability.</i>\n"
+                    "I'll act when the trend and signal line up.")
         elif kind == "suggest":
             d = "🟢 BUY" if data["side"] == "BUY" else "🔴 SELL"
             kb = {"reply_markup": json.dumps({"inline_keyboard": [[

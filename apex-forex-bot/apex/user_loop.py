@@ -12,6 +12,7 @@ _lock  = threading.Lock()
 _LOOP_INTERVAL = 300  # 5 minutes between ticks
 _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
+_SKIP_WARN_THROTTLE = 6  # "don't trade now" market-condition warnings (~30 min)
 
 
 def _log_trade(user_id, record):
@@ -94,6 +95,7 @@ def _loop(user_id, alert_fn):
     open_pos = None  # tracked locally for paper mode
     tick = 0
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
+    last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
 
     dash = {
         "broker": _broker_label(user, cfg),
@@ -259,6 +261,11 @@ def _loop(user_id, alert_fn):
                 if spread > max_spread:
                     print(f"[UserLoop:{user_id}] skip entry — spread {spread:.1f}p > {max_spread}p limit")
                     entry_ok = False
+                    if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
+                        last_warn_tick = tick
+                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
+                                           "reason": f"spread is unusually wide ({spread:.1f} pips) — "
+                                                     "entering now would hand the edge to the broker"})
                 elif cfg.TAKE_PROFIT_PIPS <= spread * 1.5:
                     print(f"[UserLoop:{user_id}] skip entry — TP {cfg.TAKE_PROFIT_PIPS:g}p doesn't clear spread {spread:.1f}p")
                     entry_ok = False
