@@ -779,6 +779,27 @@ def _handle_cb(chat_id, data):
         send_to(chat_id, "❌ Skipped. I'll keep watching and suggest the next setup.")
 
 
+def _handle_news(chat_id):
+    from apex import news
+    if not news.enabled():
+        return send_to(chat_id, "📰 News guard is <b>off</b>. The bot is not avoiding news windows.")
+    user = user_store.load(chat_id)
+    pair = (user.get("symbol", cfg.SYMBOL) or "").split("_")
+    events = news.upcoming(hours=24)
+    if not events:
+        return send_to(chat_id,
+            "📰 <b>No high-impact events</b> in the next 24h (or the calendar feed is "
+            "unavailable). Trading proceeds normally — the news guard is fail-open.")
+    lines = []
+    for e in events:
+        flag = "⭐" if e["currency"] in [c.upper() for c in pair] else "•"
+        h, m = divmod(e["in_min"], 60)
+        when = f"{h}h {m}m" if h else f"{m}m"
+        lines.append(f"{flag} <b>{e['currency']}</b> · {e['title']} — in {when}")
+    send_to(chat_id, "📰 <b>Upcoming high-impact news (24h)</b>\n" + "\n".join(lines)
+            + "\n\n<i>⭐ = affects your pair. The bot stays flat around these.</i>")
+
+
 def _handle_copilot(chat_id, args):
     arg = (args or "").strip().lower()
     if arg in ("on", "1", "yes", "true"):
@@ -1009,6 +1030,11 @@ def _user_alert(uid, result):
         send_to(uid, f"⚠️ <b>Holding off on {result.get('symbol', sym)}</b>\n"
                      f"<i>{result.get('reason', 'market conditions are unfavourable right now')}.</i>\n"
                      "I'll take the trade as soon as conditions normalise.")
+    elif action == "NEWS_WARN":
+        ev = result.get("event", {})
+        send_to(uid, f"📰 <b>High-impact news — staying flat on {result.get('symbol', sym)}</b>\n"
+                     f"<i>{ev.get('currency', '')} · {ev.get('title', 'event')} in ~{ev.get('mins', 0)} min.</i>\n"
+                     "Spreads blow out and price gaps around releases — I'll resume once it passes.")
     elif action == "SUGGEST":
         d = "🟢 BUY" if result.get("side") == "BUY" else "🔴 SELL"
         send_to(uid,
@@ -1442,6 +1468,8 @@ def _poll_loop():
                     _handle_ctaccount(chat_id, args)
                 elif cmd_l == "/copilot":
                     _handle_copilot(chat_id, args)
+                elif cmd_l == "/news":
+                    _handle_news(chat_id)
                 elif cmd_l == "/paper" and is_adm:
                     _handle_paper(chat_id, args)
                 elif cmd_l == "/risk" and is_adm:

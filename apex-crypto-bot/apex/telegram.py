@@ -433,6 +433,12 @@ def make_alert(chat_id):
                              f"${data['entryPrice']:.4f} → ${data['exitPrice']:.4f}\n"
                              f"PnL: <b>{'+' if data['pnl'] >= 0 else ''}${data['pnl']:.4f}</b>  💼 ${data['balance']:.2f}"
                              + why)
+        elif kind == "news_warn":
+            ev = data.get("event", {})
+            send_to(chat_id,
+                    f"📰 <b>High-impact news — staying flat on {data['symbol']}</b>\n"
+                    f"<i>{ev.get('currency', 'USD')} · {ev.get('title', 'event')} in ~{ev.get('mins', 0)} min.</i>\n"
+                    "Macro releases whipsaw crypto — I'll resume once it passes.")
         elif kind == "skip_warn":
             send_to(chat_id,
                     f"⚠️ <b>Holding off on {data['symbol']}</b>\n"
@@ -850,6 +856,22 @@ def _handle_command(chat_id, text, msg_id=None):
                        "✅ <b>Gemini key verified &amp; saved!</b> 🆓\n"
                        "Smart chat + market analysis on YOUR own quota (1,500/day).\n"
                        "The bot trades automatically 24/7 — no extra key needed. 🤖")
+    if cmd == "/news":
+        from apex import news
+        if not news.enabled():
+            return send_to(chat_id, "📰 News guard is <b>off</b>.")
+        events = news.upcoming(currencies=["USD"], hours=24)
+        if not events:
+            return send_to(chat_id,
+                "📰 <b>No high-impact USD events</b> in the next 24h (or the calendar feed is "
+                "unavailable). Trading proceeds normally — the news guard is fail-open.")
+        lines = []
+        for e in events:
+            h, m = divmod(e["in_min"], 60)
+            when = f"{h}h {m}m" if h else f"{m}m"
+            lines.append(f"• <b>{e['currency']}</b> · {e['title']} — in {when}")
+        return send_to(chat_id, "📰 <b>Upcoming high-impact news (24h)</b>\n" + "\n".join(lines)
+                       + "\n\n<i>The bot stays flat around these — macro moves crypto too.</i>")
     if cmd == "/copilot":
         arg = (args or "").strip().lower()
         if arg in ("on", "1", "yes", "true"):

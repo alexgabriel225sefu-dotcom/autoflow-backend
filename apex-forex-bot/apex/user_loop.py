@@ -2,7 +2,7 @@
 import threading
 import time
 from datetime import datetime
-from apex import user_store, indicators, ai, strategies, forex
+from apex import user_store, indicators, ai, strategies, forex, news
 from apex.brokers.oanda import OandaBroker
 
 
@@ -269,6 +269,16 @@ def _loop(user_id, alert_fn):
                 elif cfg.TAKE_PROFIT_PIPS <= spread * 1.5:
                     print(f"[UserLoop:{user_id}] skip entry — TP {cfg.TAKE_PROFIT_PIPS:g}p doesn't clear spread {spread:.1f}p")
                     entry_ok = False
+
+            # News guard: stand aside around high-impact releases for either
+            # currency in the pair. Fail-open (no event / feed down → trades).
+            if entry_ok:
+                ev = news.high_impact_window(cfg.SYMBOL.split("_"))
+                if ev:
+                    entry_ok = False
+                    if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
+                        last_warn_tick = tick
+                        alert_fn(user_id, {"action": "NEWS_WARN", "symbol": cfg.SYMBOL, "event": ev})
 
             # Copilot mode: propose the trade and wait for approval instead of
             # auto-executing. Re-read the flag each time so /copilot takes effect

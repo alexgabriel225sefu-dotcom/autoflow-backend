@@ -9,7 +9,7 @@ import time
 import threading
 from datetime import datetime
 from apex import config as cfg
-from apex import user_store, indicators, ai, strategies, binance, dca as dca_mod, grid as grid_mod
+from apex import user_store, indicators, ai, strategies, binance, dca as dca_mod, grid as grid_mod, news
 
 # Symbols auto-scanned in "auto" mode (highest-volume, best liquidity)
 _AUTO_SYMBOLS = [
@@ -636,6 +636,17 @@ def _tick(user_id, alert):
                 })
         user_store.save(user_id, u)
         return
+
+    # News guard: stand aside around high-impact USD macro releases (FOMC, CPI,
+    # NFP…) — they whipsaw crypto too. Fail-open (feed down → trades normally).
+    if signal["action"] in ("BUY", "SELL") and not pos:
+        ev = news.high_impact_window(["USD"])
+        if ev:
+            last = state.get("lastNewsWarnTick", -999)
+            if state["tickCount"] - last >= 30:
+                state["lastNewsWarnTick"] = state["tickCount"]
+                alert("news_warn", {"symbol": symbol, "event": ev})
+            signal["action"] = "HOLD"
 
     if signal["action"] == "CLOSE" and pos:
         _close_trade(u, state, settings, price, "AI_CLOSE", alert, exchange, signal=signal)
