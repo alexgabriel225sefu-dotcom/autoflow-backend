@@ -433,6 +433,16 @@ def make_alert(chat_id):
                              f"${data['entryPrice']:.4f} → ${data['exitPrice']:.4f}\n"
                              f"PnL: <b>{'+' if data['pnl'] >= 0 else ''}${data['pnl']:.4f}</b>  💼 ${data['balance']:.2f}"
                              + why)
+        elif kind == "suggest":
+            d = "🟢 BUY" if data["side"] == "BUY" else "🔴 SELL"
+            kb = {"reply_markup": json.dumps({"inline_keyboard": [[
+                {"text": "✅ Approve", "callback_data": "cp:y"},
+                {"text": "❌ Reject", "callback_data": "cp:n"}]]})}
+            send_to(chat_id,
+                    f"🤖 <b>Copilot suggestion</b>\n{d} <b>{data['symbol']}</b> @ ${data['price']:.4f}"
+                    + _why_block(data) +
+                    "\n\n<i>You're in copilot mode — approve to execute, or reject to skip.</i>",
+                    kb)
         elif kind == "heartbeat":
             p = data["openPosition"]
             line = (f"{'🟢' if p['side'] == 'BUY' else '🔴'} {p['symbol']} @ ${p['entryPrice']:.4f}  "
@@ -834,6 +844,22 @@ def _handle_command(chat_id, text, msg_id=None):
                        "✅ <b>Gemini key verified &amp; saved!</b> 🆓\n"
                        "Smart chat + market analysis on YOUR own quota (1,500/day).\n"
                        "The bot trades automatically 24/7 — no extra key needed. 🤖")
+    if cmd == "/copilot":
+        arg = (args or "").strip().lower()
+        if arg in ("on", "1", "yes", "true"):
+            user_store.update(chat_id, {"copilot": True})
+            return send_to(chat_id,
+                "🤖 <b>Copilot mode ON.</b>\nThe bot will now <b>suggest</b> trades and wait for your "
+                "✅ Approve before opening anything. You stay in control.\n\n<i>Turn off with /copilot off.</i>")
+        if arg in ("off", "0", "no", "false"):
+            user_store.update(chat_id, {"copilot": False})
+            return send_to(chat_id,
+                "🚀 <b>Autopilot mode ON.</b>\nThe bot will open trades automatically when a setup meets "
+                "your thresholds. (Use /copilot on to require approval.)")
+        cur = user_store.load(chat_id).get("copilot")
+        return send_to(chat_id,
+            f"🤖 Copilot is currently <b>{'ON (approval required)' if cur else 'OFF (autopilot)'}</b>.\n"
+            "Use <code>/copilot on</code> or <code>/copilot off</code>.")
     if cmd == "/pause":
         _upd(chat_id, "PAUSED", True)
         return send_to(chat_id, "⏸️ <b>Bot paused.</b>", _kb_menu(True))
@@ -891,6 +917,19 @@ def _handle_command(chat_id, text, msg_id=None):
 
 def _handle_callback(chat_id, data):
     s = _settings(chat_id)
+    if data == "cp:y":   # copilot — approve the pending suggestion
+        sug = user_loop.pending_suggestion(chat_id)
+        user_loop.clear_suggestion(chat_id)
+        if not sug:
+            return send_to(chat_id, "⌛ That suggestion expired. I'll send a fresh one on the next setup.")
+        send_to(chat_id, f"✅ Approved — opening {sug['side']} {sug['symbol']}…")
+        res = user_loop.force_trade(chat_id, sug["side"], sug["symbol"], alert_fn=make_alert(chat_id))
+        if not res.get("ok"):
+            send_to(chat_id, f"❌ Could not open: {res.get('error', '?')}")
+        return
+    if data == "cp:n":   # copilot — reject the suggestion
+        user_loop.clear_suggestion(chat_id)
+        return send_to(chat_id, "❌ Skipped. I'll keep watching and suggest the next setup.")
     if data == "setup:activate":   # tap on the first welcome button
         return _show_disclaimer(chat_id)
     if data == "setup:accept":     # accepted the risk disclaimer

@@ -263,6 +263,13 @@ def _loop(user_id, alert_fn):
                     print(f"[UserLoop:{user_id}] skip entry — TP {cfg.TAKE_PROFIT_PIPS:g}p doesn't clear spread {spread:.1f}p")
                     entry_ok = False
 
+            # Copilot mode: propose the trade and wait for approval instead of
+            # auto-executing. Re-read the flag each time so /copilot takes effect
+            # without a restart (entry_ok is rare, so the extra load is cheap).
+            if entry_ok and user_store.load(user_id).get("copilot"):
+                _suggest_trade(user_id, signal, cfg.SYMBOL, price, alert_fn)
+                entry_ok = False
+
             if entry_ok:
                 pip = forex.pip_size(cfg.SYMBOL)
                 sl_price = (price - cfg.STOP_LOSS_PIPS * pip
@@ -376,6 +383,33 @@ def start_all(alert_fn=None):
     """Restart loops for all previously active users (after server reboot)."""
     for uid in user_store.all_active():
         start(uid, alert_fn)
+
+
+def _suggest_trade(user_id, signal, symbol, price, alert_fn):
+    """Copilot mode: store a pending proposal and notify the user to approve it,
+    instead of auto-executing. One open suggestion at a time (5-min window)."""
+    user = user_store.load(user_id)
+    pend = user.get("pending_suggestion")
+    now = time.time()
+    if pend and now - pend.get("ts", 0) < 300:
+        return
+    user_store.update(user_id, {"pending_suggestion": {
+        "side": signal["action"], "symbol": symbol, "ts": now}})
+    if alert_fn:
+        alert_fn(user_id, {"action": "SUGGEST", "symbol": symbol, "side": signal["action"],
+                           "price": price, "confidence": signal.get("confidence"),
+                           "reasoning": signal.get("reasoning", ""),
+                           "keyFactors": signal.get("keyFactors", [])})
+
+
+def pending_suggestion(user_id):
+    """Return the user's pending copilot suggestion ({side,symbol,ts}) or None."""
+    return user_store.load(str(user_id)).get("pending_suggestion")
+
+
+def clear_suggestion(user_id):
+    """Drop the pending copilot suggestion (after approve/reject)."""
+    user_store.update(str(user_id), {"pending_suggestion": None})
 
 
 def force_trade(user_id, side, symbol=None):

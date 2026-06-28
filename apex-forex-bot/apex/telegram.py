@@ -759,6 +759,44 @@ def _handle_ctaccount(chat_id, args):
                      "You're in paper mode by default — /env live when ready, /start to go.")
 
 
+def _handle_cb(chat_id, data):
+    """Inline-button presses (copilot approve/reject)."""
+    if data == "cp:y":
+        sug = user_loop.pending_suggestion(str(chat_id))
+        user_loop.clear_suggestion(str(chat_id))
+        if not sug:
+            return send_to(chat_id, "⌛ That suggestion expired. I'll send a fresh one on the next setup.")
+        send_to(chat_id, f"✅ Approved — opening {sug['side']} {sug['symbol']}…")
+        res = user_loop.force_trade(str(chat_id), sug["side"], sug["symbol"])
+        if res.get("ok"):
+            send_to(chat_id,
+                    f"✅ <b>{sug['side']} {sug['symbol']}</b> @ {res['price']:.5f} | Units: {res['units']}\n"
+                    f"SL: {res['sl']:.5f} | TP: {res['tp']:.5f}")
+        else:
+            send_to(chat_id, f"❌ Could not open: {res.get('error', '?')}")
+    elif data == "cp:n":
+        user_loop.clear_suggestion(str(chat_id))
+        send_to(chat_id, "❌ Skipped. I'll keep watching and suggest the next setup.")
+
+
+def _handle_copilot(chat_id, args):
+    arg = (args or "").strip().lower()
+    if arg in ("on", "1", "yes", "true"):
+        user_store.update(chat_id, {"copilot": True})
+        return send_to(chat_id,
+            "🤖 <b>Copilot mode ON.</b>\nThe bot will <b>suggest</b> trades and wait for your "
+            "✅ Approve before opening anything. You stay in control.\n\n<i>Turn off with /copilot off.</i>")
+    if arg in ("off", "0", "no", "false"):
+        user_store.update(chat_id, {"copilot": False})
+        return send_to(chat_id,
+            "🚀 <b>Autopilot mode ON.</b>\nThe bot opens trades automatically when a setup meets your "
+            "thresholds. (Use /copilot on to require approval.)")
+    cur = user_store.load(chat_id).get("copilot")
+    return send_to(chat_id,
+        f"🤖 Copilot is currently <b>{'ON (approval required)' if cur else 'OFF (autopilot)'}</b>.\n"
+        "Use <code>/copilot on</code> or <code>/copilot off</code>.")
+
+
 def _handle_paper(chat_id, args):
     on = (args or "").strip().lower() in ("on", "true", "yes", "1")
     _save_runtime({"PAPER_TRADING": str(on).lower()})
@@ -967,6 +1005,15 @@ def _user_alert(uid, result):
     elif action == "STOP":
         reasons = ", ".join(result.get("reasons", ["risk limit"]))
         send_to(uid, f"🛑 <b>Trading paused — risk limit hit</b>\n{reasons}")
+    elif action == "SUGGEST":
+        d = "🟢 BUY" if result.get("side") == "BUY" else "🔴 SELL"
+        send_to(uid,
+                f"🤖 <b>Copilot suggestion</b>\n{d} <b>{sym}</b> @ {result.get('price', '—')}"
+                + _fx_why_block(result) +
+                "\n\n<i>You're in copilot mode — approve to execute, or reject to skip.</i>",
+                extra={"reply_markup": {"inline_keyboard": [[
+                    {"text": "✅ Approve", "callback_data": "cp:y"},
+                    {"text": "❌ Reject", "callback_data": "cp:n"}]]}})
     elif action in ("BUY", "SELL"):
         spread = result.get("spreadPips")
         spread_line = f" | Spread: {spread}p" if spread is not None else ""
@@ -1281,7 +1328,7 @@ def _poll_loop():
         try:
             r = requests.get(f"{_API}/getUpdates",
                              params={"offset": _update_id, "timeout": 10,
-                                     "allowed_updates": json.dumps(["message"])},
+                                     "allowed_updates": json.dumps(["message", "callback_query"])},
                              timeout=15)
             data = r.json()
             if not data.get("ok"):
@@ -1290,6 +1337,18 @@ def _poll_loop():
                 continue
             for u in data.get("result", []):
                 _update_id = u["update_id"] + 1
+                # Inline button presses (copilot approve/reject)
+                cb = u.get("callback_query")
+                if cb:
+                    try:
+                        requests.post(f"{_API}/answerCallbackQuery",
+                                      json={"callback_query_id": cb.get("id")}, timeout=5)
+                    except Exception:
+                        pass
+                    cb_chat = cb.get("message", {}).get("chat", {}).get("id")
+                    if cb_chat is not None and access.is_allowed(str(cb_chat)):
+                        _handle_cb(cb_chat, cb.get("data", ""))
+                    continue
                 msg = u.get("message", {})
                 raw = (msg.get("text") or "").strip()
                 chat_id = msg.get("chat", {}).get("id")
@@ -1377,6 +1436,8 @@ def _poll_loop():
                     _handle_ctrader(chat_id)
                 elif cmd_l == "/ctaccount":
                     _handle_ctaccount(chat_id, args)
+                elif cmd_l == "/copilot":
+                    _handle_copilot(chat_id, args)
                 elif cmd_l == "/paper" and is_adm:
                     _handle_paper(chat_id, args)
                 elif cmd_l == "/risk" and is_adm:

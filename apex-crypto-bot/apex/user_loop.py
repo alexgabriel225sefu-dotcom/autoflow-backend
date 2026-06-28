@@ -116,6 +116,21 @@ def _fee_pct(u):
     return _FEE_BY_EXCHANGE.get(ex, cfg.FEE_PCT)
 
 
+def _suggest_trade(state, signal, symbol, price, alert):
+    """Copilot mode: propose a trade and wait for the user to approve, instead
+    of auto-executing. Only one open suggestion at a time (5-min window) so the
+    user isn't spammed every tick while a proposal is pending."""
+    pend = state.get("pendingSuggestion")
+    now = time.time()
+    if pend and now - pend.get("ts", 0) < 300:
+        return
+    state["pendingSuggestion"] = {"side": signal["action"], "symbol": symbol, "ts": now}
+    alert("suggest", {"side": signal["action"], "symbol": symbol, "price": price,
+                      "confidence": signal.get("confidence"),
+                      "reasoning": signal.get("reasoning", ""),
+                      "keyFactors": signal.get("keyFactors", [])})
+
+
 def _open_trade(u, state, settings, side, price, druck_mult, alert, exchange=None, signal=None):
     symbol = settings["SYMBOL"]
     fee_rate = _fee_pct(u)
@@ -593,7 +608,10 @@ def _tick(user_id, alert):
     if signal["action"] == "CLOSE" and pos:
         _close_trade(u, state, settings, price, "AI_CLOSE", alert, exchange, signal=signal)
     elif signal["action"] in ("BUY", "SELL") and not pos and conf_ok and crit_ok and vol_ok:
-        _open_trade(u, state, settings, signal["action"], price, druck, alert, exchange, signal=signal)
+        if u.get("copilot"):
+            _suggest_trade(state, signal, symbol, price, alert)
+        else:
+            _open_trade(u, state, settings, signal["action"], price, druck, alert, exchange, signal=signal)
 
     user_store.save(user_id, u)
 
@@ -696,6 +714,19 @@ def _open_trade_fixed(u, state, settings, side, price, amount_usd, alert, exchan
     }
     alert("open", {"side": side, "symbol": symbol, "price": price, "qty": qty,
                    "stopLoss": sl, "takeProfit": tp, "amountUsd": round(amount_usd, 2)})
+
+
+def pending_suggestion(user_id):
+    """Return the user's pending copilot suggestion ({side,symbol,ts}) or None."""
+    u = _ensure_user(str(user_id))
+    return u.get("state", {}).get("pendingSuggestion")
+
+
+def clear_suggestion(user_id):
+    """Drop the pending copilot suggestion (after approve/reject)."""
+    u = _ensure_user(str(user_id))
+    u.get("state", {}).pop("pendingSuggestion", None)
+    user_store.save(str(user_id), u)
 
 
 def force_trade(user_id, side, symbol=None, alert_fn=None, amount_usd=None):
