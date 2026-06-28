@@ -1030,6 +1030,10 @@ def _user_alert(uid, result):
         send_to(uid, f"⚠️ <b>Holding off on {result.get('symbol', sym)}</b>\n"
                      f"<i>{result.get('reason', 'market conditions are unfavourable right now')}.</i>\n"
                      "I'll take the trade as soon as conditions normalise.")
+    elif action == "FLASH_WARN":
+        send_to(uid, f"🚨 <b>Extreme volatility on {result.get('symbol', sym)}</b>\n"
+                     "<i>A violent price spike just printed — opening into it is too risky.</i>\n"
+                     "Trading pauses until the market settles.")
     elif action == "NEWS_WARN":
         ev = result.get("event", {})
         send_to(uid, f"📰 <b>High-impact news — staying flat on {result.get('symbol', sym)}</b>\n"

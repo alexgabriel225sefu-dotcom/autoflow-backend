@@ -116,6 +116,18 @@ def _fee_pct(u):
     return _FEE_BY_EXCHANGE.get(ex, cfg.FEE_PCT)
 
 
+def _flash_spike(candles, pct):
+    """True if the latest candle's high-low range exceeds `pct` of price — a
+    flash-crash/spike signature. Fail-safe to False on bad data."""
+    try:
+        c = candles[-1]
+        hi, lo = float(c["high"]), float(c["low"])
+        ref = float(c.get("close") or c.get("open") or hi) or hi
+        return ref > 0 and (hi - lo) / ref >= pct
+    except Exception:
+        return False
+
+
 def _vol_dampen(ind):
     """Volatility regime → position-size multiplier (≤1.0).
 
@@ -636,6 +648,15 @@ def _tick(user_id, alert):
                 })
         user_store.save(user_id, u)
         return
+
+    # Flash-crash circuit breaker: if the latest candle's range is extreme
+    # (>8% of price), the market is in a violent spike — don't open into it.
+    if signal["action"] in ("BUY", "SELL") and not pos and _flash_spike(candles, 0.08):
+        last = state.get("lastFlashWarnTick", -999)
+        if state["tickCount"] - last >= 10:
+            state["lastFlashWarnTick"] = state["tickCount"]
+            alert("flash_warn", {"symbol": symbol})
+        signal["action"] = "HOLD"
 
     # News guard: stand aside around high-impact USD macro releases (FOMC, CPI,
     # NFP…) — they whipsaw crypto too. Fail-open (feed down → trades normally).

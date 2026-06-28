@@ -270,6 +270,14 @@ def _loop(user_id, alert_fn):
                     print(f"[UserLoop:{user_id}] skip entry — TP {cfg.TAKE_PROFIT_PIPS:g}p doesn't clear spread {spread:.1f}p")
                     entry_ok = False
 
+            # Flash-crash circuit breaker: skip entry when the latest candle's
+            # range is extreme for an FX major (>1.2% ≈ a violent spike).
+            if entry_ok and _flash_spike(candles, 0.012):
+                entry_ok = False
+                if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
+                    last_warn_tick = tick
+                    alert_fn(user_id, {"action": "FLASH_WARN", "symbol": cfg.SYMBOL})
+
             # News guard: stand aside around high-impact releases for either
             # currency in the pair. Fail-open (no event / feed down → trades).
             if entry_ok:
@@ -400,6 +408,18 @@ def start_all(alert_fn=None):
     """Restart loops for all previously active users (after server reboot)."""
     for uid in user_store.all_active():
         start(uid, alert_fn)
+
+
+def _flash_spike(candles, pct):
+    """True if the latest candle's high-low range exceeds `pct` of price — a
+    flash-crash/spike signature. Fail-safe to False on bad data."""
+    try:
+        c = candles[-1]
+        hi, lo = float(c["high"]), float(c["low"])
+        ref = float(c.get("close") or c.get("open") or hi) or hi
+        return ref > 0 and (hi - lo) / ref >= pct
+    except Exception:
+        return False
 
 
 def _suggest_trade(user_id, signal, symbol, price, alert_fn):

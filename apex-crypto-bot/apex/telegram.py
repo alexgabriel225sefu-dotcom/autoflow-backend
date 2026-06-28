@@ -433,6 +433,11 @@ def make_alert(chat_id):
                              f"${data['entryPrice']:.4f} → ${data['exitPrice']:.4f}\n"
                              f"PnL: <b>{'+' if data['pnl'] >= 0 else ''}${data['pnl']:.4f}</b>  💼 ${data['balance']:.2f}"
                              + why)
+        elif kind == "flash_warn":
+            send_to(chat_id,
+                    f"🚨 <b>Extreme volatility on {data['symbol']}</b>\n"
+                    "<i>A violent price spike just printed — opening into it is too risky.</i>\n"
+                    "Trading pauses until the market settles.")
         elif kind == "news_warn":
             ev = data.get("event", {})
             send_to(chat_id,
