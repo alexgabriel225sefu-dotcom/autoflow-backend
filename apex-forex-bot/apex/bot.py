@@ -261,7 +261,7 @@ def _quote_usd_rate(symbol):
         return None
 
 
-def open_trade(side, price, balance, atr_value=0, symbol=None, druck_mult=1.0):
+def open_trade(side, price, balance, atr_value=0, symbol=None, druck_mult=1.0, signal=None):
     global open_position
     symbol = symbol or cfg.SYMBOL
 
@@ -312,11 +312,13 @@ def open_trade(side, price, balance, atr_value=0, symbol=None, druck_mult=1.0):
     logger.info(f"SL: {sltp['stopLoss']:.5f} | TP: {sltp['takeProfit']:.5f} | "
                 f"{stop_pips:.0f} pips risk | R:R = 1:{rr:.2f} | margin: "
                 f"${forex.required_margin(units, symbol, price, cfg.LEVERAGE):.2f}")
-    tg.alert_open(side, symbol, price, units, sltp["stopLoss"], sltp["takeProfit"], druck_mult)
+    tg.alert_open(side, symbol, price, units, sltp["stopLoss"], sltp["takeProfit"], druck_mult,
+                  reasoning=(signal or {}).get("reasoning", ""),
+                  key_factors=(signal or {}).get("keyFactors", []))
     state.save(paper_balance, open_position)
 
 
-def close_trade(price, reason, send_order=True):
+def close_trade(price, reason, send_order=True, signal=None):
     global open_position, paper_balance
     if not open_position:
         return
@@ -342,7 +344,8 @@ def close_trade(price, reason, send_order=True):
     logger.info(f"Reason: {reason} | {pips:+.1f} pips | PnL: {'+' if pnl >= 0 else ''}${pnl:.2f}")
     strategies.record_trade(pnl > 0, pnl, start_balance or cfg.PAPER_BALANCE)
     bal = get_balance()
-    tg.alert_close(reason, symbol, side, entry_price, price, pnl, bal)
+    tg.alert_close(reason, symbol, side, entry_price, price, pnl, bal,
+                   reasoning=(signal or {}).get("reasoning", ""))
     dash["trades"].insert(0, {
         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "symbol": symbol, "side": side,
         "entry": entry_price, "exit": price, "qty": units, "pnl": round(pnl, 2),
@@ -532,11 +535,11 @@ def tick():
             logger.info(f"HOLD — confidence: {signal['confidence']}% | "
                         f"criteria: {signal.get('criteriaScore', '?')}/5")
         elif signal["action"] == "CLOSE" and open_position:
-            close_trade(price, "AI_CLOSE")
+            close_trade(price, "AI_CLOSE", signal=signal)
         elif signal["action"] == "BUY" and not open_position:
-            open_trade("BUY", price, balance, float(ind["atr"]), symbol, druck_mult)
+            open_trade("BUY", price, balance, float(ind["atr"]), symbol, druck_mult, signal=signal)
         elif signal["action"] == "SELL" and not open_position:
-            open_trade("SELL", price, balance, float(ind["atr"]), symbol, druck_mult)
+            open_trade("SELL", price, balance, float(ind["atr"]), symbol, druck_mult, signal=signal)
         else:
             logger.info("Skip — position already open/closed")
 

@@ -288,7 +288,10 @@ def _loop(user_id, alert_fn):
 
                 dash["openPosition"] = open_pos
                 result = {"action": action, "symbol": cfg.SYMBOL, "confidence": confidence,
-                          "price": price, "spreadPips": round(spread, 1), "time": now_str}
+                          "price": price, "spreadPips": round(spread, 1), "time": now_str,
+                          "stopLoss": sl_price, "takeProfit": tp_price,
+                          "reasoning": signal.get("reasoning", ""),
+                          "keyFactors": signal.get("keyFactors", [])}
                 dash["trades"].insert(0, result)
                 dash["trades"] = dash["trades"][:50]
                 if alert_fn:
@@ -310,7 +313,8 @@ def _loop(user_id, alert_fn):
                           "entryPrice": open_pos.get("entryPrice"),
                           "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
                           "netPnl": round(net, 2), "balance": round(paper_balance, 2),
-                          "openedAt": open_pos.get("openedAt"), "time": now_str}
+                          "openedAt": open_pos.get("openedAt"), "time": now_str,
+                          "reasoning": signal.get("reasoning", "")}
                 _log_trade(user_id, result)
                 if cfg.PAPER_TRADING:
                     # Persist so the simulated balance survives a restart.

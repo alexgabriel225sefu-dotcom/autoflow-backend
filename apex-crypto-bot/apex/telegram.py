@@ -389,6 +389,33 @@ _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━
 
 
 # ─── Alerts (per-user callback) ───────────────────────────
+def _why_block(data) -> str:
+    """Human-readable 'why I took this trade' block for open alerts."""
+    parts = []
+    conf = data.get("confidence")
+    if conf is not None:
+        parts.append(f"🎯 Confidence: {conf:.0f}%")
+    reasoning = (data.get("reasoning") or "").strip()
+    if reasoning:
+        parts.append(f"🧠 <i>{reasoning}</i>")
+    factors = data.get("keyFactors") or []
+    if factors:
+        parts.append("📊 " + " · ".join(str(f) for f in factors[:4]))
+    return ("\n" + "\n".join(parts)) if parts else ""
+
+
+def _close_why(reason: str) -> str:
+    """Plain-language explanation for a mechanical (non-AI) close."""
+    m = {
+        "TAKE_PROFIT": "Target reached — locking in the profit.",
+        "STOP_LOSS": "Stop hit — cutting the loss to protect capital.",
+        "MANUAL_CLOSE": "Closed manually at your request.",
+        "AI_CLOSE": "The AI judged the setup had played out.",
+    }
+    txt = m.get(reason, "")
+    return f"\n🧠 <i>{txt}</i>" if txt else ""
+
+
 def make_alert(chat_id):
     def alert(kind, data):
         if kind == "open":
@@ -396,12 +423,16 @@ def make_alert(chat_id):
             mult = f"\n📐 Druckenmiller: ×{data['druckMult']:.2f}" if data.get("druckMult", 1) != 1 else ""
             send_to(chat_id, f"{d} <b>OPENED — {data['symbol']}</b>\n"
                              f"💰 Entry: ${data['price']:.4f}  Qty: {data['qty']}\n"
-                             f"🛡 SL: ${data['stopLoss']:.4f}  🎯 TP: ${data['takeProfit']:.4f}{mult}")
+                             f"🛡 SL: ${data['stopLoss']:.4f}  🎯 TP: ${data['takeProfit']:.4f}{mult}"
+                             + _why_block(data))
         elif kind == "close":
             icons = {"TAKE_PROFIT": "🎯 TAKE PROFIT", "STOP_LOSS": "🛑 STOP LOSS", "AI_CLOSE": "🤖 AI CLOSE"}
+            why = (f"\n🧠 <i>{data['reasoning']}</i>" if data.get("reasoning")
+                   else _close_why(data.get("reason", "")))
             send_to(chat_id, f"{'✅' if data['pnl'] > 0 else '❌'} <b>{icons.get(data['reason'], data['reason'])} — {data['symbol']}</b>\n"
                              f"${data['entryPrice']:.4f} → ${data['exitPrice']:.4f}\n"
-                             f"PnL: <b>{'+' if data['pnl'] >= 0 else ''}${data['pnl']:.4f}</b>  💼 ${data['balance']:.2f}")
+                             f"PnL: <b>{'+' if data['pnl'] >= 0 else ''}${data['pnl']:.4f}</b>  💼 ${data['balance']:.2f}"
+                             + why)
         elif kind == "heartbeat":
             p = data["openPosition"]
             line = (f"{'🟢' if p['side'] == 'BUY' else '🔴'} {p['symbol']} @ ${p['entryPrice']:.4f}  "

@@ -116,7 +116,7 @@ def _fee_pct(u):
     return _FEE_BY_EXCHANGE.get(ex, cfg.FEE_PCT)
 
 
-def _open_trade(u, state, settings, side, price, druck_mult, alert, exchange=None):
+def _open_trade(u, state, settings, side, price, druck_mult, alert, exchange=None, signal=None):
     symbol = settings["SYMBOL"]
     fee_rate = _fee_pct(u)
     # Break-even guard: the target must clear a round-trip fee plus a safety
@@ -160,11 +160,15 @@ def _open_trade(u, state, settings, side, price, druck_mult, alert, exchange=Non
         "symbol": symbol, "side": side, "entryPrice": price, "quantity": qty,
         "stopLoss": sl, "takeProfit": tp, "openedAt": datetime.utcnow().isoformat(), "pnlPct": 0,
     }
+    sig = signal or {}
     alert("open", {"side": side, "symbol": symbol, "price": price, "qty": qty,
-                   "stopLoss": sl, "takeProfit": tp, "druckMult": druck_mult})
+                   "stopLoss": sl, "takeProfit": tp, "druckMult": druck_mult,
+                   "reasoning": sig.get("reasoning", ""),
+                   "keyFactors": sig.get("keyFactors", []),
+                   "confidence": sig.get("confidence")})
 
 
-def _close_trade(u, state, settings, price, reason, alert, exchange=None):
+def _close_trade(u, state, settings, price, reason, alert, exchange=None, signal=None):
     pos = state["openPosition"]
     if not pos:
         return
@@ -196,7 +200,8 @@ def _close_trade(u, state, settings, price, reason, alert, exchange=None):
     state["trades"] = state["trades"][:50]
     state["openPosition"] = None
     alert("close", {"side": side, "symbol": symbol, "entryPrice": entry, "exitPrice": price,
-                    "pnl": pnl, "balance": state["paperBalance"], "reason": reason})
+                    "pnl": pnl, "balance": state["paperBalance"], "reason": reason,
+                    "reasoning": (signal or {}).get("reasoning", "")})
 
 
 def _find_best_signal(exchange_name, timeframe, session):
@@ -586,9 +591,9 @@ def _tick(user_id, alert):
         return
 
     if signal["action"] == "CLOSE" and pos:
-        _close_trade(u, state, settings, price, "AI_CLOSE", alert, exchange)
+        _close_trade(u, state, settings, price, "AI_CLOSE", alert, exchange, signal=signal)
     elif signal["action"] in ("BUY", "SELL") and not pos and conf_ok and crit_ok and vol_ok:
-        _open_trade(u, state, settings, signal["action"], price, druck, alert, exchange)
+        _open_trade(u, state, settings, signal["action"], price, druck, alert, exchange, signal=signal)
 
     user_store.save(user_id, u)
 

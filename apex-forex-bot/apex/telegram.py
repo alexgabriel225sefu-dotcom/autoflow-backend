@@ -925,6 +925,29 @@ def _handle_users(chat_id):
             f"<code>/revoke ID</code> — remove access")
 
 
+def _fx_why_block(result) -> str:
+    """Human-readable 'why I took this trade' block for open alerts."""
+    parts = []
+    reasoning = (result.get("reasoning") or "").strip()
+    if reasoning:
+        parts.append(f"🧠 <i>{reasoning}</i>")
+    factors = result.get("keyFactors") or []
+    if factors:
+        parts.append("📊 " + " · ".join(str(f) for f in factors[:4]))
+    return ("\n" + "\n".join(parts)) if parts else ""
+
+
+def _fx_close_why(reason: str) -> str:
+    """Plain-language explanation for a mechanical (non-AI) close."""
+    m = {
+        "TAKE_PROFIT": "Target reached — locking in the profit.",
+        "STOP_LOSS": "Stop hit — cutting the loss to protect capital.",
+        "AI_CLOSE": "The AI judged the setup had played out.",
+    }
+    txt = m.get(reason, "")
+    return f"\n🧠 <i>{txt}</i>" if txt else ""
+
+
 def _user_alert(uid, result):
     """Per-user trade/heartbeat/error alert — module-level so setup auto-start,
     /start and auto-restore all share the same notification formatting."""
@@ -947,14 +970,18 @@ def _user_alert(uid, result):
     elif action in ("BUY", "SELL"):
         spread = result.get("spreadPips")
         spread_line = f" | Spread: {spread}p" if spread is not None else ""
+        d = "🟢 LONG" if action == "BUY" else "🔴 SHORT"
         send_to(uid,
-                f"⚡ <b>{action}</b> — {sym}\n"
+                f"{d} <b>{action}</b> — {sym}\n"
                 f"Price: <b>{result.get('price', '—')}</b> | "
-                f"Confidence: <b>{result.get('confidence', 0)}%</b>{spread_line}")
+                f"Confidence: <b>{result.get('confidence', 0)}%</b>{spread_line}"
+                + _fx_why_block(result))
     elif action == "CLOSE":
         net = result.get("netPnl")
         _reason_lbl = {"STOP_LOSS": "🛑 Stop loss hit",
                        "TAKE_PROFIT": "🎯 Take profit hit"}.get(result.get("reason"))
+        why = (f"\n🧠 <i>{result['reasoning']}</i>" if result.get("reasoning")
+               else _fx_close_why(result.get("reason", "")))
         if net is not None:
             icon = "✅" if net >= 0 else "❌"
             head = f"🔒 <b>Position closed</b> — {sym}"
@@ -965,11 +992,12 @@ def _user_alert(uid, result):
                     f"Exit: <b>{result.get('price', '—')}</b>\n"
                     f"{icon} Net P&amp;L: <b>{'+' if net >= 0 else ''}${net:.2f}</b> "
                     f"<i>(gross ${result.get('grossPnl', 0):.2f} − cost ${result.get('costUsd', 0):.2f})</i>\n"
-                    f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>")
+                    f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>"
+                    + why)
         else:
             send_to(uid,
                     f"🔒 <b>Position closed</b> — {sym}\n"
-                    f"Price: <b>{result.get('price', '—')}</b>")
+                    f"Price: <b>{result.get('price', '—')}</b>" + why)
     else:
         send_to(uid, f"⚡ <b>{action}</b> — {sym}")
 
@@ -1428,23 +1456,26 @@ def _broadcast(text, extra=None):
         send_to(cid, text, extra)
 
 
-def alert_open(side, symbol, price, units, stop_loss, take_profit, druck_mult=1.0):
+def alert_open(side, symbol, price, units, stop_loss, take_profit, druck_mult=1.0,
+               reasoning="", key_factors=None):
     d = "🟢 LONG" if side == "BUY" else "🔴 SHORT"
     sl_pips = forex.to_pips(abs(price - stop_loss), symbol)
     tp_pips = forex.to_pips(abs(take_profit - price), symbol)
     mult = f"\n📐 <b>Druckenmiller:</b> ×{druck_mult:.2f}" if druck_mult != 1.0 else ""
+    why = _fx_why_block({"reasoning": reasoning, "keyFactors": key_factors or []})
     _broadcast(f"{d} <b>OPENED — {symbol}</b>\n💰 @ {price}  Units: {units:,}\n"
                f"🛡 SL: {stop_loss:.5f} ({sl_pips:.0f} pips)\n"
-               f"🎯 TP: {take_profit:.5f} ({tp_pips:.0f} pips){mult}", _dashboard_keyboard())
+               f"🎯 TP: {take_profit:.5f} ({tp_pips:.0f} pips){mult}{why}", _dashboard_keyboard())
 
 
-def alert_close(reason, symbol, side, entry_price, close_price, pnl, balance):
+def alert_close(reason, symbol, side, entry_price, close_price, pnl, balance, reasoning=""):
     icons = {"TAKE_PROFIT": "🎯 TAKE PROFIT", "STOP_LOSS": "🛑 STOP LOSS", "AI_CLOSE": "🤖 AI CLOSE"}
     d = "LONG" if side == "BUY" else "SHORT"
     pips = forex.to_pips(abs(close_price - entry_price), symbol)
+    why = f"\n🧠 <i>{reasoning}</i>" if reasoning else _fx_close_why(reason)
     _broadcast(f"{'✅' if pnl > 0 else '❌'} <b>{icons.get(reason, reason)} — {symbol}</b>\n"
                f"📊 {d}  {entry_price} → {close_price} ({pips:.0f} pips)\n"
-               f"💵 PnL: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>\n💼 Balance: ${balance:.2f}",
+               f"💵 PnL: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>\n💼 Balance: ${balance:.2f}{why}",
                _dashboard_keyboard())
 
 
