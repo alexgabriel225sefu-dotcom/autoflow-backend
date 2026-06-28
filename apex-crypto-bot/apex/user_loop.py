@@ -116,6 +116,24 @@ def _fee_pct(u):
     return _FEE_BY_EXCHANGE.get(ex, cfg.FEE_PCT)
 
 
+def _vol_dampen(ind):
+    """Volatility regime → position-size multiplier (≤1.0).
+
+    Uses ATR% (average true range as a % of price). Typical crypto ATR% on the
+    trading timeframe sits well under 2%. Above 2% we start trimming; at/above
+    4% (very volatile regime) we halve the size. Linear in between.
+    """
+    try:
+        atr_pct = float(ind.get("atrPct") or 0)  # already a percentage, e.g. 1.234
+    except (TypeError, ValueError):
+        return 1.0
+    if atr_pct <= 2.0:
+        return 1.0
+    if atr_pct >= 4.0:
+        return 0.5
+    return 1.0 - (atr_pct - 2.0) / 2.0 * 0.5
+
+
 def _suggest_trade(state, signal, symbol, price, alert):
     """Copilot mode: propose a trade and wait for the user to approve, instead
     of auto-executing. Only one open suggestion at a time (5-min window) so the
@@ -547,6 +565,11 @@ def _tick(user_id, alert):
 
     druck = (strategies.druckenmiller_multiplier(signal["confidence"], signal.get("criteriaScore", 0),
                                                  strat["livermore"], strat["turtle"]) if not pos else 1.0)
+    # Volatility-aware sizing: trim exposure when the market is unusually volatile,
+    # so a wild candle can't blow through the stop with full size on. ATR% is the
+    # regime gauge — calm markets keep full size, choppy/volatile ones get less.
+    if not pos:
+        druck = max(0.2, druck * _vol_dampen(ind))
 
     # Strategy-mode gate
     mode = settings.get("STRATEGY_MODE", "auto")
