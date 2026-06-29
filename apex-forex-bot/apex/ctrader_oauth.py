@@ -25,6 +25,28 @@ from apex.brokers import ctrader
 
 _STATE_TTL = 600  # 10 minutes to complete the authorization
 
+# Fallback for the case where cTrader does not echo the `state` param back to
+# the redirect (it's standard OAuth2 but undocumented for cTrader). When a user
+# runs /ctrader we record their chat_id here; if the callback arrives without a
+# usable state, we bind it to the most recent pending authorization. The bot's
+# poll loop and HTTP callback run in the SAME process, so this dict is shared.
+_pending = {}  # chat_id -> ts
+
+
+def _record_pending(chat_id):
+    _pending[str(chat_id)] = int(time.time())
+
+
+def _recent_pending():
+    """Most recent chat_id that started authorization within the TTL, else None."""
+    now = int(time.time())
+    fresh = {c: t for c, t in _pending.items() if now - t <= _STATE_TTL}
+    _pending.clear()
+    _pending.update(fresh)
+    if not fresh:
+        return None
+    return max(fresh, key=fresh.get)
+
 
 def _secret() -> bytes:
     # Bot token is secret and always set; fall back to client secret.
@@ -67,6 +89,7 @@ def redirect_uri() -> str:
 
 
 def authorize_link(chat_id) -> str:
+    _record_pending(chat_id)
     return ctrader.authorize_url(redirect_uri(), make_state(chat_id))
 
 
@@ -100,7 +123,9 @@ def handle_callback(query: dict):
 
     code = _q("code")
     state = _q("state")
-    chat_id = parse_state(state)
+    # Prefer the signed state; fall back to the most recent pending /ctrader if
+    # cTrader didn't echo state back (so onboarding works either way).
+    chat_id = parse_state(state) or _recent_pending()
     if not code or not chat_id:
         return 400, _html("cTrader", "<div class='h err'>Invalid or expired link</div>"
                           "<div class='p'>Please return to Telegram and send /ctrader to get a fresh link.</div>")
@@ -128,6 +153,7 @@ def handle_callback(query: dict):
         updates["ctrader_account_id"] = a["ctid"]
         updates["ctrader_env"] = "live" if a["live"] else "demo"
     user_store.update(chat_id, updates)
+    _pending.pop(str(chat_id), None)
 
     # Notify the client in Telegram (best-effort).
     try:

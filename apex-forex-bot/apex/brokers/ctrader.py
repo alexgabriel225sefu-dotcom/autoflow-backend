@@ -101,29 +101,38 @@ def authorize_url(redirect_uri: str, state: str, scope: str = "trading") -> str:
     return f"{_OAUTH_AUTH}?{q}"
 
 
+def _token_request(params: dict) -> dict:
+    """cTrader's /apps/token reads QUERY-STRING params (not a form body) and
+    returns JSON with an in-band errorCode even on HTTP 200. Send params in the
+    query string and surface errorCode as an exception."""
+    r = requests.get(_OAUTH_TOKEN, params=params,
+                     headers={"Accept": "application/json"}, timeout=15)
+    r.raise_for_status()
+    data = r.json()
+    if data.get("errorCode"):
+        raise RuntimeError(f"cTrader token error: {data.get('errorCode')} — {data.get('description', '')}")
+    return data
+
+
 def exchange_code(code: str, redirect_uri: str) -> dict:
-    """Authorization code → {access_token, refresh_token, expires_in}."""
-    r = requests.post(_OAUTH_TOKEN, data={
+    """Authorization code → {accessToken, refreshToken, expiresIn}."""
+    return _token_request({
         "grant_type": "authorization_code",
         "code": code,
         "redirect_uri": redirect_uri,
         "client_id": cfg.CTRADER_CLIENT_ID,
         "client_secret": cfg.CTRADER_CLIENT_SECRET,
-    }, timeout=15)
-    r.raise_for_status()
-    return r.json()
+    })
 
 
 def refresh_access_token(refresh_token: str) -> dict:
     """Refresh an expired access token (cTrader tokens last ~30 days)."""
-    r = requests.post(_OAUTH_TOKEN, data={
+    return _token_request({
         "grant_type": "refresh_token",
         "refresh_token": refresh_token,
         "client_id": cfg.CTRADER_CLIENT_ID,
         "client_secret": cfg.CTRADER_CLIENT_SECRET,
-    }, timeout=15)
-    r.raise_for_status()
-    return r.json()
+    })
 
 
 # ── Synchronous protobuf client ──────────────────────────────────────────────
