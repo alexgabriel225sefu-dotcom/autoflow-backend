@@ -9,7 +9,7 @@ import time
 import threading
 from datetime import datetime
 from apex import config as cfg
-from apex import user_store, indicators, ai, strategies, binance, dca as dca_mod, grid as grid_mod, news
+from apex import user_store, indicators, ai, strategies, binance, dca as dca_mod, grid as grid_mod, news, market
 
 # Symbols auto-scanned in "auto" mode (highest-volume, best liquidity)
 _AUTO_SYMBOLS = [
@@ -570,6 +570,18 @@ def _tick(user_id, alert):
     state["lastSignal"] = {"action": signal["action"], "confidence": signal["confidence"],
                            "criteriaScore": signal.get("criteriaScore", 0),
                            "reasoning": signal.get("reasoning", "")}
+
+    # Market Pulse: store a plain-language read of how the market is moving so
+    # /market can show it instantly, and ping the user (throttled) when the
+    # market gets notable — extreme volatility or a volume spike.
+    mp = market.pulse(ind, strat, symbol)
+    if mp:
+        state["lastMarket"] = mp
+        if mp.get("notable"):
+            last = state.get("lastMarketWarnTick", -999)
+            if state["tickCount"] - last >= 20:
+                state["lastMarketWarnTick"] = state["tickCount"]
+                alert("market_pulse", {"symbol": symbol, **mp})
 
     conf_ok = signal["confidence"] >= settings["MIN_CONFIDENCE"]
     crit_ok = signal.get("criteriaScore", 0) >= settings["MIN_CRITERIA"]

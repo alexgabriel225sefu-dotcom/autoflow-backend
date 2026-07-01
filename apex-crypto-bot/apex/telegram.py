@@ -310,6 +310,34 @@ def _build_status(user_id):
             f"🎯 Symbol: <b>{s['SYMBOL']}</b>  ⏱️ {st.get('lastTick', 'starting…')}")
 
 
+def _build_market(user_id):
+    """Market Pulse snapshot: the last computed read + best-effort futures extras."""
+    from apex import market
+    st = user_loop._ensure_user(user_id).get("state", {})
+    mp = st.get("lastMarket")
+    sym = _settings(user_id)["SYMBOL"]
+    if not mp:
+        return "📡 <b>Market Pulse</b>\nNo read yet — the bot hasn't scanned. Try again in ~1 min."
+    fut = market.futures(sym)
+    squeeze = market.squeeze_note(fut)
+    lines = [
+        f"📡 <b>Market Pulse — {sym}</b>",
+        "━━━━━━━━━━━━━━━━━━━━",
+        f"📊 Trend: <b>{mp['trend']}</b>",
+        f"🌊 Volatility: <b>{mp['volatility']}</b>  (ATR {mp['atrPct']}%)",
+        f"🔊 Volume: <b>{mp['volume']}</b>  (×{mp['volRatio']} avg)",
+        f"🎯 Momentum: <b>{mp['momentum']}</b>  (RSI {mp['rsi']})",
+    ]
+    if fut.get("funding") is not None:
+        lines.append(f"💸 Funding: <b>{fut['funding']}%</b>")
+    if fut.get("longShort") is not None:
+        lines.append(f"⚖️ Long/Short: <b>{fut['longShort']}:1</b>")
+    if squeeze:
+        lines.append(f"\n⚠️ <i>{squeeze}</i>")
+    lines.append("\n<i>How the market is moving right now — read before you trade.</i>")
+    return "\n".join(lines)
+
+
 def _build_config(user_id):
     s = _settings(user_id)
     return (f"⚙️ <b>CONFIGURATION</b>\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -359,7 +387,8 @@ def _build_report(user_id):
 
 _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━━━━━━━\n"
          "Your AI bot trades crypto automatically. Just set it and watch.\n\n"
-         "<b>Controls:</b>\n/menu · /status · /signal · /config · /trades · /report · /news\n\n"
+         "<b>Controls:</b>\n/menu · /status · /market · /signal · /config · /trades · /report · /news\n\n"
+         "<b>📡 Market Pulse:</b>\n/market — how the market is moving now (volatility, volume, trend, funding)\n\n"
          "<b>🤖 Copilot vs Autopilot:</b>\n"
          "/copilot on — bot suggests trades, you tap ✅ Approve before it opens\n"
          "/copilot off — bot trades automatically (default)\n\n"
@@ -437,6 +466,12 @@ def make_alert(chat_id):
                              f"${data['entryPrice']:.4f} → ${data['exitPrice']:.4f}\n"
                              f"PnL: <b>{'+' if data['pnl'] >= 0 else ''}${data['pnl']:.4f}</b>  💼 ${data['balance']:.2f}"
                              + why)
+        elif kind == "market_pulse":
+            send_to(chat_id,
+                    f"📡 <b>Market Pulse — {data['symbol']}</b>\n"
+                    f"Volatility: <b>{data['volatility']}</b> · Volume: <b>{data['volume']}</b>\n"
+                    f"Trend: {data['trend']} · Momentum: {data['momentum']}\n"
+                    "<i>Conditions just shifted — trade with extra care.</i>")
         elif kind == "flash_warn":
             send_to(chat_id,
                     f"🚨 <b>Extreme volatility on {data['symbol']}</b>\n"
@@ -607,6 +642,8 @@ def _handle_command(chat_id, text, msg_id=None):
                        f"Criteria: {sig.get('criteriaScore', 0)}/5  Risk: {sig.get('riskLevel', '—')}\n"
                        f"Reasoning: <i>{sig.get('reasoning', '—')}</i>\n"
                        + (f"\nFactors:\n{factors}" if factors else ""))
+    if cmd in ("/market", "/m"):
+        return send_to(chat_id, _build_market(chat_id))
     if cmd in ("/status", "/s"):
         return send_to(chat_id, _build_status(chat_id), _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
     if cmd in ("/config", "/c"):
