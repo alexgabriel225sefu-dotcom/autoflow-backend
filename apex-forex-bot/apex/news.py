@@ -16,6 +16,7 @@ Config (env):
     NEWS_WINDOW_MIN=<int>        minutes around an event to stay flat (default 30)
 """
 import os
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -23,7 +24,17 @@ import requests
 
 _DEFAULT_FEED = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 _TTL = 1800  # re-fetch the calendar at most every 30 min
+# (connect, read) timeouts — kept short so a slow/hung feed lingers briefly.
+# The fetch runs on a background thread and never blocks the trading loop;
+# these bounds just cap how long that background thread waits.
+_TIMEOUT = (3.05, 6)
+
 _cache = {"ts": 0.0, "events": []}
+# Refresh coordination: `fetching` prevents overlapping fetches; `fails` /
+# `next_retry` implement exponential back-off so a persistently down feed is
+# retried ever more slowly instead of on every tick.
+_state = {"fetching": False, "fails": 0, "next_retry": 0.0}
+_lock = threading.Lock()
 
 
 def enabled() -> bool:
@@ -85,12 +96,12 @@ def _impact_high(val) -> bool:
     return s in ("high", "3", "red") or "high" in s
 
 
-def _load():
-    now = time.time()
-    if _cache["events"] and now - _cache["ts"] < _TTL:
-        return _cache["events"]
+def _do_fetch():
+    """Fetch + parse the calendar. Runs on a background thread so it can NEVER
+    block the trading loop. Updates the shared cache on success; applies
+    exponential back-off on failure so a down feed isn't hammered every tick."""
     try:
-        r = requests.get(_feed_url(), headers={"User-Agent": "ApexBot/1.0"}, timeout=10)
+        r = requests.get(_feed_url(), headers={"User-Agent": "ApexBot/1.0"}, timeout=_TIMEOUT)
         r.raise_for_status()
         data = r.json()
         rows = data if isinstance(data, list) else (data.get("events") or data.get("result") or [])
@@ -104,12 +115,42 @@ def _load():
                 "impact": e.get("impact") or e.get("importance"),
                 "time": e.get("date") or e.get("time") or e.get("datetime"),
             })
-        _cache["events"] = events
-        _cache["ts"] = now
+        with _lock:
+            _cache["events"] = events
+            _cache["ts"] = time.time()
+            _state["fails"] = 0
+            _state["next_retry"] = 0.0
     except Exception as ex:
-        print(f"[NEWS] feed unavailable ({ex}) — guard is fail-open, trading continues")
-        # keep any stale cache; if empty stays empty → guard reports no event
-    return _cache["events"]
+        with _lock:
+            _state["fails"] += 1
+            backoff = min(_TTL, 60 * (2 ** (_state["fails"] - 1)))
+            _state["next_retry"] = time.time() + backoff
+        # Fail-open: keep any stale cache; if empty it stays empty → the guard
+        # reports "no event" and trading continues normally.
+        print(f"[NEWS] feed unavailable ({ex}) — guard fail-open, retry in ~{int(backoff)}s")
+    finally:
+        with _lock:
+            _state["fetching"] = False
+
+
+def _load():
+    """Return the cached events immediately — NEVER blocks on the network.
+
+    When the cache is stale (and no fetch is in flight and we're past the
+    back-off window), kick off a background refresh and return whatever we have
+    right now. The very first call, before any successful fetch, returns [] →
+    the news guard fail-opens and trading proceeds; fresh data lands on a later
+    tick once the background fetch completes."""
+    now = time.time()
+    with _lock:
+        fresh = bool(_cache["events"]) and now - _cache["ts"] < _TTL
+        should_fetch = not fresh and not _state["fetching"] and now >= _state["next_retry"]
+        if should_fetch:
+            _state["fetching"] = True
+        events = list(_cache["events"])
+    if should_fetch:
+        threading.Thread(target=_do_fetch, name="news-refresh", daemon=True).start()
+    return events
 
 
 def high_impact_window(currencies, window=None):
