@@ -53,7 +53,19 @@ nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:cente
 .nav-cta:hover{background:var(--acc2);box-shadow:0 6px 28px var(--accglow)}
 @media(max-width:820px){.nav-links{display:none}}
 .wrap{max-width:1280px;margin:0 auto;padding:0 clamp(16px,4vw,46px);position:relative;z-index:2}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--accdim);border:1px solid rgba(255,45,79,.24);color:var(--acc3);border-radius:100px;padding:6px 14px;font:500 11px/1 var(--m);letter-spacing:.1em;text-transform:uppercase}
+/* hero kicker — borderless cinematic label: shimmer sweep + fading phrase cycle */
+.hero-kicker{display:flex;align-items:center;justify-content:center;gap:18px}
+.hk-line{width:64px;height:1px;flex-shrink:0;background:linear-gradient(90deg,transparent,rgba(255,45,79,.6))}
+.hk-line.r{transform:scaleX(-1)}
+.hk-text{font:500 clamp(10px,1.15vw,12px)/1.5 var(--m);letter-spacing:.42em;text-transform:uppercase;text-indent:.42em;white-space:nowrap;
+  background:linear-gradient(110deg,var(--t2) 0%,var(--acc3) 30%,#fff 50%,var(--acc3) 70%,var(--t2) 100%);
+  background-size:230% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  animation:hkshine 3.4s linear infinite;
+  transition:opacity .55s var(--ease),filter .55s var(--ease),letter-spacing .55s var(--ease)}
+.hk-text.out{opacity:0;filter:blur(9px);letter-spacing:.62em}
+@keyframes hkshine{from{background-position:130% 0}to{background-position:-130% 0}}
+@media(max-width:520px){.hk-line{width:34px}.hk-text{letter-spacing:.3em;text-indent:.3em}}
+@media(prefers-reduced-motion:reduce){.hk-text{animation:none}}
 .h2{font:600 clamp(30px,3.9vw,52px)/1.03 var(--d);letter-spacing:-.025em}
 .lead{font:400 clamp(15px,1.4vw,17px)/1.7 var(--f);color:var(--t1);max-width:560px}
 .label{font:500 11px/1 var(--m);color:var(--acc);letter-spacing:.16em;text-transform:uppercase}
@@ -369,7 +381,11 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
   <div class="wrap" style="position:relative;z-index:2">
     <div class="grid3d"></div>
     <div class="aurora"></div>
-    <span class="eyebrow rv">Algorithmic Trading · Fully Hosted</span>
+    <div class="hero-kicker rv" aria-label="Algorithmic trading, fully hosted">
+      <span class="hk-line"></span>
+      <span class="hk-text" id="kicker">Algorithmic Trading</span>
+      <span class="hk-line r"></span>
+    </div>
     <h1 class="rv">Trade smarter.<br><span class="grad" id="rotate">on autopilot.</span></h1>
     <p class="sub rv">Two bots that trade on <b style="color:var(--t0);font-weight:600">your own</b> exchange or broker — we host them, you run them from a Telegram chat. Set the pairs, the risk and the strategy; they trade around the clock and tell you <b style="color:var(--t0);font-weight:600">why</b> on every move. Pay once. No subscription. Nothing to install.</p>
     <div class="hstats rv">
@@ -599,6 +615,10 @@ document.querySelectorAll('.hs-n[data-t]').forEach(function(el){cobs.observe(el)
 (function(){var el=document.getElementById('rotate');if(!el)return;
   var words=['on autopilot.','24/7.','without emotion.','while you sleep.','on your rules.'];var i=0;
   setInterval(function(){el.classList.add('out');setTimeout(function(){i=(i+1)%words.length;el.textContent=words[i];el.classList.remove('out');},350);},2600);})();
+// Hero kicker — phrases fade in and out above the headline
+(function(){var el=document.getElementById('kicker');if(!el)return;
+  var ph=['Algorithmic Trading','Fully Hosted','AI-Powered Signals','Your Rules · Your Account'];var i=0;
+  setInterval(function(){el.classList.add('out');setTimeout(function(){i=(i+1)%ph.length;el.textContent=ph[i];el.classList.remove('out');},550);},3400);})();
 // Live crypto news ticker — real headlines when reachable, always-on market
 // highlights as a fallback so the bar never disappears.
 (function(){
