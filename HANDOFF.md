@@ -9,7 +9,18 @@
 - **Apex Trade Bot** by **AI Cash Systems** (owner: Alex Otvos, Romania).
 - Two Telegram trading bots sold as one-time licenses + a sales site + affiliate program.
   - `apex-crypto-bot/` — Python, Binance, **$297** crypto bot.
-  - `apex-forex-bot/` — Python, OANDA/cTrader/Yahoo, **$497** forex bot.
+  - `apex-forex-bot/` — Python, **$497** forex bot.
+
+> **⚠️ BROKER — read this, don't get confused:** the forex bot uses **cTrader**
+> (the owner's cTrader account is hosted at **Pepperstone** — Pepperstone is just
+> the broker where the cTrader account lives, NOT a separate integration). The bot
+> connects via the **cTrader Open API** (`apex/brokers/ctrader.py`, `/ctrader`
+> onboarding). **OANDA is a LEGACY option still in the code and defaults/help text,
+> but it is NOT used** — do not "fix" the bot toward OANDA. `_make_broker()` picks
+> the broker per-user: cTrader token present → cTrader; else OANDA token → OANDA;
+> else paper → Yahoo. The owner trades via cTrader/Pepperstone. (Cleaning the
+> stale OANDA-worded defaults/help to say cTrader is a nice-to-do, not urgent.)
+
   - `server.js` + `public/` — Node sales site, Stripe checkout, license delivery, affiliate API.
   - `apex-affiliate-bot/` — Telegram bot for affiliates (30% commission).
 
