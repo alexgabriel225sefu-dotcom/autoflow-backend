@@ -132,6 +132,19 @@ body.intro-lock{overflow:hidden}
 .mq-track{display:inline-flex;align-items:center;white-space:nowrap;will-change:transform;animation:mq 32s linear infinite;font:600 clamp(28px,4.8vw,64px)/1 var(--d);letter-spacing:-.02em}
 .mq-track span{padding:0 .32em;color:var(--t0)}.mq-track .o{color:transparent;-webkit-text-stroke:1.2px var(--acc)}.mq-track .dot{color:var(--acc)}
 @keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* LIVE CRYPTO NEWS TICKER */
+#newsbar{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg1);padding:11px 0;overflow:hidden}
+.news-inner{display:flex;align-items:center;gap:18px}
+.news-lbl{flex-shrink:0;display:inline-flex;align-items:center;gap:8px;font:600 11px/1 var(--m);color:var(--acc3);letter-spacing:.14em;text-transform:uppercase}
+.news-dot{width:7px;height:7px;border-radius:50%;background:var(--acc);box-shadow:0 0 9px var(--acc);animation:blk 1.6s ease-in-out infinite}
+.news-view{flex:1;overflow:hidden;position:relative;-webkit-mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent);mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent)}
+.news-track{display:inline-flex;white-space:nowrap;will-change:transform;animation:newsmq 68s linear infinite}
+.news-track:hover{animation-play-state:paused}
+.news-item{display:inline-flex;align-items:center;gap:9px;padding:0 24px;font:500 13px/1 var(--f);color:var(--t1);border-right:1px solid var(--line);transition:color .2s}
+.news-item:hover{color:var(--t0)}
+.news-item .src{font:600 10px/1 var(--m);color:var(--acc2);letter-spacing:.05em}
+@keyframes newsmq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(max-width:600px){.news-lbl span:not(.news-dot){display:none}}
 /* TRUST */
 #trust{padding:24px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg1)}
 .trust-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
@@ -295,6 +308,12 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <div id="intro" aria-hidden="true">
   <div class="intro-half left"></div>
   <div class="intro-half right"></div>
+  <div class="intro-core">
+    <div class="ib-glow"></div>
+    <div class="ib-chart" id="ibChart"></div>
+    <div class="ib-brand">APEX <span class="grad">TRADE</span></div>
+    <div class="ib-tag">AI Trading · Fully Hosted</div>
+  </div>
 </div>
 <div id="spbar"></div>
 <div id="glow"></div>
@@ -385,7 +404,13 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
   <span class="trust-tag">Binance</span><span class="trust-tag">Bybit</span><span class="trust-tag">OKX</span><span class="trust-tag">Kraken</span><span class="trust-tag">KuCoin</span>
   <span class="trust-sep"></span>
   <span class="trust-lbl">Forex</span>
-  <span class="trust-tag">OANDA</span><span class="trust-tag">EUR/USD</span><span class="trust-tag">GBP/USD</span><span class="trust-tag">USD/JPY</span>
+  <span class="trust-tag">cTrader</span><span class="trust-tag">EUR/USD</span><span class="trust-tag">GBP/USD</span><span class="trust-tag">USD/JPY</span>
+</div></div>
+
+<!-- LIVE CRYPTO NEWS -->
+<div id="newsbar" style="display:none"><div class="wrap news-inner">
+  <span class="news-lbl"><span class="news-dot"></span><span>Live Crypto News</span></span>
+  <div class="news-view"><div class="news-track" id="newsTrack"></div></div>
 </div></div>
 
 <!-- MARQUEE -->
@@ -577,13 +602,40 @@ document.querySelectorAll('.hs-n[data-t]').forEach(function(el){cobs.observe(el)
     p.textContent=d[0];pr.textContent=val>100?Math.round(val).toLocaleString():val.toFixed(4);
     cg.textContent=(chg>=0?'+':'')+chg.toFixed(1)+'%';cg.className=chg>=0?'up':'dn';i++;}
   tick();setInterval(tick,1800);})();
-// Cinematic curtain intro — two panels split open to reveal the site
+// Live crypto news ticker — real headlines, fetched client-side (fail-soft)
 (function(){
-  var intro=document.getElementById('intro');
-  if(!intro){document.body.classList.remove('intro-lock');return;}
-  setTimeout(function(){intro.classList.add('go');},600);            // curtain starts opening
-  setTimeout(function(){document.body.classList.remove('intro-lock');},950);  // unlock scroll mid-reveal
-  setTimeout(function(){intro.style.display='none';},1900);          // remove once fully open
+  var bar=document.getElementById('newsbar'),track=document.getElementById('newsTrack');
+  if(!track)return;
+  function esc(s){return String(s||'').replace(/[<>&"]/g,function(c){return{'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c];});}
+  fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var items=((d&&d.Data)||[]).slice(0,16);
+      if(!items.length)return;
+      var html=items.map(function(n){
+        var src=(n.source_info&&n.source_info.name)||n.source||'NEWS';
+        return '<a class="news-item" href="'+esc(n.url)+'" target="_blank" rel="noopener"><span class="src">'+esc(src)+'</span>'+esc(n.title)+'</a>';
+      }).join('');
+      track.innerHTML=html+html; // duplicate for a seamless loop
+      bar.style.display='block';
+    })
+    .catch(function(){/* feed unreachable → stay hidden, page unaffected */});
+})();
+// Cinematic intro — trading candles animation, then the two panels open smoothly
+(function(){
+  var intro=document.getElementById('intro'),chart=document.getElementById('ibChart');
+  if(!intro||!chart){document.body.classList.remove('intro-lock');return;}
+  var heights=[38,60,46,74,54,86,62,96,72];
+  heights.forEach(function(h,i){
+    var b=document.createElement('div');
+    b.className='ib-c '+([1,3,5,7,8].indexOf(i)>-1?'up':'dn');
+    b.style.height=h+'%';b.style.animationDelay=(0.14+i*0.08)+'s';
+    chart.appendChild(b);
+  });
+  var scan=document.createElement('div');scan.className='ib-scan';chart.appendChild(scan);
+  setTimeout(function(){intro.classList.add('go');},2150);           // panels start opening
+  setTimeout(function(){document.body.classList.remove('intro-lock');},2600); // unlock scroll mid-reveal
+  setTimeout(function(){intro.style.display='none';},3500);          // remove once fully open
 })();
 </script>
 <script src="/cookie-banner.js"></script>
