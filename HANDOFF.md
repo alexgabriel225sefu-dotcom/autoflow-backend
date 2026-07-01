@@ -1,9 +1,16 @@
 # HANDOFF — Apex Trade Bot (context for continuing in a new session)
 
-> New session: read this file first, then continue. All code context is in the
-> repo; this file carries the **conversation** context (decisions, pending work,
-> current bug). Working branch: **`claude/arcads-external-api-gExX7`** — Render
-> deploys from it (confirmed live via `/api/health`). Do NOT work on `main`.
+> ## 🛑 FIRST THING, BEFORE ANYTHING ELSE
+> **Run `git checkout claude/arcads-external-api-gExX7` immediately.**
+> ALL of our work (cTrader, copilot, Market Pulse, news, legal, lead funnel — 1000+
+> commits) lives ONLY on that branch. `main` is OLD and diverged: it still has
+> OANDA, has NO cTrader, and does NOT even contain this file. If you are reading
+> stale code (OANDA-only, no `/ctrader`, no `apex/market.py`), you are on the wrong
+> branch — switch now. Render deploys from `claude/arcads-external-api-gExX7`
+> (confirmed live via `/api/health` → `sale_ready:true`). Never work on `main`.
+>
+> After switching branches, read the rest of this file. It carries the
+> **conversation** context (decisions, pending work, current bug) that isn't in code.
 
 ## What this project is
 - **Apex Trade Bot** by **AI Cash Systems** (owner: Alex Otvos, Romania).
@@ -39,6 +46,15 @@
 - **Market Pulse** (`/market`): crypto = volatility/volume/trend/momentum + funding/long-short (Binance futures); forex = same + **session awareness** (Sydney/Tokyo/London/NY from UTC clock).
 - **News**: FMP economic calendar support (set `NEWS_API_KEY`); default Forex Factory feed is blocked on Render datacenter IPs.
 - **Marketing**: `public/promo.html` — on-brand animated 9:16 promo (bg `#060608`, red `#ff2d4f`, Clash Display + JetBrains Mono). Affiliate recruitment DMs + UGC scripts written (in chat history).
+- **Lead funnel** (`public/free.html` + `POST /api/lead`): cold-DM traffic → free offer → email capture → shows promo → buy CTA. Preserves affiliate ref. **Owner's plan: send ~10k DMs pointing to `aicashsystem.space/free`** (NOT the $297 page directly).
+  - To actually STORE leads, create the Supabase table (endpoint is fail-soft without it):
+    ```sql
+    create table if not exists leads (
+      id bigserial primary key, email text not null,
+      ref text, source text default 'free',
+      created_at timestamptz default now()
+    );
+    ```
 
 ## PENDING / IN PROGRESS
 1. **🔴 CURRENT BUG (unresolved): forex bot "stays in place" / repeats errors.**
