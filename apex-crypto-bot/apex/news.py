@@ -17,7 +17,7 @@ Config (env):
 """
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -37,12 +37,34 @@ def window_min() -> int:
         return 30
 
 
+_FMP = "https://financialmodelingprep.com/api/v3/economic_calendar"
+
+# Country code → currency, so a US/EU/GB event matches USD/EUR/GBP filters.
+_CCY = {"US": "USD", "USA": "USD", "EU": "EUR", "EMU": "EUR", "DE": "EUR",
+        "FR": "EUR", "IT": "EUR", "ES": "EUR", "GB": "GBP", "UK": "GBP",
+        "JP": "JPY", "CH": "CHF", "CA": "CAD", "AU": "AUD", "NZ": "NZD", "CN": "CNY"}
+
+
+def _norm_ccy(c) -> str:
+    c = (c or "").upper()
+    return _CCY.get(c, c)
+
+
 def _feed_url() -> str:
-    url = os.getenv("NEWS_FEED_URL") or _DEFAULT_FEED
+    # Explicit feed wins. Else, if a key is set, use Financial Modeling Prep's
+    # economic calendar (reachable from datacenters, unlike Forex Factory).
+    url = os.getenv("NEWS_FEED_URL")
     key = os.getenv("NEWS_API_KEY")
-    if key and "apikey=" not in url:
-        url += ("&" if "?" in url else "?") + "apikey=" + key
-    return url
+    if url:
+        if key and "apikey=" not in url:
+            url += ("&" if "?" in url else "?") + "apikey=" + key
+        return url
+    if key:
+        today = datetime.now(timezone.utc).date()
+        frm = today.isoformat()
+        to = (today + timedelta(days=8)).isoformat()
+        return f"{_FMP}?from={frm}&to={to}&apikey={key}"
+    return _DEFAULT_FEED  # Forex Factory — often blocked on datacenter IPs
 
 
 def _parse_time(raw):
@@ -78,7 +100,7 @@ def _load():
                 continue
             events.append({
                 "title": e.get("title") or e.get("event") or "Economic event",
-                "currency": (e.get("country") or e.get("currency") or "").upper(),
+                "currency": _norm_ccy(e.get("country") or e.get("currency") or ""),
                 "impact": e.get("impact") or e.get("importance"),
                 "time": e.get("date") or e.get("time") or e.get("datetime"),
             })

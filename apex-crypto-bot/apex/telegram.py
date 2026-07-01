@@ -359,7 +359,11 @@ def _build_report(user_id):
 
 _HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━━━━━━━\n"
          "Your AI bot trades crypto automatically. Just set it and watch.\n\n"
-         "<b>Controls:</b>\n/menu · /status · /signal · /config · /trades · /report\n\n"
+         "<b>Controls:</b>\n/menu · /status · /signal · /config · /trades · /report · /news\n\n"
+         "<b>🤖 Copilot vs Autopilot:</b>\n"
+         "/copilot on — bot suggests trades, you tap ✅ Approve before it opens\n"
+         "/copilot off — bot trades automatically (default)\n\n"
+         "<b>📰 News:</b>\n/news — high-impact events; the bot stays flat around them\n\n"
          "<b>Settings (you choose everything):</b>\n"
          "/symbol BTCUSDT — <b>ANY</b> of 600+ Binance pairs (PEPEUSDT, WIFUSDT, …)\n"
          "/method auto|turtle|livermore|soros|ptj|druckenmiller\n"
