@@ -346,7 +346,7 @@ def _handle_status(chat_id):
             bal = float(user.get("paper_balance", cfg.PAPER_BALANCE))
             paper = user.get("paper", True)
             is_open = forex.is_market_open()
-            mode_label = "Paper" if paper else "Live OANDA"
+            mode_label = "Paper" if paper else "Live"
             send_to(chat_id,
                     f"💱 <b>APEX FOREX BOT</b>  {mode_label}\n"
                     f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -380,8 +380,8 @@ def _handle_setup(chat_id):
             "Reply <code>1</code> or <code>2</code>:\n"
             "  <code>1</code> — 🧪 <b>Paper</b> (simulated $1000, real prices from "
             "Yahoo Finance). <b>No account, no keys, starts instantly. Zero risk.</b>\n"
-            "  <code>2</code> — 🔴 <b>Live OANDA</b> (real account, real funds — needs "
-            "OANDA API keys).\n\n"
+            "  <code>2</code> — 🔴 <b>Live</b> (real money via <b>cTrader</b> — any broker "
+            "worldwide, connected with /ctrader).\n\n"
             "<i>Most people start with 1 (paper).</i>")
 
 
@@ -395,9 +395,9 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
     if step == "MODE":
         choice = raw.strip()
         if choice not in ("1", "2"):
-            return send_to(chat_id, "❌ Reply <code>1</code> (paper) or <code>2</code> (live OANDA).")
+            return send_to(chat_id, "❌ Reply <code>1</code> (paper) or <code>2</code> (live).")
         if choice == "1":
-            # Paper — Yahoo data, no OANDA needed, skip straight to the pair
+            # Paper — Yahoo data, no account needed, skip straight to the pair
             with _lock:
                 w["data"]["paper"] = True
                 w["step"] = "SYMBOL"
@@ -407,28 +407,19 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                     "e.g. <code>EUR_USD</code>, <code>GBP_USD</code>, <code>USD_JPY</code>.\n\n"
                     "Reply with the pair. <i>You choose — the bot only trades what you pick.</i>")
         else:
-            # Live — collect OANDA credentials next
+            # Live — real money runs through cTrader (any broker worldwide).
+            # Keep the user safe in paper until cTrader is actually linked.
             with _lock:
-                w["data"]["paper"] = False
-                w["step"] = "KEYS"
+                _wizards.pop(chat_id, None)
             send_to(chat_id,
-                    "🔴 <b>Live OANDA — connect your real account</b>\n\n"
-                    "🆕 <b>No OANDA account yet?</b> Tap <b>Create OANDA account</b> "
-                    "below, open a live (fxTrade) account and fund it first.\n\n"
-                    "<b>Get your API keys from OANDA:</b>\n"
-                    "1️⃣ Log in at oanda.com → <b>Manage API Access</b> "
-                    "→ <b>Generate</b> a personal access token\n"
-                    "2️⃣ Find your <b>Account ID</b> under <b>Manage Funds</b> "
-                    "(looks like <code>001-001-1234567-001</code>)\n"
-                    "3️⃣ Send <b>both</b> here in ONE message:\n\n"
-                    "  <code>OANDA_API_TOKEN=your_token</code>\n"
-                    "  <code>OANDA_ACCOUNT_ID=001-001-1234567-001</code>\n\n"
-                    "🔒 <i>Your message is deleted immediately after reading. Keys are "
-                    "trade-only and stored encrypted.</i>",
-                    {"reply_markup": json.dumps({"inline_keyboard": [
-                        [{"text": "🆕 Create OANDA account", "url": "https://www.oanda.com/account/login"}],
-                        [{"text": "🔑 Open API token page", "url": "https://www.oanda.com/account/tpa/personal_token"}],
-                    ]})})
+                    "🔴 <b>Live trading — via cTrader</b>\n\n"
+                    "Real money runs through your own <b>cTrader</b> account (works with "
+                    "any cTrader broker worldwide — IC Markets, Pepperstone, FxPro…).\n\n"
+                    "<b>To go live:</b>\n"
+                    "1️⃣ Send <b>/ctrader</b> → tap <b>Authorize</b> → log in and approve\n"
+                    "2️⃣ Test in paper first, then switch to live when you're ready\n\n"
+                    "<i>Until you connect cTrader you stay in safe paper mode. Send "
+                    "/ctrader now to link your account.</i>")
 
     elif step == "KEYS":
         _delete_message(chat_id, msg_id)
@@ -846,7 +837,7 @@ def _handle_paper(chat_id, args):
     on = (args or "").strip().lower() in ("on", "true", "yes", "1")
     _save_runtime({"PAPER_TRADING": str(on).lower()})
     _apply("PAPER_TRADING", on)
-    mode = "ON (simulated money)" if on else "OFF (real orders on your OANDA account)"
+    mode = "ON (simulated money)" if on else "OFF (real orders on your live account)"
     send_to(chat_id, f"{'📝' if on else '🔴'} Paper trading <b>{mode}</b>.")
 
 
@@ -1172,7 +1163,7 @@ def _handle_start(chat_id):
     if not access.is_admin(str(chat_id)) and not user.get("oanda_token") and not user.get("paper"):
         return send_to(chat_id,
             "⚙️ <b>Setup required first!</b>\n\n"
-            "Send /setup to configure your OANDA account or enable paper trading.")
+            "Send /setup to start in paper mode, or /ctrader to connect a live account.")
     if user_loop.is_running(chat_id):
         return send_to(chat_id, "▶️ Bot is already running. Send /status to check.")
 
@@ -1227,10 +1218,10 @@ _HELP_CLIENT = ("📋 <b>APEX FOREX BOT</b>\n"
                 "/stop — pause your bot · /cancel — abort setup\n"
                 "/help — this list\n\n"
                 "<b>🔄 Switch Paper ↔ Real:</b>\n"
-                "Send /stop, then /setup and pick Paper or Live OANDA. "
-                "Paper (simulated) and live (real funds) are fully separate — "
-                "switching never touches your real money unless you pick Live and "
-                "connect your OANDA keys.\n\n"
+                "Start in paper with /setup. To go live, send /ctrader and connect "
+                "your own cTrader account (any broker worldwide). Paper (simulated) "
+                "and live (real funds) are fully separate — switching never touches "
+                "your real money unless you connect cTrader and go live.\n\n"
                 "💬 <i>Or just talk to me in any language!</i>\n"
                 "<i>Example: \"enter now\", \"intru acum\", \"analyzeaza EUR_USD\"</i>")
 
