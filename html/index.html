@@ -104,8 +104,11 @@ body.intro-lock{overflow:hidden}
 #rotate.out{opacity:0;filter:blur(10px);transform:translateY(10px)}
 /* live "scanning" ticker — makes the hero feel alive */
 .scanline{display:inline-flex;align-items:center;gap:10px;margin:0 auto 40px;padding:9px 16px;border:1px solid var(--line2);border-radius:100px;background:rgba(255,255,255,.02);font:500 12px/1 var(--m);color:var(--t1);backdrop-filter:blur(8px)}
-.scanline .rad{width:8px;height:8px;border-radius:50%;background:var(--up);box-shadow:0 0 0 0 rgba(39,196,106,.5);animation:radar 1.6s ease-out infinite}
-@keyframes radar{0%{box-shadow:0 0 0 0 rgba(39,196,106,.5)}70%{box-shadow:0 0 0 8px rgba(39,196,106,0)}100%{box-shadow:0 0 0 0 rgba(39,196,106,0)}}
+.scanline .rad{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 0 rgba(255,45,79,.5);animation:radar 1.9s ease-out infinite}
+@keyframes radar{0%{box-shadow:0 0 0 0 rgba(255,45,79,.45)}70%{box-shadow:0 0 0 8px rgba(255,45,79,0)}100%{box-shadow:0 0 0 0 rgba(255,45,79,0)}}
+/* product section head becomes a single centered column once the chart is removed */
+.prod-sec-head.single{display:block;max-width:700px;margin:0 auto 46px;text-align:center}
+.prod-sec-head.single .lead{margin:0 auto}
 .scanline b{color:var(--t0);font-weight:600}
 .scanline .up{color:var(--up)}.scanline .dn{color:var(--acc3)}
 .scanline .sep{width:1px;height:14px;background:var(--line2)}
@@ -393,23 +396,11 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 
 <!-- CRYPTO SECTION -->
 <section class="wrap prod-sec" id="crypto-sec">
-  <div class="prod-sec-head rv">
+  <div class="prod-sec-head rv single">
     <div>
       <span class="label">Crypto Bot</span>
       <h2 class="h2" style="margin:14px 0 14px">Apex Trade Bot</h2>
       <p class="lead">A fully-hosted AI bot for automated crypto trading. Live trading runs on your own Binance account; 7 more exchanges are supported for market data and paper trading. We run the bot 24/7 — you control everything from Telegram.</p>
-    </div>
-    <div class="terminal">
-      <div class="term-top">
-        <div class="term-id"><span id="sym-label">BTC / USDT</span></div>
-        <span class="term-live">● LIVE</span>
-      </div>
-      <div class="coin-row" id="coins"></div>
-      <div class="chart-host" id="tvchart"></div>
-      <div class="term-foot">
-        <span class="note">Real-time data via TradingView. <b>Pick any pair.</b></span>
-        <span class="note">Engine supports <b>5,000+ pairs</b> (5 default)</span>
-      </div>
     </div>
   </div>
   <div class="feat-grid">
@@ -425,33 +416,11 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <!-- FOREX SECTION -->
 <hr class="bot-divider">
 <section class="wrap prod-sec" id="forex-sec">
-  <div class="prod-sec-head rv">
+  <div class="prod-sec-head rv single">
     <div>
       <span class="label">Forex Bot</span>
       <h2 class="h2" style="margin:14px 0 14px">Apex Forex ATC</h2>
-      <p class="lead">A fully-hosted AI forex bot connected to your OANDA account. The bot runs 24/7 in the cloud — every order executes in your OANDA account with stop-loss and take-profit set on each trade.</p>
-    </div>
-    <div class="fx-dash">
-      <div class="fx-head">
-        <div class="fx-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>Apex Forex ATC · Live Dashboard</div>
-        <span class="fx-conn">OANDA CONNECTED</span>
-      </div>
-      <div class="fx-pairs">
-        <div class="fxp"><div class="sym">EUR / USD</div><div class="price" id="v0">1.08512</div><div class="chg up" id="c0">▲ +0.12%</div></div>
-        <div class="fxp"><div class="sym">GBP / USD</div><div class="price" id="v1">1.27346</div><div class="chg dn" id="c1">▼ -0.08%</div></div>
-        <div class="fxp"><div class="sym">USD / JPY</div><div class="price" id="v2">149.824</div><div class="chg up" id="c2">▲ +0.24%</div></div>
-        <div class="fxp"><div class="sym">AUD / USD</div><div class="price" id="v3">0.65234</div><div class="chg up" id="c3">▲ +0.05%</div></div>
-      </div>
-      <div class="fx-trades">
-        <div class="fxt"><span class="sb">BUY</span><span class="pp">EUR_USD</span><span style="color:var(--t2)">0.10 lot</span><span class="rp">+14.2 pips</span></div>
-        <div class="fxt"><span class="sb">BUY</span><span class="pp">GBP_USD</span><span style="color:var(--t2)">0.08 lot</span><span class="rp">+9.7 pips</span></div>
-        <div class="fxt"><span class="ss">SELL</span><span class="pp">USD_JPY</span><span style="color:var(--t2)">0.12 lot</span><span class="rn">-3.1 pips</span></div>
-      </div>
-      <div class="fx-metrics">
-        <div class="fxm"><div class="val pos">+$187.40</div><div class="lbl">Today P&amp;L</div></div>
-        <div class="fxm"><div class="val">2.1R</div><div class="lbl">Profit Factor</div></div>
-        <div class="fxm"><div class="val">2.1R</div><div class="lbl">Profit Factor</div></div>
-      </div>
+      <p class="lead">A fully-hosted AI forex bot connected to your own broker via cTrader. The bot runs 24/7 in the cloud — every order executes in your account with stop-loss and take-profit set on each trade.</p>
     </div>
   </div>
   <div class="feat-grid">
