@@ -1378,6 +1378,33 @@ app.get('/api/affiliates/click', async (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/lead — { email, ref, source } capture a lead from the free funnel.
+// Cold DM traffic rarely buys on the first click; this captures the contact so
+// it can be nurtured to the sale. Best-effort store (leads table may not exist);
+// never blocks the visitor. Affiliate ref is preserved for attribution.
+app.post('/api/lead', _authLimiter, async (req, res) => {
+  const email = String((req.body && req.body.email) || '').toLowerCase().trim().slice(0, 200);
+  const ref = String((req.body && req.body.ref) || '').toLowerCase().trim().slice(0, 40);
+  const source = String((req.body && req.body.source) || 'free').trim().slice(0, 40);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ ok: false, error: 'Please enter a valid email.' });
+  }
+  try {
+    if (supabase) {
+      await supabase.from('leads').insert([{ email, ref: ref || null, source }]);
+    }
+  } catch (e) { /* leads table optional — never block the visitor */ }
+  // Fire the affiliate click too, so a lead from an affiliate link is attributed.
+  try {
+    if (supabase && ref) {
+      const { data: aff } = await supabase.from('affiliates').select('code').eq('code', ref).maybeSingle();
+      if (aff) await supabase.from('affiliate_clicks').insert([{ affiliate_code: ref }]);
+    }
+  } catch (e) { /* best-effort */ }
+  console.log(`[LEAD] ${email}${ref ? ' (ref ' + ref + ')' : ''} via ${source}`);
+  res.json({ ok: true });
+});
+
 // POST /api/affiliates/apply — { name, email, tiktokHandle } -> { code, link }
 app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
   const { name, email, tiktokHandle } = req.body || {};
