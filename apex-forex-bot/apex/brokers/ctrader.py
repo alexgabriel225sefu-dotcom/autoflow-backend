@@ -88,14 +88,16 @@ _OAUTH_AUTH = "https://openapi.ctrader.com/apps/auth"
 _OAUTH_TOKEN = "https://openapi.ctrader.com/apps/token"
 
 
-def authorize_url(redirect_uri: str, state: str, scope: str = "trading") -> str:
+def authorize_url(redirect_uri: str, state: str, scope: str = None) -> str:
     """Link the client opens to grant access. `state` carries the Telegram id
-    (signed) so the callback knows which user authorized."""
+    (signed) so the callback knows which user authorized. Scope defaults to
+    cfg.CTRADER_SCOPE — use "accounts" before KYC (paper mode), "trading" once
+    the app is Active (live orders)."""
     from urllib.parse import urlencode
     q = urlencode({
         "client_id": cfg.CTRADER_CLIENT_ID,
         "redirect_uri": redirect_uri,
-        "scope": scope,
+        "scope": scope or getattr(cfg, "CTRADER_SCOPE", "trading"),
         "state": state,
     })
     return f"{_OAUTH_AUTH}?{q}"

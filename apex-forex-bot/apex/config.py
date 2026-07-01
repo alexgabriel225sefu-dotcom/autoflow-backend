@@ -22,6 +22,9 @@ CTRADER_ACCESS_TOKEN  = os.getenv("CTRADER_ACCESS_TOKEN", "")
 CTRADER_REFRESH_TOKEN = os.getenv("CTRADER_REFRESH_TOKEN", "")
 CTRADER_ACCOUNT_ID    = os.getenv("CTRADER_ACCOUNT_ID", "")   # ctidTraderAccountId
 CTRADER_ENV           = (os.getenv("CTRADER_ENV") or "demo").lower()  # demo | live
+# OAuth scope: "accounts" (read-only — works before KYC, enough for paper mode)
+# or "trading" (real orders — requires the app to be "Active" after KYC review).
+CTRADER_SCOPE         = (os.getenv("CTRADER_SCOPE") or "trading").lower()
 # Where cTrader redirects after the client authorizes (OAuth callback):
 CTRADER_REDIRECT_URI  = os.getenv("CTRADER_REDIRECT_URI", "")
 
