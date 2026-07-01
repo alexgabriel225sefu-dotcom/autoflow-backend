@@ -2246,13 +2246,9 @@ app.get('/index.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'html', 'index.html'));
 });
 
-// Intro animation page
-app.get('/intro', (req, res) => {
-  res.sendFile(path.join(__dirname, 'html', 'intro.html'));
-});
-app.get('/intro.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'html', 'intro.html'));
-});
+// /intro redirects to the homepage — the old separate intro page is retired;
+// the cinematic curtain intro now lives on the homepage itself.
+app.get(['/intro', '/intro.html'], (req, res) => res.redirect(301, '/'));
 
 // Configurators (linked from bot delivery emails — license-gated client-side)
 app.get('/configurator', (req, res) => {

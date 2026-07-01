@@ -550,7 +550,6 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 
 <script>
 (function(){var p=new URLSearchParams(location.search);var ref=p.get('ref');if(ref)sessionStorage.setItem('apex_ref',ref.toLowerCase().trim());})();
-if(!location.search.includes('_s=ok')&&!location.search.includes('direct')){window.location.replace('/intro');}
 (function(){var ref=sessionStorage.getItem('apex_ref');if(!ref)return;document.querySelectorAll('a[href^="https://buy.stripe.com/"]').forEach(function(a){var u=new URL(a.href);u.searchParams.set('client_reference_id',ref);a.href=u.toString();});})();
 function toggleNav(){var h=document.getElementById('ham'),m=document.getElementById('mnav');h.classList.toggle('open');m.classList.toggle('open');document.body.style.overflow=m.classList.contains('open')?'hidden':'';}
 document.getElementById('mnav').querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){setTimeout(function(){document.body.style.overflow='';},600);});});
