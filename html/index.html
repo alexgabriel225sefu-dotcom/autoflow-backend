@@ -269,8 +269,11 @@ body.intro-lock{overflow:hidden}
 #final p{font:400 16px/1.6 var(--f);color:var(--t1);max-width:480px;margin:0 auto 30px}
 footer{border-top:1px solid var(--line);padding:34px 0;font:400 12px/1.7 var(--f);color:var(--t2)}
 footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
-.rv{opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
-.rv.in{opacity:1;transform:none}
+.rv{opacity:0;transform:translateY(30px);filter:blur(6px);transition:opacity .9s var(--ease),transform 1s var(--ease),filter .9s var(--ease)}
+.rv.in{opacity:1;transform:none;filter:blur(0)}
+/* gentle fade between sections for a smoother, premium flow */
+.prod-sec,#pricing,#faq,#how{position:relative}
+.prod-sec::before,#how::before{content:'';position:absolute;top:0;left:0;right:0;height:120px;background:linear-gradient(180deg,var(--bg),transparent);pointer-events:none;z-index:0}
 .lg1{stop-color:#7a1020}.lg2{stop-color:#ff5c74}
 .sec-head{max-width:600px;margin-bottom:40px}
 .sec-head .h2{margin:14px 0 14px}
@@ -365,7 +368,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     <div class="aurora"></div>
     <span class="eyebrow rv">Algorithmic Trading · Fully Hosted</span>
     <h1 class="rv">Trade smarter.<br><span class="grad" id="rotate">on autopilot.</span></h1>
-    <p class="sub rv">Two AI-powered trading bots, fully hosted and controlled from Telegram. Crypto or Forex — you define the strategy, they run 24/7 on your own accounts. No installs, no subscriptions, no black box.</p>
+    <p class="sub rv">Two bots that trade on <b style="color:var(--t0);font-weight:600">your own</b> exchange or broker — we host them, you run them from a Telegram chat. Set the pairs, the risk and the strategy; they trade around the clock and tell you <b style="color:var(--t0);font-weight:600">why</b> on every move. Pay once. No subscription. Nothing to install.</p>
     <div class="scanline rv"><span class="rad"></span>Scanning market · <b id="scanPair">BTC/USDT</b><span class="sep"></span><b id="scanPrice">64,280</b><span id="scanChg" class="up">+1.2%</span></div>
     <div class="hstats rv">
       <div class="hs"><span class="hs-n hs-static">5,000+</span><span class="hs-l">Pairs Available (5 Default)</span></div>
@@ -494,7 +497,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Backtesting engine</li>
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Risk-control module</li>
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Real-time dashboard</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>14-day paper trading</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Unlimited paper trading</li>
         </ul>
         <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn btn-primary magnetic">Get Crypto License — $297 →</a>
         <p class="price-fine">Secure Stripe · Paper-trade before risking real funds</p>
@@ -505,7 +508,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
         <p class="price-sub">One-time · Lifetime use · Instant access</p>
         <ul class="price-list">
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Fully hosted — nothing to install</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>OANDA practice &amp; live trading</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>cTrader — any broker, demo &amp; live</li>
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Automatic SL/TP on every trade</li>
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>6 major pair scanner</li>
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>AI signals: Claude + Groq</li>
@@ -523,11 +526,11 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
   <div class="sec-head rv"><span class="label">FAQ</span><h2 class="h2">Straight answers.</h2></div>
   <div class="faq rv">
     <div class="fq"><button class="fq-q">What exactly am I buying?<span class="fq-ic">+</span></button><div class="fq-a">A lifetime license to a fully-hosted automated trading bot (crypto or forex). We run it 24/7 on our secure servers; you connect your own broker/exchange account and control everything from Telegram. Nothing to install.</div></div>
-    <div class="fq"><button class="fq-q">What broker does the forex bot use?<span class="fq-ic">+</span></button><div class="fq-a">OANDA. You'll need an OANDA account (a free practice account works to start) and an API token. Run /setup in Telegram, paste your token and account ID, and the hosted bot trades on your OANDA account — practice or live.</div></div>
+    <div class="fq"><button class="fq-q">What broker does the forex bot use?<span class="fq-ic">+</span></button><div class="fq-a">Any broker that supports <b>cTrader</b> — IC Markets, Pepperstone, FxPro and dozens more worldwide. You connect your own cTrader account in two taps (send /ctrader in Telegram, authorize, done). Start on a demo account, switch to live when you're ready.</div></div>
     <div class="fq"><button class="fq-q">Do you guarantee profit?<span class="fq-ic">+</span></button><div class="fq-a">No. The bots execute the strategy you configure — risk, pairs and timeframes are entirely under your control. We sell the tool, not a return. Always start on paper trading.</div></div>
     <div class="fq"><button class="fq-q">Do you ever touch my funds or API keys?<span class="fq-ic">+</span></button><div class="fq-a">Never. We host the bots, but they connect with <b>trade-only</b> keys you create — withdrawals disabled — stored encrypted. We can place and close trades, but we can never move or withdraw your funds, and you can revoke the keys at your exchange or OANDA at any time.</div></div>
     <div class="fq"><button class="fq-q">Are these one-time payments?<span class="fq-ic">+</span></button><div class="fq-a">Yes. $297 or $497, once. No subscription, no recurring fees from us ever — and hosting is included, so there's no server bill either. Your only costs are your broker's normal trading fees.</div></div>
-    <div class="fq"><button class="fq-q">Can I test before risking real money?<span class="fq-ic">+</span></button><div class="fq-a">Yes — and we strongly recommend it. Both bots default to paper trading (simulated balance, real market data). Run for 14 days, see exactly how your configuration behaves, then switch to live only when you're confident.</div></div>
+    <div class="fq"><button class="fq-q">Can I test before risking real money?<span class="fq-ic">+</span></button><div class="fq-a">Yes — and we strongly recommend it. Both bots default to paper trading: a simulated balance on real, live market prices. Run it as long as you want, watch exactly how your setup behaves, and only flip to live when the results convince you. No time limit.</div></div>
     <div class="fq"><button class="fq-q">What's the refund policy?<span class="fq-ic">+</span></button><div class="fq-a">Because you get instant lifetime access to a hosted product, sales are final — with one exception: if we can't get your bot activated and connected within 14 days and our support can't resolve it, we refund. We don't refund based on trading results or change of mind, since you control the strategy and can validate everything in paper mode first.</div></div>
   </div>
 </section>
