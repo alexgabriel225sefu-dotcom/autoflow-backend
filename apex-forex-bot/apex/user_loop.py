@@ -2,7 +2,7 @@
 import threading
 import time
 from datetime import datetime
-from apex import user_store, indicators, ai, strategies, forex, news
+from apex import user_store, indicators, ai, strategies, forex, news, market
 from apex.brokers.oanda import OandaBroker
 
 
@@ -96,6 +96,7 @@ def _loop(user_id, alert_fn):
     tick = 0
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
+    last_mkt_tick = -_SKIP_WARN_THROTTLE      # market-pulse heads-up (throttled)
 
     dash = {
         "broker": _broker_label(user, cfg),
@@ -207,6 +208,15 @@ def _loop(user_id, alert_fn):
 
             ind = indicators.analyze(candles)
             strat_data = strategies.analyze(candles)
+
+            # Market Pulse: store a plain-language read for /market, and ping the
+            # user (throttled) when the market gets notable (elevated volatility).
+            mp = market.pulse(ind, strat_data, cfg.SYMBOL)
+            if mp:
+                dash["market"] = mp
+                if mp.get("notable") and alert_fn and tick - last_mkt_tick >= _SKIP_WARN_THROTTLE:
+                    last_mkt_tick = tick
+                    alert_fn(user_id, {"action": "MARKET_PULSE", "symbol": cfg.SYMBOL, **mp})
 
             # Check risk limits
             stop_check = strategies.should_stop(paper_balance, dash["startBalance"])

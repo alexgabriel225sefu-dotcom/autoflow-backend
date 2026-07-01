@@ -779,6 +779,30 @@ def _handle_cb(chat_id, data):
         send_to(chat_id, "❌ Skipped. I'll keep watching and suggest the next setup.")
 
 
+def _handle_market(chat_id):
+    """Market Pulse: session awareness + the last computed volatility/trend read."""
+    from apex import market
+    user = user_store.load(chat_id)
+    sym = user.get("symbol", cfg.SYMBOL)
+    sess = market.session()
+    dash = user_loop.get_dash(chat_id) if hasattr(user_loop, "get_dash") else None
+    mp = (dash or {}).get("market") if dash else None
+
+    lines = [f"📡 <b>Market Pulse — {sym}</b>", "━━━━━━━━━━━━━━━━━━━━",
+             f"🕐 Session: <b>{sess['label']}</b>  (expected volatility: {sess['vol']})"]
+    if not forex.is_market_open():
+        lines.append("🔴 <b>Market closed</b> (weekend) — reopens Sunday 21:00 UTC.")
+    if mp:
+        lines.append(f"📊 Trend: <b>{mp['trend']}</b>")
+        lines.append(f"🌊 Volatility: <b>{mp['volatility']}</b>  (ATR {mp['atrPct']}%)")
+        if mp.get("volume"):
+            lines.append(f"🔊 Volume: <b>{mp['volume']}</b>")
+        lines.append(f"🎯 Momentum: <b>{mp['momentum']}</b>  (RSI {mp['rsi']})")
+    lines.append(f"\n💡 <i>{sess['note']}</i>")
+    lines.append("<i>How the market is moving right now — read before you trade.</i>")
+    send_to(chat_id, "\n".join(lines))
+
+
 def _handle_news(chat_id):
     from apex import news
     if not news.enabled():
@@ -1030,6 +1054,13 @@ def _user_alert(uid, result):
         send_to(uid, f"⚠️ <b>Holding off on {result.get('symbol', sym)}</b>\n"
                      f"<i>{result.get('reason', 'market conditions are unfavourable right now')}.</i>\n"
                      "I'll take the trade as soon as conditions normalise.")
+    elif action == "MARKET_PULSE":
+        vol = f" · Volume: <b>{result['volume']}</b>" if result.get("volume") else ""
+        send_to(uid,
+                f"📡 <b>Market Pulse — {result.get('symbol', sym)}</b>\n"
+                f"Volatility: <b>{result.get('volatility')}</b>{vol}\n"
+                f"Trend: {result.get('trend')} · Momentum: {result.get('momentum')}\n"
+                "<i>Conditions just shifted — trade with extra care.</i>")
     elif action == "FLASH_WARN":
         send_to(uid, f"🚨 <b>Extreme volatility on {result.get('symbol', sym)}</b>\n"
                      "<i>A violent price spike just printed — opening into it is too risky.</i>\n"
@@ -1184,6 +1215,7 @@ _HELP_CLIENT = ("📋 <b>APEX FOREX BOT</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "/setup — choose paper/live, pair, risk (start here)\n"
                 "/status — live trading snapshot\n"
+                "/market — session + how the market is moving now\n"
                 "/report — trade journal + net P&amp;L (for taxes)\n"
                 "/buy EUR_USD — open a BUY manually (any pair you want)\n"
                 "/sell EUR_USD — open a SELL manually\n"
@@ -1205,6 +1237,7 @@ _HELP_CLIENT = ("📋 <b>APEX FOREX BOT</b>\n"
 _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "/status — live trading snapshot\n"
+               "/market — session + market pulse\n"
                "/setup — guided setup wizard\n"
                "/config — show current settings\n"
                "/report — trade journal + net P&amp;L\n"
@@ -1478,6 +1511,8 @@ def _poll_loop():
                     _handle_copilot(chat_id, args)
                 elif cmd_l == "/news":
                     _handle_news(chat_id)
+                elif cmd_l in ("/market", "/m"):
+                    _handle_market(chat_id)
                 elif cmd_l == "/paper" and is_adm:
                     _handle_paper(chat_id, args)
                 elif cmd_l == "/risk" and is_adm:
