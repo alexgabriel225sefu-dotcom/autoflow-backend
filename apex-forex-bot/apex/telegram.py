@@ -718,11 +718,16 @@ def _handle_ctrader(chat_id):
         return send_to(chat_id,
             "⚠️ cTrader redirect URL isn't configured (CTRADER_REDIRECT_URI / "
             "RENDER_EXTERNAL_URL). Ask the operator to set it.")
+    scope = (getattr(cfg, "CTRADER_SCOPE", "trading") or "trading").lower()
+    scope_line = ("🔐 Access requested: <b>trading</b> (place &amp; manage orders)\n\n" if scope == "trading" else
+                  "⚠️ Access requested: <b>accounts — READ-ONLY</b>. Orders will be rejected! "
+                  "The operator must set <code>CTRADER_SCOPE=trading</code> and redeploy first.\n\n")
     send_to(chat_id,
         "🟢 <b>Connect your cTrader account</b>\n\n"
         "1. Tap the button below\n"
         "2. Log in to cTrader and approve access\n"
         "3. You'll be sent back here automatically\n\n"
+        f"{scope_line}"
         "Works with any cTrader broker (IC Markets, Pepperstone, FxPro…). "
         "Demo or live — your choice.\n\n"
         "<i>The link is valid for 10 minutes.</i>",
@@ -780,7 +785,7 @@ def _handle_cb(chat_id, data):
                     f"✅ <b>{sug['side']} {sug['symbol']}</b> @ {res['price']:.5f} | Units: {res['units']}\n"
                     f"SL: {res['sl']:.5f} | TP: {res['tp']:.5f}")
         else:
-            send_to(chat_id, f"❌ Could not open: {res.get('error', '?')}")
+            send_to(chat_id, f"❌ Could not open: {_trade_err(res.get('error'))}")
     elif data == "cp:n":
         user_loop.clear_suggestion(str(chat_id))
         send_to(chat_id, "❌ Skipped. I'll keep watching and suggest the next setup.")
@@ -1002,6 +1007,18 @@ def _handle_pairs(chat_id):
               "<i>Non-FX instruments: test in paper mode first — SL/TP use FX pip conventions.</i>")
 
 
+def _trade_err(err):
+    """Human explanation for the errors clients actually hit."""
+    e = str(err or "?")
+    if "permission" in e.lower():
+        return (e + "\n\n💡 Your cTrader authorization is <b>read-only</b>. "
+                "Send /ctrader and approve again — the new link requests <b>trading</b> access. "
+                "(If it still says read-only, the operator must set CTRADER_SCOPE=trading and redeploy.)")
+    if "not offered" in e.lower():
+        return e + "\n\n💡 Send /pairs to see what your broker offers."
+    return e
+
+
 def _handle_buy(chat_id, args):
     sym = (args or "").strip().upper().replace("/", "_").replace("-", "_")
     if not sym:
@@ -1016,7 +1033,7 @@ def _handle_buy(chat_id, args):
                 f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
                 f"Spread: {result['spread']}p")
     else:
-        send_to(chat_id, f"❌ Could not open trade: {result.get('error', '?')}")
+        send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}")
 
 
 def _handle_sell(chat_id, args):
@@ -1033,7 +1050,7 @@ def _handle_sell(chat_id, args):
                 f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
                 f"Spread: {result['spread']}p")
     else:
-        send_to(chat_id, f"❌ Could not open trade: {result.get('error', '?')}")
+        send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}")
 
 
 def _handle_close(chat_id):
