@@ -851,7 +851,11 @@ def _handle_cb(chat_id, data):
     if data.startswith("ob:sym:"):
         sym = data[7:]
         user_store.update(chat_id, {"symbol": sym})
-        send_to(chat_id, f"✅ Trading symbol: <b>{sym}</b>")
+        sugg = ("Suggested stops for gold: /sl 150 · /tp 300 (set after setup)" if sym.startswith("XAU")
+                else "Suggested stops for indices: /sl 60 · /tp 120" if sym in ("US30", "NAS100")
+                else "Suggested stops for crypto: /sl 200 · /tp 400" if sym.startswith(("BTC", "ETH"))
+                else "")
+        send_to(chat_id, f"✅ Trading symbol: <b>{sym}</b>" + (f"\n💡 <i>{sugg}</i>" if sugg else ""))
         return _ob_step_strategy(chat_id)
     if data.startswith("ob:strat:"):
         mode = data[9:]
@@ -1056,9 +1060,15 @@ def _handle_symbol(chat_id, args):
         cfg.SYMBOL = sym
     warn = ""
     if is_ct and not _PAIR_RE.match(sym):
+        s_norm = sym.replace("_", "")
+        sugg = ("/sl 150 · /tp 300" if s_norm.startswith("XAU")
+                else "/sl 60 · /tp 120" if s_norm.startswith(("US30", "NAS", "GER", "SPX", "US500", "USTEC", "JPN", "UK100"))
+                else "/sl 200 · /tp 400" if s_norm.startswith(("BTC", "ETH"))
+                else None)
         warn = ("\n💡 <i>Pip conventions for metals, indices and crypto CFDs are handled "
-                "automatically (gold: 1 pip = $0.10, indices/crypto: 1 point). "
-                "Still smart: watch the first trades on any new symbol in paper mode.</i>")
+                "automatically. Volatile instruments need wider stops than FX"
+                + (f" — suggested here: <b>{sugg}</b>" if sugg else "")
+                + ". Watch the first trades in paper mode.</i>")
     send_to(chat_id, f"💱 Trading symbol set to <b>{sym}</b>.{warn}")
 
 

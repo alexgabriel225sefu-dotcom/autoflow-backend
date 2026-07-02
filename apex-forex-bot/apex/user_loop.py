@@ -13,6 +13,7 @@ _LOOP_INTERVAL = 300  # 5 minutes between ticks
 _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
 _SKIP_WARN_THROTTLE = 6  # "don't trade now" market-condition warnings (~30 min)
+_LOSS_COOLDOWN_MIN = 20   # Seykota: no revenge trades — pause entries after a loss
 
 
 def _log_trade(user_id, record):
@@ -96,6 +97,7 @@ def _loop(user_id, alert_fn, gen=None):
     open_pos = None  # tracked locally for paper mode
     tick = 0
     data_fails = 0   # consecutive get_candles failures — alert the user at 3
+    last_loss_at = 0.0  # entry cooldown anchor (any losing close)
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
     last_mkt_tick = -_SKIP_WARN_THROTTLE      # market-pulse heads-up (throttled)
@@ -190,6 +192,8 @@ def _loop(user_id, alert_fn, gen=None):
                 # here made broker-side exits invisible in Telegram.
                 if prev_pos and not open_pos:
                     pnl_est = round(paper_balance - prev_balance, 2) if not dash.get("balStale") else None
+                    if pnl_est is not None and pnl_est < 0:
+                        last_loss_at = time.time()
                     result = {"action": "BROKER_CLOSE", "symbol": cfg.SYMBOL,
                               "side": prev_pos.get("side", ""), "price": price,
                               "entryPrice": prev_pos.get("entryPrice"),
@@ -224,6 +228,7 @@ def _loop(user_id, alert_fn, gen=None):
                                                    "reasoning": "🛡 Protective stop — price crossed the stop level; closed at market"})
                         except Exception as e:
                             print(f"[UserLoop:{user_id}] protective close failed: {e}")
+                        last_loss_at = time.time()
                         open_pos = None
                         dash["openPosition"] = None
             else:
@@ -347,6 +352,15 @@ def _loop(user_id, alert_fn, gen=None):
             confidence = signal.get("confidence", 0)
 
             entry_ok = action in ("BUY", "SELL") and not open_pos and confidence >= cfg.MIN_CONFIDENCE
+            # Post-loss cooldown: the worst trade after a stop-out is the next
+            # one taken 5 minutes later in the same falling knife.
+            if entry_ok and last_loss_at and time.time() - last_loss_at < _LOSS_COOLDOWN_MIN * 60:
+                left = int((_LOSS_COOLDOWN_MIN * 60 - (time.time() - last_loss_at)) / 60) + 1
+                entry_ok = False
+                if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
+                    last_warn_tick = tick
+                    alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
+                                       "reason": f"cooling down after a loss — entries resume in ~{left}m"})
             if entry_ok:
                 # ── Cost control: the spread is forex's hidden fee. Skip a too-wide
                 #    spread and refuse trades whose target can't clear a round-trip
@@ -449,6 +463,8 @@ def _loop(user_id, alert_fn, gen=None):
                     cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
                     net = gross - cost_usd
                     paper_balance += net
+                if net < 0:
+                    last_loss_at = time.time()
                 result = {"action": "CLOSE", "symbol": cfg.SYMBOL, "price": price,
                           "entryPrice": open_pos.get("entryPrice"),
                           "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
