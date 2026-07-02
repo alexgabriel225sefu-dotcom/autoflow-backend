@@ -976,13 +976,30 @@ def _handle_pairs(chat_id):
         return send_to(chat_id, f"⚠️ Couldn't load the symbol list: <i>{str(e)[:140]}</i>. Try again in a minute.")
     if not names:
         return send_to(chat_id, "⚠️ Your broker returned no tradable symbols. Check the account in cTrader.")
-    shown = names[:80]
-    more = len(names) - len(shown)
-    body = " · ".join(shown) + (f"\n\n…and <b>{more}</b> more." if more > 0 else "")
+    # Curate: a raw alphabetical dump starts with thousands of stock-CFD codes.
+    ccy = {"EUR", "USD", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "SEK", "NOK", "DKK",
+           "PLN", "CZK", "HUF", "TRY", "ZAR", "MXN", "SGD", "HKD", "CNH", "NOK", "RON"}
+    fx      = [n for n in names if len(n) == 6 and n[:3] in ccy and n[3:] in ccy]
+    metals  = [n for n in names if n.startswith(("XAU", "XAG", "XPT", "XPD"))]
+    crypto  = [n for n in names if n[:3] in {"BTC", "ETH", "SOL", "XRP", "ADA", "LTC", "BNB", "DOT", "BCH", "DOG"}]
+    indices = [n for n in names if re.match(r"^[A-Z]{2,6}\d{2,3}$", n) and n not in fx]
+    other   = len(names) - len(fx) - len(metals) - len(crypto) - len(indices)
+    def _sec(title, lst, cap):
+        if not lst:
+            return ""
+        cut = lst[:cap]
+        extra = f" <i>+{len(lst) - cap} more</i>" if len(lst) > cap else ""
+        return f"\n<b>{title}</b>\n{' · '.join(cut)}{extra}\n"
     send_to(chat_id,
-            f"💱 <b>Your broker offers {len(names)} instruments:</b>\n\n{body}\n\n"
-            "Pick one with <code>/symbol NAME</code> (e.g. <code>/symbol XAUUSD</code>).\n"
-            "<i>Non-FX instruments: test in paper mode first — SL/TP use FX pip conventions.</i>")
+            f"💱 <b>Your broker offers {len(names)} instruments.</b> The bot can trade any of them:\n"
+            + _sec("Forex", fx, 36)
+            + _sec("Metals", metals, 8)
+            + _sec("Indices", indices, 14)
+            + _sec("Crypto CFDs", crypto, 14)
+            + (f"\n…plus <b>{other}</b> stock CFDs &amp; other instruments — find the code in cTrader "
+               "and set it directly.\n" if other > 0 else "")
+            + "\nPick one with <code>/symbol NAME</code> (e.g. <code>/symbol XAUUSD</code>).\n"
+              "<i>Non-FX instruments: test in paper mode first — SL/TP use FX pip conventions.</i>")
 
 
 def _handle_buy(chat_id, args):

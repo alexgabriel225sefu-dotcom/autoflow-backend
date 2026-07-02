@@ -486,10 +486,23 @@ class CtraderBroker:
         req.tradeSide = ProtoOATradeSide.BUY if side == "BUY" else ProtoOATradeSide.SELL
         # cTrader volume is in units × 100 (hundredths of a unit).
         req.volume = int(round(float(units) * 100))
-        if sl:
-            req.stopLoss = float(sl)
-        if tp:
-            req.takeProfit = float(tp)
+        # MARKET orders accept only RELATIVE SL/TP (distance in 1e-5 price
+        # units) — absolute stopLoss/takeProfit fields get the order rejected.
+        if sl or tp:
+            ref = None
+            try:
+                bid, ask = self.get_bid_ask(sym)
+                ref = ask if side == "BUY" else bid
+            except Exception:
+                try:
+                    ref = self.get_candles(instrument, "1m", 2)[-1]["close"]
+                except Exception:
+                    ref = None
+            if ref:
+                if sl:
+                    req.relativeStopLoss = max(1, int(round(abs(ref - float(sl)) * 100000)))
+                if tp:
+                    req.relativeTakeProfit = max(1, int(round(abs(float(tp) - ref) * 100000)))
         res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20)
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):

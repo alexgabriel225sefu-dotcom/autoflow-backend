@@ -99,8 +99,13 @@ def _loop(user_id, alert_fn):
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
     last_mkt_tick = -_SKIP_WARN_THROTTLE      # market-pulse heads-up (throttled)
 
+    acct_env = (user.get("ctrader_env") or user.get("oanda_env") or "practice").lower()
+    mode_label = ("📝 PAPER (simulation)" if cfg.PAPER_TRADING
+                  else ("🔴 REAL orders · demo account 🧪" if acct_env in ("demo", "practice")
+                        else "🔴 REAL orders · LIVE account"))
     dash = {
         "broker": _broker_label(user, cfg),
+        "mode": mode_label,
         "balance": paper_balance,
         "startBalance": paper_balance,
         "symbol": cfg.SYMBOL,
