@@ -332,7 +332,7 @@ def _loop(user_id, alert_fn, gen=None):
                 entry_ok = False
 
             if entry_ok:
-                pip = forex.pip_size(cfg.SYMBOL)
+                pip = forex.pip_size(cfg.SYMBOL, price)
                 sl_price = (price - cfg.STOP_LOSS_PIPS * pip
                             if action == "BUY"
                             else price + cfg.STOP_LOSS_PIPS * pip)
@@ -511,7 +511,7 @@ def force_trade(user_id, side, symbol=None):
     except Exception:
         spread = 0.0
 
-    pip = forex.pip_size(sym)
+    pip = forex.pip_size(sym, price)
     sl_price = (price - cfg.STOP_LOSS_PIPS * pip if side == "BUY"
                 else price + cfg.STOP_LOSS_PIPS * pip)
     tp_price = (price + cfg.TAKE_PROFIT_PIPS * pip if side == "BUY"

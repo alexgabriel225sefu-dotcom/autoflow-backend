@@ -1066,7 +1066,7 @@ def _sim_strategy(mode, candles, symbol, sl_pips, tp_pips, risk, balance0):
     so treat results as method COMPARISON, not a profit forecast."""
     from apex.position import check_position
     from apex import ai as _ai, strategies as _st, indicators as _ind, forex as _fx
-    pip = _fx.pip_size(symbol)
+    pip = _fx.pip_size(symbol, candles[-1]["close"] if candles else None)
     bal, pos, trades = balance0, None, []
     for i in range(220, len(candles)):
         win = candles[:i + 1]
