@@ -94,6 +94,7 @@ def _loop(user_id, alert_fn):
     paper_balance = cfg.PAPER_BALANCE
     open_pos = None  # tracked locally for paper mode
     tick = 0
+    data_fails = 0   # consecutive get_candles failures — alert the user at 3
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
     last_mkt_tick = -_SKIP_WARN_THROTTLE      # market-pulse heads-up (throttled)
@@ -120,10 +121,26 @@ def _loop(user_id, alert_fn):
                 time.sleep(60)
                 continue
 
-            candles = broker.get_candles(cfg.SYMBOL, cfg.TIMEFRAME, cfg.CANDLES)
+            # Data fetch is the loop's lifeline — if it fails silently the user
+            # just sees "Last tick: None" forever. Count failures and tell them.
+            try:
+                candles = broker.get_candles(cfg.SYMBOL, cfg.TIMEFRAME, cfg.CANDLES)
+                data_err = None if candles else "broker returned no candles"
+            except Exception as e:
+                candles, data_err = None, str(e)
             if not candles:
+                data_fails += 1
+                print(f"[UserLoop:{user_id}] data error ({data_fails}): {data_err}")
+                if data_fails == 3 and alert_fn:
+                    alert_fn(user_id, {
+                        "action": "DATA_ERROR",
+                        "reason": data_err,
+                        "symbol": cfg.SYMBOL,
+                        "broker": dash.get("broker", "your broker"),
+                    })
                 time.sleep(30)
                 continue
+            data_fails = 0
 
             tick += 1
             price = candles[-1]["close"]

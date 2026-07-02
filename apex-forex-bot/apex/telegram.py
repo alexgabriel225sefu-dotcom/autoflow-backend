@@ -684,6 +684,12 @@ def _handle_env(chat_id, args):
     env = (args or "").strip().lower()
     if env not in ("practice", "live"):
         return send_to(chat_id, "❌ Usage: <code>/env practice</code> or <code>/env live</code>")
+    # cTrader users: the account type (demo/live) is fixed by the account they
+    # linked — what /env really means for them is paper simulation vs. real
+    # orders in that account. Route it there, or the command changes nothing.
+    user = user_store.load(chat_id)
+    if user.get("ctrader_access_token") and user.get("ctrader_account_id"):
+        return _handle_paper(chat_id, "on" if env == "practice" else "off")
     # Per-user: the multi-user loop builds each broker from the user record, so the
     # env MUST be stored there or the change never reaches the running loop.
     user_store.update(chat_id, {"oanda_env": env})
@@ -740,13 +746,19 @@ def _handle_ctaccount(chat_id, args):
     match = next((a for a in accounts if str(a["ctid"]) == want), None)
     if not match:
         return send_to(chat_id, f"❌ No linked account with id <code>{want}</code>.")
-    user_store.update(chat_id, {
-        "ctrader_account_id": match["ctid"],
-        "ctrader_env": "live" if match.get("live") else "demo",
-    })
+    ct_env = "live" if match.get("live") else "demo"
+    updates = {"ctrader_account_id": match["ctid"], "ctrader_env": ct_env}
+    try:
+        from apex.brokers import ctrader as _ct
+        bal = _ct.account_balance(user.get("ctrader_access_token", ""), match["ctid"], ct_env)
+        updates["paper_balance"] = bal
+        bal_line = f"💰 Balance detected: <b>${bal:,.2f}</b> — paper mode starts from your real balance.\n"
+    except Exception as e:
+        bal_line = f"⚠️ Could not read the account balance yet: <i>{str(e)[:140]}</i>\n"
+    user_store.update(chat_id, updates)
     _restart_user_loop(chat_id)
     env = "LIVE 🔴" if match.get("live") else "demo 🧪"
-    send_to(chat_id, f"✅ Trading account set to <code>{match['ctid']}</code> ({env}).\n"
+    send_to(chat_id, f"✅ Trading account set to <code>{match['ctid']}</code> ({env}).\n{bal_line}"
                      "You're in paper mode by default — /env live when ready, /start to go.")
 
 
@@ -835,10 +847,20 @@ def _handle_copilot(chat_id, args):
 
 def _handle_paper(chat_id, args):
     on = (args or "").strip().lower() in ("on", "true", "yes", "1")
-    _save_runtime({"PAPER_TRADING": str(on).lower()})
-    _apply("PAPER_TRADING", on)
-    mode = "ON (simulated money)" if on else "OFF (real orders on your live account)"
-    send_to(chat_id, f"{'📝' if on else '🔴'} Paper trading <b>{mode}</b>.")
+    # Per-user first — the client's loop reads the user record, not the global cfg.
+    user_store.update(chat_id, {"paper": on})
+    _restart_user_loop(chat_id)
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"PAPER_TRADING": str(on).lower()})
+        _apply("PAPER_TRADING", on)
+    if on:
+        return send_to(chat_id, "📝 Paper trading <b>ON</b> — simulated balance, zero risk.")
+    u = user_store.load(chat_id)
+    env = (u.get("ctrader_env") or u.get("oanda_env") or "").lower()
+    where = ("your <b>demo</b> account — still fake money 🧪" if env in ("demo", "practice")
+             else "your <b>LIVE</b> account — real money 🔴")
+    send_to(chat_id, f"🔴 Paper trading <b>OFF</b> — orders now execute in {where}.\n"
+                     "Send /start if the bot isn't running.")
 
 
 def _handle_risk(chat_id, args):
@@ -849,8 +871,11 @@ def _handle_risk(chat_id, args):
     except ValueError:
         return send_to(chat_id, "❌ Usage: <code>/risk 2</code>  (0.5–10%)")
     frac = pct / 100
-    _save_runtime({"RISK_PER_TRADE": frac})
-    _apply("RISK_PER_TRADE", frac)
+    user_store.update(chat_id, {"risk": frac})
+    _restart_user_loop(chat_id)
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"RISK_PER_TRADE": frac})
+        _apply("RISK_PER_TRADE", frac)
     send_to(chat_id, f"⚖️ Risk per trade set to <b>{pct:g}%</b> of balance.")
 
 
@@ -861,8 +886,11 @@ def _handle_sl(chat_id, args):
             raise ValueError
     except ValueError:
         return send_to(chat_id, "❌ Usage: <code>/sl 15</code>  (2–200 pips)")
-    _save_runtime({"STOP_LOSS_PIPS": pips})
-    _apply("STOP_LOSS_PIPS", pips)
+    user_store.update(chat_id, {"sl_pips": pips})
+    _restart_user_loop(chat_id)
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"STOP_LOSS_PIPS": pips})
+        _apply("STOP_LOSS_PIPS", pips)
     send_to(chat_id, f"🛡 Stop loss set to <b>{pips:g} pips</b>.")
 
 
@@ -873,8 +901,11 @@ def _handle_tp(chat_id, args):
             raise ValueError
     except ValueError:
         return send_to(chat_id, "❌ Usage: <code>/tp 30</code>  (2–500 pips)")
-    _save_runtime({"TAKE_PROFIT_PIPS": pips})
-    _apply("TAKE_PROFIT_PIPS", pips)
+    user_store.update(chat_id, {"tp_pips": pips})
+    _restart_user_loop(chat_id)
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"TAKE_PROFIT_PIPS": pips})
+        _apply("TAKE_PROFIT_PIPS", pips)
     send_to(chat_id, f"🎯 Take profit set to <b>{pips:g} pips</b>.")
 
 
@@ -882,9 +913,12 @@ def _handle_symbol(chat_id, args):
     sym = (args or "").strip().upper().replace("/", "_").replace("-", "_")
     if not _PAIR_RE.match(sym):
         return send_to(chat_id, "❌ Usage: <code>/symbol EUR_USD</code>")
-    _save_runtime({"TRADE_SYMBOL": sym})
-    _apply("TRADE_SYMBOL", sym)
-    cfg.SYMBOL = sym
+    user_store.update(chat_id, {"symbol": sym})
+    _restart_user_loop(chat_id)
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"TRADE_SYMBOL": sym})
+        _apply("TRADE_SYMBOL", sym)
+        cfg.SYMBOL = sym
     send_to(chat_id, f"💱 Currency pair set to <b>{sym}</b>.")
 
 
@@ -1038,6 +1072,13 @@ def _user_alert(uid, result):
                 f"⚠️ <b>AI temporarily unavailable</b>\n"
                 f"Bot continues with rule-based signals — trading is not interrupted.\n"
                 f"<i>{result.get('reason', '')[:120]}</i>")
+    elif action == "DATA_ERROR":
+        send_to(uid,
+                f"⚠️ <b>Market data problem</b> — {sym}\n"
+                f"I can't fetch prices from <b>{result.get('broker', 'your broker')}</b>:\n"
+                f"<i>{result.get('reason', '')[:160]}</i>\n\n"
+                "I retry every 30s automatically. If this keeps up, "
+                "send /ctrader to re-connect your account.")
     elif action == "STOP":
         reasons = ", ".join(result.get("reasons", ["risk limit"]))
         send_to(uid, f"🛑 <b>Trading paused — risk limit hit</b>\n{reasons}")
@@ -1504,15 +1545,15 @@ def _poll_loop():
                     _handle_news(chat_id)
                 elif cmd_l in ("/market", "/m"):
                     _handle_market(chat_id)
-                elif cmd_l == "/paper" and is_adm:
+                elif cmd_l == "/paper":
                     _handle_paper(chat_id, args)
-                elif cmd_l == "/risk" and is_adm:
+                elif cmd_l == "/risk":
                     _handle_risk(chat_id, args)
-                elif cmd_l == "/sl" and is_adm:
+                elif cmd_l == "/sl":
                     _handle_sl(chat_id, args)
-                elif cmd_l == "/tp" and is_adm:
+                elif cmd_l == "/tp":
                     _handle_tp(chat_id, args)
-                elif cmd_l == "/symbol" and is_adm:
+                elif cmd_l == "/symbol":
                     _handle_symbol(chat_id, args)
                 elif cmd_l == "/buy":
                     _handle_buy(chat_id, args)

@@ -148,10 +148,19 @@ def handle_callback(query: dict):
         "ctrader_refresh_token": refresh,
         "ctrader_accounts": accounts,
     }
+    bal, bal_err = None, None
     if len(accounts) == 1:
         a = accounts[0]
         updates["ctrader_account_id"] = a["ctid"]
         updates["ctrader_env"] = "live" if a["live"] else "demo"
+        # Mirror the account's real balance into paper mode so the client sees
+        # THEIR money, not an arbitrary $1000. Also a live connection check:
+        # if this fails, candles/orders will fail identically — surface it now.
+        try:
+            bal = ctrader.account_balance(access, a["ctid"], updates["ctrader_env"])
+            updates["paper_balance"] = bal
+        except Exception as e:
+            bal_err = str(e)
     user_store.update(chat_id, updates)
     _pending.pop(str(chat_id), None)
 
@@ -161,10 +170,20 @@ def handle_callback(query: dict):
         if len(accounts) == 1:
             a = accounts[0]
             env = "LIVE 🔴" if a["live"] else "demo 🧪"
+            bal_line = (f"💰 Balance detected: <b>${bal:,.2f}</b> — paper mode starts from your real balance.\n\n"
+                        if bal is not None else
+                        (f"⚠️ Could not read the account balance yet: <i>{bal_err[:140]}</i>\n"
+                         "I'll keep trying — if trading doesn't start, send /ctrader to re-connect.\n\n"
+                         if bal_err else ""))
+            live_hint = ("When you're confident: <b>/env live</b> places real orders in your <b>demo</b> "
+                         "account — still fake money 🧪, watch them appear in cTrader.\n"
+                         if not a["live"] else
+                         "When you're confident: <b>/env live</b> places REAL orders in your LIVE account 🔴.\n")
             tg.send_to(chat_id,
                        f"✅ <b>cTrader connected!</b>\n\nAccount <code>{a['ctid']}</code> ({env}) is linked.\n\n"
+                       f"{bal_line}"
                        "You're in <b>paper mode</b> by default — test risk-free first.\n"
-                       "When ready for real money: /env live\nStart trading: /start")
+                       f"{live_hint}Start trading: /start")
         elif accounts:
             lines = "\n".join(
                 f"• <code>{a['ctid']}</code> — {'LIVE 🔴' if a['live'] else 'demo 🧪'}"

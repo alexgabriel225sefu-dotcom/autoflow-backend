@@ -483,6 +483,18 @@ def is_configured() -> bool:
                 and getattr(cfg, "CTRADER_CLIENT_SECRET", ""))
 
 
+def account_balance(access_token: str, ctid, env: str = "demo") -> float:
+    """Real balance of a linked account (demo or live). Read-only — works with
+    the `accounts` scope too, so it doubles as a connection health check right
+    after OAuth: if this fails, candles/orders will fail the same way."""
+    conn = _conn_for(env, access_token, int(ctid))
+    req = ProtoOATraderReq()
+    req.ctidTraderAccountId = int(ctid)
+    res = conn._request(req, ProtoOATraderRes)
+    money_digits = getattr(res.trader, "moneyDigits", 2) or 2
+    return res.trader.balance / (10 ** money_digits)
+
+
 def list_accounts(access_token: str) -> list:
     """Trading accounts authorized by this token — used after OAuth to let the
     client pick which account to trade. Opens a short-lived demo connection."""
