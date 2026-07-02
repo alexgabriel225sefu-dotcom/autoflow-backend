@@ -1006,6 +1006,19 @@ def _handle_risk(chat_id, args):
     send_to(chat_id, f"⚖️ Risk per trade set to <b>{pct:g}%</b> of balance.")
 
 
+def _rr_note(chat_id):
+    """Warn when the configured TP is smaller than the SL (RR < 1)."""
+    u = user_store.load(chat_id)
+    try:
+        slv, tpv = float(u.get("sl_pips", 20)), float(u.get("tp_pips", 40))
+    except (TypeError, ValueError):
+        return ""
+    if tpv < slv:
+        return (f"\n⚠️ <i>Your TP ({tpv:g}p) is smaller than your SL ({slv:g}p) — "
+                f"risk/reward {tpv / slv:.2f}. Winners must outpay losers: consider /tp {int(slv * 2)}.</i>")
+    return ""
+
+
 def _handle_sl(chat_id, args):
     try:
         pips = float((args or "").strip())
@@ -1018,7 +1031,7 @@ def _handle_sl(chat_id, args):
     if access.is_admin(str(chat_id)):
         _save_runtime({"STOP_LOSS_PIPS": pips})
         _apply("STOP_LOSS_PIPS", pips)
-    send_to(chat_id, f"🛡 Stop loss set to <b>{pips:g} pips</b>.")
+    send_to(chat_id, f"🛡 Stop loss set to <b>{pips:g} pips</b>." + _rr_note(chat_id))
 
 
 def _handle_tp(chat_id, args):
@@ -1033,7 +1046,7 @@ def _handle_tp(chat_id, args):
     if access.is_admin(str(chat_id)):
         _save_runtime({"TAKE_PROFIT_PIPS": pips})
         _apply("TAKE_PROFIT_PIPS", pips)
-    send_to(chat_id, f"🎯 Take profit set to <b>{pips:g} pips</b>.")
+    send_to(chat_id, f"🎯 Take profit set to <b>{pips:g} pips</b>." + _rr_note(chat_id))
 
 
 def _handle_symbol(chat_id, args):
@@ -1524,10 +1537,17 @@ def _user_alert(uid, result):
         spread = result.get("spreadPips")
         spread_line = f" | Spread: {spread}p" if spread is not None else ""
         d = "🟢 LONG" if action == "BUY" else "🔴 SHORT"
+        rr_line = ""
+        try:
+            sl_, tp_, px_ = result.get("stopLoss"), result.get("takeProfit"), result.get("price")
+            if sl_ and tp_ and px_ and abs(px_ - sl_) > 0:
+                rr_line = f"\n🎯 SL <b>{sl_:g}</b> · TP <b>{tp_:g}</b> · RR <b>1:{abs(tp_ - px_) / abs(px_ - sl_):.1f}</b>"
+        except (TypeError, ValueError):
+            pass
         send_to(uid,
                 f"{d} <b>{action}</b> — {sym}\n"
                 f"Price: <b>{result.get('price', '—')}</b> | "
-                f"Confidence: <b>{result.get('confidence', 0)}%</b>{spread_line}"
+                f"Confidence: <b>{result.get('confidence', 0)}%</b>{spread_line}{rr_line}"
                 + _fx_why_block(result))
         _send_chart_async(uid, symbol=sym, position={
             "side": action, "entryPrice": result.get("price"),

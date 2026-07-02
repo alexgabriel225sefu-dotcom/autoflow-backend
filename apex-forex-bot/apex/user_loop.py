@@ -245,6 +245,8 @@ def _loop(user_id, alert_fn, gen=None):
                     # stale number as fresh — the client compares it to cTrader.
                     dash["balStale"] = True
                     print(f"[UserLoop:{user_id}] balance read error: {e}")
+                if not open_pos and dash.get("manualHold"):
+                    dash["manualHold"] = False
                 # cTrader executed the SL/TP server-side: the position we were
                 # managing vanished between ticks. Tell the client — silence
                 # here made broker-side exits invisible in Telegram.
@@ -586,17 +588,21 @@ def _loop(user_id, alert_fn, gen=None):
                 if alert_fn:
                     alert_fn(user_id, result)
 
+            elif action == "CLOSE" and open_pos and dash.get("manualHold"):
+                # /buy - /sell trades belong to the USER: the strategy engine
+                # must not close them (a mean-reversion bot would instantly
+                # exit a manual entry placed near the mean). SL/TP rule them.
+                pass
             elif action == "CLOSE" and open_pos:
+                # A strategy exit is NOT always a win — label it honestly.
                 broker.close_position(cfg.SYMBOL)
-                gross = cost_usd = net = 0.0
-                if cfg.PAPER_TRADING and open_pos:
-                    units_ = open_pos.get("units", 1000)
-                    gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
-                                          price, units_, cfg.SYMBOL)
-                    # Net profit = gross minus the spread cost (forex's real fee).
-                    pv = forex.pip_value_per_unit(cfg.SYMBOL, price)
-                    cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
-                    net = gross - cost_usd
+                units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
+                gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
+                                      price, units_, cfg.SYMBOL)
+                pv = forex.pip_value_per_unit(cfg.SYMBOL, price)
+                cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                net = gross - cost_usd
+                if cfg.PAPER_TRADING:
                     paper_balance += net
                 if net < 0:
                     last_loss_at = time.time()
@@ -766,6 +772,7 @@ def force_trade(user_id, side, symbol=None):
     if loop_data:
         dash = loop_data.get("dash", {})
         dash["openPosition"] = open_pos
+        dash["manualHold"] = True  # user's trade — engine keeps hands off, SL/TP manage
         result = {"action": side, "symbol": sym, "confidence": 99,
                   "price": price, "spreadPips": round(spread, 1), "time": now_str}
         trades = dash.get("trades", [])
