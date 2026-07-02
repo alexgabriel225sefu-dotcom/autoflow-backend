@@ -42,7 +42,7 @@ from apex import config as cfg
 # generated message classes — not the Twisted-based Client.
 try:
     from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import (
-        ProtoMessage, ProtoHeartbeatEvent,
+        ProtoMessage, ProtoHeartbeatEvent, ProtoErrorRes,
     )
     from ctrader_open_api.messages.OpenApiMessages_pb2 import (
         ProtoOAApplicationAuthReq, ProtoOAApplicationAuthRes,
@@ -197,9 +197,24 @@ class _Conn:
         while time.time() < deadline:
             pm = self._read_frame(timeout=max(1, int(deadline - time.time())))
             if pm.payloadType == ProtoHeartbeatEvent().payloadType:
+                # Reply in kind — the proxy drops connections that stay silent.
+                try:
+                    hb = ProtoMessage()
+                    hb.payloadType = ProtoHeartbeatEvent().payloadType
+                    hb.payload = ProtoHeartbeatEvent().SerializeToString()
+                    self._sock.sendall(struct.pack(">I", len(hb.SerializeToString())) + hb.SerializeToString())
+                except Exception:
+                    pass
                 continue
             if pm.payloadType == ProtoOAErrorRes().payloadType:
                 err = ProtoOAErrorRes()
+                err.ParseFromString(pm.payload)
+                raise RuntimeError(f"cTrader error: {err.errorCode} {err.description}")
+            # Common-layer error (bad app credentials, throttling, protocol issue).
+            # Without this branch the frame is skipped and the server's follow-up
+            # close surfaces as a bare "connection closed" with no cause.
+            if pm.payloadType == ProtoErrorRes().payloadType:
+                err = ProtoErrorRes()
                 err.ParseFromString(pm.payload)
                 raise RuntimeError(f"cTrader error: {err.errorCode} {err.description}")
             if want_client_id and pm.clientMsgId and pm.clientMsgId != want_client_id:
@@ -223,15 +238,23 @@ class _Conn:
         raw = socket.create_connection((_HOST[self.env], _PORT), timeout=15)
         self._sock = ctx.wrap_socket(raw, server_hostname=_HOST[self.env])
         # 1. application auth
-        app = ProtoOAApplicationAuthReq()
-        app.clientId = cfg.CTRADER_CLIENT_ID
-        app.clientSecret = cfg.CTRADER_CLIENT_SECRET
-        self._request(app, ProtoOAApplicationAuthRes)
+        try:
+            app = ProtoOAApplicationAuthReq()
+            app.clientId = cfg.CTRADER_CLIENT_ID
+            app.clientSecret = cfg.CTRADER_CLIENT_SECRET
+            self._request(app, ProtoOAApplicationAuthRes)
+        except Exception as e:
+            self.close()
+            raise RuntimeError(f"app auth failed ({self.env}): {e}") from e
         # 2. account auth
-        acc = ProtoOAAccountAuthReq()
-        acc.ctidTraderAccountId = self.ctid
-        acc.accessToken = self.access_token
-        self._request(acc, ProtoOAAccountAuthRes)
+        try:
+            acc = ProtoOAAccountAuthReq()
+            acc.ctidTraderAccountId = self.ctid
+            acc.accessToken = self.access_token
+            self._request(acc, ProtoOAAccountAuthRes)
+        except Exception as e:
+            self.close()
+            raise RuntimeError(f"account auth failed ({self.env} #{self.ctid}): {e}") from e
         return self
 
     def close(self):
@@ -293,12 +316,24 @@ class CtraderBroker:
     def _ctid(self):
         return int(self._c.CTRADER_ACCOUNT_ID)
 
+    def _rpc(self, req, res_cls, timeout=15):
+        """Read-only request with one transparent reconnect. The proxy closes
+        idle sockets and the pool can't tell a dead socket from a live one —
+        without this, one idle period kills every later call with
+        'connection closed'. Order placement must NOT use this (a blind retry
+        could double-fill); orders ride the connection get_candles just warmed."""
+        try:
+            return self._conn()._request(req, res_cls, timeout)
+        except (ConnectionError, OSError, TimeoutError):
+            _drop_conn(getattr(self._c, "CTRADER_ENV", "demo"), self._ctid())
+            return self._conn()._request(req, res_cls, timeout)
+
     def _load_symbols(self):
         if self._sym_id:
             return
         req = ProtoOASymbolsListReq()
         req.ctidTraderAccountId = self._ctid()
-        res = self._conn()._request(req, ProtoOASymbolsListRes)
+        res = self._rpc(req, ProtoOASymbolsListRes)
         for s in res.symbol:
             self._sym_id[s.symbolName.replace("/", "").replace("_", "").upper()] = s.symbolId
             # symbol digits live on the detailed symbol; default 5 (3 for JPY)
@@ -372,7 +407,7 @@ class CtraderBroker:
         req.count = count
         # toTimestamp = now; the API returns the most recent `count` bars
         req.toTimestamp = int(time.time() * 1000)
-        res = self._conn()._request(req, ProtoOAGetTrendbarsRes, timeout=20)
+        res = self._rpc(req, ProtoOAGetTrendbarsRes, timeout=20)
         scale = self._scale(sym)
         out = []
         for tb in res.trendbar:
@@ -393,7 +428,7 @@ class CtraderBroker:
             return self._c.PAPER_BALANCE
         req = ProtoOATraderReq()
         req.ctidTraderAccountId = self._ctid()
-        res = self._conn()._request(req, ProtoOATraderRes)
+        res = self._rpc(req, ProtoOATraderRes)
         # balance is in cents of the deposit currency (moneyDigits)
         money_digits = getattr(res.trader, "moneyDigits", 2) or 2
         return res.trader.balance / (10 ** money_digits)
@@ -407,7 +442,7 @@ class CtraderBroker:
             sid = self._symbol_id(instrument)
             req = ProtoOAReconcileReq()
             req.ctidTraderAccountId = self._ctid()
-            res = self._conn()._request(req, ProtoOAReconcileRes)
+            res = self._rpc(req, ProtoOAReconcileRes)
             scale = self._scale(sym)
             for p in res.position:
                 td = p.tradeData
@@ -487,10 +522,13 @@ def account_balance(access_token: str, ctid, env: str = "demo") -> float:
     """Real balance of a linked account (demo or live). Read-only — works with
     the `accounts` scope too, so it doubles as a connection health check right
     after OAuth: if this fails, candles/orders will fail the same way."""
-    conn = _conn_for(env, access_token, int(ctid))
     req = ProtoOATraderReq()
     req.ctidTraderAccountId = int(ctid)
-    res = conn._request(req, ProtoOATraderRes)
+    try:
+        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOATraderRes)
+    except (ConnectionError, OSError, TimeoutError):
+        _drop_conn(env, int(ctid))  # pooled socket may be dead — one clean retry
+        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOATraderRes)
     money_digits = getattr(res.trader, "moneyDigits", 2) or 2
     return res.trader.balance / (10 ** money_digits)
 
