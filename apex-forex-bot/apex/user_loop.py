@@ -88,7 +88,7 @@ def _broker_label(user, cfg):
     return "Yahoo (paper data)"
 
 
-def _loop(user_id, alert_fn):
+def _loop(user_id, alert_fn, gen=None):
     user = user_store.load(user_id)
     broker, cfg = _make_broker(user)
 
@@ -121,8 +121,9 @@ def _loop(user_id, alert_fn):
 
     while True:
         with _lock:
-            if not _loops.get(user_id, {}).get("running"):
-                break
+            entry = _loops.get(user_id, {})
+            if not entry.get("running") or (gen is not None and entry.get("gen") != gen):
+                break  # stopped, or replaced by a newer loop (restart race)
         try:
             if not forex.is_market_open():
                 time.sleep(60)
@@ -341,7 +342,7 @@ def _loop(user_id, alert_fn):
                 # Risk-based sizing: never risk more than RISK_PER_TRADE of balance.
                 units = forex.calc_units(paper_balance, cfg.RISK_PER_TRADE,
                                          cfg.STOP_LOSS_PIPS, cfg.SYMBOL, price)
-                units = max(int(units), 1000)
+                units = max(int(units), forex.min_units(cfg.SYMBOL))
 
                 broker.place_order(action, units, cfg.SYMBOL, sl=sl_price, tp=tp_price)
 
@@ -405,10 +406,16 @@ def start(user_id, alert_fn=None):
     with _lock:
         if user_id in _loops and _loops[user_id]["running"]:
             return False
-        _loops[user_id] = {"running": True, "dash": {}}
+        # Generation token: a stop()+start() restart can race a thread that is
+        # asleep in its 5-minute tick — it wakes, sees the NEW entry's
+        # running=True and keeps trading alongside the new loop (two engines
+        # fighting over one account: open/close churn). The token lets the old
+        # thread recognise it was replaced and exit.
+        gen = _loops.get(user_id, {}).get("gen", 0) + 1
+        _loops[user_id] = {"running": True, "gen": gen, "dash": {}}
 
     user_store.update(user_id, {"active": True})
-    t = threading.Thread(target=_loop, args=(user_id, alert_fn), daemon=True)
+    t = threading.Thread(target=_loop, args=(user_id, alert_fn, gen), daemon=True)
     t.start()
     with _lock:
         _loops[user_id]["thread"] = t
@@ -516,7 +523,7 @@ def force_trade(user_id, side, symbol=None):
         balance = dash.get("balance", balance)
 
     units = forex.calc_units(balance, cfg.RISK_PER_TRADE, cfg.STOP_LOSS_PIPS, sym, price)
-    units = max(int(units), 1000)
+    units = max(int(units), forex.min_units(sym))
 
     try:
         broker.place_order(side, units, sym, sl=sl_price, tp=tp_price)

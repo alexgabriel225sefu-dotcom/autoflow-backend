@@ -55,6 +55,7 @@ try:
         ProtoOANewOrderReq, ProtoOAExecutionEvent,
         ProtoOAReconcileReq, ProtoOAReconcileRes,
         ProtoOAClosePositionReq, ProtoOAErrorRes, ProtoOAOrderErrorEvent,
+        ProtoOASymbolByIdReq, ProtoOASymbolByIdRes,
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
@@ -345,6 +346,24 @@ class CtraderBroker:
             # symbol digits live on the detailed symbol; default 5 (3 for JPY)
         # store nothing else here — digits resolved lazily from name
 
+    def _vol_rules(self, sid):
+        """(minVolume, stepVolume) in hundredths-of-a-unit, from the symbol's
+        full details. FX is 0.01 lots = 100k hundredths, but gold is 1 oz and
+        indices 1 contract — a hard-coded FX step breaks every other class."""
+        if not hasattr(self, "_vol_cache"):
+            self._vol_cache = {}
+        if sid in self._vol_cache:
+            return self._vol_cache[sid]
+        req = ProtoOASymbolByIdReq()
+        req.ctidTraderAccountId = self._ctid()
+        req.symbolId.append(sid)
+        res = self._rpc(req, ProtoOASymbolByIdRes)
+        sym = res.symbol[0] if res.symbol else None
+        mn = int(getattr(sym, "minVolume", 0) or 0) or 100_000
+        st = int(getattr(sym, "stepVolume", 0) or 0) or mn
+        self._vol_cache[sid] = (mn, st)
+        return mn, st
+
     def _symbol_id(self, instrument):
         self._load_symbols()
         name = _to_ct_symbol(instrument or self._c.SYMBOL)
@@ -490,12 +509,15 @@ class CtraderBroker:
         req.symbolId = sid
         req.orderType = ProtoOAOrderType.MARKET
         req.tradeSide = ProtoOATradeSide.BUY if side == "BUY" else ProtoOATradeSide.SELL
-        # cTrader volume is in units × 100 (hundredths of a unit), and FX
-        # accounts only accept 0.01-lot steps (1,000 units) — an unrounded
-        # risk-based size like 35,235 units gets the order rejected.
+        # cTrader volume is in units × 100 (hundredths of a unit). Min/step
+        # differ per instrument class (FX 0.01 lot = 1,000 units; gold 1 oz;
+        # indices 1 contract) — ask the broker instead of assuming FX.
         vol_h = int(round(float(units) * 100))
-        step = 100_000  # 0.01 lot
-        req.volume = max(step, (vol_h // step) * step)
+        try:
+            mn, st = self._vol_rules(sid)
+        except Exception:
+            mn, st = 100_000, 100_000  # FX fallback
+        req.volume = max(mn, (vol_h // st) * st)
         # MARKET orders accept only RELATIVE SL/TP (distance in 1e-5 price
         # units) — absolute stopLoss/takeProfit fields get the order rejected.
         if sl or tp:

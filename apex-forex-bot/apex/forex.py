@@ -9,8 +9,38 @@ MAJORS = ["EUR_USD", "GBP_USD", "USD_JPY", "USD_CHF", "AUD_USD", "USD_CAD", "NZD
 
 
 def pip_size(instrument: str) -> float:
-    """0.01 for JPY-quoted pairs, 0.0001 for everything else."""
-    return 0.01 if instrument.upper().endswith("_JPY") else 0.0001
+    """Pip size per instrument class — clients can pick anything the broker
+    offers (/symbol), so SL/TP distances must use each market's convention,
+    not blanket FX math (20 'pips' on gold at 0.0001 = a $0.002 stop).
+
+    Normalizes XAUUSD / XAU_USD / xau/usd alike — the old endswith('_JPY')
+    check silently mis-sized USDJPY typed without an underscore."""
+    s = (instrument or "").upper().replace("_", "").replace("/", "").replace("-", "")
+    if s.startswith("XAU"):
+        return 0.1     # gold: 1 pip = $0.10
+    if s.startswith(("XAG", "XPT", "XPD")):
+        return 0.01    # silver/platinum/palladium
+    if s.startswith(("BTC", "ETH", "SOL", "XRP", "LTC", "BNB", "ADA", "DOG")):
+        return 1.0     # crypto CFDs: whole dollars
+    if s.startswith(("US30", "US500", "USTEC", "NAS100", "SPX500", "GER40", "DE40",
+                     "UK100", "JPN225", "AUS200", "HK50", "FRA40", "EUSTX50",
+                     "US2000", "DJ30", "STOXX50")):
+        return 1.0     # index CFDs: whole points
+    if s.endswith("JPY"):
+        return 0.01
+    return 0.0001
+
+
+def min_units(instrument: str) -> int:
+    """Sensible order floor per class: 0.01 lot (1,000 units) for FX, but a
+    single unit for metals/indices/crypto CFDs — 1,000 oz of gold is $3M+."""
+    s = (instrument or "").upper().replace("_", "").replace("/", "").replace("-", "")
+    if s.startswith(("XAU", "XAG", "XPT", "XPD", "BTC", "ETH", "SOL", "XRP", "LTC",
+                     "BNB", "ADA", "DOG", "US30", "US500", "USTEC", "NAS100", "SPX500",
+                     "GER40", "DE40", "UK100", "JPN225", "AUS200", "HK50", "FRA40",
+                     "EUSTX50", "US2000", "DJ30", "STOXX50")):
+        return 1
+    return 1000
 
 
 def to_pips(price_distance: float, instrument: str) -> float:
@@ -34,10 +64,13 @@ def pip_value_per_unit(instrument: str, price: float,
     money on crosses should always provide the rate.
     """
     instrument = instrument.upper()
+    s = instrument.replace("_", "").replace("/", "").replace("-", "")
     ps = pip_size(instrument)
-    if instrument.endswith("_USD"):
+    # USD-quoted: FX ending in USD, plus metals/indices/crypto CFDs (all
+    # priced in USD at cTrader brokers) → 1 pip on 1 unit = pip size in USD.
+    if s.endswith("USD") or ps >= 0.01 and not s.endswith("JPY"):
         return ps
-    if instrument.startswith("USD_"):
+    if s.startswith("USD"):
         return ps / price if price else ps
     if quote_usd_rate and quote_usd_rate > 0:
         return ps * quote_usd_rate
@@ -64,10 +97,11 @@ def calc_units(balance: float, risk_pct: float, stop_pips: float,
     # Notional per unit in USD: USD_XXX = $1, XXX_USD = price,
     # crosses (EUR_JPY) = price × USD-value of quote (165 JPY ≈ $1.06, nu $165)
     inst = instrument.upper()
-    if inst.startswith("USD_"):
+    sN = inst.replace("_", "").replace("/", "").replace("-", "")
+    if sN.startswith("USD") and not sN.endswith("USD"):
         notional_per_unit = 1.0
-    elif inst.endswith("_USD"):
-        notional_per_unit = price
+    elif sN.endswith("USD") or (pip_size(inst) >= 0.01 and not sN.endswith("JPY")):
+        notional_per_unit = price  # USD-quoted FX + metals/indices/crypto CFDs
     elif quote_usd_rate and quote_usd_rate > 0:
         notional_per_unit = price * quote_usd_rate
     else:
