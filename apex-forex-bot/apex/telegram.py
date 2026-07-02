@@ -1053,19 +1053,21 @@ def _handle_symbol(chat_id, args):
     elif not _PAIR_RE.match(sym):
         return send_to(chat_id, "❌ Usage: <code>/symbol EUR_USD</code>")
     user_store.update(chat_id, {"symbol": sym})
-    _restart_user_loop(chat_id)
+    running = _restart_user_loop(chat_id)
     if access.is_admin(str(chat_id)):
         _save_runtime({"TRADE_SYMBOL": sym})
         _apply("TRADE_SYMBOL", sym)
         cfg.SYMBOL = sym
     warn = ""
+    if not running and not user_loop.is_running(chat_id):
+        warn += "\n⏸ <i>The bot is currently stopped — send /start to trade this symbol.</i>"
     if is_ct and not _PAIR_RE.match(sym):
         s_norm = sym.replace("_", "")
         sugg = ("/sl 150 · /tp 300" if s_norm.startswith("XAU")
                 else "/sl 60 · /tp 120" if s_norm.startswith(("US30", "NAS", "GER", "SPX", "US500", "USTEC", "JPN", "UK100"))
                 else "/sl 200 · /tp 400" if s_norm.startswith(("BTC", "ETH"))
                 else None)
-        warn = ("\n💡 <i>Pip conventions for metals, indices and crypto CFDs are handled "
+        warn += ("\n💡 <i>Pip conventions for metals, indices and crypto CFDs are handled "
                 "automatically. Volatile instruments need wider stops than FX"
                 + (f" — suggested here: <b>{sugg}</b>" if sugg else "")
                 + ". Watch the first trades in paper mode.</i>")
@@ -1169,10 +1171,11 @@ def _handle_strategy(chat_id, args):
             f"🎯 <b>Trading method</b> (current: <b>{STRATEGY_MODES[current]['label']}</b>)\n\n{lines}\n\n"
             "<i>Switching restarts your loop instantly. Test a new method in paper mode first.</i>")
     user_store.update(chat_id, {"strategy": want})
-    _restart_user_loop(chat_id)
+    running = _restart_user_loop(chat_id)
     m = STRATEGY_MODES[want]
-    send_to(chat_id, f"🎯 Method set to <b>{m['label']}</b>.\n<i>{m['blurb']}</i>\n\n"
-                     "Applied immediately — check /status.")
+    tail = ("Applied immediately — check /status." if running
+            else "⏸ The bot is currently <b>stopped</b> — send /start to begin trading with it.")
+    send_to(chat_id, f"🎯 Method set to <b>{m['label']}</b>.\n<i>{m['blurb']}</i>\n\n{tail}")
 
 
 def _handle_pairs(chat_id):
