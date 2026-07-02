@@ -191,8 +191,8 @@ def handle_callback(query: dict):
             tg.send_to(chat_id,
                        f"✅ <b>cTrader connected!</b>\n\nAccount <code>{a['ctid']}</code> ({env}) is linked.\n\n"
                        f"{bal_line}"
-                       "You're in <b>paper mode</b> by default — test risk-free first.\n"
-                       f"{live_hint}Start trading: /start")
+                       "Let's set you up — 3 quick taps and the bot is trading. 👇")
+            tg.onboard_start(chat_id)
         elif accounts:
             lines = "\n".join(
                 f"• <code>{a['ctid']}</code> — {'LIVE 🔴' if a['live'] else 'demo 🧪'}"

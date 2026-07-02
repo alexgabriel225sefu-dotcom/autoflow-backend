@@ -765,11 +765,111 @@ def _handle_ctaccount(chat_id, args):
     _restart_user_loop(chat_id)
     env = "LIVE 🔴" if match.get("live") else "demo 🧪"
     send_to(chat_id, f"✅ Trading account set to <code>{match['ctid']}</code> ({env}).\n{bal_line}"
-                     "You're in paper mode by default — /env live when ready, /start to go.")
+                     "Let's set you up — 3 quick taps and the bot is trading. 👇")
+    onboard_start(chat_id)
+
+
+_OB_SYMS = [
+    ("EUR/USD", "EURUSD"), ("GBP/USD", "GBPUSD"), ("USD/JPY", "USDJPY"),
+    ("AUD/USD", "AUDUSD"), ("USD/CHF", "USDCHF"), ("USD/CAD", "USDCAD"),
+    ("🥇 Gold", "XAUUSD"), ("🥈 Silver", "XAGUSD"), ("₿ Bitcoin", "BTCUSD"),
+    ("Ξ Ethereum", "ETHUSD"), ("📈 US30", "US30"), ("📈 NAS100", "NAS100"),
+]
+
+_RISK_TEXT = ("⚠️ <b>Before I place real orders — read this once.</b>\n\n"
+              "This bot executes <b>your</b> strategy, with <b>your</b> settings, on <b>your</b> account.\n\n"
+              "• No profit is guaranteed — results depend on your settings and the market\n"
+              "• Trading with leverage carries substantial risk; losses are possible and they are <b>yours</b>\n"
+              "• We provide the software — not financial advice, not a promised return\n"
+              "• Only trade money you can afford to lose; test in paper mode first\n\n"
+              "<i>Demo account = fake money 🧪 · Live account = real money 🔴</i>")
+
+
+def onboard_start(chat_id):
+    """Guided setup after the broker is connected: symbol → method → mode → go."""
+    rows, row = [], []
+    for label, code in _OB_SYMS:
+        row.append({"text": label, "callback_data": f"ob:sym:{code}"})
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    send_to(chat_id,
+            "🧭 <b>Setup 1/3 — What do you want to trade?</b>\n\n"
+            "Pick one to start — you can switch any time with /symbol, "
+            "or browse your broker's full list with /pairs.",
+            extra={"reply_markup": {"inline_keyboard": rows}})
+
+
+def _ob_step_strategy(chat_id):
+    from apex.ai import STRATEGY_MODES
+    kb = [[{"text": "⭐ Mean Reversion (recommended)", "callback_data": "ob:strat:mean_reversion"}],
+          [{"text": "📈 Trend Following", "callback_data": "ob:strat:trend"}],
+          [{"text": "🚀 Turtle Breakout", "callback_data": "ob:strat:breakout"}]]
+    body = "\n\n".join(f"<b>{m['label']}</b> — <i>{m['blurb']}</i>" for m in STRATEGY_MODES.values())
+    send_to(chat_id, f"🧭 <b>Setup 2/3 — Pick your trading method:</b>\n\n{body}",
+            extra={"reply_markup": {"inline_keyboard": kb}})
+
+
+def _ob_step_mode(chat_id):
+    kb = [[{"text": "🧪 Paper — simulated, zero risk (recommended)", "callback_data": "ob:mode:paper"}],
+          [{"text": "🔴 Real orders in my connected account", "callback_data": "ob:mode:real"}]]
+    send_to(chat_id,
+            "🧭 <b>Setup 3/3 — How should I trade?</b>\n\n"
+            "📝 <b>Paper</b>: simulated balance on live prices — watch it work, risk-free.\n"
+            "🔴 <b>Real</b>: every order executes in your connected account "
+            "(demo account = still fake money 🧪).",
+            extra={"reply_markup": {"inline_keyboard": kb}})
+
+
+def _finish_onboard(chat_id):
+    from apex.ai import STRATEGY_MODES
+    u = user_store.load(chat_id)
+    strat = STRATEGY_MODES.get((u.get("strategy") or "mean_reversion").lower(),
+                               STRATEGY_MODES["mean_reversion"])["label"]
+    mode = "📝 Paper (simulation)" if u.get("paper", True) else "🔴 Real orders"
+    user_loop.stop(chat_id)
+    user_loop.start(chat_id, alert_fn=_user_alert)
+    send_to(chat_id,
+            "🎉 <b>You're all set — the bot is running!</b>\n\n"
+            f"💱 Symbol: <b>{u.get('symbol', 'EUR_USD')}</b>\n"
+            f"🎯 Method: <b>{strat}</b>\n"
+            f"⚙️ Mode: <b>{mode}</b>\n"
+            f"⚖️ Risk: <b>{float(u.get('risk', 0.005)) * 100:g}%</b> per trade\n\n"
+            "I analyze the market every few minutes and alert you on every move — "
+            "with the reason in plain language.\n\n"
+            "/status — live overview\n"
+            "/pairs · /strategy · /risk · /sl · /tp — tune anytime\n"
+            "/env live · /env practice — real ↔ paper")
 
 
 def _handle_cb(chat_id, data):
-    """Inline-button presses (copilot approve/reject, risk acceptance)."""
+    """Inline-button presses (copilot approve/reject, risk acceptance, onboarding)."""
+    if data.startswith("ob:sym:"):
+        sym = data[7:]
+        user_store.update(chat_id, {"symbol": sym})
+        send_to(chat_id, f"✅ Trading symbol: <b>{sym}</b>")
+        return _ob_step_strategy(chat_id)
+    if data.startswith("ob:strat:"):
+        mode = data[9:]
+        user_store.update(chat_id, {"strategy": mode})
+        return _ob_step_mode(chat_id)
+    if data == "ob:mode:paper":
+        user_store.update(chat_id, {"paper": True})
+        return _finish_onboard(chat_id)
+    if data == "ob:mode:real":
+        u = user_store.load(chat_id)
+        if not u.get("risk_accepted"):
+            return send_to(chat_id, _RISK_TEXT,
+                           extra={"reply_markup": {"inline_keyboard": [[
+                               {"text": "✅ I understand — I accept the risk", "callback_data": "ob:risk"}]]}})
+        user_store.update(chat_id, {"paper": False})
+        return _finish_onboard(chat_id)
+    if data == "ob:risk":
+        from datetime import datetime as _dt
+        user_store.update(chat_id, {"risk_accepted": _dt.utcnow().isoformat(), "paper": False})
+        return _finish_onboard(chat_id)
     if data == "risk:ok":
         from datetime import datetime as _dt
         user_store.update(chat_id, {"risk_accepted": _dt.utcnow().isoformat()})
@@ -862,14 +962,7 @@ def _handle_paper(chat_id, args):
     if not on:
         u0 = user_store.load(chat_id)
         if not u0.get("risk_accepted"):
-            return send_to(chat_id,
-                "⚠️ <b>Before I place real orders — read this once.</b>\n\n"
-                "This bot executes <b>your</b> strategy, with <b>your</b> settings, on <b>your</b> account.\n\n"
-                "• No profit is guaranteed — results depend on your settings and the market\n"
-                "• Trading with leverage carries substantial risk; losses are possible and they are <b>yours</b>\n"
-                "• We provide the software — not financial advice, not a promised return\n"
-                "• Only trade money you can afford to lose; test in paper mode first\n\n"
-                "<i>Demo account = fake money 🧪 · Live account = real money 🔴</i>",
+            return send_to(chat_id, _RISK_TEXT,
                 extra={"reply_markup": {"inline_keyboard": [[
                     {"text": "✅ I understand — I accept the risk", "callback_data": "risk:ok"}]]}})
     # Per-user first — the client's loop reads the user record, not the global cfg.
@@ -1490,6 +1583,7 @@ _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "/symbol &lt;PAIR&gt; — set pair (EUR_USD)\n"
                "/pairs — everything your broker lets you trade\n"
                "/strategy — pick your trading method (mean reversion · trend · breakout)\n"
+               "/wizard — guided setup (symbol → method → mode)\n"
                "/setkeys KEY=val ... — set credentials\n"
                "  (message is auto-deleted for safety)\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
@@ -1765,6 +1859,8 @@ def _poll_loop():
                     _handle_strategy(chat_id, args)
                 elif cmd_l == "/backtest":
                     _handle_backtest(chat_id, args)
+                elif cmd_l == "/wizard":
+                    onboard_start(chat_id)
                 elif cmd_l == "/buy":
                     _handle_buy(chat_id, args)
                 elif cmd_l == "/sell":
