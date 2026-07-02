@@ -56,13 +56,45 @@ def _call_anthropic(prompt):
     raise RuntimeError("Anthropic unavailable")
 
 
-def get_signal(ind, balance, open_position, strategy_data=None):
+_MODE_INTRO = {
+    "mean_reversion": ("Forex ranges far more than it trends, so your PRIMARY edge is MEAN REVERSION: "
+                       "fade overbought/oversold extremes back to the mean (RSI + Bollinger Bands), and only "
+                       "ride a move when the higher-timeframe trend is genuinely strong. This is the opposite "
+                       "of a crypto breakout bot."),
+    "trend": ("Your PRIMARY edge is TREND FOLLOWING (Livermore: trade WITH the tape): identify the "
+              "higher-timeframe trend and enter only in its direction — buy pullbacks to value in an uptrend, "
+              "sell rallies in a downtrend. NEVER fade the trend, never chase an extended move."),
+    "breakout": ("Your PRIMARY edge is BREAKOUT trading (Turtle rules): enter when price breaks a fresh "
+                 "20-bar high/low with momentum and volatility expansion behind it, ride the expansion, and "
+                 "exit on the opposite channel break. Skip exhausted or unconfirmed breaks."),
+}
+
+_MODE_RULES = {
+    "mean_reversion": """- BUY (fade oversold dip, min 3/5): price in lower BB (<30%), RSI≤35 or bullish divergence, Stoch RSI K low, price stretched below EMA20, no strong downtrend
+- SELL (fade overbought spike, min 3/5): price in upper BB (>70%), RSI≥65 or bearish divergence, Stoch RSI K high, price stretched above EMA20, no strong uptrend
+- CLOSE when price reverts to the BB mid (the mean = your target)
+- TREND GUARD: in a strong trend (EMA50 vs EMA200 widely separated) do NOT fade against it — only buy dips in an uptrend / sell rallies in a downtrend, else HOLD""",
+    "trend": """- BUY (min 3/5): EMA50>EMA200 with price above EMA200, HH+HL market structure, pullback to/below EMA20 with RSI 35–60 (dip, not crash), MACD histogram positive, bullish momentum in recent candles
+- SELL (min 3/5): EMA50<EMA200 with price below EMA200, LH+LL structure, rally to/above EMA20 with RSI 40–65, MACD histogram negative, bearish momentum
+- NO TREND = NO TRADE: if EMAs are flat/tangled or structure is mixed, HOLD
+- CLOSE early only if market structure flips hard against the position; otherwise let SL/TP work""",
+    "breakout": """- BUY (min 3/5): fresh break of the 20-bar high, momentum agrees (recent candles bullish), MACD histogram positive, Bollinger bandwidth expanding, RSI not exhausted (<80)
+- SELL (min 3/5): fresh break of the 20-bar low, bearish momentum, MACD negative, bandwidth expanding, RSI >20
+- Never chase: if the break happened several candles ago or RSI is already extreme, HOLD
+- CLOSE on an opposite 20-bar channel break; otherwise let SL/TP work""",
+}
+
+
+def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_reversion"):
     def fnum(v):
         try:
             return float(v)
         except (TypeError, ValueError):
             return 0.0
 
+    mode = (mode or "mean_reversion").lower()
+    if mode not in _MODE_INTRO:
+        mode = "mean_reversion"
     rsi_v, srsi_k, macd_h, vol_r, bb_pos = (fnum(ind.get(k)) for k in
                                             ("rsi", "stochRsiK", "macdHist", "volumeRatio", "bb_position"))
     recent = "\n".join(
@@ -78,7 +110,7 @@ def get_signal(ind, balance, open_position, strategy_data=None):
                 else "- Volume: N/A (this data source has no forex tick volume — judge on price action, do NOT treat as low liquidity)")
     vol_crit = "tick volume>1.2x" if has_volume else "Stoch RSI K aligned with direction"
 
-    prompt = f"""You are a professional FOREX trader with 20 years of experience. Forex ranges far more than it trends, so your PRIMARY edge is MEAN REVERSION: fade overbought/oversold extremes back to the mean (RSI + Bollinger Bands), and only ride a move when the higher-timeframe trend is genuinely strong. This is the opposite of a crypto breakout bot. Analyze ALL the data and give a precise signal.
+    prompt = f"""You are a professional FOREX trader with 20 years of experience. {_MODE_INTRO[mode]} Analyze ALL the data and give a precise signal.
 
 ## MARKET DATA — {cfg.SYMBOL} ({cfg.TIMEFRAME})
 - Active sessions: {sessions} (liquidity is best when London/New York overlap)
@@ -107,13 +139,10 @@ def get_signal(ind, balance, open_position, strategy_data=None):
 - Balance: ${balance:.2f} USD | Leverage: 1:{cfg.LEVERAGE:g}
 - Open position: {pos}
 
-## ENTRY RULES — MEAN REVERSION FIRST
+## ENTRY RULES — {STRATEGY_MODES[mode]['label'].upper() if mode in STRATEGY_MODES else 'MEAN REVERSION'}
 - SL: {cfg.STOP_LOSS_PIPS:g} pips | TP: {cfg.TAKE_PROFIT_PIPS:g} pips | Risk: {cfg.RISK_PER_TRADE * 100:g}% per trade
 - Minimum confidence: {cfg.MIN_CONFIDENCE}%
-- BUY (fade oversold dip, min 3/5): price in lower BB (<30%), RSI≤35 or bullish divergence, Stoch RSI K low, price stretched below EMA20, no strong downtrend
-- SELL (fade overbought spike, min 3/5): price in upper BB (>70%), RSI≥65 or bearish divergence, Stoch RSI K high, price stretched above EMA20, no strong uptrend
-- CLOSE when price reverts to the BB mid (the mean = your target)
-- TREND GUARD: in a strong trend (EMA50 vs EMA200 widely separated) do NOT fade against it — only buy dips in an uptrend / sell rallies in a downtrend, else HOLD
+{_MODE_RULES[mode]}
 - Leverage is 1:{cfg.LEVERAGE:g} — size for stability, not for chasing volatility
 
 Respond ONLY with valid JSON:
@@ -127,8 +156,8 @@ Respond ONLY with valid JSON:
         return _call_groq(prompt)
     except Exception as err:
         print(f"[AI ❌] Groq failed: {err}")
-    sig = mean_reversion_signal(ind, open_position)
-    print(f"[AI] Mean-reversion fallback: {sig['action']} {sig['confidence']}%")
+    sig = signal_for_mode(mode, ind, strategy_data, open_position)
+    print(f"[AI] {mode} rule fallback: {sig['action']} {sig['confidence']}%")
     return sig
 
 
@@ -305,3 +334,166 @@ def mean_reversion_signal(ind, open_position=None):
     return {"action": "HOLD", "confidence": 42, "criteriaScore": crit,
             "reasoning": f"No mean-reversion extreme ({', '.join(factors) or 'neutral'})",
             "riskLevel": "LOW", "keyFactors": factors}
+
+
+def trend_signal(ind, strat=None, open_position=None):
+    """TREND FOLLOWING engine (Livermore/Soros): trade WITH the tape.
+
+    Buy pullbacks in a confirmed uptrend, sell rallies in a confirmed
+    downtrend. Never fade. Exits ride SL/TP; a structure flip closes early.
+    """
+    def fnum(v, d=0.0):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return d
+
+    strat = strat or {}
+    liv = strat.get("livermore") or {}
+    sor = strat.get("soros") or {}
+    rsi_v = fnum(ind.get("rsi"), 50)
+    price = fnum(ind.get("price"))
+    ema20 = fnum(ind.get("ema20"))
+    ema50 = fnum(ind.get("ema50"))
+    ema200 = fnum(ind.get("ema200"))
+    macd_h = fnum(ind.get("macdHist"))
+
+    up = ema50 > ema200 and price > ema200
+    dn = ema50 < ema200 and price < ema200
+
+    # In a trade → close early only if the structure flips against us.
+    if open_position:
+        side = open_position.get("side")
+        flip = (side == "BUY" and liv.get("trend") == "BEARISH" and fnum(liv.get("strength")) >= 0.8) or \
+               (side == "SELL" and liv.get("trend") == "BULLISH" and fnum(liv.get("strength")) >= 0.8)
+        if flip:
+            return {"action": "CLOSE", "confidence": 72, "criteriaScore": 3,
+                    "reasoning": "Trend following: market structure flipped against the position",
+                    "riskLevel": "MEDIUM", "keyFactors": ["structure flip"]}
+        return {"action": "HOLD", "confidence": 55, "criteriaScore": 2,
+                "reasoning": "Riding the trend — SL/TP manage the exit",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    score, factors = 0, []
+    if up:
+        score += 2; factors.append("uptrend (EMA50>EMA200, price above)")
+    elif dn:
+        score -= 2; factors.append("downtrend (EMA50<EMA200, price below)")
+    if liv.get("trend") == "BULLISH" and fnum(liv.get("strength")) >= 0.55:
+        score += 1; factors.append("HH+HL structure")
+    elif liv.get("trend") == "BEARISH" and fnum(liv.get("strength")) >= 0.55:
+        score -= 1; factors.append("LH+LL structure")
+    if sor.get("direction") == "BULLISH":
+        score += 1; factors.append("bullish momentum")
+    elif sor.get("direction") == "BEARISH":
+        score -= 1; factors.append("bearish momentum")
+    # Entry timing: pullback to value, not a chase. Buy dips (price at/under
+    # EMA20 with RSI cooled off), sell rallies mirrored.
+    pullback_buy = score > 0 and price <= ema20 * 1.0005 and 35 <= rsi_v <= 60
+    pullback_sell = score < 0 and price >= ema20 * 0.9995 and 40 <= rsi_v <= 65
+    if pullback_buy:
+        score += 1; factors.append(f"pullback to EMA20 (RSI {rsi_v:.0f})")
+    if pullback_sell:
+        score -= 1; factors.append(f"rally to EMA20 (RSI {rsi_v:.0f})")
+    if (macd_h > 0) and score > 0:
+        score += 1; factors.append("MACD confirms")
+    elif (macd_h < 0) and score < 0:
+        score -= 1; factors.append("MACD confirms")
+
+    conf = min(86, 50 + abs(score) * 7)
+    crit = min(5, abs(score))
+    if score >= 4 and pullback_buy:
+        return {"action": "BUY", "confidence": conf, "criteriaScore": crit,
+                "reasoning": f"Trend following BUY: {', '.join(factors)}",
+                "riskLevel": "MEDIUM", "keyFactors": factors}
+    if score <= -4 and pullback_sell:
+        return {"action": "SELL", "confidence": conf, "criteriaScore": crit,
+                "reasoning": f"Trend following SELL: {', '.join(factors)}",
+                "riskLevel": "MEDIUM", "keyFactors": factors}
+    return {"action": "HOLD", "confidence": 44, "criteriaScore": crit,
+            "reasoning": f"No trend entry ({', '.join(factors) or 'no confirmed trend / no pullback'})",
+            "riskLevel": "LOW", "keyFactors": factors}
+
+
+def breakout_signal(ind, strat=None, open_position=None):
+    """TURTLE BREAKOUT engine: trade 20-bar channel breaks with confirmation.
+
+    Enter on a fresh break of the 20-bar high/low when momentum agrees; an
+    opposite break closes the position (classic channel exit).
+    """
+    def fnum(v, d=0.0):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return d
+
+    strat = strat or {}
+    tur = strat.get("turtle") or {}
+    sor = strat.get("soros") or {}
+    rsi_v = fnum(ind.get("rsi"), 50)
+    macd_h = fnum(ind.get("macdHist"))
+    bw = fnum(ind.get("bb_bandwidth"))
+
+    if open_position:
+        side = open_position.get("side")
+        opposite = "SELL" if side == "BUY" else "BUY"
+        if tur.get("signal") == opposite:
+            return {"action": "CLOSE", "confidence": 74, "criteriaScore": 3,
+                    "reasoning": "Turtle exit: opposite 20-bar channel break",
+                    "riskLevel": "MEDIUM", "keyFactors": ["opposite breakout"]}
+        return {"action": "HOLD", "confidence": 55, "criteriaScore": 2,
+                "reasoning": "Riding the breakout — SL/TP manage the exit",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    sig = tur.get("signal")
+    if not sig:
+        return {"action": "HOLD", "confidence": 42, "criteriaScore": 0,
+                "reasoning": "No 20-bar channel break",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    score, factors = 2, [f"fresh 20-bar {'high' if sig == 'BUY' else 'low'} break"]
+    if (sor.get("direction") == "BULLISH") == (sig == "BUY") and sor.get("direction") != "NEUTRAL":
+        score += 1; factors.append("momentum agrees")
+    if (macd_h > 0) == (sig == "BUY"):
+        score += 1; factors.append("MACD agrees")
+    if bw >= 0.12:
+        score += 1; factors.append("volatility expanding")
+    # Skip exhausted breaks — chasing a spike that already ran is the classic trap.
+    if (sig == "BUY" and rsi_v >= 82) or (sig == "SELL" and rsi_v <= 18):
+        return {"action": "HOLD", "confidence": 45, "criteriaScore": 1,
+                "reasoning": f"Breakout already exhausted (RSI {rsi_v:.0f}) — not chasing",
+                "riskLevel": "MEDIUM", "keyFactors": factors}
+
+    if score >= 3:
+        conf = min(86, 56 + score * 6)
+        return {"action": sig, "confidence": conf, "criteriaScore": min(5, score),
+                "reasoning": f"Turtle breakout {sig}: {', '.join(factors)}",
+                "riskLevel": "MEDIUM", "keyFactors": factors}
+    return {"action": "HOLD", "confidence": 46, "criteriaScore": min(5, score),
+            "reasoning": f"Unconfirmed breakout ({', '.join(factors)})",
+            "riskLevel": "LOW", "keyFactors": factors}
+
+
+# ── Strategy-mode registry (used by the loop, Telegram and the backtester) ──
+STRATEGY_MODES = {
+    "mean_reversion": {
+        "label": "Mean Reversion",
+        "blurb": "fades overbought/oversold extremes back to the mean (RSI + Bollinger). Best in ranging markets — the forex default.",
+        "engine": lambda ind, strat, pos: mean_reversion_signal(ind, pos),
+    },
+    "trend": {
+        "label": "Trend Following",
+        "blurb": "trades WITH the higher-timeframe trend, buying pullbacks in uptrends and selling rallies in downtrends (Livermore).",
+        "engine": lambda ind, strat, pos: trend_signal(ind, strat, pos),
+    },
+    "breakout": {
+        "label": "Turtle Breakout",
+        "blurb": "enters on fresh 20-bar channel breaks with momentum confirmation, exits on the opposite break (Turtle).",
+        "engine": lambda ind, strat, pos: breakout_signal(ind, strat, pos),
+    },
+}
+
+
+def signal_for_mode(mode, ind, strat=None, open_position=None):
+    m = STRATEGY_MODES.get((mode or "mean_reversion").lower(), STRATEGY_MODES["mean_reversion"])
+    return m["engine"](ind, strat, open_position)

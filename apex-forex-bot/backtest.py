@@ -28,7 +28,9 @@ CANDLES = int(os.getenv("BT_CANDLES") or 2000)
 SLIPPAGE_PIPS = float(os.getenv("BT_SLIPPAGE_PIPS") or 0.3)
 SPREAD_PIPS = float(os.getenv("BT_SPREAD_PIPS") or 1.0)
 SYNTHETIC = os.getenv("BT_SYNTHETIC") == "true"
-MIN_CRITERIA = int(os.getenv("MIN_CRITERIA") or 4)  # 4/5 — forex: mc4>mc5 (mc5 prea puține semnale pe 3000 lumânări)
+MIN_CRITERIA = int(os.getenv("MIN_CRITERIA") or 4)
+# BT_STRATEGY: criteria (rubrica AI istorică) | mean_reversion | trend | breakout
+BT_STRATEGY = (os.getenv("BT_STRATEGY") or "criteria").lower().replace("mean", "mean_reversion") if (os.getenv("BT_STRATEGY") or "criteria").lower() == "mean" else (os.getenv("BT_STRATEGY") or "criteria").lower()  # 4/5 — forex: mc4>mc5 (mc5 prea puține semnale pe 3000 lumânări)
 
 logger.info = lambda *a, **k: None  # fără spam pe mii de lumânări
 
@@ -115,7 +117,7 @@ def run():
     half_spread = SPREAD_PIPS / 2 * pip
     slip = SLIPPAGE_PIPS * pip
     print("\n" + "═" * 64)
-    print("  📊 APEX FOREX BACKTEST — strategia reală (rubrică AI + exituri live)")
+    print(f"  📊 APEX FOREX BACKTEST — metoda: {BT_STRATEGY} (exituri live)")
     print(f"  {'⚠️  DATE SINTETICE — validare motor, NU concluzii de profit' if SYNTHETIC else f'Symbol: {SYMBOL} | TF: {cfg.TIMEFRAME}'}")
     print(f"  Balanță: ${START_BAL:.0f} | SL {cfg.STOP_LOSS_PIPS:g}p / TP {cfg.TAKE_PROFIT_PIPS:g}p | "
           f"risc {cfg.RISK_PER_TRADE * 100:g}% | spread {SPREAD_PIPS:g}p | slippage {SLIPPAGE_PIPS:g}p")
@@ -162,7 +164,14 @@ def run():
 
         ind = indicators.analyze(window)
         strat = strategies.analyze(window)
-        sig = criteria_signal(ind, strat)
+        if BT_STRATEGY == "criteria":
+            sig = criteria_signal(ind, strat)
+        else:
+            from apex import ai
+            s2 = ai.signal_for_mode(BT_STRATEGY, ind, strat, None)
+            sig = ({"action": s2["action"], "criteriaScore": s2.get("criteriaScore", 3)}
+                   if s2["action"] in ("BUY", "SELL") and s2.get("confidence", 0) >= 62
+                   else {"action": "HOLD", "criteriaScore": 0})
         if sig["action"] == "HOLD":
             continue
 

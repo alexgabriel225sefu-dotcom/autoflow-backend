@@ -67,6 +67,7 @@ def _make_broker(user):
         MARGIN_CAP       = 0.5,
         MAX_SPREAD_PIPS  = 3.0,
         MIN_CONFIDENCE   = int(user.get("min_confidence", 62)),
+        STRATEGY         = (user.get("strategy") or "mean_reversion").lower(),
     )
     # cTrader linked → use it (paper uses its data; live places real orders worldwide).
     if ct_token and ct_account:
@@ -106,6 +107,7 @@ def _loop(user_id, alert_fn):
     dash = {
         "broker": _broker_label(user, cfg),
         "mode": mode_label,
+        "strategy": ai.STRATEGY_MODES.get(cfg.STRATEGY, ai.STRATEGY_MODES["mean_reversion"])["label"],
         "balance": paper_balance,
         "startBalance": paper_balance,
         "symbol": cfg.SYMBOL,
@@ -264,7 +266,8 @@ def _loop(user_id, alert_fn):
 
             # AI signal with rule-based fallback
             try:
-                signal = ai.get_signal(ind, paper_balance, open_pos, strat_data)
+                signal = ai.get_signal(ind, paper_balance, open_pos, strat_data,
+                                       mode=getattr(cfg, "STRATEGY", "mean_reversion"))
             except Exception as e:
                 print(f"[UserLoop:{user_id}] AI error: {e}")
                 if tick - last_ai_error_tick >= _AI_ERROR_THROTTLE and alert_fn:
@@ -274,7 +277,7 @@ def _loop(user_id, alert_fn):
                         "symbol": cfg.SYMBOL,
                     })
                     last_ai_error_tick = tick
-                signal = ai.mean_reversion_signal(ind, open_pos)
+                signal = ai.signal_for_mode(getattr(cfg, "STRATEGY", "mean_reversion"), ind, strat_data, open_pos)
 
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)

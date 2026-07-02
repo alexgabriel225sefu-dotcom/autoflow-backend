@@ -330,7 +330,8 @@ def _build_status(dash, chart=""):
             f"{dash.get('broker', '')}{state_tag}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"💰 Balance: <b>${dash.get('balance', 0):.2f}</b>  ({sign}{pnl_pct:.2f}%){chart_line}\n"
-            f"🕐 Market: {market} · Sessions: {sessions}\n\n"
+            f"🕐 Market: {market} · Sessions: {sessions}\n"
+            f"🎯 Method: {dash.get('strategy', 'Mean Reversion')}\n\n"
             f"{pos_line}\n\n"
             f"📈 {total} trades · {wins}W/{total - wins}L · Win: {win_rate}\n"
             f"⏱️ Last tick: {dash.get('lastTick', '—')}")
@@ -965,6 +966,109 @@ def _handle_symbol(chat_id, args):
     send_to(chat_id, f"💱 Trading symbol set to <b>{sym}</b>.{warn}")
 
 
+def _sim_strategy(mode, candles, symbol, sl_pips, tp_pips, risk, balance0):
+    """Compact real-data simulator for /backtest — same signal engines and the
+    live exit checker, evaluated on candle closes. Spread/slippage not modeled,
+    so treat results as method COMPARISON, not a profit forecast."""
+    from apex.position import check_position
+    from apex import ai as _ai, strategies as _st, indicators as _ind, forex as _fx
+    pip = _fx.pip_size(symbol)
+    bal, pos, trades = balance0, None, []
+    for i in range(220, len(candles)):
+        win = candles[:i + 1]
+        px = win[-1]["close"]
+        ind = _ind.analyze(win)
+        st = _st.analyze(win)
+        if pos:
+            trig = check_position(pos, px)
+            if not trig:
+                sx = _ai.signal_for_mode(mode, ind, st, pos)
+                if sx.get("action") == "CLOSE":
+                    trig = "STRATEGY"
+            if trig:
+                pnl = _fx.pnl_usd(pos["side"], pos["entryPrice"], px, pos["quantity"], symbol)
+                bal += pnl
+                trades.append(pnl)
+                pos = None
+            continue
+        sx = _ai.signal_for_mode(mode, ind, st, None)
+        if sx.get("action") in ("BUY", "SELL") and sx.get("confidence", 0) >= 62:
+            d = 1 if sx["action"] == "BUY" else -1
+            sl = px - d * sl_pips * pip
+            tp = px + d * tp_pips * pip
+            units = _fx.calc_units(bal, risk, sl_pips, symbol, px)
+            pos = {"symbol": symbol, "side": sx["action"], "entryPrice": px,
+                   "quantity": max(int(units), 1000), "stopLoss": sl, "takeProfit": tp,
+                   "initialStop": sl, "trailHigh": px if d == 1 else None,
+                   "trailLow": px if d == -1 else None}
+    if pos:
+        pnl = _fx.pnl_usd(pos["side"], pos["entryPrice"], candles[-1]["close"], pos["quantity"], symbol)
+        bal += pnl
+        trades.append(pnl)
+    wins = [t for t in trades if t > 0]
+    return {"n": len(trades), "w": len(wins), "net": bal - balance0}
+
+
+def _handle_backtest(chat_id, args):
+    """Admin: compare all strategy methods on REAL candles from the linked broker."""
+    if not access.is_admin(str(chat_id)):
+        return send_to(chat_id, "⛔ Admin only.")
+    user = user_store.load(chat_id)
+    sym = user.get("symbol", cfg.SYMBOL)
+    send_to(chat_id, f"⏳ Pulling real {sym} candles and simulating all methods — 1-2 minutes…")
+
+    def run():
+        try:
+            from apex import user_loop as _ul
+            from apex.ai import STRATEGY_MODES
+            br, ucfg = _ul._make_broker(user)
+            candles = br.get_candles(sym, "5m", 1000)
+            if not candles or len(candles) < 400:
+                return send_to(chat_id, f"❌ Not enough data ({len(candles or [])} candles).")
+            days = (len(candles) - 220) * 5 / 1440
+            bal0 = float(user.get("paper_balance", 1000))
+            lines = []
+            for key, m in STRATEGY_MODES.items():
+                r = _sim_strategy(key, candles, sym, ucfg.STOP_LOSS_PIPS,
+                                  ucfg.TAKE_PROFIT_PIPS, ucfg.RISK_PER_TRADE, bal0)
+                wr = f"{r['w'] / r['n'] * 100:.0f}%" if r["n"] else "—"
+                lines.append(f"<b>{m['label']}</b>: {r['n']} trades · win {wr} · "
+                             f"net {'+' if r['net'] >= 0 else ''}${r['net']:.2f}")
+            send_to(chat_id,
+                    f"📊 <b>Method comparison — {sym}, last ~{days:.1f} days (real data)</b>\n\n"
+                    + "\n".join(lines) +
+                    "\n\n<i>Same entries/exits as live, evaluated on candle closes; spread "
+                    "not modeled — use for comparing methods, not as a profit promise. "
+                    "Short sample: markets change. Switch with /strategy.</i>")
+        except Exception as e:
+            send_to(chat_id, f"❌ Backtest failed: {str(e)[:180]}")
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _handle_strategy(chat_id, args):
+    """Pick the trading method — the per-user loop and the AI prompt follow it."""
+    from apex.ai import STRATEGY_MODES
+    aliases = {"mean": "mean_reversion", "mr": "mean_reversion", "mean_reversion": "mean_reversion",
+               "reversion": "mean_reversion", "trend": "trend", "trending": "trend",
+               "breakout": "breakout", "turtle": "breakout"}
+    want = aliases.get((args or "").strip().lower().replace("-", "_"))
+    user = user_store.load(chat_id)
+    current = (user.get("strategy") or "mean_reversion").lower()
+    if not want:
+        lines = "\n\n".join(
+            f"{'✅ ' if key == current else ''}<b>{m['label']}</b> — <code>/strategy {key.split('_')[0]}</code>\n<i>{m['blurb']}</i>"
+            for key, m in STRATEGY_MODES.items())
+        return send_to(chat_id,
+            f"🎯 <b>Trading method</b> (current: <b>{STRATEGY_MODES[current]['label']}</b>)\n\n{lines}\n\n"
+            "<i>Switching restarts your loop instantly. Test a new method in paper mode first.</i>")
+    user_store.update(chat_id, {"strategy": want})
+    _restart_user_loop(chat_id)
+    m = STRATEGY_MODES[want]
+    send_to(chat_id, f"🎯 Method set to <b>{m['label']}</b>.\n<i>{m['blurb']}</i>\n\n"
+                     "Applied immediately — check /status.")
+
+
 def _handle_pairs(chat_id):
     """List everything the client's linked cTrader account can trade."""
     user = user_store.load(chat_id)
@@ -1384,6 +1488,7 @@ _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "/tp &lt;pips&gt; — take profit in pips\n"
                "/symbol &lt;PAIR&gt; — set pair (EUR_USD)\n"
                "/pairs — everything your broker lets you trade\n"
+               "/strategy — pick your trading method (mean reversion · trend · breakout)\n"
                "/setkeys KEY=val ... — set credentials\n"
                "  (message is auto-deleted for safety)\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
@@ -1655,6 +1760,10 @@ def _poll_loop():
                     _handle_symbol(chat_id, args)
                 elif cmd_l in ("/pairs", "/symbols"):
                     _handle_pairs(chat_id)
+                elif cmd_l in ("/strategy", "/method"):
+                    _handle_strategy(chat_id, args)
+                elif cmd_l == "/backtest":
+                    _handle_backtest(chat_id, args)
                 elif cmd_l == "/buy":
                     _handle_buy(chat_id, args)
                 elif cmd_l == "/sell":
