@@ -177,8 +177,12 @@ def _loop(user_id, alert_fn, gen=None):
                 data_fails = 0
                 try:
                     paper_balance = broker.get_balance()
-                except Exception:
-                    pass
+                    dash["balStale"] = False
+                except Exception as e:
+                    # Keep trading on the last known balance, but never show a
+                    # stale number as fresh — the client compares it to cTrader.
+                    dash["balStale"] = True
+                    print(f"[UserLoop:{user_id}] balance read error: {e}")
             else:
                 # Reconcile with manual trades (force_trade/force_close write to
                 # the shared dash via chat/commands). Adopt a manually-opened
