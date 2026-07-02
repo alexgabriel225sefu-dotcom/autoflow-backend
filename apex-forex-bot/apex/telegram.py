@@ -332,7 +332,8 @@ def _build_status(dash, chart=""):
             f"💰 Balance: <b>${dash.get('balance', 0):.2f}</b>  ({sign}{pnl_pct:.2f}%)"
             f"{' ⏳ <i>refreshing…</i>' if dash.get('balStale') else ''}{chart_line}\n"
             f"🕐 Market: {market} · Sessions: {sessions}\n"
-            f"🎯 Method: {dash.get('strategy', 'Mean Reversion')}\n\n"
+            f"🎯 Method: {dash.get('strategy', 'Mean Reversion')}\n"
+            + (f"🌊 Regime: {dash['regime']['label']}\n" if isinstance(dash.get('regime'), dict) else "") + "\n"
             f"{pos_line}\n\n"
             f"📈 {total} trades · {wins}W/{total - wins}L · Win: {win_rate}\n"
             f"⏱️ Last tick: {dash.get('lastTick', '—')}")
@@ -805,7 +806,8 @@ def onboard_start(chat_id):
 
 def _ob_step_strategy(chat_id):
     from apex.ai import STRATEGY_MODES
-    kb = [[{"text": "⭐ Mean Reversion (recommended)", "callback_data": "ob:strat:mean_reversion"}],
+    kb = [[{"text": "🤖 Auto — adapts to the market (recommended)", "callback_data": "ob:strat:auto"}],
+          [{"text": "⭐ Mean Reversion", "callback_data": "ob:strat:mean_reversion"}],
           [{"text": "📈 Trend Following", "callback_data": "ob:strat:trend"}],
           [{"text": "🚀 Turtle Breakout", "callback_data": "ob:strat:breakout"}]]
     body = "\n\n".join(f"<b>{m['label']}</b> — <i>{m['blurb']}</i>" for m in STRATEGY_MODES.values())
@@ -1159,10 +1161,11 @@ def _handle_strategy(chat_id, args):
     from apex.ai import STRATEGY_MODES
     aliases = {"mean": "mean_reversion", "mr": "mean_reversion", "mean_reversion": "mean_reversion",
                "reversion": "mean_reversion", "trend": "trend", "trending": "trend",
-               "breakout": "breakout", "turtle": "breakout"}
+               "breakout": "breakout", "turtle": "breakout",
+               "auto": "auto", "adaptive": "auto", "ai": "auto"}
     want = aliases.get((args or "").strip().lower().replace("-", "_"))
     user = user_store.load(chat_id)
-    current = (user.get("strategy") or "mean_reversion").lower()
+    current = (user.get("strategy") or "auto").lower()
     if not want:
         lines = "\n\n".join(
             f"{'✅ ' if key == current else ''}<b>{m['label']}</b> — <code>/strategy {key.split('_')[0]}</code>\n<i>{m['blurb']}</i>"
@@ -1262,6 +1265,21 @@ def _send_chart_async(chat_id, symbol=None, position=None, caption=""):
         except Exception as e:
             print(f"[TELEGRAM] chart failed: {e}")
     threading.Thread(target=run, daemon=True).start()
+
+
+def _handle_atr(chat_id, args):
+    on = (args or "").strip().lower() in ("on", "true", "1", "yes")
+    user_store.update(chat_id, {"atr_stops": on})
+    running = _restart_user_loop(chat_id)
+    if on:
+        msg = ("📐 <b>Dynamic ATR stops ON</b> — SL = 1.5×ATR, TP = 3×ATR: distances "
+               "breathe with the market's volatility instead of fixed pips. "
+               "Position size still respects your /risk %.")
+    else:
+        msg = "📏 Dynamic ATR stops <b>OFF</b> — using your fixed /sl and /tp pip distances."
+    if not running and not user_loop.is_running(chat_id):
+        msg += "\n⏸ <i>The bot is stopped — send /start to apply.</i>"
+    send_to(chat_id, msg)
 
 
 def _handle_terminal(chat_id):
@@ -1666,7 +1684,8 @@ _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "/tp &lt;pips&gt; — take profit in pips\n"
                "/symbol &lt;PAIR&gt; — set pair (EUR_USD)\n"
                "/pairs — everything your broker lets you trade\n"
-               "/strategy — pick your trading method (mean reversion · trend · breakout)\n"
+               "/strategy — trading method (auto · mean reversion · trend · breakout)\n"
+               "/atr on|off — dynamic ATR stops (SL 1.5×ATR / TP 3×ATR)\n"
                "/wizard — guided setup (symbol → method → mode)\n"
                "/terminal — live trading terminal (interactive chart + news)\n"
                "/chart — quick chart snapshot\n"
@@ -1951,6 +1970,8 @@ def _poll_loop():
                     _handle_chart(chat_id, args)
                 elif cmd_l in ("/terminal", "/app"):
                     _handle_terminal(chat_id)
+                elif cmd_l == "/atr":
+                    _handle_atr(chat_id, args)
                 elif cmd_l == "/buy":
                     _handle_buy(chat_id, args)
                 elif cmd_l == "/sell":

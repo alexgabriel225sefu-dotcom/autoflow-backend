@@ -476,6 +476,11 @@ def breakout_signal(ind, strat=None, open_position=None):
 
 # ── Strategy-mode registry (used by the loop, Telegram and the backtester) ──
 STRATEGY_MODES = {
+    "auto": {
+        "label": "Auto (regime-adaptive)",
+        "blurb": "detects the market regime live — trend, range, high/low volatility — and switches to the right engine automatically, halving risk in violent markets and standing aside in dead ones. Recommended.",
+        "engine": lambda ind, strat, pos: mean_reversion_signal(ind, pos),
+    },
     "mean_reversion": {
         "label": "Mean Reversion",
         "blurb": "fades overbought/oversold extremes back to the mean (RSI + Bollinger). Best in ranging markets — the forex default.",

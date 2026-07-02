@@ -199,3 +199,65 @@ def analyze(candles):
         "meanReversion": mean_reversion(candles),
         "session": dict(session),
     }
+
+
+def resample(candles, ratio=12):
+    """Aggregate M5 candles into a higher timeframe (12 → H1)."""
+    out = []
+    for i in range(0, len(candles) - ratio + 1, ratio):
+        grp = candles[i:i + ratio]
+        out.append({"time": grp[0].get("time"), "open": grp[0]["open"],
+                    "close": grp[-1]["close"],
+                    "high": max(c["high"] for c in grp),
+                    "low": min(c["low"] for c in grp),
+                    "volume": sum(c.get("volume", 0) for c in grp)})
+    return out
+
+
+def detect_regime(candles):
+    """Classify the market so the AUTO strategy can pick the right engine.
+
+    Self-calibrating (ratios, not absolute thresholds), so it works the same
+    on EURUSD, gold or an index:
+      trending  — clear structure + separated EMAs → trend following
+      ranging   — flat, mean-reverting conditions  → mean reversion
+      volatile  — ATR ≫ its own recent norm        → breakout, half risk
+      quiet     — ATR ≪ norm                       → stand aside
+    """
+    if len(candles) < 130:
+        return {"regime": "unknown", "vol_ratio": 1.0, "label": "warming up"}
+    trs = []
+    for i in range(1, len(candles)):
+        c, p = candles[i], candles[i - 1]
+        trs.append(max(c["high"] - c["low"], abs(c["high"] - p["close"]),
+                       abs(c["low"] - p["close"])))
+    atr_now = sum(trs[-14:]) / 14
+    # Long reference window: a 100-bar base converges with the present after
+    # ~1.5h of a new regime and stops detecting it. 400 bars (~33h of M5)
+    # anchors "normal" firmly enough to flag both dead and violent tape.
+    base_w = min(400, len(trs))
+    atr_base = sum(trs[-base_w:]) / base_w
+    vol_ratio = atr_now / atr_base if atr_base else 1.0
+
+    closes = [c["close"] for c in candles]
+    k50, k200 = 2 / 51, 2 / 201
+    e50 = sum(closes[:50]) / 50
+    e200 = sum(closes[:200]) / 200 if len(closes) >= 200 else e50
+    for px in closes[50:]:
+        e50 = px * k50 + e50 * (1 - k50)
+    for px in closes[200:]:
+        e200 = px * k200 + e200 * (1 - k200)
+    sep_pct = abs(e50 - e200) / closes[-1] * 100 if closes[-1] else 0
+    liv = livermore_structure(candles)
+
+    if vol_ratio >= 1.8:
+        return {"regime": "volatile", "vol_ratio": round(vol_ratio, 2),
+                "label": f"high volatility ({vol_ratio:.1f}× normal) — breakout mode, half risk"}
+    if vol_ratio <= 0.65:
+        return {"regime": "quiet", "vol_ratio": round(vol_ratio, 2),
+                "label": f"very low volatility ({vol_ratio:.1f}× normal) — standing aside"}
+    if sep_pct >= 0.18 and liv.get("trend") in ("BULLISH", "BEARISH") and liv.get("strength", 0) >= 0.55:
+        return {"regime": "trending", "vol_ratio": round(vol_ratio, 2),
+                "label": f"{liv['trend'].lower()} trend — trend following"}
+    return {"regime": "ranging", "vol_ratio": round(vol_ratio, 2),
+            "label": "ranging market — mean reversion"}

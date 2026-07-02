@@ -58,7 +58,7 @@ def _make_broker(user):
         CTRADER_ENV           = user.get("ctrader_env", "demo"),
         SYMBOL           = user.get("symbol", "EUR_USD"),
         TIMEFRAME        = user.get("timeframe", "5m"),
-        CANDLES          = 200,
+        CANDLES          = 720,  # enough M5 history to confirm the H1 trend
         PAPER_TRADING    = paper,
         PAPER_BALANCE    = float(user.get("paper_balance", 1000)),
         STOP_LOSS_PIPS   = float(user.get("sl_pips", 20)),
@@ -68,7 +68,8 @@ def _make_broker(user):
         MARGIN_CAP       = 0.5,
         MAX_SPREAD_PIPS  = 3.0,
         MIN_CONFIDENCE   = int(user.get("min_confidence", 62)),
-        STRATEGY         = (user.get("strategy") or "mean_reversion").lower(),
+        STRATEGY         = (user.get("strategy") or "auto").lower(),
+        ATR_STOPS        = bool(user.get("atr_stops")),
     )
     # cTrader linked → use it (paper uses its data; live places real orders worldwide).
     if ct_token and ct_account:
@@ -107,6 +108,7 @@ def _loop(user_id, alert_fn, gen=None):
     tick = 0
     data_fails = 0   # consecutive get_candles failures — alert the user at 3
     last_loss_at = 0.0  # entry cooldown anchor (any losing close)
+    loss_streak = 0     # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
     last_mkt_tick = -_SKIP_WARN_THROTTLE      # market-pulse heads-up (throttled)
@@ -205,6 +207,9 @@ def _loop(user_id, alert_fn, gen=None):
                     pnl_est = round(paper_balance - prev_balance, 2) if not dash.get("balStale") else None
                     if pnl_est is not None and pnl_est < 0:
                         last_loss_at = time.time()
+                        loss_streak += 1
+                    elif pnl_est is not None and pnl_est > 0:
+                        loss_streak = 0
                     result = {"action": "BROKER_CLOSE", "symbol": cfg.SYMBOL,
                               "side": prev_pos.get("side", ""), "price": price,
                               "entryPrice": prev_pos.get("entryPrice"),
@@ -240,6 +245,7 @@ def _loop(user_id, alert_fn, gen=None):
                         except Exception as e:
                             print(f"[UserLoop:{user_id}] protective close failed: {e}")
                         last_loss_at = time.time()
+                        loss_streak += 1
                         open_pos = None
                         dash["openPosition"] = None
             else:
@@ -291,6 +297,11 @@ def _loop(user_id, alert_fn, gen=None):
                     cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
                     net = gross - cost_usd
                     paper_balance += net
+                    if net < 0:
+                        last_loss_at = time.time()
+                        loss_streak += 1
+                    else:
+                        loss_streak = 0
                     result = {"action": "CLOSE", "symbol": cfg.SYMBOL,
                               "price": exit_price, "entryPrice": open_pos.get("entryPrice"),
                               "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
@@ -312,6 +323,19 @@ def _loop(user_id, alert_fn, gen=None):
 
             ind = indicators.analyze(candles)
             strat_data = strategies.analyze(candles)
+
+            # Market regime → in AUTO mode it picks the engine, halves risk in
+            # violent markets and stands aside in dead ones (premium spec #1).
+            regime = strategies.detect_regime(candles)
+            dash["regime"] = regime
+            active_mode = cfg.STRATEGY
+            regime_block = False
+            if active_mode == "auto":
+                picked = {"trending": "trend", "ranging": "mean_reversion",
+                          "volatile": "breakout"}.get(regime["regime"])
+                regime_block = regime["regime"] == "quiet"
+                active_mode = picked or "mean_reversion"
+                dash["strategy"] = f"Auto → {ai.STRATEGY_MODES[active_mode]['label']}"
 
             # Market Pulse: store a plain-language read for /market, and ping the
             # user (throttled) when the market gets notable (elevated volatility).
@@ -347,7 +371,7 @@ def _loop(user_id, alert_fn, gen=None):
             # AI signal with rule-based fallback
             try:
                 signal = ai.get_signal(ind, paper_balance, open_pos, strat_data,
-                                       mode=getattr(cfg, "STRATEGY", "mean_reversion"))
+                                       mode=active_mode)
             except Exception as e:
                 print(f"[UserLoop:{user_id}] AI error: {e}")
                 if tick - last_ai_error_tick >= _AI_ERROR_THROTTLE and alert_fn:
@@ -357,12 +381,29 @@ def _loop(user_id, alert_fn, gen=None):
                         "symbol": cfg.SYMBOL,
                     })
                     last_ai_error_tick = tick
-                signal = ai.signal_for_mode(getattr(cfg, "STRATEGY", "mean_reversion"), ind, strat_data, open_pos)
+                signal = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
 
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)
 
             entry_ok = action in ("BUY", "SELL") and not open_pos and confidence >= cfg.MIN_CONFIDENCE
+            # Quiet regime (AUTO): no edge, no trade.
+            if entry_ok and regime_block:
+                entry_ok = False
+                if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
+                    last_warn_tick = tick
+                    alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
+                                       "reason": regime.get("label", "market too quiet")})
+            # Multi-timeframe confirmation: directional engines must agree with
+            # the H1 trend (premium spec #8) — blocks the weakest signals.
+            if entry_ok and active_mode in ("trend", "breakout") and len(candles) >= 660:
+                htf = strategies.htf_trend(strategies.resample(candles[-720:]))
+                if (action == "BUY" and htf == "BEARISH") or (action == "SELL" and htf == "BULLISH"):
+                    entry_ok = False
+                    if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
+                        last_warn_tick = tick
+                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
+                                           "reason": f"the 1-hour trend is {htf} — not trading against it"})
             # Post-loss cooldown: the worst trade after a stop-out is the next
             # one taken 5 minutes later in the same falling knife.
             if entry_ok and last_loss_at and time.time() - last_loss_at < _LOSS_COOLDOWN_MIN * 60:
@@ -421,15 +462,31 @@ def _loop(user_id, alert_fn, gen=None):
 
             if entry_ok:
                 pip = forex.pip_size(cfg.SYMBOL, price)
-                sl_price = (price - cfg.STOP_LOSS_PIPS * pip
-                            if action == "BUY"
-                            else price + cfg.STOP_LOSS_PIPS * pip)
-                tp_price = (price + cfg.TAKE_PROFIT_PIPS * pip
-                            if action == "BUY"
-                            else price - cfg.TAKE_PROFIT_PIPS * pip)
-                # Risk-based sizing: never risk more than RISK_PER_TRADE of balance.
+                stop_pips_eff = cfg.STOP_LOSS_PIPS
+                # Dynamic ATR stops (premium spec #10): SL = 1.5×ATR, TP = 3×ATR
+                # — distances that breathe with the instrument's volatility.
+                atr_v = 0.0
+                if getattr(cfg, "ATR_STOPS", False):
+                    try:
+                        atr_v = float(ind.get("atr") or 0)
+                    except (TypeError, ValueError):
+                        atr_v = 0.0
+                if atr_v > 0:
+                    sl_dist, tp_dist = 1.5 * atr_v, 3.0 * atr_v
+                    stop_pips_eff = forex.to_pips(sl_dist, cfg.SYMBOL, price)
+                else:
+                    sl_dist = cfg.STOP_LOSS_PIPS * pip
+                    tp_dist = cfg.TAKE_PROFIT_PIPS * pip
+                sl_price = price - sl_dist if action == "BUY" else price + sl_dist
+                tp_price = price + tp_dist if action == "BUY" else price - tp_dist
+                # Adaptive risk ladder (premium spec #3): consecutive losses
+                # shrink the risk — 2 losses → ½, 3+ → ¼; violent regime → ½.
+                risk_mult = 1.0 if loss_streak < 2 else (0.5 if loss_streak == 2 else 0.25)
+                if regime.get("regime") == "volatile":
+                    risk_mult *= 0.5
                 units = forex.calc_units(paper_balance, cfg.RISK_PER_TRADE,
-                                         cfg.STOP_LOSS_PIPS, cfg.SYMBOL, price)
+                                         stop_pips_eff, cfg.SYMBOL, price,
+                                         mult=risk_mult)
                 units = max(int(units), forex.min_units(cfg.SYMBOL))
 
                 broker.place_order(action, units, cfg.SYMBOL, sl=sl_price, tp=tp_price)
@@ -476,6 +533,9 @@ def _loop(user_id, alert_fn, gen=None):
                     paper_balance += net
                 if net < 0:
                     last_loss_at = time.time()
+                    loss_streak += 1
+                elif net > 0:
+                    loss_streak = 0
                 result = {"action": "CLOSE", "symbol": cfg.SYMBOL, "price": price,
                           "entryPrice": open_pos.get("entryPrice"),
                           "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
