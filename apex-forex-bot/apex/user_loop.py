@@ -156,9 +156,25 @@ def _loop(user_id, alert_fn, gen=None):
             dash["currentPrice"] = price
             dash["lastTick"] = now_str
 
-            # Live: sync position from broker; paper: use local tracking
+            # Live: sync position from broker; paper: use local tracking.
+            # If the position read FAILS we must not assume flat — entering
+            # blind is how positions stack. Skip the tick and alert instead.
             if not cfg.PAPER_TRADING:
-                open_pos = broker.get_open_position(cfg.SYMBOL)
+                try:
+                    open_pos = broker.get_open_position(cfg.SYMBOL)
+                except Exception as e:
+                    data_fails += 1
+                    print(f"[UserLoop:{user_id}] position read error ({data_fails}): {e}")
+                    if data_fails == 3 and alert_fn:
+                        alert_fn(user_id, {
+                            "action": "DATA_ERROR",
+                            "reason": f"can't read open positions: {e}",
+                            "symbol": cfg.SYMBOL,
+                            "broker": dash.get("broker", "your broker"),
+                        })
+                    time.sleep(30)
+                    continue
+                data_fails = 0
                 try:
                     paper_balance = broker.get_balance()
                 except Exception:
@@ -352,7 +368,16 @@ def _loop(user_id, alert_fn, gen=None):
                                 "quantity": units, "stopLoss": sl_price, "takeProfit": tp_price,
                                 "entrySpreadPips": spread, "openedAt": now_str}
                 else:
-                    open_pos = broker.get_open_position(cfg.SYMBOL)
+                    # A read hiccup right after the fill must not look like
+                    # "no position" — assume the order we just sent is live.
+                    try:
+                        open_pos = broker.get_open_position(cfg.SYMBOL)
+                    except Exception:
+                        open_pos = None
+                    open_pos = open_pos or {"side": action, "entryPrice": price,
+                                            "symbol": cfg.SYMBOL, "units": units,
+                                            "quantity": units, "stopLoss": sl_price,
+                                            "takeProfit": tp_price, "openedAt": now_str}
 
                 dash["openPosition"] = open_pos
                 result = {"action": action, "symbol": cfg.SYMBOL, "confidence": confidence,

@@ -465,32 +465,37 @@ class CtraderBroker:
 
     # -- positions ------------------------------------------------------------
     def get_open_position(self, instrument=None):
+        """Open position for the symbol, or None when the account is FLAT.
+
+        MUST raise on failure instead of returning None: a swallowed error here
+        told the loop "you're flat" while a position was open, so it stacked a
+        fresh entry every tick (2.72 lots of AUDUSD from 0.34-lot orders)."""
         if getattr(self._c, "PAPER_TRADING", True):
             return None
-        try:
-            sym = _to_ct_symbol(instrument or self._c.SYMBOL)
-            sid = self._symbol_id(instrument)
-            req = ProtoOAReconcileReq()
-            req.ctidTraderAccountId = self._ctid()
-            res = self._rpc(req, ProtoOAReconcileRes)
-            scale = self._scale(sym)
-            for p in res.position:
-                td = p.tradeData
-                if td.symbolId != sid:
-                    continue
-                side = "BUY" if td.tradeSide == ProtoOATradeSide.BUY else "SELL"
-                return {
-                    "instrument": sym,
-                    "side": side,
-                    "units": int(td.volume / 100),  # cTrader volume = units × 100
-                    "entryPrice": p.price if p.price else None,
-                    "sl": p.stopLoss / scale if p.HasField("stopLoss") else None,
-                    "tp": p.takeProfit / scale if p.HasField("takeProfit") else None,
-                    "openTime": td.openTimestamp,
-                    "positionId": p.positionId,
-                }
-        except Exception:
-            return None
+        sym = _to_ct_symbol(instrument or self._c.SYMBOL)
+        sid = self._symbol_id(instrument)
+        req = ProtoOAReconcileReq()
+        req.ctidTraderAccountId = self._ctid()
+        res = self._rpc(req, ProtoOAReconcileRes)
+        for p in res.position:
+            td = p.tradeData
+            if td.symbolId != sid:
+                continue
+            side = "BUY" if td.tradeSide == ProtoOATradeSide.BUY else "SELL"
+            return {
+                "instrument": sym,
+                "side": side,
+                "units": int(td.volume / 100),  # cTrader volume = units × 100
+                "symbol": instrument or self._c.SYMBOL,
+                # position price/SL/TP are plain doubles (unlike trendbar ints)
+                "entryPrice": p.price if p.price else None,
+                "stopLoss": p.stopLoss if p.HasField("stopLoss") else None,
+                "takeProfit": p.takeProfit if p.HasField("takeProfit") else None,
+                "sl": p.stopLoss if p.HasField("stopLoss") else None,
+                "tp": p.takeProfit if p.HasField("takeProfit") else None,
+                "openTime": td.openTimestamp,
+                "positionId": p.positionId,
+            }
         return None
 
     def get_open_trades(self):
