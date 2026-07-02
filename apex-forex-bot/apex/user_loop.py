@@ -94,6 +94,15 @@ def _loop(user_id, alert_fn, gen=None):
     broker, cfg = _make_broker(user)
 
     paper_balance = cfg.PAPER_BALANCE
+    # REAL mode: the stored seed goes stale the moment a trade closes — read
+    # the broker's actual balance BEFORE the first status can be asked for,
+    # and persist it so any future restart seeds correctly too.
+    if not cfg.PAPER_TRADING:
+        try:
+            paper_balance = broker.get_balance()
+            user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
+        except Exception as e:
+            print(f"[UserLoop:{user_id}] initial balance read failed: {e}")
     open_pos = None  # tracked locally for paper mode
     tick = 0
     data_fails = 0   # consecutive get_candles failures — alert the user at 3
@@ -182,6 +191,8 @@ def _loop(user_id, alert_fn, gen=None):
                 try:
                     paper_balance = broker.get_balance()
                     dash["balStale"] = False
+                    if abs(paper_balance - prev_balance) >= 0.01:
+                        user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                 except Exception as e:
                     # Keep trading on the last known balance, but never show a
                     # stale number as fresh — the client compares it to cTrader.
