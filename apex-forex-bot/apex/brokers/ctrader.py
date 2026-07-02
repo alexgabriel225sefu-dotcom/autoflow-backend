@@ -55,7 +55,7 @@ try:
         ProtoOANewOrderReq, ProtoOAExecutionEvent,
         ProtoOAReconcileReq, ProtoOAReconcileRes,
         ProtoOAClosePositionReq, ProtoOAErrorRes, ProtoOAOrderErrorEvent,
-        ProtoOASymbolByIdReq, ProtoOASymbolByIdRes,
+        ProtoOASymbolByIdReq, ProtoOASymbolByIdRes, ProtoOAAmendPositionSLTPReq,
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
@@ -544,6 +544,38 @@ class CtraderBroker:
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):
             fill = res.order.executionPrice
+        # ── HARD GUARANTEE: the stop must live AT THE BROKER. Relative SL/TP
+        # on the market order can be dropped silently (observed: a gold BUY
+        # ran to −80 pips with a 20-pip stop configured). Amend the position
+        # with ABSOLUTE prices, verify, and never keep a naked position.
+        if sl or tp:
+            pid = res.position.positionId if res.HasField("position") else None
+            if not pid:
+                try:
+                    pos = self.get_open_position(instrument)
+                    pid = (pos or {}).get("positionId")
+                except Exception:
+                    pid = None
+            attached = False
+            if pid:
+                try:
+                    am = ProtoOAAmendPositionSLTPReq()
+                    am.ctidTraderAccountId = self._ctid()
+                    am.positionId = int(pid)
+                    if sl:
+                        am.stopLoss = float(sl)
+                    if tp:
+                        am.takeProfit = float(tp)
+                    self._conn()._request(am, ProtoOAExecutionEvent, timeout=15)
+                    attached = True
+                except Exception as e:
+                    print(f"[cTrader] SL/TP amend failed: {e}")
+            if not attached:
+                try:
+                    self.close_position(instrument)
+                finally:
+                    raise RuntimeError("could not attach stop-loss at the broker — "
+                                       "position closed immediately for safety")
         return {"orderId": str(getattr(res.order, "orderId", "")),
                 "status": "FILLED", "fillPrice": fill}
 

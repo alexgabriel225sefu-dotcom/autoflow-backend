@@ -201,6 +201,31 @@ def _loop(user_id, alert_fn, gen=None):
                     dash["trades"] = dash["trades"][:50]
                     if alert_fn:
                         alert_fn(user_id, result)
+
+                # Client-side protective stop: if the broker somehow holds the
+                # position without a stop — or price already crossed it — close
+                # at market. A naked position must never survive a tick.
+                if open_pos:
+                    side_ = open_pos.get("side")
+                    stop_ = open_pos.get("stopLoss")
+                    if not stop_ and open_pos.get("entryPrice"):
+                        pip_g = forex.pip_size(cfg.SYMBOL, price)
+                        stop_ = (open_pos["entryPrice"] - cfg.STOP_LOSS_PIPS * pip_g
+                                 if side_ == "BUY"
+                                 else open_pos["entryPrice"] + cfg.STOP_LOSS_PIPS * pip_g)
+                    breached = stop_ and ((side_ == "BUY" and price <= stop_) or
+                                          (side_ == "SELL" and price >= stop_))
+                    if breached:
+                        try:
+                            broker.close_position(cfg.SYMBOL)
+                            if alert_fn:
+                                alert_fn(user_id, {"action": "CLOSE", "symbol": cfg.SYMBOL,
+                                                   "price": price,
+                                                   "reasoning": "🛡 Protective stop — price crossed the stop level; closed at market"})
+                        except Exception as e:
+                            print(f"[UserLoop:{user_id}] protective close failed: {e}")
+                        open_pos = None
+                        dash["openPosition"] = None
             else:
                 # Reconcile with manual trades (force_trade/force_close write to
                 # the shared dash via chat/commands). Adopt a manually-opened
