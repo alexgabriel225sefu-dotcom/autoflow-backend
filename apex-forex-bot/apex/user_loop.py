@@ -132,6 +132,17 @@ def _loop(user_id, alert_fn, gen=None):
         if user_id in _loops:
             _loops[user_id]["dash"] = dash
 
+    def _skip(reason):
+        """Journal every rejected entry (premium spec #12) — clients see the
+        discipline, not just the trades: 'refused 14 weak setups today'."""
+        today = datetime.now().strftime("%Y-%m-%d")
+        if dash.get("skipsDay") != today:
+            dash["skipsDay"], dash["skipsToday"] = today, 0
+        dash["skipsToday"] = dash.get("skipsToday", 0) + 1
+        lst = dash.setdefault("skips", [])
+        lst.insert(0, {"time": datetime.now().strftime("%H:%M"), "reason": str(reason)[:120]})
+        del lst[30:]
+
     while True:
         with _lock:
             entry = _loops.get(user_id, {})
@@ -390,6 +401,7 @@ def _loop(user_id, alert_fn, gen=None):
             # Quiet regime (AUTO): no edge, no trade.
             if entry_ok and regime_block:
                 entry_ok = False
+                _skip(regime.get("label", "market too quiet"))
                 if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                     last_warn_tick = tick
                     alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
@@ -400,6 +412,7 @@ def _loop(user_id, alert_fn, gen=None):
                 htf = strategies.htf_trend(strategies.resample(candles[-720:]))
                 if (action == "BUY" and htf == "BEARISH") or (action == "SELL" and htf == "BULLISH"):
                     entry_ok = False
+                    _skip(f"H1 trend {htf} — signal was {action}")
                     if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
                         alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
@@ -409,6 +422,7 @@ def _loop(user_id, alert_fn, gen=None):
             if entry_ok and last_loss_at and time.time() - last_loss_at < _LOSS_COOLDOWN_MIN * 60:
                 left = int((_LOSS_COOLDOWN_MIN * 60 - (time.time() - last_loss_at)) / 60) + 1
                 entry_ok = False
+                _skip(f"post-loss cooldown ({left}m left)")
                 if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                     last_warn_tick = tick
                     alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
@@ -426,6 +440,7 @@ def _loop(user_id, alert_fn, gen=None):
                 if spread > max_spread:
                     print(f"[UserLoop:{user_id}] skip entry — spread {spread:.1f}p > {max_spread}p limit")
                     entry_ok = False
+                    _skip(f"spread too wide ({spread:.1f}p > {max_spread:g}p)")
                     if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
                         alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
@@ -434,11 +449,13 @@ def _loop(user_id, alert_fn, gen=None):
                 elif cfg.TAKE_PROFIT_PIPS <= spread * 1.5:
                     print(f"[UserLoop:{user_id}] skip entry — TP {cfg.TAKE_PROFIT_PIPS:g}p doesn't clear spread {spread:.1f}p")
                     entry_ok = False
+                    _skip(f"edge too thin: TP {cfg.TAKE_PROFIT_PIPS:g}p vs spread {spread:.1f}p")
 
             # Flash-crash circuit breaker: skip entry when the latest candle's
             # range is extreme for an FX major (>1.2% ≈ a violent spike).
             if entry_ok and _flash_spike(candles, 0.012):
                 entry_ok = False
+                _skip("flash-crash guard: extreme candle range")
                 if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                     last_warn_tick = tick
                     alert_fn(user_id, {"action": "FLASH_WARN", "symbol": cfg.SYMBOL})
@@ -449,6 +466,7 @@ def _loop(user_id, alert_fn, gen=None):
                 ev = news.high_impact_window(cfg.SYMBOL.split("_"))
                 if ev:
                     entry_ok = False
+                    _skip(f"news guard: {ev.get('title', 'high-impact event') if isinstance(ev, dict) else ev}")
                     if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
                         alert_fn(user_id, {"action": "NEWS_WARN", "symbol": cfg.SYMBOL, "event": ev})

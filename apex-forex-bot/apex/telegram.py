@@ -1282,6 +1282,32 @@ def _handle_atr(chat_id, args):
     send_to(chat_id, msg)
 
 
+def _handle_stats(chat_id):
+    """Performance report from the persistent trade journal (premium spec #10)."""
+    from apex import stats as stats_mod
+    trades = user_store.load_trades(chat_id)
+    dash = user_loop.get_dash(chat_id) or {}
+    st = stats_mod.compute(trades, dash.get("skipsToday", 0))
+    if not st["trades"]:
+        return send_to(chat_id, "📊 No closed trades in the journal yet — run the bot and stats will build up here.")
+    pf = st["profitFactor"]
+    pf_s = "∞" if pf == float("inf") else (f"{pf:.2f}" if pf is not None else "—")
+    def money(v):
+        return f"+${v:,.2f}" if v >= 0 else f"−${abs(v):,.2f}"
+    t = st["today"]
+    send_to(chat_id,
+            f"📊 <b>Performance</b> — last {st['trades']} closed trades\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"✅ {st['wins']}W / ❌ {st['losses']}L · Win rate <b>{st['winRate']:.0f}%</b>\n"
+            f"⚖️ Profit factor: <b>{pf_s}</b> · Net: <b>{money(st['netPnl'])}</b>\n"
+            f"📈 Avg win {money(st['avgWin'])} · Avg loss {money(st['avgLoss'])}\n"
+            f"🏆 Best {money(st['best'])} · 💥 Worst {money(st['worst'])}\n"
+            f"📉 Max drawdown: <b>{st['maxDrawdownPct']:.1f}%</b>\n\n"
+            f"<b>Today:</b> {t['trades']} trades · {money(t['netPnl'])} · "
+            f"{t['skips']} weak setups rejected 🛡\n\n"
+            f"<i>Full breakdown, equity curve &amp; rejection journal: /terminal</i>")
+
+
 def _handle_terminal(chat_id):
     """Open the Telegram Mini App — live interactive chart, position, news."""
     base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
@@ -1688,6 +1714,7 @@ _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "/atr on|off — dynamic ATR stops (SL 1.5×ATR / TP 3×ATR)\n"
                "/wizard — guided setup (symbol → method → mode)\n"
                "/terminal — live trading terminal (interactive chart + news)\n"
+               "/stats — performance report (win rate · profit factor · drawdown)\n"
                "/chart — quick chart snapshot\n"
                "/setkeys KEY=val ... — set credentials\n"
                "  (message is auto-deleted for safety)\n"
@@ -1972,6 +1999,8 @@ def _poll_loop():
                     _handle_terminal(chat_id)
                 elif cmd_l == "/atr":
                     _handle_atr(chat_id, args)
+                elif cmd_l in ("/stats", "/performance"):
+                    _handle_stats(chat_id)
                 elif cmd_l == "/buy":
                     _handle_buy(chat_id, args)
                 elif cmd_l == "/sell":

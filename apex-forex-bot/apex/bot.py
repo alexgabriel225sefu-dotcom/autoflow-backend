@@ -624,13 +624,22 @@ def _start_dashboard_server():
                     candles = br.get_candles(ucfg.SYMBOL, ucfg.TIMEFRAME, 150) or []
                     pos = udash.get("openPosition")
                     events = news_mod.upcoming(hours=24) or []
+                    from apex import stats as stats_mod, forex as fx_mod
+                    journal = user_store.load_trades(chat_id)
+                    st = stats_mod.compute(journal, udash.get("skipsToday", 0))
                     body = json.dumps({
                         "symbol": ucfg.SYMBOL, "timeframe": ucfg.TIMEFRAME,
                         "mode": udash.get("mode", "📝 PAPER" if u.get("paper", True) else "🔴 REAL"),
                         "strategy": udash.get("strategy", "Mean Reversion"),
                         "broker": udash.get("broker", ""),
                         "balance": udash.get("balance", u.get("paper_balance", 0)),
+                        "regime": udash.get("regime"),
+                        "sessions": fx_mod.active_sessions(),
                         "position": pos, "trades": (udash.get("trades") or [])[:12],
+                        "skips": (udash.get("skips") or [])[:15],
+                        "stats": {k: (None if isinstance(v, float) and v != v or v == float("inf") else v)
+                                  for k, v in st.items() if k != "equity"},
+                        "equity": st.get("equity") or [],
                         "events": events,
                         "candles": [{"time": c["time"], "open": c["open"], "high": c["high"],
                                      "low": c["low"], "close": c["close"]} for c in candles],
