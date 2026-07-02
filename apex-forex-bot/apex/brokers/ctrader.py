@@ -461,7 +461,11 @@ class CtraderBroker:
         res = self._rpc(req, ProtoOATraderRes)
         # balance is in cents of the deposit currency (moneyDigits)
         money_digits = getattr(res.trader, "moneyDigits", 2) or 2
-        return res.trader.balance / (10 ** money_digits)
+        bal = res.trader.balance / (10 ** money_digits)
+        # Raw log — if this ever disagrees with the cTrader app, the line
+        # pins down whether the API sent it or we mis-scaled it.
+        print(f"[cTrader] balance ctid={self._ctid()} raw={res.trader.balance} digits={money_digits} -> {bal:.2f}")
+        return bal
 
     # -- positions ------------------------------------------------------------
     def get_open_position(self, instrument=None):
