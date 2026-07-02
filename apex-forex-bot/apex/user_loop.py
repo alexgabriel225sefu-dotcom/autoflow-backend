@@ -247,6 +247,11 @@ def _loop(user_id, alert_fn, gen=None):
                     print(f"[UserLoop:{user_id}] balance read error: {e}")
                 if not open_pos and dash.get("manualHold"):
                     dash["manualHold"] = False
+                # A balance jump with NO position close = deposit/withdrawal.
+                # Shift the baseline so profit % keeps measuring TRADING only.
+                if (abs(paper_balance - prev_balance) >= 0.01
+                        and not (prev_pos and not open_pos)):
+                    dash["startBalance"] = dash.get("startBalance", prev_balance) + (paper_balance - prev_balance)
                 # cTrader executed the SL/TP server-side: the position we were
                 # managing vanished between ticks. Tell the client — silence
                 # here made broker-side exits invisible in Telegram.
@@ -678,6 +683,26 @@ def is_running(user_id):
     user_id = str(user_id)
     with _lock:
         return _loops.get(user_id, {}).get("running", False)
+
+
+def live_balance(user_id):
+    """Read the account balance from the broker RIGHT NOW (real mode only).
+    /status and the terminal must never show a number older than the request
+    — a withdrawal between loop ticks made the cached figure look broken."""
+    user = user_store.load(str(user_id))
+    if user.get("paper", True):
+        return None
+    try:
+        broker, _cfg = _make_broker(user)
+        bal = broker.get_balance()
+        user_store.update(str(user_id), {"paper_balance": round(bal, 2)})
+        d = get_dash(str(user_id))
+        if d:
+            d["balance"] = bal
+        return bal
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] live_balance failed: {e}")
+        return None
 
 
 def get_dash(user_id):

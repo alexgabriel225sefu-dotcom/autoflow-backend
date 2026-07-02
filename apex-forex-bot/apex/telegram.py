@@ -342,6 +342,11 @@ def _build_status(dash, chart=""):
 
 def _handle_status(chat_id):
     dash = user_loop.get_dash(chat_id)
+    # REAL mode: pull the balance from the broker at REQUEST time — a cached
+    # figure looked frozen the moment the client deposited/withdrew between
+    # the loop's 5-minute ticks.
+    user_loop.live_balance(chat_id)
+    dash = user_loop.get_dash(chat_id) or dash
     # If user's loop hasn't ticked yet, build a minimal dash from their settings
     if not dash or not dash.get("broker"):
         user = user_store.load(chat_id)
