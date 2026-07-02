@@ -594,6 +594,60 @@ def _start_dashboard_server():
                 self.end_headers()
                 self.wfile.write(b"ok")
                 return
+            # Telegram Mini App — the page is public; every DATA call inside it
+            # carries Telegram's signed initData, validated per user below.
+            if self.path == "/app" or self.path.startswith("/app?"):
+                from apex import webapp
+                payload = webapp.HTML.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+            if self.path.startswith("/api/app/data"):
+                from apex import webapp, user_loop, user_store, news as news_mod
+                qs = parse_qs(urlparse(self.path).query)
+                init = (qs.get("init") or [""])[0]
+                tg_user = webapp.validate(init, cfg.TELEGRAM_BOT_TOKEN or "")
+                if not tg_user or not tg_user.get("id"):
+                    self.send_response(401)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"error":"unauthorized"}')
+                    return
+                chat_id = str(tg_user["id"])
+                try:
+                    u = user_store.load(chat_id)
+                    udash = user_loop.get_dash(chat_id) or {}
+                    br, ucfg = user_loop._make_broker(u)
+                    candles = br.get_candles(ucfg.SYMBOL, ucfg.TIMEFRAME, 150) or []
+                    pos = udash.get("openPosition")
+                    events = news_mod.upcoming(hours=24) or []
+                    body = json.dumps({
+                        "symbol": ucfg.SYMBOL, "timeframe": ucfg.TIMEFRAME,
+                        "mode": udash.get("mode", "📝 PAPER" if u.get("paper", True) else "🔴 REAL"),
+                        "strategy": udash.get("strategy", "Mean Reversion"),
+                        "broker": udash.get("broker", ""),
+                        "balance": udash.get("balance", u.get("paper_balance", 0)),
+                        "position": pos, "trades": (udash.get("trades") or [])[:12],
+                        "events": events,
+                        "candles": [{"time": c["time"], "open": c["open"], "high": c["high"],
+                                     "low": c["low"], "close": c["close"]} for c in candles],
+                    }).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                except Exception as e:
+                    err = json.dumps({"error": str(e)[:200]}).encode()
+                    self.send_response(502)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(err)
+                return
             # cTrader OAuth callback — no auth (state is HMAC-signed), public by design
             if self.path.startswith("/api/ctrader/callback"):
                 from apex import ctrader_oauth

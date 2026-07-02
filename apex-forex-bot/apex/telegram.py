@@ -840,6 +840,7 @@ def _finish_onboard(chat_id):
             f"⚖️ Risk: <b>{float(u.get('risk', 0.005)) * 100:g}%</b> per trade\n\n"
             "I analyze the market every few minutes and alert you on every move — "
             "with the reason in plain language.\n\n"
+            "/terminal — live chart &amp; news terminal 📈\n"
             "/status — live overview\n"
             "/pairs · /strategy · /risk · /sl · /tp — tune anytime\n"
             "/env live · /env practice — real ↔ paper")
@@ -1250,6 +1251,20 @@ def _send_chart_async(chat_id, symbol=None, position=None, caption=""):
     threading.Thread(target=run, daemon=True).start()
 
 
+def _handle_terminal(chat_id):
+    """Open the Telegram Mini App — live interactive chart, position, news."""
+    base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+    if not base:
+        return send_to(chat_id, "⚠️ Terminal URL not configured (RENDER_EXTERNAL_URL).")
+    send_to(chat_id,
+            "📈 <b>Apex Terminal</b>\n\n"
+            "Live interactive chart (pinch to zoom, drag to pan), your position with "
+            "entry/SL/TP lines, balance, upcoming market events and your trade history — "
+            "all in one screen.",
+            extra={"reply_markup": {"inline_keyboard": [[
+                {"text": "📈 Open Terminal", "web_app": {"url": f"{base}/app"}}]]}})
+
+
 def _handle_chart(chat_id, args=None):
     sym = (args or "").strip().upper().replace("/", "_").replace("-", "_") or None
     send_to(chat_id, "🖼 Rendering your chart…")
@@ -1640,7 +1655,8 @@ _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "/pairs — everything your broker lets you trade\n"
                "/strategy — pick your trading method (mean reversion · trend · breakout)\n"
                "/wizard — guided setup (symbol → method → mode)\n"
-               "/chart — live candlestick chart of your symbol\n"
+               "/terminal — live trading terminal (interactive chart + news)\n"
+               "/chart — quick chart snapshot\n"
                "/setkeys KEY=val ... — set credentials\n"
                "  (message is auto-deleted for safety)\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
@@ -1920,6 +1936,8 @@ def _poll_loop():
                     onboard_start(chat_id)
                 elif cmd_l == "/chart":
                     _handle_chart(chat_id, args)
+                elif cmd_l in ("/terminal", "/app"):
+                    _handle_terminal(chat_id)
                 elif cmd_l == "/buy":
                     _handle_buy(chat_id, args)
                 elif cmd_l == "/sell":
