@@ -961,8 +961,9 @@ def _handle_symbol(chat_id, args):
         cfg.SYMBOL = sym
     warn = ""
     if is_ct and not _PAIR_RE.match(sym):
-        warn = ("\n⚠️ <i>Non-FX instrument: stop-loss/take-profit use FX pip conventions, "
-                "so distances and sizing can differ on this symbol. Test it in paper mode first.</i>")
+        warn = ("\n💡 <i>Pip conventions for metals, indices and crypto CFDs are handled "
+                "automatically (gold: 1 pip = $0.10, indices/crypto: 1 point). "
+                "Still smart: watch the first trades on any new symbol in paper mode.</i>")
     send_to(chat_id, f"💱 Trading symbol set to <b>{sym}</b>.{warn}")
 
 
@@ -1108,7 +1109,7 @@ def _handle_pairs(chat_id):
             + (f"\n…plus <b>{other}</b> stock CFDs &amp; other instruments — find the code in cTrader "
                "and set it directly.\n" if other > 0 else "")
             + "\nPick one with <code>/symbol NAME</code> (e.g. <code>/symbol XAUUSD</code>).\n"
-              "<i>Non-FX instruments: test in paper mode first — SL/TP use FX pip conventions.</i>")
+              "<i>Metals, indices and crypto pip conventions are handled automatically — still, watch a new symbol in paper first.</i>")
 
 
 def _trade_err(err):
