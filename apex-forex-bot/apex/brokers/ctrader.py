@@ -54,7 +54,7 @@ try:
         ProtoOASubscribeSpotsReq, ProtoOASpotEvent,
         ProtoOANewOrderReq, ProtoOAExecutionEvent,
         ProtoOAReconcileReq, ProtoOAReconcileRes,
-        ProtoOAClosePositionReq, ProtoOAErrorRes,
+        ProtoOAClosePositionReq, ProtoOAErrorRes, ProtoOAOrderErrorEvent,
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
@@ -217,6 +217,12 @@ class _Conn:
                 err = ProtoErrorRes()
                 err.ParseFromString(pm.payload)
                 raise RuntimeError(f"cTrader error: {err.errorCode} {err.description}")
+            # Order rejections arrive as a DEDICATED event type — skipping it
+            # leaves the caller waiting for an ExecutionEvent until timeout.
+            if pm.payloadType == ProtoOAOrderErrorEvent().payloadType:
+                err = ProtoOAOrderErrorEvent()
+                err.ParseFromString(pm.payload)
+                raise RuntimeError(f"cTrader order error: {err.errorCode} {err.description}")
             if want_client_id and pm.clientMsgId and pm.clientMsgId != want_client_id:
                 continue
             if pm.payloadType == res_cls().payloadType:
@@ -484,8 +490,12 @@ class CtraderBroker:
         req.symbolId = sid
         req.orderType = ProtoOAOrderType.MARKET
         req.tradeSide = ProtoOATradeSide.BUY if side == "BUY" else ProtoOATradeSide.SELL
-        # cTrader volume is in units × 100 (hundredths of a unit).
-        req.volume = int(round(float(units) * 100))
+        # cTrader volume is in units × 100 (hundredths of a unit), and FX
+        # accounts only accept 0.01-lot steps (1,000 units) — an unrounded
+        # risk-based size like 35,235 units gets the order rejected.
+        vol_h = int(round(float(units) * 100))
+        step = 100_000  # 0.01 lot
+        req.volume = max(step, (vol_h // step) * step)
         # MARKET orders accept only RELATIVE SL/TP (distance in 1e-5 price
         # units) — absolute stopLoss/takeProfit fields get the order rejected.
         if sl or tp:
