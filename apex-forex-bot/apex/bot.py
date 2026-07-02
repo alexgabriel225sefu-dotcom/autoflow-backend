@@ -623,8 +623,31 @@ def _start_dashboard_server():
                     br, ucfg = user_loop._make_broker(u)
                     candles = br.get_candles(ucfg.SYMBOL, ucfg.TIMEFRAME, 150) or []
                     pos = udash.get("openPosition")
-                    events = news_mod.upcoming(hours=24) or []
                     from apex import stats as stats_mod, forex as fx_mod
+                    balance_live = udash.get("balance", u.get("paper_balance", 0))
+                    # REAL mode: the loop ticks every 5 minutes — far too stale
+                    # for a terminal. Read position + balance live per poll.
+                    if not u.get("paper", True):
+                        try:
+                            pos = br.get_open_position(ucfg.SYMBOL)
+                        except Exception:
+                            pass
+                        try:
+                            balance_live = br.get_balance()
+                        except Exception:
+                            pass
+                    # Live unrealized P&L from the freshest candle close.
+                    last_px = candles[-1]["close"] if candles else None
+                    if pos and last_px and pos.get("entryPrice"):
+                        d_ = 1 if pos.get("side") == "BUY" else -1
+                        pos = dict(pos)
+                        pos["pnlPips"] = round(fx_mod.to_pips(
+                            (last_px - pos["entryPrice"]) * d_, ucfg.SYMBOL, last_px), 1)
+                        units_ = pos.get("units") or pos.get("quantity") or 0
+                        if units_:
+                            pos["pnlUsd"] = round(fx_mod.pnl_usd(
+                                pos["side"], pos["entryPrice"], last_px, units_, ucfg.SYMBOL), 2)
+                    events = news_mod.upcoming(hours=24) or []
                     journal = user_store.load_trades(chat_id)
                     st = stats_mod.compute(journal, udash.get("skipsToday", 0))
                     body = json.dumps({
@@ -632,7 +655,8 @@ def _start_dashboard_server():
                         "mode": udash.get("mode", "📝 PAPER" if u.get("paper", True) else "🔴 REAL"),
                         "strategy": udash.get("strategy", "Mean Reversion"),
                         "broker": udash.get("broker", ""),
-                        "balance": udash.get("balance", u.get("paper_balance", 0)),
+                        "balance": balance_live,
+                        "price": last_px,
                         "regime": udash.get("regime"),
                         "sessions": fx_mod.active_sessions(),
                         "position": pos, "trades": (udash.get("trades") or [])[:12],
