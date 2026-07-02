@@ -160,6 +160,7 @@ def _loop(user_id, alert_fn, gen=None):
             # If the position read FAILS we must not assume flat — entering
             # blind is how positions stack. Skip the tick and alert instead.
             if not cfg.PAPER_TRADING:
+                prev_pos = open_pos
                 try:
                     open_pos = broker.get_open_position(cfg.SYMBOL)
                 except Exception as e:
@@ -175,6 +176,7 @@ def _loop(user_id, alert_fn, gen=None):
                     time.sleep(30)
                     continue
                 data_fails = 0
+                prev_balance = paper_balance
                 try:
                     paper_balance = broker.get_balance()
                     dash["balStale"] = False
@@ -183,6 +185,22 @@ def _loop(user_id, alert_fn, gen=None):
                     # stale number as fresh — the client compares it to cTrader.
                     dash["balStale"] = True
                     print(f"[UserLoop:{user_id}] balance read error: {e}")
+                # cTrader executed the SL/TP server-side: the position we were
+                # managing vanished between ticks. Tell the client — silence
+                # here made broker-side exits invisible in Telegram.
+                if prev_pos and not open_pos:
+                    pnl_est = round(paper_balance - prev_balance, 2) if not dash.get("balStale") else None
+                    result = {"action": "BROKER_CLOSE", "symbol": cfg.SYMBOL,
+                              "side": prev_pos.get("side", ""), "price": price,
+                              "entryPrice": prev_pos.get("entryPrice"),
+                              "netPnl": pnl_est, "balance": round(paper_balance, 2),
+                              "grossPnl": pnl_est, "costUsd": 0.0,
+                              "openedAt": prev_pos.get("openedAt"), "time": now_str}
+                    _log_trade(user_id, result)
+                    dash["trades"].insert(0, result)
+                    dash["trades"] = dash["trades"][:50]
+                    if alert_fn:
+                        alert_fn(user_id, result)
             else:
                 # Reconcile with manual trades (force_trade/force_close write to
                 # the shared dash via chat/commands). Adopt a manually-opened

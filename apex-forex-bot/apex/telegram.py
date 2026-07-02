@@ -1218,6 +1218,46 @@ def _trade_err(err):
     return e
 
 
+def send_photo(chat_id, png, caption=""):
+    """Send a PNG to the chat (used for /chart and entry snapshots)."""
+    try:
+        requests.post(f"{_API}/sendPhoto",
+                      data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
+                      files={"photo": ("chart.png", png, "image/png")}, timeout=25)
+    except Exception as e:
+        print(f"[TELEGRAM] send_photo failed: {e}")
+
+
+def _send_chart_async(chat_id, symbol=None, position=None, caption=""):
+    """Render + send the chart without blocking the caller (alerts, commands)."""
+    def run():
+        try:
+            from apex import chart, user_loop as _ul
+            user = user_store.load(chat_id)
+            sym = symbol or user.get("symbol", cfg.SYMBOL)
+            br, ucfg = _ul._make_broker(user)
+            candles = br.get_candles(sym, ucfg.TIMEFRAME, 130)
+            if not candles:
+                return send_to(chat_id, "⚠️ No chart data available right now.")
+            pos = position
+            if pos is None:
+                dash = _ul.get_dash(chat_id) or {}
+                pos = dash.get("openPosition")
+            png = chart.render(candles, sym, ucfg.TIMEFRAME, pos)
+            send_photo(chat_id, png, caption)
+        except Exception as e:
+            print(f"[TELEGRAM] chart failed: {e}")
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _handle_chart(chat_id, args=None):
+    sym = (args or "").strip().upper().replace("/", "_").replace("-", "_") or None
+    send_to(chat_id, "🖼 Rendering your chart…")
+    _send_chart_async(chat_id, symbol=sym or None,
+                      caption="Live view — candles, EMA 20/50" +
+                              (", entry/SL/TP" if not sym else ""))
+
+
 def _handle_buy(chat_id, args):
     sym = (args or "").strip().upper().replace("/", "_").replace("-", "_")
     if not sym:
@@ -1416,6 +1456,10 @@ def _user_alert(uid, result):
                 f"Price: <b>{result.get('price', '—')}</b> | "
                 f"Confidence: <b>{result.get('confidence', 0)}%</b>{spread_line}"
                 + _fx_why_block(result))
+        _send_chart_async(uid, symbol=sym, position={
+            "side": action, "entryPrice": result.get("price"),
+            "stopLoss": result.get("stopLoss"), "takeProfit": result.get("takeProfit")},
+            caption=f"{d} {sym} — entry, SL &amp; TP on the chart")
     elif action == "CLOSE":
         net = result.get("netPnl")
         _reason_lbl = {"STOP_LOSS": "🛑 Stop loss hit",
@@ -1438,6 +1482,17 @@ def _user_alert(uid, result):
             send_to(uid,
                     f"🔒 <b>Position closed</b> — {sym}\n"
                     f"Price: <b>{result.get('price', '—')}</b>" + why)
+    elif action == "BROKER_CLOSE":
+        pnl = result.get("netPnl")
+        icon = "✅" if (pnl or 0) >= 0 else "❌"
+        pnl_line = (f"{icon} Realized P&amp;L: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>\n"
+                    if pnl is not None else "")
+        send_to(uid,
+                f"🎯 <b>Your broker closed the position</b> — {sym}\n"
+                f"{result.get('side', '')} from <b>{result.get('entryPrice', '—')}</b> → "
+                f"≈ <b>{result.get('price', '—')}</b> (stop-loss or take-profit executed at cTrader)\n"
+                f"{pnl_line}"
+                f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>")
     else:
         send_to(uid, f"⚡ <b>{action}</b> — {sym}")
 
@@ -1585,6 +1640,7 @@ _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "/pairs — everything your broker lets you trade\n"
                "/strategy — pick your trading method (mean reversion · trend · breakout)\n"
                "/wizard — guided setup (symbol → method → mode)\n"
+               "/chart — live candlestick chart of your symbol\n"
                "/setkeys KEY=val ... — set credentials\n"
                "  (message is auto-deleted for safety)\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
@@ -1862,6 +1918,8 @@ def _poll_loop():
                     _handle_backtest(chat_id, args)
                 elif cmd_l == "/wizard":
                     onboard_start(chat_id)
+                elif cmd_l == "/chart":
+                    _handle_chart(chat_id, args)
                 elif cmd_l == "/buy":
                     _handle_buy(chat_id, args)
                 elif cmd_l == "/sell":
