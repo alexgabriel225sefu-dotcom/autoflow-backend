@@ -337,7 +337,22 @@ def _build_status(dash, chart=""):
             + (f"🩺 Broker: {dash['brokerHealth']}\n" if str(dash.get('brokerHealth', '')).startswith('degraded') else "") + "\n"
             f"{pos_line}\n\n"
             f"📈 {total} trades · {wins}W/{total - wins}L · Win: {win_rate}\n"
-            f"⏱️ Last tick: {dash.get('lastTick', '—')}")
+            f"⏱️ Last tick: {_ago(dash)}")
+
+
+def _ago(dash):
+    """Human 'Xm ago' — absolute server timestamps (UTC) kept reading as
+    hours-stale to clients in other timezones."""
+    import time as _t
+    ts = dash.get("lastTickTs")
+    if not ts:
+        return dash.get("lastTick", "—")
+    mins = int((_t.time() - ts) / 60)
+    if mins < 1:
+        return "just now ✅"
+    if mins < 60:
+        return f"{mins}m ago"
+    return f"{mins // 60}h {mins % 60}m ago"
 
 
 def _handle_status(chat_id):

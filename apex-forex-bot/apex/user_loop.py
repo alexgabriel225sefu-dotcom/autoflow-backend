@@ -213,6 +213,7 @@ def _loop(user_id, alert_fn, gen=None):
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             dash["currentPrice"] = price
             dash["lastTick"] = now_str
+            dash["lastTickTs"] = time.time()  # epoch — status shows "Xm ago", timezone-proof
 
             # Live: sync position from broker; paper: use local tracking.
             # If the position read FAILS we must not assume flat — entering
