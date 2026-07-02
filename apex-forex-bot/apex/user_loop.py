@@ -70,7 +70,7 @@ def _make_broker(user):
         MAX_SPREAD_PIPS  = 3.0,
         MIN_CONFIDENCE   = int(user.get("min_confidence", 62)),
         STRATEGY         = (user.get("strategy") or "auto").lower(),
-        ATR_STOPS        = bool(user.get("atr_stops")),
+        ATR_STOPS        = bool(user.get("atr_stops", True)),  # dynamic RR 1:2 by default
     )
     # cTrader linked → use it (paper uses its data; live places real orders worldwide).
     if ct_token and ct_account:
@@ -546,6 +546,14 @@ def _loop(user_id, alert_fn, gen=None):
                 else:
                     sl_dist = cfg.STOP_LOSS_PIPS * pip
                     tp_dist = cfg.TAKE_PROFIT_PIPS * pip
+                    if tp_dist < sl_dist:
+                        # RR guard: a target smaller than the stop bleeds the
+                        # account through costs no matter the win rate.
+                        tp_dist = 2.0 * sl_dist
+                        try:
+                            signal.setdefault("keyFactors", []).append("TP auto-raised to 2×SL (RR guard)")
+                        except Exception:
+                            pass
                 sl_price = price - sl_dist if action == "BUY" else price + sl_dist
                 tp_price = price + tp_dist if action == "BUY" else price - tp_dist
                 # Adaptive risk ladder (premium spec #3): consecutive losses
@@ -744,10 +752,11 @@ def force_trade(user_id, side, symbol=None):
         spread = 0.0
 
     pip = forex.pip_size(sym, price)
+    tp_pips_eff = max(cfg.TAKE_PROFIT_PIPS, 2.0 * cfg.STOP_LOSS_PIPS)         if cfg.TAKE_PROFIT_PIPS < cfg.STOP_LOSS_PIPS else cfg.TAKE_PROFIT_PIPS
     sl_price = (price - cfg.STOP_LOSS_PIPS * pip if side == "BUY"
                 else price + cfg.STOP_LOSS_PIPS * pip)
-    tp_price = (price + cfg.TAKE_PROFIT_PIPS * pip if side == "BUY"
-                else price - cfg.TAKE_PROFIT_PIPS * pip)
+    tp_price = (price + tp_pips_eff * pip if side == "BUY"
+                else price - tp_pips_eff * pip)
 
     balance = user.get("paper_balance") or cfg.PAPER_BALANCE
     dash = get_dash(user_id)
