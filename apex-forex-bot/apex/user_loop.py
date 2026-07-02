@@ -1,4 +1,5 @@
 """Per-user trading loop manager — each client gets their own isolated loop."""
+import os
 import threading
 import time
 from datetime import datetime
@@ -132,6 +133,37 @@ def _loop(user_id, alert_fn, gen=None):
         if user_id in _loops:
             _loops[user_id]["dash"] = dash
 
+    health = {"lats": [], "spreads": [], "degraded": False}
+
+    def _health_check(lat=None, spread=None):
+        """Broker Health Monitor (premium spec #8): when latency or spread
+        blows past the broker's own recent norm, suspend entries and say so —
+        degraded execution silently eats the edge."""
+        if lat is not None:
+            health["lats"] = (health["lats"] + [lat])[-30:]
+        if spread is not None and spread > 0:
+            health["spreads"] = (health["spreads"] + [spread])[-30:]
+        bad = None
+        lats, sps = health["lats"], health["spreads"]
+        if len(lats) >= 6:
+            med = sorted(lats)[len(lats) // 2]
+            if lats[-1] > max(8.0, med * 5):
+                bad = f"data latency {lats[-1]:.1f}s (normal ~{med:.1f}s)"
+        if not bad and len(sps) >= 8 and spread is not None:
+            med = sorted(sps)[len(sps) // 2]
+            if spread > max(med * 4, med + 2):
+                bad = f"spread {spread:.1f}p vs normal ~{med:.1f}p"
+        was = health["degraded"]
+        health["degraded"] = bool(bad)
+        dash["brokerHealth"] = "degraded: " + bad if bad else "ok"
+        if bad and not was and alert_fn:
+            alert_fn(user_id, {"action": "BROKER_HEALTH", "status": "degraded",
+                               "reason": bad, "symbol": cfg.SYMBOL})
+        elif was and not bad and alert_fn:
+            alert_fn(user_id, {"action": "BROKER_HEALTH", "status": "recovered",
+                               "symbol": cfg.SYMBOL})
+        return health["degraded"]
+
     def _skip(reason):
         """Journal every rejected entry (premium spec #12) — clients see the
         discipline, not just the trades: 'refused 14 weak setups today'."""
@@ -156,7 +188,9 @@ def _loop(user_id, alert_fn, gen=None):
             # Data fetch is the loop's lifeline — if it fails silently the user
             # just sees "Last tick: None" forever. Count failures and tell them.
             try:
+                _t0 = time.time()
                 candles = broker.get_candles(cfg.SYMBOL, cfg.TIMEFRAME, cfg.CANDLES)
+                _health_check(lat=time.time() - _t0)
                 data_err = None if candles else "broker returned no candles"
             except Exception as e:
                 candles, data_err = None, str(e)
@@ -436,8 +470,23 @@ def _loop(user_id, alert_fn, gen=None):
                     spread = forex.spread_pips(bid, ask, cfg.SYMBOL)
                 except Exception:
                     spread = 0.0
+                _health_check(spread=spread)
+                # Cost-aware edge (premium spec #5): round-trip commission in
+                # pips joins the spread — the target must clear REAL costs.
+                comm_pips = 0.0
+                try:
+                    comm_rt = float(os.getenv("COMMISSION_PER_LOT_RT", "7"))
+                    pv_lot = forex.pip_value_per_unit(cfg.SYMBOL, price) * 100_000
+                    comm_pips = comm_rt / pv_lot if pv_lot > 0 else 0.0
+                except Exception:
+                    comm_pips = 0.0
+                if health["degraded"]:
+                    entry_ok = False
+                    _skip(f"broker health: {dash.get('brokerHealth', 'degraded')}")
                 max_spread = getattr(cfg, "MAX_SPREAD_PIPS", 3.0)
-                if spread > max_spread:
+                if not entry_ok:
+                    pass
+                elif spread > max_spread:
                     print(f"[UserLoop:{user_id}] skip entry — spread {spread:.1f}p > {max_spread}p limit")
                     entry_ok = False
                     _skip(f"spread too wide ({spread:.1f}p > {max_spread:g}p)")
@@ -446,10 +495,10 @@ def _loop(user_id, alert_fn, gen=None):
                         alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
                                            "reason": f"spread is unusually wide ({spread:.1f} pips) — "
                                                      "entering now would hand the edge to the broker"})
-                elif cfg.TAKE_PROFIT_PIPS <= spread * 1.5:
-                    print(f"[UserLoop:{user_id}] skip entry — TP {cfg.TAKE_PROFIT_PIPS:g}p doesn't clear spread {spread:.1f}p")
+                elif cfg.TAKE_PROFIT_PIPS <= (spread + comm_pips) * 1.5:
+                    print(f"[UserLoop:{user_id}] skip entry — TP {cfg.TAKE_PROFIT_PIPS:g}p doesn't clear costs {spread + comm_pips:.1f}p")
                     entry_ok = False
-                    _skip(f"edge too thin: TP {cfg.TAKE_PROFIT_PIPS:g}p vs spread {spread:.1f}p")
+                    _skip(f"edge too thin: TP {cfg.TAKE_PROFIT_PIPS:g}p vs real costs {spread + comm_pips:.1f}p (spread+commission)")
 
             # Flash-crash circuit breaker: skip entry when the latest candle's
             # range is extreme for an FX major (>1.2% ≈ a violent spike).

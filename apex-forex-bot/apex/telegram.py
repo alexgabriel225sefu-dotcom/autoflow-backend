@@ -333,7 +333,8 @@ def _build_status(dash, chart=""):
             f"{' ⏳ <i>refreshing…</i>' if dash.get('balStale') else ''}{chart_line}\n"
             f"🕐 Market: {market} · Sessions: {sessions}\n"
             f"🎯 Method: {dash.get('strategy', 'Mean Reversion')}\n"
-            + (f"🌊 Regime: {dash['regime']['label']}\n" if isinstance(dash.get('regime'), dict) else "") + "\n"
+            + (f"🌊 Regime: {dash['regime']['label']}\n" if isinstance(dash.get('regime'), dict) else "")
+            + (f"🩺 Broker: {dash['brokerHealth']}\n" if str(dash.get('brokerHealth', '')).startswith('degraded') else "") + "\n"
             f"{pos_line}\n\n"
             f"📈 {total} trades · {wins}W/{total - wins}L · Win: {win_rate}\n"
             f"⏱️ Last tick: {dash.get('lastTick', '—')}")
@@ -1554,6 +1555,15 @@ def _user_alert(uid, result):
             send_to(uid,
                     f"🔒 <b>Position closed</b> — {sym}\n"
                     f"Price: <b>{result.get('price', '—')}</b>" + why)
+    elif action == "BROKER_HEALTH":
+        if result.get("status") == "degraded":
+            send_to(uid,
+                    f"🩺 <b>Broker health warning</b> — {sym}\n"
+                    f"<i>{result.get('reason', 'execution conditions degraded')}</i>\n\n"
+                    "Entries are <b>suspended</b> until conditions normalise — degraded "
+                    "execution silently eats the edge. Open positions stay protected by their stops.")
+        else:
+            send_to(uid, f"🩺 <b>Broker conditions back to normal</b> — {sym}. Trading resumes.")
     elif action == "BROKER_CLOSE":
         pnl = result.get("netPnl")
         icon = "✅" if (pnl or 0) >= 0 else "❌"
