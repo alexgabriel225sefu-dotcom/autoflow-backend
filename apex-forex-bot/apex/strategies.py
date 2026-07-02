@@ -253,7 +253,7 @@ def detect_regime(candles):
     if vol_ratio >= 1.8:
         return {"regime": "volatile", "vol_ratio": round(vol_ratio, 2),
                 "label": f"high volatility ({vol_ratio:.1f}× normal) — breakout mode, half risk"}
-    if vol_ratio <= 0.65:
+    if vol_ratio <= 0.70:
         return {"regime": "quiet", "vol_ratio": round(vol_ratio, 2),
                 "label": f"very low volatility ({vol_ratio:.1f}× normal) — standing aside"}
     if sep_pct >= 0.18 and liv.get("trend") in ("BULLISH", "BEARISH") and liv.get("strength", 0) >= 0.55:
