@@ -164,6 +164,15 @@ def handle_callback(query: dict):
     user_store.update(chat_id, updates)
     _pending.pop(str(chat_id), None)
 
+    # A loop that was already running (auto-restore at boot) still holds the OLD
+    # token/balance — it reads the user record only at start. Restart it so the
+    # fresh credentials and the mirrored balance take effect immediately.
+    try:
+        from apex import telegram as _tg
+        _tg._restart_user_loop(chat_id)
+    except Exception as e:
+        print(f"[cTrader OAuth] loop restart failed: {e}")
+
     # Notify the client in Telegram (best-effort).
     try:
         from apex import telegram as tg
