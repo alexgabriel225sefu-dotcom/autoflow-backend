@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /configurator
+Disallow: /access.html
+Sitemap: https://aicashsystem.space/sitemap.xml
