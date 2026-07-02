@@ -763,7 +763,11 @@ def _handle_ctaccount(chat_id, args):
 
 
 def _handle_cb(chat_id, data):
-    """Inline-button presses (copilot approve/reject)."""
+    """Inline-button presses (copilot approve/reject, risk acceptance)."""
+    if data == "risk:ok":
+        from datetime import datetime as _dt
+        user_store.update(chat_id, {"risk_accepted": _dt.utcnow().isoformat()})
+        return _handle_paper(chat_id, "off")
     if data == "cp:y":
         sug = user_loop.pending_suggestion(str(chat_id))
         user_loop.clear_suggestion(str(chat_id))
@@ -847,6 +851,21 @@ def _handle_copilot(chat_id, args):
 
 def _handle_paper(chat_id, args):
     on = (args or "").strip().lower() in ("on", "true", "yes", "1")
+    # Real-order mode is gated behind an explicit, recorded risk acceptance —
+    # the client owns the strategy, the settings and every loss.
+    if not on:
+        u0 = user_store.load(chat_id)
+        if not u0.get("risk_accepted"):
+            return send_to(chat_id,
+                "⚠️ <b>Before I place real orders — read this once.</b>\n\n"
+                "This bot executes <b>your</b> strategy, with <b>your</b> settings, on <b>your</b> account.\n\n"
+                "• No profit is guaranteed — results depend on your settings and the market\n"
+                "• Trading with leverage carries substantial risk; losses are possible and they are <b>yours</b>\n"
+                "• We provide the software — not financial advice, not a promised return\n"
+                "• Only trade money you can afford to lose; test in paper mode first\n\n"
+                "<i>Demo account = fake money 🧪 · Live account = real money 🔴</i>",
+                extra={"reply_markup": {"inline_keyboard": [[
+                    {"text": "✅ I understand — I accept the risk", "callback_data": "risk:ok"}]]}})
     # Per-user first — the client's loop reads the user record, not the global cfg.
     user_store.update(chat_id, {"paper": on})
     _restart_user_loop(chat_id)
@@ -910,8 +929,23 @@ def _handle_tp(chat_id, args):
 
 
 def _handle_symbol(chat_id, args):
-    sym = (args or "").strip().upper().replace("/", "_").replace("-", "_")
-    if not _PAIR_RE.match(sym):
+    sym = (args or "").strip().upper().replace("/", "_").replace("-", "_").replace(" ", "")
+    user = user_store.load(chat_id)
+    is_ct = bool(user.get("ctrader_access_token") and user.get("ctrader_account_id"))
+    if is_ct:
+        # cTrader accounts offer far more than FX majors (gold, indices, crypto
+        # CFDs…) — validate against what THIS account actually offers.
+        if not re.match(r"^[A-Z0-9_]{3,16}$", sym):
+            return send_to(chat_id, "❌ Usage: <code>/symbol EUR_USD</code> — see /pairs for everything you can trade.")
+        try:
+            from apex import user_loop as _ul
+            br, _ = _ul._make_broker(user)
+            br._symbol_id(sym)   # raises if the account doesn't offer it
+        except ValueError:
+            return send_to(chat_id, f"❌ Your broker doesn't offer <b>{sym}</b>. Send /pairs to see what's available.")
+        except Exception as e:
+            return send_to(chat_id, f"⚠️ Couldn't verify the symbol right now: <i>{str(e)[:120]}</i>. Try again in a minute.")
+    elif not _PAIR_RE.match(sym):
         return send_to(chat_id, "❌ Usage: <code>/symbol EUR_USD</code>")
     user_store.update(chat_id, {"symbol": sym})
     _restart_user_loop(chat_id)
@@ -919,7 +953,36 @@ def _handle_symbol(chat_id, args):
         _save_runtime({"TRADE_SYMBOL": sym})
         _apply("TRADE_SYMBOL", sym)
         cfg.SYMBOL = sym
-    send_to(chat_id, f"💱 Currency pair set to <b>{sym}</b>.")
+    warn = ""
+    if is_ct and not _PAIR_RE.match(sym):
+        warn = ("\n⚠️ <i>Non-FX instrument: stop-loss/take-profit use FX pip conventions, "
+                "so distances and sizing can differ on this symbol. Test it in paper mode first.</i>")
+    send_to(chat_id, f"💱 Trading symbol set to <b>{sym}</b>.{warn}")
+
+
+def _handle_pairs(chat_id):
+    """List everything the client's linked cTrader account can trade."""
+    user = user_store.load(chat_id)
+    if not (user.get("ctrader_access_token") and user.get("ctrader_account_id")):
+        return send_to(chat_id,
+            "💱 <b>Available pairs</b> (connect cTrader with /ctrader to see your broker's full list):\n"
+            "EUR_USD · GBP_USD · USD_JPY · AUD_USD · USD_CAD · NZD_USD · USD_CHF · EUR_GBP")
+    try:
+        from apex import user_loop as _ul
+        br, _ = _ul._make_broker(user)
+        br._load_symbols()
+        names = sorted(br._sym_id.keys())
+    except Exception as e:
+        return send_to(chat_id, f"⚠️ Couldn't load the symbol list: <i>{str(e)[:140]}</i>. Try again in a minute.")
+    if not names:
+        return send_to(chat_id, "⚠️ Your broker returned no tradable symbols. Check the account in cTrader.")
+    shown = names[:80]
+    more = len(names) - len(shown)
+    body = " · ".join(shown) + (f"\n\n…and <b>{more}</b> more." if more > 0 else "")
+    send_to(chat_id,
+            f"💱 <b>Your broker offers {len(names)} instruments:</b>\n\n{body}\n\n"
+            "Pick one with <code>/symbol NAME</code> (e.g. <code>/symbol XAUUSD</code>).\n"
+            "<i>Non-FX instruments: test in paper mode first — SL/TP use FX pip conventions.</i>")
 
 
 def _handle_buy(chat_id, args):
@@ -1286,6 +1349,7 @@ _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "/sl &lt;pips&gt; — stop loss in pips\n"
                "/tp &lt;pips&gt; — take profit in pips\n"
                "/symbol &lt;PAIR&gt; — set pair (EUR_USD)\n"
+               "/pairs — everything your broker lets you trade\n"
                "/setkeys KEY=val ... — set credentials\n"
                "  (message is auto-deleted for safety)\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
@@ -1555,6 +1619,8 @@ def _poll_loop():
                     _handle_tp(chat_id, args)
                 elif cmd_l == "/symbol":
                     _handle_symbol(chat_id, args)
+                elif cmd_l in ("/pairs", "/symbols"):
+                    _handle_pairs(chat_id)
                 elif cmd_l == "/buy":
                     _handle_buy(chat_id, args)
                 elif cmd_l == "/sell":

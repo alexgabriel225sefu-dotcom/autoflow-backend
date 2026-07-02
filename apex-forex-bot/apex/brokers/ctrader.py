@@ -405,8 +405,13 @@ class CtraderBroker:
         req.symbolId = sid
         req.period = getattr(ProtoOATrendbarPeriod, period_name)
         req.count = count
-        # toTimestamp = now; the API returns the most recent `count` bars
-        req.toTimestamp = int(time.time() * 1000)
+        # fromTimestamp/toTimestamp are REQUIRED protobuf fields — omitting
+        # `from` rejects every request. Window = count bars back from now.
+        period_sec = {"M1": 60, "M5": 300, "M15": 900, "M30": 1800,
+                      "H1": 3600, "H4": 14400, "D1": 86400}.get(period_name, 300)
+        now_ms = int(time.time() * 1000)
+        req.toTimestamp = now_ms
+        req.fromTimestamp = now_ms - (count + 5) * period_sec * 1000
         res = self._rpc(req, ProtoOAGetTrendbarsRes, timeout=20)
         scale = self._scale(sym)
         out = []
