@@ -298,6 +298,28 @@ def mini_chart(closes):
     return "".join(blocks[min(7, int((c - lo) / rng * 8))] for c in sl)
 
 
+def _guide_url():
+    base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+    return f"{base}/guide-app" if base else ""
+
+
+def _guide_button():
+    url = _guide_url()
+    return ({"reply_markup": {"inline_keyboard": [[
+        {"text": "📖 How it works — open the guide", "web_app": {"url": url}}]]}}
+        if url else None)
+
+
+def _handle_guide(chat_id):
+    url = _guide_url()
+    if not url:
+        return send_to(chat_id, "⚠️ Guide isn't available (RENDER_EXTERNAL_URL not set).")
+    send_to(chat_id,
+        "📖 <b>Apex — How it works</b>\n\nA 2-minute visual guide: connecting, setup, "
+        "how it trades, the controls and the terminal. Tap to open.",
+        _guide_button())
+
+
 def _dashboard_keyboard(chat_id=None):
     """One clear control surface: a big ON/OFF toggle + the live terminal.
     The toggle reflects the real running state so nobody has to remember
@@ -813,6 +835,8 @@ def _handle_ctaccount(chat_id, args):
     env = "LIVE 🔴" if match.get("live") else "demo 🧪"
     send_to(chat_id, f"✅ Trading account set to <code>{match['ctid']}</code> ({env}).\n{bal_line}"
                      "Let's set you up — 3 quick taps and the bot is trading. 👇")
+    if _guide_button():
+        send_to(chat_id, "📖 First time? Open the quick guide anytime with /guide.", _guide_button())
     onboard_start(chat_id)
 
 
@@ -889,6 +913,7 @@ def _finish_onboard(chat_id):
             "you'll get an alert on every move. It may sit and wait a while; that's normal, "
             "it only takes good setups.\n\n"
             "Use the buttons below to turn it OFF/ON or open the live terminal.\n"
+            "📖 Full guide anytime: /guide\n"
             "<i>Fine-tune anytime:</i> /pairs · /watch · /strategy · /risk",
             _dashboard_keyboard(chat_id))
 
@@ -2043,10 +2068,13 @@ def _poll_loop():
                         continue
                     access.grant(chat_id_str)
                     send_to(chat_id,
-                            "✅ <b>Welcome to Apex Forex Bot!</b>\n\n"
-                            "Your bot is now active. 🚀\n\n"
-                            "Send /setup to choose paper/live, your pair and risk, "
-                            "then /status to see the live snapshot.")
+                            "✅ <b>Welcome to Apex Forex Bot!</b> 🚀\n\n"
+                            "You're in. Here's the whole thing in 3 moves:\n"
+                            "1️⃣ Connect your account — send <b>/ctrader</b>\n"
+                            "2️⃣ Pick what to trade, the method &amp; paper/real (3 taps)\n"
+                            "3️⃣ The bot turns ON and trades for you\n\n"
+                            "New to this? Open the visual guide first 👇 — then send /ctrader.",
+                            _guide_button())
                     send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id_str}</code>")
                     continue
 
@@ -2141,6 +2169,8 @@ def _poll_loop():
                     _handle_chart(chat_id, args)
                 elif cmd_l in ("/terminal", "/app"):
                     _handle_terminal(chat_id)
+                elif cmd_l in ("/guide", "/help2", "/manual", "/howto"):
+                    _handle_guide(chat_id)
                 elif cmd_l == "/atr":
                     _handle_atr(chat_id, args)
                 elif cmd_l in ("/stats", "/performance"):

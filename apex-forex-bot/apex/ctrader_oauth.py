@@ -192,6 +192,9 @@ def handle_callback(query: dict):
                        f"✅ <b>cTrader connected!</b>\n\nAccount <code>{a['ctid']}</code> ({env}) is linked.\n\n"
                        f"{bal_line}"
                        "Let's set you up — 3 quick taps and the bot is trading. 👇")
+            gb = tg._guide_button()
+            if gb:
+                tg.send_to(chat_id, "📖 First time? Open the quick guide anytime with /guide.", gb)
             tg.onboard_start(chat_id)
         elif accounts:
             lines = "\n".join(

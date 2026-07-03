@@ -596,6 +596,15 @@ def _start_dashboard_server():
                 return
             # Telegram Mini App — the page is public; every DATA call inside it
             # carries Telegram's signed initData, validated per user below.
+            if self.path == "/guide-app" or self.path.startswith("/guide-app?"):
+                from apex import webapp
+                payload = webapp.GUIDE_HTML.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
             if self.path == "/app" or self.path.startswith("/app?"):
                 from apex import webapp
                 payload = webapp.HTML.encode("utf-8")
