@@ -124,6 +124,7 @@ def _loop(user_id, alert_fn, gen=None):
     last_close_at = 0.0 # re-entry lock after ANY close — kills open/close churn
     loss_streak = 0     # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
     prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
+    pos_details = {}    # nrm(symbol) -> {symbol, side, entry, units} for P&L on close
     rate_limit_until = 0.0  # while > now, do only the minimal 1-symbol fetch
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
@@ -225,18 +226,50 @@ def _loop(user_id, alert_fn, gen=None):
                     all_positions = broker.get_all_positions()
                     open_syms = {_nrm(p["symbol"]) for p in all_positions}
                     open_exposure = [forex.usd_exposure(p["symbol"], p["side"]) for p in all_positions]
+                    # Remember each position's details so we can compute realized
+                    # P&L when it later closes at the broker (multi-position).
+                    for p in all_positions:
+                        pos_details[_nrm(p["symbol"])] = {
+                            "symbol": p["symbol"], "side": p["side"],
+                            "entry": p.get("entryPrice"), "units": p.get("units", 0)}
                 except Exception as e:
                     all_positions = None  # unknown → don't open blind this tick
                     print(f"[UserLoop:{user_id}] positions read: {e}")
-            # Report positions that closed at the broker since last tick.
+            # Report + JOURNAL positions that closed at the broker since last tick.
             if all_positions is not None:
                 # Focused symbol's close is reported by the single-position path
                 # below; only announce the OTHER (self-managed) ones here.
                 closed_now = prev_open_syms - open_syms - {_nrm(symbol)}
                 for cs in closed_now:
+                    det = pos_details.get(cs, {})
+                    est_pnl = None
+                    xp = None
+                    try:
+                        if det.get("entry") and det.get("units"):
+                            xc = broker.get_candles(det["symbol"], cfg.TIMEFRAME, 2)
+                            xp = xc[-1]["close"] if xc else None
+                            if xp:
+                                est_pnl = round(forex.pnl_usd(det["side"], det["entry"], xp,
+                                                              det["units"], det["symbol"]), 2)
+                    except Exception:
+                        est_pnl = None
+                    now2 = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    rec = {"action": "CLOSE", "symbol": det.get("symbol", cs),
+                           "entryPrice": det.get("entry"), "price": xp,
+                           "grossPnl": est_pnl, "costUsd": 0.0, "netPnl": est_pnl,
+                           "balance": round(paper_balance, 2), "time": now2}
+                    _log_trade(user_id, rec)
+                    dash["trades"].insert(0, {**rec, "reasoning": "closed at broker (target/stop)"})
+                    dash["trades"] = dash["trades"][:50]
+                    if est_pnl is not None and est_pnl < 0:
+                        loss_streak += 1
+                        last_loss_at = time.time()
+                    elif est_pnl is not None and est_pnl > 0:
+                        loss_streak = 0
+                    pos_details.pop(cs, None)
                     if alert_fn:
-                        alert_fn(user_id, {"action": "BROKER_CLOSE_MULTI", "symbol": cs,
-                                           "balance": round(paper_balance, 2)})
+                        alert_fn(user_id, {"action": "BROKER_CLOSE_MULTI", "symbol": det.get("symbol", cs),
+                                           "netPnl": est_pnl, "balance": round(paper_balance, 2)})
                 prev_open_syms = set(open_syms)
             open_count = len(open_syms)
             dash["openCount"] = open_count
