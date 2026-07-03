@@ -59,7 +59,7 @@ def _make_broker(user):
         CTRADER_ENV           = user.get("ctrader_env", "demo"),
         SYMBOL           = user.get("symbol", "EUR_USD"),
         TIMEFRAME        = user.get("timeframe", "5m"),
-        CANDLES          = 720,  # enough M5 history to confirm the H1 trend
+        CANDLES          = 240,  # M5 history for indicators (H1 gate removed → 720 was overkill)
         PAPER_TRADING    = paper,
         PAPER_BALANCE    = float(user.get("paper_balance", 1000)),
         STOP_LOSS_PIPS   = float(user.get("sl_pips", 20)),
@@ -247,8 +247,9 @@ def _loop(user_id, alert_fn, gen=None):
                     if _nrm(ws) in open_syms:
                         continue  # already holding this one
                     try:
-                        c2 = broker.get_candles(ws, cfg.TIMEFRAME, 260)
-                        if not c2 or len(c2) < 220:
+                        time.sleep(0.35)  # space out trendbar requests — cTrader rate-limits bursts
+                        c2 = broker.get_candles(ws, cfg.TIMEFRAME, 160)
+                        if not c2 or len(c2) < 130:
                             continue
                         ind2 = indicators.analyze(c2)
                         st2 = strategies.analyze(c2)
@@ -282,14 +283,17 @@ def _loop(user_id, alert_fn, gen=None):
             if not candles:
                 data_fails += 1
                 print(f"[UserLoop:{user_id}] data error ({data_fails}): {data_err}")
-                if data_fails == 3 and alert_fn:
+                rate_limited = "rate" in str(data_err).lower() or "BLOCKED_PAYLOAD" in str(data_err)
+                if data_fails == 3 and alert_fn and not rate_limited:
                     alert_fn(user_id, {
                         "action": "DATA_ERROR",
                         "reason": data_err,
                         "symbol": symbol,
                         "broker": dash.get("broker", "your broker"),
                     })
-                time.sleep(30)
+                # Rate-limit → back off longer so the limit resets; transient
+                # rate limits shouldn't spam the user with data-error alerts.
+                time.sleep(90 if rate_limited else 30)
                 continue
             data_fails = 0
 
