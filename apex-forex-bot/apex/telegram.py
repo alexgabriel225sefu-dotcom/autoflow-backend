@@ -350,7 +350,7 @@ def _build_status(dash, chart=""):
     chart_line = (f"\n<code>{chart}</code>  <b>{dash.get('currentPrice', 0):.5f}</b>") if chart else ""
     market = "🟢 OPEN" if forex.is_market_open() else "🔴 CLOSED (weekend)"
     sessions = ", ".join(forex.active_sessions()) or "—"
-    pos_line = "📭 No open position"
+    oc = dash.get("openCount", 0)
     if dash.get("openPosition"):
         op = dash["openPosition"]
         d = "🟢 LONG" if op["side"] == "BUY" else "🔴 SHORT"
@@ -358,6 +358,12 @@ def _build_status(dash, chart=""):
         pos_line = (f"{d} <b>{op['symbol']}</b>\n  Entry: {op['entryPrice']}  "
                     f"SL: {(op.get('stopLoss') or 0):.5f}\n"
                     f"  PnL: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>")
+        if oc > 1:
+            pos_line += f"\n  <i>+{oc - 1} more open — see the terminal / cTrader</i>"
+    elif oc > 0:
+        pos_line = f"📊 <b>{oc} position{'s' if oc != 1 else ''} open</b> — managed by their broker stops. See the terminal."
+    else:
+        pos_line = "📭 No open position"
     return (f"💱 <b>APEX FOREX BOT</b>  {dash.get('mode', '')} · "
             f"{dash.get('broker', '')}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
