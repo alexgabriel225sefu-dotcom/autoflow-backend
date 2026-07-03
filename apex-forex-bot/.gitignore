@@ -12,3 +12,6 @@ dist/
 build/
 .venv/
 venv/
+
+# claude-flow tooling artifacts (session state, local only)
+.claude-flow/
