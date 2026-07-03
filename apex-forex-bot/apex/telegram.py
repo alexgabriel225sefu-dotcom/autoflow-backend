@@ -298,11 +298,23 @@ def mini_chart(closes):
     return "".join(blocks[min(7, int((c - lo) / rng * 8))] for c in sl)
 
 
-def _dashboard_keyboard():
-    if not DASHBOARD_URL:
+def _dashboard_keyboard(chat_id=None):
+    """One clear control surface: a big ON/OFF toggle + the live terminal.
+    The toggle reflects the real running state so nobody has to remember
+    /start vs /stop — you just tap."""
+    rows = []
+    if chat_id is not None:
+        if user_loop.is_running(chat_id):
+            rows.append([{"text": "⏸  Turn bot OFF", "callback_data": "bot:off"}])
+        else:
+            rows.append([{"text": "▶️  Turn bot ON — start trading", "callback_data": "bot:on"}])
+    term_url = DASHBOARD_URL or ((os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/") + "/app"
+                                 if os.getenv("RENDER_EXTERNAL_URL") else "")
+    if term_url:
+        rows.append([{"text": "📊 Open Terminal", "web_app": {"url": term_url}}])
+    if not rows:
         return {}
-    return {"reply_markup": json.dumps(
-        {"inline_keyboard": [[{"text": "📊 Live Dashboard", "web_app": {"url": DASHBOARD_URL}}]]})}
+    return {"reply_markup": json.dumps({"inline_keyboard": rows})}
 
 
 def _build_status(dash, chart=""):
@@ -372,18 +384,23 @@ def _handle_status(chat_id):
             paper = user.get("paper", True)
             is_open = forex.is_market_open()
             mode_label = "Paper" if paper else "Live"
+            running = user_loop.is_running(chat_id)
+            header = ("✅ <b>BOT IS ON</b> — watching the market.\n\n" if running
+                      else "⏸ <b>BOT IS OFF</b> — tap ▶️ below to start.\n\n")
             send_to(chat_id,
+                    header +
                     f"💱 <b>APEX FOREX BOT</b>  {mode_label}\n"
                     f"━━━━━━━━━━━━━━━━━━━━\n"
                     f"💰 Balance: <b>${bal:.2f}</b>\n"
                     f"💱 Pair: <b>{sym}</b> | "
-                    f"{'🟢 OPEN' if is_open else '🔴 CLOSED (weekend)'}\n\n"
-                    f"📭 No open position. Bot is scanning automatically.\n"
-                    f"<i>Force entry:</i> <code>/buy {sym}</code> or <code>/sell {sym}</code>")
+                    f"{'🟢 OPEN' if is_open else '🔴 CLOSED (weekend)'}",
+                    _dashboard_keyboard(chat_id))
             return
         dash = _get_dash()
     if not dash or not dash.get("broker"):
-        return send_to(chat_id, "⏳ Bot not started yet. Send /start to begin trading.")
+        return send_to(chat_id,
+            "⏸ <b>Bot is OFF.</b> Tap the button to start trading.",
+            _dashboard_keyboard(chat_id))
     chart = ""
     if _broker:
         try:
@@ -391,7 +408,13 @@ def _handle_status(chat_id):
             chart = mini_chart([c["close"] for c in candles])
         except Exception:
             pass
-    send_to(chat_id, _build_status(dash, chart), _dashboard_keyboard())
+    # Crystal-clear ON/OFF header so 'running but no position' never reads as
+    # 'broken'. Running = watching, will trade when a valid setup appears.
+    running = user_loop.is_running(chat_id)
+    header = ("✅ <b>BOT IS ON</b> — watching the market, it trades automatically when a valid setup appears.\n\n"
+              if running else
+              "⏸ <b>BOT IS OFF</b> — tap ▶️ below to start.\n\n")
+    send_to(chat_id, header + _build_status(dash, chart), _dashboard_keyboard(chat_id))
 
 
 # ─── Setup wizard ─────────────────────────────────────────
@@ -857,21 +880,35 @@ def _finish_onboard(chat_id):
     user_loop.stop(chat_id)
     user_loop.start(chat_id, alert_fn=_user_alert)
     send_to(chat_id,
-            "🎉 <b>You're all set — the bot is running!</b>\n\n"
+            "🎉 <b>All set — your bot is ON and trading!</b>\n\n"
             f"💱 Symbol: <b>{u.get('symbol', 'EUR_USD')}</b>\n"
             f"🎯 Method: <b>{strat}</b>\n"
             f"⚙️ Mode: <b>{mode}</b>\n"
             f"⚖️ Risk: <b>{float(u.get('risk', 0.005)) * 100:g}%</b> per trade\n\n"
-            "I analyze the market every few minutes and alert you on every move — "
-            "with the reason in plain language.\n\n"
-            "/terminal — live chart &amp; news terminal 📈\n"
-            "/status — live overview\n"
-            "/pairs · /strategy · /risk · /sl · /tp — tune anytime\n"
-            "/env live · /env practice — real ↔ paper")
+            "It watches the market and trades automatically when a valid setup appears — "
+            "you'll get an alert on every move. It may sit and wait a while; that's normal, "
+            "it only takes good setups.\n\n"
+            "Use the buttons below to turn it OFF/ON or open the live terminal.\n"
+            "<i>Fine-tune anytime:</i> /pairs · /watch · /strategy · /risk",
+            _dashboard_keyboard(chat_id))
 
 
 def _handle_cb(chat_id, data):
     """Inline-button presses (copilot approve/reject, risk acceptance, onboarding)."""
+    if data == "bot:on":
+        _auto_start_user(chat_id)
+        return send_to(chat_id,
+            "✅ <b>Bot is ON.</b>\nIt's watching the market now and will trade automatically "
+            "when a valid setup appears — you'll get an alert on every move.",
+            _dashboard_keyboard(chat_id))
+    if data == "bot:off":
+        user_loop.stop(chat_id)
+        if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
+            _bot_control["set_paused"](True)
+        return send_to(chat_id,
+            "⏸ <b>Bot is OFF.</b>\nNo new trades will open. Any open position stays protected by its stop. "
+            "Tap ▶️ to turn it back on.",
+            _dashboard_keyboard(chat_id))
     if data.startswith("ob:sym:"):
         sym = data[7:]
         user_store.update(chat_id, {"symbol": sym})
@@ -1726,10 +1763,14 @@ def _handle_start(chat_id):
             "⚙️ <b>Setup required first!</b>\n\n"
             "Send /setup to start in paper mode, or /ctrader to connect a live account.")
     if user_loop.is_running(chat_id):
-        return send_to(chat_id, "▶️ Bot is already running. Send /status to check.")
+        return send_to(chat_id,
+            "✅ <b>Bot is already ON</b> — watching the market. It trades automatically when a valid setup appears.",
+            _dashboard_keyboard(chat_id))
 
     _auto_start_user(chat_id)
-    send_to(chat_id, "▶️ <b>Your bot started!</b> Trading is now active.\nSend /status to monitor.", _dashboard_keyboard())
+    send_to(chat_id,
+        "✅ <b>Bot is ON — trading now active.</b>\nIt watches the market and trades automatically on valid setups.",
+        _dashboard_keyboard(chat_id))
 
 
 def _handle_stop(chat_id):
@@ -1737,7 +1778,10 @@ def _handle_stop(chat_id):
     # Also pause global bot for admin
     if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
         _bot_control["set_paused"](True)
-    send_to(chat_id, "⏸️ <b>Bot paused.</b> No new trades will open.\nSend /start to resume.")
+    send_to(chat_id,
+        "⏸ <b>Bot is OFF.</b> No new trades will open. Any open position stays protected by its stop.\n"
+        "Tap ▶️ below to turn it back on.",
+        _dashboard_keyboard(chat_id))
 
 
 def _handle_config(chat_id):
