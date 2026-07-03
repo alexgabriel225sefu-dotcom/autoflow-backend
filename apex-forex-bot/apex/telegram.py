@@ -959,6 +959,8 @@ def _finish_onboard(chat_id):
 
 def _handle_cb(chat_id, data):
     """Inline-button presses (copilot approve/reject, risk acceptance, onboarding)."""
+    if data == "go:connect":
+        return _handle_ctrader(chat_id)
     if data == "bot:on":
         if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
             _bot_control["set_paused"](False)
@@ -1932,10 +1934,13 @@ def _restart_user_loop(chat_id):
 def _handle_start(chat_id):
     user = user_store.load(chat_id)
     # Check user has credentials set up
-    if not access.is_admin(str(chat_id)) and not user.get("oanda_token") and not user.get("paper"):
+    if (not access.is_admin(str(chat_id)) and not user.get("paper")
+            and not (user.get("ctrader_access_token") and user.get("ctrader_account_id"))):
         return send_to(chat_id,
-            "⚙️ <b>Setup required first!</b>\n\n"
-            "Send /setup to start in paper mode, or /ctrader to connect a live account.")
+            "🔗 <b>First, connect your trading account.</b>\n\n"
+            "Tap below — it takes 30 seconds and then the bot sets itself up.",
+            extra={"reply_markup": {"inline_keyboard": [[
+                {"text": "🔗 Connect my account", "callback_data": "go:connect"}]]}})
     if user_loop.is_running(chat_id):
         return send_to(chat_id,
             "✅ <b>Bot is already ON</b> — watching the market. It trades automatically when a valid setup appears.",
@@ -2218,14 +2223,19 @@ def _poll_loop():
                     if not _license_ok(chat_id, raw):
                         continue
                     access.grant(chat_id_str)
+                    gurl = _guide_url()
+                    kb = [[{"text": "🚀 Set up my bot (30 sec)", "callback_data": "go:connect"}]]
+                    if gurl:
+                        kb.append([{"text": "📖 How it works — watch first", "web_app": {"url": gurl}}])
                     send_to(chat_id,
-                            "✅ <b>Welcome to Apex Forex Bot!</b> 🚀\n\n"
-                            "You're in. Here's the whole thing in 3 moves:\n"
-                            "1️⃣ Connect your account — send <b>/ctrader</b>\n"
-                            "2️⃣ Pick what to trade, the method &amp; paper/real (3 taps)\n"
-                            "3️⃣ The bot turns ON and trades for you\n\n"
-                            "New to this? Open the visual guide first 👇 — then send /ctrader.",
-                            _guide_button())
+                            "🎉 <b>Welcome — your license is active!</b>\n\n"
+                            "You now own a fully-hosted AI trading bot that runs on "
+                            "<b>your own</b> account and you control from right here in Telegram. "
+                            "No apps, no installs, nothing to configure by hand.\n\n"
+                            "👇 <b>One tap sets everything up</b> — connect your account, pick "
+                            "what to trade, and the bot starts working for you. "
+                            "New to trading bots? Watch the 2-minute guide first.",
+                            extra={"reply_markup": {"inline_keyboard": kb}})
                     send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id_str}</code>")
                     continue
 
