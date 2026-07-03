@@ -52,6 +52,20 @@ def pip_size(instrument: str, price: float = None) -> float:
     return 0.0001
 
 
+def usd_exposure(instrument: str, side: str) -> int:
+    """+1 = the trade is net LONG USD, -1 = net SHORT USD, 0 = no USD leg.
+    Used by the correlation guard so the bot doesn't stack many positions that
+    are secretly the same macro bet (BUY EURUSD + BUY GBPUSD = both short USD)."""
+    s = _norm(instrument)
+    if not _is_fx(s) or "USD" not in s:
+        return 0  # non-FX (gold, indices, crypto) or non-USD cross → own bucket
+    if s.startswith("USD"):
+        return 1 if side == "BUY" else -1     # BUY USDJPY = long USD
+    if s.endswith("USD"):
+        return -1 if side == "BUY" else 1     # BUY EURUSD = short USD
+    return 0
+
+
 def min_units(instrument: str) -> int:
     """Order floor: 0.01 lot (1,000 units) for FX; a single unit for everything
     else (oz, contracts, shares, coins) — the broker's real per-symbol minimum

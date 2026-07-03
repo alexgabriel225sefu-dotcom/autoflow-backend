@@ -365,6 +365,7 @@ def _build_status(dash, chart=""):
             f"{' ⏳ <i>refreshing…</i>' if dash.get('balStale') else ''}{chart_line}\n"
             f"🕐 Market: {market} · Sessions: {sessions}\n"
             f"🎯 Method: {dash.get('strategy', 'Mean Reversion')}\n"
+            + (f"📊 Positions: {dash.get('openCount', 0)}/{dash['maxpos']} open\n" if dash.get('maxpos', 1) > 1 else "")
             + (f"🤖 Auto-Pilot: scanning {len(dash['watchlist'])} instruments — focus {dash.get('symbol', '')}\n" if dash.get('autopilot') and dash.get('watchlist')
                else f"👁 Scanning: {' · '.join(dash['watchlist'])} — focus {dash.get('symbol', '')}\n" if dash.get('watchlist') else "")
             + (f"🌊 Regime: {dash['regime']['label']}\n" if isinstance(dash.get('regime'), dict) else "")
@@ -1291,6 +1292,38 @@ _AUTOPILOT_CANDIDATES = [
 ]
 
 
+def _handle_maxpos(chat_id, args):
+    """Set how many positions the bot may hold at once (multi-position mode)."""
+    arg = (args or "").strip()
+    user = user_store.load(chat_id)
+    if not arg:
+        cur = int(user.get("maxpos", 1))
+        risk = float(user.get("max_total_risk", 0.05)) * 100
+        return send_to(chat_id,
+            f"📊 <b>Max positions: {cur}</b> · total-risk cap {risk:g}%\n\n"
+            "The bot can hold several trades at once and closes each on its own "
+            "target/stop. Total risk stays capped no matter how many are open.\n\n"
+            "<code>/maxpos 5</code> — allow up to 5 at once (1–8)\n"
+            "<code>/maxpos 1</code> — one at a time (default)")
+    try:
+        n = int(arg)
+        if not (1 <= n <= 8):
+            raise ValueError
+    except ValueError:
+        return send_to(chat_id, "❌ Usage: <code>/maxpos 5</code> (a number 1–8)")
+    user_store.update(chat_id, {"maxpos": n})
+    running = _restart_user_loop(chat_id)
+    per = 5.0 / n
+    send_to(chat_id,
+        f"📊 <b>Max positions set to {n}.</b>\n"
+        + ("One trade at a time.\n" if n == 1 else
+           f"Up to {n} trades at once — each risks ~{per:.1f}% so all {n} together "
+           f"never risk more than 5% of the account. Correlated same-direction "
+           f"trades are limited automatically.\n")
+        + ("" if running or user_loop.is_running(chat_id) else "⏸ <i>Bot stopped — tap ▶️ to start.</i>"),
+        _dashboard_keyboard(chat_id))
+
+
 def _handle_autopilot(chat_id, args):
     """Full hands-off mode: the bot picks the instruments itself from a curated
     liquid universe (validated against the client's broker) and trades the
@@ -1760,6 +1793,11 @@ def _user_alert(uid, result):
             send_to(uid,
                     f"🔒 <b>Position closed</b> — {sym}\n"
                     f"Price: <b>{result.get('price', '—')}</b>" + why)
+    elif action == "BROKER_CLOSE_MULTI":
+        send_to(uid,
+                f"🔒 <b>Position closed</b> — {sym}\n"
+                f"Hit its target or stop at the broker.\n"
+                f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>")
     elif action == "BROKER_HEALTH":
         if result.get("status") == "degraded":
             send_to(uid,
@@ -1934,6 +1972,7 @@ _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "/pairs — everything your broker lets you trade\n"
                "/watch — scan a basket of instruments, trade the strongest setup\n"
                "/autopilot on — full hands-off: bot picks the instruments too\n"
+               "/maxpos 5 — hold several trades at once (risk stays capped)\n"
                "/strategy — trading method (auto · mean reversion · trend · breakout)\n"
                "/atr on|off — dynamic ATR stops (SL 1.5×ATR / TP 3×ATR)\n"
                "/wizard — guided setup (symbol → method → mode)\n"
@@ -2218,6 +2257,8 @@ def _poll_loop():
                     _handle_watch(chat_id, args)
                 elif cmd_l in ("/autopilot", "/auto"):
                     _handle_autopilot(chat_id, args)
+                elif cmd_l in ("/maxpos", "/positions"):
+                    _handle_maxpos(chat_id, args)
                 elif cmd_l in ("/strategy", "/method"):
                     _handle_strategy(chat_id, args)
                 elif cmd_l == "/backtest":

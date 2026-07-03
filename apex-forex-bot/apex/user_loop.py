@@ -123,6 +123,7 @@ def _loop(user_id, alert_fn, gen=None):
     last_loss_at = 0.0  # entry cooldown anchor (any losing close)
     last_close_at = 0.0 # re-entry lock after ANY close — kills open/close churn
     loss_streak = 0     # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
+    prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
     last_mkt_tick = -_SKIP_WARN_THROTTLE      # market-pulse heads-up (throttled)
@@ -200,12 +201,51 @@ def _loop(user_id, alert_fn, gen=None):
                 time.sleep(60)
                 continue
 
-            # ── Basket scan: with no open position, shop every watched symbol
-            # with the cheap rule engines and focus this tick on the strongest
-            # candidate. The winner still passes the FULL pipeline below.
-            if watchlist and not open_pos:
+            # ── MULTI-POSITION: how many concurrent trades, and total-risk cap.
+            # Live-only (paper stays single). Total exposure is bounded by
+            # sizing each trade at max_total_risk / maxpos, so N positions never
+            # risk more than max_total_risk of the account combined.
+            maxpos = int(user_store.load(user_id).get("maxpos", 1)) if not cfg.PAPER_TRADING else 1
+            maxpos = max(1, min(maxpos, 8))
+            max_total_risk = float(user_store.load(user_id).get("max_total_risk", 0.05))
+            per_trade_risk = min(cfg.RISK_PER_TRADE, max_total_risk / maxpos)
+
+            def _nrm(x):
+                return (x or "").upper().replace("_", "").replace("/", "").replace("-", "")
+
+            all_positions = None
+            open_syms, open_exposure = set(), []
+            if not cfg.PAPER_TRADING:
+                try:
+                    all_positions = broker.get_all_positions()
+                    open_syms = {_nrm(p["symbol"]) for p in all_positions}
+                    open_exposure = [forex.usd_exposure(p["symbol"], p["side"]) for p in all_positions]
+                except Exception as e:
+                    all_positions = None  # unknown → don't open blind this tick
+                    print(f"[UserLoop:{user_id}] positions read: {e}")
+            # Report positions that closed at the broker since last tick.
+            if all_positions is not None:
+                # Focused symbol's close is reported by the single-position path
+                # below; only announce the OTHER (self-managed) ones here.
+                closed_now = prev_open_syms - open_syms - {_nrm(symbol)}
+                for cs in closed_now:
+                    if alert_fn:
+                        alert_fn(user_id, {"action": "BROKER_CLOSE_MULTI", "symbol": cs,
+                                           "balance": round(paper_balance, 2)})
+                prev_open_syms = set(open_syms)
+            open_count = len(open_syms)
+            dash["openCount"] = open_count
+            dash["maxpos"] = maxpos
+
+            # ── Basket/Auto-Pilot scan: shop every watched symbol (that isn't
+            # already open) and focus on the strongest candidate. Only scan if
+            # we have a free slot. The winner still passes the FULL pipeline.
+            slot_free = (all_positions is not None) and (open_count < maxpos)
+            if watchlist and slot_free:
                 best = None
                 for ws in watchlist:
+                    if _nrm(ws) in open_syms:
+                        continue  # already holding this one
                     try:
                         c2 = broker.get_candles(ws, cfg.TIMEFRAME, 260)
                         if not c2 or len(c2) < 220:
@@ -226,8 +266,9 @@ def _loop(user_id, alert_fn, gen=None):
                             best = (ws, s2["confidence"])
                     except Exception as e:
                         print(f"[UserLoop:{user_id}] scan {ws}: {e}")
-                symbol = best[0] if best else watchlist[0]
-                dash["symbol"] = symbol
+                if best:
+                    symbol = best[0]
+                    dash["symbol"] = symbol
 
             # Data fetch is the loop's lifeline — if it fails silently the user
             # just sees "Last tick: None" forever. Count failures and tell them.
@@ -265,11 +306,12 @@ def _loop(user_id, alert_fn, gen=None):
             if not cfg.PAPER_TRADING:
                 prev_pos = open_pos
                 try:
+                    # Focus this tick on the SCANNED symbol; its position (if any)
+                    # is managed here. Other open positions ride their broker
+                    # SL/TP. In single-position mode (maxpos 1) fall back to
+                    # whatever symbol currently holds the one position.
                     open_pos = broker.get_open_position(symbol)
-                    # basket mode: the open position may be on another watched
-                    # symbol — if so, this tick manages THAT one. Never scan
-                    # into a second entry while any watched position is open.
-                    if watchlist and not open_pos:
+                    if maxpos == 1 and watchlist and not open_pos:
                         for ws in watchlist:
                             if ws == symbol:
                                 continue
@@ -504,6 +546,24 @@ def _loop(user_id, alert_fn, gen=None):
             confidence = signal.get("confidence", 0)
 
             entry_ok = action in ("BUY", "SELL") and not open_pos and confidence >= cfg.MIN_CONFIDENCE
+            # ── Multi-position gates (live) ──
+            if entry_ok and not cfg.PAPER_TRADING:
+                if all_positions is None:
+                    entry_ok = False  # couldn't read positions — don't stack blind
+                elif open_count >= maxpos:
+                    entry_ok = False
+                    _skip(f"at max positions ({open_count}/{maxpos})")
+                elif _nrm(symbol) in open_syms:
+                    entry_ok = False  # already holding this symbol
+                else:
+                    # Correlation guard: cap how many positions share the same
+                    # USD direction, so 5 trades aren't secretly one USD bet.
+                    new_exp = forex.usd_exposure(symbol, action)
+                    if new_exp != 0:
+                        same_dir = sum(1 for e in open_exposure if e == new_exp)
+                        if same_dir >= 2:
+                            entry_ok = False
+                            _skip(f"correlation guard — already {same_dir} {'USD-long' if new_exp>0 else 'USD-short'} positions")
             # Quiet regime (AUTO): no edge, no trade.
             if entry_ok and regime_block:
                 entry_ok = False
@@ -634,7 +694,7 @@ def _loop(user_id, alert_fn, gen=None):
                 risk_mult = 1.0 if loss_streak < 2 else (0.5 if loss_streak == 2 else 0.25)
                 if regime.get("regime") == "volatile":
                     risk_mult *= 0.5
-                units = forex.calc_units(paper_balance, cfg.RISK_PER_TRADE,
+                units = forex.calc_units(paper_balance, per_trade_risk,
                                          stop_pips_eff, symbol, price,
                                          mult=risk_mult)
                 units = max(int(units), forex.min_units(symbol))

@@ -502,6 +502,30 @@ class CtraderBroker:
             }
         return None
 
+    def get_all_positions(self):
+        """Every open position on the account (multi-position mode). Maps the
+        cTrader symbolId back to a name via the loaded symbol table."""
+        if getattr(self._c, "PAPER_TRADING", True):
+            return []
+        req = ProtoOAReconcileReq()
+        req.ctidTraderAccountId = self._ctid()
+        res = self._rpc(req, ProtoOAReconcileRes)
+        self._load_symbols()
+        id2name = {v: k for k, v in self._sym_id.items()}
+        out = []
+        for p in res.position:
+            td = p.tradeData
+            out.append({
+                "symbol": id2name.get(td.symbolId, str(td.symbolId)),
+                "side": "BUY" if td.tradeSide == ProtoOATradeSide.BUY else "SELL",
+                "units": int(td.volume / 100),
+                "entryPrice": p.price if p.price else None,
+                "stopLoss": p.stopLoss if p.HasField("stopLoss") else None,
+                "takeProfit": p.takeProfit if p.HasField("takeProfit") else None,
+                "positionId": p.positionId,
+            })
+        return out
+
     def get_open_trades(self):
         pos = self.get_open_position(self._c.SYMBOL)
         return [pos] if pos else []
