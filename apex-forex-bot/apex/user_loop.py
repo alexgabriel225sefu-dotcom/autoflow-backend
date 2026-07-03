@@ -64,7 +64,7 @@ def _make_broker(user):
         PAPER_BALANCE    = float(user.get("paper_balance", 1000)),
         STOP_LOSS_PIPS   = float(user.get("sl_pips", 20)),
         TAKE_PROFIT_PIPS = float(user.get("tp_pips", 40)),
-        RISK_PER_TRADE   = float(user.get("risk", 0.005)),
+        RISK_PER_TRADE   = float(user.get("risk", 0.01)),  # 1% default (was 0.5%) — bigger, still safe
         LEVERAGE         = float(user.get("leverage", 30)),
         MARGIN_CAP       = 0.5,
         MAX_SPREAD_PIPS  = 3.0,
@@ -838,18 +838,34 @@ def force_trade(user_id, side, symbol=None):
         spread = 0.0
 
     pip = forex.pip_size(sym, price)
-    tp_pips_eff = max(cfg.TAKE_PROFIT_PIPS, 2.0 * cfg.STOP_LOSS_PIPS)         if cfg.TAKE_PROFIT_PIPS < cfg.STOP_LOSS_PIPS else cfg.TAKE_PROFIT_PIPS
-    sl_price = (price - cfg.STOP_LOSS_PIPS * pip if side == "BUY"
-                else price + cfg.STOP_LOSS_PIPS * pip)
-    tp_price = (price + tp_pips_eff * pip if side == "BUY"
-                else price - tp_pips_eff * pip)
+    # Size a manual /buy the SAME way the autonomous bot does — ATR-based with
+    # a noise floor — so it's never tiny because of a leftover wide fixed /sl.
+    stop_pips_eff = cfg.STOP_LOSS_PIPS
+    try:
+        ind_m = indicators.analyze(broker.get_candles(sym, cfg.TIMEFRAME, 60) or [])
+        atr_m = float(ind_m.get("atr") or 0)
+    except Exception:
+        atr_m = 0.0
+    if getattr(cfg, "ATR_STOPS", True) and atr_m > 0:
+        sl_dist = 2.0 * atr_m
+        min_stop = max(4.0 * spread * pip, 10.0 * pip)
+        if sl_dist < min_stop:
+            sl_dist = min_stop
+        tp_dist = 2.5 * sl_dist
+        stop_pips_eff = forex.to_pips(sl_dist, sym, price)
+    else:
+        sl_dist = cfg.STOP_LOSS_PIPS * pip
+        tp_dist = (max(cfg.TAKE_PROFIT_PIPS, 2.0 * cfg.STOP_LOSS_PIPS)
+                   if cfg.TAKE_PROFIT_PIPS < cfg.STOP_LOSS_PIPS else cfg.TAKE_PROFIT_PIPS) * pip
+    sl_price = price - sl_dist if side == "BUY" else price + sl_dist
+    tp_price = price + tp_dist if side == "BUY" else price - tp_dist
 
     balance = user.get("paper_balance") or cfg.PAPER_BALANCE
     dash = get_dash(user_id)
     if dash:
         balance = dash.get("balance", balance)
 
-    units = forex.calc_units(balance, cfg.RISK_PER_TRADE, cfg.STOP_LOSS_PIPS, sym, price)
+    units = forex.calc_units(balance, cfg.RISK_PER_TRADE, stop_pips_eff, sym, price)
     units = max(int(units), forex.min_units(sym))
 
     try:
