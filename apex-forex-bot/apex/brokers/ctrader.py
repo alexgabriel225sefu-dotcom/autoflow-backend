@@ -551,30 +551,18 @@ class CtraderBroker:
         except Exception:
             mn, st = 100_000, 100_000  # FX fallback
         req.volume = max(mn, (vol_h // st) * st)
-        # MARKET orders accept only RELATIVE SL/TP (distance in 1e-5 price
-        # units) — absolute stopLoss/takeProfit fields get the order rejected.
-        if sl or tp:
-            ref = None
-            try:
-                bid, ask = self.get_bid_ask(sym)
-                ref = ask if side == "BUY" else bid
-            except Exception:
-                try:
-                    ref = self.get_candles(instrument, "1m", 2)[-1]["close"]
-                except Exception:
-                    ref = None
-            if ref:
-                if sl:
-                    req.relativeStopLoss = max(1, int(round(abs(ref - float(sl)) * 100000)))
-                if tp:
-                    req.relativeTakeProfit = max(1, int(round(abs(float(tp) - ref) * 100000)))
+        # NOTE: we do NOT put relativeStopLoss/TP on the order — its 1e-5 unit
+        # doesn't match every instrument's tick size (gold moves in 0.01, so
+        # the relative value fails 'invalid precision'). Instead the position
+        # is amended with ABSOLUTE prices (rounded to the symbol's digits)
+        # immediately after the fill, then verified — see below.
         res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20)
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):
             fill = res.order.executionPrice
-        # ── HARD GUARANTEE: the stop must live AT THE BROKER. The market order
-        # already carries relativeStopLoss/TP (attached at fill); the amend
-        # below just refines it to the exact absolute prices. So we only PANIC
+        # ── HARD GUARANTEE: the stop must live AT THE BROKER. We attach it via
+        # an ABSOLUTE-price amend right after the fill (relative SL/TP on the
+        # order failed 'invalid precision' on non-FX). We only PANIC
         # (close the position) if, after everything, the broker still shows NO
         # stop on the position. A failed amend on an already-protected position
         # must NOT close a valid trade (the false-negative that rejected

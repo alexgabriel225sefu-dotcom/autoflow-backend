@@ -124,6 +124,7 @@ def _loop(user_id, alert_fn, gen=None):
     last_close_at = 0.0 # re-entry lock after ANY close — kills open/close churn
     loss_streak = 0     # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
     prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
+    rate_limit_until = 0.0  # while > now, do only the minimal 1-symbol fetch
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
     last_mkt_tick = -_SKIP_WARN_THROTTLE      # market-pulse heads-up (throttled)
@@ -213,9 +214,10 @@ def _loop(user_id, alert_fn, gen=None):
             def _nrm(x):
                 return (x or "").upper().replace("_", "").replace("/", "").replace("-", "")
 
+            rate_ok = time.time() >= rate_limit_until
             all_positions = None
             open_syms, open_exposure = set(), []
-            if not cfg.PAPER_TRADING:
+            if not cfg.PAPER_TRADING and rate_ok:
                 try:
                     all_positions = broker.get_all_positions()
                     open_syms = {_nrm(p["symbol"]) for p in all_positions}
@@ -241,7 +243,11 @@ def _loop(user_id, alert_fn, gen=None):
             # already open) and focus on the strongest candidate. Only scan if
             # we have a free slot. The winner still passes the FULL pipeline.
             slot_free = (all_positions is not None) and (open_count < maxpos)
-            if watchlist and slot_free:
+            # Scan at most once every 3 ticks (~15 min) — 8 historical requests
+            # every 5 min was tripping cTrader's trendbar rate limit and
+            # freezing the loop. Between scans, keep the last focus.
+            due_to_scan = (tick % 3 == 0)
+            if watchlist and slot_free and due_to_scan and rate_ok:
                 best = None
                 for ws in watchlist:
                     if _nrm(ws) in open_syms:
@@ -284,6 +290,8 @@ def _loop(user_id, alert_fn, gen=None):
                 data_fails += 1
                 print(f"[UserLoop:{user_id}] data error ({data_fails}): {data_err}")
                 rate_limited = "rate" in str(data_err).lower() or "BLOCKED_PAYLOAD" in str(data_err)
+                if rate_limited:
+                    rate_limit_until = time.time() + 120  # pause scanner/positions 2 min
                 if data_fails == 3 and alert_fn and not rate_limited:
                     alert_fn(user_id, {
                         "action": "DATA_ERROR",
