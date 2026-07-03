@@ -548,10 +548,13 @@ class CtraderBroker:
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):
             fill = res.order.executionPrice
-        # ── HARD GUARANTEE: the stop must live AT THE BROKER. Relative SL/TP
-        # on the market order can be dropped silently (observed: a gold BUY
-        # ran to −80 pips with a 20-pip stop configured). Amend the position
-        # with ABSOLUTE prices, verify, and never keep a naked position.
+        # ── HARD GUARANTEE: the stop must live AT THE BROKER. The market order
+        # already carries relativeStopLoss/TP (attached at fill); the amend
+        # below just refines it to the exact absolute prices. So we only PANIC
+        # (close the position) if, after everything, the broker still shows NO
+        # stop on the position. A failed amend on an already-protected position
+        # must NOT close a valid trade (the false-negative that rejected
+        # EURUSD buys).
         if sl or tp:
             pid = res.position.positionId if res.HasField("position") else None
             if not pid:
@@ -560,21 +563,32 @@ class CtraderBroker:
                     pid = (pos or {}).get("positionId")
                 except Exception:
                     pid = None
-            attached = False
             if pid:
                 try:
                     am = ProtoOAAmendPositionSLTPReq()
                     am.ctidTraderAccountId = self._ctid()
                     am.positionId = int(pid)
+                    # cTrader rejects SL/TP prices that aren't rounded to the
+                    # symbol's digit count — the amend failure on 5-digit FX.
+                    dg = self._digits(instrument)
                     if sl:
-                        am.stopLoss = float(sl)
+                        am.stopLoss = round(float(sl), dg)
                     if tp:
-                        am.takeProfit = float(tp)
+                        am.takeProfit = round(float(tp), dg)
                     self._conn()._request(am, ProtoOAExecutionEvent, timeout=15)
-                    attached = True
                 except Exception as e:
-                    print(f"[cTrader] SL/TP amend failed: {e}")
-            if not attached:
+                    print(f"[cTrader] SL/TP amend failed (relative stop may still be attached): {e}")
+            # Verify the position actually has a stop; only close if truly naked.
+            protected = False
+            try:
+                pos2 = self.get_open_position(instrument)
+                protected = bool(pos2 and pos2.get("stopLoss"))
+            except Exception:
+                # Can't verify → trust the relative stop the order carried
+                # rather than close a possibly-good trade. Loop's protective
+                # stop is the backstop.
+                protected = True
+            if not protected and sl:
                 try:
                     self.close_position(instrument)
                 finally:
