@@ -358,10 +358,8 @@ def _build_status(dash, chart=""):
         pos_line = (f"{d} <b>{op['symbol']}</b>\n  Entry: {op['entryPrice']}  "
                     f"SL: {(op.get('stopLoss') or 0):.5f}\n"
                     f"  PnL: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>")
-    paused = _bot_control.get("get_paused", lambda: False)()
-    state_tag = "  ⏸️ PAUSED" if paused else ""
     return (f"💱 <b>APEX FOREX BOT</b>  {dash.get('mode', '')} · "
-            f"{dash.get('broker', '')}{state_tag}\n"
+            f"{dash.get('broker', '')}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"💰 Balance: <b>${dash.get('balance', 0):.2f}</b>  ({sign}{pnl_pct:.2f}%)"
             f"{' ⏳ <i>refreshing…</i>' if dash.get('balStale') else ''}{chart_line}\n"
@@ -921,6 +919,8 @@ def _finish_onboard(chat_id):
 def _handle_cb(chat_id, data):
     """Inline-button presses (copilot approve/reject, risk acceptance, onboarding)."""
     if data == "bot:on":
+        if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
+            _bot_control["set_paused"](False)
         _auto_start_user(chat_id)
         return send_to(chat_id,
             "✅ <b>Bot is ON.</b>\nIt's watching the market now and will trade automatically "
