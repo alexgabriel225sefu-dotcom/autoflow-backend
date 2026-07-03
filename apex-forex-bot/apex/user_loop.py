@@ -114,6 +114,7 @@ def _loop(user_id, alert_fn, gen=None):
     tick = 0
     data_fails = 0   # consecutive get_candles failures — alert the user at 3
     last_loss_at = 0.0  # entry cooldown anchor (any losing close)
+    last_close_at = 0.0 # re-entry lock after ANY close — kills open/close churn
     loss_streak = 0     # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
@@ -306,6 +307,7 @@ def _loop(user_id, alert_fn, gen=None):
                 # managing vanished between ticks. Tell the client — silence
                 # here made broker-side exits invisible in Telegram.
                 if prev_pos and not open_pos:
+                    last_close_at = time.time()  # re-entry lock (churn guard)
                     pnl_est = round(paper_balance - prev_balance, 2) if not dash.get("balStale") else None
                     if pnl_est is not None and pnl_est < 0:
                         last_loss_at = time.time()
@@ -347,6 +349,7 @@ def _loop(user_id, alert_fn, gen=None):
                         except Exception as e:
                             print(f"[UserLoop:{user_id}] protective close failed: {e}")
                         last_loss_at = time.time()
+                        last_close_at = time.time()
                         loss_streak += 1
                         open_pos = None
                         dash["openPosition"] = None
@@ -416,6 +419,7 @@ def _loop(user_id, alert_fn, gen=None):
                     _log_trade(user_id, result)
                     # Persist so the simulated balance survives a restart.
                     user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
+                    last_close_at = time.time()
                     open_pos = None
                     dash["openPosition"] = None
                     dash["balance"] = paper_balance
@@ -511,6 +515,12 @@ def _loop(user_id, alert_fn, gen=None):
                         last_warn_tick = tick
                         alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                            "reason": f"the 1-hour trend is {htf} — not trading against it"})
+            # Re-entry lock after ANY close (churn guard): open→close→reopen at
+            # spread cost was bleeding the account. Wait 2 cycles before a new
+            # entry regardless of the close's P&L.
+            if entry_ok and last_close_at and time.time() - last_close_at < 2 * _LOOP_INTERVAL:
+                entry_ok = False
+                _skip("re-entry lock — just closed a trade, waiting a couple of cycles")
             # Post-loss cooldown: the worst trade after a stop-out is the next
             # one taken 5 minutes later in the same falling knife.
             if entry_ok and last_loss_at and time.time() - last_loss_at < _LOSS_COOLDOWN_MIN * 60:
@@ -600,6 +610,15 @@ def _loop(user_id, alert_fn, gen=None):
                         atr_v = 0.0
                 if atr_v > 0:
                     sl_dist, tp_dist = 1.5 * atr_v, 3.0 * atr_v
+                    # FLOOR: on a 5-min candle the ATR of a calm FX pair is only
+                    # ~2 pips, so 1.5×ATR is a sub-noise stop that the spread
+                    # alone triggers instantly — the churn that bled the account.
+                    # Never let the stop sit inside spread+noise: at least 4×
+                    # the current spread and a sane per-class pip floor.
+                    min_stop = max(4.0 * spread * pip, 10.0 * pip)
+                    if sl_dist < min_stop:
+                        sl_dist = min_stop
+                        tp_dist = 2.0 * sl_dist  # keep RR ≥ 1:2
                     stop_pips_eff = forex.to_pips(sl_dist, symbol, price)
                 else:
                     sl_dist = cfg.STOP_LOSS_PIPS * pip
@@ -685,6 +704,7 @@ def _loop(user_id, alert_fn, gen=None):
                 if cfg.PAPER_TRADING:
                     # Persist so the simulated balance survives a restart.
                     user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
+                last_close_at = time.time()
                 open_pos = None
                 dash["openPosition"] = None
                 dash["balance"] = paper_balance
