@@ -99,7 +99,14 @@ def _loop(user_id, alert_fn, gen=None):
     # Multi-symbol scanner (premium spec): the client can watch ANY basket of
     # instruments their broker offers; the bot enters only the strongest
     # setup per cycle, one open position at a time.
-    watchlist = [w for w in (user.get("watchlist") or []) if w][:6]
+    # Auto-Pilot: the bot picks the instruments itself from a curated liquid
+    # universe (validated per broker at enable time). Otherwise the client's
+    # own /symbol or /watch basket is used.
+    autopilot = bool(user.get("autopilot"))
+    if autopilot and user.get("autopilot_universe"):
+        watchlist = [w for w in user["autopilot_universe"] if w][:8]
+    else:
+        watchlist = [w for w in (user.get("watchlist") or []) if w][:6]
     paper_balance = cfg.PAPER_BALANCE
     # REAL mode: the stored seed goes stale the moment a trade closes — read
     # the broker's actual balance BEFORE the first status can be asked for,
@@ -132,6 +139,7 @@ def _loop(user_id, alert_fn, gen=None):
         "startBalance": paper_balance,
         "symbol": symbol,
         "watchlist": watchlist,
+        "autopilot": autopilot,
         "trades": [],
         "lastTick": None,
         "currentPrice": None,

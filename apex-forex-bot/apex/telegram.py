@@ -365,7 +365,8 @@ def _build_status(dash, chart=""):
             f"{' ⏳ <i>refreshing…</i>' if dash.get('balStale') else ''}{chart_line}\n"
             f"🕐 Market: {market} · Sessions: {sessions}\n"
             f"🎯 Method: {dash.get('strategy', 'Mean Reversion')}\n"
-            + (f"👁 Scanning: {' · '.join(dash['watchlist'])} — focus {dash.get('symbol', '')}\n" if dash.get('watchlist') else "")
+            + (f"🤖 Auto-Pilot: scanning {len(dash['watchlist'])} instruments — focus {dash.get('symbol', '')}\n" if dash.get('autopilot') and dash.get('watchlist')
+               else f"👁 Scanning: {' · '.join(dash['watchlist'])} — focus {dash.get('symbol', '')}\n" if dash.get('watchlist') else "")
             + (f"🌊 Regime: {dash['regime']['label']}\n" if isinstance(dash.get('regime'), dict) else "")
             + (f"🩺 Broker: {dash['brokerHealth']}\n" if str(dash.get('brokerHealth', '')).startswith('degraded') else "") + "\n"
             f"{pos_line}\n\n"
@@ -856,7 +857,8 @@ _RISK_TEXT = ("⚠️ <b>Before I place real orders — read this once.</b>\n\n"
 
 def onboard_start(chat_id):
     """Guided setup after the broker is connected: symbol → method → mode → go."""
-    rows, row = [], []
+    rows = [[{"text": "🤖 Auto-Pilot — let the bot pick everything (recommended)", "callback_data": "ob:sym:__auto__"}]]
+    row = []
     for label, code in _OB_SYMS:
         row.append({"text": label, "callback_data": f"ob:sym:{code}"})
         if len(row) == 3:
@@ -866,8 +868,8 @@ def onboard_start(chat_id):
         rows.append(row)
     send_to(chat_id,
             "🧭 <b>Setup 1/3 — What do you want to trade?</b>\n\n"
-            "Pick one to start — you can switch any time with /symbol, "
-            "or browse your broker's full list with /pairs.",
+            "🤖 <b>Auto-Pilot</b> = the bot scans liquid markets and trades the best setups itself.\n"
+            "Or pick one instrument — you can change any time with /symbol or /pairs.",
             extra={"reply_markup": {"inline_keyboard": rows}})
 
 
@@ -934,9 +936,12 @@ def _handle_cb(chat_id, data):
             "⏸ <b>Bot is OFF.</b>\nNo new trades will open. Any open position stays protected by its stop. "
             "Tap ▶️ to turn it back on.",
             _dashboard_keyboard(chat_id))
+    if data == "ob:sym:__auto__":
+        _handle_autopilot(chat_id, "on")
+        return _ob_step_strategy(chat_id)
     if data.startswith("ob:sym:"):
         sym = data[7:]
-        user_store.update(chat_id, {"symbol": sym})
+        user_store.update(chat_id, {"symbol": sym, "autopilot": False})
         sugg = ("Suggested stops for gold: /sl 150 · /tp 300 (set after setup)" if sym.startswith("XAU")
                 else "Suggested stops for indices: /sl 60 · /tp 120" if sym in ("US30", "NAS100")
                 else "Suggested stops for crypto: /sl 200 · /tp 400" if sym.startswith(("BTC", "ETH"))
@@ -1276,6 +1281,57 @@ def _handle_strategy(chat_id, args):
     tail = ("Applied immediately — check /status." if running
             else "⏸ The bot is currently <b>stopped</b> — send /start to begin trading with it.")
     send_to(chat_id, f"🎯 Method set to <b>{m['label']}</b>.\n<i>{m['blurb']}</i>\n\n{tail}")
+
+
+# Curated liquid universe the Auto-Pilot scans. FX majors + gold are on every
+# cTrader broker; indices/crypto are candidates that get validated per account.
+_AUTOPILOT_CANDIDATES = [
+    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD",
+    "XAUUSD", "US30", "NAS100", "US500", "GER40", "BTCUSD", "ETHUSD",
+]
+
+
+def _handle_autopilot(chat_id, args):
+    """Full hands-off mode: the bot picks the instruments itself from a curated
+    liquid universe (validated against the client's broker) and trades the
+    strongest setup anywhere — one position at a time."""
+    arg = (args or "").strip().lower()
+    user = user_store.load(chat_id)
+    if arg in ("off", "stop", "0", "false"):
+        user_store.update(chat_id, {"autopilot": False})
+        running = _restart_user_loop(chat_id)
+        return send_to(chat_id,
+            "🤖 <b>Auto-Pilot OFF.</b> Back to your chosen instrument (/symbol) or basket (/watch).",
+            _dashboard_keyboard(chat_id))
+    if arg not in ("on", "start", "1", "true", ""):
+        return send_to(chat_id, "Usage: <code>/autopilot on</code> or <code>/autopilot off</code>")
+    # Validate the candidate universe against what THIS broker actually offers.
+    universe = []
+    is_ct = bool(user.get("ctrader_access_token") and user.get("ctrader_account_id"))
+    if is_ct:
+        send_to(chat_id, "🤖 Setting up Auto-Pilot — checking which instruments your broker offers…")
+        try:
+            from apex import user_loop as _ul
+            br, _ = _ul._make_broker(user)
+            br._load_symbols()
+            offered = set(br._sym_id.keys())
+            universe = [c for c in _AUTOPILOT_CANDIDATES if c in offered]
+        except Exception as e:
+            return send_to(chat_id, f"⚠️ Couldn't read your broker's instruments: <i>{str(e)[:120]}</i>. Try again in a minute.")
+    else:
+        universe = ["EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "XAU_USD"]
+    if not universe:
+        return send_to(chat_id, "⚠️ Couldn't build the Auto-Pilot list for your broker. Use /watch to pick instruments manually.")
+    universe = universe[:8]
+    user_store.update(chat_id, {"autopilot": True, "autopilot_universe": universe})
+    running = _restart_user_loop(chat_id)
+    send_to(chat_id,
+        "🤖 <b>Auto-Pilot ON.</b>\n\n"
+        f"I'll scan these every cycle and trade the strongest setup anywhere — one position at a time:\n"
+        f"<b>{' · '.join(universe)}</b>\n\n"
+        "You stay in control: /symbol or /watch to take over, /autopilot off to stop."
+        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot stopped — tap ▶️ to start.</i>"),
+        _dashboard_keyboard(chat_id))
 
 
 def _handle_watch(chat_id, args):
@@ -1877,6 +1933,7 @@ _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "/symbol &lt;PAIR&gt; — set pair (EUR_USD)\n"
                "/pairs — everything your broker lets you trade\n"
                "/watch — scan a basket of instruments, trade the strongest setup\n"
+               "/autopilot on — full hands-off: bot picks the instruments too\n"
                "/strategy — trading method (auto · mean reversion · trend · breakout)\n"
                "/atr on|off — dynamic ATR stops (SL 1.5×ATR / TP 3×ATR)\n"
                "/wizard — guided setup (symbol → method → mode)\n"
@@ -2159,6 +2216,8 @@ def _poll_loop():
                     _handle_pairs(chat_id)
                 elif cmd_l == "/watch":
                     _handle_watch(chat_id, args)
+                elif cmd_l in ("/autopilot", "/auto"):
+                    _handle_autopilot(chat_id, args)
                 elif cmd_l in ("/strategy", "/method"):
                     _handle_strategy(chat_id, args)
                 elif cmd_l == "/backtest":
