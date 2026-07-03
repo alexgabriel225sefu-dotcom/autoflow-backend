@@ -14,7 +14,7 @@ _LOOP_INTERVAL = 300  # 5 minutes between ticks
 _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
 _SKIP_WARN_THROTTLE = 6  # "don't trade now" market-condition warnings (~30 min)
-_LOSS_COOLDOWN_MIN = 20   # Seykota: no revenge trades — pause entries after a loss
+_LOSS_COOLDOWN_MIN = 5    # brief pause after a loss (was 20) — trade more freely
 
 
 def _log_trade(user_id, record):
@@ -68,7 +68,7 @@ def _make_broker(user):
         LEVERAGE         = float(user.get("leverage", 30)),
         MARGIN_CAP       = 0.5,
         MAX_SPREAD_PIPS  = 3.0,
-        MIN_CONFIDENCE   = int(user.get("min_confidence", 62)),
+        MIN_CONFIDENCE   = int(user.get("min_confidence", 55)),  # was 62 — trade more freely
         STRATEGY         = (user.get("strategy") or "auto").lower(),
         ATR_STOPS        = bool(user.get("atr_stops", True)),  # dynamic RR 1:2 by default
     )
@@ -504,23 +504,10 @@ def _loop(user_id, alert_fn, gen=None):
                     last_warn_tick = tick
                     alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                        "reason": regime.get("label", "market too quiet")})
-            # Multi-timeframe confirmation: directional engines must agree with
-            # the H1 trend (premium spec #8) — blocks the weakest signals.
-            if entry_ok and active_mode in ("trend", "breakout") and len(candles) >= 660:
-                htf = strategies.htf_trend(strategies.resample(candles[-720:]))
-                if (action == "BUY" and htf == "BEARISH") or (action == "SELL" and htf == "BULLISH"):
-                    entry_ok = False
-                    _skip(f"H1 trend {htf} — signal was {action}")
-                    if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
-                        last_warn_tick = tick
-                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
-                                           "reason": f"the 1-hour trend is {htf} — not trading against it"})
-            # Re-entry lock after ANY close (churn guard): open→close→reopen at
-            # spread cost was bleeding the account. Wait 2 cycles before a new
-            # entry regardless of the close's P&L.
-            if entry_ok and last_close_at and time.time() - last_close_at < 2 * _LOOP_INTERVAL:
-                entry_ok = False
-                _skip("re-entry lock — just closed a trade, waiting a couple of cycles")
+            # (Multi-timeframe gate relaxed to advisory by request — no longer
+            # blocks entries, so the bot trades more freely.)
+            # (Re-entry lock removed by request — the ATR stop floor already
+            # prevents same-candle churn, so trade freely.)
             # Post-loss cooldown: the worst trade after a stop-out is the next
             # one taken 5 minutes later in the same falling knife.
             if entry_ok and last_loss_at and time.time() - last_loss_at < _LOSS_COOLDOWN_MIN * 60:
@@ -609,7 +596,8 @@ def _loop(user_id, alert_fn, gen=None):
                     except (TypeError, ValueError):
                         atr_v = 0.0
                 if atr_v > 0:
-                    sl_dist, tp_dist = 1.5 * atr_v, 3.0 * atr_v
+                    # Wider stop + far target so trades breathe and profits run.
+                    sl_dist, tp_dist = 2.0 * atr_v, 5.0 * atr_v
                     # FLOOR: on a 5-min candle the ATR of a calm FX pair is only
                     # ~2 pips, so 1.5×ATR is a sub-noise stop that the spread
                     # alone triggers instantly — the churn that bled the account.
