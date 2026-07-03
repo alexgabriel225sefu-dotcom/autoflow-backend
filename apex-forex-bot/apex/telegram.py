@@ -334,6 +334,15 @@ def _dashboard_keyboard(chat_id=None):
                                  if os.getenv("RENDER_EXTERNAL_URL") else "")
     if term_url:
         rows.append([{"text": "📊 Open Terminal", "web_app": {"url": term_url}}])
+    # Discoverable path from demo → real money without knowing a command.
+    if chat_id is not None:
+        try:
+            u = user_store.load(chat_id)
+            if (u.get("ctrader_access_token")
+                    and (u.get("ctrader_env") or "demo").lower() != "live"):
+                rows.append([{"text": "🔴 Switch to real money", "callback_data": "acct:switch"}])
+        except Exception:
+            pass
     if not rows:
         return {}
     return {"reply_markup": json.dumps({"inline_keyboard": rows})}
@@ -843,6 +852,52 @@ def _handle_ctrader(chat_id):
         extra={"reply_markup": {"inline_keyboard": kb}})
 
 
+def _apply_account(chat_id, ctid):
+    """Bind the bot to a linked cTrader account by id and restart the loop."""
+    user = user_store.load(chat_id)
+    acc = next((a for a in (user.get("ctrader_accounts") or []) if str(a["ctid"]) == str(ctid)), None)
+    if not acc:
+        return send_to(chat_id, "❌ Account not found. Tap Connect a different account.")
+    ct_env = "live" if acc.get("live") else "demo"
+    updates = {"ctrader_account_id": acc["ctid"], "ctrader_env": ct_env}
+    # LIVE = real money: turn OFF the internal simulation so orders actually execute.
+    if acc.get("live"):
+        updates["paper"] = False
+    try:
+        from apex.brokers import ctrader as _ct
+        bal = _ct.account_balance(user.get("ctrader_access_token", ""), acc["ctid"], ct_env)
+        updates["paper_balance"] = bal
+        bal_line = f"💰 Balance: <b>${bal:,.2f}</b>\n"
+    except Exception as e:
+        bal_line = f"⚠️ Couldn't read the balance yet: <i>{str(e)[:120]}</i>\n"
+    user_store.update(chat_id, updates)
+    _restart_user_loop(chat_id)
+    tag = "🔴 LIVE · real money" if acc.get("live") else "🧪 Practice · demo"
+    send_to(chat_id, f"✅ <b>Now trading: {tag}</b> (account {acc['ctid']}).\n{bal_line}"
+                     "Use the buttons below to turn the bot ON/OFF.",
+            _dashboard_keyboard(chat_id))
+
+
+def _handle_switch(chat_id):
+    """Let the client change which account the bot trades — pick a linked
+    account, or disconnect and connect a different one (e.g. demo → live)."""
+    user = user_store.load(chat_id)
+    accounts = user.get("ctrader_accounts") or []
+    cur_id = str(user.get("ctrader_account_id", ""))
+    rows = []
+    for a in accounts:
+        tag = "🔴 LIVE (real money)" if a.get("live") else "🧪 Practice (demo)"
+        here = " ✓ current" if str(a["ctid"]) == cur_id else ""
+        rows.append([{"text": f"{tag} · {a['ctid']}{here}", "callback_data": f"acct:use:{a['ctid']}"}])
+    rows.append([{"text": "🔗 Connect a DIFFERENT account", "callback_data": "acct:new"}])
+    send_to(chat_id,
+        "🔄 <b>Switch trading account</b>\n\n"
+        "Tested on demo and ready for real money? Connect your live account below. "
+        "Or pick one of your linked accounts.\n\n"
+        "<i>🧪 Practice = fake money · 🔴 LIVE = real money.</i>",
+        extra={"reply_markup": {"inline_keyboard": rows}})
+
+
 def _handle_ctaccount(chat_id, args):
     """Pick which cTrader trading account to trade when the client has several."""
     want = (args or "").strip()
@@ -961,6 +1016,36 @@ def _handle_cb(chat_id, data):
     """Inline-button presses (copilot approve/reject, risk acceptance, onboarding)."""
     if data == "go:connect":
         return _handle_ctrader(chat_id)
+    if data == "acct:switch":
+        return _handle_switch(chat_id)
+    if data == "acct:new":
+        # Disconnect the current cTrader link and start a fresh authorization
+        # (e.g. moving from a demo login to a real-money broker account).
+        user_store.update(chat_id, {"ctrader_access_token": "", "ctrader_refresh_token": "",
+                                    "ctrader_account_id": "", "ctrader_accounts": []})
+        send_to(chat_id, "🔌 Old account disconnected. Now connect the account you want to trade 👇")
+        return _handle_ctrader(chat_id)
+    if data.startswith("acct:use:"):
+        ctid = data.split(":", 2)[2]
+        u = user_store.load(chat_id)
+        acc = next((a for a in (u.get("ctrader_accounts") or []) if str(a["ctid"]) == ctid), None)
+        if not acc:
+            return send_to(chat_id, "❌ That account isn't linked anymore. Tap Connect a different account.")
+        if acc.get("live"):
+            # Real money → require an explicit confirmation.
+            return send_to(chat_id,
+                f"🔴 <b>Switch to LIVE account {ctid}?</b>\n\n"
+                "This account trades <b>REAL money</b>. The bot will place real orders on it. "
+                "Make sure you've watched it work on demo first.\n\n"
+                "<i>You accept full responsibility for live trading — results are yours.</i>",
+                extra={"reply_markup": {"inline_keyboard": [[
+                    {"text": "✅ Yes, trade my real-money account", "callback_data": f"acct:go:{ctid}"}],
+                    [{"text": "↩️ Cancel — stay on demo", "callback_data": "acct:cancel"}]]}})
+        return _apply_account(chat_id, ctid)
+    if data.startswith("acct:go:"):
+        return _apply_account(chat_id, data.split(":", 2)[2])
+    if data == "acct:cancel":
+        return send_to(chat_id, "↩️ Staying on your current account. Test as long as you like.")
     if data == "bot:on":
         if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
             _bot_control["set_paused"](False)
@@ -2300,6 +2385,8 @@ def _poll_loop():
                     _handle_ctrader(chat_id)
                 elif cmd_l == "/ctaccount":
                     _handle_ctaccount(chat_id, args)
+                elif cmd_l in ("/switch", "/account", "/golive"):
+                    _handle_switch(chat_id)
                 elif cmd_l == "/copilot":
                     _handle_copilot(chat_id, args)
                 elif cmd_l == "/news":
