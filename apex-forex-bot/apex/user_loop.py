@@ -95,6 +95,11 @@ def _loop(user_id, alert_fn, gen=None):
     user = user_store.load(user_id)
     broker, cfg = _make_broker(user)
 
+    symbol = cfg.SYMBOL
+    # Multi-symbol scanner (premium spec): the client can watch ANY basket of
+    # instruments their broker offers; the bot enters only the strongest
+    # setup per cycle, one open position at a time.
+    watchlist = [w for w in (user.get("watchlist") or []) if w][:6]
     paper_balance = cfg.PAPER_BALANCE
     # REAL mode: the stored seed goes stale the moment a trade closes — read
     # the broker's actual balance BEFORE the first status can be asked for,
@@ -124,7 +129,8 @@ def _loop(user_id, alert_fn, gen=None):
         "strategy": ai.STRATEGY_MODES.get(cfg.STRATEGY, ai.STRATEGY_MODES["mean_reversion"])["label"],
         "balance": paper_balance,
         "startBalance": paper_balance,
-        "symbol": cfg.SYMBOL,
+        "symbol": symbol,
+        "watchlist": watchlist,
         "trades": [],
         "lastTick": None,
         "currentPrice": None,
@@ -158,10 +164,10 @@ def _loop(user_id, alert_fn, gen=None):
         dash["brokerHealth"] = "degraded: " + bad if bad else "ok"
         if bad and not was and alert_fn:
             alert_fn(user_id, {"action": "BROKER_HEALTH", "status": "degraded",
-                               "reason": bad, "symbol": cfg.SYMBOL})
+                               "reason": bad, "symbol": symbol})
         elif was and not bad and alert_fn:
             alert_fn(user_id, {"action": "BROKER_HEALTH", "status": "recovered",
-                               "symbol": cfg.SYMBOL})
+                               "symbol": symbol})
         return health["degraded"]
 
     def _skip(reason):
@@ -185,11 +191,40 @@ def _loop(user_id, alert_fn, gen=None):
                 time.sleep(60)
                 continue
 
+            # ── Basket scan: with no open position, shop every watched symbol
+            # with the cheap rule engines and focus this tick on the strongest
+            # candidate. The winner still passes the FULL pipeline below.
+            if watchlist and not open_pos:
+                best = None
+                for ws in watchlist:
+                    try:
+                        c2 = broker.get_candles(ws, cfg.TIMEFRAME, 260)
+                        if not c2 or len(c2) < 220:
+                            continue
+                        ind2 = indicators.analyze(c2)
+                        st2 = strategies.analyze(c2)
+                        m2 = cfg.STRATEGY
+                        if m2 == "auto":
+                            reg2 = strategies.detect_regime(c2)
+                            if reg2["regime"] == "quiet":
+                                continue
+                            m2 = {"trending": "trend", "ranging": "mean_reversion",
+                                  "volatile": "breakout"}.get(reg2["regime"], "mean_reversion")
+                        s2 = ai.signal_for_mode(m2, ind2, st2, None)
+                        if (s2.get("action") in ("BUY", "SELL")
+                                and s2.get("confidence", 0) >= cfg.MIN_CONFIDENCE
+                                and (not best or s2["confidence"] > best[1])):
+                            best = (ws, s2["confidence"])
+                    except Exception as e:
+                        print(f"[UserLoop:{user_id}] scan {ws}: {e}")
+                symbol = best[0] if best else watchlist[0]
+                dash["symbol"] = symbol
+
             # Data fetch is the loop's lifeline — if it fails silently the user
             # just sees "Last tick: None" forever. Count failures and tell them.
             try:
                 _t0 = time.time()
-                candles = broker.get_candles(cfg.SYMBOL, cfg.TIMEFRAME, cfg.CANDLES)
+                candles = broker.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES)
                 _health_check(lat=time.time() - _t0)
                 data_err = None if candles else "broker returned no candles"
             except Exception as e:
@@ -201,7 +236,7 @@ def _loop(user_id, alert_fn, gen=None):
                     alert_fn(user_id, {
                         "action": "DATA_ERROR",
                         "reason": data_err,
-                        "symbol": cfg.SYMBOL,
+                        "symbol": symbol,
                         "broker": dash.get("broker", "your broker"),
                     })
                 time.sleep(30)
@@ -221,7 +256,21 @@ def _loop(user_id, alert_fn, gen=None):
             if not cfg.PAPER_TRADING:
                 prev_pos = open_pos
                 try:
-                    open_pos = broker.get_open_position(cfg.SYMBOL)
+                    open_pos = broker.get_open_position(symbol)
+                    # basket mode: the open position may be on another watched
+                    # symbol — if so, this tick manages THAT one. Never scan
+                    # into a second entry while any watched position is open.
+                    if watchlist and not open_pos:
+                        for ws in watchlist:
+                            if ws == symbol:
+                                continue
+                            p_ = broker.get_open_position(ws)
+                            if p_:
+                                symbol = ws
+                                dash["symbol"] = symbol
+                                open_pos = p_
+                                candles = broker.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES) or candles
+                                break
                 except Exception as e:
                     data_fails += 1
                     print(f"[UserLoop:{user_id}] position read error ({data_fails}): {e}")
@@ -229,7 +278,7 @@ def _loop(user_id, alert_fn, gen=None):
                         alert_fn(user_id, {
                             "action": "DATA_ERROR",
                             "reason": f"can't read open positions: {e}",
-                            "symbol": cfg.SYMBOL,
+                            "symbol": symbol,
                             "broker": dash.get("broker", "your broker"),
                         })
                     time.sleep(30)
@@ -263,7 +312,7 @@ def _loop(user_id, alert_fn, gen=None):
                         loss_streak += 1
                     elif pnl_est is not None and pnl_est > 0:
                         loss_streak = 0
-                    result = {"action": "BROKER_CLOSE", "symbol": cfg.SYMBOL,
+                    result = {"action": "BROKER_CLOSE", "symbol": symbol,
                               "side": prev_pos.get("side", ""), "price": price,
                               "entryPrice": prev_pos.get("entryPrice"),
                               "netPnl": pnl_est, "balance": round(paper_balance, 2),
@@ -282,7 +331,7 @@ def _loop(user_id, alert_fn, gen=None):
                     side_ = open_pos.get("side")
                     stop_ = open_pos.get("stopLoss")
                     if not stop_ and open_pos.get("entryPrice"):
-                        pip_g = forex.pip_size(cfg.SYMBOL, price)
+                        pip_g = forex.pip_size(symbol, price)
                         stop_ = (open_pos["entryPrice"] - cfg.STOP_LOSS_PIPS * pip_g
                                  if side_ == "BUY"
                                  else open_pos["entryPrice"] + cfg.STOP_LOSS_PIPS * pip_g)
@@ -290,9 +339,9 @@ def _loop(user_id, alert_fn, gen=None):
                                           (side_ == "SELL" and price >= stop_))
                     if breached:
                         try:
-                            broker.close_position(cfg.SYMBOL)
+                            broker.close_position(symbol)
                             if alert_fn:
-                                alert_fn(user_id, {"action": "CLOSE", "symbol": cfg.SYMBOL,
+                                alert_fn(user_id, {"action": "CLOSE", "symbol": symbol,
                                                    "price": price,
                                                    "reasoning": "🛡 Protective stop — price crossed the stop level; closed at market"})
                         except Exception as e:
@@ -302,6 +351,9 @@ def _loop(user_id, alert_fn, gen=None):
                         open_pos = None
                         dash["openPosition"] = None
             else:
+                if open_pos and open_pos.get("symbol") and open_pos["symbol"] != symbol:
+                    symbol = open_pos["symbol"]
+                    dash["symbol"] = symbol
                 # Reconcile with manual trades (force_trade/force_close write to
                 # the shared dash via chat/commands). Adopt a manually-opened
                 # position the loop doesn't know about, and clear one closed by
@@ -345,8 +397,8 @@ def _loop(user_id, alert_fn, gen=None):
                     exit_price = sl if hit == "STOP_LOSS" else tp
                     units_ = open_pos.get("units", 1000)
                     gross = forex.pnl_usd(pside, open_pos["entryPrice"],
-                                          exit_price, units_, cfg.SYMBOL)
-                    pv = forex.pip_value_per_unit(cfg.SYMBOL, exit_price)
+                                          exit_price, units_, symbol)
+                    pv = forex.pip_value_per_unit(symbol, exit_price)
                     cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
                     net = gross - cost_usd
                     paper_balance += net
@@ -355,7 +407,7 @@ def _loop(user_id, alert_fn, gen=None):
                         loss_streak += 1
                     else:
                         loss_streak = 0
-                    result = {"action": "CLOSE", "symbol": cfg.SYMBOL,
+                    result = {"action": "CLOSE", "symbol": symbol,
                               "price": exit_price, "entryPrice": open_pos.get("entryPrice"),
                               "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
                               "netPnl": round(net, 2), "balance": round(paper_balance, 2),
@@ -392,12 +444,12 @@ def _loop(user_id, alert_fn, gen=None):
 
             # Market Pulse: store a plain-language read for /market, and ping the
             # user (throttled) when the market gets notable (elevated volatility).
-            mp = market.pulse(ind, strat_data, cfg.SYMBOL)
+            mp = market.pulse(ind, strat_data, symbol)
             if mp:
                 dash["market"] = mp
                 if mp.get("notable") and alert_fn and tick - last_mkt_tick >= _SKIP_WARN_THROTTLE:
                     last_mkt_tick = tick
-                    alert_fn(user_id, {"action": "MARKET_PULSE", "symbol": cfg.SYMBOL, **mp})
+                    alert_fn(user_id, {"action": "MARKET_PULSE", "symbol": symbol, **mp})
 
             # Check risk limits
             stop_check = strategies.should_stop(paper_balance, dash["startBalance"])
@@ -414,7 +466,7 @@ def _loop(user_id, alert_fn, gen=None):
                             if open_pos else " | No open position")
                 alert_fn(user_id, {
                     "action": "HEARTBEAT",
-                    "symbol": cfg.SYMBOL,
+                    "symbol": symbol,
                     "price": price,
                     "balance": paper_balance,
                     "tick": tick,
@@ -431,7 +483,7 @@ def _loop(user_id, alert_fn, gen=None):
                     alert_fn(user_id, {
                         "action": "AI_ERROR",
                         "reason": str(e),
-                        "symbol": cfg.SYMBOL,
+                        "symbol": symbol,
                     })
                     last_ai_error_tick = tick
                 signal = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
@@ -446,7 +498,7 @@ def _loop(user_id, alert_fn, gen=None):
                 _skip(regime.get("label", "market too quiet"))
                 if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                     last_warn_tick = tick
-                    alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
+                    alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                        "reason": regime.get("label", "market too quiet")})
             # Multi-timeframe confirmation: directional engines must agree with
             # the H1 trend (premium spec #8) — blocks the weakest signals.
@@ -457,7 +509,7 @@ def _loop(user_id, alert_fn, gen=None):
                     _skip(f"H1 trend {htf} — signal was {action}")
                     if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
-                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
+                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                            "reason": f"the 1-hour trend is {htf} — not trading against it"})
             # Post-loss cooldown: the worst trade after a stop-out is the next
             # one taken 5 minutes later in the same falling knife.
@@ -467,15 +519,15 @@ def _loop(user_id, alert_fn, gen=None):
                 _skip(f"post-loss cooldown ({left}m left)")
                 if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                     last_warn_tick = tick
-                    alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
+                    alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                        "reason": f"cooling down after a loss — entries resume in ~{left}m"})
             if entry_ok:
                 # ── Cost control: the spread is forex's hidden fee. Skip a too-wide
                 #    spread and refuse trades whose target can't clear a round-trip
                 #    spread plus a safety margin (break-even guard). ──
                 try:
-                    bid, ask = broker.get_bid_ask(cfg.SYMBOL)
-                    spread = forex.spread_pips(bid, ask, cfg.SYMBOL)
+                    bid, ask = broker.get_bid_ask(symbol)
+                    spread = forex.spread_pips(bid, ask, symbol)
                 except Exception:
                     spread = 0.0
                 _health_check(spread=spread)
@@ -484,7 +536,7 @@ def _loop(user_id, alert_fn, gen=None):
                 comm_pips = 0.0
                 try:
                     comm_rt = float(os.getenv("COMMISSION_PER_LOT_RT", "7"))
-                    pv_lot = forex.pip_value_per_unit(cfg.SYMBOL, price) * 100_000
+                    pv_lot = forex.pip_value_per_unit(symbol, price) * 100_000
                     comm_pips = comm_rt / pv_lot if pv_lot > 0 else 0.0
                 except Exception:
                     comm_pips = 0.0
@@ -500,7 +552,7 @@ def _loop(user_id, alert_fn, gen=None):
                     _skip(f"spread too wide ({spread:.1f}p > {max_spread:g}p)")
                     if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
-                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": cfg.SYMBOL,
+                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                            "reason": f"spread is unusually wide ({spread:.1f} pips) — "
                                                      "entering now would hand the edge to the broker"})
                 elif cfg.TAKE_PROFIT_PIPS <= (spread + comm_pips) * 1.5:
@@ -515,28 +567,28 @@ def _loop(user_id, alert_fn, gen=None):
                 _skip("flash-crash guard: extreme candle range")
                 if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                     last_warn_tick = tick
-                    alert_fn(user_id, {"action": "FLASH_WARN", "symbol": cfg.SYMBOL})
+                    alert_fn(user_id, {"action": "FLASH_WARN", "symbol": symbol})
 
             # News guard: stand aside around high-impact releases for either
             # currency in the pair. Fail-open (no event / feed down → trades).
             if entry_ok:
-                ev = news.high_impact_window(cfg.SYMBOL.split("_"))
+                ev = news.high_impact_window(symbol.split("_"))
                 if ev:
                     entry_ok = False
                     _skip(f"news guard: {ev.get('title', 'high-impact event') if isinstance(ev, dict) else ev}")
                     if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
-                        alert_fn(user_id, {"action": "NEWS_WARN", "symbol": cfg.SYMBOL, "event": ev})
+                        alert_fn(user_id, {"action": "NEWS_WARN", "symbol": symbol, "event": ev})
 
             # Copilot mode: propose the trade and wait for approval instead of
             # auto-executing. Re-read the flag each time so /copilot takes effect
             # without a restart (entry_ok is rare, so the extra load is cheap).
             if entry_ok and user_store.load(user_id).get("copilot"):
-                _suggest_trade(user_id, signal, cfg.SYMBOL, price, alert_fn)
+                _suggest_trade(user_id, signal, symbol, price, alert_fn)
                 entry_ok = False
 
             if entry_ok:
-                pip = forex.pip_size(cfg.SYMBOL, price)
+                pip = forex.pip_size(symbol, price)
                 stop_pips_eff = cfg.STOP_LOSS_PIPS
                 # Dynamic ATR stops (premium spec #10): SL = 1.5×ATR, TP = 3×ATR
                 # — distances that breathe with the instrument's volatility.
@@ -548,7 +600,7 @@ def _loop(user_id, alert_fn, gen=None):
                         atr_v = 0.0
                 if atr_v > 0:
                     sl_dist, tp_dist = 1.5 * atr_v, 3.0 * atr_v
-                    stop_pips_eff = forex.to_pips(sl_dist, cfg.SYMBOL, price)
+                    stop_pips_eff = forex.to_pips(sl_dist, symbol, price)
                 else:
                     sl_dist = cfg.STOP_LOSS_PIPS * pip
                     tp_dist = cfg.TAKE_PROFIT_PIPS * pip
@@ -568,31 +620,31 @@ def _loop(user_id, alert_fn, gen=None):
                 if regime.get("regime") == "volatile":
                     risk_mult *= 0.5
                 units = forex.calc_units(paper_balance, cfg.RISK_PER_TRADE,
-                                         stop_pips_eff, cfg.SYMBOL, price,
+                                         stop_pips_eff, symbol, price,
                                          mult=risk_mult)
-                units = max(int(units), forex.min_units(cfg.SYMBOL))
+                units = max(int(units), forex.min_units(symbol))
 
-                broker.place_order(action, units, cfg.SYMBOL, sl=sl_price, tp=tp_price)
+                broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
 
                 if cfg.PAPER_TRADING:
                     open_pos = {"side": action, "entryPrice": price,
-                                "symbol": cfg.SYMBOL, "units": units,
+                                "symbol": symbol, "units": units,
                                 "quantity": units, "stopLoss": sl_price, "takeProfit": tp_price,
                                 "entrySpreadPips": spread, "openedAt": now_str}
                 else:
                     # A read hiccup right after the fill must not look like
                     # "no position" — assume the order we just sent is live.
                     try:
-                        open_pos = broker.get_open_position(cfg.SYMBOL)
+                        open_pos = broker.get_open_position(symbol)
                     except Exception:
                         open_pos = None
                     open_pos = open_pos or {"side": action, "entryPrice": price,
-                                            "symbol": cfg.SYMBOL, "units": units,
+                                            "symbol": symbol, "units": units,
                                             "quantity": units, "stopLoss": sl_price,
                                             "takeProfit": tp_price, "openedAt": now_str}
 
                 dash["openPosition"] = open_pos
-                result = {"action": action, "symbol": cfg.SYMBOL, "confidence": confidence,
+                result = {"action": action, "symbol": symbol, "confidence": confidence,
                           "price": price, "spreadPips": round(spread, 1), "time": now_str,
                           "stopLoss": sl_price, "takeProfit": tp_price,
                           "reasoning": signal.get("reasoning", ""),
@@ -609,11 +661,11 @@ def _loop(user_id, alert_fn, gen=None):
                 pass
             elif action == "CLOSE" and open_pos:
                 # A strategy exit is NOT always a win — label it honestly.
-                broker.close_position(cfg.SYMBOL)
+                broker.close_position(symbol)
                 units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
                 gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
-                                      price, units_, cfg.SYMBOL)
-                pv = forex.pip_value_per_unit(cfg.SYMBOL, price)
+                                      price, units_, symbol)
+                pv = forex.pip_value_per_unit(symbol, price)
                 cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
                 net = gross - cost_usd
                 if cfg.PAPER_TRADING:
@@ -623,7 +675,7 @@ def _loop(user_id, alert_fn, gen=None):
                     loss_streak += 1
                 elif net > 0:
                     loss_streak = 0
-                result = {"action": "CLOSE", "symbol": cfg.SYMBOL, "price": price,
+                result = {"action": "CLOSE", "symbol": symbol, "price": price,
                           "entryPrice": open_pos.get("entryPrice"),
                           "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
                           "netPnl": round(net, 2), "balance": round(paper_balance, 2),

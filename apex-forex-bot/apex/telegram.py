@@ -333,6 +333,7 @@ def _build_status(dash, chart=""):
             f"{' ⏳ <i>refreshing…</i>' if dash.get('balStale') else ''}{chart_line}\n"
             f"🕐 Market: {market} · Sessions: {sessions}\n"
             f"🎯 Method: {dash.get('strategy', 'Mean Reversion')}\n"
+            + (f"👁 Scanning: {' · '.join(dash['watchlist'])} — focus {dash.get('symbol', '')}\n" if dash.get('watchlist') else "")
             + (f"🌊 Regime: {dash['regime']['label']}\n" if isinstance(dash.get('regime'), dict) else "")
             + (f"🩺 Broker: {dash['brokerHealth']}\n" if str(dash.get('brokerHealth', '')).startswith('degraded') else "") + "\n"
             f"{pos_line}\n\n"
@@ -1215,6 +1216,52 @@ def _handle_strategy(chat_id, args):
     send_to(chat_id, f"🎯 Method set to <b>{m['label']}</b>.\n<i>{m['blurb']}</i>\n\n{tail}")
 
 
+def _handle_watch(chat_id, args):
+    """Basket scanner: watch up to 6 instruments — ANY the broker offers —
+    and enter only the strongest setup per cycle, one position at a time."""
+    raw = (args or "").strip()
+    user = user_store.load(chat_id)
+    if not raw:
+        wl = user.get("watchlist") or []
+        cur = " · ".join(wl) if wl else "— (single-symbol mode)"
+        return send_to(chat_id,
+            f"👁 <b>Watchlist:</b> {cur}\n\n"
+            "Usage:\n"
+            "<code>/watch XAUUSD EURUSD GBPUSD</code> — scan a basket (max 6, anything from /pairs)\n"
+            "<code>/watch off</code> — back to single-symbol mode\n\n"
+            "<i>The bot shops the whole basket every cycle and trades only the strongest "
+            "setup — never more than one open position.</i>")
+    if raw.lower() in ("off", "clear", "none"):
+        user_store.update(chat_id, {"watchlist": []})
+        running = _restart_user_loop(chat_id)
+        return send_to(chat_id, "👁 Watchlist cleared — back to single-symbol mode (/symbol)."
+                       + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot stopped — /start to run.</i>"))
+    syms = [w.upper().replace("/", "_").replace("-", "_") for w in raw.split()][:6]
+    is_ct = bool(user.get("ctrader_access_token") and user.get("ctrader_account_id"))
+    if is_ct:
+        try:
+            from apex import user_loop as _ul
+            br, _ = _ul._make_broker(user)
+            bad = []
+            for sym in syms:
+                try:
+                    br._symbol_id(sym)
+                except ValueError:
+                    bad.append(sym)
+            if bad:
+                return send_to(chat_id, f"❌ Your broker doesn't offer: <b>{', '.join(bad)}</b>. "
+                                        "Check /pairs and try again.")
+        except Exception as e:
+            return send_to(chat_id, f"⚠️ Couldn't verify the symbols right now: <i>{str(e)[:120]}</i>. Try again in a minute.")
+    user_store.update(chat_id, {"watchlist": syms})
+    running = _restart_user_loop(chat_id)
+    send_to(chat_id,
+            f"👁 <b>Watchlist set:</b> {' · '.join(syms)}\n\n"
+            "Every cycle I scan all of them and take only the strongest setup — "
+            "one open position at a time, risk rules unchanged."
+            + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot stopped — send /start to begin.</i>"))
+
+
 def _handle_pairs(chat_id):
     """List everything the client's linked cTrader account can trade."""
     user = user_store.load(chat_id)
@@ -1760,6 +1807,7 @@ _HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
                "/tp &lt;pips&gt; — take profit in pips\n"
                "/symbol &lt;PAIR&gt; — set pair (EUR_USD)\n"
                "/pairs — everything your broker lets you trade\n"
+               "/watch — scan a basket of instruments, trade the strongest setup\n"
                "/strategy — trading method (auto · mean reversion · trend · breakout)\n"
                "/atr on|off — dynamic ATR stops (SL 1.5×ATR / TP 3×ATR)\n"
                "/wizard — guided setup (symbol → method → mode)\n"
@@ -2037,6 +2085,8 @@ def _poll_loop():
                     _handle_symbol(chat_id, args)
                 elif cmd_l in ("/pairs", "/symbols"):
                     _handle_pairs(chat_id)
+                elif cmd_l == "/watch":
+                    _handle_watch(chat_id, args)
                 elif cmd_l in ("/strategy", "/method"):
                     _handle_strategy(chat_id, args)
                 elif cmd_l == "/backtest":
