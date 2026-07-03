@@ -1552,6 +1552,23 @@ def _handle_atr(chat_id, args):
     send_to(chat_id, msg)
 
 
+def _handle_resetstats(chat_id):
+    """Wipe the trade journal + in-memory skip/streak counters for a clean run."""
+    user_store.clear_trades(chat_id)
+    dash = user_loop.get_dash(chat_id)
+    if dash:
+        dash["trades"] = []
+        dash["skips"] = []
+        dash["skipsToday"] = 0
+        dash["startBalance"] = dash.get("balance", dash.get("startBalance", 0))
+    send_to(chat_id,
+        "🧹 <b>Journal reset — clean slate.</b>\n\n"
+        "Performance stats now start fresh from this moment. Let the bot run "
+        "undisturbed and check /stats in a week or two — that's the real,\n"
+        "bug-free track record to judge it on.",
+        _dashboard_keyboard(chat_id))
+
+
 def _handle_stats(chat_id):
     """Performance report from the persistent trade journal (premium spec #10)."""
     from apex import stats as stats_mod
@@ -2313,6 +2330,8 @@ def _poll_loop():
                     _handle_atr(chat_id, args)
                 elif cmd_l in ("/stats", "/performance"):
                     _handle_stats(chat_id)
+                elif cmd_l in ("/resetstats", "/resetjournal"):
+                    _handle_resetstats(chat_id)
                 elif cmd_l == "/buy":
                     _handle_buy(chat_id, args)
                 elif cmd_l == "/sell":

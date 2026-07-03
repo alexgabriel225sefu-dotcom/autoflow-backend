@@ -96,6 +96,23 @@ def update(user_id, updates):
     save(user_id, d)
 
 
+def clear_trades(user_id):
+    """Wipe the closed-trade journal — used to start a clean performance run
+    after a period polluted by bugs/test churn."""
+    user_id = str(user_id)
+    if _USE_REDIS:
+        try:
+            _redis_set(f"forex:trades:{user_id}", "[]")
+        except Exception as e:
+            print(f"[Store] clear_trades redis failed: {e}")
+        return
+    try:
+        with open(_path(user_id) + ".trades", "w") as f:
+            f.write("[]")
+    except Exception as e:
+        print(f"[Store] clear_trades failed: {e}")
+
+
 def append_trade(user_id, record):
     """Append a closed-trade record to the user's tax journal (keeps last 500)."""
     user_id = str(user_id)
