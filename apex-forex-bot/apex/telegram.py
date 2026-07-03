@@ -781,6 +781,30 @@ def _handle_env(chat_id, args):
                      f"<i>Make sure your token matches this environment.</i>")
 
 
+def _broker_signup_rows():
+    """Broker sign-up buttons carrying the operator's IB/partner referral links
+    (set via env: BROKER_NAME + BROKER_DEMO_LINK [+ BROKER_LIVE_LINK], or a
+    JSON list in BROKER_LINKS for several brokers). Empty if none configured."""
+    rows = []
+    raw = os.getenv("BROKER_LINKS", "").strip()
+    if raw:
+        try:
+            for b in json.loads(raw):
+                if b.get("name") and b.get("url"):
+                    rows.append([{"text": f"🏦 Open {b['name']} account", "url": b["url"]}])
+        except Exception as e:
+            print(f"[TELEGRAM] BROKER_LINKS parse error: {e}")
+    else:
+        name = os.getenv("BROKER_NAME", "").strip()
+        demo = os.getenv("BROKER_DEMO_LINK", "").strip()
+        live = os.getenv("BROKER_LIVE_LINK", "").strip()
+        if name and demo:
+            rows.append([{"text": f"🧪 Create a free {name} DEMO account", "url": demo}])
+        if name and live:
+            rows.append([{"text": f"🏦 Open a {name} live account", "url": live}])
+    return rows
+
+
 def _handle_ctrader(chat_id):
     """Start the cTrader OAuth onboarding — sends the client an authorize link."""
     from apex import ctrader_oauth
@@ -798,17 +822,25 @@ def _handle_ctrader(chat_id):
     scope_line = ("🔐 Access requested: <b>trading</b> (place &amp; manage orders)\n\n" if scope == "trading" else
                   "⚠️ Access requested: <b>accounts — READ-ONLY</b>. Orders will be rejected! "
                   "The operator must set <code>CTRADER_SCOPE=trading</code> and redeploy first.\n\n")
+    broker_rows = _broker_signup_rows()
+    # Strongly steer new clients to PRACTICE first: a demo cTrader account gives
+    # real market conditions with fake money — the honest, refund-proof test.
+    tip = ("💡 <b>New here? Start on a demo (Practice) account</b> — real market, "
+           "fake money. Watch the bot work risk-free, switch to live when you're "
+           "confident.\n\n")
+    if broker_rows:
+        tip += "Don't have a cTrader account yet? Create one below, then come back and Authorize.\n\n"
+    kb = broker_rows + [[{"text": "🔗 Authorize cTrader", "url": link}]]
     send_to(chat_id,
         "🟢 <b>Connect your cTrader account</b>\n\n"
-        "1. Tap the button below\n"
+        f"{tip}"
+        "1. Tap Authorize below\n"
         "2. Log in to cTrader and approve access\n"
         "3. You'll be sent back here automatically\n\n"
         f"{scope_line}"
-        "Works with any cTrader broker (IC Markets, Pepperstone, FxPro…). "
-        "Demo or live — your choice.\n\n"
+        "Works with any cTrader broker (IC Markets, Pepperstone, FxPro…).\n\n"
         "<i>The link is valid for 10 minutes.</i>",
-        extra={"reply_markup": {"inline_keyboard": [[
-            {"text": "🔗 Authorize cTrader", "url": link}]]}})
+        extra={"reply_markup": {"inline_keyboard": kb}})
 
 
 def _handle_ctaccount(chat_id, args):
