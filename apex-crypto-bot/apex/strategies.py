@@ -1,98 +1,64 @@
-"""Legendary-trader strategy engine — crypto, per-user session.
+"""Legendary-trader strategy engine (port of strategies.js).
 
 Turtle breakout, Livermore structure, Soros momentum, PTJ/Seykota defense,
 Druckenmiller position sizing.
-
-Unlike the forex port, the session dict is passed in per-user (no module-level
-global), so every client's risk counters are fully isolated.
 """
 import time
 from datetime import date
-from apex import config as cfg
+
+session = {
+    "consecutiveLosses": 0,
+    "consecutiveWins": 0,
+    "dailyTrades": 0,
+    "dailyPnL": 0.0,
+    "dailyPnLPct": 0.0,
+    "lastResetDay": date.today().isoformat(),
+    "peakBalance": None,
+    "totalTrades": 0,
+    "lastLossAt": 0.0,
+}
 
 
-def new_session(start_balance):
-    return {
-        "consecutiveLosses": 0,
-        "consecutiveWins": 0,
-        "dailyTrades": 0,
-        "dailyPnL": 0.0,
-        "lastResetDay": date.today().isoformat(),
-        "peakBalance": start_balance,
-        "totalTrades": 0,
-        "lastLossAt": 0.0,
-        "stopStartedAt": 0.0,   # self-healing risk pause timestamp
-    }
-
-
-def _reset_daily_if_needed(session):
+def _reset_daily_if_needed():
     today = date.today().isoformat()
-    if session.get("lastResetDay") != today:
+    if session["lastResetDay"] != today:
         session["dailyTrades"] = 0
         session["dailyPnL"] = 0.0
+        session["dailyPnLPct"] = 0.0
         session["lastResetDay"] = today
+        print("[STRATEGY] 🌅 New day — counters reset.")
 
 
-def should_stop(session, balance, start_balance):
-    _reset_daily_if_needed(session)
+def should_stop(balance, start_balance):
+    _reset_daily_if_needed()
     reasons = []
-    if session.get("peakBalance") is None or balance > session["peakBalance"]:
+    if session["peakBalance"] is None or balance > session["peakBalance"]:
         session["peakBalance"] = balance
-    if session["consecutiveLosses"] >= cfg.MAX_CONSECUTIVE_LOSSES:
-        reasons.append(f"{cfg.MAX_CONSECUTIVE_LOSSES} consecutive losses (Seykota rule)")
-    daily_dd = (session["dailyPnL"] / start_balance) * 100 if start_balance else 0
-    if daily_dd < -cfg.MAX_DAILY_LOSS_PCT:
-        reasons.append(f"Daily loss over {cfg.MAX_DAILY_LOSS_PCT:g}% (PTJ stop)")
-    peak = session.get("peakBalance") or start_balance
-    peak_dd = ((balance - peak) / peak) * 100 if peak else 0
-    if peak_dd < -cfg.MAX_DRAWDOWN_PCT:
-        reasons.append(f"Drawdown {peak_dd:.1f}% from peak (capital protection)")
-    if session["dailyTrades"] >= cfg.MAX_DAILY_TRADES:
-        reasons.append(f"{cfg.MAX_DAILY_TRADES} trades/day limit (Turtle rule)")
+    if session["consecutiveLosses"] >= 3:
+        reasons.append("3 consecutive losses — unfavorable conditions (Seykota rule)")
+    daily_dd_pct = (session["dailyPnL"] / start_balance) * 100 if start_balance else 0
+    if daily_dd_pct < -3:
+        reasons.append(f"Daily loss exceeded -3% (${abs(session['dailyPnL']):.2f}) — PTJ daily stop")
+    peak_dd = ((balance - session["peakBalance"]) / session["peakBalance"]) * 100 if session["peakBalance"] else 0
+    if peak_dd < -20:
+        reasons.append(f"Drawdown from peak: {peak_dd:.1f}% — capital protection stop")
+    if session["dailyTrades"] >= 10:
+        reasons.append("10 trades/day limit reached — Turtle rule")
+    if balance < 1:
+        reasons.append("Balance under $1 — cannot trade")
     return {"stop": len(reasons) > 0, "reasons": reasons}
 
 
-def record_trade(session, won, pnl_amount):
-    _reset_daily_if_needed(session)
-    session["totalTrades"] += 1
-    session["dailyTrades"] += 1
-    session["dailyPnL"] += pnl_amount
-    if won:
-        session["consecutiveWins"] += 1
-        session["consecutiveLosses"] = 0
-    else:
-        session["consecutiveLosses"] += 1
-        session["consecutiveWins"] = 0
-        session["lastLossAt"] = time.time()
-
-
-def reset_risk(session, balance):
-    """Self-heal: clear all counters after the risk pause cools down."""
-    session["consecutiveLosses"] = 0
-    session["consecutiveWins"] = 0
-    session["dailyTrades"] = 0
-    session["dailyPnL"] = 0.0
-    session["peakBalance"] = balance
-    session["stopStartedAt"] = 0.0
-
-
-def cooldown_remaining(session, cooldown_min):
-    """Ed Seykota: avoid revenge trading. Minutes left until entries allowed."""
-    if not session.get("lastLossAt") or cooldown_min <= 0:
-        return 0
-    elapsed = (time.time() - session["lastLossAt"]) / 60
-    return 0 if elapsed >= cooldown_min else int(cooldown_min - elapsed) + 1
-
-
-# ─── Pattern analysis (stateless — pure candle math) ─────
 def turtle_breakout(candles):
     PERIOD = 20
     if len(candles) < PERIOD + 2:
         return {"signal": None, "high20": None, "low20": None, "nearSignal": None, "breakoutStr": "NONE"}
     lookback = candles[-(PERIOD + 1):-1]
-    current, prev = candles[-1], candles[-2]
+    current = candles[-1]
+    prev = candles[-2]
     high20 = max(c["high"] for c in lookback)
     low20 = min(c["low"] for c in lookback)
+    rng = high20 - low20
     buy_bo = current["close"] > high20 and prev["close"] <= high20
     sell_bo = current["close"] < low20 and prev["close"] >= low20
     near_high = current["close"] > high20 * 0.995 and not buy_bo
@@ -100,7 +66,7 @@ def turtle_breakout(candles):
     return {
         "signal": "BUY" if buy_bo else ("SELL" if sell_bo else None),
         "nearSignal": "BUY" if near_high else ("SELL" if near_low else None),
-        "high20": round(high20, 6), "low20": round(low20, 6),
+        "high20": round(high20, 6), "low20": round(low20, 6), "range": round(rng, 6),
         "breakoutStr": "STRONG" if (buy_bo or sell_bo) else ("NEAR" if (near_high or near_low) else "NONE"),
     }
 
@@ -110,10 +76,14 @@ def livermore_structure(candles):
         return {"trend": "NEUTRAL", "strength": 0}
     last12 = candles[-12:]
     h1, h2 = last12[:6], last12[6:]
-    h1_high, h2_high = max(c["high"] for c in h1), max(c["high"] for c in h2)
-    h1_low, h2_low = min(c["low"] for c in h1), min(c["low"] for c in h2)
-    higher_highs, higher_lows = h2_high > h1_high, h2_low > h1_low
-    lower_highs, lower_lows = h2_high < h1_high, h2_low < h1_low
+    h1_high = max(c["high"] for c in h1)
+    h2_high = max(c["high"] for c in h2)
+    h1_low = min(c["low"] for c in h1)
+    h2_low = min(c["low"] for c in h2)
+    higher_highs = h2_high > h1_high
+    higher_lows = h2_low > h1_low
+    lower_highs = h2_high < h1_high
+    lower_lows = h2_low < h1_low
     closes = [c["close"] for c in last12]
     slope = (closes[-1] - closes[0]) / closes[0] * 100
     if higher_highs and higher_lows and slope > 0:
@@ -143,6 +113,7 @@ def soros_momentum(candles):
 
 
 def mean_reversion(candles, period=20, threshold=2.0):
+    """Z-score of price vs SMA — flags stretched moves likely to snap back."""
     if len(candles) < period + 1:
         return {"signal": None, "zscore": 0, "stretched": False}
     closes = [c["close"] for c in candles[-period:]]
@@ -150,8 +121,12 @@ def mean_reversion(candles, period=20, threshold=2.0):
     std = (sum((c - mean) ** 2 for c in closes) / period) ** 0.5
     price = candles[-1]["close"]
     z = (price - mean) / std if std else 0
-    return {"signal": "SELL" if z > threshold else ("BUY" if z < -threshold else None),
-            "zscore": round(z, 2), "stretched": abs(z) > threshold}
+    return {
+        "signal": "SELL" if z > threshold else ("BUY" if z < -threshold else None),
+        "zscore": round(z, 2),
+        "stretched": abs(z) > threshold,
+        "mean": round(mean, 6),
+    }
 
 
 def druckenmiller_multiplier(confidence, criteria_score, livermore, turtle):
@@ -169,7 +144,36 @@ def druckenmiller_multiplier(confidence, criteria_score, livermore, turtle):
     return min(2.0, max(0.4, mult))
 
 
+def record_trade(won, pnl_amount, start_balance):
+    session["totalTrades"] += 1
+    session["dailyTrades"] += 1
+    session["dailyPnL"] += pnl_amount
+    session["dailyPnLPct"] = (session["dailyPnL"] / start_balance) * 100 if start_balance else 0
+    if won:
+        session["consecutiveWins"] += 1
+        session["consecutiveLosses"] = 0
+    else:
+        session["consecutiveLosses"] += 1
+        session["consecutiveWins"] = 0
+        session["lastLossAt"] = time.time()
+    icon = "✅" if won else "❌"
+    print(f"[STRATEGY] {icon} Streak: {session['consecutiveLosses']} losses / "
+          f"{session['consecutiveWins']} wins | Today: {session['dailyTrades']} trades | "
+          f"Daily PnL: {'+' if session['dailyPnL'] >= 0 else ''}${session['dailyPnL']:.4f}")
+
+
+def cooldown_remaining(cooldown_min):
+    """Ed Seykota: after a loss, the worst trade is the revenge trade.
+    Returns minutes left until entries are allowed again (0 = clear)."""
+    if not session["lastLossAt"] or cooldown_min <= 0:
+        return 0
+    elapsed = (time.time() - session["lastLossAt"]) / 60
+    return 0 if elapsed >= cooldown_min else int(cooldown_min - elapsed) + 1
+
+
 def htf_trend(candles):
+    """Higher-timeframe trend via EMA50 (Livermore: trade WITH the tape).
+    Price above rising EMA = BULLISH, below falling EMA = BEARISH, else NEUTRAL."""
     if not candles or len(candles) < 55:
         return "NEUTRAL"
     closes = [c["close"] for c in candles]
@@ -187,7 +191,7 @@ def htf_trend(candles):
     return "NEUTRAL"
 
 
-def analyze(candles, session):
+def analyze(candles):
     return {
         "turtle": turtle_breakout(candles),
         "livermore": livermore_structure(candles),
@@ -195,3 +199,65 @@ def analyze(candles, session):
         "meanReversion": mean_reversion(candles),
         "session": dict(session),
     }
+
+
+def resample(candles, ratio=12):
+    """Aggregate M5 candles into a higher timeframe (12 → H1)."""
+    out = []
+    for i in range(0, len(candles) - ratio + 1, ratio):
+        grp = candles[i:i + ratio]
+        out.append({"time": grp[0].get("time"), "open": grp[0]["open"],
+                    "close": grp[-1]["close"],
+                    "high": max(c["high"] for c in grp),
+                    "low": min(c["low"] for c in grp),
+                    "volume": sum(c.get("volume", 0) for c in grp)})
+    return out
+
+
+def detect_regime(candles):
+    """Classify the market so the AUTO strategy can pick the right engine.
+
+    Self-calibrating (ratios, not absolute thresholds), so it works the same
+    on EURUSD, gold or an index:
+      trending  — clear structure + separated EMAs → trend following
+      ranging   — flat, mean-reverting conditions  → mean reversion
+      volatile  — ATR ≫ its own recent norm        → breakout, half risk
+      quiet     — ATR ≪ norm                       → stand aside
+    """
+    if len(candles) < 130:
+        return {"regime": "unknown", "vol_ratio": 1.0, "label": "warming up"}
+    trs = []
+    for i in range(1, len(candles)):
+        c, p = candles[i], candles[i - 1]
+        trs.append(max(c["high"] - c["low"], abs(c["high"] - p["close"]),
+                       abs(c["low"] - p["close"])))
+    atr_now = sum(trs[-14:]) / 14
+    # Long reference window: a 100-bar base converges with the present after
+    # ~1.5h of a new regime and stops detecting it. 400 bars (~33h of M5)
+    # anchors "normal" firmly enough to flag both dead and violent tape.
+    base_w = min(400, len(trs))
+    atr_base = sum(trs[-base_w:]) / base_w
+    vol_ratio = atr_now / atr_base if atr_base else 1.0
+
+    closes = [c["close"] for c in candles]
+    k50, k200 = 2 / 51, 2 / 201
+    e50 = sum(closes[:50]) / 50
+    e200 = sum(closes[:200]) / 200 if len(closes) >= 200 else e50
+    for px in closes[50:]:
+        e50 = px * k50 + e50 * (1 - k50)
+    for px in closes[200:]:
+        e200 = px * k200 + e200 * (1 - k200)
+    sep_pct = abs(e50 - e200) / closes[-1] * 100 if closes[-1] else 0
+    liv = livermore_structure(candles)
+
+    if vol_ratio >= 1.8:
+        return {"regime": "volatile", "vol_ratio": round(vol_ratio, 2),
+                "label": f"high volatility ({vol_ratio:.1f}× normal) — breakout mode, half risk"}
+    if vol_ratio <= 0.42:
+        return {"regime": "quiet", "vol_ratio": round(vol_ratio, 2),
+                "label": f"very low volatility ({vol_ratio:.1f}× normal) — standing aside"}
+    if sep_pct >= 0.18 and liv.get("trend") in ("BULLISH", "BEARISH") and liv.get("strength", 0) >= 0.55:
+        return {"regime": "trending", "vol_ratio": round(vol_ratio, 2),
+                "label": f"{liv['trend'].lower()} trend — trend following"}
+    return {"regime": "ranging", "vol_ratio": round(vol_ratio, 2),
+            "label": "ranging market — mean reversion"}

@@ -1,30 +1,35 @@
-"""Conversational AI trading assistant — Claude tool-use via Telegram.
+"""Conversational AI trading assistant — natural-language chat + trade execution.
 
-Users send free-text messages; Claude understands context, analyzes markets,
-and executes trades through structured tools. Falls back to Groq chat if no
-Anthropic key is configured.
+Any free-text message from a client (non-command) comes here. The assistant
+understands the user's intent, fetches live market data, and can execute trades
+directly. Falls back gracefully when AI providers are unavailable.
+
+Provider priority (shared owner key covers ALL clients):
+  1. Claude (Anthropic) — full tool-use + execution
+  2. Gemini              — FREE, full tool-use + execution
+  3. Groq               — free chat + analysis only
+  4. Local status       — always works, no AI needed
 """
 import json
-import time
 import threading
 from apex import config as cfg
 
-_clients: dict = {}     # api_key → anthropic.Anthropic client (cached per key)
-_conv: dict = {}        # user_id → [{"role", "content"}]
-_MAX_HISTORY = 12
+_conv: dict = {}       # user_id → [{"role", "content"}]
+_clients: dict = {}    # api_key → anthropic.Anthropic client (cached)
+_MAX_HISTORY = 10
 _lock = threading.Lock()
 
 _TOOLS = [
     {
         "name": "analyze_market",
         "description": (
-            "Run fresh technical + AI analysis on a symbol. "
-            "Use when asked about market conditions, signals, or whether to trade."
+            "Fetch live technical analysis for a forex pair. "
+            "Use when the user asks about market conditions, current signal, or whether to trade."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "symbol": {"type": "string", "description": "e.g. BTCUSDT, ETHUSDT, AVAXUSDT"}
+                "symbol": {"type": "string", "description": "e.g. EUR_USD, GBP_USD, USD_JPY"}
             },
             "required": ["symbol"],
         },
@@ -32,36 +37,44 @@ _TOOLS = [
     {
         "name": "execute_trade",
         "description": (
-            "Open a BUY or SELL position. "
-            "Only call AFTER the user explicitly confirms they want to trade. "
-            "Confirmation can be in ANY language (e.g. yes, da, sí, oui, ja, evet, نعم, да, go, intru). "
-            "If the user says an exact dollar amount (e.g. 'cu $60', 'cu 50 dolari', 'with $100'), "
-            "pass it as amount_usd. Otherwise omit it and the default risk % is used."
+            "Open a BUY or SELL position NOW. "
+            "Use when the user explicitly says they want to enter, buy, sell, or go long/short. "
+            "Confirmation can be in ANY language (yes, da, sí, oui, ja, evet, да, go, intru)."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "side":       {"type": "string", "enum": ["BUY", "SELL"]},
-                "symbol":     {"type": "string", "description": "e.g. BTCUSDT"},
-                "amount_usd": {"type": "number", "description": "Exact USD to trade (optional). Use ONLY when user specifies a dollar amount."},
+                "side":   {"type": "string", "enum": ["BUY", "SELL"]},
+                "symbol": {"type": "string", "description": "e.g. EUR_USD"},
             },
             "required": ["side", "symbol"],
         },
     },
     {
         "name": "close_position",
-        "description": "Close the open position immediately. Only call when user asks to exit/close.",
+        "description": "Close the open position immediately. Use when the user asks to exit, close, or sell out.",
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
         "name": "set_symbol",
-        "description": "Change the trading pair the bot auto-trades.",
+        "description": "Change which forex pair the bot auto-trades.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "symbol": {"type": "string", "description": "e.g. BTCUSDT"}
+                "symbol": {"type": "string", "description": "e.g. EUR_USD, GBP_JPY"}
             },
             "required": ["symbol"],
+        },
+    },
+    {
+        "name": "set_risk",
+        "description": "Change the risk per trade (percentage of balance).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "risk_pct": {"type": "number", "description": "Risk percent (0.5–10)"}
+            },
+            "required": ["risk_pct"],
         },
     },
     {
@@ -76,64 +89,42 @@ _TOOLS = [
     },
 ]
 
-_SYSTEM = """You are Apex, an intelligent crypto trading assistant inside a Telegram bot.
+_SYSTEM = """You are Apex, an intelligent forex trading assistant inside a Telegram bot.
 
-You help users trade smarter: analyze markets, execute trades, explain results, fix issues.
+You help users trade: analyze forex markets, execute trades, explain P&L, manage settings.
 
 RULES:
-- Be concise — Telegram messages, 2-4 sentences max unless detailed analysis is needed
-- LANGUAGE: Detect the language of the user's message and ALWAYS reply in that
-  EXACT same language — Romanian, English, Spanish, French, German, Arabic,
-  Hindi, Turkish, Portuguese, Russian, or ANY other. Mirror the user perfectly.
-  Never default to a fixed language; match whatever they wrote in this message.
-- Before executing a trade: show signal analysis briefly (1-2 lines), then execute immediately.
-  Do NOT ask for confirmation — users can always close with /close.
-- If the user says an amount (e.g. "cu 60 dolari", "with $50", "100 USDT"), extract it as
-  amount_usd and pass it to execute_trade. Execute right away without asking "are you sure?".
-- Always cite real numbers: RSI, confidence %, price, P&L
-- Auto-trading runs in background 24/7 — you only intervene when asked
-- For errors: explain what happened in plain language and suggest a fix
-- Use HTML for Telegram: <b>bold</b>, numbers, no markdown asterisks
-- CRITICAL: NEVER invent or guess prices, RSI, or any market numbers.
-  Use ONLY the live price from the account context below.
-  If you don't have a number in the context, say "I don't have that data right now."
-- For direct manual trades users can always use: /buy SYMBOL or /sell SYMBOL or /close
+- Be concise — Telegram messages, 2-4 sentences max unless analysis is requested
+- LANGUAGE: Detect the user's language and ALWAYS reply in that EXACT language.
+  Romanian, English, Spanish, French, Italian, Portuguese, German, Arabic, Russian — any.
+  Never default to a fixed language; mirror whatever the user wrote.
+- Trade execution: show a brief analysis, then execute immediately without asking for confirmation.
+  The user can always close manually. Do NOT ask "are you sure?" — just do it.
+- Always cite real numbers: RSI, price, balance, P&L — never invent them
+- Auto-trading runs 24/7 in the background — you only intervene when asked
+- For errors: explain in plain language and suggest a fix
+- Use HTML: <b>bold</b>, no markdown asterisks
+- NEVER invent prices or indicators. Only use numbers from the account context below.
+- Forex market hours: closed on weekends. Mention this if relevant.
+- For manual entries: /buy EUR_USD or /sell EUR_USD also work
 
-Current account context is injected below the system prompt."""
+Current account context is injected after this system prompt."""
 
 
 def _load_history(user_id: str):
-    """Return conversation history, restoring from persistent store on first use."""
     with _lock:
-        if user_id in _conv:
-            return list(_conv[user_id])
-    try:
-        from apex import user_store
-        hist = user_store.load_chat(user_id)
-    except Exception:
-        hist = []
-    with _lock:
-        _conv[user_id] = list(hist)
-    return list(hist)
+        return list(_conv.get(user_id, []))
 
 
 def _save_exchange(user_id: str, user_msg: str, assistant_msg: str):
-    """Append a user+assistant turn to memory AND persist it (survives redeploys)."""
     with _lock:
         conv = list(_conv.get(user_id, []))
         conv.append({"role": "user", "content": user_msg})
         conv.append({"role": "assistant", "content": assistant_msg})
-        conv = conv[-_MAX_HISTORY:]
-        _conv[user_id] = conv
-    try:
-        from apex import user_store
-        user_store.save_chat(user_id, conv)
-    except Exception:
-        pass
+        _conv[user_id] = conv[-_MAX_HISTORY:]
 
 
-def _get_client(api_key: str):
-    """Cache one Anthropic client per distinct API key (per-user keys supported)."""
+def _get_anthropic_client(api_key: str):
     with _lock:
         client = _clients.get(api_key)
     if client is None:
@@ -142,6 +133,427 @@ def _get_client(api_key: str):
         with _lock:
             _clients[api_key] = client
     return client
+
+
+def _build_context(user_id: str) -> str:
+    """Inject live account state so the AI talks with real numbers."""
+    from apex import user_loop, user_store, forex, indicators
+    from apex.brokers import yahoo
+    from apex.brokers.oanda import OandaBroker
+    import types
+
+    user = user_store.load(user_id)
+    dash = user_loop.get_dash(user_id) or {}
+
+    balance = dash.get("balance", user.get("paper_balance", cfg.PAPER_BALANCE))
+    start_bal = dash.get("startBalance", balance)
+    pnl_pct = ((balance - start_bal) / start_bal * 100) if start_bal else 0
+    symbol = dash.get("symbol") or user.get("symbol", cfg.SYMBOL)
+    paper = user.get("paper", cfg.PAPER_TRADING)
+    open_pos = dash.get("openPosition")
+    last_price = dash.get("currentPrice")
+
+    lines = [
+        f"Balance: ${balance:.2f} (start ${start_bal:.2f}, P&L: {pnl_pct:+.1f}%)",
+        f"Symbol: {symbol}",
+        f"Mode: {'Paper (simulated)' if paper else 'LIVE OANDA'}",
+        f"Market: {'OPEN' if forex.is_market_open() else 'CLOSED (weekend/holiday)'}",
+        f"Sessions: {', '.join(forex.active_sessions()) or '—'}",
+    ]
+    if last_price:
+        lines.append(f"Last price: {last_price:.5f}")
+
+    try:
+        fake_cfg = types.SimpleNamespace(
+            OANDA_API_TOKEN=user.get("oanda_token", ""),
+            OANDA_ACCOUNT_ID=user.get("oanda_account_id", ""),
+            OANDA_ENV=user.get("oanda_env", "practice"),
+            SYMBOL=symbol, TIMEFRAME=cfg.TIMEFRAME, CANDLES=50,
+            PAPER_TRADING=paper, PAPER_BALANCE=balance,
+            STOP_LOSS_PIPS=float(user.get("sl_pips", cfg.STOP_LOSS_PIPS)),
+            TAKE_PROFIT_PIPS=float(user.get("tp_pips", cfg.TAKE_PROFIT_PIPS)),
+            RISK_PER_TRADE=float(user.get("risk", cfg.RISK_PER_TRADE)),
+            LEVERAGE=float(user.get("leverage", cfg.LEVERAGE)),
+            MARGIN_CAP=0.5, MAX_SPREAD_PIPS=3.0,
+            MIN_CONFIDENCE=int(user.get("min_confidence", cfg.MIN_CONFIDENCE)),
+        )
+        broker = yahoo if (paper and not user.get("oanda_token")) else OandaBroker(fake_cfg)
+        candles = broker.get_candles(symbol, cfg.TIMEFRAME, 50)
+        if candles:
+            ind = indicators.analyze(candles)
+            lines.append(
+                f"Indicators: RSI={ind.get('rsi')}, "
+                f"BB-pos={ind.get('bb_position')}%, "
+                f"EMA trend={ind.get('emaTrend')}"
+            )
+    except Exception:
+        pass
+
+    if open_pos:
+        entry = open_pos.get("entryPrice", 0)
+        side = open_pos.get("side", "?")
+        sl = open_pos.get("stopLoss", 0)
+        tp = open_pos.get("takeProfit", 0)
+        lines.append(
+            f"Open position: {side} {open_pos.get('symbol', symbol)} "
+            f"@ {entry:.5f} | SL: {sl:.5f} | TP: {tp:.5f}"
+        )
+    else:
+        lines.append("Open position: None")
+
+    trades = dash.get("trades", [])
+    if trades:
+        wins = sum(1 for t in trades if t.get("netPnl", 0) > 0)
+        lines.append(f"Recent: {len(trades)} closed trades, {wins} wins")
+
+    return "\n".join(lines)
+
+
+def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
+    from apex import user_loop, user_store, forex, indicators
+    send_status = send_status or (lambda _: None)
+
+    if name == "analyze_market":
+        symbol = inp.get("symbol", "EUR_USD").upper().replace("/", "_").replace("-", "_")
+        send_status(f"🔍 Analyzing <b>{symbol}</b>…")
+        try:
+            from apex.brokers import yahoo
+            from apex.brokers.oanda import OandaBroker
+            import types
+            user = user_store.load(user_id)
+            paper = user.get("paper", True)
+            fake_cfg = types.SimpleNamespace(
+                OANDA_API_TOKEN=user.get("oanda_token", ""),
+                OANDA_ACCOUNT_ID=user.get("oanda_account_id", ""),
+                OANDA_ENV="practice", SYMBOL=symbol, TIMEFRAME=cfg.TIMEFRAME,
+                CANDLES=100, PAPER_TRADING=paper, PAPER_BALANCE=1000,
+                STOP_LOSS_PIPS=cfg.STOP_LOSS_PIPS, TAKE_PROFIT_PIPS=cfg.TAKE_PROFIT_PIPS,
+                RISK_PER_TRADE=cfg.RISK_PER_TRADE, LEVERAGE=cfg.LEVERAGE,
+                MARGIN_CAP=0.5, MAX_SPREAD_PIPS=3.0, MIN_CONFIDENCE=cfg.MIN_CONFIDENCE,
+            )
+            broker = yahoo if (paper and not user.get("oanda_token")) else OandaBroker(fake_cfg)
+            candles = broker.get_candles(symbol, cfg.TIMEFRAME, 100)
+            if not candles:
+                return json.dumps({"error": "No market data available"})
+            ind = indicators.analyze(candles)
+            from apex import ai as ai_mod
+            signal = ai_mod.mean_reversion_signal(ind, None)
+            return json.dumps({
+                "symbol": symbol,
+                "price": candles[-1]["close"],
+                "rsi": ind.get("rsi"),
+                "bb_position": ind.get("bb_position"),
+                "ema_trend": ind.get("emaTrend"),
+                "signal": signal["action"],
+                "confidence": signal["confidence"],
+                "reasoning": signal.get("reasoning", ""),
+            })
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    if name == "execute_trade":
+        side = inp.get("side", "BUY").upper()
+        symbol = inp.get("symbol", "EUR_USD").upper().replace("/", "_").replace("-", "_")
+        send_status(f"⚡ Executing <b>{side} {symbol}</b>…")
+        try:
+            result = user_loop.force_trade(user_id, side, symbol)
+            return json.dumps(result)
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    if name == "close_position":
+        send_status("🔄 Closing position…")
+        try:
+            result = user_loop.force_close(user_id)
+            return json.dumps(result)
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    if name == "set_symbol":
+        symbol = inp.get("symbol", "EUR_USD").upper().replace("/", "_").replace("-", "_")
+        try:
+            user_store.update(user_id, {"symbol": symbol})
+            return json.dumps({"ok": True, "symbol": symbol})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    if name == "set_risk":
+        risk_pct = float(inp.get("risk_pct", 1.0))
+        risk_pct = max(0.5, min(risk_pct, 10.0))
+        try:
+            user_store.update(user_id, {"risk": risk_pct / 100})
+            return json.dumps({"ok": True, "risk_pct": risk_pct})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    if name == "pause_trading":
+        try:
+            user_loop.stop(user_id)
+            return json.dumps({"ok": True, "status": "paused"})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    if name == "resume_trading":
+        try:
+            if not user_loop.is_running(user_id):
+                from apex.telegram import _user_alert
+                user_loop.start(user_id, alert_fn=_user_alert)
+            return json.dumps({"ok": True, "status": "active"})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    return json.dumps({"error": f"Unknown tool: {name}"})
+
+
+class _ProviderDown(Exception):
+    pass
+
+
+def _chat_anthropic(user_id: str, message: str, api_key: str, send_fn, send_status) -> str:
+    client = _get_anthropic_client(api_key)
+    context = _build_context(user_id)
+    system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
+
+    history = _load_history(user_id)
+    history.append({"role": "user", "content": message})
+    messages = history[-_MAX_HISTORY:]
+
+    for _ in range(5):
+        try:
+            response = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=600,
+                system=system,
+                messages=messages,
+                tools=_TOOLS,
+            )
+        except Exception as e:
+            raise _ProviderDown(f"claude: {e}")
+
+        if response.stop_reason != "tool_use":
+            text = "".join(b.text for b in response.content if hasattr(b, "text")).strip()
+            _save_exchange(user_id, message, text)
+            return text
+
+        tool_results = []
+        for block in response.content:
+            if block.type == "tool_use":
+                result = _run_tool(block.name, block.input, user_id, send_status)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result,
+                })
+        messages.append({"role": "assistant", "content": response.content})
+        messages.append({"role": "user", "content": tool_results})
+
+    return "⚠️ Could not complete request. Please try again."
+
+
+def _to_gemini_tools():
+    decls = []
+    for t in _TOOLS:
+        decl = {"name": t["name"], "description": t["description"]}
+        schema = t.get("input_schema") or {}
+        if schema.get("properties"):
+            decl["parameters"] = schema
+        decls.append(decl)
+    return [{"function_declarations": decls}]
+
+
+def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None) -> str:
+    import requests
+    send_status = send_status or (lambda _: None)
+    model = getattr(cfg, "GEMINI_MODEL", "") or "gemini-2.5-flash"
+    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+           f"{model}:generateContent")
+    context = _build_context(user_id)
+    system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
+
+    history = _load_history(user_id)
+    history.append({"role": "user", "content": message})
+
+    contents = []
+    for m in history[-_MAX_HISTORY:]:
+        role = "model" if m["role"] == "assistant" else "user"
+        contents.append({"role": role, "parts": [{"text": m["content"]}]})
+
+    tools = _to_gemini_tools()
+
+    for _ in range(5):
+        try:
+            r = requests.post(
+                url, params={"key": api_key},
+                json={"system_instruction": {"parts": [{"text": system}]},
+                      "contents": contents,
+                      "tools": tools,
+                      "generationConfig": {"maxOutputTokens": 600, "temperature": 0.3}},
+                timeout=20,
+            )
+            if r.status_code == 429:
+                raise _ProviderDown("gemini quota")
+            r.raise_for_status()
+        except _ProviderDown:
+            raise
+        except Exception as e:
+            raise _ProviderDown(f"gemini {e}")
+
+        data = r.json()
+        cands = data.get("candidates", [])
+        if not cands:
+            raise _ProviderDown("gemini empty response")
+        parts = cands[0].get("content", {}).get("parts", [])
+
+        fcalls = [p["functionCall"] for p in parts if "functionCall" in p]
+        if not fcalls:
+            reply = "".join(p.get("text", "") for p in parts).strip()
+            if not reply:
+                raise _ProviderDown("gemini empty text")
+            _save_exchange(user_id, message, reply)
+            return reply
+
+        contents.append({"role": "model", "parts": parts})
+        resp_parts = []
+        for fc in fcalls:
+            name = fc.get("name", "")
+            args = fc.get("args", {}) or {}
+            result = _run_tool(name, args, user_id, send_status)
+            resp_parts.append({
+                "functionResponse": {"name": name, "response": {"result": result}}
+            })
+        contents.append({"role": "user", "parts": resp_parts})
+
+    return "⚠️ Could not complete the request. Please try again."
+
+
+def _chat_groq(user_id: str, message: str, api_key: str = "") -> str:
+    import requests
+    key = api_key or cfg.GROQ_API_KEY
+    if not key:
+        raise _ProviderDown("no groq key")
+
+    context = _build_context(user_id)
+    system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
+
+    history = _load_history(user_id)
+    history.append({"role": "user", "content": message})
+    messages = [{"role": "system", "content": system}] + history[-_MAX_HISTORY:]
+
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={"model": "llama-3.3-70b-versatile", "messages": messages,
+                  "max_tokens": 400, "temperature": 0.3},
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            timeout=15,
+        )
+        if r.status_code == 429:
+            raise _ProviderDown("groq quota")
+        r.raise_for_status()
+        reply = r.json()["choices"][0]["message"]["content"].strip()
+        _save_exchange(user_id, message, reply)
+        return reply
+    except _ProviderDown:
+        raise
+    except Exception as e:
+        raise _ProviderDown(f"groq {e}")
+
+
+def _local_status(user_id: str) -> str:
+    """Rule-based reply from real state — always works, no AI needed."""
+    from apex import user_loop, user_store, forex
+    user = user_store.load(user_id)
+    dash = user_loop.get_dash(user_id) or {}
+    balance = dash.get("balance", user.get("paper_balance", cfg.PAPER_BALANCE))
+    start_bal = dash.get("startBalance", balance)
+    pnl_pct = ((balance - start_bal) / start_bal * 100) if start_bal else 0
+    symbol = dash.get("symbol") or user.get("symbol", cfg.SYMBOL)
+    open_pos = dash.get("openPosition")
+    market = "🟢 OPEN" if forex.is_market_open() else "🔴 CLOSED (weekend)"
+
+    lines = [
+        f"💼 <b>Balance:</b> ${balance:.2f} (start ${start_bal:.2f}, {pnl_pct:+.1f}%)",
+        f"💱 <b>Pair:</b> {symbol} | {market}",
+    ]
+    if open_pos:
+        entry = open_pos.get("entryPrice", 0)
+        side = open_pos.get("side", "?")
+        sl = open_pos.get("stopLoss", 0)
+        tp = open_pos.get("takeProfit", 0)
+        lines.append(
+            f"📈 <b>Position:</b> {side} @ {entry:.5f}\n"
+            f"   SL: {sl:.5f}  TP: {tp:.5f}\n"
+            f"   Close with <code>/close</code>"
+        )
+    else:
+        lines.append("📭 <b>No open position.</b> Bot is scanning automatically.")
+        lines.append(f"<i>Force entry:</i> <code>/buy {symbol}</code> or <code>/sell {symbol}</code>")
+    return "\n".join(lines)
+
+
+def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
+    """Route to the best available AI, execute tools, send reply."""
+    send_status = send_status or (lambda _: None)
+    user_id = str(user_id)
+
+    def _run():
+        try:
+            # Per-user keys (the client pasted their own) take priority over the
+            # shared admin keys, so every client can run AI chat on their own quota.
+            from apex import user_store
+            try:
+                u = user_store.load(user_id)
+            except Exception:
+                u = {}
+            anthropic_key = u.get("anthropic_key") or cfg.ANTHROPIC_API_KEY
+            gemini_key = u.get("gemini_key") or cfg.GEMINI_API_KEY
+            groq_key = u.get("groq_key") or cfg.GROQ_API_KEY
+
+            chain = []
+            if anthropic_key:
+                chain.append(("Claude", lambda: _chat_anthropic(user_id, message, anthropic_key, send_fn, send_status)))
+            if gemini_key:
+                chain.append(("Gemini", lambda: _chat_gemini(user_id, message, gemini_key, send_status)))
+            if groq_key:
+                chain.append(("Groq", lambda: _chat_groq(user_id, message, groq_key)))
+
+            reply = None
+            for name, prov in chain:
+                try:
+                    reply = prov()
+                    if reply:
+                        break
+                except _ProviderDown as e:
+                    print(f"[ForexAssistant:{user_id}] {name} down ({e}) → next")
+                    continue
+                except Exception as e:
+                    print(f"[ForexAssistant:{user_id}] {name} error ({e}) → next")
+                    continue
+
+            if not reply:
+                reply = (_local_status(user_id) +
+                         "\n\n🧠 <b>Want AI chat to help you trade?</b>\n"
+                         "It needs an API key — <b>your choice</b>, free or paid:\n"
+                         "🥇 <b>Gemini</b> (free, 1,500/day) → aistudio.google.com/apikey\n"
+                         "🥈 <b>Groq</b> (free, fast) → console.groq.com/keys\n"
+                         "🥉 <b>Claude</b> (paid, smartest) → console.anthropic.com\n"
+                         "Then send <code>/ai</code> and paste your key. "
+                         "<i>Trading runs fine without it — this only powers the chat.</i>")
+            send_fn(reply)
+        except Exception as e:
+            print(f"[ForexAssistant:{user_id}] error: {e}")
+            try:
+                send_fn(_local_status(user_id))
+            except Exception:
+                send_fn("⚠️ Assistant error. Please try again.")
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _gemini_url() -> str:
+    model = getattr(cfg, "GEMINI_MODEL", "") or "gemini-2.5-flash"
+    return (f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model}:generateContent")
 
 
 def test_key(key: str):
@@ -166,315 +578,29 @@ def test_key(key: str):
         return False, f"Could not verify key ({e})"
 
 
-def _build_context(user_id: str) -> str:
-    """Return a short account snapshot to inject into the system prompt."""
-    from apex import user_loop, binance
-    u = user_loop._ensure_user(user_id)
-    state = u.get("state", {})
-    settings = u.get("settings", {})
-
-    balance = state.get("paperBalance", 0)
-    start_bal = state.get("startBalance", 100)
-    pnl_pct = ((balance - start_bal) / start_bal * 100) if start_bal else 0
-    pos = state.get("openPosition")
-    sig = state.get("lastSignal")
-    trades = state.get("trades", [])
-
-    symbol = settings.get("SYMBOL", "BTCUSDT")
-    ex_name = u.get("exchange", "binance")
-    try:
-        live_price = binance.get_price(symbol, exchange=ex_name)
-    except Exception:
-        live_price = None
-
-    # Live technical indicators so the assistant talks with REAL numbers
-    # (works for both Claude and the Groq fallback, no tool call needed).
-    indi = None
-    try:
-        from apex import indicators
-        candles = binance.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES, exchange=ex_name)
-        if candles:
-            indi = indicators.analyze(candles)
-    except Exception:
-        indi = None
-
-    lines = [
-        f"Balance: ${balance:.2f} USDT (start: ${start_bal:.2f}, P&L: {pnl_pct:+.1f}%)",
-        f"Symbol: {symbol}",
-        f"Live price: ${live_price:.4f}" if live_price else "Live price: unavailable",
-        f"Auto-trading: {'PAUSED' if settings.get('PAUSED') else 'ACTIVE'}",
-        f"Mode: {'Paper (testnet)' if u.get('paper', True) else 'LIVE'}",
-    ]
-    if indi:
-        macd_h = float(indi.get("macdHist") or 0)
-        lines.append(
-            f"Live indicators ({cfg.TIMEFRAME}): RSI(14)={indi.get('rsi')}, "
-            f"MACD={'bullish' if macd_h > 0 else 'bearish'} ({indi.get('macdHist')}), "
-            f"EMA trend={indi.get('emaTrend')}, "
-            f"volume ratio={indi.get('volumeRatio')}x, ATR={indi.get('atrPct')}%"
-        )
-    if pos:
-        try:
-            price = binance.get_price(pos["symbol"])
-            pnl = pos.get("currentPnl", 0)
-            lines.append(
-                f"Open position: {pos['side']} {pos['symbol']} @ ${pos['entryPrice']:.4f} | "
-                f"Now: ${price:.4f} | PnL: {pnl:+.4f} USDT | "
-                f"SL: ${pos['stopLoss']:.4f} | TP: ${pos['takeProfit']:.4f}"
-            )
-        except Exception:
-            lines.append(f"Open position: {pos['side']} {pos['symbol']}")
-    else:
-        lines.append("Open position: None")
-
-    if sig:
-        lines.append(
-            f"Last signal: {sig['action']} {sig['confidence']:.0f}% — {sig.get('reasoning', '')[:80]}"
-        )
-    if trades:
-        wins = sum(1 for t in trades if t.get("win"))
-        lines.append(f"Recent trades: {len(trades)} total, {wins} wins")
-
-    return "\n".join(lines)
-
-
-def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
-    """Execute a tool and return the result as a JSON string for Claude."""
-    from apex import user_loop, binance, indicators, strategies, ai
-
-    if name == "analyze_market":
-        symbol = inp.get("symbol", "BTCUSDT").upper()
-        send_status(f"🔍 Analyzing <b>{symbol}</b>…")
-        try:
-            u = user_loop._ensure_user(user_id)
-            ex_name = u.get("exchange", "binance")
-            candles = binance.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES, exchange=ex_name)
-            if not candles:
-                return json.dumps({"error": "No market data"})
-            ind = indicators.analyze(candles)
-            strat = strategies.analyze(candles, u["state"].get("session", {}))
-            signal = ai.get_signal(
-                ind, u["state"].get("paperBalance", 100),
-                u["state"].get("openPosition"), strat,
-                symbol=symbol, timeframe=cfg.TIMEFRAME,
-                user_key=u.get("groq_key") or None,
-            )
-            return json.dumps({
-                "symbol": symbol,
-                "price": ind.get("price"),
-                "rsi": ind.get("rsi"),
-                "macd": "bullish" if float(ind.get("macdHist") or 0) > 0 else "bearish",
-                "trend": ind.get("emaTrend"),
-                "volume_ratio": ind.get("volumeRatio"),
-                "signal": signal["action"],
-                "confidence": signal["confidence"],
-                "criteria_score": signal.get("criteriaScore", 0),
-                "reasoning": signal.get("reasoning", ""),
-            })
-        except Exception as e:
-            return json.dumps({"error": str(e)})
-
-    if name == "execute_trade":
-        side = inp.get("side", "BUY").upper()
-        symbol = inp.get("symbol", "BTCUSDT").upper()
-        amount_usd = inp.get("amount_usd")
-        amt_label = f" ${amount_usd:.0f}" if amount_usd else ""
-        send_status(f"⚡ Executing <b>{side} {symbol}{amt_label}</b>…")
-        try:
-            result = user_loop.force_trade(user_id, side, symbol, amount_usd=amount_usd)
-            return json.dumps(result)
-        except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
-
-    if name == "close_position":
-        send_status("🔄 Closing position…")
-        try:
-            result = user_loop.force_close(user_id)
-            return json.dumps(result)
-        except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
-
-    if name == "set_symbol":
-        symbol = inp.get("symbol", "BTCUSDT").upper()
-        try:
-            from apex import user_store
-            u = user_loop._ensure_user(user_id)
-            u["settings"]["SYMBOL"] = symbol
-            user_store.save(user_id, u)
-            return json.dumps({"ok": True, "symbol": symbol})
-        except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
-
-    if name == "pause_trading":
-        try:
-            from apex import user_store
-            u = user_loop._ensure_user(user_id)
-            u["settings"]["PAUSED"] = True
-            user_store.save(user_id, u)
-            return json.dumps({"ok": True, "status": "paused"})
-        except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
-
-    if name == "resume_trading":
-        try:
-            user_loop.reset_risk(user_id)  # clears pause + risk counters
-            if not user_loop.is_running(user_id):
-                user_loop.start(user_id)
-            return json.dumps({"ok": True, "status": "active"})
-        except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
-
-    return json.dumps({"error": f"Unknown tool: {name}"})
-
-
-class _ProviderDown(Exception):
-    """Raised when an AI provider is rate-limited/unavailable so the chat
-    fallback chain can transparently try the next provider."""
-
-
-def _chat_anthropic(user_id: str, message: str, api_key: str, send_fn, send_status) -> str:
-    """Full Claude tool-use conversation loop."""
-    client = _get_client(api_key)
-    context = _build_context(user_id)
-    system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
-
-    history = _load_history(user_id)
-    history.append({"role": "user", "content": message})
-
-    messages = history[-_MAX_HISTORY:]
-    max_loops = 5
-
-    for _ in range(max_loops):
-        try:
-            response = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=600,
-                system=system,
-                messages=messages,
-                tools=_TOOLS,
-            )
-        except Exception as e:
-            # Rate-limited / overloaded / no credit → let the chain fall through.
-            raise _ProviderDown(f"claude: {e}")
-
-        if response.stop_reason != "tool_use":
-            # Final text response
-            text = "".join(b.text for b in response.content if hasattr(b, "text")).strip()
-            _save_exchange(user_id, message, text)
-            return text
-
-        # Execute all tool calls
-        tool_results = []
-        for block in response.content:
-            if block.type == "tool_use":
-                result = _run_tool(block.name, block.input, user_id, send_status)
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result,
-                })
-
-        # Build next messages with tool results (raw blocks passed back to the API)
-        messages.append({"role": "assistant", "content": response.content})
-        messages.append({"role": "user", "content": tool_results})
-
-    return "⚠️ Could not complete request. Please try again."
-
-
-def _local_status_answer(user_id: str) -> str:
-    """Rule-based reply built from REAL state — works with zero AI quota.
-
-    Used whenever every AI provider is rate-limited so the user still gets a
-    truthful answer about their position instead of a canned error.
-    """
-    from apex import user_loop, binance
-    u = user_loop._ensure_user(user_id)
-    state = u.get("state", {})
-    settings = u.get("settings", {})
-    balance = state.get("paperBalance", 0)
-    start_bal = state.get("startBalance", 100)
-    pnl_pct = ((balance - start_bal) / start_bal * 100) if start_bal else 0
-    pos = state.get("openPosition")
-    sig = state.get("lastSignal")
-
-    # Universal/English wording: this only shows in the rare all-AI-down state,
-    # where we can't translate dynamically. It's mostly numbers + symbols anyway.
-    lines = [f"💼 <b>Account:</b> ${balance:.2f} (start ${start_bal:.2f}, {pnl_pct:+.1f}%)"]
-    if pos:
-        try:
-            price = binance.get_price(pos["symbol"])
-            entry = pos["entryPrice"]
-            chg = ((price - entry) / entry * 100) * (1 if pos["side"] == "BUY" else -1)
-            sign = "+" if chg >= 0 else ""
-            lines.append(
-                f"📈 <b>Open position:</b> {pos['side']} {pos['symbol']}\n"
-                f"Entry: ${entry:.4f} → Now: ${price:.4f} ({sign}{chg:.2f}%)\n"
-                f"🛡 SL: ${pos['stopLoss']:.4f}  🎯 TP: ${pos['takeProfit']:.4f}"
-            )
-        except Exception:
-            lines.append(f"📈 <b>Position:</b> {pos['side']} {pos['symbol']}")
-        lines.append("<i>Close anytime with</i> <code>/close</code>")
-    else:
-        lines.append("📭 <b>No open position.</b> The bot is scanning automatically.")
-        lines.append("<i>Force an entry:</i> <code>/buy BTCUSDT</code> · <code>/sell BTCUSDT</code>")
-    if sig:
-        lines.append(f"🤖 Last signal: <b>{sig['action']}</b> ({sig['confidence']:.0f}%)")
-    return "\n".join(lines)
-
-
-def _chat_groq(user_id: str, message: str) -> str:
-    """Simple Groq chat fallback (no tool execution — conversational only)."""
+def test_groq_key(key: str):
+    """Quick liveness check for a Groq key. Returns (ok, message)."""
     import requests
-    key = cfg.GROQ_API_KEY
-    u_data = None
-    try:
-        from apex import user_loop
-        u_data = user_loop._ensure_user(user_id)
-        key = u_data.get("groq_key") or key
-    except Exception:
-        pass
-
-    if not key:
-        return (_local_status_answer(user_id) +
-                "\n\n🧠 <i>For AI chat (questions, analysis, natural-language commands) "
-                "add a free key — send</i> <code>/ai</code> <i>and pick Gemini, Groq or Claude.</i>")
-
-    context = _build_context(user_id)
-    system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
-
-    history = _load_history(user_id)
-    history.append({"role": "user", "content": message})
-
-    messages = [{"role": "system", "content": system}] + history[-_MAX_HISTORY:]
-
+    key = (key or "").strip()
+    if not key.startswith("gsk_"):
+        return False, "Groq keys start with gsk_ — copy it from console.groq.com/keys"
     try:
         r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
-            json={"model": "llama-3.1-8b-instant", "messages": messages,
-                  "max_tokens": 400, "temperature": 0.3},
+            json={"model": "llama-3.3-70b-versatile",
+                  "messages": [{"role": "user", "content": "Reply with the single word OK."}],
+                  "max_tokens": 5},
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            timeout=15,
+            timeout=12,
         )
+        if r.status_code == 401:
+            return False, "Key rejected — recreate it at console.groq.com/keys"
         if r.status_code == 429:
-            # Groq quota gone → fall through to the next provider / local answer.
-            raise _ProviderDown("groq quota")
+            return True, "Key valid (was briefly rate-limited, that's fine)"
         r.raise_for_status()
-        reply = r.json()["choices"][0]["message"]["content"].strip()
-        _save_exchange(user_id, message, reply)
-        return reply
-    except _ProviderDown:
-        raise
-    except requests.HTTPError as e:
-        raise _ProviderDown(f"groq http {e}")
+        return True, "Key works"
     except Exception as e:
-        raise _ProviderDown(f"groq {e}")
-
-
-def _gemini_url():
-    """Build the Gemini endpoint from the configured model (default 2.5-flash)."""
-    model = getattr(cfg, "GEMINI_MODEL", "") or "gemini-2.5-flash"
-    return ("https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{model}:generateContent")
+        return False, f"Could not verify key ({e})"
 
 
 def test_gemini_key(key: str):
@@ -491,26 +617,18 @@ def test_gemini_key(key: str):
             timeout=12,
         )
         if r.status_code == 429:
-            # A 429 only happens AFTER auth succeeds — the key is valid, save it.
             return True, "Key valid (was briefly rate-limited, that's fine)"
         if r.status_code >= 400:
-            # Surface Google's real reason so we know exactly what's wrong
             try:
                 err = r.json().get("error", {})
-                reason = ""
-                for d in err.get("details", []):
-                    if d.get("reason"):
-                        reason = d["reason"]
-                        break
+                reason = next((d["reason"] for d in err.get("details", []) if d.get("reason")), "")
                 msg = err.get("message", "")
             except Exception:
                 reason, msg = "", r.text[:120]
             if reason == "API_KEY_INVALID":
-                return False, "Google says the key is invalid. Recreate it at aistudio.google.com/apikey and copy the WHOLE key (starts with AIza, ~39 chars)."
+                return False, "Google says the key is invalid. Recreate it at aistudio.google.com/apikey and copy the WHOLE key (starts with AIza)."
             if reason in ("SERVICE_DISABLED", "PERMISSION_DENIED"):
                 return False, "The Generative Language API isn't enabled for this key's project. Create the key in a NEW project at aistudio.google.com/apikey."
-            if reason == "FAILED_PRECONDITION":
-                return False, "Gemini API isn't available for your account's country/billing setup yet."
             return False, f"Google rejected the key: {msg or reason or r.status_code}"
         r.raise_for_status()
         return True, "Key works"
@@ -518,156 +636,7 @@ def test_gemini_key(key: str):
         return False, f"Could not verify key ({e})"
 
 
-def _to_gemini_tools():
-    """Convert our Anthropic-style _TOOLS to Gemini function_declarations."""
-    decls = []
-    for t in _TOOLS:
-        decl = {"name": t["name"], "description": t["description"]}
-        schema = t.get("input_schema") or {}
-        # Gemini rejects empty parameter objects — omit params for no-arg tools.
-        if schema.get("properties"):
-            decl["parameters"] = schema
-        decls.append(decl)
-    return [{"function_declarations": decls}]
-
-
-def _chat_gemini(user_id: str, message: str, key: str, send_status=None) -> str:
-    """Gemini path with function calling — FREE chat + real trade execution."""
-    import requests
-    send_status = send_status or (lambda _: None)
-    context = _build_context(user_id)
-    system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
-
-    history = _load_history(user_id)
-    history.append({"role": "user", "content": message})
-
-    # Map our history to Gemini's contents format (role "model" not "assistant")
-    contents = []
-    for m in history[-_MAX_HISTORY:]:
-        role = "model" if m["role"] == "assistant" else "user"
-        contents.append({"role": role, "parts": [{"text": m["content"]}]})
-
-    tools = _to_gemini_tools()
-
-    for _ in range(5):  # tool-use loop
-        try:
-            r = requests.post(
-                _gemini_url(), params={"key": key},
-                json={"system_instruction": {"parts": [{"text": system}]},
-                      "contents": contents,
-                      "tools": tools,
-                      "generationConfig": {"maxOutputTokens": 600, "temperature": 0.3}},
-                timeout=20,
-            )
-            if r.status_code == 429:
-                # Daily Gemini quota exhausted → fall through to the next provider.
-                raise _ProviderDown("gemini quota")
-            r.raise_for_status()
-        except _ProviderDown:
-            raise
-        except requests.HTTPError as e:
-            raise _ProviderDown(f"gemini http {e}")
-        except Exception as e:
-            raise _ProviderDown(f"gemini {e}")
-
-        data = r.json()
-        cands = data.get("candidates", [])
-        if not cands:
-            raise _ProviderDown("gemini empty response")
-        parts = cands[0].get("content", {}).get("parts", [])
-
-        # Collect any function calls Gemini wants to make
-        fcalls = [p["functionCall"] for p in parts if "functionCall" in p]
-        if not fcalls:
-            reply = "".join(p.get("text", "") for p in parts).strip()
-            if not reply:
-                raise _ProviderDown("gemini empty text")
-            _save_exchange(user_id, message, reply)
-            return reply
-
-        # Echo the model's function-call turn, then append our results
-        contents.append({"role": "model", "parts": parts})
-        resp_parts = []
-        for fc in fcalls:
-            name = fc.get("name", "")
-            args = fc.get("args", {}) or {}
-            result = _run_tool(name, args, user_id, send_status)
-            resp_parts.append({
-                "functionResponse": {"name": name, "response": {"result": result}}
-            })
-        contents.append({"role": "user", "parts": resp_parts})
-
-    return "⚠️ Could not complete the request. Please try again."
-
-
-def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
-    """Main entry: route to the best available AI per user, send reply.
-
-    Priority (owner's shared key covers ALL clients — clients need nothing):
-      1. Anthropic key (user or shared) → Claude, full trade EXECUTION
-      2. Gemini key (user or shared)    → FREE, full trade EXECUTION (function calling)
-      3. Groq key (user or shared)      → free chat + analysis (no execution)
-    """
-    send_status = send_status or (lambda _: None)
-    user_id = str(user_id)
-
-    def _run():
-        try:
-            from apex import user_loop
-            u = user_loop._ensure_user(user_id)
-            anthropic_key = u.get("anthropic_key") or cfg.ANTHROPIC_API_KEY
-            gemini_key = u.get("gemini_key") or cfg.GEMINI_API_KEY
-            groq_key = u.get("groq_key") or cfg.GROQ_API_KEY
-
-            # Fallback CHAIN: try every available provider in order of capability.
-            # When one is rate-limited/down it raises _ProviderDown and we slide to
-            # the next. If ALL are exhausted we still answer from real state — so the
-            # chat is NEVER fully silent, and (separately) trading never stops since
-            # it runs on the rule-based engine, not on any AI key.
-            chain = []
-            if anthropic_key:
-                chain.append(("Claude", lambda: _chat_anthropic(user_id, message, anthropic_key, send_fn, send_status)))
-            if gemini_key:
-                chain.append(("Gemini", lambda: _chat_gemini(user_id, message, gemini_key, send_status)))
-            if groq_key:
-                chain.append(("Groq", lambda: _chat_groq(user_id, message)))
-
-            reply = None
-            for name, prov in chain:
-                try:
-                    reply = prov()
-                    if reply:
-                        break
-                except _ProviderDown as e:
-                    print(f"[Assistant:{user_id}] {name} down ({e}) → next provider")
-                    continue
-                except Exception as e:
-                    print(f"[Assistant:{user_id}] {name} error ({e}) → next provider")
-                    continue
-
-            if not reply:
-                reply = _local_status_answer(user_id)
-                if chain:  # had keys but all rate-limited
-                    reply += ("\n\n🧠 <i>AI la limită momentan (se resetează în câteva ore). "
-                              "Trading-ul continuă pe motorul de reguli. "
-                              "Adaugă propria cheie cu</i> <code>/ai</code><i>.</i>")
-            send_fn(reply)
-        except Exception as e:
-            print(f"[Assistant:{user_id}] error: {e}")
-            try:
-                send_fn(_local_status_answer(user_id))
-            except Exception:
-                send_fn("⚠️ Assistant error. Please try again.")
-
-    threading.Thread(target=_run, daemon=True).start()
-
-
 def clear_history(user_id: str) -> None:
     user_id = str(user_id)
     with _lock:
         _conv.pop(user_id, None)
-    try:
-        from apex import user_store
-        user_store.clear_chat(user_id)
-    except Exception:
-        pass

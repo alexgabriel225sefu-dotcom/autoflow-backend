@@ -68,14 +68,39 @@ def _scalp(name, scalp_default, normal_default):
     return v if v is not None else (scalp_default if SCALP_MODE else normal_default)
 
 
+# ─── Product / branding (one engine serves Forex and Crypto builds) ──
+# PRODUCT flips the asset-class defaults: "forex" (24/5, FX universe) or
+# "crypto" (24/7, crypto-CFD universe). Each is overridable individually below,
+# so a deployment can fine-tune without changing code.
+PRODUCT = (os.getenv("PRODUCT") or "forex").lower()
+_IS_CRYPTO = PRODUCT == "crypto"
+BOT_NAME = os.getenv("BOT_NAME") or ("Apex Crypto Bot" if _IS_CRYPTO else "Apex Forex Bot")
+ASSET_EMOJI = os.getenv("ASSET_EMOJI") or ("₿" if _IS_CRYPTO else "💱")
+ASSET_NOUN = os.getenv("ASSET_NOUN") or ("crypto" if _IS_CRYPTO else "forex")
+# Market hours: crypto trades 24/7, forex 24/5 (closed weekends).
+MARKET_24_7 = _truthy(os.getenv("MARKET_24_7") or ("true" if _IS_CRYPTO else "false"))
+LICENSE_PRODUCT = os.getenv("LICENSE_PRODUCT") or ("apex-crypto" if _IS_CRYPTO else "apex-forex")
+LICENSE_KEY_PREFIX = (os.getenv("LICENSE_KEY_PREFIX") or ("CRPT" if _IS_CRYPTO else "FORX")).upper()
+
 # ─── Trading ────────────────────────────────────────────
-SYMBOL = os.getenv("TRADE_SYMBOL", "EUR_USD")
+SYMBOL = os.getenv("TRADE_SYMBOL") or ("BTCUSD" if _IS_CRYPTO else "EUR_USD")
 TIMEFRAME = _scalp("TIMEFRAME", "1m", "5m")
 CANDLES = 200
 
 # ─── Scanner ────────────────────────────────────────────
-SCAN_SYMBOLS = (os.getenv("SCAN_SYMBOLS") or "NZD_USD").split(",")  # tuning r9: NZD-only (EUR/AUD/JPY/CAD all negative; NZD edge is signal-specific)
+_DEFAULT_SCAN = "BTCUSD,ETHUSD,SOLUSD" if _IS_CRYPTO else "NZD_USD"
+SCAN_SYMBOLS = (os.getenv("SCAN_SYMBOLS") or _DEFAULT_SCAN).split(",")  # tuning r9: NZD-only (EUR/AUD/JPY/CAD all negative; NZD edge is signal-specific)
 MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
+
+# Curated liquid universe the Auto-Pilot scans (comma-separated env override).
+# FX majors + gold are on every cTrader broker; crypto CFDs are the liquid
+# majors. Non-FX candidates are validated per account before use.
+_DEFAULT_UNIVERSE = ("BTCUSD,ETHUSD,SOLUSD,XRPUSD,LTCUSD,ADAUSD,DOGEUSD,DOTUSD,"
+                     "LINKUSD,BCHUSD,XAUUSD" if _IS_CRYPTO else
+                     "EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,NZDUSD,"
+                     "XAUUSD,US30,NAS100,US500,GER40,BTCUSD,ETHUSD")
+AUTOPILOT_UNIVERSE = [s.strip().upper() for s in
+                      (os.getenv("AUTOPILOT_UNIVERSE") or _DEFAULT_UNIVERSE).split(",") if s.strip()]
 
 # ─── Risk ───────────────────────────────────────────────
 RISK_PER_TRADE = float(_scalp("RISK_PER_TRADE", 0.01, 0.005))  # scalp: 1% (controlled, not aggressive) · swing: 0.5%

@@ -373,7 +373,7 @@ def _build_status(dash, chart=""):
         pos_line = f"📊 <b>{oc} position{'s' if oc != 1 else ''} open</b> — managed by their broker stops. See the terminal."
     else:
         pos_line = "📭 No open position"
-    return (f"💱 <b>APEX FOREX BOT</b>  {dash.get('mode', '')} · "
+    return (f"{cfg.ASSET_EMOJI} <b>{cfg.BOT_NAME.upper()}</b>  {dash.get('mode', '')} · "
             f"{dash.get('broker', '')}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"💰 Balance: <b>${dash.get('balance', 0):.2f}</b>  ({sign}{pnl_pct:.2f}%)"
@@ -426,10 +426,10 @@ def _handle_status(chat_id):
                       else "⏸ <b>BOT IS OFF</b> — tap ▶️ below to start.\n\n")
             send_to(chat_id,
                     header +
-                    f"💱 <b>APEX FOREX BOT</b>  {mode_label}\n"
+                    f"{cfg.ASSET_EMOJI} <b>{cfg.BOT_NAME.upper()}</b>  {mode_label}\n"
                     f"━━━━━━━━━━━━━━━━━━━━\n"
                     f"💰 Balance: <b>${bal:.2f}</b>\n"
-                    f"💱 Pair: <b>{sym}</b> | "
+                    f"{cfg.ASSET_EMOJI} Pair: <b>{sym}</b> | "
                     f"{'🟢 OPEN' if is_open else '🔴 CLOSED (weekend)'}",
                     _dashboard_keyboard(chat_id))
             return
@@ -460,7 +460,7 @@ def _handle_setup(chat_id):
     with _lock:
         _wizards[chat_id] = {"step": "MODE", "data": {}}
     send_to(chat_id,
-            "🛠️ <b>APEX FOREX BOT SETUP</b>\n\n"
+            f"🛠️ <b>{cfg.BOT_NAME.upper()} SETUP</b>\n\n"
             "1/5 — <b>How do you want to trade?</b>\n\n"
             "Reply <code>1</code> or <code>2</code>:\n"
             "  <code>1</code> — 🧪 <b>Paper</b> (simulated $1000, real prices from "
@@ -933,12 +933,22 @@ def _handle_ctaccount(chat_id, args):
     onboard_start(chat_id)
 
 
-_OB_SYMS = [
+# Quick-pick trade symbols — asset-class aware (crypto majors first for the
+# crypto build, FX majors first for the forex build). Clients can still type
+# any symbol their broker offers.
+_OB_SYMS_FOREX = [
     ("EUR/USD", "EURUSD"), ("GBP/USD", "GBPUSD"), ("USD/JPY", "USDJPY"),
     ("AUD/USD", "AUDUSD"), ("USD/CHF", "USDCHF"), ("USD/CAD", "USDCAD"),
     ("🥇 Gold", "XAUUSD"), ("🥈 Silver", "XAGUSD"), ("₿ Bitcoin", "BTCUSD"),
     ("Ξ Ethereum", "ETHUSD"), ("📈 US30", "US30"), ("📈 NAS100", "NAS100"),
 ]
+_OB_SYMS_CRYPTO = [
+    ("₿ Bitcoin", "BTCUSD"), ("Ξ Ethereum", "ETHUSD"), ("◎ Solana", "SOLUSD"),
+    ("✕ XRP", "XRPUSD"), ("Ł Litecoin", "LTCUSD"), ("● Cardano", "ADAUSD"),
+    ("Ð Dogecoin", "DOGEUSD"), ("⬡ Polkadot", "DOTUSD"), ("🔗 Chainlink", "LINKUSD"),
+    ("Ƀ Bitcoin Cash", "BCHUSD"), ("🥇 Gold", "XAUUSD"), ("🥈 Silver", "XAGUSD"),
+]
+_OB_SYMS = _OB_SYMS_CRYPTO if cfg.PRODUCT == "crypto" else _OB_SYMS_FOREX
 
 _RISK_TEXT = ("⚠️ <b>Before I place real orders — read this once.</b>\n\n"
               "This bot executes <b>your</b> strategy, with <b>your</b> settings, on <b>your</b> account.\n\n"
@@ -1409,12 +1419,11 @@ def _handle_strategy(chat_id, args):
     send_to(chat_id, f"🎯 Method set to <b>{m['label']}</b>.\n<i>{m['blurb']}</i>\n\n{tail}")
 
 
-# Curated liquid universe the Auto-Pilot scans. FX majors + gold are on every
-# cTrader broker; indices/crypto are candidates that get validated per account.
-_AUTOPILOT_CANDIDATES = [
-    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD",
-    "XAUUSD", "US30", "NAS100", "US500", "GER40", "BTCUSD", "ETHUSD",
-]
+# Curated liquid universe the Auto-Pilot scans — asset-class aware (FX majors +
+# gold for the forex build, crypto-CFD majors for the crypto build). Configured
+# in config.py (AUTOPILOT_UNIVERSE, env-overridable). Non-FX candidates are
+# validated per account before use.
+_AUTOPILOT_CANDIDATES = cfg.AUTOPILOT_UNIVERSE
 
 
 def _handle_maxpos(chat_id, args):
@@ -1785,7 +1794,7 @@ def _handle_grant(chat_id, args):
         return send_to(chat_id, "❌ Usage: <code>/grant 123456789</code>")
     if access.grant(target):
         send_to(chat_id, f"✅ Access granted to <code>{target}</code>.")
-        send_to(target, "✅ <b>You now have access to Apex Forex Bot!</b>\nSend /status to check trading.")
+        send_to(target, f"✅ <b>You now have access to {cfg.BOT_NAME}!</b>\nSend /status to check trading.")
     else:
         send_to(chat_id, f"ℹ️ <code>{target}</code> already has access.")
 
@@ -1796,7 +1805,7 @@ def _handle_revoke(chat_id, args):
         return send_to(chat_id, "❌ Usage: <code>/revoke 123456789</code>")
     if access.revoke(target):
         send_to(chat_id, f"✅ Access revoked for <code>{target}</code>.")
-        send_to(target, "⛔ Your access to Apex Forex Bot has been revoked.")
+        send_to(target, f"⛔ Your access to {cfg.BOT_NAME} has been revoked.")
     else:
         send_to(chat_id, f"ℹ️ <code>{target}</code> not found or is an admin.")
 
@@ -2071,14 +2080,14 @@ def _handle_config(chat_id):
             f"🔑 {key_title} keys:\n{key_lines or '  (none set — use /setup)'}")
 
 
-_HELP_CLIENT = ("📋 <b>APEX FOREX BOT</b>\n"
+_HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "/setup — choose paper/live, pair, risk (start here)\n"
                 "/status — live trading snapshot\n"
                 "/market — session + how the market is moving now\n"
                 "/report — trade journal + net P&amp;L (for taxes)\n"
-                "/buy EUR_USD — open a BUY manually (any pair you want)\n"
-                "/sell EUR_USD — open a SELL manually\n"
+                f"/buy {cfg.SYMBOL} — open a BUY manually (any pair you want)\n"
+                f"/sell {cfg.SYMBOL} — open a SELL manually\n"
                 "/close — close current position\n"
                 "/ctrader — connect your cTrader account (any broker, worldwide)\n"
                 "/copilot on|off — approve trades yourself vs auto-trade\n"
@@ -2094,7 +2103,7 @@ _HELP_CLIENT = ("📋 <b>APEX FOREX BOT</b>\n"
                 "💬 <i>Or just talk to me in any language!</i>\n"
                 "<i>Example: \"enter now\", \"intru acum\", \"analyzeaza EUR_USD\"</i>")
 
-_HELP_ADMIN = ("📋 <b>APEX FOREX BOT COMMANDS</b>\n"
+_HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "/status — live trading snapshot\n"
                "/market — session + market pulse\n"
@@ -2169,16 +2178,16 @@ def _license_ok(chat_id, text):
         send_to(chat_id,
             "🔒 <b>Activation required</b>\n\n"
             "Open the activation link from your purchase email to unlock the bot.\n\n"
-            "Don't have Apex Forex Bot yet? Get it at https://aicashsystem.space")
+            f"Don't have {cfg.BOT_NAME} yet? Get it at https://aicashsystem.space")
         return False
-    if not re.match(r'^FORX-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$', key):
+    if not re.match(rf'^{cfg.LICENSE_KEY_PREFIX}-[A-Z2-9]{{4}}-[A-Z2-9]{{4}}-[A-Z2-9]{{4}}$', key):
         send_to(chat_id,
             "❌ <b>That doesn't look like a valid key.</b>\n\n"
-            "Use the <code>FORX-XXXX-XXXX-XXXX</code> key from your purchase email, "
+            f"Use the <code>{cfg.LICENSE_KEY_PREFIX}-XXXX-XXXX-XXXX</code> key from your purchase email, "
             "or buy at https://aicashsystem.space")
         return False
     try:
-        r = requests.post(_VERIFY_URL, json={"key": key, "product": "apex-forex"}, timeout=8)
+        r = requests.post(_VERIFY_URL, json={"key": key, "product": cfg.LICENSE_PRODUCT}, timeout=8)
         data = r.json()
         if not data.get("valid"):
             send_to(chat_id,
@@ -2219,7 +2228,7 @@ def _revalidate_license(chat_id):
     if time.time() - u.get("license_checked_at", 0) < _REVALIDATE_SEC:
         return True
     try:
-        r = requests.post(_VERIFY_URL, json={"key": key, "product": "apex-forex"}, timeout=8)
+        r = requests.post(_VERIFY_URL, json={"key": key, "product": cfg.LICENSE_PRODUCT}, timeout=8)
         data = r.json()
     except Exception:
         return True  # fail-open
@@ -2535,7 +2544,7 @@ def alert_market_closed():
 
 
 def alert_start(symbol, timeframe, balance, mode):
-    send(f"🚀 <b>APEX FOREX BOT STARTED</b>\n💱 {symbol} | {timeframe} | ${balance:.2f}\n⚙️ {mode}\n"
+    send(f"🚀 <b>{cfg.BOT_NAME.upper()} STARTED</b>\n{cfg.ASSET_EMOJI} {symbol} | {timeframe} | ${balance:.2f}\n⚙️ {mode}\n"
          + (f"🌐 Dashboard: {DASHBOARD_URL}\n" if DASHBOARD_URL else "")
          + "<i>Send /setup to configure · /status to check · /help for all commands</i>",
          _dashboard_keyboard())

@@ -1,24 +1,48 @@
 services:
   # 'web' (not 'background') with a $PORT health check. Starter ($7/mo) so the
-  # bot is always-on — a trading bot must run 24/7 to scan and trade, which
-  # blows past the free 750h pool. On Starter it no longer needs the self-ping.
+  # bot is always-on — a crypto bot must run 24/7 to scan and trade.
+  #
+  # Same proven engine as apex-forex-bot, configured crypto-first via PRODUCT.
+  # Trades crypto CFDs (BTCUSD, ETHUSD, SOLUSD …) through the client's own
+  # cTrader account — real orders on a licensed broker, no Binance keys, no
+  # Binance licensing risk. 24/7 market, crypto Auto-Pilot universe.
   - type: web
     name: apex-crypto-bot
     env: python
-    # Frankfurt (EU) — Binance geo-blocks trading from US regions (Oregon/Ohio/
-    # Virginia return "restricted location"). EU/Asia regions can place orders.
-    region: frankfurt
     buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
+    # -u = unbuffered stdout so startup logs appear in Render's log tab in real time
+    startCommand: python -u main.py
     plan: starter
     autoDeploy: true
     envVars:
-      # Required: bot token from @BotFather + a free Groq key (console.groq.com).
-      # Owner gets /grant /revoke /users; everyone else is a paying client,
-      # activated instantly when they open the Telegram deep link.
+      # Flip the shared engine to its crypto profile: 24/7 market, crypto-CFD
+      # Auto-Pilot universe, "Apex Crypto Bot" branding, CRPT-… license keys.
+      - key: PRODUCT
+        value: crypto
+      # Unbuffered Python output so startup logs show in real time.
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # Required: bot token from @BotFather (this is the CRYPTO bot's own token).
       - key: TELEGRAM_BOT_TOKEN
         sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
+      # cTrader Open API app credentials (openapi.ctrader.com/apps) — clients
+      # connect their own account via OAuth (/ctrader).
+      - key: CTRADER_CLIENT_ID
+        sync: false
+      - key: CTRADER_CLIENT_SECRET
+        sync: false
+      - key: CTRADER_REDIRECT_URI
+        sync: false
+      # AI brain (one shared key; clients never need their own).
       - key: GROQ_API_KEY
         sync: false
-      - key: ADMIN_CHAT_ID
+      # Optional: Upstash persistence (settings/access survive redeploys)
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      # Optional license — leave empty to run open (access via Telegram).
+      - key: LICENSE_KEY
         sync: false

@@ -598,7 +598,7 @@ def _start_dashboard_server():
             # carries Telegram's signed initData, validated per user below.
             if self.path == "/guide-app" or self.path.startswith("/guide-app?"):
                 from apex import webapp
-                payload = webapp.GUIDE_HTML.encode("utf-8")
+                payload = webapp.guide_html().encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(payload)))
@@ -607,7 +607,7 @@ def _start_dashboard_server():
                 return
             if self.path == "/app" or self.path.startswith("/app?"):
                 from apex import webapp
-                payload = webapp.HTML.encode("utf-8")
+                payload = webapp.terminal_html().encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(payload)))

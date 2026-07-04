@@ -17,7 +17,7 @@ _UPD_URL   = (os.getenv("UPSTASH_REDIS_REST_URL")   or "").rstrip("/")
 _UPD_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
 _USE_REDIS = bool(_UPD_URL and _UPD_TOKEN)
 
-_ACTIVE_SET = "apex:active_users"   # Redis SET that tracks active user IDs
+_ACTIVE_SET = "forex:active_users"   # Redis SET that tracks active user IDs
 
 
 # ─── Redis helpers ────────────────────────────────────────
@@ -33,12 +33,12 @@ def _redis(cmd_parts):
         return None
 
 
-def _redis_set(key, value_str):
-    return _redis(["SET", key, value_str])
-
-
 def _redis_get(key):
     return _redis(["GET", key])
+
+
+def _redis_set(key, value_str):
+    return _redis(["SET", key, value_str])
 
 
 def _redis_sadd(key, member):
@@ -64,7 +64,7 @@ def _path(user_id):
 def load(user_id):
     user_id = str(user_id)
     if _USE_REDIS:
-        raw = _redis_get(f"apex:user:{user_id}")
+        raw = _redis_get(f"forex:user:{user_id}")
         if raw:
             try:
                 return json.loads(raw)
@@ -80,7 +80,7 @@ def load(user_id):
 def save(user_id, data):
     user_id = str(user_id)
     if _USE_REDIS:
-        _redis_set(f"apex:user:{user_id}", json.dumps(data))
+        _redis_set(f"forex:user:{user_id}", json.dumps(data))
         if data.get("active"):
             _redis_sadd(_ACTIVE_SET, user_id)
         else:
@@ -96,28 +96,48 @@ def update(user_id, updates):
     save(user_id, d)
 
 
-def save_chat(user_id, messages):
-    """Persist a user's assistant conversation (survives redeploys)."""
+def clear_trades(user_id):
+    """Wipe the closed-trade journal — used to start a clean performance run
+    after a period polluted by bugs/test churn."""
     user_id = str(user_id)
-    payload = json.dumps(messages)
     if _USE_REDIS:
-        _redis_set(f"apex:chat:{user_id}", payload)
+        try:
+            _redis_set(f"forex:trades:{user_id}", "[]")
+        except Exception as e:
+            print(f"[Store] clear_trades redis failed: {e}")
         return
     try:
-        with open(_path(user_id) + ".chat", "w") as f:
+        with open(_path(user_id) + ".trades", "w") as f:
+            f.write("[]")
+    except Exception as e:
+        print(f"[Store] clear_trades failed: {e}")
+
+
+def append_trade(user_id, record):
+    """Append a closed-trade record to the user's tax journal (keeps last 500)."""
+    user_id = str(user_id)
+    trades = load_trades(user_id)
+    trades.append(record)
+    trades = trades[-500:]
+    payload = json.dumps(trades)
+    if _USE_REDIS:
+        _redis_set(f"forex:trades:{user_id}", payload)
+        return
+    try:
+        with open(_path(user_id) + ".trades", "w") as f:
             f.write(payload)
     except Exception as e:
-        print(f"[Store] save_chat failed: {e}")
+        print(f"[Store] append_trade failed: {e}")
 
 
-def load_chat(user_id):
-    """Load a user's persisted conversation, or [] if none."""
+def load_trades(user_id):
+    """Load the user's closed-trade journal, or [] if none."""
     user_id = str(user_id)
     if _USE_REDIS:
-        raw = _redis_get(f"apex:chat:{user_id}")
+        raw = _redis_get(f"forex:trades:{user_id}")
     else:
         try:
-            raw = open(_path(user_id) + ".chat").read()
+            raw = open(_path(user_id) + ".trades").read()
         except Exception:
             raw = None
     if raw:
@@ -126,17 +146,6 @@ def load_chat(user_id):
         except Exception:
             pass
     return []
-
-
-def clear_chat(user_id):
-    user_id = str(user_id)
-    if _USE_REDIS:
-        _redis(["DEL", f"apex:chat:{user_id}"])
-        return
-    try:
-        os.remove(_path(user_id) + ".chat")
-    except Exception:
-        pass
 
 
 def all_active():

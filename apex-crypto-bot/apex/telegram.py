@@ -1,1152 +1,2162 @@
-"""Telegram multi-tenant handler — crypto edition.
+"""Telegram alerts + full interactive config/control commands (Forex edition).
 
-One bot token serves all paying clients. Keyless instant activation: the
-purchase email / thank-you page hands out a t.me deep link, so anyone who
-reaches the bot is a paying customer → granted on contact. Owner is set via
-ADMIN_CHAT_ID. Polling runs in a background daemon thread.
+Access model: owner bootstraps on first /start, then grants clients via /grant.
+All admin commands are owner-only. Clients get /status and /help.
+Polling runs in a background daemon thread.
 """
-import json
+import os
 import re
+import json
 import time
 import threading
 import requests
 from apex import config as cfg
-from apex import access, user_store, user_loop, binance, ai, assistant, dca, grid
+from apex import forex
+from apex import access
+from apex import user_store
+from apex import user_loop
+from apex import assistant
+from apex import affiliate_store
 
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
+CHAT_ID = (cfg.TELEGRAM_CHAT_ID or "").strip()
+DASHBOARD_URL = cfg.DASHBOARD_URL
 _API = f"https://api.telegram.org/bot{TOKEN}"
-_update_id = 0
-_wizard = {}        # chat_id → step (e.g. "KEYS") for the real-account setup flow
-_pending_key = {}   # chat_id → raw key waiting for provider confirmation
-
-SYMBOLS = [
-    [("₿ BTC", "BTCUSDT"), ("⟠ ETH", "ETHUSDT"), ("◎ SOL", "SOLUSDT")],
-    [("✕ XRP", "XRPUSDT"), ("Ð DOGE", "DOGEUSDT"), ("△ ADA", "ADAUSDT")],
-    [("⬡ BNB", "BNBUSDT"), ("☀ AVAX", "AVAXUSDT"), ("🔗 LINK", "LINKUSDT")],
-    [("◆ TON", "TONUSDT"), ("🐕 SHIB", "SHIBUSDT"), ("🐸 PEPE", "PEPEUSDT")],
-    [("Ξ MATIC", "MATICUSDT"), ("🦄 UNI", "UNIUSDT"), ("⬢ DOT", "DOTUSDT")],
-]
-METHODS = ["auto", "turtle", "livermore", "soros", "ptj", "druckenmiller"]
-METHOD_DESC = {
-    "auto":          "🤖 <b>Auto</b> — AI blends all strategies. Best for hands-off trading.",
-    "turtle":        "🐢 <b>Turtle</b> — buys breakouts of recent highs. Trend-following.",
-    "livermore":     "📐 <b>Livermore</b> — follows market structure &amp; strong trends.",
-    "soros":         "💡 <b>Soros</b> — rides momentum, enters on strong directional moves.",
-    "ptj":           "🛡 <b>PTJ</b> — defensive; only high-confidence setups (fewer trades).",
-    "druckenmiller": "📈 <b>Druckenmiller</b> — scales position size up on the best setups.",
-}
 
 
 def refresh_from_config():
-    global TOKEN, _API
+    # TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are also settable from the web
+    # configurator (configurator-forex.html cfg.TELEGRAM_BOT_TOKEN/CHAT_ID)
+    # and only land on cfg after load_remote() resolves in main(). This
+    # module is imported at the top of bot.py, before that — without a
+    # refresh, a customer who set their Telegram token via the configurator
+    # (instead of a Railway env var) would silently get no Telegram bot at all.
+    global TOKEN, CHAT_ID, _API
     TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
+    CHAT_ID = (cfg.TELEGRAM_CHAT_ID or "").strip()
     _API = f"https://api.telegram.org/bot{TOKEN}"
+_RUNTIME = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "runtime.json")
 
+_get_dash = lambda: None
+_broker = None
+_update_id = 0
+_lock = threading.Lock()
+_wizards = {}      # per-chat wizard state: {chat_id: {step: str, data: dict}}
+                   # MUST be per-chat — many clients run /setup on the same shared
+                   # bot at once; a single global dict would clobber their flows.
+_bot_control = {}  # callbacks: {set_paused, get_paused, reload_broker}
 
-# ─── API helpers ──────────────────────────────────────────
-def send_to(chat_id, text, extra=None):
-    if not TOKEN:
-        return
-    try:
-        requests.post(f"{_API}/sendMessage",
-                      json={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
-                            "disable_web_page_preview": True, **(extra or {})}, timeout=8)
-    except Exception as e:
-        print(f"[TG] send error: {e}")
+_PAIR_RE = re.compile(r"^[A-Z]{3}_[A-Z]{3}$")
 
-
-def _broadcast_owner(text):
-    for cid in access.list_admins():
-        send_to(cid, text)
-
-
-def _answer_cb(cb_id):
-    try:
-        requests.post(f"{_API}/answerCallbackQuery", json={"callback_query_id": cb_id}, timeout=5)
-    except Exception:
-        pass
-
-
-def _send_typing(chat_id):
-    try:
-        requests.post(f"{_API}/sendChatAction",
-                      json={"chat_id": chat_id, "action": "typing"}, timeout=3)
-    except Exception:
-        pass
-
-
-# ── Pattern-based trade intent detection ─────────────────────────────────────
-# Catches explicit trade commands in any language BEFORE hitting the AI quota.
-# Trade execution should never depend on AI availability.
-
-_RE_AMOUNT = re.compile(
-    r"(?:cu\s+|with\s+|de\s+|pentru\s+|)(\d+(?:[.,]\d+)?)\s*(?:\$|usd|usdt|dolari?|bucks?)?",
+# ─── Trade intent patterns (work without any AI key) ─────
+_RE_AMOUNT_FX = re.compile(
+    r"(?:cu\s+|with\s+|de\s+|pentru\s+)(\d+(?:[.,]\d+)?)\s*(?:\$|usd|dolari?|bucks?)?",
     re.IGNORECASE,
 )
-_RE_BUY = re.compile(
+_RE_BUY_FX = re.compile(
     r"\b(intr[aă]|intr[aă]-?[oO]|cumpăr[aă]?|cumpara|buy|long|intru)\b",
     re.IGNORECASE,
 )
-_RE_SELL = re.compile(
+_RE_SELL_FX = re.compile(
     r"\b(vinde|vânz[iă]|short|sell)\b",
     re.IGNORECASE,
 )
-_RE_CLOSE = re.compile(
-    r"\b(inchide|închide|close|exit|iesi|ieși|stop.?poziti|sell.?all)\b",
+_RE_CLOSE_FX = re.compile(
+    r"\b(inchide|închide|close|exit|iesi|ieși)\b",
     re.IGNORECASE,
 )
-_RE_ALL_IN = re.compile(
+_RE_ALL_IN_FX = re.compile(
     r"\ball.?in\b|toat[aă]\s+suma|tot\s+balant|full\s+balance",
     re.IGNORECASE,
 )
-_RE_CLOSE_MATH = re.compile(
-    r"(inchide|close|iesi|exit|dac[aă]).{0,30}(cât|cat|cati|câți|rămâne|ramane|profit|lose|pierd)",
+_RE_CLOSE_MATH_FX = re.compile(
+    r"(inchide|close|iesi|exit|dac[aă]).{0,30}(cât|cat|cati|câți|rămâne|ramane|profit|pierd|lose)",
     re.IGNORECASE,
 )
+_RE_PAIR_FX = re.compile(r"\b([A-Z]{3})[/_]([A-Z]{3})\b|\b(XAU|XAG|EUR|GBP|USD|JPY|AUD|CAD|CHF|NZD)\b")
 
 
-def _handle_trade_intent(chat_id, text) -> bool:
-    """Return True if the message was a trade command handled directly (no AI needed)."""
+def _user_symbol(chat_id) -> str:
+    dash = user_loop.get_dash(chat_id)
+    if dash and dash.get("symbol"):
+        return dash["symbol"]
+    user = user_store.load(chat_id)
+    return user.get("symbol", cfg.SYMBOL)
+
+
+def _handle_trade_intent_fx(chat_id, text) -> bool:
+    """Return True if the message was a direct trade command — no AI needed."""
     t = text.strip()
 
-    # "if I close now, how much would I have?" → calculate from live price
-    if _RE_CLOSE_MATH.search(t):
-        u = user_loop._ensure_user(str(chat_id))
-        pos = u["state"].get("openPosition")
-        if not pos:
-            send_to(chat_id, "📭 No open position right now.")
+    # "if I close now, how much would I have?"
+    if _RE_CLOSE_MATH_FX.search(t):
+        dash = user_loop.get_dash(chat_id) or {}
+        open_pos = dash.get("openPosition")
+        if not open_pos:
+            send_to(chat_id, "📭 Nicio poziție deschisă momentan.")
             return True
-        sym = pos["symbol"]
-        ex = u.get("exchange", "binance")
-        price = binance.get_price(sym, exchange=ex) or pos["entryPrice"]
-        entry, qty, side = pos["entryPrice"], pos["quantity"], pos["side"]
-        pnl = (price - entry) * qty if side == "BUY" else (entry - price) * qty
-        _fee_map = {"binance": 0.001, "binanceus": 0.001, "coinbase": 0.006,
-                    "kraken": 0.0026, "bybit": 0.001, "okx": 0.001}
-        fee_rate = _fee_map.get((u.get("exchange") or "binance").lower(), 0.001)
-        fee = price * qty * fee_rate
-        net = pnl - fee
-        bal = u["state"].get("paperBalance", 0) + net
+        from apex.brokers import yahoo
+        from apex.brokers.oanda import OandaBroker
+        import types as _types
+        user = user_store.load(chat_id)
+        sym = open_pos.get("symbol", _user_symbol(chat_id))
+        try:
+            paper = user.get("paper", True)
+            fake_cfg = _types.SimpleNamespace(
+                OANDA_API_TOKEN=user.get("oanda_token", ""),
+                OANDA_ACCOUNT_ID=user.get("oanda_account_id", ""),
+                OANDA_ENV="practice", SYMBOL=sym, TIMEFRAME="5m", CANDLES=5,
+                PAPER_TRADING=paper, PAPER_BALANCE=1000,
+                STOP_LOSS_PIPS=20.0, TAKE_PROFIT_PIPS=40.0,
+                RISK_PER_TRADE=0.005, LEVERAGE=30.0, MARGIN_CAP=0.5,
+                MAX_SPREAD_PIPS=3.0, MIN_CONFIDENCE=62,
+            )
+            broker = yahoo if (paper and not user.get("oanda_token")) else OandaBroker(fake_cfg)
+            candles = broker.get_candles(sym, "5m", 5)
+            price = candles[-1]["close"] if candles else open_pos["entryPrice"]
+        except Exception:
+            price = open_pos["entryPrice"]
+        entry = open_pos["entryPrice"]
+        units = open_pos.get("units", 1000)
+        side = open_pos["side"]
+        gross = forex.pnl_usd(side, entry, price, units, sym)
+        pv = forex.pip_value_per_unit(sym, price)
+        cost = open_pos.get("entrySpreadPips", 0.0) * pv * units
+        net = gross - cost
+        bal = dash.get("balance", 1000.0) + net
         sign = "+" if net >= 0 else ""
         send_to(chat_id,
                 f"📊 <b>Dacă închizi acum:</b>\n"
-                f"Preț curent: <b>${price:.4f}</b>\n"
-                f"P&amp;L brut: <b>{sign}${pnl:.2f}</b>\n"
-                f"Taxă: <b>−${fee:.2f}</b>\n"
+                f"Preț curent: <b>{price:.5f}</b>\n"
+                f"P&amp;L brut: <b>{sign}${gross:.2f}</b>\n"
+                f"Cost spread: <b>−${cost:.2f}</b>\n"
                 f"Net: <b>{sign}${net:.2f}</b>\n"
                 f"Balanță după: <b>${bal:.2f}</b>\n\n"
                 f"<i>Folosește</i> <code>/close</code> <i>pentru a închide efectiv.</i>")
         return True
 
     # Close intent
-    if _RE_CLOSE.search(t) and not _RE_BUY.search(t):
-        u = user_loop._ensure_user(str(chat_id))
-        if not u["state"].get("openPosition"):
-            send_to(chat_id, "📭 No open position to close.")
+    if _RE_CLOSE_FX.search(t) and not _RE_BUY_FX.search(t):
+        dash = user_loop.get_dash(chat_id) or {}
+        if not dash.get("openPosition"):
+            send_to(chat_id, "📭 Nicio poziție deschisă.")
             return True
-        _handle_command(chat_id, "/close")
+        _handle_close(chat_id)
         return True
 
-    # All-in intent
-    if _RE_ALL_IN.search(t):
-        u = user_loop._ensure_user(str(chat_id))
-        bal = u["state"].get("paperBalance", 0)
-        sym = u["settings"].get("SYMBOL", "BTCUSDT")
-        price = binance.get_price(sym, exchange=u.get("exchange", "binance")) or 1
-        amount = round(bal * 0.98, 2)  # leave 2% for fees
-        send_to(chat_id, f"⚡ <b>ALL IN</b> — entering BUY {sym} with <b>${amount:.2f}</b>…")
-        result = user_loop.force_trade(str(chat_id), "BUY", sym, amount_usd=amount)
-        _send_trade_result(chat_id, result, sym)
+    # All-in
+    if _RE_ALL_IN_FX.search(t):
+        sym = _user_symbol(chat_id)
+        dash = user_loop.get_dash(chat_id) or {}
+        bal = dash.get("balance", 1000.0)
+        send_to(chat_id, f"⚡ <b>ALL IN</b> — BUY <b>{sym}</b> cu <b>${bal * 0.98:.0f}</b>…")
+        result = user_loop.force_trade(str(chat_id), "BUY", sym)
+        _send_fx_trade_result(chat_id, result, sym)
         return True
 
-    # BUY intent (with or without amount)
-    if _RE_BUY.search(t):
-        u = user_loop._ensure_user(str(chat_id))
-        sym = u["settings"].get("SYMBOL", "BTCUSDT")
-        # Extract symbol if mentioned (e.g. "intra in BTC", "buy ETH")
-        sym_match = re.search(r"\b([A-Z]{2,5})USDT?\b|\b(BTC|ETH|SOL|BNB|ADA|DOT|AVAX|MATIC|LINK|XRP)\b",
-                               t.upper())
-        if sym_match:
-            raw_sym = (sym_match.group(1) or sym_match.group(2) or "").upper()
-            sym = raw_sym + ("USDT" if not raw_sym.endswith("USDT") else "")
-        # Extract amount
-        amt_match = _RE_AMOUNT.search(t)
-        amount_usd = float(amt_match.group(1).replace(",", ".")) if amt_match else None
-        if amount_usd:
-            send_to(chat_id, f"⚡ BUY <b>{sym}</b> cu <b>${amount_usd:.0f}</b>…")
-        else:
-            send_to(chat_id, f"⚡ BUY <b>{sym}</b>…")
-        result = user_loop.force_trade(str(chat_id), "BUY", sym, amount_usd=amount_usd)
-        _send_trade_result(chat_id, result, sym)
+    # BUY intent
+    if _RE_BUY_FX.search(t):
+        sym = _user_symbol(chat_id)
+        # detect pair in message
+        pm = _RE_PAIR_FX.search(t.upper())
+        if pm:
+            raw = pm.group(0).replace("/", "_").replace("-", "_")
+            if "_" not in raw:
+                raw = raw + "_USD"
+            if _PAIR_RE.match(raw):
+                sym = raw
+        send_to(chat_id, f"⚡ Deschid <b>BUY {sym}</b>…")
+        result = user_loop.force_trade(str(chat_id), "BUY", sym)
+        _send_fx_trade_result(chat_id, result, sym)
         return True
 
     # SELL/SHORT intent
-    if _RE_SELL.search(t):
-        u = user_loop._ensure_user(str(chat_id))
-        sym = u["settings"].get("SYMBOL", "BTCUSDT")
-        amt_match = _RE_AMOUNT.search(t)
-        amount_usd = float(amt_match.group(1).replace(",", ".")) if amt_match else None
-        send_to(chat_id, f"⚡ SELL <b>{sym}</b>…")
-        result = user_loop.force_trade(str(chat_id), "SELL", sym, amount_usd=amount_usd)
-        _send_trade_result(chat_id, result, sym)
+    if _RE_SELL_FX.search(t):
+        sym = _user_symbol(chat_id)
+        pm = _RE_PAIR_FX.search(t.upper())
+        if pm:
+            raw = pm.group(0).replace("/", "_").replace("-", "_")
+            if "_" not in raw:
+                raw = raw + "_USD"
+            if _PAIR_RE.match(raw):
+                sym = raw
+        send_to(chat_id, f"⚡ Deschid <b>SELL {sym}</b>…")
+        result = user_loop.force_trade(str(chat_id), "SELL", sym)
+        _send_fx_trade_result(chat_id, result, sym)
         return True
 
     return False
 
 
-def _send_trade_result(chat_id, result, sym):
+def _send_fx_trade_result(chat_id, result, sym):
     if result.get("ok"):
-        pos = result
         send_to(chat_id,
                 f"✅ <b>{result['side']} {sym}</b> deschis\n"
-                f"Preț: <b>${result['price']:.4f}</b>\n"
-                f"Sumă: <b>${result.get('amountUsd', '—')}</b>  Qty: {result.get('quantity', '—')}\n"
-                f"SL: ${result['stopLoss']:.4f} | TP: ${result['takeProfit']:.4f}\n"
+                f"Preț: <b>{result['price']:.5f}</b> | Unități: {result.get('units', '—')}\n"
+                f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
+                f"Spread: {result.get('spread', '—')}p\n"
                 f"<i>Închide cu</i> <code>/close</code>")
     else:
         err = result.get("error", "unknown error")
         send_to(chat_id, f"❌ Nu am putut deschide tranzacția: <i>{err}</i>")
 
 
+# ─── Telegram API helpers ─────────────────────────────────
+
+def send(text, extra=None):
+    if not TOKEN or not CHAT_ID:
+        return
+    try:
+        requests.post(f"{_API}/sendMessage",
+                      json={"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML",
+                            **(extra or {})}, timeout=6)
+    except Exception as e:
+        print(f"[TELEGRAM] Send error: {e}")
+
+
+def send_to(chat_id, text, extra=None):
+    if not TOKEN:
+        return
+    try:
+        requests.post(f"{_API}/sendMessage",
+                      json={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                            **(extra or {})}, timeout=6)
+    except Exception as e:
+        print(f"[TELEGRAM] Send error: {e}")
+
+
 def _delete_message(chat_id, message_id):
     try:
         requests.post(f"{_API}/deleteMessage",
-                      json={"chat_id": chat_id, "message_id": message_id}, timeout=5)
+                      json={"chat_id": chat_id, "message_id": message_id}, timeout=6)
     except Exception:
         pass
 
 
-# ─── Keyboards ────────────────────────────────────────────
-def _kb_menu(paused, symbol="BTCUSDT"):
-    # Both Start and Pause always visible — active one gets a checkmark.
-    return {"reply_markup": json.dumps({"inline_keyboard": [
-        [{"text": "📊 Status", "callback_data": "c:status"}, {"text": "📋 Trades", "callback_data": "c:trades"}],
-        [{"text": "💎 Symbol", "callback_data": "c:symbol"}, {"text": "⚙️ Config", "callback_data": "c:config"}],
-        [{"text": "🎯 Method", "callback_data": "c:method"}, {"text": "❓ Help", "callback_data": "c:help"}],
-        [{"text": "🔄 Paper / Real", "callback_data": "c:mode"}, {"text": "📈 Live Chart", "callback_data": "c:chart"}],
-        [
-            {"text": "▶️ Start" + (" ✅" if not paused else ""), "callback_data": "c:resume"},
-            {"text": "⏸ Pause" + (" ✅" if paused else ""),    "callback_data": "c:pause"},
-        ],
-    ]})}
+# ─── Runtime config persistence ──────────────────────────
+
+def _load_runtime() -> dict:
+    try:
+        with open(_RUNTIME) as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
 
-def _kb_activate():
-    """Single button shown on very first contact."""
-    return {"reply_markup": json.dumps({"inline_keyboard": [
-        [{"text": "🚀 Activate Bot", "callback_data": "setup:activate"}],
-    ]})}
+def _save_runtime(updates: dict):
+    data = _load_runtime()
+    data.update(updates)
+    with open(_RUNTIME, "w") as f:
+        json.dump(data, f, indent=2)
 
 
-def _kb_mode():
-    """Paper vs Real choice."""
-    return {"reply_markup": json.dumps({"inline_keyboard": [
-        [{"text": "📝 Paper Trading — $100 virtual, no risk", "callback_data": "setup:paper"}],
-        [{"text": "🔴 Real Binance — live account",           "callback_data": "setup:live"}],
-    ]})}
+# Env-key → (cfg attribute, cast)
+_CFG_MAP = {
+    "BROKER":           ("BROKER",           lambda v: str(v).lower()),
+    "PAPER_TRADING":    ("PAPER_TRADING",    lambda v: str(v).lower() in ("true", "1", "yes", "on")),
+    "TRADE_SYMBOL":     ("SYMBOL",           str),
+    "RISK_PER_TRADE":   ("RISK_PER_TRADE",   float),
+    "STOP_LOSS_PIPS":   ("STOP_LOSS_PIPS",   float),
+    "TAKE_PROFIT_PIPS": ("TAKE_PROFIT_PIPS", float),
+    "MIN_CONFIDENCE":   ("MIN_CONFIDENCE",   int),
+    "OANDA_ENV":        ("OANDA_ENV",        lambda v: str(v).lower()),
+    "LEVERAGE":         ("LEVERAGE",         float),
+}
+
+_BROKER_KEYS = {
+    "oanda": ["OANDA_API_TOKEN", "OANDA_ACCOUNT_ID"],
+    "mt": ["MT_BRIDGE_SECRET"],
+}
 
 
-_BINANCE_KEYS_URL = "https://www.binance.com/en/my/settings/api-management"
-_BINANCEUS_KEYS_URL = "https://www.binance.us/usercenter/settings/api-management"
-# Your Binance referral link — new clients who don't have an account yet open
-# this to sign up (and you earn the referral commission). Code: CPA_00IH1SQY0U
-_BINANCE_SIGNUP_URL = "https://www.binance.com/activity/referral-entry/CPA?ref=CPA_00IH1SQY0U"
-_BINANCE_REF_CODE = "CPA_00IH1SQY0U"
+def _broker_label():
+    return "MetaTrader Bridge" if cfg.BROKER == "mt" else f"OANDA ({cfg.OANDA_ENV})"
 
 
-def _kb_binance():
-    return {"reply_markup": json.dumps({"inline_keyboard": [
-        [{"text": "🔑 Open Binance API page", "url": _BINANCE_KEYS_URL}],
-    ]})}
+def _apply(env_key: str, value):
+    """Set a key on cfg module and os.environ so it takes effect immediately."""
+    os.environ[env_key] = str(value)
+    if env_key in _CFG_MAP:
+        attr, cast = _CFG_MAP[env_key]
+        setattr(cfg, attr, cast(value))
+    else:
+        setattr(cfg, env_key, str(value))
 
 
-def _kb_symbols():
-    rows = [[{"text": label, "callback_data": f"sym:{sym}"} for label, sym in row] for row in SYMBOLS]
-    # Make it explicit that ANY of the 600+ Binance pairs works, not just these.
-    rows.append([{"text": "✏️ Type any other coin…", "callback_data": "sym:custom"}])
+def _mask(v: str) -> str:
+    return (v[:4] + "***") if len(v) > 4 else "***"
+
+
+# ─── Status / dashboard ──────────────────────────────────
+
+def mini_chart(closes):
+    n = min(len(closes), 24)
+    sl = closes[-n:]
+    lo, hi = min(sl), max(sl)
+    rng = hi - lo or 1
+    blocks = "▁▂▃▄▅▆▇█"
+    return "".join(blocks[min(7, int((c - lo) / rng * 8))] for c in sl)
+
+
+def _guide_url():
+    base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+    return f"{base}/guide-app" if base else ""
+
+
+def _guide_button():
+    url = _guide_url()
+    return ({"reply_markup": {"inline_keyboard": [[
+        {"text": "📖 How it works — open the guide", "web_app": {"url": url}}]]}}
+        if url else None)
+
+
+def _handle_guide(chat_id):
+    url = _guide_url()
+    if not url:
+        return send_to(chat_id, "⚠️ Guide isn't available (RENDER_EXTERNAL_URL not set).")
+    send_to(chat_id,
+        "📖 <b>Apex — How it works</b>\n\nA 2-minute visual guide: connecting, setup, "
+        "how it trades, the controls and the terminal. Tap to open.",
+        _guide_button())
+
+
+def _dashboard_keyboard(chat_id=None):
+    """One clear control surface: a big ON/OFF toggle + the live terminal.
+    The toggle reflects the real running state so nobody has to remember
+    /start vs /stop — you just tap."""
+    rows = []
+    if chat_id is not None:
+        if user_loop.is_running(chat_id):
+            rows.append([{"text": "⏸  Turn bot OFF", "callback_data": "bot:off"}])
+        else:
+            rows.append([{"text": "▶️  Turn bot ON — start trading", "callback_data": "bot:on"}])
+    term_url = DASHBOARD_URL or ((os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/") + "/app"
+                                 if os.getenv("RENDER_EXTERNAL_URL") else "")
+    if term_url:
+        rows.append([{"text": "📊 Open Terminal", "web_app": {"url": term_url}}])
+    # Discoverable path from demo → real money without knowing a command.
+    if chat_id is not None:
+        try:
+            u = user_store.load(chat_id)
+            if (u.get("ctrader_access_token")
+                    and (u.get("ctrader_env") or "demo").lower() != "live"):
+                rows.append([{"text": "🔴 Switch to real money", "callback_data": "acct:switch"}])
+        except Exception:
+            pass
+    if not rows:
+        return {}
     return {"reply_markup": json.dumps({"inline_keyboard": rows})}
 
 
-def _kb_methods():
-    rows = [[{"text": m.capitalize(), "callback_data": f"m:{m}"}] for m in METHODS]
-    return {"reply_markup": json.dumps({"inline_keyboard": rows})}
-
-
-# ─── Views ────────────────────────────────────────────────
-def _settings(user_id):
-    return user_loop._ensure_user(user_id)["settings"]
-
-
-def _build_status(user_id):
-    u = user_loop._ensure_user(user_id)
-    s, st = u["settings"], u["state"]
-    sb = st.get("startBalance", cfg.PAPER_BALANCE)
-    bal = st.get("paperBalance", sb)
-    pnl_pct = (bal - sb) / sb * 100 if sb else 0
-    trades = st.get("trades", [])
+def _build_status(dash, chart=""):
+    sb = dash.get("startBalance", 0)
+    pnl_pct = ((dash.get("balance", 0) - sb) / sb * 100) if sb > 0 else 0.0
+    sign = "+" if pnl_pct >= 0 else ""
+    trades = dash.get("trades", [])
     wins = sum(1 for t in trades if t.get("win"))
     total = len(trades)
-    wr = f"{wins / total * 100:.0f}%" if total else "—"
-    pos = st.get("openPosition")
-    dca_deal = st.get("dca_deal")
-    if dca_deal:
-        price = binance.get_price(dca_deal["symbol"])
-        pos_line = dca.deal_summary(dca_deal, price or dca_deal["avg_entry"])
-    elif pos:
-        d = "🟢 LONG" if pos["side"] == "BUY" else "🔴 SHORT"
-        p = pos.get("currentPnl", 0)
-        pos_line = (f"{d} <b>{pos['symbol']}</b>\n  Entry: ${pos['entryPrice']:.4f}  "
-                    f"PnL: <b>{'+' if p >= 0 else ''}${p:.4f}</b>")
+    win_rate = f"{wins / total * 100:.0f}%" if total else "—"
+    chart_line = (f"\n<code>{chart}</code>  <b>{dash.get('currentPrice', 0):.5f}</b>") if chart else ""
+    market = "🟢 OPEN" if forex.is_market_open() else "🔴 CLOSED (weekend)"
+    sessions = ", ".join(forex.active_sessions()) or "—"
+    oc = dash.get("openCount", 0)
+    if dash.get("openPosition"):
+        op = dash["openPosition"]
+        d = "🟢 LONG" if op["side"] == "BUY" else "🔴 SHORT"
+        pnl = op.get("currentPnl", 0)
+        pos_line = (f"{d} <b>{op['symbol']}</b>\n  Entry: {op['entryPrice']}  "
+                    f"SL: {(op.get('stopLoss') or 0):.5f}\n"
+                    f"  PnL: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>")
+        if oc > 1:
+            pos_line += f"\n  <i>+{oc - 1} more open — see the terminal / cTrader</i>"
+    elif oc > 0:
+        pos_line = f"📊 <b>{oc} position{'s' if oc != 1 else ''} open</b> — managed by their broker stops. See the terminal."
     else:
         pos_line = "📭 No open position"
-    dca_flag = "  🤖 DCA" if s.get("dca_enabled") else ""
-    sig = st.get("lastSignal")
-    sig_line = (f"🤖 Signal: <b>{sig['action']}</b> ({sig['confidence']:.0f}%)" if sig else "🤖 Signal: scanning…")
-    return (f"⚡ <b>APEX TRADE BOT</b>  {'PAPER' if u.get('paper', True) else 'LIVE'}{dca_flag}\n"
+    return (f"{cfg.ASSET_EMOJI} <b>{cfg.BOT_NAME.upper()}</b>  {dash.get('mode', '')} · "
+            f"{dash.get('broker', '')}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"💰 Balance: <b>${bal:.2f}</b>  ({'+' if pnl_pct >= 0 else ''}{pnl_pct:.2f}%)\n\n"
-            f"{pos_line}\n\n{sig_line}\n"
-            f"📈 {total} trades · {wins}W/{total - wins}L · WR: {wr}\n"
-            f"🎯 Symbol: <b>{s['SYMBOL']}</b>  ⏱️ {st.get('lastTick', 'starting…')}")
+            f"💰 Balance: <b>${dash.get('balance', 0):.2f}</b>  ({sign}{pnl_pct:.2f}%)"
+            f"{' ⏳ <i>refreshing…</i>' if dash.get('balStale') else ''}{chart_line}\n"
+            f"🕐 Market: {market} · Sessions: {sessions}\n"
+            f"🎯 Method: {dash.get('strategy', 'Mean Reversion')}\n"
+            + (f"📊 Positions: {dash.get('openCount', 0)}/{dash['maxpos']} open\n" if dash.get('maxpos', 1) > 1 else "")
+            + (f"🤖 Auto-Pilot: scanning {len(dash['watchlist'])} instruments — focus {dash.get('symbol', '')}\n" if dash.get('autopilot') and dash.get('watchlist')
+               else f"👁 Scanning: {' · '.join(dash['watchlist'])} — focus {dash.get('symbol', '')}\n" if dash.get('watchlist') else "")
+            + (f"🌊 Regime: {dash['regime']['label']}\n" if isinstance(dash.get('regime'), dict) else "")
+            + (f"🩺 Broker: {dash['brokerHealth']}\n" if str(dash.get('brokerHealth', '')).startswith('degraded') else "") + "\n"
+            f"{pos_line}\n\n"
+            f"📈 {total} trades · {wins}W/{total - wins}L · Win: {win_rate}\n"
+            f"⏱️ Last tick: {_ago(dash)}")
 
 
-def _build_market(user_id):
-    """Market Pulse snapshot: the last computed read + best-effort futures extras."""
+def _ago(dash):
+    """Human 'Xm ago' — absolute server timestamps (UTC) kept reading as
+    hours-stale to clients in other timezones."""
+    import time as _t
+    ts = dash.get("lastTickTs")
+    if not ts:
+        return dash.get("lastTick", "—")
+    mins = int((_t.time() - ts) / 60)
+    if mins < 1:
+        return "just now ✅"
+    if mins < 60:
+        return f"{mins}m ago"
+    return f"{mins // 60}h {mins % 60}m ago"
+
+
+def _handle_status(chat_id):
+    dash = user_loop.get_dash(chat_id)
+    # REAL mode: pull the balance from the broker at REQUEST time — a cached
+    # figure looked frozen the moment the client deposited/withdrew between
+    # the loop's 5-minute ticks.
+    user_loop.live_balance(chat_id)
+    dash = user_loop.get_dash(chat_id) or dash
+    # If user's loop hasn't ticked yet, build a minimal dash from their settings
+    if not dash or not dash.get("broker"):
+        user = user_store.load(chat_id)
+        if user.get("symbol") or user.get("paper") is not None:
+            sym = user.get("symbol", cfg.SYMBOL)
+            bal = float(user.get("paper_balance", cfg.PAPER_BALANCE))
+            paper = user.get("paper", True)
+            is_open = forex.is_market_open()
+            mode_label = "Paper" if paper else "Live"
+            running = user_loop.is_running(chat_id)
+            header = ("✅ <b>BOT IS ON</b> — watching the market.\n\n" if running
+                      else "⏸ <b>BOT IS OFF</b> — tap ▶️ below to start.\n\n")
+            send_to(chat_id,
+                    header +
+                    f"{cfg.ASSET_EMOJI} <b>{cfg.BOT_NAME.upper()}</b>  {mode_label}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 Balance: <b>${bal:.2f}</b>\n"
+                    f"{cfg.ASSET_EMOJI} Pair: <b>{sym}</b> | "
+                    f"{'🟢 OPEN' if is_open else '🔴 CLOSED (weekend)'}",
+                    _dashboard_keyboard(chat_id))
+            return
+        dash = _get_dash()
+    if not dash or not dash.get("broker"):
+        return send_to(chat_id,
+            "⏸ <b>Bot is OFF.</b> Tap the button to start trading.",
+            _dashboard_keyboard(chat_id))
+    chart = ""
+    if _broker:
+        try:
+            candles = _broker.get_candles(dash.get("currentSymbol"), "5m", 24)
+            chart = mini_chart([c["close"] for c in candles])
+        except Exception:
+            pass
+    # Crystal-clear ON/OFF header so 'running but no position' never reads as
+    # 'broken'. Running = watching, will trade when a valid setup appears.
+    running = user_loop.is_running(chat_id)
+    header = ("✅ <b>BOT IS ON</b> — watching the market, it trades automatically when a valid setup appears.\n\n"
+              if running else
+              "⏸ <b>BOT IS OFF</b> — tap ▶️ below to start.\n\n")
+    send_to(chat_id, header + _build_status(dash, chart), _dashboard_keyboard(chat_id))
+
+
+# ─── Setup wizard ─────────────────────────────────────────
+
+def _handle_setup(chat_id):
+    with _lock:
+        _wizards[chat_id] = {"step": "MODE", "data": {}}
+    send_to(chat_id,
+            f"🛠️ <b>{cfg.BOT_NAME.upper()} SETUP</b>\n\n"
+            "1/5 — <b>How do you want to trade?</b>\n\n"
+            "Reply <code>1</code> or <code>2</code>:\n"
+            "  <code>1</code> — 🧪 <b>Paper</b> (simulated $1000, real prices from "
+            "Yahoo Finance). <b>No account, no keys, starts instantly. Zero risk.</b>\n"
+            "  <code>2</code> — 🔴 <b>Live</b> (real money via <b>cTrader</b> — any broker "
+            "worldwide, connected with /ctrader).\n\n"
+            "<i>Most people start with 1 (paper).</i>")
+
+
+def _handle_wizard_reply(chat_id, raw, msg_id):
+    with _lock:
+        w = _wizards.get(chat_id)
+        step = w.get("step") if w else None
+    if not w:
+        return   # no active wizard for this chat
+
+    if step == "MODE":
+        choice = raw.strip()
+        if choice not in ("1", "2"):
+            return send_to(chat_id, "❌ Reply <code>1</code> (paper) or <code>2</code> (live).")
+        if choice == "1":
+            # Paper — Yahoo data, no account needed, skip straight to the pair
+            with _lock:
+                w["data"]["paper"] = True
+                w["step"] = "SYMBOL"
+            send_to(chat_id,
+                    "🧪 <b>Paper mode</b> — free Yahoo Finance prices, no account.\n\n"
+                    "2/5 — <b>Which pair do YOU want to trade?</b>\n\n"
+                    "e.g. <code>EUR_USD</code>, <code>GBP_USD</code>, <code>USD_JPY</code>.\n\n"
+                    "Reply with the pair. <i>You choose — the bot only trades what you pick.</i>")
+        else:
+            # Live — real money runs through cTrader (any broker worldwide).
+            # Keep the user safe in paper until cTrader is actually linked.
+            with _lock:
+                _wizards.pop(chat_id, None)
+            send_to(chat_id,
+                    "🔴 <b>Live trading — via cTrader</b>\n\n"
+                    "Real money runs through your own <b>cTrader</b> account (works with "
+                    "any cTrader broker worldwide — IC Markets, Pepperstone, FxPro…).\n\n"
+                    "<b>To go live:</b>\n"
+                    "1️⃣ Send <b>/ctrader</b> → tap <b>Authorize</b> → log in and approve\n"
+                    "2️⃣ Test in paper first, then switch to live when you're ready\n\n"
+                    "<i>Until you connect cTrader you stay in safe paper mode. Send "
+                    "/ctrader now to link your account.</i>")
+
+    elif step == "KEYS":
+        _delete_message(chat_id, msg_id)
+        pairs = {}
+        for part in raw.replace("\n", " ").split():
+            if "=" in part:
+                k, _, v = part.partition("=")
+                pairs[k.strip().upper()] = v.strip()
+        if "OANDA_API_TOKEN" not in pairs or "OANDA_ACCOUNT_ID" not in pairs:
+            return send_to(chat_id,
+                           "❌ I need both values. Send them in one message:\n"
+                           "<code>OANDA_API_TOKEN=... OANDA_ACCOUNT_ID=...</code>")
+        with _lock:
+            w["data"]["keys"] = pairs
+            w["step"] = "SYMBOL"
+        send_to(chat_id,
+                "✅ Credentials saved.\n\n"
+                "2/5 — <b>Which pair do YOU want to trade?</b>\n\n"
+                "e.g. <code>EUR_USD</code>, <code>GBP_USD</code>, <code>USD_JPY</code>.\n\n"
+                "Reply with the pair. <i>You choose — the bot only trades what you pick.</i>")
+
+    elif step == "SYMBOL":
+        sym = raw.strip().upper().replace("/", "_").replace("-", "_")
+        if not _PAIR_RE.match(sym):
+            return send_to(chat_id, "❌ Invalid pair. Example: <code>EUR_USD</code>")
+        with _lock:
+            w["data"]["symbol"] = sym
+            w["step"] = "RISK"
+        send_to(chat_id,
+                f"✅ Pair: <b>{sym}</b>\n\n"
+                "3/5 — <b>How much do YOU want to risk per trade?</b>\n\n"
+                "Reply <code>1</code>, <code>2</code> or <code>3</code>:\n"
+                "  <code>1</code> — 🟢 Conservative (0.5% of balance per trade)\n"
+                "  <code>2</code> — 🟡 Balanced (1% per trade)\n"
+                "  <code>3</code> — 🔴 Aggressive (2% per trade)\n\n"
+                "<i>You decide the risk. Smaller = safer.</i>")
+
+    elif step == "RISK":
+        choice = raw.strip()
+        risk_map = {"1": 0.005, "2": 0.01, "3": 0.02}
+        if choice not in risk_map:
+            return send_to(chat_id, "❌ Reply <code>1</code>, <code>2</code> or <code>3</code>.")
+        with _lock:
+            w["data"]["risk"] = risk_map[choice]
+            w["step"] = "STYLE"
+        send_to(chat_id,
+                "4/5 — <b>How should the bot trade?</b>\n\n"
+                "Reply <code>1</code>, <code>2</code> or <code>3</code>:\n"
+                "  <code>1</code> — 🛡 Defensive — only the strongest setups (fewer trades)\n"
+                "  <code>2</code> — ⚖️ Balanced — standard selectivity\n"
+                "  <code>3</code> — ⚡ Active — more trades, lower bar\n\n"
+                "<i>You set the style — this controls how often it enters.</i>")
+
+    elif step == "STYLE":
+        choice = raw.strip()
+        conf_map = {"1": 70, "2": 62, "3": 55}
+        if choice not in conf_map:
+            return send_to(chat_id, "❌ Reply <code>1</code>, <code>2</code> or <code>3</code>.")
+        with _lock:
+            w["data"]["min_confidence"] = conf_map[choice]
+            w["step"] = "DISCLAIMER"
+            d = dict(w["data"])
+        risk_pct = d.get("risk", 0.005) * 100
+        send_to(chat_id,
+                "5/5 — ⚠️ <b>Risk acknowledgment</b>\n\n"
+                "Forex trading carries a real risk of loss. <b>You alone</b> chose:\n"
+                f"  • Pair: <b>{d.get('symbol')}</b>\n"
+                f"  • Risk per trade: <b>{risk_pct:g}%</b>\n"
+                f"  • Mode: <b>{'paper (simulated)' if d.get('paper') else 'LIVE funds'}</b>\n\n"
+                "By continuing you confirm that <b>you are solely responsible</b> for all "
+                "trades and any losses. The bot and its provider are not liable.\n\n"
+                "Reply <code>ACCEPT</code> to activate, or /cancel to abort.")
+
+    elif step == "DISCLAIMER":
+        if raw.strip().upper() != "ACCEPT":
+            return send_to(chat_id,
+                           "Type <code>ACCEPT</code> (in capitals) to activate, or /cancel to abort.")
+        with _lock:
+            d = dict(w["data"])
+            _wizards.pop(chat_id, None)
+        sym = d.get("symbol", "EUR_USD")
+
+        # Save per-user settings — every risk parameter was chosen by the client
+        user_data = {
+            "paper": d.get("paper", True),
+            "symbol": sym,
+            "risk": d.get("risk", 0.005),
+            "min_confidence": d.get("min_confidence", 62),
+            "accepted_risk": True,
+            "active": True,
+        }
+        if d.get("keys"):
+            user_data["oanda_token"]      = d["keys"].get("OANDA_API_TOKEN", "")
+            user_data["oanda_account_id"] = d["keys"].get("OANDA_ACCOUNT_ID", "")
+            # Live branch → point this user at OANDA's real fxtrade endpoint.
+            # Without this, oanda_env stays "practice" and "live" trades silently
+            # execute on the practice server. Default to the live host they asked
+            # for; they can flip back with /env practice if it's a demo token.
+            user_data["oanda_env"]        = d.get("oanda_env", "live")
+        else:
+            user_data["oanda_env"]        = "practice"
+        user_store.update(chat_id, user_data)
+
+        # Also apply globally if admin (for owner's own bot)
+        if access.is_admin(str(chat_id)):
+            updates: dict = {
+                "PAPER_TRADING": str(d.get("paper", True)).lower(),
+                "TRADE_SYMBOL": sym,
+                "RISK_PER_TRADE": str(d.get("risk", 0.005)),
+                "MIN_CONFIDENCE": str(d.get("min_confidence", 62)),
+            }
+            if d.get("keys"):
+                updates.update(d["keys"])
+                updates["BROKER"] = "oanda"
+            else:
+                # Paper with no OANDA keys → free Yahoo Finance data globally too
+                updates["BROKER"] = "yahoo"
+            _save_runtime(updates)
+            for k, v in updates.items():
+                _apply(k, v)
+            if _bot_control.get("reload_broker"):
+                _bot_control["reload_broker"]()
+
+        # Auto-start trading immediately — no manual /start needed.
+        # Restart first so a re-run of /setup applies the new broker/env/keys
+        # even if the loop was already running.
+        _restart_user_loop(chat_id)
+        _auto_start_user(chat_id)
+
+        paper_str = "ON (simulated)" if d.get("paper") else "OFF (live)"
+        risk_pct = d.get("risk", 0.005) * 100
+        if d.get("paper"):
+            broker_str = "Yahoo data (paper)"
+        else:
+            broker_str = f"OANDA ({user_data.get('oanda_env', 'live')})"
+        send_to(chat_id,
+                f"✅ <b>Setup complete — bot is LIVE!</b>\n\n"
+                f"Broker: <b>{broker_str}</b>\n"
+                f"Pair: <b>{sym}</b>  (your choice)\n"
+                f"Risk/trade: <b>{risk_pct:g}%</b>  (your choice)\n"
+                f"Paper mode: <b>{paper_str}</b>\n\n"
+                f"⚡ Trading is active now. You'll get an alert on every trade,\n"
+                f"plus a heartbeat so you always know the bot is awake.\n"
+                f"Change anything with /setup · /status to check · /stop to pause.\n\n"
+                f"🧠 <b>Want AI chat to help you trade?</b> Send /ai to connect a free "
+                f"Gemini/Groq key (or paid Claude) — your choice.",
+                _dashboard_keyboard())
+
+
+# ─── Individual command handlers ──────────────────────────
+
+def _handle_setkeys(chat_id, args_text, msg_id):
+    _delete_message(chat_id, msg_id)
+    pairs = {}
+    for part in args_text.replace("\n", " ").split():
+        if "=" in part:
+            k, _, v = part.partition("=")
+            pairs[k.strip().upper()] = v.strip()
+    if not pairs:
+        return send_to(chat_id, "❌ Format: <code>/setkeys KEY=value KEY2=value2</code>")
+    _save_runtime(pairs)
+    for k, v in pairs.items():
+        _apply(k, v)
+    if _bot_control.get("reload_broker"):
+        _bot_control["reload_broker"]()
+    masked = "\n".join(f"  {k} = {_mask(v)}" for k, v in pairs.items())
+    send_to(chat_id, f"🔑 <b>{len(pairs)} credential(s) updated:</b>\n<code>{masked}</code>")
+
+
+_AI_KB = {"reply_markup": json.dumps({"inline_keyboard": [
+    [{"text": "🥇 Get free Gemini key", "url": "https://aistudio.google.com/apikey"}],
+    [{"text": "🥈 Get free Groq key", "url": "https://console.groq.com/keys"}],
+]})}
+
+
+def _handle_ai_setup(chat_id):
+    """Explain the AI-chat key options — client connects their OWN free/paid key."""
+    u = user_store.load(chat_id)
+    if u.get("groq_key") or u.get("gemini_key") or u.get("anthropic_key"):
+        return send_to(chat_id,
+                       "🧠 <b>AI chat is already connected</b> on your own key. ✅\n"
+                       "Just talk to me — \"analyze EUR_USD\", \"should I buy gold?\".\n"
+                       "Paste a different key any time to switch.")
+    send_to(chat_id,
+            "🧠 <b>Activate AI chat (helps you trade)</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Your bot already trades on its built-in rule engine. A free AI key adds "
+            "<b>smart chat</b> — ask it to analyze a pair, explain a trade, or enter for you.\n\n"
+            "⚠️ <b>AI chat needs a key — your choice, free or paid:</b>\n"
+            "🥇 <b>Gemini</b> — free, 1,500/day → aistudio.google.com/apikey\n"
+            "🥈 <b>Groq</b> — free, fast (key starts <code>gsk_</code>) → console.groq.com/keys\n"
+            "🥉 <b>Claude</b> — paid, smartest (key starts <code>sk-ant-</code>) → console.anthropic.com\n\n"
+            "📋 <b>Just paste your key here</b> — I auto-detect which one it is and verify it.\n"
+            "<i>Trading works fine without a key; this only powers the chat.</i>",
+            _AI_KB)
+
+
+def _detect_ai_key(key):
+    k = (key or "").strip()
+    if k.startswith("sk-ant-"):
+        return "claude"
+    if k.startswith("gsk_"):
+        return "groq"
+    if k.startswith("AIza"):
+        return "gemini"
+    return None
+
+
+def _handle_ai_key(chat_id, key, msg_id):
+    """Verify & save a pasted AI key (any provider, auto-detected)."""
+    _delete_message(chat_id, msg_id)
+    key = (key or "").strip().split()[0] if key else ""
+    kind = _detect_ai_key(key)
+    if kind is None:
+        return send_to(chat_id,
+                       "🤔 <b>I couldn't tell which provider that key is for.</b>\n"
+                       "Gemini keys start with <code>AIza</code>, Groq with <code>gsk_</code>, "
+                       "Claude with <code>sk-ant-</code>.\n"
+                       "Copy the full key again, or tap a button below to get a free one.",
+                       _AI_KB)
+    label = {"claude": "Claude", "groq": "Groq", "gemini": "Gemini"}[kind]
+    send_to(chat_id, f"🔍 Testing your {label} key…")
+    if kind == "claude":
+        ok, why = assistant.test_key(key); field = "anthropic_key"
+    elif kind == "groq":
+        ok, why = assistant.test_groq_key(key); field = "groq_key"
+    else:
+        ok, why = assistant.test_gemini_key(key); field = "gemini_key"
+    if not ok:
+        return send_to(chat_id, f"❌ <b>{label} key not working:</b> {why}\n\nPaste a different key.", _AI_KB)
+    user_store.update(chat_id, {field: key})
+    assistant.clear_history(chat_id)
+    send_to(chat_id,
+            f"✅ <b>{label} key verified &amp; saved!</b>\n"
+            "AI chat now runs on YOUR own quota. Try: <i>\"analyze EUR_USD\"</i> 🧠")
+
+
+def _handle_broker(chat_id, args):
+    b = (args or "").strip().lower()
+    if b not in cfg.SUPPORTED_BROKERS:
+        return send_to(chat_id,
+                       "❌ Usage: <code>/broker oanda</code> or <code>/broker mt</code>\n\n"
+                       "• <b>oanda</b> — direct API (easiest)\n"
+                       "• <b>mt</b> — MetaTrader 5 via the ApexBridge EA "
+                       "(IC Markets &amp; any MT5 broker)")
+    _save_runtime({"BROKER": b})
+    _apply("BROKER", b)
+    if _bot_control.get("reload_broker"):
+        _bot_control["reload_broker"]()
+    if b == "mt":
+        send_to(chat_id,
+                "🔗 Broker set to <b>MetaTrader Bridge</b>.\n\n"
+                "1. Set a secret: <code>/setkeys MT_BRIDGE_SECRET=choose_something_long</code>\n"
+                "2. Install <b>ApexBridge.mq5</b> in MetaTrader (see docs/METATRADER.md)\n"
+                "3. Put the same secret + your bot URL in the EA settings\n\n"
+                "I'll start trading as soon as the EA connects.")
+    else:
+        send_to(chat_id, "✅ Broker set to <b>OANDA</b>. Use /setup if you need to enter credentials.")
+
+
+def _handle_env(chat_id, args):
+    env = (args or "").strip().lower()
+    if env not in ("practice", "live"):
+        return send_to(chat_id, "❌ Usage: <code>/env practice</code> or <code>/env live</code>")
+    # cTrader users: the account type (demo/live) is fixed by the account they
+    # linked — what /env really means for them is paper simulation vs. real
+    # orders in that account. Route it there, or the command changes nothing.
+    user = user_store.load(chat_id)
+    if user.get("ctrader_access_token") and user.get("ctrader_account_id"):
+        return _handle_paper(chat_id, "on" if env == "practice" else "off")
+    # Per-user: the multi-user loop builds each broker from the user record, so the
+    # env MUST be stored there or the change never reaches the running loop.
+    user_store.update(chat_id, {"oanda_env": env})
+    _restart_user_loop(chat_id)
+    # Admin: also flip the global runtime config for the owner's own engine.
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"OANDA_ENV": env})
+        _apply("OANDA_ENV", env)
+        if _bot_control.get("reload_broker"):
+            _bot_control["reload_broker"]()
+    icon = "🧪" if env == "practice" else "🔴"
+    send_to(chat_id, f"{icon} OANDA environment set to <b>{env.upper()}</b>.\n"
+                     f"<i>Make sure your token matches this environment.</i>")
+
+
+def _broker_signup_rows():
+    """Broker sign-up buttons carrying the operator's IB/partner referral links
+    (set via env: BROKER_NAME + BROKER_DEMO_LINK [+ BROKER_LIVE_LINK], or a
+    JSON list in BROKER_LINKS for several brokers). Empty if none configured."""
+    rows = []
+    raw = os.getenv("BROKER_LINKS", "").strip()
+    if raw:
+        try:
+            for b in json.loads(raw):
+                if b.get("name") and b.get("url"):
+                    rows.append([{"text": f"🏦 Open {b['name']} account", "url": b["url"]}])
+        except Exception as e:
+            print(f"[TELEGRAM] BROKER_LINKS parse error: {e}")
+    else:
+        name = os.getenv("BROKER_NAME", "").strip()
+        demo = os.getenv("BROKER_DEMO_LINK", "").strip()
+        live = os.getenv("BROKER_LIVE_LINK", "").strip()
+        if name and demo:
+            rows.append([{"text": f"🧪 Create a free {name} DEMO account", "url": demo}])
+        if name and live:
+            rows.append([{"text": f"🏦 Open a {name} live account", "url": live}])
+    return rows
+
+
+def _handle_ctrader(chat_id):
+    """Start the cTrader OAuth onboarding — sends the client an authorize link."""
+    from apex import ctrader_oauth
+    from apex.brokers import ctrader as ct
+    if not ct.is_configured():
+        return send_to(chat_id,
+            "⚠️ cTrader isn't available yet — the operator must set "
+            "CTRADER_CLIENT_ID and CTRADER_CLIENT_SECRET first.")
+    link = ctrader_oauth.authorize_link(chat_id)
+    if not link or "client_id=" not in link:
+        return send_to(chat_id,
+            "⚠️ cTrader redirect URL isn't configured (CTRADER_REDIRECT_URI / "
+            "RENDER_EXTERNAL_URL). Ask the operator to set it.")
+    scope = (getattr(cfg, "CTRADER_SCOPE", "trading") or "trading").lower()
+    scope_line = ("🔐 Access requested: <b>trading</b> (place &amp; manage orders)\n\n" if scope == "trading" else
+                  "⚠️ Access requested: <b>accounts — READ-ONLY</b>. Orders will be rejected! "
+                  "The operator must set <code>CTRADER_SCOPE=trading</code> and redeploy first.\n\n")
+    broker_rows = _broker_signup_rows()
+    # Strongly steer new clients to PRACTICE first: a demo cTrader account gives
+    # real market conditions with fake money — the honest, refund-proof test.
+    tip = ("💡 <b>New here? Start on a demo (Practice) account</b> — real market, "
+           "fake money. Watch the bot work risk-free, switch to live when you're "
+           "confident.\n\n")
+    if broker_rows:
+        tip += "Don't have a cTrader account yet? Create one below, then come back and Authorize.\n\n"
+    kb = broker_rows + [[{"text": "🔗 Authorize cTrader", "url": link}]]
+    send_to(chat_id,
+        "🟢 <b>Connect your cTrader account</b>\n\n"
+        f"{tip}"
+        "1. Tap Authorize below\n"
+        "2. Log in to cTrader and approve access\n"
+        "3. You'll be sent back here automatically\n\n"
+        f"{scope_line}"
+        "Works with any cTrader broker (IC Markets, Pepperstone, FxPro…).\n\n"
+        "<i>The link is valid for 10 minutes.</i>",
+        extra={"reply_markup": {"inline_keyboard": kb}})
+
+
+def _apply_account(chat_id, ctid):
+    """Bind the bot to a linked cTrader account by id and restart the loop."""
+    user = user_store.load(chat_id)
+    acc = next((a for a in (user.get("ctrader_accounts") or []) if str(a["ctid"]) == str(ctid)), None)
+    if not acc:
+        return send_to(chat_id, "❌ Account not found. Tap Connect a different account.")
+    ct_env = "live" if acc.get("live") else "demo"
+    updates = {"ctrader_account_id": acc["ctid"], "ctrader_env": ct_env}
+    # LIVE = real money: turn OFF the internal simulation so orders actually execute.
+    if acc.get("live"):
+        updates["paper"] = False
+    try:
+        from apex.brokers import ctrader as _ct
+        bal = _ct.account_balance(user.get("ctrader_access_token", ""), acc["ctid"], ct_env)
+        updates["paper_balance"] = bal
+        bal_line = f"💰 Balance: <b>${bal:,.2f}</b>\n"
+    except Exception as e:
+        bal_line = f"⚠️ Couldn't read the balance yet: <i>{str(e)[:120]}</i>\n"
+    user_store.update(chat_id, updates)
+    _restart_user_loop(chat_id)
+    tag = "🔴 LIVE · real money" if acc.get("live") else "🧪 Practice · demo"
+    send_to(chat_id, f"✅ <b>Now trading: {tag}</b> (account {acc['ctid']}).\n{bal_line}"
+                     "Use the buttons below to turn the bot ON/OFF.",
+            _dashboard_keyboard(chat_id))
+
+
+def _handle_switch(chat_id):
+    """Let the client change which account the bot trades — pick a linked
+    account, or disconnect and connect a different one (e.g. demo → live)."""
+    user = user_store.load(chat_id)
+    accounts = user.get("ctrader_accounts") or []
+    cur_id = str(user.get("ctrader_account_id", ""))
+    rows = []
+    for a in accounts:
+        tag = "🔴 LIVE (real money)" if a.get("live") else "🧪 Practice (demo)"
+        here = " ✓ current" if str(a["ctid"]) == cur_id else ""
+        rows.append([{"text": f"{tag} · {a['ctid']}{here}", "callback_data": f"acct:use:{a['ctid']}"}])
+    rows.append([{"text": "🔗 Connect a DIFFERENT account", "callback_data": "acct:new"}])
+    send_to(chat_id,
+        "🔄 <b>Switch trading account</b>\n\n"
+        "Tested on demo and ready for real money? Connect your live account below. "
+        "Or pick one of your linked accounts.\n\n"
+        "<i>🧪 Practice = fake money · 🔴 LIVE = real money.</i>",
+        extra={"reply_markup": {"inline_keyboard": rows}})
+
+
+def _handle_ctaccount(chat_id, args):
+    """Pick which cTrader trading account to trade when the client has several."""
+    want = (args or "").strip()
+    user = user_store.load(chat_id)
+    accounts = user.get("ctrader_accounts") or []
+    if not accounts:
+        return send_to(chat_id, "No cTrader accounts linked yet. Send /ctrader first.")
+    if not want:
+        lines = "\n".join(
+            f"• <code>{a['ctid']}</code> — {'LIVE 🔴' if a.get('live') else 'demo 🧪'}"
+            for a in accounts)
+        return send_to(chat_id, f"Your cTrader accounts:\n{lines}\n\n"
+                                "Pick one: <code>/ctaccount &lt;id&gt;</code>")
+    match = next((a for a in accounts if str(a["ctid"]) == want), None)
+    if not match:
+        return send_to(chat_id, f"❌ No linked account with id <code>{want}</code>.")
+    ct_env = "live" if match.get("live") else "demo"
+    updates = {"ctrader_account_id": match["ctid"], "ctrader_env": ct_env}
+    try:
+        from apex.brokers import ctrader as _ct
+        bal = _ct.account_balance(user.get("ctrader_access_token", ""), match["ctid"], ct_env)
+        updates["paper_balance"] = bal
+        bal_line = f"💰 Balance detected: <b>${bal:,.2f}</b> — paper mode starts from your real balance.\n"
+    except Exception as e:
+        bal_line = f"⚠️ Could not read the account balance yet: <i>{str(e)[:140]}</i>\n"
+    user_store.update(chat_id, updates)
+    _restart_user_loop(chat_id)
+    env = "LIVE 🔴" if match.get("live") else "demo 🧪"
+    send_to(chat_id, f"✅ Trading account set to <code>{match['ctid']}</code> ({env}).\n{bal_line}"
+                     "Let's set you up — 3 quick taps and the bot is trading. 👇")
+    if _guide_button():
+        send_to(chat_id, "📖 First time? Open the quick guide anytime with /guide.", _guide_button())
+    onboard_start(chat_id)
+
+
+# Quick-pick trade symbols — asset-class aware (crypto majors first for the
+# crypto build, FX majors first for the forex build). Clients can still type
+# any symbol their broker offers.
+_OB_SYMS_FOREX = [
+    ("EUR/USD", "EURUSD"), ("GBP/USD", "GBPUSD"), ("USD/JPY", "USDJPY"),
+    ("AUD/USD", "AUDUSD"), ("USD/CHF", "USDCHF"), ("USD/CAD", "USDCAD"),
+    ("🥇 Gold", "XAUUSD"), ("🥈 Silver", "XAGUSD"), ("₿ Bitcoin", "BTCUSD"),
+    ("Ξ Ethereum", "ETHUSD"), ("📈 US30", "US30"), ("📈 NAS100", "NAS100"),
+]
+_OB_SYMS_CRYPTO = [
+    ("₿ Bitcoin", "BTCUSD"), ("Ξ Ethereum", "ETHUSD"), ("◎ Solana", "SOLUSD"),
+    ("✕ XRP", "XRPUSD"), ("Ł Litecoin", "LTCUSD"), ("● Cardano", "ADAUSD"),
+    ("Ð Dogecoin", "DOGEUSD"), ("⬡ Polkadot", "DOTUSD"), ("🔗 Chainlink", "LINKUSD"),
+    ("Ƀ Bitcoin Cash", "BCHUSD"), ("🥇 Gold", "XAUUSD"), ("🥈 Silver", "XAGUSD"),
+]
+_OB_SYMS = _OB_SYMS_CRYPTO if cfg.PRODUCT == "crypto" else _OB_SYMS_FOREX
+
+_RISK_TEXT = ("⚠️ <b>Before I place real orders — read this once.</b>\n\n"
+              "This bot executes <b>your</b> strategy, with <b>your</b> settings, on <b>your</b> account.\n\n"
+              "• No profit is guaranteed — results depend on your settings and the market\n"
+              "• Trading with leverage carries substantial risk; losses are possible and they are <b>yours</b>\n"
+              "• We provide the software — not financial advice, not a promised return\n"
+              "• Only trade money you can afford to lose; test in paper mode first\n\n"
+              "<i>Demo account = fake money 🧪 · Live account = real money 🔴</i>")
+
+
+def onboard_start(chat_id):
+    """Guided setup after the broker is connected: symbol → method → mode → go."""
+    rows = [[{"text": "🤖 Auto-Pilot — let the bot pick everything (recommended)", "callback_data": "ob:sym:__auto__"}]]
+    row = []
+    for label, code in _OB_SYMS:
+        row.append({"text": label, "callback_data": f"ob:sym:{code}"})
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    send_to(chat_id,
+            "🧭 <b>Setup 1/3 — What do you want to trade?</b>\n\n"
+            "🤖 <b>Auto-Pilot</b> = the bot scans liquid markets and trades the best setups itself.\n"
+            "Or pick one instrument — you can change any time with /symbol or /pairs.",
+            extra={"reply_markup": {"inline_keyboard": rows}})
+
+
+def _ob_step_strategy(chat_id):
+    from apex.ai import STRATEGY_MODES
+    kb = [[{"text": "🤖 Auto — adapts to the market (recommended)", "callback_data": "ob:strat:auto"}],
+          [{"text": "⭐ Mean Reversion", "callback_data": "ob:strat:mean_reversion"}],
+          [{"text": "📈 Trend Following", "callback_data": "ob:strat:trend"}],
+          [{"text": "🚀 Turtle Breakout", "callback_data": "ob:strat:breakout"}]]
+    body = "\n\n".join(f"<b>{m['label']}</b> — <i>{m['blurb']}</i>" for m in STRATEGY_MODES.values())
+    send_to(chat_id, f"🧭 <b>Setup 2/3 — Pick your trading method:</b>\n\n{body}",
+            extra={"reply_markup": {"inline_keyboard": kb}})
+
+
+def _ob_step_mode(chat_id):
+    kb = [[{"text": "🧪 Paper — simulated, zero risk (recommended)", "callback_data": "ob:mode:paper"}],
+          [{"text": "🔴 Real orders in my connected account", "callback_data": "ob:mode:real"}]]
+    send_to(chat_id,
+            "🧭 <b>Setup 3/3 — How should I trade?</b>\n\n"
+            "📝 <b>Paper</b>: simulated balance on live prices — watch it work, risk-free.\n"
+            "🔴 <b>Real</b>: every order executes in your connected account "
+            "(demo account = still fake money 🧪).",
+            extra={"reply_markup": {"inline_keyboard": kb}})
+
+
+def _finish_onboard(chat_id):
+    from apex.ai import STRATEGY_MODES
+    u = user_store.load(chat_id)
+    strat = STRATEGY_MODES.get((u.get("strategy") or "mean_reversion").lower(),
+                               STRATEGY_MODES["mean_reversion"])["label"]
+    mode = "📝 Paper (simulation)" if u.get("paper", True) else "🔴 Real orders"
+    user_loop.stop(chat_id)
+    user_loop.start(chat_id, alert_fn=_user_alert)
+    send_to(chat_id,
+            "🎉 <b>All set — your bot is ON and trading!</b>\n\n"
+            f"💱 Symbol: <b>{u.get('symbol', 'EUR_USD')}</b>\n"
+            f"🎯 Method: <b>{strat}</b>\n"
+            f"⚙️ Mode: <b>{mode}</b>\n"
+            f"⚖️ Risk: <b>{float(u.get('risk', 0.005)) * 100:g}%</b> per trade\n\n"
+            "It watches the market and trades automatically when a valid setup appears — "
+            "you'll get an alert on every move. It may sit and wait a while; that's normal, "
+            "it only takes good setups.\n\n"
+            "Use the buttons below to turn it OFF/ON or open the live terminal.\n"
+            "📖 Full guide anytime: /guide\n"
+            "<i>Fine-tune anytime:</i> /pairs · /watch · /strategy · /risk",
+            _dashboard_keyboard(chat_id))
+
+
+def _handle_cb(chat_id, data):
+    """Inline-button presses (copilot approve/reject, risk acceptance, onboarding)."""
+    if data == "go:connect":
+        return _handle_ctrader(chat_id)
+    if data == "acct:switch":
+        return _handle_switch(chat_id)
+    if data == "acct:new":
+        # Disconnect the current cTrader link and start a fresh authorization
+        # (e.g. moving from a demo login to a real-money broker account).
+        user_store.update(chat_id, {"ctrader_access_token": "", "ctrader_refresh_token": "",
+                                    "ctrader_account_id": "", "ctrader_accounts": []})
+        send_to(chat_id, "🔌 Old account disconnected. Now connect the account you want to trade 👇")
+        return _handle_ctrader(chat_id)
+    if data.startswith("acct:use:"):
+        ctid = data.split(":", 2)[2]
+        u = user_store.load(chat_id)
+        acc = next((a for a in (u.get("ctrader_accounts") or []) if str(a["ctid"]) == ctid), None)
+        if not acc:
+            return send_to(chat_id, "❌ That account isn't linked anymore. Tap Connect a different account.")
+        if acc.get("live"):
+            # Real money → require an explicit confirmation.
+            return send_to(chat_id,
+                f"🔴 <b>Switch to LIVE account {ctid}?</b>\n\n"
+                "This account trades <b>REAL money</b>. The bot will place real orders on it. "
+                "Make sure you've watched it work on demo first.\n\n"
+                "<i>You accept full responsibility for live trading — results are yours.</i>",
+                extra={"reply_markup": {"inline_keyboard": [[
+                    {"text": "✅ Yes, trade my real-money account", "callback_data": f"acct:go:{ctid}"}],
+                    [{"text": "↩️ Cancel — stay on demo", "callback_data": "acct:cancel"}]]}})
+        return _apply_account(chat_id, ctid)
+    if data.startswith("acct:go:"):
+        return _apply_account(chat_id, data.split(":", 2)[2])
+    if data == "acct:cancel":
+        return send_to(chat_id, "↩️ Staying on your current account. Test as long as you like.")
+    if data == "bot:on":
+        if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
+            _bot_control["set_paused"](False)
+        _auto_start_user(chat_id)
+        return send_to(chat_id,
+            "✅ <b>Bot is ON.</b>\nIt's watching the market now and will trade automatically "
+            "when a valid setup appears — you'll get an alert on every move.",
+            _dashboard_keyboard(chat_id))
+    if data == "bot:off":
+        user_loop.stop(chat_id)
+        if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
+            _bot_control["set_paused"](True)
+        return send_to(chat_id,
+            "⏸ <b>Bot is OFF.</b>\nNo new trades will open. Any open position stays protected by its stop. "
+            "Tap ▶️ to turn it back on.",
+            _dashboard_keyboard(chat_id))
+    if data == "ob:sym:__auto__":
+        _handle_autopilot(chat_id, "on")
+        return _ob_step_strategy(chat_id)
+    if data.startswith("ob:sym:"):
+        sym = data[7:]
+        user_store.update(chat_id, {"symbol": sym, "autopilot": False})
+        sugg = ("Suggested stops for gold: /sl 150 · /tp 300 (set after setup)" if sym.startswith("XAU")
+                else "Suggested stops for indices: /sl 60 · /tp 120" if sym in ("US30", "NAS100")
+                else "Suggested stops for crypto: /sl 200 · /tp 400" if sym.startswith(("BTC", "ETH"))
+                else "")
+        send_to(chat_id, f"✅ Trading symbol: <b>{sym}</b>" + (f"\n💡 <i>{sugg}</i>" if sugg else ""))
+        return _ob_step_strategy(chat_id)
+    if data.startswith("ob:strat:"):
+        mode = data[9:]
+        user_store.update(chat_id, {"strategy": mode})
+        return _ob_step_mode(chat_id)
+    if data == "ob:mode:paper":
+        user_store.update(chat_id, {"paper": True})
+        return _finish_onboard(chat_id)
+    if data == "ob:mode:real":
+        u = user_store.load(chat_id)
+        if not u.get("risk_accepted"):
+            return send_to(chat_id, _RISK_TEXT,
+                           extra={"reply_markup": {"inline_keyboard": [[
+                               {"text": "✅ I understand — I accept the risk", "callback_data": "ob:risk"}]]}})
+        user_store.update(chat_id, {"paper": False})
+        return _finish_onboard(chat_id)
+    if data == "ob:risk":
+        from datetime import datetime as _dt
+        user_store.update(chat_id, {"risk_accepted": _dt.utcnow().isoformat(), "paper": False})
+        return _finish_onboard(chat_id)
+    if data == "risk:ok":
+        from datetime import datetime as _dt
+        user_store.update(chat_id, {"risk_accepted": _dt.utcnow().isoformat()})
+        return _handle_paper(chat_id, "off")
+    if data == "cp:y":
+        sug = user_loop.pending_suggestion(str(chat_id))
+        user_loop.clear_suggestion(str(chat_id))
+        if not sug:
+            return send_to(chat_id, "⌛ That suggestion expired. I'll send a fresh one on the next setup.")
+        send_to(chat_id, f"✅ Approved — opening {sug['side']} {sug['symbol']}…")
+        res = user_loop.force_trade(str(chat_id), sug["side"], sug["symbol"])
+        if res.get("ok"):
+            send_to(chat_id,
+                    f"✅ <b>{sug['side']} {sug['symbol']}</b> @ {res['price']:.5f} | Units: {res['units']}\n"
+                    f"SL: {res['sl']:.5f} | TP: {res['tp']:.5f}")
+        else:
+            send_to(chat_id, f"❌ Could not open: {_trade_err(res.get('error'))}")
+    elif data == "cp:n":
+        user_loop.clear_suggestion(str(chat_id))
+        send_to(chat_id, "❌ Skipped. I'll keep watching and suggest the next setup.")
+
+
+def _handle_market(chat_id):
+    """Market Pulse: session awareness + the last computed volatility/trend read."""
     from apex import market
-    st = user_loop._ensure_user(user_id).get("state", {})
-    mp = st.get("lastMarket")
-    sym = _settings(user_id)["SYMBOL"]
-    if not mp:
-        return "📡 <b>Market Pulse</b>\nNo read yet — the bot hasn't scanned. Try again in ~1 min."
-    fut = market.futures(sym)
-    squeeze = market.squeeze_note(fut)
-    lines = [
-        f"📡 <b>Market Pulse — {sym}</b>",
-        "━━━━━━━━━━━━━━━━━━━━",
-        f"📊 Trend: <b>{mp['trend']}</b>",
-        f"🌊 Volatility: <b>{mp['volatility']}</b>  (ATR {mp['atrPct']}%)",
-        f"🔊 Volume: <b>{mp['volume']}</b>  (×{mp['volRatio']} avg)",
-        f"🎯 Momentum: <b>{mp['momentum']}</b>  (RSI {mp['rsi']})",
-    ]
-    if fut.get("funding") is not None:
-        lines.append(f"💸 Funding: <b>{fut['funding']}%</b>")
-    if fut.get("longShort") is not None:
-        lines.append(f"⚖️ Long/Short: <b>{fut['longShort']}:1</b>")
-    if squeeze:
-        lines.append(f"\n⚠️ <i>{squeeze}</i>")
-    lines.append("\n<i>How the market is moving right now — read before you trade.</i>")
-    return "\n".join(lines)
+    user = user_store.load(chat_id)
+    sym = user.get("symbol", cfg.SYMBOL)
+    sess = market.session()
+    dash = user_loop.get_dash(chat_id) if hasattr(user_loop, "get_dash") else None
+    mp = (dash or {}).get("market") if dash else None
+
+    lines = [f"📡 <b>Market Pulse — {sym}</b>", "━━━━━━━━━━━━━━━━━━━━",
+             f"🕐 Session: <b>{sess['label']}</b>  (expected volatility: {sess['vol']})"]
+    if not forex.is_market_open():
+        lines.append("🔴 <b>Market closed</b> (weekend) — reopens Sunday 21:00 UTC.")
+    if mp:
+        lines.append(f"📊 Trend: <b>{mp['trend']}</b>")
+        lines.append(f"🌊 Volatility: <b>{mp['volatility']}</b>  (ATR {mp['atrPct']}%)")
+        if mp.get("volume"):
+            lines.append(f"🔊 Volume: <b>{mp['volume']}</b>")
+        lines.append(f"🎯 Momentum: <b>{mp['momentum']}</b>  (RSI {mp['rsi']})")
+    lines.append(f"\n💡 <i>{sess['note']}</i>")
+    lines.append("<i>How the market is moving right now — read before you trade.</i>")
+    send_to(chat_id, "\n".join(lines))
 
 
-def _build_config(user_id):
-    s = _settings(user_id)
-    return (f"⚙️ <b>CONFIGURATION</b>\n━━━━━━━━━━━━━━━━━━━━\n"
-            f"💎 Symbol: <b>{s['SYMBOL']}</b>\n"
-            f"🎯 Method: <b>{s['STRATEGY_MODE']}</b>\n"
-            f"💸 Risk/trade: <b>{s['RISK_PER_TRADE'] * 100:.1f}%</b>\n"
-            f"🛡 SL: <b>{s['STOP_LOSS_PCT'] * 100:.1f}%</b>  🎯 TP: <b>{s['TAKE_PROFIT_PCT'] * 100:.1f}%</b>\n"
-            f"🧠 Min confidence: <b>{s['MIN_CONFIDENCE']}%</b>  Criteria: <b>{s['MIN_CRITERIA']}/5</b>\n\n"
-            f"<i>Change: /symbol /risk /sl /tp /confidence /method</i>")
+def _handle_news(chat_id):
+    from apex import news
+    if not news.enabled():
+        return send_to(chat_id, "📰 News guard is <b>off</b>. The bot is not avoiding news windows.")
+    user = user_store.load(chat_id)
+    pair = (user.get("symbol", cfg.SYMBOL) or "").split("_")
+    events = news.upcoming(hours=24)
+    if not events:
+        return send_to(chat_id,
+            "📰 <b>No high-impact events</b> in the next 24h (or the calendar feed is "
+            "unavailable). Trading proceeds normally — the news guard is fail-open.")
+    lines = []
+    for e in events:
+        flag = "⭐" if e["currency"] in [c.upper() for c in pair] else "•"
+        h, m = divmod(e["in_min"], 60)
+        when = f"{h}h {m}m" if h else f"{m}m"
+        lines.append(f"{flag} <b>{e['currency']}</b> · {e['title']} — in {when}")
+    send_to(chat_id, "📰 <b>Upcoming high-impact news (24h)</b>\n" + "\n".join(lines)
+            + "\n\n<i>⭐ = affects your pair. The bot stays flat around these.</i>")
 
 
-def _build_trades(user_id):
-    st = user_loop._ensure_user(user_id)["state"]
-    lst = st.get("trades", [])[:10]
-    if not lst:
-        return "📭 No trades yet — the bot trades automatically when a setup appears."
-    rows = [f"{'✅' if t['win'] else '❌'} {t['side']} <b>{t['symbol']}</b>  "
-            f"${t['entry']}→${t['exit']}  <b>{'+' if t['pnl'] >= 0 else ''}${t['pnl']}</b>" for t in lst]
-    return f"📋 <b>LAST {len(lst)} TRADES</b>\n━━━━━━━━━━━━━━━━━━━━\n" + "\n".join(rows)
+def _handle_copilot(chat_id, args):
+    arg = (args or "").strip().lower()
+    if arg in ("on", "1", "yes", "true"):
+        user_store.update(chat_id, {"copilot": True})
+        return send_to(chat_id,
+            "🤖 <b>Copilot mode ON.</b>\nThe bot will <b>suggest</b> trades and wait for your "
+            "✅ Approve before opening anything. You stay in control.\n\n<i>Turn off with /copilot off.</i>")
+    if arg in ("off", "0", "no", "false"):
+        user_store.update(chat_id, {"copilot": False})
+        return send_to(chat_id,
+            "🚀 <b>Autopilot mode ON.</b>\nThe bot opens trades automatically when a setup meets your "
+            "thresholds. (Use /copilot on to require approval.)")
+    cur = user_store.load(chat_id).get("copilot")
+    return send_to(chat_id,
+        f"🤖 Copilot is currently <b>{'ON (approval required)' if cur else 'OFF (autopilot)'}</b>.\n"
+        "Use <code>/copilot on</code> or <code>/copilot off</code>.")
 
 
-def _build_report(user_id):
-    st = user_loop._ensure_user(user_id)["state"]
-    lst = st.get("trades", [])
-    if not lst:
-        return ("📒 <b>No closed trades yet.</b>\n"
-                "Your tax journal fills up as the bot closes positions.")
-    net = sum(t.get("pnl", 0) or 0 for t in lst)
-    gross = sum(t.get("grossPnl", t.get("pnl", 0)) or 0 for t in lst)
-    fees = sum(t.get("feeUsd", 0) or 0 for t in lst)
-    wins = sum(1 for t in lst if t.get("win"))
-    n = len(lst)
-    wr = wins / n * 100 if n else 0
-    rows = [f"{'✅' if t.get('win') else '❌'} {t.get('side')} <b>{t.get('symbol')}</b> "
-            f"${t.get('entry')}→${t.get('exit')} <b>{'+' if t.get('pnl',0) >= 0 else ''}${t.get('pnl')}</b> "
-            f"<i>{(t.get('time') or '')[:16]}</i>" for t in lst[:10]]
-    return (f"📒 <b>Trade Journal &amp; Tax Report</b>\n"
+def _handle_paper(chat_id, args):
+    on = (args or "").strip().lower() in ("on", "true", "yes", "1")
+    # Real-order mode is gated behind an explicit, recorded risk acceptance —
+    # the client owns the strategy, the settings and every loss.
+    if not on:
+        u0 = user_store.load(chat_id)
+        if not u0.get("risk_accepted"):
+            return send_to(chat_id, _RISK_TEXT,
+                extra={"reply_markup": {"inline_keyboard": [[
+                    {"text": "✅ I understand — I accept the risk", "callback_data": "risk:ok"}]]}})
+    # Per-user first — the client's loop reads the user record, not the global cfg.
+    user_store.update(chat_id, {"paper": on})
+    _restart_user_loop(chat_id)
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"PAPER_TRADING": str(on).lower()})
+        _apply("PAPER_TRADING", on)
+    if on:
+        return send_to(chat_id, "📝 Paper trading <b>ON</b> — simulated balance, zero risk.")
+    u = user_store.load(chat_id)
+    env = (u.get("ctrader_env") or u.get("oanda_env") or "").lower()
+    where = ("your <b>demo</b> account — still fake money 🧪" if env in ("demo", "practice")
+             else "your <b>LIVE</b> account — real money 🔴")
+    send_to(chat_id, f"🔴 Paper trading <b>OFF</b> — orders now execute in {where}.\n"
+                     "Send /start if the bot isn't running.")
+
+
+def _handle_risk(chat_id, args):
+    try:
+        pct = float((args or "").strip())
+        if not (0.5 <= pct <= 10):
+            raise ValueError
+    except ValueError:
+        return send_to(chat_id, "❌ Usage: <code>/risk 2</code>  (0.5–10%)")
+    frac = pct / 100
+    user_store.update(chat_id, {"risk": frac})
+    _restart_user_loop(chat_id)
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"RISK_PER_TRADE": frac})
+        _apply("RISK_PER_TRADE", frac)
+    send_to(chat_id, f"⚖️ Risk per trade set to <b>{pct:g}%</b> of balance.")
+
+
+def _rr_note(chat_id):
+    """Warn when the configured TP is smaller than the SL (RR < 1)."""
+    u = user_store.load(chat_id)
+    try:
+        slv, tpv = float(u.get("sl_pips", 20)), float(u.get("tp_pips", 40))
+    except (TypeError, ValueError):
+        return ""
+    if tpv < slv:
+        return (f"\n⚠️ <i>Your TP ({tpv:g}p) is smaller than your SL ({slv:g}p) — "
+                f"risk/reward {tpv / slv:.2f}. Winners must outpay losers: consider /tp {int(slv * 2)}.</i>")
+    return ""
+
+
+def _handle_sl(chat_id, args):
+    try:
+        pips = float((args or "").strip())
+        if not (2 <= pips <= 200):
+            raise ValueError
+    except ValueError:
+        return send_to(chat_id, "❌ Usage: <code>/sl 15</code>  (2–200 pips)")
+    user_store.update(chat_id, {"sl_pips": pips})
+    _restart_user_loop(chat_id)
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"STOP_LOSS_PIPS": pips})
+        _apply("STOP_LOSS_PIPS", pips)
+    send_to(chat_id, f"🛡 Stop loss set to <b>{pips:g} pips</b>." + _rr_note(chat_id))
+
+
+def _handle_tp(chat_id, args):
+    try:
+        pips = float((args or "").strip())
+        if not (2 <= pips <= 500):
+            raise ValueError
+    except ValueError:
+        return send_to(chat_id, "❌ Usage: <code>/tp 30</code>  (2–500 pips)")
+    user_store.update(chat_id, {"tp_pips": pips})
+    _restart_user_loop(chat_id)
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"TAKE_PROFIT_PIPS": pips})
+        _apply("TAKE_PROFIT_PIPS", pips)
+    send_to(chat_id, f"🎯 Take profit set to <b>{pips:g} pips</b>." + _rr_note(chat_id))
+
+
+def _handle_symbol(chat_id, args):
+    sym = (args or "").strip().upper().replace("/", "_").replace("-", "_").replace(" ", "")
+    user = user_store.load(chat_id)
+    is_ct = bool(user.get("ctrader_access_token") and user.get("ctrader_account_id"))
+    if is_ct:
+        # cTrader accounts offer far more than FX majors (gold, indices, crypto
+        # CFDs…) — validate against what THIS account actually offers.
+        if not re.match(r"^[A-Z0-9_]{3,16}$", sym):
+            return send_to(chat_id, "❌ Usage: <code>/symbol EUR_USD</code> — see /pairs for everything you can trade.")
+        try:
+            from apex import user_loop as _ul
+            br, _ = _ul._make_broker(user)
+            br._symbol_id(sym)   # raises if the account doesn't offer it
+        except ValueError:
+            return send_to(chat_id, f"❌ Your broker doesn't offer <b>{sym}</b>. Send /pairs to see what's available.")
+        except Exception as e:
+            return send_to(chat_id, f"⚠️ Couldn't verify the symbol right now: <i>{str(e)[:120]}</i>. Try again in a minute.")
+    elif not _PAIR_RE.match(sym):
+        return send_to(chat_id, "❌ Usage: <code>/symbol EUR_USD</code>")
+    user_store.update(chat_id, {"symbol": sym})
+    running = _restart_user_loop(chat_id)
+    if access.is_admin(str(chat_id)):
+        _save_runtime({"TRADE_SYMBOL": sym})
+        _apply("TRADE_SYMBOL", sym)
+        cfg.SYMBOL = sym
+    warn = ""
+    if not running and not user_loop.is_running(chat_id):
+        warn += "\n⏸ <i>The bot is currently stopped — send /start to trade this symbol.</i>"
+    if is_ct and not _PAIR_RE.match(sym):
+        s_norm = sym.replace("_", "")
+        sugg = ("/sl 150 · /tp 300" if s_norm.startswith("XAU")
+                else "/sl 60 · /tp 120" if s_norm.startswith(("US30", "NAS", "GER", "SPX", "US500", "USTEC", "JPN", "UK100"))
+                else "/sl 200 · /tp 400" if s_norm.startswith(("BTC", "ETH"))
+                else None)
+        warn += ("\n💡 <i>Pip conventions for metals, indices and crypto CFDs are handled "
+                "automatically. Volatile instruments need wider stops than FX"
+                + (f" — suggested here: <b>{sugg}</b>" if sugg else "")
+                + ". Watch the first trades in paper mode.</i>")
+    send_to(chat_id, f"💱 Trading symbol set to <b>{sym}</b>.{warn}")
+
+
+def _sim_strategy(mode, candles, symbol, sl_pips, tp_pips, risk, balance0):
+    """Compact real-data simulator for /backtest — same signal engines and the
+    live exit checker, evaluated on candle closes. Spread/slippage not modeled,
+    so treat results as method COMPARISON, not a profit forecast."""
+    from apex.position import check_position
+    from apex import ai as _ai, strategies as _st, indicators as _ind, forex as _fx
+    pip = _fx.pip_size(symbol, candles[-1]["close"] if candles else None)
+    bal, pos, trades = balance0, None, []
+    for i in range(220, len(candles)):
+        win = candles[:i + 1]
+        px = win[-1]["close"]
+        ind = _ind.analyze(win)
+        st = _st.analyze(win)
+        if pos:
+            trig = check_position(pos, px)
+            if not trig:
+                sx = _ai.signal_for_mode(mode, ind, st, pos)
+                if sx.get("action") == "CLOSE":
+                    trig = "STRATEGY"
+            if trig:
+                pnl = _fx.pnl_usd(pos["side"], pos["entryPrice"], px, pos["quantity"], symbol)
+                bal += pnl
+                trades.append(pnl)
+                pos = None
+            continue
+        sx = _ai.signal_for_mode(mode, ind, st, None)
+        if sx.get("action") in ("BUY", "SELL") and sx.get("confidence", 0) >= 62:
+            d = 1 if sx["action"] == "BUY" else -1
+            sl = px - d * sl_pips * pip
+            tp = px + d * tp_pips * pip
+            units = _fx.calc_units(bal, risk, sl_pips, symbol, px)
+            pos = {"symbol": symbol, "side": sx["action"], "entryPrice": px,
+                   "quantity": max(int(units), 1000), "stopLoss": sl, "takeProfit": tp,
+                   "initialStop": sl, "trailHigh": px if d == 1 else None,
+                   "trailLow": px if d == -1 else None}
+    if pos:
+        pnl = _fx.pnl_usd(pos["side"], pos["entryPrice"], candles[-1]["close"], pos["quantity"], symbol)
+        bal += pnl
+        trades.append(pnl)
+    wins = [t for t in trades if t > 0]
+    return {"n": len(trades), "w": len(wins), "net": bal - balance0}
+
+
+def _handle_backtest(chat_id, args):
+    """Admin: compare all strategy methods on REAL candles from the linked broker."""
+    if not access.is_admin(str(chat_id)):
+        return send_to(chat_id, "⛔ Admin only.")
+    user = user_store.load(chat_id)
+    sym = user.get("symbol", cfg.SYMBOL)
+    send_to(chat_id, f"⏳ Pulling real {sym} candles and simulating all methods — 1-2 minutes…")
+
+    def run():
+        try:
+            from apex import user_loop as _ul
+            from apex.ai import STRATEGY_MODES
+            br, ucfg = _ul._make_broker(user)
+            candles = br.get_candles(sym, "5m", 1000)
+            if not candles or len(candles) < 400:
+                return send_to(chat_id, f"❌ Not enough data ({len(candles or [])} candles).")
+            days = (len(candles) - 220) * 5 / 1440
+            bal0 = float(user.get("paper_balance", 1000))
+            lines = []
+            for key, m in STRATEGY_MODES.items():
+                r = _sim_strategy(key, candles, sym, ucfg.STOP_LOSS_PIPS,
+                                  ucfg.TAKE_PROFIT_PIPS, ucfg.RISK_PER_TRADE, bal0)
+                wr = f"{r['w'] / r['n'] * 100:.0f}%" if r["n"] else "—"
+                lines.append(f"<b>{m['label']}</b>: {r['n']} trades · win {wr} · "
+                             f"net {'+' if r['net'] >= 0 else ''}${r['net']:.2f}")
+            send_to(chat_id,
+                    f"📊 <b>Method comparison — {sym}, last ~{days:.1f} days (real data)</b>\n\n"
+                    + "\n".join(lines) +
+                    "\n\n<i>Same entries/exits as live, evaluated on candle closes; spread "
+                    "not modeled — use for comparing methods, not as a profit promise. "
+                    "Short sample: markets change. Switch with /strategy.</i>")
+        except Exception as e:
+            send_to(chat_id, f"❌ Backtest failed: {str(e)[:180]}")
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _handle_strategy(chat_id, args):
+    """Pick the trading method — the per-user loop and the AI prompt follow it."""
+    from apex.ai import STRATEGY_MODES
+    aliases = {"mean": "mean_reversion", "mr": "mean_reversion", "mean_reversion": "mean_reversion",
+               "reversion": "mean_reversion", "trend": "trend", "trending": "trend",
+               "breakout": "breakout", "turtle": "breakout",
+               "auto": "auto", "adaptive": "auto", "ai": "auto"}
+    want = aliases.get((args or "").strip().lower().replace("-", "_"))
+    user = user_store.load(chat_id)
+    current = (user.get("strategy") or "auto").lower()
+    if not want:
+        lines = "\n\n".join(
+            f"{'✅ ' if key == current else ''}<b>{m['label']}</b> — <code>/strategy {key.split('_')[0]}</code>\n<i>{m['blurb']}</i>"
+            for key, m in STRATEGY_MODES.items())
+        return send_to(chat_id,
+            f"🎯 <b>Trading method</b> (current: <b>{STRATEGY_MODES[current]['label']}</b>)\n\n{lines}\n\n"
+            "<i>Switching restarts your loop instantly. Test a new method in paper mode first.</i>")
+    user_store.update(chat_id, {"strategy": want})
+    running = _restart_user_loop(chat_id)
+    m = STRATEGY_MODES[want]
+    tail = ("Applied immediately — check /status." if running
+            else "⏸ The bot is currently <b>stopped</b> — send /start to begin trading with it.")
+    send_to(chat_id, f"🎯 Method set to <b>{m['label']}</b>.\n<i>{m['blurb']}</i>\n\n{tail}")
+
+
+# Curated liquid universe the Auto-Pilot scans — asset-class aware (FX majors +
+# gold for the forex build, crypto-CFD majors for the crypto build). Configured
+# in config.py (AUTOPILOT_UNIVERSE, env-overridable). Non-FX candidates are
+# validated per account before use.
+_AUTOPILOT_CANDIDATES = cfg.AUTOPILOT_UNIVERSE
+
+
+def _handle_maxpos(chat_id, args):
+    """Set how many positions the bot may hold at once (multi-position mode)."""
+    arg = (args or "").strip()
+    user = user_store.load(chat_id)
+    if not arg:
+        cur = int(user.get("maxpos", 1))
+        risk = float(user.get("max_total_risk", 0.05)) * 100
+        return send_to(chat_id,
+            f"📊 <b>Max positions: {cur}</b> · total-risk cap {risk:g}%\n\n"
+            "The bot can hold several trades at once and closes each on its own "
+            "target/stop. Total risk stays capped no matter how many are open.\n\n"
+            "<code>/maxpos 5</code> — allow up to 5 at once (1–8)\n"
+            "<code>/maxpos 1</code> — one at a time (default)")
+    try:
+        n = int(arg)
+        if not (1 <= n <= 8):
+            raise ValueError
+    except ValueError:
+        return send_to(chat_id, "❌ Usage: <code>/maxpos 5</code> (a number 1–8)")
+    user_store.update(chat_id, {"maxpos": n})
+    running = _restart_user_loop(chat_id)
+    per = 5.0 / n
+    send_to(chat_id,
+        f"📊 <b>Max positions set to {n}.</b>\n"
+        + ("One trade at a time.\n" if n == 1 else
+           f"Up to {n} trades at once — each risks ~{per:.1f}% so all {n} together "
+           f"never risk more than 5% of the account. Correlated same-direction "
+           f"trades are limited automatically.\n")
+        + ("" if running or user_loop.is_running(chat_id) else "⏸ <i>Bot stopped — tap ▶️ to start.</i>"),
+        _dashboard_keyboard(chat_id))
+
+
+def _handle_autopilot(chat_id, args):
+    """Full hands-off mode: the bot picks the instruments itself from a curated
+    liquid universe (validated against the client's broker) and trades the
+    strongest setup anywhere — one position at a time."""
+    arg = (args or "").strip().lower()
+    user = user_store.load(chat_id)
+    if arg in ("off", "stop", "0", "false"):
+        user_store.update(chat_id, {"autopilot": False})
+        running = _restart_user_loop(chat_id)
+        return send_to(chat_id,
+            "🤖 <b>Auto-Pilot OFF.</b> Back to your chosen instrument (/symbol) or basket (/watch).",
+            _dashboard_keyboard(chat_id))
+    if arg not in ("on", "start", "1", "true", ""):
+        return send_to(chat_id, "Usage: <code>/autopilot on</code> or <code>/autopilot off</code>")
+    # Validate the candidate universe against what THIS broker actually offers.
+    universe = []
+    is_ct = bool(user.get("ctrader_access_token") and user.get("ctrader_account_id"))
+    if is_ct:
+        send_to(chat_id, "🤖 Setting up Auto-Pilot — checking which instruments your broker offers…")
+        try:
+            from apex import user_loop as _ul
+            br, _ = _ul._make_broker(user)
+            br._load_symbols()
+            offered = set(br._sym_id.keys())
+            universe = [c for c in _AUTOPILOT_CANDIDATES if c in offered]
+        except Exception as e:
+            return send_to(chat_id, f"⚠️ Couldn't read your broker's instruments: <i>{str(e)[:120]}</i>. Try again in a minute.")
+    else:
+        universe = ["EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "XAU_USD"]
+    if not universe:
+        return send_to(chat_id, "⚠️ Couldn't build the Auto-Pilot list for your broker. Use /watch to pick instruments manually.")
+    universe = universe[:8]
+    user_store.update(chat_id, {"autopilot": True, "autopilot_universe": universe})
+    running = _restart_user_loop(chat_id)
+    send_to(chat_id,
+        "🤖 <b>Auto-Pilot ON.</b>\n\n"
+        f"I'll scan these every cycle and trade the strongest setup anywhere — one position at a time:\n"
+        f"<b>{' · '.join(universe)}</b>\n\n"
+        "You stay in control: /symbol or /watch to take over, /autopilot off to stop."
+        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot stopped — tap ▶️ to start.</i>"),
+        _dashboard_keyboard(chat_id))
+
+
+def _handle_watch(chat_id, args):
+    """Basket scanner: watch up to 6 instruments — ANY the broker offers —
+    and enter only the strongest setup per cycle, one position at a time."""
+    raw = (args or "").strip()
+    user = user_store.load(chat_id)
+    if not raw:
+        wl = user.get("watchlist") or []
+        cur = " · ".join(wl) if wl else "— (single-symbol mode)"
+        return send_to(chat_id,
+            f"👁 <b>Watchlist:</b> {cur}\n\n"
+            "Usage:\n"
+            "<code>/watch XAUUSD EURUSD GBPUSD</code> — scan a basket (max 6, anything from /pairs)\n"
+            "<code>/watch off</code> — back to single-symbol mode\n\n"
+            "<i>The bot shops the whole basket every cycle and trades only the strongest "
+            "setup — never more than one open position.</i>")
+    if raw.lower() in ("off", "clear", "none"):
+        user_store.update(chat_id, {"watchlist": []})
+        running = _restart_user_loop(chat_id)
+        return send_to(chat_id, "👁 Watchlist cleared — back to single-symbol mode (/symbol)."
+                       + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot stopped — /start to run.</i>"))
+    syms = [w.upper().replace("/", "_").replace("-", "_") for w in raw.split()][:6]
+    is_ct = bool(user.get("ctrader_access_token") and user.get("ctrader_account_id"))
+    if is_ct:
+        try:
+            from apex import user_loop as _ul
+            br, _ = _ul._make_broker(user)
+            bad = []
+            for sym in syms:
+                try:
+                    br._symbol_id(sym)
+                except ValueError:
+                    bad.append(sym)
+            if bad:
+                return send_to(chat_id, f"❌ Your broker doesn't offer: <b>{', '.join(bad)}</b>. "
+                                        "Check /pairs and try again.")
+        except Exception as e:
+            return send_to(chat_id, f"⚠️ Couldn't verify the symbols right now: <i>{str(e)[:120]}</i>. Try again in a minute.")
+    user_store.update(chat_id, {"watchlist": syms})
+    running = _restart_user_loop(chat_id)
+    send_to(chat_id,
+            f"👁 <b>Watchlist set:</b> {' · '.join(syms)}\n\n"
+            "Every cycle I scan all of them and take only the strongest setup — "
+            "one open position at a time, risk rules unchanged."
+            + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot stopped — send /start to begin.</i>"))
+
+
+def _handle_pairs(chat_id):
+    """List everything the client's linked cTrader account can trade."""
+    user = user_store.load(chat_id)
+    if not (user.get("ctrader_access_token") and user.get("ctrader_account_id")):
+        return send_to(chat_id,
+            "💱 <b>Available pairs</b> (connect cTrader with /ctrader to see your broker's full list):\n"
+            "EUR_USD · GBP_USD · USD_JPY · AUD_USD · USD_CAD · NZD_USD · USD_CHF · EUR_GBP")
+    try:
+        from apex import user_loop as _ul
+        br, _ = _ul._make_broker(user)
+        br._load_symbols()
+        names = sorted(br._sym_id.keys())
+    except Exception as e:
+        return send_to(chat_id, f"⚠️ Couldn't load the symbol list: <i>{str(e)[:140]}</i>. Try again in a minute.")
+    if not names:
+        return send_to(chat_id, "⚠️ Your broker returned no tradable symbols. Check the account in cTrader.")
+    # Curate: a raw alphabetical dump starts with thousands of stock-CFD codes.
+    ccy = {"EUR", "USD", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "SEK", "NOK", "DKK",
+           "PLN", "CZK", "HUF", "TRY", "ZAR", "MXN", "SGD", "HKD", "CNH", "NOK", "RON"}
+    fx      = [n for n in names if len(n) == 6 and n[:3] in ccy and n[3:] in ccy]
+    metals  = [n for n in names if n.startswith(("XAU", "XAG", "XPT", "XPD"))]
+    crypto  = [n for n in names if n[:3] in {"BTC", "ETH", "SOL", "XRP", "ADA", "LTC", "BNB", "DOT", "BCH", "DOG"}]
+    indices = [n for n in names if re.match(r"^[A-Z]{2,6}\d{2,3}$", n) and n not in fx]
+    other   = len(names) - len(fx) - len(metals) - len(crypto) - len(indices)
+    def _sec(title, lst, cap):
+        if not lst:
+            return ""
+        cut = lst[:cap]
+        extra = f" <i>+{len(lst) - cap} more</i>" if len(lst) > cap else ""
+        return f"\n<b>{title}</b>\n{' · '.join(cut)}{extra}\n"
+    send_to(chat_id,
+            f"💱 <b>Your broker offers {len(names)} instruments.</b> The bot can trade any of them:\n"
+            + _sec("Forex", fx, 36)
+            + _sec("Metals", metals, 8)
+            + _sec("Indices", indices, 14)
+            + _sec("Crypto CFDs", crypto, 14)
+            + (f"\n…plus <b>{other}</b> stock CFDs &amp; other instruments — find the code in cTrader "
+               "and set it directly.\n" if other > 0 else "")
+            + "\nPick one with <code>/symbol NAME</code> (e.g. <code>/symbol XAUUSD</code>).\n"
+              "<i>Metals, indices and crypto pip conventions are handled automatically — still, watch a new symbol in paper first.</i>")
+
+
+def _trade_err(err):
+    """Human explanation for the errors clients actually hit."""
+    e = str(err or "?")
+    if "permission" in e.lower():
+        return (e + "\n\n💡 Your cTrader authorization is <b>read-only</b>. "
+                "Send /ctrader and approve again — the new link requests <b>trading</b> access. "
+                "(If it still says read-only, the operator must set CTRADER_SCOPE=trading and redeploy.)")
+    if "not offered" in e.lower():
+        return e + "\n\n💡 Send /pairs to see what your broker offers."
+    return e
+
+
+def send_photo(chat_id, png, caption=""):
+    """Send a PNG to the chat (used for /chart and entry snapshots)."""
+    try:
+        requests.post(f"{_API}/sendPhoto",
+                      data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
+                      files={"photo": ("chart.png", png, "image/png")}, timeout=25)
+    except Exception as e:
+        print(f"[TELEGRAM] send_photo failed: {e}")
+
+
+def _send_chart_async(chat_id, symbol=None, position=None, caption=""):
+    """Render + send the chart without blocking the caller (alerts, commands)."""
+    def run():
+        try:
+            from apex import chart, user_loop as _ul
+            user = user_store.load(chat_id)
+            sym = symbol or user.get("symbol", cfg.SYMBOL)
+            br, ucfg = _ul._make_broker(user)
+            candles = br.get_candles(sym, ucfg.TIMEFRAME, 130)
+            if not candles:
+                return send_to(chat_id, "⚠️ No chart data available right now.")
+            pos = position
+            if pos is None:
+                dash = _ul.get_dash(chat_id) or {}
+                pos = dash.get("openPosition")
+            png = chart.render(candles, sym, ucfg.TIMEFRAME, pos)
+            send_photo(chat_id, png, caption)
+        except Exception as e:
+            print(f"[TELEGRAM] chart failed: {e}")
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _handle_atr(chat_id, args):
+    on = (args or "").strip().lower() in ("on", "true", "1", "yes")
+    user_store.update(chat_id, {"atr_stops": on})
+    running = _restart_user_loop(chat_id)
+    if on:
+        msg = ("📐 <b>Dynamic ATR stops ON</b> — SL = 1.5×ATR, TP = 3×ATR: distances "
+               "breathe with the market's volatility instead of fixed pips. "
+               "Position size still respects your /risk %.")
+    else:
+        msg = "📏 Dynamic ATR stops <b>OFF</b> — using your fixed /sl and /tp pip distances."
+    if not running and not user_loop.is_running(chat_id):
+        msg += "\n⏸ <i>The bot is stopped — send /start to apply.</i>"
+    send_to(chat_id, msg)
+
+
+def _handle_resetstats(chat_id):
+    """Wipe the trade journal + in-memory skip/streak counters for a clean run."""
+    user_store.clear_trades(chat_id)
+    dash = user_loop.get_dash(chat_id)
+    if dash:
+        dash["trades"] = []
+        dash["skips"] = []
+        dash["skipsToday"] = 0
+        dash["startBalance"] = dash.get("balance", dash.get("startBalance", 0))
+    send_to(chat_id,
+        "🧹 <b>Journal reset — clean slate.</b>\n\n"
+        "Performance stats now start fresh from this moment. Let the bot run "
+        "undisturbed and check /stats in a week or two — that's the real,\n"
+        "bug-free track record to judge it on.",
+        _dashboard_keyboard(chat_id))
+
+
+def _handle_stats(chat_id):
+    """Performance report from the persistent trade journal (premium spec #10)."""
+    from apex import stats as stats_mod
+    trades = user_store.load_trades(chat_id)
+    dash = user_loop.get_dash(chat_id) or {}
+    st = stats_mod.compute(trades, dash.get("skipsToday", 0))
+    if not st["trades"]:
+        return send_to(chat_id, "📊 No closed trades in the journal yet — run the bot and stats will build up here.")
+    pf = st["profitFactor"]
+    pf_s = "∞" if pf == float("inf") else (f"{pf:.2f}" if pf is not None else "—")
+    def money(v):
+        return f"+${v:,.2f}" if v >= 0 else f"−${abs(v):,.2f}"
+    t = st["today"]
+    send_to(chat_id,
+            f"📊 <b>Performance</b> — last {st['trades']} closed trades\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"Closed trades: <b>{n}</b>   Win rate: <b>{wr:.0f}%</b>\n"
-            f"Gross P&amp;L: <b>${gross:.2f}</b>\n"
-            f"Fees (maker/taker): <b>−${fees:.2f}</b>\n"
-            f"<b>NET P&amp;L: {'+' if net >= 0 else ''}${net:.2f}</b>\n"
+            f"✅ {st['wins']}W / ❌ {st['losses']}L · Win rate <b>{st['winRate']:.0f}%</b>\n"
+            f"⚖️ Profit factor: <b>{pf_s}</b> · Net: <b>{money(st['netPnl'])}</b>\n"
+            f"📈 Avg win {money(st['avgWin'])} · Avg loss {money(st['avgLoss'])}\n"
+            f"🏆 Best {money(st['best'])} · 💥 Worst {money(st['worst'])}\n"
+            f"📉 Max drawdown: <b>{st['maxDrawdownPct']:.1f}%</b>\n\n"
+            f"<b>Today:</b> {t['trades']} trades · {money(t['netPnl'])} · "
+            f"{t['skips']} weak setups rejected 🛡\n\n"
+            f"<i>Full breakdown, equity curve &amp; rejection journal: /terminal</i>")
+
+
+def _handle_terminal(chat_id):
+    """Open the Telegram Mini App — live interactive chart, position, news."""
+    base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+    if not base:
+        return send_to(chat_id, "⚠️ Terminal URL not configured (RENDER_EXTERNAL_URL).")
+    send_to(chat_id,
+            "📈 <b>Apex Terminal</b>\n\n"
+            "Live interactive chart (pinch to zoom, drag to pan), your position with "
+            "entry/SL/TP lines, balance, upcoming market events and your trade history — "
+            "all in one screen.",
+            extra={"reply_markup": {"inline_keyboard": [[
+                {"text": "📈 Open Terminal", "web_app": {"url": f"{base}/app"}}]]}})
+
+
+def _handle_chart(chat_id, args=None):
+    sym = (args or "").strip().upper().replace("/", "_").replace("-", "_") or None
+    send_to(chat_id, "🖼 Rendering your chart…")
+    _send_chart_async(chat_id, symbol=sym or None,
+                      caption="Live view — candles, EMA 20/50" +
+                              (", entry/SL/TP" if not sym else ""))
+
+
+def _handle_buy(chat_id, args):
+    sym = (args or "").strip().upper().replace("/", "_").replace("-", "_")
+    if not sym:
+        user = user_store.load(chat_id)
+        sym = user.get("symbol", cfg.SYMBOL)
+    send_to(chat_id, f"⚡ Opening <b>BUY {sym}</b>…")
+    result = user_loop.force_trade(str(chat_id), "BUY", sym)
+    if result.get("ok"):
+        send_to(chat_id,
+                f"✅ <b>BUY {sym}</b> entered\n"
+                f"Price: <b>{result['price']:.5f}</b> | Units: {result['units']}\n"
+                f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
+                f"Spread: {result['spread']}p")
+    else:
+        send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}")
+
+
+def _handle_sell(chat_id, args):
+    sym = (args or "").strip().upper().replace("/", "_").replace("-", "_")
+    if not sym:
+        user = user_store.load(chat_id)
+        sym = user.get("symbol", cfg.SYMBOL)
+    send_to(chat_id, f"⚡ Opening <b>SELL {sym}</b>…")
+    result = user_loop.force_trade(str(chat_id), "SELL", sym)
+    if result.get("ok"):
+        send_to(chat_id,
+                f"✅ <b>SELL {sym}</b> entered\n"
+                f"Price: <b>{result['price']:.5f}</b> | Units: {result['units']}\n"
+                f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
+                f"Spread: {result['spread']}p")
+    else:
+        send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}")
+
+
+def _handle_close(chat_id):
+    result = user_loop.force_close(str(chat_id))
+    if result.get("ok"):
+        net = result.get("netPnl", 0)
+        icon = "✅" if net >= 0 else "❌"
+        send_to(chat_id,
+                f"🔒 <b>Position closed</b>\n"
+                f"Price: <b>{result.get('price', '—')}</b>\n"
+                f"{icon} Net P&amp;L: <b>{'+' if net >= 0 else ''}${net:.2f}</b> "
+                f"<i>(gross ${result.get('grossPnl', 0):.2f} − cost ${result.get('costUsd', 0):.2f})</i>")
+    else:
+        send_to(chat_id, f"❌ {result.get('error', 'No open position')}")
+
+
+def _handle_deploy(chat_id):
+    import subprocess
+    import threading
+    send_to(chat_id, "🔄 <b>Deploying latest code...</b>\n<i>This takes ~30 seconds.</i>")
+    pull_cmd = " && ".join([
+        "export PATH=/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/bin:/sbin:$PATH",
+        "cd /opt/apex-forex",
+        "git fetch origin claude/arcads-external-api-gExX7",
+        "git reset --hard origin/claude/arcads-external-api-gExX7",
+        "cd apex-forex-bot",
+        "pip3 install -q -r requirements.txt",
+    ])
+
+    def _run():
+        result = subprocess.run(pull_cmd, shell=True, executable="/bin/bash",
+                                capture_output=True, text=True, timeout=110)
+        if result.returncode != 0:
+            send_to(chat_id, f"❌ <b>Deploy failed:</b>\n<code>{(result.stderr or result.stdout)[:500]}</code>")
+            return
+        send_to(chat_id, "✅ <b>Deploy successful!</b> Restarting Forex Bot...\n\nSend /status when ready.")
+        import time
+        time.sleep(1)
+        subprocess.run("systemctl restart apex-forex", shell=True, executable="/bin/bash")
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _handle_grant(chat_id, args):
+    target = (args or "").strip()
+    if not target.lstrip("-").isdigit():
+        return send_to(chat_id, "❌ Usage: <code>/grant 123456789</code>")
+    if access.grant(target):
+        send_to(chat_id, f"✅ Access granted to <code>{target}</code>.")
+        send_to(target, f"✅ <b>You now have access to {cfg.BOT_NAME}!</b>\nSend /status to check trading.")
+    else:
+        send_to(chat_id, f"ℹ️ <code>{target}</code> already has access.")
+
+
+def _handle_revoke(chat_id, args):
+    target = (args or "").strip()
+    if not target.lstrip("-").isdigit():
+        return send_to(chat_id, "❌ Usage: <code>/revoke 123456789</code>")
+    if access.revoke(target):
+        send_to(chat_id, f"✅ Access revoked for <code>{target}</code>.")
+        send_to(target, f"⛔ Your access to {cfg.BOT_NAME} has been revoked.")
+    else:
+        send_to(chat_id, f"ℹ️ <code>{target}</code> not found or is an admin.")
+
+
+def _handle_users(chat_id):
+    admins  = access.list_admins()
+    clients = access.list_clients()
+    admin_lines  = "\n".join(f"👑 {a}" for a in admins) or "—"
+    client_lines = "\n".join(f"✅ {c}" for c in clients) or "— none yet —"
+    send_to(chat_id,
+            f"👥 <b>ACCESS LIST</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"<b>Last {min(10, n)} trades:</b>\n" + "\n".join(rows) + "\n"
-            f"<i>Each trade is logged with entry, exit, fees and net P&amp;L for taxes.</i>")
+            f"<b>Admins:</b>\n{admin_lines}\n\n"
+            f"<b>Paying clients ({len(clients)}):</b>\n{client_lines}\n\n"
+            f"<code>/grant ID</code> — give access\n"
+            f"<code>/revoke ID</code> — remove access")
 
 
-_HELP = ("📋 <b>APEX TRADE BOT</b>\n━━━━━━━━━━━━━━━━━━━━\n"
-         "Your AI bot trades crypto automatically. Just set it and watch.\n\n"
-         "<b>Controls:</b>\n/menu · /status · /market · /signal · /config · /trades · /report · /news\n\n"
-         "<b>📡 Market Pulse:</b>\n/market — how the market is moving now (volatility, volume, trend, funding)\n\n"
-         "<b>🤖 Copilot vs Autopilot:</b>\n"
-         "/copilot on — bot suggests trades, you tap ✅ Approve before it opens\n"
-         "/copilot off — bot trades automatically (default)\n\n"
-         "<b>📰 News:</b>\n/news — high-impact events; the bot stays flat around them\n\n"
-         "<b>Settings (you choose everything):</b>\n"
-         "/symbol BTCUSDT — <b>ANY</b> of 600+ Binance pairs (PEPEUSDT, WIFUSDT, …)\n"
-         "/method auto|turtle|livermore|soros|ptj|druckenmiller\n"
-         "/risk 5 — % per trade\n/sl 1.6 — stop loss %\n/tp 3.2 — take profit %\n/confidence 70 — min AI confidence\n\n"
-         "<b>🔄 Switch Paper ↔ Real:</b>\n/pause first, then /setup → pick the mode. "
-         "Paper and real are fully separate.\n\n"
-         "<b>🤖 DCA Bot (3Commas-style):</b>\n"
-         "/dca — show DCA status &amp; settings\n"
-         "/dca on · /dca off — enable/disable\n"
-         "/dca base 5 — base order % · /dca safety 3 — safety order %\n"
-         "/dca step 2.5 — % drop per safety · /dca tp 2 — take profit %\n"
-         "/dca max 3 — max safety orders\n\n"
-         "<b>📊 Grid Bot (passive income):</b>\n"
-         "/grid — show grid status &amp; settings\n"
-         "/grid on · /grid off — enable/disable\n"
-         "/grid lower 95000 · /grid upper 105000 — set price range\n"
-         "/grid levels 10 — number of grid lines · /grid step 2 — order size %\n"
-         "/grid stop — cancel active grid\n\n"
-         "<b>Manual trading:</b>\n/buy XRPUSDT — open LONG\n/sell ETHUSDT — open SHORT\n/close — close open position\n\n"
-         "<b>Run:</b>\n/pause · /resume\n\n"
-         "<b>Account:</b>\n/setup — switch paper ↔ real, re-run onboarding\n\n"
-         "<b>💬 Smart assistant:</b>\nJust talk to me! \"analyze BTC\", \"buy ETH\", \"close position\"\n"
-         "/ai — connect your own FREE AI key (Gemini / Groq / Claude) for unlimited chat\n"
-         "/gemini AIza-KEY — FREE chat + analysis, 1500/day (aistudio.google.com)\n"
-         "/groq gsk_KEY — free fast chat (console.groq.com)\n"
-         "/claude sk-ant-KEY — full chat + trade execution (console.anthropic.com)")
-
-
-# ─── Alerts (per-user callback) ───────────────────────────
-def _why_block(data) -> str:
+def _fx_why_block(result) -> str:
     """Human-readable 'why I took this trade' block for open alerts."""
     parts = []
-    conf = data.get("confidence")
-    if conf is not None:
-        parts.append(f"🎯 Confidence: {conf:.0f}%")
-    reasoning = (data.get("reasoning") or "").strip()
+    reasoning = (result.get("reasoning") or "").strip()
     if reasoning:
         parts.append(f"🧠 <i>{reasoning}</i>")
-    factors = data.get("keyFactors") or []
+    factors = result.get("keyFactors") or []
     if factors:
         parts.append("📊 " + " · ".join(str(f) for f in factors[:4]))
     return ("\n" + "\n".join(parts)) if parts else ""
 
 
-def _close_why(reason: str) -> str:
+def _fx_close_why(reason: str) -> str:
     """Plain-language explanation for a mechanical (non-AI) close."""
     m = {
         "TAKE_PROFIT": "Target reached — locking in the profit.",
         "STOP_LOSS": "Stop hit — cutting the loss to protect capital.",
-        "MANUAL_CLOSE": "Closed manually at your request.",
         "AI_CLOSE": "The AI judged the setup had played out.",
     }
     txt = m.get(reason, "")
     return f"\n🧠 <i>{txt}</i>" if txt else ""
 
 
-def make_alert(chat_id):
-    def alert(kind, data):
-        if kind == "open":
-            d = "🟢 LONG" if data["side"] == "BUY" else "🔴 SHORT"
-            mult = f"\n📐 Druckenmiller: ×{data['druckMult']:.2f}" if data.get("druckMult", 1) != 1 else ""
-            send_to(chat_id, f"{d} <b>OPENED — {data['symbol']}</b>\n"
-                             f"💰 Entry: ${data['price']:.4f}  Qty: {data['qty']}\n"
-                             f"🛡 SL: ${data['stopLoss']:.4f}  🎯 TP: ${data['takeProfit']:.4f}{mult}"
-                             + _why_block(data))
-        elif kind == "close":
-            icons = {"TAKE_PROFIT": "🎯 TAKE PROFIT", "STOP_LOSS": "🛑 STOP LOSS", "AI_CLOSE": "🤖 AI CLOSE"}
-            why = (f"\n🧠 <i>{data['reasoning']}</i>" if data.get("reasoning")
-                   else _close_why(data.get("reason", "")))
-            send_to(chat_id, f"{'✅' if data['pnl'] > 0 else '❌'} <b>{icons.get(data['reason'], data['reason'])} — {data['symbol']}</b>\n"
-                             f"${data['entryPrice']:.4f} → ${data['exitPrice']:.4f}\n"
-                             f"PnL: <b>{'+' if data['pnl'] >= 0 else ''}${data['pnl']:.4f}</b>  💼 ${data['balance']:.2f}"
-                             + why)
-        elif kind == "market_pulse":
-            send_to(chat_id,
-                    f"📡 <b>Market Pulse — {data['symbol']}</b>\n"
-                    f"Volatility: <b>{data['volatility']}</b> · Volume: <b>{data['volume']}</b>\n"
-                    f"Trend: {data['trend']} · Momentum: {data['momentum']}\n"
-                    "<i>Conditions just shifted — trade with extra care.</i>")
-        elif kind == "flash_warn":
-            send_to(chat_id,
-                    f"🚨 <b>Extreme volatility on {data['symbol']}</b>\n"
-                    "<i>A violent price spike just printed — opening into it is too risky.</i>\n"
-                    "Trading pauses until the market settles.")
-        elif kind == "news_warn":
-            ev = data.get("event", {})
-            send_to(chat_id,
-                    f"📰 <b>High-impact news — staying flat on {data['symbol']}</b>\n"
-                    f"<i>{ev.get('currency', 'USD')} · {ev.get('title', 'event')} in ~{ev.get('mins', 0)} min.</i>\n"
-                    "Macro releases whipsaw crypto — I'll resume once it passes.")
-        elif kind == "skip_warn":
-            send_to(chat_id,
-                    f"⚠️ <b>Holding off on {data['symbol']}</b>\n"
-                    f"<i>A {data['wanted']} setup appeared, but the {data['trend'].lower()} structure is "
-                    f"strong ({data['strength']}%) — trading against it is low-probability.</i>\n"
-                    "I'll act when the trend and signal line up.")
-        elif kind == "suggest":
-            d = "🟢 BUY" if data["side"] == "BUY" else "🔴 SELL"
-            kb = {"reply_markup": json.dumps({"inline_keyboard": [[
-                {"text": "✅ Approve", "callback_data": "cp:y"},
-                {"text": "❌ Reject", "callback_data": "cp:n"}]]})}
-            send_to(chat_id,
-                    f"🤖 <b>Copilot suggestion</b>\n{d} <b>{data['symbol']}</b> @ ${data['price']:.4f}"
-                    + _why_block(data) +
-                    "\n\n<i>You're in copilot mode — approve to execute, or reject to skip.</i>",
-                    kb)
-        elif kind == "heartbeat":
-            p = data["openPosition"]
-            line = (f"{'🟢' if p['side'] == 'BUY' else '🔴'} {p['symbol']} @ ${p['entryPrice']:.4f}  "
-                    f"PnL: {'+' if p.get('currentPnl', 0) >= 0 else ''}${p.get('currentPnl', 0):.4f}")
-            send_to(chat_id, f"💓 Tick #{data['tickCount']}  💼 ${data['balance']:.2f}\n{line}")
-        elif kind == "risk_pause":
-            send_to(chat_id, "🛡️ <b>Risk pause</b> — protecting your capital.\n"
-                             + "\n".join(f"• {r}" for r in data["reasons"])
-                             + f"\n\n<i>Auto-resumes in {cfg.RISK_PAUSE_MIN} min, or tap ▶️ Start Trading to resume now.</i>")
-        elif kind == "risk_resume":
-            send_to(chat_id, "▶️ <b>Trading resumed</b> — risk pause over, scanning the market again. 🚀")
-        elif kind == "scan":
-            sig = user_loop._ensure_user(chat_id).get("state", {}).get("lastSignal")
-            sig_txt = (f"🤖 Last signal: <b>{sig['action']}</b> ({sig['confidence']:.0f}% conf)"
-                       if sig else "🤖 Scanning for setups…")
-            send_to(chat_id, f"⚡ <b>Bot active</b> — ${data['balance']:.2f} · {data['symbol']} · tick #{data['tickCount']}\n{sig_txt}")
-        elif kind == "groq_error":
-            reason = data.get("reason", "")
-            if reason == "GROQ_KEY_QUOTA":
-                send_to(chat_id,
-                        "⏳ <b>Groq daily limit reached.</b> The bot keeps trading on its "
-                        "rule-based engine (Turtle + Livermore + Soros) — no action needed.\n\n"
-                        "💡 <b>Want unlimited AI chat?</b> Add a free Gemini key — 1,500/day, "
-                        "no per-minute limits:\n"
-                        "1. aistudio.google.com → <i>Get API key</i>\n"
-                        "2. Send <code>/gemini YOUR_KEY</code> here\n\n"
-                        "<i>(You'll only see this message once every ~30 min.)</i>")
-            else:
-                send_to(chat_id, "⚠️ <b>Groq key invalid.</b> Get a new free key at console.groq.com → API Keys, "
-                                 "then send /groq gsk_NEW_KEY")
-        elif kind == "auto_symbol":
-            icon = "🟢" if data["action"] == "BUY" else "🔴"
-            send_to(chat_id,
-                    f"🔍 <b>Best setup found: {data['symbol']}</b>\n"
-                    f"{icon} Signal: <b>{data['action']}</b>  Confidence: {data['confidence']:.0f}%\n"
-                    f"<i>{data.get('reasoning', '')}</i>")
-        elif kind == "grid_start":
-            send_to(chat_id,
-                    f"📊 <b>Grid Bot started — {data['symbol']}</b>\n"
-                    f"Range: ${data['lower']:.4f} – ${data['upper']:.4f}  ({data['levels']} levels)\n"
-                    f"Grid step: ${data['step']:.4f}  Profit per round-trip: ~${data['step']:.4f}/unit")
-        elif kind == "grid_fill":
-            sign = "+" if data["pnl"] >= 0 else ""
-            send_to(chat_id,
-                    f"💹 <b>Grid {data['type']}</b> — {data['symbol']} @ ${data['price']:.4f}\n"
-                    f"Trip #{data['round_trips']}  Profit: <b>{sign}${data['pnl']:.4f}</b>  "
-                    f"Total: ${data['total_pnl']:.4f}")
-        elif kind == "grid_out_of_range":
-            sign = "+" if data["total_pnl"] >= 0 else ""
-            send_to(chat_id,
-                    f"⚠️ <b>Grid stopped — price left range</b>\n"
-                    f"{data['symbol']} @ ${data['price']:.4f}  "
-                    f"(range was ${data['lower']:.4f}–${data['upper']:.4f})\n"
-                    f"Total P&L: <b>{sign}${data['total_pnl']:.4f}</b>  "
-                    f"Round-trips: {data['round_trips']}\n"
-                    f"/grid on — restart with new auto-range")
-        elif kind == "dca_open":
-            side_icon = "🟢 LONG" if data["side"] == "BUY" else "🔴 SHORT"
-            safety_prices = "  |  ".join(f"${p:.2f}" for p in data["safety_orders"])
-            send_to(chat_id,
-                    f"🤖 <b>DCA Deal opened</b> — {side_icon} <b>{data['symbol']}</b>\n"
-                    f"Base entry: ${data['base_price']:.4f}  Qty: {data['base_qty']}\n"
-                    f"Take profit: ${data['take_profit_price']:.4f}  (+{data['tp_pct']:.1f}%)\n"
-                    f"Safety levels: {safety_prices}\n"
-                    + (f"Stop loss: ${data['stop_loss_price']:.4f}" if data.get("stop_loss_price") else ""))
-        elif kind == "dca_safety":
-            sign = "+" if data["pnl_pct"] >= 0 else ""
-            send_to(chat_id,
-                    f"🔄 <b>DCA Safety #{data['index']}</b> triggered — <b>{data['symbol']}</b>\n"
-                    f"Filled @ ${data['price']:.4f}  New avg: ${data['avg_entry']:.4f}\n"
-                    f"New TP: ${data['take_profit_price']:.4f}  "
-                    f"Safety: {data['safety_filled']}/{data['max_safety']}\n"
-                    f"PnL so far: {sign}{data['pnl_pct']:.2f}%")
-        elif kind == "dca_close":
-            sign = "+" if data["pnl"] >= 0 else ""
-            icon = {"TAKE_PROFIT": "✅", "STOP_LOSS": "🛑"}.get(data["reason"], "🔵")
-            send_to(chat_id,
-                    f"{icon} <b>DCA Deal closed — {data['symbol']}</b>\n"
-                    f"Avg entry: ${data['avg_entry']:.4f} → Exit: ${data['exit_price']:.4f}\n"
-                    f"Safety fills: {data['safety_filled']}  "
-                    f"PnL: <b>{sign}${data['pnl']:.4f} ({sign}{data['pnl_pct']:.2f}%)</b>\n"
-                    f"Balance: ${data['balance']:.2f}")
-        elif kind == "error":
-            sym = data.get("symbol", "")
-            send_to(chat_id,
-                    f"⚠️ <b>Order not placed{f' — {sym}' if sym else ''}</b>\n"
-                    f"{data.get('message', 'unknown error')}")
-    return alert
+def _user_alert(uid, result):
+    """Per-user trade/heartbeat/error alert — module-level so setup auto-start,
+    /start and auto-restore all share the same notification formatting."""
+    action = result.get("action", "")
+    sym = result.get("symbol", cfg.SYMBOL)
+    if action == "HEARTBEAT":
+        send_to(uid,
+                f"💓 <b>Bot alive</b> — {sym}\n"
+                f"Price: <b>{result.get('price', '—')}</b> | "
+                f"Balance: <b>${result.get('balance', 0):.2f}</b>"
+                f"{result.get('posInfo', '')}")
+    elif action == "AI_ERROR":
+        send_to(uid,
+                f"⚠️ <b>AI temporarily unavailable</b>\n"
+                f"Bot continues with rule-based signals — trading is not interrupted.\n"
+                f"<i>{result.get('reason', '')[:120]}</i>")
+    elif action == "DATA_ERROR":
+        send_to(uid,
+                f"⚠️ <b>Market data problem</b> — {sym}\n"
+                f"I can't fetch prices from <b>{result.get('broker', 'your broker')}</b>:\n"
+                f"<i>{result.get('reason', '')[:160]}</i>\n\n"
+                "I retry every 30s automatically. If this keeps up, "
+                "send /ctrader to re-connect your account.")
+    elif action == "STOP":
+        reasons = ", ".join(result.get("reasons", ["risk limit"]))
+        send_to(uid, f"🛑 <b>Trading paused — risk limit hit</b>\n{reasons}")
+    elif action == "SKIP_WARN":
+        send_to(uid, f"⚠️ <b>Holding off on {result.get('symbol', sym)}</b>\n"
+                     f"<i>{result.get('reason', 'market conditions are unfavourable right now')}.</i>\n"
+                     "I'll take the trade as soon as conditions normalise.")
+    elif action == "MARKET_PULSE":
+        vol = f" · Volume: <b>{result['volume']}</b>" if result.get("volume") else ""
+        send_to(uid,
+                f"📡 <b>Market Pulse — {result.get('symbol', sym)}</b>\n"
+                f"Volatility: <b>{result.get('volatility')}</b>{vol}\n"
+                f"Trend: {result.get('trend')} · Momentum: {result.get('momentum')}\n"
+                "<i>Conditions just shifted — trade with extra care.</i>")
+    elif action == "FLASH_WARN":
+        send_to(uid, f"🚨 <b>Extreme volatility on {result.get('symbol', sym)}</b>\n"
+                     "<i>A violent price spike just printed — opening into it is too risky.</i>\n"
+                     "Trading pauses until the market settles.")
+    elif action == "NEWS_WARN":
+        ev = result.get("event", {})
+        send_to(uid, f"📰 <b>High-impact news — staying flat on {result.get('symbol', sym)}</b>\n"
+                     f"<i>{ev.get('currency', '')} · {ev.get('title', 'event')} in ~{ev.get('mins', 0)} min.</i>\n"
+                     "Spreads blow out and price gaps around releases — I'll resume once it passes.")
+    elif action == "SUGGEST":
+        d = "🟢 BUY" if result.get("side") == "BUY" else "🔴 SELL"
+        send_to(uid,
+                f"🤖 <b>Copilot suggestion</b>\n{d} <b>{sym}</b> @ {result.get('price', '—')}"
+                + _fx_why_block(result) +
+                "\n\n<i>You're in copilot mode — approve to execute, or reject to skip.</i>",
+                extra={"reply_markup": {"inline_keyboard": [[
+                    {"text": "✅ Approve", "callback_data": "cp:y"},
+                    {"text": "❌ Reject", "callback_data": "cp:n"}]]}})
+    elif action in ("BUY", "SELL"):
+        spread = result.get("spreadPips")
+        spread_line = f" | Spread: {spread}p" if spread is not None else ""
+        d = "🟢 LONG" if action == "BUY" else "🔴 SHORT"
+        rr_line = ""
+        try:
+            sl_, tp_, px_ = result.get("stopLoss"), result.get("takeProfit"), result.get("price")
+            if sl_ and tp_ and px_ and abs(px_ - sl_) > 0:
+                rr_line = f"\n🎯 SL <b>{sl_:g}</b> · TP <b>{tp_:g}</b> · RR <b>1:{abs(tp_ - px_) / abs(px_ - sl_):.1f}</b>"
+        except (TypeError, ValueError):
+            pass
+        send_to(uid,
+                f"{d} <b>{action}</b> — {sym}\n"
+                f"Price: <b>{result.get('price', '—')}</b> | "
+                f"Confidence: <b>{result.get('confidence', 0)}%</b>{spread_line}{rr_line}"
+                + _fx_why_block(result))
+        _send_chart_async(uid, symbol=sym, position={
+            "side": action, "entryPrice": result.get("price"),
+            "stopLoss": result.get("stopLoss"), "takeProfit": result.get("takeProfit")},
+            caption=f"{d} {sym} — entry, SL &amp; TP on the chart")
+    elif action == "CLOSE":
+        net = result.get("netPnl")
+        _reason_lbl = {"STOP_LOSS": "🛑 Stop loss hit",
+                       "TAKE_PROFIT": "🎯 Take profit hit"}.get(result.get("reason"))
+        why = (f"\n🧠 <i>{result['reasoning']}</i>" if result.get("reasoning")
+               else _fx_close_why(result.get("reason", "")))
+        if net is not None:
+            icon = "✅" if net >= 0 else "❌"
+            head = f"🔒 <b>Position closed</b> — {sym}"
+            if _reason_lbl:
+                head = f"{_reason_lbl} — {sym}"
+            send_to(uid,
+                    f"{head}\n"
+                    f"Exit: <b>{result.get('price', '—')}</b>\n"
+                    f"{icon} Net P&amp;L: <b>{'+' if net >= 0 else ''}${net:.2f}</b> "
+                    f"<i>(gross ${result.get('grossPnl', 0):.2f} − cost ${result.get('costUsd', 0):.2f})</i>\n"
+                    f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>"
+                    + why)
+        else:
+            send_to(uid,
+                    f"🔒 <b>Position closed</b> — {sym}\n"
+                    f"Price: <b>{result.get('price', '—')}</b>" + why)
+    elif action == "BROKER_CLOSE_MULTI":
+        send_to(uid,
+                f"🔒 <b>Position closed</b> — {sym}\n"
+                f"Hit its target or stop at the broker.\n"
+                f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>")
+    elif action == "BROKER_HEALTH":
+        if result.get("status") == "degraded":
+            send_to(uid,
+                    f"🩺 <b>Broker health warning</b> — {sym}\n"
+                    f"<i>{result.get('reason', 'execution conditions degraded')}</i>\n\n"
+                    "Entries are <b>suspended</b> until conditions normalise — degraded "
+                    "execution silently eats the edge. Open positions stay protected by their stops.")
+        else:
+            send_to(uid, f"🩺 <b>Broker conditions back to normal</b> — {sym}. Trading resumes.")
+    elif action == "BROKER_CLOSE":
+        pnl = result.get("netPnl")
+        icon = "✅" if (pnl or 0) >= 0 else "❌"
+        pnl_line = (f"{icon} Realized P&amp;L: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>\n"
+                    if pnl is not None else "")
+        send_to(uid,
+                f"🎯 <b>Your broker closed the position</b> — {sym}\n"
+                f"{result.get('side', '')} from <b>{result.get('entryPrice', '—')}</b> → "
+                f"≈ <b>{result.get('price', '—')}</b> (stop-loss or take-profit executed at cTrader)\n"
+                f"{pnl_line}"
+                f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>")
+    else:
+        send_to(uid, f"⚡ <b>{action}</b> — {sym}")
 
 
-def _ensure_running(chat_id):
+def _handle_report(chat_id):
+    """Trade journal summary — net P&L, costs, win rate. For tax reporting."""
+    trades = user_store.load_trades(chat_id)
+    if not trades:
+        return send_to(chat_id,
+                       "📒 <b>No closed trades yet.</b>\n"
+                       "Your tax journal fills up as the bot closes positions.")
+    total_net = sum(t.get("netPnl", 0) or 0 for t in trades)
+    total_cost = sum(t.get("costUsd", 0) or 0 for t in trades)
+    total_gross = sum(t.get("grossPnl", 0) or 0 for t in trades)
+    wins = sum(1 for t in trades if (t.get("netPnl", 0) or 0) > 0)
+    n = len(trades)
+    win_rate = wins / n * 100 if n else 0
+    lines = []
+    for t in trades[-10:][::-1]:
+        net = t.get("netPnl", 0) or 0
+        icon = "✅" if net >= 0 else "❌"
+        lines.append(f"{icon} {t.get('symbol','?')}  {t.get('entry','?')}→{t.get('exit','?')}  "
+                     f"<b>{'+' if net >= 0 else ''}${net:.2f}</b>  <i>{(t.get('time') or '')[:16]}</i>")
+    send_to(chat_id,
+            f"📒 <b>Trade Journal &amp; Tax Report</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Closed trades: <b>{n}</b>   Win rate: <b>{win_rate:.0f}%</b>\n"
+            f"Gross P&amp;L: <b>${total_gross:.2f}</b>\n"
+            f"Costs (spread): <b>−${total_cost:.2f}</b>\n"
+            f"<b>NET P&amp;L: {'+' if total_net >= 0 else ''}${total_net:.2f}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"<b>Last {min(10, n)} trades:</b>\n" + "\n".join(lines) + "\n"
+            f"<i>Every closed trade is logged with entry, exit, fees and net P&amp;L "
+            f"for your tax records.</i>")
+
+
+def _auto_start_user(chat_id):
+    """Start a user's trading loop with the shared alert function."""
+    if user_loop.is_running(chat_id):
+        return False
+    return user_loop.start(chat_id, alert_fn=_user_alert)
+
+
+def _restart_user_loop(chat_id):
+    """Restart a running loop so it rebuilds the broker from the user record.
+
+    The loop reads the user record + builds the broker ONCE at start
+    (user_loop._loop), so config changes like oanda_env only take effect on a
+    fresh loop. No-op if the user isn't currently trading.
+    """
     if not user_loop.is_running(chat_id):
-        user_loop.start(chat_id, make_alert(chat_id))
+        return False
+    user_loop.stop(chat_id)
+    return user_loop.start(chat_id, alert_fn=_user_alert)
 
 
-# ─── Command handling ─────────────────────────────────────
-def _upd(chat_id, key, value):
-    u = user_loop._ensure_user(chat_id)
-    u["settings"][key] = value
-    user_store.save(chat_id, u)
+def _handle_start(chat_id):
+    user = user_store.load(chat_id)
+    # Check user has credentials set up
+    if (not access.is_admin(str(chat_id)) and not user.get("paper")
+            and not (user.get("ctrader_access_token") and user.get("ctrader_account_id"))):
+        return send_to(chat_id,
+            "🔗 <b>First, connect your trading account.</b>\n\n"
+            "Tap below — it takes 30 seconds and then the bot sets itself up.",
+            extra={"reply_markup": {"inline_keyboard": [[
+                {"text": "🔗 Connect my account", "callback_data": "go:connect"}]]}})
+    if user_loop.is_running(chat_id):
+        return send_to(chat_id,
+            "✅ <b>Bot is already ON</b> — watching the market. It trades automatically when a valid setup appears.",
+            _dashboard_keyboard(chat_id))
+
+    _auto_start_user(chat_id)
+    send_to(chat_id,
+        "✅ <b>Bot is ON — trading now active.</b>\nIt watches the market and trades automatically on valid setups.",
+        _dashboard_keyboard(chat_id))
 
 
-def _handle_command(chat_id, text, msg_id=None):
-    parts = text.strip().split()
-    cmd = parts[0].lower().split("@")[0]
-    args = parts[1:]
-    is_adm = access.is_admin(str(chat_id))
-    s = _settings(chat_id)
-
-    if cmd == "/setup":
-        u = user_loop._ensure_user(chat_id)
-        u["setup_done"] = False
-        user_store.save(chat_id, u)
-        return send_to(chat_id,
-                       "🔄 <b>Setup reset.</b>\n\nHow do you want to trade?",
-                       _kb_mode())
-    if cmd in ("/start", "/menu", "/m"):
-        u = user_loop._ensure_user(chat_id)
-        if cmd == "/start" and not u.get("setup_done"):
-            return send_to(chat_id,
-                           "👋 <b>Welcome to APEX TRADE BOT!</b>\n\n"
-                           "Your AI-powered crypto trading bot is ready.\n"
-                           "Tap below to activate and configure it in 2 minutes.",
-                           _kb_activate())
-        _ensure_running(chat_id)
-        paused = u["settings"].get("PAUSED", False)
-        status = "⏸ PAUSED" if paused else "▶️ ACTIVE"
-        return send_to(chat_id,
-                       f"⚡ <b>APEX TRADE BOT</b> — {status}\n"
-                       f"Symbol: <b>{u['settings']['SYMBOL']}</b>  Strategy: <b>{u['settings']['STRATEGY_MODE']}</b>",
-                       _kb_menu(paused, u["settings"]["SYMBOL"]))
-    if cmd in ("/signal", "/sig"):
-        st = user_loop._ensure_user(chat_id)["state"]
-        sig = st.get("lastSignal")
-        if not sig:
-            return send_to(chat_id, "🤖 No signal yet — bot hasn't scanned yet. Try again in 1 minute.")
-        factors = "\n".join(f"  • {f}" for f in sig.get("keyFactors", []))
-        return send_to(chat_id,
-                       f"🤖 <b>Last signal — {s['SYMBOL']}</b>\n"
-                       f"Action: <b>{sig['action']}</b>  Confidence: <b>{sig['confidence']:.0f}%</b>\n"
-                       f"Criteria: {sig.get('criteriaScore', 0)}/5  Risk: {sig.get('riskLevel', '—')}\n"
-                       f"Reasoning: <i>{sig.get('reasoning', '—')}</i>\n"
-                       + (f"\nFactors:\n{factors}" if factors else ""))
-    if cmd in ("/market", "/m"):
-        return send_to(chat_id, _build_market(chat_id))
-    if cmd in ("/status", "/s"):
-        return send_to(chat_id, _build_status(chat_id), _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
-    if cmd in ("/config", "/c"):
-        return send_to(chat_id, _build_config(chat_id))
-    if cmd in ("/trades", "/t"):
-        return send_to(chat_id, _build_trades(chat_id))
-    if cmd == "/report":
-        return send_to(chat_id, _build_report(chat_id))
-    if cmd == "/help":
-        return send_to(chat_id, _HELP)
-    if cmd == "/symbol":
-        if not args:
-            return send_to(chat_id,
-                           f"💎 <b>Choose trading pair:</b>\nCurrent: <b>{s['SYMBOL']}</b>\n\n"
-                           f"💡 <i>Tap a coin below, or type <code>/symbol PEPEUSDT</code> — "
-                           f"<b>ANY</b> Binance pair works (600+ coins).</i>", _kb_symbols())
-        sym = args[0].upper()
-        if not binance.valid_symbol(sym):
-            return send_to(chat_id, f"❌ <b>{sym}</b> is not a valid Binance pair. Example: <code>/symbol BTCUSDT</code>")
-        _upd(chat_id, "SYMBOL", sym)
-        user_loop.reset_risk(chat_id)
-        return send_to(chat_id, f"💎 Symbol → <b>{sym}</b>", _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
-    if cmd == "/method":
-        if not args or args[0].lower() not in METHODS:
-            return send_to(chat_id, f"🎯 Method (current: <b>{s['STRATEGY_MODE']}</b>)\nChoose:", _kb_methods())
-        _upd(chat_id, "STRATEGY_MODE", args[0].lower())
-        return send_to(chat_id, f"🎯 Method → <b>{args[0].lower()}</b>")
-    if cmd == "/risk":
-        try:
-            pct = float(args[0])
-            assert 0.5 <= pct <= 20
-        except (IndexError, ValueError, AssertionError):
-            return send_to(chat_id, "❌ Usage: <code>/risk 5</code>  (0.5–20%)")
-        _upd(chat_id, "RISK_PER_TRADE", pct / 100)
-        return send_to(chat_id, f"💸 Risk/trade → <b>{pct:g}%</b>")
-    if cmd == "/sl":
-        try:
-            pct = float(args[0])
-            assert 0.3 <= pct <= 20
-        except (IndexError, ValueError, AssertionError):
-            return send_to(chat_id, "❌ Usage: <code>/sl 1.6</code>  (0.3–20%)")
-        _upd(chat_id, "STOP_LOSS_PCT", pct / 100)
-        return send_to(chat_id, f"🛡 Stop loss → <b>{pct:g}%</b>")
-    if cmd == "/tp":
-        try:
-            pct = float(args[0])
-            assert 0.3 <= pct <= 50
-        except (IndexError, ValueError, AssertionError):
-            return send_to(chat_id, "❌ Usage: <code>/tp 3.2</code>  (0.3–50%)")
-        _upd(chat_id, "TAKE_PROFIT_PCT", pct / 100)
-        return send_to(chat_id, f"🎯 Take profit → <b>{pct:g}%</b>")
-    if cmd == "/confidence":
-        try:
-            v = int(args[0])
-            assert 40 <= v <= 95
-        except (IndexError, ValueError, AssertionError):
-            return send_to(chat_id, "❌ Usage: <code>/confidence 70</code>  (40–95)")
-        _upd(chat_id, "MIN_CONFIDENCE", v)
-        return send_to(chat_id, f"🧠 Min confidence → <b>{v}%</b>")
-    if cmd == "/dca":
-        u = user_loop._ensure_user(chat_id)
-        s2 = u["settings"]
-        if args and args[0] == "on":
-            _upd(chat_id, "dca_enabled", True)
-            return send_to(chat_id,
-                           "🤖 <b>DCA Bot ENABLED</b>\n"
-                           "Instead of single orders, the bot will open DCA deals with safety orders.\n\n"
-                           f"Settings:\n"
-                           f"• Base order: <b>{s2.get('dca_base_order_pct', 5):g}%</b> of balance\n"
-                           f"• Safety order: <b>{s2.get('dca_safety_order_pct', 3):g}%</b> (×{s2.get('dca_safety_scale', 1.5):g} each)\n"
-                           f"• Max safeties: <b>{s2.get('dca_max_safety_orders', 3)}</b>  Step: <b>{s2.get('dca_safety_step_pct', 2.5):g}%</b>\n"
-                           f"• Take profit: <b>{s2.get('dca_take_profit_pct', 2):g}%</b> from avg entry\n\n"
-                           "<i>Adjust: /dca base 5 · /dca safety 3 · /dca step 2.5 · /dca tp 2 · /dca max 3</i>")
-        if args and args[0] == "off":
-            _upd(chat_id, "dca_enabled", False)
-            return send_to(chat_id, "⏹ <b>DCA Bot disabled.</b> Back to single-order strategy mode.")
-        if args and args[0] == "base":
-            try:
-                v = float(args[1]); assert 1 <= v <= 50
-            except (IndexError, ValueError, AssertionError):
-                return send_to(chat_id, "❌ /dca base 5  (1–50%)")
-            _upd(chat_id, "dca_base_order_pct", v)
-            return send_to(chat_id, f"✅ DCA base order → <b>{v:g}%</b> of balance")
-        if args and args[0] == "safety":
-            try:
-                v = float(args[1]); assert 1 <= v <= 50
-            except (IndexError, ValueError, AssertionError):
-                return send_to(chat_id, "❌ /dca safety 3  (1–50%)")
-            _upd(chat_id, "dca_safety_order_pct", v)
-            return send_to(chat_id, f"✅ DCA safety order → <b>{v:g}%</b> of balance")
-        if args and args[0] == "step":
-            try:
-                v = float(args[1]); assert 0.5 <= v <= 20
-            except (IndexError, ValueError, AssertionError):
-                return send_to(chat_id, "❌ /dca step 2.5  (0.5–20%)")
-            _upd(chat_id, "dca_safety_step_pct", v)
-            return send_to(chat_id, f"✅ DCA safety step → <b>{v:g}%</b> per level")
-        if args and args[0] == "tp":
-            try:
-                v = float(args[1]); assert 0.3 <= v <= 20
-            except (IndexError, ValueError, AssertionError):
-                return send_to(chat_id, "❌ /dca tp 2  (0.3–20%)")
-            _upd(chat_id, "dca_take_profit_pct", v)
-            return send_to(chat_id, f"✅ DCA take profit → <b>{v:g}%</b> from avg entry")
-        if args and args[0] == "max":
-            try:
-                v = int(args[1]); assert 1 <= v <= 8
-            except (IndexError, ValueError, AssertionError):
-                return send_to(chat_id, "❌ /dca max 3  (1–8 orders)")
-            _upd(chat_id, "dca_max_safety_orders", v)
-            return send_to(chat_id, f"✅ DCA max safety orders → <b>{v}</b>")
-        # Show current DCA status
-        enabled = s2.get("dca_enabled", False)
-        deal = u.get("state", {}).get("dca_deal")
-        deal_line = ""
-        if deal:
-            price = binance.get_price(deal["symbol"])
-            deal_line = f"\n\n<b>Active deal:</b>\n{dca.deal_summary(deal, price)}" if price else ""
-        return send_to(chat_id,
-                       f"🤖 <b>DCA Bot</b> — {'✅ ON' if enabled else '⏹ OFF'}\n"
-                       f"━━━━━━━━━━━━━━━━━━━━\n"
-                       f"Base order: <b>{s2.get('dca_base_order_pct', 5):g}%</b>  "
-                       f"Safety: <b>{s2.get('dca_safety_order_pct', 3):g}%</b> ×{s2.get('dca_safety_scale', 1.5):g}\n"
-                       f"Max orders: <b>{s2.get('dca_max_safety_orders', 3)}</b>  "
-                       f"Step: <b>{s2.get('dca_safety_step_pct', 2.5):g}%</b>\n"
-                       f"Take profit: <b>{s2.get('dca_take_profit_pct', 2):g}%</b>  "
-                       f"SL: <b>{s2.get('dca_stop_loss_pct', 10):g}%</b>"
-                       f"{deal_line}\n\n"
-                       "<i>/dca on · /dca off · /dca base 5 · /dca safety 3 · /dca step 2.5 · /dca tp 2 · /dca max 3</i>")
-    if cmd == "/grid":
-        u = user_loop._ensure_user(chat_id)
-        s2 = u["settings"]
-        if args and args[0] == "on":
-            _upd(chat_id, "grid_enabled", True)
-            lower = s2.get("grid_lower", 0)
-            upper = s2.get("grid_upper", 0)
-            range_note = (f"Range: <b>${lower:,.2f} – ${upper:,.2f}</b>"
-                          if lower and upper else
-                          "Range: <b>auto</b> (set from last 50 candles)")
-            return send_to(chat_id,
-                           "📊 <b>Grid Bot ENABLED</b>\n"
-                           "Passive income on sideways markets — profits on every price bounce.\n\n"
-                           f"{range_note}\n"
-                           f"Levels: <b>{s2.get('grid_levels', 10)}</b>  "
-                           f"Order size: <b>{s2.get('grid_order_pct', 2):g}%</b> each\n\n"
-                           "<i>Adjust: /grid lower 95000 · /grid upper 105000 · "
-                           "/grid levels 10 · /grid step 2 · /grid off</i>")
-        if args and args[0] == "off":
-            _upd(chat_id, "grid_enabled", False)
-            return send_to(chat_id, "⏹ <b>Grid Bot disabled.</b>")
-        if args and args[0] == "stop":
-            u2 = user_loop._ensure_user(chat_id)
-            st = u2.get("state", {})
-            if st.get("grid_deal"):
-                st["grid_deal"] = None
-                user_store.update(chat_id, {"state": st})
-                return send_to(chat_id, "⏹ <b>Active grid stopped.</b> All virtual orders cancelled.")
-            return send_to(chat_id, "ℹ️ No active grid to stop.")
-        if args and args[0] == "lower":
-            try:
-                v = float(args[1]); assert v > 0
-            except (IndexError, ValueError, AssertionError):
-                return send_to(chat_id, "❌ /grid lower 95000  (price in $)")
-            _upd(chat_id, "grid_lower", v)
-            return send_to(chat_id, f"✅ Grid lower bound → <b>${v:,.2f}</b>")
-        if args and args[0] == "upper":
-            try:
-                v = float(args[1]); assert v > 0
-            except (IndexError, ValueError, AssertionError):
-                return send_to(chat_id, "❌ /grid upper 105000  (price in $)")
-            _upd(chat_id, "grid_upper", v)
-            return send_to(chat_id, f"✅ Grid upper bound → <b>${v:,.2f}</b>")
-        if args and args[0] == "levels":
-            try:
-                v = int(args[1]); assert 3 <= v <= 50
-            except (IndexError, ValueError, AssertionError):
-                return send_to(chat_id, "❌ /grid levels 10  (3–50)")
-            _upd(chat_id, "grid_levels", v)
-            return send_to(chat_id, f"✅ Grid levels → <b>{v}</b>")
-        if args and args[0] == "step":
-            try:
-                v = float(args[1]); assert 0.5 <= v <= 20
-            except (IndexError, ValueError, AssertionError):
-                return send_to(chat_id, "❌ /grid step 2  (0.5–20% of balance per order)")
-            _upd(chat_id, "grid_order_pct", v)
-            return send_to(chat_id, f"✅ Grid order size → <b>{v:g}%</b> per level")
-        # Show current grid status
-        enabled = s2.get("grid_enabled", False)
-        deal = u.get("state", {}).get("grid_deal")
-        deal_line = ""
-        if deal:
-            price = binance.get_price(deal["symbol"])
-            deal_line = f"\n\n<b>Active grid:</b>\n{grid.grid_status(deal, price)}" if price else ""
-        lower = s2.get("grid_lower", 0)
-        upper = s2.get("grid_upper", 0)
-        range_str = (f"${lower:,.2f} – ${upper:,.2f}"
-                     if lower and upper else "auto (last 50 candles)")
-        return send_to(chat_id,
-                       f"📊 <b>Grid Bot</b> — {'✅ ON' if enabled else '⏹ OFF'}\n"
-                       f"━━━━━━━━━━━━━━━━━━━━\n"
-                       f"Range: <b>{range_str}</b>\n"
-                       f"Levels: <b>{s2.get('grid_levels', 10)}</b>  "
-                       f"Order size: <b>{s2.get('grid_order_pct', 2):g}%</b> each"
-                       f"{deal_line}\n\n"
-                       "<i>/grid on · /grid off · /grid stop · /grid lower 95000 · "
-                       "/grid upper 105000 · /grid levels 10 · /grid step 2</i>")
-    if cmd == "/ai":
-        # Let a client (re)connect their own free AI key any time.
-        return _ask_groq(chat_id)
-    if cmd == "/groq":
-        if msg_id:   # delete the message so the secret key doesn't linger in chat
-            _delete_message(chat_id, msg_id)
-        if not args or not args[0].startswith("gsk_"):
-            return send_to(chat_id, "❌ Usage: <code>/groq gsk_YOUR_KEY</code>\nGet a free key at console.groq.com")
-        send_to(chat_id, "🔍 Testing your Groq key…")
-        ok, why = ai.test_key(args[0])
-        if not ok:
-            return send_to(chat_id, f"❌ <b>Key not working:</b> {why}\nGet a fresh key at console.groq.com → API Keys.")
-        user_store.update(chat_id, {"groq_key": args[0]})
-        return send_to(chat_id, "✅ <b>Groq key verified &amp; saved!</b> Your AI signals now run on YOUR personal quota. 🧠")
-    if cmd == "/claude":
-        if msg_id:   # delete so the secret key doesn't linger in chat
-            _delete_message(chat_id, msg_id)
-        if not args or not args[0].startswith("sk-ant-"):
-            return send_to(chat_id,
-                           "❌ Usage: <code>/claude sk-ant-YOUR_KEY</code>\n"
-                           "Get a free key at console.anthropic.com → API Keys.\n"
-                           "This unlocks the smart assistant: natural chat + real trade execution.")
-        send_to(chat_id, "🔍 Testing your Claude key…")
-        ok, why = assistant.test_key(args[0])
-        if not ok:
-            return send_to(chat_id, f"❌ <b>Key not working:</b> {why}\n"
-                                    "Get a fresh key at console.anthropic.com → API Keys.")
-        user_store.update(chat_id, {"anthropic_key": args[0]})
-        assistant.clear_history(chat_id)
-        return send_to(chat_id,
-                       "✅ <b>Claude key verified &amp; saved!</b>\n"
-                       "Now just talk to me naturally — I'll analyze markets and execute trades for you. 🧠⚡\n"
-                       "Try: <i>\"analyze BTC\"</i> or <i>\"should I buy ETH now?\"</i>")
-    if cmd == "/gemini":
-        if msg_id:   # delete so the secret key doesn't linger in chat
-            _delete_message(chat_id, msg_id)
-        if not args:
-            return send_to(chat_id,
-                           "❌ Usage: <code>/gemini YOUR_KEY</code>\n"
-                           "Get a FREE key at aistudio.google.com → Get API key.\n"
-                           "Most generous free tier: 1,500 messages/day for chat + analysis.")
-        gkey = args[0].strip()
-        send_to(chat_id, "🔍 Testing your Gemini key…")
-        ok, why = assistant.test_gemini_key(gkey)
-        if not ok:
-            return send_to(chat_id, f"❌ <b>Key not working:</b> {why}")
-        user_store.update(chat_id, {"gemini_key": gkey})
-        assistant.clear_history(chat_id)
-        return send_to(chat_id,
-                       "✅ <b>Gemini key verified &amp; saved!</b> 🆓\n"
-                       "Smart chat + market analysis on YOUR own quota (1,500/day).\n"
-                       "The bot trades automatically 24/7 — no extra key needed. 🤖")
-    if cmd == "/news":
-        from apex import news
-        if not news.enabled():
-            return send_to(chat_id, "📰 News guard is <b>off</b>.")
-        events = news.upcoming(currencies=["USD"], hours=24)
-        if not events:
-            return send_to(chat_id,
-                "📰 <b>No high-impact USD events</b> in the next 24h (or the calendar feed is "
-                "unavailable). Trading proceeds normally — the news guard is fail-open.")
-        lines = []
-        for e in events:
-            h, m = divmod(e["in_min"], 60)
-            when = f"{h}h {m}m" if h else f"{m}m"
-            lines.append(f"• <b>{e['currency']}</b> · {e['title']} — in {when}")
-        return send_to(chat_id, "📰 <b>Upcoming high-impact news (24h)</b>\n" + "\n".join(lines)
-                       + "\n\n<i>The bot stays flat around these — macro moves crypto too.</i>")
-    if cmd == "/copilot":
-        arg = (args or "").strip().lower()
-        if arg in ("on", "1", "yes", "true"):
-            user_store.update(chat_id, {"copilot": True})
-            return send_to(chat_id,
-                "🤖 <b>Copilot mode ON.</b>\nThe bot will now <b>suggest</b> trades and wait for your "
-                "✅ Approve before opening anything. You stay in control.\n\n<i>Turn off with /copilot off.</i>")
-        if arg in ("off", "0", "no", "false"):
-            user_store.update(chat_id, {"copilot": False})
-            return send_to(chat_id,
-                "🚀 <b>Autopilot mode ON.</b>\nThe bot will open trades automatically when a setup meets "
-                "your thresholds. (Use /copilot on to require approval.)")
-        cur = user_store.load(chat_id).get("copilot")
-        return send_to(chat_id,
-            f"🤖 Copilot is currently <b>{'ON (approval required)' if cur else 'OFF (autopilot)'}</b>.\n"
-            "Use <code>/copilot on</code> or <code>/copilot off</code>.")
-    if cmd == "/pause":
-        _upd(chat_id, "PAUSED", True)
-        return send_to(chat_id, "⏸️ <b>Bot paused.</b>", _kb_menu(True))
-    if cmd == "/resume":
-        _upd(chat_id, "PAUSED", False)
-        user_loop.reset_risk(chat_id)
-        _ensure_running(chat_id)
-        sym = s["SYMBOL"]
-        return send_to(chat_id,
-                       f"▶️ <b>Bot ACTIVE</b> — scanning <b>{sym}</b> every 60s.\n"
-                       "You'll get a ping every 30 min + all trade alerts.",
-                       _kb_menu(False, sym))
-    if cmd in ("/buy", "/sell", "/close"):
-        _ensure_running(chat_id)
-        alert = make_alert(chat_id)
-        if cmd == "/close":
-            res = user_loop.force_close(chat_id, alert)
-            if res.get("ok"):
-                sign = "+" if res.get("pnl", 0) >= 0 else ""
-                return send_to(chat_id,
-                               f"✅ <b>Position closed.</b>\n"
-                               f"PnL: <b>{sign}${res.get('pnl', 0):.4f} ({sign}{res.get('pnlPct', 0):.2f}%)</b>")
-            return send_to(chat_id, f"❌ {res.get('error', 'No open position')}")
-        side = "BUY" if cmd == "/buy" else "SELL"
-        symbol = args[0].upper() if args else None
-        res = user_loop.force_trade(chat_id, side, symbol, alert)
-        if res.get("ok"):
-            sym = res["symbol"]
-            icon = "🟢 LONG" if side == "BUY" else "🔴 SHORT"
-            return send_to(chat_id,
-                           f"{icon} <b>{sym}</b> @ ${res['price']:.4f}\n"
-                           f"SL: ${res['stopLoss']:.4f}  TP: ${res['takeProfit']:.4f}")
-        return send_to(chat_id, f"❌ {res.get('error', 'Could not open trade')}")
-
-    # ── Admin ──
-    if cmd == "/grant" and is_adm and args:
-        if access.grant(args[0]):
-            send_to(chat_id, f"✅ Access granted to <code>{args[0]}</code>.")
-            send_to(args[0], "✅ <b>Welcome to Apex Trade Bot!</b> Send /start to begin.")
-        else:
-            send_to(chat_id, f"ℹ️ <code>{args[0]}</code> already has access.")
-        return
-    if cmd == "/revoke" and is_adm and args:
-        ok = access.revoke(args[0])
-        return send_to(chat_id, f"{'✅ Revoked' if ok else 'ℹ️ Not found'} <code>{args[0]}</code>.")
-    if cmd == "/users" and is_adm:
-        clients = access.list_clients()
-        lines = "\n".join(f"✅ {c}" for c in clients) or "— none yet —"
-        return send_to(chat_id, f"👥 <b>CLIENTS ({len(clients)})</b>\n{lines}")
-
-    if not is_adm:
-        return  # clients: ignore unknown commands silently
-    send_to(chat_id, _HELP)
+def _handle_stop(chat_id):
+    user_loop.stop(chat_id)
+    # Also pause global bot for admin
+    if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
+        _bot_control["set_paused"](True)
+    send_to(chat_id,
+        "⏸ <b>Bot is OFF.</b> No new trades will open. Any open position stays protected by its stop.\n"
+        "Tap ▶️ below to turn it back on.",
+        _dashboard_keyboard(chat_id))
 
 
-def _handle_callback(chat_id, data):
-    s = _settings(chat_id)
-    if data == "cp:y":   # copilot — approve the pending suggestion
-        sug = user_loop.pending_suggestion(chat_id)
-        user_loop.clear_suggestion(chat_id)
-        if not sug:
-            return send_to(chat_id, "⌛ That suggestion expired. I'll send a fresh one on the next setup.")
-        send_to(chat_id, f"✅ Approved — opening {sug['side']} {sug['symbol']}…")
-        res = user_loop.force_trade(chat_id, sug["side"], sug["symbol"], alert_fn=make_alert(chat_id))
-        if not res.get("ok"):
-            send_to(chat_id, f"❌ Could not open: {res.get('error', '?')}")
-        return
-    if data == "cp:n":   # copilot — reject the suggestion
-        user_loop.clear_suggestion(chat_id)
-        return send_to(chat_id, "❌ Skipped. I'll keep watching and suggest the next setup.")
-    if data == "setup:activate":   # tap on the first welcome button
-        return _show_disclaimer(chat_id)
-    if data == "setup:accept":     # accepted the risk disclaimer
-        from datetime import datetime as _dt
-        user_store.update(chat_id, {"disclaimer_accepted": _dt.utcnow().isoformat()})
-        return _show_mode_choice(chat_id)
-    if data == "setup:paper":
-        return _start_paper(chat_id)
-    if data == "setup:live":
-        return _start_live_setup(chat_id)
-    if data == "ex:binance" or data == "ex:binanceus":
-        user_store.update(chat_id, {"exchange": data[3:]})
-        return _ask_live_keys(chat_id)
-    if data == "groq:skip":
-        _wizard.pop(str(chat_id), None)
-        _pending_key.pop(str(chat_id), None)
-        return _ready(chat_id)
-    if data.startswith("kk:"):
-        # User confirmed which provider their unknown-format key belongs to
-        kind = data[3:]  # "gemini" | "groq" | "claude"
-        key = _pending_key.pop(str(chat_id), None)
-        if not key:
-            return send_to(chat_id, "⚠️ Key session expired. Please paste your key again.")
-        _wizard.pop(str(chat_id), None)
-        label = {"claude": "Claude", "groq": "Groq", "gemini": "Gemini"}.get(kind, kind)
-        send_to(chat_id, f"🔍 Testing your {label} key…")
-        if kind == "claude":
-            ok, why = assistant.test_key(key)
-            field = "anthropic_key"
-        elif kind == "gemini":
-            ok, why = assistant.test_gemini_key(key)
-            field = "gemini_key"
-        else:
-            ok, why = ai.test_key(key)
-            field = "groq_key"
-        _retry_kb = {"reply_markup": json.dumps({"inline_keyboard": [
-            [{"text": "🥇 Get free Gemini key", "url": "https://aistudio.google.com/apikey"}],
-            [{"text": "🥈 Get free Groq key", "url": "https://console.groq.com/keys"}],
-            [{"text": "⚡ Skip — use shared AI", "callback_data": "groq:skip"}],
-        ]})}
-        if not ok:
-            return send_to(chat_id,
-                           f"❌ <b>{label} key not working:</b> {why}\n\n"
-                           "Paste a different key or skip.", _retry_kb)
-        user_store.update(chat_id, {field: key})
-        assistant.clear_history(chat_id)
-        send_to(chat_id, f"✅ <b>{label} key verified &amp; saved!</b> "
-                         "Smart signals + unlimited chat now run on YOUR own quota. 🧠")
-        return _ready(chat_id)
-    if data == "c:chart":
-        sym = s["SYMBOL"]
-        url = f"{cfg.SITE_URL}/chart?s={sym}"
-        return send_to(chat_id, f"📈 <b>{sym}</b> — live chart",
-                       {"reply_markup": json.dumps({"inline_keyboard": [[
-                           {"text": f"📈 Open {sym} chart", "web_app": {"url": url}}]]})})
-    if data.startswith("sym:"):
-        sym = data[4:]
-        if sym == "custom":
-            return send_to(chat_id,
-                           "✏️ <b>Type any Binance pair you want to trade.</b>\n\n"
-                           "Just send <code>/symbol PEPEUSDT</code> (or any of the 600+ "
-                           "pairs — <code>FETUSDT</code>, <code>WIFUSDT</code>, "
-                           "<code>JUPUSDT</code>, …).\n\n"
-                           "<i>You're not limited to the coins on the buttons — the bot "
-                           "trades whatever you choose.</i>")
-        _upd(chat_id, "SYMBOL", sym)
-        user_loop.reset_risk(chat_id)
-        return send_to(chat_id, f"💎 Symbol → <b>{sym}</b>", _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
-    if data.startswith("m:"):
-        method = data[2:]
-        _upd(chat_id, "STRATEGY_MODE", method)
-        desc = METHOD_DESC.get(method, "")
-        return send_to(chat_id, f"🎯 Strategy set → {desc or f'<b>{method}</b>'}",
-                       _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
-    if data == "c:status":
-        return send_to(chat_id, _build_status(chat_id), _kb_menu(s.get("PAUSED", False), s["SYMBOL"]))
-    if data == "c:config":
-        return send_to(chat_id, _build_config(chat_id))
-    if data == "c:trades":
-        return send_to(chat_id, _build_trades(chat_id))
-    if data == "c:symbol":
-        return send_to(chat_id, f"💎 Choose trading pair:\nCurrent: <b>{s['SYMBOL']}</b>", _kb_symbols())
-    if data == "c:method":
-        guide = "\n".join(METHOD_DESC[m] for m in METHODS)
-        return send_to(chat_id,
-                       f"🎯 <b>Choose your strategy</b>\nCurrent: <b>{s['STRATEGY_MODE']}</b>\n"
-                       f"━━━━━━━━━━━━━━━━━━━━\n{guide}",
-                       _kb_methods())
-    if data == "c:help":
-        return send_to(chat_id, _HELP)
-    if data == "c:mode":
-        u = user_loop._ensure_user(chat_id)
-        cur = "📝 PAPER ($100 virtual)" if u.get("paper", True) else "🔴 REAL Binance (live funds)"
-        return send_to(chat_id,
-                       "🔄 <b>Paper ↔ Real — switch any time</b>\n"
-                       "━━━━━━━━━━━━━━━━━━━━\n"
-                       f"You're currently in: <b>{cur}</b>\n\n"
-                       "<b>To switch safely:</b>\n"
-                       "1️⃣ Tap <b>⏸ Pause</b> (or send /pause) to stop the current mode "
-                       "and let any open position close first.\n"
-                       "2️⃣ Send /setup and pick the mode you want:\n"
-                       "   • 📝 <b>Paper</b> — practice, $100 virtual, no keys.\n"
-                       "   • 🔴 <b>Real Binance</b> — your account &amp; real funds.\n"
-                       "3️⃣ The bot restarts in the new mode and auto-resumes.\n\n"
-                       "<i>Paper and real are fully separate — switching never touches "
-                       "your real funds unless you choose Real and connect your keys.</i>",
-                       {"reply_markup": json.dumps({"inline_keyboard": [
-                           [{"text": "⏸ Pause first", "callback_data": "c:pause"}],
-                           [{"text": "🔄 Switch mode (/setup)", "callback_data": "setup:reset"}],
-                       ]})})
-    if data == "setup:reset":
-        u = user_loop._ensure_user(chat_id)
-        u["setup_done"] = False
-        user_store.save(chat_id, u)
-        return send_to(chat_id, "🔄 <b>Switch mode</b> — how do you want to trade?", _kb_mode())
-    if data == "c:pause":
-        _upd(chat_id, "PAUSED", True)
-        u = user_loop._ensure_user(chat_id)
-        return send_to(chat_id,
-                       f"⏸ <b>Bot paused.</b>\n"
-                       f"Symbol: <b>{u['settings']['SYMBOL']}</b> — tap ▶️ Start to resume.",
-                       _kb_menu(True))
-    if data == "c:resume":
-        _upd(chat_id, "PAUSED", False)
-        user_loop.reset_risk(chat_id)
-        _ensure_running(chat_id)
-        u = user_loop._ensure_user(chat_id)
-        sym = u["settings"]["SYMBOL"]
-        mode = u["settings"]["STRATEGY_MODE"]
-        return send_to(chat_id,
-                       f"▶️ <b>Bot ACTIVE</b> — scanning <b>{sym}</b> every 60s.\n"
-                       f"Strategy: <b>{mode}</b> · You'll get a ping every 30 min + all trade alerts.",
-                       _kb_menu(False, sym))
+def _handle_config(chat_id):
+    keys = _BROKER_KEYS.get(cfg.BROKER, [])
+    key_lines = "\n".join(
+        f"  {k}: {_mask(getattr(cfg, k, '')) if getattr(cfg, k, '') else '—'}"
+        for k in keys)
+    paused = _bot_control.get("get_paused", lambda: False)()
+    state_tag = "⏸️ PAUSED" if paused else "▶️ RUNNING"
+    key_title = "MT bridge" if cfg.BROKER == "mt" else "OANDA"
+    send_to(chat_id,
+            f"⚙️ <b>Config</b>  [{state_tag}]\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Broker:    <b>{_broker_label()}</b>\n"
+            f"Pair:      <b>{cfg.SYMBOL}</b>\n"
+            f"Timeframe: <b>{cfg.TIMEFRAME}</b>\n"
+            f"Paper:     <b>{'ON' if cfg.PAPER_TRADING else 'OFF'}</b>\n"
+            f"Risk:      <b>{cfg.RISK_PER_TRADE * 100:g}%</b>\n"
+            f"SL/TP:     <b>{cfg.STOP_LOSS_PIPS:g} / {cfg.TAKE_PROFIT_PIPS:g} pips</b>\n"
+            f"Leverage:  <b>1:{cfg.LEVERAGE:g}</b>\n"
+            f"Min conf:  <b>{cfg.MIN_CONFIDENCE}%</b>\n"
+            f"Interval:  <b>{cfg.LOOP_INTERVAL_MS // 60000}m</b>\n\n"
+            f"🔑 {key_title} keys:\n{key_lines or '  (none set — use /setup)'}")
+
+
+_HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "/setup — choose paper/live, pair, risk (start here)\n"
+                "/status — live trading snapshot\n"
+                "/market — session + how the market is moving now\n"
+                "/report — trade journal + net P&amp;L (for taxes)\n"
+                f"/buy {cfg.SYMBOL} — open a BUY manually (any pair you want)\n"
+                f"/sell {cfg.SYMBOL} — open a SELL manually\n"
+                "/close — close current position\n"
+                "/ctrader — connect your cTrader account (any broker, worldwide)\n"
+                "/copilot on|off — approve trades yourself vs auto-trade\n"
+                "/news — high-impact events (bot stays flat around them)\n"
+                "/ai — connect your own free/paid AI key for smart chat\n"
+                "/stop — pause your bot · /cancel — abort setup\n"
+                "/help — this list\n\n"
+                "<b>🔄 Switch Paper ↔ Real:</b>\n"
+                "Start in paper with /setup. To go live, send /ctrader and connect "
+                "your own cTrader account (any broker worldwide). Paper (simulated) "
+                "and live (real funds) are fully separate — switching never touches "
+                "your real money unless you connect cTrader and go live.\n\n"
+                "💬 <i>Or just talk to me in any language!</i>\n"
+                "<i>Example: \"enter now\", \"intru acum\", \"analyzeaza EUR_USD\"</i>")
+
+_HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "/status — live trading snapshot\n"
+               "/market — session + market pulse\n"
+               "/setup — guided setup wizard\n"
+               "/config — show current settings\n"
+               "/report — trade journal + net P&amp;L\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "/buy &lt;PAIR&gt; — open BUY manually\n"
+               "/sell &lt;PAIR&gt; — open SELL manually\n"
+               "/close — close current position\n"
+               "/ctrader — connect cTrader · /copilot on|off · /news\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "/broker oanda|mt — OANDA API or MetaTrader\n"
+               "/env practice|live — OANDA environment\n"
+               "/paper on|off — toggle paper mode\n"
+               "/risk &lt;0.5-10&gt; — risk % per trade\n"
+               "/sl &lt;pips&gt; — stop loss in pips\n"
+               "/tp &lt;pips&gt; — take profit in pips\n"
+               "/symbol &lt;PAIR&gt; — set pair (EUR_USD)\n"
+               "/pairs — everything your broker lets you trade\n"
+               "/watch — scan a basket of instruments, trade the strongest setup\n"
+               "/autopilot on — full hands-off: bot picks the instruments too\n"
+               "/maxpos 5 — hold several trades at once (risk stays capped)\n"
+               "/strategy — trading method (auto · mean reversion · trend · breakout)\n"
+               "/atr on|off — dynamic ATR stops (SL 1.5×ATR / TP 3×ATR)\n"
+               "/wizard — guided setup (symbol → method → mode)\n"
+               "/terminal — live trading terminal (interactive chart + news)\n"
+               "/stats — performance report (win rate · profit factor · drawdown)\n"
+               "/chart — quick chart snapshot\n"
+               "/setkeys KEY=val ... — set credentials\n"
+               "  (message is auto-deleted for safety)\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "/start — resume trading\n"
+               "/stop — pause trading\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "👑 <b>Admin</b>\n"
+               "/grant &lt;id&gt; — give client access\n"
+               "/revoke &lt;id&gt; — remove access\n"
+               "/users — list clients\n"
+               "/help — this list\n\n"
+               "💬 <i>Free text → AI assistant (any language)</i>")
 
 
 # ─── Poll loop ────────────────────────────────────────────
-_VERIFY_URL = f"{cfg.LICENSE_SERVER.rstrip('/')}/api/verify-license"
+
+_VERIFY_URL = "https://aicashsystem.space/api/verify-license"
+_DEPLOY_URL = "https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/autoflow-backend"
 
 
 def _license_ok(chat_id, text):
     """Validate the buyer's license before granting access to the bot.
 
-    The activation deep link from the purchase email is `/start APEX-...`.
+    The activation deep link from the purchase email is `/start FORX-...`.
     Returns True if access should be granted. FAIL-OPEN: if our verify server
     is unreachable we still let a real-looking key through, so a server hiccup
     never locks out a paying customer. Only a server that actively says
@@ -1166,26 +2176,26 @@ def _license_ok(chat_id, text):
     key = karg.strip().upper()
     if cmd.lower().split("@")[0] != "/start" or not key:
         send_to(chat_id,
-                "🔒 <b>Activation required</b>\n\n"
-                "Open the activation link from your purchase email to unlock the bot.\n\n"
-                "Don't have Apex Trade Bot yet? Get it at https://aicashsystem.space")
+            "🔒 <b>Activation required</b>\n\n"
+            "Open the activation link from your purchase email to unlock the bot.\n\n"
+            f"Don't have {cfg.BOT_NAME} yet? Get it at https://aicashsystem.space")
         return False
-    if not re.match(r'^APEX-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$', key):
+    if not re.match(rf'^{cfg.LICENSE_KEY_PREFIX}-[A-Z2-9]{{4}}-[A-Z2-9]{{4}}-[A-Z2-9]{{4}}$', key):
         send_to(chat_id,
-                "❌ <b>That doesn't look like a valid key.</b>\n\n"
-                "Use the <code>APEX-XXXX-XXXX-XXXX</code> key from your purchase email, "
-                "or buy at https://aicashsystem.space")
+            "❌ <b>That doesn't look like a valid key.</b>\n\n"
+            f"Use the <code>{cfg.LICENSE_KEY_PREFIX}-XXXX-XXXX-XXXX</code> key from your purchase email, "
+            "or buy at https://aicashsystem.space")
         return False
     try:
-        r = requests.post(_VERIFY_URL, json={"key": key, "product": "apex-bot"}, timeout=8)
+        r = requests.post(_VERIFY_URL, json={"key": key, "product": cfg.LICENSE_PRODUCT}, timeout=8)
         data = r.json()
         if not data.get("valid"):
             send_to(chat_id,
-                    f"❌ <b>{data.get('message', 'License not found.')}</b>\n\n"
-                    "Need help? supportaicashsystem@gmail.com")
+                f"❌ <b>{data.get('message', 'License not found.')}</b>\n\n"
+                "Need help? supportaicashsystem@gmail.com")
             return False
     except Exception as e:
-        print(f"[TG] verify-license unreachable ({e}) — fail-open grant for {key}")
+        print(f"[TELEGRAM] verify-license unreachable ({e}) — fail-open grant for {key}")
     try:
         user_store.update(cid, {"license_key": key})
     except Exception:
@@ -1218,7 +2228,7 @@ def _revalidate_license(chat_id):
     if time.time() - u.get("license_checked_at", 0) < _REVALIDATE_SEC:
         return True
     try:
-        r = requests.post(_VERIFY_URL, json={"key": key, "product": "apex-bot"}, timeout=8)
+        r = requests.post(_VERIFY_URL, json={"key": key, "product": cfg.LICENSE_PRODUCT}, timeout=8)
         data = r.json()
     except Exception:
         return True  # fail-open
@@ -1243,396 +2253,312 @@ def _revalidate_license(chat_id):
     return True
 
 
-def _activate(chat_id):
-    """Step 1: brand new user — show welcome + risk disclaimer (must accept)."""
-    access.grant(str(chat_id))
-    send_to(chat_id,
-            "👋 <b>Welcome to APEX TRADE BOT!</b>\n\n"
-            "Your AI-powered crypto trading bot is ready.\n"
-            "Tap below to activate and set it up in 2 minutes.",
-            _kb_activate())
-    _broadcast_owner(f"🆕 <b>New client!</b>\nID: <code>{chat_id}</code>")
-
-
-_DISCLAIMER = (
-    "⚠️ <b>Risk Disclaimer — please read</b>\n"
-    "━━━━━━━━━━━━━━━━━━━━\n"
-    "APEX TRADE BOT is a <b>trading tool</b>. <b>You</b> choose the symbol, "
-    "strategy, risk and settings — and <b>you</b> control when it trades.\n\n"
-    "• Crypto trading carries risk. You can lose money.\n"
-    "• This is NOT financial advice and NOT a profit guarantee.\n"
-    "• Past or simulated results don't predict future results.\n"
-    "• <b>You are solely responsible</b> for your own trades, settings and funds.\n"
-    "• Only trade with money you can afford to lose.\n\n"
-    "By tapping <b>I Understand &amp; Accept</b> you agree you use this tool at "
-    "your own risk and the seller is not liable for any losses."
-)
-
-
-def _show_disclaimer(chat_id):
-    """Mandatory risk disclaimer — must accept before any setup (legal shield)."""
-    send_to(chat_id, _DISCLAIMER,
-            {"reply_markup": json.dumps({"inline_keyboard": [
-                [{"text": "✅ I Understand & Accept", "callback_data": "setup:accept"}],
-            ]})})
-
-
-def _show_mode_choice(chat_id):
-    """Step 2: choose Paper or Real."""
-    send_to(chat_id,
-            "⚙️ <b>How do you want to trade?</b>\n\n"
-            "🧪 <b>Paper Trading</b> — practice with $100 virtual USDT and REAL market "
-            "prices. No keys, no signup, starts instantly. Zero risk.\n"
-            "   → Pick <b>any</b> coin (600+ pairs), any strategy, your own risk.\n\n"
-            "🔴 <b>Real Binance</b> — connect your real Binance account and trade with real funds.\n"
-            "   → No Binance account yet? I'll give you the signup link in the next step.\n\n"
-            "<i>You can switch between paper and real any time with /setup.</i>",
-            _kb_mode())
-
-
-def _start_paper(chat_id):
-    """Paper trading = instant internal simulation with REAL market prices (no keys)."""
-    u = user_loop._ensure_user(chat_id)
-    u["paper"] = True
-    u["setup_done"] = True
-    # Keyless paper: clear any old keys so the loop uses internal simulation.
-    u.pop("api_key", None)
-    u.pop("api_secret", None)
-    u["settings"]["PAUSED"] = True
-    user_store.save(chat_id, u)
-    send_to(chat_id,
-            "🧪 <b>Paper Trading ready!</b>\n\n"
-            "You're starting with <b>$100 virtual USDT</b> and REAL live market prices.\n"
-            "No keys, no signup — the bot trades a simulation so you can test risk-free.\n\n"
-            "Next: set up the AI brain 👇")
-    _ask_groq(chat_id)
-
-
-def _start_live_setup(chat_id):
-    """Real trading — first pick the exchange (global vs US)."""
-    u = user_loop._ensure_user(chat_id)
-    u["paper"] = False
-    user_store.save(chat_id, u)
-    send_to(chat_id,
-            "🌍 <b>Which exchange is your account on?</b>\n\n"
-            "🟡 <b>Binance.com</b> — global (Europe, Asia, LatAm, most countries)\n"
-            "🇺🇸 <b>Binance.US</b> — for United States clients\n\n"
-            "🆕 <b>No Binance account yet?</b> Tap <b>Create Binance account</b> "
-            "below to sign up first (takes ~3 minutes), then come back and pick "
-            "your exchange.\n\n"
-            "<i>Pick the one where your account &amp; funds are.</i>",
-            {"reply_markup": json.dumps({"inline_keyboard": [
-                [{"text": "🆕 Create Binance account", "url": _BINANCE_SIGNUP_URL}],
-                [{"text": "🟡 Binance.com (Global)", "callback_data": "ex:binance"}],
-                [{"text": "🇺🇸 Binance.US", "callback_data": "ex:binanceus"}],
-            ]})})
-
-
-def _ask_live_keys(chat_id):
-    """Show API-key instructions for the chosen exchange."""
-    _wizard[str(chat_id)] = "KEYS"
-    u = user_loop._ensure_user(chat_id)
-    is_us = u.get("exchange") == "binanceus"
-    url = _BINANCEUS_KEYS_URL if is_us else _BINANCE_KEYS_URL
-    name = "Binance.US" if is_us else "Binance.com"
-    send_to(chat_id,
-            f"🔴 <b>Connect your {name} account</b>\n\n"
-            "1️⃣ Tap <b>Open API page</b> below (log in to Binance)\n"
-            "2️⃣ Create an API key — enable <b>Spot &amp; Margin Trading</b>, "
-            "leave <b>withdrawals OFF</b> (the bot only needs trade access)\n"
-            "3️⃣ Copy the <b>API Key</b> and <b>Secret Key</b> Binance shows you\n"
-            "4️⃣ Send both here in ONE message:\n"
-            "<code>API_KEY=your_key API_SECRET=your_secret</code>\n\n"
-            "🔒 <i>Your message is deleted instantly after reading — keys are stored "
-            "encrypted and can never withdraw your funds.</i>",
-            {"reply_markup": json.dumps({"inline_keyboard": [
-                [{"text": f"🔑 Open {name} API page", "url": url}],
-                [{"text": "🆕 No account yet? Create Binance", "url": _BINANCE_SIGNUP_URL}],
-            ]})})
-
-
-def _finish_live_setup(chat_id, text, msg_id):
-    _delete_message(chat_id, msg_id)
-    pairs = {}
-    for part in text.replace("\n", " ").split():
-        if "=" in part:
-            k, _, v = part.partition("=")
-            pairs[k.strip().upper()] = v.strip()
-    if "API_KEY" not in pairs or "API_SECRET" not in pairs:
-        return send_to(chat_id, "❌ Send both in one message:\n<code>API_KEY=xxx API_SECRET=yyy</code>")
-    u = user_loop._ensure_user(chat_id)
-    is_testnet = u.get("paper", True)
-    exchange = u.get("exchange", "binance")
-
-    # Validate the keys against Binance BEFORE saving — fail fast with a clear reason.
-    send_to(chat_id, "🔍 Verifying your Binance keys…")
-    try:
-        ex = binance.LiveExchange(pairs["API_KEY"], pairs["API_SECRET"],
-                                  testnet=is_testnet, exchange=exchange)
-        ok, why, usdt = ex.verify()
-    except Exception as e:
-        ok, why, usdt = False, str(e), 0.0
-    if not ok:
-        return send_to(chat_id,
-                       f"❌ <b>Connection failed:</b> {why}\n\n"
-                       "Fix the API key and send both again:\n"
-                       "<code>API_KEY=xxx API_SECRET=yyy</code>")
-
-    u["setup_done"] = True
-    u["api_key"] = pairs["API_KEY"]
-    u["api_secret"] = pairs["API_SECRET"]
-    u["settings"]["PAUSED"] = True
-    user_store.save(chat_id, u)
-    mode_label = "🧪 Binance Testnet (virtual USDT)" if is_testnet else "🔴 Real Binance (live funds)"
-    send_to(chat_id,
-            f"✅ <b>Binance connected &amp; verified!</b>\n"
-            f"Mode: <b>{mode_label}</b>\n"
-            f"💰 Balance: <b>${usdt:.2f} USDT</b>")
-    _ask_groq(chat_id)
-
-
-def _ask_groq(chat_id):
-    """Onboarding step 3: collect ANY free AI key (Gemini / Claude / Groq) or skip."""
-    u = user_loop._ensure_user(chat_id)
-    if u.get("groq_key") or u.get("gemini_key") or u.get("anthropic_key"):
-        return _ready(chat_id)
-    _wizard[str(chat_id)] = "GROQ"
-    send_to(chat_id,
-            "🧠 <b>Activate your AI brain (free)</b>\n\n"
-            "Your bot already trades on its built-in rule engine — but a free AI key "
-            "unlocks <b>smart signals + unlimited chat</b> (\"how's my trade?\", \"buy ETH\", etc.).\n\n"
-            "Pick ONE — all free, takes 1 minute:\n\n"
-            "🥇 <b>Gemini</b> — best free option, 1,500/day, no limits.\n"
-            "   → aistudio.google.com → <i>Get API key</i>\n"
-            "🥈 <b>Groq</b> — fast, ~14,400/day.\n"
-            "   → console.groq.com/keys (key starts <code>gsk_</code>)\n"
-            "🥉 <b>Claude</b> — smartest, executes trades from chat.\n"
-            "   → console.anthropic.com (key starts <code>sk-ant-</code>)\n\n"
-            "📋 <b>Just paste the key here</b> — I auto-detect which one it is.\n"
-            "Or tap <b>Skip</b> to ride the shared AI (may hit limits).",
-            {"reply_markup": json.dumps({"inline_keyboard": [
-                [{"text": "🥇 Get free Gemini key", "url": "https://aistudio.google.com/apikey"}],
-                [{"text": "🥈 Get free Groq key", "url": "https://console.groq.com/keys"}],
-                [{"text": "⚡ Skip — use shared AI", "callback_data": "groq:skip"}],
-            ]})})
-
-
-def _detect_key_kind(key):
-    """Return 'claude' | 'groq' | 'gemini' from a pasted key, or None if unknown."""
-    k = (key or "").strip()
-    if k.startswith("sk-ant-"):
-        return "claude"
-    if k.startswith("gsk_"):
-        return "groq"
-    # Google AI Studio Gemini keys: AIza prefix OR any long key without provider prefix
-    if k.startswith("AIza") or k.startswith("AIzaSy"):
-        return "gemini"
-    # Fallback: long alphanumeric key — likely Gemini (but ask user to confirm)
-    return None
-
-
-def _finish_groq(chat_id, key, msg_id):
-    """Verify & save ANY supported AI key, auto-detecting the provider."""
-    _delete_message(chat_id, msg_id)
-    key = key.strip()
-    kind = _detect_key_kind(key)
-    _retry_kb = {"reply_markup": json.dumps({"inline_keyboard": [
-        [{"text": "🥇 Get free Gemini key", "url": "https://aistudio.google.com/apikey"}],
-        [{"text": "🥈 Get free Groq key", "url": "https://console.groq.com/keys"}],
-        [{"text": "⚡ Skip — use shared AI", "callback_data": "groq:skip"}],
-    ]})}
-    if kind is None:
-        # Unknown prefix — store key and ask user to confirm provider
-        _pending_key[str(chat_id)] = key
-        _wizard[str(chat_id)] = "KEY_KIND"
-        return send_to(chat_id,
-                       "🤔 <b>Which provider is this key for?</b>",
-                       {"reply_markup": json.dumps({"inline_keyboard": [
-                           [{"text": "🥇 Gemini (Google AI Studio)", "callback_data": "kk:gemini"}],
-                           [{"text": "🥈 Groq", "callback_data": "kk:groq"}],
-                           [{"text": "🥉 Claude (Anthropic)", "callback_data": "kk:claude"}],
-                           [{"text": "❌ Cancel", "callback_data": "groq:skip"}],
-                       ]})})
-
-    label = {"claude": "Claude", "groq": "Groq", "gemini": "Gemini"}[kind]
-    send_to(chat_id, f"🔍 Testing your {label} key…")
-    if kind == "claude":
-        ok, why = assistant.test_key(key)
-        field = "anthropic_key"
-    elif kind == "gemini":
-        ok, why = assistant.test_gemini_key(key)
-        field = "gemini_key"
-    else:
-        ok, why = ai.test_key(key)
-        field = "groq_key"
-
-    if not ok:
-        return send_to(chat_id,
-                       f"❌ <b>{label} key not working:</b> {why}\n\n"
-                       "Paste a different key or skip.", _retry_kb)
-    user_store.update(chat_id, {field: key})
-    assistant.clear_history(chat_id)
-    _wizard.pop(str(chat_id), None)
-    send_to(chat_id, f"✅ <b>{label} key verified &amp; saved!</b> "
-                     "Smart signals + unlimited chat now run on YOUR own quota. 🧠")
-    _ready(chat_id)
-
-
-def _ready(chat_id):
-    """Setup complete — AUTO-START the bot and show the control panel."""
-    u = user_loop._ensure_user(chat_id)
-    # Auto-start: don't make the user press Start after onboarding.
-    u["settings"]["PAUSED"] = False
-    user_store.save(chat_id, u)
-    _ensure_running(chat_id)
-    s = u["settings"]
-    if u.get("anthropic_key"):
-        ai_info = "Claude (yours) ✅ — smart chat + voice trade commands"
-    elif u.get("gemini_key"):
-        ai_info = "Gemini (yours) ✅ — unlimited smart chat"
-    elif u.get("groq_key"):
-        ai_info = "Groq (yours) ✅ — unlimited smart chat"
-    else:
-        ai_info = "rule-based engine (add a free AI key via /ai for smart chat)"
-    # Message 1: confirmation that bot is live
-    send_to(chat_id,
-            f"⚡ <b>Bot is LIVE and trading!</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"Mode: <b>{'📝 PAPER ($100 virtual)' if u.get('paper', True) else '🔴 REAL Binance'}</b>\n"
-            f"Symbol: <b>{s['SYMBOL']}</b>   Strategy: <b>{s['STRATEGY_MODE']}</b>\n"
-            f"AI: <b>{ai_info}</b>\n\n"
-            "📡 Market data: live from Binance (free, no key needed).\n"
-            "🤖 Trading: automatic 24/7 — rule-based engine, zero quota.\n"
-            "Use the buttons below to control the bot any time.")
-    # Message 2: control panel (separate so buttons are always visible)
-    send_to(chat_id, "🎛 <b>Control Panel</b>", _kb_menu(False, s["SYMBOL"]))
-
-
-def _auto_restore(chat_id):
-    """Silently restart a user's trading thread after a server restart.
-
-    On Render free tier the container is wiped on every deploy, so
-    user files (and the 'active' flag) are gone after a redeploy.
-    Any interaction from a setup-and-unpaused user should bring their
-    thread back without requiring them to press ▶️ Start Trading again.
-    """
-    if user_loop.is_running(chat_id):
-        return
-    u = user_loop._ensure_user(chat_id)
-    if u.get("setup_done") and not u["settings"].get("PAUSED", True):
-        user_loop.start(chat_id, make_alert(chat_id))
-        print(f"[TG] Auto-restored thread for user {chat_id}")
-
-
 def _poll_loop():
     global _update_id
+    # Clear any webhook — getUpdates returns 409 while a webhook is active,
+    # which silently stops the bot from ever seeing messages.
     try:
-        requests.post(f"{_API}/deleteWebhook", json={"drop_pending_updates": False}, timeout=5)
-    except Exception:
-        pass
-    for uid in user_store.all_active():
-        user_loop.start(uid, make_alert(uid))
-    print(f"[TG] Poll loop started. TOKEN={bool(TOKEN)}")
+        wr = requests.post(f"{_API}/deleteWebhook",
+                           json={"drop_pending_updates": False}, timeout=5)
+        print(f"[TELEGRAM] deleteWebhook → {wr.json()}")
+    except Exception as e:
+        print(f"[TELEGRAM] deleteWebhook failed: {e}")
+    # Confirm the token is valid so the cause is obvious in the logs
+    try:
+        me = requests.get(f"{_API}/getMe", timeout=8).json()
+        if me.get("ok"):
+            print(f"[TELEGRAM] Bot identity OK → @{me['result'].get('username')}")
+        else:
+            print(f"[TELEGRAM] getMe FAILED → {me.get('description')} "
+                  f"(check TELEGRAM_BOT_TOKEN)")
+    except Exception as e:
+        print(f"[TELEGRAM] getMe error: {e}")
+    print(f"[TELEGRAM] Poll loop started. TOKEN={bool(TOKEN)} CHAT_ID={CHAT_ID}")
     while True:
         try:
             r = requests.get(f"{_API}/getUpdates",
-                             params={"offset": _update_id, "timeout": 25,
+                             params={"offset": _update_id, "timeout": 10,
                                      "allowed_updates": json.dumps(["message", "callback_query"])},
-                             timeout=30)
+                             timeout=15)
             data = r.json()
             if not data.get("ok"):
-                print(f"[TG] API error: {data.get('description')} (code {data.get('error_code')})")
-                time.sleep(5)
+                print(f"[TELEGRAM] API error: {data.get('description')} (code {data.get('error_code')})")
+                time.sleep(10)
                 continue
             for u in data.get("result", []):
                 _update_id = u["update_id"] + 1
-                if "callback_query" in u:
-                    cb = u["callback_query"]
-                    chat_id = cb["message"]["chat"]["id"]
-                    _answer_cb(cb["id"])
-                    if not access.is_allowed(str(chat_id)):
-                        _license_ok(chat_id, "")  # button press w/o a key → prompt for activation
-                        continue
-                    if not _revalidate_license(chat_id):
-                        continue  # license refunded/revoked
-                    _auto_restore(chat_id)
+                # Inline button presses (copilot approve/reject)
+                cb = u.get("callback_query")
+                if cb:
                     try:
-                        _handle_callback(chat_id, cb.get("data", ""))
-                    except Exception as e:
-                        print(f"[TG] callback error: {e}")
+                        requests.post(f"{_API}/answerCallbackQuery",
+                                      json={"callback_query_id": cb.get("id")}, timeout=5)
+                    except Exception:
+                        pass
+                    cb_chat = cb.get("message", {}).get("chat", {}).get("id")
+                    if cb_chat is not None and access.is_allowed(str(cb_chat)):
+                        _handle_cb(cb_chat, cb.get("data", ""))
                     continue
                 msg = u.get("message", {})
-                text = (msg.get("text") or "").strip()
+                raw = (msg.get("text") or "").strip()
                 chat_id = msg.get("chat", {}).get("id")
                 msg_id = msg.get("message_id")
-                if not text or chat_id is None:
+                if not raw or chat_id is None:
                     continue
-                if not access.is_allowed(str(chat_id)):
+                chat_id_str = str(chat_id)
+
+                # Owner is set via the ADMIN_CHAT_ID env var — no first-message
+                # bootstrap, so a customer can never become the owner.
+
+                if not access.is_allowed(chat_id_str):
                     # Gate access behind a valid purchase license (fail-open on
                     # server errors). Admins are already is_allowed, so they skip
-                    # this. The deep-link /start APEX-... key lands here.
-                    if _license_ok(chat_id, text):
-                        _activate(chat_id)
+                    # this. _license_ok sends the prompt/error on refusal.
+                    if not _license_ok(chat_id, raw):
+                        continue
+                    access.grant(chat_id_str)
+                    gurl = _guide_url()
+                    kb = [[{"text": "🚀 Set up my bot (30 sec)", "callback_data": "go:connect"}]]
+                    if gurl:
+                        kb.append([{"text": "📖 How it works — watch first", "web_app": {"url": gurl}}])
+                    send_to(chat_id,
+                            "🎉 <b>Welcome — your license is active!</b>\n\n"
+                            "You now own a fully-hosted AI trading bot that runs on "
+                            "<b>your own</b> account and you control from right here in Telegram. "
+                            "No apps, no installs, nothing to configure by hand.\n\n"
+                            "👇 <b>One tap sets everything up</b> — connect your account, pick "
+                            "what to trade, and the bot starts working for you. "
+                            "New to trading bots? Watch the 2-minute guide first.",
+                            extra={"reply_markup": {"inline_keyboard": kb}})
+                    send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id_str}</code>")
                     continue
+
+                # Refunded/charged-back licenses lose access (fail-open re-check).
                 if not _revalidate_license(chat_id):
-                    continue  # license refunded/revoked
-                _auto_restore(chat_id)
-                # SECURITY: any message that looks like API keys is deleted
-                # instantly and NEVER reaches the AI assistant or chat history.
-                low = text.lower()
-                looks_like_keys = ("api_key=" in low and "api_secret=" in low) or \
-                                  (len(text) > 40 and text.count("=") >= 2 and " " not in text.strip() and "_" in text)
-                step = _wizard.get(str(chat_id))
-                if looks_like_keys:
-                    _delete_message(chat_id, msg_id)
-                    if step == "KEYS":
-                        try:
-                            _finish_live_setup(chat_id, text, msg_id)
-                        except Exception as e:
-                            print(f"[TG] keys error: {e}")
-                    else:
-                        send_to(chat_id,
-                                "🔒 <b>Keys detected &amp; deleted for your safety.</b>\n"
-                                "To connect an account, start setup with /setup → Real Binance, "
-                                "then send your keys when asked.")
                     continue
-                # Real-account setup: capture the API key message (not a command)
-                if step == "KEYS" and not text.startswith("/"):
-                    try:
-                        _finish_live_setup(chat_id, text, msg_id)
-                    except Exception as e:
-                        print(f"[TG] keys error: {e}")
-                    continue
-                if step == "GROQ" and not text.startswith("/"):
-                    # Accept any pasted AI key (Gemini / Groq / Claude) — auto-detected.
-                    try:
-                        _finish_groq(chat_id, text.split()[0], msg_id)
-                    except Exception as e:
-                        print(f"[TG] ai-key error: {e}")
-                    continue
-                # Free text (non-command) → intent check first, then AI
-                if not text.startswith("/"):
-                    handled = _handle_trade_intent(chat_id, text)
-                    if not handled:
-                        _send_typing(chat_id)
-                        assistant.chat(
-                            chat_id, text,
-                            send_fn=lambda reply, cid=chat_id: send_to(cid, reply),
-                            send_status=lambda status, cid=chat_id: send_to(cid, status),
-                        )
-                    continue
+
+                # Auto-restore: if this user was active but their loop died
+                # (e.g. server restart), silently bring it back on interaction.
                 try:
-                    _handle_command(chat_id, text, msg_id)
+                    if user_store.load(chat_id_str).get("active") and not user_loop.is_running(chat_id_str):
+                        _auto_start_user(chat_id_str)
                 except Exception as e:
-                    print(f"[TG] command error: {e}")
+                    print(f"[TELEGRAM] auto-restore-on-msg error: {e}")
+
+                # Active wizard step takes priority over /commands
+                with _lock:
+                    in_wizard = bool(_wizards.get(chat_id, {}).get("step")) and not raw.startswith("/")
+                if in_wizard:
+                    _handle_wizard_reply(chat_id, raw, msg_id)
+                    continue
+
+                first_line = raw.splitlines()[0].strip()
+                cmd, _, args = first_line.partition(" ")
+                cmd_l = cmd.lower().split("@")[0]  # strip @botname suffix
+                args = args.split("\n")[0].strip()  # first line of args only
+
+                is_adm = access.is_admin(chat_id_str)
+
+                if cmd_l == "/deploy" and is_adm:
+                    _handle_deploy(chat_id)
+                elif cmd_l in ("/status", "/s"):
+                    _handle_status(chat_id)
+                elif cmd_l == "/report":
+                    _handle_report(chat_id)
+                elif cmd_l == "/help":
+                    send_to(chat_id, _HELP_ADMIN if is_adm else _HELP_CLIENT)
+                elif cmd_l == "/users" and is_adm:
+                    _handle_users(chat_id)
+                elif cmd_l == "/grant" and is_adm:
+                    _handle_grant(chat_id, args)
+                elif cmd_l == "/revoke" and is_adm:
+                    _handle_revoke(chat_id, args)
+                elif cmd_l == "/setup":
+                    # Every paying client self-configures their OWN trading via the
+                    # wizard (writes only their user record); admin extras apply
+                    # globally inside _handle_wizard_reply.
+                    _handle_setup(chat_id)
+                elif cmd_l == "/cancel":
+                    with _lock:
+                        _had = _wizards.pop(chat_id, None)
+                    send_to(chat_id, "✖️ Setup cancelled." if _had else "Nothing to cancel.")
+                elif cmd_l == "/config" and is_adm:
+                    _handle_config(chat_id)
+                elif cmd_l == "/setkeys" and is_adm:
+                    _handle_setkeys(chat_id, args, msg_id)
+                elif cmd_l == "/broker" and is_adm:
+                    _handle_broker(chat_id, args)
+                elif cmd_l == "/env" and is_adm:
+                    _handle_env(chat_id, args)
+                elif cmd_l == "/ctrader":
+                    _handle_ctrader(chat_id)
+                elif cmd_l == "/ctaccount":
+                    _handle_ctaccount(chat_id, args)
+                elif cmd_l in ("/switch", "/account", "/golive"):
+                    _handle_switch(chat_id)
+                elif cmd_l == "/copilot":
+                    _handle_copilot(chat_id, args)
+                elif cmd_l == "/news":
+                    _handle_news(chat_id)
+                elif cmd_l in ("/market", "/m"):
+                    _handle_market(chat_id)
+                elif cmd_l == "/paper":
+                    _handle_paper(chat_id, args)
+                elif cmd_l == "/risk":
+                    _handle_risk(chat_id, args)
+                elif cmd_l == "/sl":
+                    _handle_sl(chat_id, args)
+                elif cmd_l == "/tp":
+                    _handle_tp(chat_id, args)
+                elif cmd_l == "/symbol":
+                    _handle_symbol(chat_id, args)
+                elif cmd_l in ("/pairs", "/symbols"):
+                    _handle_pairs(chat_id)
+                elif cmd_l == "/watch":
+                    _handle_watch(chat_id, args)
+                elif cmd_l in ("/autopilot", "/auto"):
+                    _handle_autopilot(chat_id, args)
+                elif cmd_l in ("/maxpos", "/positions"):
+                    _handle_maxpos(chat_id, args)
+                elif cmd_l in ("/strategy", "/method"):
+                    _handle_strategy(chat_id, args)
+                elif cmd_l == "/backtest":
+                    _handle_backtest(chat_id, args)
+                elif cmd_l == "/wizard":
+                    onboard_start(chat_id)
+                elif cmd_l == "/chart":
+                    _handle_chart(chat_id, args)
+                elif cmd_l in ("/terminal", "/app"):
+                    _handle_terminal(chat_id)
+                elif cmd_l in ("/guide", "/help2", "/manual", "/howto"):
+                    _handle_guide(chat_id)
+                elif cmd_l == "/atr":
+                    _handle_atr(chat_id, args)
+                elif cmd_l in ("/stats", "/performance"):
+                    _handle_stats(chat_id)
+                elif cmd_l in ("/resetstats", "/resetjournal"):
+                    _handle_resetstats(chat_id)
+                elif cmd_l == "/buy":
+                    _handle_buy(chat_id, args)
+                elif cmd_l == "/sell":
+                    _handle_sell(chat_id, args)
+                elif cmd_l == "/close":
+                    _handle_close(chat_id)
+                elif cmd_l == "/start":
+                    _handle_start(chat_id)
+                elif cmd_l == "/stop":
+                    # Per-user: stops only this client's loop (admin also pauses global).
+                    _handle_stop(chat_id)
+                elif cmd_l == "/ai":
+                    _handle_ai_setup(chat_id)
+                elif cmd_l in ("/groq", "/gemini", "/claude", "/key"):
+                    # Explicit key command — the key is the argument.
+                    _handle_ai_key(chat_id, args, msg_id)
+                elif not raw.startswith("/"):
+                    # A bare pasted AI key → connect it (and keep it out of chat history).
+                    if _detect_ai_key(raw.strip()):
+                        _handle_ai_key(chat_id, raw.strip(), msg_id)
+                        continue
+                    # Intent detection first (works with zero AI key)
+                    handled = _handle_trade_intent_fx(chat_id, raw)
+                    if not handled:
+                        # Fall through to AI assistant
+                        def _typing_reply(reply, cid=chat_id):
+                            send_to(cid, reply)
+                        def _typing_status(status, cid=chat_id):
+                            send_to(cid, status)
+                        assistant.chat(
+                            chat_id, raw,
+                            send_fn=_typing_reply,
+                            send_status=_typing_status,
+                        )
+                # Unknown /commands → silently ignored
         except Exception as e:
-            print(f"[TG] poll error: {e}")
-            time.sleep(3)
+            print(f"[TELEGRAM] Poll error: {e}")
+        time.sleep(2)
 
 
-def start_polling():
+def start_polling(get_dash, broker, control=None):
+    global _get_dash, _broker, _bot_control
     if not TOKEN:
-        print("[TG] Missing TELEGRAM_BOT_TOKEN — polling disabled")
+        print("[TELEGRAM] Missing TOKEN — polling disabled")
         return
+    _get_dash = get_dash
+    _broker = broker
+    _bot_control = control or {}
     threading.Thread(target=_poll_loop, daemon=True).start()
-    print("[TG] Polling started")
+    # Auto-restore: restart trading loops for everyone who was active before
+    # the server restarted (Render free tier wipes the container on redeploy).
+    try:
+        user_loop.start_all(alert_fn=_user_alert)
+    except Exception as e:
+        print(f"[TELEGRAM] auto-restore error: {e}")
+    print("[TELEGRAM] Polling started — /grant /revoke /users /status /help")
+
+
+# ─── Outbound alerts ─────────────────────────────────────
+
+def _broadcast(text, extra=None):
+    """Send to owner + all granted clients."""
+    all_ids = set(access.list_admins() + access.list_clients())
+    if CHAT_ID:
+        all_ids.add(CHAT_ID)
+    for cid in all_ids:
+        send_to(cid, text, extra)
+
+
+def alert_open(side, symbol, price, units, stop_loss, take_profit, druck_mult=1.0,
+               reasoning="", key_factors=None):
+    d = "🟢 LONG" if side == "BUY" else "🔴 SHORT"
+    sl_pips = forex.to_pips(abs(price - stop_loss), symbol)
+    tp_pips = forex.to_pips(abs(take_profit - price), symbol)
+    mult = f"\n📐 <b>Druckenmiller:</b> ×{druck_mult:.2f}" if druck_mult != 1.0 else ""
+    why = _fx_why_block({"reasoning": reasoning, "keyFactors": key_factors or []})
+    _broadcast(f"{d} <b>OPENED — {symbol}</b>\n💰 @ {price}  Units: {units:,}\n"
+               f"🛡 SL: {stop_loss:.5f} ({sl_pips:.0f} pips)\n"
+               f"🎯 TP: {take_profit:.5f} ({tp_pips:.0f} pips){mult}{why}", _dashboard_keyboard())
+
+
+def alert_close(reason, symbol, side, entry_price, close_price, pnl, balance, reasoning=""):
+    icons = {"TAKE_PROFIT": "🎯 TAKE PROFIT", "STOP_LOSS": "🛑 STOP LOSS", "AI_CLOSE": "🤖 AI CLOSE"}
+    d = "LONG" if side == "BUY" else "SHORT"
+    pips = forex.to_pips(abs(close_price - entry_price), symbol)
+    why = f"\n🧠 <i>{reasoning}</i>" if reasoning else _fx_close_why(reason)
+    _broadcast(f"{'✅' if pnl > 0 else '❌'} <b>{icons.get(reason, reason)} — {symbol}</b>\n"
+               f"📊 {d}  {entry_price} → {close_price} ({pips:.0f} pips)\n"
+               f"💵 PnL: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>\n💼 Balance: ${balance:.2f}{why}",
+               _dashboard_keyboard())
+
+
+def alert_stop(reasons):
+    _broadcast("🚨 <b>STRATEGY STOP</b>\n" + "\n".join(f"• {r}" for r in reasons))
+
+
+def alert_filtered(action, livermore, turtle):
+    send(f"⚡ <b>SIGNAL FILTERED</b>\nAI: {action} | Livermore: {livermore} | Turtle: {turtle}\n"
+         f"<i>PTJ: Play defense</i>")
+
+
+def alert_market_closed():
+    send("🕐 <b>Market closed</b> (weekend). The bot resumes automatically at the Sunday open (21:00 UTC).")
+
+
+def alert_start(symbol, timeframe, balance, mode):
+    send(f"🚀 <b>{cfg.BOT_NAME.upper()} STARTED</b>\n{cfg.ASSET_EMOJI} {symbol} | {timeframe} | ${balance:.2f}\n⚙️ {mode}\n"
+         + (f"🌐 Dashboard: {DASHBOARD_URL}\n" if DASHBOARD_URL else "")
+         + "<i>Send /setup to configure · /status to check · /help for all commands</i>",
+         _dashboard_keyboard())
+
+
+def alert_heartbeat(tick_count, balance, open_position, current_price):
+    pos_line = "📭 No position"
+    if open_position and current_price:
+        d = "LONG" if open_position["side"] == "BUY" else "SHORT"
+        pnl = forex.pnl_usd(open_position["side"], open_position["entryPrice"],
+                            current_price, open_position["quantity"],
+                            open_position.get("symbol", cfg.SYMBOL))
+        pos_line = (f"{'🟢' if open_position['side'] == 'BUY' else '🔴'} {d} "
+                    f"<b>{open_position['symbol']}</b> @ {open_position['entryPrice']}\n"
+                    f"PnL: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>")
+    send(f"💓 <b>ACTIVE</b>  tick #{tick_count}\n💼 Balance: ${balance:.2f}\n{pos_line}\n"
+         f"<i>/status for details</i>", _dashboard_keyboard())
