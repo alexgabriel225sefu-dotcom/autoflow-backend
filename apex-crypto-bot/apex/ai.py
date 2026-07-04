@@ -316,7 +316,11 @@ def mean_reversion_signal(ind, open_position=None):
     # Strong-trend guard: fading a strong trend is how mean-reversion bots blow up.
     # Only fade in the trend's direction (buy dips in an uptrend, sell rallies in a downtrend).
     trend_sep = abs(ema50 - ema200) / price * 100 if price else 0
-    if trend_sep > 0.5:
+    # 0.5% is an FX "strong trend" cutoff; crypto sits above it almost always,
+    # which would turn mean-reversion into a trend-only engine and kill genuine
+    # range fades. Raise the cutoff for crypto.
+    _mr_crypto = getattr(cfg, "PRODUCT", "forex") == "crypto"
+    if trend_sep > (2.0 if _mr_crypto else 0.5):
         uptrend = ema50 > ema200
         if not ((score >= 3 and uptrend) or (score <= -3 and not uptrend)):
             return {"action": "HOLD", "confidence": 45, "criteriaScore": crit,

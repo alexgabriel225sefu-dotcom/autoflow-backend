@@ -256,7 +256,16 @@ def detect_regime(candles):
     if vol_ratio <= 0.42:
         return {"regime": "quiet", "vol_ratio": round(vol_ratio, 2),
                 "label": f"very low volatility ({vol_ratio:.1f}× normal) — standing aside"}
-    if sep_pct >= 0.18 and liv.get("trend") in ("BULLISH", "BEARISH") and liv.get("strength", 0) >= 0.55:
+    # EMA-separation cutoff for "trending". 0.18% is FX-scale; crypto EMAs sit
+    # 1-5%+ apart almost always, so on crypto that gate is always true and the
+    # regime never comes back "ranging". Raise it for the crypto build so the
+    # trend/range split is meaningful.
+    try:
+        from apex import config as _cfg
+        sep_thr = 0.9 if getattr(_cfg, "PRODUCT", "forex") == "crypto" else 0.18
+    except Exception:
+        sep_thr = 0.18
+    if sep_pct >= sep_thr and liv.get("trend") in ("BULLISH", "BEARISH") and liv.get("strength", 0) >= 0.55:
         return {"regime": "trending", "vol_ratio": round(vol_ratio, 2),
                 "label": f"{liv['trend'].lower()} trend — trend following"}
     return {"regime": "ranging", "vol_ratio": round(vol_ratio, 2),

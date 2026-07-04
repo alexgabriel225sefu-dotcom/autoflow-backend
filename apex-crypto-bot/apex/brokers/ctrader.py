@@ -349,9 +349,12 @@ class CtraderBroker:
     def _vol_rules(self, sid):
         """(minVolume, stepVolume) in hundredths-of-a-unit, from the symbol's
         full details. FX is 0.01 lots = 100k hundredths, but gold is 1 oz and
-        indices 1 contract — a hard-coded FX step breaks every other class."""
+        indices 1 contract — a hard-coded FX step breaks every other class.
+        Also caches the symbol's price DIGITS (used to round SL/TP)."""
         if not hasattr(self, "_vol_cache"):
             self._vol_cache = {}
+        if not hasattr(self, "_digits_cache"):
+            self._digits_cache = {}
         if sid in self._vol_cache:
             return self._vol_cache[sid]
         req = ProtoOASymbolByIdReq()
@@ -361,7 +364,10 @@ class CtraderBroker:
         sym = res.symbol[0] if res.symbol else None
         mn = int(getattr(sym, "minVolume", 0) or 0) or 100_000
         st = int(getattr(sym, "stepVolume", 0) or 0) or mn
+        dg = int(getattr(sym, "digits", 0) or 0)
         self._vol_cache[sid] = (mn, st)
+        if dg:
+            self._digits_cache[sid] = dg
         return mn, st
 
     def _symbol_id(self, instrument):
@@ -371,8 +377,22 @@ class CtraderBroker:
             raise ValueError(f"cTrader: symbol {name} not offered by this account")
         return self._sym_id[name]
 
-    @staticmethod
-    def _digits(instrument):
+    def _digits(self, instrument):
+        """Price decimal places for rounding SL/TP, taken from the broker's
+        symbol details. A hard-coded 5 makes cTrader reject the SL/TP amend on
+        instruments with fewer digits (BTCUSD is 2) as 'invalid precision' —
+        the position then reads back unprotected and gets closed 'for safety',
+        so EVERY crypto trade opens and instantly closes."""
+        if not hasattr(self, "_digits_cache"):
+            self._digits_cache = {}
+        try:
+            sid = self._symbol_id(instrument)
+            if sid not in self._digits_cache:
+                self._vol_rules(sid)  # populates _digits_cache from symbol details
+            if sid in self._digits_cache:
+                return self._digits_cache[sid]
+        except Exception:
+            pass
         return 3 if "JPY" in _to_ct_symbol(instrument) else 5
 
     @staticmethod
@@ -489,7 +509,7 @@ class CtraderBroker:
             return {
                 "instrument": sym,
                 "side": side,
-                "units": int(td.volume / 100),  # cTrader volume = units × 100
+                "units": round(td.volume / 100.0, 8),  # cTrader volume = units × 100; fractional for crypto
                 "symbol": instrument or self._c.SYMBOL,
                 # position price/SL/TP are plain doubles (unlike trendbar ints)
                 "entryPrice": p.price if p.price else None,
@@ -518,7 +538,7 @@ class CtraderBroker:
             out.append({
                 "symbol": id2name.get(td.symbolId, str(td.symbolId)),
                 "side": "BUY" if td.tradeSide == ProtoOATradeSide.BUY else "SELL",
-                "units": int(td.volume / 100),
+                "units": round(td.volume / 100.0, 8),  # fractional for crypto (0.34 BTC)
                 "entryPrice": p.price if p.price else None,
                 "stopLoss": p.stopLoss if p.HasField("stopLoss") else None,
                 "takeProfit": p.takeProfit if p.HasField("takeProfit") else None,
@@ -549,7 +569,15 @@ class CtraderBroker:
         try:
             mn, st = self._vol_rules(sid)
         except Exception:
-            mn, st = 100_000, 100_000  # FX fallback
+            # Fail SAFE per class: the FX 0.01-lot floor (100k) on a crypto
+            # symbol would turn a 0.34 BTC order into 1,000 BTC (~$100M) if the
+            # symbol-details RPC hiccups. For non-FX never inflate — use the
+            # requested size and let the broker reject a sub-minimum order.
+            from apex import forex as _fx
+            if _fx._is_fx(_fx._norm(instrument or self._c.SYMBOL)):
+                mn, st = 100_000, 100_000
+            else:
+                mn, st = 1, 1
         req.volume = max(mn, (vol_h // st) * st)
         # NOTE: we do NOT put relativeStopLoss/TP on the order — its 1e-5 unit
         # doesn't match every instrument's tick size (gold moves in 0.01, so
@@ -619,7 +647,7 @@ class CtraderBroker:
         req = ProtoOAClosePositionReq()
         req.ctidTraderAccountId = self._ctid()
         req.positionId = pos["positionId"]
-        req.volume = int(pos["units"] * 100)
+        req.volume = int(round(pos["units"] * 100))  # fractional-safe (0.34 BTC → 34)
         res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20)
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):

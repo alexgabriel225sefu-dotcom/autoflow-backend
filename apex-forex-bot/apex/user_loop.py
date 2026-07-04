@@ -66,9 +66,13 @@ def _make_broker(user):
         STOP_LOSS_PIPS   = float(user.get("sl_pips", 20)),
         TAKE_PROFIT_PIPS = float(user.get("tp_pips", 40)),
         RISK_PER_TRADE   = float(user.get("risk", 0.01)),  # 1% default (was 0.5%) — bigger, still safe
-        LEVERAGE         = float(user.get("leverage", 30)),
+        # Crypto CFDs are leveraged far lower than FX (retail ~2-5x vs 30x), so
+        # the margin cap must assume less leverage or it sizes positions the
+        # account can't actually margin.
+        LEVERAGE         = float(user.get("leverage", 5 if _appcfg.PRODUCT == "crypto" else 30)),
         MARGIN_CAP       = 0.5,
         MAX_SPREAD_PIPS  = 3.0,
+        PRODUCT          = _appcfg.PRODUCT,  # so the loop's crypto branches fire
         # Asset-class-aware spread/volatility guards (crypto uses a %-of-price
         # spread limit + higher flash-spike bar; forex keeps the pip limit).
         # Pulled from the global product config so PRODUCT=crypto takes effect.
@@ -124,6 +128,7 @@ def _loop(user_id, alert_fn, gen=None):
         except Exception as e:
             print(f"[UserLoop:{user_id}] initial balance read failed: {e}")
     open_pos = None  # tracked locally for paper mode
+    _crypto_build = getattr(cfg, "PRODUCT", "forex") == "crypto"
     tick = 0
     data_fails = 0   # consecutive get_candles failures — alert the user at 3
     last_loss_at = 0.0  # entry cooldown anchor (any losing close)
@@ -286,7 +291,11 @@ def _loop(user_id, alert_fn, gen=None):
             # ── Basket/Auto-Pilot scan: shop every watched symbol (that isn't
             # already open) and focus on the strongest candidate. Only scan if
             # we have a free slot. The winner still passes the FULL pipeline.
-            slot_free = (all_positions is not None) and (open_count < maxpos)
+            # Free-slot signal differs by mode: live reads broker positions,
+            # paper tracks a single local position (all_positions is always None
+            # in paper, which used to freeze the scanner and pin the focus).
+            slot_free = ((open_pos is None) if cfg.PAPER_TRADING
+                         else ((all_positions is not None) and (open_count < maxpos)))
             # Scan at most once every 3 ticks (~15 min) — 8 historical requests
             # every 5 min was tripping cTrader's trendbar rate limit and
             # freezing the loop. Between scans, keep the last focus.
@@ -325,6 +334,20 @@ def _loop(user_id, alert_fn, gen=None):
                 if best:
                     symbol = best[0]
                     dash["symbol"] = symbol
+                elif (spread_blocked.get(_nrm(symbol), 0) > time.time()
+                      or _nrm(symbol) in open_syms):
+                    # Nothing signalled this scan AND the current focus is
+                    # untradeable (spread-blocked or already open) — camp on ANY
+                    # tradeable coin instead of freezing on the dead one and
+                    # re-tripping its spread guard forever.
+                    for ws in watchlist:
+                        if _nrm(ws) in open_syms:
+                            continue
+                        if spread_blocked.get(_nrm(ws), 0) > time.time():
+                            continue
+                        symbol = ws
+                        dash["symbol"] = symbol
+                        break
 
             # Data fetch is the loop's lifeline — if it fails silently the user
             # just sees "Last tick: None" forever. Count failures and tell them.
@@ -554,7 +577,11 @@ def _loop(user_id, alert_fn, gen=None):
                 picked = {"trending": "trend", "ranging": "mean_reversion",
                           "volatile": "breakout"}.get(regime["regime"])
                 regime_block = regime["regime"] == "quiet"
-                active_mode = picked or "mean_reversion"
+                # Neutral default: crypto trends more than it ranges, so a
+                # warming-up/unknown regime should default to trend-following,
+                # not fading (the forex default).
+                _default_mode = "trend" if _crypto_build else "mean_reversion"
+                active_mode = picked or _default_mode
                 dash["strategy"] = f"Auto → {ai.STRATEGY_MODES[active_mode]['label']}"
 
             # Market Pulse: store a plain-language read for /market, and ping the
@@ -686,7 +713,8 @@ def _loop(user_id, alert_fn, gen=None):
                     # on the FIRST detection per block window — repeating the
                     # same 'holding off' every cycle reads as a stuck bot.
                     was_blocked = spread_blocked.get(_nrm(symbol), 0) > time.time()
-                    spread_blocked[_nrm(symbol)] = time.time() + 1800
+                    if not was_blocked:  # arm ONCE — don't renew the 30-min TTL every tick
+                        spread_blocked[_nrm(symbol)] = time.time() + 1800
                     _skip(f"spread too wide ({spread_pct:.2f}% > {max_spread_pct:g}%)")
                     if alert_fn and not was_blocked and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
@@ -696,9 +724,11 @@ def _loop(user_id, alert_fn, gen=None):
                 elif max_spread_pct <= 0 and spread > max_spread:
                     print(f"[UserLoop:{user_id}] skip entry — spread {spread:.1f}p > {max_spread}p limit")
                     entry_ok = False
-                    spread_blocked[_nrm(symbol)] = time.time() + 1800
+                    was_blocked = spread_blocked.get(_nrm(symbol), 0) > time.time()
+                    if not was_blocked:
+                        spread_blocked[_nrm(symbol)] = time.time() + 1800
                     _skip(f"spread too wide ({spread:.1f}p > {max_spread:g}p)")
-                    if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
+                    if alert_fn and not was_blocked and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
                         alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                            "reason": f"spread is unusually wide ({spread:.1f} pips) — "
@@ -740,6 +770,7 @@ def _loop(user_id, alert_fn, gen=None):
 
             if entry_ok:
                 pip = forex.pip_size(symbol, price)
+                _crypto = _crypto_build
                 stop_pips_eff = cfg.STOP_LOSS_PIPS
                 # Dynamic ATR stops (premium spec #10): SL = 1.5×ATR, TP = 3×ATR
                 # — distances that breathe with the instrument's volatility.
@@ -757,10 +788,20 @@ def _loop(user_id, alert_fn, gen=None):
                     # alone triggers instantly — the churn that bled the account.
                     # Never let the stop sit inside spread+noise: at least 4×
                     # the current spread and a sane per-class pip floor.
-                    min_stop = max(4.0 * spread * pip, 10.0 * pip)
+                    # Crypto's magnitude pip makes 10×pip a 0.01-0.1% sub-noise
+                    # floor; use a %-of-price floor (~0.4%) so the stop clears
+                    # crypto tick noise. Forex keeps the 10-pip floor.
+                    floor_abs = (0.004 * price) if _crypto else (10.0 * pip)
+                    min_stop = max(4.0 * spread * pip, floor_abs)
                     if sl_dist < min_stop:
                         sl_dist = min_stop
                         tp_dist = 2.0 * sl_dist  # keep RR ≥ 1:2
+                    stop_pips_eff = forex.to_pips(sl_dist, symbol, price)
+                elif _crypto:
+                    # No ATR available on crypto → %-of-price stop, not the
+                    # sub-noise fixed-pip default (20 pips = 0.02% on SOL).
+                    sl_dist = 0.012 * price   # ~1.2% stop
+                    tp_dist = 0.024 * price   # ~2.4% target (RR 1:2)
                     stop_pips_eff = forex.to_pips(sl_dist, symbol, price)
                 else:
                     sl_dist = cfg.STOP_LOSS_PIPS * pip
@@ -782,7 +823,7 @@ def _loop(user_id, alert_fn, gen=None):
                     risk_mult *= 0.5
                 units = forex.calc_units(paper_balance, per_trade_risk,
                                          stop_pips_eff, symbol, price,
-                                         mult=risk_mult)
+                                         leverage=cfg.LEVERAGE, mult=risk_mult)
                 # Floor to the instrument minimum, then round per instrument
                 # (whole units for FX, fractional lots for crypto/metals/indices
                 # — int() truncation used to zero a 0.34-BTC risk size).
@@ -1022,7 +1063,8 @@ def force_trade(user_id, side, symbol=None):
     if dash:
         balance = dash.get("balance", balance)
 
-    units = forex.calc_units(balance, cfg.RISK_PER_TRADE, stop_pips_eff, sym, price)
+    units = forex.calc_units(balance, cfg.RISK_PER_TRADE, stop_pips_eff, sym, price,
+                             leverage=cfg.LEVERAGE)
     units = forex.round_units(max(units, forex.min_units(sym)), sym)
 
     try:
