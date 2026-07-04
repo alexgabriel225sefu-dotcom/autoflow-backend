@@ -388,9 +388,20 @@ def trend_signal(ind, strat=None, open_position=None):
     elif sor.get("direction") == "BEARISH":
         score -= 1; factors.append("bearish momentum")
     # Entry timing: pullback to value, not a chase. Buy dips (price at/under
-    # EMA20 with RSI cooled off), sell rallies mirrored.
-    pullback_buy = score > 0 and price <= ema20 * 1.0005 and 35 <= rsi_v <= 60
-    pullback_sell = score < 0 and price >= ema20 * 0.9995 and 40 <= rsi_v <= 65
+    # EMA20 with RSI cooled off), sell rallies mirrored. Crypto trends harder
+    # and its RSI runs hotter, so a forex-tight pullback band (RSI 35-60, price
+    # ≤ EMA20+0.05%) almost never triggers on a crypto uptrend — widen the band
+    # and shave the score threshold for the crypto build so it actually rides
+    # trends instead of waiting forever.
+    _crypto = getattr(cfg, "PRODUCT", "forex") == "crypto"
+    if _crypto:
+        pullback_buy = score > 0 and price <= ema20 * 1.004 and 38 <= rsi_v <= 70
+        pullback_sell = score < 0 and price >= ema20 * 0.996 and 30 <= rsi_v <= 62
+        thr = 3
+    else:
+        pullback_buy = score > 0 and price <= ema20 * 1.0005 and 35 <= rsi_v <= 60
+        pullback_sell = score < 0 and price >= ema20 * 0.9995 and 40 <= rsi_v <= 65
+        thr = 4
     if pullback_buy:
         score += 1; factors.append(f"pullback to EMA20 (RSI {rsi_v:.0f})")
     if pullback_sell:
@@ -402,11 +413,11 @@ def trend_signal(ind, strat=None, open_position=None):
 
     conf = min(86, 50 + abs(score) * 7)
     crit = min(5, abs(score))
-    if score >= 4 and pullback_buy:
+    if score >= thr and pullback_buy:
         return {"action": "BUY", "confidence": conf, "criteriaScore": crit,
                 "reasoning": f"Trend following BUY: {', '.join(factors)}",
                 "riskLevel": "MEDIUM", "keyFactors": factors}
-    if score <= -4 and pullback_sell:
+    if score <= -thr and pullback_sell:
         return {"action": "SELL", "confidence": conf, "criteriaScore": crit,
                 "reasoning": f"Trend following SELL: {', '.join(factors)}",
                 "riskLevel": "MEDIUM", "keyFactors": factors}
