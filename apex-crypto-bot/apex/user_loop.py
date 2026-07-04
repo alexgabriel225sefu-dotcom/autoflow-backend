@@ -131,6 +131,8 @@ def _loop(user_id, alert_fn, gen=None):
     loss_streak = 0     # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
     prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
     pos_details = {}    # nrm(symbol) -> {symbol, side, entry, units} for P&L on close
+    spread_blocked = {}  # nrm(symbol) -> retry_ts: Auto-Pilot avoids symbols whose
+                         # spread is blown out (weekend crypto) instead of camping on them
     rate_limit_until = 0.0  # while > now, do only the minimal 1-symbol fetch
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
@@ -294,6 +296,8 @@ def _loop(user_id, alert_fn, gen=None):
                 for ws in watchlist:
                     if _nrm(ws) in open_syms:
                         continue  # already holding this one
+                    if spread_blocked.get(_nrm(ws), 0) > time.time():
+                        continue  # spread blown out recently — try others first
                     try:
                         time.sleep(0.35)  # space out trendbar requests — cTrader rate-limits bursts
                         c2 = broker.get_candles(ws, cfg.TIMEFRAME, 160)
@@ -674,6 +678,9 @@ def _loop(user_id, alert_fn, gen=None):
                 elif max_spread_pct > 0 and spread_pct > max_spread_pct:
                     print(f"[UserLoop:{user_id}] skip entry — spread {spread_pct:.2f}% > {max_spread_pct:g}% limit")
                     entry_ok = False
+                    # Let Auto-Pilot rotate to a tradeable symbol instead of
+                    # camping on this one until its spread normalises.
+                    spread_blocked[_nrm(symbol)] = time.time() + 1800
                     _skip(f"spread too wide ({spread_pct:.2f}% > {max_spread_pct:g}%)")
                     if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
@@ -683,6 +690,7 @@ def _loop(user_id, alert_fn, gen=None):
                 elif max_spread_pct <= 0 and spread > max_spread:
                     print(f"[UserLoop:{user_id}] skip entry — spread {spread:.1f}p > {max_spread}p limit")
                     entry_ok = False
+                    spread_blocked[_nrm(symbol)] = time.time() + 1800
                     _skip(f"spread too wide ({spread:.1f}p > {max_spread:g}p)")
                     if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
