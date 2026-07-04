@@ -296,12 +296,14 @@ def _loop(user_id, alert_fn, gen=None):
             # in paper, which used to freeze the scanner and pin the focus).
             slot_free = ((open_pos is None) if cfg.PAPER_TRADING
                          else ((all_positions is not None) and (open_count < maxpos)))
-            # Scan at most once every 3 ticks (~15 min) — 8 historical requests
-            # every 5 min was tripping cTrader's trendbar rate limit and
-            # freezing the loop. Between scans, keep the last focus.
-            # Rescan immediately when the current focus is spread-blocked —
-            # waiting up to 3 ticks kept the bot camped on a dead symbol.
-            due_to_scan = (tick % 3 == 0) or (
+            # Scan cadence: forex every 3 ticks (~15 min); crypto every 2 (~10
+            # min) because setups rotate faster across the coin basket and only
+            # the focus symbol is entered per tick, so scanning too rarely misses
+            # most setups. Requests are spaced 0.35s to respect cTrader's limit.
+            # Also rescan immediately when the focus is spread-blocked so the bot
+            # doesn't camp on a dead symbol.
+            _scan_every = 2 if _crypto_build else 3
+            due_to_scan = (tick % _scan_every == 0) or (
                 spread_blocked.get(_nrm(symbol), 0) > time.time())
             if watchlist and slot_free and due_to_scan and rate_ok:
                 best = None

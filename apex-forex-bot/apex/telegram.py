@@ -357,8 +357,14 @@ def _build_status(dash, chart=""):
     total = len(trades)
     win_rate = f"{wins / total * 100:.0f}%" if total else "—"
     chart_line = (f"\n<code>{chart}</code>  <b>{dash.get('currentPrice', 0):.5f}</b>") if chart else ""
-    market = "🟢 OPEN" if forex.is_market_open() else "🔴 CLOSED (weekend)"
-    sessions = ", ".join(forex.active_sessions()) or "—"
+    # Crypto trades 24/7 and has no forex "sessions" — showing London/New York
+    # on a crypto bot is wrong. Forex keeps the session line.
+    if getattr(cfg, "MARKET_24_7", False):
+        market_line = "🕐 Market: 🟢 <b>24/7</b> · crypto never sleeps"
+    else:
+        market = "🟢 OPEN" if forex.is_market_open() else "🔴 CLOSED (weekend)"
+        sessions = ", ".join(forex.active_sessions()) or "—"
+        market_line = f"🕐 Market: {market} · Sessions: {sessions}"
     oc = dash.get("openCount", 0)
     if dash.get("openPosition"):
         op = dash["openPosition"]
@@ -378,7 +384,7 @@ def _build_status(dash, chart=""):
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"💰 Balance: <b>${dash.get('balance', 0):.2f}</b>  ({sign}{pnl_pct:.2f}%)"
             f"{' ⏳ <i>refreshing…</i>' if dash.get('balStale') else ''}{chart_line}\n"
-            f"🕐 Market: {market} · Sessions: {sessions}\n"
+            f"{market_line}\n"
             f"🎯 Method: {dash.get('strategy', 'Mean Reversion')}\n"
             + (f"📊 Positions: {dash.get('openCount', 0)}/{dash['maxpos']} open\n" if dash.get('maxpos', 1) > 1 else "")
             + (f"🤖 Auto-Pilot: scanning {len(dash['watchlist'])} instruments — focus {dash.get('symbol', '')}\n" if dash.get('autopilot') and dash.get('watchlist')
