@@ -45,6 +45,7 @@ def _make_broker(user):
       • paper + no broker linked          → Yahoo Finance data (free, no account)
     """
     import types
+    from apex import config as _appcfg
     paper = user.get("paper", True)
     oanda_token = user.get("oanda_token", "")
     ct_token = user.get("ctrader_access_token", "")
@@ -68,6 +69,11 @@ def _make_broker(user):
         LEVERAGE         = float(user.get("leverage", 30)),
         MARGIN_CAP       = 0.5,
         MAX_SPREAD_PIPS  = 3.0,
+        # Asset-class-aware spread/volatility guards (crypto uses a %-of-price
+        # spread limit + higher flash-spike bar; forex keeps the pip limit).
+        # Pulled from the global product config so PRODUCT=crypto takes effect.
+        MAX_SPREAD_PCT   = getattr(_appcfg, "MAX_SPREAD_PCT", 0),
+        FLASH_SPIKE_PCT  = getattr(_appcfg, "FLASH_SPIKE_PCT", 0.012),
         MIN_CONFIDENCE   = int(user.get("min_confidence", 55)),  # was 62 — trade more freely
         STRATEGY         = (user.get("strategy") or "auto").lower(),
         ATR_STOPS        = bool(user.get("atr_stops", True)),  # dynamic RR 1:2 by default
