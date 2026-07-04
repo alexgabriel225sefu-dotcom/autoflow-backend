@@ -1344,9 +1344,10 @@ def _sim_strategy(mode, candles, symbol, sl_pips, tp_pips, risk, balance0):
             d = 1 if sx["action"] == "BUY" else -1
             sl = px - d * sl_pips * pip
             tp = px + d * tp_pips * pip
-            units = _fx.calc_units(bal, risk, sl_pips, symbol, px)
+            units = _fx.round_units(max(_fx.calc_units(bal, risk, sl_pips, symbol, px),
+                                        _fx.min_units(symbol)), symbol)
             pos = {"symbol": symbol, "side": sx["action"], "entryPrice": px,
-                   "quantity": max(int(units), 1000), "stopLoss": sl, "takeProfit": tp,
+                   "quantity": units, "stopLoss": sl, "takeProfit": tp,
                    "initialStop": sl, "trailHigh": px if d == 1 else None,
                    "trailLow": px if d == -1 else None}
     if pos:

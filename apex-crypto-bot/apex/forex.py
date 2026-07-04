@@ -66,12 +66,25 @@ def usd_exposure(instrument: str, side: str) -> int:
     return 0
 
 
-def min_units(instrument: str) -> int:
-    """Order floor: 0.01 lot (1,000 units) for FX; a single unit for everything
-    else (oz, contracts, shares, coins) — the broker's real per-symbol minimum
-    is applied at order time on top of this."""
+def min_units(instrument: str):
+    """Order floor: 0.01 lot (1,000 units) for FX. For everything else
+    (crypto, metals, indices) 1 unit can be worth thousands (1 BTC ≈ $100k), so
+    the floor is a small FRACTION — otherwise a whole coin blows a small account
+    and risk-based sizing that lands below 1 unit would be forced up ~10×. The
+    broker's real per-symbol minimum/step is applied on top of this at order
+    time (see ctrader._vol_rules)."""
     s = _norm(instrument)
-    return 1000 if (_is_fx(s) or s.endswith("JPY")) else 1
+    return 1000 if (_is_fx(s) or s.endswith("JPY")) else 0.01
+
+
+def round_units(units: float, instrument: str):
+    """FX trades in whole units (thousands); crypto/metals/indices allow
+    fractional lots, so keep 2 decimals instead of truncating to int (which
+    zeroed out any sub-1-unit size like 0.34 BTC)."""
+    s = _norm(instrument)
+    if _is_fx(s) or s.endswith("JPY"):
+        return int(units)
+    return round(float(units), 2)
 
 
 def to_pips(price_distance: float, instrument: str, price: float = None) -> float:
@@ -138,7 +151,9 @@ def calc_units(balance: float, risk_pct: float, stop_pips: float,
     else:
         notional_per_unit = price  # fallback conservator — supraestimează marja
     max_units = (balance * leverage * margin_cap) / notional_per_unit
-    return int(max(0, min(units, max_units)))
+    # Keep the fractional size — callers round per instrument (round_units).
+    # int() here silently zeroed crypto sizes below 1 unit (0.34 BTC → 0).
+    return max(0.0, min(units, max_units))
 
 
 def required_margin(units: int, instrument: str, price: float, leverage: float = 30) -> float:

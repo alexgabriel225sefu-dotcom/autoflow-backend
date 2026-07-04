@@ -769,7 +769,10 @@ def _loop(user_id, alert_fn, gen=None):
                 units = forex.calc_units(paper_balance, per_trade_risk,
                                          stop_pips_eff, symbol, price,
                                          mult=risk_mult)
-                units = max(int(units), forex.min_units(symbol))
+                # Floor to the instrument minimum, then round per instrument
+                # (whole units for FX, fractional lots for crypto/metals/indices
+                # — int() truncation used to zero a 0.34-BTC risk size).
+                units = forex.round_units(max(units, forex.min_units(symbol)), symbol)
 
                 broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
 
@@ -1006,7 +1009,7 @@ def force_trade(user_id, side, symbol=None):
         balance = dash.get("balance", balance)
 
     units = forex.calc_units(balance, cfg.RISK_PER_TRADE, stop_pips_eff, sym, price)
-    units = max(int(units), forex.min_units(sym))
+    units = forex.round_units(max(units, forex.min_units(sym)), sym)
 
     try:
         broker.place_order(side, units, sym, sl=sl_price, tp=tp_price)
