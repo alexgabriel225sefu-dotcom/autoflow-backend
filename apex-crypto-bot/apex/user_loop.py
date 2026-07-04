@@ -638,6 +638,7 @@ def _loop(user_id, alert_fn, gen=None):
                 # ── Cost control: the spread is forex's hidden fee. Skip a too-wide
                 #    spread and refuse trades whose target can't clear a round-trip
                 #    spread plus a safety margin (break-even guard). ──
+                bid, ask = 0.0, 0.0
                 try:
                     bid, ask = broker.get_bid_ask(symbol)
                     spread = forex.spread_pips(bid, ask, symbol)
@@ -656,10 +657,24 @@ def _loop(user_id, alert_fn, gen=None):
                 if health["degraded"]:
                     entry_ok = False
                     _skip(f"broker health: {dash.get('brokerHealth', 'degraded')}")
+                # Spread guard — crypto uses a %-of-price limit (pip-count limits
+                # are meaningless across crypto's varied pip sizes); forex keeps
+                # the pip limit.
                 max_spread = getattr(cfg, "MAX_SPREAD_PIPS", 3.0)
+                max_spread_pct = getattr(cfg, "MAX_SPREAD_PCT", 0)
+                spread_pct = ((ask - bid) / price * 100) if price > 0 else 0.0
                 if not entry_ok:
                     pass
-                elif spread > max_spread:
+                elif max_spread_pct > 0 and spread_pct > max_spread_pct:
+                    print(f"[UserLoop:{user_id}] skip entry — spread {spread_pct:.2f}% > {max_spread_pct:g}% limit")
+                    entry_ok = False
+                    _skip(f"spread too wide ({spread_pct:.2f}% > {max_spread_pct:g}%)")
+                    if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
+                        last_warn_tick = tick
+                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
+                                           "reason": f"spread is unusually wide ({spread_pct:.2f}%) — "
+                                                     "entering now would hand the edge to the broker"})
+                elif max_spread_pct <= 0 and spread > max_spread:
                     print(f"[UserLoop:{user_id}] skip entry — spread {spread:.1f}p > {max_spread}p limit")
                     entry_ok = False
                     _skip(f"spread too wide ({spread:.1f}p > {max_spread:g}p)")
@@ -668,14 +683,17 @@ def _loop(user_id, alert_fn, gen=None):
                         alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                            "reason": f"spread is unusually wide ({spread:.1f} pips) — "
                                                      "entering now would hand the edge to the broker"})
-                elif cfg.TAKE_PROFIT_PIPS <= (spread + comm_pips) * 1.5:
+                # Break-even guard (pip-based) only applies to the forex pip model;
+                # crypto's %-spread guard above already ensures the edge clears costs.
+                elif max_spread_pct <= 0 and cfg.TAKE_PROFIT_PIPS <= (spread + comm_pips) * 1.5:
                     print(f"[UserLoop:{user_id}] skip entry — TP {cfg.TAKE_PROFIT_PIPS:g}p doesn't clear costs {spread + comm_pips:.1f}p")
                     entry_ok = False
                     _skip(f"edge too thin: TP {cfg.TAKE_PROFIT_PIPS:g}p vs real costs {spread + comm_pips:.1f}p (spread+commission)")
 
             # Flash-crash circuit breaker: skip entry when the latest candle's
-            # range is extreme for an FX major (>1.2% ≈ a violent spike).
-            if entry_ok and _flash_spike(candles, 0.012):
+            # range is extreme (>1.2% for FX majors; crypto is far more volatile,
+            # so the threshold is raised via FLASH_SPIKE_PCT).
+            if entry_ok and _flash_spike(candles, getattr(cfg, "FLASH_SPIKE_PCT", 0.012)):
                 entry_ok = False
                 _skip("flash-crash guard: extreme candle range")
                 if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:

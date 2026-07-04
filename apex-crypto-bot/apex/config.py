@@ -110,6 +110,15 @@ MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 55)  # was 62 — trade more
 LEVERAGE = float(os.getenv("LEVERAGE") or 30)
 MARGIN_CAP = float(os.getenv("MARGIN_CAP") or 0.5)             # use ≤50% of available margin
 MAX_SPREAD_PIPS = float(_scalp("MAX_SPREAD_PIPS", 1.2, 3.0))   # scalp: strict 1.2p — wide spread kills tight targets
+# Crypto's pip conventions make spreads huge in pip terms (SOL pip=$0.01 → a
+# $0.30 spread = 30 pips), so a fixed pip limit blocks every crypto trade. For
+# crypto use a %-of-price spread limit instead: normal crypto CFD spread is
+# ~0.05-0.3%, and brokers blow it out to 1-3% on weekends (correctly skipped).
+# 0 = disabled (forex keeps the pip limit).
+MAX_SPREAD_PCT = float(os.getenv("MAX_SPREAD_PCT") or (0.35 if _IS_CRYPTO else 0))
+# Flash-crash guard: an FX major moving >1.2% in one M5 candle is a violent
+# spike; crypto routinely moves that much normally, so raise the bar for crypto.
+FLASH_SPIKE_PCT = float(os.getenv("FLASH_SPIKE_PCT") or (0.05 if _IS_CRYPTO else 0.012))
 
 # ─── Trailing stop ──────────────────────────────────────
 TRAILING_STOP = os.getenv("TRAILING_STOP") != "false"  # ON by default — let winners run, exit on reversal
