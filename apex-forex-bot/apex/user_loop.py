@@ -345,7 +345,7 @@ def _loop(user_id, alert_fn, gen=None):
             # most setups. Requests are spaced 0.35s to respect cTrader's limit.
             # Also rescan immediately when the focus is spread-blocked so the bot
             # doesn't camp on a dead symbol.
-            _scan_every = 2 if _crypto_build else 3
+            _scan_every = 1 if _crypto_build else 3
             due_to_scan = (tick % _scan_every == 0) or (
                 spread_blocked.get(_nrm(symbol), 0) > time.time())
             if watchlist and slot_free and due_to_scan and rate_ok:

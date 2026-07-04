@@ -327,11 +327,16 @@ def mean_reversion_signal(ind, open_position=None):
                     "reasoning": f"Strong trend — skipping counter-trend fade ({', '.join(factors) or 'neutral'})",
                     "riskLevel": "MEDIUM", "keyFactors": factors}
 
-    if score >= 3:
+    # Crypto hits single clean extremes (BB edge OR RSI extreme = score 2) far
+    # more usefully than forex, which needs the full stack to fade safely. A
+    # score-3 gate left the crypto bot idle for hours in ranging markets, so
+    # enter at score 2 on crypto (conf 64 ≥ MIN_CONFIDENCE). Forex stays at 3.
+    _mr_thr = 2 if _mr_crypto else 3
+    if score >= _mr_thr:
         return {"action": "BUY", "confidence": confidence, "criteriaScore": crit,
                 "reasoning": f"Mean reversion BUY: {', '.join(factors)}",
                 "riskLevel": "MEDIUM", "keyFactors": factors}
-    if score <= -3:
+    if score <= -_mr_thr:
         return {"action": "SELL", "confidence": confidence, "criteriaScore": crit,
                 "reasoning": f"Mean reversion SELL: {', '.join(factors)}",
                 "riskLevel": "MEDIUM", "keyFactors": factors}
