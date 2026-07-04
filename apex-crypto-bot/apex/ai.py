@@ -483,7 +483,7 @@ STRATEGY_MODES = {
     },
     "mean_reversion": {
         "label": "Mean Reversion",
-        "blurb": "fades overbought/oversold extremes back to the mean (RSI + Bollinger). Best in ranging markets — the forex default.",
+        "blurb": "fades overbought/oversold extremes back to the mean (RSI + Bollinger). Best in ranging, sideways markets.",
         "engine": lambda ind, strat, pos: mean_reversion_signal(ind, pos),
     },
     "trend": {
