@@ -290,7 +290,10 @@ def _loop(user_id, alert_fn, gen=None):
             # Scan at most once every 3 ticks (~15 min) — 8 historical requests
             # every 5 min was tripping cTrader's trendbar rate limit and
             # freezing the loop. Between scans, keep the last focus.
-            due_to_scan = (tick % 3 == 0)
+            # Rescan immediately when the current focus is spread-blocked —
+            # waiting up to 3 ticks kept the bot camped on a dead symbol.
+            due_to_scan = (tick % 3 == 0) or (
+                spread_blocked.get(_nrm(symbol), 0) > time.time())
             if watchlist and slot_free and due_to_scan and rate_ok:
                 best = None
                 for ws in watchlist:
@@ -679,10 +682,13 @@ def _loop(user_id, alert_fn, gen=None):
                     print(f"[UserLoop:{user_id}] skip entry — spread {spread_pct:.2f}% > {max_spread_pct:g}% limit")
                     entry_ok = False
                     # Let Auto-Pilot rotate to a tradeable symbol instead of
-                    # camping on this one until its spread normalises.
+                    # camping on this one until its spread normalises. Alert only
+                    # on the FIRST detection per block window — repeating the
+                    # same 'holding off' every cycle reads as a stuck bot.
+                    was_blocked = spread_blocked.get(_nrm(symbol), 0) > time.time()
                     spread_blocked[_nrm(symbol)] = time.time() + 1800
                     _skip(f"spread too wide ({spread_pct:.2f}% > {max_spread_pct:g}%)")
-                    if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
+                    if alert_fn and not was_blocked and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
                         alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                            "reason": f"spread is unusually wide ({spread_pct:.2f}%) — "
