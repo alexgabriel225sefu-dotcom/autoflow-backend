@@ -101,6 +101,48 @@ def _broker_label(user, cfg):
     return "Yahoo (paper data)"
 
 
+def _looks_like_auth_error(msg: str) -> bool:
+    """Broker errors that a token refresh + reconnect can heal (expired token,
+    dropped/unroutable connection) vs. plain data hiccups."""
+    m = (msg or "").lower()
+    return any(k in m for k in (
+        "auth", "token", "route", "not_authenticated", "expired",
+        "invalid_request", "access", "unauthor"))
+
+
+def _refresh_ctrader_token(user_id, cfg) -> bool:
+    """Self-heal a cTrader connection: swap the expired access token for a fresh
+    one using the stored refresh token, persist it, and drop the pooled
+    connection so the next tick re-authenticates. Returns True on success.
+    (When cTrader itself is down the refresh call also fails — harmless, we just
+    keep retrying.)"""
+    try:
+        from apex.brokers import ctrader as _ct
+        refresh = (getattr(cfg, "CTRADER_REFRESH_TOKEN", "")
+                   or user_store.load(user_id).get("ctrader_refresh_token", ""))
+        if not refresh:
+            return False
+        tok = _ct.refresh_access_token(refresh)
+        access = tok.get("accessToken") or tok.get("access_token")
+        new_refresh = tok.get("refreshToken") or tok.get("refresh_token") or refresh
+        if not access:
+            return False
+        user_store.update(user_id, {"ctrader_access_token": access,
+                                    "ctrader_refresh_token": new_refresh})
+        cfg.CTRADER_ACCESS_TOKEN = access
+        cfg.CTRADER_REFRESH_TOKEN = new_refresh
+        try:
+            _ct._drop_conn(getattr(cfg, "CTRADER_ENV", "demo"),
+                           cfg.CTRADER_ACCOUNT_ID)
+        except Exception:
+            pass
+        print(f"[UserLoop:{user_id}] cTrader token refreshed + reconnected")
+        return True
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] token refresh failed (cTrader may be down): {e}")
+        return False
+
+
 def _loop(user_id, alert_fn, gen=None):
     user = user_store.load(user_id)
     broker, cfg = _make_broker(user)
@@ -131,6 +173,7 @@ def _loop(user_id, alert_fn, gen=None):
     _crypto_build = getattr(cfg, "PRODUCT", "forex") == "crypto"
     tick = 0
     data_fails = 0   # consecutive get_candles failures — alert the user at 3
+    last_refresh_at = 0.0  # throttle cTrader token-refresh/reconnect attempts
     last_loss_at = 0.0  # entry cooldown anchor (any losing close)
     last_close_at = 0.0 # re-entry lock after ANY close — kills open/close churn
     loss_streak = 0     # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
@@ -366,6 +409,18 @@ def _loop(user_id, alert_fn, gen=None):
                 rate_limited = "rate" in str(data_err).lower() or "BLOCKED_PAYLOAD" in str(data_err)
                 if rate_limited:
                     rate_limit_until = time.time() + 120  # pause scanner/positions 2 min
+                # Self-heal: on a cTrader auth/route error, refresh the token +
+                # reconnect ONCE (throttled to every 3 min) before nagging the
+                # client to /ctrader. If cTrader is fully down this no-ops and we
+                # just keep retrying until their API recovers.
+                elif (not cfg.PAPER_TRADING and cfg.CTRADER_ACCESS_TOKEN
+                      and _looks_like_auth_error(data_err)
+                      and data_fails >= 2 and time.time() - last_refresh_at > 180):
+                    last_refresh_at = time.time()
+                    if _refresh_ctrader_token(user_id, cfg):
+                        data_fails = 0
+                        time.sleep(5)
+                        continue
                 if data_fails == 3 and alert_fn and not rate_limited:
                     alert_fn(user_id, {
                         "action": "DATA_ERROR",
