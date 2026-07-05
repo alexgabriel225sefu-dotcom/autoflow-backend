@@ -817,10 +817,21 @@ def main():
     })
 
     verify_license()
-    logger.info("🚀 First analysis...")
-    tick()
-    interval = cfg.LOOP_INTERVAL_MS / 1000
-    logger.info(f"⏱️  Analysis every {cfg.LOOP_INTERVAL_MS / 60000} minutes.")
-    while True:
-        time.sleep(interval)
+    # The global single-account tick() loop is legacy: it analyzes ONE instrument
+    # via the global broker (OANDA). In the per-user cTrader architecture each
+    # client runs their own isolated loop (started by the Telegram poller), so
+    # when no global OANDA data source is configured the global loop has no valid
+    # feed and would just error every tick (e.g. 'BTCUSD on OANDA 400') while
+    # burning the AI quota. Skip it and keep the process alive for the poller.
+    if cfg.OANDA_API_TOKEN and cfg.OANDA_ACCOUNT_ID:
+        logger.info("🚀 First analysis...")
         tick()
+        interval = cfg.LOOP_INTERVAL_MS / 1000
+        logger.info(f"⏱️  Analysis every {cfg.LOOP_INTERVAL_MS / 60000} minutes.")
+        while True:
+            time.sleep(interval)
+            tick()
+    else:
+        logger.info("Per-user mode: global analysis loop OFF — each client trades on their own cTrader loop.")
+        while True:
+            time.sleep(3600)

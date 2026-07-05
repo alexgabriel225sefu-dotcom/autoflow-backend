@@ -450,6 +450,11 @@ def _loop(user_id, alert_fn, gen=None):
             # the bot would sit silent forever. Detect it, mark the symbol so
             # Auto-Pilot rotates to a live one, and tell the user once.
             _bt = candles[-1]["time"]
+            # Diagnostic: shows whether the newest candle advances (fresh feed)
+            # or repeats (frozen feed) — visible in the host logs.
+            print(f"[UserLoop:{user_id}] tick {tick} {symbol} px={price} "
+                  f"newest_bar={datetime.utcfromtimestamp(_bt).strftime('%m-%d %H:%M')}UTC "
+                  f"bars={len(candles)}")
             _bs = bar_seen.get(_nrm(symbol))
             if _bs and _bs[0] == _bt:
                 _bs[1] += 1
