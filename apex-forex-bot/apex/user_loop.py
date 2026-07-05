@@ -460,13 +460,28 @@ def _loop(user_id, alert_fn, gen=None):
                 live_syms = [w for w in watchlist
                              if bar_seen.get(_nrm(w), [0, 0])[1] < 3
                              and spread_blocked.get(_nrm(w), 0) <= time.time()]
+                # A long-lived cTrader connection can keep answering (heartbeats)
+                # while its trendbar stream goes stale. If EVERY watched symbol
+                # is frozen, the connection itself is stale — drop it so the next
+                # tick reconnects fresh (throttled), then tell the user once.
+                if not live_syms and not cfg.PAPER_TRADING and time.time() - last_refresh_at > 300:
+                    last_refresh_at = time.time()
+                    try:
+                        from apex.brokers import ctrader as _ct
+                        _ct._drop_conn(getattr(cfg, "CTRADER_ENV", "demo"),
+                                       cfg.CTRADER_ACCOUNT_ID)
+                        for k in bar_seen:  # reset so we re-measure after reconnect
+                            bar_seen[k][1] = 0
+                        print(f"[UserLoop:{user_id}] feed stale on all symbols — dropped cTrader connection to reconnect")
+                    except Exception as e:
+                        print(f"[UserLoop:{user_id}] stale-feed reconnect failed: {e}")
                 if not live_syms and alert_fn and time.time() - stale_alerted > 3600:
                     stale_alerted = time.time()
                     alert_fn(user_id, {
                         "action": "DATA_ERROR",
-                        "reason": ("the broker's price feed looks frozen (no new candles) — "
-                                   "many brokers pause crypto-CFD quotes on weekends/off-hours. "
-                                   "The bot resumes automatically when prices move again."),
+                        "reason": ("the broker's price feed stopped sending new candles — "
+                                   "reconnecting to the broker now. If it persists the broker "
+                                   "may be having a data issue; the bot resumes when prices move."),
                         "symbol": symbol,
                         "broker": dash.get("broker", "your broker"),
                     })
