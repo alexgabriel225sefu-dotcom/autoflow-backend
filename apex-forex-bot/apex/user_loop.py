@@ -174,6 +174,8 @@ def _loop(user_id, alert_fn, gen=None):
     tick = 0
     data_fails = 0   # consecutive get_candles failures — alert the user at 3
     last_refresh_at = 0.0  # throttle cTrader token-refresh/reconnect attempts
+    bar_seen = {}    # nrm(symbol) -> [newest_bar_time, ticks_unchanged]
+    stale_alerted = 0.0  # throttle "feed frozen" alerts
     last_loss_at = 0.0  # entry cooldown anchor (any losing close)
     last_close_at = 0.0 # re-entry lock after ANY close — kills open/close churn
     loss_streak = 0     # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
@@ -440,6 +442,34 @@ def _loop(user_id, alert_fn, gen=None):
             dash["currentPrice"] = price
             dash["lastTick"] = now_str
             dash["lastTickTs"] = time.time()  # epoch — status shows "Xm ago", timezone-proof
+
+            # ── Frozen-feed detection ──────────────────────────────────────
+            # If the newest candle's timestamp stops advancing, the broker isn't
+            # quoting this symbol (many brokers freeze crypto-CFD feeds on
+            # weekends / off-hours). A frozen feed never produces a signal, so
+            # the bot would sit silent forever. Detect it, mark the symbol so
+            # Auto-Pilot rotates to a live one, and tell the user once.
+            _bt = candles[-1]["time"]
+            _bs = bar_seen.get(_nrm(symbol))
+            if _bs and _bs[0] == _bt:
+                _bs[1] += 1
+            else:
+                bar_seen[_nrm(symbol)] = [_bt, 0]
+            if bar_seen[_nrm(symbol)][1] >= 3:  # ~15+ min with no new candle
+                spread_blocked[_nrm(symbol)] = time.time() + 900  # rotate away 15 min
+                live_syms = [w for w in watchlist
+                             if bar_seen.get(_nrm(w), [0, 0])[1] < 3
+                             and spread_blocked.get(_nrm(w), 0) <= time.time()]
+                if not live_syms and alert_fn and time.time() - stale_alerted > 3600:
+                    stale_alerted = time.time()
+                    alert_fn(user_id, {
+                        "action": "DATA_ERROR",
+                        "reason": ("the broker's price feed looks frozen (no new candles) — "
+                                   "many brokers pause crypto-CFD quotes on weekends/off-hours. "
+                                   "The bot resumes automatically when prices move again."),
+                        "symbol": symbol,
+                        "broker": dash.get("broker", "your broker"),
+                    })
 
             # Live: sync position from broker; paper: use local tracking.
             # If the position read FAILS we must not assume flat — entering
