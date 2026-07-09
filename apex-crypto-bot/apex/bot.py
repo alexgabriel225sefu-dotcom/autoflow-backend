@@ -753,7 +753,7 @@ def _start_dashboard_server():
 
 def main():
     global start_balance, paper_balance, open_position, broker
-    print(f"[APEX FOREX BOT] Starting... Python {sys.version.split()[0]}")
+    print(f"[{getattr(cfg, 'BOT_NAME', 'Apex Forex Bot').upper()}] Starting... Python {sys.version.split()[0]}")
     load_remote()           # config saved in the configurator (broker keys, env, risk)
     _load_runtime_config()  # Telegram-saved overrides take precedence
     broker = get_broker()   # re-init with the now-loaded settings

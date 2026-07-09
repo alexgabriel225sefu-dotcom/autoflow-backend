@@ -92,7 +92,7 @@ def print_banner(balance):
     mode = "📝 PAPER TRADING (no real risk)" if cfg.PAPER_TRADING else (
         "🧪 OANDA PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE TRADING")
     print("\n" + "═" * 60)
-    print("  💱 APEX FOREX BOT — AI Powered Trading")
+    print(f"  {getattr(cfg, 'ASSET_EMOJI', '💱')} {getattr(cfg, 'BOT_NAME', 'Apex Forex Bot').upper()} — AI Powered Trading")
     print(f"  Pair: {cfg.SYMBOL} | Timeframe: {cfg.TIMEFRAME}")
     print(f"  Mode: {mode}")
     print(f"  Starting balance: ${balance:.2f}")
