@@ -17,7 +17,14 @@ _UPD_URL   = (os.getenv("UPSTASH_REDIS_REST_URL")   or "").rstrip("/")
 _UPD_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
 _USE_REDIS = bool(_UPD_URL and _UPD_TOKEN)
 
-_ACTIVE_SET = "forex:active_users"   # Redis SET that tracks active user IDs
+# Namespace every key by PRODUCT so the crypto and forex bots DON'T share user
+# state when they point at the same Upstash Redis. Without this, connecting a
+# cTrader account (or setting a watchlist) on one bot leaked into the other —
+# both ran the same account/symbols. Existing single-product deployments keep
+# the historical "forex:" prefix.
+_NS = (os.getenv("PRODUCT") or "forex").strip().lower()
+
+_ACTIVE_SET = f"{_NS}:active_users"   # Redis SET that tracks active user IDs
 
 
 # ─── Redis helpers ────────────────────────────────────────
@@ -64,7 +71,7 @@ def _path(user_id):
 def load(user_id):
     user_id = str(user_id)
     if _USE_REDIS:
-        raw = _redis_get(f"forex:user:{user_id}")
+        raw = _redis_get(f"{_NS}:user:{user_id}")
         if raw:
             try:
                 return json.loads(raw)
@@ -80,7 +87,7 @@ def load(user_id):
 def save(user_id, data):
     user_id = str(user_id)
     if _USE_REDIS:
-        _redis_set(f"forex:user:{user_id}", json.dumps(data))
+        _redis_set(f"{_NS}:user:{user_id}", json.dumps(data))
         if data.get("active"):
             _redis_sadd(_ACTIVE_SET, user_id)
         else:
@@ -102,7 +109,7 @@ def clear_trades(user_id):
     user_id = str(user_id)
     if _USE_REDIS:
         try:
-            _redis_set(f"forex:trades:{user_id}", "[]")
+            _redis_set(f"{_NS}:trades:{user_id}", "[]")
         except Exception as e:
             print(f"[Store] clear_trades redis failed: {e}")
         return
@@ -121,7 +128,7 @@ def append_trade(user_id, record):
     trades = trades[-500:]
     payload = json.dumps(trades)
     if _USE_REDIS:
-        _redis_set(f"forex:trades:{user_id}", payload)
+        _redis_set(f"{_NS}:trades:{user_id}", payload)
         return
     try:
         with open(_path(user_id) + ".trades", "w") as f:
@@ -134,7 +141,7 @@ def load_trades(user_id):
     """Load the user's closed-trade journal, or [] if none."""
     user_id = str(user_id)
     if _USE_REDIS:
-        raw = _redis_get(f"forex:trades:{user_id}")
+        raw = _redis_get(f"{_NS}:trades:{user_id}")
     else:
         try:
             raw = open(_path(user_id) + ".trades").read()
