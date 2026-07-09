@@ -212,12 +212,15 @@ def _loop(user_id, alert_fn, gen=None):
         if user_id in _loops:
             _loops[user_id]["dash"] = dash
 
-    health = {"lats": [], "spreads": [], "degraded": False}
+    health = {"lats": [], "spreads": [], "degraded": False, "last_alert": 0.0}
 
     def _health_check(lat=None, spread=None):
-        """Broker Health Monitor (premium spec #8): when latency or spread
-        blows past the broker's own recent norm, suspend entries and say so —
-        degraded execution silently eats the edge."""
+        """Broker Health Monitor (premium spec #8): when latency blows past the
+        broker's own recent norm, suspend entries and say so. The spread-based
+        check is skipped for crypto — the Auto-Pilot scans a basket whose per-
+        coin spreads differ 10x (SOL 600p vs BTC 5p), so a shared spread median
+        is meaningless and would flip-flop degraded/recovered every scan (spam).
+        The per-entry %-spread guard already blocks wide-spread entries."""
         if lat is not None:
             health["lats"] = (health["lats"] + [lat])[-30:]
         if spread is not None and spread > 0:
@@ -228,19 +231,25 @@ def _loop(user_id, alert_fn, gen=None):
             med = sorted(lats)[len(lats) // 2]
             if lats[-1] > max(8.0, med * 5):
                 bad = f"data latency {lats[-1]:.1f}s (normal ~{med:.1f}s)"
-        if not bad and len(sps) >= 8 and spread is not None:
+        if not bad and not _crypto_build and len(sps) >= 8 and spread is not None:
             med = sorted(sps)[len(sps) // 2]
             if spread > max(med * 4, med + 2):
                 bad = f"spread {spread:.1f}p vs normal ~{med:.1f}p"
         was = health["degraded"]
         health["degraded"] = bool(bad)
         dash["brokerHealth"] = "degraded: " + bad if bad else "ok"
-        if bad and not was and alert_fn:
-            alert_fn(user_id, {"action": "BROKER_HEALTH", "status": "degraded",
-                               "reason": bad, "symbol": symbol})
-        elif was and not bad and alert_fn:
-            alert_fn(user_id, {"action": "BROKER_HEALTH", "status": "recovered",
-                               "symbol": symbol})
+        # Throttle the alert to at most once per 30 min so a flapping condition
+        # can't spam the client.
+        now = time.time()
+        if alert_fn and now - health["last_alert"] > 1800:
+            if bad and not was:
+                health["last_alert"] = now
+                alert_fn(user_id, {"action": "BROKER_HEALTH", "status": "degraded",
+                                   "reason": bad, "symbol": symbol})
+            elif was and not bad:
+                health["last_alert"] = now
+                alert_fn(user_id, {"action": "BROKER_HEALTH", "status": "recovered",
+                                   "symbol": symbol})
         return health["degraded"]
 
     def _skip(reason):
@@ -300,6 +309,12 @@ def _loop(user_id, alert_fn, gen=None):
                 closed_now = prev_open_syms - open_syms - {_nrm(symbol)}
                 for cs in closed_now:
                     det = pos_details.get(cs, {})
+                    # Only journal positions WE opened (have details for). Without
+                    # this, a position opened by another bot sharing the account
+                    # is journaled here with mismatched data — e.g. a gold entry
+                    # reported as BTCUSD — corrupting P&L and the tax journal.
+                    if not det or not det.get("entry"):
+                        continue
                     est_pnl = None
                     xp = None
                     try:
