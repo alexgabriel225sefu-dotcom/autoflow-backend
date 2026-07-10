@@ -98,7 +98,7 @@ MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
 _DEFAULT_UNIVERSE = ("BTCUSD,ETHUSD,SOLUSD,XRPUSD,LTCUSD,ADAUSD,DOGEUSD,DOTUSD,"
                      "LINKUSD,BCHUSD,XAUUSD" if _IS_CRYPTO else
                      "EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,NZDUSD,"
-                     "XAUUSD,US30,NAS100,US500,GER40,BTCUSD,ETHUSD")
+                     "XAUUSD,US30,NAS100,US500,GER40")
 AUTOPILOT_UNIVERSE = [s.strip().upper() for s in
                       (os.getenv("AUTOPILOT_UNIVERSE") or _DEFAULT_UNIVERSE).split(",") if s.strip()]
 

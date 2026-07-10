@@ -156,7 +156,15 @@ def _loop(user_id, alert_fn, gen=None):
     # own /symbol or /watch basket is used.
     autopilot = bool(user.get("autopilot"))
     if autopilot and user.get("autopilot_universe"):
-        watchlist = [w for w in user["autopilot_universe"] if w][:8]
+        # Self-heal cross-product pollution: a stored Auto-Pilot universe written
+        # while crypto & forex shared one Redis namespace can contain the OTHER
+        # product's symbols (e.g. a forex account ending up trading SOLUSD).
+        # Keep only instruments valid for THIS build's curated universe.
+        _valid = {s.upper().replace("_", "").replace("/", "").replace("-", "")
+                  for s in getattr(cfg, "AUTOPILOT_UNIVERSE", [])}
+        watchlist = [w for w in user["autopilot_universe"]
+                     if w and (not _valid or
+                               w.upper().replace("_", "").replace("/", "").replace("-", "") in _valid)][:8]
     else:
         watchlist = [w for w in (user.get("watchlist") or []) if w][:6]
     paper_balance = cfg.PAPER_BALANCE
