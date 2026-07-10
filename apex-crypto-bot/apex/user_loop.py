@@ -1215,6 +1215,30 @@ def start_all(alert_fn=None):
         start(uid, alert_fn)
 
 
+def start_watchdog(alert_fn=None, interval=180):
+    """Self-healing watchdog: every `interval` seconds, restart any user marked
+    active whose loop thread has died (crash, unhandled error, server hiccup).
+    Runs 24/7 inside the bot process, so overnight recovery needs no operator and
+    no external session — start() is idempotent, so healthy loops are untouched."""
+    def _run():
+        while True:
+            time.sleep(interval)
+            try:
+                for uid in (user_store.all_active() or []):
+                    if not is_running(uid):
+                        print(f"[Watchdog] active loop for {uid} is down — restarting")
+                        try:
+                            start(uid, alert_fn)
+                            from apex import control as _ctl
+                            _ctl.event("watchdog", f"restarted dead loop for {uid}", user_id=uid)
+                        except Exception as e:
+                            print(f"[Watchdog] restart failed for {uid}: {e}")
+            except Exception as e:
+                print(f"[Watchdog] sweep error: {e}")
+    threading.Thread(target=_run, daemon=True).start()
+    print(f"[Watchdog] self-healing watchdog ON (every {interval}s)")
+
+
 def _flash_spike(candles, pct):
     """True if the latest candle's high-low range exceeds `pct` of price — a
     flash-crash/spike signature. Fail-safe to False on bad data."""

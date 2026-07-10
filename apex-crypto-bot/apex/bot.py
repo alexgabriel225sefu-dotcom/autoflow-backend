@@ -847,6 +847,17 @@ def main():
     except Exception as e:
         logger.warn(f"MCP control plane failed to start: {e}")
 
+    # Overnight resilience: after ANY restart, bring every previously-active
+    # user's loop back immediately (don't wait for them to message), then run a
+    # self-healing watchdog that restarts any loop that dies. Both live in the
+    # bot process, so recovery is 24/7 and needs no operator/session.
+    try:
+        from apex import user_loop as _ul
+        _ul.start_all(alert_fn=tg._user_alert)
+        _ul.start_watchdog(alert_fn=tg._user_alert)
+    except Exception as e:
+        logger.warn(f"boot auto-start / watchdog failed: {e}")
+
     verify_license()
     # The global single-account tick() loop is legacy: it analyzes ONE instrument
     # via the global broker (OANDA). In the per-user cTrader architecture each
