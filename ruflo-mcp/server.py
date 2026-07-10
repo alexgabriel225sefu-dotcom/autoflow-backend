@@ -147,6 +147,15 @@ def audit_log(product: str, limit: int = 40) -> dict:
     return {"audit": _lrange(product, "audit", limit)}
 
 
+@mcp.tool()
+def recent_commands(product: str, limit: int = 60) -> dict:
+    """What clients sent in Telegram (level tg_in) and the exact orders the bot
+    sent to cTrader (level order) — newest first."""
+    evs = _lrange(product, "events", 200)
+    keep = [e for e in evs if e.get("level") in ("tg_in", "order")]
+    return {"commands": keep[:max(1, int(limit))]}
+
+
 # ─── Action tools (need MCP_CONTROL_ENABLED=true on the bot) ──
 @mcp.tool()
 def restart_user(product: str, user_id: str) -> dict:

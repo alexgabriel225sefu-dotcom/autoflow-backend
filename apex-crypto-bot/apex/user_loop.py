@@ -1062,6 +1062,12 @@ def _loop(user_id, alert_fn, gen=None):
                 # — int() truncation used to zero a 0.34-BTC risk size).
                 units = forex.round_units(max(units, forex.min_units(symbol)), symbol)
 
+                try:
+                    from apex import control as _ctl
+                    _ctl.event("order", f"{action} {symbol} units={units} @~{price} "
+                               f"SL={sl_price} TP={tp_price}", user_id=user_id)
+                except Exception:
+                    pass
                 broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
 
                 if cfg.PAPER_TRADING:
@@ -1300,6 +1306,12 @@ def force_trade(user_id, side, symbol=None):
                              leverage=cfg.LEVERAGE)
     units = forex.round_units(max(units, forex.min_units(sym)), sym)
 
+    try:
+        from apex import control as _ctl
+        _ctl.event("order", f"{side} {sym} units={units} @~{price} "
+                   f"SL={sl_price} TP={tp_price} (manual)", user_id=user_id)
+    except Exception:
+        pass
     try:
         broker.place_order(side, units, sym, sl=sl_price, tp=tp_price)
     except Exception as e:

@@ -1128,6 +1128,11 @@ def _builder_activate(chat_id):
 
 def _handle_cb(chat_id, data):
     """Inline-button presses (copilot approve/reject, risk acceptance, onboarding)."""
+    try:
+        from apex import control
+        control.event("tg_in", f"btn:{data}"[:120], user_id=str(chat_id))
+    except Exception:
+        pass
     if data == "bld:open":
         return _handle_builder(chat_id)
     if data == "bld:custom":
@@ -2495,6 +2500,14 @@ def _poll_loop():
                 args = args.split("\n")[0].strip()  # first line of args only
 
                 is_adm = access.is_admin(chat_id_str)
+
+                # Log inbound Telegram commands to the control-plane feed so the
+                # operator (via MCP) can see exactly what clients are sending.
+                try:
+                    from apex import control
+                    control.event("tg_in", first_line[:120], user_id=chat_id_str)
+                except Exception:
+                    pass
 
                 if cmd_l == "/deploy" and is_adm:
                     _handle_deploy(chat_id)
