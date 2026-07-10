@@ -12,3 +12,9 @@ services:
         sync: false          # same value as the bots
       - key: RUFLO_MCP_SECRET
         generateValue: true  # becomes the secret path segment in the connector URL
+      - key: SITE_URL
+        value: https://aicashsystem.space   # affiliate reads via the website API
+      - key: AFFILIATE_BOT_SECRET
+        sync: false          # same value as the affiliate bot / server.js
+      - key: AFFILIATE_BOT_TOKEN
+        sync: false          # affiliate bot token, for messaging affiliates
