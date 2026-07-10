@@ -79,7 +79,7 @@ def _make_broker(user):
         # Pulled from the global product config so PRODUCT=crypto takes effect.
         MAX_SPREAD_PCT   = getattr(_appcfg, "MAX_SPREAD_PCT", 0),
         FLASH_SPIKE_PCT  = getattr(_appcfg, "FLASH_SPIKE_PCT", 0.012),
-        MIN_CONFIDENCE   = int(user.get("min_confidence", 55)),  # was 62 — trade more freely
+        MIN_CONFIDENCE   = int(user.get("min_confidence", 65)),
         STRATEGY         = (user.get("strategy") or "auto").lower(),
         ATR_STOPS        = bool(user.get("atr_stops", True)),  # dynamic RR 1:2 by default
         # ── Strategy Builder knobs (all per-user, all enforced in the loop) ──
@@ -886,10 +886,18 @@ def _loop(user_id, alert_fn, gen=None):
                     last_warn_tick = tick
                     alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                        "reason": regime.get("label", "market too quiet")})
-            # (Multi-timeframe gate relaxed to advisory by request — no longer
-            # blocks entries, so the bot trades more freely.)
-            # (Re-entry lock removed by request — the ATR stop floor already
-            # prevents same-candle churn, so trade freely.)
+            if entry_ok and getattr(cfg, "HTF_CONFIRM", False):
+                htf_c = None
+                try:
+                    htf_c = broker.get_candles(symbol, "1h", 60)
+                except Exception:
+                    pass
+                if htf_c and len(htf_c) >= 55:
+                    htf_dir = strategies.htf_trend(htf_c)
+                    if (action == "BUY" and htf_dir == "BEARISH") or \
+                       (action == "SELL" and htf_dir == "BULLISH"):
+                        entry_ok = False
+                        _skip(f"HTF gate: {action} blocked by H1 {htf_dir} trend")
             # Post-loss cooldown: the worst trade after a stop-out is the next
             # one taken 5 minutes later in the same falling knife.
             if entry_ok and last_loss_at and time.time() - last_loss_at < _LOSS_COOLDOWN_MIN * 60:
@@ -1057,54 +1065,61 @@ def _loop(user_id, alert_fn, gen=None):
                             pass
                 sl_price = price - sl_dist if action == "BUY" else price + sl_dist
                 tp_price = price + tp_dist if action == "BUY" else price - tp_dist
-                # Adaptive risk ladder (premium spec #3): consecutive losses
-                # shrink the risk — 2 losses → ½, 3+ → ¼; violent regime → ½.
-                risk_mult = 1.0 if loss_streak < 2 else (0.5 if loss_streak == 2 else 0.25)
+                risk_mult = strategies.druckenmiller_multiplier(
+                    confidence, signal.get("criteriaScore", 0),
+                    strat_data.get("livermore"), strat_data.get("turtle"))
+                if loss_streak >= 3:
+                    risk_mult *= 0.25
+                elif loss_streak == 2:
+                    risk_mult *= 0.5
                 if regime.get("regime") == "volatile":
                     risk_mult *= 0.5
                 units = forex.calc_units(paper_balance, per_trade_risk,
                                          stop_pips_eff, symbol, price,
                                          leverage=cfg.LEVERAGE, mult=risk_mult)
-                # Floor to the instrument minimum, then round per instrument
-                # (whole units for FX, fractional lots for crypto/metals/indices
-                # — int() truncation used to zero a 0.34-BTC risk size).
-                units = forex.round_units(max(units, forex.min_units(symbol)), symbol)
-
-                try:
-                    from apex import control as _ctl
-                    _ctl.event("order", f"{action} {symbol} units={units} @~{price} "
-                               f"SL={sl_price} TP={tp_price}", user_id=user_id)
-                except Exception:
-                    pass
-                broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
-
-                if cfg.PAPER_TRADING:
-                    open_pos = {"side": action, "entryPrice": price,
-                                "symbol": symbol, "units": units,
-                                "quantity": units, "stopLoss": sl_price, "takeProfit": tp_price,
-                                "entrySpreadPips": spread, "openedAt": now_str}
+                floor = forex.safe_min_units(symbol, paper_balance, price,
+                                             cfg.LEVERAGE, cfg.MARGIN_CAP)
+                if floor == 0:
+                    _skip("account too small for minimum lot on this instrument")
+                    entry_ok = False
+                if not entry_ok:
+                    pass  # margin too small — skip to CLOSE handling below
                 else:
-                    # A read hiccup right after the fill must not look like
-                    # "no position" — assume the order we just sent is live.
-                    try:
-                        open_pos = broker.get_open_position(symbol)
-                    except Exception:
-                        open_pos = None
-                    open_pos = open_pos or {"side": action, "entryPrice": price,
-                                            "symbol": symbol, "units": units,
-                                            "quantity": units, "stopLoss": sl_price,
-                                            "takeProfit": tp_price, "openedAt": now_str}
+                    units = forex.round_units(max(units, floor), symbol)
 
-                dash["openPosition"] = open_pos
-                result = {"action": action, "symbol": symbol, "confidence": confidence,
-                          "price": price, "spreadPips": round(spread, 1), "time": now_str,
-                          "stopLoss": sl_price, "takeProfit": tp_price,
-                          "reasoning": signal.get("reasoning", ""),
-                          "keyFactors": signal.get("keyFactors", [])}
-                dash["trades"].insert(0, result)
-                dash["trades"] = dash["trades"][:50]
-                if alert_fn:
-                    alert_fn(user_id, result)
+                    try:
+                        from apex import control as _ctl
+                        _ctl.event("order", f"{action} {symbol} units={units} @~{price} "
+                                   f"SL={sl_price} TP={tp_price}", user_id=user_id)
+                    except Exception:
+                        pass
+                    broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
+
+                    if cfg.PAPER_TRADING:
+                        open_pos = {"side": action, "entryPrice": price,
+                                    "symbol": symbol, "units": units,
+                                    "quantity": units, "stopLoss": sl_price, "takeProfit": tp_price,
+                                    "entrySpreadPips": spread, "openedAt": now_str}
+                    else:
+                        try:
+                            open_pos = broker.get_open_position(symbol)
+                        except Exception:
+                            open_pos = None
+                        open_pos = open_pos or {"side": action, "entryPrice": price,
+                                                "symbol": symbol, "units": units,
+                                                "quantity": units, "stopLoss": sl_price,
+                                                "takeProfit": tp_price, "openedAt": now_str}
+
+                    dash["openPosition"] = open_pos
+                    result = {"action": action, "symbol": symbol, "confidence": confidence,
+                              "price": price, "spreadPips": round(spread, 1), "time": now_str,
+                              "stopLoss": sl_price, "takeProfit": tp_price,
+                              "reasoning": signal.get("reasoning", ""),
+                              "keyFactors": signal.get("keyFactors", [])}
+                    dash["trades"].insert(0, result)
+                    dash["trades"] = dash["trades"][:50]
+                    if alert_fn:
+                        alert_fn(user_id, result)
 
             elif action == "CLOSE" and open_pos and dash.get("manualHold"):
                 # /buy - /sell trades belong to the USER: the strategy engine

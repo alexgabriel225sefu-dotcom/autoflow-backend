@@ -94,6 +94,18 @@ def min_units(instrument: str):
     return 1000 if (_is_fx(s) or s.endswith("JPY")) else 0.01
 
 
+def safe_min_units(instrument: str, balance: float, price: float,
+                   leverage: float = 30, margin_cap: float = 0.5) -> float:
+    """Min units that the account can actually margin. Returns 0 if the account
+    is too small for even 1 micro-lot, so the caller can skip the trade instead
+    of sending a broker-rejected order."""
+    floor = min_units(instrument)
+    margin_needed = required_margin(floor, instrument, price, leverage)
+    if margin_needed > balance * margin_cap:
+        return 0
+    return floor
+
+
 def round_units(units: float, instrument: str):
     """FX trades in whole units (thousands); crypto/metals/indices allow
     fractional lots, so keep 2 decimals instead of truncating to int (which
