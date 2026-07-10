@@ -128,6 +128,21 @@ def build():
         uid = str(args["user_id"])
         return {"user": uid, "result": user_loop.force_close(uid)}
 
+    def h_force_trade(args):
+        """Open a trade on command (BUY/SELL a symbol). SAFETY: demo accounts
+        only — refuses on a live/real-money account so it can never place a real
+        order remotely. Gated behind MCP_CONTROL_ENABLED like all writes."""
+        uid = str(args["user_id"])
+        side = str(args["side"]).upper()
+        if side not in ("BUY", "SELL"):
+            raise ValueError("side must be BUY or SELL")
+        symbol = args.get("symbol")
+        u = user_store.load(uid)
+        env = (u.get("ctrader_env") or "demo").lower()
+        if env not in ("demo", "practice"):
+            raise ValueError("refused: force_trade is demo-only (real-money account)")
+        return {"user": uid, "result": user_loop.force_trade(uid, side, symbol)}
+
     return {
         "status": h_status,
         "user_detail": h_user_detail,
@@ -140,4 +155,5 @@ def build():
         "set_setting": h_set_setting,
         "send_message": h_send_message,
         "force_close": h_force_close,
+        "force_trade": h_force_trade,
     }

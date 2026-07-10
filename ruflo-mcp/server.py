@@ -195,6 +195,17 @@ def force_close(product: str, user_id: str) -> dict:
     return _call(product, "force_close", {"user_id": user_id})
 
 
+@mcp.tool()
+def open_trade(product: str, user_id: str, side: str, symbol: str = None) -> dict:
+    """Open a trade on command: side = BUY or SELL, optional symbol (defaults to
+    the user's current symbol). SAFETY: demo accounts only — the bot refuses on a
+    real-money account, so this can never place a live order remotely."""
+    args = {"user_id": user_id, "side": side}
+    if symbol:
+        args["symbol"] = symbol
+    return _call(product, "force_trade", args)
+
+
 # ─── Affiliate / referral bot (over the website API) ─────────
 def _site_post(path: str, body: dict, timeout: float = 15.0):
     r = requests.post(f"{_SITE}{path}", json=body, timeout=timeout)

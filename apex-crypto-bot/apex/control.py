@@ -38,7 +38,7 @@ _RESULT    = lambda cid: f"{_NS}:cmdresult:{cid}"
 
 # Actions that mutate state / reach the client. Gated behind MCP_CONTROL_ENABLED.
 WRITE_ACTIONS = {"restart_loop", "bot_on", "bot_off", "refresh_token",
-                 "set_setting", "send_message", "force_close"}
+                 "set_setting", "send_message", "force_close", "force_trade"}
 
 
 def actions_enabled() -> bool:
