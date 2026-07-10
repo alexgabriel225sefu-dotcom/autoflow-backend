@@ -360,13 +360,17 @@ def close_trade(price, reason, send_order=True, signal=None):
 
 
 def best_symbol():
+    # Forex + metals only — never scan/return a crypto CFD or index.
+    default = cfg.SYMBOL if forex.is_tradeable(cfg.SYMBOL) else "EUR_USD"
     if cfg.BROKER == "mt":          # the EA only sees its own chart
-        return cfg.SYMBOL
+        return default
     if not cfg.MULTI_SYMBOL or len(cfg.SCAN_SYMBOLS) <= 1:
-        return cfg.SYMBOL
+        return default
+    scan = [s.strip() for s in cfg.SCAN_SYMBOLS if forex.is_tradeable(s.strip())]
+    if not scan:
+        return default
     results = []
-    for sym in cfg.SCAN_SYMBOLS:
-        sym = sym.strip()
+    for sym in scan:
         try:
             candles = broker.get_candles(sym, cfg.TIMEFRAME, 50)
             ind = indicators.analyze(candles)

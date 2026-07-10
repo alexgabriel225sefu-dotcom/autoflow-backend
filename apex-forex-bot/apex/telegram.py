@@ -595,6 +595,9 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             d = dict(w["data"])
             _wizards.pop(chat_id, None)
         sym = d.get("symbol", "EUR_USD")
+        # Forex + metals only — never let onboarding persist a crypto/index symbol.
+        if not forex.is_tradeable(sym):
+            sym = "EUR_USD"
 
         # Save per-user settings — every risk parameter was chosen by the client
         user_data = {
@@ -1404,6 +1407,11 @@ def _handle_tp(chat_id, args):
 
 def _handle_symbol(chat_id, args):
     sym = (args or "").strip().upper().replace("/", "_").replace("-", "_").replace(" ", "")
+    # Forex + metals only — this is a forex bot; reject crypto CFDs / indices.
+    if not forex.is_tradeable(sym):
+        return send_to(chat_id, "❌ This is a forex bot — pick a forex pair or a metal "
+                                "(e.g. <code>/symbol EUR_USD</code> or <code>/symbol XAUUSD</code>). "
+                                "Crypto and indices aren't supported here (crypto has its own bot).")
     user = user_store.load(chat_id)
     is_ct = bool(user.get("ctrader_access_token") and user.get("ctrader_account_id"))
     if is_ct:
@@ -1652,6 +1660,11 @@ def _handle_watch(chat_id, args):
         return send_to(chat_id, "👁 Watchlist cleared — back to single-symbol mode (/symbol)."
                        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot stopped — /start to run.</i>"))
     syms = [w.upper().replace("/", "_").replace("-", "_") for w in raw.split()][:6]
+    # Forex + metals only — reject crypto CFDs / indices from the basket.
+    non_fx = [s for s in syms if not forex.is_tradeable(s)]
+    if non_fx:
+        return send_to(chat_id, f"❌ This is a forex bot — not supported: <b>{', '.join(non_fx)}</b>. "
+                                "Use forex pairs or metals (e.g. XAUUSD, EURUSD). Crypto has its own bot.")
     is_ct = bool(user.get("ctrader_access_token") and user.get("ctrader_account_id"))
     if is_ct:
         try:

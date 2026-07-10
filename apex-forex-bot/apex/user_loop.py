@@ -241,6 +241,14 @@ def _loop(user_id, alert_fn, gen=None):
         watchlist = [w for w in user["autopilot_universe"] if w][:8]
     else:
         watchlist = [w for w in (user.get("watchlist") or []) if w][:6]
+    # Forex + metals only — drop crypto CFDs / indices / anything non-FX that a
+    # cTrader/Pepperstone account also lists, so they can never bleed into the
+    # forex bot ("crypto intră peste forex"). Crypto has its own bot. (Guarded
+    # by PRODUCT so this never touches the crypto build that reuses this engine.)
+    if getattr(cfg, "PRODUCT", "forex") != "crypto":
+        watchlist = [w for w in watchlist if forex.is_tradeable(w)]
+        if not forex.is_tradeable(symbol):
+            symbol = watchlist[0] if watchlist else "EUR_USD"
     paper_balance = cfg.PAPER_BALANCE
     # REAL mode: the stored seed goes stale the moment a trade closes — read
     # the broker's actual balance BEFORE the first status can be asked for,
@@ -1284,6 +1292,10 @@ def force_trade(user_id, side, symbol=None):
     user = user_store.load(user_id)
     broker, cfg = _make_broker(user)
     sym = (symbol or cfg.SYMBOL).upper()
+    # Forex + metals only — reject manual trades on crypto CFDs / indices.
+    if getattr(cfg, "PRODUCT", "forex") != "crypto" and not forex.is_tradeable(sym):
+        return {"ok": False, "error": f"{sym} isn't a forex/metal instrument — this is a "
+                                      "forex bot (crypto has its own bot). Try e.g. EUR_USD or XAUUSD."}
     try:
         candles = broker.get_candles(sym, cfg.TIMEFRAME, 5)
         price = candles[-1]["close"] if candles else 0.0

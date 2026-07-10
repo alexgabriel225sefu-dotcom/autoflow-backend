@@ -21,6 +21,23 @@ def _is_fx(s: str) -> bool:
     return len(s) == 6 and s.isalpha() and s[:3] in _CCY and s[3:] in _CCY
 
 
+_METALS = {"XAU", "XAG", "XPT", "XPD"}   # gold, silver, platinum, palladium
+
+
+def is_tradeable(instrument: str) -> bool:
+    """Whitelist for the FOREX bot: spot FX pairs and metals (XAU/XAG/XPT/XPD
+    quoted vs a fiat) ONLY. Rejects crypto CFDs (BTCUSD…), indices (US30…),
+    stocks and anything else a cTrader/Pepperstone account also lists. This is a
+    forex product — crypto has its own bot — and mixing them confuses clients
+    ("crypto intră peste forex"). Accepts EUR_USD / EURUSD / XAUUSD."""
+    s = _norm(instrument)
+    if len(s) != 6 or not s.isalpha():
+        return False
+    if _is_fx(s):
+        return True
+    return s[:3] in _METALS and s[3:] in _CCY
+
+
 def pip_size(instrument: str, price: float = None) -> float:
     """Pip size for ANY instrument the broker offers — clients pick freely via
     /symbol, so this can't assume FX.
