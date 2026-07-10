@@ -102,6 +102,16 @@ _DEFAULT_UNIVERSE = ("BTCUSD,ETHUSD,SOLUSD,XRPUSD,LTCUSD,ADAUSD,DOGEUSD,DOTUSD,"
 AUTOPILOT_UNIVERSE = [s.strip().upper() for s in
                       (os.getenv("AUTOPILOT_UNIVERSE") or _DEFAULT_UNIVERSE).split(",") if s.strip()]
 
+# Symbols that belong to the OTHER product. Used to self-heal a user record that
+# picked up cross-product symbols back when crypto & forex shared one Redis
+# namespace (e.g. a forex account trading SOLUSD). Gold (XAUUSD) is shared and
+# never blocked. Compared normalised (no separators, upper-case).
+_CRYPTO_ONLY = {"BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "LTCUSD", "ADAUSD",
+                "DOGEUSD", "DOTUSD", "LINKUSD", "BCHUSD"}
+_FOREX_ONLY = {"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF",
+               "NZDUSD", "US30", "NAS100", "US500", "GER40"}
+CROSS_PRODUCT_BLOCK = _FOREX_ONLY if _IS_CRYPTO else _CRYPTO_ONLY
+
 # ─── Risk ───────────────────────────────────────────────
 RISK_PER_TRADE = float(_scalp("RISK_PER_TRADE", 0.01, 0.005))  # scalp: 1% (controlled, not aggressive) · swing: 0.5%
 STOP_LOSS_PIPS = float(_scalp("STOP_LOSS_PIPS", 6, 20))        # scalp: tight 6p · swing: 20p

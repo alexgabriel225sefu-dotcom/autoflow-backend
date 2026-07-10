@@ -4,6 +4,7 @@ import threading
 import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
+from apex import config as cfg_mod
 from apex.brokers.oanda import OandaBroker
 
 
@@ -145,6 +146,36 @@ def _refresh_ctrader_token(user_id, cfg) -> bool:
 
 def _loop(user_id, alert_fn, gen=None):
     user = user_store.load(user_id)
+
+    # Self-heal cross-product pollution AT THE SOURCE. When crypto & forex shared
+    # one Redis namespace, a user record could keep the OTHER product's symbols
+    # (a forex account trading SOLUSD, etc.). Scrub them out of every stored field
+    # — symbol, watchlist, autopilot_universe — and PERSIST, so the terminal, the
+    # status card and the scanner all reflect a clean, single-product account
+    # without the user running any command.
+    _block = getattr(cfg_mod, "CROSS_PRODUCT_BLOCK", set())
+
+    def _foreign(sym):
+        return bool(sym) and (sym.upper().replace("_", "").replace("/", "").replace("-", "")
+                              in _block)
+
+    _patch = {}
+    if _foreign(user.get("symbol")):
+        _patch["symbol"] = cfg_mod.SYMBOL
+        user["symbol"] = cfg_mod.SYMBOL
+    for _fld in ("watchlist", "autopilot_universe"):
+        _orig = user.get(_fld) or []
+        _clean = [s for s in _orig if s and not _foreign(s)]
+        if _clean != _orig:
+            _patch[_fld] = _clean
+            user[_fld] = _clean
+    if _patch:
+        try:
+            user_store.update(user_id, _patch)
+            print(f"[UserLoop:{user_id}] scrubbed cross-product symbols: {list(_patch)}")
+        except Exception as e:
+            print(f"[UserLoop:{user_id}] cross-product scrub persist failed: {e}")
+
     broker, cfg = _make_broker(user)
 
     symbol = cfg.SYMBOL
@@ -156,15 +187,7 @@ def _loop(user_id, alert_fn, gen=None):
     # own /symbol or /watch basket is used.
     autopilot = bool(user.get("autopilot"))
     if autopilot and user.get("autopilot_universe"):
-        # Self-heal cross-product pollution: a stored Auto-Pilot universe written
-        # while crypto & forex shared one Redis namespace can contain the OTHER
-        # product's symbols (e.g. a forex account ending up trading SOLUSD).
-        # Keep only instruments valid for THIS build's curated universe.
-        _valid = {s.upper().replace("_", "").replace("/", "").replace("-", "")
-                  for s in getattr(cfg, "AUTOPILOT_UNIVERSE", [])}
-        watchlist = [w for w in user["autopilot_universe"]
-                     if w and (not _valid or
-                               w.upper().replace("_", "").replace("/", "").replace("-", "") in _valid)][:8]
+        watchlist = [w for w in user["autopilot_universe"] if w][:8]
     else:
         watchlist = [w for w in (user.get("watchlist") or []) if w][:6]
     paper_balance = cfg.PAPER_BALANCE
