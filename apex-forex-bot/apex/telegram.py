@@ -1975,6 +1975,11 @@ def _fx_close_why(reason: str) -> str:
 def _user_alert(uid, result):
     """Per-user trade/heartbeat/error alert — module-level so setup auto-start,
     /start and auto-restore all share the same notification formatting."""
+    try:
+        from apex import control
+        control.event_from_alert(uid, result)
+    except Exception:
+        pass
     action = result.get("action", "")
     sym = result.get("symbol", cfg.SYMBOL)
     if action == "HEARTBEAT":

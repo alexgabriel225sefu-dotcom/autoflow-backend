@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ruflo-mcp
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    envVars:
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false          # same value as the bots
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false          # same value as the bots
+      - key: RUFLO_MCP_SECRET
+        generateValue: true  # becomes the secret path segment in the connector URL

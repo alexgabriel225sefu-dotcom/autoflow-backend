@@ -841,6 +841,14 @@ def main():
         "reload_broker": reload_broker_connector,
     })
 
+    # Remote control plane (Ruflo MCP) — lets the operator read live state and
+    # (when MCP_CONTROL_ENABLED) act on the bot, over the shared Redis bus.
+    try:
+        from apex import control, control_actions
+        control.start_consumer(control_actions.build())
+    except Exception as e:
+        logger.warn(f"MCP control plane failed to start: {e}")
+
     verify_license()
     # The global single-account tick() loop is legacy: it analyzes ONE instrument
     # via the global broker (OANDA). In the per-user cTrader architecture each
