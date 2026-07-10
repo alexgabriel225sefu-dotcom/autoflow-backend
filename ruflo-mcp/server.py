@@ -26,7 +26,8 @@ import uuid
 
 import requests
 from starlette.applications import Starlette
-from starlette.routing import Mount
+from starlette.responses import PlainTextResponse
+from starlette.routing import Mount, Route
 from mcp.server.fastmcp import FastMCP
 
 _URL = (os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
@@ -220,8 +221,17 @@ def message_affiliate(chat_id: str, text: str) -> dict:
     return {"sent": r.ok, "status": r.status_code}
 
 
-# Mount the MCP app behind the secret path: https://<host>/<secret>/mcp
-app = Starlette(routes=[Mount(f"/{_SECRET}", app=mcp.streamable_http_app())])
+async def _health(request):
+    return PlainTextResponse("ruflo-mcp ok")
+
+
+# Root health check for Render + the MCP app behind the secret path
+# (connector URL: https://<host>/<secret>/mcp).
+app = Starlette(routes=[
+    Route("/", _health),
+    Route("/healthz", _health),
+    Mount(f"/{_SECRET}", app=mcp.streamable_http_app()),
+])
 
 
 if __name__ == "__main__":
