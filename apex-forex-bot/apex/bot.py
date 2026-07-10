@@ -656,6 +656,29 @@ def _start_dashboard_server():
                         if units_:
                             pos["pnlUsd"] = round(fx_mod.pnl_usd(
                                 pos["side"], pos["entryPrice"], last_px, units_, ucfg.SYMBOL), 2)
+                    # Live account money, exactly like a cTrader terminal:
+                    #   Equity = Balance + floating (unrealized) P&L.
+                    # Floating from every open position, priced at the freshest
+                    # close we can read (focused symbol is already priced above).
+                    floating = float(pos.get("pnlUsd") or 0) if pos else 0.0
+                    if pos is not None:
+                        try:
+                            all_pos = br.get_all_positions() if not u.get("paper", True) else []
+                        except Exception:
+                            all_pos = []
+                        for ap in all_pos or []:
+                            if ap.get("symbol") == ucfg.SYMBOL:
+                                continue  # already counted via the focused pos
+                            try:
+                                apx = br.get_candles(ap["symbol"], ucfg.TIMEFRAME, 2)
+                                apx = apx[-1]["close"] if apx else None
+                                un = ap.get("units") or 0
+                                if apx and ap.get("entryPrice") and un:
+                                    floating += float(fx_mod.pnl_usd(
+                                        ap["side"], ap["entryPrice"], apx, un, ap["symbol"]))
+                            except Exception:
+                                pass
+                    equity_live = round(float(balance_live or 0) + floating, 2)
                     events = news_mod.upcoming(hours=24) or []
                     journal = user_store.load_trades(chat_id)
                     st = stats_mod.compute(journal, udash.get("skipsToday", 0))
@@ -665,6 +688,8 @@ def _start_dashboard_server():
                         "strategy": udash.get("strategy", "Mean Reversion"),
                         "broker": udash.get("broker", ""),
                         "balance": balance_live,
+                        "equityLive": equity_live,
+                        "floatingPnl": round(floating, 2),
                         "price": last_px,
                         "regime": udash.get("regime"),
                         "sessions": fx_mod.active_sessions(),
