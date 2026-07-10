@@ -17,6 +17,7 @@ from apex import user_store
 from apex import user_loop
 from apex import assistant
 from apex import affiliate_store
+from apex import builder
 
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 CHAT_ID = (cfg.TELEGRAM_CHAT_ID or "").strip()
@@ -334,6 +335,8 @@ def _dashboard_keyboard(chat_id=None):
                                  if os.getenv("RENDER_EXTERNAL_URL") else "")
     if term_url:
         rows.append([{"text": "📊 Open Terminal", "web_app": {"url": term_url}}])
+    if chat_id is not None:
+        rows.append([{"text": "⚙️ Build strategy", "callback_data": "bld:open"}])
     # Discoverable path from demo → real money without knowing a command.
     if chat_id is not None:
         try:
@@ -1028,8 +1031,122 @@ def _finish_onboard(chat_id):
             _dashboard_keyboard(chat_id))
 
 
+_builder_drafts = {}  # chat_id -> {"i": step_index, "d": draft-fields dict}
+
+
+def _handle_builder(chat_id):
+    """Entry: one-tap presets for THIS market + a custom step-by-step path.
+    Framed as a setup assistant — the bot executes what the user picks."""
+    ps = builder.presets()
+    rows = [[{"text": p["label"], "callback_data": f"bld:preset:{k}"}] for k, p in ps.items()]
+    rows.append([{"text": "🛠 Custom (step by step)", "callback_data": "bld:custom"}])
+    desc = "\n".join(f"<b>{p['label']}</b> — <i>{p['desc']}</i>" for p in ps.values())
+    return send_to(chat_id,
+        "⚙️ <b>Strategy Builder</b>\n\n"
+        "Compose how your bot trades. Pick a ready preset, or build it step by step. "
+        "Every choice changes real behaviour — you stay in control.\n\n"
+        f"{desc}",
+        extra={"reply_markup": {"inline_keyboard": rows}})
+
+
+def _apply_builder_patch(chat_id, patch):
+    """Persist a composed strategy and restart the loop so it takes effect."""
+    user_store.update(chat_id, patch)
+    running = _restart_user_loop(chat_id)
+    return running
+
+
+def _builder_preset(chat_id, key):
+    p = builder.presets().get(key)
+    if not p:
+        return send_to(chat_id, "That preset isn't available. Tap ⚙️ Build strategy again.")
+    running = _apply_builder_patch(chat_id, p["patch"])
+    send_to(chat_id, builder.summary(dict(user_store.load(chat_id))))
+    return send_to(chat_id,
+        f"✅ <b>{p['label']} applied.</b> The bot now trades with these settings."
+        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot is off — tap ▶️ to start.</i>"),
+        _dashboard_keyboard(chat_id))
+
+
+def _builder_render_step(chat_id):
+    st = _builder_drafts.get(chat_id)
+    steps = builder.steps()
+    if not st or st["i"] >= len(steps):
+        return _builder_show_summary(chat_id)
+    step = steps[st["i"]]
+    rows = [[{"text": o["label"], "callback_data": f"bld:pick:{st['i']}:{j}"}]
+            for j, o in enumerate(step["options"])]
+    rows.append([{"text": "✖️ Cancel", "callback_data": "bld:cancel"}])
+    return send_to(chat_id,
+        f"<b>{step['title']}</b>\n<i>{step['sub']}</i>",
+        extra={"reply_markup": {"inline_keyboard": rows}})
+
+
+def _builder_pick(chat_id, step_i, opt_i):
+    st = _builder_drafts.get(chat_id)
+    steps = builder.steps()
+    if not st or step_i != st["i"] or st["i"] >= len(steps):
+        return  # stale button press from an old message
+    try:
+        patch = steps[step_i]["options"][opt_i]["patch"]
+    except (IndexError, KeyError):
+        return
+    st["d"].update(patch)
+    st["i"] += 1
+    return _builder_render_step(chat_id)
+
+
+def _builder_show_summary(chat_id):
+    st = _builder_drafts.get(chat_id)
+    d = dict(st["d"]) if st else {}
+    if builder._is_crypto():
+        d.setdefault("news_filter", False)
+    else:
+        d.setdefault("news_filter", True)
+    return send_to(chat_id, builder.summary(d),
+        extra={"reply_markup": {"inline_keyboard": [
+            [{"text": "✅ Activate this strategy", "callback_data": "bld:activate"}],
+            [{"text": "🔁 Start over", "callback_data": "bld:custom"},
+             {"text": "✖️ Cancel", "callback_data": "bld:cancel"}]]}})
+
+
+def _builder_activate(chat_id):
+    st = _builder_drafts.pop(chat_id, None)
+    d = dict(st["d"]) if st else {}
+    if builder._is_crypto():
+        d.setdefault("news_filter", False)
+    else:
+        d.setdefault("news_filter", True)
+    if not d:
+        return send_to(chat_id, "Nothing to activate — tap ⚙️ Build strategy to start.")
+    running = _apply_builder_patch(chat_id, d)
+    return send_to(chat_id,
+        "✅ <b>Strategy activated.</b> The bot now trades exactly this."
+        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot is off — tap ▶️ to start.</i>"),
+        _dashboard_keyboard(chat_id))
+
+
 def _handle_cb(chat_id, data):
     """Inline-button presses (copilot approve/reject, risk acceptance, onboarding)."""
+    if data == "bld:open":
+        return _handle_builder(chat_id)
+    if data == "bld:custom":
+        _builder_drafts[chat_id] = {"i": 0, "d": {}}
+        return _builder_render_step(chat_id)
+    if data == "bld:cancel":
+        _builder_drafts.pop(chat_id, None)
+        return send_to(chat_id, "✖️ Builder cancelled. Nothing changed.")
+    if data == "bld:activate":
+        return _builder_activate(chat_id)
+    if data.startswith("bld:preset:"):
+        return _builder_preset(chat_id, data.split(":", 2)[2])
+    if data.startswith("bld:pick:"):
+        _, _, rest = data.split(":", 2)
+        try:
+            step_i, opt_i = (int(x) for x in rest.split(":"))
+        except ValueError:
+            return
+        return _builder_pick(chat_id, step_i, opt_i)
     if data == "go:connect":
         return _handle_ctrader(chat_id)
     if data == "acct:switch":
@@ -1976,6 +2093,13 @@ def _user_alert(uid, result):
                 f"≈ <b>{result.get('price', '—')}</b> (stop-loss or take-profit executed at cTrader)\n"
                 f"{pnl_line}"
                 f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>")
+    elif action == "STOP_MOVED":
+        sl = result.get("sl")
+        side = "🟢 LONG" if result.get("side") == "BUY" else "🔴 SHORT"
+        send_to(uid,
+                f"🛡️ <b>Stop moved</b> — {sym} {side}\n"
+                f"Locking in the trade — stop trailed to <b>{sl}</b>. "
+                "Profit is being protected as price moves your way.")
     else:
         send_to(uid, f"⚡ <b>{action}</b> — {sym}")
 
@@ -2135,6 +2259,7 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "/autopilot on — full hands-off: bot picks the instruments too\n"
                "/maxpos 5 — hold several trades at once (risk stays capped)\n"
                "/strategy — trading method (auto · mean reversion · trend · breakout)\n"
+               "/builder — build a full strategy (style · setup · risk · exit) or a 1-tap preset\n"
                "/atr on|off — dynamic ATR stops (SL 1.5×ATR / TP 3×ATR)\n"
                "/wizard — guided setup (symbol → method → mode)\n"
                "/terminal — live trading terminal (interactive chart + news)\n"
@@ -2427,6 +2552,8 @@ def _poll_loop():
                     _handle_autopilot(chat_id, args)
                 elif cmd_l in ("/maxpos", "/positions"):
                     _handle_maxpos(chat_id, args)
+                elif cmd_l in ("/builder", "/build", "/strategybuilder"):
+                    _handle_builder(chat_id)
                 elif cmd_l in ("/strategy", "/method"):
                     _handle_strategy(chat_id, args)
                 elif cmd_l == "/backtest":

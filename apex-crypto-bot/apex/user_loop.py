@@ -82,6 +82,16 @@ def _make_broker(user):
         MIN_CONFIDENCE   = int(user.get("min_confidence", 55)),  # was 62 — trade more freely
         STRATEGY         = (user.get("strategy") or "auto").lower(),
         ATR_STOPS        = bool(user.get("atr_stops", True)),  # dynamic RR 1:2 by default
+        # ── Strategy Builder knobs (all per-user, all enforced in the loop) ──
+        HTF_CONFIRM      = bool(user.get("htf", False)),          # multi-timeframe gate
+        EXIT_MODE        = (user.get("exit_mode") or "fixed").lower(),
+        TRAILING_STOP    = bool(user.get("trailing", False)),     # move SL behind price
+        BREAKEVEN_AT_R   = float(user.get("breakeven_r", 0)),     # 0 = off; 1 = at +1R
+        NEWS_FILTER      = bool(user.get("news_filter", _appcfg.PRODUCT != "crypto")),
+        SESSION_FILTER   = list(user.get("session_filter") or []),  # [] = all sessions
+        MAX_TRADES_DAY   = int(user.get("max_trades_day", 10)),
+        MAX_DD_PCT       = float(user.get("max_dd_pct", 20)),
+        MAX_DAILY_LOSS_PCT = float(user.get("max_daily_loss_pct", 3)),
     )
     # cTrader linked → use it (paper uses its data; live places real orders worldwide).
     if ct_token and ct_account:
@@ -142,6 +152,47 @@ def _refresh_ctrader_token(user_id, cfg) -> bool:
     except Exception as e:
         print(f"[UserLoop:{user_id}] token refresh failed (cTrader may be down): {e}")
         return False
+
+
+def _manage_trailing(broker, cfg, pos, symbol, price):
+    """Trailing stop + break-even (Strategy Builder exit modes). Moves the SL
+    only in the favourable direction — never loosens it, never closes the trade.
+    Real-broker only (needs a live positionId + amend_sltp). Returns the new SL
+    if it moved, else None. Fail-soft everywhere."""
+    try:
+        if not pos or not price or not hasattr(broker, "amend_sltp"):
+            return None
+        trailing = bool(getattr(cfg, "TRAILING_STOP", False))
+        be_r = float(getattr(cfg, "BREAKEVEN_AT_R", 0) or 0)
+        if not (trailing or be_r > 0):
+            return None
+        pid = pos.get("positionId")
+        entry = pos.get("entryPrice")
+        cur_sl = pos.get("stopLoss") or pos.get("sl")
+        side = pos.get("side")
+        if not (pid and entry and cur_sl and side in ("BUY", "SELL")):
+            return None
+        risk = abs(float(entry) - float(cur_sl))
+        if risk <= 0:
+            return None
+        profit = (price - entry) if side == "BUY" else (entry - price)
+        if profit <= 0:
+            return None
+        new_sl = float(cur_sl)
+        # Break-even: once profit >= R×risk, lock the stop at entry.
+        if be_r > 0 and profit >= be_r * risk:
+            new_sl = max(new_sl, entry) if side == "BUY" else min(new_sl, entry)
+        # Trailing: keep the stop one risk-unit (1R) behind price, tighten-only.
+        if trailing:
+            trail = (price - risk) if side == "BUY" else (price + risk)
+            new_sl = max(new_sl, trail) if side == "BUY" else min(new_sl, trail)
+        improved = (new_sl - cur_sl) if side == "BUY" else (cur_sl - new_sl)
+        if improved > risk * 0.05:  # only amend on a meaningful move
+            if broker.amend_sltp(pid, sl=new_sl, instrument=symbol):
+                return new_sl
+    except Exception as e:
+        print(f"[Trailing] manage failed: {e}")
+    return None
 
 
 def _loop(user_id, alert_fn, gen=None):
@@ -572,6 +623,16 @@ def _loop(user_id, alert_fn, gen=None):
                     time.sleep(30)
                     continue
                 data_fails = 0
+
+                # Trailing-stop / break-even management for the open position
+                # (Strategy Builder exit modes). Fail-soft; real-broker only.
+                if open_pos and not cfg.PAPER_TRADING:
+                    moved = _manage_trailing(broker, cfg, open_pos, symbol, price)
+                    if moved is not None:
+                        open_pos["stopLoss"] = open_pos["sl"] = moved
+                        if alert_fn:
+                            alert_fn(user_id, {"action": "STOP_MOVED", "symbol": symbol,
+                                               "sl": moved, "side": open_pos.get("side")})
                 prev_balance = paper_balance
                 try:
                     paper_balance = broker.get_balance()
@@ -746,8 +807,12 @@ def _loop(user_id, alert_fn, gen=None):
                     last_mkt_tick = tick
                     alert_fn(user_id, {"action": "MARKET_PULSE", "symbol": symbol, **mp})
 
-            # Check risk limits
-            stop_check = strategies.should_stop(paper_balance, dash["startBalance"])
+            # Check risk limits (per-user, from the Strategy Builder)
+            stop_check = strategies.should_stop(
+                paper_balance, dash["startBalance"],
+                max_daily_loss_pct=getattr(cfg, "MAX_DAILY_LOSS_PCT", 3.0),
+                max_dd_pct=getattr(cfg, "MAX_DD_PCT", 20.0),
+                max_trades_day=getattr(cfg, "MAX_TRADES_DAY", 10))
             if stop_check["stop"]:
                 print(f"[UserLoop:{user_id}] Strategy stop: {stop_check['reasons']}")
                 if alert_fn:
@@ -903,9 +968,24 @@ def _loop(user_id, alert_fn, gen=None):
                     last_warn_tick = tick
                     alert_fn(user_id, {"action": "FLASH_WARN", "symbol": symbol})
 
+            # Session filter (Strategy Builder): only trade the sessions the user
+            # picked. [] = all sessions. Crypto ignores this (runs 24/5 on the CFD
+            # feed). Forex reacts to session opens, so honouring it is real.
+            if entry_ok and not _crypto_build:
+                want_sess = getattr(cfg, "SESSION_FILTER", []) or []
+                if want_sess:
+                    try:
+                        now_sess = (market.session() or {}).get("label", "")
+                    except Exception:
+                        now_sess = ""
+                    if now_sess and not any(w.lower() in now_sess.lower() for w in want_sess):
+                        entry_ok = False
+                        _skip(f"session filter: {now_sess} not in {', '.join(want_sess)}")
+
             # News guard: stand aside around high-impact releases for either
             # currency in the pair. Fail-open (no event / feed down → trades).
-            if entry_ok:
+            # Gated by the user's news_filter toggle (Strategy Builder).
+            if entry_ok and getattr(cfg, "NEWS_FILTER", True):
                 ev = news.high_impact_window(symbol.split("_"))
                 if ev:
                     entry_ok = False

@@ -29,7 +29,10 @@ def _reset_daily_if_needed():
         print("[STRATEGY] 🌅 New day — counters reset.")
 
 
-def should_stop(balance, start_balance):
+def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
+                max_dd_pct=20.0, max_trades_day=10):
+    """Circuit breaker. Limits are per-user (set by the Strategy Builder); the
+    defaults preserve the historical behaviour when called without them."""
     _reset_daily_if_needed()
     reasons = []
     if session["peakBalance"] is None or balance > session["peakBalance"]:
@@ -37,13 +40,14 @@ def should_stop(balance, start_balance):
     if session["consecutiveLosses"] >= 3:
         reasons.append("3 consecutive losses — unfavorable conditions (Seykota rule)")
     daily_dd_pct = (session["dailyPnL"] / start_balance) * 100 if start_balance else 0
-    if daily_dd_pct < -3:
-        reasons.append(f"Daily loss exceeded -3% (${abs(session['dailyPnL']):.2f}) — PTJ daily stop")
+    if daily_dd_pct < -abs(max_daily_loss_pct):
+        reasons.append(f"Daily loss exceeded -{abs(max_daily_loss_pct):g}% "
+                       f"(${abs(session['dailyPnL']):.2f}) — daily stop")
     peak_dd = ((balance - session["peakBalance"]) / session["peakBalance"]) * 100 if session["peakBalance"] else 0
-    if peak_dd < -20:
-        reasons.append(f"Drawdown from peak: {peak_dd:.1f}% — capital protection stop")
-    if session["dailyTrades"] >= 10:
-        reasons.append("10 trades/day limit reached — Turtle rule")
+    if peak_dd < -abs(max_dd_pct):
+        reasons.append(f"Drawdown from peak: {peak_dd:.1f}% (limit {abs(max_dd_pct):g}%) — capital protection stop")
+    if session["dailyTrades"] >= max_trades_day:
+        reasons.append(f"{max_trades_day} trades/day limit reached")
     if balance < 1:
         reasons.append("Balance under $1 — cannot trade")
     return {"stop": len(reasons) > 0, "reasons": reasons}

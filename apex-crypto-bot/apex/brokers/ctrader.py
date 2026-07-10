@@ -550,6 +550,25 @@ class CtraderBroker:
         pos = self.get_open_position(self._c.SYMBOL)
         return [pos] if pos else []
 
+    def amend_sltp(self, position_id, sl=None, tp=None, instrument=None):
+        """Move SL/TP on an existing position — used by the trailing-stop /
+        break-even manager. Fail-soft: a failed amend never raises into the loop
+        (the existing stop stays attached), so it can't close a good trade."""
+        try:
+            am = ProtoOAAmendPositionSLTPReq()
+            am.ctidTraderAccountId = self._ctid()
+            am.positionId = int(position_id)
+            dg = self._digits(instrument or self._c.SYMBOL)
+            if sl is not None:
+                am.stopLoss = round(float(sl), dg)
+            if tp is not None:
+                am.takeProfit = round(float(tp), dg)
+            self._conn()._request(am, ProtoOAExecutionEvent, timeout=15)
+            return True
+        except Exception as e:
+            print(f"[cTrader] amend_sltp failed: {e}")
+            return False
+
     # -- orders ---------------------------------------------------------------
     def place_order(self, side, units, instrument=None, sl=None, tp=None):
         sym = _to_ct_symbol(instrument or self._c.SYMBOL)
