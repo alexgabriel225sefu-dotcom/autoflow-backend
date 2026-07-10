@@ -25,10 +25,10 @@ import time
 import uuid
 
 import requests
-from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
-from starlette.routing import Mount, Route
+from starlette.routing import Route
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.server import TransportSecuritySettings
 
 _URL = (os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
 _TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
@@ -89,7 +89,17 @@ def _lrange(product: str, key: str, n: int):
     return out
 
 
-mcp = FastMCP("ruflo", stateless_http=True)
+# Serve the MCP endpoint natively at /<secret>/mcp — mounting FastMCP under a
+# Starlette prefix skips its lifespan, which never starts the session manager
+# (the endpoint then dies with a connect error). Setting the path here keeps the
+# lifespan intact. DNS-rebinding protection is off because the secret path is the
+# guard and the real host (…onrender.com) isn't localhost.
+mcp = FastMCP(
+    "ruflo",
+    stateless_http=True,
+    streamable_http_path=f"/{_SECRET}/mcp",
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
 
 
 # ─── Read tools ────────────────────────────────────────────
@@ -225,13 +235,11 @@ async def _health(request):
     return PlainTextResponse("ruflo-mcp ok")
 
 
-# Root health check for Render + the MCP app behind the secret path
-# (connector URL: https://<host>/<secret>/mcp).
-app = Starlette(routes=[
-    Route("/", _health),
-    Route("/healthz", _health),
-    Mount(f"/{_SECRET}", app=mcp.streamable_http_app()),
-])
+# The MCP app already serves /<secret>/mcp (with its lifespan). Add a root health
+# check for Render. Connector URL: https://<host>/<secret>/mcp
+app = mcp.streamable_http_app()
+app.router.routes.append(Route("/", _health))
+app.router.routes.append(Route("/healthz", _health))
 
 
 if __name__ == "__main__":
