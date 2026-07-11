@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Animation Catalog — Apex Trading Suite</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://api.fontshare.com"><link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060608;--bg1:#0b0b0e;--panel:#111115;--panel2:#18181d;
+  --line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.13);
+  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
+  --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;
+  --accdim:rgba(255,45,79,.12);--accglow:rgba(255,45,79,.45);
+  --up:#27c46a;
+  --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
+  --ease:cubic-bezier(.32,.72,0,1);
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:900px;margin:0 auto;padding:0 20px}
+
+/* HEADER */
+.page-head{padding:60px 0 20px;text-align:center}
+.page-head h1{font:700 clamp(32px,6vw,48px)/1 var(--d);letter-spacing:-.03em;margin-bottom:10px}
+.page-head h1 span{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.page-head p{color:var(--t1);font-size:15px;line-height:1.7;max-width:500px;margin:0 auto}
+
+/* SECTIONS */
+.demo{margin:28px 0;border:1px solid var(--line2);border-radius:20px;overflow:hidden;background:var(--panel)}
+.demo-top{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+.demo-top h2{font:600 15px/1 var(--f);letter-spacing:-.01em}
+.demo-tag{font:600 10px/1 var(--m);color:var(--acc2);letter-spacing:.14em;text-transform:uppercase;background:var(--accdim);border:1px solid rgba(255,45,79,.25);padding:4px 10px;border-radius:6px}
+.demo-body{padding:32px 22px;min-height:180px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.demo-note{font:400 12px/1.6 var(--f);color:var(--t2);text-align:center;max-width:460px;border-top:1px solid var(--line);padding-top:14px;width:100%;margin-top:8px}
+.replay{background:none;border:1px solid var(--line2);color:var(--t1);font:500 12px/1 var(--f);padding:7px 16px;border-radius:8px;cursor:pointer;transition:all .2s}
+.replay:hover{border-color:var(--acc);color:var(--acc2)}
+
+/* ═══ 1. STAGGERED FADE UP ═══ */
+.stagger-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.stagger-card{width:100px;height:70px;background:linear-gradient(165deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid var(--line2);border-radius:14px;display:flex;align-items:center;justify-content:center;font:600 12px/1 var(--f);color:var(--t1);opacity:0;transform:translateY(30px);animation:staggerIn .7s var(--ease) forwards}
+.stagger-card:nth-child(1){animation-delay:0s}.stagger-card:nth-child(2){animation-delay:.1s}
+.stagger-card:nth-child(3){animation-delay:.2s}.stagger-card:nth-child(4){animation-delay:.3s}
+.stagger-card:nth-child(5){animation-delay:.4s}
+@keyframes staggerIn{to{opacity:1;transform:translateY(0)}}
+
+/* ═══ 2. 3D TILT ═══ */
+.tilt-card{width:200px;height:130px;background:linear-gradient(165deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid var(--line2);border-radius:18px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;font:600 14px/1 var(--f);transition:transform .12s ease-out,box-shadow .3s;transform-style:preserve-3d;cursor:pointer;box-shadow:0 20px 40px rgba(0,0,0,.3)}
+.tilt-card:hover{box-shadow:0 30px 60px rgba(255,45,79,.15)}
+.tilt-card small{font:400 11px/1 var(--f);color:var(--t2)}
+
+/* ═══ 3. GLASSMORPHISM FLOAT ═══ */
+.glass-scene{position:relative;width:280px;height:170px}
+.glass-bg{position:absolute;inset:0;background:linear-gradient(135deg,var(--acc),#7a1020,#1a0520);border-radius:18px}
+.glass-card{position:absolute;top:20px;left:28px;right:28px;bottom:20px;background:rgba(255,255,255,.08);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.15);border-radius:14px;box-shadow:0 20px 40px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font:600 14px/1 var(--f);color:#fff;animation:glassFloat 4s ease-in-out infinite}
+@keyframes glassFloat{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(.8deg)}}
+
+/* ═══ 4. GRADIENT WAVE ═══ */
+.gradient-box{width:280px;height:100px;border-radius:16px;background:linear-gradient(-45deg,#ff2d4f,#ff5c74,#7a1020,#2d1040,#ff2d4f);background-size:400% 400%;animation:gradWave 6s ease infinite;display:flex;align-items:center;justify-content:center;font:700 15px/1 var(--f);color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.4)}
+@keyframes gradWave{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+/* ═══ 5. COUNTER ═══ */
+.counter-row{display:flex;gap:28px;text-align:center}
+.counter-val{font:700 34px/1 var(--d);letter-spacing:-.03em;background:linear-gradient(120deg,#fff,var(--acc2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.counter-lbl{font:400 10px/1 var(--f);color:var(--t2);margin-top:5px;text-transform:uppercase;letter-spacing:.1em}
+
+/* ═══ 6. MAGNETIC BUTTON ═══ */
+.mag-btn{background:var(--acc);color:#fff;font:700 16px/1 var(--f);padding:18px 36px;border:none;border-radius:14px;cursor:pointer;transition:transform .12s ease-out,box-shadow .3s;box-shadow:0 8px 30px rgba(255,45,79,.3)}
+.mag-btn:hover{box-shadow:0 14px 44px rgba(255,45,79,.5)}
+
+/* ═══ 7. TEXT REVEAL ═══ */
+.text-reveal{font:700 clamp(20px,4vw,30px)/1.2 var(--d);letter-spacing:-.02em;overflow:hidden}
+.text-reveal span{display:inline-block;opacity:0;transform:translateY(100%);animation:textUp .6s var(--ease) forwards}
+.text-reveal span:nth-child(1){animation-delay:0s}.text-reveal span:nth-child(2){animation-delay:.08s}
+.text-reveal span:nth-child(3){animation-delay:.16s}.text-reveal span:nth-child(4){animation-delay:.24s}
+.text-reveal span:nth-child(5){animation-delay:.32s}
+@keyframes textUp{to{opacity:1;transform:translateY(0)}}
+
+/* ═══ 8. PULSE GLOW ═══ */
+.glow-circle{width:90px;height:90px;border-radius:50%;background:var(--acc);box-shadow:0 0 40px var(--acc),0 0 80px rgba(255,45,79,.3);animation:pulseGlow 2.4s ease-in-out infinite;display:flex;align-items:center;justify-content:center;font:700 24px/1 var(--f);color:#fff}
+@keyframes pulseGlow{0%,100%{transform:scale(1);box-shadow:0 0 40px var(--acc),0 0 80px rgba(255,45,79,.3)}50%{transform:scale(1.08);box-shadow:0 0 60px var(--acc),0 0 120px rgba(255,45,79,.4)}}
+
+/* ═══ 9. SLIDE FROM SIDES ═══ */
+.slide-row{display:flex;gap:14px;width:100%;max-width:360px}
+.slide-left,.slide-right{flex:1;height:60px;background:var(--bg1);border:1px solid var(--line2);border-radius:12px;display:flex;align-items:center;justify-content:center;font:600 12px/1 var(--f);color:var(--t1)}
+.slide-left{opacity:0;animation:slideL .8s var(--ease) forwards}
+.slide-right{opacity:0;animation:slideR .8s .12s var(--ease) forwards}
+@keyframes slideL{from{opacity:0;transform:translateX(-50px)}to{opacity:1;transform:none}}
+@keyframes slideR{from{opacity:0;transform:translateX(50px)}to{opacity:1;transform:none}}
+
+/* ═══ 10. TYPEWRITER ═══ */
+.typewriter{font:600 16px/1 var(--m);color:var(--up);border-right:2px solid var(--up);white-space:nowrap;overflow:hidden;width:0;animation:typing 2.2s steps(26) forwards,blink .7s step-end infinite}
+@keyframes typing{to{width:26ch}}
+@keyframes blink{50%{border-color:transparent}}
+
+/* ═══ 11. MORPHING BLOB ═══ */
+.blob-wrap{position:relative;width:140px;height:140px}
+.blob{width:100%;height:100%;background:linear-gradient(135deg,var(--acc),#7a1020);border-radius:60% 40% 30% 70%/60% 30% 70% 40%;animation:morph 8s ease-in-out infinite;opacity:.7;filter:blur(1px)}
+@keyframes morph{0%{border-radius:60% 40% 30% 70%/60% 30% 70% 40%}25%{border-radius:30% 60% 70% 40%/50% 60% 30% 60%}50%{border-radius:50% 60% 40% 70%/40% 70% 60% 30%}75%{border-radius:40% 30% 60% 50%/70% 40% 50% 60%}100%{border-radius:60% 40% 30% 70%/60% 30% 70% 40%}}
+
+/* ═══ 12. SHIMMER ═══ */
+.shimmer-row{display:flex;flex-direction:column;gap:10px;width:240px}
+.shimmer-line{height:14px;background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(255,255,255,.1),rgba(255,255,255,.04));background-size:200% 100%;border-radius:6px;animation:shimmer 1.8s ease-in-out infinite}
+.shimmer-line:nth-child(1){width:100%}.shimmer-line:nth-child(2){width:80%}.shimmer-line:nth-child(3){width:60%}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ═══ 13. CARD FLIP ═══ */
+.flip-wrap{perspective:600px;width:200px;height:130px;cursor:pointer}
+.flip-inner{position:relative;width:100%;height:100%;transition:transform .7s var(--ease);transform-style:preserve-3d}
+.flip-wrap:hover .flip-inner{transform:rotateY(180deg)}
+.flip-front,.flip-back{position:absolute;inset:0;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;backface-visibility:hidden;border:1px solid var(--line2)}
+.flip-front{background:var(--panel);font:600 14px/1 var(--f)}
+.flip-back{background:var(--accdim);border-color:rgba(255,45,79,.3);transform:rotateY(180deg);font:600 14px/1 var(--f);color:var(--acc3)}
+.flip-front small,.flip-back small{font:400 11px/1 var(--f);color:var(--t2)}
+
+/* ═══ 14. ORBIT ═══ */
+.orbit-wrap{position:relative;width:180px;height:180px}
+.orbit-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:50px;height:50px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font:700 16px/1 var(--f);color:#fff;box-shadow:0 0 30px rgba(255,45,79,.4);z-index:2}
+.orbit-ring{position:absolute;inset:0;border:1px solid rgba(255,45,79,.15);border-radius:50%;animation:orbitSpin 6s linear infinite}
+.orbit-dot{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:12px;height:12px;border-radius:50%;background:var(--acc2);box-shadow:0 0 12px var(--acc)}
+.orbit-ring:nth-child(2){inset:20px;animation-duration:4s;animation-direction:reverse;border-color:rgba(255,255,255,.06)}
+.orbit-ring:nth-child(2) .orbit-dot{background:var(--up);box-shadow:0 0 12px var(--up);width:10px;height:10px}
+@keyframes orbitSpin{to{transform:rotate(360deg)}}
+
+/* ═══ 15. PROGRESS BAR ═══ */
+.progress-wrap{width:280px}
+.progress-label{display:flex;justify-content:space-between;font:500 12px/1 var(--f);color:var(--t1);margin-bottom:8px}
+.progress-bar{height:8px;background:var(--bg1);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--acc),var(--acc2));width:0;animation:fillBar 2s var(--ease) forwards}
+.p2 .progress-fill{animation-delay:.3s;background:linear-gradient(90deg,var(--up),#2ecc71)}
+.p3 .progress-fill{animation-delay:.6s;background:linear-gradient(90deg,#a78bfa,#7c3aed)}
+@keyframes fillBar{to{width:var(--w)}}
+
+/* ═══ 16. ACCORDION EXPAND ═══ */
+.acc-item{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line2);border-radius:14px;overflow:hidden;margin:4px 0}
+.acc-q{width:100%;display:flex;align-items:center;justify-content:space-between;padding:16px 18px;font:600 14px/1 var(--f);color:var(--t0);background:none;border:none;cursor:pointer;text-align:left;transition:color .2s}
+.acc-q:hover{color:var(--acc3)}
+.acc-ic{font:400 18px/1 var(--m);color:var(--t2);transition:transform .3s var(--ease)}
+.acc-q.open .acc-ic{transform:rotate(45deg);color:var(--acc)}
+.acc-a{max-height:0;overflow:hidden;transition:max-height .4s var(--ease),padding .4s;padding:0 18px;font:400 13px/1.7 var(--f);color:var(--t1)}
+.acc-a.open{max-height:200px;padding:0 18px 16px}
+
+/* ═══ 17. PARTICLE FIELD ═══ */
+.particle-box{width:100%;height:200px;border-radius:14px;overflow:hidden;position:relative;background:var(--bg)}
+.particle-box canvas{width:100%;height:100%}
+
+/* ═══ 18. SCROLL PROGRESS ═══ */
+.scroll-bar{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--acc),var(--acc3));z-index:999;width:0;transition:width .1s}
+
+/* ═══ 19. HOVER CARD BORDER ═══ */
+.border-card{width:220px;height:140px;border-radius:18px;background:var(--panel);position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;font:600 14px/1 var(--f);cursor:pointer;overflow:hidden}
+.border-card::before{content:'';position:absolute;inset:-2px;border-radius:20px;background:conic-gradient(from 0deg,var(--acc),var(--acc3),transparent,var(--acc));opacity:0;transition:opacity .4s;animation:borderSpin 3s linear infinite}
+.border-card::after{content:'';position:absolute;inset:2px;border-radius:16px;background:var(--panel);z-index:1}
+.border-card:hover::before{opacity:1}
+.border-card>*{position:relative;z-index:2}
+.border-card small{font:400 11px/1 var(--f);color:var(--t2)}
+@keyframes borderSpin{to{transform:rotate(360deg)}}
+
+/* ═══ 20. NOTIFICATION TOAST ═══ */
+.toast{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid rgba(39,196,106,.25);border-radius:14px;padding:14px 20px;box-shadow:0 20px 40px rgba(0,0,0,.4);opacity:0;transform:translateY(20px) scale(.95);animation:toastIn .5s var(--ease) forwards}
+.toast-dot{width:8px;height:8px;border-radius:50%;background:var(--up);box-shadow:0 0 10px var(--up);flex-shrink:0}
+.toast-text{font:500 13px/1.4 var(--f);color:var(--t0)}
+.toast-text span{color:var(--up);font-weight:600}
+.toast-time{font:400 11px/1 var(--m);color:var(--t2);margin-left:auto;flex-shrink:0}
+@keyframes toastIn{to{opacity:1;transform:none}}
+
+/* FOOTER */
+.page-foot{text-align:center;padding:48px 0 40px;color:var(--t2);font:400 13px/1.6 var(--f)}
+.page-foot a{color:var(--acc2)}
+
+@media(max-width:500px){
+  .tilt-card,.flip-wrap{width:160px;height:100px}
+  .glass-scene{width:240px;height:150px}
+  .gradient-box{width:240px}
+  .counter-row{gap:18px}.counter-val{font-size:26px}
+  .orbit-wrap{width:140px;height:140px}
+  .border-card{width:180px;height:110px}
+}
+</style>
+</head>
+<body>
+<div class="scroll-bar" id="scrollBar"></div>
+<div class="wrap">
+
+<div class="page-head">
+  <h1>Animation <span>Catalog</span></h1>
+  <p>Scrollează prin toate animațiile. Alege care-ți plac și le pun pe site. Apasă Replay ca să le revezi.</p>
+</div>
+
+<!-- 1 -->
+<div class="demo"><div class="demo-top"><h2>Staggered Fade Up</h2><span class="demo-tag">01</span></div>
+<div class="demo-body">
+  <div class="stagger-row" id="stagger1"><div class="stagger-card">Card 1</div><div class="stagger-card">Card 2</div><div class="stagger-card">Card 3</div><div class="stagger-card">Card 4</div><div class="stagger-card">Card 5</div></div>
+  <button class="replay" onclick="replay('#stagger1 .stagger-card')">Replay ↻</button>
+  <p class="demo-note">Cardurile apar pe rând cu delay între ele. Premium și subtil.</p>
+</div></div>
+
+<!-- 2 -->
+<div class="demo"><div class="demo-top"><h2>3D Tilt on Hover</h2><span class="demo-tag">02</span></div>
+<div class="demo-body">
+  <div class="tilt-card" id="tiltCard">Hover / Touch me<small>Mișcă degetul pe card</small></div>
+  <p class="demo-note">Cardul se înclină 3D spre cursor/deget. Senzație de profunzime.</p>
+</div></div>
+
+<!-- 3 -->
+<div class="demo"><div class="demo-top"><h2>Glassmorphism Float</h2><span class="demo-tag">03</span></div>
+<div class="demo-body">
+  <div class="glass-scene"><div class="glass-bg"></div><div class="glass-card">Glass Effect</div></div>
+  <p class="demo-note">Card transparent cu blur care plutește. Efect sticlă premium.</p>
+</div></div>
+
+<!-- 4 -->
+<div class="demo"><div class="demo-top"><h2>Gradient Wave</h2><span class="demo-tag">04</span></div>
+<div class="demo-body">
+  <div class="gradient-box">Living Gradient</div>
+  <p class="demo-note">Gradientul se mișcă continuu. Dă viață oricărui element.</p>
+</div></div>
+
+<!-- 5 -->
+<div class="demo"><div class="demo-top"><h2>Counter Animation</h2><span class="demo-tag">05</span></div>
+<div class="demo-body">
+  <div class="counter-row">
+    <div><div class="counter-val" id="c1">0</div><div class="counter-lbl">Users</div></div>
+    <div><div class="counter-val" id="c2">0</div><div class="counter-lbl">Trades</div></div>
+    <div><div class="counter-val" id="c3">0</div><div class="counter-lbl">Pairs</div></div>
+  </div>
+  <button class="replay" onclick="replayCounters()">Replay ↻</button>
+  <p class="demo-note">Numere care cresc rapid de la 0. Impact pe statistici.</p>
+</div></div>
+
+<!-- 6 -->
+<div class="demo"><div class="demo-top"><h2>Magnetic Button</h2><span class="demo-tag">06</span></div>
+<div class="demo-body">
+  <button class="mag-btn" id="magBtn">Get License — $297 →</button>
+  <p class="demo-note">Butonul urmărește cursorul. Se simte "viu" și interactiv.</p>
+</div></div>
+
+<!-- 7 -->
+<div class="demo"><div class="demo-top"><h2>Text Reveal (Word by Word)</h2><span class="demo-tag">07</span></div>
+<div class="demo-body">
+  <div class="text-reveal" id="textReveal"><span>Your&nbsp;</span><span>trading&nbsp;</span><span>bot,&nbsp;</span><span>from&nbsp;</span><span>your&nbsp;phone.</span></div>
+  <button class="replay" onclick="replay('#textReveal span')">Replay ↻</button>
+  <p class="demo-note">Cuvintele apar pe rând din jos. Impact mare pe headlines.</p>
+</div></div>
+
+<!-- 8 -->
+<div class="demo"><div class="demo-top"><h2>Pulse Glow</h2><span class="demo-tag">08</span></div>
+<div class="demo-body">
+  <div class="glow-circle">AI</div>
+  <p class="demo-note">Pulsație cu strălucire. Bun pentru CTA-uri și indicatoare live.</p>
+</div></div>
+
+<!-- 9 -->
+<div class="demo"><div class="demo-top"><h2>Slide In From Sides</h2><span class="demo-tag">09</span></div>
+<div class="demo-body">
+  <div class="slide-row" id="slideRow"><div class="slide-left">← From Left</div><div class="slide-right">From Right →</div></div>
+  <button class="replay" onclick="replay('#slideRow > div')">Replay ↻</button>
+  <p class="demo-note">Elementele intră din ambele părți. Perfect pentru comparații.</p>
+</div></div>
+
+<!-- 10 -->
+<div class="demo"><div class="demo-top"><h2>Typewriter</h2><span class="demo-tag">10</span></div>
+<div class="demo-body">
+  <div class="typewriter" id="tw">BUY BTC/USDT @ $104,285.40</div>
+  <button class="replay" onclick="replayEl('#tw')">Replay ↻</button>
+  <p class="demo-note">Text care se scrie singur. Efect de terminal/cod.</p>
+</div></div>
+
+<!-- 11 -->
+<div class="demo"><div class="demo-top"><h2>Morphing Blob</h2><span class="demo-tag">11</span></div>
+<div class="demo-body">
+  <div class="blob-wrap"><div class="blob"></div></div>
+  <p class="demo-note">Formă organică care se transformă. Bun ca background decorativ.</p>
+</div></div>
+
+<!-- 12 -->
+<div class="demo"><div class="demo-top"><h2>Shimmer Loading</h2><span class="demo-tag">12</span></div>
+<div class="demo-body">
+  <div class="shimmer-row"><div class="shimmer-line"></div><div class="shimmer-line"></div><div class="shimmer-line"></div></div>
+  <p class="demo-note">Linii care strălucesc. Skeleton loading premium.</p>
+</div></div>
+
+<!-- 13 -->
+<div class="demo"><div class="demo-top"><h2>Card Flip 3D</h2><span class="demo-tag">13</span></div>
+<div class="demo-body">
+  <div class="flip-wrap"><div class="flip-inner"><div class="flip-front">Hover me<small>Întoarce cardul</small></div><div class="flip-back">Back Side<small>Informații ascunse</small></div></div></div>
+  <p class="demo-note">Card care se întoarce 3D pe hover. Bun pentru features sau pricing.</p>
+</div></div>
+
+<!-- 14 -->
+<div class="demo"><div class="demo-top"><h2>Orbiting Elements</h2><span class="demo-tag">14</span></div>
+<div class="demo-body">
+  <div class="orbit-wrap">
+    <div class="orbit-ring"><div class="orbit-dot"></div></div>
+    <div class="orbit-ring"><div class="orbit-dot"></div></div>
+    <div class="orbit-center">AI</div>
+  </div>
+  <p class="demo-note">Elemente care orbitează. Sugerează AI, conectivitate, ecosistem.</p>
+</div></div>
+
+<!-- 15 -->
+<div class="demo"><div class="demo-top"><h2>Animated Progress Bars</h2><span class="demo-tag">15</span></div>
+<div class="demo-body">
+  <div class="progress-wrap">
+    <div class="p1"><div class="progress-label"><span>Win Rate</span><span>78%</span></div><div class="progress-bar"><div class="progress-fill" style="--w:78%"></div></div></div>
+    <div class="p2" style="margin-top:14px"><div class="progress-label"><span>Risk Control</span><span>92%</span></div><div class="progress-bar"><div class="progress-fill" style="--w:92%"></div></div></div>
+    <div class="p3" style="margin-top:14px"><div class="progress-label"><span>Uptime</span><span>99.9%</span></div><div class="progress-bar"><div class="progress-fill" style="--w:99.9%"></div></div></div>
+  </div>
+  <button class="replay" onclick="replay('.progress-fill')">Replay ↻</button>
+  <p class="demo-note">Bare de progres animate. Bun pentru metrici și statistici.</p>
+</div></div>
+
+<!-- 16 -->
+<div class="demo"><div class="demo-top"><h2>Smooth Accordion</h2><span class="demo-tag">16</span></div>
+<div class="demo-body">
+  <div class="acc-item"><button class="acc-q" onclick="toggleAcc(this)">What strategies does the bot use?<span class="acc-ic">+</span></button><div class="acc-a">AI signal trading, grid trading for ranging markets, and DCA accumulation. All configurable from Telegram.</div></div>
+  <div class="acc-item"><button class="acc-q" onclick="toggleAcc(this)">Is my money safe?<span class="acc-ic">+</span></button><div class="acc-a">Yes. Trade-only API keys mean the bot can never withdraw. You can revoke access instantly.</div></div>
+  <div class="acc-item"><button class="acc-q" onclick="toggleAcc(this)">Do I need a computer?<span class="acc-ic">+</span></button><div class="acc-a">No. Everything runs from Telegram on your phone. No MT5, no VPS, no desktop.</div></div>
+  <p class="demo-note">Accordion smooth cu animație. Bun pentru FAQ.</p>
+</div></div>
+
+<!-- 17 -->
+<div class="demo"><div class="demo-top"><h2>Particle Field</h2><span class="demo-tag">17</span></div>
+<div class="demo-body" style="padding:0">
+  <div class="particle-box"><canvas id="particles"></canvas></div>
+  <p class="demo-note" style="padding:14px 22px 0">Particule conectate care se mișcă. Background futuristic.</p>
+</div></div>
+
+<!-- 18 -->
+<div class="demo"><div class="demo-top"><h2>Scroll Progress Bar</h2><span class="demo-tag">18</span></div>
+<div class="demo-body">
+  <div style="font:600 14px/1 var(--f);color:var(--t1);text-align:center">↑ Uite bara roșie sus de tot — crește pe măsură ce scrollezi</div>
+  <p class="demo-note">Bară de progres fixă sus. Arată cât ai scrollat din pagină.</p>
+</div></div>
+
+<!-- 19 -->
+<div class="demo"><div class="demo-top"><h2>Animated Border Glow</h2><span class="demo-tag">19</span></div>
+<div class="demo-body">
+  <div class="border-card"><span style="position:relative;z-index:2;font:600 14px/1 var(--f)">Hover me</span><small style="position:relative;z-index:2">Border glow animat</small></div>
+  <p class="demo-note">Border care se rotește și strălucește pe hover. Efect premium pe carduri.</p>
+</div></div>
+
+<!-- 20 -->
+<div class="demo"><div class="demo-top"><h2>Notification Toast</h2><span class="demo-tag">20</span></div>
+<div class="demo-body">
+  <div class="toast" id="toast1"><div class="toast-dot"></div><div class="toast-text"><span>+$47.20</span> profit on BTC/USDT</div><div class="toast-time">now</div></div>
+  <button class="replay" onclick="replayEl('#toast1')">Replay ↻</button>
+  <p class="demo-note">Toast notification care apare smooth. Bun pentru alerte de trade.</p>
+</div></div>
+
+<div class="page-foot">
+  Alege numerele care-ți plac și spune-mi.<br>
+  <a href="/">← Înapoi la site</a>
+</div>
+
+</div>
+
+<script>
+// Generic replay
+function replay(sel){document.querySelectorAll(sel).forEach(function(el){el.style.animation='none';el.offsetHeight;el.style.animation='';});}
+function replayEl(sel){var el=document.querySelector(sel);el.style.animation='none';el.offsetHeight;el.style.animation='';}
+
+// Counters
+function animCount(el,t,s){var n=0,st=Math.max(1,Math.floor(t/50));var iv=setInterval(function(){n=Math.min(n+st,t);el.textContent=n.toLocaleString()+(s||'');if(n>=t)clearInterval(iv);},20);}
+function replayCounters(){animCount(document.getElementById('c1'),1847,'');animCount(document.getElementById('c2'),12400,'');animCount(document.getElementById('c3'),1000,'+');}
+replayCounters();
+
+// 3D Tilt
+var tc=document.getElementById('tiltCard');
+tc.addEventListener('mousemove',function(e){var r=tc.getBoundingClientRect();var x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;tc.style.transform='perspective(600px) rotateY('+(x*20)+'deg) rotateX('+(-y*20)+'deg)';});
+tc.addEventListener('touchmove',function(e){var t=e.touches[0];var r=tc.getBoundingClientRect();var x=(t.clientX-r.left)/r.width-.5,y=(t.clientY-r.top)/r.height-.5;tc.style.transform='perspective(600px) rotateY('+(x*20)+'deg) rotateX('+(-y*20)+'deg)';});
+tc.addEventListener('mouseleave',function(){tc.style.transform='';});
+tc.addEventListener('touchend',function(){tc.style.transform='';});
+
+// Magnetic button
+var mb=document.getElementById('magBtn');
+mb.addEventListener('mousemove',function(e){var r=mb.getBoundingClientRect();mb.style.transform='translate('+((e.clientX-r.left-r.width/2)*.25)+'px,'+((e.clientY-r.top-r.height/2)*.35)+'px)';});
+mb.addEventListener('mouseleave',function(){mb.style.transform='';});
+
+// Accordion
+function toggleAcc(btn){var open=btn.classList.contains('open');document.querySelectorAll('.acc-q').forEach(function(b){b.classList.remove('open');});document.querySelectorAll('.acc-a').forEach(function(a){a.classList.remove('open');});if(!open){btn.classList.add('open');btn.nextElementSibling.classList.add('open');}}
+
+// Scroll progress
+window.addEventListener('scroll',function(){var pct=window.scrollY/(document.documentElement.scrollHeight-innerHeight)*100;document.getElementById('scrollBar').style.width=pct+'%';},{passive:true});
+
+// Particles
+(function(){
+  var canvas=document.getElementById('particles');if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  function resize(){canvas.width=canvas.offsetWidth*2;canvas.height=canvas.offsetHeight*2;ctx.scale(2,2);}
+  resize();window.addEventListener('resize',resize);
+  var pts=[];var w=canvas.offsetWidth,h=canvas.offsetHeight;
+  for(var i=0;i<40;i++)pts.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4,r:Math.random()*2+1});
+  function draw(){
+    ctx.clearRect(0,0,w,h);
+    w=canvas.offsetWidth;h=canvas.offsetHeight;
+    pts.forEach(function(p){
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0||p.x>w)p.vx*=-1;
+      if(p.y<0||p.y>h)p.vy*=-1;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(255,45,79,.5)';ctx.fill();
+    });
+    for(var i=0;i<pts.length;i++)for(var j=i+1;j<pts.length;j++){
+      var dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);
+      if(d<100){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.strokeStyle='rgba(255,45,79,'+(1-d/100)*.2+')';ctx.lineWidth=.5;ctx.stroke();}
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>
+</body>
+</html>
