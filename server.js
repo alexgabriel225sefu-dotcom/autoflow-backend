@@ -2245,13 +2245,29 @@ async function handleLemonWebhook(req, res) {
 }
 app.post('/lemon-webhook', express.raw({ type: 'application/json' }), handleLemonWebhook);
 
+// ── LEMON SQUEEZY — auto-detect Store ID on first use ──
+let _lemonStoreId = process.env.LEMON_STORE_ID || '';
+async function _getLemonStoreId() {
+  if (_lemonStoreId) return _lemonStoreId;
+  const apiKey = process.env.LEMONSQUEEZY_API_KEY;
+  if (!apiKey) return '';
+  try {
+    const r = await fetch('https://api.lemonsqueezy.com/v1/stores', {
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/vnd.api+json' }
+    });
+    const d = await r.json();
+    if (d.data?.[0]?.id) { _lemonStoreId = String(d.data[0].id); console.log(`[LEMON] Auto-detected store ID: ${_lemonStoreId}`); }
+  } catch (e) { console.error('[LEMON] Store auto-detect failed:', e.message); }
+  return _lemonStoreId;
+}
+
 // ── LEMON SQUEEZY CHECKOUT — creates a checkout URL via the API.
 // The landing page calls this to get a Lemon Squeezy checkout overlay URL.
 app.post('/api/lemon-checkout', _paymentLimiter, async (req, res) => {
   const { product, email, name, ref } = req.body;
   const apiKey = process.env.LEMONSQUEEZY_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Lemon Squeezy not configured' });
-  const storeId = process.env.LEMON_STORE_ID;
+  const storeId = await _getLemonStoreId();
   const variantId = product === 'apex-forex'
     ? process.env.LEMON_VARIANT_FOREX
     : process.env.LEMON_VARIANT_CRYPTO;
