@@ -593,7 +593,10 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     fetch('/api/lemon-checkout',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({product:product,ref:ref})})
     .then(function(r){return r.json();})
-    .then(function(d){if(d.url)window.open(d.url,'_blank');else alert('Checkout unavailable — please try again.');})
+    .then(function(d){
+      if(d.url){window.open(d.url,'_blank');}
+      else{alert('Checkout unavailable — '+(d.error||'please try again.'));}
+    })
     .catch(function(){alert('Connection error — please try again.');});
   }
   document.querySelectorAll('a[href="#buy-crypto"]').forEach(function(a){

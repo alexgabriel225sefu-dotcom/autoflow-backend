@@ -2271,7 +2271,10 @@ app.post('/api/lemon-checkout', _paymentLimiter, async (req, res) => {
   const variantId = product === 'apex-forex'
     ? process.env.LEMON_VARIANT_FOREX
     : process.env.LEMON_VARIANT_CRYPTO;
-  if (!storeId || !variantId) return res.status(500).json({ error: 'Lemon Squeezy products not configured' });
+  if (!storeId || !variantId) {
+    console.error('[LEMON] Missing config — storeId:', storeId, 'variantId:', variantId, 'product:', product);
+    return res.status(500).json({ error: 'Lemon Squeezy products not configured (store=' + (storeId||'?') + ' variant=' + (variantId||'?') + ')' });
+  }
   try {
     const resp = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
       method: 'POST',
@@ -2299,7 +2302,11 @@ app.post('/api/lemon-checkout', _paymentLimiter, async (req, res) => {
       })
     });
     const data = await resp.json();
-    if (!resp.ok) return res.status(resp.status).json({ error: data.errors?.[0]?.detail || 'Checkout creation failed' });
+    if (!resp.ok) {
+      const detail = data.errors?.[0]?.detail || JSON.stringify(data.errors || data);
+      console.error('[LEMON] Checkout API error:', resp.status, detail);
+      return res.status(resp.status).json({ error: detail });
+    }
     const checkoutUrl = data.data?.attributes?.url;
     if (!checkoutUrl) return res.status(500).json({ error: 'No checkout URL returned' });
     res.json({ url: checkoutUrl });
