@@ -327,6 +327,29 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .sec-card:hover{border-color:rgba(255,45,79,.3);transform:translateY(-3px)}
 .sec-card h3{font:600 16px/1.3 var(--f);margin-bottom:8px;letter-spacing:-.02em}
 .sec-card p{font:400 13px/1.7 var(--f);color:var(--t1)}
+/* TRADING METHODS */
+.method-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:820px){.method-grid{grid-template-columns:1fr}}
+.method-card{background:var(--panel);border:1px solid var(--line2);border-radius:20px;padding:28px;position:relative;overflow:hidden;transition:border-color .3s var(--ease),transform .3s var(--ease)}
+.method-card:hover{border-color:rgba(255,45,79,.3);transform:translateY(-3px)}
+.method-num{font:600 48px/1 var(--d);color:rgba(255,255,255,.04);position:absolute;top:16px;right:20px;letter-spacing:-.03em}
+.method-tag{display:inline-flex;font:600 10px/1 var(--m);letter-spacing:.14em;text-transform:uppercase;border-radius:6px;padding:5px 10px;margin-bottom:14px}
+.ai-tag{color:#a78bfa;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25)}
+.grid-tag{color:var(--up);background:rgba(39,196,106,.08);border:1px solid rgba(39,196,106,.25)}
+.dca-tag{color:#f59e0b;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25)}
+.method-card h3{font:600 18px/1.3 var(--f);margin-bottom:10px;letter-spacing:-.02em}
+.method-card>p{font:400 13px/1.7 var(--f);color:var(--t1);margin-bottom:18px}
+.method-you{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.you-label{font:600 10px/1 var(--m);color:var(--t2);letter-spacing:.12em;text-transform:uppercase;width:100%;margin-bottom:2px}
+.you-item{font:500 11px/1 var(--f);color:var(--t1);background:var(--bg1);border:1px solid var(--line);border-radius:6px;padding:5px 10px}
+/* YOU CONTROL */
+.control-list{display:grid;gap:14px}
+.ctrl-item{display:flex;align-items:flex-start;gap:14px;padding:16px 18px;background:var(--panel);border:1px solid var(--line2);border-radius:14px;transition:border-color .3s var(--ease)}
+.ctrl-item:hover{border-color:rgba(255,45,79,.25)}
+.ctrl-ico{width:40px;height:40px;border-radius:10px;background:var(--accdim);border:1px solid rgba(255,45,79,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ctrl-item b{display:block;font:600 14px/1.3 var(--f);color:var(--t0);margin-bottom:3px}
+.ctrl-item span{font:400 13px/1.5 var(--f);color:var(--t1)}
+@media(max-width:900px){#control>div{grid-template-columns:1fr!important}}
 .center{text-align:center}
 #spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--acc),var(--acc3));z-index:600;will-change:width;pointer-events:none}
 @keyframes blk{0%,100%{opacity:1}50%{opacity:.2}}.blink-live{animation:blk 1.6s ease-in-out infinite}
@@ -622,6 +645,74 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     <div class="arch-box"><span class="arch-tag">Cloud · Hosted by us</span><h4>Apex Forex ATC</h4><p>AI analysis, strategy logic, risk management, Telegram control. Runs 24/7 — nothing for you to host.</p></div>
     <div class="arch-mid"><span class="arch-lbl">PRICES · BALANCE · CANDLES</span><div class="arch-line"></div><span class="arch-lbl">TRADE COMMANDS · SL · TP</span><div class="arch-line"></div></div>
     <div class="arch-box"><span class="arch-tag">Your cTrader account</span><h4>cTrader — demo or live</h4><p>You connect your own cTrader account. Every order executes there with SL and TP — you keep full control of your funds.</p></div>
+  </div>
+</section>
+
+<!-- TRADING METHODS -->
+<section class="wrap sec" id="methods" style="border-top:1px solid var(--line)">
+  <div class="sec-head rv center" style="margin-left:auto;margin-right:auto;text-align:center">
+    <span class="label">Trading Methods</span>
+    <h2 class="h2" style="margin:14px 0 14px">Three engines. You pick which one runs.</h2>
+    <p class="lead" style="margin:0 auto">The bot doesn't decide for you — <b style="color:var(--t0)">you</b> choose the strategy, the pairs, the risk level. Switch any time from Telegram.</p>
+  </div>
+  <div class="method-grid rv">
+    <div class="method-card">
+      <div class="method-num">01</div>
+      <div class="method-tag ai-tag">AI Signals</div>
+      <h3>AI-Powered Trading</h3>
+      <p>The bot analyzes the market using technical indicators (RSI, Bollinger Bands, moving averages) combined with AI reasoning. When it spots a high-probability setup, it opens a trade with automatic stop-loss and take-profit.</p>
+      <div class="method-you">
+        <span class="you-label">You control:</span>
+        <span class="you-item">Risk % per trade</span>
+        <span class="you-item">Which pairs</span>
+        <span class="you-item">Timeframe</span>
+        <span class="you-item">SL/TP distance</span>
+      </div>
+    </div>
+    <div class="method-card">
+      <div class="method-num">02</div>
+      <div class="method-tag grid-tag">Grid</div>
+      <h3>Grid Trading</h3>
+      <p>Places a grid of buy and sell orders across a price range. Profits from natural market bouncing without needing to predict direction. Best for ranging, sideways markets.</p>
+      <div class="method-you">
+        <span class="you-label">You control:</span>
+        <span class="you-item">Grid range</span>
+        <span class="you-item">Number of levels</span>
+        <span class="you-item">Order size</span>
+        <span class="you-item">Pair selection</span>
+      </div>
+    </div>
+    <div class="method-card">
+      <div class="method-num">03</div>
+      <div class="method-tag dca-tag">DCA</div>
+      <h3>Dollar-Cost Averaging</h3>
+      <p>Buys at regular intervals regardless of price — a proven accumulation strategy. Reduces the impact of volatility by spreading your entries over time.</p>
+      <div class="method-you">
+        <span class="you-label">You control:</span>
+        <span class="you-item">Buy interval</span>
+        <span class="you-item">Amount per buy</span>
+        <span class="you-item">Target asset</span>
+        <span class="you-item">Take-profit %</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- YOU CONTROL EVERYTHING -->
+<section class="wrap sec" id="control" style="border-top:1px solid var(--line)">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,6vw,72px);align-items:center">
+    <div class="rv">
+      <span class="label">Full Control</span>
+      <h2 class="h2" style="margin:14px 0 14px">You decide everything.<br>The bot executes.</h2>
+      <p class="lead">This is not a "set and forget" black box. You configure every parameter, monitor every trade, and can pause or stop at any moment. The bot is the tool — you are the trader.</p>
+    </div>
+    <div class="control-list rv">
+      <div class="ctrl-item"><div class="ctrl-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--acc2)" stroke-width="1.7"><path d="M12 20V10m0 0l-3 3m3-3l3 3M4 4h16"/></svg></div><div><b>You pick the pairs</b><span>BTC/USDT, EUR/USD, Gold — any asset your exchange offers</span></div></div>
+      <div class="ctrl-item"><div class="ctrl-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--acc2)" stroke-width="1.7"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div><b>You set the risk</b><span>Risk per trade, max drawdown, daily loss limit — all configurable</span></div></div>
+      <div class="ctrl-item"><div class="ctrl-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--acc2)" stroke-width="1.7"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><div><b>You choose the strategy</b><span>AI Signals, Grid, or DCA — switch with one Telegram command</span></div></div>
+      <div class="ctrl-item"><div class="ctrl-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--acc2)" stroke-width="1.7"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><div><b>You start and stop</b><span>/start to begin, /stop to pause — the bot never trades without your command</span></div></div>
+      <div class="ctrl-item"><div class="ctrl-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--acc2)" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div><b>You see every trade</b><span>Instant Telegram alert with entry, SL, TP, size, and the AI's reasoning</span></div></div>
+    </div>
   </div>
 </section>
 
