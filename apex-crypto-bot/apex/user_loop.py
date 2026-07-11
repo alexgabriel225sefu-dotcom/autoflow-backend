@@ -842,6 +842,7 @@ def _loop(user_id, alert_fn, gen=None):
                 })
 
             # AI signal with rule-based fallback
+            _sig_t0 = time.time()
             try:
                 signal = ai.get_signal(ind, paper_balance, open_pos, strat_data,
                                        mode=active_mode)
@@ -860,6 +861,11 @@ def _loop(user_id, alert_fn, gen=None):
             confidence = signal.get("confidence", 0)
 
             entry_ok = action in ("BUY", "SELL") and not open_pos and confidence >= cfg.MIN_CONFIDENCE
+            # Signal TTL: if AI analysis took too long the market moved on.
+            _sig_age = time.time() - _sig_t0
+            if entry_ok and _sig_age > 5.0:
+                entry_ok = False
+                _skip(f"signal TTL expired ({_sig_age:.1f}s > 5s)")
             # ── Multi-position gates (live) ──
             if entry_ok and not cfg.PAPER_TRADING:
                 if all_positions is None:
@@ -1087,39 +1093,63 @@ def _loop(user_id, alert_fn, gen=None):
                 else:
                     units = forex.round_units(max(units, floor), symbol)
 
+                    # Spread re-check: verify spread is still acceptable
+                    # right before execution — it may have widened since analysis.
+                    _skip_exec = False
                     try:
-                        from apex import control as _ctl
-                        _ctl.event("order", f"{action} {symbol} units={units} @~{price} "
-                                   f"SL={sl_price} TP={tp_price}", user_id=user_id)
+                        _rb, _ra = broker.get_bid_ask(symbol)
+                        _rs = forex.spread_pips(_rb, _ra, symbol)
+                        _rs_pct = ((_ra - _rb) / price * 100) if price > 0 else 0.0
+                        _msp = getattr(cfg, "MAX_SPREAD_PCT", 0)
+                        _msp_pip = getattr(cfg, "MAX_SPREAD_PIPS", 3.0)
+                        if _msp > 0 and _rs_pct > _msp:
+                            _skip_exec = True
+                            _skip(f"spread widened before exec ({_rs_pct:.2f}% > {_msp:g}%)")
+                        elif _msp <= 0 and _rs > _msp_pip:
+                            _skip_exec = True
+                            _skip(f"spread widened before exec ({_rs:.1f}p > {_msp_pip:g}p)")
+                        else:
+                            price = (_rb + _ra) / 2
+                            sl_price = price - sl_dist if action == "BUY" else price + sl_dist
+                            tp_price = price + tp_dist if action == "BUY" else price - tp_dist
                     except Exception:
                         pass
-                    broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
-
-                    if cfg.PAPER_TRADING:
-                        open_pos = {"side": action, "entryPrice": price,
-                                    "symbol": symbol, "units": units,
-                                    "quantity": units, "stopLoss": sl_price, "takeProfit": tp_price,
-                                    "entrySpreadPips": spread, "openedAt": now_str}
+                    if _skip_exec:
+                        entry_ok = False
                     else:
                         try:
-                            open_pos = broker.get_open_position(symbol)
+                            from apex import control as _ctl
+                            _ctl.event("order", f"{action} {symbol} units={units} @~{price} "
+                                       f"SL={sl_price} TP={tp_price}", user_id=user_id)
                         except Exception:
-                            open_pos = None
-                        open_pos = open_pos or {"side": action, "entryPrice": price,
-                                                "symbol": symbol, "units": units,
-                                                "quantity": units, "stopLoss": sl_price,
-                                                "takeProfit": tp_price, "openedAt": now_str}
+                            pass
+                        broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
 
-                    dash["openPosition"] = open_pos
-                    result = {"action": action, "symbol": symbol, "confidence": confidence,
-                              "price": price, "spreadPips": round(spread, 1), "time": now_str,
-                              "stopLoss": sl_price, "takeProfit": tp_price,
-                              "reasoning": signal.get("reasoning", ""),
-                              "keyFactors": signal.get("keyFactors", [])}
-                    dash["trades"].insert(0, result)
-                    dash["trades"] = dash["trades"][:50]
-                    if alert_fn:
-                        alert_fn(user_id, result)
+                        if cfg.PAPER_TRADING:
+                            open_pos = {"side": action, "entryPrice": price,
+                                        "symbol": symbol, "units": units,
+                                        "quantity": units, "stopLoss": sl_price, "takeProfit": tp_price,
+                                        "entrySpreadPips": spread, "openedAt": now_str}
+                        else:
+                            try:
+                                open_pos = broker.get_open_position(symbol)
+                            except Exception:
+                                open_pos = None
+                            open_pos = open_pos or {"side": action, "entryPrice": price,
+                                                    "symbol": symbol, "units": units,
+                                                    "quantity": units, "stopLoss": sl_price,
+                                                    "takeProfit": tp_price, "openedAt": now_str}
+
+                        dash["openPosition"] = open_pos
+                        result = {"action": action, "symbol": symbol, "confidence": confidence,
+                                  "price": price, "spreadPips": round(spread, 1), "time": now_str,
+                                  "stopLoss": sl_price, "takeProfit": tp_price,
+                                  "reasoning": signal.get("reasoning", ""),
+                                  "keyFactors": signal.get("keyFactors", [])}
+                        dash["trades"].insert(0, result)
+                        dash["trades"] = dash["trades"][:50]
+                        if alert_fn:
+                            alert_fn(user_id, result)
 
             elif action == "CLOSE" and open_pos and dash.get("manualHold"):
                 # /buy - /sell trades belong to the USER: the strategy engine
