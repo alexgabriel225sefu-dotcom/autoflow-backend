@@ -2292,7 +2292,7 @@ app.post('/api/lemon-checkout', _paymentLimiter, async (req, res) => {
               name: name || undefined,
               custom: { product: product || 'apex-bot', ref: ref || 'direct' }
             },
-            product_options: { redirect_url: 'https://aicashsystem.space/thank-you.html' }
+            product_options: { redirect_url: 'https://aicashsystem.space/thank-you.html?order_id={order_id}&product=' + (product === 'apex-forex' ? 'apex-forex' : 'apex-bot') }
           },
           relationships: {
             store: { data: { type: 'stores', id: storeId } },
