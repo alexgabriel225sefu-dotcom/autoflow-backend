@@ -2435,6 +2435,12 @@ app.get('/index.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'html', 'index.html'));
 });
 
+// Landing sub-pages (served from html/)
+['features','strategies','faq','security'].forEach(p => {
+  app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'html', `${p}.html`), { headers: { 'Cache-Control': 'no-store' } }));
+  app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'html', `${p}.html`), { headers: { 'Cache-Control': 'no-store' } }));
+});
+
 // /intro redirects to the homepage — the old separate intro page is retired;
 // the cinematic curtain intro now lives on the homepage itself.
 app.get(['/intro', '/intro.html'], (req, res) => res.redirect(301, '/'));
