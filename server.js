@@ -2290,7 +2290,7 @@ app.post('/api/lemon-checkout', _paymentLimiter, async (req, res) => {
             checkout_data: {
               email: email || undefined,
               name: name || undefined,
-              custom: { product, ref: ref || '', email: email || '', name: name || '' }
+              custom: { product: product || 'apex-bot', ref: ref || 'direct' }
             },
             product_options: { redirect_url: 'https://aicashsystem.space/thank-you.html' }
           },
