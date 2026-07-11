@@ -16,9 +16,9 @@ app.use(cors({
   origin: ['https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'],
   credentials: true
 }));
-// Skip JSON body parsing for Stripe webhook — it needs the raw Buffer for signature verification
+// Skip JSON body parsing for Stripe/Lemon webhooks — they need the raw Buffer for signature verification
 app.use((req, res, next) => {
-  if (req.path === '/stripe-webhook' || req.path === '/webhook') return next();
+  if (req.path === '/stripe-webhook' || req.path === '/webhook' || req.path === '/lemon-webhook') return next();
   express.json()(req, res, next);
 });
 // Serve static assets (JS, CSS, images) but NOT HTML — HTML goes through route handlers
@@ -2137,19 +2137,185 @@ async function handleStripeWebhook(req, res) {
 app.post('/stripe-webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 app.post('/webhook',        express.raw({ type: 'application/json' }), handleStripeWebhook);
 
-// ── ORDER STATUS — polled by the thank-you page right after Stripe checkout.
-// Stripe redirects the buyer here before our webhook may have finished processing,
-// so this looks up the session's payment_intent and reports whether the license is ready yet. ──
+// ── LEMON SQUEEZY WEBHOOK ──────────────────────────────────────────────────
+// Merchant of Record — Lemon handles VAT/taxes/invoices, we just deliver the license.
+// Webhook events: order_created (deliver license), order_refunded (revoke license).
+// Signature: HMAC-SHA256 of the raw body using LEMONSQUEEZY_WEBHOOK_SECRET.
+async function handleLemonWebhook(req, res) {
+  const sig = req.headers['x-signature'] || '';
+  const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
+  if (!secret) { console.error('[LEMON] Missing LEMONSQUEEZY_WEBHOOK_SECRET'); return res.status(400).json({ error: 'Webhook not configured' }); }
+  const hmac = crypto.createHmac('sha256', secret).update(req.body).digest('hex');
+  if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(sig))) {
+    console.error('[LEMON] Invalid signature');
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  try {
+    const payload = JSON.parse(req.body.toString());
+    const eventName = payload.meta?.event_name;
+    const attrs = payload.data?.attributes || {};
+    const customData = payload.meta?.custom_data || {};
+    const email = attrs.user_email || customData.email || '';
+    const buyerName = attrs.user_name || customData.name || 'there';
+    const ref = (customData.ref || '').toLowerCase().trim();
+    const variantId = String(attrs.first_order_item?.variant_id || customData.variant_id || '');
+    const orderId = String(payload.data?.id || '');
+    const amountCents = Number(attrs.total || attrs.first_order_item?.price || 0);
+
+    // Map Lemon Squeezy variant IDs to products.
+    // Set these env vars to your Lemon Squeezy variant IDs:
+    //   LEMON_VARIANT_CRYPTO=123456  (the $297 crypto bot variant)
+    //   LEMON_VARIANT_FOREX=789012   (the $497 forex bot variant)
+    const cryptoVariant = process.env.LEMON_VARIANT_CRYPTO || '';
+    const forexVariant  = process.env.LEMON_VARIANT_FOREX || '';
+    let product = null;
+    if (variantId && variantId === cryptoVariant) product = 'apex-bot';
+    else if (variantId && variantId === forexVariant) product = 'apex-forex';
+    else if (amountCents >= 49000 && amountCents <= 50000) product = 'apex-forex';
+    else if (amountCents >= 29000 && amountCents <= 30000) product = 'apex-bot';
+    else product = customData.product || null;
+
+    if (eventName === 'order_created' && attrs.status === 'paid' && product) {
+      const isForex = product === 'apex-forex';
+      const licenseKey = isForex ? generateForexKey() : generateLicenseKey();
+
+      if (supabase) {
+        const { error } = await supabase.from('licenses').upsert([{
+          key: licenseKey, active: true, activated_at: new Date().toISOString(),
+          email: email || '', name: buyerName, product,
+          payment_intent_id: `lemon_${orderId}`
+        }], { onConflict: 'key' });
+        if (error) addLog(`[LEMON] License DB error: ${error.message}`, 'license', 'error');
+      }
+      addLog(`[LEMON] License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
+
+      // Affiliate commission
+      if (ref && supabase) {
+        try {
+          const { data: aff } = await supabase.from('affiliates').select('code,commission_percent,status').eq('code', ref).maybeSingle();
+          if (aff && aff.status === 'active') {
+            const pct = Number(aff.commission_percent) > 0 ? Number(aff.commission_percent) : 30;
+            const commission = Math.round(amountCents * pct / 100);
+            await supabase.from('referral_sales').upsert([{
+              affiliate_code: aff.code, license_key: licenseKey,
+              payment_intent_id: `lemon_${orderId}`,
+              product, amount: amountCents, commission_amount: commission
+            }], { onConflict: 'payment_intent_id' });
+            addLog(`[LEMON] Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}`, 'affiliate', 'success');
+            _notifyAffiliateSale(aff.code, product, commission);
+          }
+        } catch (e) { addLog(`[LEMON] Affiliate error: ${e.message}`, 'affiliate', 'error'); }
+      }
+
+      // Email the license key
+      if (email) {
+        const html = isForex
+          ? _buildForexEmailHtml(_he(buyerName), _he(email), licenseKey)
+          : _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey);
+        const subject = isForex
+          ? '🤖 Your Apex Forex Bot — License Key inside'
+          : '🤖 Your Apex Trade Bot — License Key inside';
+        const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
+        if (!result.ok) addLog(`[LEMON] Email NOT sent for ${email} — ${result.error}`, 'email', 'error');
+        else addLog(`[LEMON] ${isForex ? 'Forex' : 'Crypto'} email sent to ${email}`, 'email', 'success');
+      }
+      const price = isForex ? '$497' : '$297';
+      addLog(`[LEMON] ${isForex ? 'Forex' : 'Crypto'} Bot sold: ${email} — ${price} — key: ${licenseKey}`, 'payment', 'success');
+    }
+
+    // Refund — revoke license + claw back affiliate commission
+    if (eventName === 'order_refunded' && orderId) {
+      if (supabase) {
+        const piRef = `lemon_${orderId}`;
+        const { data: revoked } = await supabase.from('licenses')
+          .update({ active: false, refunded: true, refunded_at: new Date().toISOString() })
+          .eq('payment_intent_id', piRef).select('key,product');
+        if (revoked?.length) addLog(`[LEMON] License revoked: ${revoked[0].key} (${revoked[0].product})`, 'license', 'warn');
+        await supabase.from('referral_sales')
+          .update({ refunded: true, refunded_at: new Date().toISOString() })
+          .eq('payment_intent_id', piRef);
+      }
+    }
+
+    res.json({ received: true });
+  } catch (e) {
+    console.error('[LEMON] Webhook error:', e);
+    res.status(400).json({ error: e.message });
+  }
+}
+app.post('/lemon-webhook', express.raw({ type: 'application/json' }), handleLemonWebhook);
+
+// ── LEMON SQUEEZY CHECKOUT — creates a checkout URL via the API.
+// The landing page calls this to get a Lemon Squeezy checkout overlay URL.
+app.post('/api/lemon-checkout', _paymentLimiter, async (req, res) => {
+  const { product, email, name, ref } = req.body;
+  const apiKey = process.env.LEMONSQUEEZY_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Lemon Squeezy not configured' });
+  const storeId = process.env.LEMON_STORE_ID;
+  const variantId = product === 'apex-forex'
+    ? process.env.LEMON_VARIANT_FOREX
+    : process.env.LEMON_VARIANT_CRYPTO;
+  if (!storeId || !variantId) return res.status(500).json({ error: 'Lemon Squeezy products not configured' });
+  try {
+    const resp = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/vnd.api+json',
+        'Accept': 'application/vnd.api+json'
+      },
+      body: JSON.stringify({
+        data: {
+          type: 'checkouts',
+          attributes: {
+            checkout_data: {
+              email: email || undefined,
+              name: name || undefined,
+              custom: { product, ref: ref || '', email: email || '', name: name || '' }
+            },
+            product_options: { redirect_url: 'https://aicashsystem.space/thank-you.html' }
+          },
+          relationships: {
+            store: { data: { type: 'stores', id: storeId } },
+            variant: { data: { type: 'variants', id: variantId } }
+          }
+        }
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok) return res.status(resp.status).json({ error: data.errors?.[0]?.detail || 'Checkout creation failed' });
+    const checkoutUrl = data.data?.attributes?.url;
+    if (!checkoutUrl) return res.status(500).json({ error: 'No checkout URL returned' });
+    res.json({ url: checkoutUrl });
+  } catch (e) {
+    console.error('[LEMON] Checkout error:', e.message);
+    res.status(500).json({ error: 'Checkout creation failed' });
+  }
+});
+
+// ── ORDER STATUS — polled by the thank-you page after checkout.
+// Supports both Stripe session_id and Lemon Squeezy order_id. ──
 app.get('/api/order-status', async (req, res) => {
   const sessionId = String(req.query.session_id || '').trim();
-  if (!sessionId) return res.status(400).json({ error: 'Missing session_id' });
+  const lemonOrderId = String(req.query.order_id || '').trim();
+  if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+  // Lemon Squeezy path — look up by lemon_<orderId>
+  if (lemonOrderId) {
+    try {
+      const { data: lic } = await supabase.from('licenses')
+        .select('key,product,email').eq('payment_intent_id', `lemon_${lemonOrderId}`).maybeSingle();
+      if (!lic?.key) return res.json({ ready: false });
+      return res.json({ ready: true, licenseKey: lic.key, product: lic.product, email: lic.email || '' });
+    } catch (e) { return res.status(400).json({ error: e.message }); }
+  }
+  // Stripe path (legacy)
+  if (!sessionId) return res.status(400).json({ error: 'Missing session_id or order_id' });
   if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe not configured' });
   try {
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     const piId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
     if (!piId) return res.json({ ready: false });
-    if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
     const { data: lic } = await supabase.from('licenses')
       .select('key,product,email').eq('payment_intent_id', piId).maybeSingle();
     if (!lic?.key) return res.json({ ready: false });

@@ -532,8 +532,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Live alerts &amp; reports in Telegram</li>
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Unlimited paper trading</li>
         </ul>
-        <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn btn-primary magnetic">Get Crypto License — $297 →</a>
-        <p class="price-fine">🔒 Checkout secured by Stripe · API keys are <b>trade-only</b> — withdrawals impossible · Instant activation by email</p>
+        <a href="#buy-crypto" class="btn btn-primary magnetic">Get Crypto License — $297 →</a>
+        <p class="price-fine">🔒 Secure checkout · VAT handled automatically · API keys are <b>trade-only</b> — withdrawals impossible · Instant activation by email</p>
       </div>
       <div class="price-card">
         <span class="price-badge">Apex Forex ATC · Forex</span>
@@ -547,8 +547,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>AI signals: Claude + Groq</li>
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Paper trading to test risk-free</li>
         </ul>
-        <a href="https://buy.stripe.com/4gMeVdcnn7AX5Xp5TU2Ji01" class="btn btn-primary magnetic">Get Forex License — $497 →</a>
-        <p class="price-fine">🔒 Checkout secured by Stripe · API keys are <b>trade-only</b> — withdrawals impossible · Instant activation by email</p>
+        <a href="#buy-forex" class="btn btn-primary magnetic">Get Forex License — $497 →</a>
+        <p class="price-fine">🔒 Secure checkout · VAT handled automatically · API keys are <b>trade-only</b> — withdrawals impossible · Instant activation by email</p>
       </div>
     </div>
   </div>
@@ -573,8 +573,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
   <h2 class="h2 rv">Your strategy. Your accounts.<br>No subscriptions, ever.</h2>
   <p class="rv">Two fully-hosted bots for crypto and forex. Configure them, control them from Telegram, run them forever.</p>
   <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap" class="rv">
-    <a href="https://buy.stripe.com/cNi28rdrr8F10D56XY2Ji00" class="btn btn-ghost magnetic">Crypto Bot — $297</a>
-    <a href="https://buy.stripe.com/4gMeVdcnn7AX5Xp5TU2Ji01" class="btn btn-primary magnetic">Forex Bot — $497 →</a>
+    <a href="#buy-crypto" class="btn btn-ghost magnetic">Crypto Bot — $297</a>
+    <a href="#buy-forex" class="btn btn-primary magnetic">Forex Bot — $497 →</a>
   </div>
 </section>
 
@@ -586,7 +586,23 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 
 <script>
 (function(){var p=new URLSearchParams(location.search);var ref=p.get('ref');if(ref)sessionStorage.setItem('apex_ref',ref.toLowerCase().trim());})();
-(function(){var ref=sessionStorage.getItem('apex_ref');if(!ref)return;document.querySelectorAll('a[href^="https://buy.stripe.com/"]').forEach(function(a){var u=new URL(a.href);u.searchParams.set('client_reference_id',ref);a.href=u.toString();});})();
+// Lemon Squeezy checkout overlay
+(function(){
+  function openLemon(product){
+    var ref=sessionStorage.getItem('apex_ref')||'';
+    fetch('/api/lemon-checkout',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({product:product,ref:ref})})
+    .then(function(r){return r.json();})
+    .then(function(d){if(d.url)window.open(d.url,'_blank');else alert('Checkout unavailable — please try again.');})
+    .catch(function(){alert('Connection error — please try again.');});
+  }
+  document.querySelectorAll('a[href="#buy-crypto"]').forEach(function(a){
+    a.addEventListener('click',function(e){e.preventDefault();openLemon('apex-bot');});
+  });
+  document.querySelectorAll('a[href="#buy-forex"]').forEach(function(a){
+    a.addEventListener('click',function(e){e.preventDefault();openLemon('apex-forex');});
+  });
+})();
 function toggleNav(){var h=document.getElementById('ham'),m=document.getElementById('mnav');h.classList.toggle('open');m.classList.toggle('open');document.body.style.overflow=m.classList.contains('open')?'hidden':'';}
 document.getElementById('mnav').querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){setTimeout(function(){document.body.style.overflow='';},600);});});
 (function(){var g=document.getElementById('glow');window.addEventListener('mousemove',function(e){g.style.transform='translate3d('+e.clientX+'px,'+e.clientY+'px,0) translate(-50%,-50%)';g.style.opacity='1';});})();

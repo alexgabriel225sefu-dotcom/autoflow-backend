@@ -100,6 +100,7 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
 (function(){
   var params = new URLSearchParams(location.search);
   var sessionId = params.get('session_id');
+  var orderId = params.get('order_id');
   var product = params.get('product') || 'apex-bot';
   var isForex = product === 'apex-forex';
 
@@ -109,14 +110,15 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
     });
   }
 
-  if (!sessionId) { show('stateError'); return; }
+  if (!sessionId && !orderId) { show('stateError'); return; }
 
   var attempts = 0;
   var maxAttempts = 14; // ~35s of polling
 
   function poll(){
     attempts++;
-    fetch('/api/order-status?session_id=' + encodeURIComponent(sessionId))
+    var qs = orderId ? 'order_id=' + encodeURIComponent(orderId) : 'session_id=' + encodeURIComponent(sessionId);
+    fetch('/api/order-status?' + qs)
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (d.ready && d.licenseKey) {
