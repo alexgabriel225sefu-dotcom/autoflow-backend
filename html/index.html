@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="google-site-verification" content="GmkLyb902wfRSysD9sZoDBTpPbmgdKbW9yzehN6lT7g" />
 <title>Apex Trading Suite by AI Cash System — Hosted AI Trading Bots · Crypto & Forex</title>
-<meta name="description" content="Apex Trading Suite (AI Cash System): two fully-hosted AI trading bots controlled from Telegram. Crypto on your own Binance account, forex on any cTrader broker. One-time payment — $297 crypto, $497 forex. No subscriptions, nothing to install.">
+<meta name="description" content="Apex Trading Suite (AI Cash System): two fully-hosted AI trading bots controlled from Telegram. Crypto & Forex on cTrader. One-time payment — $297 crypto, $497 forex. No subscriptions, nothing to install.">
 <link rel="canonical" href="https://aicashsystem.space/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" href="/favicon.svg">
@@ -13,7 +13,7 @@
 <meta property="og:site_name" content="Apex Trading Suite · AI Cash System">
 <meta property="og:url" content="https://aicashsystem.space/">
 <meta property="og:title" content="Apex Trading Suite — Hosted AI Crypto &amp; Forex Bots · $297">
-<meta property="og:description" content="Two fully-hosted AI trading bots, controlled from Telegram. Crypto: trades live on your own Binance account. Forex: cTrader — any broker, demo & live. One-time payment — no subscription, nothing to install.">
+<meta property="og:description" content="Two fully-hosted AI trading bots, controlled from Telegram. Crypto & Forex on cTrader — any broker, demo & live. One-time payment — no subscription, nothing to install.">
 <meta property="og:image" content="https://aicashsystem.space/og.svg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://aicashsystem.space/og.svg">
@@ -23,17 +23,17 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#060608;--bg1:#0b0b0e;--panel:#111115;--panel2:#18181d;--hover:#212128;
-  --line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.13);
+  --bg:#030108;--bg1:#080412;--panel:#0e0818;--panel2:#150e22;--hover:#1c1530;
+  --line:rgba(255,255,255,.06);--line2:rgba(255,255,255,.11);
   --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
-  --acc:#ff2d4f;--acc2:#ff5c74;--acc3:#ff97a8;
-  --accdim:rgba(255,45,79,.12);--accglow:rgba(255,45,79,.45);
+  --acc:#e63946;--acc2:#ff6b7a;--acc3:#ff97a8;
+  --accdim:rgba(230,57,70,.12);--accglow:rgba(230,57,70,.45);
   --up:#27c46a;
   --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
   --ease:cubic-bezier(.32,.72,0,1);--r:16px;
 }
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;letter-spacing:-.011em;overflow-x:hidden}
+body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;letter-spacing:-.011em;overflow-x:hidden;background-image:radial-gradient(ellipse 80% 60% at 50% 30%,rgba(10,2,21,.6),transparent)}
 a{color:inherit;text-decoration:none}
 #glow{position:fixed;top:0;left:0;width:680px;height:680px;border-radius:50%;background:radial-gradient(circle,rgba(255,45,79,.09),transparent 62%);pointer-events:none;z-index:1;transform:translate3d(-50%,-50%,0);opacity:0;transition:opacity .5s;will-change:transform}
 @media(hover:none){#glow{display:none}}
@@ -108,8 +108,13 @@ body.intro-lock{overflow:hidden}
 .grid3d{position:absolute;left:-25%;right:-25%;bottom:-30%;height:90%;z-index:0;pointer-events:none;perspective:340px;opacity:.6}
 .grid3d::after{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,45,79,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(255,45,79,.13) 1px,transparent 1px);background-size:56px 56px;transform:rotateX(68deg);transform-origin:bottom center;animation:grid 6s linear infinite;-webkit-mask-image:linear-gradient(transparent,#000 55%,transparent);mask-image:linear-gradient(transparent,#000 55%,transparent)}
 @keyframes grid{from{background-position-y:0}to{background-position-y:56px}}
-.aurora{position:absolute;top:-20%;left:50%;transform:translateX(-50%);width:80%;height:130%;z-index:0;pointer-events:none;background:radial-gradient(ellipse,rgba(255,45,79,.14),rgba(255,45,79,.04) 55%,transparent);filter:blur(44px);will-change:transform;animation:aur 10s ease-in-out infinite}
-@keyframes aur{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.12)}}
+.aurora{position:absolute;top:-20%;left:50%;transform:translateX(-50%);width:80%;height:130%;z-index:0;pointer-events:none;background:radial-gradient(ellipse,rgba(230,57,70,.12),rgba(155,29,234,.06) 45%,transparent 70%);filter:blur(50px);will-change:transform;animation:aur 12s ease-in-out infinite}
+.aurora2{position:absolute;top:10%;right:-10%;width:50%;height:80%;z-index:0;pointer-events:none;background:radial-gradient(ellipse,rgba(155,29,234,.08),transparent 65%);filter:blur(60px);animation:aur2 14s ease-in-out infinite}
+@keyframes aur{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.15)}}
+@keyframes aur2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-30px,20px) scale(1.1)}}
+/* Stars */
+.hero-stars{position:absolute;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(1px 1px at 15% 12%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 32% 38%,rgba(255,255,255,.4),transparent),radial-gradient(1.2px 1.2px at 48% 8%,rgba(255,200,200,.5),transparent),radial-gradient(1px 1px at 65% 22%,rgba(255,255,255,.4),transparent),radial-gradient(1px 1px at 78% 55%,rgba(255,255,255,.3),transparent),radial-gradient(1px 1px at 88% 15%,rgba(255,255,255,.4),transparent),radial-gradient(1px 1px at 22% 72%,rgba(255,255,255,.3),transparent),radial-gradient(1.2px 1.2px at 55% 85%,rgba(200,180,255,.4),transparent),radial-gradient(1px 1px at 72% 68%,rgba(255,255,255,.3),transparent),radial-gradient(1px 1px at 92% 78%,rgba(255,255,255,.35),transparent);animation:star-tw 4s ease-in-out infinite alternate}
+@keyframes star-tw{0%{opacity:.5}100%{opacity:.9}}
 #hero h1{font:600 clamp(48px,7vw,96px)/.92 var(--d);letter-spacing:-.03em;margin:24px 0 20px}
 #hero h1 .grad{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 30px rgba(255,45,79,.35))}
 #hero .sub{font:400 clamp(16px,1.6vw,19px)/1.65 var(--f);color:var(--t1);max-width:580px;margin:0 auto 26px}
@@ -389,7 +394,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 {"@context":"https://schema.org","@graph":[
  {"@type":"Organization","@id":"https://aicashsystem.space/#org","name":"Apex Trading Suite","alternateName":["AI Cash System","AICashSystem","Apex Trade Bot"],"url":"https://aicashsystem.space/","logo":"https://aicashsystem.space/favicon.svg","email":"supportaicashsystem@gmail.com"},
  {"@type":"WebSite","name":"Apex Trading Suite","alternateName":"AI Cash System","url":"https://aicashsystem.space/","publisher":{"@id":"https://aicashsystem.space/#org"}},
- {"@type":"Product","name":"Apex Trade Bot (Crypto)","description":"Fully-hosted AI crypto trading bot for your own Binance account, controlled from Telegram. One-time license.","brand":{"@type":"Brand","name":"Apex Trading Suite"},"offers":{"@type":"Offer","price":"297","priceCurrency":"USD","url":"https://aicashsystem.space/#pricing","availability":"https://schema.org/InStock"}},
+ {"@type":"Product","name":"Apex Trade Bot (Crypto)","description":"Fully-hosted AI crypto trading bot on cTrader, controlled from Telegram. One-time license.","brand":{"@type":"Brand","name":"Apex Trading Suite"},"offers":{"@type":"Offer","price":"297","priceCurrency":"USD","url":"https://aicashsystem.space/#pricing","availability":"https://schema.org/InStock"}},
  {"@type":"Product","name":"Apex Forex ATC","description":"Fully-hosted AI forex bot for any cTrader broker — demo and live — controlled from Telegram. One-time license.","brand":{"@type":"Brand","name":"Apex Trading Suite"},"offers":{"@type":"Offer","price":"497","priceCurrency":"USD","url":"https://aicashsystem.space/#pricing","availability":"https://schema.org/InStock"}},
  {"@type":"FAQPage","mainEntity":[
   {"@type":"Question","name":"What exactly am I buying?","acceptedAnswer":{"@type":"Answer","text":"A lifetime license to a fully-hosted automated trading bot (crypto or forex). We run it 24/7; you connect your own broker or exchange account and control everything from Telegram."}},
@@ -456,9 +461,11 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 
 <!-- HERO -->
 <section id="hero">
+  <div class="hero-stars"></div>
   <div class="wrap" style="position:relative;z-index:2">
     <div class="grid3d"></div>
     <div class="aurora"></div>
+    <div class="aurora2"></div>
     <div class="hero-kicker rv" aria-label="Algorithmic trading, fully hosted">
       <span class="hk-line"></span>
       <span class="hk-text" id="kicker">Algorithmic Trading</span>
@@ -476,9 +483,9 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
       <div class="prod-card">
         <span class="pc-tag">Crypto</span>
         <h3>Apex Trade Bot</h3>
-        <p>AI-powered crypto trading bot. Connects to your own Binance account with a trade-only API key — every trade appears live in your exchange, the moment it happens.</p>
+        <p>AI-powered crypto trading bot. Connects to your own cTrader account with a trade-only API key — every trade appears live in your broker, the moment it happens.</p>
         <div class="pc-pills">
-          <span class="pc-pill">Binance Live</span><span class="pc-pill">1,000+ Pairs</span><span class="pc-pill">Grid &amp; DCA</span><span class="pc-pill">AI Signals</span>
+          <span class="pc-pill">cTrader</span><span class="pc-pill">1,000+ Pairs</span><span class="pc-pill">Grid &amp; DCA</span><span class="pc-pill">AI Signals</span>
         </div>
         <div class="pc-price"><span class="now">$297</span><span class="was">$497</span><span class="note">one-time</span></div>
         <a href="#pricing" class="btn btn-primary magnetic">Get Crypto License →</a>
@@ -500,7 +507,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <!-- TRUST -->
 <div id="trust"><div class="wrap trust-inner rv">
   <span class="trust-lbl">Crypto</span>
-  <span class="trust-tag">Binance</span><span class="trust-tag">Binance.US</span><span class="trust-tag">BTC/USDT</span><span class="trust-tag">ETH/USDT</span><span class="trust-tag">SOL/USDT</span>
+  <span class="trust-tag">cTrader</span><span class="trust-tag">BTC/USDT</span><span class="trust-tag">ETH/USDT</span><span class="trust-tag">SOL/USDT</span><span class="trust-tag">XRP/USDT</span>
   <span class="trust-sep"></span>
   <span class="trust-lbl">Forex</span>
   <span class="trust-tag">cTrader</span><span class="trust-tag">EUR/USD</span><span class="trust-tag">GBP/USD</span><span class="trust-tag">USD/JPY</span>
@@ -610,14 +617,14 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     <div>
       <span class="label">Crypto Bot</span>
       <h2 class="h2" style="margin:14px 0 14px">Apex Trade Bot</h2>
-      <p class="lead">A fully-hosted AI bot for automated crypto trading. It trades live on your own Binance account — global or US — through a trade-only API key, so every order is visible in your exchange the second it happens. We run the bot 24/7 — you control everything from Telegram.</p>
+      <p class="lead">A fully-hosted AI bot for automated crypto trading. It trades live on your own cTrader account through a trade-only API key, so every order is visible in your broker the second it happens. We run the bot 24/7 — you control everything from Telegram.</p>
     </div>
   </div>
   <div class="feat-grid">
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div><span class="feat-badge">FULLY HOSTED</span><h3>Nothing to install</h3><p>We host and run both bots 24/7 on secure, always-on servers. No setup, no server to manage — just connect your account and control it from Telegram.</p></div>
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><span class="feat-badge">YOUR STRATEGY</span><h3>You define the strategy</h3><p>Choose pairs, timeframes and entry logic. The strategy is yours — not ours.</p></div>
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><span class="feat-badge">RISK SHIELD</span><h3>Built-in risk controls</h3><p>Stop-loss and take-profit on every trade, max-drawdown cap, daily −3% circuit breaker, flash-crash guard and a news filter around FOMC &amp; CPI.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="feat-badge">YOUR ACCOUNT</span><h3>Trades in your Binance</h3><p>Connects to Binance global or Binance.US with a trade-only API key you create. Withdrawals stay disabled — your funds never leave your exchange.</p></div>
+    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="feat-badge">YOUR ACCOUNT</span><h3>Trades in your cTrader</h3><p>Connects to any cTrader broker with a trade-only API key you create. Withdrawals stay disabled — your funds never leave your account.</p></div>
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><span class="feat-badge">3 STRATEGIES</span><h3>AI, Grid &amp; DCA</h3><p>Three engines in one bot: AI signal trading, grid trading for ranging markets, DCA accumulation. Switch or tune any of them from Telegram.</p></div>
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H4z"/><path d="M2 20h20"/></svg></div><span class="feat-badge">LIVE MONITOR</span><h3>Every move, explained</h3><p>Instant Telegram alert on every entry and exit — with the reasoning. /status and /report show balance, open position, win rate and net P&amp;L any time.</p></div>
   </div>
@@ -743,7 +750,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
         <p class="price-sub">One-time · Lifetime use · Instant access</p>
         <ul class="price-list">
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Fully hosted — nothing to install</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Trades live on your own Binance account</li>
+          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Trades live on your own cTrader account</li>
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>AI, Grid &amp; DCA strategies</li>
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Risk-control module</li>
           <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Live alerts &amp; reports in Telegram</li>
