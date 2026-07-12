@@ -1817,15 +1817,21 @@ app.get('/apple-touch-icon.png', (req, res) => { res.setHeader('Content-Type','i
 
 // Root — serve AiCash System landing page
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'html', 'index.html'));
+  res.sendFile(path.join(__dirname, 'html', 'index.html'), { headers: { 'Cache-Control': 'no-store' } });
 });
 
 // /index and /index.html also serve the landing page (prevent publicPages override)
 app.get('/index', (req, res) => {
-  res.sendFile(path.join(__dirname, 'html', 'index.html'));
+  res.sendFile(path.join(__dirname, 'html', 'index.html'), { headers: { 'Cache-Control': 'no-store' } });
 });
 app.get('/index.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'html', 'index.html'));
+  res.sendFile(path.join(__dirname, 'html', 'index.html'), { headers: { 'Cache-Control': 'no-store' } });
+});
+
+// Landing sub-pages (served from html/)
+['features','strategies','faq','security'].forEach(p => {
+  app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'html', `${p}.html`), { headers: { 'Cache-Control': 'no-store' } }));
+  app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'html', `${p}.html`), { headers: { 'Cache-Control': 'no-store' } }));
 });
 
 // Intro animation page
