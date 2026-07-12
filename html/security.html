@@ -38,7 +38,7 @@ body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoo
 .fm-item:hover svg{stroke:#fff}
 .fm-item span{font:500 13px/1 var(--f);color:var(--t1);transition:color .2s}
 .fm-item:hover span{color:#fff}
-@media(max-width:700px){.nav-wrap{left:16px;right:16px;transform:none}.fm{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}.fm::-webkit-scrollbar{display:none}}
+@media(max-width:700px){.nav-wrap{left:16px;right:16px;transform:none}.fm{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}.fm::-webkit-scrollbar{display:none}}
 
 .stars{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(1px 1px at 12% 8%,rgba(255,255,255,.4),transparent),radial-gradient(1px 1px at 45% 6%,rgba(255,200,200,.4),transparent),radial-gradient(1px 1px at 72% 30%,rgba(255,255,255,.3),transparent),radial-gradient(1px 1px at 88% 38%,rgba(255,255,255,.25),transparent),radial-gradient(1px 1px at 35% 60%,rgba(200,180,255,.3),transparent),radial-gradient(1px 1px at 65% 82%,rgba(255,255,255,.25),transparent);animation:tw 4s ease-in-out infinite alternate}
 @keyframes tw{0%{opacity:.5}100%{opacity:.85}}
@@ -47,6 +47,7 @@ body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoo
 .aurora-bg::after{content:'';position:absolute;top:50%;right:20%;width:350px;height:300px;border-radius:50%;background:rgba(155,29,234,.03);filter:blur(70px);animation:d2 14s ease-in-out infinite alternate}
 @keyframes d1{0%{transform:translate(0,0)}100%{transform:translate(40px,30px)}}
 @keyframes d2{0%{transform:translate(0,0)}100%{transform:translate(-30px,20px)}}
+@media(max-width:700px){.aurora-bg::before,.aurora-bg::after{width:250px;height:200px;filter:blur(60px);animation:none}}
 
 .page-header{text-align:center;padding:140px 24px 60px;max-width:700px;margin:0 auto;position:relative;z-index:1}
 .page-header-icon{width:64px;height:64px;display:flex;align-items:center;justify-content:center;margin:0 auto 28px;background:var(--accdim);border:1px solid rgba(230,57,70,.18);border-radius:20px}
@@ -57,13 +58,9 @@ body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoo
 .sec-section{max-width:900px;margin:0 auto;padding:0 24px 80px;position:relative;z-index:1}
 .sec-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 @media(max-width:640px){.sec-grid{grid-template-columns:1fr}}
-@keyframes spin-glow{to{transform:rotate(360deg)}}
 .sec-card{position:relative;border-radius:1.25rem;padding:2px;background:var(--border2);overflow:hidden}
 .sec-card::before{content:'';position:absolute;inset:-1px;border-radius:inherit;background:conic-gradient(from 0deg,transparent 0%,rgba(230,57,70,.4) 25%,transparent 50%,transparent 75%,rgba(155,29,234,.3) 100%);opacity:0;z-index:0;transition:opacity .4s}
 .sec-card:hover::before{opacity:1}
-.sec-card:nth-child(2)::before{animation-delay:-1s}
-.sec-card:nth-child(3)::before{animation-delay:-2s}
-.sec-card:nth-child(4)::before{animation-delay:-3s}
 .sec-inner{position:relative;z-index:1;border-radius:calc(1.25rem - 2px);background:var(--surface);padding:28px;display:flex;flex-direction:column;gap:16px;height:100%}
 .sec-icon{width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:var(--accdim);border:1px solid rgba(230,57,70,.15);border-radius:14px;flex-shrink:0}
 .sec-icon svg{width:22px;height:22px;stroke:var(--acc2);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
