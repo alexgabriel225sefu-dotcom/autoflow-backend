@@ -2655,152 +2655,92 @@ publicPages.forEach(p => {
 // ── BOT EMAIL HTML — funcție separată reutilizabilă ──────────────────────────
 function _buildBotEmailHtml(safeName, safeEmail, licenseKey = 'APEX-XXXX-XXXX-XXXX') {
   const firstName = safeName.split(' ')[0];
-  const envRow = (k, v) => `<tr>
-    <td style="padding:9px 14px 9px 0;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;color:#f59e0b;white-space:nowrap;vertical-align:top;border-bottom:1px solid rgba(255,255,255,0.05)">${k}</td>
-    <td style="padding:9px 0;font-size:12px;color:#94a3b8;font-family:Arial,sans-serif;line-height:1.7;vertical-align:top;border-bottom:1px solid rgba(255,255,255,0.05)">${v}</td>
-  </tr>`;
-  const code = (t) => `<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:11px;font-weight:700">${t}</span>`;
-  const pill = (t, c='#f59e0b', bg='rgba(245,158,11,0.12)', br='rgba(245,158,11,0.3)') =>
-    `<span style="background:${bg};border:1px solid ${br};border-radius:4px;padding:1px 7px;color:${c};font-family:'Courier New',monospace;font-size:11px;font-weight:700">${t}</span>`;
+  const step = (n, title, body) => `<tr><td style="padding:0 0 12px"><table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0c0c0f;border:1px solid rgba(255,255,255,0.06);border-radius:12px"><tr><td style="padding:20px 22px"><table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 12px"><tr><td style="background:#e63946;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#fff;font-family:Arial,sans-serif">${n}</td><td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#fff;font-family:Arial,sans-serif">${title}</td></tr></table><p style="margin:0;font-size:12px;color:#71717a;font-family:Arial,sans-serif;line-height:1.8">${body}</p></td></tr></table></td></tr>`;
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-body,table,td,p,a,li,blockquote{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+body,table,td,p,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
 table,td{mso-table-lspace:0;mso-table-rspace:0}
-img{border:0;outline:none;text-decoration:none;display:block}
-body{margin:0;padding:0;background:#060608}
+body{margin:0;padding:0;background:#09090b}
 a{text-decoration:none}
 @media only screen and (max-width:600px){
-  .key-mono{font-size:18px!important;letter-spacing:2px!important}
+  .key-mono{font-size:17px!important;letter-spacing:2px!important}
   .hero-h1{font-size:26px!important}
   .outer-pad{padding:24px 12px 0!important}
   .inner-pad{padding:28px 20px!important}
 }
 </style></head>
-<body style="margin:0;padding:0;background:#060608">
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;min-height:100vh">
+<body style="margin:0;padding:0;background:#09090b">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#09090b;min-height:100vh">
 <tr><td class="outer-pad" align="center" style="padding:36px 16px 0">
-
-<!-- ── OUTER WRAPPER ── -->
 <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%">
 
-<!-- TOP LABEL -->
 <tr><td align="center" style="padding:0 0 20px">
-  <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:3.5px;text-transform:uppercase;color:#374151;font-family:Arial,sans-serif">APEX TRADE BOT &nbsp;&bull;&nbsp; PURCHASE CONFIRMATION</p>
+  <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:3.5px;text-transform:uppercase;color:#52525b;font-family:Arial,sans-serif">APEX TRADING SUITE &nbsp;&bull;&nbsp; PURCHASE CONFIRMATION</p>
 </td></tr>
 
-<!-- ── HEADER CARD ── -->
-<tr><td style="background:#0a0d18;border:1px solid rgba(255,255,255,0.07);border-bottom:none;border-radius:18px 18px 0 0">
+<tr><td style="background:#0c0c0f;border:1px solid rgba(255,255,255,0.08);border-bottom:none;border-radius:18px 18px 0 0">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
-
-    <!-- red top accent bar -->
-    <tr><td style="background:linear-gradient(90deg,#ff2d4f,#c9193a);height:3px;border-radius:17px 17px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
-
-    <!-- header content -->
+    <tr><td style="background:linear-gradient(90deg,#e63946,#ff6b7a);height:3px;border-radius:17px 17px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
     <tr><td class="inner-pad" align="center" style="padding:36px 40px 32px">
-      <!-- ACCESS GRANTED chip -->
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 24px">
-        <tr><td style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:20px;padding:5px 16px">
-          <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#22c55e;font-family:Arial,sans-serif">&#10003;&nbsp; ACCESS GRANTED</p>
-        </td></tr>
-      </table>
-      <!-- headline -->
-      <p class="hero-h1" style="margin:0 0 6px;font-size:32px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">Your bot is ready,</p>
-      <p class="hero-h1" style="margin:0 0 20px;font-size:32px;font-weight:900;color:#ff2d4f;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">${firstName}.</p>
-      <p style="margin:0;font-size:14px;color:#64748b;font-family:Arial,sans-serif;line-height:1.75;max-width:420px">Apex Trade Bot is fully set up and ready to deploy.<br>Follow the steps below — you can be live in under 10 minutes.</p>
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 24px"><tr><td style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:20px;padding:5px 16px">
+        <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#22c55e;font-family:Arial,sans-serif">&#10003;&nbsp; ACCESS GRANTED</p>
+      </td></tr></table>
+      <p class="hero-h1" style="margin:0 0 6px;font-size:32px;font-weight:900;color:#e4e4e7;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">Your Crypto bot is ready,</p>
+      <p class="hero-h1" style="margin:0 0 20px;font-size:32px;font-weight:900;color:#e63946;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">${firstName}.</p>
+      <p style="margin:0;font-size:14px;color:#a1a1aa;font-family:Arial,sans-serif;line-height:1.75;max-width:420px">Apex Crypto Bot is fully set up and ready to deploy.<br>Follow the steps below — you can be trading in under 10 minutes.</p>
     </td></tr>
   </table>
 </td></tr>
 
-<!-- ── LICENSE KEY CARD ── -->
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,45,79,0.3);border-radius:12px">
-    <tr>
-      <!-- left red accent line -->
-      <td style="background:#ff2d4f;width:4px;border-radius:12px 0 0 12px;font-size:0;line-height:0">&nbsp;</td>
-      <td style="padding:22px 24px">
-        <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#ff2d4f;font-family:Arial,sans-serif">YOUR LICENSE KEY &mdash; KEEP THIS SAFE</p>
-        <p class="key-mono" style="margin:0 0 14px;font-family:'Courier New',Courier,monospace;font-size:24px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px 12px;word-break:break-all">${licenseKey}</p>
-        <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Save this key &mdash; you may need it for support</p>
-      </td>
-    </tr>
-  </table>
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 28px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#09090b;border:1px solid rgba(230,57,70,0.25);border-radius:12px"><tr>
+    <td style="background:#e63946;width:4px;border-radius:12px 0 0 12px;font-size:0;line-height:0">&nbsp;</td>
+    <td style="padding:22px 24px">
+      <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#ff6b7a;font-family:Arial,sans-serif">YOUR LICENSE KEY &mdash; KEEP THIS SAFE</p>
+      <p class="key-mono" style="margin:0 0 14px;font-family:'Courier New',Courier,monospace;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#111114;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px 12px;word-break:break-all">${licenseKey}</p>
+      <p style="margin:0;font-size:12px;color:#71717a;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Save this key &mdash; you may need it for support</p>
+    </td>
+  </tr></table>
 </td></tr>
 
-<!-- ── PRIMARY CTA: TELEGRAM ── -->
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:4px 32px 32px;text-align:center">
-  <a href="https://t.me/ApexTradeBot_official_bot?start=${licenseKey}" style="display:inline-block;background:#ff2d4f;color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:900;padding:18px 48px;border-radius:12px;text-decoration:none;letter-spacing:0.3px">&#128640; Open your Crypto Bot &rarr;</a>
-  <p style="margin:14px 0 0;font-size:12px;color:#374151;font-family:Arial,sans-serif">Tap the button above &mdash; Telegram opens and the bot activates automatically</p>
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:4px 32px 32px;text-align:center">
+  <a href="https://t.me/ApexTradeBot_official_bot?start=${licenseKey}" style="display:inline-block;background:#e63946;color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:900;padding:18px 48px;border-radius:12px;text-decoration:none;letter-spacing:0.3px">&#128640; Open your Crypto Bot &rarr;</a>
+  <p style="margin:14px 0 0;font-size:12px;color:#52525b;font-family:Arial,sans-serif">Tap the button — Telegram opens and the bot activates automatically</p>
 </td></tr>
 
-<!-- ── SECTION DIVIDER ── -->
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 24px">
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 24px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
     <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
-    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#1e293b;font-family:Arial,sans-serif">HOW IT WORKS</td>
+    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#3f3f46;font-family:Arial,sans-serif">HOW IT WORKS</td>
     <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
   </tr></table>
 </td></tr>
 
-<!-- ── STEPS ── -->
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 16px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
-    <tr><td style="padding:22px 24px">
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px"><tr>
-        <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#fff;font-family:Arial,sans-serif">1</td>
-        <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#fff;font-family:Arial,sans-serif">Press the button above</td>
-      </tr></table>
-      <p style="margin:0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Telegram opens automatically. The bot sends you a welcome message and activates your account instantly &mdash; no copy-pasting, no setup steps.</p>
-    </td></tr>
-  </table>
-</td></tr>
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px 16px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
-    <tr><td style="padding:22px 24px">
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px"><tr>
-        <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#fff;font-family:Arial,sans-serif">2</td>
-        <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#fff;font-family:Arial,sans-serif">Configure your exchange via Telegram</td>
-      </tr></table>
-      <p style="margin:0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Send <code style="font-size:11px">/settings</code> in the bot. Enter your Binance API key + secret. The bot guides you step by step &mdash; everything stays private in your chat.</p>
-    </td></tr>
-  </table>
-</td></tr>
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:16px 32px 28px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px">
-    <tr><td style="padding:22px 24px">
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px"><tr>
-        <td style="background:#ff2d4f;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#fff;font-family:Arial,sans-serif">3</td>
-        <td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#fff;font-family:Arial,sans-serif">Start trading (paper mode first)</td>
-      </tr></table>
-      <p style="margin:0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">Send <code style="font-size:11px">/start</code> to begin. The bot starts in paper trading mode by default &mdash; simulated money, real signals. Run it for 7-14 days before switching to live funds.</p>
-    </td></tr>
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 16px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    ${step(1, 'Press the button above', 'Telegram opens automatically. The bot sends you a welcome message and activates your account instantly &mdash; no copy-pasting, no setup steps.')}
+    ${step(2, 'Connect your cTrader account via Telegram', 'Send <code style="font-size:11px">/settings</code> in the bot. Enter your cTID credentials. The bot guides you step by step &mdash; everything stays private in your chat.')}
+    ${step(3, 'Start trading (paper mode first)', 'Send <code style="font-size:11px">/start</code> to begin. The bot starts in paper trading mode by default &mdash; simulated money, real signals. Run it 7-14 days before switching to live funds.')}
   </table>
 </td></tr>
 
-<!-- ── RISK DISCLOSURE ── -->
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 18px">
-  <p style="margin:0;font-size:11px;color:#1e293b;font-family:Arial,sans-serif;line-height:1.8;text-align:center"><strong style="color:#374151">Risk Disclosure</strong> &mdash; Crypto trading involves substantial risk of loss. Only invest what you can afford to lose. Apex Trade Bot is an automation tool, not financial advice. You are solely responsible for all trading decisions.</p>
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 18px">
+  <p style="margin:0;font-size:11px;color:#3f3f46;font-family:Arial,sans-serif;line-height:1.8;text-align:center"><strong style="color:#52525b">Risk Disclosure</strong> &mdash; Crypto trading involves substantial risk of loss. Only invest what you can afford to lose. Apex Trading Suite is an automation tool, not financial advice. You are solely responsible for all trading decisions.</p>
 </td></tr>
 
-<!-- ── LEGAL / WITHDRAWAL WAIVER ── -->
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
-  <p style="margin:0;font-size:10px;color:#1e293b;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you expressly requested immediate supply of this digital product and acknowledged that you waive your 14-day right of withdrawal in accordance with Art. 16(m) of EU Directive 2011/83/EU. All sales are final once access is delivered. See our full <a href="https://aicashsystem.space/terms" style="color:#374151">Terms of Service</a>.</p>
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 28px">
+  <p style="margin:0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you expressly requested immediate supply of this digital product and acknowledged that you waive your 14-day right of withdrawal in accordance with Art. 16(m) of EU Directive 2011/83/EU. All sales are final once access is delivered. See our full <a href="https://aicashsystem.space/terms" style="color:#52525b">Terms of Service</a>.</p>
 </td></tr>
 
-<!-- ── FOOTER ── -->
-<tr><td align="center" style="background:#0a0d18;border:1px solid rgba(255,255,255,0.07);border-top:1px solid rgba(255,255,255,0.05);border-radius:0 0 18px 18px;padding:24px 40px 28px">
-  <p style="margin:0 0 6px;font-size:12px;color:#334155;font-family:Arial,sans-serif">Questions? Reply to this email or reach us at:</p>
-  <a href="mailto:supportaicashsystem@gmail.com" style="color:#ff2d4f;font-size:13px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">supportaicashsystem@gmail.com</a>
-  <p style="margin:16px 0 0;font-size:10px;color:#0f172a;font-family:Arial,sans-serif">&copy; 2025 AI Cash Systems &nbsp;&middot;&nbsp; <a href="https://aicashsystem.space" style="color:#0f172a;text-decoration:none">aicashsystem.space</a></p>
+<tr><td align="center" style="background:#0c0c0f;border:1px solid rgba(255,255,255,0.08);border-top:1px solid rgba(255,255,255,0.05);border-radius:0 0 18px 18px;padding:24px 40px 28px">
+  <p style="margin:0 0 6px;font-size:12px;color:#71717a;font-family:Arial,sans-serif">Need help? Contact us:</p>
+  <a href="mailto:supportaicashsystem@gmail.com" style="color:#ff6b7a;font-size:13px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">supportaicashsystem@gmail.com</a>
+  <p style="margin:16px 0 0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif">&copy; 2025 Apex Trading Suite &nbsp;&middot;&nbsp; <a href="https://aicashsystem.space" style="color:#3f3f46;text-decoration:none">aicashsystem.space</a></p>
 </td></tr>
 
-<!-- bottom spacing -->
 <tr><td style="height:36px;font-size:0;line-height:0">&nbsp;</td></tr>
-
-</table><!-- /wrapper -->
-</td></tr>
-</table><!-- /outer -->
-</body></html>`;}
+</table></td></tr></table></body></html>`;}
 
 // ── FOREX BOT EMAIL ─────────────────────────────────────────────────────────
 function _buildForexEmailHtml(safeName, safeEmail, licenseKey = 'FORX-XXXX-XXXX-XXXX') {
@@ -2808,73 +2748,73 @@ function _buildForexEmailHtml(safeName, safeEmail, licenseKey = 'FORX-XXXX-XXXX-
   const code = (t) => `<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:'Courier New',monospace;font-size:11px;font-weight:700">${t}</span>`;
   const pill = (t, c='#f59e0b', bg='rgba(245,158,11,0.12)', br='rgba(245,158,11,0.3)') =>
     `<span style="background:${bg};border:1px solid ${br};border-radius:4px;padding:1px 7px;color:${c};font-family:'Courier New',monospace;font-size:11px;font-weight:700">${t}</span>`;
-  const step = (n, title, body) => `<tr><td style="background:#060608;border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:22px 24px;margin-bottom:12px"><table width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#2aabee;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#fff;font-family:Arial,sans-serif">${n}</td><td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#fff;font-family:Arial,sans-serif">${title}</td></tr><tr><td colspan="2" style="padding:12px 0 0;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.8">${body}</td></tr></table></td></tr><tr><td style="height:12px"></td></tr>`;
+  const step = (n, title, body) => `<tr><td style="background:#09090b;border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:22px 24px;margin-bottom:12px"><table width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#e63946;border-radius:6px;width:24px;height:24px;text-align:center;vertical-align:middle;font-size:11px;font-weight:900;color:#fff;font-family:Arial,sans-serif">${n}</td><td style="padding:0 0 0 10px;font-size:13px;font-weight:700;color:#fff;font-family:Arial,sans-serif">${title}</td></tr><tr><td colspan="2" style="padding:12px 0 0;font-size:12px;color:#a1a1aa;font-family:Arial,sans-serif;line-height:1.8">${body}</td></tr></table></td></tr><tr><td style="height:12px"></td></tr>`;
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#060608">
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;min-height:100vh">
+<body style="margin:0;padding:0;background:#09090b">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#09090b;min-height:100vh">
 <tr><td align="center" style="padding:36px 16px 0">
 <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%">
 
 <tr><td align="center" style="padding:0 0 20px">
-  <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:3.5px;text-transform:uppercase;color:#374151;font-family:Arial,sans-serif">APEX FOREX BOT &nbsp;&bull;&nbsp; PURCHASE CONFIRMATION</p>
+  <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:3.5px;text-transform:uppercase;color:#71717a;font-family:Arial,sans-serif">APEX FOREX BOT &nbsp;&bull;&nbsp; PURCHASE CONFIRMATION</p>
 </td></tr>
 
-<tr><td style="background:#0a0d18;border:1px solid rgba(255,255,255,0.07);border-bottom:none;border-radius:18px 18px 0 0">
+<tr><td style="background:#0c0c0f;border:1px solid rgba(255,255,255,0.08);border-bottom:none;border-radius:18px 18px 0 0">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr><td style="background:linear-gradient(90deg,#2aabee,#1a8fc9);height:3px;border-radius:17px 17px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
+    <tr><td style="background:linear-gradient(90deg,#e63946,#ff6b7a);height:3px;border-radius:17px 17px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
     <tr><td align="center" style="padding:36px 40px 32px">
       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 24px"><tr><td style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:20px;padding:5px 16px"><p style="margin:0;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#22c55e;font-family:Arial,sans-serif">&#10003;&nbsp; ACCESS GRANTED</p></td></tr></table>
       <p style="margin:0 0 6px;font-size:32px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">Your Forex bot is ready,</p>
-      <p style="margin:0 0 20px;font-size:32px;font-weight:900;color:#2aabee;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">${firstName}.</p>
-      <p style="margin:0;font-size:14px;color:#64748b;font-family:Arial,sans-serif;line-height:1.75;max-width:420px">Apex Forex Bot is ready to deploy. Follow the steps below — you can be trading in under 10 minutes.</p>
+      <p style="margin:0 0 20px;font-size:32px;font-weight:900;color:#e63946;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">${firstName}.</p>
+      <p style="margin:0;font-size:14px;color:#a1a1aa;font-family:Arial,sans-serif;line-height:1.75;max-width:420px">Apex Forex Bot is ready to deploy. Follow the steps below — you can be trading in under 10 minutes.</p>
     </td></tr>
   </table>
 </td></tr>
 
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060608;border:1px solid rgba(42,171,238,0.3);border-radius:12px"><tr>
-    <td style="background:#2aabee;width:4px;border-radius:12px 0 0 12px;font-size:0;line-height:0">&nbsp;</td>
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 28px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#09090b;border:1px solid rgba(230,57,70,0.3);border-radius:12px"><tr>
+    <td style="background:#e63946;width:4px;border-radius:12px 0 0 12px;font-size:0;line-height:0">&nbsp;</td>
     <td style="padding:22px 24px">
-      <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#2aabee;font-family:Arial,sans-serif">YOUR FOREX LICENSE KEY &mdash; KEEP THIS SAFE</p>
-      <p style="margin:0 0 14px;font-family:'Courier New',Courier,monospace;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px 12px;word-break:break-all">${licenseKey}</p>
-      <p style="margin:0;font-size:12px;color:#475569;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Save this key &mdash; you may need it for support</p>
+      <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#e63946;font-family:Arial,sans-serif">YOUR FOREX LICENSE KEY &mdash; KEEP THIS SAFE</p>
+      <p style="margin:0 0 14px;font-family:'Courier New',Courier,monospace;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#111114;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px 12px;word-break:break-all">${licenseKey}</p>
+      <p style="margin:0;font-size:12px;color:#71717a;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Save this key &mdash; you may need it for support</p>
     </td>
   </tr></table>
 </td></tr>
 
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:4px 32px 32px;text-align:center">
-  <a href="https://t.me/FOREX_APEX_BOT?start=${licenseKey}" style="display:inline-block;background:#2aabee;color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:900;padding:18px 48px;border-radius:12px;text-decoration:none;letter-spacing:0.3px">&#128640; Open your Forex Bot &rarr;</a>
-  <p style="margin:14px 0 0;font-size:12px;color:#374151;font-family:Arial,sans-serif">Tap the button above &mdash; Telegram opens and the bot activates automatically</p>
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:4px 32px 32px;text-align:center">
+  <a href="https://t.me/FOREX_APEX_BOT?start=${licenseKey}" style="display:inline-block;background:#e63946;color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:900;padding:18px 48px;border-radius:12px;text-decoration:none;letter-spacing:0.3px">&#128640; Open your Forex Bot &rarr;</a>
+  <p style="margin:14px 0 0;font-size:12px;color:#71717a;font-family:Arial,sans-serif">Tap the button above &mdash; Telegram opens and the bot activates automatically</p>
 </td></tr>
 
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 24px">
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 24px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
     <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
-    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#1e293b;font-family:Arial,sans-serif">HOW IT WORKS</td>
+    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#71717a;font-family:Arial,sans-serif">HOW IT WORKS</td>
     <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
   </tr></table>
 </td></tr>
 
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 16px">
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 16px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
     ${step(1, 'Press the button above', 'Telegram opens automatically. The bot sends you a welcome message and activates your account instantly &mdash; no copy-pasting, no setup steps.')}
-    ${step(2, 'Configure your OANDA account via Telegram', 'Send /settings in the bot. Enter your OANDA API token and Account ID. Choose PAPER mode to start &mdash; the bot guides you step by step.')}
-    ${step(3, 'Start trading (paper mode first)', 'Send /start to begin. The bot runs in paper trading mode by default &mdash; simulated money, real signals. Run it 7-14 days before switching to live funds.')}
+    ${step(2, 'Configure your cTrader account via Telegram', 'Send ' + code('/settings') + ' in the bot. Enter your cTID credentials (email &amp; password). Choose ' + pill('PAPER') + ' mode to start &mdash; the bot guides you step by step.')}
+    ${step(3, 'Start trading (paper mode first)', 'Send ' + code('/start') + ' to begin. The bot runs in paper trading mode by default &mdash; simulated money, real signals. Run it 7-14 days before switching to live funds.')}
   </table>
 </td></tr>
 
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 18px">
-  <p style="margin:0;font-size:11px;color:#1e293b;font-family:Arial,sans-serif;line-height:1.8;text-align:center"><strong style="color:#374151">Risk Disclosure</strong> &mdash; Forex trading involves substantial risk of loss. Only trade capital you can afford to lose. Apex Forex Bot is an automation tool, not financial advice.</p>
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 18px">
+  <p style="margin:0;font-size:11px;color:#71717a;font-family:Arial,sans-serif;line-height:1.8;text-align:center"><strong style="color:#a1a1aa">Risk Disclosure</strong> &mdash; Forex trading involves substantial risk of loss. Only trade capital you can afford to lose. Apex Forex Bot is an automation tool, not financial advice.</p>
 </td></tr>
 
-<tr><td style="background:#0a0d18;border-left:1px solid rgba(255,255,255,0.07);border-right:1px solid rgba(255,255,255,0.07);padding:0 32px 28px">
-  <p style="margin:0;font-size:10px;color:#1e293b;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you expressly requested immediate supply of this digital product and acknowledged that you waive your 14-day right of withdrawal in accordance with Art. 16(m) of EU Directive 2011/83/EU. All sales are final once access is delivered. See our full <a href="https://aicashsystem.space/terms" style="color:#374151">Terms of Service</a>.</p>
+<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 28px">
+  <p style="margin:0;font-size:10px;color:#71717a;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you expressly requested immediate supply of this digital product and acknowledged that you waive your 14-day right of withdrawal in accordance with Art. 16(m) of EU Directive 2011/83/EU. All sales are final once access is delivered. See our full <a href="https://aicashsystem.space/terms" style="color:#a1a1aa">Terms of Service</a>.</p>
 </td></tr>
 
-<tr><td align="center" style="background:#0a0d18;border:1px solid rgba(255,255,255,0.07);border-top:1px solid rgba(255,255,255,0.05);border-radius:0 0 18px 18px;padding:24px 40px 28px">
-  <p style="margin:0 0 6px;font-size:12px;color:#334155;font-family:Arial,sans-serif">Questions? Reply to this email:</p>
-  <a href="mailto:supportaicashsystem@gmail.com" style="color:#2aabee;font-size:13px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">supportaicashsystem@gmail.com</a>
-  <p style="margin:16px 0 0;font-size:10px;color:#0f172a;font-family:Arial,sans-serif">&copy; 2025 AI Cash Systems &nbsp;&middot;&nbsp; <a href="https://aicashsystem.space" style="color:#0f172a;text-decoration:none">aicashsystem.space</a></p>
+<tr><td align="center" style="background:#0c0c0f;border:1px solid rgba(255,255,255,0.08);border-top:1px solid rgba(255,255,255,0.05);border-radius:0 0 18px 18px;padding:24px 40px 28px">
+  <p style="margin:0 0 6px;font-size:12px;color:#71717a;font-family:Arial,sans-serif">Questions? Contact support:</p>
+  <a href="mailto:supportaicashsystem@gmail.com" style="color:#e63946;font-size:13px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">supportaicashsystem@gmail.com</a>
+  <p style="margin:16px 0 0;font-size:10px;color:#71717a;font-family:Arial,sans-serif">&copy; 2025 Apex Trading Suite &nbsp;&middot;&nbsp; <a href="https://aicashsystem.space" style="color:#71717a;text-decoration:none">aicashsystem.space</a></p>
 </td></tr>
 <tr><td style="height:36px;font-size:0;line-height:0">&nbsp;</td></tr>
 </table></td></tr></table></body></html>`;}
