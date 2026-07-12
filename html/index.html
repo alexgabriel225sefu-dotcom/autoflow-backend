@@ -43,7 +43,7 @@ a{color:inherit;text-decoration:none}
 #fm-check:checked ~ .nav-wrap .bar1{transform:rotate(45deg)}
 #fm-check:checked ~ .nav-wrap .bar2{opacity:0;transform:scaleX(0)}
 #fm-check:checked ~ .nav-wrap .bar3{transform:rotate(-45deg)}
-.fm-item{height:38px;width:0;border-radius:999px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;gap:6px;overflow:hidden;opacity:0;padding:0;transform:scale(.3);transition:width .4s cubic-bezier(.4,0,.2,1),opacity .35s cubic-bezier(.4,0,.2,1),transform .4s cubic-bezier(.4,0,.2,1),padding .4s cubic-bezier(.4,0,.2,1),background .2s ease;-webkit-tap-highlight-color:transparent;white-space:nowrap;text-decoration:none}
+.fm-item{height:38px;width:0;border-radius:999px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;gap:6px;overflow:hidden;opacity:0;padding:0;transform:scale(.3);flex-shrink:0;transition:width .4s cubic-bezier(.4,0,.2,1),opacity .35s cubic-bezier(.4,0,.2,1),transform .4s cubic-bezier(.4,0,.2,1),padding .4s cubic-bezier(.4,0,.2,1),background .2s ease;-webkit-tap-highlight-color:transparent;white-space:nowrap;text-decoration:none}
 #fm-check:checked ~ .nav-wrap .fm-item{opacity:1;transform:scale(1);padding:0 14px 0 10px}
 #fm-check:checked ~ .nav-wrap .fm-item[data-w="s"]{width:100px}
 #fm-check:checked ~ .nav-wrap .fm-item[data-w="m"]{width:120px}
