@@ -206,7 +206,9 @@ body.intro-lock{overflow:hidden}
 /* FEATURES */
 .sec{padding:clamp(48px,6vw,80px) 0}
 .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-@media(max-width:880px){.feat-grid{grid-template-columns:1fr 1fr}}@media(max-width:560px){.feat-grid{grid-template-columns:1fr}}
+.feat-grid .feat.wide{grid-column:span 2}
+@media(max-width:880px){.feat-grid{grid-template-columns:1fr 1fr}.feat-grid .feat.wide{grid-column:span 2}}
+@media(max-width:560px){.feat-grid{grid-template-columns:1fr}.feat-grid .feat.wide{grid-column:span 1}}
 .feat{background:linear-gradient(165deg,rgba(255,255,255,.045),rgba(255,255,255,.012));border:1px solid var(--line2);border-radius:var(--r);padding:24px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:inset 0 1px 0 rgba(255,255,255,.05);transition:transform .3s var(--ease),border-color .3s,box-shadow .3s;transform-style:preserve-3d}
 .feat:hover{border-color:rgba(255,45,79,.32);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 24px 50px rgba(255,45,79,.1)}
 .feat:hover{border-color:rgba(255,45,79,.3);background:var(--panel2)}
@@ -278,10 +280,11 @@ body.intro-lock{overflow:hidden}
 .fq+.fq{border-top:1px solid var(--line)}
 .fq-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 24px;font:600 15px/1.4 var(--f);color:var(--t0);background:var(--panel);border:none;cursor:pointer;text-align:left;letter-spacing:-.01em;transition:color .2s}
 .fq-q:hover{color:var(--acc3)}
-.fq-ic{font:400 20px/1 var(--m);color:var(--t2);transition:transform .3s var(--ease);flex-shrink:0}
-.fq-q.open .fq-ic{transform:rotate(45deg);color:var(--acc)}
-.fq-a{display:none;padding:0 24px 22px;font:400 15px/1.75 var(--f);color:var(--t1);background:var(--panel)}
-.fq-a.open{display:block}
+.fq-ic{font:400 16px/1 var(--m);color:var(--t2);transition:transform .3s var(--ease),color .3s,border-color .3s,background .3s;flex-shrink:0;width:28px;height:28px;border-radius:50%;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center}
+.fq-q.open .fq-ic{transform:rotate(45deg);color:var(--acc);border-color:rgba(230,57,70,.3);background:var(--accdim)}
+.fq-a{max-height:0;overflow:hidden;transition:max-height .4s var(--ease);background:var(--panel)}
+.fq-a-inner{padding:0 24px 22px;font:400 15px/1.75 var(--f);color:var(--t1)}
+.fq-a.open{max-height:300px}
 #final{text-align:center;padding:clamp(64px,8vw,104px) 0;position:relative;overflow:hidden}
 #final .h2{font-size:clamp(32px,4vw,52px);margin-bottom:16px}
 #final p{font:400 16px/1.6 var(--f);color:var(--t1);max-width:480px;margin:0 auto 30px}
@@ -333,10 +336,42 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 /* SECURITY GRID */
 .sec-grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 @media(max-width:700px){.sec-grid3{grid-template-columns:1fr}}
-.sec-card{background:var(--panel);border:1px solid var(--line2);border-radius:18px;padding:28px;transition:border-color .3s var(--ease),transform .3s var(--ease)}
-.sec-card:hover{border-color:rgba(255,45,79,.3);transform:translateY(-3px)}
+.sec-card{background:var(--panel);border:1px solid var(--line2);border-radius:18px;padding:28px;transition:all .35s var(--ease);position:relative;overflow:hidden}
+.sec-card:hover{border-color:rgba(39,196,106,.35);transform:translateY(-4px);box-shadow:0 20px 50px rgba(39,196,106,.08)}
+.sec-card::before{content:'';position:absolute;top:-60%;right:-30%;width:70%;height:120%;background:radial-gradient(circle,rgba(39,196,106,.08),transparent 60%);pointer-events:none;opacity:0;transition:opacity .4s}
+.sec-card:hover::before{opacity:1}
+.sec-card .feat-ico{background:rgba(39,196,106,.08);border-color:rgba(39,196,106,.2)}
+.sec-card .feat-ico svg{stroke:var(--up)}
 .sec-card h3{font:600 16px/1.3 var(--f);margin-bottom:8px;letter-spacing:-.02em}
 .sec-card p{font:400 13px/1.7 var(--f);color:var(--t1)}
+/* SHIELD */
+.shield-wrap{text-align:center;margin-top:40px}
+.shield-anim{position:relative;display:inline-block;margin-bottom:16px}
+.shield-anim svg{width:64px;height:64px;stroke:var(--up);fill:none;stroke-width:1.2}
+.shield-ring{position:absolute;top:50%;left:50%;border:1px solid rgba(39,196,106,.15);border-radius:50%;animation:shield-pulse 3s ease-in-out infinite}
+.sr1{width:100px;height:100px;margin:-50px 0 0 -50px}
+.sr2{width:130px;height:130px;margin:-65px 0 0 -65px;animation-delay:1s;border-color:rgba(39,196,106,.08)}
+@keyframes shield-pulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.1);opacity:1}}
+/* WORLD MAP */
+#world-map{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg1);position:relative;overflow:hidden}
+.map-container{position:relative;max-width:900px;margin:0 auto}
+.map-container svg{width:100%;height:auto;opacity:.35}
+.map-dot{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc),0 0 24px rgba(230,57,70,.3);animation:map-ping 2s ease-in-out infinite}
+.map-dot::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:1px solid var(--acc);opacity:0;animation:map-ring 2s ease-out infinite}
+@keyframes map-ping{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.3);opacity:1}}
+@keyframes map-ring{0%{transform:scale(.5);opacity:.8}100%{transform:scale(2.5);opacity:0}}
+.map-dot.d2{animation-delay:.6s;background:var(--up);box-shadow:0 0 12px var(--up),0 0 24px rgba(39,196,106,.3)}
+.map-dot.d2::after{border-color:var(--up)}
+.map-dot.d3{animation-delay:1.2s}
+.map-dot.d4{animation-delay:.3s;background:var(--up);box-shadow:0 0 12px var(--up)}
+.map-dot.d4::after{border-color:var(--up)}
+.map-dot.d5{animation-delay:.9s}
+.map-label{position:absolute;font:500 9px/1 var(--m);color:var(--t2);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.map-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:24px}
+@media(max-width:640px){.map-stats{grid-template-columns:1fr 1fr}}
+.map-stat{text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.map-stat b{display:block;font:600 22px/1 var(--d);color:var(--t0);margin-bottom:4px}
+.map-stat span{font:400 11px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.1em}
 /* TRADING METHODS */
 .method-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 @media(max-width:820px){.method-grid{grid-template-columns:1fr}}
@@ -604,6 +639,48 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
       <p>Go to your exchange or cTrader, delete the API key, and the bot loses access instantly. You're always in full control.</p>
     </div>
   </div>
+  <div class="shield-wrap rv">
+    <div class="shield-anim">
+      <div class="shield-ring sr1"></div>
+      <div class="shield-ring sr2"></div>
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4" stroke-width="2"/></svg>
+    </div>
+    <p style="font:600 16px/1 var(--f);margin-bottom:6px">Zero access to your funds</p>
+    <p style="font:400 14px/1.6 var(--f);color:var(--t1);max-width:400px;margin:0 auto">Trade-only permissions — the bot can never withdraw, transfer, or move your money. Period.</p>
+  </div>
+</section>
+
+<!-- WORLD MAP -->
+<section id="world-map">
+  <div class="wrap sec">
+    <div class="sec-head rv center" style="margin-left:auto;margin-right:auto;text-align:center">
+      <span class="label">Global Coverage</span>
+      <h2 class="h2" style="margin:14px 0 14px">Trade any market, from anywhere.</h2>
+      <p class="lead" style="margin:0 auto">Your bot runs 24/7 in the cloud. Connect from any country, trade any pair your broker offers.</p>
+    </div>
+    <div class="map-container rv">
+      <svg viewBox="0 0 1000 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M165,120 Q180,90 220,85 Q260,80 280,95 Q300,75 340,80 Q360,72 380,78 Q400,70 420,75 L425,85 Q440,78 460,82 Q470,90 485,88 L490,100 Q500,95 520,100 Q540,90 560,95 Q580,88 600,92 Q620,85 640,90 L645,80 Q660,75 680,82 Q700,78 720,85 Q740,80 760,88 L755,100 Q770,95 780,100 Q790,108 785,120 Q800,115 810,125 L805,140 Q815,148 810,160 Q820,165 815,178 L800,185 Q810,195 800,205 Q790,215 780,210 Q770,220 755,215 L740,225 Q725,235 710,228 Q695,240 680,232 L665,238 Q650,250 640,242 Q625,248 610,240 Q595,250 580,242 L560,248 Q545,255 530,245 Q515,252 500,242 L485,248 Q470,258 455,248 Q440,255 425,245 L410,252 Q395,260 380,248 Q365,255 350,245 L335,252 Q320,260 310,248 Q295,255 280,245 L265,252 Q250,260 240,248 Q225,255 215,245 L200,252 Q185,258 175,248 L170,240 Q160,245 155,235 L150,220 Q140,225 138,215 L135,200 Q125,205 128,192 L130,180 Q120,185 125,172 L130,160 Q122,155 128,145 L135,135 Q125,130 132,122 Z" stroke="rgba(230,57,70,.15)" stroke-width=".8" fill="rgba(230,57,70,.03)"/>
+        <path d="M580,180 Q600,170 620,175 Q640,168 660,178 Q680,170 700,180 Q720,175 740,185 L745,200 Q755,195 760,205 Q770,210 765,225 L755,235 Q765,245 755,255 Q745,268 730,258 Q720,270 705,260 L690,265 Q675,275 660,265 Q645,272 630,262 L615,268 Q600,278 588,268 L580,275 Q565,282 558,270 L550,262 Q540,268 538,255 L535,240 Q525,245 528,232 L535,218 Q525,222 530,210 L538,198 Q530,195 535,185 Z" stroke="rgba(230,57,70,.15)" stroke-width=".8" fill="rgba(230,57,70,.03)"/>
+        <path d="M720,280 Q740,270 760,278 Q780,272 800,282 Q820,275 835,285 L840,300 Q852,295 855,308 Q860,320 852,332 L845,342 Q855,352 848,365 L838,375 Q848,388 835,395 L820,398 Q828,410 815,412 L798,408 Q800,420 788,418 L770,412 Q772,425 758,420 L740,415 Q742,428 728,422 L715,418 Q710,430 700,422 L695,410 Q685,418 682,405 L680,392 Q668,398 670,385 L672,370 Q662,375 665,362 L670,348 Q660,352 665,338 L672,325 Q662,328 668,315 L678,302 Q670,298 678,288 Z" stroke="rgba(230,57,70,.15)" stroke-width=".8" fill="rgba(230,57,70,.03)"/>
+        <path d="M140,250 Q160,240 180,248 Q200,242 220,252 Q240,245 255,255 L260,270 Q272,265 275,278 L272,290 Q280,288 278,302 L270,315 Q278,318 275,332 L265,345 Q272,352 265,362 L252,365 Q258,378 245,375 L230,370 Q232,382 218,378 L205,372 Q205,385 192,380 L178,375 Q178,388 165,382 L155,375 Q150,385 142,378 L138,365 Q128,370 130,358 L132,342 Q122,348 125,335 L130,320 Q120,325 125,310 L130,295 Q122,298 125,285 L132,270 Q125,268 130,258 Z" stroke="rgba(230,57,70,.15)" stroke-width=".8" fill="rgba(230,57,70,.03)"/>
+      </svg>
+      <div class="map-dot" style="top:22%;left:48%"></div>
+      <div class="map-dot d2" style="top:35%;left:72%"></div>
+      <div class="map-dot d3" style="top:28%;left:30%"></div>
+      <div class="map-dot d4" style="top:18%;left:55%"></div>
+      <div class="map-dot d5" style="top:42%;left:15%"></div>
+      <div class="map-dot d2" style="top:55%;left:78%"></div>
+      <div class="map-dot" style="top:30%;left:85%"></div>
+      <div class="map-dot d3" style="top:62%;left:52%"></div>
+    </div>
+    <div class="map-stats rv">
+      <div class="map-stat"><b>190+</b><span>Countries</span></div>
+      <div class="map-stat"><b>24/7</b><span>Uptime</span></div>
+      <div class="map-stat"><b>1,000+</b><span>Pairs</span></div>
+      <div class="map-stat"><b>&lt;50ms</b><span>Latency</span></div>
+    </div>
+  </div>
 </section>
 
 <!-- LIVE CRYPTO NEWS -->
@@ -628,11 +705,11 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     </div>
   </div>
   <div class="feat-grid">
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div><span class="feat-badge">FULLY HOSTED</span><h3>Nothing to install</h3><p>We host and run both bots 24/7 on secure, always-on servers. No setup, no server to manage — just connect your account and control it from Telegram.</p></div>
+    <div class="feat wide tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div><span class="feat-badge">FULLY HOSTED</span><h3>Nothing to install, ever</h3><p>We host and run both bots 24/7 on secure, always-on servers. No setup, no server to manage — just connect your account and control it from Telegram. $0/month hosting included.</p></div>
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><span class="feat-badge">YOUR STRATEGY</span><h3>You define the strategy</h3><p>Choose pairs, timeframes and entry logic. The strategy is yours — not ours.</p></div>
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><span class="feat-badge">RISK SHIELD</span><h3>Built-in risk controls</h3><p>Stop-loss and take-profit on every trade, max-drawdown cap, daily −3% circuit breaker, flash-crash guard and a news filter around FOMC &amp; CPI.</p></div>
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="feat-badge">YOUR ACCOUNT</span><h3>Trades in your cTrader</h3><p>Connects to any cTrader broker with a trade-only API key you create. Withdrawals stay disabled — your funds never leave your account.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><span class="feat-badge">3 STRATEGIES</span><h3>AI, Grid &amp; DCA</h3><p>Three engines in one bot: AI signal trading, grid trading for ranging markets, DCA accumulation. Switch or tune any of them from Telegram.</p></div>
+    <div class="feat wide tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><span class="feat-badge">3 STRATEGIES</span><h3>AI Signals, Grid &amp; DCA — switch from Telegram</h3><p>Three engines in one bot: AI signal trading for directional moves, grid trading for ranging markets, and DCA accumulation for long-term positions. Switch or tune any of them with a single Telegram command.</p></div>
     <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H4z"/><path d="M2 20h20"/></svg></div><span class="feat-badge">LIVE MONITOR</span><h3>Every move, explained</h3><p>Instant Telegram alert on every entry and exit — with the reasoning. /status and /report show balance, open position, win rate and net P&amp;L any time.</p></div>
   </div>
 </section>
@@ -789,13 +866,13 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <section class="wrap sec" id="faq">
   <div class="sec-head rv"><span class="label">FAQ</span><h2 class="h2">Straight answers.</h2></div>
   <div class="faq rv">
-    <div class="fq"><button class="fq-q">What exactly am I buying?<span class="fq-ic">+</span></button><div class="fq-a">A lifetime license to a fully-hosted automated trading bot (crypto or forex). We run it 24/7 on our secure servers; you connect your own broker/exchange account and control everything from Telegram. Nothing to install.</div></div>
-    <div class="fq"><button class="fq-q">What broker does the forex bot use?<span class="fq-ic">+</span></button><div class="fq-a">Any broker that supports <b>cTrader</b> — IC Markets, Pepperstone, FxPro and dozens more worldwide. You connect your own cTrader account in two taps (send /ctrader in Telegram, authorize, done). Start on a demo account, switch to live when you're ready.</div></div>
-    <div class="fq"><button class="fq-q">Do you guarantee profit?<span class="fq-ic">+</span></button><div class="fq-a">No — and anyone who does is lying to you. The bots execute <b>your</b> strategy: you choose the pairs, the risk and the settings, and your results depend on those choices and on the market. We sell the automation, not a return. You manage your own risk — that's why both bots start in paper mode, so you can validate your setup with zero real money before going live.</div></div>
-    <div class="fq"><button class="fq-q">Do you ever touch my funds or API keys?<span class="fq-ic">+</span></button><div class="fq-a">Never. We host the bots, but they connect with <b>trade-only</b> keys you create — withdrawals disabled at the exchange level. The bot can place and close trades, but it can never move or withdraw your funds, and you can revoke the keys at your exchange or cTrader at any time.</div></div>
-    <div class="fq"><button class="fq-q">Are these one-time payments?<span class="fq-ic">+</span></button><div class="fq-a">Yes. $297 or $497, once. No subscription, no recurring fees from us ever — and hosting is included, so there's no server bill either. Your only costs are your broker's normal trading fees.</div></div>
-    <div class="fq"><button class="fq-q">Can I test before risking real money?<span class="fq-ic">+</span></button><div class="fq-a">Yes — and we strongly recommend it. Both bots default to paper trading: a simulated balance on real, live market prices. Run it as long as you want, watch exactly how your setup behaves, and only flip to live when the results convince you. No time limit.</div></div>
-    <div class="fq"><button class="fq-q">What's the refund policy?<span class="fq-ic">+</span></button><div class="fq-a"><b>All sales are final.</b> You receive instant lifetime access to a hosted product, so we never refund based on trading results or change of mind — you control the strategy, you manage the risk, and you can validate everything free in paper mode before a single dollar goes live. The one exception: if your bot can't be activated and connected within 14 days and our support can't fix it, we make it right.</div></div>
+    <div class="fq"><button class="fq-q">What exactly am I buying?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">A lifetime license to a fully-hosted automated trading bot (crypto or forex). We run it 24/7 on our secure servers; you connect your own broker/exchange account and control everything from Telegram. Nothing to install.</div></div></div>
+    <div class="fq"><button class="fq-q">What broker does the forex bot use?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">Any broker that supports <b>cTrader</b> — IC Markets, Pepperstone, FxPro and dozens more worldwide. You connect your own cTrader account in two taps (send /ctrader in Telegram, authorize, done). Start on a demo account, switch to live when you're ready.</div></div></div>
+    <div class="fq"><button class="fq-q">Do you guarantee profit?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">No — and anyone who does is lying to you. The bots execute <b>your</b> strategy: you choose the pairs, the risk and the settings, and your results depend on those choices and on the market. We sell the automation, not a return. You manage your own risk — that's why both bots start in paper mode, so you can validate your setup with zero real money before going live.</div></div></div>
+    <div class="fq"><button class="fq-q">Do you ever touch my funds or API keys?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">Never. We host the bots, but they connect with <b>trade-only</b> keys you create — withdrawals disabled at the exchange level. The bot can place and close trades, but it can never move or withdraw your funds, and you can revoke the keys at your exchange or cTrader at any time.</div></div></div>
+    <div class="fq"><button class="fq-q">Are these one-time payments?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">Yes. $297 or $497, once. No subscription, no recurring fees from us ever — and hosting is included, so there's no server bill either. Your only costs are your broker's normal trading fees.</div></div></div>
+    <div class="fq"><button class="fq-q">Can I test before risking real money?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">Yes — and we strongly recommend it. Both bots default to paper trading: a simulated balance on real, live market prices. Run it as long as you want, watch exactly how your setup behaves, and only flip to live when the results convince you. No time limit.</div></div></div>
+    <div class="fq"><button class="fq-q">What's the refund policy?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner"><b>All sales are final.</b> You receive instant lifetime access to a hosted product, so we never refund based on trading results or change of mind — you control the strategy, you manage the risk, and you can validate everything free in paper mode before a single dollar goes live. The one exception: if your bot can't be activated and connected within 14 days and our support can't fix it, we make it right.</div></div></div>
   </div>
 </section>
 
@@ -812,7 +889,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <footer><div class="wrap">
   <div>© Apex Trading Suite — the <b>AI Cash System</b> platform · Algorithmic Trading Software<br>
   <a href="/privacy" style="color:inherit">Privacy Policy</a> · <a href="/terms" style="color:inherit">Terms of Service</a> · <a href="/affiliate.html" style="color:inherit">Become an Affiliate</a> · <a href="/guide" style="color:inherit">Free Trading Guide</a>
-  <span style="display:block;margin-top:8px;font:400 10px/1 var(--m);color:rgba(255,255,255,.15)">v2.2-cosmic</span></div>
+  <span style="display:block;margin-top:8px;font:400 10px/1 var(--m);color:rgba(255,255,255,.15)">v3.0-full</span></div>
   <div style="max-width:560px">Hosted trading software that you configure and control yourself. No financial advice, no guaranteed returns, no refunds based on trading results — your strategy and your risk settings determine your outcome. Trading with leverage carries substantial risk; you may lose more than your deposit. Only trade capital you can afford to lose. Any figures shown are from simulated environments and are not a representation of real trading results. Market data via TradingView for reference only.</div>
 </div></footer>
 
@@ -864,7 +941,7 @@ function loadChart(sym){var h=document.getElementById('tvchart');h.innerHTML='';
   s.innerHTML=JSON.stringify({autosize:true,symbol:sym,interval:'15',timezone:'Etc/UTC',theme:'dark',style:'1',locale:'en',hide_side_toolbar:true,allow_symbol_change:false,save_image:false,backgroundColor:'rgba(6,6,8,1)',gridColor:'rgba(255,255,255,0.04)',enable_publishing:false,support_host:'https://www.tradingview.com'});h.appendChild(s);}
 (function(){var row=document.getElementById('coins'),lbl=document.getElementById('sym-label');if(!row)return;COINS.forEach(function(c,i){var b=document.createElement('button');b.className='coin'+(i===0?' active':'');b.textContent=c.l.split(' ')[0];b.onclick=function(){document.querySelectorAll('.coin').forEach(function(x){x.classList.remove('active');});b.classList.add('active');lbl.textContent=c.l;loadChart(c.s);};row.appendChild(b);});loadChart(COINS[0].s);})();
 // FAQ
-document.querySelectorAll('.fq-q').forEach(function(btn){btn.addEventListener('click',function(){var op=this.classList.contains('open');document.querySelectorAll('.fq-q').forEach(function(b){b.classList.remove('open');});document.querySelectorAll('.fq-a').forEach(function(a){a.classList.remove('open');});if(!op){this.classList.add('open');this.nextElementSibling.classList.add('open');}});});
+document.querySelectorAll('.fq-q').forEach(function(btn){btn.addEventListener('click',function(){var op=this.classList.contains('open');document.querySelectorAll('.fq-q').forEach(function(b){b.classList.remove('open');});document.querySelectorAll('.fq-a').forEach(function(a){a.classList.remove('open');a.style.maxHeight=null;});if(!op){this.classList.add('open');var ans=this.nextElementSibling;ans.classList.add('open');ans.style.maxHeight=ans.scrollHeight+'px';}});});
 // REVEAL
 var obs=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;e.target.classList.add('in');obs.unobserve(e.target);});},{threshold:.12});
 document.querySelectorAll('.rv').forEach(function(el){obs.observe(el);});
