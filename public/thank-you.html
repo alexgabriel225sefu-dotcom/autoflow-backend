@@ -6,96 +6,108 @@
 <title>Order Confirmed — Apex Trading Suite</title>
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="preconnect" href="https://api.fontshare.com"><link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://api.fontshare.com/v2/css?f[]=clash-display@600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#060608;--bg1:#0b0b0e;--panel:#0a0d18;--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.13);
-  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
-  --acc:#ff2d4f;--acc2:#ff5c74;--accdim:rgba(255,45,79,.12);
-  --gold:#f59e0b;--up:#22c55e;
-  --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
+  --bg:#09090b;--surface:#0c0c0f;--surface2:#111114;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.11);
+  --t0:#e4e4e7;--t1:#a1a1aa;--t2:#71717a;
+  --acc:#e63946;--acc2:#ff6b7a;--acc3:#ff97a8;
+  --up:#22c55e;--gold:#f59e0b;
+  --sans:system-ui,-apple-system,'Segoe UI',sans-serif;
   --ease:cubic-bezier(.32,.72,0,1);
 }
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--t0);font-family:var(--f);min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:32px 16px;-webkit-font-smoothing:antialiased}
-a{color:inherit}
-.wrap{max-width:560px;width:100%}
-.eyebrow{text-align:center;font-size:11px;font-weight:700;letter-spacing:3.5px;text-transform:uppercase;color:var(--t2);margin-bottom:18px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden}
-.accent{height:3px;background:linear-gradient(90deg,var(--acc),#c9193a)}
-.inner{padding:40px 36px}
-.chip{display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:20px;padding:6px 16px;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--up);margin-bottom:22px}
-h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-spacing:-.01em;line-height:1.15;margin-bottom:10px}
-.sub{color:var(--t1);font-size:14.5px;line-height:1.7;margin-bottom:28px}
-.state{display:none}
-.state.active{display:block}
-.spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--line2);border-top-color:var(--acc);animation:spin 1s linear infinite;margin:0 auto 18px}
+body{background:var(--bg);color:var(--t0);font-family:var(--sans);min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:32px 16px;-webkit-font-smoothing:antialiased;background-image:radial-gradient(ellipse 80% 60% at 50% 20%,rgba(10,2,21,.5),transparent)}
+
+.stars{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(1px 1px at 15% 12%,rgba(255,255,255,.4),transparent),radial-gradient(1px 1px at 48% 8%,rgba(255,200,200,.4),transparent),radial-gradient(1px 1px at 65% 22%,rgba(255,255,255,.3),transparent),radial-gradient(1px 1px at 78% 55%,rgba(255,255,255,.25),transparent),radial-gradient(1px 1px at 22% 72%,rgba(255,255,255,.25),transparent),radial-gradient(1.2px 1.2px at 55% 85%,rgba(200,180,255,.3),transparent);animation:tw 4s ease-in-out infinite alternate}
+@keyframes tw{0%{opacity:.5}100%{opacity:.85}}
+.aurora-bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:hidden}
+.aurora-bg::before{content:'';position:absolute;top:-10%;left:20%;width:500px;height:400px;border-radius:50%;background:rgba(230,57,70,.06);filter:blur(80px);animation:d1 12s ease-in-out infinite alternate}
+.aurora-bg::after{content:'';position:absolute;top:30%;right:10%;width:400px;height:350px;border-radius:50%;background:rgba(155,29,234,.05);filter:blur(70px);animation:d2 14s ease-in-out infinite alternate}
+@keyframes d1{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,30px) scale(1.1)}}
+@keyframes d2{0%{transform:translate(0,0) scale(1)}100%{transform:translate(-30px,20px) scale(1.15)}}
+@media(max-width:700px){.aurora-bg::before,.aurora-bg::after{width:250px;height:200px;filter:blur(60px);animation:none}}
+
+.wrap{max-width:520px;width:100%;position:relative;z-index:1}
+.eyebrow{text-align:center;font:700 11px/1 var(--sans);letter-spacing:3.5px;text-transform:uppercase;color:var(--t2);margin-bottom:20px}
+.card-shell{position:relative;border-radius:1.25rem;padding:2px;background:var(--border2)}
+.card-shell::before{content:'';position:absolute;inset:-1px;border-radius:inherit;background:conic-gradient(from 0deg,transparent 0%,rgba(230,57,70,.4) 25%,transparent 50%,transparent 75%,rgba(230,57,70,.3) 100%);opacity:.6;z-index:0;transition:opacity .4s var(--ease)}
+.card-inner{position:relative;z-index:1;border-radius:calc(1.25rem - 2px);background:var(--surface);overflow:hidden}
+.accent-line{height:3px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.content{padding:40px 36px}
+@media(max-width:480px){.content{padding:32px 20px}}
+.chip{display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:20px;padding:6px 16px;font:700 11px/1 var(--sans);letter-spacing:2.5px;text-transform:uppercase;color:var(--up);margin-bottom:22px}
+h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#fff;margin-bottom:10px}
+.sub{color:var(--t1);font:400 14.5px/1.7 var(--sans);margin-bottom:28px}
+.state{display:none}.state.active{display:block}
+.spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--border2);border-top-color:var(--acc);animation:spin 1s linear infinite;margin:0 auto 18px}
 @keyframes spin{to{transform:rotate(360deg)}}
-.wait-text{text-align:center;color:var(--t1);font-size:13.5px;line-height:1.7}
-.keybox{background:#000;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:18px 14px;text-align:center;margin-bottom:8px}
-.keylabel{font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--acc);margin-bottom:10px}
-.keyval{font-family:var(--m);font-size:clamp(16px,4vw,20px);font-weight:700;color:#fff;letter-spacing:2px;word-break:break-all}
-.copyhint{text-align:center;font-size:11.5px;color:var(--t2);margin-bottom:26px}
-.cta{display:block;text-align:center;background:var(--acc);color:#fff;font-weight:700;font-size:15px;padding:16px;border-radius:10px;text-decoration:none;transition:transform .2s var(--ease),background .2s}
-.cta:hover{background:var(--acc2)}
+.wait-text{text-align:center;color:var(--t1);font:400 13.5px/1.7 var(--sans)}
+.cta{display:block;text-align:center;background:var(--acc);color:#fff;font:700 17px/1 var(--sans);padding:20px;border-radius:12px;text-decoration:none;transition:all .2s var(--ease);margin-bottom:10px}
+.cta:hover{background:var(--acc2);transform:translateY(-1px);box-shadow:0 8px 24px rgba(230,57,70,.3)}
 .cta:active{transform:scale(.98)}
-.cta-row{display:grid;gap:10px}
-.cta-secondary{display:block;text-align:center;background:transparent;border:1px solid var(--line2);color:var(--t0);font-weight:600;font-size:13.5px;padding:13px;border-radius:10px;text-decoration:none;transition:border-color .2s,background .2s}
-.cta-secondary:hover{border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.03)}
-.cta-secondary:active{transform:scale(.98)}
-.steps{margin-top:26px;border-top:1px solid var(--line);padding-top:22px}
-.steps-label{font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t2);margin-bottom:14px}
+.copyhint{text-align:center;font:400 11.5px/1 var(--sans);color:var(--t2);margin-bottom:4px}
+.steps{margin-top:26px;border-top:1px solid var(--border);padding-top:22px}
+.steps-label{font:700 10px/1 var(--sans);letter-spacing:2.5px;text-transform:uppercase;color:var(--t2);margin-bottom:14px}
 .step{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .step:last-child{border-bottom:none}
-.stepn{flex:0 0 22px;height:22px;border-radius:6px;background:var(--acc);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
-.stepbody{font-size:13px;color:var(--t1);line-height:1.6}
+.stepn{flex:0 0 22px;height:22px;border-radius:6px;background:var(--acc);color:#fff;font:700 11px/22px var(--sans);text-align:center}
+.stepbody{font:400 13px/1.6 var(--sans);color:var(--t1)}
 .stepbody b{color:var(--t0)}
-.email-note{margin-top:24px;text-align:center;font-size:12.5px;color:var(--t2);line-height:1.7}
-.err{color:var(--acc2);text-align:center;font-size:13.5px;line-height:1.7}
-.retry{display:block;margin:16px auto 0;background:transparent;border:1px solid var(--line2);color:var(--t0);font-size:13px;font-weight:600;padding:10px 20px;border-radius:8px;cursor:pointer}
+.email-note{margin-top:24px;text-align:center;font:400 12.5px/1.7 var(--sans);color:var(--t2)}
+.err{color:var(--acc3);text-align:center;font:400 13.5px/1.7 var(--sans)}
+.retry{display:block;margin:16px auto 0;background:transparent;border:1px solid var(--border2);color:var(--t0);font:600 13px/1 var(--sans);padding:10px 20px;border-radius:8px;cursor:pointer;transition:all .2s}
+.retry:hover{border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.03)}
+.back-link{display:block;text-align:center;margin-top:24px;font:400 13px/1 var(--sans);color:var(--t2);text-decoration:none;transition:color .2s}
+.back-link:hover{color:var(--t0)}
 </style>
 </head>
 <body>
+<div class="stars"></div>
+<div class="aurora-bg"></div>
+
 <div class="wrap">
   <p class="eyebrow">Apex Trading Suite &nbsp;&bull;&nbsp; Order Confirmation</p>
-  <div class="card">
-    <div class="accent"></div>
-    <div class="inner">
+  <div class="card-shell">
+    <div class="card-inner">
+      <div class="accent-line"></div>
+      <div class="content">
 
-      <div class="state active" id="stateLoading">
-        <div class="spinner"></div>
-        <p class="wait-text">Confirming your payment&hellip;<br>This usually takes a few seconds.</p>
-      </div>
-
-      <div class="state" id="stateReady">
-        <span class="chip">&#10003; Payment confirmed</span>
-        <h1 id="readyTitle">Your bot is ready.</h1>
-        <p class="sub" id="readySub">Tap the button below — Telegram opens and your bot activates automatically. No setup required.</p>
-        <a class="cta" id="tgBtn" href="#" target="_blank" rel="noopener" style="font-size:17px;padding:20px;border-radius:12px;margin-bottom:10px;display:block">&#128640; Open your Bot on Telegram &rarr;</a>
-        <p class="copyhint">We also emailed you the same link in case you need it later.</p>
-
-        <div class="steps">
-          <div class="steps-label">How it works</div>
-          <div class="step"><div class="stepn">1</div><div class="stepbody">Press the button above &mdash; the bot sends you a <b>welcome message</b> instantly.</div></div>
-          <div class="step"><div class="stepn">2</div><div class="stepbody">Send <b>/settings</b> in the chat to enter your exchange API keys and configure trading.</div></div>
-          <div class="step"><div class="stepn">3</div><div class="stepbody">Send <b>/start</b> to begin trading. Starts in <b>paper mode</b> by default &mdash; safe simulated money.</div></div>
+        <div class="state active" id="stateLoading">
+          <div class="spinner"></div>
+          <p class="wait-text">Confirming your payment&hellip;<br>This usually takes a few seconds.</p>
         </div>
-        <p class="email-note">Check your inbox for the setup email with the same Telegram link.</p>
-      </div>
 
-      <div class="state" id="stateError">
-        <span class="chip" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:var(--gold)">&#9888; Almost there</span>
-        <h1>We're still processing your order.</h1>
-        <p class="err">This can happen if the payment confirmation is taking a bit longer than usual. Your license key and setup email are on the way — check your inbox in a minute or two.</p>
-        <button class="retry" onclick="location.reload()">Check again</button>
-      </div>
+        <div class="state" id="stateReady">
+          <span class="chip">&#10003; Payment confirmed</span>
+          <h1 id="readyTitle">Your bot is ready.</h1>
+          <p class="sub" id="readySub">Tap the button below — Telegram opens and your bot activates automatically. No setup required.</p>
+          <a class="cta" id="tgBtn" href="#" target="_blank" rel="noopener">&#128640; Open your Bot on Telegram &rarr;</a>
+          <p class="copyhint">We also emailed you the same link in case you need it later.</p>
 
+          <div class="steps">
+            <div class="steps-label">How it works</div>
+            <div class="step"><div class="stepn">1</div><div class="stepbody">Press the button above &mdash; the bot sends you a <b>welcome message</b> instantly.</div></div>
+            <div class="step"><div class="stepn">2</div><div class="stepbody">Send <b>/settings</b> in the chat to enter your exchange API keys and configure trading.</div></div>
+            <div class="step"><div class="stepn">3</div><div class="stepbody">Send <b>/start</b> to begin trading. Starts in <b>paper mode</b> by default &mdash; safe simulated money.</div></div>
+          </div>
+          <p class="email-note">Check your inbox for the setup email with the same Telegram link.</p>
+        </div>
+
+        <div class="state" id="stateError">
+          <span class="chip" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:var(--gold)">&#9888; Almost there</span>
+          <h1>We're still processing your order.</h1>
+          <p class="err">This can happen if the payment confirmation is taking a bit longer than usual. Your license key and setup email are on the way — check your inbox in a minute or two.</p>
+          <button class="retry" onclick="location.reload()">Check again</button>
+        </div>
+
+      </div>
     </div>
   </div>
+  <a class="back-link" href="/">&larr; Back to Apex Trading Suite</a>
 </div>
+
 <script>
 (function(){
   var params = new URLSearchParams(location.search);
@@ -113,7 +125,7 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
   if (!sessionId && !orderId) { show('stateError'); return; }
 
   var attempts = 0;
-  var maxAttempts = 14; // ~35s of polling
+  var maxAttempts = 14;
 
   function poll(){
     attempts++;
@@ -122,13 +134,11 @@ h1{font-family:var(--d);font-size:clamp(28px,5vw,36px);font-weight:700;letter-sp
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (d.ready && d.licenseKey) {
-          var key = d.licenseKey;
           var botUsername = isForex ? 'FOREX_APEX_BOT' : 'ApexTradeBot_official_bot';
-          var tgLink = 'https://t.me/' + botUsername + '?start=' + encodeURIComponent(key);
+          var tgLink = 'https://t.me/' + botUsername + '?start=' + encodeURIComponent(d.licenseKey);
           document.getElementById('readyTitle').textContent = isForex ? 'Your Forex bot is ready.' : 'Your Crypto bot is ready.';
           document.getElementById('readySub').textContent = 'Tap the button below — Telegram opens and your ' + (isForex ? 'Forex' : 'Crypto') + ' bot activates automatically. No setup required.';
           document.getElementById('tgBtn').href = tgLink;
-
           show('stateReady');
           return;
         }
