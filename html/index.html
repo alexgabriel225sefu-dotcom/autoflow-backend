@@ -17,418 +17,234 @@
 <meta property="og:image" content="https://aicashsystem.space/og.svg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://aicashsystem.space/og.svg">
-<link rel="preconnect" href="https://api.fontshare.com"><link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#030108;--bg1:#080412;--panel:#0e0818;--panel2:#150e22;--hover:#1c1530;
-  --line:rgba(255,255,255,.06);--line2:rgba(255,255,255,.11);
-  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;
-  --acc:#e63946;--acc2:#ff6b7a;--acc3:#ff97a8;
-  --accdim:rgba(230,57,70,.12);--accglow:rgba(230,57,70,.45);
-  --up:#27c46a;
-  --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
-  --ease:cubic-bezier(.32,.72,0,1);--r:16px;
+  --bg:#09090b;
+  --surface:#0c0c0f;
+  --surface2:#111114;
+  --border:rgba(255,255,255,.08);
+  --text:#e4e4e7;
+  --text2:#a1a1aa;
+  --muted:#71717a;
+  --accent:#e63946;
+  --accent2:#ff6b7a;
+  --sans:system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'SF Mono','Consolas',monospace;
 }
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;letter-spacing:-.011em;overflow-x:hidden;background-image:radial-gradient(ellipse 80% 50% at 50% 15%,rgba(40,5,60,.5),transparent 60%),radial-gradient(ellipse 60% 40% at 80% 80%,rgba(15,3,40,.4),transparent),radial-gradient(ellipse 50% 30% at 20% 60%,rgba(20,2,35,.3),transparent)}
+html{font-size:16px;scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden;min-height:100vh}
 a{color:inherit;text-decoration:none}
-#glow{position:fixed;top:0;left:0;width:680px;height:680px;border-radius:50%;background:radial-gradient(circle,rgba(255,45,79,.09),transparent 62%);pointer-events:none;z-index:1;transform:translate3d(-50%,-50%,0);opacity:0;transition:opacity .5s;will-change:transform}
-@media(hover:none){#glow{display:none}}
-#paths{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;opacity:.45}
-#paths path{fill:none;stroke:var(--acc);stroke-width:.8;opacity:0;animation:pf 20s ease-in-out infinite}
-#paths path:nth-child(2){animation-delay:-6s;stroke:var(--acc3);stroke-width:.5}
-#paths path:nth-child(3){animation-delay:-11s}
-#paths path:nth-child(4){animation-delay:-15s;stroke:var(--acc3)}
-@keyframes pf{0%{opacity:0;stroke-dashoffset:1200}12%{opacity:.7}88%{opacity:.4}100%{opacity:0;stroke-dashoffset:0}}
-#tape{border-bottom:1px solid var(--line);background:var(--bg1);position:relative;z-index:5}
-nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,46px);background:rgba(3,1,8,.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid rgba(230,57,70,.12);box-shadow:0 1px 30px rgba(230,57,70,.06)}
-.brand{display:flex;align-items:center;gap:10px;font:600 15px/1 var(--d);letter-spacing:-.01em;transition:transform .3s var(--ease)}
-.brand:hover{transform:scale(1.05)}
-.logo{width:32px;height:32px;display:block;filter:drop-shadow(0 0 12px rgba(255,45,79,.5))}
-.nav-links{display:flex;gap:28px}
-.nav-links a{font:500 14px/1 var(--f);color:var(--t1);transition:color .2s}
-.nav-links a:hover{color:var(--t0)}
-.nav-cta{background:var(--acc);color:#fff;font:600 14px/1 var(--f);border-radius:10px;padding:11px 19px;transition:all .25s var(--ease)}
-.nav-cta:hover{background:var(--acc2);box-shadow:0 6px 28px var(--accglow)}
-@media(max-width:820px){.nav-links{display:none}}
-.wrap{max-width:1280px;margin:0 auto;padding:0 clamp(16px,4vw,46px);position:relative;z-index:2}
-/* hero kicker — borderless cinematic label: shimmer sweep + fading phrase cycle */
-.hero-kicker{display:flex;align-items:center;justify-content:center;gap:18px}
-.hk-line{width:64px;height:1px;flex-shrink:0;background:linear-gradient(90deg,transparent,rgba(255,45,79,.6))}
-.hk-line.r{transform:scaleX(-1)}
-.hk-text{font:500 clamp(10px,1.15vw,12px)/1.5 var(--m);letter-spacing:.42em;text-transform:uppercase;text-indent:.42em;white-space:nowrap;
-  background:linear-gradient(110deg,var(--t2) 0%,var(--acc3) 30%,#fff 50%,var(--acc3) 70%,var(--t2) 100%);
-  background-size:230% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  animation:hkshine 3.4s linear infinite;
-  transition:opacity .55s var(--ease),filter .55s var(--ease),letter-spacing .55s var(--ease)}
-.hk-text.out{opacity:0;filter:blur(9px);letter-spacing:.62em}
-@keyframes hkshine{from{background-position:130% 0}to{background-position:-130% 0}}
-@media(max-width:520px){.hk-line{width:34px}.hk-text{letter-spacing:.3em;text-indent:.3em}}
-@media(prefers-reduced-motion:reduce){.hk-text{animation:none}}
-.h2{font:600 clamp(30px,3.9vw,52px)/1.03 var(--d);letter-spacing:-.025em}
-.lead{font:400 clamp(15px,1.4vw,17px)/1.7 var(--f);color:var(--t1);max-width:560px}
-.label{font:500 11px/1 var(--m);color:var(--acc);letter-spacing:.16em;text-transform:uppercase}
-.btn{display:inline-flex;align-items:center;gap:10px;font:600 15px/1 var(--f);border-radius:12px;padding:15px 24px;cursor:pointer;border:none;transition:all .3s var(--ease);will-change:transform}
-.btn-primary{background:var(--acc);color:#fff;box-shadow:0 8px 30px var(--accdim)}
-.btn-primary:hover{background:var(--acc2);box-shadow:0 14px 44px var(--accglow)}
-.btn-ghost{background:var(--panel);color:var(--t0);border:1px solid var(--line2)}
-.btn-ghost:hover{background:var(--hover)}
-/* ── CINEMATIC INTRO (two panels open, trading animation in the middle) ── */
-#intro{position:fixed;inset:0;z-index:9999;pointer-events:none}
-.intro-half{position:absolute;top:0;bottom:0;width:50.4%;background:linear-gradient(180deg,#050210,#030108);
-  transition:transform 1.15s cubic-bezier(.76,0,.24,1);will-change:transform}
-.intro-half.left{left:0;box-shadow:10px 0 80px rgba(230,57,70,.2);border-right:1px solid rgba(230,57,70,.4)}
-.intro-half.right{right:0;box-shadow:-10px 0 80px rgba(230,57,70,.2);border-left:1px solid rgba(230,57,70,.4)}
-#intro.go .intro-half.left{transform:translateX(-101%)}
-#intro.go .intro-half.right{transform:translateX(101%)}
-.intro-core{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;
-  transition:opacity .5s ease,transform .7s cubic-bezier(.76,0,.24,1)}
-#intro.go .intro-core{opacity:0;transform:scale(1.06);transition-delay:0s}
-.ib-glow{position:absolute;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(255,45,79,.16),transparent 62%);animation:ibpulse 2.4s ease-in-out infinite}
-@keyframes ibpulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.12);opacity:1}}
-.ib-chart{display:flex;align-items:flex-end;gap:7px;height:96px;position:relative;z-index:2}
-.ib-c{width:9px;border-radius:2px;transform-origin:bottom;transform:scaleY(0);animation:ibgrow .55s cubic-bezier(.22,.61,.36,1) forwards}
-.ib-c.up{background:linear-gradient(var(--up),rgba(39,196,106,.35))}
-.ib-c.dn{background:linear-gradient(var(--acc),rgba(255,45,79,.35))}
-@keyframes ibgrow{to{transform:scaleY(1)}}
-.ib-scan{position:absolute;top:0;bottom:0;width:2px;left:0;background:linear-gradient(180deg,transparent,var(--acc),transparent);
-  box-shadow:0 0 18px var(--acc);animation:ibscan 1.5s cubic-bezier(.5,0,.5,1) infinite;z-index:3}
-@keyframes ibscan{0%{left:0;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:100%;opacity:0}}
-.ib-brand{font:600 clamp(30px,7vw,60px)/1 var(--d);letter-spacing:.06em;position:relative;z-index:2;opacity:0;animation:ibin .9s .55s cubic-bezier(.22,.61,.36,1) forwards}
-.ib-brand .grad{background:linear-gradient(115deg,var(--acc),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 26px rgba(255,45,79,.4))}
-.ib-tag{font:500 11px/1 var(--m);letter-spacing:.34em;text-transform:uppercase;color:var(--t2);opacity:0;animation:ibin .9s .8s forwards;position:relative;z-index:2}
-@keyframes ibin{from{opacity:0;transform:translateY(12px);filter:blur(8px)}to{opacity:1;transform:none;filter:none}}
-body.intro-lock{overflow:hidden}
-@media(prefers-reduced-motion:reduce){#intro{display:none!important}}
-/* HERO */
-#hero{position:relative;padding:clamp(64px,8vw,110px) 0 clamp(48px,5vw,68px);text-align:center;overflow:hidden}
-/* Pulsing orb behind the hero text */
-.hero-orb{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:clamp(300px,50vw,600px);height:clamp(300px,50vw,600px);border-radius:50%;background:radial-gradient(circle,rgba(230,57,70,.25) 0%,rgba(155,29,234,.12) 35%,transparent 65%);filter:blur(40px);animation:orb-pulse 4s ease-in-out infinite;pointer-events:none;z-index:0}
-@keyframes orb-pulse{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.7}50%{transform:translate(-50%,-50%) scale(1.15);opacity:1}}
-.grid3d{position:absolute;left:-25%;right:-25%;bottom:-30%;height:90%;z-index:0;pointer-events:none;perspective:340px;opacity:.6}
-.grid3d::after{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,45,79,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(255,45,79,.13) 1px,transparent 1px);background-size:56px 56px;transform:rotateX(68deg);transform-origin:bottom center;animation:grid 6s linear infinite;-webkit-mask-image:linear-gradient(transparent,#000 55%,transparent);mask-image:linear-gradient(transparent,#000 55%,transparent)}
-@keyframes grid{from{background-position-y:0}to{background-position-y:56px}}
-.aurora{position:absolute;top:-30%;left:50%;transform:translateX(-50%);width:100%;height:150%;z-index:0;pointer-events:none;background:radial-gradient(ellipse 70% 50%,rgba(230,57,70,.22),rgba(155,29,234,.14) 40%,rgba(59,130,246,.06) 65%,transparent 80%);filter:blur(60px);will-change:transform;animation:aur 10s ease-in-out infinite}
-.aurora2{position:absolute;top:5%;right:-15%;width:60%;height:90%;z-index:0;pointer-events:none;background:radial-gradient(ellipse,rgba(155,29,234,.18),rgba(99,102,241,.08) 50%,transparent 70%);filter:blur(70px);animation:aur2 13s ease-in-out infinite}
-.aurora3{position:absolute;bottom:-20%;left:-10%;width:50%;height:70%;z-index:0;pointer-events:none;background:radial-gradient(ellipse,rgba(230,57,70,.12),rgba(236,72,153,.08) 45%,transparent 70%);filter:blur(80px);animation:aur3 16s ease-in-out infinite}
-@keyframes aur{0%,100%{transform:translateX(-50%) scale(1);opacity:.8}50%{transform:translateX(-50%) scale(1.2);opacity:1}}
-@keyframes aur2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-40px,25px) scale(1.15)}}
-@keyframes aur3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-20px) scale(1.1)}}
-/* Stars */
-.hero-stars{position:absolute;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(1.5px 1.5px at 15% 12%,rgba(255,255,255,.7),transparent),radial-gradient(1px 1px at 32% 38%,rgba(255,255,255,.5),transparent),radial-gradient(1.8px 1.8px at 48% 8%,rgba(255,200,200,.7),transparent),radial-gradient(1px 1px at 65% 22%,rgba(255,255,255,.5),transparent),radial-gradient(1.2px 1.2px at 78% 55%,rgba(255,255,255,.45),transparent),radial-gradient(1px 1px at 88% 15%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 22% 72%,rgba(255,255,255,.4),transparent),radial-gradient(1.5px 1.5px at 55% 85%,rgba(200,180,255,.6),transparent),radial-gradient(1px 1px at 72% 68%,rgba(255,255,255,.4),transparent),radial-gradient(1.2px 1.2px at 92% 78%,rgba(255,255,255,.5),transparent),radial-gradient(2px 2px at 5% 45%,rgba(230,57,70,.5),transparent),radial-gradient(1.5px 1.5px at 42% 62%,rgba(167,139,250,.5),transparent),radial-gradient(1px 1px at 85% 35%,rgba(255,255,255,.6),transparent);animation:star-tw 3s ease-in-out infinite alternate}
-@keyframes star-tw{0%{opacity:.6}100%{opacity:1}}
-#hero h1{font:700 clamp(52px,8vw,104px)/.9 var(--d);letter-spacing:-.035em;margin:28px 0 22px;text-shadow:0 0 80px rgba(230,57,70,.15)}
-#hero h1 .grad{background:linear-gradient(125deg,#ff2d55,#ff6b7a 40%,#ff97a8 70%,#ffcad4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 6px 40px rgba(255,45,79,.5))}
-#hero .sub{font:400 clamp(16px,1.6vw,19px)/1.65 var(--f);color:var(--t1);max-width:580px;margin:0 auto 26px}
-/* rotating headline word — futuristic cycle */
-#rotate{display:inline-block;min-width:4ch;transition:opacity .35s var(--ease),filter .35s var(--ease),transform .35s var(--ease)}
-#rotate.out{opacity:0;filter:blur(10px);transform:translateY(10px)}
-/* product section head becomes a single centered column once the chart is removed */
-.prod-sec-head.single{display:block;max-width:700px;margin:0 auto 46px;text-align:center}
-.prod-sec-head.single .lead{margin:0 auto}
-/* PRODUCT CARDS */
-.prod-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px}
-@media(max-width:820px){.prod-grid{grid-template-columns:1fr}}
-.prod-card{background:linear-gradient(165deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid var(--line2);border-radius:22px;padding:32px;text-align:left;position:relative;overflow:hidden;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 30px 60px rgba(0,0,0,.5),0 0 0 0 rgba(230,57,70,0);transition:border-color .4s var(--ease),transform .4s var(--ease),box-shadow .4s var(--ease)}
-.prod-card:hover{border-color:rgba(230,57,70,.5);transform:translateY(-6px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 30px 60px rgba(0,0,0,.5),0 0 40px rgba(230,57,70,.15)}
-.prod-card::before{content:'';position:absolute;top:-40%;right:-20%;width:60%;height:100%;background:radial-gradient(circle,rgba(255,45,79,.12),transparent 60%);pointer-events:none}
-.pc-tag{display:inline-block;font:500 9px/1 var(--m);color:var(--acc2);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:4px;padding:3px 8px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px}
-.prod-card h3{font:600 clamp(22px,2.6vw,30px)/1.15 var(--d);letter-spacing:-.02em;margin-bottom:10px}
-.prod-card p{font:400 14px/1.65 var(--f);color:var(--t1);margin-bottom:22px}
-.pc-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
-.pc-pill{font:500 11px/1 var(--m);color:var(--t1);border:1px solid var(--line2);border-radius:6px;padding:5px 10px}
-.pc-price{display:flex;align-items:baseline;gap:10px;margin-bottom:20px}
-.pc-price .now{font:600 40px/1 var(--d);letter-spacing:-.02em}
-.pc-price .was{font:400 16px/1 var(--m);color:var(--t2);text-decoration:line-through}
-.pc-price .note{font:400 12px/1 var(--m);color:var(--t2);align-self:center}
-/* MARQUEE */
-.marquee{overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg);padding:22px 0}
-.mq-track{display:inline-flex;align-items:center;white-space:nowrap;will-change:transform;animation:mq 32s linear infinite;font:600 clamp(28px,4.8vw,64px)/1 var(--d);letter-spacing:-.02em}
-.mq-track span{padding:0 .32em;color:var(--t0)}.mq-track .o{color:transparent;-webkit-text-stroke:1.2px var(--acc)}.mq-track .dot{color:var(--acc)}
-@keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-/* LIVE CRYPTO NEWS TICKER */
-#newsbar{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg1);padding:11px 0;overflow:hidden}
-.news-inner{display:flex;align-items:center;gap:18px}
-.news-lbl{flex-shrink:0;display:inline-flex;align-items:center;gap:8px;font:600 11px/1 var(--m);color:var(--acc3);letter-spacing:.14em;text-transform:uppercase}
-.news-dot{width:7px;height:7px;border-radius:50%;background:var(--acc);box-shadow:0 0 9px var(--acc);animation:blk 1.6s ease-in-out infinite}
-.news-view{flex:1;overflow:hidden;position:relative;-webkit-mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent);mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent)}
-.news-track{display:inline-flex;white-space:nowrap;will-change:transform;animation:newsmq 68s linear infinite}
-.news-track:hover{animation-play-state:paused}
-.news-item{display:inline-flex;align-items:center;gap:9px;padding:0 24px;font:500 13px/1 var(--f);color:var(--t1);border-right:1px solid var(--line);transition:color .2s}
-.news-item:hover{color:var(--t0)}
-.news-item .src{font:600 10px/1 var(--m);color:var(--acc2);letter-spacing:.05em}
-@keyframes newsmq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@media(max-width:600px){.news-lbl span:not(.news-dot){display:none}}
-/* TRUST */
-#trust{padding:24px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg1)}
-.trust-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.trust-lbl{font:400 12px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.1em}
-.trust-sep{width:1px;height:18px;background:var(--line2);flex-shrink:0}
-.trust-tag{font:600 13px/1 var(--f);color:var(--t1);opacity:.8;transition:color .2s,opacity .2s}
-.trust-tag:hover{color:var(--t0);opacity:1}
-/* PRODUCT SECTIONS */
-.prod-sec{padding:clamp(58px,7vw,96px) 0;border-top:1px solid var(--line)}
-.prod-sec-head{display:grid;grid-template-columns:1.1fr 1fr;gap:clamp(32px,5vw,72px);align-items:center;margin-bottom:52px}
-@media(max-width:900px){.prod-sec-head{grid-template-columns:1fr}}
-.prod-sec-head .h2{margin:14px 0 14px}
-/* TERMINAL / FX DASH */
-.terminal,.fx-dash{background:var(--panel);border:1px solid var(--line2);border-radius:18px;overflow:hidden;box-shadow:0 40px 90px rgba(0,0,0,.6),0 0 60px rgba(255,45,79,.07);animation:float 7s ease-in-out infinite}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
-.term-top,.fx-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg1);border-bottom:1px solid var(--line)}
-.term-id,.fx-title{display:flex;align-items:center;gap:9px;font:500 12px/1 var(--m);color:var(--t1)}
-.term-live{font:500 10px/1 var(--m);color:var(--acc3);letter-spacing:.12em;border:1px solid rgba(255,45,79,.32);border-radius:5px;padding:4px 8px}
-.fx-conn{font:500 10px/1 var(--m);color:var(--up);border:1px solid rgba(39,196,106,.3);border-radius:5px;padding:4px 8px;letter-spacing:.1em}
-.coin-row{display:flex;gap:6px;padding:10px 12px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--bg1);scrollbar-width:none}
-.coin-row::-webkit-scrollbar{display:none}
-.coin{flex-shrink:0;font:500 12px/1 var(--m);color:var(--t1);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;transition:all .2s}
-.coin:hover{color:var(--t0);border-color:var(--line2)}.coin.active{background:var(--accdim);border-color:var(--acc);color:var(--acc3)}
-.chart-host{height:clamp(300px,38vw,390px);background:var(--bg)}.chart-host>div{height:100%}
-.term-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-top:1px solid var(--line);background:var(--bg1);flex-wrap:wrap}
-.term-foot .note{font:400 11px/1.5 var(--m);color:var(--t2)}.term-foot .note b{color:var(--t1);font-weight:500}
-.fx-pairs{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--bg)}
-.fxp{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-.fxp .sym{font:500 10px/1 var(--m);color:var(--t2);letter-spacing:.08em;margin-bottom:4px}
-.fxp .price{font:600 15px/1 var(--m);color:var(--t0)}
-.fxp .chg{font:500 10px/1 var(--m);margin-top:3px}
-.fxp .chg.up{color:var(--up)}.fxp .chg.dn{color:var(--acc2)}
-.fx-trades{padding:10px 12px;background:var(--bg);border-top:1px solid var(--line)}
-.fxt{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font:400 11px/1 var(--m)}
-.fxt:last-child{border-bottom:none}
-.fxt .sb{color:var(--up)}.fxt .ss{color:var(--acc2)}.fxt .pp{color:var(--t1)}.fxt .rp{color:var(--up)}.fxt .rn{color:var(--acc2)}
-.fx-metrics{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);background:var(--bg1)}
-.fxm{padding:10px 14px;text-align:center;border-right:1px solid var(--line)}
-.fxm:last-child{border-right:none}
-.fxm .val{font:600 15px/1 var(--m);color:var(--t0)}.fxm .val.pos{color:var(--up)}
-.fxm .lbl{font:400 10px/1 var(--f);color:var(--t2);margin-top:3px}
-/* FEATURES */
-.sec{padding:clamp(48px,6vw,80px) 0}
-.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.feat-grid .feat.wide{grid-column:span 2}
-@media(max-width:880px){.feat-grid{grid-template-columns:1fr 1fr}.feat-grid .feat.wide{grid-column:span 2}}
-@media(max-width:560px){.feat-grid{grid-template-columns:1fr}.feat-grid .feat.wide{grid-column:span 1}}
-.feat{background:linear-gradient(165deg,rgba(255,255,255,.045),rgba(255,255,255,.012));border:1px solid var(--line2);border-radius:var(--r);padding:24px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:inset 0 1px 0 rgba(255,255,255,.05);transition:transform .3s var(--ease),border-color .3s,box-shadow .3s;transform-style:preserve-3d}
-.feat:hover{border-color:rgba(255,45,79,.32);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 24px 50px rgba(255,45,79,.1)}
-.feat:hover{border-color:rgba(255,45,79,.3);background:var(--panel2)}
-.feat-ico{width:42px;height:42px;border-radius:12px;background:var(--accdim);border:1px solid rgba(255,45,79,.26);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
-.feat-ico svg{width:20px;height:20px;stroke:var(--acc2);fill:none;stroke-width:1.7}
-.feat h3{font:600 16px/1.3 var(--f);margin-bottom:8px;letter-spacing:-.02em}
-.feat p{font:400 13px/1.7 var(--f);color:var(--t0);opacity:.75}
-.feat-badge{display:inline-flex;font:600 9px/1 var(--m);color:var(--acc2);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:4px;padding:3px 7px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
-/* ARCH */
-.arch{display:grid;grid-template-columns:1fr auto 1fr;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:36px}
-@media(max-width:600px){.arch{grid-template-columns:1fr}}
-.arch-box{background:var(--panel);padding:24px 22px}
-.arch-box h4{font:600 15px/1.3 var(--f);margin-bottom:7px;letter-spacing:-.02em}
-.arch-box p{font:400 13px/1.6 var(--f);color:var(--t1)}
-.arch-tag{display:inline-block;font:500 9px/1 var(--m);color:var(--acc);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:4px;padding:3px 7px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
-.arch-mid{padding:20px 16px;border-left:1px solid var(--line);border-right:1px solid var(--line);background:var(--bg1);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px}
-.arch-line{width:2px;height:44px;background:linear-gradient(to bottom,var(--acc),var(--acc3));border-radius:1px;position:relative;overflow:hidden}
-.arch-line::after{content:'';position:absolute;top:-100%;width:100%;height:50%;background:linear-gradient(to bottom,transparent,rgba(255,255,255,.8),transparent);animation:scan 1.9s linear infinite}
-@keyframes scan{to{top:200%}}
-.arch-lbl{font:500 9px/1 var(--m);color:var(--t2);letter-spacing:.08em;text-align:center}
-/* STATS */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel)}
-@media(max-width:680px){.stats{grid-template-columns:1fr 1fr}}
-.stat{padding:28px 22px;text-align:center;border-right:1px solid var(--line)}
-.stat:last-child{border-right:none}
-.stat b{display:block;font:600 clamp(26px,3.4vw,38px)/1 var(--m);letter-spacing:-.03em;background:linear-gradient(120deg,var(--t0),var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:7px}
-.stat span{font:400 13px/1.4 var(--f);color:var(--t1);opacity:.7}
-/* STEPS */
-.steps{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-@media(max-width:880px){.steps{grid-template-columns:1fr 1fr}}@media(max-width:480px){.steps{grid-template-columns:1fr}}
-.step{padding:26px 22px;border-right:1px solid var(--line);background:var(--panel)}
-.step:last-child{border-right:none}
-.step-n{font:500 13px/1 var(--m);color:var(--acc);margin-bottom:12px}
-.step h3{font:600 15px/1.3 var(--f);margin-bottom:7px;letter-spacing:-.02em}
-.step p{font:400 13px/1.7 var(--f);color:var(--t1)}
-/* PRICING */
-#pricing{background:var(--bg1);border-top:1px solid var(--line);border-bottom:1px solid var(--line);position:relative;overflow:hidden}
-.price-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px}
-@media(max-width:820px){.price-grid{grid-template-columns:1fr}}
-.price-card{background:linear-gradient(165deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid var(--line2);border-radius:22px;padding:32px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 28px 64px rgba(0,0,0,.5),0 0 50px rgba(255,45,79,.06);position:relative;overflow:hidden;animation:gp 4.5s ease-in-out infinite}
-.price-card:nth-child(2){animation-delay:-2.2s}
-@keyframes gp{0%,100%{box-shadow:0 28px 64px rgba(0,0,0,.5),0 0 50px rgba(255,45,79,.05)}50%{box-shadow:0 28px 64px rgba(0,0,0,.5),0 0 80px rgba(255,45,79,.18),0 0 0 1px rgba(255,45,79,.13)}}
-.price-card::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:120%;background:radial-gradient(circle,rgba(255,45,79,.15),transparent 64%);pointer-events:none}
-.price-card::after{content:'';position:absolute;top:0;left:0;width:35%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent);animation:shimmer 3.5s ease-in-out infinite;pointer-events:none}
-@keyframes shimmer{0%{transform:translateX(-100%) skewX(-15deg)}100%{transform:translateX(200%) skewX(-15deg)}}
-.price-badge{display:inline-flex;align-items:center;gap:6px;font:500 10px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.3);border-radius:100px;padding:5px 11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px;position:relative}
-.price-amt{display:flex;align-items:baseline;gap:10px;margin-bottom:5px;position:relative}
-.price-amt .now{font:600 60px/1 var(--d);letter-spacing:-.03em}
-.price-amt .was{font:400 18px/1 var(--m);color:var(--t2);text-decoration:line-through}
-.price-sub{font:400 12px/1.5 var(--m);color:var(--t2);margin-bottom:22px;position:relative}
-.price-list{list-style:none;margin-bottom:24px;display:grid;gap:9px;position:relative}
-.price-list li{display:flex;align-items:flex-start;gap:9px;font:400 13px/1.5 var(--f);color:var(--t1)}
-.price-list li svg{width:16px;height:16px;stroke:var(--acc);fill:none;stroke-width:2.4;flex-shrink:0;margin-top:1px}
-.price-card .btn{width:100%;justify-content:center;font-size:15px;padding:15px;position:relative}
-.price-fine{font:400 11px/1.6 var(--m);color:var(--t2);text-align:center;margin-top:12px;position:relative}
-/* TESTIMONIALS */
-.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-@media(max-width:880px){.tgrid{grid-template-columns:1fr}}
-.tcard{background:var(--panel);border:1px solid var(--line2);border-radius:20px;padding:28px;transition:transform .3s var(--ease),border-color .3s;position:relative;overflow:hidden}
-.tcard::before{content:'\201C';position:absolute;top:-12px;right:20px;font:700 96px/1 Georgia,serif;color:var(--acc);opacity:.09;pointer-events:none}
-.tcard:hover{border-color:rgba(255,45,79,.28);transform:translateY(-3px)}
-.tcard p{font:400 14px/1.8 var(--f);color:var(--t0);margin-bottom:20px;position:relative}
-.tmeta{display:flex;align-items:center;gap:10px}
-.tav{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#7a1020);display:flex;align-items:center;justify-content:center;font:600 13px/1 var(--f);color:#fff;flex-shrink:0}
-.tmeta b{font:600 13px/1.2 var(--f);display:block}.tmeta span{font:400 12px/1.2 var(--f);color:var(--t2);margin-top:2px}
-.tvbadge{margin-left:auto;font:500 9px/1 var(--m);color:var(--acc3);background:var(--accdim);border:1px solid rgba(255,45,79,.2);border-radius:100px;padding:3px 9px;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
-/* FAQ */
-.faq{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-.fq+.fq{border-top:1px solid var(--line)}
-.fq-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 24px;font:600 15px/1.4 var(--f);color:var(--t0);background:var(--panel);border:none;cursor:pointer;text-align:left;letter-spacing:-.01em;transition:color .2s}
-.fq-q:hover{color:var(--acc3)}
-.fq-ic{font:400 16px/1 var(--m);color:var(--t2);transition:transform .3s var(--ease),color .3s,border-color .3s,background .3s;flex-shrink:0;width:28px;height:28px;border-radius:50%;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center}
-.fq-q.open .fq-ic{transform:rotate(45deg);color:var(--acc);border-color:rgba(230,57,70,.3);background:var(--accdim)}
-.fq-a{max-height:0;overflow:hidden;transition:max-height .4s var(--ease);background:var(--panel)}
-.fq-a-inner{padding:0 24px 22px;font:400 15px/1.75 var(--f);color:var(--t1)}
-.fq-a.open{max-height:300px}
-#final{text-align:center;padding:clamp(64px,8vw,104px) 0;position:relative;overflow:hidden}
-#final .h2{font-size:clamp(32px,4vw,52px);margin-bottom:16px}
-#final p{font:400 16px/1.6 var(--f);color:var(--t1);max-width:480px;margin:0 auto 30px}
-footer{border-top:1px solid var(--line);padding:34px 0;font:400 12px/1.7 var(--f);color:var(--t2)}
-footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
-.rv{opacity:0;transform:translateY(30px);filter:blur(6px);transition:opacity .9s var(--ease),transform 1s var(--ease),filter .9s var(--ease)}
-.rv.in{opacity:1;transform:none;filter:blur(0)}
-/* gentle fade between sections for a smoother, premium flow */
-.prod-sec,#pricing,#faq,#how{position:relative}
-.prod-sec::before,#how::before{content:'';position:absolute;top:0;left:0;right:0;height:120px;background:linear-gradient(180deg,var(--bg),transparent);pointer-events:none;z-index:0}
-.lg1{stop-color:#7a1020}.lg2{stop-color:#ff5c74}
-.sec-head{max-width:600px;margin-bottom:40px}
-.sec-head .h2{margin:14px 0 14px}
-@media(max-width:480px){.price-card{padding:22px}}
-@media(max-width:600px){.chart-host{height:200px}.trust-inner{gap:8px}.trust-tag{font-size:11px}.mq-track{font-size:clamp(22px,7vw,36px)}.arch{grid-template-columns:1fr}.arch-mid{display:none}.prod-sec-head{gap:24px}.stat{padding:18px 10px}}
-.bot-divider{border:none;border-top:2px solid var(--acc);opacity:.18;margin:0}
-/* COMPARISON TABLE */
-.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px}
-@media(max-width:700px){.compare-grid{grid-template-columns:1fr}}
-.compare-col{background:var(--panel);border:1px solid var(--line2);border-radius:18px;overflow:hidden}
-.compare-col.new{border-color:rgba(255,45,79,.25);box-shadow:0 0 60px rgba(255,45,79,.08)}
-.compare-head{padding:18px 22px;font:600 14px/1 var(--f);color:var(--t2);background:var(--bg1);border-bottom:1px solid var(--line);letter-spacing:.02em}
-.compare-item{display:flex;align-items:center;gap:12px;padding:14px 22px;font:400 14px/1.5 var(--f);color:var(--t1);border-bottom:1px solid rgba(255,255,255,.04)}
-.compare-item:last-child{border-bottom:none}
-.compare-item.yes{color:var(--t0)}
-.compare-item.no{color:var(--t2)}
-/* TELEGRAM MOCKUP */
-.phone-mock{width:300px;height:520px;background:#1a1a2e;border:2px solid rgba(255,255,255,.12);border-radius:36px;padding:8px;position:relative;box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 60px rgba(255,45,79,.06),inset 0 1px 0 rgba(255,255,255,.08)}
-.phone-notch{width:100px;height:24px;background:#0a0a14;border-radius:0 0 16px 16px;margin:0 auto 0;position:relative;z-index:2}
-.phone-screen{background:#0e0e1a;border-radius:28px;height:calc(100% - 8px);overflow:hidden;display:flex;flex-direction:column}
-.tg-header{display:flex;align-items:center;gap:10px;padding:14px 12px;background:#1c1c2e;border-bottom:1px solid rgba(255,255,255,.06)}
-.tg-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#7a1020);display:flex;align-items:center;justify-content:center;font:600 13px/1 var(--f);color:#fff;flex-shrink:0}
-.tg-name{font:600 13px/1 var(--f);color:#fff}.tg-online{font:400 11px/1 var(--f);color:var(--up);margin-top:2px}
-.tg-chat{flex:1;padding:12px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
-.tg-msg{display:flex;flex-direction:column;max-width:88%}
-.tg-msg.user{align-self:flex-end;align-items:flex-end}
-.tg-msg.bot{align-self:flex-start}
-.tg-bubble{padding:10px 14px;border-radius:16px;font:400 13px/1.5 var(--f)}
-.bot-b{background:#1e2d3d;color:#e8e8f0;border-bottom-left-radius:4px}
-.user-b{background:var(--acc);color:#fff;border-bottom-right-radius:4px;font:500 14px/1 var(--m)}
-.tg-time{font:400 10px/1 var(--f);color:var(--t2);margin-top:3px;padding:0 4px}
-.trade-alert{border-left:3px solid var(--up);margin-top:2px}
-@media(max-width:900px){#tg-demo>div{grid-template-columns:1fr!important}.phone-mock{margin:0 auto}}
-/* TG COMMAND FEATURES */
-.tg-feat{display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--panel);border:1px solid var(--line2);border-radius:12px;transition:border-color .3s var(--ease)}
-.tg-feat:hover{border-color:rgba(255,45,79,.3)}
-.tg-cmd{font:600 14px/1 var(--m);color:var(--acc3);min-width:90px}
-.tg-desc{font:400 14px/1 var(--f);color:var(--t1)}
-/* SECURITY GRID */
-.sec-grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-@media(max-width:700px){.sec-grid3{grid-template-columns:1fr}}
-.sec-card{background:var(--panel);border:1px solid var(--line2);border-radius:18px;padding:28px;transition:all .35s var(--ease);position:relative;overflow:hidden}
-.sec-card:hover{border-color:rgba(39,196,106,.35);transform:translateY(-4px);box-shadow:0 20px 50px rgba(39,196,106,.08)}
-.sec-card::before{content:'';position:absolute;top:-60%;right:-30%;width:70%;height:120%;background:radial-gradient(circle,rgba(39,196,106,.08),transparent 60%);pointer-events:none;opacity:0;transition:opacity .4s}
-.sec-card:hover::before{opacity:1}
-.sec-card .feat-ico{background:rgba(39,196,106,.08);border-color:rgba(39,196,106,.2)}
-.sec-card .feat-ico svg{stroke:var(--up)}
-.sec-card h3{font:600 16px/1.3 var(--f);margin-bottom:8px;letter-spacing:-.02em}
-.sec-card p{font:400 13px/1.7 var(--f);color:var(--t1)}
-/* SHIELD */
-.shield-wrap{text-align:center;margin-top:40px}
-.shield-anim{position:relative;display:inline-block;margin-bottom:16px}
-.shield-anim svg{width:64px;height:64px;stroke:var(--up);fill:none;stroke-width:1.2}
-.shield-ring{position:absolute;top:50%;left:50%;border:1px solid rgba(39,196,106,.15);border-radius:50%;animation:shield-pulse 3s ease-in-out infinite}
-.sr1{width:100px;height:100px;margin:-50px 0 0 -50px}
-.sr2{width:130px;height:130px;margin:-65px 0 0 -65px;animation-delay:1s;border-color:rgba(39,196,106,.08)}
-@keyframes shield-pulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.1);opacity:1}}
-/* WORLD MAP */
-#world-map{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg1);position:relative;overflow:hidden}
-.map-container{position:relative;max-width:900px;margin:0 auto}
-.map-container svg{width:100%;height:auto;opacity:.35}
-.map-dot{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc),0 0 24px rgba(230,57,70,.3);animation:map-ping 2s ease-in-out infinite}
-.map-dot::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:1px solid var(--acc);opacity:0;animation:map-ring 2s ease-out infinite}
-@keyframes map-ping{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.3);opacity:1}}
-@keyframes map-ring{0%{transform:scale(.5);opacity:.8}100%{transform:scale(2.5);opacity:0}}
-.map-dot.d2{animation-delay:.6s;background:var(--up);box-shadow:0 0 12px var(--up),0 0 24px rgba(39,196,106,.3)}
-.map-dot.d2::after{border-color:var(--up)}
-.map-dot.d3{animation-delay:1.2s}
-.map-dot.d4{animation-delay:.3s;background:var(--up);box-shadow:0 0 12px var(--up)}
-.map-dot.d4::after{border-color:var(--up)}
-.map-dot.d5{animation-delay:.9s}
-.map-label{position:absolute;font:500 9px/1 var(--m);color:var(--t2);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
-.map-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:24px}
-@media(max-width:640px){.map-stats{grid-template-columns:1fr 1fr}}
-.map-stat{text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
-.map-stat b{display:block;font:600 22px/1 var(--d);color:var(--t0);margin-bottom:4px}
-.map-stat span{font:400 11px/1 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.1em}
-/* TRADING METHODS */
-.method-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-@media(max-width:820px){.method-grid{grid-template-columns:1fr}}
-.method-card{background:var(--panel);border:1px solid var(--line2);border-radius:20px;padding:28px;position:relative;overflow:hidden;transition:border-color .3s var(--ease),transform .3s var(--ease)}
-.method-card:hover{border-color:rgba(255,45,79,.3);transform:translateY(-3px)}
-.method-num{font:600 48px/1 var(--d);color:rgba(255,255,255,.04);position:absolute;top:16px;right:20px;letter-spacing:-.03em}
-.method-tag{display:inline-flex;font:600 10px/1 var(--m);letter-spacing:.14em;text-transform:uppercase;border-radius:6px;padding:5px 10px;margin-bottom:14px}
-.ai-tag{color:#a78bfa;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25)}
-.grid-tag{color:var(--up);background:rgba(39,196,106,.08);border:1px solid rgba(39,196,106,.25)}
-.dca-tag{color:#f59e0b;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25)}
-.method-card h3{font:600 18px/1.3 var(--f);margin-bottom:10px;letter-spacing:-.02em}
-.method-card>p{font:400 13px/1.7 var(--f);color:var(--t1);margin-bottom:18px}
-.method-you{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.you-label{font:600 10px/1 var(--m);color:var(--t2);letter-spacing:.12em;text-transform:uppercase;width:100%;margin-bottom:2px}
-.you-item{font:500 11px/1 var(--f);color:var(--t1);background:var(--bg1);border:1px solid var(--line);border-radius:6px;padding:5px 10px}
-/* YOU CONTROL */
-.control-list{display:grid;gap:14px}
-.ctrl-item{display:flex;align-items:flex-start;gap:14px;padding:16px 18px;background:var(--panel);border:1px solid var(--line2);border-radius:14px;transition:border-color .3s var(--ease)}
-.ctrl-item:hover{border-color:rgba(255,45,79,.25)}
-.ctrl-ico{width:40px;height:40px;border-radius:10px;background:var(--accdim);border:1px solid rgba(255,45,79,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.ctrl-item b{display:block;font:600 14px/1.3 var(--f);color:var(--t0);margin-bottom:3px}
-.ctrl-item span{font:400 13px/1.5 var(--f);color:var(--t1)}
-@media(max-width:900px){#control>div{grid-template-columns:1fr!important}}
-.center{text-align:center}
-#spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--acc),var(--acc3));z-index:600;will-change:width;pointer-events:none}
-@keyframes blk{0%,100%{opacity:1}50%{opacity:.2}}.blink-live{animation:blk 1.6s ease-in-out infinite}
-.hstats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:760px;margin:0 auto 40px}
-@media(max-width:640px){.hstats{grid-template-columns:1fr 1fr;gap:12px}}
-.hs{position:relative;text-align:center;padding:22px 14px;border-radius:16px;overflow:hidden;
-  background:linear-gradient(165deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
-  border:1px solid var(--line2);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 20px 40px rgba(0,0,0,.35);
-  transition:transform .35s var(--ease),border-color .35s var(--ease),box-shadow .35s var(--ease)}
-.hs::after{content:'';position:absolute;top:-60%;left:-30%;width:80%;height:120%;background:radial-gradient(circle,rgba(255,45,79,.14),transparent 62%);pointer-events:none;opacity:0;transition:opacity .4s}
-.hs:hover{transform:translateY(-4px);border-color:rgba(255,45,79,.4);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 26px 54px rgba(255,45,79,.14)}
-.hs:hover::after{opacity:1}
-.hs-n{display:block;font:600 clamp(26px,3.6vw,38px)/1 var(--d);letter-spacing:-.03em;background:linear-gradient(120deg,#fff,var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 20px rgba(255,45,79,.25))}
-.hs-n i{font-style:normal;font-size:.62em;color:var(--acc3);-webkit-text-fill-color:var(--acc3)}
-.hs-l{font:500 10px/1.3 var(--m);color:var(--t2);text-transform:uppercase;letter-spacing:.13em;margin-top:9px;display:block}
-/* HAMBURGER */
-#ham{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:6px;z-index:400}
-#ham span{display:block;width:22px;height:2px;background:var(--t0);border-radius:1px;transition:all .3s var(--ease)}
-#ham.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
-#ham.open span:nth-child(2){opacity:0;transform:translateX(-8px)}
-#ham.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
-@media(max-width:820px){#ham{display:flex}.nav-cta{display:none}}
-#mnav{position:fixed;inset:0;z-index:250;background:rgba(6,6,8,.97);backdrop-filter:blur(24px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px;transform:translateY(-100%);transition:transform .45s var(--ease);pointer-events:none}
-#mnav.open{transform:none;pointer-events:auto}
-#mnav a{font:600 clamp(22px,6vw,34px)/1 var(--d);color:var(--t0);letter-spacing:-.02em;opacity:0;transform:translateY(20px);transition:color .2s,opacity .4s,transform .4s var(--ease)}
-#mnav a:hover{color:var(--acc)}
-#mnav.open a{opacity:1;transform:none}
-#mnav.open a:nth-child(1){transition-delay:.08s}
-#mnav.open a:nth-child(2){transition-delay:.15s}
-#mnav.open a:nth-child(3){transition-delay:.22s}
-#mnav.open a:nth-child(4){transition-delay:.29s}
-#mnav.open a:nth-child(5){transition-delay:.36s}
-#mnav .m-cta{background:var(--acc);color:#fff!important;padding:14px 36px;border-radius:12px;margin-top:6px;transition-delay:.43s!important;font-size:clamp(15px,4vw,18px)!important}
+
+/* ═══ FLOATING NAV ═══ */
+#fm-check{display:none}
+.nav-wrap{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:100}
+.fm{display:flex;align-items:center;gap:0;background:rgba(22,22,25,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:999px;padding:6px;box-shadow:0 8px 32px rgba(0,0,0,.5);transition:gap .4s cubic-bezier(.4,0,.2,1)}
+#fm-check:checked ~ .nav-wrap .fm{gap:2px}
+.fm-toggle{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.05);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .25s ease;-webkit-tap-highlight-color:transparent;position:relative}
+.fm-toggle:hover{background:rgba(255,255,255,.1)}
+.fm-toggle .bar{position:absolute;width:18px;height:1.5px;background:#fff;border-radius:2px;transition:all .35s cubic-bezier(.4,0,.2,1)}
+.bar1{transform:translateY(-5px)}.bar2{opacity:1}.bar3{transform:translateY(5px)}
+#fm-check:checked ~ .nav-wrap .bar1{transform:rotate(45deg)}
+#fm-check:checked ~ .nav-wrap .bar2{opacity:0;transform:scaleX(0)}
+#fm-check:checked ~ .nav-wrap .bar3{transform:rotate(-45deg)}
+.fm-item{height:38px;width:0;border-radius:999px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;gap:6px;overflow:hidden;opacity:0;padding:0;transform:scale(.3);transition:width .4s cubic-bezier(.4,0,.2,1),opacity .35s cubic-bezier(.4,0,.2,1),transform .4s cubic-bezier(.4,0,.2,1),padding .4s cubic-bezier(.4,0,.2,1),background .2s ease;-webkit-tap-highlight-color:transparent;white-space:nowrap;text-decoration:none}
+#fm-check:checked ~ .nav-wrap .fm-item{opacity:1;transform:scale(1);padding:0 14px 0 10px}
+#fm-check:checked ~ .nav-wrap .fm-item[data-w="s"]{width:100px}
+#fm-check:checked ~ .nav-wrap .fm-item[data-w="m"]{width:120px}
+#fm-check:checked ~ .nav-wrap .fm-item:nth-child(3){transition-delay:.05s}
+#fm-check:checked ~ .nav-wrap .fm-item:nth-child(4){transition-delay:.1s}
+#fm-check:checked ~ .nav-wrap .fm-item:nth-child(5){transition-delay:.15s}
+#fm-check:checked ~ .nav-wrap .fm-item:nth-child(6){transition-delay:.2s}
+#fm-check:not(:checked) ~ .nav-wrap .fm-item:nth-child(6){transition-delay:0s}
+#fm-check:not(:checked) ~ .nav-wrap .fm-item:nth-child(5){transition-delay:.03s}
+#fm-check:not(:checked) ~ .nav-wrap .fm-item:nth-child(4){transition-delay:.06s}
+#fm-check:not(:checked) ~ .nav-wrap .fm-item:nth-child(3){transition-delay:.09s}
+.fm-item:hover{background:rgba(230,57,70,.15)}
+.fm-item:active{background:rgba(230,57,70,.25)}
+.fm-item svg{width:18px;height:18px;stroke:var(--text2);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:stroke .2s ease}
+.fm-item:hover svg{stroke:#fff}
+.fm-item span{font:500 13px/1 var(--sans);color:var(--text2);transition:color .2s ease}
+.fm-item:hover span{color:#fff}
+@media(max-width:700px){.fm{flex-wrap:wrap;border-radius:20px;justify-content:center;max-width:340px}#fm-check:checked ~ .nav-wrap .fm{gap:4px}}
+
+/* ═══ HERO (AURORA) ═══ */
+.hero{position:relative;width:100%;min-height:100dvh;overflow:hidden;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse 80% 60% at 50% 40%,#0a0215,var(--bg))}
+.stars{position:absolute;inset:0;z-index:1;pointer-events:none}
+.stars::before,.stars::after{content:'';position:absolute;inset:0}
+.stars::before{background-image:radial-gradient(1px 1px at 12% 8%,rgba(255,255,255,.7),transparent),radial-gradient(1px 1px at 27% 15%,rgba(255,255,255,.7),transparent),radial-gradient(1.2px 1.2px at 45% 6%,rgba(255,200,200,.8),transparent),radial-gradient(1px 1px at 62% 12%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 78% 9%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 91% 18%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 8% 32%,rgba(255,255,255,.5),transparent),radial-gradient(1.3px 1.3px at 35% 28%,rgba(255,150,150,.9),transparent),radial-gradient(1px 1px at 53% 35%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 72% 30%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 88% 38%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 15% 52%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 42% 48%,rgba(255,255,255,.5),transparent),radial-gradient(1.2px 1.2px at 67% 55%,rgba(200,180,255,.8),transparent),radial-gradient(1px 1px at 82% 50%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 5% 72%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 22% 68%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 38% 75%,rgba(255,255,255,.5),transparent),radial-gradient(1.2px 1.2px at 58% 70%,rgba(255,200,200,.8),transparent),radial-gradient(1px 1px at 75% 78%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 90% 72%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 18% 88%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 48% 92%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 65% 85%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 83% 90%,rgba(255,255,255,.5),transparent);animation:star-twinkle 4s ease-in-out infinite alternate}
+.stars::after{background-image:radial-gradient(.8px .8px at 7% 14%,rgba(255,255,255,.4),transparent),radial-gradient(.8px .8px at 19% 42%,rgba(255,255,255,.35),transparent),radial-gradient(.8px .8px at 31% 62%,rgba(255,255,255,.4),transparent),radial-gradient(.8px .8px at 44% 22%,rgba(255,255,255,.3),transparent),radial-gradient(.8px .8px at 56% 82%,rgba(255,255,255,.35),transparent),radial-gradient(.8px .8px at 69% 44%,rgba(255,255,255,.4),transparent),radial-gradient(.8px .8px at 81% 66%,rgba(255,255,255,.3),transparent),radial-gradient(.8px .8px at 93% 28%,rgba(255,255,255,.35),transparent);animation:star-twinkle 5s ease-in-out .5s infinite alternate}
+@keyframes star-twinkle{0%{opacity:.6}100%{opacity:1}}
+.aurora{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;opacity:0;animation:aurora-in 3s ease .5s forwards}
+@keyframes aurora-in{to{opacity:1}}
+.aurora-blob{position:absolute;border-radius:50%;filter:blur(80px);mix-blend-mode:screen}
+.ab1{width:600px;height:400px;top:10%;left:15%;background:rgba(230,57,70,.5);animation:drift1 12s ease-in-out infinite alternate}
+.ab2{width:500px;height:350px;top:25%;right:10%;background:rgba(155,29,234,.3);animation:drift2 14s ease-in-out .5s infinite alternate}
+.ab3{width:700px;height:300px;bottom:15%;left:25%;background:rgba(255,107,122,.4);animation:drift3 10s ease-in-out 1s infinite alternate}
+.ab4{width:400px;height:400px;top:40%;left:45%;background:rgba(255,34,68,.25);animation:drift4 16s ease-in-out .8s infinite alternate}
+@keyframes drift1{0%{transform:translate(0,0) scale(1)}100%{transform:translate(60px,40px) scale(1.15)}}
+@keyframes drift2{0%{transform:translate(0,0) scale(1) rotate(0)}100%{transform:translate(-50px,30px) scale(1.1) rotate(5deg)}}
+@keyframes drift3{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,-30px) scale(1.2)}}
+@keyframes drift4{0%{transform:translate(0,0) scale(1) rotate(0)}100%{transform:translate(-30px,50px) scale(.9) rotate(-5deg)}}
+.vignette{position:absolute;inset:0;z-index:5;pointer-events:none;background:radial-gradient(ellipse 55% 55% at 50% 48%,transparent 30%,rgba(9,9,11,.9))}
+.hero-content{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 24px;max-width:820px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:8px 18px 8px 12px;background:rgba(230,57,70,.06);border:1px solid rgba(230,57,70,.12);border-radius:999px;margin-bottom:36px;opacity:0;animation:rise .9s cubic-bezier(.32,.72,0,1) 1s forwards}
+.eyebrow-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent),0 0 14px rgba(230,57,70,.5);animation:pulse 2.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+.eyebrow span{font:500 10px/1 var(--sans);color:var(--accent2);letter-spacing:.1em;text-transform:uppercase}
+.hero-title{font:800 clamp(46px,9.5vw,92px)/1.0 var(--sans);letter-spacing:-.06em;color:#fff;margin-bottom:28px;text-shadow:0 0 60px rgba(230,57,70,.15)}
+.word{display:inline-block;opacity:0;animation:word-appear 1s cubic-bezier(.22,.68,0,1) forwards}
+.w1{animation-delay:1.2s}.w2{animation-delay:1.35s}.w3{animation-delay:1.6s}.w4{animation-delay:1.75s}
+.w3,.w4{background:linear-gradient(135deg,var(--accent) 20%,var(--accent2) 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-shadow:none}
+@keyframes word-appear{0%{opacity:0;transform:translateY(50px);filter:blur(12px)}60%{filter:blur(2px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
+.hero-sub{font:400 clamp(15px,2.2vw,19px)/1.7 var(--sans);color:rgba(255,255,255,.45);max-width:520px;margin-bottom:48px;opacity:0;animation:rise .9s cubic-bezier(.32,.72,0,1) 2.2s forwards}
+.cta-row{display:flex;gap:14px;opacity:0;animation:rise .9s cubic-bezier(.32,.72,0,1) 2.5s forwards}
+.cta-primary{position:relative;display:inline-flex;align-items:center;gap:10px;padding:16px 30px;border-radius:12px;background:var(--accent);color:#fff;font:600 15px/1 var(--sans);text-decoration:none;border:none;cursor:pointer;overflow:hidden;transition:all .35s cubic-bezier(.32,.72,0,1);box-shadow:0 4px 30px rgba(230,57,70,.3),inset 0 1px 0 rgba(255,255,255,.15)}
+.cta-primary:hover{transform:translateY(-3px);box-shadow:0 10px 50px rgba(230,57,70,.45)}
+.cta-primary:active{transform:translateY(0) scale(.97)}
+.cta-primary svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.cta-ghost{display:inline-flex;align-items:center;gap:8px;padding:16px 24px;border-radius:12px;background:rgba(255,255,255,.03);color:rgba(255,255,255,.6);font:500 15px/1 var(--sans);text-decoration:none;border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:all .35s cubic-bezier(.32,.72,0,1)}
+.cta-ghost:hover{color:#fff;border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.06)}
+.hero-stats{display:flex;gap:44px;margin-top:60px;opacity:0;animation:rise .8s cubic-bezier(.32,.72,0,1) 2.8s forwards}
+.stat{text-align:center;position:relative;padding:0 4px}
+.stat+.stat::before{content:'';position:absolute;top:50%;left:-22px;width:1px;height:22px;transform:translateY(-50%);background:rgba(255,255,255,.06)}
+.stat strong{display:block;font:700 24px/1 var(--sans);color:#fff;letter-spacing:-.02em}
+.stat small{display:block;font:400 11px/1.4 var(--sans);color:rgba(255,255,255,.3);margin-top:6px;letter-spacing:.02em}
+@keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:640px){.hero-stats{gap:20px;flex-wrap:wrap;justify-content:center}.stat+.stat::before{display:none}.cta-row{flex-direction:column;align-items:center}.aurora-blob{filter:blur(60px)}.ab1{width:300px;height:200px}.ab2{width:250px;height:180px}.ab3{width:350px;height:150px}.ab4{width:200px;height:200px}}
+
+/* ═══ SECTIONS ═══ */
+.section{max-width:1100px;margin:0 auto;padding:100px 24px 60px}
+.section-head{text-align:center;margin-bottom:48px}
+.section-head h2{font:700 clamp(28px,4vw,42px)/1.1 var(--sans);letter-spacing:-.04em;color:#fff;margin-bottom:12px}
+.section-head p{font:400 16px/1.6 var(--sans);color:var(--text2);max-width:520px;margin:0 auto}
+
+/* ═══ BENTO FEATURES ═══ */
+@keyframes spin-glow{to{transform:rotate(360deg)}}
+.bento-grid{display:grid;grid-template-columns:repeat(12,1fr);grid-auto-rows:minmax(14rem,auto);gap:16px;max-width:1100px;width:100%;list-style:none}
+@media(max-width:900px){.bento-grid{grid-template-columns:1fr 1fr}.bento-grid .gi{grid-area:auto!important}}
+@media(max-width:560px){.bento-grid{grid-template-columns:1fr}}
+.gi{position:relative;border-radius:1.5rem;padding:2px;background:var(--border);-webkit-tap-highlight-color:transparent}
+.gi::before{content:'';position:absolute;inset:-1px;border-radius:inherit;background:conic-gradient(from 0deg,transparent 0%,rgba(230,57,70,.5) 20%,transparent 40%,transparent 60%,rgba(230,57,70,.4) 80%,transparent 100%);opacity:0;z-index:0;animation:spin-glow 4s linear infinite;transition:opacity .4s ease}
+.gi:hover::before{opacity:1}
+.gi:nth-child(2)::before{animation-delay:-.8s}
+.gi:nth-child(3)::before{animation-delay:-1.6s}
+.gi:nth-child(4)::before{animation-delay:-2.4s}
+.gi:nth-child(5)::before{animation-delay:-3.2s}
+.gi-inner{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:space-between;gap:24px;height:100%;border-radius:calc(1.5rem - 2px);background:var(--surface);padding:24px;overflow:hidden}
+.gi-icon{width:40px;height:40px;border-radius:10px;border:0.75px solid var(--border);background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center}
+.gi-icon svg{width:18px;height:18px;stroke:var(--text2);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.gi-content{display:flex;flex-direction:column;gap:12px}
+.gi-content h3{font:600 clamp(18px,2vw,22px)/1.25 var(--sans);letter-spacing:-.04em;color:#fff;text-wrap:balance}
+.gi-content p{font:400 14px/1.5 var(--sans);color:var(--muted)}
+.gi:nth-child(1){grid-area:1/1/2/5}.gi:nth-child(2){grid-area:1/5/2/9}.gi:nth-child(3){grid-area:1/9/2/13}.gi:nth-child(4){grid-area:2/1/3/7}.gi:nth-child(5){grid-area:2/7/3/13}
+
+/* ═══ MAP ═══ */
+.map-section{max-width:1100px;width:100%;padding:0 24px;margin:0 auto}
+.map-eyebrow{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:20px}
+.map-eyebrow-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:rgba(230,57,70,.08);border:1px solid rgba(230,57,70,.15);border-radius:999px;font:500 11px/1 var(--sans);color:var(--accent2);letter-spacing:.06em;text-transform:uppercase}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:live-blink 1.5s ease-in-out infinite}
+@keyframes live-blink{0%,100%{opacity:.3}50%{opacity:1}}
+.map-title{text-align:center;margin-bottom:48px}
+.map-title h2{font:700 clamp(28px,4vw,42px)/1.08 var(--sans);letter-spacing:-.04em;color:#fff;margin-bottom:14px}
+.map-title p{font:400 16px/1.6 var(--sans);color:var(--text2);max-width:520px;margin:0 auto}
+@keyframes shell-glow{to{transform:rotate(1turn)}}
+.map-shell{position:relative;border-radius:1.5rem;padding:1.5px;background:var(--border)}
+.map-shell::before{content:'';position:absolute;inset:-1px;border-radius:inherit;background:conic-gradient(from 0deg,transparent 0%,rgba(230,57,70,.3) 12%,transparent 24%,transparent 50%,rgba(230,57,70,.2) 62%,transparent 74%,transparent 100%);opacity:0;z-index:0;transition:opacity .6s cubic-bezier(.32,.72,0,1);animation:shell-glow 8s linear infinite}
+.map-shell:hover::before{opacity:1}
+.map-core{position:relative;z-index:1;border-radius:calc(1.5rem - 1.5px);background:var(--surface);overflow:hidden}
+.map-core::before{content:'';position:absolute;inset:0;z-index:0;background:radial-gradient(ellipse 30% 50% at 28% 30%,rgba(230,57,70,.06),transparent),radial-gradient(ellipse 25% 40% at 88% 65%,rgba(230,57,70,.04),transparent),radial-gradient(ellipse 50% 60% at 50% 40%,rgba(255,255,255,.015),transparent);pointer-events:none}
+.map-core::after{content:'';position:absolute;inset:0;z-index:3;background:radial-gradient(ellipse 75% 70% at 50% 50%,transparent 50%,rgba(9,9,11,.6));pointer-events:none}
+.map-inner{position:relative;z-index:1;padding:40px 36px 28px}
+.map-canvas{position:relative;width:100%;aspect-ratio:2.2/1;margin-bottom:24px}
+.map-canvas svg{width:100%;height:100%;display:block}
+.sessions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;position:relative;z-index:2}
+.sess{display:flex;align-items:center;gap:10px;padding:10px 20px;background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:12px;transition:all .35s cubic-bezier(.32,.72,0,1)}
+.sess:hover{border-color:rgba(230,57,70,.2);background:rgba(230,57,70,.04);transform:translateY(-1px)}
+.sess-indicator{position:relative;width:8px;height:8px}
+.sess-indicator::before{content:'';position:absolute;inset:0;border-radius:50%;background:var(--accent);animation:ind-pulse 2.8s ease-in-out infinite}
+.sess-indicator::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:1px solid var(--accent);opacity:0;animation:ind-ring 2.8s ease-out infinite}
+.sess:nth-child(2) .sess-indicator::before,.sess:nth-child(2) .sess-indicator::after{animation-delay:.7s}
+.sess:nth-child(3) .sess-indicator::before,.sess:nth-child(3) .sess-indicator::after{animation-delay:1.4s}
+.sess:nth-child(4) .sess-indicator::before,.sess:nth-child(4) .sess-indicator::after{animation-delay:2.1s}
+@keyframes ind-pulse{0%,100%{opacity:.35;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
+@keyframes ind-ring{0%{transform:scale(1);opacity:.5}100%{transform:scale(2.5);opacity:0}}
+.sess-info{display:flex;flex-direction:column;gap:2px}
+.sess-city{font:600 13px/1 var(--sans);color:var(--text);letter-spacing:.01em}
+.sess-time{font:400 11px/1 var(--sans);color:var(--muted)}
+@media(max-width:700px){.map-inner{padding:24px 16px 20px}.sessions{gap:6px}.sess{padding:8px 14px;gap:8px;border-radius:10px}.sess-city{font-size:11px}.sess-time{font-size:9px}}
+@media(max-width:480px){.sessions{display:grid;grid-template-columns:1fr 1fr;gap:6px}}
+
+/* ═══ PRICING ═══ */
+.pricing-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:820px;width:100%;margin:0 auto}
+@media(max-width:700px){.pricing-grid{grid-template-columns:1fr;max-width:400px}}
+.p-card{position:relative;border-radius:1.25rem;padding:2px;background:var(--border);overflow:hidden}
+.p-card::before{content:'';position:absolute;inset:-1px;border-radius:inherit;background:conic-gradient(from 0deg,transparent 0%,rgba(230,57,70,.45) 25%,transparent 50%,transparent 75%,rgba(230,57,70,.35) 100%);opacity:0;z-index:0;transition:opacity .4s ease;animation:spin-glow 4s linear infinite}
+.p-card:hover::before{opacity:1}
+.p-card:nth-child(2)::before{animation-delay:-2s}
+.p-inner{position:relative;z-index:1;border-radius:calc(1.25rem - 2px);background:var(--surface);padding:32px 28px;display:flex;flex-direction:column;gap:24px;height:100%}
+.p-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(230,57,70,.12);color:var(--accent2);font:600 11px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:100px;width:fit-content}
+.p-badge-alt{background:rgba(255,255,255,.06);color:var(--text2)}
+.p-name{font:600 22px/1.2 var(--sans);color:#fff;letter-spacing:-.02em}
+.p-desc{font:400 14px/1.5 var(--sans);color:var(--muted);margin-top:4px}
+.p-price-row{display:flex;align-items:baseline;gap:8px;margin:4px 0}
+.p-price{font:700 48px/1 var(--sans);letter-spacing:-.04em;color:#fff}
+.p-price-label{font:400 14px/1.4 var(--sans);color:var(--muted)}
+.p-divider{height:1px;background:var(--border);margin:4px 0}
+.p-features{list-style:none;display:flex;flex-direction:column;gap:12px;flex:1}
+.p-features li{display:flex;align-items:flex-start;gap:10px;font:400 14px/1.5 var(--sans);color:var(--text2)}
+.p-features li svg{width:18px;height:18px;flex-shrink:0;margin-top:1px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.p-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px 24px;border:none;border-radius:12px;cursor:pointer;font:600 15px/1 var(--sans);transition:all .2s ease;text-decoration:none}
+.p-btn-primary{background:var(--accent);color:#fff}
+.p-btn-primary:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 8px 24px rgba(230,57,70,.3)}
+.p-btn-secondary{background:rgba(255,255,255,.06);color:#fff;border:1px solid var(--border)}
+.p-btn-secondary:hover{background:rgba(255,255,255,.1);transform:translateY(-1px)}
+.p-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.p-card.highlighted .p-inner{background:var(--surface2);border:0.5px solid rgba(230,57,70,.15)}
+
+/* ═══ SECURITY ═══ */
+.sec-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+@media(max-width:700px){.sec-grid{grid-template-columns:1fr}}
+.sec-item{padding:24px 20px;background:var(--surface)}
+.sec-item h3{font:600 14px/1.3 var(--sans);color:var(--text);letter-spacing:-.02em;margin-bottom:6px}
+.sec-item p{font:400 13px/1.6 var(--sans);color:var(--text2)}
+
+/* ═══ FAQ ═══ */
+.faq-list{border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.faq-item+.faq-item{border-top:1px solid var(--border)}
+.faq-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;font:500 14px/1.4 var(--sans);color:var(--text);background:var(--surface);border:none;cursor:pointer;text-align:left;transition:color .15s}
+.faq-q:hover{color:#fff}
+.faq-q .icon{font:400 18px/1 var(--mono);color:var(--muted);transition:transform .2s,color .2s;flex-shrink:0}
+.faq-q.open .icon{transform:rotate(45deg);color:var(--accent)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.32,.72,0,1);background:var(--surface)}
+.faq-a-inner{padding:0 20px 16px;font:400 14px/1.7 var(--sans);color:var(--text2)}
+.faq-a.open{max-height:200px}
+
+/* ═══ FINAL CTA ═══ */
+.final{text-align:center;padding:80px 24px;border-top:1px solid var(--border)}
+.final h2{font:600 clamp(24px,3vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#fff;margin-bottom:12px}
+.final p{font:400 15px/1.7 var(--sans);color:var(--text2);max-width:420px;margin:0 auto 24px}
+.final-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;font:500 14px/1 var(--sans);padding:12px 22px;border-radius:8px;cursor:pointer;border:none;transition:all .15s;text-decoration:none}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid rgba(255,255,255,.12)}
+.btn-ghost:hover{background:var(--surface);color:var(--text)}
+
+/* ═══ FOOTER ═══ */
+footer{border-top:1px solid var(--border);padding:24px 0}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;max-width:1100px;margin:0 auto;padding:0 24px}
+footer .left{font:400 12px/1.6 var(--sans);color:var(--muted)}
+footer .left a{color:var(--text2);transition:color .15s}
+footer .left a:hover{color:var(--text)}
+footer .right{font:400 11px/1.6 var(--sans);color:var(--muted);max-width:500px}
+
+/* ═══ SCROLL REVEAL ═══ */
+.rv{opacity:0;transform:translateY(20px);transition:opacity .7s ease,transform .7s ease}
+.rv.in{opacity:1;transform:none}
+
+/* ═══ REDUCED MOTION ═══ */
+@media(prefers-reduced-motion:reduce){*{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important}.word,.eyebrow,.hero-sub,.cta-row,.hero-stats,.aurora{opacity:1!important;transform:none!important;filter:none!important}}
 </style>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@graph":[
@@ -444,170 +260,136 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
  ]}]}
 </script>
 </head>
-<body class="intro-lock">
-<!-- CINEMATIC INTRO -->
-<div id="intro" aria-hidden="true">
-  <div class="intro-half left"></div>
-  <div class="intro-half right"></div>
-  <div class="intro-core">
-    <div class="ib-glow"></div>
-    <div class="ib-chart" id="ibChart"></div>
-    <div class="ib-brand">APEX <span class="grad">TRADE</span></div>
-    <div class="ib-tag">AI Trading · Fully Hosted</div>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<input type="checkbox" id="fm-check">
+<div class="nav-wrap">
+  <div class="fm">
+    <label class="fm-toggle" for="fm-check">
+      <span class="bar bar1"></span><span class="bar bar2"></span><span class="bar bar3"></span>
+    </label>
+    <a href="#home" class="fm-item" data-w="s"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Home</span></a>
+    <a href="#features" class="fm-item" data-w="m"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg><span>Features</span></a>
+    <a href="#map" class="fm-item" data-w="s"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>Map</span></a>
+    <a href="#pricing" class="fm-item" data-w="s"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Pricing</span></a>
+    <a href="#faq" class="fm-item" data-w="s"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>FAQ</span></a>
   </div>
 </div>
-<div id="spbar"></div>
-<div id="glow"></div>
-<svg id="paths" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
-  <path stroke-dasharray="1200" d="M-100,400 C200,100 500,700 800,300 S1200,600 1600,200"/>
-  <path stroke-dasharray="900" d="M1600,600 C1200,400 800,800 400,500 S0,200 -200,400"/>
-  <path stroke-dasharray="800" d="M300,-50 C500,200 700,100 900,400 S1100,700 1400,500"/>
-  <path stroke-dasharray="1000" d="M-50,700 C300,500 600,900 900,600 S1300,300 1500,550"/>
-</svg>
 
-<div id="tape"><div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div></div></div>
-
-<nav>
-  <a href="#" class="brand">
-    <svg class="logo" viewBox="0 0 32 32" fill="none">
-      <defs><linearGradient id="cg" x1="3" y1="29" x2="29" y2="3" gradientUnits="userSpaceOnUse"><stop class="lg1"/><stop offset="1" class="lg2"/></linearGradient></defs>
-      <rect x="3" y="19" width="5" height="10" rx="2.5" fill="url(#cg)" opacity=".45"/>
-      <rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="url(#cg)" opacity=".72"/>
-      <rect x="20" y="6" width="5" height="23" rx="2.5" fill="url(#cg)"/>
-      <circle cx="22.5" cy="5" r="3.1" fill="#ff5c74"/>
-    </svg>
-    Apex Trading Suite
-  </a>
-  <div class="nav-links">
-    <a href="#crypto-sec">Crypto Bot</a>
-    <a href="#forex-sec">Forex Bot</a>
-    <a href="#how">How It Works</a>
-    <a href="#pricing">Pricing</a>
-    <a href="#faq">FAQ</a>
-    <a href="/affiliate.html">Become an Affiliate</a>
+<!-- ═══ HERO ═══ -->
+<section class="hero" id="home">
+  <div class="stars"></div>
+  <div class="aurora">
+    <div class="aurora-blob ab1"></div>
+    <div class="aurora-blob ab2"></div>
+    <div class="aurora-blob ab3"></div>
+    <div class="aurora-blob ab4"></div>
   </div>
-  <a href="#pricing" class="nav-cta">Get License</a>
-  <button id="ham" aria-label="Menu" onclick="toggleNav()"><span></span><span></span><span></span></button>
-</nav>
-<div id="mnav">
-  <a href="#crypto-sec" onclick="toggleNav()">Crypto Bot</a>
-  <a href="#forex-sec" onclick="toggleNav()">Forex Bot</a>
-  <a href="#how" onclick="toggleNav()">How It Works</a>
-  <a href="#pricing" onclick="toggleNav()">Pricing</a>
-  <a href="#faq" onclick="toggleNav()">FAQ</a>
-  <a href="/affiliate.html" onclick="toggleNav()">Become an Affiliate</a>
-  <a href="#pricing" class="m-cta" onclick="toggleNav()">Get License →</a>
-</div>
-
-<!-- HERO -->
-<section id="hero">
-  <div class="hero-stars"></div>
-  <div class="hero-orb"></div>
-  <div class="wrap" style="position:relative;z-index:2">
-    <div class="grid3d"></div>
-    <div class="aurora"></div>
-    <div class="aurora2"></div>
-    <div class="aurora3"></div>
-    <div class="hero-kicker rv" aria-label="Algorithmic trading, fully hosted">
-      <span class="hk-line"></span>
-      <span class="hk-text" id="kicker">Algorithmic Trading</span>
-      <span class="hk-line r"></span>
+  <div class="vignette"></div>
+  <div class="hero-content">
+    <div class="eyebrow">
+      <div class="eyebrow-dot"></div>
+      <span>Apex Trading Suite</span>
     </div>
-    <h1 class="rv">Your trading bot,<br><span class="grad" id="rotate">from your phone.</span></h1>
-    <p class="sub rv">No MT5. No computer. No VPS. Just open Telegram on your phone, tap <b style="color:var(--t0);font-weight:600">Start</b>, and your bot is live — trading on <b style="color:var(--t0);font-weight:600">your own</b> exchange or broker, 24/7. We host everything. You control everything from a chat. Pay once, own it forever.</p>
-    <div class="hstats rv">
-      <div class="hs"><span class="hs-n hs-static">1,000<i>+</i></span><span class="hs-l">Pairs available</span></div>
-      <div class="hs"><span class="hs-n hs-static">24<i>/7</i></span><span class="hs-l">Always trading</span></div>
-      <div class="hs"><span class="hs-n hs-static">1<i>×</i></span><span class="hs-l">One-time payment</span></div>
-      <div class="hs"><span class="hs-n hs-static">$0<i>/mo</i></span><span class="hs-l">Monthly fees</span></div>
+    <h1 class="hero-title">
+      <span class="word w1">Trade</span>
+      <span class="word w2">smarter.</span><br>
+      <span class="word w3">Not</span>
+      <span class="word w4">harder.</span>
+    </h1>
+    <p class="hero-sub">AI-powered bots trade crypto & forex on cTrader around the clock. One-time purchase. Full source code. Your funds stay in your account.</p>
+    <div class="cta-row">
+      <a href="#pricing" class="cta-primary">
+        <span>Get started</span>
+        <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </a>
+      <a href="#features" class="cta-ghost">How it works</a>
     </div>
-    <div class="prod-grid rv">
-      <div class="prod-card">
-        <span class="pc-tag">Crypto</span>
-        <h3>Apex Trade Bot</h3>
-        <p>AI-powered crypto trading bot. Connects to your own cTrader account with a trade-only API key — every trade appears live in your broker, the moment it happens.</p>
-        <div class="pc-pills">
-          <span class="pc-pill">cTrader</span><span class="pc-pill">1,000+ Pairs</span><span class="pc-pill">Grid &amp; DCA</span><span class="pc-pill">AI Signals</span>
-        </div>
-        <div class="pc-price"><span class="now">$297</span><span class="was">$497</span><span class="note">one-time</span></div>
-        <a href="#pricing" class="btn btn-primary magnetic">Get Crypto License →</a>
-      </div>
-      <div class="prod-card">
-        <span class="pc-tag">Forex</span>
-        <h3>Apex Forex ATC</h3>
-        <p>AI-powered forex bot connected to your cTrader account. Practice or live, stop-loss and take-profit set on every trade — fully hosted, controlled from Telegram.</p>
-        <div class="pc-pills">
-          <span class="pc-pill">cTrader</span><span class="pc-pill">Practice &amp; Live</span><span class="pc-pill">Major Pairs</span><span class="pc-pill">Paper Mode</span>
-        </div>
-        <div class="pc-price"><span class="now">$497</span><span class="was">$797</span><span class="note">one-time</span></div>
-        <a href="#pricing" class="btn btn-primary magnetic">Get Forex License →</a>
-      </div>
+    <div class="hero-stats">
+      <div class="stat"><strong>24/7</strong><small>Always running</small></div>
+      <div class="stat"><strong>Crypto & Forex</strong><small>Two markets</small></div>
+      <div class="stat"><strong>One-time</strong><small>No subscription</small></div>
     </div>
   </div>
 </section>
 
-<!-- TRUST -->
-<div id="trust"><div class="wrap trust-inner rv">
-  <span class="trust-lbl">Crypto</span>
-  <span class="trust-tag">cTrader</span><span class="trust-tag">BTC/USDT</span><span class="trust-tag">ETH/USDT</span><span class="trust-tag">SOL/USDT</span><span class="trust-tag">XRP/USDT</span>
-  <span class="trust-sep"></span>
-  <span class="trust-lbl">Forex</span>
-  <span class="trust-tag">cTrader</span><span class="trust-tag">EUR/USD</span><span class="trust-tag">GBP/USD</span><span class="trust-tag">USD/JPY</span>
-</div></div>
-
-<!-- WHY APEX — comparison + phone mockup -->
-<section class="wrap sec" id="why-apex" style="border-top:1px solid var(--line)">
-  <div class="sec-head rv center" style="margin-left:auto;margin-right:auto;text-align:center">
-    <span class="label">Why Apex</span>
-    <h2 class="h2" style="margin:14px 0 14px">Forget MT5, VPS and complicated setups.</h2>
-    <p class="lead" style="margin:0 auto">Traditional bots need a desktop computer running 24/7 or an expensive VPS. Apex runs in the cloud — you control it from Telegram on any phone.</p>
+<!-- ═══ FEATURES ═══ -->
+<section class="section" id="features">
+  <div class="section-head rv">
+    <h2>What's included.</h2>
+    <p>Both bots come fully hosted. You configure the strategy — we run everything.</p>
   </div>
-  <div class="compare-grid rv">
-    <div class="compare-col old">
-      <div class="compare-head">Traditional Bots</div>
-      <div class="compare-item no"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--acc)" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Need MT4/MT5 on a computer</div>
-      <div class="compare-item no"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--acc)" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Rent a VPS ($15–40/month)</div>
-      <div class="compare-item no"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--acc)" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Install, configure, maintain</div>
-      <div class="compare-item no"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--acc)" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Monthly subscription fees</div>
-      <div class="compare-item no"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--acc)" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>No control from phone</div>
-      <div class="compare-item no"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--acc)" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Technical setup required</div>
-    </div>
-    <div class="compare-col new">
-      <div class="compare-head" style="background:var(--accdim);border-color:rgba(255,45,79,.3);color:var(--acc3)">Apex Trading Suite</div>
-      <div class="compare-item yes"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--up)" stroke-width="2.4"><path d="m5 12 5 5L20 7"/></svg>Runs entirely from Telegram</div>
-      <div class="compare-item yes"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--up)" stroke-width="2.4"><path d="m5 12 5 5L20 7"/></svg>We host everything — $0/month</div>
-      <div class="compare-item yes"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--up)" stroke-width="2.4"><path d="m5 12 5 5L20 7"/></svg>Activate in 60 seconds</div>
-      <div class="compare-item yes"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--up)" stroke-width="2.4"><path d="m5 12 5 5L20 7"/></svg>One-time payment, forever</div>
-      <div class="compare-item yes"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--up)" stroke-width="2.4"><path d="m5 12 5 5L20 7"/></svg>Full control from any phone</div>
-      <div class="compare-item yes"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--up)" stroke-width="2.4"><path d="m5 12 5 5L20 7"/></svg>Zero technical knowledge needed</div>
-    </div>
-  </div>
+  <ul class="bento-grid rv">
+    <li class="gi"><div class="gi-inner"><div class="gi-icon"><svg viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></div><div class="gi-content"><h3>Nothing to install — fully hosted</h3><p>We run both bots 24/7 on secure servers. No VPS, no setup, no maintenance.</p></div></div></li>
+    <li class="gi"><div class="gi-inner"><div class="gi-icon"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><div class="gi-content"><h3>AI, Grid & DCA — three strategies</h3><p>AI signal trading, grid for ranging markets, DCA for accumulation. Switch with one command.</p></div></div></li>
+    <li class="gi"><div class="gi-inner"><div class="gi-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="gi-content"><h3>Risk controls on every trade</h3><p>Stop-loss and take-profit set automatically. Max drawdown cap and flash-crash guard built in.</p></div></div></li>
+    <li class="gi"><div class="gi-inner"><div class="gi-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="gi-content"><h3>Full Telegram control</h3><p>Instant alerts on every entry and exit with reasoning. /status and /report any time.</p></div></div></li>
+    <li class="gi"><div class="gi-inner"><div class="gi-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><div class="gi-content"><h3>Your funds never leave your account</h3><p>Trade-only API keys — withdrawals disabled. Your exchange account stays 100% yours.</p></div></div></li>
+  </ul>
 </section>
 
-<!-- TELEGRAM MOCKUP -->
-<section class="wrap sec" id="tg-demo" style="border-top:1px solid var(--line)">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,6vw,72px);align-items:center">
-    <div class="rv">
-      <span class="label">Control from Telegram</span>
-      <h2 class="h2" style="margin:14px 0 14px">Your entire trading desk<br>in one chat.</h2>
-      <p class="lead">No apps to download. No dashboards to learn. Open Telegram, send a command, and the bot responds instantly. Start, stop, switch pairs, check your balance — all from the same chat where you talk to friends.</p>
-      <div style="display:grid;gap:14px;margin-top:28px">
-        <div class="tg-feat rv"><span class="tg-cmd">/start</span><span class="tg-desc">Begin trading in one tap</span></div>
-        <div class="tg-feat rv"><span class="tg-cmd">/status</span><span class="tg-desc">Balance, position, P&L — instant</span></div>
-        <div class="tg-feat rv"><span class="tg-cmd">/settings</span><span class="tg-desc">Risk, pairs, strategy — all configurable</span></div>
-        <div class="tg-feat rv"><span class="tg-cmd">/stop</span><span class="tg-desc">Pause trading any time</span></div>
-      </div>
+<!-- ═══ SESSION MAP ═══ -->
+<section class="section" id="map" style="border-top:1px solid var(--border)">
+  <div class="map-section">
+    <div class="map-eyebrow rv">
+      <div class="map-eyebrow-pill"><span class="live-dot"></span>Session-aware trading</div>
     </div>
-    <div class="rv" style="display:flex;justify-content:center">
-      <div class="phone-mock">
-        <div class="phone-notch"></div>
-        <div class="phone-screen">
-          <div class="tg-header"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg><div class="tg-avatar">A</div><div><div class="tg-name">Apex Trade Bot</div><div class="tg-online">online</div></div></div>
-          <div class="tg-chat">
-            <div class="tg-msg bot"><div class="tg-bubble bot-b">Welcome to <b>Apex Trade Bot</b>. Your license is active. Send /start to begin trading.</div><span class="tg-time">09:41</span></div>
-            <div class="tg-msg user"><div class="tg-bubble user-b">/start</div><span class="tg-time">09:41</span></div>
-            <div class="tg-msg bot"><div class="tg-bubble bot-b">Paper trading started on <b>BTC/USDT</b>. Balance: $10,000.00. I'll send you alerts for every trade.</div><span class="tg-time">09:41</span></div>
-            <div class="tg-msg bot"><div class="tg-bubble bot-b trade-alert"><span style="color:var(--up);font-weight:600">BUY BTC/USDT</span><br>Entry: $104,285.40<br>SL: $103,850.20 · TP: $105,150.80<br>Risk: 1.5% · Size: 0.014 BTC<br><span style="color:var(--t2);font-size:11px">AI Signal: RSI oversold + support bounce</span></div><span class="tg-time">09:43</span></div>
+    <div class="map-title rv">
+      <h2>Trade across global sessions.</h2>
+      <p>The bot detects which session is active and adapts its strategy to match each market's volatility and liquidity.</p>
+    </div>
+    <div class="map-shell rv">
+      <div class="map-core">
+        <div class="map-inner">
+          <div class="map-canvas">
+            <svg viewBox="0 0 800 360" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id="land" width="5" height="5" patternUnits="userSpaceOnUse"><circle cx="2.5" cy="2.5" r=".8" fill="rgba(255,255,255,.18)"/></pattern>
+                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="40" stroke="rgba(255,255,255,.03)" stroke-width=".5"/><line x1="0" y1="0" x2="40" y2="0" stroke="rgba(255,255,255,.03)" stroke-width=".5"/></pattern>
+                <linearGradient id="ag" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#e63946" stop-opacity=".1"/><stop offset="50%" stop-color="#ff6b7a" stop-opacity=".8"/><stop offset="100%" stop-color="#e63946" stop-opacity=".1"/></linearGradient>
+                <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                <filter id="glow-lg"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <rect width="800" height="360" fill="url(#grid)"/>
+              <g opacity=".85">
+                <path fill="url(#land)" d="M34,52 L56,44 L88,38 L118,32 L148,36 L170,30 L196,34 L218,42 L236,50 L248,60 L256,72 L258,86 L254,100 L248,112 L240,122 L230,130 L218,138 L224,130 L222,144 L214,152 L202,158 L192,164 L180,168 L168,164 L158,170 L146,174 L138,170 L130,162 L122,152 L116,142 L110,130 L106,118 L102,104 L100,90 L98,78 L96,66 L92,56 L80,52 L66,48 L52,50Z"/>
+                <path fill="url(#land)" d="M268,22 L286,18 L302,22 L310,32 L308,44 L298,52 L284,54 L272,48 L266,36 L264,28Z"/>
+                <path fill="url(#land)" d="M158,170 L168,168 L178,174 L186,182 L190,190 L184,194 L176,192 L168,186 L160,178Z"/>
+                <path fill="url(#land)" d="M190,190 L210,184 L228,186 L246,190 L260,198 L270,210 L272,224 L268,240 L262,254 L254,268 L246,278 L240,288 L234,294 L226,288 L220,278 L216,268 L212,256 L206,242 L200,228 L196,214 L192,200Z"/>
+                <path fill="url(#land)" d="M380,50 L388,44 L394,48 L396,58 L392,66 L384,68 L378,62 L376,54Z"/>
+                <path fill="url(#land)" d="M386,72 L394,66 L404,62 L414,60 L424,56 L434,52 L444,48 L456,48 L468,52 L472,60 L468,68 L460,72 L448,76 L440,82 L432,86 L424,90 L416,94 L408,98 L400,102 L392,98 L388,92 L384,84Z"/>
+                <path fill="url(#land)" d="M388,108 L400,104 L414,104 L428,108 L440,114 L452,122 L462,132 L470,144 L476,160 L478,176 L476,192 L470,208 L462,222 L452,234 L442,244 L432,252 L422,256 L412,252 L404,244 L396,232 L390,218 L384,202 L380,186 L376,168 L374,150 L374,134 L378,120Z"/>
+                <path fill="url(#land)" d="M472,48 L500,38 L530,32 L560,28 L592,26 L624,28 L656,32 L684,38 L706,46 L720,56 L728,66 L724,76 L714,84 L700,90 L682,94 L660,98 L636,102 L614,106 L592,108 L570,106 L550,100 L532,92 L516,84 L504,76 L492,66 L482,56Z"/>
+                <path fill="url(#land)" d="M546,112 L562,106 L576,112 L586,124 L592,140 L590,158 L582,174 L572,186 L560,190 L550,184 L542,170 L536,154 L534,138 L536,124Z"/>
+                <path fill="url(#land)" d="M608,108 L624,104 L638,108 L650,116 L658,128 L660,142 L654,152 L644,158 L632,154 L622,146 L614,134 L610,120Z"/>
+                <path fill="url(#land)" d="M700,60 L710,54 L718,58 L722,68 L720,80 L714,88 L706,92 L700,86 L696,76 L696,66Z"/>
+                <path fill="url(#land)" d="M618,194 L636,188 L656,190 L674,194 L690,200 L700,208 L694,214 L678,212 L660,208 L642,204 L626,200Z"/>
+                <path fill="url(#land)" d="M656,228 L678,220 L702,218 L724,222 L740,232 L750,246 L752,262 L746,276 L734,286 L718,292 L700,294 L682,290 L666,282 L656,270 L650,256 L650,242Z"/>
+              </g>
+              <g filter="url(#glow)">
+                <path fill="none" stroke="url(#ag)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 4" d="M390,62 Q310,10 230,96"><animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.5s" repeatCount="indefinite"/></path>
+                <path fill="none" stroke="url(#ag)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 4" d="M230,96 Q470,-50 708,72"><animate attributeName="stroke-dashoffset" from="0" to="-20" dur="2s" repeatCount="indefinite"/></path>
+                <path fill="none" stroke="url(#ag)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 4" d="M708,72 Q750,170 702,258"><animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.5s" repeatCount="indefinite"/></path>
+                <path fill="none" stroke="url(#ag)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 4" d="M702,258 Q540,330 390,62"><animate attributeName="stroke-dashoffset" from="0" to="-20" dur="2s" repeatCount="indefinite"/></path>
+              </g>
+              <g filter="url(#glow-lg)">
+                <circle r="3" fill="#ff6b7a"><animateMotion dur="3s" repeatCount="indefinite" path="M390,62 Q310,10 230,96"/></circle>
+                <circle r="3" fill="#ff6b7a"><animateMotion dur="4s" repeatCount="indefinite" path="M230,96 Q470,-50 708,72"/></circle>
+                <circle r="3" fill="#ff6b7a"><animateMotion dur="3s" repeatCount="indefinite" path="M708,72 Q750,170 702,258"/></circle>
+                <circle r="3" fill="#ff6b7a"><animateMotion dur="4s" repeatCount="indefinite" path="M702,258 Q540,330 390,62"/></circle>
+              </g>
+              <g><circle cx="390" cy="62" r="4" fill="none" stroke="var(--accent)" stroke-width=".6" opacity="0"><animate attributeName="r" values="4;18" dur="2.5s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;0" dur="2.5s" repeatCount="indefinite"/></circle><circle cx="390" cy="62" r="3.5" fill="#e63946" filter="url(#glow)"/><text x="390" y="44" text-anchor="middle" fill="#fff" font-family="system-ui" font-weight="600" font-size="11" letter-spacing=".3">London</text></g>
+              <g><circle cx="230" cy="96" r="4" fill="none" stroke="var(--accent)" stroke-width=".6" opacity="0"><animate attributeName="r" values="4;18" dur="2.5s" begin=".3s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;0" dur="2.5s" begin=".3s" repeatCount="indefinite"/></circle><circle cx="230" cy="96" r="3.5" fill="#e63946" filter="url(#glow)"/><text x="230" y="78" text-anchor="middle" fill="#fff" font-family="system-ui" font-weight="600" font-size="11" letter-spacing=".3">New York</text></g>
+              <g><circle cx="708" cy="72" r="4" fill="none" stroke="var(--accent)" stroke-width=".6" opacity="0"><animate attributeName="r" values="4;18" dur="2.5s" begin=".6s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;0" dur="2.5s" begin=".6s" repeatCount="indefinite"/></circle><circle cx="708" cy="72" r="3.5" fill="#e63946" filter="url(#glow)"/><text x="708" y="54" text-anchor="middle" fill="#fff" font-family="system-ui" font-weight="600" font-size="11" letter-spacing=".3">Tokyo</text></g>
+              <g><circle cx="702" cy="258" r="4" fill="none" stroke="var(--accent)" stroke-width=".6" opacity="0"><animate attributeName="r" values="4;18" dur="2.5s" begin=".9s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;0" dur="2.5s" begin=".9s" repeatCount="indefinite"/></circle><circle cx="702" cy="258" r="3.5" fill="#e63946" filter="url(#glow)"/><text x="702" y="240" text-anchor="middle" fill="#fff" font-family="system-ui" font-weight="600" font-size="11" letter-spacing=".3">Sydney</text></g>
+            </svg>
+          </div>
+          <div class="sessions">
+            <div class="sess"><div class="sess-indicator"></div><div class="sess-info"><span class="sess-city">London</span><span class="sess-time">08:00 – 17:00 GMT</span></div></div>
+            <div class="sess"><div class="sess-indicator"></div><div class="sess-info"><span class="sess-city">New York</span><span class="sess-time">13:00 – 22:00 GMT</span></div></div>
+            <div class="sess"><div class="sess-indicator"></div><div class="sess-info"><span class="sess-city">Tokyo</span><span class="sess-time">00:00 – 09:00 GMT</span></div></div>
+            <div class="sess"><div class="sess-indicator"></div><div class="sess-info"><span class="sess-city">Sydney</span><span class="sess-time">22:00 – 07:00 GMT</span></div></div>
           </div>
         </div>
       </div>
@@ -615,406 +397,118 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
   </div>
 </section>
 
-<!-- SECURITY -->
-<section class="wrap sec" id="security" style="border-top:1px solid var(--line)">
-  <div class="sec-head rv center" style="margin-left:auto;margin-right:auto;text-align:center">
-    <span class="label">Security</span>
-    <h2 class="h2" style="margin:14px 0 14px">Your funds never leave your account.</h2>
-    <p class="lead" style="margin:0 auto">We can't touch your money. The bot connects with trade-only API keys — withdrawals are impossible by design. You can revoke access at any time.</p>
+<!-- ═══ SECURITY ═══ -->
+<section class="section" id="security" style="border-top:1px solid var(--border)">
+  <div class="section-head rv">
+    <h2>Your funds never leave your account.</h2>
+    <p>We can't touch your money. The bot connects with trade-only API keys — withdrawals are impossible.</p>
   </div>
-  <div class="sec-grid3 rv">
-    <div class="sec-card">
-      <div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-      <h3>Trade-Only API Keys</h3>
-      <p>You create the API key at your exchange with "trade only" permission. The bot can place orders but can never withdraw, transfer, or access your funds.</p>
+  <div class="sec-grid rv">
+    <div class="sec-item">
+      <h3>Trade-only API keys</h3>
+      <p>You create the key at your exchange with "trade only" permission. The bot can place orders but can never withdraw or transfer funds.</p>
     </div>
-    <div class="sec-card">
-      <div class="feat-ico"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-      <h3>Encrypted Storage</h3>
-      <p>API keys are encrypted at rest and never stored in plain text. They're used only to execute trades on your behalf — nothing else.</p>
+    <div class="sec-item">
+      <h3>Encrypted storage</h3>
+      <p>API keys are encrypted at rest and never stored in plain text. Used only to execute trades.</p>
     </div>
-    <div class="sec-card">
-      <div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14l5-5-5-5m5 5H9"/></svg></div>
-      <h3>Revoke Any Time</h3>
-      <p>Go to your exchange or cTrader, delete the API key, and the bot loses access instantly. You're always in full control.</p>
-    </div>
-  </div>
-  <div class="shield-wrap rv">
-    <div class="shield-anim">
-      <div class="shield-ring sr1"></div>
-      <div class="shield-ring sr2"></div>
-      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4" stroke-width="2"/></svg>
-    </div>
-    <p style="font:600 16px/1 var(--f);margin-bottom:6px">Zero access to your funds</p>
-    <p style="font:400 14px/1.6 var(--f);color:var(--t1);max-width:400px;margin:0 auto">Trade-only permissions — the bot can never withdraw, transfer, or move your money. Period.</p>
-  </div>
-</section>
-
-<!-- WORLD MAP -->
-<section id="world-map">
-  <div class="wrap sec">
-    <div class="sec-head rv center" style="margin-left:auto;margin-right:auto;text-align:center">
-      <span class="label">Global Coverage</span>
-      <h2 class="h2" style="margin:14px 0 14px">Trade any market, from anywhere.</h2>
-      <p class="lead" style="margin:0 auto">Your bot runs 24/7 in the cloud. Connect from any country, trade any pair your broker offers.</p>
-    </div>
-    <div class="map-container rv">
-      <svg viewBox="0 0 1000 500" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M165,120 Q180,90 220,85 Q260,80 280,95 Q300,75 340,80 Q360,72 380,78 Q400,70 420,75 L425,85 Q440,78 460,82 Q470,90 485,88 L490,100 Q500,95 520,100 Q540,90 560,95 Q580,88 600,92 Q620,85 640,90 L645,80 Q660,75 680,82 Q700,78 720,85 Q740,80 760,88 L755,100 Q770,95 780,100 Q790,108 785,120 Q800,115 810,125 L805,140 Q815,148 810,160 Q820,165 815,178 L800,185 Q810,195 800,205 Q790,215 780,210 Q770,220 755,215 L740,225 Q725,235 710,228 Q695,240 680,232 L665,238 Q650,250 640,242 Q625,248 610,240 Q595,250 580,242 L560,248 Q545,255 530,245 Q515,252 500,242 L485,248 Q470,258 455,248 Q440,255 425,245 L410,252 Q395,260 380,248 Q365,255 350,245 L335,252 Q320,260 310,248 Q295,255 280,245 L265,252 Q250,260 240,248 Q225,255 215,245 L200,252 Q185,258 175,248 L170,240 Q160,245 155,235 L150,220 Q140,225 138,215 L135,200 Q125,205 128,192 L130,180 Q120,185 125,172 L130,160 Q122,155 128,145 L135,135 Q125,130 132,122 Z" stroke="rgba(230,57,70,.15)" stroke-width=".8" fill="rgba(230,57,70,.03)"/>
-        <path d="M580,180 Q600,170 620,175 Q640,168 660,178 Q680,170 700,180 Q720,175 740,185 L745,200 Q755,195 760,205 Q770,210 765,225 L755,235 Q765,245 755,255 Q745,268 730,258 Q720,270 705,260 L690,265 Q675,275 660,265 Q645,272 630,262 L615,268 Q600,278 588,268 L580,275 Q565,282 558,270 L550,262 Q540,268 538,255 L535,240 Q525,245 528,232 L535,218 Q525,222 530,210 L538,198 Q530,195 535,185 Z" stroke="rgba(230,57,70,.15)" stroke-width=".8" fill="rgba(230,57,70,.03)"/>
-        <path d="M720,280 Q740,270 760,278 Q780,272 800,282 Q820,275 835,285 L840,300 Q852,295 855,308 Q860,320 852,332 L845,342 Q855,352 848,365 L838,375 Q848,388 835,395 L820,398 Q828,410 815,412 L798,408 Q800,420 788,418 L770,412 Q772,425 758,420 L740,415 Q742,428 728,422 L715,418 Q710,430 700,422 L695,410 Q685,418 682,405 L680,392 Q668,398 670,385 L672,370 Q662,375 665,362 L670,348 Q660,352 665,338 L672,325 Q662,328 668,315 L678,302 Q670,298 678,288 Z" stroke="rgba(230,57,70,.15)" stroke-width=".8" fill="rgba(230,57,70,.03)"/>
-        <path d="M140,250 Q160,240 180,248 Q200,242 220,252 Q240,245 255,255 L260,270 Q272,265 275,278 L272,290 Q280,288 278,302 L270,315 Q278,318 275,332 L265,345 Q272,352 265,362 L252,365 Q258,378 245,375 L230,370 Q232,382 218,378 L205,372 Q205,385 192,380 L178,375 Q178,388 165,382 L155,375 Q150,385 142,378 L138,365 Q128,370 130,358 L132,342 Q122,348 125,335 L130,320 Q120,325 125,310 L130,295 Q122,298 125,285 L132,270 Q125,268 130,258 Z" stroke="rgba(230,57,70,.15)" stroke-width=".8" fill="rgba(230,57,70,.03)"/>
-      </svg>
-      <div class="map-dot" style="top:22%;left:48%"></div>
-      <div class="map-dot d2" style="top:35%;left:72%"></div>
-      <div class="map-dot d3" style="top:28%;left:30%"></div>
-      <div class="map-dot d4" style="top:18%;left:55%"></div>
-      <div class="map-dot d5" style="top:42%;left:15%"></div>
-      <div class="map-dot d2" style="top:55%;left:78%"></div>
-      <div class="map-dot" style="top:30%;left:85%"></div>
-      <div class="map-dot d3" style="top:62%;left:52%"></div>
-    </div>
-    <div class="map-stats rv">
-      <div class="map-stat"><b>190+</b><span>Countries</span></div>
-      <div class="map-stat"><b>24/7</b><span>Uptime</span></div>
-      <div class="map-stat"><b>1,000+</b><span>Pairs</span></div>
-      <div class="map-stat"><b>&lt;50ms</b><span>Latency</span></div>
+    <div class="sec-item">
+      <h3>Revoke any time</h3>
+      <p>Delete the API key at your exchange or cTrader and the bot loses access instantly. You're always in control.</p>
     </div>
   </div>
 </section>
 
-<!-- LIVE CRYPTO NEWS -->
-<div id="newsbar" style="display:none"><div class="wrap news-inner">
-  <span class="news-lbl"><span class="news-dot"></span><span>Live Crypto News</span></span>
-  <div class="news-view"><div class="news-track" id="newsTrack"></div></div>
-</div></div>
-
-<!-- MARQUEE -->
-<div class="marquee" aria-hidden="true"><div class="mq-track">
-  <span>Automated Crypto</span><span class="dot">✦</span><span class="o">Automated Forex</span><span class="dot">✦</span><span>Fully Hosted</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Nothing to Install</span><span class="dot">✦</span>
-  <span>Automated Crypto</span><span class="dot">✦</span><span class="o">Automated Forex</span><span class="dot">✦</span><span>Fully Hosted</span><span class="dot">✦</span><span class="o">No Subscription</span><span class="dot">✦</span><span>Nothing to Install</span><span class="dot">✦</span>
-</div></div>
-
-<!-- CRYPTO SECTION -->
-<section class="wrap prod-sec" id="crypto-sec">
-  <div class="prod-sec-head rv single">
-    <div>
-      <span class="label">Crypto Bot</span>
-      <h2 class="h2" style="margin:14px 0 14px">Apex Trade Bot</h2>
-      <p class="lead">A fully-hosted AI bot for automated crypto trading. It trades live on your own cTrader account through a trade-only API key, so every order is visible in your broker the second it happens. We run the bot 24/7 — you control everything from Telegram.</p>
-    </div>
+<!-- ═══ PRICING ═══ -->
+<section class="section" id="pricing" style="border-top:1px solid var(--border)">
+  <div class="section-head rv">
+    <h2>One price. Yours forever.</h2>
+    <p>No subscriptions, no monthly fees. Pay once, trade for life. Full source code included.</p>
   </div>
-  <div class="feat-grid">
-    <div class="feat wide tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div><span class="feat-badge">FULLY HOSTED</span><h3>Nothing to install, ever</h3><p>We host and run both bots 24/7 on secure, always-on servers. No setup, no server to manage — just connect your account and control it from Telegram. $0/month hosting included.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><span class="feat-badge">YOUR STRATEGY</span><h3>You define the strategy</h3><p>Choose pairs, timeframes and entry logic. The strategy is yours — not ours.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><span class="feat-badge">RISK SHIELD</span><h3>Built-in risk controls</h3><p>Stop-loss and take-profit on every trade, max-drawdown cap, daily −3% circuit breaker, flash-crash guard and a news filter around FOMC &amp; CPI.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><span class="feat-badge">YOUR ACCOUNT</span><h3>Trades in your cTrader</h3><p>Connects to any cTrader broker with a trade-only API key you create. Withdrawals stay disabled — your funds never leave your account.</p></div>
-    <div class="feat wide tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><span class="feat-badge">3 STRATEGIES</span><h3>AI Signals, Grid &amp; DCA — switch from Telegram</h3><p>Three engines in one bot: AI signal trading for directional moves, grid trading for ranging markets, and DCA accumulation for long-term positions. Switch or tune any of them with a single Telegram command.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H4z"/><path d="M2 20h20"/></svg></div><span class="feat-badge">LIVE MONITOR</span><h3>Every move, explained</h3><p>Instant Telegram alert on every entry and exit — with the reasoning. /status and /report show balance, open position, win rate and net P&amp;L any time.</p></div>
-  </div>
-</section>
-
-<!-- FOREX SECTION -->
-<hr class="bot-divider">
-<section class="wrap prod-sec" id="forex-sec">
-  <div class="prod-sec-head rv single">
-    <div>
-      <span class="label">Forex Bot</span>
-      <h2 class="h2" style="margin:14px 0 14px">Apex Forex ATC</h2>
-      <p class="lead">A fully-hosted AI forex bot connected to your own broker via cTrader. The bot runs 24/7 in the cloud — every order executes in your account with stop-loss and take-profit set on each trade.</p>
-    </div>
-  </div>
-  <div class="feat-grid">
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></div><span class="feat-badge">cTrader</span><h3>Practice &amp; live</h3><p>Connects to your own cTrader account. Switch between paper practice and real live trading with one Telegram command.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><span class="feat-badge">RISK SHIELD</span><h3>Pip-based risk controls</h3><p>Stop-loss and take-profit in pips, configurable risk % per trade, leverage-aware margin cap — placed on every order.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><span class="feat-badge">AI SIGNALS</span><h3>Claude + Groq engine</h3><p>A dedicated mean-reversion strategy: fades overbought/oversold extremes (RSI + Bollinger Bands) with a higher-timeframe trend guard.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><span class="feat-badge">ZERO RISK START</span><h3>Paper trading first</h3><p>Start on a cTrader demo with zero real funds. Watch the bot trade for days, then switch to live when you're confident.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><span class="feat-badge">YOUR PAIR</span><h3>Trade the pair you choose</h3><p>EUR/USD, GBP/USD, USD/JPY, NZD/USD and more — switch instantly with /symbol in Telegram. One focused position at a time, never overexposed.</p></div>
-    <div class="feat tilt rv"><div class="feat-ico"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><span class="feat-badge">TELEGRAM</span><h3>Full Telegram control</h3><p>Start, stop, switch pairs, adjust risk, change broker — all from Telegram. /status shows balance, position and market hours.</p></div>
-  </div>
-  <div class="arch rv">
-    <div class="arch-box"><span class="arch-tag">Cloud · Hosted by us</span><h4>Apex Forex ATC</h4><p>AI analysis, strategy logic, risk management, Telegram control. Runs 24/7 — nothing for you to host.</p></div>
-    <div class="arch-mid"><span class="arch-lbl">PRICES · BALANCE · CANDLES</span><div class="arch-line"></div><span class="arch-lbl">TRADE COMMANDS · SL · TP</span><div class="arch-line"></div></div>
-    <div class="arch-box"><span class="arch-tag">Your cTrader account</span><h4>cTrader — demo or live</h4><p>You connect your own cTrader account. Every order executes there with SL and TP — you keep full control of your funds.</p></div>
-  </div>
-</section>
-
-<!-- TRADING METHODS -->
-<section class="wrap sec" id="methods" style="border-top:1px solid var(--line)">
-  <div class="sec-head rv center" style="margin-left:auto;margin-right:auto;text-align:center">
-    <span class="label">Trading Methods</span>
-    <h2 class="h2" style="margin:14px 0 14px">Three engines. You pick which one runs.</h2>
-    <p class="lead" style="margin:0 auto">The bot doesn't decide for you — <b style="color:var(--t0)">you</b> choose the strategy, the pairs, the risk level. Switch any time from Telegram.</p>
-  </div>
-  <div class="method-grid rv">
-    <div class="method-card">
-      <div class="method-num">01</div>
-      <div class="method-tag ai-tag">AI Signals</div>
-      <h3>AI-Powered Trading</h3>
-      <p>The bot analyzes the market using technical indicators (RSI, Bollinger Bands, moving averages) combined with AI reasoning. When it spots a high-probability setup, it opens a trade with automatic stop-loss and take-profit.</p>
-      <div class="method-you">
-        <span class="you-label">You control:</span>
-        <span class="you-item">Risk % per trade</span>
-        <span class="you-item">Which pairs</span>
-        <span class="you-item">Timeframe</span>
-        <span class="you-item">SL/TP distance</span>
-      </div>
-    </div>
-    <div class="method-card">
-      <div class="method-num">02</div>
-      <div class="method-tag grid-tag">Grid</div>
-      <h3>Grid Trading</h3>
-      <p>Places a grid of buy and sell orders across a price range. Profits from natural market bouncing without needing to predict direction. Best for ranging, sideways markets.</p>
-      <div class="method-you">
-        <span class="you-label">You control:</span>
-        <span class="you-item">Grid range</span>
-        <span class="you-item">Number of levels</span>
-        <span class="you-item">Order size</span>
-        <span class="you-item">Pair selection</span>
-      </div>
-    </div>
-    <div class="method-card">
-      <div class="method-num">03</div>
-      <div class="method-tag dca-tag">DCA</div>
-      <h3>Dollar-Cost Averaging</h3>
-      <p>Buys at regular intervals regardless of price — a proven accumulation strategy. Reduces the impact of volatility by spreading your entries over time.</p>
-      <div class="method-you">
-        <span class="you-label">You control:</span>
-        <span class="you-item">Buy interval</span>
-        <span class="you-item">Amount per buy</span>
-        <span class="you-item">Target asset</span>
-        <span class="you-item">Take-profit %</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- YOU CONTROL EVERYTHING -->
-<section class="wrap sec" id="control" style="border-top:1px solid var(--line)">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,6vw,72px);align-items:center">
-    <div class="rv">
-      <span class="label">Full Control</span>
-      <h2 class="h2" style="margin:14px 0 14px">You decide everything.<br>The bot executes.</h2>
-      <p class="lead">This is not a "set and forget" black box. You configure every parameter, monitor every trade, and can pause or stop at any moment. The bot is the tool — you are the trader.</p>
-    </div>
-    <div class="control-list rv">
-      <div class="ctrl-item"><div class="ctrl-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--acc2)" stroke-width="1.7"><path d="M12 20V10m0 0l-3 3m3-3l3 3M4 4h16"/></svg></div><div><b>You pick the pairs</b><span>BTC/USDT, EUR/USD, Gold — any asset your exchange offers</span></div></div>
-      <div class="ctrl-item"><div class="ctrl-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--acc2)" stroke-width="1.7"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div><b>You set the risk</b><span>Risk per trade, max drawdown, daily loss limit — all configurable</span></div></div>
-      <div class="ctrl-item"><div class="ctrl-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--acc2)" stroke-width="1.7"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div><div><b>You choose the strategy</b><span>AI Signals, Grid, or DCA — switch with one Telegram command</span></div></div>
-      <div class="ctrl-item"><div class="ctrl-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--acc2)" stroke-width="1.7"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg></div><div><b>You start and stop</b><span>/start to begin, /stop to pause — the bot never trades without your command</span></div></div>
-      <div class="ctrl-item"><div class="ctrl-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--acc2)" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div><b>You see every trade</b><span>Instant Telegram alert with entry, SL, TP, size, and the AI's reasoning</span></div></div>
-    </div>
-  </div>
-</section>
-
-<!-- HOW IT WORKS -->
-<section class="wrap sec" id="how" style="border-top:1px solid var(--line)">
-  <div class="sec-head rv"><span class="label">How It Works</span><h2 class="h2">60 seconds from checkout to live bot.</h2><p class="lead">No installation. No computer needed. Just your phone and Telegram.</p></div>
-  <div class="steps">
-    <div class="step rv"><div class="step-n">01</div><h3>Buy — one payment</h3><p>Pay once, get instant access. Your license key and personal activation link arrive by email in seconds.</p></div>
-    <div class="step rv"><div class="step-n">02</div><h3>Tap the link on your phone</h3><p>It opens Telegram. Your bot activates instantly — no downloads, no setup screens, no credentials to copy.</p></div>
-    <div class="step rv"><div class="step-n">03</div><h3>Connect your exchange</h3><p>Send your API key in the chat (crypto) or tap the auth link (forex). That's it — your account is linked.</p></div>
-    <div class="step rv"><div class="step-n">04</div><h3>Bot starts trading</h3><p>Start on paper mode with simulated money. When you're confident, switch to live. All from the same Telegram chat.</p></div>
-  </div>
-</section>
-
-
-<!-- PRICING -->
-<section id="pricing">
-  <div class="wrap sec">
-    <div class="sec-head rv center" style="margin-left:auto;margin-right:auto;text-align:center">
-      <span class="label">Pricing</span>
-      <h2 class="h2" style="margin:14px 0 14px">One payment. Full ownership.</h2>
-      <p class="lead" style="margin:0 auto">No subscription, no monthly fees, no upsells. Buy once and it's yours — forever.</p>
-    </div>
-    <div class="price-grid rv">
-      <div class="price-card">
-        <span class="price-badge">Apex Trade Bot · Crypto</span>
-        <div class="price-amt"><span class="now">$297</span><span class="was">$497</span></div>
-        <p class="price-sub">One-time · Lifetime use · Instant access</p>
-        <ul class="price-list">
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Fully hosted — nothing to install</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Trades live on your own cTrader account</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>AI, Grid &amp; DCA strategies</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Risk-control module</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Live alerts &amp; reports in Telegram</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Unlimited paper trading</li>
+  <div class="pricing-grid rv">
+    <div class="p-card highlighted">
+      <div class="p-inner">
+        <div><div class="p-badge"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Most popular</div></div>
+        <div><div class="p-name">Crypto Bot</div><div class="p-desc">Automated trading on cTrader — spot & futures. AI signals, grid, and DCA strategies built in.</div></div>
+        <div class="p-price-row"><span class="p-price">$297</span><span class="p-price-label">one-time<br>lifetime access</span></div>
+        <div class="p-divider"></div>
+        <ul class="p-features">
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>AI signal trading with auto entry & exit</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Grid bot for ranging / sideways markets</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>DCA strategy for long-term accumulation</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Auto stop-loss, take-profit & drawdown cap</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Full Telegram control & trade alerts</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Complete source code & free updates</li>
         </ul>
-        <a href="#buy-crypto" class="btn btn-primary magnetic">Get Crypto License — $297 →</a>
-        <p class="price-fine">🔒 Secure checkout · VAT handled automatically · API keys are <b>trade-only</b> — withdrawals impossible · Instant activation by email</p>
+        <a href="#" class="p-btn p-btn-primary">Get Crypto Bot<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
       </div>
-      <div class="price-card">
-        <span class="price-badge">Apex Forex ATC · Forex</span>
-        <div class="price-amt"><span class="now">$497</span><span class="was">$797</span></div>
-        <p class="price-sub">One-time · Lifetime use · Instant access</p>
-        <ul class="price-list">
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Fully hosted — nothing to install</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>cTrader — any broker, demo &amp; live</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Automatic SL/TP on every trade</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Major pairs — switch any time in Telegram</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>AI signals: Claude + Groq</li>
-          <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Paper trading to test risk-free</li>
+    </div>
+    <div class="p-card">
+      <div class="p-inner">
+        <div><div class="p-badge p-badge-alt"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>Professional</div></div>
+        <div><div class="p-name">Forex Bot</div><div class="p-desc">Automated trading on cTrader — major & minor pairs. AI-driven entries with institutional-grade risk management.</div></div>
+        <div class="p-price-row"><span class="p-price">$497</span><span class="p-price-label">one-time<br>lifetime access</span></div>
+        <div class="p-divider"></div>
+        <ul class="p-features">
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>AI signal trading on 28+ forex pairs</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Grid bot tuned for forex volatility</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>DCA for position building on dips</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>cTrader integration — any broker</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Session-aware trading (London, NY, Asia)</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Complete source code & free updates</li>
         </ul>
-        <a href="#buy-forex" class="btn btn-primary magnetic">Get Forex License — $497 →</a>
-        <p class="price-fine">🔒 Secure checkout · VAT handled automatically · API keys are <b>trade-only</b> — withdrawals impossible · Instant activation by email</p>
+        <a href="#" class="p-btn p-btn-secondary">Get Forex Bot<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
       </div>
     </div>
   </div>
 </section>
 
-<!-- FAQ -->
-<section class="wrap sec" id="faq">
-  <div class="sec-head rv"><span class="label">FAQ</span><h2 class="h2">Straight answers.</h2></div>
-  <div class="faq rv">
-    <div class="fq"><button class="fq-q">What exactly am I buying?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">A lifetime license to a fully-hosted automated trading bot (crypto or forex). We run it 24/7 on our secure servers; you connect your own broker/exchange account and control everything from Telegram. Nothing to install.</div></div></div>
-    <div class="fq"><button class="fq-q">What broker does the forex bot use?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">Any broker that supports <b>cTrader</b> — IC Markets, Pepperstone, FxPro and dozens more worldwide. You connect your own cTrader account in two taps (send /ctrader in Telegram, authorize, done). Start on a demo account, switch to live when you're ready.</div></div></div>
-    <div class="fq"><button class="fq-q">Do you guarantee profit?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">No — and anyone who does is lying to you. The bots execute <b>your</b> strategy: you choose the pairs, the risk and the settings, and your results depend on those choices and on the market. We sell the automation, not a return. You manage your own risk — that's why both bots start in paper mode, so you can validate your setup with zero real money before going live.</div></div></div>
-    <div class="fq"><button class="fq-q">Do you ever touch my funds or API keys?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">Never. We host the bots, but they connect with <b>trade-only</b> keys you create — withdrawals disabled at the exchange level. The bot can place and close trades, but it can never move or withdraw your funds, and you can revoke the keys at your exchange or cTrader at any time.</div></div></div>
-    <div class="fq"><button class="fq-q">Are these one-time payments?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">Yes. $297 or $497, once. No subscription, no recurring fees from us ever — and hosting is included, so there's no server bill either. Your only costs are your broker's normal trading fees.</div></div></div>
-    <div class="fq"><button class="fq-q">Can I test before risking real money?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner">Yes — and we strongly recommend it. Both bots default to paper trading: a simulated balance on real, live market prices. Run it as long as you want, watch exactly how your setup behaves, and only flip to live when the results convince you. No time limit.</div></div></div>
-    <div class="fq"><button class="fq-q">What's the refund policy?<span class="fq-ic">+</span></button><div class="fq-a"><div class="fq-a-inner"><b>All sales are final.</b> You receive instant lifetime access to a hosted product, so we never refund based on trading results or change of mind — you control the strategy, you manage the risk, and you can validate everything free in paper mode before a single dollar goes live. The one exception: if your bot can't be activated and connected within 14 days and our support can't fix it, we make it right.</div></div></div>
+<!-- ═══ FAQ ═══ -->
+<section class="section" id="faq" style="border-top:1px solid var(--border)">
+  <div class="section-head rv">
+    <h2>Questions.</h2>
+  </div>
+  <div class="faq-list rv">
+    <div class="faq-item"><button class="faq-q">What exactly am I buying?<span class="icon">+</span></button><div class="faq-a"><div class="faq-a-inner">A lifetime license to a fully-hosted automated trading bot (crypto or forex). We run it 24/7; you connect your own broker or exchange account and control everything from Telegram. Nothing to install.</div></div></div>
+    <div class="faq-item"><button class="faq-q">Do you guarantee profit?<span class="icon">+</span></button><div class="faq-a"><div class="faq-a-inner">No — and anyone who does is lying. The bots execute your strategy: you choose the pairs, the risk and the settings. We sell the automation, not a return. Start in paper mode to validate before going live.</div></div></div>
+    <div class="faq-item"><button class="faq-q">Do you ever touch my funds?<span class="icon">+</span></button><div class="faq-a"><div class="faq-a-inner">Never. The bots connect with trade-only API keys — withdrawals disabled at the exchange level. You can revoke access at any time.</div></div></div>
+    <div class="faq-item"><button class="faq-q">Is this a one-time payment?<span class="icon">+</span></button><div class="faq-a"><div class="faq-a-inner">Yes. $297 or $497, once. No subscription, no recurring fees — hosting included. Your only costs are your broker's normal trading fees.</div></div></div>
+    <div class="faq-item"><button class="faq-q">Can I test before risking real money?<span class="icon">+</span></button><div class="faq-a"><div class="faq-a-inner">Yes. Both bots default to paper trading: simulated balance on real market prices. Run it as long as you want, then switch to live when the results convince you.</div></div></div>
+    <div class="faq-item"><button class="faq-q">What's the refund policy?<span class="icon">+</span></button><div class="faq-a"><div class="faq-a-inner">All sales are final. You receive instant lifetime access to a hosted product. Validate everything in paper mode before risking real money. If your bot can't be activated within 14 days and our support can't fix it, we make it right.</div></div></div>
   </div>
 </section>
 
-<!-- FINAL CTA -->
-<section class="wrap" id="final">
-  <h2 class="h2 rv">Your bot. Your phone.<br>No subscriptions, ever.</h2>
-  <p class="rv">Two fully-hosted trading bots you control from Telegram. No computer, no MT5, no VPS. Pay once, trade forever.</p>
-  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap" class="rv">
-    <a href="#buy-crypto" class="btn btn-ghost magnetic">Crypto Bot — $297</a>
-    <a href="#buy-forex" class="btn btn-primary magnetic">Forex Bot — $497 →</a>
+<!-- ═══ FINAL CTA ═══ -->
+<section class="final">
+  <h2 class="rv">Your bot. Your phone. No subscription.</h2>
+  <p class="rv">Fully-hosted trading bots you control from Telegram. Pay once, trade forever.</p>
+  <div class="final-actions rv">
+    <a href="#pricing" class="btn btn-ghost">Crypto — $297</a>
+    <a href="#pricing" class="btn btn-primary">Forex — $497</a>
   </div>
 </section>
 
-<footer><div class="wrap">
-  <div>© Apex Trading Suite — the <b>AI Cash System</b> platform · Algorithmic Trading Software<br>
-  <a href="/privacy" style="color:inherit">Privacy Policy</a> · <a href="/terms" style="color:inherit">Terms of Service</a> · <a href="/affiliate.html" style="color:inherit">Become an Affiliate</a> · <a href="/guide" style="color:inherit">Free Trading Guide</a>
-  <span style="display:block;margin-top:8px;font:400 10px/1 var(--m);color:rgba(255,255,255,.15)">v3.0-full</span></div>
-  <div style="max-width:560px">Hosted trading software that you configure and control yourself. No financial advice, no guaranteed returns, no refunds based on trading results — your strategy and your risk settings determine your outcome. Trading with leverage carries substantial risk; you may lose more than your deposit. Only trade capital you can afford to lose. Any figures shown are from simulated environments and are not a representation of real trading results. Market data via TradingView for reference only.</div>
-</div></footer>
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="wrap">
+    <div class="left">© Apex Trading Suite · <a href="/affiliate.html">Affiliate Program</a></div>
+    <div class="right">Trading software you configure and control. No financial advice, no guaranteed returns. Trading carries risk — only trade capital you can afford to lose.</div>
+  </div>
+</footer>
 
 <script>
-(function(){var p=new URLSearchParams(location.search);var ref=p.get('ref');if(ref)sessionStorage.setItem('apex_ref',ref.toLowerCase().trim());})();
-// Lemon Squeezy checkout overlay
-(function(){
-  function openLemon(product){
-    var ref=sessionStorage.getItem('apex_ref')||'';
-    fetch('/api/lemon-checkout',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({product:product,ref:ref})})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if(d.url){window.open(d.url,'_blank');}
-      else{alert('Checkout unavailable — '+(d.error||'please try again.'));}
-    })
-    .catch(function(){alert('Connection error — please try again.');});
-  }
-  document.querySelectorAll('a[href="#buy-crypto"]').forEach(function(a){
-    a.addEventListener('click',function(e){e.preventDefault();openLemon('apex-bot');});
+document.querySelectorAll('.faq-q').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var wasOpen=this.classList.contains('open');
+    document.querySelectorAll('.faq-q').forEach(function(b){b.classList.remove('open')});
+    document.querySelectorAll('.faq-a').forEach(function(a){a.classList.remove('open')});
+    if(!wasOpen){this.classList.add('open');this.nextElementSibling.classList.add('open')}
   });
-  document.querySelectorAll('a[href="#buy-forex"]').forEach(function(a){
-    a.addEventListener('click',function(e){e.preventDefault();openLemon('apex-forex');});
-  });
-})();
-function toggleNav(){var h=document.getElementById('ham'),m=document.getElementById('mnav');h.classList.toggle('open');m.classList.toggle('open');document.body.style.overflow=m.classList.contains('open')?'hidden':'';}
-document.getElementById('mnav').querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){setTimeout(function(){document.body.style.overflow='';},600);});});
-(function(){var g=document.getElementById('glow');window.addEventListener('mousemove',function(e){g.style.transform='translate3d('+e.clientX+'px,'+e.clientY+'px,0) translate(-50%,-50%)';g.style.opacity='1';});})();
-document.querySelectorAll('.magnetic').forEach(function(b){
-  b.addEventListener('mousemove',function(e){var r=b.getBoundingClientRect();b.style.transform='translate('+((e.clientX-r.left-r.width/2)*.18)+'px,'+((e.clientY-r.top-r.height/2)*.3)+'px)';});
-  b.addEventListener('mouseleave',function(){b.style.transform='';});
 });
-if(window.matchMedia('(hover:hover)').matches){
-  document.querySelectorAll('.tilt').forEach(function(c){
-    c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();var x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.transform='perspective(820px) rotateY('+(x*7)+'deg) rotateX('+(-y*7)+'deg) translateY(-4px)';});
-    c.addEventListener('mouseleave',function(){c.style.transform='';});
-  });
-}
-// LIVE FX PRICES
-var FXP=[{id:'v0',cid:'c0',v:1.08512,d:5},{id:'v1',cid:'c1',v:1.27346,d:5},{id:'v2',cid:'c2',v:149.824,d:3},{id:'v3',cid:'c3',v:0.65234,d:5}];
-setInterval(function(){FXP.forEach(function(p){p.v+=((Math.random()-.5)*0.0002)*(p.d<4?10:1);var el=document.getElementById(p.id),cl=document.getElementById(p.cid);if(!el)return;el.textContent=p.v.toFixed(p.d);var up=Math.random()>.45;cl.textContent=(up?'▲ +':'▼ -')+(Math.random()*.3+0.01).toFixed(2)+'%';cl.className='chg '+(up?'up':'dn');});},2800);
-// TICKER TAPE
-(function(){var s=document.createElement('script');s.src='https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';s.async=true;
-  s.innerHTML=JSON.stringify({symbols:[{proName:'BINANCE:BTCUSDT',title:'BTC'},{proName:'BINANCE:ETHUSDT',title:'ETH'},{proName:'OANDA:EURUSD',title:'EUR/USD'},{proName:'OANDA:GBPUSD',title:'GBP/USD'},{proName:'BINANCE:SOLUSDT',title:'SOL'},{proName:'OANDA:USDJPY',title:'USD/JPY'},{proName:'BINANCE:BNBUSDT',title:'BNB'},{proName:'OANDA:XAUUSD',title:'Gold'}],showSymbolLogo:true,isTransparent:true,displayMode:'compact',colorTheme:'dark',locale:'en'});
-  document.querySelector('#tape .tradingview-widget-container').appendChild(s);})();
-// CRYPTO CHART + SELECTOR
-var COINS=[{s:'BINANCE:BTCUSDT',l:'BTC / USDT'},{s:'BINANCE:ETHUSDT',l:'ETH / USDT'},{s:'BINANCE:SOLUSDT',l:'SOL / USDT'},{s:'BINANCE:BNBUSDT',l:'BNB / USDT'},{s:'BINANCE:XRPUSDT',l:'XRP / USDT'},{s:'BINANCE:DOGEUSDT',l:'DOGE / USDT'},{s:'BINANCE:AVAXUSDT',l:'AVAX / USDT'},{s:'BINANCE:ADAUSDT',l:'ADA / USDT'}];
-function loadChart(sym){var h=document.getElementById('tvchart');h.innerHTML='';var s=document.createElement('script');s.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';s.async=true;
-  s.innerHTML=JSON.stringify({autosize:true,symbol:sym,interval:'15',timezone:'Etc/UTC',theme:'dark',style:'1',locale:'en',hide_side_toolbar:true,allow_symbol_change:false,save_image:false,backgroundColor:'rgba(6,6,8,1)',gridColor:'rgba(255,255,255,0.04)',enable_publishing:false,support_host:'https://www.tradingview.com'});h.appendChild(s);}
-(function(){var row=document.getElementById('coins'),lbl=document.getElementById('sym-label');if(!row)return;COINS.forEach(function(c,i){var b=document.createElement('button');b.className='coin'+(i===0?' active':'');b.textContent=c.l.split(' ')[0];b.onclick=function(){document.querySelectorAll('.coin').forEach(function(x){x.classList.remove('active');});b.classList.add('active');lbl.textContent=c.l;loadChart(c.s);};row.appendChild(b);});loadChart(COINS[0].s);})();
-// FAQ
-document.querySelectorAll('.fq-q').forEach(function(btn){btn.addEventListener('click',function(){var op=this.classList.contains('open');document.querySelectorAll('.fq-q').forEach(function(b){b.classList.remove('open');});document.querySelectorAll('.fq-a').forEach(function(a){a.classList.remove('open');a.style.maxHeight=null;});if(!op){this.classList.add('open');var ans=this.nextElementSibling;ans.classList.add('open');ans.style.maxHeight=ans.scrollHeight+'px';}});});
-// REVEAL
-var obs=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;e.target.classList.add('in');obs.unobserve(e.target);});},{threshold:.12});
-document.querySelectorAll('.rv').forEach(function(el){obs.observe(el);});
-document.querySelectorAll('.feat').forEach(function(el,i){el.style.transitionDelay=(i*70)+'ms';});
-// SCROLL PROGRESS BAR
-window.addEventListener('scroll',function(){document.getElementById('spbar').style.width=(window.scrollY/(document.documentElement.scrollHeight-innerHeight)*100)+'%';},{passive:true});
-// BLINK LIVE BADGES
-document.querySelectorAll('.term-live,.fx-conn').forEach(function(el){el.classList.add('blink-live');});
-// COUNT-UP STATS
-function countUp(el){var t=+el.getAttribute('data-t'),suf=el.getAttribute('data-s')||'',n=0,step=Math.max(1,Math.floor(t/55));var ti=setInterval(function(){n=Math.min(n+step,t);el.textContent=n.toLocaleString()+suf;if(n>=t)clearInterval(ti);},18);}
-var cobs=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;countUp(e.target);cobs.unobserve(e.target);});},{threshold:.5});
-document.querySelectorAll('.hs-n[data-t]').forEach(function(el){cobs.observe(el);});
-// Rotating headline word — futuristic cycle
-(function(){var el=document.getElementById('rotate');if(!el)return;
-  var words=['from your phone.','no MT5 needed.','while you sleep.','on your rules.','in 60 seconds.'];var i=0;
-  setInterval(function(){el.classList.add('out');setTimeout(function(){i=(i+1)%words.length;el.textContent=words[i];el.classList.remove('out');},350);},2600);})();
-// Hero kicker — phrases fade in and out above the headline
-(function(){var el=document.getElementById('kicker');if(!el)return;
-  var ph=['No MT5 Required','Runs on Your Phone','Fully Hosted · $0/mo','AI-Powered Signals','Activate in 60 Seconds'];var i=0;
-  setInterval(function(){el.classList.add('out');setTimeout(function(){i=(i+1)%ph.length;el.textContent=ph[i];el.classList.remove('out');},550);},3400);})();
-// Live crypto news ticker — real headlines when reachable, always-on market
-// highlights as a fallback so the bar never disappears.
-(function(){
-  var bar=document.getElementById('newsbar'),track=document.getElementById('newsTrack');
-  if(!track)return;
-  function esc(s){return String(s||'').replace(/[<>&"]/g,function(c){return{'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c];});}
-  function render(items){
-    var html=items.map(function(n){
-      var inner='<span class="src">'+esc(n.src)+'</span>'+esc(n.title);
-      return n.url?'<a class="news-item" href="'+esc(n.url)+'" target="_blank" rel="noopener">'+inner+'</a>':'<span class="news-item">'+inner+'</span>';
-    }).join('');
-    track.innerHTML=html+html; bar.style.display='block';
-  }
-  // Always-on fallback (true, evergreen market context → urgency to automate)
-  var fallback=[
-    {src:'MARKET',title:'Crypto trades 24/7 — the market never sleeps, and neither does the bot'},
-    {src:'FLOWS',title:'Spot Bitcoin ETFs keep pulling in institutional money'},
-    {src:'VOLATILITY',title:'Altcoins swing 5–20% a day — automation turns volatility into opportunity'},
-    {src:'EDGE',title:'Automated traders remove emotion — the #1 reason retail loses'},
-    {src:'ON-CHAIN',title:'Funding rates and liquidations move the market every hour'},
-    {src:'TIMING',title:'Miss a breakout at 3 AM? A hosted bot catches it while you sleep'},
-    {src:'AI',title:'AI-driven strategies are reshaping how retail traders compete'},
-    {src:'ACCESS',title:'1,000+ pairs, one Telegram chat — trade any market from your phone'}
-  ];
-  render(fallback);
-  // Try to overlay real live headlines on top (fail-soft — keeps the fallback)
-  fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN')
-    .then(function(r){return r.json();})
-    .then(function(d){
-      var items=((d&&d.Data)||[]).slice(0,16).map(function(n){
-        return {src:(n.source_info&&n.source_info.name)||n.source||'NEWS',title:n.title,url:n.url};
-      });
-      if(items.length) render(items);
-    })
-    .catch(function(){/* keep fallback */});
-})();
-// Cinematic intro — trading candles animation, then the two panels open smoothly
-(function(){
-  var intro=document.getElementById('intro'),chart=document.getElementById('ibChart');
-  if(!intro||!chart){document.body.classList.remove('intro-lock');return;}
-  var heights=[38,60,46,74,54,86,62,96,72];
-  heights.forEach(function(h,i){
-    var b=document.createElement('div');
-    b.className='ib-c '+([1,3,5,7,8].indexOf(i)>-1?'up':'dn');
-    b.style.height=h+'%';b.style.animationDelay=(0.14+i*0.08)+'s';
-    chart.appendChild(b);
-  });
-  var scan=document.createElement('div');scan.className='ib-scan';chart.appendChild(scan);
-  setTimeout(function(){intro.classList.add('go');},2150);           // panels start opening
-  setTimeout(function(){document.body.classList.remove('intro-lock');},2600); // unlock scroll mid-reveal
-  setTimeout(function(){intro.style.display='none';},3500);          // remove once fully open
-})();
+var obs=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target)}});
+},{threshold:.15});
+document.querySelectorAll('.rv').forEach(function(el){obs.observe(el)});
 </script>
-<script src="/cookie-banner.js"></script>
 </body>
 </html>
