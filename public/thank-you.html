@@ -41,9 +41,12 @@ body{background:var(--bg);color:var(--t0);font-family:var(--sans);min-height:100
 h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#fff;margin-bottom:10px}
 .sub{color:var(--t1);font:400 14.5px/1.7 var(--sans);margin-bottom:28px}
 .state{display:none}.state.active{display:block}
-.spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--border2);border-top-color:var(--acc);animation:spin 1s linear infinite;margin:0 auto 18px}
+.spinner{width:40px;height:40px;border-radius:50%;border:3px solid var(--border2);border-top-color:var(--acc);animation:spin .8s linear infinite;margin:0 auto 20px}
 @keyframes spin{to{transform:rotate(360deg)}}
-.wait-text{text-align:center;color:var(--t1);font:400 13.5px/1.7 var(--sans)}
+.wait-text{text-align:center;color:var(--t1);font:400 14px/1.7 var(--sans)}
+.progress-bar{margin:20px auto 0;width:80%;height:4px;border-radius:4px;background:var(--surface2);overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:4px;width:0%;transition:width .4s var(--ease)}
+.progress-text{text-align:center;margin-top:8px;font:400 11px/1 var(--sans);color:var(--t2)}
 .cta{display:block;text-align:center;background:var(--acc);color:#fff;font:700 17px/1 var(--sans);padding:20px;border-radius:12px;text-decoration:none;transition:all .2s var(--ease);margin-bottom:10px}
 .cta:hover{background:var(--acc2);transform:translateY(-1px);box-shadow:0 8px 24px rgba(230,57,70,.3)}
 .cta:active{transform:scale(.98)}
@@ -56,9 +59,13 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
 .stepbody{font:400 13px/1.6 var(--sans);color:var(--t1)}
 .stepbody b{color:var(--t0)}
 .email-note{margin-top:24px;text-align:center;font:400 12.5px/1.7 var(--sans);color:var(--t2)}
-.err{color:var(--acc3);text-align:center;font:400 13.5px/1.7 var(--sans)}
-.retry{display:block;margin:16px auto 0;background:transparent;border:1px solid var(--border2);color:var(--t0);font:600 13px/1 var(--sans);padding:10px 20px;border-radius:8px;cursor:pointer;transition:all .2s}
+.err{color:var(--t1);text-align:center;font:400 14px/1.7 var(--sans);margin-bottom:20px}
+.retry{display:block;margin:0 auto 16px;background:transparent;border:1px solid var(--border2);color:var(--t0);font:600 13px/1 var(--sans);padding:12px 24px;border-radius:8px;cursor:pointer;transition:all .2s}
 .retry:hover{border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.03)}
+.support-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 20px;text-align:center;margin-top:8px}
+.support-box p{font:400 12px/1.6 var(--sans);color:var(--t2);margin-bottom:6px}
+.support-box a{color:var(--acc2);font:600 13px/1 var(--sans);text-decoration:none}
+.support-box a:hover{color:var(--acc3)}
 .back-link{display:block;text-align:center;margin-top:24px;font:400 13px/1 var(--sans);color:var(--t2);text-decoration:none;transition:color .2s}
 .back-link:hover{color:var(--t0)}
 </style>
@@ -77,6 +84,8 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
         <div class="state active" id="stateLoading">
           <div class="spinner"></div>
           <p class="wait-text">Confirming your payment&hellip;<br>This usually takes a few seconds.</p>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+          <p class="progress-text" id="progressText">Connecting&hellip;</p>
         </div>
 
         <div class="state" id="stateReady">
@@ -89,7 +98,7 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
           <div class="steps">
             <div class="steps-label">How it works</div>
             <div class="step"><div class="stepn">1</div><div class="stepbody">Press the button above &mdash; the bot sends you a <b>welcome message</b> instantly.</div></div>
-            <div class="step"><div class="stepn">2</div><div class="stepbody">Send <b>/settings</b> in the chat to enter your exchange API keys and configure trading.</div></div>
+            <div class="step"><div class="stepn">2</div><div class="stepbody">Send <b>/settings</b> to connect your cTrader account via cTID credentials.</div></div>
             <div class="step"><div class="stepn">3</div><div class="stepbody">Send <b>/start</b> to begin trading. Starts in <b>paper mode</b> by default &mdash; safe simulated money.</div></div>
           </div>
           <p class="email-note">Check your inbox for the setup email with the same Telegram link.</p>
@@ -97,9 +106,13 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
 
         <div class="state" id="stateError">
           <span class="chip" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:var(--gold)">&#9888; Almost there</span>
-          <h1>We're still processing your order.</h1>
-          <p class="err">This can happen if the payment confirmation is taking a bit longer than usual. Your license key and setup email are on the way — check your inbox in a minute or two.</p>
-          <button class="retry" onclick="location.reload()">Check again</button>
+          <h1>Your order is being processed.</h1>
+          <p class="err">Payment was received &mdash; your license key and setup email will arrive in your inbox within 1-2 minutes. If you don't see it, check your spam folder.</p>
+          <button class="retry" onclick="location.reload()">&#x21bb; Check again</button>
+          <div class="support-box">
+            <p>Didn't receive it? Contact us and we'll sort it out right away:</p>
+            <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a>
+          </div>
         </div>
 
       </div>
@@ -125,21 +138,37 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
   if (!sessionId && !orderId) { show('stateError'); return; }
 
   var attempts = 0;
-  var maxAttempts = 14;
+  var maxAttempts = 12;
+  var progressEl = document.getElementById('progressFill');
+  var progressTextEl = document.getElementById('progressText');
+  var statusMessages = [
+    'Connecting…',
+    'Verifying payment…',
+    'Payment verified, generating license…',
+    'Preparing your bot…',
+    'Almost ready…'
+  ];
 
   function poll(){
     attempts++;
+    var pct = Math.min(95, Math.round((attempts / maxAttempts) * 100));
+    progressEl.style.width = pct + '%';
+    var msgIdx = Math.min(Math.floor(attempts / 3), statusMessages.length - 1);
+    progressTextEl.textContent = statusMessages[msgIdx];
+
     var qs = orderId ? 'order_id=' + encodeURIComponent(orderId) : 'session_id=' + encodeURIComponent(sessionId);
     fetch('/api/order-status?' + qs)
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (d.ready && d.licenseKey) {
+          progressEl.style.width = '100%';
+          progressTextEl.textContent = 'Done!';
           var botUsername = isForex ? 'FOREX_APEX_BOT' : 'ApexTradeBot_official_bot';
           var tgLink = 'https://t.me/' + botUsername + '?start=' + encodeURIComponent(d.licenseKey);
           document.getElementById('readyTitle').textContent = isForex ? 'Your Forex bot is ready.' : 'Your Crypto bot is ready.';
           document.getElementById('readySub').textContent = 'Tap the button below — Telegram opens and your ' + (isForex ? 'Forex' : 'Crypto') + ' bot activates automatically. No setup required.';
           document.getElementById('tgBtn').href = tgLink;
-          show('stateReady');
+          setTimeout(function(){ show('stateReady'); }, 400);
           return;
         }
         if (attempts >= maxAttempts) { show('stateError'); return; }
