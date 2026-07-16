@@ -938,16 +938,14 @@ def _handle_ctaccount(chat_id, args):
         from apex.brokers import ctrader as _ct
         bal = _ct.account_balance(user.get("ctrader_access_token", ""), match["ctid"], ct_env)
         updates["paper_balance"] = bal
-        bal_line = f"💰 Balance detected: <b>${bal:,.2f}</b> — paper mode starts from your real balance.\n"
+        bal_line = f"💰 Balance: <b>${bal:,.2f}</b>\n"
     except Exception as e:
-        bal_line = f"⚠️ Could not read the account balance yet: <i>{str(e)[:140]}</i>\n"
+        bal_line = f"⚠️ Balance unavailable: <i>{str(e)[:80]}</i>\n"
     user_store.update(chat_id, updates)
     _restart_user_loop(chat_id)
     env = "LIVE 🔴" if match.get("live") else "demo 🧪"
-    send_to(chat_id, f"✅ Trading account set to <code>{match['ctid']}</code> ({env}).\n{bal_line}"
-                     "Let's set you up — 3 quick taps and the bot is trading. 👇")
-    if _guide_button():
-        send_to(chat_id, "📖 First time? Open the quick guide anytime with /guide.", _guide_button())
+    send_to(chat_id, f"✅ Account <code>{match['ctid']}</code> ({env}) linked.\n{bal_line}"
+                     "Setting up — 2 quick taps. 👇")
     onboard_start(chat_id)
 
 
@@ -968,13 +966,11 @@ _OB_SYMS_CRYPTO = [
 ]
 _OB_SYMS = _OB_SYMS_CRYPTO if cfg.PRODUCT == "crypto" else _OB_SYMS_FOREX
 
-_RISK_TEXT = ("⚠️ <b>Before I place real orders — read this once.</b>\n\n"
-              "This bot executes <b>your</b> strategy, with <b>your</b> settings, on <b>your</b> account.\n\n"
-              "• No profit is guaranteed — results depend on your settings and the market\n"
-              "• Trading with leverage carries substantial risk; losses are possible and they are <b>yours</b>\n"
-              "• We provide the software — not financial advice, not a promised return\n"
-              "• Only trade money you can afford to lose; test in paper mode first\n\n"
-              "<i>Demo account = fake money 🧪 · Live account = real money 🔴</i>")
+_RISK_TEXT = ("⚠️ <b>Risk disclaimer</b>\n\n"
+              "• No profit is guaranteed — results depend on the market\n"
+              "• Losses are possible and they are <b>yours</b>\n"
+              "• We provide software, not financial advice\n\n"
+              "<i>Demo = fake money 🧪 · Live = real money 🔴</i>")
 
 
 def onboard_start(chat_id):
@@ -989,9 +985,9 @@ def onboard_start(chat_id):
     if row:
         rows.append(row)
     send_to(chat_id,
-            "🧭 <b>Setup 1/3 — What do you want to trade?</b>\n\n"
-            "🤖 <b>Auto-Pilot</b> = the bot scans liquid markets and trades the best setups itself.\n"
-            "Or pick one instrument — you can change any time with /symbol or /pairs.",
+            "🧭 <b>Setup 1/2 — What do you want to trade?</b>\n\n"
+            "🤖 <b>Auto-Pilot</b> = the bot picks the best setups.\n"
+            "Or choose one instrument.",
             extra={"reply_markup": {"inline_keyboard": rows}})
 
 
@@ -1002,19 +998,18 @@ def _ob_step_strategy(chat_id):
           [{"text": "📈 Trend Following", "callback_data": "ob:strat:trend"}],
           [{"text": "🚀 Turtle Breakout", "callback_data": "ob:strat:breakout"}]]
     body = "\n\n".join(f"<b>{m['label']}</b> — <i>{m['blurb']}</i>" for m in STRATEGY_MODES.values())
-    send_to(chat_id, f"🧭 <b>Setup 2/3 — Pick your trading method:</b>\n\n{body}",
+    send_to(chat_id, f"🧭 <b>Setup 2/2 — Trading method:</b>\n\n{body}",
             extra={"reply_markup": {"inline_keyboard": kb}})
 
 
 def _ob_step_mode(chat_id):
-    kb = [[{"text": "🧪 Paper — simulated, zero risk (recommended)", "callback_data": "ob:mode:paper"}],
-          [{"text": "🔴 Real orders in my connected account", "callback_data": "ob:mode:real"}]]
-    send_to(chat_id,
-            "🧭 <b>Setup 3/3 — How should I trade?</b>\n\n"
-            "📝 <b>Paper</b>: simulated balance on live prices — watch it work, risk-free.\n"
-            "🔴 <b>Real</b>: every order executes in your connected account "
-            "(demo account = still fake money 🧪).",
-            extra={"reply_markup": {"inline_keyboard": kb}})
+    u = user_store.load(chat_id)
+    if not u.get("risk_accepted"):
+        return send_to(chat_id, _RISK_TEXT,
+                       extra={"reply_markup": {"inline_keyboard": [[
+                           {"text": "✅ I understand — I accept the risk", "callback_data": "ob:risk"}]]}})
+    user_store.update(chat_id, {"paper": False})
+    return _finish_onboard(chat_id)
 
 
 def _finish_onboard(chat_id):
@@ -1022,21 +1017,18 @@ def _finish_onboard(chat_id):
     u = user_store.load(chat_id)
     strat = STRATEGY_MODES.get((u.get("strategy") or "mean_reversion").lower(),
                                STRATEGY_MODES["mean_reversion"])["label"]
-    mode = "📝 Paper (simulation)" if u.get("paper", True) else "🔴 Real orders"
+    ct_env = u.get("ctrader_env", "demo")
+    mode = "🧪 Demo" if ct_env == "demo" else "🔴 Live"
     user_loop.stop(chat_id)
     user_loop.start(chat_id, alert_fn=_user_alert)
     send_to(chat_id,
-            "🎉 <b>All set — your bot is ON and trading!</b>\n\n"
-            f"💱 Symbol: <b>{u.get('symbol', 'EUR_USD')}</b>\n"
-            f"🎯 Method: <b>{strat}</b>\n"
-            f"⚙️ Mode: <b>{mode}</b>\n"
-            f"⚖️ Risk: <b>{float(u.get('risk', 0.005)) * 100:g}%</b> per trade\n\n"
-            "It watches the market and trades automatically when a valid setup appears — "
-            "you'll get an alert on every move. It may sit and wait a while; that's normal, "
-            "it only takes good setups.\n\n"
-            "Use the buttons below to turn it OFF/ON or open the live terminal.\n"
-            "📖 Full guide anytime: /guide\n"
-            "<i>Fine-tune anytime:</i> /pairs · /watch · /strategy · /risk",
+            "✅ <b>Bot is ON</b>\n\n"
+            f"Symbol: <b>{u.get('symbol', 'EUR_USD')}</b>\n"
+            f"Method: <b>{strat}</b>\n"
+            f"Mode: <b>{mode}</b>\n"
+            f"Risk: <b>{float(u.get('risk', 0.005)) * 100:g}%</b> per trade\n\n"
+            "It trades automatically when a valid setup appears.\n"
+            "<i>Fine-tune:</i> /pairs · /strategy · /risk",
             _dashboard_keyboard(chat_id))
 
 
@@ -1230,11 +1222,6 @@ def _handle_cb(chat_id, data):
         user_store.update(chat_id, {"paper": True})
         return _finish_onboard(chat_id)
     if data == "ob:mode:real":
-        u = user_store.load(chat_id)
-        if not u.get("risk_accepted"):
-            return send_to(chat_id, _RISK_TEXT,
-                           extra={"reply_markup": {"inline_keyboard": [[
-                               {"text": "✅ I understand — I accept the risk", "callback_data": "ob:risk"}]]}})
         user_store.update(chat_id, {"paper": False})
         return _finish_onboard(chat_id)
     if data == "ob:risk":

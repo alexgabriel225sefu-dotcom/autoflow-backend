@@ -179,22 +179,15 @@ def handle_callback(query: dict):
         if len(accounts) == 1:
             a = accounts[0]
             env = "LIVE 🔴" if a["live"] else "demo 🧪"
-            bal_line = (f"💰 Balance detected: <b>${bal:,.2f}</b> — paper mode starts from your real balance.\n\n"
+            bal_line = (f"💰 Balance: <b>${bal:,.2f}</b>\n"
                         if bal is not None else
-                        (f"⚠️ Could not read the account balance yet: <i>{bal_err[:140]}</i>\n"
-                         "I'll keep trying — if trading doesn't start, send /ctrader to re-connect.\n\n"
+                        (f"⚠️ Balance unavailable: <i>{bal_err[:80]}</i>\n"
                          if bal_err else ""))
-            live_hint = ("When you're confident: <b>/env live</b> places real orders in your <b>demo</b> "
-                         "account — still fake money 🧪, watch them appear in cTrader.\n"
-                         if not a["live"] else
-                         "When you're confident: <b>/env live</b> places REAL orders in your LIVE account 🔴.\n")
             tg.send_to(chat_id,
-                       f"✅ <b>cTrader connected!</b>\n\nAccount <code>{a['ctid']}</code> ({env}) is linked.\n\n"
-                       f"{bal_line}"
-                       "Let's set you up — 3 quick taps and the bot is trading. 👇")
-            gb = tg._guide_button()
-            if gb:
-                tg.send_to(chat_id, "📖 First time? Open the quick guide anytime with /guide.", gb)
+                       f"✅ <b>cTrader connected!</b>\n\n"
+                       f"Account <code>{a['ctid']}</code> ({env})\n"
+                       f"{bal_line}\n"
+                       "Setting up your bot — 2 quick taps. 👇")
             tg.onboard_start(chat_id)
         elif accounts:
             lines = "\n".join(
