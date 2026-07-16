@@ -21,7 +21,7 @@ _REGISTRY = {
 
 
 def get_broker(name: str = None):
-    name = (name or cfg.BROKER or "oanda").lower()
+    name = (name or cfg.BROKER or "ctrader").lower()
     if name not in _REGISTRY:
         raise ValueError(
             f'Unsupported BROKER="{name}". Supported: {", ".join(_REGISTRY)}'

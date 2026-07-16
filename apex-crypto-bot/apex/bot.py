@@ -220,6 +220,8 @@ def validate():
 def get_balance():
     if cfg.PAPER_TRADING:
         return paper_balance
+    if cfg.BROKER == "ctrader":
+        return 0
     try:
         return broker.get_balance()
     except Exception as e:

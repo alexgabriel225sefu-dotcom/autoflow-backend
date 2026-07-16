@@ -80,7 +80,9 @@ def print_stats(balance, open_position=None, current_price=None):
                          f"@ {open_position['entryPrice']} | PnL: {'+' if unrealized >= 0 else ''}${unrealized:.2f}")
     pnl_pct = ((total_value - _stats["startBalance"]) / _stats["startBalance"] * 100) if _stats["startBalance"] > 0 else 0
     win_rate = (_stats["wins"] / _stats["trades"] * 100) if _stats["trades"] > 0 else 0
-    mode = "📝 PAPER" if cfg.PAPER_TRADING else ("🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE")
+    mode = ("📝 PAPER" if cfg.PAPER_TRADING else
+            f"🔗 cTrader" if cfg.BROKER == "ctrader" else
+            "🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE")
     print("\n📊 STATS:")
     print(f"   Equity: ${total_value:.2f} ({'+' if pnl_pct >= 0 else ''}{pnl_pct:.2f}%){position_note}")
     print(f"   Closed trades: {_stats['trades']} | ✅ {_stats['wins']} | ❌ {_stats['losses']} | Win Rate: {win_rate:.0f}%")
@@ -89,8 +91,9 @@ def print_stats(balance, open_position=None, current_price=None):
 
 
 def print_banner(balance):
-    mode = "📝 PAPER TRADING (no real risk)" if cfg.PAPER_TRADING else (
-        "🧪 OANDA PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE TRADING")
+    mode = ("📝 PAPER TRADING (no real risk)" if cfg.PAPER_TRADING else
+            f"🔗 cTrader ({cfg.CTRADER_ENV})" if cfg.BROKER == "ctrader" else
+            "🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE TRADING")
     print("\n" + "═" * 60)
     print(f"  {getattr(cfg, 'ASSET_EMOJI', '💱')} {getattr(cfg, 'BOT_NAME', 'Apex Forex Bot').upper()} — AI Powered Trading")
     print(f"  Pair: {cfg.SYMBOL} | Timeframe: {cfg.TIMEFRAME}")
