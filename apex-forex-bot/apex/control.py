@@ -152,19 +152,29 @@ def _audit(entry):
     _cmd("LTRIM", K_AUDIT, 0, 499)
 
 
-def start_consumer(handlers, poll=2.0):
+def start_consumer(handlers, poll=10.0, heartbeat_interval=60.0):
     """Spawn the daemon that executes MCP commands. `handlers` is
-    {action: callable(args:dict) -> json-able result}."""
+    {action: callable(args:dict) -> json-able result}.
+
+    poll: seconds between command checks (10s default — ~260K cmds/month).
+    heartbeat_interval: seconds between heartbeat writes (60s — ~43K cmds/month).
+    Total ~300K cmds/month per bot, well within Upstash free 500K.
+    """
     if not _ENABLED_STORE:
         print("[Control] No Redis configured — MCP control plane OFF")
         return
 
     def _run():
         print(f"[Control] MCP control plane ON (ns={_NS}, backend={_BACKEND}, "
+              f"poll={poll}s, heartbeat={heartbeat_interval}s, "
               f"actions={'enabled' if actions_enabled() else 'READ-ONLY'})")
+        last_heartbeat = 0
         while True:
             try:
-                _cmd("SET", K_HEART, int(time.time()))
+                now = time.time()
+                if now - last_heartbeat >= heartbeat_interval:
+                    _cmd("SET", K_HEART, int(now))
+                    last_heartbeat = now
                 raw = _cmd("RPOP", K_COMMANDS)
                 if not raw:
                     time.sleep(poll)
