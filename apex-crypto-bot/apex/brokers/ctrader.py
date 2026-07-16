@@ -85,7 +85,7 @@ def _period():
 # ── OAuth2 web flow (REST — simple requests) ─────────────────────────────────
 # Used by the server-side callback + Telegram onboarding, not by the trading loop.
 
-_OAUTH_AUTH = "https://openapi.ctrader.com/apps/auth"
+_OAUTH_AUTH = "https://id.ctrader.com/my/settings/openapi/grantingaccess/"
 _OAUTH_TOKEN = "https://openapi.ctrader.com/apps/token"
 
 
@@ -100,6 +100,7 @@ def authorize_url(redirect_uri: str, state: str, scope: str = None) -> str:
         "redirect_uri": redirect_uri,
         "scope": scope or getattr(cfg, "CTRADER_SCOPE", "trading"),
         "state": state,
+        "product": "web",
     })
     return f"{_OAUTH_AUTH}?{q}"
 
