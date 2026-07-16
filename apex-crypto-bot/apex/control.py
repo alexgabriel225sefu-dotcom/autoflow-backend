@@ -1,7 +1,7 @@
 """Remote control plane over Redis — powers the Ruflo MCP server.
 
 The MCP server (hosted by the operator, wired into Claude as a custom connector)
-never touches the bot process directly. Instead it uses the shared Upstash Redis
+never touches the bot process directly. Instead it uses the shared Redis
 as a message bus:
 
   • the bot LPUSHes notable events to  {ns}:events   (a capped ring buffer)
@@ -25,9 +25,31 @@ import time
 
 import requests as _req
 
+# ─── Backend selection (same priority as user_store) ──────
+_REDIS_URL = os.getenv("REDIS_URL", "")
+
 _URL   = (os.getenv("UPSTASH_REDIS_REST_URL")   or "").rstrip("/")
 _TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
-_ENABLED_STORE = bool(_URL and _TOKEN)
+
+_BACKEND = "none"
+_r = None
+
+if _REDIS_URL:
+    try:
+        import redis as _redis_lib
+        _r = _redis_lib.from_url(_REDIS_URL, decode_responses=True,
+                                 socket_connect_timeout=5, socket_timeout=8,
+                                 retry_on_timeout=True)
+        _r.ping()
+        _BACKEND = "redis"
+    except Exception as e:
+        print(f"[Control] REDIS_URL set but connection failed: {e}")
+        _r = None
+
+if _BACKEND == "none" and _URL and _TOKEN:
+    _BACKEND = "upstash"
+
+_ENABLED_STORE = _BACKEND != "none"
 
 _NS = (os.getenv("PRODUCT") or "forex").strip().lower()
 K_EVENTS   = f"{_NS}:events"
@@ -36,7 +58,6 @@ K_AUDIT    = f"{_NS}:audit"
 K_HEART    = f"{_NS}:mcp_heartbeat"
 _RESULT    = lambda cid: f"{_NS}:cmdresult:{cid}"
 
-# Actions that mutate state / reach the client. Gated behind MCP_CONTROL_ENABLED.
 WRITE_ACTIONS = {"restart_loop", "bot_on", "bot_off", "refresh_token",
                  "set_setting", "send_message", "force_close", "force_trade"}
 
@@ -45,10 +66,33 @@ def actions_enabled() -> bool:
     return (os.getenv("MCP_CONTROL_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
 
 
-# ─── Redis (Upstash REST, single-command POST for safe arbitrary values) ──
+# ─── Redis commands (standard or Upstash REST) ────────────
 def _cmd(*parts):
     if not _ENABLED_STORE:
         return None
+    if _BACKEND == "redis":
+        try:
+            cmd_name = parts[0].upper()
+            args = parts[1:]
+            if cmd_name == "SET":
+                return _r.set(args[0], args[1])
+            elif cmd_name == "GET":
+                return _r.get(args[0])
+            elif cmd_name == "LPUSH":
+                return _r.lpush(args[0], args[1])
+            elif cmd_name == "LTRIM":
+                return _r.ltrim(args[0], int(args[1]), int(args[2]))
+            elif cmd_name == "RPOP":
+                return _r.rpop(args[0])
+            elif cmd_name == "EXPIRE":
+                return _r.expire(args[0], int(args[1]))
+            elif cmd_name == "LRANGE":
+                return _r.lrange(args[0], int(args[1]), int(args[2]))
+            else:
+                return _r.execute_command(*parts)
+        except Exception as e:
+            print(f"[Control] redis {parts[0] if parts else '?'} failed: {e}")
+            return None
     try:
         r = _req.post(_URL, json=[str(p) for p in parts],
                       headers={"Authorization": f"Bearer {_TOKEN}"}, timeout=8)
@@ -86,7 +130,7 @@ def event_from_alert(user_id, result):
     stream the client sees — errors, closes, health, stops."""
     action = (result or {}).get("action", "")
     if action in ("HEARTBEAT", "MARKET_PULSE", "SKIP_WARN"):
-        return  # too chatty for the audit stream
+        return
     level = _LEVEL_FOR.get(action, "info")
     sym = result.get("symbol", "")
     bits = [action, sym]
@@ -112,12 +156,12 @@ def start_consumer(handlers, poll=2.0):
     """Spawn the daemon that executes MCP commands. `handlers` is
     {action: callable(args:dict) -> json-able result}."""
     if not _ENABLED_STORE:
-        print("[Control] Upstash not configured — MCP control plane OFF")
+        print("[Control] No Redis configured — MCP control plane OFF")
         return
 
     def _run():
-        print(f"[Control] MCP control plane ON (ns={_NS}, actions="
-              f"{'enabled' if actions_enabled() else 'READ-ONLY'})")
+        print(f"[Control] MCP control plane ON (ns={_NS}, backend={_BACKEND}, "
+              f"actions={'enabled' if actions_enabled() else 'READ-ONLY'})")
         while True:
             try:
                 _cmd("SET", K_HEART, int(time.time()))

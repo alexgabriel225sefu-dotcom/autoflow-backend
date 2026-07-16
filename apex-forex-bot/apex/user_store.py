@@ -1,9 +1,9 @@
 """Per-user settings and state storage.
 
-Dual-backend:
-  • Upstash Redis (recommended on Render) — survives every redeploy.
-    Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in Render env.
-  • Local JSON files — fallback for local dev or when Upstash not configured.
+Triple-backend (first match wins):
+  1. Standard Redis via REDIS_URL (e.g. Redis Cloud — free, no command limit).
+  2. Upstash Redis REST via UPSTASH_REDIS_REST_URL + token.
+  3. Local JSON files — fallback for local dev.
 """
 import json
 import os
@@ -12,24 +12,44 @@ import requests as _req
 
 _DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "users")
 
-# Upstash Redis REST API — https://upstash.com (free tier: 256 MB, 10k cmds/day)
+# ─── Backend selection ───────────────────────────────────
+_REDIS_URL = os.getenv("REDIS_URL", "")
+
+# Upstash REST
 _UPD_URL   = (os.getenv("UPSTASH_REDIS_REST_URL")   or "").rstrip("/")
 _UPD_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
-_USE_REDIS = bool(_UPD_URL and _UPD_TOKEN)
 
-# Namespace every key by PRODUCT so the crypto and forex bots DON'T share user
-# state when they point at the same Upstash Redis. Without this, connecting a
-# cTrader account (or setting a watchlist) on one bot leaked into the other —
-# both ran the same account/symbols. Existing single-product deployments keep
-# the historical "forex:" prefix.
+_BACKEND = "none"
+_r = None
+
+if _REDIS_URL:
+    try:
+        import redis as _redis_lib
+        _r = _redis_lib.from_url(_REDIS_URL, decode_responses=True,
+                                 socket_connect_timeout=5, socket_timeout=8,
+                                 retry_on_timeout=True)
+        _r.ping()
+        _BACKEND = "redis"
+        print(f"[Store] Using standard Redis")
+    except Exception as e:
+        print(f"[Store] REDIS_URL set but connection failed: {e}")
+        _r = None
+
+if _BACKEND == "none" and _UPD_URL and _UPD_TOKEN:
+    _BACKEND = "upstash"
+    print("[Store] Using Upstash REST")
+
+if _BACKEND == "none":
+    print("[Store] Using local JSON files (no Redis configured)")
+
+_USE_REDIS = _BACKEND in ("redis", "upstash")
+
 _NS = (os.getenv("PRODUCT") or "forex").strip().lower()
-
-_ACTIVE_SET = f"{_NS}:active_users"   # Redis SET that tracks active user IDs
+_ACTIVE_SET = f"{_NS}:active_users"
 
 
 # ─── Redis helpers ────────────────────────────────────────
-def _redis(cmd_parts):
-    """Send a single Redis command via Upstash REST API. Returns the result."""
+def _upstash(cmd_parts):
     try:
         url = f"{_UPD_URL}/{'/'.join(str(p) for p in cmd_parts)}"
         r = _req.get(url, headers={"Authorization": f"Bearer {_UPD_TOKEN}"}, timeout=8)
@@ -41,23 +61,54 @@ def _redis(cmd_parts):
 
 
 def _redis_get(key):
-    return _redis(["GET", key])
+    if _BACKEND == "redis":
+        try:
+            return _r.get(key)
+        except Exception as e:
+            print(f"[Redis] GET failed: {e}")
+            return None
+    return _upstash(["GET", key])
 
 
 def _redis_set(key, value_str):
-    return _redis(["SET", key, value_str])
+    if _BACKEND == "redis":
+        try:
+            return _r.set(key, value_str)
+        except Exception as e:
+            print(f"[Redis] SET failed: {e}")
+            return None
+    return _upstash(["SET", key, value_str])
 
 
 def _redis_sadd(key, member):
-    return _redis(["SADD", key, member])
+    if _BACKEND == "redis":
+        try:
+            return _r.sadd(key, member)
+        except Exception as e:
+            print(f"[Redis] SADD failed: {e}")
+            return None
+    return _upstash(["SADD", key, member])
 
 
 def _redis_srem(key, member):
-    return _redis(["SREM", key, member])
+    if _BACKEND == "redis":
+        try:
+            return _r.srem(key, member)
+        except Exception as e:
+            print(f"[Redis] SREM failed: {e}")
+            return None
+    return _upstash(["SREM", key, member])
 
 
 def _redis_smembers(key):
-    result = _redis(["SMEMBERS", key])
+    if _BACKEND == "redis":
+        try:
+            result = _r.smembers(key)
+            return list(result) if result else []
+        except Exception as e:
+            print(f"[Redis] SMEMBERS failed: {e}")
+            return []
+    result = _upstash(["SMEMBERS", key])
     return result if isinstance(result, list) else []
 
 
@@ -104,8 +155,7 @@ def update(user_id, updates):
 
 
 def clear_trades(user_id):
-    """Wipe the closed-trade journal — used to start a clean performance run
-    after a period polluted by bugs/test churn."""
+    """Wipe the closed-trade journal."""
     user_id = str(user_id)
     if _USE_REDIS:
         try:
