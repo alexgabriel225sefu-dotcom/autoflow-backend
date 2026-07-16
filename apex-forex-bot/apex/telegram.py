@@ -476,8 +476,8 @@ def _handle_setup(chat_id):
             f"🛠️ <b>{cfg.BOT_NAME.upper()} SETUP</b>\n\n"
             "1/5 — <b>How do you want to trade?</b>\n\n"
             "Reply <code>1</code> or <code>2</code>:\n"
-            "  <code>1</code> — 🧪 <b>Demo</b> (create a FREE demo account on cTrader — "
-            "real market data, fake money, see trades appear in the cTrader app).\n"
+            "  <code>1</code> — 🧪 <b>Demo</b> (free demo account on cTrader — "
+            "real market data, no risk).\n"
             "  <code>2</code> — 🔴 <b>Live</b> (real money via <b>cTrader</b> — any broker "
             "worldwide).\n\n"
             "<i>Most people start with 1 (demo) to test the bot risk-free.</i>")
@@ -500,14 +500,10 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                 w["data"]["env"] = "demo"
                 _wizards.pop(chat_id, None)
             send_to(chat_id,
-                    "🧪 <b>Demo mode — via cTrader</b>\n\n"
-                    "Create a FREE demo account on any <b>cTrader</b> broker "
+                    "🧪 <b>Demo mode</b>\n\n"
+                    "Create a free demo account on any <b>cTrader</b> broker "
                     "(IC Markets, Pepperstone, FxPro…) and link it here.\n\n"
-                    "You'll see real market data and trades appear directly in the "
-                    "cTrader app — just like live, but with fake money.\n\n"
-                    "<b>Next step:</b>\n"
-                    "1️⃣ Send <b>/ctrader</b> → tap <b>Authorize</b> → log in and approve\n\n"
-                    "<i>Send /ctrader now to link your demo account.</i>")
+                    "<b>Next:</b> Send <b>/ctrader</b> to connect your account.")
         else:
             with _lock:
                 w["data"]["paper"] = False
@@ -850,11 +846,8 @@ def _handle_ctrader(chat_id):
                   "⚠️ Access requested: <b>accounts — READ-ONLY</b>. Orders will be rejected! "
                   "The operator must set <code>CTRADER_SCOPE=trading</code> and redeploy first.\n\n")
     broker_rows = _broker_signup_rows()
-    # Strongly steer new clients to PRACTICE first: a demo cTrader account gives
-    # real market conditions with fake money — the honest, refund-proof test.
-    tip = ("💡 <b>New here? Start on a demo (Practice) account</b> — real market, "
-           "fake money. Watch the bot work risk-free, switch to live when you're "
-           "confident.\n\n")
+    tip = ("💡 <b>New here?</b> Start on a demo account — test the bot risk-free, "
+           "switch to live when you're confident.\n\n")
     if broker_rows:
         tip += "Don't have a cTrader account yet? Create one below, then come back and Authorize.\n\n"
     kb = broker_rows + [[{"text": "🔗 Authorize cTrader", "url": link}]]
@@ -912,7 +905,7 @@ def _handle_switch(chat_id):
         "🔄 <b>Switch trading account</b>\n\n"
         "Tested on demo and ready for real money? Connect your live account below. "
         "Or pick one of your linked accounts.\n\n"
-        "<i>🧪 Practice = fake money · 🔴 LIVE = real money.</i>",
+        "<i>🧪 Demo · 🔴 LIVE</i>",
         extra={"reply_markup": {"inline_keyboard": rows}})
 
 
@@ -970,7 +963,7 @@ _RISK_TEXT = ("⚠️ <b>Risk disclaimer</b>\n\n"
               "• No profit is guaranteed — results depend on the market\n"
               "• Losses are possible and they are <b>yours</b>\n"
               "• We provide software, not financial advice\n\n"
-              "<i>Demo = fake money 🧪 · Live = real money 🔴</i>")
+              "<i>Demo 🧪 · Live 🔴</i>")
 
 
 def onboard_start(chat_id):
@@ -1333,8 +1326,8 @@ def _handle_paper(chat_id, args):
         return send_to(chat_id, "📝 Paper trading <b>ON</b> — simulated balance, zero risk.")
     u = user_store.load(chat_id)
     env = (u.get("ctrader_env") or u.get("oanda_env") or "").lower()
-    where = ("your <b>demo</b> account — still fake money 🧪" if env in ("demo", "practice")
-             else "your <b>LIVE</b> account — real money 🔴")
+    where = ("your <b>demo</b> account 🧪" if env in ("demo", "practice")
+             else "your <b>LIVE</b> account 🔴")
     send_to(chat_id, f"🔴 Paper trading <b>OFF</b> — orders now execute in {where}.\n"
                      "Send /start if the bot isn't running.")
 

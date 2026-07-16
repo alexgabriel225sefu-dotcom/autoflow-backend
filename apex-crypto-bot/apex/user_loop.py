@@ -280,13 +280,10 @@ def _loop(user_id, alert_fn, gen=None):
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
     last_mkt_tick = -_SKIP_WARN_THROTTLE      # market-pulse heads-up (throttled)
 
-    acct_env = (user.get("ctrader_env") or user.get("oanda_env") or "practice").lower()
-    # Two clear modes for clients: PRACTICE (real market conditions, fake money —
-    # the realistic test) and LIVE (real money). Internal simulation is a quick
-    # preview only.
-    mode_label = ("📝 Simulation (quick preview)" if cfg.PAPER_TRADING
-                  else ("🧪 PRACTICE · real market, fake money" if acct_env in ("demo", "practice")
-                        else "🔴 LIVE · real money"))
+    acct_env = (user.get("ctrader_env") or user.get("oanda_env") or "demo").lower()
+    mode_label = ("📝 Simulation" if cfg.PAPER_TRADING
+                  else ("🧪 Demo" if acct_env in ("demo", "practice")
+                        else "🔴 LIVE"))
     dash = {
         "broker": _broker_label(user, cfg),
         "mode": mode_label,
