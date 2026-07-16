@@ -10,8 +10,8 @@ def _truthy(v: str) -> bool:
 
 
 # ─── Broker ─────────────────────────────────────────────
-BROKER = (os.getenv("BROKER") or "oanda").lower()
-SUPPORTED_BROKERS = ["oanda", "mt", "td", "metaapi", "ctrader", "yahoo"]
+BROKER = (os.getenv("BROKER") or "ctrader").lower()
+SUPPORTED_BROKERS = ["ctrader", "oanda", "mt", "td", "metaapi", "yahoo"]
 
 # ─── cTrader Open API (BROKER=ctrader) ──────────────────
 # App credentials (per business, once) from openapi.ctrader.com/apps:
@@ -154,7 +154,7 @@ ATR_TP_MULT = float(os.getenv("ATR_TP_MULT") or 3.0)
 LOOP_INTERVAL_MS = int(_scalp("LOOP_INTERVAL_MS", 60 * 1000, 5 * 60 * 1000))  # scalp: analyze every 1 min
 
 # ─── Paper trading ──────────────────────────────────────
-PAPER_TRADING = _truthy(os.getenv("PAPER_TRADING") or "true")
+PAPER_TRADING = _truthy(os.getenv("PAPER_TRADING") or "false")
 PAPER_BALANCE = float(os.getenv("PAPER_BALANCE") or 1000)
 
 # ─── License ────────────────────────────────────────────

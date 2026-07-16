@@ -18,6 +18,8 @@ broker = get_broker()
 
 
 def broker_label():
+    if cfg.BROKER == "ctrader":
+        return f"cTrader ({cfg.CTRADER_ENV})"
     if cfg.BROKER == "mt":
         return "MT BRIDGE"
     if cfg.BROKER == "td":
@@ -159,7 +161,7 @@ market_closed_alerted = False
 dash = {
     "balance": 0, "startBalance": 0, "currentSymbol": cfg.SYMBOL, "currentPrice": 0,
     "openPosition": None, "trades": [], "lastTick": None,
-    "mode": "PAPER" if cfg.PAPER_TRADING else cfg.OANDA_ENV.upper(),
+    "mode": "PAPER" if cfg.PAPER_TRADING else (cfg.CTRADER_ENV.upper() if cfg.BROKER == "ctrader" else cfg.OANDA_ENV.upper()),
     "broker": broker_label(),
     "marketOpen": True,
     "candles": [],
@@ -194,36 +196,25 @@ def validate():
               "Add ANTHROPIC_API_KEY or GROQ_API_KEY for AI-enhanced signals.")
     elif not has_anthropic and has_groq:
         print("ℹ️  ANTHROPIC_API_KEY missing — using Groq (free).")
-    # Live trading e validat doar pe OANDA (SL/TP server-side + reconciliere).
-    # MT bridge / altele: paper până la override explicit.
-    if (not cfg.PAPER_TRADING and cfg.BROKER != "oanda"
-            and os.getenv("ALLOW_EXPERIMENTAL_LIVE") != "true"):
-        print(f"⚠️  Live trading on broker '{cfg.BROKER}' is not validated — "
-              "forcing PAPER_TRADING.")
-        print("    Supported live: OANDA. Override (at your own risk): "
-              "ALLOW_EXPERIMENTAL_LIVE=true")
-        cfg.PAPER_TRADING = True
-    if cfg.BROKER == "mt":
+    if cfg.BROKER == "ctrader":
+        if cfg.CTRADER_CLIENT_ID and cfg.CTRADER_CLIENT_SECRET:
+            print("🔗 cTrader mode — clients connect via /ctrader (OAuth).")
+        else:
+            print("⚠️  cTrader credentials missing (CTRADER_CLIENT_ID / CTRADER_CLIENT_SECRET).")
+            print("    Clients won't be able to link accounts. Set them in Render env vars.")
+    elif cfg.BROKER == "mt":
         if not cfg.MT_BRIDGE_SECRET:
-            print("⚠️  BROKER=mt needs MT_BRIDGE_SECRET — falling back to OANDA so the bot still starts.")
-            cfg.BROKER = "oanda"
+            print("⚠️  BROKER=mt needs MT_BRIDGE_SECRET.")
         else:
             print("🔗 MetaTrader bridge mode — waiting for the ApexBridge EA to sync.")
     elif cfg.BROKER == "td":
         if not cfg.TWELVE_DATA_KEY:
-            print("⚠️  BROKER=td needs TWELVE_DATA_KEY — falling back to OANDA so the bot still starts.")
-            cfg.BROKER = "oanda"
+            print("⚠️  BROKER=td needs TWELVE_DATA_KEY.")
         else:
-            print("📡 Twelve Data mode — paper trading with live forex prices.")
-        if cfg.MULTI_SYMBOL and len(cfg.SCAN_SYMBOLS) > 3:
-            print(f"⚠️  MULTI_SYMBOL with {len(cfg.SCAN_SYMBOLS)} pairs needs "
-                  f"{len(cfg.SCAN_SYMBOLS) + 3}+ TD calls/cycle — the free tier allows 8/min.")
-            print("    If you see rate-limit retries, set SCAN_SYMBOLS to max 3 pairs"
-                  " or MULTI_SYMBOL=false.")
-    elif not cfg.OANDA_API_TOKEN or not cfg.OANDA_ACCOUNT_ID:
-        print("⚠️  OANDA credentials missing — market data unavailable.")
-        print("    Create a FREE practice account at oanda.com, then send /setup")
-        print("    to your Telegram bot (or set OANDA_API_TOKEN + OANDA_ACCOUNT_ID).")
+            print("📡 Twelve Data mode.")
+    elif cfg.BROKER == "oanda":
+        if not cfg.OANDA_API_TOKEN or not cfg.OANDA_ACCOUNT_ID:
+            print("⚠️  OANDA credentials missing — market data unavailable.")
 
 
 def get_balance():
@@ -825,10 +816,11 @@ def main():
     logger.set_start_balance(balance)
     logger.print_banner(balance)
 
-    mode = "📝 PAPER TRADING" if cfg.PAPER_TRADING else (
-        "🔗 METATRADER" if cfg.BROKER == "mt" else (
-            "📡 TWELVE DATA" if cfg.BROKER == "td" else (
-                "🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE")))
+    mode = ("📝 PAPER TRADING" if cfg.PAPER_TRADING else
+            "🔗 METATRADER" if cfg.BROKER == "mt" else
+            "📡 TWELVE DATA" if cfg.BROKER == "td" else
+            f"🔗 cTrader ({cfg.CTRADER_ENV})" if cfg.BROKER == "ctrader" else
+            "🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE")
     dash["mode"] = mode.replace("📝", "").replace("🧪", "").replace("🔴", "").strip()
     tg.alert_start(cfg.SYMBOL, cfg.TIMEFRAME, balance, mode)
 
@@ -859,13 +851,11 @@ def main():
         logger.warn(f"boot auto-start / watchdog failed: {e}")
 
     verify_license()
-    # The global single-account tick() loop is legacy: it analyzes ONE instrument
-    # via the global broker (OANDA). In the per-user cTrader architecture each
-    # client runs their own isolated loop (started by the Telegram poller), so
-    # when no global OANDA data source is configured the global loop has no valid
-    # feed and would just error every tick (e.g. 'BTCUSD on OANDA 400') while
-    # burning the AI quota. Skip it and keep the process alive for the poller.
-    if cfg.OANDA_API_TOKEN and cfg.OANDA_ACCOUNT_ID:
+    # Per-user cTrader architecture: each client runs their own isolated loop
+    # (started by the Telegram poller after /ctrader OAuth). The global tick()
+    # loop is legacy (single OANDA account) — only run it if OANDA credentials
+    # are explicitly configured.
+    if cfg.BROKER == "oanda" and cfg.OANDA_API_TOKEN and cfg.OANDA_ACCOUNT_ID:
         logger.info("🚀 First analysis...")
         tick()
         interval = cfg.LOOP_INTERVAL_MS / 1000
@@ -874,6 +864,6 @@ def main():
             time.sleep(interval)
             tick()
     else:
-        logger.info("Per-user mode: global analysis loop OFF — each client trades on their own cTrader loop.")
+        logger.info("Per-user mode — each client trades on their own cTrader loop. Send /ctrader to connect.")
         while True:
             time.sleep(3600)

@@ -42,12 +42,12 @@ def _make_broker(user):
 
     Selection order:
       • cTrader linked (token + account) → cTrader (free, international)
-      • OANDA token present or live mode  → OANDA
-      • paper + no broker linked          → Yahoo Finance data (free, no account)
+      • OANDA token present              → OANDA (legacy)
+      • paper mode explicitly on         → Yahoo Finance data (free, no account)
     """
     import types
     from apex import config as _appcfg
-    paper = user.get("paper", True)
+    paper = user.get("paper", False)
     oanda_token = user.get("oanda_token", "")
     ct_token = user.get("ctrader_access_token", "")
     ct_account = user.get("ctrader_account_id", "")
@@ -107,9 +107,11 @@ def _make_broker(user):
 def _broker_label(user, cfg):
     if user.get("ctrader_access_token") and user.get("ctrader_account_id"):
         return f"cTrader ({getattr(cfg, 'CTRADER_ENV', 'demo')})"
-    if user.get("oanda_token") or not user.get("paper", True):
+    if user.get("oanda_token"):
         return f"OANDA ({cfg.OANDA_ENV})"
-    return "Yahoo (paper data)"
+    if getattr(cfg, 'PAPER_TRADING', False):
+        return "Yahoo (paper data)"
+    return "cTrader (not linked)"
 
 
 def _looks_like_auth_error(msg: str) -> bool:

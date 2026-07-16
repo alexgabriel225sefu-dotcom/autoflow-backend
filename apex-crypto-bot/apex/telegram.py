@@ -271,7 +271,11 @@ _BROKER_KEYS = {
 
 
 def _broker_label():
-    return "MetaTrader Bridge" if cfg.BROKER == "mt" else f"OANDA ({cfg.OANDA_ENV})"
+    if cfg.BROKER == "ctrader":
+        return f"cTrader ({cfg.CTRADER_ENV})"
+    if cfg.BROKER == "mt":
+        return "MetaTrader Bridge"
+    return f"OANDA ({cfg.OANDA_ENV})"
 
 
 def _apply(env_key: str, value):
@@ -472,11 +476,11 @@ def _handle_setup(chat_id):
             f"🛠️ <b>{cfg.BOT_NAME.upper()} SETUP</b>\n\n"
             "1/5 — <b>How do you want to trade?</b>\n\n"
             "Reply <code>1</code> or <code>2</code>:\n"
-            "  <code>1</code> — 🧪 <b>Paper</b> (simulated $1000, real prices from "
-            "Yahoo Finance). <b>No account, no keys, starts instantly. Zero risk.</b>\n"
+            "  <code>1</code> — 🧪 <b>Demo</b> (create a FREE demo account on cTrader — "
+            "real market data, fake money, see trades appear in the cTrader app).\n"
             "  <code>2</code> — 🔴 <b>Live</b> (real money via <b>cTrader</b> — any broker "
-            "worldwide, connected with /ctrader).\n\n"
-            "<i>Most people start with 1 (paper).</i>")
+            "worldwide).\n\n"
+            "<i>Most people start with 1 (demo) to test the bot risk-free.</i>")
 
 
 def _handle_wizard_reply(chat_id, raw, msg_id):
@@ -489,31 +493,33 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
     if step == "MODE":
         choice = raw.strip()
         if choice not in ("1", "2"):
-            return send_to(chat_id, "❌ Reply <code>1</code> (paper) or <code>2</code> (live).")
+            return send_to(chat_id, "❌ Reply <code>1</code> (demo) or <code>2</code> (live).")
         if choice == "1":
-            # Paper — Yahoo data, no account needed, skip straight to the pair
             with _lock:
-                w["data"]["paper"] = True
-                w["step"] = "SYMBOL"
+                w["data"]["paper"] = False
+                w["data"]["env"] = "demo"
+                _wizards.pop(chat_id, None)
             send_to(chat_id,
-                    "🧪 <b>Paper mode</b> — free Yahoo Finance prices, no account.\n\n"
-                    "2/5 — <b>Which pair do YOU want to trade?</b>\n\n"
-                    "e.g. <code>EUR_USD</code>, <code>GBP_USD</code>, <code>USD_JPY</code>.\n\n"
-                    "Reply with the pair. <i>You choose — the bot only trades what you pick.</i>")
+                    "🧪 <b>Demo mode — via cTrader</b>\n\n"
+                    "Create a FREE demo account on any <b>cTrader</b> broker "
+                    "(IC Markets, Pepperstone, FxPro…) and link it here.\n\n"
+                    "You'll see real market data and trades appear directly in the "
+                    "cTrader app — just like live, but with fake money.\n\n"
+                    "<b>Next step:</b>\n"
+                    "1️⃣ Send <b>/ctrader</b> → tap <b>Authorize</b> → log in and approve\n\n"
+                    "<i>Send /ctrader now to link your demo account.</i>")
         else:
-            # Live — real money runs through cTrader (any broker worldwide).
-            # Keep the user safe in paper until cTrader is actually linked.
             with _lock:
+                w["data"]["paper"] = False
+                w["data"]["env"] = "live"
                 _wizards.pop(chat_id, None)
             send_to(chat_id,
                     "🔴 <b>Live trading — via cTrader</b>\n\n"
                     "Real money runs through your own <b>cTrader</b> account (works with "
                     "any cTrader broker worldwide — IC Markets, Pepperstone, FxPro…).\n\n"
-                    "<b>To go live:</b>\n"
-                    "1️⃣ Send <b>/ctrader</b> → tap <b>Authorize</b> → log in and approve\n"
-                    "2️⃣ Test in paper first, then switch to live when you're ready\n\n"
-                    "<i>Until you connect cTrader you stay in safe paper mode. Send "
-                    "/ctrader now to link your account.</i>")
+                    "<b>Next step:</b>\n"
+                    "1️⃣ Send <b>/ctrader</b> → tap <b>Authorize</b> → log in and approve\n\n"
+                    "<i>Send /ctrader now to link your account.</i>")
 
     elif step == "KEYS":
         _delete_message(chat_id, msg_id)
