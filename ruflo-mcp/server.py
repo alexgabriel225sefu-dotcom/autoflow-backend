@@ -30,8 +30,18 @@ from starlette.routing import Route
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.server import TransportSecuritySettings
 
-_URL = (os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
-_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
+_REDIS = {
+    "forex": {
+        "url": (os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/"),
+        "token": os.getenv("UPSTASH_REDIS_REST_TOKEN") or "",
+    },
+    "crypto": {
+        "url": (os.getenv("UPSTASH_CRYPTO_URL")
+                or os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/"),
+        "token": (os.getenv("UPSTASH_CRYPTO_TOKEN")
+                  or os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""),
+    },
+}
 _SECRET = os.getenv("RUFLO_MCP_SECRET") or "ruflo"
 _PRODUCTS = {"crypto", "forex"}
 
@@ -50,9 +60,10 @@ def _ns(product: str) -> str:
     return p
 
 
-def _redis(*parts):
-    r = requests.post(_URL, json=[str(p) for p in parts],
-                      headers={"Authorization": f"Bearer {_TOKEN}"}, timeout=10)
+def _redis(product: str, *parts):
+    cfg = _REDIS.get(product, _REDIS["forex"])
+    r = requests.post(cfg["url"], json=[str(p) for p in parts],
+                      headers={"Authorization": f"Bearer {cfg['token']}"}, timeout=10)
     r.raise_for_status()
     return r.json().get("result")
 
@@ -61,12 +72,12 @@ def _call(product: str, action: str, args: dict = None, timeout: float = 20.0):
     """Send a command to the bot and wait for its result."""
     ns = _ns(product)
     cid = uuid.uuid4().hex[:16]
-    _redis("LPUSH", f"{ns}:commands", json.dumps(
+    _redis(ns, "LPUSH", f"{ns}:commands", json.dumps(
         {"id": cid, "action": action, "args": args or {}, "ts": int(time.time())}))
     deadline = time.time() + timeout
     key = f"{ns}:cmdresult:{cid}"
     while time.time() < deadline:
-        raw = _redis("GET", key)
+        raw = _redis(ns, "GET", key)
         if raw:
             try:
                 return json.loads(raw)
@@ -79,7 +90,7 @@ def _call(product: str, action: str, args: dict = None, timeout: float = 20.0):
 
 def _lrange(product: str, key: str, n: int):
     ns = _ns(product)
-    raw = _redis("LRANGE", f"{ns}:{key}", 0, max(1, min(int(n), 200)) - 1) or []
+    raw = _redis(ns, "LRANGE", f"{ns}:{key}", 0, max(1, min(int(n), 200)) - 1) or []
     out = []
     for r in raw:
         try:
@@ -107,7 +118,7 @@ mcp = FastMCP(
 def bot_alive(product: str) -> dict:
     """Is the crypto/forex bot alive? Returns seconds since its last heartbeat."""
     ns = _ns(product)
-    hb = _redis("GET", f"{ns}:mcp_heartbeat")
+    hb = _redis(ns, "GET", f"{ns}:mcp_heartbeat")
     if not hb:
         return {"alive": False, "reason": "no heartbeat — bot down or control plane off"}
     age = int(time.time()) - int(hb)

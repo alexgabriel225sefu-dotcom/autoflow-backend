@@ -7,9 +7,13 @@ services:
     startCommand: python server.py
     envVars:
       - key: UPSTASH_REDIS_REST_URL
-        sync: false          # same value as the bots
+        sync: false          # forex Upstash
       - key: UPSTASH_REDIS_REST_TOKEN
-        sync: false          # same value as the bots
+        sync: false          # forex Upstash
+      - key: UPSTASH_CRYPTO_URL
+        sync: false          # crypto Upstash (falls back to UPSTASH_REDIS_REST_URL)
+      - key: UPSTASH_CRYPTO_TOKEN
+        sync: false          # crypto Upstash (falls back to UPSTASH_REDIS_REST_TOKEN)
       - key: RUFLO_MCP_SECRET
         generateValue: true  # becomes the secret path segment in the connector URL
       - key: SITE_URL
