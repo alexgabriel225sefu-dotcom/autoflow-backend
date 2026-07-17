@@ -517,26 +517,6 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                     "1️⃣ Send <b>/ctrader</b> → tap <b>Authorize</b> → log in and approve\n\n"
                     "<i>Send /ctrader now to link your account.</i>")
 
-    elif step == "KEYS":
-        _delete_message(chat_id, msg_id)
-        pairs = {}
-        for part in raw.replace("\n", " ").split():
-            if "=" in part:
-                k, _, v = part.partition("=")
-                pairs[k.strip().upper()] = v.strip()
-        if "OANDA_API_TOKEN" not in pairs or "OANDA_ACCOUNT_ID" not in pairs:
-            return send_to(chat_id,
-                           "❌ I need both values. Send them in one message:\n"
-                           "<code>OANDA_API_TOKEN=... OANDA_ACCOUNT_ID=...</code>")
-        with _lock:
-            w["data"]["keys"] = pairs
-            w["step"] = "SYMBOL"
-        send_to(chat_id,
-                "✅ Credentials saved.\n\n"
-                "2/5 — <b>Which pair do YOU want to trade?</b>\n\n"
-                "e.g. <code>EUR_USD</code>, <code>GBP_USD</code>, <code>USD_JPY</code>.\n\n"
-                "Reply with the pair. <i>You choose — the bot only trades what you pick.</i>")
-
     elif step == "SYMBOL":
         sym = raw.strip().upper().replace("/", "_").replace("-", "_")
         if not _PAIR_RE.match(sym):

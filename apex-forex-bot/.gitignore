@@ -1,6 +1,6 @@
 .env
 runtime.json
-# Per-client runtime data — stores OANDA tokens & AI keys, must NEVER be committed
+# Per-client runtime data — stores cTrader tokens & AI keys, must NEVER be committed
 users/
 access.json
 trades/

@@ -1,9 +1,9 @@
 # 💱 Apex Forex Bot
 
-AI-powered forex trading bot. **OANDA + MetaTrader 5. Telegram-controlled. Zero config files.**
+AI-powered forex trading bot. **cTrader + MetaTrader 5. Telegram-controlled. Zero config files.**
 
 Two ways to connect (3Commas-style — trades appear live in the app you already use):
-- **OANDA** — direct API, easiest setup, free practice account. **The validated live-trading path**: SL/TP are placed server-side at OANDA and positions are reconciled automatically after a restart
+- **cTrader** — free Open API, works with any cTrader broker worldwide (IC Markets, Pepperstone, FxPro…). SL/TP are placed server-side and positions are reconciled automatically after a restart
 - **MetaTrader 5** — via the included ApexBridge EA: IC Markets, Pepperstone, or any MT5 broker ([guide](docs/METATRADER.md)). Paper + practice supported; live mode requires the `ALLOW_EXPERIMENTAL_LIVE=true` flag
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/autoflow-backend)
@@ -33,8 +33,8 @@ Find your bot and send:
 ```
 /setup
 ```
-The bot walks you through connecting your **free OANDA practice account**
-(market data + paper trading) — and later your live account if you choose.
+The bot walks you through connecting your **cTrader account**
+(demo for risk-free testing, or live for real money) — and later switching accounts if you choose.
 
 ---
 
@@ -42,13 +42,13 @@ The bot walks you through connecting your **free OANDA practice account**
 
 | Command | Action |
 |---|---|
-| `/setup` | Guided setup wizard (OANDA → paper → pair) |
-| `/broker oanda\|mt` | Switch between OANDA API and MetaTrader bridge |
+| `/setup` | Guided setup wizard (cTrader → pair → risk) |
+| `/ctrader` | Connect or reconnect your cTrader account (OAuth) |
 | `/start` | Start trading |
 | `/stop` | Pause trading |
 | `/status` | Live balance, position, PnL, market hours |
 | `/config` | Show all current settings |
-| `/env practice\|live` | Switch OANDA environment |
+| `/env practice\|live` | Switch demo/live mode |
 | `/paper on\|off` | Toggle paper / live mode |
 | `/risk 2` | Set risk % per trade (0.5–10) |
 | `/sl 15` / `/tp 30` | Stop loss / take profit in pips |
@@ -58,7 +58,7 @@ The bot walks you through connecting your **free OANDA practice account**
 ---
 
 ## Features
-- **OANDA v20 API** — practice + live, free practice account for data
+- **cTrader Open API** — demo + live, any cTrader broker worldwide, server-side SL/TP
 - **MetaTrader 5 bridge** — ApexBridge EA executes on any MT5 broker; trades, SL and TP visible on your chart
 - **7 major pairs scanner** — EUR_USD, GBP_USD, USD_JPY, AUD_USD, USD_CAD + custom
 - **Pip-based risk** — SL/TP in pips, 2% risk per trade default, leverage-aware sizing with margin cap
@@ -77,7 +77,7 @@ The bot walks you through connecting your **free OANDA practice account**
 
 | Guide | What's inside |
 |---|---|
-| [docs/SETUP.md](docs/SETUP.md) | Step-by-step deployment + OANDA account |
+| [docs/SETUP.md](docs/SETUP.md) | Step-by-step deployment + cTrader account |
 | [docs/METATRADER.md](docs/METATRADER.md) | MetaTrader 5 / IC Markets integration |
 | [docs/CONFIG.md](docs/CONFIG.md) | Every setting + all Telegram commands |
 | [docs/STRATEGIES.md](docs/STRATEGIES.md) | How the bot decides to trade |
@@ -92,7 +92,8 @@ The bot walks you through connecting your **free OANDA practice account**
 python tests/run_all.py           # everything in one shot (6 suites, 70+ checks)
 
 python tests/test_forex.py        # pip math, sizing, margin, market hours
-python tests/test_brokers.py      # OANDA server-side SL/TP, TD rate-limit retry, cross-pair sizing
+python tests/test_brokers.py      # TD rate-limit retry, cross-pair sizing
+python tests/test_ctrader.py      # cTrader symbol mapping, OAuth, broker selection
 python tests/test_mtbridge.py     # MetaTrader bridge protocol
 python tests/test_indicators.py   # indicator math
 python tests/test_strategies.py   # strategies + risk circuit breakers
@@ -103,7 +104,7 @@ python tests/test_ai.py           # AI signal layer (no network needed)
 the exact live exit code from `apex/position.py`):
 
 ```bash
-python backtest.py                          # uses your OANDA/TD key from .env
+python backtest.py                          # uses your cTrader/TD key from .env
 BT_SYMBOL=GBP_USD python backtest.py
 BT_SYNTHETIC=true python backtest.py        # engine validation, no internet
 ```
@@ -118,7 +119,7 @@ guarantee future profit — treat the backtest as a sanity check, not a promise.
 ## Safety
 
 Start with paper trading (the default). The bot runs on **your** Railway
-account with **your** OANDA token — the seller has zero access to your
+account with **your** cTrader credentials — the seller has zero access to your
 credentials. Never enable more permissions than the bot needs.
 
 > Forex trading with leverage is risky. Past results do not guarantee future

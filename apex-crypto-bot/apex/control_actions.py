@@ -19,7 +19,7 @@ _SETTABLE = {
     "atr_stops", "htf", "confirm", "maxpos", "copilot",
 }
 
-_REDACT = {"ctrader_access_token", "ctrader_refresh_token", "oanda_token",
+_REDACT = {"ctrader_access_token", "ctrader_refresh_token",
            "ctrader_accounts"}
 
 

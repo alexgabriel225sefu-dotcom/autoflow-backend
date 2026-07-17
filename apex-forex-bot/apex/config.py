@@ -11,7 +11,7 @@ def _truthy(v: str) -> bool:
 
 # ─── Broker ─────────────────────────────────────────────
 BROKER = (os.getenv("BROKER") or "ctrader").lower()
-SUPPORTED_BROKERS = ["ctrader", "oanda", "mt", "td", "metaapi", "yahoo"]
+SUPPORTED_BROKERS = ["ctrader"]
 
 # ─── cTrader Open API (BROKER=ctrader) ──────────────────
 # App credentials (per business, once) from openapi.ctrader.com/apps:
@@ -37,11 +37,6 @@ TWELVE_DATA_KEY = os.getenv("TWELVE_DATA_KEY", "")
 # ─── MetaAPI (BROKER=metaapi) ───────────────────────────
 METAAPI_TOKEN      = os.getenv("METAAPI_TOKEN", "")
 METAAPI_ACCOUNT_ID = os.getenv("METAAPI_ACCOUNT_ID", "")
-
-# ─── OANDA ──────────────────────────────────────────────
-OANDA_API_TOKEN = os.getenv("OANDA_API_TOKEN", "")
-OANDA_ACCOUNT_ID = os.getenv("OANDA_ACCOUNT_ID", "")
-OANDA_ENV = (os.getenv("OANDA_ENV") or "practice").lower()  # practice | live
 
 # ─── AI providers ───────────────────────────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")

@@ -28,7 +28,7 @@ check.failed = 0
 
 print("\n🧪 cTRADER TESTS\n")
 
-print("1. Symbol mapping (OANDA/slash → cTrader)")
+print("1. Symbol mapping (Underscore/slash → cTrader)")
 check("EUR_USD → EURUSD", ctrader._to_ct_symbol("EUR_USD") == "EURUSD")
 check("EUR/USD → EURUSD", ctrader._to_ct_symbol("EUR/USD") == "EURUSD")
 check("lowercase usd_jpy → USDJPY", ctrader._to_ct_symbol("usd_jpy") == "USDJPY")
@@ -63,10 +63,6 @@ check("cTrader creds → CtraderBroker", b_ct.__class__.__name__ == "CtraderBrok
 b_yh, _ = user_loop._make_broker({"paper": True})
 check("paper + no broker → yahoo module",
       getattr(b_yh, "__name__", "") .endswith("yahoo"), getattr(b_yh, "__name__", b_yh))
-
-b_oa, _ = user_loop._make_broker({"oanda_token": "x", "oanda_account_id": "y", "paper": False})
-check("oanda token → OandaBroker", b_oa.__class__.__name__ == "OandaBroker",
-      b_oa.__class__.__name__)
 
 print("\n6. Broker label")
 check("ctrader label",

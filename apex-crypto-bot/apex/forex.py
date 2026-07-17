@@ -1,6 +1,6 @@
 """Forex domain math — pips, position sizing, leverage, market hours.
 
-Instruments use OANDA notation: EUR_USD, GBP_JPY, XAU_USD …
+Instruments use underscore notation: EUR_USD, GBP_JPY, XAU_USD …
 Account currency is assumed to be USD.
 """
 from datetime import datetime, timezone

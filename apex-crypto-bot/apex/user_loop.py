@@ -43,13 +43,9 @@ def _make_broker(user):
     import types
     from apex import config as _appcfg
     paper = user.get("paper", False)
-    oanda_token = user.get("oanda_token", "")
     ct_token = user.get("ctrader_access_token", "")
     ct_account = user.get("ctrader_account_id", "")
     fake_cfg = types.SimpleNamespace(
-        OANDA_API_TOKEN  = oanda_token,
-        OANDA_ACCOUNT_ID = user.get("oanda_account_id", ""),
-        OANDA_ENV        = user.get("oanda_env", "practice"),
         CTRADER_ACCESS_TOKEN  = ct_token,
         CTRADER_REFRESH_TOKEN = user.get("ctrader_refresh_token", ""),
         CTRADER_ACCOUNT_ID    = ct_account,
@@ -727,7 +723,7 @@ def _loop(user_id, alert_fn, gen=None):
             dash["openPosition"] = open_pos
 
             # ── Paper SL/TP enforcement ──
-            # In LIVE mode OANDA holds the stop/target server-side, so a hit
+            # In LIVE mode the broker holds the stop/target server-side, so a hit
             # closes the position and get_open_position() reflects it next tick.
             # In PAPER mode nothing closes the trade unless we check the price
             # ourselves — without this, stops are decorative and a losing paper

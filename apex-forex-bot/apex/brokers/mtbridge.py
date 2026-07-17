@@ -110,7 +110,7 @@ def handle_sync(body: str) -> tuple:
     return 200, out
 
 
-# ─── Broker interface (same shape as oanda.py) ───────────
+# ─── Broker interface (same shape as ctrader.py) ───────────
 
 def _fresh():
     if time.time() - _state["last_sync"] > STALE_AFTER:

@@ -87,7 +87,7 @@ def _apply_config(data, source="config"):
             elif isinstance(cur, float):
                 setattr(cfg, k, float(v))
             elif isinstance(cur, str):
-                setattr(cfg, k, str(v).lower() if k in ("BROKER", "OANDA_ENV") else str(v))
+                setattr(cfg, k, str(v).lower() if k == "BROKER" else str(v))
         except (ValueError, TypeError):
             pass  # leave the default if the value can't be coerced
     return applied
@@ -112,7 +112,7 @@ def load_remote():
     """Fetch the config the client saved in the configurator and apply it.
 
     Mirrors the crypto bot's cfg.loadRemote(): with only LICENSE_KEY set, the
-    bot pulls broker keys, OANDA_ENV, risk and strategy from the license server
+    bot pulls broker keys, CTRADER_ENV, risk and strategy from the license server
     so deployment is truly one-click. Falls back to env vars on any failure.
     """
     key = cfg.LICENSE_KEY
@@ -212,9 +212,6 @@ def validate():
             print("⚠️  BROKER=td needs TWELVE_DATA_KEY.")
         else:
             print("📡 Twelve Data mode.")
-    elif cfg.BROKER == "oanda":
-        if not cfg.OANDA_API_TOKEN or not cfg.OANDA_ACCOUNT_ID:
-            print("⚠️  OANDA credentials missing — market data unavailable.")
 
 
 def get_balance():
@@ -852,18 +849,7 @@ def main():
 
     verify_license()
     # Per-user cTrader architecture: each client runs their own isolated loop
-    # (started by the Telegram poller after /ctrader OAuth). The global tick()
-    # loop is legacy (single OANDA account) — only run it if OANDA credentials
-    # are explicitly configured.
-    if cfg.BROKER == "oanda" and cfg.OANDA_API_TOKEN and cfg.OANDA_ACCOUNT_ID:
-        logger.info("🚀 First analysis...")
-        tick()
-        interval = cfg.LOOP_INTERVAL_MS / 1000
-        logger.info(f"⏱️  Analysis every {cfg.LOOP_INTERVAL_MS / 60000} minutes.")
-        while True:
-            time.sleep(interval)
-            tick()
-    else:
-        logger.info("Per-user mode — each client trades on their own cTrader loop. Send /ctrader to connect.")
-        while True:
-            time.sleep(3600)
+    # (started by the Telegram poller after /ctrader OAuth).
+    logger.info("Per-user mode — each client trades on their own cTrader loop. Send /ctrader to connect.")
+    while True:
+        time.sleep(3600)

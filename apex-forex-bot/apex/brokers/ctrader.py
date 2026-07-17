@@ -1,9 +1,8 @@
-"""cTrader Open API connector — free, international, works with any cTrader broker.
+"""cTrader Open API connector — the sole broker for this bot.
 
-Why this exists: OANDA's free v20 REST API is not available to EU retail clients
-(they are routed to OANDA TMS / MT5). cTrader Open API is free for anyone with a
-cTrader account and is offered by many international brokers (IC Markets,
-Pepperstone, FxPro, ...), so a single integration covers clients worldwide.
+cTrader Open API is free for anyone with a cTrader account and is offered by many
+international brokers (IC Markets, Pepperstone, FxPro, ...), so a single
+integration covers clients worldwide.
 
 Protocol reality: cTrader Open API is NOT REST. It is Protocol-Buffers messages
 over a persistent TLS socket on port 5035. The official Python SDK uses Twisted
@@ -70,7 +69,7 @@ except Exception as e:  # pragma: no cover - import guard
 _HOST = {"live": "live.ctraderapi.com", "demo": "demo.ctraderapi.com"}
 _PORT = 5035
 
-# OANDA-style "EUR_USD" / "EUR/USD" → cTrader "EURUSD".
+# Underscore/slash notation EUR_USD / EUR/USD → cTrader EURUSD.
 def _to_ct_symbol(sym: str) -> str:
     return (sym or "").replace("_", "").replace("/", "").upper()
 
