@@ -44,7 +44,9 @@ if _BACKEND == "none":
 
 _USE_REDIS = _BACKEND in ("redis", "upstash")
 
-_NS = (os.getenv("PRODUCT") or "forex").strip().lower()
+_NS = os.getenv("PRODUCT", "").strip().lower()
+if not _NS:
+    raise RuntimeError("PRODUCT env var MUST be set ('forex' or 'crypto') — refusing to start with ambiguous namespace")
 _ACTIVE_SET = f"{_NS}:active_users"
 
 

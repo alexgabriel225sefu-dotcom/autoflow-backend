@@ -9,7 +9,7 @@ the candlestick chart with BUY/SELL markers and SL/TP lines.
 def render(dash):
     return """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Apex Forex Bot — Live Trading</title>
+<title>Apex Crypto Bot — Live Trading</title>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}

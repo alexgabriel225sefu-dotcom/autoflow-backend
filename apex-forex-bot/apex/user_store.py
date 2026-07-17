@@ -44,7 +44,10 @@ if _BACKEND == "none":
 
 _USE_REDIS = _BACKEND in ("redis", "upstash")
 
-_NS = (os.getenv("PRODUCT") or "forex").strip().lower()
+_NS = os.getenv("PRODUCT", "").strip().lower()
+if not _NS:
+    _NS = "forex"
+    print("⚠️  WARNING: PRODUCT env var not set — defaulting to 'forex'. Set PRODUCT=forex explicitly!")
 _ACTIVE_SET = f"{_NS}:active_users"
 
 

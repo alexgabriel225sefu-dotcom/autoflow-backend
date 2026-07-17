@@ -260,12 +260,12 @@ _CFG_MAP = {
     "STOP_LOSS_PIPS":   ("STOP_LOSS_PIPS",   float),
     "TAKE_PROFIT_PIPS": ("TAKE_PROFIT_PIPS", float),
     "MIN_CONFIDENCE":   ("MIN_CONFIDENCE",   int),
-    "OANDA_ENV":        ("OANDA_ENV",        lambda v: str(v).lower()),
+    "CTRADER_ENV":      ("CTRADER_ENV",      lambda v: str(v).lower()),
     "LEVERAGE":         ("LEVERAGE",         float),
 }
 
 _BROKER_KEYS = {
-    "oanda": ["OANDA_API_TOKEN", "OANDA_ACCOUNT_ID"],
+    "ctrader": ["CTRADER_CLIENT_ID", "CTRADER_CLIENT_SECRET"],
     "mt": ["MT_BRIDGE_SECRET"],
 }
 
@@ -275,7 +275,7 @@ def _broker_label():
         return f"cTrader ({cfg.CTRADER_ENV})"
     if cfg.BROKER == "mt":
         return "MetaTrader Bridge"
-    return f"OANDA ({cfg.OANDA_ENV})"
+    return f"cTrader ({cfg.CTRADER_ENV})"
 
 
 def _apply(env_key: str, value):
@@ -581,7 +581,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
         risk_pct = d.get("risk", 0.005) * 100
         send_to(chat_id,
                 "5/5 — ⚠️ <b>Risk acknowledgment</b>\n\n"
-                "Forex trading carries a real risk of loss. <b>You alone</b> chose:\n"
+                f"{cfg.ASSET_NOUN.capitalize()} trading carries a real risk of loss. <b>You alone</b> chose:\n"
                 f"  • Pair: <b>{d.get('symbol')}</b>\n"
                 f"  • Risk per trade: <b>{risk_pct:g}%</b>\n"
                 f"  • Mode: <b>{'paper (simulated)' if d.get('paper') else 'LIVE funds'}</b>\n\n"
@@ -610,16 +610,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             "accepted_risk": True,
             "active": True,
         }
-        if d.get("keys"):
-            user_data["oanda_token"]      = d["keys"].get("OANDA_API_TOKEN", "")
-            user_data["oanda_account_id"] = d["keys"].get("OANDA_ACCOUNT_ID", "")
-            # Live branch → point this user at OANDA's real fxtrade endpoint.
-            # Without this, oanda_env stays "practice" and "live" trades silently
-            # execute on the practice server. Default to the live host they asked
-            # for; they can flip back with /env practice if it's a demo token.
-            user_data["oanda_env"]        = d.get("oanda_env", "live")
-        else:
-            user_data["oanda_env"]        = "practice"
+        user_data["ctrader_env"] = d.get("env", "demo")
         user_store.update(chat_id, user_data)
 
         # Also apply globally if admin (for owner's own bot)
@@ -652,7 +643,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
         if d.get("paper"):
             broker_str = "Yahoo data (paper)"
         else:
-            broker_str = f"OANDA ({user_data.get('oanda_env', 'live')})"
+            broker_str = f"cTrader ({user_data.get('ctrader_env', 'demo')})"
         send_to(chat_id,
                 f"✅ <b>Setup complete — bot is LIVE!</b>\n\n"
                 f"Broker: <b>{broker_str}</b>\n"
@@ -759,10 +750,8 @@ def _handle_broker(chat_id, args):
     b = (args or "").strip().lower()
     if b not in cfg.SUPPORTED_BROKERS:
         return send_to(chat_id,
-                       "❌ Usage: <code>/broker oanda</code> or <code>/broker mt</code>\n\n"
-                       "• <b>oanda</b> — direct API (easiest)\n"
-                       "• <b>mt</b> — MetaTrader 5 via the ApexBridge EA "
-                       "(IC Markets &amp; any MT5 broker)")
+                       "❌ Usage: <code>/broker ctrader</code>\n\n"
+                       "• <b>ctrader</b> — cTrader Open API (connect via /ctrader)")
     _save_runtime({"BROKER": b})
     _apply("BROKER", b)
     if _bot_control.get("reload_broker"):
@@ -775,7 +764,7 @@ def _handle_broker(chat_id, args):
                 "3. Put the same secret + your bot URL in the EA settings\n\n"
                 "I'll start trading as soon as the EA connects.")
     else:
-        send_to(chat_id, "✅ Broker set to <b>OANDA</b>. Use /setup if you need to enter credentials.")
+        send_to(chat_id, "✅ Broker set to <b>cTrader</b>. Use /ctrader to connect your account.")
 
 
 def _handle_env(chat_id, args):
@@ -790,17 +779,16 @@ def _handle_env(chat_id, args):
         return _handle_paper(chat_id, "on" if env == "practice" else "off")
     # Per-user: the multi-user loop builds each broker from the user record, so the
     # env MUST be stored there or the change never reaches the running loop.
-    user_store.update(chat_id, {"oanda_env": env})
+    user_store.update(chat_id, {"ctrader_env": "demo" if env == "practice" else "live"})
     _restart_user_loop(chat_id)
-    # Admin: also flip the global runtime config for the owner's own engine.
     if access.is_admin(str(chat_id)):
-        _save_runtime({"OANDA_ENV": env})
-        _apply("OANDA_ENV", env)
+        _save_runtime({"CTRADER_ENV": "demo" if env == "practice" else "live"})
+        _apply("CTRADER_ENV", "demo" if env == "practice" else "live")
         if _bot_control.get("reload_broker"):
             _bot_control["reload_broker"]()
     icon = "🧪" if env == "practice" else "🔴"
-    send_to(chat_id, f"{icon} OANDA environment set to <b>{env.upper()}</b>.\n"
-                     f"<i>Make sure your token matches this environment.</i>")
+    send_to(chat_id, f"{icon} cTrader environment set to <b>{('DEMO' if env == 'practice' else 'LIVE')}</b>.\n"
+                     f"<i>Make sure your account matches this environment.</i>")
 
 
 def _broker_signup_rows():
@@ -1326,7 +1314,7 @@ def _handle_paper(chat_id, args):
     if on:
         return send_to(chat_id, "📝 Paper trading <b>ON</b> — simulated balance, zero risk.")
     u = user_store.load(chat_id)
-    env = (u.get("ctrader_env") or u.get("oanda_env") or "").lower()
+    env = (u.get("ctrader_env") or "demo").lower()
     where = ("your <b>demo</b> account 🧪" if env in ("demo", "practice")
              else "your <b>LIVE</b> account 🔴")
     send_to(chat_id, f"🔴 Paper trading <b>OFF</b> — orders now execute in {where}.\n"
@@ -1855,7 +1843,7 @@ def _handle_buy(chat_id, args):
                 f"✅ <b>BUY {sym}</b> entered\n"
                 f"Price: <b>{result['price']:.5f}</b> | Units: {result['units']}\n"
                 f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
-                f"Spread: {result['spread']}p")
+                f"Spread: {result.get('spread', '?')}p")
     else:
         send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}")
 
@@ -1872,7 +1860,7 @@ def _handle_sell(chat_id, args):
                 f"✅ <b>SELL {sym}</b> entered\n"
                 f"Price: <b>{result['price']:.5f}</b> | Units: {result['units']}\n"
                 f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
-                f"Spread: {result['spread']}p")
+                f"Spread: {result.get('spread', '?')}p")
     else:
         send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}")
 
@@ -2158,7 +2146,7 @@ def _restart_user_loop(chat_id):
     """Restart a running loop so it rebuilds the broker from the user record.
 
     The loop reads the user record + builds the broker ONCE at start
-    (user_loop._loop), so config changes like oanda_env only take effect on a
+    (user_loop._loop), so config changes like ctrader_env only take effect on a
     fresh loop. No-op if the user isn't currently trading.
     """
     if not user_loop.is_running(chat_id):
@@ -2206,7 +2194,7 @@ def _handle_config(chat_id):
         for k in keys)
     paused = _bot_control.get("get_paused", lambda: False)()
     state_tag = "⏸️ PAUSED" if paused else "▶️ RUNNING"
-    key_title = "MT bridge" if cfg.BROKER == "mt" else "OANDA"
+    key_title = "MT bridge" if cfg.BROKER == "mt" else "cTrader"
     send_to(chat_id,
             f"⚙️ <b>Config</b>  [{state_tag}]\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -2320,7 +2308,7 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
 
 # ─── Poll loop ────────────────────────────────────────────
 
-_VERIFY_URL = "https://aicashsystem.space/api/verify-license"
+_VERIFY_URL = f"{cfg.LICENSE_SERVER}/api/verify-license"
 _DEPLOY_URL = ""
 
 

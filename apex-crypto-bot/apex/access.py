@@ -14,7 +14,7 @@ _UPD_URL   = (os.getenv("UPSTASH_REDIS_REST_URL")   or "").rstrip("/")
 _UPD_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
 _USE_REDIS = bool(_UPD_URL and _UPD_TOKEN)
 
-_ACCESS_KEY = "forex:access"   # Redis key holding the {admins, allowed} JSON blob
+_ACCESS_KEY = f"{(os.getenv('PRODUCT') or 'forex').strip().lower()}:access"
 
 
 def _redis(cmd_parts):

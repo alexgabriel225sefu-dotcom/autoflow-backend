@@ -11,6 +11,10 @@ services:
     plan: starter
     autoDeploy: true
     envVars:
+      # Product identity — MUST be set; the bot refuses to start without it
+      # to prevent cross-product Redis namespace contamination.
+      - key: PRODUCT
+        value: forex
       # Unbuffered Python output — without this, print() is buffered and the
       # startup logs never show, making "the bot won't start" impossible to debug.
       - key: PYTHONUNBUFFERED

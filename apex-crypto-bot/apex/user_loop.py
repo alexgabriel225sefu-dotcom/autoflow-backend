@@ -54,7 +54,7 @@ def _make_broker(user):
         CTRADER_REFRESH_TOKEN = user.get("ctrader_refresh_token", ""),
         CTRADER_ACCOUNT_ID    = ct_account,
         CTRADER_ENV           = user.get("ctrader_env", "demo"),
-        SYMBOL           = user.get("symbol", "EUR_USD"),
+        SYMBOL           = user.get("symbol") or _appcfg.SYMBOL,
         TIMEFRAME        = user.get("timeframe", "5m"),
         CANDLES          = 240,  # M5 history for indicators (H1 gate removed → 720 was overkill)
         PAPER_TRADING    = paper,
@@ -94,8 +94,6 @@ def _make_broker(user):
 def _broker_label(user, cfg):
     if user.get("ctrader_access_token") and user.get("ctrader_account_id"):
         return f"cTrader ({getattr(cfg, 'CTRADER_ENV', 'demo')})"
-    if user.get("oanda_token"):
-        return f"OANDA ({cfg.OANDA_ENV})"
     if getattr(cfg, 'PAPER_TRADING', False):
         return "Yahoo (paper data)"
     return "cTrader (not linked)"
@@ -209,10 +207,19 @@ def _loop(user_id, alert_fn, gen=None):
         if _clean != _orig:
             _patch[_fld] = _clean
             user[_fld] = _clean
+    _is_crypto = cfg_mod.PRODUCT == "crypto"
+    if _is_crypto:
+        for _stale in ("oanda_token", "oanda_account_id", "oanda_env"):
+            if user.get(_stale):
+                _patch[_stale] = ""
+                user[_stale] = ""
+    else:
+        for _stale in ("ctrader_access_token", "ctrader_refresh_token", "ctrader_account_id"):
+            pass
     if _patch:
         try:
             user_store.update(user_id, _patch)
-            print(f"[UserLoop:{user_id}] scrubbed cross-product symbols: {list(_patch)}")
+            print(f"[UserLoop:{user_id}] scrubbed cross-product data: {list(_patch)}")
         except Exception as e:
             print(f"[UserLoop:{user_id}] cross-product scrub persist failed: {e}")
 
@@ -267,7 +274,7 @@ def _loop(user_id, alert_fn, gen=None):
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
     last_mkt_tick = -_SKIP_WARN_THROTTLE      # market-pulse heads-up (throttled)
 
-    acct_env = (user.get("ctrader_env") or user.get("oanda_env") or "demo").lower()
+    acct_env = (user.get("ctrader_env") or "demo").lower()
     mode_label = ("📝 Simulation" if cfg.PAPER_TRADING
                   else ("🧪 Demo" if acct_env in ("demo", "practice")
                         else "🔴 LIVE"))
@@ -415,6 +422,7 @@ def _loop(user_id, alert_fn, gen=None):
                         last_loss_at = time.time()
                     elif est_pnl is not None and est_pnl > 0:
                         loss_streak = 0
+                    last_close_at = time.time()
                     pos_details.pop(cs, None)
                     if alert_fn:
                         alert_fn(user_id, {"action": "BROKER_CLOSE_MULTI", "symbol": det.get("symbol", cs),

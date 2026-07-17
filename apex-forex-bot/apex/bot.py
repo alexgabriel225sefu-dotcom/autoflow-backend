@@ -24,7 +24,7 @@ def broker_label():
         return "MT BRIDGE"
     if cfg.BROKER == "td":
         return "TWELVE DATA"
-    return f"OANDA ({cfg.OANDA_ENV})"
+    return f"cTrader ({cfg.CTRADER_ENV})"
 
 
 # ─── Runtime pause control ───────────────────────────────
@@ -123,7 +123,7 @@ def load_remote():
     try:
         r = requests.get(f"{server}/api/bot-config",
                          params={"key": key}, timeout=10,
-                         headers={"User-Agent": "ApexForexBot/1.0"})
+                         headers={"User-Agent": f"{cfg.BOT_NAME.replace(' ', '')}/1.0"})
         if r.status_code != 200:
             print(f"⚠️   load_remote: server returned {r.status_code} — {r.text[:200]}")
             print('     → Did you complete the configurator and click "Save Config & Deploy"?')
@@ -161,7 +161,7 @@ market_closed_alerted = False
 dash = {
     "balance": 0, "startBalance": 0, "currentSymbol": cfg.SYMBOL, "currentPrice": 0,
     "openPosition": None, "trades": [], "lastTick": None,
-    "mode": "PAPER" if cfg.PAPER_TRADING else (cfg.CTRADER_ENV.upper() if cfg.BROKER == "ctrader" else cfg.OANDA_ENV.upper()),
+    "mode": "PAPER" if cfg.PAPER_TRADING else cfg.CTRADER_ENV.upper(),
     "broker": broker_label(),
     "marketOpen": True,
     "candles": [],
@@ -178,10 +178,10 @@ def verify_license():
         return
     # If a key is present, verify it for telemetry, but NEVER exit on failure.
     try:
-        res = requests.post(f"{server}/api/verify-license", json={"key": key, "product": "apex-forex"}, timeout=10)
+        res = requests.post(f"{server}/api/verify-license", json={"key": key, "product": cfg.LICENSE_PRODUCT}, timeout=10)
         data = res.json()
         if data.get("valid"):
-            print(f"✅  Forex license verified — welcome, {data.get('email', 'trader')}!")
+            print(f"✅  {cfg.BOT_NAME} license verified — welcome, {data.get('email', 'trader')}!")
         else:
             print(f"⚠️  License not valid ({data.get('message')}) — continuing anyway.")
     except Exception as e:
@@ -825,10 +825,8 @@ def main():
     logger.print_banner(balance)
 
     mode = ("📝 PAPER TRADING" if cfg.PAPER_TRADING else
-            "🔗 METATRADER" if cfg.BROKER == "mt" else
-            "📡 TWELVE DATA" if cfg.BROKER == "td" else
             f"🔗 cTrader ({cfg.CTRADER_ENV})" if cfg.BROKER == "ctrader" else
-            "🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE")
+            "🔴 LIVE")
     dash["mode"] = mode.replace("📝", "").replace("🧪", "").replace("🔴", "").strip()
     tg.alert_start(cfg.SYMBOL, cfg.TIMEFRAME, balance, mode)
 

@@ -82,7 +82,7 @@ def print_stats(balance, open_position=None, current_price=None):
     win_rate = (_stats["wins"] / _stats["trades"] * 100) if _stats["trades"] > 0 else 0
     mode = ("📝 PAPER" if cfg.PAPER_TRADING else
             f"🔗 cTrader" if cfg.BROKER == "ctrader" else
-            "🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE")
+            "🔴 LIVE")
     print("\n📊 STATS:")
     print(f"   Equity: ${total_value:.2f} ({'+' if pnl_pct >= 0 else ''}{pnl_pct:.2f}%){position_note}")
     print(f"   Closed trades: {_stats['trades']} | ✅ {_stats['wins']} | ❌ {_stats['losses']} | Win Rate: {win_rate:.0f}%")
@@ -93,9 +93,9 @@ def print_stats(balance, open_position=None, current_price=None):
 def print_banner(balance):
     mode = ("📝 PAPER TRADING (no real risk)" if cfg.PAPER_TRADING else
             f"🔗 cTrader ({cfg.CTRADER_ENV})" if cfg.BROKER == "ctrader" else
-            "🧪 PRACTICE" if cfg.OANDA_ENV == "practice" else "🔴 LIVE TRADING")
+            "🔴 LIVE TRADING")
     print("\n" + "═" * 60)
-    print(f"  {getattr(cfg, 'ASSET_EMOJI', '💱')} {getattr(cfg, 'BOT_NAME', 'Apex Forex Bot').upper()} — AI Powered Trading")
+    print(f"  {getattr(cfg, 'ASSET_EMOJI', '₿')} {getattr(cfg, 'BOT_NAME', 'Apex Crypto Bot').upper()} — AI Powered Trading")
     print(f"  Pair: {cfg.SYMBOL} | Timeframe: {cfg.TIMEFRAME}")
     print(f"  Mode: {mode}")
     print(f"  Starting balance: ${balance:.2f}")
