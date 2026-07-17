@@ -14,7 +14,7 @@ _lock  = threading.Lock()
 _LOOP_INTERVAL = 300  # 5 minutes between ticks
 _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
-_SKIP_WARN_THROTTLE = 6  # "don't trade now" market-condition warnings (~30 min)
+_SKIP_WARN_THROTTLE = 36  # "don't trade now" warnings — only every ~3h (was 30m)
 _LOSS_COOLDOWN_MIN = 15   # pause after a loss — avoid revenge trades in the same move
 _CLOSE_COOLDOWN_MIN = 10  # pause after ANY close — prevent open/close churn
 
@@ -797,9 +797,8 @@ def _loop(user_id, alert_fn, gen=None):
             mp = market.pulse(ind, strat_data, symbol)
             if mp:
                 dash["market"] = mp
-                if mp.get("notable") and alert_fn and tick - last_mkt_tick >= _SKIP_WARN_THROTTLE:
+                if mp.get("notable"):
                     last_mkt_tick = tick
-                    alert_fn(user_id, {"action": "MARKET_PULSE", "symbol": symbol, **mp})
 
             # Check risk limits (per-user, from the Strategy Builder)
             stop_check = strategies.should_stop(
