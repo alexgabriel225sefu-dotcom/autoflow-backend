@@ -1145,6 +1145,8 @@ def _handle_cb(chat_id, data):
         return _builder_pick(chat_id, step_i, opt_i)
     if data == "go:connect":
         return _handle_ctrader(chat_id)
+    if data == "go:controls":
+        return send_to(chat_id, _CONTROLS_TEXT)
     if data == "acct:switch":
         return _handle_switch(chat_id)
     if data == "acct:new":
@@ -2209,11 +2211,12 @@ def _handle_config(chat_id):
 
 _HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "/setup — choose demo/live, pair, risk (start here)\n"
+                "/setup — choose demo/live, pair, risk\n"
                 "/status — live trading snapshot\n"
                 "/ctrader — connect your cTrader account\n"
                 "/start — resume trading\n"
                 "/stop — pause your bot\n"
+                "/controls — all controls explained\n"
                 "/help — this list\n\n"
                 "<b>📊 Trading</b>\n"
                 f"/buy — open a BUY · /sell — open a SELL\n"
@@ -2227,6 +2230,43 @@ _HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "Start on a demo account with /setup. When you're ready, "
                 "send /ctrader and switch to your live account.\n\n"
                 "💬 <i>Or just talk to me in any language!</i>")
+
+_CONTROLS_TEXT = (
+    f"🎛 <b>{cfg.BOT_NAME.upper()} — Controls Guide</b>\n"
+    "━━━━━━━━━━━━━━━━━━━━\n\n"
+    "<b>🟢 Getting Started</b>\n"
+    "/ctrader — Connect your cTrader broker account\n"
+    "/setup — Guided setup: pick your pair, strategy, mode\n\n"
+    "<b>⏯ ON / OFF</b>\n"
+    "/start — Turn the bot ON (it watches the market and trades automatically)\n"
+    "/stop — Pause the bot (no new trades; open positions keep their safety stop)\n\n"
+    "<b>📊 Trading</b>\n"
+    "/status — See your current position, balance, and bot state\n"
+    "/report — Full trade journal with profit/loss breakdown\n"
+    "/terminal — Open the live dashboard (chart, equity, stats)\n"
+    "/buy — Manually open a BUY trade\n"
+    "/sell — Manually open a SELL trade\n"
+    "/close — Close your current open position\n\n"
+    "<b>⚙️ Settings</b>\n"
+    "/pairs — Browse available trading instruments\n"
+    "/symbol BTCUSD — Change what you trade\n"
+    "/strategy — Pick a trading method (Auto, Mean Reversion, Trend, Breakout)\n"
+    "/risk 1 — Set risk per trade (0.5–10%)\n"
+    "/sl 50 — Set stop loss in pips\n"
+    "/tp 100 — Set take profit in pips\n"
+    "/atr on|off — Use dynamic ATR-based stops\n"
+    "/copilot on|off — Approve each trade before it opens\n"
+    "/builder — Build a custom strategy step by step\n"
+    "/autopilot on — Let the bot pick the best instruments too\n"
+    "/maxpos 3 — Allow multiple positions at once\n\n"
+    "<b>📰 Info</b>\n"
+    "/news — Upcoming high-impact economic events\n"
+    "/guide — How the bot works (visual guide)\n"
+    "/help — Quick command list\n\n"
+    "<b>🔄 Demo ↔ Live</b>\n"
+    "Start on a demo account. When you're confident, send /ctrader "
+    "and connect your live broker account.\n\n"
+    "💬 <i>You can also talk to me in any language — just type your question.</i>")
 
 _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
@@ -2435,19 +2475,44 @@ def _poll_loop():
                     if not _license_ok(chat_id, raw):
                         continue
                     access.grant(chat_id_str)
-                    gurl = _guide_url()
-                    kb = [[{"text": "🚀 Set up my bot (30 sec)", "callback_data": "go:connect"}]]
-                    if gurl:
-                        kb.append([{"text": "📖 How it works — watch first", "web_app": {"url": gurl}}])
                     send_to(chat_id,
                             "🎉 <b>Welcome — your license is active!</b>\n\n"
                             "You now own a fully-hosted AI trading bot that runs on "
-                            "<b>your own</b> account and you control from right here in Telegram. "
-                            "No apps, no installs, nothing to configure by hand.\n\n"
-                            "👇 <b>One tap sets everything up</b> — connect your account, pick "
-                            "what to trade, and the bot starts working for you. "
-                            "New to trading bots? Watch the 2-minute guide first.",
-                            extra={"reply_markup": {"inline_keyboard": kb}})
+                            "<b>your own</b> trading account, controlled entirely from "
+                            "this Telegram chat. No apps to install, no PC required.\n\n"
+                            "⚠️ <b>Important — please read:</b>\n"
+                            "• Trading involves risk — profits are not guaranteed\n"
+                            "• Losses are possible and they are <b>yours</b>\n"
+                            "• This is software, not financial advice\n"
+                            "• Start on a <b>demo account</b> first to test risk-free\n\n"
+                            "Ready? Follow these steps 👇")
+                    broker_rows = _broker_signup_rows()
+                    step1_kb = []
+                    if broker_rows:
+                        step1_kb.extend(broker_rows)
+                    step1_kb.append([{"text": "🔗 Connect cTrader account", "callback_data": "go:connect"}])
+                    send_to(chat_id,
+                            "📌 <b>Step 1 — Create a broker account</b>\n\n"
+                            "You need a cTrader account with a supported broker. "
+                            "If you don't have one yet, create a free demo account "
+                            "below (takes 2 minutes).\n\n"
+                            "Supported brokers: IC Markets, Pepperstone, FxPro, "
+                            "RoboForex, and any broker that offers cTrader.\n\n"
+                            "📌 <b>Step 2 — Connect your account</b>\n\n"
+                            "Once you have an account, tap the button below to link it.",
+                            extra={"reply_markup": {"inline_keyboard": step1_kb}})
+                    gurl = _guide_url()
+                    tips_kb = []
+                    if gurl:
+                        tips_kb.append([{"text": "📖 How it works — 2 min guide", "web_app": {"url": gurl}}])
+                    tips_kb.append([{"text": "🎛 See all controls", "callback_data": "go:controls"}])
+                    send_to(chat_id,
+                            "💡 <b>Helpful links</b>\n\n"
+                            "• /controls — see every command and what it does\n"
+                            "• /guide — how the bot works (visual guide)\n"
+                            "• /help — quick command list\n"
+                            "• /terminal — live trading dashboard",
+                            extra={"reply_markup": {"inline_keyboard": tips_kb}})
                     send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id_str}</code>")
                     continue
 
@@ -2493,6 +2558,8 @@ def _poll_loop():
                     _handle_report(chat_id)
                 elif cmd_l == "/help":
                     send_to(chat_id, _HELP_ADMIN if is_adm else _HELP_CLIENT)
+                elif cmd_l == "/controls":
+                    send_to(chat_id, _CONTROLS_TEXT)
                 elif cmd_l == "/users" and is_adm:
                     _handle_users(chat_id)
                 elif cmd_l == "/grant" and is_adm:
