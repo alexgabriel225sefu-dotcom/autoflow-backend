@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
 from apex import config as cfg_mod
-from apex.brokers import yahoo as _yahoo_mod
+from apex.brokers.ctrader import CtraderBroker as _CtraderBroker
 
 
 _loops = {}   # user_id → {"thread": Thread, "running": bool, "dash": dict}
@@ -38,13 +38,7 @@ def _log_trade(user_id, record):
 
 
 def _make_broker(user):
-    """Create the per-user broker with isolated config.
-
-    Selection order:
-      • cTrader linked (token + account) → cTrader (free, international)
-      • OANDA token present              → OANDA (legacy)
-      • paper mode explicitly on         → Yahoo Finance data (free, no account)
-    """
+    """Create the per-user broker with isolated config — cTrader exclusively."""
     import types
     from apex import config as _appcfg
     paper = user.get("paper", False)
@@ -93,12 +87,7 @@ def _make_broker(user):
         MAX_DD_PCT       = float(user.get("max_dd_pct", 20)),
         MAX_DAILY_LOSS_PCT = float(user.get("max_daily_loss_pct", 3)),
     )
-    # cTrader linked → use it (paper uses its data; live places real orders worldwide).
-    if ct_token and ct_account:
-        from apex.brokers.ctrader import CtraderBroker
-        return CtraderBroker(fake_cfg), fake_cfg
-    # No broker linked → free Yahoo Finance data for charts, zero signup.
-    return _yahoo_mod, fake_cfg
+    return _CtraderBroker(fake_cfg), fake_cfg
 
 
 def _broker_label(user, cfg):

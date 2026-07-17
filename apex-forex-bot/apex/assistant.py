@@ -138,7 +138,6 @@ def _get_anthropic_client(api_key: str):
 def _build_context(user_id: str) -> str:
     """Inject live account state so the AI talks with real numbers."""
     from apex import user_loop, user_store, forex, indicators
-    from apex.brokers import yahoo
     from apex.brokers.ctrader import CtraderBroker
     import types
 
@@ -152,8 +151,6 @@ def _build_context(user_id: str) -> str:
     paper = user.get("paper", cfg.PAPER_TRADING)
     open_pos = dash.get("openPosition")
     last_price = dash.get("currentPrice")
-    ct_token = user.get("ctrader_access_token", "")
-    ct_account = user.get("ctrader_account_id", "")
     ct_env = user.get("ctrader_env", "demo")
 
     lines = [
@@ -168,9 +165,9 @@ def _build_context(user_id: str) -> str:
 
     try:
         fake_cfg = types.SimpleNamespace(
-            CTRADER_ACCESS_TOKEN=ct_token,
+            CTRADER_ACCESS_TOKEN=user.get("ctrader_access_token", ""),
             CTRADER_REFRESH_TOKEN=user.get("ctrader_refresh_token", ""),
-            CTRADER_ACCOUNT_ID=ct_account,
+            CTRADER_ACCOUNT_ID=user.get("ctrader_account_id", ""),
             CTRADER_ENV=ct_env,
             SYMBOL=symbol, TIMEFRAME=cfg.TIMEFRAME, CANDLES=50,
             PAPER_TRADING=paper, PAPER_BALANCE=balance,
@@ -181,7 +178,7 @@ def _build_context(user_id: str) -> str:
             MARGIN_CAP=0.5, MAX_SPREAD_PIPS=3.0,
             MIN_CONFIDENCE=int(user.get("min_confidence", cfg.MIN_CONFIDENCE)),
         )
-        broker = CtraderBroker(fake_cfg) if (ct_token and ct_account) else yahoo
+        broker = CtraderBroker(fake_cfg)
         candles = broker.get_candles(symbol, cfg.TIMEFRAME, 50)
         if candles:
             ind = indicators.analyze(candles)
@@ -221,16 +218,13 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
         symbol = inp.get("symbol", "EUR_USD").upper().replace("/", "_").replace("-", "_")
         send_status(f"🔍 Analyzing <b>{symbol}</b>…")
         try:
-            from apex.brokers import yahoo
             from apex.brokers.ctrader import CtraderBroker
             import types
             user = user_store.load(user_id)
-            ct_token = user.get("ctrader_access_token", "")
-            ct_account = user.get("ctrader_account_id", "")
             fake_cfg = types.SimpleNamespace(
-                CTRADER_ACCESS_TOKEN=ct_token,
+                CTRADER_ACCESS_TOKEN=user.get("ctrader_access_token", ""),
                 CTRADER_REFRESH_TOKEN=user.get("ctrader_refresh_token", ""),
-                CTRADER_ACCOUNT_ID=ct_account,
+                CTRADER_ACCOUNT_ID=user.get("ctrader_account_id", ""),
                 CTRADER_ENV=user.get("ctrader_env", "demo"),
                 SYMBOL=symbol, TIMEFRAME=cfg.TIMEFRAME,
                 CANDLES=100, PAPER_TRADING=user.get("paper", True), PAPER_BALANCE=1000,
@@ -238,7 +232,7 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
                 RISK_PER_TRADE=cfg.RISK_PER_TRADE, LEVERAGE=cfg.LEVERAGE,
                 MARGIN_CAP=0.5, MAX_SPREAD_PIPS=3.0, MIN_CONFIDENCE=cfg.MIN_CONFIDENCE,
             )
-            broker = CtraderBroker(fake_cfg) if (ct_token and ct_account) else yahoo
+            broker = CtraderBroker(fake_cfg)
             candles = broker.get_candles(symbol, cfg.TIMEFRAME, 100)
             if not candles:
                 return json.dumps({"error": "No market data available"})
