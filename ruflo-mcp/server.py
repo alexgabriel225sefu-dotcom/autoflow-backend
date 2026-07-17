@@ -122,7 +122,7 @@ def bot_alive(product: str) -> dict:
     if not hb:
         return {"alive": False, "reason": "no heartbeat — bot down or control plane off"}
     age = int(time.time()) - int(hb)
-    return {"alive": age < 30, "last_seen_sec_ago": age}
+    return {"alive": age < 120, "last_seen_sec_ago": age}
 
 
 @mcp.tool()

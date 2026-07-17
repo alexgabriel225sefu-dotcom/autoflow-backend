@@ -347,7 +347,7 @@ def _dashboard_keyboard(chat_id=None):
             u = user_store.load(chat_id)
             if (u.get("ctrader_access_token")
                     and (u.get("ctrader_env") or "demo").lower() != "live"):
-                rows.append([{"text": "🔴 Switch to real money", "callback_data": "acct:switch"}])
+                rows.append([{"text": "🔴 Switch to Live", "callback_data": "acct:switch"}])
         except Exception:
             pass
     if not rows:
@@ -1424,7 +1424,7 @@ def _handle_symbol(chat_id, args):
         warn += ("\n💡 <i>Pip conventions for metals, indices and crypto CFDs are handled "
                 "automatically. Volatile instruments need wider stops than FX"
                 + (f" — suggested here: <b>{sugg}</b>" if sugg else "")
-                + ". Watch the first trades in paper mode.</i>")
+                + ". Watch the first trades on a demo account.</i>")
     send_to(chat_id, f"💱 Trading symbol set to <b>{sym}</b>.{warn}")
 
 
@@ -1525,7 +1525,7 @@ def _handle_strategy(chat_id, args):
             for key, m in STRATEGY_MODES.items())
         return send_to(chat_id,
             f"🎯 <b>Trading method</b> (current: <b>{STRATEGY_MODES[current]['label']}</b>)\n\n{lines}\n\n"
-            "<i>Switching restarts your loop instantly. Test a new method in paper mode first.</i>")
+            "<i>Switching restarts your loop instantly. Test a new method on demo first.</i>")
     user_store.update(chat_id, {"strategy": want})
     running = _restart_user_loop(chat_id)
     m = STRATEGY_MODES[want]
@@ -2209,26 +2209,24 @@ def _handle_config(chat_id):
 
 _HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "/setup — choose paper/live, pair, risk (start here)\n"
+                "/setup — choose demo/live, pair, risk (start here)\n"
                 "/status — live trading snapshot\n"
-                "/market — session + how the market is moving now\n"
-                "/report — trade journal + net P&amp;L (for taxes)\n"
-                f"/buy {cfg.SYMBOL} — open a BUY manually (any pair you want)\n"
-                f"/sell {cfg.SYMBOL} — open a SELL manually\n"
-                "/close — close current position\n"
-                "/ctrader — connect your cTrader account (any broker, worldwide)\n"
-                "/copilot on|off — approve trades yourself vs auto-trade\n"
-                "/news — high-impact events (bot stays flat around them)\n"
-                "/ai — connect your own free/paid AI key for smart chat\n"
-                "/stop — pause your bot · /cancel — abort setup\n"
+                "/ctrader — connect your cTrader account\n"
+                "/start — resume trading\n"
+                "/stop — pause your bot\n"
                 "/help — this list\n\n"
-                "<b>🔄 Switch Paper ↔ Real:</b>\n"
-                "Start in paper with /setup. To go live, send /ctrader and connect "
-                "your own cTrader account (any broker worldwide). Paper (simulated) "
-                "and live (real funds) are fully separate — switching never touches "
-                "your real money unless you connect cTrader and go live.\n\n"
-                "💬 <i>Or just talk to me in any language!</i>\n"
-                "<i>Example: \"enter now\", \"intru acum\", \"analyzeaza EUR_USD\"</i>")
+                "<b>📊 Trading</b>\n"
+                f"/buy — open a BUY · /sell — open a SELL\n"
+                "/close — close current position\n"
+                "/report — trade journal + P&amp;L\n\n"
+                "<b>⚙️ Settings</b>\n"
+                "/copilot on|off — approve trades yourself\n"
+                "/builder — build your strategy\n"
+                "/news — high-impact events\n\n"
+                "<b>🔄 Demo ↔ Live:</b>\n"
+                "Start on a demo account with /setup. When you're ready, "
+                "send /ctrader and switch to your live account.\n\n"
+                "💬 <i>Or just talk to me in any language!</i>")
 
 _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
@@ -2243,29 +2241,21 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "/close — close current position\n"
                "/ctrader — connect cTrader · /copilot on|off · /news\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
-               "/broker oanda|mt — OANDA API or MetaTrader\n"
-               "/env practice|live — OANDA environment\n"
-               "/paper on|off — toggle paper mode\n"
                "/risk &lt;0.5-10&gt; — risk % per trade\n"
-               "/sl &lt;pips&gt; — stop loss in pips\n"
-               "/tp &lt;pips&gt; — take profit in pips\n"
-               "/symbol &lt;PAIR&gt; — set pair (EUR_USD)\n"
-               "/pairs — everything your broker lets you trade\n"
-               "/watch — scan a basket of instruments, trade the strongest setup\n"
-               "/autopilot on — full hands-off: bot picks the instruments too\n"
-               "/maxpos 5 — hold several trades at once (risk stays capped)\n"
-               "/strategy — trading method (auto · mean reversion · trend · breakout)\n"
-               "/builder — build a full strategy (style · setup · risk · exit) or a 1-tap preset\n"
-               "/atr on|off — dynamic ATR stops (SL 1.5×ATR / TP 3×ATR)\n"
-               "/wizard — guided setup (symbol → method → mode)\n"
-               "/terminal — live trading terminal (interactive chart + news)\n"
-               "/stats — performance report (win rate · profit factor · drawdown)\n"
+               "/sl &lt;pips&gt; — stop loss · /tp &lt;pips&gt; — take profit\n"
+               "/symbol &lt;PAIR&gt; — set pair\n"
+               "/pairs — available instruments\n"
+               "/watch — scan a basket, trade the strongest setup\n"
+               "/autopilot on — bot picks instruments too\n"
+               "/maxpos 5 — hold several trades at once\n"
+               "/strategy — method (auto · mean reversion · trend · breakout)\n"
+               "/builder — build a full strategy or 1-tap preset\n"
+               "/atr on|off — dynamic ATR stops\n"
+               "/terminal — live trading terminal\n"
+               "/stats — performance report\n"
                "/chart — quick chart snapshot\n"
-               "/setkeys KEY=val ... — set credentials\n"
-               "  (message is auto-deleted for safety)\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
-               "/start — resume trading\n"
-               "/stop — pause trading\n"
+               "/start — resume · /stop — pause\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "👑 <b>Admin</b>\n"
                "/grant &lt;id&gt; — give client access\n"
@@ -2278,7 +2268,7 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
 # ─── Poll loop ────────────────────────────────────────────
 
 _VERIFY_URL = "https://aicashsystem.space/api/verify-license"
-_DEPLOY_URL = "https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/autoflow-backend"
+_DEPLOY_URL = ""
 
 
 def _license_ok(chat_id, text):
