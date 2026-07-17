@@ -25,7 +25,7 @@ candles ──► indicators ──► strategies ──► AI signal ──► 
 
 RSI (14), Stoch RSI, MACD (12/26/9), EMA 20/50/200, Bollinger Bands, ATR,
 tick-volume ratio, RSI divergence, and market-structure classification —
-all computed on OANDA mid-price candles.
+all computed on cTrader candles.
 
 ## 2. Legendary-trader strategies
 
@@ -100,7 +100,7 @@ never the risk.
 | +1R in profit (+15 pips) | **Breakeven stop** — SL moves to entry +1 pip. The trade can no longer lose (`BREAKEVEN_AT_R`) |
 | Trailing | Stop ratchets 10 pips behind price, locking profit as it moves |
 | TP reached | **Runner mode** (paper trading) — instead of closing, the trail tightens to 6 pips and the trade rides the trend (`LET_WINNERS_RUN`). Exits as `TRAIL_PROFIT`, often well past the 30-pip TP |
-| Live brokers | SL/TP are placed server-side at the broker (OANDA/MT5) — they protect you even if the bot goes offline |
+| Live brokers | SL/TP are placed server-side at the broker (cTrader/MT5) — they protect you even if the bot goes offline |
 | AI CLOSE | The AI can close early if conditions reverse |
 
 ## Realistic expectations

@@ -6,14 +6,14 @@ happens through Telegram. The source code is yours to read or modify, but
 you never have to touch it.
 
 ### How is this different from the Apex Trade Bot (crypto)?
-Same AI brain and legendary-trader strategies, rebuilt for forex: OANDA
+Same AI brain and legendary-trader strategies, rebuilt for forex: cTrader
 broker connection, pip-based stops and sizing, leverage-aware margin
 management, spread guard, and market-hours awareness (forex closes on
 weekends). Forex pairs trend on macro cycles and respect technical levels —
 a different opportunity set than crypto.
 
 ### How much money do I need to start?
-$0. The free OANDA **practice account** gives you real market data and the
+$0. A free **cTrader demo account** gives you real market data and the
 bot trades a simulated balance. When you go live, $100–$500 is a sensible
 start.
 
@@ -25,20 +25,21 @@ Never trade money you can't afford to lose.
 
 ### What are the ongoing costs?
 - **Railway hosting:** ~$5/month
-- **OANDA practice account:** free; live account has no monthly fee (the
+- **cTrader account:** free demo; live account has no monthly fee (the
   broker earns from the spread)
 - **Groq AI key:** free tier is sufficient
 - **From us:** $0 — the $497 is one-time, no subscription
 
-### Why OANDA?
-It's one of the few regulated brokers with a clean public REST API and free
-practice accounts — no MetaTrader, no plugins, no VPS hacks. (MT4/MT5-only
-brokers like IC Markets can't be driven from a simple cloud bot.)
+### Why cTrader?
+cTrader Open API is free, available internationally, and works with many
+regulated brokers (IC Markets, Pepperstone, FxPro, ...). A single OAuth
+integration covers clients worldwide — no VPS, no plugins, no MetaTrader
+hacks needed for cloud trading.
 
 ### Which pairs can it trade?
-Any instrument your OANDA account offers — all majors, crosses, and even
-gold (XAU_USD). The default scanner watches EUR_USD, GBP_USD, USD_JPY,
-AUD_USD, USD_CAD.
+Any instrument your cTrader account offers — all majors, crosses, and even
+gold (XAUUSD). The default scanner watches EURUSD, GBPUSD, USDJPY,
+AUDUSD, USDCAD.
 
 ### What leverage does it use?
 Your account's leverage (default assumption 1:30, the EU retail cap). The
@@ -46,8 +47,8 @@ bot sizes positions from your **risk %**, not from maximum leverage — the
 margin cap just prevents oversizing.
 
 ### Can the bot withdraw my money?
-No. The OANDA API token only allows trading and account reads. Withdrawals
-require logging in to OANDA itself.
+No. The cTrader OAuth token only allows trading and account reads. Withdrawals
+require logging in to your broker directly.
 
 ### Where are my credentials stored?
 Only on **your** server (Railway environment + `runtime.json` on your

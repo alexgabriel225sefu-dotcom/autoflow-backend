@@ -302,7 +302,7 @@ def _drop_conn(env, ctid):
 class CtraderBroker:
     """cTrader connector with per-user config (token + account id + env).
 
-    Mirrors the OandaBroker interface so user_loop / bot.py can use it unchanged.
+    Implements the standard broker interface so user_loop / bot.py can use it.
     Symbol id and price digits are resolved once and cached per connection.
     """
 

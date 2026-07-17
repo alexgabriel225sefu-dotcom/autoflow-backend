@@ -13,33 +13,30 @@ Variables, exactly as written (format `APEX-XXXX-XXXX-XXXX`), then redeploy.
 ### ❌ `No AI key found`
 Add `GROQ_API_KEY` (free at [console.groq.com](https://console.groq.com)).
 
-### ⚠️ `OANDA credentials missing`
-The bot needs an OANDA token even for paper trading (that's where prices come
-from). Create a free practice account at oanda.com → Manage API Access, then
-send `/setup` to your Telegram bot.
+### ⚠️ `cTrader credentials missing`
+The bot needs cTrader app credentials (CTRADER_CLIENT_ID / CTRADER_CLIENT_SECRET)
+to let clients connect. Set them in your Railway env vars from
+openapi.ctrader.com/apps.
 
 ---
 
-## OANDA
+## cTrader
 
-### 401 Unauthorized
-- Your token doesn't match the environment: practice tokens only work with
-  `OANDA_ENV=practice`, live tokens with `live`. Check `/config`.
-- Tokens can be revoked — generate a fresh one in the OANDA portal.
+### Authentication errors / token expired
+- cTrader access tokens expire after ~30 days. The bot auto-refreshes them
+  using the stored refresh token. If the refresh also fails, send `/ctrader`
+  again to re-authorize.
+- Check that CTRADER_CLIENT_ID and CTRADER_CLIENT_SECRET are correct.
 
-### `Insufficient authorization to perform request`
-Your `OANDA_ACCOUNT_ID` belongs to a different environment or user. Copy the
-exact ID from the portal of the same environment as your token.
+### `cTrader: symbol X not offered by this account`
+The symbol isn't available on this broker/account. Try a standard FX pair
+like EUR_USD. Each broker offers a different instrument list.
 
 ### Prices look stale / no candles
 - Forex closes on weekends (Friday 21:00 → Sunday 21:00 UTC). `/status`
   shows the market state — this is normal, the bot resumes automatically.
-- OANDA practice occasionally lags a few seconds; this is harmless at the
-  5-minute analysis interval.
-
-### Order rejected: `MARKET_HALTED`
-The instrument is closed (weekend/holiday) or halted around major news.
-The bot skips and retries next cycle.
+- A long-idle cTrader connection may go stale. The bot auto-reconnects;
+  if it persists, send `/ctrader` to re-link.
 
 ---
 

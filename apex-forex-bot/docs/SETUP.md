@@ -4,17 +4,16 @@ Get the bot running in **under 15 minutes**. No coding required.
 
 ---
 
-## Step 0 — Create a free OANDA practice account
+## Step 0 — Create a free cTrader demo account
 
-The bot needs OANDA for market data (even in paper mode) — the practice
-account is free and takes 3 minutes:
+The bot connects to any cTrader broker (IC Markets, Pepperstone, FxPro, ...).
+A free demo account gives you real market data and risk-free practice:
 
-1. Go to [oanda.com](https://www.oanda.com) → **Try a free demo**
-2. After signing up, log in to the **fxTrade Practice** portal
-3. Go to **Manage API Access** → generate a **Personal Access Token** — copy it
-4. Note your **Account ID** (format: `101-001-1234567-001`, shown in My Account)
+1. Sign up at your preferred cTrader broker (e.g. IC Markets, Pepperstone)
+2. Create a **demo** trading account (free, instant)
+3. You'll link the account to the bot via OAuth in Step 4 below
 
-> The practice account trades fake money on real prices. You only need a
+> The demo account trades fake money on real prices. You only need a
 > funded live account when you decide to go live, much later.
 
 ---
@@ -52,8 +51,8 @@ Open your bot in Telegram and send:
 /setup
 ```
 
-The wizard asks for your OANDA token + account ID (the message is auto-deleted
-for safety), paper mode preference, and your currency pair. Done.
+The wizard walks you through mode selection (demo or live), then send
+`/ctrader` to connect your cTrader account via OAuth. Done.
 
 ---
 
@@ -74,10 +73,10 @@ The dashboard starts at [http://localhost:3000](http://localhost:3000).
 
 ## Going live (real money)
 
-1. Open a **live** OANDA account and fund it
-2. Generate a live API token (live portal → Manage API Access)
-3. Send your bot: `/setkeys OANDA_API_TOKEN=<live_token> OANDA_ACCOUNT_ID=<live_id>`
-4. `/env live` then `/paper off`
+1. Open a **live** cTrader account at your broker and fund it
+2. Send `/ctrader` to your bot — tap Authorize and log in with your live account
+3. Select the live account when prompted
+4. The bot confirms "LIVE" mode and starts trading
 
 Start small. Recommended first live balance: **$100–$500**. Keep risk at the
 default 2% per trade.

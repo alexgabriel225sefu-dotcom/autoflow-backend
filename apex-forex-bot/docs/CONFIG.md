@@ -12,11 +12,11 @@ Settings come from three places (highest priority first):
 
 | Command | What it does |
 |---|---|
-| `/setup` | Guided wizard: OANDA → paper → pair |
-| `/broker oanda\|mt` | OANDA API or MetaTrader bridge ([guide](METATRADER.md)) |
+| `/setup` | Guided wizard: mode → pair → risk |
+| `/ctrader` | Connect your cTrader account (OAuth) |
 | `/config` | Show all current settings |
 | `/status` | Live balance, position, PnL, market hours, sessions |
-| `/env practice\|live` | Switch OANDA environment |
+| `/env practice\|live` | Switch demo/live mode |
 | `/paper on\|off` | Toggle paper / live trading |
 | `/risk <0.5-10>` | Risk % per trade (e.g. `/risk 2`) |
 | `/sl <pips>` | Stop loss in pips (e.g. `/sl 15`) |
@@ -33,14 +33,14 @@ Settings come from three places (highest priority first):
 | Variable | Default | Description |
 |---|---|---|
 | `LICENSE_KEY` | — | Your license from the purchase email (**required**) |
-| `BROKER` | `oanda` | `oanda` (direct API — **the only broker validated for live trading**, with server-side SL/TP), `mt` (MetaTrader 5 bridge) or `td` (Twelve Data, paper only). With `mt`, live mode requires `ALLOW_EXPERIMENTAL_LIVE=true` — otherwise the bot stays in paper for safety |
-| `OANDA_API_TOKEN` | — | Personal Access Token from OANDA (required for `oanda`) |
-| `OANDA_ACCOUNT_ID` | — | e.g. `101-001-1234567-001` (required for `oanda`) |
-| `OANDA_ENV` | `practice` | `practice` or `live` — must match your token |
+| `BROKER` | `ctrader` | `ctrader` (cTrader Open API — **the primary broker**, with server-side SL/TP), `mt` (MetaTrader 5 bridge) or `td` (Twelve Data, paper only). With `mt`, live mode requires `ALLOW_EXPERIMENTAL_LIVE=true` — otherwise the bot stays in paper for safety |
+| `CTRADER_CLIENT_ID` | — | App credentials from openapi.ctrader.com/apps |
+| `CTRADER_CLIENT_SECRET` | — | App credentials from openapi.ctrader.com/apps |
+| `CTRADER_ENV` | `demo` | `demo` or `live` — set automatically when the client links an account |
 | `MT_BRIDGE_SECRET` | — | Shared secret for the ApexBridge EA (required for `mt`) |
 | `TRADE_SYMBOL` | `EUR_USD` | Pair to trade when scanner is off |
 | `TIMEFRAME` | `5m` | Candle interval: `1m` `5m` `15m` `30m` `1h` `4h` `1d` |
-| `PAPER_TRADING` | `true` | Simulated balance (data still comes from OANDA) |
+| `PAPER_TRADING` | `true` | Simulated balance (data still comes from cTrader) |
 | `PAPER_BALANCE` | `1000` | Starting balance in paper mode |
 
 ## AI providers
