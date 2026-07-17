@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
 from apex import config as cfg_mod
-from apex.brokers.oanda import OandaBroker
+from apex.brokers import yahoo as _yahoo_mod
 
 
 _loops = {}   # user_id → {"thread": Thread, "running": bool, "dash": dict}
@@ -97,11 +97,8 @@ def _make_broker(user):
     if ct_token and ct_account:
         from apex.brokers.ctrader import CtraderBroker
         return CtraderBroker(fake_cfg), fake_cfg
-    # Paper + no broker linked → free Yahoo Finance data, zero signup.
-    if paper and not oanda_token:
-        from apex.brokers import yahoo
-        return yahoo, fake_cfg
-    return OandaBroker(fake_cfg), fake_cfg
+    # No broker linked → free Yahoo Finance data for charts, zero signup.
+    return _yahoo_mod, fake_cfg
 
 
 def _broker_label(user, cfg):

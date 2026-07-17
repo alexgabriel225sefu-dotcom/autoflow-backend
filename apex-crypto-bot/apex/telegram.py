@@ -97,22 +97,25 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
             send_to(chat_id, "📭 Nicio poziție deschisă momentan.")
             return True
         from apex.brokers import yahoo
-        from apex.brokers.oanda import OandaBroker
+        from apex.brokers.ctrader import CtraderBroker
         import types as _types
         user = user_store.load(chat_id)
         sym = open_pos.get("symbol", _user_symbol(chat_id))
         try:
-            paper = user.get("paper", True)
+            ct_token = user.get("ctrader_access_token", "")
+            ct_account = user.get("ctrader_account_id", "")
             fake_cfg = _types.SimpleNamespace(
-                OANDA_API_TOKEN=user.get("oanda_token", ""),
-                OANDA_ACCOUNT_ID=user.get("oanda_account_id", ""),
-                OANDA_ENV="practice", SYMBOL=sym, TIMEFRAME="5m", CANDLES=5,
-                PAPER_TRADING=paper, PAPER_BALANCE=1000,
+                CTRADER_ACCESS_TOKEN=ct_token,
+                CTRADER_REFRESH_TOKEN=user.get("ctrader_refresh_token", ""),
+                CTRADER_ACCOUNT_ID=ct_account,
+                CTRADER_ENV=user.get("ctrader_env", "demo"),
+                SYMBOL=sym, TIMEFRAME="5m", CANDLES=5,
+                PAPER_TRADING=user.get("paper", True), PAPER_BALANCE=1000,
                 STOP_LOSS_PIPS=20.0, TAKE_PROFIT_PIPS=40.0,
                 RISK_PER_TRADE=0.005, LEVERAGE=30.0, MARGIN_CAP=0.5,
                 MAX_SPREAD_PIPS=3.0, MIN_CONFIDENCE=62,
             )
-            broker = yahoo if (paper and not user.get("oanda_token")) else OandaBroker(fake_cfg)
+            broker = CtraderBroker(fake_cfg) if (ct_token and ct_account) else yahoo
             candles = broker.get_candles(sym, "5m", 5)
             price = candles[-1]["close"] if candles else open_pos["entryPrice"]
         except Exception:

@@ -139,7 +139,7 @@ def _build_context(user_id: str) -> str:
     """Inject live account state so the AI talks with real numbers."""
     from apex import user_loop, user_store, forex, indicators
     from apex.brokers import yahoo
-    from apex.brokers.oanda import OandaBroker
+    from apex.brokers.ctrader import CtraderBroker
     import types
 
     user = user_store.load(user_id)
@@ -152,11 +152,14 @@ def _build_context(user_id: str) -> str:
     paper = user.get("paper", cfg.PAPER_TRADING)
     open_pos = dash.get("openPosition")
     last_price = dash.get("currentPrice")
+    ct_token = user.get("ctrader_access_token", "")
+    ct_account = user.get("ctrader_account_id", "")
+    ct_env = user.get("ctrader_env", "demo")
 
     lines = [
         f"Balance: ${balance:.2f} (start ${start_bal:.2f}, P&L: {pnl_pct:+.1f}%)",
         f"Symbol: {symbol}",
-        f"Mode: {'Paper (simulated)' if paper else 'LIVE OANDA'}",
+        f"Mode: {'Demo' if ct_env == 'demo' else 'LIVE'}",
         f"Market: {'OPEN' if forex.is_market_open() else 'CLOSED (weekend/holiday)'}",
         f"Sessions: {', '.join(forex.active_sessions()) or '—'}",
     ]
@@ -165,9 +168,10 @@ def _build_context(user_id: str) -> str:
 
     try:
         fake_cfg = types.SimpleNamespace(
-            OANDA_API_TOKEN=user.get("oanda_token", ""),
-            OANDA_ACCOUNT_ID=user.get("oanda_account_id", ""),
-            OANDA_ENV=user.get("oanda_env", "practice"),
+            CTRADER_ACCESS_TOKEN=ct_token,
+            CTRADER_REFRESH_TOKEN=user.get("ctrader_refresh_token", ""),
+            CTRADER_ACCOUNT_ID=ct_account,
+            CTRADER_ENV=ct_env,
             SYMBOL=symbol, TIMEFRAME=cfg.TIMEFRAME, CANDLES=50,
             PAPER_TRADING=paper, PAPER_BALANCE=balance,
             STOP_LOSS_PIPS=float(user.get("sl_pips", cfg.STOP_LOSS_PIPS)),
@@ -177,7 +181,7 @@ def _build_context(user_id: str) -> str:
             MARGIN_CAP=0.5, MAX_SPREAD_PIPS=3.0,
             MIN_CONFIDENCE=int(user.get("min_confidence", cfg.MIN_CONFIDENCE)),
         )
-        broker = yahoo if (paper and not user.get("oanda_token")) else OandaBroker(fake_cfg)
+        broker = CtraderBroker(fake_cfg) if (ct_token and ct_account) else yahoo
         candles = broker.get_candles(symbol, cfg.TIMEFRAME, 50)
         if candles:
             ind = indicators.analyze(candles)
@@ -218,20 +222,23 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
         send_status(f"🔍 Analyzing <b>{symbol}</b>…")
         try:
             from apex.brokers import yahoo
-            from apex.brokers.oanda import OandaBroker
+            from apex.brokers.ctrader import CtraderBroker
             import types
             user = user_store.load(user_id)
-            paper = user.get("paper", True)
+            ct_token = user.get("ctrader_access_token", "")
+            ct_account = user.get("ctrader_account_id", "")
             fake_cfg = types.SimpleNamespace(
-                OANDA_API_TOKEN=user.get("oanda_token", ""),
-                OANDA_ACCOUNT_ID=user.get("oanda_account_id", ""),
-                OANDA_ENV="practice", SYMBOL=symbol, TIMEFRAME=cfg.TIMEFRAME,
-                CANDLES=100, PAPER_TRADING=paper, PAPER_BALANCE=1000,
+                CTRADER_ACCESS_TOKEN=ct_token,
+                CTRADER_REFRESH_TOKEN=user.get("ctrader_refresh_token", ""),
+                CTRADER_ACCOUNT_ID=ct_account,
+                CTRADER_ENV=user.get("ctrader_env", "demo"),
+                SYMBOL=symbol, TIMEFRAME=cfg.TIMEFRAME,
+                CANDLES=100, PAPER_TRADING=user.get("paper", True), PAPER_BALANCE=1000,
                 STOP_LOSS_PIPS=cfg.STOP_LOSS_PIPS, TAKE_PROFIT_PIPS=cfg.TAKE_PROFIT_PIPS,
                 RISK_PER_TRADE=cfg.RISK_PER_TRADE, LEVERAGE=cfg.LEVERAGE,
                 MARGIN_CAP=0.5, MAX_SPREAD_PIPS=3.0, MIN_CONFIDENCE=cfg.MIN_CONFIDENCE,
             )
-            broker = yahoo if (paper and not user.get("oanda_token")) else OandaBroker(fake_cfg)
+            broker = CtraderBroker(fake_cfg) if (ct_token and ct_account) else yahoo
             candles = broker.get_candles(symbol, cfg.TIMEFRAME, 100)
             if not candles:
                 return json.dumps({"error": "No market data available"})
