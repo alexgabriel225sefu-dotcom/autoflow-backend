@@ -6,47 +6,60 @@ Druckenmiller position sizing.
 import time
 from datetime import date
 
-session = {
-    "consecutiveLosses": 0,
-    "consecutiveWins": 0,
-    "dailyTrades": 0,
-    "dailyPnL": 0.0,
-    "dailyPnLPct": 0.0,
-    "lastResetDay": date.today().isoformat(),
-    "peakBalance": None,
-    "totalTrades": 0,
-    "lastLossAt": 0.0,
-}
+_sessions = {}  # user_id → per-user session dict (thread-safe: each user has its own)
+
+def _default_session():
+    return {
+        "consecutiveLosses": 0,
+        "consecutiveWins": 0,
+        "dailyTrades": 0,
+        "dailyPnL": 0.0,
+        "dailyPnLPct": 0.0,
+        "lastResetDay": date.today().isoformat(),
+        "peakBalance": None,
+        "totalTrades": 0,
+        "lastLossAt": 0.0,
+    }
+
+session = _default_session()  # legacy compat for single-user code paths
+
+def get_session(user_id=None):
+    if user_id is None:
+        return session
+    if user_id not in _sessions:
+        _sessions[user_id] = _default_session()
+    return _sessions[user_id]
 
 
-def _reset_daily_if_needed():
+def _reset_daily_if_needed(user_id=None):
+    s = get_session(user_id)
     today = date.today().isoformat()
-    if session["lastResetDay"] != today:
-        session["dailyTrades"] = 0
-        session["dailyPnL"] = 0.0
-        session["dailyPnLPct"] = 0.0
-        session["lastResetDay"] = today
-        print("[STRATEGY] 🌅 New day — counters reset.")
+    if s["lastResetDay"] != today:
+        s["dailyTrades"] = 0
+        s["dailyPnL"] = 0.0
+        s["dailyPnLPct"] = 0.0
+        s["lastResetDay"] = today
+        print(f"[STRATEGY:{user_id or '?'}] 🌅 New day — counters reset.")
 
 
 def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
-                max_dd_pct=20.0, max_trades_day=10):
-    """Circuit breaker. Limits are per-user (set by the Strategy Builder); the
-    defaults preserve the historical behaviour when called without them."""
-    _reset_daily_if_needed()
+                max_dd_pct=20.0, max_trades_day=10, user_id=None):
+    """Circuit breaker — per-user when user_id is provided."""
+    _reset_daily_if_needed(user_id)
+    s = get_session(user_id)
     reasons = []
-    if session["peakBalance"] is None or balance > session["peakBalance"]:
-        session["peakBalance"] = balance
-    if session["consecutiveLosses"] >= 3:
+    if s["peakBalance"] is None or balance > s["peakBalance"]:
+        s["peakBalance"] = balance
+    if s["consecutiveLosses"] >= 3:
         reasons.append("3 consecutive losses — unfavorable conditions (Seykota rule)")
-    daily_dd_pct = (session["dailyPnL"] / start_balance) * 100 if start_balance else 0
+    daily_dd_pct = (s["dailyPnL"] / start_balance) * 100 if start_balance else 0
     if daily_dd_pct < -abs(max_daily_loss_pct):
         reasons.append(f"Daily loss exceeded -{abs(max_daily_loss_pct):g}% "
-                       f"(${abs(session['dailyPnL']):.2f}) — daily stop")
-    peak_dd = ((balance - session["peakBalance"]) / session["peakBalance"]) * 100 if session["peakBalance"] else 0
+                       f"(${abs(s['dailyPnL']):.2f}) — daily stop")
+    peak_dd = ((balance - s["peakBalance"]) / s["peakBalance"]) * 100 if s["peakBalance"] else 0
     if peak_dd < -abs(max_dd_pct):
         reasons.append(f"Drawdown from peak: {peak_dd:.1f}% (limit {abs(max_dd_pct):g}%) — capital protection stop")
-    if session["dailyTrades"] >= max_trades_day:
+    if s["dailyTrades"] >= max_trades_day:
         reasons.append(f"{max_trades_day} trades/day limit reached")
     if balance < 1:
         reasons.append("Balance under $1 — cannot trade")
@@ -101,17 +114,23 @@ def livermore_structure(candles):
     return {"trend": "NEUTRAL", "strength": 0.2, "reason": "Mixed structure"}
 
 
-def soros_momentum(candles):
+def soros_momentum(candles, velocity_thr=None):
     if len(candles) < 8:
         return {"momentum": 0, "direction": "NEUTRAL", "velocity": 0}
+    if velocity_thr is None:
+        try:
+            from apex import config as _cfg
+            velocity_thr = 1.0 if getattr(_cfg, "PRODUCT", "forex") == "crypto" else 0.3
+        except Exception:
+            velocity_thr = 0.3
     recent = candles[-8:]
     wins = sum(1 for c in recent if c["close"] > c["open"])
     bull_pct = wins / len(recent)
     closes = [c["close"] for c in recent]
     velocity = (closes[-1] - closes[0]) / closes[0] * 100
-    if bull_pct >= 0.75 and velocity > 0.3:
+    if bull_pct >= 0.75 and velocity > velocity_thr:
         return {"momentum": bull_pct, "direction": "BULLISH", "velocity": velocity}
-    if bull_pct <= 0.25 and velocity < -0.3:
+    if bull_pct <= 0.25 and velocity < -velocity_thr:
         return {"momentum": 1 - bull_pct, "direction": "BEARISH", "velocity": velocity}
     return {"momentum": 0.5, "direction": "NEUTRAL", "velocity": velocity}
 
@@ -136,42 +155,44 @@ def mean_reversion(candles, period=20, threshold=2.0):
 def druckenmiller_multiplier(confidence, criteria_score, livermore, turtle):
     mult = 1.0
     if confidence >= 85 and criteria_score >= 5:
-        mult *= 1.5
+        mult *= 1.3
     elif confidence >= 80 and criteria_score >= 4:
-        mult *= 1.2
+        mult *= 1.1
     elif confidence < 75 or criteria_score < 3:
         mult *= 0.6
     if turtle and turtle.get("breakoutStr") == "STRONG":
-        mult *= 1.3
+        mult *= 1.2
     if livermore and (livermore.get("strength") or 0) >= 0.8:
         mult *= 1.1
-    return min(2.0, max(0.4, mult))
+    return min(1.5, max(0.4, mult))
 
 
-def record_trade(won, pnl_amount, start_balance):
-    session["totalTrades"] += 1
-    session["dailyTrades"] += 1
-    session["dailyPnL"] += pnl_amount
-    session["dailyPnLPct"] = (session["dailyPnL"] / start_balance) * 100 if start_balance else 0
+def record_trade(won, pnl_amount, start_balance, user_id=None):
+    s = get_session(user_id)
+    s["totalTrades"] += 1
+    s["dailyTrades"] += 1
+    s["dailyPnL"] += pnl_amount
+    s["dailyPnLPct"] = (s["dailyPnL"] / start_balance) * 100 if start_balance else 0
     if won:
-        session["consecutiveWins"] += 1
-        session["consecutiveLosses"] = 0
+        s["consecutiveWins"] += 1
+        s["consecutiveLosses"] = 0
     else:
-        session["consecutiveLosses"] += 1
-        session["consecutiveWins"] = 0
-        session["lastLossAt"] = time.time()
+        s["consecutiveLosses"] += 1
+        s["consecutiveWins"] = 0
+        s["lastLossAt"] = time.time()
     icon = "✅" if won else "❌"
-    print(f"[STRATEGY] {icon} Streak: {session['consecutiveLosses']} losses / "
-          f"{session['consecutiveWins']} wins | Today: {session['dailyTrades']} trades | "
-          f"Daily PnL: {'+' if session['dailyPnL'] >= 0 else ''}${session['dailyPnL']:.4f}")
+    print(f"[STRATEGY:{user_id or '?'}] {icon} Streak: {s['consecutiveLosses']} losses / "
+          f"{s['consecutiveWins']} wins | Today: {s['dailyTrades']} trades | "
+          f"Daily PnL: {'+' if s['dailyPnL'] >= 0 else ''}${s['dailyPnL']:.4f}")
 
 
-def cooldown_remaining(cooldown_min):
+def cooldown_remaining(cooldown_min, user_id=None):
     """Ed Seykota: after a loss, the worst trade is the revenge trade.
     Returns minutes left until entries are allowed again (0 = clear)."""
-    if not session["lastLossAt"] or cooldown_min <= 0:
+    s = get_session(user_id)
+    if not s["lastLossAt"] or cooldown_min <= 0:
         return 0
-    elapsed = (time.time() - session["lastLossAt"]) / 60
+    elapsed = (time.time() - s["lastLossAt"]) / 60
     return 0 if elapsed >= cooldown_min else int(cooldown_min - elapsed) + 1
 
 

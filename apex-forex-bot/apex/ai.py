@@ -205,7 +205,7 @@ def rule_based_fallback(ind, open_position=None):
     elif score < 0 and above_emas:
         score -= 1; factors.append("Price overextended above EMAs")
     elif score < 0 and below_emas:
-        score += 1; factors.append("Price at discount below EMAs")
+        score -= 1; factors.append("Price confirms bearish below EMAs")
 
     # Volume amplifies the existing direction
     if vol_r >= 1.3 and score != 0 and ind.get("hasVolume", True):
@@ -216,11 +216,11 @@ def rule_based_fallback(ind, open_position=None):
     confidence    = min(85, 52 + abs_score * 8)
     criteria_score = min(5, abs_score + 1)
 
-    if score >= 2:
+    if score >= 3:
         return {"action": "BUY",  "confidence": confidence, "criteriaScore": criteria_score,
                 "reasoning": f"Rule-based: {', '.join(factors)}", "riskLevel": "MEDIUM",
                 "keyFactors": factors}
-    if score <= -2:
+    if score <= -3:
         return {"action": "SELL", "confidence": confidence, "criteriaScore": criteria_score,
                 "reasoning": f"Rule-based: {', '.join(factors)}", "riskLevel": "MEDIUM",
                 "keyFactors": factors}
@@ -256,14 +256,14 @@ def mean_reversion_signal(ind, open_position=None):
     # Already in a trade → exit once price has reverted to the mean (the target).
     if open_position:
         side = open_position.get("side")
-        if side == "BUY" and bb_pos >= 60:
+        if side == "BUY" and bb_pos >= 52:
             return {"action": "CLOSE", "confidence": 70, "criteriaScore": 3,
-                    "reasoning": "Mean reversion: price reverted past BB mid — take profit",
-                    "riskLevel": "LOW", "keyFactors": ["reverted past mean"]}
-        if side == "SELL" and bb_pos <= 40:
+                    "reasoning": "Mean reversion: price reached BB mid — take profit",
+                    "riskLevel": "LOW", "keyFactors": ["reached mean"]}
+        if side == "SELL" and bb_pos <= 48:
             return {"action": "CLOSE", "confidence": 70, "criteriaScore": 3,
-                    "reasoning": "Mean reversion: price reverted past BB mid — take profit",
-                    "riskLevel": "LOW", "keyFactors": ["reverted past mean"]}
+                    "reasoning": "Mean reversion: price reached BB mid — take profit",
+                    "riskLevel": "LOW", "keyFactors": ["reached mean"]}
         return {"action": "HOLD", "confidence": 50, "criteriaScore": 1,
                 "reasoning": "Holding mean-reversion trade, waiting for reversion to the mean",
                 "riskLevel": "LOW", "keyFactors": []}
@@ -408,8 +408,8 @@ def trend_signal(ind, strat=None, open_position=None):
         pullback_sell = score < 0 and price >= ema20 * 0.996 and 30 <= rsi_v <= 62
         thr = 3
     else:
-        pullback_buy = score > 0 and price <= ema20 * 1.002 and 35 <= rsi_v <= 62
-        pullback_sell = score < 0 and price >= ema20 * 0.998 and 38 <= rsi_v <= 65
+        pullback_buy = score > 0 and price <= ema20 * 1.005 and 35 <= rsi_v <= 65
+        pullback_sell = score < 0 and price >= ema20 * 0.995 and 35 <= rsi_v <= 65
         thr = 3
     if pullback_buy:
         score += 1; factors.append(f"pullback to EMA20 (RSI {rsi_v:.0f})")

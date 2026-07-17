@@ -15,7 +15,8 @@ _LOOP_INTERVAL = 300  # 5 minutes between ticks
 _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
 _SKIP_WARN_THROTTLE = 6  # "don't trade now" market-condition warnings (~30 min)
-_LOSS_COOLDOWN_MIN = 5    # brief pause after a loss (was 20) — trade more freely
+_LOSS_COOLDOWN_MIN = 15   # pause after a loss — avoid revenge trades in the same move
+_CLOSE_COOLDOWN_MIN = 10  # pause after ANY close — prevent open/close churn
 
 
 def _log_trade(user_id, record):
@@ -899,6 +900,10 @@ def _loop(user_id, alert_fn, gen=None):
                     last_warn_tick = tick
                     alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                        "reason": f"cooling down after a loss — entries resume in ~{left}m"})
+            if entry_ok and last_close_at and time.time() - last_close_at < _CLOSE_COOLDOWN_MIN * 60:
+                left = int((_CLOSE_COOLDOWN_MIN * 60 - (time.time() - last_close_at)) / 60) + 1
+                entry_ok = False
+                _skip(f"post-close cooldown ({left}m left)")
             if entry_ok:
                 # ── Cost control: the spread is forex's hidden fee. Skip a too-wide
                 #    spread and refuse trades whose target can't clear a round-trip
