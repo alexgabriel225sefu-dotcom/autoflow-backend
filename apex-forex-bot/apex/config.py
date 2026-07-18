@@ -91,7 +91,7 @@ MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
 # FX majors + gold are on every cTrader broker; crypto CFDs are the liquid
 # majors. Non-FX candidates are validated per account before use.
 _DEFAULT_UNIVERSE = ("BTCUSD,ETHUSD,SOLUSD,XRPUSD,LTCUSD,ADAUSD,DOGEUSD,DOTUSD,"
-                     "LINKUSD,BCHUSD,XAUUSD" if _IS_CRYPTO else
+                     "LINKUSD,BCHUSD" if _IS_CRYPTO else
                      "EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,NZDUSD,"
                      "XAUUSD,US30,NAS100,US500,GER40")
 AUTOPILOT_UNIVERSE = [s.strip().upper() for s in
@@ -109,8 +109,8 @@ CROSS_PRODUCT_BLOCK = _FOREX_ONLY if _IS_CRYPTO else _CRYPTO_ONLY
 
 # ─── Risk ───────────────────────────────────────────────
 RISK_PER_TRADE = float(_scalp("RISK_PER_TRADE", 0.01, 0.005))  # scalp: 1% (controlled, not aggressive) · swing: 0.5%
-STOP_LOSS_PIPS = float(_scalp("STOP_LOSS_PIPS", 6, 20))        # scalp: tight 6p · swing: 20p
-TAKE_PROFIT_PIPS = float(_scalp("TAKE_PROFIT_PIPS", 9, 40))    # scalp: 9p (R:R 1.5) · swing: 40p (R:R 2)
+STOP_LOSS_PIPS = float(_scalp("STOP_LOSS_PIPS", 15, 25))        # scalp: 15p · swing: 25p — room to breathe past spread+noise
+TAKE_PROFIT_PIPS = float(_scalp("TAKE_PROFIT_PIPS", 30, 50))   # scalp: 30p (RR 1:2) · swing: 50p (RR 2:1)
 MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 68)
 LEVERAGE = float(os.getenv("LEVERAGE") or 30)
 MARGIN_CAP = float(os.getenv("MARGIN_CAP") or 0.5)             # use ≤50% of available margin

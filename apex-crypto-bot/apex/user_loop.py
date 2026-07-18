@@ -1039,7 +1039,7 @@ def _loop(user_id, alert_fn, gen=None):
                     # Crypto's magnitude pip makes 10×pip a 0.01-0.1% sub-noise
                     # floor; use a %-of-price floor (~0.4%) so the stop clears
                     # crypto tick noise. Forex keeps the 10-pip floor.
-                    floor_abs = (0.004 * price) if _crypto else (10.0 * pip)
+                    floor_abs = (0.004 * price) if _crypto else (15.0 * pip)
                     min_stop = max(4.0 * spread * pip, floor_abs)
                     if sl_dist < min_stop:
                         sl_dist = min_stop
@@ -1359,7 +1359,7 @@ def force_trade(user_id, side, symbol=None):
         atr_m = 0.0
     if getattr(cfg, "ATR_STOPS", True) and atr_m > 0:
         sl_dist = 2.0 * atr_m
-        min_stop = max(4.0 * spread * pip, 10.0 * pip)
+        min_stop = max(4.0 * spread * pip, 15.0 * pip)
         if sl_dist < min_stop:
             sl_dist = min_stop
         tp_dist = 2.5 * sl_dist

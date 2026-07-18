@@ -58,7 +58,7 @@ def presets():
             "patch": {
                 "style": "scalping", "strategy": "auto", "timeframe": "1m",
                 "risk": 0.005, "min_confidence": 55, "atr_stops": False,
-                "sl_pips": 6, "tp_pips": 9,
+                "sl_pips": 15, "tp_pips": 30,
                 "exit_mode": "fixed", "trailing": False, "breakeven_r": 0,
                 "news_filter": True, "session_filter": ["London", "New York"],
                 "max_trades_day": 15, "max_dd_pct": 15, "max_daily_loss_pct": 3,
@@ -94,10 +94,10 @@ def _style_step():
         "options": [
             {"label": "⚡ Scalping (1m)", "patch": {
                 "style": "scalping", "timeframe": "1m",
-                **({"atr_stops": True} if _is_crypto() else {"sl_pips": 6, "tp_pips": 9, "atr_stops": False})}},
+                **({"atr_stops": True} if _is_crypto() else {"sl_pips": 15, "tp_pips": 30, "atr_stops": False})}},
             {"label": "📅 Day trading (5m)", "patch": {
                 "style": "day", "timeframe": "5m",
-                **({"atr_stops": True} if _is_crypto() else {"sl_pips": 12, "tp_pips": 24, "atr_stops": True})}},
+                **({"atr_stops": True} if _is_crypto() else {"sl_pips": 20, "tp_pips": 40, "atr_stops": True})}},
             {"label": "📈 Swing (1h)", "patch": {
                 "style": "swing", "timeframe": "1h", "atr_stops": True,
                 **({"sl_pips": 400, "tp_pips": 900} if _is_crypto() else {"sl_pips": 25, "tp_pips": 60})}},
