@@ -17,10 +17,10 @@
   --sans:system-ui,-apple-system,'Segoe UI',sans-serif;
   --mono:'Courier New',monospace;
 }
-html,body{height:100%;overflow:hidden;background:#000}
-body{display:flex;align-items:center;justify-content:center;font-family:var(--sans);-webkit-font-smoothing:antialiased;color:var(--text)}
+html,body{height:100%;background:#000;margin:0;padding:0}
+body{display:flex;align-items:center;justify-content:center;font-family:var(--sans);-webkit-font-smoothing:antialiased;color:var(--text);overflow:hidden;min-height:100vh;min-height:100dvh}
 
-.canvas{position:relative;width:min(100vw,960px);aspect-ratio:16/9;background:var(--bg);overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.8)}
+.canvas{position:relative;width:100%;max-width:960px;aspect-ratio:16/9;background:var(--bg);overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.8)}
 
 /* Stars background */
 .stars{position:absolute;inset:0;z-index:0;pointer-events:none;
@@ -156,12 +156,13 @@ body{display:flex;align-items:center;justify-content:center;font-family:var(--sa
 .scene.active .s5-right{opacity:1;transform:none}
 
 /* Play overlay */
-.play-overlay{position:absolute;inset:0;z-index:50;background:rgba(9,9,11,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:16px;transition:opacity .4s ease}
-.play-overlay.hidden{opacity:0;pointer-events:none}
-.play-btn{width:clamp(56px,10vw,80px);height:clamp(56px,10vw,80px);border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(230,57,70,.4);transition:all .3s cubic-bezier(.32,.72,0,1)}
-.play-btn:hover{transform:scale(1.08);box-shadow:0 0 60px rgba(230,57,70,.6)}
-.play-btn svg{width:40%;height:40%;fill:#fff;margin-left:4px}
-.play-label{font-size:clamp(12px,1.6vw,16px);color:var(--text2);letter-spacing:.02em}
+.play-overlay{position:absolute;inset:0;z-index:50;background:rgba(9,9,11,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:16px;transition:opacity .4s ease;-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.play-overlay.hidden{opacity:0;pointer-events:none;visibility:hidden}
+.play-btn{width:80px;height:80px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(230,57,70,.4),0 0 0 8px rgba(230,57,70,.15);transition:all .3s cubic-bezier(.32,.72,0,1);animation:pulse-ring 2s ease-in-out infinite}
+@keyframes pulse-ring{0%,100%{box-shadow:0 0 40px rgba(230,57,70,.4),0 0 0 8px rgba(230,57,70,.15)}50%{box-shadow:0 0 50px rgba(230,57,70,.5),0 0 0 16px rgba(230,57,70,.1)}}
+.play-btn:hover{transform:scale(1.08);box-shadow:0 0 60px rgba(230,57,70,.6),0 0 0 12px rgba(230,57,70,.2)}
+.play-btn svg{width:36px;height:36px;fill:#fff;margin-left:4px}
+.play-label{font-size:16px;color:var(--text2);letter-spacing:.02em}
 
 /* Progress bar */
 .progress{position:absolute;bottom:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));z-index:40;width:0;transition:width .1s linear}
@@ -325,6 +326,7 @@ body{display:flex;align-items:center;justify-content:center;font-family:var(--sa
   let tickerAnim = null;
 
   overlay.addEventListener('click', start);
+  overlay.addEventListener('touchend', function(e){e.preventDefault();start();});
 
   function start(){
     if(running) return;
