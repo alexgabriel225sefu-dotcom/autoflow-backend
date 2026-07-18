@@ -2437,7 +2437,7 @@ app.get('/index.html', (req, res) => {
 });
 
 // Landing sub-pages (served from html/)
-['features','strategies','faq','security'].forEach(p => {
+['features','strategies','faq','security','promo-16x9'].forEach(p => {
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'html', `${p}.html`), { headers: { 'Cache-Control': 'no-store' } }));
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'html', `${p}.html`), { headers: { 'Cache-Control': 'no-store' } }));
 });

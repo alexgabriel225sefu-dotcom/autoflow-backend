@@ -1,0 +1,399 @@
+<title>Apex Trading Suite — Promo</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090b;
+  --surface:#0c0c0f;
+  --surface2:#111114;
+  --border:rgba(255,255,255,.08);
+  --text:#e4e4e7;
+  --text2:#a1a1aa;
+  --muted:#71717a;
+  --accent:#e63946;
+  --accent2:#ff6b7a;
+  --accent-dim:rgba(230,57,70,.12);
+  --accent-glow:rgba(230,57,70,.45);
+  --green:#22c55e;
+  --sans:system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'Courier New',monospace;
+}
+html,body{height:100%;background:#000;margin:0;padding:0}
+body{display:flex;align-items:center;justify-content:center;font-family:var(--sans);-webkit-font-smoothing:antialiased;color:var(--text);overflow:hidden;min-height:100vh;min-height:100dvh}
+
+.canvas{position:relative;width:100%;max-width:960px;aspect-ratio:16/9;background:var(--bg);overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,.8)}
+
+/* Stars background */
+.stars{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    radial-gradient(1px 1px at 15% 12%,rgba(255,255,255,.35),transparent),
+    radial-gradient(1px 1px at 32% 38%,rgba(255,255,255,.25),transparent),
+    radial-gradient(1.2px 1.2px at 48% 8%,rgba(255,200,200,.3),transparent),
+    radial-gradient(1px 1px at 65% 22%,rgba(255,255,255,.25),transparent),
+    radial-gradient(1px 1px at 78% 55%,rgba(255,255,255,.2),transparent),
+    radial-gradient(1px 1px at 88% 15%,rgba(255,255,255,.25),transparent),
+    radial-gradient(1px 1px at 22% 72%,rgba(255,255,255,.2),transparent),
+    radial-gradient(1.2px 1.2px at 55% 85%,rgba(200,180,255,.25),transparent),
+    radial-gradient(1px 1px at 92% 78%,rgba(255,255,255,.2),transparent),
+    radial-gradient(.8px .8px at 5% 45%,rgba(255,255,255,.2),transparent),
+    radial-gradient(.8px .8px at 42% 62%,rgba(255,255,255,.18),transparent),
+    radial-gradient(1px 1px at 72% 88%,rgba(255,255,255,.15),transparent);
+  animation:twinkle 4s ease-in-out infinite alternate}
+@keyframes twinkle{0%{opacity:.5}100%{opacity:.85}}
+
+/* Aurora glow */
+.aurora{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.aurora::before{content:'';position:absolute;top:-20%;left:15%;width:50%;height:60%;border-radius:50%;background:rgba(230,57,70,.06);filter:blur(80px);animation:aur1 12s ease-in-out infinite alternate}
+.aurora::after{content:'';position:absolute;top:30%;right:5%;width:40%;height:50%;border-radius:50%;background:rgba(155,29,234,.04);filter:blur(70px);animation:aur2 14s ease-in-out infinite alternate}
+@keyframes aur1{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,30px) scale(1.1)}}
+@keyframes aur2{0%{transform:translate(0,0) scale(1)}100%{transform:translate(-30px,20px) scale(1.15)}}
+
+/* Scenes */
+.scene{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;padding:8%;opacity:0;pointer-events:none;transition:opacity .6s cubic-bezier(.32,.72,0,1)}
+.scene.active{opacity:1;pointer-events:auto}
+
+/* Scene 1: Hook */
+.s1-content{text-align:center;max-width:85%}
+.s1-content h1{font-size:clamp(28px,5.5vw,54px);font-weight:700;line-height:1;letter-spacing:-.04em;color:#fff;opacity:0;transform:translateY(30px);transition:all .8s cubic-bezier(.32,.72,0,1)}
+.s1-content h1 .highlight{background:linear-gradient(115deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 30px rgba(230,57,70,.35))}
+.s1-content .sub{font-size:clamp(13px,1.8vw,18px);color:var(--text2);margin-top:1.5em;opacity:0;transform:translateY(20px);transition:all .7s cubic-bezier(.32,.72,0,1) .3s}
+.scene.active .s1-content h1,
+.scene.active .s1-content .sub{opacity:1;transform:translateY(0)}
+
+/* Animated line under hook */
+.hook-line{width:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);margin:1.5em auto 0;transition:width 1.2s cubic-bezier(.32,.72,0,1) .5s}
+.scene.active .hook-line{width:60%}
+
+/* Scene 2: Problem */
+.s2-content{display:flex;align-items:center;gap:8%;width:100%}
+.s2-text{flex:1}
+.s2-text p{font-size:clamp(18px,3.2vw,32px);font-weight:400;line-height:1.3;color:var(--text2);margin-bottom:.6em;opacity:0;transform:translateX(-30px);transition:all .7s cubic-bezier(.32,.72,0,1)}
+.s2-text p:nth-child(2){transition-delay:.3s}
+.s2-text p strong{color:#fff;font-weight:700}
+.s2-text .accent-text{color:var(--accent2)}
+.s2-icon{flex-shrink:0;font-size:clamp(48px,10vw,100px);opacity:0;transform:scale(.5);transition:all .8s cubic-bezier(.32,.72,0,1) .2s}
+.scene.active .s2-text p,
+.scene.active .s2-icon{opacity:1;transform:none}
+
+/* Scene 3: Solution */
+.s3-content{display:flex;align-items:center;gap:6%;width:100%}
+.s3-left{flex:1;display:flex;flex-direction:column;gap:1.2em}
+.s3-brand{display:flex;align-items:center;gap:clamp(10px,2vw,20px);opacity:0;transform:translateY(20px);transition:all .7s cubic-bezier(.32,.72,0,1)}
+.s3-logo{width:clamp(40px,8vw,72px);height:clamp(40px,8vw,72px);border-radius:16px;background:linear-gradient(135deg,var(--accent),#7a1020);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(230,57,70,.3)}
+.s3-logo svg{width:60%;height:60%}
+.s3-brand-text h2{font-size:clamp(20px,3.6vw,36px);font-weight:700;letter-spacing:-.03em;color:#fff}
+.s3-brand-text p{font-size:clamp(12px,1.6vw,16px);color:var(--text2);margin-top:4px}
+.s3-brand-text .a24{color:var(--accent2);font-weight:600}
+.s3-right{flex-shrink:0;display:flex;flex-direction:column;gap:clamp(6px,1.2vw,12px)}
+.s3-step{display:flex;align-items:center;gap:clamp(8px,1.5vw,14px);padding:clamp(8px,1.5vw,14px) clamp(12px,2vw,20px);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;font-size:clamp(11px,1.4vw,15px);color:var(--text2);opacity:0;transform:translateX(30px);transition:all .5s cubic-bezier(.32,.72,0,1)}
+.s3-step:nth-child(1){transition-delay:.3s}
+.s3-step:nth-child(2){transition-delay:.5s}
+.s3-step:nth-child(3){transition-delay:.7s}
+.s3-step.done{background:var(--accent-dim);border-color:rgba(230,57,70,.25);color:var(--accent2)}
+.s3-step .check{width:clamp(16px,2.5vw,24px);height:clamp(16px,2.5vw,24px);border-radius:50%;background:rgba(255,255,255,.06);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.s3-step.done .check{background:var(--accent);border-color:var(--accent)}
+.s3-step.done .check svg{opacity:1}
+.s3-step .check svg{width:12px;height:12px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+.s3-usps{display:flex;flex-direction:column;gap:clamp(4px,.8vw,8px);opacity:0;transform:translateY(15px);transition:all .6s cubic-bezier(.32,.72,0,1) .4s}
+.s3-usp{display:flex;align-items:center;gap:clamp(6px,1vw,10px);font-size:clamp(11px,1.4vw,15px);color:var(--text2)}
+.s3-usp .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0}
+.s3-usp strong{color:#fff}
+.scene.active .s3-brand,
+.scene.active .s3-usps,
+.scene.active .s3-step{opacity:1;transform:none}
+
+/* Scene 4: Dashboard / Proof */
+.s4-content{width:100%;display:flex;flex-direction:column;gap:clamp(12px,2.5vw,24px)}
+.s4-top{display:flex;justify-content:space-between;align-items:center}
+.s4-label{font-size:clamp(10px,1.2vw,12px);font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase;opacity:0;transform:translateY(10px);transition:all .5s cubic-bezier(.32,.72,0,1)}
+.s4-ticker{font-size:clamp(28px,5vw,52px);font-weight:700;font-family:var(--mono);letter-spacing:-.03em;color:var(--green);opacity:0;transform:translateY(10px);transition:all .6s cubic-bezier(.32,.72,0,1) .2s}
+.scene.active .s4-label,
+.scene.active .s4-ticker{opacity:1;transform:none}
+
+.s4-dash{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(6px,1.2vw,12px)}
+.s4-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:clamp(10px,2vw,20px);text-align:center;opacity:0;transform:translateY(20px);transition:all .5s cubic-bezier(.32,.72,0,1)}
+.s4-card:nth-child(1){transition-delay:.1s}
+.s4-card:nth-child(2){transition-delay:.2s}
+.s4-card:nth-child(3){transition-delay:.3s}
+.s4-card:nth-child(4){transition-delay:.4s}
+.s4-card .val{font-size:clamp(16px,2.8vw,28px);font-weight:700;font-family:var(--mono);color:#fff;letter-spacing:-.02em}
+.s4-card .lbl{font-size:clamp(8px,1vw,11px);color:var(--muted);margin-top:4px;letter-spacing:.04em}
+.s4-card .val.green{color:var(--green)}
+.s4-card .val.red{color:var(--accent)}
+.scene.active .s4-card{opacity:1;transform:none}
+
+.s4-feed{display:flex;flex-direction:column;gap:clamp(3px,.6vw,6px)}
+.s4-row{display:flex;align-items:center;gap:clamp(6px,1.2vw,12px);font-size:clamp(9px,1.1vw,12px);font-family:var(--mono);padding:clamp(4px,.8vw,8px) clamp(8px,1.5vw,14px);background:rgba(255,255,255,.02);border-radius:8px;opacity:0;transform:translateX(-20px);transition:all .4s cubic-bezier(.32,.72,0,1)}
+.s4-row:nth-child(1){transition-delay:.5s}
+.s4-row:nth-child(2){transition-delay:.65s}
+.s4-row:nth-child(3){transition-delay:.8s}
+.s4-row .tag{padding:2px 6px;border-radius:4px;font-weight:600;font-size:clamp(8px,1vw,10px);letter-spacing:.06em}
+.s4-row .buy{background:rgba(34,197,94,.15);color:var(--green)}
+.s4-row .sell{background:rgba(230,57,70,.15);color:var(--accent2)}
+.s4-row .sym{color:#fff;font-weight:600}
+.s4-row .price{color:var(--text2)}
+.s4-row .profit{margin-left:auto;font-weight:600}
+.s4-row .profit.pos{color:var(--green)}
+.scene.active .s4-row{opacity:1;transform:none}
+
+/* Scene 5: CTA */
+.s5-content{display:flex;align-items:center;justify-content:space-between;width:100%;gap:6%}
+.s5-left{flex:1}
+.s5-left h2{font-size:clamp(22px,4vw,42px);font-weight:700;line-height:1.05;letter-spacing:-.04em;color:#fff;margin-bottom:.6em;opacity:0;transform:translateY(20px);transition:all .7s cubic-bezier(.32,.72,0,1)}
+.s5-left .url{font-size:clamp(12px,1.6vw,16px);color:var(--muted);opacity:0;transform:translateY(15px);transition:all .6s cubic-bezier(.32,.72,0,1) .2s}
+.s5-left .url strong{color:var(--accent2)}
+.s5-right{flex-shrink:0;display:flex;flex-direction:column;gap:clamp(8px,1.5vw,16px);opacity:0;transform:translateY(20px);transition:all .7s cubic-bezier(.32,.72,0,1) .3s}
+.s5-price-card{background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:clamp(14px,2.5vw,24px) clamp(18px,3vw,32px);display:flex;flex-direction:column;gap:clamp(8px,1.5vw,14px)}
+.s5-row{display:flex;align-items:baseline;justify-content:space-between;gap:clamp(16px,4vw,48px)}
+.s5-row .name{font-size:clamp(13px,1.6vw,17px);color:var(--text2);font-weight:500}
+.s5-row .amt{font-size:clamp(18px,3vw,30px);font-weight:700;color:#fff;letter-spacing:-.02em}
+.s5-divider{height:1px;background:var(--border)}
+.s5-cta{display:flex;align-items:center;justify-content:center;gap:8px;padding:clamp(10px,2vw,16px) clamp(16px,3vw,28px);background:var(--accent);color:#fff;font-weight:600;font-size:clamp(12px,1.5vw,16px);border-radius:12px;border:none;cursor:pointer;transition:all .3s cubic-bezier(.32,.72,0,1);box-shadow:0 8px 30px var(--accent-dim)}
+.s5-cta:hover{background:var(--accent2);box-shadow:0 14px 44px var(--accent-glow);transform:translateY(-2px)}
+.s5-badge{display:flex;align-items:center;justify-content:center;gap:6px;font-size:clamp(9px,1.1vw,11px);color:var(--muted);letter-spacing:.04em}
+.s5-badge svg{width:14px;height:14px;stroke:var(--accent);fill:none;stroke-width:2}
+.scene.active .s5-left h2,
+.scene.active .s5-left .url,
+.scene.active .s5-right{opacity:1;transform:none}
+
+/* Play overlay */
+.play-overlay{position:absolute;inset:0;z-index:50;background:rgba(9,9,11,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:16px;transition:opacity .4s ease;-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.play-overlay.hidden{opacity:0;pointer-events:none;visibility:hidden}
+.play-btn{width:80px;height:80px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(230,57,70,.4),0 0 0 8px rgba(230,57,70,.15);transition:all .3s cubic-bezier(.32,.72,0,1);animation:pulse-ring 2s ease-in-out infinite}
+@keyframes pulse-ring{0%,100%{box-shadow:0 0 40px rgba(230,57,70,.4),0 0 0 8px rgba(230,57,70,.15)}50%{box-shadow:0 0 50px rgba(230,57,70,.5),0 0 0 16px rgba(230,57,70,.1)}}
+.play-btn:hover{transform:scale(1.08);box-shadow:0 0 60px rgba(230,57,70,.6),0 0 0 12px rgba(230,57,70,.2)}
+.play-btn svg{width:36px;height:36px;fill:#fff;margin-left:4px}
+.play-label{font-size:16px;color:var(--text2);letter-spacing:.02em}
+
+/* Progress bar */
+.progress{position:absolute;bottom:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));z-index:40;width:0;transition:width .1s linear}
+
+/* Scene counter */
+.scene-counter{position:absolute;top:clamp(12px,2.5vw,24px);right:clamp(12px,2.5vw,24px);z-index:30;font-size:clamp(9px,1vw,11px);font-family:var(--mono);color:var(--muted);letter-spacing:.08em;opacity:0;transition:opacity .3s}
+.scene-counter.visible{opacity:1}
+
+/* Watermark */
+.watermark{position:absolute;bottom:clamp(10px,2vw,20px);left:clamp(12px,2.5vw,24px);z-index:30;display:flex;align-items:center;gap:8px;opacity:0;transition:opacity .3s}
+.watermark.visible{opacity:1}
+.wm-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.wm-text{font-size:clamp(8px,1vw,11px);font-family:var(--mono);color:var(--muted);letter-spacing:.06em}
+</style>
+
+<div class="canvas" id="canvas">
+  <div class="stars"></div>
+  <div class="aurora"></div>
+
+  <!-- Play overlay (hidden, auto-play) -->
+  <div class="play-overlay hidden" id="playOverlay" style="display:none"></div>
+
+  <!-- Progress bar -->
+  <div class="progress" id="progress"></div>
+
+  <!-- Scene counter -->
+  <div class="scene-counter" id="counter">01 / 05</div>
+
+  <!-- Watermark -->
+  <div class="watermark" id="watermark">
+    <span class="wm-dot"></span>
+    <span class="wm-text">aicashsystem.space</span>
+  </div>
+
+  <!-- SCENE 1: HOOK -->
+  <div class="scene" id="scene1">
+    <div class="s1-content">
+      <h1>What if your <span class="highlight">money worked</span> while you slept?</h1>
+      <div class="hook-line"></div>
+      <p class="sub">No VPS. No MetaTrader. No computer running 24/7.</p>
+    </div>
+  </div>
+
+  <!-- SCENE 2: THE PROBLEM -->
+  <div class="scene" id="scene2">
+    <div class="s2-content">
+      <div class="s2-text">
+        <p>Most people watch the market all day...</p>
+        <p><strong>...and still <span class="accent-text">miss the best trades.</span></strong></p>
+      </div>
+      <div class="s2-icon">&#x23F0;</div>
+    </div>
+  </div>
+
+  <!-- SCENE 3: THE SOLUTION -->
+  <div class="scene" id="scene3">
+    <div class="s3-content">
+      <div class="s3-left">
+        <div class="s3-brand">
+          <div class="s3-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/>
+            </svg>
+          </div>
+          <div class="s3-brand-text">
+            <h2>Apex Trade Bot</h2>
+            <p>AI trading — <span class="a24">24/7 automated.</span></p>
+          </div>
+        </div>
+        <div class="s3-usps">
+          <div class="s3-usp"><span class="dot"></span>Controlled entirely from <strong>Telegram</strong></div>
+          <div class="s3-usp"><span class="dot"></span><strong>Nothing to install</strong> — fully hosted</div>
+          <div class="s3-usp"><span class="dot"></span>Works on <strong>cTrader</strong> — any broker</div>
+          <div class="s3-usp"><span class="dot"></span>Active <strong>2 minutes</strong> after purchase</div>
+        </div>
+      </div>
+      <div class="s3-right">
+        <div class="s3-step done">
+          <span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+          Signal detected
+        </div>
+        <div class="s3-step done">
+          <span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+          Trade opened
+        </div>
+        <div class="s3-step done">
+          <span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+          Profit locked
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCENE 4: PROOF -->
+  <div class="scene" id="scene4">
+    <div class="s4-content">
+      <div class="s4-top">
+        <span class="s4-label">Live performance</span>
+        <span class="s4-ticker" id="ticker">+0.00%</span>
+      </div>
+      <div class="s4-dash">
+        <div class="s4-card"><div class="val green" id="winrate">0%</div><div class="lbl">Win rate</div></div>
+        <div class="s4-card"><div class="val" id="trades">0</div><div class="lbl">Trades today</div></div>
+        <div class="s4-card"><div class="val green" id="pnl">$0</div><div class="lbl">Net P&L</div></div>
+        <div class="s4-card"><div class="val red" id="dd">0%</div><div class="lbl">Max drawdown</div></div>
+      </div>
+      <div class="s4-feed">
+        <div class="s4-row"><span class="tag buy">BUY</span><span class="sym">BTCUSD</span><span class="price">64,218.40</span><span class="profit pos">+$42.60</span></div>
+        <div class="s4-row"><span class="tag sell">SELL</span><span class="sym">ETHUSD</span><span class="price">3,412.80</span><span class="profit pos">+$18.30</span></div>
+        <div class="s4-row"><span class="tag buy">BUY</span><span class="sym">EURUSD</span><span class="price">1.08642</span><span class="profit pos">+$27.15</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCENE 5: CTA -->
+  <div class="scene" id="scene5">
+    <div class="s5-content">
+      <div class="s5-left">
+        <h2>One payment.<br>Yours <span style="color:var(--accent2)">forever.</span></h2>
+        <p class="url">Visit <strong>aicashsystem.space</strong></p>
+      </div>
+      <div class="s5-right">
+        <div class="s5-price-card">
+          <div class="s5-row"><span class="name">Crypto Bot</span><span class="amt">$297</span></div>
+          <div class="s5-divider"></div>
+          <div class="s5-row"><span class="name">Forex Bot</span><span class="amt">$497</span></div>
+        </div>
+        <button class="s5-cta" onclick="window.open('https://aicashsystem.space','_blank')">
+          Get Started Now
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+        <div class="s5-badge">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          No subscriptions &middot; No monthly fees
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const scenes = [
+    {id:'scene1', duration:4500},
+    {id:'scene2', duration:4500},
+    {id:'scene3', duration:6000},
+    {id:'scene4', duration:6500},
+    {id:'scene5', duration:8000}
+  ];
+  const totalDuration = scenes.reduce((s,sc)=>s+sc.duration,0);
+  const overlay = document.getElementById('playOverlay');
+  const progress = document.getElementById('progress');
+  const counter = document.getElementById('counter');
+  const watermark = document.getElementById('watermark');
+  let running = false;
+  let currentScene = -1;
+  let startTime = 0;
+  let tickerAnim = null;
+
+  function start(){
+    if(running) return;
+    running = true;
+    counter.classList.add('visible');
+    watermark.classList.add('visible');
+    startTime = performance.now();
+    currentScene = -1;
+    advanceScene();
+    requestAnimationFrame(updateProgress);
+  }
+
+  // Auto-play on load
+  start();
+
+  function advanceScene(){
+    if(currentScene >= 0){
+      document.getElementById(scenes[currentScene].id).classList.remove('active');
+    }
+    currentScene++;
+    if(currentScene >= scenes.length){
+      // Loop back to start
+      currentScene = -1;
+      startTime = performance.now();
+      if(tickerAnim) cancelAnimationFrame(tickerAnim);
+      progress.style.width = '0';
+      advanceScene();
+      return;
+    }
+    counter.textContent = String(currentScene+1).padStart(2,'0')+' / '+String(scenes.length).padStart(2,'0');
+    const el = document.getElementById(scenes[currentScene].id);
+    el.classList.add('active');
+
+    if(scenes[currentScene].id === 'scene4') startTickerAnim();
+
+    setTimeout(advanceScene, scenes[currentScene].duration);
+  }
+
+  function updateProgress(){
+    if(!running) return;
+    const elapsed = performance.now() - startTime;
+    const pct = Math.min(100, (elapsed / totalDuration) * 100);
+    progress.style.width = pct + '%';
+    requestAnimationFrame(updateProgress);
+  }
+
+  function startTickerAnim(){
+    const ticker = document.getElementById('ticker');
+    const winrate = document.getElementById('winrate');
+    const trades = document.getElementById('trades');
+    const pnl = document.getElementById('pnl');
+    const dd = document.getElementById('dd');
+    const start = performance.now();
+    const dur = 5000;
+    const targetPct = 3.82;
+    const targetWin = 72;
+    const targetTrades = 14;
+    const targetPnl = 287;
+    const targetDd = 4.1;
+
+    function tick(){
+      const t = Math.min(1, (performance.now()-start)/dur);
+      const ease = 1 - Math.pow(1 - t, 3);
+      ticker.textContent = '+' + (targetPct * ease).toFixed(2) + '%';
+      winrate.textContent = Math.round(targetWin * ease) + '%';
+      trades.textContent = Math.round(targetTrades * ease);
+      pnl.textContent = '$' + Math.round(targetPnl * ease);
+      dd.textContent = (targetDd * ease).toFixed(1) + '%';
+      if(t < 1){
+        tickerAnim = requestAnimationFrame(tick);
+      }
+    }
+    tickerAnim = requestAnimationFrame(tick);
+  }
+})();
+</script>
