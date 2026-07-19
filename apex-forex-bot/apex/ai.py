@@ -67,6 +67,23 @@ _MODE_INTRO = {
     "breakout": ("Your PRIMARY edge is BREAKOUT trading (Turtle rules): enter when price breaks a fresh "
                  "20-bar high/low with momentum and volatility expansion behind it, ride the expansion, and "
                  "exit on the opposite channel break. Skip exhausted or unconfirmed breaks."),
+    "fibonacci": ("Your PRIMARY edge is FIBONACCI trading: identify the current swing and trade bounces "
+                  "off key retracement levels (38.2%, 50%, 61.8%). Enter when price reaches a Fibonacci level "
+                  "with confirmation from RSI and candle structure."),
+    "fvg": ("Your PRIMARY edge is FAIR VALUE GAP (FVG) trading: identify 3-candle imbalance zones where "
+            "price moved too fast (gap between candle 1 and candle 3), and enter when price returns to fill "
+            "these gaps — institutional footprints of aggressive moves."),
+    "ifvg": ("Your PRIMARY edge is INVERSE FVG trading: identify FVGs that have already been filled (invalidated) "
+             "and now act as rejection zones — price gets repelled from these zones, providing reversal entries."),
+    "supply_demand": ("Your PRIMARY edge is SUPPLY & DEMAND zone trading: identify areas where institutional "
+                      "orders created strong impulsive moves (big candle bodies with high momentum), and enter "
+                      "when price returns to the origin of that move — the supply/demand zone."),
+    "liquidity_sweep": ("Your PRIMARY edge is LIQUIDITY SWEEP trading: identify false breakouts past swing "
+                        "highs/lows (stop hunts) where price sweeps liquidity pools and reverses. Enter on the "
+                        "reversal for high-probability mean-reversion back into the range."),
+    "evc": ("Your PRIMARY edge is EQUILIBRIUM VOLUME CANDLE (EVC) trading: identify candles with balanced "
+            "buyer/seller volume at key price levels (small body, equal wicks, average volume), signaling "
+            "indecision that resolves into a directional move. Enter on the resolution."),
 }
 
 _MODE_RULES = {
@@ -82,6 +99,30 @@ _MODE_RULES = {
 - SELL (min 3/5): fresh break of the 20-bar low, bearish momentum, MACD negative, bandwidth expanding, RSI >20
 - Never chase: if the break happened several candles ago or RSI is already extreme, HOLD
 - CLOSE on an opposite 20-bar channel break; otherwise let SL/TP work""",
+    "fibonacci": """- BUY (min 3/5): price touching a Fibonacci retracement level (38.2%, 50%, 61.8%) in an upswing, RSI not overbought, bullish candle pattern at level, higher-timeframe trend supports
+- SELL (min 3/5): price touching a Fibonacci level in a downswing, RSI not oversold, bearish candle at level, trend supports
+- HOLD if price is between levels with no clear reaction
+- CLOSE at the next Fibonacci extension (127.2% or 161.8%) or if price breaks back through the entry level""",
+    "fvg": """- BUY (min 3/5): price has returned to a bullish FVG zone, showing signs of holding (wick rejection, small body), market structure bullish (UPTREND), RSI not extreme
+- SELL (min 3/5): price has returned to a bearish FVG zone with rejection signals, market structure bearish, RSI not oversold
+- HOLD if price is not in any FVG zone or the zone is stale (>30 candles old)
+- CLOSE when the gap is fully filled (price exits the other side of the zone) or at the origin of the impulse""",
+    "ifvg": """- BUY (min 3/5): price rejected at an invalidated bearish FVG (it filled and is now acting as support), bullish candle structure, momentum turning up
+- SELL (min 3/5): price rejected at an invalidated bullish FVG (now resistance), bearish candle, momentum turning down
+- HOLD if no IFVG rejection is occurring
+- CLOSE at the next structure level or if the IFVG zone is broken through cleanly""",
+    "supply_demand": """- BUY (min 3/5): price at a demand zone (base of a strong bullish impulse), RSI not overbought, candle showing wick rejection from zone, higher-timeframe trend not strongly bearish
+- SELL (min 3/5): price at a supply zone (origin of strong bearish impulse), RSI not oversold, rejection candle visible, trend not strongly bullish
+- HOLD if price is in no-man's land between zones
+- CLOSE if price breaks cleanly through the zone (the zone is invalidated) — do not hold a loser in a broken zone""",
+    "liquidity_sweep": """- BUY (min 3/5): price swept below a swing low (stop hunt), closed back above it (reversal confirmed), ideally with a long lower wick and increased volume
+- SELL (min 3/5): price swept above a swing high, closed back below it, with rejection wick
+- HOLD if no sweep has occurred or price hasn't yet closed back inside the range
+- CLOSE at the opposite end of the range or at a key resistance/support — the reversal target is the other side of the range that was swept""",
+    "evc": """- BUY (min 3/5): equilibrium volume candle (small body, balanced wicks, normal volume) at a key level, followed by bullish resolution (next candle closes above EVC high)
+- SELL (min 3/5): EVC at a key level with bearish resolution (next candle closes below EVC low)
+- HOLD if no equilibrium candle is present or resolution hasn't occurred yet
+- CLOSE at the next significant level or if momentum fades (RSI extreme); EVC trades typically target 1:2 RR""",
 }
 
 
@@ -132,6 +173,14 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
 - BB Bandwidth: {ind['bb_bandwidth']}% | Position in BB: {ind['bb_position']}%
 {vol_line}
 - High 24h: {ind['high24h']} | Low 24h: {ind['low24h']}
+
+### Smart Money Concepts
+- Fibonacci: trend={ind.get('fibonacci', {}).get('trend', 'N/A')}, nearest level={ind.get('fibonacci', {}).get('nearest', 'N/A')} @ {ind.get('fibonacci', {}).get('nearestPrice', 'N/A')}, signal={ind.get('fibonacci', {}).get('signal', 'NONE')}
+- FVG (Fair Value Gap): signal={ind.get('fvg', {}).get('signal', 'NONE')}, gaps found={ind.get('fvg', {}).get('count', 0)}
+- Inverse FVG: signal={ind.get('ifvg', {}).get('signal', 'NONE')}, zones={len(ind.get('ifvg', {}).get('zones', []))}
+- Supply/Demand: signal={ind.get('supplyDemand', {}).get('signal', 'NONE')}
+- Liquidity Sweep: signal={ind.get('liquiditySweep', {}).get('signal', 'NONE')}, type={ind.get('liquiditySweep', {}).get('type', 'none')}, swept={ind.get('liquiditySweep', {}).get('swept', 'N/A')}
+- EVC (Equilibrium Volume): signal={ind.get('evc', {}).get('signal', 'NONE')}, equilibrium={ind.get('evc', {}).get('equilibrium', False)}
 
 ### Last 5 candles
 {recent}
@@ -327,11 +376,7 @@ def mean_reversion_signal(ind, open_position=None):
                     "reasoning": f"Strong trend — skipping counter-trend fade ({', '.join(factors) or 'neutral'})",
                     "riskLevel": "MEDIUM", "keyFactors": factors}
 
-    # Crypto hits single clean extremes (BB edge OR RSI extreme = score 2) far
-    # more usefully than forex, which needs the full stack to fade safely. A
-    # score-3 gate left the crypto bot idle for hours in ranging markets, so
-    # enter at score 2 on crypto (conf 64 ≥ MIN_CONFIDENCE). Forex stays at 3.
-    _mr_thr = 2 if _mr_crypto else 3
+    _mr_thr = 3
     if score >= _mr_thr:
         return {"action": "BUY", "confidence": confidence, "criteriaScore": crit,
                 "reasoning": f"Mean reversion BUY: {', '.join(factors)}",
@@ -494,6 +539,159 @@ def breakout_signal(ind, strat=None, open_position=None):
             "riskLevel": "LOW", "keyFactors": factors}
 
 
+def fibonacci_signal(ind, strat=None, open_position=None):
+    """FIBONACCI engine: trade bounces off key retracement/extension levels."""
+    fib = ind.get("fibonacci") or {}
+    signal = fib.get("signal")
+    trend = fib.get("trend", "NEUTRAL")
+    nearest = fib.get("nearest", "N/A")
+
+    if open_position:
+        return {"action": "HOLD", "confidence": 55, "criteriaScore": 2,
+                "reasoning": "Fibonacci: holding position, SL/TP manage exit",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    if not signal:
+        return {"action": "HOLD", "confidence": 42, "criteriaScore": 0,
+                "reasoning": f"No Fibonacci level reaction (nearest: {nearest})",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    factors = [f"price at Fib {nearest}", f"swing trend {trend}"]
+    rsi_v = float(ind.get("rsi") or 50)
+    if signal == "BUY" and rsi_v < 45:
+        factors.append(f"RSI supports ({rsi_v:.0f})")
+    elif signal == "SELL" and rsi_v > 55:
+        factors.append(f"RSI supports ({rsi_v:.0f})")
+
+    return {"action": signal, "confidence": 72, "criteriaScore": 3,
+            "reasoning": f"Fibonacci {signal}: {', '.join(factors)}",
+            "riskLevel": "MEDIUM", "keyFactors": factors}
+
+
+def fvg_signal(ind, strat=None, open_position=None):
+    """FVG engine: trade into unfilled Fair Value Gaps."""
+    fvg = ind.get("fvg") or {}
+    signal = fvg.get("signal")
+
+    if open_position:
+        return {"action": "HOLD", "confidence": 55, "criteriaScore": 2,
+                "reasoning": "FVG: holding, waiting for gap fill target",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    if not signal:
+        return {"action": "HOLD", "confidence": 42, "criteriaScore": 0,
+                "reasoning": "No price in FVG zone",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    factors = [f"price inside {'bullish' if signal == 'BUY' else 'bearish'} FVG"]
+    structure = ind.get("marketStructure", "SIDEWAYS")
+    if (signal == "BUY" and structure == "UPTREND") or (signal == "SELL" and structure == "DOWNTREND"):
+        factors.append("aligned with market structure")
+
+    return {"action": signal, "confidence": 70, "criteriaScore": 3,
+            "reasoning": f"FVG {signal}: {', '.join(factors)}",
+            "riskLevel": "MEDIUM", "keyFactors": factors}
+
+
+def ifvg_signal(ind, strat=None, open_position=None):
+    """Inverse FVG engine: trade rejections from invalidated gaps."""
+    ifvg = ind.get("ifvg") or {}
+    signal = ifvg.get("signal")
+
+    if open_position:
+        return {"action": "HOLD", "confidence": 55, "criteriaScore": 2,
+                "reasoning": "IFVG: holding position",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    if not signal:
+        return {"action": "HOLD", "confidence": 42, "criteriaScore": 0,
+                "reasoning": "No Inverse FVG rejection detected",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    factors = ["price rejected at invalidated FVG zone"]
+    return {"action": signal, "confidence": 68, "criteriaScore": 3,
+            "reasoning": f"Inverse FVG {signal}: {', '.join(factors)}",
+            "riskLevel": "MEDIUM", "keyFactors": factors}
+
+
+def supply_demand_signal(ind, strat=None, open_position=None):
+    """Supply & Demand zone engine: trade entries at institutional zones."""
+    sd = ind.get("supplyDemand") or {}
+    signal = sd.get("signal")
+
+    if open_position:
+        return {"action": "HOLD", "confidence": 55, "criteriaScore": 2,
+                "reasoning": "Supply/Demand: holding, SL/TP manage exit",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    if not signal:
+        return {"action": "HOLD", "confidence": 42, "criteriaScore": 0,
+                "reasoning": "Price not at a supply/demand zone",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    zone_type = "demand" if signal == "BUY" else "supply"
+    factors = [f"price at {zone_type} zone"]
+    rsi_v = float(ind.get("rsi") or 50)
+    if signal == "BUY" and rsi_v < 50:
+        factors.append(f"RSI not overbought ({rsi_v:.0f})")
+    elif signal == "SELL" and rsi_v > 50:
+        factors.append(f"RSI not oversold ({rsi_v:.0f})")
+
+    return {"action": signal, "confidence": 72, "criteriaScore": 3,
+            "reasoning": f"Supply/Demand {signal}: {', '.join(factors)}",
+            "riskLevel": "MEDIUM", "keyFactors": factors}
+
+
+def liquidity_sweep_signal(ind, strat=None, open_position=None):
+    """Liquidity Sweep engine: trade reversals after stop hunts."""
+    ls = ind.get("liquiditySweep") or {}
+    signal = ls.get("signal")
+
+    if open_position:
+        return {"action": "HOLD", "confidence": 55, "criteriaScore": 2,
+                "reasoning": "Liquidity sweep: riding reversal",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    if not signal:
+        return {"action": "HOLD", "confidence": 42, "criteriaScore": 0,
+                "reasoning": "No liquidity sweep detected",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    sweep_type = ls.get("type", "unknown")
+    swept = ls.get("swept", "N/A")
+    factors = [f"{sweep_type} detected", f"swept level: {swept}"]
+    return {"action": signal, "confidence": 74, "criteriaScore": 4,
+            "reasoning": f"Liquidity Sweep {signal}: {', '.join(factors)}",
+            "riskLevel": "MEDIUM", "keyFactors": factors}
+
+
+def evc_signal(ind, strat=None, open_position=None):
+    """EVC engine: trade off equilibrium volume candles at key levels."""
+    evc_data = ind.get("evc") or {}
+    signal = evc_data.get("signal")
+
+    if open_position:
+        return {"action": "HOLD", "confidence": 55, "criteriaScore": 2,
+                "reasoning": "EVC: holding position",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    if not signal:
+        eq = evc_data.get("equilibrium", False)
+        if eq:
+            return {"action": "HOLD", "confidence": 50, "criteriaScore": 1,
+                    "reasoning": "Equilibrium candle detected but no directional bias",
+                    "riskLevel": "LOW", "keyFactors": ["equilibrium candle"]}
+        return {"action": "HOLD", "confidence": 42, "criteriaScore": 0,
+                "reasoning": "No equilibrium volume candle",
+                "riskLevel": "LOW", "keyFactors": []}
+
+    level = evc_data.get("level", "N/A")
+    factors = [f"equilibrium candle at {level}", f"body ratio: {evc_data.get('bodyRatio', 'N/A')}"]
+    return {"action": signal, "confidence": 68, "criteriaScore": 3,
+            "reasoning": f"EVC {signal}: {', '.join(factors)}",
+            "riskLevel": "MEDIUM", "keyFactors": factors}
+
+
 # ── Strategy-mode registry (used by the loop, Telegram and the backtester) ──
 STRATEGY_MODES = {
     "auto": {
@@ -515,6 +713,36 @@ STRATEGY_MODES = {
         "label": "Turtle Breakout",
         "blurb": "enters on fresh 20-bar channel breaks with momentum confirmation, exits on the opposite break (Turtle).",
         "engine": lambda ind, strat, pos: breakout_signal(ind, strat, pos),
+    },
+    "fibonacci": {
+        "label": "Fibonacci",
+        "blurb": "trades bounces off key Fibonacci retracement (38.2%, 50%, 61.8%) and extension levels from the current swing.",
+        "engine": lambda ind, strat, pos: fibonacci_signal(ind, strat, pos),
+    },
+    "fvg": {
+        "label": "Fair Value Gap (FVG)",
+        "blurb": "enters when price returns to an unfilled imbalance gap — institutional footprint left by aggressive moves.",
+        "engine": lambda ind, strat, pos: fvg_signal(ind, strat, pos),
+    },
+    "ifvg": {
+        "label": "Inverse FVG",
+        "blurb": "trades rejections at invalidated FVGs — zones that initially attracted price but failed and now repel it.",
+        "engine": lambda ind, strat, pos: ifvg_signal(ind, strat, pos),
+    },
+    "supply_demand": {
+        "label": "Supply & Demand",
+        "blurb": "identifies institutional accumulation/distribution zones and enters when price returns to them with reduced risk.",
+        "engine": lambda ind, strat, pos: supply_demand_signal(ind, strat, pos),
+    },
+    "liquidity_sweep": {
+        "label": "Liquidity Sweep",
+        "blurb": "detects stop hunts — false breaks past swing highs/lows that reverse — and enters on the reversal for high-probability trades.",
+        "engine": lambda ind, strat, pos: liquidity_sweep_signal(ind, strat, pos),
+    },
+    "evc": {
+        "label": "EVC (Equilibrium Volume)",
+        "blurb": "identifies balanced volume candles at key price levels — indecision that resolves into a directional move.",
+        "engine": lambda ind, strat, pos: evc_signal(ind, strat, pos),
     },
 }
 

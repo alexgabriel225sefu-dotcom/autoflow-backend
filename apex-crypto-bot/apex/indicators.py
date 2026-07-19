@@ -143,6 +143,225 @@ def market_structure(candles, lookback=20):
     return "SIDEWAYS"
 
 
+def fibonacci_levels(candles, lookback=50):
+    """Fibonacci retracement & extension levels from the recent swing high/low."""
+    if len(candles) < lookback:
+        return {"levels": {}, "trend": "NEUTRAL", "nearest": None, "signal": None}
+    recent = candles[-lookback:]
+    highs = [c["high"] for c in recent]
+    lows = [c["low"] for c in recent]
+    swing_high = max(highs)
+    swing_low = min(lows)
+    hi_idx = highs.index(swing_high)
+    lo_idx = lows.index(swing_low)
+    price = candles[-1]["close"]
+    diff = swing_high - swing_low
+    if diff < 1e-10:
+        return {"levels": {}, "trend": "NEUTRAL", "nearest": None, "signal": None}
+    trend = "UP" if lo_idx < hi_idx else "DOWN"
+    ratios = [0.236, 0.382, 0.5, 0.618, 0.786]
+    levels = {}
+    if trend == "UP":
+        for r in ratios:
+            levels[f"{r*100:.1f}%"] = round(swing_high - diff * r, 6)
+        levels["ext_1.272"] = round(swing_high + diff * 0.272, 6)
+        levels["ext_1.618"] = round(swing_high + diff * 0.618, 6)
+    else:
+        for r in ratios:
+            levels[f"{r*100:.1f}%"] = round(swing_low + diff * r, 6)
+        levels["ext_1.272"] = round(swing_low - diff * 0.272, 6)
+        levels["ext_1.618"] = round(swing_low - diff * 0.618, 6)
+    nearest = min(levels.items(), key=lambda kv: abs(kv[1] - price))
+    tolerance = diff * 0.02
+    signal = None
+    if abs(price - nearest[1]) < tolerance:
+        if trend == "UP" and price <= nearest[1]:
+            signal = "BUY"
+        elif trend == "DOWN" and price >= nearest[1]:
+            signal = "SELL"
+    return {"levels": levels, "trend": trend, "nearest": nearest[0],
+            "nearestPrice": nearest[1], "signal": signal,
+            "swingHigh": round(swing_high, 6), "swingLow": round(swing_low, 6)}
+
+
+def fair_value_gap(candles, lookback=30):
+    """Detect Fair Value Gaps (3-candle imbalance zones)."""
+    if len(candles) < lookback:
+        return {"bullish": [], "bearish": [], "signal": None}
+    recent = candles[-lookback:]
+    bullish_gaps = []
+    bearish_gaps = []
+    for i in range(2, len(recent)):
+        c1, c2, c3 = recent[i - 2], recent[i - 1], recent[i]
+        if c3["low"] > c1["high"]:
+            bullish_gaps.append({"top": c3["low"], "bottom": c1["high"],
+                                 "mid": (c3["low"] + c1["high"]) / 2, "idx": i})
+        if c1["low"] > c3["high"]:
+            bearish_gaps.append({"top": c1["low"], "bottom": c3["high"],
+                                 "mid": (c1["low"] + c3["high"]) / 2, "idx": i})
+    price = candles[-1]["close"]
+    signal = None
+    for gap in reversed(bullish_gaps[-5:]):
+        if gap["bottom"] <= price <= gap["top"]:
+            signal = "BUY"
+            break
+    if not signal:
+        for gap in reversed(bearish_gaps[-5:]):
+            if gap["bottom"] <= price <= gap["top"]:
+                signal = "SELL"
+                break
+    return {"bullish": bullish_gaps[-5:], "bearish": bearish_gaps[-5:],
+            "signal": signal, "count": len(bullish_gaps) + len(bearish_gaps)}
+
+
+def inverse_fvg(candles, lookback=50):
+    """Detect Inverse FVGs — gaps that got filled and now act as rejection zones."""
+    if len(candles) < lookback:
+        return {"zones": [], "signal": None}
+    recent = candles[-lookback:]
+    zones = []
+    for i in range(2, len(recent) - 3):
+        c1, c2, c3 = recent[i - 2], recent[i - 1], recent[i]
+        gap_top = gap_bot = None
+        direction = None
+        if c3["low"] > c1["high"]:
+            gap_top, gap_bot = c3["low"], c1["high"]
+            direction = "bullish"
+        elif c1["low"] > c3["high"]:
+            gap_top, gap_bot = c1["low"], c3["high"]
+            direction = "bearish"
+        if gap_top is None:
+            continue
+        filled = False
+        for j in range(i + 1, len(recent)):
+            if direction == "bullish" and recent[j]["low"] <= gap_bot:
+                filled = True
+                break
+            if direction == "bearish" and recent[j]["high"] >= gap_top:
+                filled = True
+                break
+        if filled:
+            zones.append({"top": gap_top, "bottom": gap_bot,
+                          "mid": (gap_top + gap_bot) / 2,
+                          "originalDirection": direction})
+    price = candles[-1]["close"]
+    signal = None
+    for z in reversed(zones[-5:]):
+        if z["bottom"] <= price <= z["top"]:
+            if z["originalDirection"] == "bullish":
+                signal = "SELL"
+            else:
+                signal = "BUY"
+            break
+    return {"zones": zones[-5:], "signal": signal}
+
+
+def supply_demand_zones(candles, lookback=50):
+    """Identify supply/demand zones from strong impulsive moves."""
+    if len(candles) < lookback:
+        return {"supply": [], "demand": [], "signal": None}
+    recent = candles[-lookback:]
+    supply_zones = []
+    demand_zones = []
+    atr_vals = atr(recent, min(14, len(recent) - 2))
+    avg_atr = 0
+    valid_atr = [v for v in atr_vals if v is not None]
+    if valid_atr:
+        avg_atr = sum(valid_atr) / len(valid_atr)
+    threshold = avg_atr * 1.5 if avg_atr else 0
+    for i in range(1, len(recent) - 1):
+        body = abs(recent[i]["close"] - recent[i]["open"])
+        if body < threshold:
+            continue
+        if recent[i]["close"] > recent[i]["open"]:
+            zone_top = max(recent[i - 1]["open"], recent[i - 1]["close"])
+            zone_bot = min(recent[i - 1]["low"], recent[i]["low"])
+            demand_zones.append({"top": zone_top, "bottom": zone_bot,
+                                 "strength": body / avg_atr if avg_atr else 1})
+        else:
+            zone_top = max(recent[i - 1]["high"], recent[i]["high"])
+            zone_bot = min(recent[i - 1]["open"], recent[i - 1]["close"])
+            supply_zones.append({"top": zone_top, "bottom": zone_bot,
+                                 "strength": body / avg_atr if avg_atr else 1})
+    price = candles[-1]["close"]
+    signal = None
+    for z in sorted(demand_zones, key=lambda x: -x["strength"])[:5]:
+        if z["bottom"] <= price <= z["top"]:
+            signal = "BUY"
+            break
+    if not signal:
+        for z in sorted(supply_zones, key=lambda x: -x["strength"])[:5]:
+            if z["bottom"] <= price <= z["top"]:
+                signal = "SELL"
+                break
+    return {"supply": supply_zones[-5:], "demand": demand_zones[-5:], "signal": signal}
+
+
+def liquidity_sweep(candles, lookback=20):
+    """Detect liquidity sweeps (stop hunts past swing highs/lows that reverse)."""
+    if len(candles) < lookback + 3:
+        return {"signal": None, "type": None, "swept": None}
+    body = candles[-lookback:-3]
+    swing_highs = []
+    swing_lows = []
+    for i in range(1, len(body) - 1):
+        if body[i]["high"] > body[i - 1]["high"] and body[i]["high"] > body[i + 1]["high"]:
+            swing_highs.append(body[i]["high"])
+        if body[i]["low"] < body[i - 1]["low"] and body[i]["low"] < body[i + 1]["low"]:
+            swing_lows.append(body[i]["low"])
+    if not swing_highs and not swing_lows:
+        return {"signal": None, "type": None, "swept": None}
+    last3 = candles[-3:]
+    top_level = max(swing_highs) if swing_highs else None
+    bot_level = min(swing_lows) if swing_lows else None
+    if top_level is not None:
+        swept_high = any(c["high"] > top_level for c in last3)
+        closed_below = last3[-1]["close"] < top_level
+        if swept_high and closed_below:
+            return {"signal": "SELL", "type": "high_sweep",
+                    "swept": round(top_level, 6)}
+    if bot_level is not None:
+        swept_low = any(c["low"] < bot_level for c in last3)
+        closed_above = last3[-1]["close"] > bot_level
+        if swept_low and closed_above:
+            return {"signal": "BUY", "type": "low_sweep",
+                    "swept": round(bot_level, 6)}
+    return {"signal": None, "type": None, "swept": None}
+
+
+def evc(candles, lookback=20):
+    """Equilibrium Volume Candles — candles with balanced volume at key levels."""
+    if len(candles) < lookback:
+        return {"signal": None, "equilibrium": False, "level": None}
+    recent = candles[-lookback:]
+    volumes = [c.get("volume", 0) for c in recent]
+    avg_vol = sum(volumes) / len(volumes) if volumes else 0
+    if avg_vol == 0:
+        return {"signal": None, "equilibrium": False, "level": None}
+    last = candles[-1]
+    body = abs(last["close"] - last["open"])
+    wick_upper = last["high"] - max(last["open"], last["close"])
+    wick_lower = min(last["open"], last["close"]) - last["low"]
+    total_range = last["high"] - last["low"]
+    if total_range < 1e-10:
+        return {"signal": None, "equilibrium": False, "level": None}
+    body_ratio = body / total_range
+    vol_ratio = last.get("volume", 0) / avg_vol if avg_vol else 0
+    is_equilibrium = (body_ratio < 0.35 and 0.7 <= vol_ratio <= 1.5 and
+                      abs(wick_upper - wick_lower) / total_range < 0.3)
+    if not is_equilibrium:
+        return {"signal": None, "equilibrium": False, "level": None}
+    mid = (last["high"] + last["low"]) / 2
+    prev = candles[-2]
+    signal = None
+    if prev["close"] > prev["open"] and last["close"] < mid:
+        signal = "SELL"
+    elif prev["close"] < prev["open"] and last["close"] > mid:
+        signal = "BUY"
+    return {"signal": signal, "equilibrium": True, "level": round(mid, 6),
+            "bodyRatio": round(body_ratio, 3), "volRatio": round(vol_ratio, 2)}
+
+
 def _fmt(v, n):
     return None if v is None else f"{v:.{n}f}"
 
@@ -178,6 +397,13 @@ def analyze(candles):
     bb_position = (f"{(price - bb_last['lower']) / (bb_last['upper'] - bb_last['lower']) * 100:.0f}"
                    if bb_last.get("upper") and bb_last.get("lower") else None)
 
+    fib = fibonacci_levels(candles)
+    fvg = fair_value_gap(candles)
+    ifvg = inverse_fvg(candles)
+    sd_zones = supply_demand_zones(candles)
+    liq_sweep = liquidity_sweep(candles)
+    evc_data = evc(candles)
+
     return {
         "price": price,
         "rsi": _fmt(rsi_values[last], 2),
@@ -207,6 +433,12 @@ def analyze(candles):
         "stochRsiD": _fmt(srsi["d"], 2),
         "divergence": divergence,
         "marketStructure": structure,
+        "fibonacci": fib,
+        "fvg": fvg,
+        "ifvg": ifvg,
+        "supplyDemand": sd_zones,
+        "liquiditySweep": liq_sweep,
+        "evc": evc_data,
         "recentCandles": [{
             "open": c["open"], "high": c["high"], "low": c["low"], "close": c["close"],
             "direction": "🟢" if c["close"] > c["open"] else "🔴",
