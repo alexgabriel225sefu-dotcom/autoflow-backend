@@ -72,8 +72,10 @@ _IS_CRYPTO = PRODUCT == "crypto"
 BOT_NAME = os.getenv("BOT_NAME") or ("Apex Crypto Bot" if _IS_CRYPTO else "Apex Forex Bot")
 ASSET_EMOJI = os.getenv("ASSET_EMOJI") or ("₿" if _IS_CRYPTO else "💱")
 ASSET_NOUN = os.getenv("ASSET_NOUN") or ("crypto" if _IS_CRYPTO else "forex")
-# Market hours: crypto trades 24/7, forex 24/5 (closed weekends).
-MARKET_24_7 = _truthy(os.getenv("MARKET_24_7") or ("true" if _IS_CRYPTO else "false"))
+# Market hours: cTrader closes ALL instruments on weekends (crypto included),
+# so both builds follow the same 24/5 schedule (Sun 21:00 → Fri 21:00 UTC).
+# Override with MARKET_24_7=true only if the broker genuinely trades crypto 24/7.
+MARKET_24_7 = _truthy(os.getenv("MARKET_24_7") or "false")
 LICENSE_PRODUCT = os.getenv("LICENSE_PRODUCT") or ("apex-crypto" if _IS_CRYPTO else "apex-forex")
 LICENSE_KEY_PREFIX = (os.getenv("LICENSE_KEY_PREFIX") or ("CRPT" if _IS_CRYPTO else "FORX")).upper()
 
