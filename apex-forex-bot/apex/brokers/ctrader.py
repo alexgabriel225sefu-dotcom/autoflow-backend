@@ -617,34 +617,39 @@ class CtraderBroker:
         if sl or tp:
             pid = res.position.positionId if res.HasField("position") else None
             if not pid:
-                try:
-                    pos = self.get_open_position(instrument)
-                    pid = (pos or {}).get("positionId")
-                except Exception:
-                    pid = None
+                for _try in range(3):
+                    time.sleep(0.3 * (_try + 1))
+                    try:
+                        pos = self.get_open_position(instrument)
+                        pid = (pos or {}).get("positionId")
+                        if pid:
+                            break
+                    except Exception:
+                        pass
             amend_ok = False
             if pid:
-                try:
-                    am = ProtoOAAmendPositionSLTPReq()
-                    am.ctidTraderAccountId = self._ctid()
-                    am.positionId = int(pid)
-                    dg = self._digits(instrument)
-                    if sl:
-                        am.stopLoss = round(float(sl), dg)
-                    if tp:
-                        am.takeProfit = round(float(tp), dg)
-                    self._conn()._request(am, ProtoOAExecutionEvent, timeout=15)
-                    amend_ok = True
-                except Exception as e:
-                    print(f"[cTrader] SL/TP amend failed: {e}")
-            # If the amend RPC succeeded, trust it — the stop IS at the broker
-            # even if a Reconcile snapshot taken milliseconds later hasn't
-            # propagated it yet (crypto symbols lag more than FX). Only verify
-            # when the amend itself failed; the loop's protective stop is the
-            # last-resort backstop.
+                for _try in range(3):
+                    try:
+                        if _try > 0:
+                            time.sleep(0.5 * _try)
+                        am = ProtoOAAmendPositionSLTPReq()
+                        am.ctidTraderAccountId = self._ctid()
+                        am.positionId = int(pid)
+                        dg = self._digits(instrument)
+                        if sl:
+                            am.stopLoss = round(float(sl), dg)
+                        if tp:
+                            am.takeProfit = round(float(tp), dg)
+                        self._conn()._request(am, ProtoOAExecutionEvent, timeout=15)
+                        amend_ok = True
+                        break
+                    except Exception as e:
+                        print(f"[cTrader] SL/TP amend attempt {_try+1}/3 failed: {e}")
+            else:
+                print(f"[cTrader] WARNING: no positionId after fill for {sym}")
             protected = amend_ok
             if not protected:
-                time.sleep(0.5)
+                time.sleep(1.0)
                 try:
                     pos2 = self.get_open_position(instrument)
                     protected = bool(pos2 and pos2.get("stopLoss"))
