@@ -31,20 +31,45 @@ def ema(data, period):
 
 
 def rsi(closes, period=14):
+    """RSI using Wilder's exponential smoothing (matches TradingView/cTrader)."""
+    n = len(closes)
+    if n < period + 1:
+        return [None] * n
+    out = [None] * period
+    gains = losses = 0.0
+    for j in range(1, period + 1):
+        d = closes[j] - closes[j - 1]
+        if d > 0:
+            gains += d
+        else:
+            losses -= d
+    avg_gain = gains / period
+    avg_loss = losses / period
+    out.append(100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss))
+    for i in range(period + 1, n):
+        d = closes[i] - closes[i - 1]
+        g = d if d > 0 else 0.0
+        l = -d if d < 0 else 0.0
+        avg_gain = (avg_gain * (period - 1) + g) / period
+        avg_loss = (avg_loss * (period - 1) + l) / period
+        out.append(100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss))
+    return out
+
+
+def _positional_sma(data, period):
+    """SMA preserving positional alignment — None gaps reset the window."""
     out = []
-    for i in range(len(closes)):
-        if i < period:
+    buf = []
+    for v in data:
+        if v is None:
             out.append(None)
-            continue
-        gains = losses = 0.0
-        for j in range(i - period + 1, i + 1):
-            diff = closes[j] - closes[j - 1]
-            if diff > 0:
-                gains += diff
+            buf.clear()
+        else:
+            buf.append(v)
+            if len(buf) >= period:
+                out.append(sum(buf[-period:]) / period)
             else:
-                losses -= diff
-        ag, al = gains / period, losses / period
-        out.append(100.0 if al == 0 else 100 - 100 / (1 + ag / al))
+                out.append(None)
     return out
 
 
@@ -55,14 +80,14 @@ def stoch_rsi(closes, rsi_period=14, stoch_period=14, k_period=3, d_period=3):
         if i < stoch_period - 1 or rsi_vals[i] is None:
             stoch.append(None)
             continue
-        sl = [v for v in rsi_vals[i - stoch_period + 1: i + 1] if v is not None]
-        if len(sl) < stoch_period:
+        window = rsi_vals[i - stoch_period + 1: i + 1]
+        if any(v is None for v in window):
             stoch.append(None)
             continue
-        lo, hi = min(sl), max(sl)
+        lo, hi = min(window), max(window)
         stoch.append(0 if hi == lo else (rsi_vals[i] - lo) / (hi - lo) * 100)
-    k_line = sma([v for v in stoch if v is not None], k_period)
-    d_line = sma([v for v in k_line if v is not None], d_period)
+    k_line = _positional_sma(stoch, k_period)
+    d_line = _positional_sma(k_line, d_period)
     last_k = next((v for v in reversed(k_line) if v is not None), None)
     last_d = next((v for v in reversed(d_line) if v is not None), None)
     return {"k": last_k, "d": last_d}

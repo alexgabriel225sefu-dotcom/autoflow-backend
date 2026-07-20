@@ -164,7 +164,7 @@ def druckenmiller_multiplier(confidence, criteria_score, livermore, turtle):
         mult *= 1.2
     if livermore and (livermore.get("strength") or 0) >= 0.8:
         mult *= 1.1
-    return min(1.5, max(0.4, mult))
+    return min(1.2, max(0.4, mult))
 
 
 def record_trade(won, pnl_amount, start_balance, user_id=None):
@@ -287,7 +287,7 @@ def detect_regime(candles):
     # trend/range split is meaningful.
     try:
         from apex import config as _cfg
-        sep_thr = 0.9 if getattr(_cfg, "PRODUCT", "forex") == "crypto" else 0.18
+        sep_thr = 0.9 if getattr(_cfg, "PRODUCT", "forex") == "crypto" else 0.30
     except Exception:
         sep_thr = 0.18
     if sep_pct >= sep_thr and liv.get("trend") in ("BULLISH", "BEARISH") and liv.get("strength", 0) >= 0.55:

@@ -127,22 +127,32 @@ _MODE_RULES = {
 
 
 def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_reversion"):
+    """Rule-based signal is PRIMARY. AI confirms or blocks — never initiates."""
+    mode = (mode or "mean_reversion").lower()
+    if mode not in _MODE_INTRO:
+        mode = "mean_reversion"
+
+    rule_sig = signal_for_mode(mode, ind, strategy_data, open_position)
+    rule_action = rule_sig.get("action", "HOLD")
+    rule_conf = rule_sig.get("confidence", 0)
+
+    if rule_action in ("CLOSE", "HOLD"):
+        print(f"[AI] {mode} rule-based: {rule_action} {rule_conf}%")
+        return rule_sig
+
+    # Rule says BUY/SELL — ask AI to confirm (optional filter)
     def fnum(v):
         try:
             return float(v)
         except (TypeError, ValueError):
             return 0.0
 
-    mode = (mode or "mean_reversion").lower()
-    if mode not in _MODE_INTRO:
-        mode = "mean_reversion"
     rsi_v, srsi_k, macd_h, vol_r, bb_pos = (fnum(ind.get(k)) for k in
                                             ("rsi", "stochRsiK", "macdHist", "volumeRatio", "bb_position"))
     recent = "\n".join(
         f"{i+1}. {c['direction']} O:{c['open']} H:{c['high']} L:{c['low']} C:{c['close']} (body: {c['bodyPct']}%)"
         for i, c in enumerate(ind["recentCandles"]))
-    pos = (f"{open_position['side']} @ {open_position['entryPrice']} | "
-           f"PnL: {open_position.get('pnlPips', 0):.1f} pips") if open_position else "NONE"
+    pos = "NONE"  # hide position from AI to prevent directional bias
     sessions = ", ".join(forex.active_sessions()) or "between sessions"
 
     # Twelve Data forex has no tick volume — swap the dead criterion for Stoch RSI
@@ -197,17 +207,34 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
 Respond ONLY with valid JSON:
 {{"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 sentences>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}}"""
 
+    ai_sig = None
     try:
-        return _call_anthropic(prompt)
+        ai_sig = _call_anthropic(prompt)
     except Exception:
-        pass
-    try:
-        return _call_groq(prompt)
-    except Exception as err:
-        print(f"[AI ❌] Groq failed: {err}")
-    sig = signal_for_mode(mode, ind, strategy_data, open_position)
-    print(f"[AI] {mode} rule fallback: {sig['action']} {sig['confidence']}%")
-    return sig
+        try:
+            ai_sig = _call_groq(prompt)
+        except Exception as err:
+            print(f"[AI ❌] AI unavailable ({err}) — using rule signal")
+
+    if ai_sig is None:
+        print(f"[AI] {mode} rule-only: {rule_action} {rule_conf}%")
+        return rule_sig
+
+    ai_action = ai_sig.get("action", "HOLD")
+    if ai_action == rule_action:
+        rule_sig["confidence"] = min(88, rule_conf + 8)
+        rule_sig.setdefault("keyFactors", []).append("AI confirms")
+        print(f"[AI] {mode} rule+AI agree: {rule_action} {rule_sig['confidence']}%")
+        return rule_sig
+    if ai_action == "HOLD":
+        rule_sig["confidence"] = max(55, rule_conf - 5)
+        print(f"[AI] {mode} rule {rule_action}, AI neutral → {rule_sig['confidence']}%")
+        return rule_sig
+    # AI contradicts → block
+    print(f"[AI] {mode} rule {rule_action} BLOCKED by AI ({ai_action})")
+    return {"action": "HOLD", "confidence": 45, "criteriaScore": 1,
+            "reasoning": f"Rule {rule_action} blocked — AI sees {ai_action}",
+            "riskLevel": "LOW", "keyFactors": ["rule-AI disagreement"]}
 
 
 def rule_based_fallback(ind, open_position=None):
@@ -302,19 +329,20 @@ def mean_reversion_signal(ind, open_position=None):
     bw     = fnum(ind.get("bb_bandwidth"), 0)
     div    = (ind.get("divergence") or "NONE").upper()
 
-    # Already in a trade → exit once price has reverted to the mean (the target).
+    # Already in a trade → let SL/TP handle exit. Only close early if price
+    # has overshot well past the mean (profit-taking zone, not midline).
     if open_position:
         side = open_position.get("side")
-        if side == "BUY" and bb_pos >= 52:
-            return {"action": "CLOSE", "confidence": 70, "criteriaScore": 3,
-                    "reasoning": "Mean reversion: price reached BB mid — take profit",
-                    "riskLevel": "LOW", "keyFactors": ["reached mean"]}
-        if side == "SELL" and bb_pos <= 48:
-            return {"action": "CLOSE", "confidence": 70, "criteriaScore": 3,
-                    "reasoning": "Mean reversion: price reached BB mid — take profit",
-                    "riskLevel": "LOW", "keyFactors": ["reached mean"]}
-        return {"action": "HOLD", "confidence": 50, "criteriaScore": 1,
-                "reasoning": "Holding mean-reversion trade, waiting for reversion to the mean",
+        if side == "BUY" and bb_pos >= 65:
+            return {"action": "CLOSE", "confidence": 72, "criteriaScore": 3,
+                    "reasoning": "Mean reversion: price overshot past mean — taking profit",
+                    "riskLevel": "LOW", "keyFactors": ["overshot mean"]}
+        if side == "SELL" and bb_pos <= 35:
+            return {"action": "CLOSE", "confidence": 72, "criteriaScore": 3,
+                    "reasoning": "Mean reversion: price overshot past mean — taking profit",
+                    "riskLevel": "LOW", "keyFactors": ["overshot mean"]}
+        return {"action": "HOLD", "confidence": 55, "criteriaScore": 2,
+                "reasoning": "Holding mean-reversion trade — riding to TP",
                 "riskLevel": "LOW", "keyFactors": []}
 
     # Flat bands = no edge; don't fade noise.

@@ -70,14 +70,14 @@ def _make_broker(user):
         # Pulled from the global product config so PRODUCT=crypto takes effect.
         MAX_SPREAD_PCT   = getattr(_appcfg, "MAX_SPREAD_PCT", 0),
         FLASH_SPIKE_PCT  = getattr(_appcfg, "FLASH_SPIKE_PCT", 0.012),
-        MIN_CONFIDENCE   = int(user.get("min_confidence", 65)),
+        MIN_CONFIDENCE   = int(user.get("min_confidence", 70)),
         STRATEGY         = (user.get("strategy") or "auto").lower(),
         ATR_STOPS        = bool(user.get("atr_stops", True)),  # dynamic RR 1:2 by default
         # ── Strategy Builder knobs (all per-user, all enforced in the loop) ──
-        HTF_CONFIRM      = bool(user.get("htf", False)),          # multi-timeframe gate
+        HTF_CONFIRM      = bool(user.get("htf", True)),           # multi-timeframe gate — ON by default
         EXIT_MODE        = (user.get("exit_mode") or "fixed").lower(),
-        TRAILING_STOP    = bool(user.get("trailing", False)),     # move SL behind price
-        BREAKEVEN_AT_R   = float(user.get("breakeven_r", 0)),     # 0 = off; 1 = at +1R
+        TRAILING_STOP    = bool(user.get("trailing", True)),      # move SL behind price — ON by default
+        BREAKEVEN_AT_R   = float(user.get("breakeven_r", 1.0)),   # move SL to entry at +1R
         NEWS_FILTER      = bool(user.get("news_filter", _appcfg.PRODUCT != "crypto")),
         SESSION_FILTER   = list(user.get("session_filter") or []),  # [] = all sessions
         MAX_TRADES_DAY   = int(user.get("max_trades_day", 10)),
@@ -903,10 +903,11 @@ def _loop(user_id, alert_fn, gen=None):
                     last_warn_tick = tick
                     alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
                                        "reason": f"cooling down after a loss — entries resume in ~{left}m"})
-            if entry_ok and last_close_at and time.time() - last_close_at < _CLOSE_COOLDOWN_MIN * 60:
+            if entry_ok and last_close_at and last_loss_at and last_close_at == last_loss_at and \
+               time.time() - last_close_at < _CLOSE_COOLDOWN_MIN * 60:
                 left = int((_CLOSE_COOLDOWN_MIN * 60 - (time.time() - last_close_at)) / 60) + 1
                 entry_ok = False
-                _skip(f"post-close cooldown ({left}m left)")
+                _skip(f"post-loss-close cooldown ({left}m left)")
             if entry_ok:
                 # ── Cost control: the spread is forex's hidden fee. Skip a too-wide
                 #    spread and refuse trades whose target can't clear a round-trip
@@ -1030,7 +1031,7 @@ def _loop(user_id, alert_fn, gen=None):
                         atr_v = 0.0
                 if atr_v > 0:
                     # Wider stop + far target so trades breathe and profits run.
-                    sl_dist, tp_dist = 2.0 * atr_v, 5.0 * atr_v
+                    sl_dist, tp_dist = 2.5 * atr_v, 5.0 * atr_v
                     # FLOOR: on a 5-min candle the ATR of a calm FX pair is only
                     # ~2 pips, so 1.5×ATR is a sub-noise stop that the spread
                     # alone triggers instantly — the churn that bled the account.
@@ -1039,7 +1040,7 @@ def _loop(user_id, alert_fn, gen=None):
                     # Crypto's magnitude pip makes 10×pip a 0.01-0.1% sub-noise
                     # floor; use a %-of-price floor (~0.4%) so the stop clears
                     # crypto tick noise. Forex keeps the 10-pip floor.
-                    floor_abs = (0.004 * price) if _crypto else (15.0 * pip)
+                    floor_abs = (0.004 * price) if _crypto else (20.0 * pip)
                     min_stop = max(4.0 * spread * pip, floor_abs)
                     if sl_dist < min_stop:
                         sl_dist = min_stop
