@@ -235,5 +235,13 @@ def active_sessions(now: datetime = None) -> list:
     return sessions
 
 
+def lots_to_units(lots: float, instrument: str) -> float:
+    """Convert lot size to units: FX 1 lot = 100,000 units; crypto/metals = units directly."""
+    s = _norm(instrument)
+    if _is_fx(s) or s.endswith("JPY"):
+        return lots * 100_000
+    return lots
+
+
 def spread_pips(bid: float, ask: float, instrument: str) -> float:
     return to_pips(ask - bid, instrument, bid)

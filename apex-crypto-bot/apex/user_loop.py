@@ -1336,7 +1336,7 @@ def clear_suggestion(user_id):
     user_store.update(str(user_id), {"pending_suggestion": None})
 
 
-def force_trade(user_id, side, symbol=None):
+def force_trade(user_id, side, symbol=None, lots=None):
     """Open a manual trade immediately (called from AI assistant or /buy /sell commands)."""
     user_id = str(user_id)
     user = user_store.load(user_id)
@@ -1388,8 +1388,11 @@ def force_trade(user_id, side, symbol=None):
     if dash:
         balance = dash.get("balance", balance)
 
-    units = forex.calc_units(balance, cfg.RISK_PER_TRADE, stop_pips_eff, sym, price,
-                             leverage=cfg.LEVERAGE)
+    if lots is not None and lots > 0:
+        units = forex.lots_to_units(lots, sym)
+    else:
+        units = forex.calc_units(balance, cfg.RISK_PER_TRADE, stop_pips_eff, sym, price,
+                                 leverage=cfg.LEVERAGE)
     units = forex.round_units(max(units, forex.min_units(sym)), sym)
 
     try:

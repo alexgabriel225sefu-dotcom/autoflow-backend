@@ -116,6 +116,14 @@ def round_units(units: float, instrument: str):
     return round(float(units), 2)
 
 
+def lots_to_units(lots: float, instrument: str) -> float:
+    """Convert lot size to units: FX 1 lot = 100,000 units; crypto/metals = units directly."""
+    s = _norm(instrument)
+    if _is_fx(s) or s.endswith("JPY"):
+        return lots * 100_000
+    return lots
+
+
 def to_pips(price_distance: float, instrument: str, price: float = None) -> float:
     return price_distance / pip_size(instrument, price)
 

@@ -1795,13 +1795,26 @@ def _handle_chart(chat_id, args=None):
                               (", entry/SL/TP" if not sym else ""))
 
 
+def _parse_trade_args(args):
+    """Parse '/buy BTCUSD 0.5' → (symbol_or_None, lots_or_None)."""
+    parts = (args or "").strip().split()
+    sym, lots = None, None
+    for p in parts:
+        try:
+            lots = float(p)
+        except ValueError:
+            sym = p.upper().replace("/", "_").replace("-", "_")
+    return sym, lots
+
+
 def _handle_buy(chat_id, args):
-    sym = (args or "").strip().upper().replace("/", "_").replace("-", "_")
+    sym, lots = _parse_trade_args(args)
     if not sym:
         user = user_store.load(chat_id)
         sym = user.get("symbol", cfg.SYMBOL)
-    send_to(chat_id, f"⚡ Opening <b>BUY {sym}</b>…")
-    result = user_loop.force_trade(str(chat_id), "BUY", sym)
+    lots_lbl = f" ({lots} lots)" if lots else ""
+    send_to(chat_id, f"⚡ Opening <b>BUY {sym}</b>{lots_lbl}…")
+    result = user_loop.force_trade(str(chat_id), "BUY", sym, lots=lots)
     if result.get("ok"):
         send_to(chat_id,
                 f"✅ <b>BUY {sym}</b> entered\n"
@@ -1813,12 +1826,13 @@ def _handle_buy(chat_id, args):
 
 
 def _handle_sell(chat_id, args):
-    sym = (args or "").strip().upper().replace("/", "_").replace("-", "_")
+    sym, lots = _parse_trade_args(args)
     if not sym:
         user = user_store.load(chat_id)
         sym = user.get("symbol", cfg.SYMBOL)
-    send_to(chat_id, f"⚡ Opening <b>SELL {sym}</b>…")
-    result = user_loop.force_trade(str(chat_id), "SELL", sym)
+    lots_lbl = f" ({lots} lots)" if lots else ""
+    send_to(chat_id, f"⚡ Opening <b>SELL {sym}</b>{lots_lbl}…")
+    result = user_loop.force_trade(str(chat_id), "SELL", sym, lots=lots)
     if result.get("ok"):
         send_to(chat_id,
                 f"✅ <b>SELL {sym}</b> entered\n"
