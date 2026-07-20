@@ -936,6 +936,9 @@ def _loop(user_id, alert_fn, gen=None):
                 # the pip limit.
                 max_spread = getattr(cfg, "MAX_SPREAD_PIPS", 3.0)
                 max_spread_pct = getattr(cfg, "MAX_SPREAD_PCT", 0)
+                # Tighter limit for liquid majors (BTC/ETH), looser for altcoins
+                if max_spread_pct > 0 and _nrm(symbol) in ("BTCUSD", "ETHUSD"):
+                    max_spread_pct = min(max_spread_pct, 0.4)
                 spread_pct = ((ask - bid) / price * 100) if price > 0 else 0.0
                 if not entry_ok:
                     pass
@@ -1095,6 +1098,8 @@ def _loop(user_id, alert_fn, gen=None):
                         _rs = forex.spread_pips(_rb, _ra, symbol)
                         _rs_pct = ((_ra - _rb) / price * 100) if price > 0 else 0.0
                         _msp = getattr(cfg, "MAX_SPREAD_PCT", 0)
+                        if _msp > 0 and _nrm(symbol) in ("BTCUSD", "ETHUSD"):
+                            _msp = min(_msp, 0.4)
                         _msp_pip = getattr(cfg, "MAX_SPREAD_PIPS", 3.0)
                         if _msp > 0 and _rs_pct > _msp:
                             _skip_exec = True
