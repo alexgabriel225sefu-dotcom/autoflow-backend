@@ -1210,6 +1210,16 @@ def _handle_cb(chat_id, data):
     elif data == "cp:n":
         user_loop.clear_suggestion(str(chat_id))
         send_to(chat_id, "❌ Skipped. I'll keep watching and suggest the next setup.")
+    elif data.startswith("tr:"):
+        parts = data.split(":")
+        if len(parts) == 3:
+            _, side, sym = parts
+            send_to(chat_id, f"📊 <b>{side} {sym}</b> — choose lot size:",
+                    extra={"reply_markup": {"inline_keyboard": _trade_lots_kb(side, sym)}})
+        elif len(parts) == 4:
+            _, side, sym, lot_str = parts
+            lots = None if lot_str == "auto" else float(lot_str)
+            _exec_trade(chat_id, side, sym, lots)
 
 
 def _handle_market(chat_id):
@@ -1823,40 +1833,65 @@ def _parse_trade_args(args):
     return sym, lots
 
 
-def _handle_buy(chat_id, args):
-    sym, lots = _parse_trade_args(args)
-    if not sym:
-        user = user_store.load(chat_id)
-        sym = user.get("symbol", cfg.SYMBOL)
+_QUICK_SYMS_FX = ["EUR_USD", "GBP_USD", "USD_JPY", "XAU_USD", "GBP_JPY", "AUD_USD"]
+_LOT_SIZES_FX = [0.01, 0.05, 0.1, 0.5, 1.0, 2.0]
+
+
+def _trade_sym_kb(side):
+    """Symbol picker buttons for /buy or /sell."""
+    rows = []
+    for i in range(0, len(_QUICK_SYMS_FX), 3):
+        row = [{"text": s.replace("_", "/"), "callback_data": f"tr:{side}:{s}"}
+               for s in _QUICK_SYMS_FX[i:i+3]]
+        rows.append(row)
+    return rows
+
+
+def _trade_lots_kb(side, sym):
+    """Lot size picker buttons after symbol is chosen."""
+    rows = []
+    for i in range(0, len(_LOT_SIZES_FX), 3):
+        row = [{"text": f"{l} lot{'s' if l != 1 else ''}", "callback_data": f"tr:{side}:{sym}:{l}"}
+               for l in _LOT_SIZES_FX[i:i+3]]
+        rows.append(row)
+    rows.append([{"text": "🤖 Auto (risk-based)", "callback_data": f"tr:{side}:{sym}:auto"}])
+    return rows
+
+
+def _exec_trade(chat_id, side, sym, lots):
     lots_lbl = f" ({lots} lots)" if lots else ""
-    send_to(chat_id, f"⚡ Opening <b>BUY {sym}</b>{lots_lbl}…")
-    result = user_loop.force_trade(str(chat_id), "BUY", sym, lots=lots)
+    send_to(chat_id, f"⚡ Opening <b>{side} {sym}</b>{lots_lbl}…")
+    result = user_loop.force_trade(str(chat_id), side, sym, lots=lots)
     if result.get("ok"):
         send_to(chat_id,
-                f"✅ <b>BUY {sym}</b> entered\n"
+                f"✅ <b>{side} {sym}</b> entered\n"
                 f"Price: <b>{result['price']:.5f}</b> | Units: {result['units']}\n"
                 f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
                 f"Spread: {result.get('spread', '?')}p")
     else:
         send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}")
+
+
+def _handle_buy(chat_id, args):
+    sym, lots = _parse_trade_args(args)
+    if sym and lots is not None:
+        return _exec_trade(chat_id, "BUY", sym, lots)
+    if sym:
+        return send_to(chat_id, f"📊 <b>BUY {sym}</b> — choose lot size:",
+                        extra={"reply_markup": {"inline_keyboard": _trade_lots_kb("BUY", sym)}})
+    return send_to(chat_id, "📊 <b>BUY</b> — choose a pair:",
+                    extra={"reply_markup": {"inline_keyboard": _trade_sym_kb("BUY")}})
 
 
 def _handle_sell(chat_id, args):
     sym, lots = _parse_trade_args(args)
-    if not sym:
-        user = user_store.load(chat_id)
-        sym = user.get("symbol", cfg.SYMBOL)
-    lots_lbl = f" ({lots} lots)" if lots else ""
-    send_to(chat_id, f"⚡ Opening <b>SELL {sym}</b>{lots_lbl}…")
-    result = user_loop.force_trade(str(chat_id), "SELL", sym, lots=lots)
-    if result.get("ok"):
-        send_to(chat_id,
-                f"✅ <b>SELL {sym}</b> entered\n"
-                f"Price: <b>{result['price']:.5f}</b> | Units: {result['units']}\n"
-                f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
-                f"Spread: {result.get('spread', '?')}p")
-    else:
-        send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}")
+    if sym and lots is not None:
+        return _exec_trade(chat_id, "SELL", sym, lots)
+    if sym:
+        return send_to(chat_id, f"📊 <b>SELL {sym}</b> — choose lot size:",
+                        extra={"reply_markup": {"inline_keyboard": _trade_lots_kb("SELL", sym)}})
+    return send_to(chat_id, "📊 <b>SELL</b> — choose a pair:",
+                    extra={"reply_markup": {"inline_keyboard": _trade_sym_kb("SELL")}})
 
 
 def _handle_close(chat_id):
