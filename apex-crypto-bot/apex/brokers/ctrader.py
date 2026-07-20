@@ -622,31 +622,34 @@ class CtraderBroker:
                     pid = (pos or {}).get("positionId")
                 except Exception:
                     pid = None
+            amend_ok = False
             if pid:
                 try:
                     am = ProtoOAAmendPositionSLTPReq()
                     am.ctidTraderAccountId = self._ctid()
                     am.positionId = int(pid)
-                    # cTrader rejects SL/TP prices that aren't rounded to the
-                    # symbol's digit count — the amend failure on 5-digit FX.
                     dg = self._digits(instrument)
                     if sl:
                         am.stopLoss = round(float(sl), dg)
                     if tp:
                         am.takeProfit = round(float(tp), dg)
                     self._conn()._request(am, ProtoOAExecutionEvent, timeout=15)
+                    amend_ok = True
                 except Exception as e:
-                    print(f"[cTrader] SL/TP amend failed (relative stop may still be attached): {e}")
-            # Verify the position actually has a stop; only close if truly naked.
-            protected = False
-            try:
-                pos2 = self.get_open_position(instrument)
-                protected = bool(pos2 and pos2.get("stopLoss"))
-            except Exception:
-                # Can't verify → trust the relative stop the order carried
-                # rather than close a possibly-good trade. Loop's protective
-                # stop is the backstop.
-                protected = True
+                    print(f"[cTrader] SL/TP amend failed: {e}")
+            # If the amend RPC succeeded, trust it — the stop IS at the broker
+            # even if a Reconcile snapshot taken milliseconds later hasn't
+            # propagated it yet (crypto symbols lag more than FX). Only verify
+            # when the amend itself failed; the loop's protective stop is the
+            # last-resort backstop.
+            protected = amend_ok
+            if not protected:
+                time.sleep(0.5)
+                try:
+                    pos2 = self.get_open_position(instrument)
+                    protected = bool(pos2 and pos2.get("stopLoss"))
+                except Exception:
+                    protected = True
             if not protected and sl:
                 try:
                     self.close_position(instrument)

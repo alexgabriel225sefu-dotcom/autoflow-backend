@@ -1122,33 +1122,39 @@ def _loop(user_id, alert_fn, gen=None):
                                        f"SL={sl_price} TP={tp_price}", user_id=user_id)
                         except Exception:
                             pass
-                        broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
+                        order_ok = True
+                        try:
+                            broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
+                        except Exception as oe:
+                            order_ok = False
+                            print(f"[UserLoop:{user_id}] place_order error: {oe}")
 
-                        if cfg.PAPER_TRADING:
-                            open_pos = {"side": action, "entryPrice": price,
-                                        "symbol": symbol, "units": units,
-                                        "quantity": units, "stopLoss": sl_price, "takeProfit": tp_price,
-                                        "entrySpreadPips": spread, "openedAt": now_str}
-                        else:
-                            try:
-                                open_pos = broker.get_open_position(symbol)
-                            except Exception:
-                                open_pos = None
-                            open_pos = open_pos or {"side": action, "entryPrice": price,
-                                                    "symbol": symbol, "units": units,
-                                                    "quantity": units, "stopLoss": sl_price,
-                                                    "takeProfit": tp_price, "openedAt": now_str}
+                        if order_ok:
+                            if cfg.PAPER_TRADING:
+                                open_pos = {"side": action, "entryPrice": price,
+                                            "symbol": symbol, "units": units,
+                                            "quantity": units, "stopLoss": sl_price, "takeProfit": tp_price,
+                                            "entrySpreadPips": spread, "openedAt": now_str}
+                            else:
+                                try:
+                                    open_pos = broker.get_open_position(symbol)
+                                except Exception:
+                                    open_pos = None
+                                open_pos = open_pos or {"side": action, "entryPrice": price,
+                                                        "symbol": symbol, "units": units,
+                                                        "quantity": units, "stopLoss": sl_price,
+                                                        "takeProfit": tp_price, "openedAt": now_str}
 
-                        dash["openPosition"] = open_pos
-                        result = {"action": action, "symbol": symbol, "confidence": confidence,
-                                  "price": price, "spreadPips": round(spread, 1), "time": now_str,
-                                  "stopLoss": sl_price, "takeProfit": tp_price,
-                                  "reasoning": signal.get("reasoning", ""),
-                                  "keyFactors": signal.get("keyFactors", [])}
-                        dash["trades"].insert(0, result)
-                        dash["trades"] = dash["trades"][:50]
-                        if alert_fn:
-                            alert_fn(user_id, result)
+                            dash["openPosition"] = open_pos
+                            result = {"action": action, "symbol": symbol, "confidence": confidence,
+                                      "price": price, "spreadPips": round(spread, 1), "time": now_str,
+                                      "stopLoss": sl_price, "takeProfit": tp_price,
+                                      "reasoning": signal.get("reasoning", ""),
+                                      "keyFactors": signal.get("keyFactors", [])}
+                            dash["trades"].insert(0, result)
+                            dash["trades"] = dash["trades"][:50]
+                            if alert_fn:
+                                alert_fn(user_id, result)
 
             elif action == "CLOSE" and open_pos and dash.get("manualHold"):
                 # /buy - /sell trades belong to the USER: the strategy engine
