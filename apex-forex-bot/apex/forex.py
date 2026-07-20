@@ -23,6 +23,10 @@ def _is_fx(s: str) -> bool:
 
 _METALS = {"XAU", "XAG", "XPT", "XPD"}   # gold, silver, platinum, palladium
 
+_CRYPTO = {"BTC", "ETH", "SOL", "XRP", "LTC", "BNB", "ADA", "DOT", "DOGE",
+           "LINK", "BCH", "AVAX", "MATIC", "UNI", "SHIB", "ATOM", "APT",
+           "ARB", "OP", "FIL", "NEAR", "ICP", "ALGO", "FTM", "SAND", "MANA"}
+
 
 def is_tradeable(instrument: str) -> bool:
     """Whitelist for the FOREX bot: spot FX pairs and metals (XAU/XAG/XPT/XPD
@@ -36,6 +40,18 @@ def is_tradeable(instrument: str) -> bool:
     if _is_fx(s):
         return True
     return s[:3] in _METALS and s[3:] in _CCY
+
+
+def is_crypto(instrument: str) -> bool:
+    """Whitelist for the CRYPTO bot: only crypto CFDs (BTCUSD, ETHUSD, etc.).
+    Rejects forex pairs, metals, indices, stocks."""
+    s = _norm(instrument)
+    if not s or len(s) < 4:
+        return False
+    for c in _CRYPTO:
+        if s.startswith(c):
+            return True
+    return False
 
 
 def pip_size(instrument: str, price: float = None) -> float:
