@@ -27,8 +27,29 @@ def get_session(user_id=None):
     if user_id is None:
         return session
     if user_id not in _sessions:
-        _sessions[user_id] = _default_session()
+        s = _default_session()
+        # Restore the persisted copy so a restart can't wipe the circuit
+        # breakers (daily loss/trade counters, consecutive losses, peak
+        # balance for the drawdown limit) mid-day.
+        try:
+            from apex import user_store
+            saved = user_store.load(user_id).get("strategy_session")
+            if isinstance(saved, dict):
+                s.update({k: saved[k] for k in s if k in saved})
+        except Exception:
+            pass
+        _sessions[user_id] = s
     return _sessions[user_id]
+
+
+def _persist_session(user_id):
+    if user_id is None:
+        return
+    try:
+        from apex import user_store
+        user_store.update(user_id, {"strategy_session": dict(get_session(user_id))})
+    except Exception as e:
+        print(f"[STRATEGY:{user_id}] session persist failed: {e}")
 
 
 def _reset_daily_if_needed(user_id=None):
@@ -184,6 +205,7 @@ def record_trade(won, pnl_amount, start_balance, user_id=None):
     print(f"[STRATEGY:{user_id or '?'}] {icon} Streak: {s['consecutiveLosses']} losses / "
           f"{s['consecutiveWins']} wins | Today: {s['dailyTrades']} trades | "
           f"Daily PnL: {'+' if s['dailyPnL'] >= 0 else ''}${s['dailyPnL']:.4f}")
+    _persist_session(user_id)
 
 
 def cooldown_remaining(cooldown_min, user_id=None):

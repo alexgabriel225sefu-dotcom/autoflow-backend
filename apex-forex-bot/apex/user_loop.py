@@ -249,9 +249,20 @@ def _loop(user_id, alert_fn, gen=None):
     last_refresh_at = 0.0  # throttle cTrader token-refresh/reconnect attempts
     bar_seen = {}    # nrm(symbol) -> [newest_bar_time, ticks_unchanged]
     stale_alerted = 0.0  # throttle "feed frozen" alerts
-    last_loss_at = 0.0  # entry cooldown anchor (any losing close)
-    last_close_at = 0.0 # re-entry lock after ANY close — kills open/close churn
-    loss_streak = 0     # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
+    # Risk state is PERSISTED: a restart (redeploy, settings change, watchdog)
+    # used to wipe the post-loss cooldown and the loss-streak risk ladder at
+    # exactly the moment they mattered most — right after losses.
+    last_loss_at = float(user.get("last_loss_at") or 0)   # entry cooldown anchor (any losing close)
+    last_close_at = float(user.get("last_close_at") or 0) # re-entry lock after ANY close — kills open/close churn
+    loss_streak = int(user.get("loss_streak") or 0)       # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
+
+    def _persist_risk_state():
+        try:
+            user_store.update(user_id, {"last_loss_at": last_loss_at,
+                                        "last_close_at": last_close_at,
+                                        "loss_streak": loss_streak})
+        except Exception as e:
+            print(f"[UserLoop:{user_id}] risk-state persist failed: {e}")
     prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
     pos_details = {}    # nrm(symbol) -> {symbol, side, entry, units} for P&L on close
     spread_blocked = {}  # nrm(symbol) -> retry_ts: Auto-Pilot avoids symbols whose
@@ -410,6 +421,11 @@ def _loop(user_id, alert_fn, gen=None):
                     elif est_pnl is not None and est_pnl > 0:
                         loss_streak = 0
                     last_close_at = time.time()
+                    _persist_risk_state()
+                    if est_pnl is not None:
+                        strategies.record_trade(est_pnl > 0, est_pnl,
+                                                dash.get("startBalance") or paper_balance,
+                                                user_id=user_id)
                     pos_details.pop(cs, None)
                     if alert_fn:
                         alert_fn(user_id, {"action": "BROKER_CLOSE_MULTI", "symbol": det.get("symbol", cs),
@@ -651,6 +667,11 @@ def _loop(user_id, alert_fn, gen=None):
                         loss_streak += 1
                     elif pnl_est is not None and pnl_est > 0:
                         loss_streak = 0
+                    _persist_risk_state()
+                    if pnl_est is not None:
+                        strategies.record_trade(pnl_est > 0, pnl_est,
+                                                dash.get("startBalance") or paper_balance,
+                                                user_id=user_id)
                     result = {"action": "BROKER_CLOSE", "symbol": symbol,
                               "side": prev_pos.get("side", ""), "price": price,
                               "entryPrice": prev_pos.get("entryPrice"),
@@ -688,6 +709,10 @@ def _loop(user_id, alert_fn, gen=None):
                         last_loss_at = time.time()
                         last_close_at = time.time()
                         loss_streak += 1
+                        _persist_risk_state()
+                        strategies.record_trade(False, 0.0,
+                                                dash.get("startBalance") or paper_balance,
+                                                user_id=user_id)
                         open_pos = None
                         dash["openPosition"] = None
             else:
@@ -757,6 +782,10 @@ def _loop(user_id, alert_fn, gen=None):
                     # Persist so the simulated balance survives a restart.
                     user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                     last_close_at = time.time()
+                    _persist_risk_state()
+                    strategies.record_trade(net > 0, net,
+                                            dash.get("startBalance") or paper_balance,
+                                            user_id=user_id)
                     open_pos = None
                     dash["openPosition"] = None
                     dash["balance"] = paper_balance
@@ -796,11 +825,16 @@ def _loop(user_id, alert_fn, gen=None):
                     last_mkt_tick = tick
 
             # Check risk limits (per-user, from the Strategy Builder)
+            # user_id makes the circuit breakers PER-USER. Without it every
+            # client shared one global session: user A's peak balance made
+            # user B's smaller account read as a huge drawdown (false stop),
+            # and the loss-streak/daily counters never tracked anyone.
             stop_check = strategies.should_stop(
                 paper_balance, dash["startBalance"],
                 max_daily_loss_pct=getattr(cfg, "MAX_DAILY_LOSS_PCT", 3.0),
                 max_dd_pct=getattr(cfg, "MAX_DD_PCT", 20.0),
-                max_trades_day=getattr(cfg, "MAX_TRADES_DAY", 10))
+                max_trades_day=getattr(cfg, "MAX_TRADES_DAY", 10),
+                user_id=user_id)
             if stop_check["stop"]:
                 print(f"[UserLoop:{user_id}] Strategy stop: {stop_check['reasons']}")
                 if alert_fn:
@@ -841,11 +875,15 @@ def _loop(user_id, alert_fn, gen=None):
             confidence = signal.get("confidence", 0)
 
             entry_ok = action in ("BUY", "SELL") and not open_pos and confidence >= cfg.MIN_CONFIDENCE
-            # Signal TTL: if AI analysis took too long the market moved on.
+            # Signal TTL: if analysis took too long the market moved on. The AI
+            # confirmation itself takes 2-8s when it runs (only on BUY/SELL
+            # candidates) — a 5s TTL made a successful-but-slow AI confirm
+            # cancel its own entry. 12s tolerates a slow confirm and still
+            # rejects genuinely stale signals (retry cascades take 30s+).
             _sig_age = time.time() - _sig_t0
-            if entry_ok and _sig_age > 5.0:
+            if entry_ok and _sig_age > 12.0:
                 entry_ok = False
-                _skip(f"signal TTL expired ({_sig_age:.1f}s > 5s)")
+                _skip(f"signal TTL expired ({_sig_age:.1f}s > 12s)")
             # ── Multi-position gates (live) ──
             if entry_ok and not cfg.PAPER_TRADING:
                 if all_positions is None:
@@ -1174,6 +1212,10 @@ def _loop(user_id, alert_fn, gen=None):
                     # Persist so the simulated balance survives a restart.
                     user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                 last_close_at = time.time()
+                _persist_risk_state()
+                strategies.record_trade(net > 0, net,
+                                        dash.get("startBalance") or paper_balance,
+                                        user_id=user_id)
                 open_pos = None
                 dash["openPosition"] = None
                 dash["balance"] = paper_balance
