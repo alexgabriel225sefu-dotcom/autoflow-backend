@@ -72,6 +72,7 @@ def _make_broker(user):
         FLASH_SPIKE_PCT  = getattr(_appcfg, "FLASH_SPIKE_PCT", 0.012),
         MIN_CONFIDENCE   = int(user.get("min_confidence", 70)),
         STRATEGY         = (user.get("strategy") or "auto").lower(),
+        AI_CONFIRM       = bool(user.get("ai_confirm", True)),  # /aiconfirm off = pure rule engine
         ATR_STOPS        = bool(user.get("atr_stops", True)),  # dynamic RR 1:2 by default
         # ── Strategy Builder knobs (all per-user, all enforced in the loop) ──
         HTF_CONFIRM      = bool(user.get("htf", True)),           # multi-timeframe gate — ON by default
@@ -864,11 +865,17 @@ def _loop(user_id, alert_fn, gen=None):
                     "posInfo": pos_info,
                 })
 
-            # AI signal with rule-based fallback
+            # AI signal with rule-based fallback. The client chooses via
+            # /aiconfirm: ON = every rule entry is double-checked by the AI
+            # (can block weak setups, costs a few seconds per candidate);
+            # OFF = pure rule engine — instant, zero API cost.
             _sig_t0 = time.time()
             try:
-                signal = ai.get_signal(ind, paper_balance, open_pos, strat_data,
-                                       mode=active_mode)
+                if getattr(cfg, "AI_CONFIRM", True):
+                    signal = ai.get_signal(ind, paper_balance, open_pos, strat_data,
+                                           mode=active_mode)
+                else:
+                    signal = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
             except Exception as e:
                 print(f"[UserLoop:{user_id}] AI error: {e}")
                 if tick - last_ai_error_tick >= _AI_ERROR_THROTTLE and alert_fn:

@@ -1725,6 +1725,27 @@ def _send_chart_async(chat_id, symbol=None, position=None, caption=""):
     threading.Thread(target=run, daemon=True).start()
 
 
+def _handle_aiconfirm(chat_id, args):
+    """Client choice: AI double-checks every entry (on) or pure rules (off)."""
+    arg = (args or "").strip().lower()
+    if arg in ("on", "1", "true", "yes"):
+        user_store.update(chat_id, {"ai_confirm": True})
+        _restart_user_loop(chat_id)
+        return send_to(chat_id,
+            "🧠 <b>AI confirmation ON.</b>\nEvery rule-based entry signal gets double-checked "
+            "by the AI before executing — it can block weak setups (adds a few seconds per entry).")
+    if arg in ("off", "0", "false", "no"):
+        user_store.update(chat_id, {"ai_confirm": False})
+        _restart_user_loop(chat_id)
+        return send_to(chat_id,
+            "⚡ <b>AI confirmation OFF.</b>\nEntries fire on the rule engine alone — instant, zero AI cost. "
+            "All the risk guards (spread, news, HTF trend, cooldowns, circuit breakers) stay active.")
+    cur = user_store.load(chat_id).get("ai_confirm", True)
+    return send_to(chat_id,
+        f"🧠 AI confirmation is <b>{'ON' if cur else 'OFF'}</b>.\n"
+        "Use <code>/aiconfirm on</code> or <code>/aiconfirm off</code>.")
+
+
 def _handle_atr(chat_id, args):
     on = (args or "").strip().lower() in ("on", "true", "1", "yes")
     user_store.update(chat_id, {"atr_stops": on})
@@ -2269,6 +2290,7 @@ _CONTROLS_TEXT = (
     "/sl 50 — Set stop loss in pips\n"
     "/tp 100 — Set take profit in pips\n"
     "/atr on|off — Use dynamic ATR-based stops\n"
+    "/aiconfirm on|off — AI double-checks each entry (on) or pure rules (off)\n"
     "/copilot on|off — Approve each trade before it opens\n"
     "/builder — Build a custom strategy step by step\n"
     "/autopilot on — Let the bot pick the best instruments too\n"
@@ -2643,6 +2665,8 @@ def _poll_loop():
                     _handle_guide(chat_id)
                 elif cmd_l == "/atr":
                     _handle_atr(chat_id, args)
+                elif cmd_l == "/aiconfirm":
+                    _handle_aiconfirm(chat_id, args)
                 elif cmd_l in ("/stats", "/performance"):
                     _handle_stats(chat_id)
                 elif cmd_l in ("/resetstats", "/resetjournal"):

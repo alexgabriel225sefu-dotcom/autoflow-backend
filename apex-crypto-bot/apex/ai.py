@@ -720,12 +720,25 @@ def evc_signal(ind, strat=None, open_position=None):
             "riskLevel": "MEDIUM", "keyFactors": factors}
 
 
+def auto_engine(ind, strat, open_position):
+    """AUTO fallback for calls where the mode wasn't pre-resolved by regime
+    detection (the live loop resolves 'auto' via strategies.detect_regime;
+    /backtest and any direct signal_for_mode('auto') land here). Follow a
+    confirmed Livermore trend, otherwise fade the range with mean reversion —
+    previously this silently ran pure mean reversion, which loses in trends."""
+    strat = strat or {}
+    liv = strat.get("livermore") or {}
+    if liv.get("trend") in ("BULLISH", "BEARISH") and (liv.get("strength") or 0) >= 0.6:
+        return trend_signal(ind, strat, open_position)
+    return mean_reversion_signal(ind, open_position)
+
+
 # ── Strategy-mode registry (used by the loop, Telegram and the backtester) ──
 STRATEGY_MODES = {
     "auto": {
         "label": "Auto (regime-adaptive)",
         "blurb": "detects the market regime live — trend, range, high/low volatility — and switches to the right engine automatically, halving risk in violent markets and standing aside in dead ones. Recommended.",
-        "engine": lambda ind, strat, pos: mean_reversion_signal(ind, pos),
+        "engine": lambda ind, strat, pos: auto_engine(ind, strat, pos),
     },
     "mean_reversion": {
         "label": "Mean Reversion",
