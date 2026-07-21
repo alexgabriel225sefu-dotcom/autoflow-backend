@@ -204,13 +204,46 @@ def _send_fx_trade_result(chat_id, result, sym):
 
 # ─── Telegram API helpers ─────────────────────────────────
 
+def _esc(v) -> str:
+    """Escape dynamic text for Telegram HTML. A bare '<' (e.g. 'EMA50<EMA200'
+    in a signal reasoning) makes the API reject the WHOLE message with a parse
+    error — and it used to be dropped silently, so trade alerts never arrived."""
+    return (str(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+def _fmt_px(v) -> str:
+    """Human price: kills float noise like 0.7017249999999999 in alerts."""
+    try:
+        return f"{float(v):g}"
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _post_message(chat_id, text, extra=None):
+    """sendMessage with a visible failure path: log the API error and, on an
+    HTML parse error, resend as plain text — an alert must never vanish."""
+    r = requests.post(f"{_API}/sendMessage",
+                      json={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                            **(extra or {})}, timeout=6)
+    try:
+        data = r.json()
+    except Exception:
+        return
+    if not data.get("ok"):
+        desc = str(data.get("description", ""))
+        print(f"[TELEGRAM] send to {chat_id} failed: {desc[:140]}")
+        if "parse" in desc.lower():
+            plain = re.sub(r"<[^>]+>", "", text)
+            requests.post(f"{_API}/sendMessage",
+                          json={"chat_id": chat_id, "text": plain, **(extra or {})},
+                          timeout=6)
+
+
 def send(text, extra=None):
     if not TOKEN or not CHAT_ID:
         return
     try:
-        requests.post(f"{_API}/sendMessage",
-                      json={"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML",
-                            **(extra or {})}, timeout=6)
+        _post_message(CHAT_ID, text, extra)
     except Exception as e:
         print(f"[TELEGRAM] Send error: {e}")
 
@@ -219,9 +252,7 @@ def send_to(chat_id, text, extra=None):
     if not TOKEN:
         return
     try:
-        requests.post(f"{_API}/sendMessage",
-                      json={"chat_id": chat_id, "text": text, "parse_mode": "HTML",
-                            **(extra or {})}, timeout=6)
+        _post_message(chat_id, text, extra)
     except Exception as e:
         print(f"[TELEGRAM] Send error: {e}")
 
@@ -1981,10 +2012,10 @@ def _fx_why_block(result) -> str:
     parts = []
     reasoning = (result.get("reasoning") or "").strip()
     if reasoning:
-        parts.append(f"🧠 <i>{reasoning}</i>")
+        parts.append(f"🧠 <i>{_esc(reasoning)}</i>")
     factors = result.get("keyFactors") or []
     if factors:
-        parts.append("📊 " + " · ".join(str(f) for f in factors[:4]))
+        parts.append("📊 " + " · ".join(_esc(f) for f in factors[:4]))
     return ("\n" + "\n".join(parts)) if parts else ""
 
 
@@ -2024,7 +2055,7 @@ def _user_alert(uid, result):
         send_to(uid,
                 f"⚠️ <b>Market data problem</b> — {sym}\n"
                 f"I can't fetch prices from <b>{result.get('broker', 'your broker')}</b>:\n"
-                f"<i>{result.get('reason', '')[:160]}</i>\n\n"
+                f"<i>{_esc(result.get('reason', '')[:160])}</i>\n\n"
                 "I retry every 30s automatically. If this keeps up, "
                 "send /ctrader to re-connect your account.")
     elif action == "STOP":
@@ -2032,7 +2063,7 @@ def _user_alert(uid, result):
         send_to(uid, f"🛑 <b>Trading paused — risk limit hit</b>\n{reasons}")
     elif action == "SKIP_WARN":
         send_to(uid, f"⚠️ <b>Holding off on {result.get('symbol', sym)}</b>\n"
-                     f"<i>{result.get('reason', 'market conditions are unfavourable right now')}.</i>\n"
+                     f"<i>{_esc(result.get('reason', 'market conditions are unfavourable right now'))}.</i>\n"
                      "I'll take the trade as soon as conditions normalise.")
     elif action == "MARKET_PULSE":
         vol = f" · Volume: <b>{result['volume']}</b>" if result.get("volume") else ""
@@ -2072,7 +2103,7 @@ def _user_alert(uid, result):
             pass
         send_to(uid,
                 f"{d} <b>{action}</b> — {sym}\n"
-                f"Price: <b>{result.get('price', '—')}</b> | "
+                f"Price: <b>{_fmt_px(result.get('price'))}</b> | "
                 f"Confidence: <b>{result.get('confidence', 0)}%</b>{spread_line}{rr_line}"
                 + _fx_why_block(result))
         _send_chart_async(uid, symbol=sym, position={
@@ -2083,7 +2114,7 @@ def _user_alert(uid, result):
         net = result.get("netPnl")
         _reason_lbl = {"STOP_LOSS": "🛑 Stop loss hit",
                        "TAKE_PROFIT": "🎯 Take profit hit"}.get(result.get("reason"))
-        why = (f"\n🧠 <i>{result['reasoning']}</i>" if result.get("reasoning")
+        why = (f"\n🧠 <i>{_esc(result['reasoning'])}</i>" if result.get("reasoning")
                else _fx_close_why(result.get("reason", "")))
         if net is not None:
             icon = "✅" if net >= 0 else "❌"
@@ -2092,7 +2123,7 @@ def _user_alert(uid, result):
                 head = f"{_reason_lbl} — {sym}"
             send_to(uid,
                     f"{head}\n"
-                    f"Exit: <b>{result.get('price', '—')}</b>\n"
+                    f"Exit: <b>{_fmt_px(result.get('price'))}</b>\n"
                     f"{icon} Net P&amp;L: <b>{'+' if net >= 0 else ''}${net:.2f}</b> "
                     f"<i>(gross ${result.get('grossPnl', 0):.2f} − cost ${result.get('costUsd', 0):.2f})</i>\n"
                     f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>"
@@ -2100,7 +2131,7 @@ def _user_alert(uid, result):
         else:
             send_to(uid,
                     f"🔒 <b>Position closed</b> — {sym}\n"
-                    f"Price: <b>{result.get('price', '—')}</b>" + why)
+                    f"Price: <b>{_fmt_px(result.get('price'))}</b>" + why)
     elif action == "BROKER_CLOSE_MULTI":
         send_to(uid,
                 f"🔒 <b>Position closed</b> — {sym}\n"
@@ -2122,8 +2153,8 @@ def _user_alert(uid, result):
                     if pnl is not None else "")
         send_to(uid,
                 f"🎯 <b>Your broker closed the position</b> — {sym}\n"
-                f"{result.get('side', '')} from <b>{result.get('entryPrice', '—')}</b> → "
-                f"≈ <b>{result.get('price', '—')}</b> (stop-loss or take-profit executed at cTrader)\n"
+                f"{result.get('side', '')} from <b>{_fmt_px(result.get('entryPrice'))}</b> → "
+                f"≈ <b>{_fmt_px(result.get('price'))}</b> (stop-loss or take-profit executed at cTrader)\n"
                 f"{pnl_line}"
                 f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>")
     elif action == "STOP_MOVED":
@@ -2131,7 +2162,7 @@ def _user_alert(uid, result):
         side = "🟢 LONG" if result.get("side") == "BUY" else "🔴 SHORT"
         send_to(uid,
                 f"🛡️ <b>Stop moved</b> — {sym} {side}\n"
-                f"Locking in the trade — stop trailed to <b>{sl}</b>. "
+                f"Locking in the trade — stop trailed to <b>{_fmt_px(sl)}</b>. "
                 "Profit is being protected as price moves your way.")
     else:
         send_to(uid, f"⚡ <b>{action}</b> — {sym}")

@@ -290,6 +290,17 @@ def _loop(user_id, alert_fn, gen=None):
         "lastTick": None,
         "currentPrice": None,
     }
+    # Seed the trade history from the persistent journal: the in-memory list
+    # was wiped on every loop restart (redeploy, settings change), so /status
+    # showed "0 trades" and the bot looked like it never traded.
+    try:
+        _j = user_store.load_trades(user_id) or []
+        dash["trades"] = [{**t, "action": "CLOSE", "price": t.get("exit"),
+                           "entryPrice": t.get("entry"),
+                           "win": (t.get("netPnl") or 0) > 0}
+                          for t in reversed(_j[-15:])]
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] journal seed failed: {e}")
     with _lock:
         if user_id in _loops:
             _loops[user_id]["dash"] = dash
@@ -1099,8 +1110,10 @@ def _loop(user_id, alert_fn, gen=None):
                             signal.setdefault("keyFactors", []).append("TP auto-raised to 2×SL (RR guard)")
                         except Exception:
                             pass
-                sl_price = price - sl_dist if action == "BUY" else price + sl_dist
-                tp_price = price + tp_dist if action == "BUY" else price - tp_dist
+                # Round to broker-grade precision — raw float math produced
+                # 0.7017249999999999-style prices in orders and alerts.
+                sl_price = round(price - sl_dist if action == "BUY" else price + sl_dist, 6)
+                tp_price = round(price + tp_dist if action == "BUY" else price - tp_dist, 6)
                 risk_mult = strategies.druckenmiller_multiplier(
                     confidence, signal.get("criteriaScore", 0),
                     strat_data.get("livermore"), strat_data.get("turtle"))
@@ -1139,9 +1152,9 @@ def _loop(user_id, alert_fn, gen=None):
                             _skip_exec = True
                             _skip(f"spread widened before exec ({_rs:.1f}p > {_msp_pip:g}p)")
                         else:
-                            price = (_rb + _ra) / 2
-                            sl_price = price - sl_dist if action == "BUY" else price + sl_dist
-                            tp_price = price + tp_dist if action == "BUY" else price - tp_dist
+                            price = round((_rb + _ra) / 2, 6)
+                            sl_price = round(price - sl_dist if action == "BUY" else price + sl_dist, 6)
+                            tp_price = round(price + tp_dist if action == "BUY" else price - tp_dist, 6)
                     except Exception:
                         pass
                     if _skip_exec:
@@ -1420,8 +1433,8 @@ def force_trade(user_id, side, symbol=None, lots=None):
         sl_dist = cfg.STOP_LOSS_PIPS * pip
         tp_dist = (max(cfg.TAKE_PROFIT_PIPS, 2.0 * cfg.STOP_LOSS_PIPS)
                    if cfg.TAKE_PROFIT_PIPS < cfg.STOP_LOSS_PIPS else cfg.TAKE_PROFIT_PIPS) * pip
-    sl_price = price - sl_dist if side == "BUY" else price + sl_dist
-    tp_price = price + tp_dist if side == "BUY" else price - tp_dist
+    sl_price = round(price - sl_dist if side == "BUY" else price + sl_dist, 6)
+    tp_price = round(price + tp_dist if side == "BUY" else price - tp_dist, 6)
 
     balance = user.get("paper_balance") or cfg.PAPER_BALANCE
     dash = get_dash(user_id)
