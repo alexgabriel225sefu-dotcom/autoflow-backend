@@ -132,6 +132,74 @@ def atr(candles, period=14):
     return sma(tr, period)
 
 
+def adx(candles, period=14):
+    """Average Directional Index with +DI/-DI for trend strength measurement.
+    ADX > 25 = trending, ADX < 20 = ranging, 20-25 = transitional."""
+    n = len(candles)
+    if n < period + 2:
+        return {"adx": None, "plus_di": None, "minus_di": None}
+    plus_dm, minus_dm, tr_list = [], [], []
+    for i in range(1, n):
+        h, l, pc = candles[i]["high"], candles[i]["low"], candles[i - 1]["close"]
+        up_move = h - candles[i - 1]["high"]
+        dn_move = candles[i - 1]["low"] - l
+        plus_dm.append(up_move if up_move > dn_move and up_move > 0 else 0.0)
+        minus_dm.append(dn_move if dn_move > up_move and dn_move > 0 else 0.0)
+        tr_list.append(max(h - l, abs(h - pc), abs(l - pc)))
+    sm_plus = sum(plus_dm[:period])
+    sm_minus = sum(minus_dm[:period])
+    sm_tr = sum(tr_list[:period])
+    plus_di_list, minus_di_list, dx_list = [], [], []
+    for i in range(period, len(tr_list)):
+        sm_plus = sm_plus - sm_plus / period + plus_dm[i]
+        sm_minus = sm_minus - sm_minus / period + minus_dm[i]
+        sm_tr = sm_tr - sm_tr / period + tr_list[i]
+        pdi = 100 * sm_plus / sm_tr if sm_tr else 0
+        mdi = 100 * sm_minus / sm_tr if sm_tr else 0
+        plus_di_list.append(pdi)
+        minus_di_list.append(mdi)
+        dx_list.append(100 * abs(pdi - mdi) / (pdi + mdi) if (pdi + mdi) else 0)
+    if len(dx_list) < period:
+        pdi_last = plus_di_list[-1] if plus_di_list else None
+        mdi_last = minus_di_list[-1] if minus_di_list else None
+        return {"adx": None, "plus_di": pdi_last, "minus_di": mdi_last}
+    adx_val = sum(dx_list[:period]) / period
+    for i in range(period, len(dx_list)):
+        adx_val = (adx_val * (period - 1) + dx_list[i]) / period
+    return {"adx": round(adx_val, 2),
+            "plus_di": round(plus_di_list[-1], 2),
+            "minus_di": round(minus_di_list[-1], 2)}
+
+
+def obv(candles):
+    """On-Balance Volume — cumulative volume in the direction of price.
+    Rising OBV confirms buying pressure; divergence from price warns of reversal."""
+    if len(candles) < 2:
+        return {"obv": 0, "obv_slope": 0.0, "obv_divergence": "NONE"}
+    val = 0.0
+    vals = [0.0]
+    for i in range(1, len(candles)):
+        if candles[i]["close"] > candles[i - 1]["close"]:
+            val += candles[i].get("volume", 0)
+        elif candles[i]["close"] < candles[i - 1]["close"]:
+            val -= candles[i].get("volume", 0)
+        vals.append(val)
+    lookback = min(14, len(vals) - 1)
+    if lookback < 2:
+        return {"obv": val, "obv_slope": 0.0, "obv_divergence": "NONE"}
+    obv_recent = vals[-lookback:]
+    obv_slope = (obv_recent[-1] - obv_recent[0]) / lookback if lookback else 0
+    closes = [c["close"] for c in candles[-lookback:]]
+    price_up = closes[-1] > closes[0]
+    obv_up = obv_recent[-1] > obv_recent[0]
+    div = "NONE"
+    if price_up and not obv_up:
+        div = "BEARISH"
+    elif not price_up and obv_up:
+        div = "BULLISH"
+    return {"obv": val, "obv_slope": round(obv_slope, 2), "obv_divergence": div}
+
+
 def detect_divergence(closes, rsi_values, lookback=5):
     last = len(closes) - 1
     if last < lookback + 1:
@@ -422,6 +490,8 @@ def analyze(candles):
     bb_position = (f"{(price - bb_last['lower']) / (bb_last['upper'] - bb_last['lower']) * 100:.0f}"
                    if bb_last.get("upper") and bb_last.get("lower") else None)
 
+    adx_data = adx(candles)
+    obv_data = obv(candles)
     fib = fibonacci_levels(candles)
     fvg = fair_value_gap(candles)
     ifvg = inverse_fvg(candles)
@@ -464,6 +534,11 @@ def analyze(candles):
         "supplyDemand": sd_zones,
         "liquiditySweep": liq_sweep,
         "evc": evc_data,
+        "adx": _fmt(adx_data.get("adx"), 2),
+        "plus_di": _fmt(adx_data.get("plus_di"), 2),
+        "minus_di": _fmt(adx_data.get("minus_di"), 2),
+        "obv_slope": obv_data.get("obv_slope", 0),
+        "obv_divergence": obv_data.get("obv_divergence", "NONE"),
         "recentCandles": [{
             "open": c["open"], "high": c["high"], "low": c["low"], "close": c["close"],
             "direction": "🟢" if c["close"] > c["open"] else "🔴",
