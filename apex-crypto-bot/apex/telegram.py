@@ -128,7 +128,7 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
         sign = "+" if net >= 0 else ""
         send_to(chat_id,
                 f"📊 <b>Dacă închizi acum:</b>\n"
-                f"Preț curent: <b>{price:.5f}</b>\n"
+                f"Preț curent: <b>{_fmt_px(price)}</b>\n"
                 f"P&amp;L brut: <b>{sign}${gross:.2f}</b>\n"
                 f"Cost spread: <b>−${cost:.2f}</b>\n"
                 f"Net: <b>{sign}${net:.2f}</b>\n"
@@ -193,8 +193,8 @@ def _send_fx_trade_result(chat_id, result, sym):
     if result.get("ok"):
         send_to(chat_id,
                 f"✅ <b>{result['side']} {sym}</b> deschis\n"
-                f"Preț: <b>{result['price']:.5f}</b> | Unități: {result.get('units', '—')}\n"
-                f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
+                f"Preț: <b>{_fmt_px(result['price'])}</b> | Unități: {result.get('units', '—')}\n"
+                f"SL: {_fmt_px(result['sl'])} | TP: {_fmt_px(result['tp'])}\n"
                 f"Spread: {result.get('spread', '—')}p\n"
                 f"<i>Închide cu</i> <code>/close</code>")
     else:
@@ -394,7 +394,7 @@ def _build_status(dash, chart=""):
     wins = sum(1 for t in trades if t.get("win"))
     total = len(trades)
     win_rate = f"{wins / total * 100:.0f}%" if total else "—"
-    chart_line = (f"\n<code>{chart}</code>  <b>{dash.get('currentPrice', 0):.5f}</b>") if chart else ""
+    chart_line = (f"\n<code>{chart}</code>  <b>{_fmt_px(dash.get('currentPrice', 0))}</b>") if chart else ""
     # Crypto trades 24/7 and has no forex "sessions" — showing London/New York
     # on a crypto bot is wrong. Forex keeps the session line.
     if getattr(cfg, "MARKET_24_7", False):
@@ -409,7 +409,7 @@ def _build_status(dash, chart=""):
         d = "🟢 LONG" if op["side"] == "BUY" else "🔴 SHORT"
         pnl = op.get("currentPnl", 0)
         pos_line = (f"{d} <b>{op['symbol']}</b>\n  Entry: {op['entryPrice']}  "
-                    f"SL: {(op.get('stopLoss') or 0):.5f}\n"
+                    f"SL: {_fmt_px(op.get('stopLoss') or 0)}\n"
                     f"  PnL: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>")
         if oc > 1:
             pos_line += f"\n  <i>+{oc - 1} more open — see the terminal / cTrader</i>"
@@ -1228,8 +1228,8 @@ def _handle_cb(chat_id, data):
         res = user_loop.force_trade(str(chat_id), sug["side"], sug["symbol"])
         if res.get("ok"):
             send_to(chat_id,
-                    f"✅ <b>{sug['side']} {sug['symbol']}</b> @ {res['price']:.5f} | Units: {res['units']}\n"
-                    f"SL: {res['sl']:.5f} | TP: {res['tp']:.5f}")
+                    f"✅ <b>{sug['side']} {sug['symbol']}</b> @ {_fmt_px(res['price'])} | Units: {res['units']}\n"
+                    f"SL: {_fmt_px(res['sl'])} | TP: {_fmt_px(res['tp'])}")
         else:
             send_to(chat_id, f"❌ Could not open: {_trade_err(res.get('error'))}")
     elif data == "cp:n":
@@ -1901,8 +1901,8 @@ def _exec_trade(chat_id, side, sym, lots):
     if result.get("ok"):
         send_to(chat_id,
                 f"✅ <b>{side} {sym}</b> entered\n"
-                f"Price: <b>{result['price']:.5f}</b> | Units: {result['units']}\n"
-                f"SL: {result['sl']:.5f} | TP: {result['tp']:.5f}\n"
+                f"Price: <b>{_fmt_px(result['price'])}</b> | Units: {result['units']}\n"
+                f"SL: {_fmt_px(result['sl'])} | TP: {_fmt_px(result['tp'])}\n"
                 f"Spread: {result.get('spread', '?')}p")
     else:
         send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}")
@@ -2779,8 +2779,8 @@ def alert_open(side, symbol, price, units, stop_loss, take_profit, druck_mult=1.
     mult = f"\n📐 <b>Druckenmiller:</b> ×{druck_mult:.2f}" if druck_mult != 1.0 else ""
     why = _fx_why_block({"reasoning": reasoning, "keyFactors": key_factors or []})
     _broadcast(f"{d} <b>OPENED — {symbol}</b>\n💰 @ {price}  Units: {units:,}\n"
-               f"🛡 SL: {stop_loss:.5f} ({sl_pips:.0f} pips)\n"
-               f"🎯 TP: {take_profit:.5f} ({tp_pips:.0f} pips){mult}{why}", _dashboard_keyboard())
+               f"🛡 SL: {_fmt_px(stop_loss)} ({sl_pips:.0f} pips)\n"
+               f"🎯 TP: {_fmt_px(take_profit)} ({tp_pips:.0f} pips){mult}{why}", _dashboard_keyboard())
 
 
 def alert_close(reason, symbol, side, entry_price, close_price, pnl, balance, reasoning=""):
