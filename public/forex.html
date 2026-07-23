@@ -393,7 +393,7 @@ footer .disc{max-width:560px}
         <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>AI signal detection engine</li>
         <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Automatic SL/TP on every trade</li>
         <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Fully hosted 24/7 — nothing to run</li>
-        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Paper trading to test risk-free</li>
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Free cTrader demo account to test risk-free</li>
         <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Complete Telegram control (7 commands)</li>
         <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>FORX- license key, instant delivery</li>
         <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>6+ major forex pairs supported</li>
@@ -414,7 +414,7 @@ footer .disc{max-width:560px}
         <label class="fx-check"><input type="checkbox" id="fxck3" onchange="updateForexBtn()"/><span>I agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/privacy" target="_blank">Privacy Policy</a>. This is NOT financial advice.</span></label>
       </div>
       <button id="fxBtn" class="btn btn-primary" onclick="gotoCheckout()" style="width:100%;justify-content:center;font-size:16px;padding:16px" disabled>Accept terms to continue</button>
-      <p class="price-fine">Secured by Stripe · License key emailed instantly<br>Forex trading involves risk — only trade what you can afford to lose.</p>
+      <p class="price-fine">Secured by Digistore24 · License key emailed instantly<br>Forex trading involves risk — only trade what you can afford to lose.</p>
     </div>
   </div>
 </section>
@@ -428,7 +428,7 @@ footer .disc{max-width:560px}
   <div class="faq rv">
     <div class="fq">
       <button class="fq-q" onclick="toggleFq(this)">What broker does the bot use? <span class="fq-ic">+</span></button>
-      <div class="fq-a">The bot connects exclusively to <strong>cTrader</strong>. cTrader offers both a free practice (paper) account and a live trading account. You'll need a cTrader account and an API token from their platform before running /setup.</div>
+      <div class="fq-a">The bot connects exclusively to <strong>cTrader</strong> (any cTrader-compatible broker — IC Markets, Pepperstone, FxPro, and more). cTrader offers both a free demo account and a live trading account. You'll need a cTrader account — send <code style="font-family:var(--m);color:var(--acc3)">/ctrader</code> in the bot and log in with your cTID to connect it, no manual API keys needed.</div>
     </div>
     <div class="fq">
       <button class="fq-q" onclick="toggleFq(this)">Do I need forex knowledge to use it? <span class="fq-ic">+</span></button>
@@ -436,7 +436,7 @@ footer .disc{max-width:560px}
     </div>
     <div class="fq">
       <button class="fq-q" onclick="toggleFq(this)">Can I test it before going live? <span class="fq-ic">+</span></button>
-      <div class="fq-a">Yes. The bot starts in paper trading mode by default, connected to your cTrader practice account. Paper trades follow real market prices with simulated funds. Switch to live with <code style="font-family:var(--m);color:var(--acc3)">/env live</code> when you're ready.</div>
+      <div class="fq-a">Yes. During <code style="font-family:var(--m);color:var(--acc3)">/setup</code> you choose Demo or Live upfront — a free cTrader demo account uses real market prices with simulated funds, so you can watch it trade risk-free before switching to a live account whenever you're ready.</div>
     </div>
     <div class="fq">
       <button class="fq-q" onclick="toggleFq(this)">Which pairs does it trade? <span class="fq-ic">+</span></button>
@@ -463,7 +463,7 @@ footer .disc{max-width:560px}
     <div class="rv">
       <button class="btn btn-primary" onclick="gotoCheckout()" style="font-size:17px;padding:17px 32px;margin-top:8px">Get Apex Forex Bot — $497 →</button>
     </div>
-    <p class="rv" style="font:400 12px/1.6 var(--m);color:var(--t2);margin-top:16px">Secure checkout via Stripe · Instant license delivery · Forex trading involves risk of loss</p>
+    <p class="rv" style="font:400 12px/1.6 var(--m);color:var(--t2);margin-top:16px">Secure checkout via Digistore24 · Instant license delivery · Forex trading involves risk of loss</p>
   </div>
 </section>
 
@@ -504,7 +504,8 @@ footer .disc{max-width:560px}
   }
 })();
 
-// Payment Link redirect — requires consent checkboxes; scrolls to price card if not checked
+// Digistore24 checkout redirect — requires consent checkboxes; scrolls to price card if not checked
+var FOREX_CHECKOUT_URL = ''; // TODO: set to the Digistore24 checkout URL once the forex product is created
 function gotoCheckout(){
   var c1=document.getElementById('fxck1');
   var c2=document.getElementById('fxck2');
@@ -514,10 +515,8 @@ function gotoCheckout(){
     if(card)card.scrollIntoView({behavior:'smooth',block:'center'});
     return;
   }
-  var ref=sessionStorage.getItem('rfrsn_ref')||'';
-  var url='https://buy.stripe.com/4gMeVdcnn7AX5Xp5TU2Ji01';
-  if(ref) url+='?client_reference_id='+encodeURIComponent(ref);
-  window.location.href=url;
+  if(!FOREX_CHECKOUT_URL){ alert('This product is not available for purchase yet — check back soon.'); return; }
+  window.location.href=FOREX_CHECKOUT_URL;
 }
 
 function updateForexBtn(){
