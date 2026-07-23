@@ -338,33 +338,16 @@ footer .right{font:400 11px/1.6 var(--sans);color:var(--muted);max-width:500px}
 </footer>
 
 <script>
-async function openCheckout(e, product) {
+var CHECKOUT_URLS = {
+  'apex-crypto': 'https://www.checkout-ds24.com/product/714550'
+};
+function openCheckout(e, product) {
   e.preventDefault();
-  var btn = e.currentTarget;
-  var orig = btn.innerHTML;
-  btn.style.opacity = '.6';
-  btn.style.pointerEvents = 'none';
-  btn.innerHTML = '<span>Loading…</span>';
-  try {
-    var r = await fetch('/api/lemon-checkout', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ product: product })
-    });
-    var d = await r.json();
-    if (d.url) {
-      window.location.href = d.url;
-    } else {
-      alert('Checkout unavailable. Please try again.');
-      btn.innerHTML = orig;
-      btn.style.opacity = '';
-      btn.style.pointerEvents = '';
-    }
-  } catch (err) {
-    alert('Connection error. Please try again.');
-    btn.innerHTML = orig;
-    btn.style.opacity = '';
-    btn.style.pointerEvents = '';
+  var url = CHECKOUT_URLS[product];
+  if (url) {
+    window.location.href = url;
+  } else {
+    alert('This product is not available for purchase yet — check back soon.');
   }
 }
 </script>
