@@ -8,6 +8,33 @@ from apex import forex
 _anthropic_client = None
 
 
+def _context_line():
+    """One extra line of market context for the AI prompt — sentiment for
+    crypto (Fear & Greed), upcoming high-impact events for forex. This is
+    informational context the AI weighs alongside the technicals, never a
+    standalone prediction and never a hard block on its own."""
+    try:
+        if getattr(cfg, "PRODUCT", "forex") == "crypto":
+            from apex import sentiment
+            fg = sentiment.fear_greed()
+            if not fg:
+                return "- Market sentiment: unavailable right now — weigh technicals only"
+            return (f"- Crypto Fear & Greed Index: {fg['value']}/100 ({fg['label']}) — "
+                    "context only: extreme readings often precede mean-reversion, "
+                    "but do not treat this as a standalone signal")
+        else:
+            from apex import news
+            currencies = [c for c in re.split(r"[_/]", cfg.SYMBOL) if c]
+            events = news.upcoming(currencies, hours=12, limit=3)
+            if not events:
+                return "- Upcoming high-impact news (next 12h): none scheduled"
+            lines = "; ".join(f"{e['title']} ({e['currency']}) in {e['in_min']}m" for e in events)
+            return (f"- Upcoming high-impact news (next 12h): {lines} — "
+                    "reduce confidence or stand aside if entry timing lands near release time")
+    except Exception:
+        return "- Market context: unavailable this tick — weigh technicals only"
+
+
 def _get_anthropic():
     global _anthropic_client
     if _anthropic_client is None:
@@ -198,6 +225,10 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
 
 ### Last 5 candles
 {recent}
+
+### Market Context
+{_context_line()}
+
 ## ACCOUNT
 - Balance: ${balance:.2f} USD | Leverage: 1:{cfg.LEVERAGE:g}
 - Open position: {pos}
@@ -207,6 +238,9 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
 - Minimum confidence: {cfg.MIN_CONFIDENCE}%
 {_MODE_RULES[mode]}
 - Leverage is 1:{cfg.LEVERAGE:g} — size for stability, not for chasing volatility
+- Weigh the Market Context line above like any other input: it can lower your
+  confidence or tip a borderline call, but the technicals still lead — it is
+  not a prediction and never justifies a trade the technicals don't support
 
 Respond ONLY with valid JSON:
 {{"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 sentences>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}}"""
