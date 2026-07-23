@@ -12,7 +12,11 @@ def _get_anthropic():
     global _anthropic_client
     if _anthropic_client is None:
         import anthropic
-        _anthropic_client = anthropic.Anthropic(api_key=cfg.ANTHROPIC_API_KEY)
+        # The SDK's default timeout is 600s — a slow/hung Anthropic call would
+        # stall a user's trading tick that long before falling back to Groq
+        # (get_signal only falls back on an exception, not on latency). Cap it
+        # short so a slow API degrades to the fallback instead of freezing.
+        _anthropic_client = anthropic.Anthropic(api_key=cfg.ANTHROPIC_API_KEY, timeout=20.0)
     return _anthropic_client
 
 
