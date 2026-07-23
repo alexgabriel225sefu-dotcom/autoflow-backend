@@ -1388,6 +1388,22 @@ app.post('/api/affiliates/start', _authLimiter, async (req, res) => {
 });
 
 // Notify an affiliate on Telegram when one of their referrals buys.
+// Alerts the owner on Telegram when a paying customer might not have gotten
+// their license email — the D24 IPN itself still returns 'OK' in that case
+// (the payment really did go through), so Digistore24 won't retry it and
+// nothing else will surface the failure.
+async function _notifyAdminAlert(text) {
+  const botToken = process.env.AFFILIATE_BOT_TOKEN;
+  const chatId = process.env.ADMIN_CHAT_ID || '7585109158';
+  if (!botToken) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text })
+    });
+  } catch (e) { addLog(`Admin TG alert error: ${e.message}`, 'system', 'warn'); }
+}
+
 async function _notifyAffiliateSale(code, product, commissionCents) {
   const botToken = process.env.AFFILIATE_BOT_TOKEN;
   if (!botToken || !supabase) return;
@@ -1943,8 +1959,15 @@ async function handleDigistore24Webhook(req, res) {
           ? '🤖 Your Apex Forex Bot — License Key inside'
           : '🤖 Your Apex Trade Bot — License Key inside';
         const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
-        if (!result.ok) addLog(`[D24] Email NOT sent for ${email} — ${result.error}`, 'email', 'error');
-        else addLog(`[D24] ${isForex ? 'Forex' : 'Crypto'} email sent to ${email}`, 'email', 'success');
+        if (!result.ok) {
+          addLog(`[D24] Email NOT sent for ${email} — ${result.error}`, 'email', 'error');
+          _notifyAdminAlert(
+            `⚠️ Customer paid but the license email FAILED to send.\n\n` +
+            `Product: ${isForex ? 'Forex' : 'Crypto'}\nEmail: ${email}\nOrder: ${orderId}\n` +
+            `License key: ${licenseKey}\nError: ${result.error}\n\n` +
+            `Send the key to them manually until this is fixed.`
+          );
+        } else addLog(`[D24] ${isForex ? 'Forex' : 'Crypto'} email sent to ${email}`, 'email', 'success');
       }
       if (isNew) addLog(`[D24] ${isForex ? 'Forex' : 'Crypto'} Bot sold: ${email} — key: ${licenseKey}`, 'payment', 'success');
     } else if (event === 'on_payment') {
