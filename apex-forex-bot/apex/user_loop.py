@@ -710,21 +710,41 @@ def _loop(user_id, alert_fn, gen=None):
                     breached = stop_ and ((side_ == "BUY" and price <= stop_) or
                                           (side_ == "SELL" and price >= stop_))
                     if breached:
+                        exit_price = price
                         try:
-                            broker.close_position(symbol)
+                            _close_res = broker.close_position(symbol)
+                            exit_price = (_close_res or {}).get("fillPrice") or price
                             if alert_fn:
                                 alert_fn(user_id, {"action": "CLOSE", "symbol": symbol,
-                                                   "price": price,
+                                                   "price": exit_price,
                                                    "reasoning": "🛡 Protective stop — price crossed the stop level; closed at market"})
                         except Exception as e:
                             print(f"[UserLoop:{user_id}] protective close failed: {e}")
+                        units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
+                        gross = forex.pnl_usd(side_, open_pos["entryPrice"], exit_price, units_, symbol)
+                        pv = forex.pip_value_per_unit(symbol, exit_price)
+                        cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                        net = gross - cost_usd
+                        if cfg.PAPER_TRADING:
+                            paper_balance += net
                         last_loss_at = time.time()
                         last_close_at = time.time()
                         loss_streak += 1
                         _persist_risk_state()
-                        strategies.record_trade(False, 0.0,
+                        strategies.record_trade(net > 0, net,
                                                 dash.get("startBalance") or paper_balance,
                                                 user_id=user_id, symbol=symbol)
+                        result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
+                                  "entryPrice": open_pos.get("entryPrice"),
+                                  "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
+                                  "netPnl": round(net, 2), "balance": round(paper_balance, 2),
+                                  "openedAt": open_pos.get("openedAt"), "time": now_str,
+                                  "reasoning": "protective stop — closed at market"}
+                        _log_trade(user_id, result)
+                        if cfg.PAPER_TRADING:
+                            user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
+                        dash["trades"].insert(0, result)
+                        dash["trades"] = dash["trades"][:50]
                         open_pos = None
                         dash["openPosition"] = None
             else:
@@ -1207,11 +1227,21 @@ def _loop(user_id, alert_fn, gen=None):
                 pass
             elif action == "CLOSE" and open_pos:
                 # A strategy exit is NOT always a win — label it honestly.
-                broker.close_position(symbol)
+                _close_res = None
+                try:
+                    _close_res = broker.close_position(symbol)
+                except Exception:
+                    pass
+                # Use the broker's actual execution price when it gives us one —
+                # the last fetched candle close is a stale proxy and can differ
+                # from the real fill by real spread/slippage, quietly
+                # misreporting P&L (this is why a client's own broker showed a
+                # different result than what the bot logged for the same trade).
+                exit_price = (_close_res or {}).get("fillPrice") or price
                 units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
                 gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
-                                      price, units_, symbol)
-                pv = forex.pip_value_per_unit(symbol, price)
+                                      exit_price, units_, symbol)
+                pv = forex.pip_value_per_unit(symbol, exit_price)
                 cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
                 net = gross - cost_usd
                 if cfg.PAPER_TRADING:
@@ -1221,7 +1251,7 @@ def _loop(user_id, alert_fn, gen=None):
                     loss_streak += 1
                 elif net > 0:
                     loss_streak = 0
-                result = {"action": "CLOSE", "symbol": symbol, "price": price,
+                result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
                           "entryPrice": open_pos.get("entryPrice"),
                           "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
                           "netPnl": round(net, 2), "balance": round(paper_balance, 2),
@@ -1501,12 +1531,16 @@ def force_close(user_id):
         price = 0.0
 
     try:
-        broker.close_position(sym)
+        _close_res = broker.close_position(sym)
     except Exception as e:
         return {"ok": False, "error": str(e)}
+    # Prefer the broker's actual fill price over the last fetched candle —
+    # the candle close is a stale proxy and can diverge from the real
+    # execution price by real spread/slippage.
+    price = (_close_res or {}).get("fillPrice") or price
 
     gross = cost_usd = net = 0.0
-    if cfg.PAPER_TRADING and open_pos and price:
+    if open_pos and price:
         units_ = open_pos.get("units", 1000)
         gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"], price, units_, sym)
         pv = forex.pip_value_per_unit(sym, price)
