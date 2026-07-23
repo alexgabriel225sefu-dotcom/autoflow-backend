@@ -1870,6 +1870,7 @@ async function handleDigistore24Webhook(req, res) {
 
   const sigOk = _digistore24VerifySignature(params, passphrase);
   if (!sigOk) {
+    console.error(`[D24] Signature mismatch — raw params: ${JSON.stringify(params).slice(0, 500)}`);
     addLog(`[D24] Signature mismatch — raw params: ${JSON.stringify(params).slice(0, 500)}`, 'payment', 'error');
     return res.status(401).send('Invalid signature');
   }
@@ -1968,7 +1969,13 @@ async function handleDigistore24Webhook(req, res) {
     res.status(500).send('Internal error');
   }
 }
-app.post('/digistore24-webhook', express.urlencoded({ extended: true }), handleDigistore24Webhook);
+app.post('/digistore24-webhook', (req, res, next) => {
+  console.log(`[D24] Incoming request — content-type=${req.headers['content-type']} content-length=${req.headers['content-length']} ip=${req.ip}`);
+  next();
+}, express.urlencoded({ extended: true }), (req, res, next) => {
+  console.log(`[D24] Parsed body: ${JSON.stringify(req.body).slice(0, 500)}`);
+  next();
+}, handleDigistore24Webhook);
 
 // ════════════════════════════════════════
 // VIDEO DOWNLOAD ROUTES (Veo 3 generated)
