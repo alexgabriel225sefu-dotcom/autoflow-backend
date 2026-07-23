@@ -63,8 +63,12 @@ def _reset_daily_if_needed(user_id=None):
         print(f"[STRATEGY:{user_id or '?'}] 🌅 New day — counters reset.")
 
 
+_SEYKOTA_COOLDOWN_MIN = 60  # after 3 losses in a row, stand aside this long, then clear the streak
+
+
 def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
-                max_dd_pct=20.0, max_trades_day=10, user_id=None):
+                max_dd_pct=20.0, max_trades_day=10, user_id=None,
+                seykota_cooldown_min=_SEYKOTA_COOLDOWN_MIN):
     """Circuit breaker — per-user when user_id is provided."""
     _reset_daily_if_needed(user_id)
     s = get_session(user_id)
@@ -72,7 +76,17 @@ def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
     if s["peakBalance"] is None or balance > s["peakBalance"]:
         s["peakBalance"] = balance
     if s["consecutiveLosses"] >= 3:
-        reasons.append("3 consecutive losses — unfavorable conditions (Seykota rule)")
+        # Time-boxed, not permanent: this only clears on a WIN, and the bot
+        # can't win a trade it's forbidden from entering — that deadlocked a
+        # user for hours in production. Stand aside for the cooldown, then
+        # clear the streak so a fresh run of losses is needed to re-trigger it.
+        elapsed_min = (time.time() - s["lastLossAt"]) / 60 if s["lastLossAt"] else seykota_cooldown_min
+        if elapsed_min >= seykota_cooldown_min:
+            s["consecutiveLosses"] = 0
+            _persist_session(user_id)
+        else:
+            left = int(seykota_cooldown_min - elapsed_min) + 1
+            reasons.append(f"3 consecutive losses — standing aside {left}m more (Seykota rule)")
     daily_dd_pct = (s["dailyPnL"] / start_balance) * 100 if start_balance else 0
     if daily_dd_pct < -abs(max_daily_loss_pct):
         reasons.append(f"Daily loss exceeded -{abs(max_daily_loss_pct):g}% "
