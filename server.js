@@ -16,9 +16,10 @@ app.use(cors({
   origin: ['https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'],
   credentials: true
 }));
-// Skip JSON body parsing for Stripe/Lemon webhooks — they need the raw Buffer for signature verification
+// Skip JSON body parsing for Stripe/Digistore24 webhooks — Stripe needs the raw
+// Buffer for signature verification, Digistore24 posts form-urlencoded.
 app.use((req, res, next) => {
-  if (req.path === '/stripe-webhook' || req.path === '/webhook' || req.path === '/lemon-webhook') return next();
+  if (req.path === '/stripe-webhook' || req.path === '/webhook' || req.path === '/digistore24-webhook') return next();
   express.json()(req, res, next);
 });
 // Serve static assets (JS, CSS, images) but NOT HTML — HTML goes through route handlers
@@ -2137,78 +2138,98 @@ async function handleStripeWebhook(req, res) {
 app.post('/stripe-webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 app.post('/webhook',        express.raw({ type: 'application/json' }), handleStripeWebhook);
 
-// ── LEMON SQUEEZY WEBHOOK ──────────────────────────────────────────────────
-// Merchant of Record — Lemon handles VAT/taxes/invoices, we just deliver the license.
-// Webhook events: order_created (deliver license), order_refunded (revoke license).
-// Signature: HMAC-SHA256 of the raw body using LEMONSQUEEZY_WEBHOOK_SECRET.
-async function handleLemonWebhook(req, res) {
-  const sig = req.headers['x-signature'] || '';
-  const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
-  if (!secret) { console.error('[LEMON] Missing LEMONSQUEEZY_WEBHOOK_SECRET'); return res.status(400).json({ error: 'Webhook not configured' }); }
-  const hmac = crypto.createHmac('sha256', secret).update(req.body).digest('hex');
-  if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(sig))) {
-    console.error('[LEMON] Invalid signature');
-    return res.status(401).json({ error: 'Invalid signature' });
+// ── DIGISTORE24 IPN (webhook) ───────────────────────────────────────────────
+// Merchant of Record — D24 handles EU VAT/taxes/invoices, we just deliver the
+// license. Events (sent as $_POST['event'] equivalent): on_payment (deliver
+// license), on_refund / on_chargeback (revoke license).
+//
+// Signature: sha_sign = SHA-512 of every OTHER param, sorted by key
+// (case-insensitive), concatenated as "UPPERKEY=value" per key, then
+// "$" + IPN passphrase appended, all hashed once. (Best-effort from public
+// docs — D24's own docs site is unreachable from here; verified against the
+// first real IPN hit, see the [D24] signature-mismatch log line if it's off.)
+function _digistore24VerifySignature(params, passphrase) {
+  const { sha_sign, ...rest } = params;
+  if (!sha_sign || !passphrase) return false;
+  const keys = Object.keys(rest).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  let buf = '';
+  for (const k of keys) buf += `${k.toUpperCase()}=${rest[k]}`;
+  buf += `$${passphrase}`;
+  const computed = crypto.createHash('sha512').update(buf, 'utf8').digest('hex');
+  return computed.toLowerCase() === String(sha_sign).toLowerCase();
+}
+
+async function handleDigistore24Webhook(req, res) {
+  const params = req.body || {};
+  const passphrase = process.env.DIGISTORE24_IPN_PASSPHRASE;
+  if (!passphrase) { console.error('[D24] Missing DIGISTORE24_IPN_PASSPHRASE'); return res.status(400).send('Webhook not configured'); }
+
+  const sigOk = _digistore24VerifySignature(params, passphrase);
+  if (!sigOk) {
+    addLog(`[D24] Signature mismatch — raw params: ${JSON.stringify(params).slice(0, 500)}`, 'payment', 'error');
+    return res.status(401).send('Invalid signature');
   }
+
   try {
-    const payload = JSON.parse(req.body.toString());
-    const eventName = payload.meta?.event_name;
-    const attrs = payload.data?.attributes || {};
-    const customData = payload.meta?.custom_data || {};
-    const email = attrs.user_email || customData.email || '';
-    const buyerName = attrs.user_name || customData.name || 'there';
-    const ref = (customData.ref || '').toLowerCase().trim();
-    const variantId = String(attrs.first_order_item?.variant_id || customData.variant_id || '');
-    const orderId = String(payload.data?.id || '');
-    const amountCents = Number(attrs.total || attrs.first_order_item?.price || 0);
+    const event = params.event || '';
+    const email = params.email || params.buyer_email || '';
+    const buyerName = [params.first_name, params.last_name].filter(Boolean).join(' ')
+      || params.buyer_first_name || 'there';
+    const orderId = String(params.order_id || '');
+    const productId = String(params.product_id || '');
+    const amount = Number(params.amount || params.amount_netto || 0);
 
-    // Map Lemon Squeezy variant IDs to products.
-    // Set these env vars to your Lemon Squeezy variant IDs:
-    //   LEMON_VARIANT_CRYPTO=123456  (the $297 crypto bot variant)
-    //   LEMON_VARIANT_FOREX=789012   (the $497 forex bot variant)
-    const cryptoVariant = process.env.LEMON_VARIANT_CRYPTO || '';
-    const forexVariant  = process.env.LEMON_VARIANT_FOREX || '';
+    // Map D24 product IDs to our products.
+    //   DIGISTORE24_PRODUCT_CRYPTO=714550  (the $297 crypto bot)
+    //   DIGISTORE24_PRODUCT_FOREX=<set once the forex product is created>
+    const cryptoProductId = process.env.DIGISTORE24_PRODUCT_CRYPTO || '714550';
+    const forexProductId = process.env.DIGISTORE24_PRODUCT_FOREX || '';
     let product = null;
-    if (variantId && variantId === cryptoVariant) product = 'apex-bot';
-    else if (variantId && variantId === forexVariant) product = 'apex-forex';
-    else if (amountCents >= 49000 && amountCents <= 50000) product = 'apex-forex';
-    else if (amountCents >= 29000 && amountCents <= 30000) product = 'apex-bot';
-    else product = customData.product || null;
+    if (productId && productId === cryptoProductId) product = 'apex-bot';
+    else if (productId && forexProductId && productId === forexProductId) product = 'apex-forex';
 
-    if (eventName === 'order_created' && attrs.status === 'paid' && product) {
+    if (event === 'on_payment' && orderId && product) {
       const isForex = product === 'apex-forex';
-      const licenseKey = isForex ? generateForexKey() : generateLicenseKey();
+      const piRef = `d24_${orderId}`;
+
+      // Idempotency: a retried IPN for the same order must not re-generate/re-email.
+      let licenseKey;
+      if (supabase) {
+        const { data: existing } = await supabase.from('licenses').select('key').eq('payment_intent_id', piRef).maybeSingle();
+        if (existing?.key) licenseKey = existing.key;
+      }
+      const isNew = !licenseKey;
+      if (!licenseKey) licenseKey = isForex ? generateForexKey() : generateLicenseKey();
 
       if (supabase) {
         const { error } = await supabase.from('licenses').upsert([{
           key: licenseKey, active: true, activated_at: new Date().toISOString(),
-          email: email || '', name: buyerName, product,
-          payment_intent_id: `lemon_${orderId}`
+          email: email || '', name: buyerName, product, payment_intent_id: piRef
         }], { onConflict: 'key' });
-        if (error) addLog(`[LEMON] License DB error: ${error.message}`, 'license', 'error');
+        if (error) addLog(`[D24] License DB error: ${error.message}`, 'license', 'error');
       }
-      addLog(`[LEMON] License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
+      addLog(`[D24] License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
 
-      // Affiliate commission
-      if (ref && supabase) {
+      // Affiliate commission — D24's own affiliate marketplace already pays its
+      // affiliates directly, so this only applies to refs from our own funnel.
+      const ref = (params.aff || params.affiliate || params.custom_aff || '').toLowerCase().trim();
+      if (isNew && ref && supabase) {
         try {
           const { data: aff } = await supabase.from('affiliates').select('code,commission_percent,status').eq('code', ref).maybeSingle();
           if (aff && aff.status === 'active') {
             const pct = Number(aff.commission_percent) > 0 ? Number(aff.commission_percent) : 30;
-            const commission = Math.round(amountCents * pct / 100);
+            const commission = Math.round(amount * 100 * pct / 100); // amount is in whole currency units
             await supabase.from('referral_sales').upsert([{
-              affiliate_code: aff.code, license_key: licenseKey,
-              payment_intent_id: `lemon_${orderId}`,
-              product, amount: amountCents, commission_amount: commission
+              affiliate_code: aff.code, license_key: licenseKey, payment_intent_id: piRef,
+              product, amount: Math.round(amount * 100), commission_amount: commission
             }], { onConflict: 'payment_intent_id' });
-            addLog(`[LEMON] Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}`, 'affiliate', 'success');
+            addLog(`[D24] Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}`, 'affiliate', 'success');
             _notifyAffiliateSale(aff.code, product, commission);
           }
-        } catch (e) { addLog(`[LEMON] Affiliate error: ${e.message}`, 'affiliate', 'error'); }
+        } catch (e) { addLog(`[D24] Affiliate error: ${e.message}`, 'affiliate', 'error'); }
       }
 
-      // Email the license key
-      if (email) {
+      if (isNew && email) {
         const html = isForex
           ? _buildForexEmailHtml(_he(buyerName), _he(email), licenseKey)
           : _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey);
@@ -2216,123 +2237,40 @@ async function handleLemonWebhook(req, res) {
           ? '🤖 Your Apex Forex Bot — License Key inside'
           : '🤖 Your Apex Trade Bot — License Key inside';
         const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
-        if (!result.ok) addLog(`[LEMON] Email NOT sent for ${email} — ${result.error}`, 'email', 'error');
-        else addLog(`[LEMON] ${isForex ? 'Forex' : 'Crypto'} email sent to ${email}`, 'email', 'success');
+        if (!result.ok) addLog(`[D24] Email NOT sent for ${email} — ${result.error}`, 'email', 'error');
+        else addLog(`[D24] ${isForex ? 'Forex' : 'Crypto'} email sent to ${email}`, 'email', 'success');
       }
-      const price = isForex ? '$497' : '$297';
-      addLog(`[LEMON] ${isForex ? 'Forex' : 'Crypto'} Bot sold: ${email} — ${price} — key: ${licenseKey}`, 'payment', 'success');
+      if (isNew) addLog(`[D24] ${isForex ? 'Forex' : 'Crypto'} Bot sold: ${email} — key: ${licenseKey}`, 'payment', 'success');
+    } else if (event === 'on_payment') {
+      addLog(`[D24] on_payment for unmapped product_id=${productId} order=${orderId} — set DIGISTORE24_PRODUCT_CRYPTO/FOREX`, 'payment', 'warn');
     }
 
-    // Refund — revoke license + claw back affiliate commission
-    if (eventName === 'order_refunded' && orderId) {
+    if ((event === 'on_refund' || event === 'on_chargeback') && orderId) {
+      const piRef = `d24_${orderId}`;
       if (supabase) {
-        const piRef = `lemon_${orderId}`;
         const { data: revoked } = await supabase.from('licenses')
           .update({ active: false, refunded: true, refunded_at: new Date().toISOString() })
           .eq('payment_intent_id', piRef).select('key,product');
-        if (revoked?.length) addLog(`[LEMON] License revoked: ${revoked[0].key} (${revoked[0].product})`, 'license', 'warn');
+        if (revoked?.length) addLog(`[D24] License revoked (${event}): ${revoked[0].key} (${revoked[0].product})`, 'license', 'warn');
         await supabase.from('referral_sales')
           .update({ refunded: true, refunded_at: new Date().toISOString() })
           .eq('payment_intent_id', piRef);
       }
     }
 
-    res.json({ received: true });
+    res.send('OK');
   } catch (e) {
-    console.error('[LEMON] Webhook error:', e);
-    res.status(400).json({ error: e.message });
+    console.error('[D24] Webhook error:', e);
+    res.status(500).send('Internal error');
   }
 }
-app.post('/lemon-webhook', express.raw({ type: 'application/json' }), handleLemonWebhook);
+app.post('/digistore24-webhook', express.urlencoded({ extended: true }), handleDigistore24Webhook);
 
-// ── LEMON SQUEEZY — auto-detect Store ID on first use ──
-let _lemonStoreId = process.env.LEMON_STORE_ID || '';
-async function _getLemonStoreId() {
-  if (_lemonStoreId) return _lemonStoreId;
-  const apiKey = process.env.LEMONSQUEEZY_API_KEY;
-  if (!apiKey) return '';
-  try {
-    const r = await fetch('https://api.lemonsqueezy.com/v1/stores', {
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/vnd.api+json' }
-    });
-    const d = await r.json();
-    if (d.data?.[0]?.id) { _lemonStoreId = String(d.data[0].id); console.log(`[LEMON] Auto-detected store ID: ${_lemonStoreId}`); }
-  } catch (e) { console.error('[LEMON] Store auto-detect failed:', e.message); }
-  return _lemonStoreId;
-}
-
-// ── LEMON SQUEEZY CHECKOUT — creates a checkout URL via the API.
-// The landing page calls this to get a Lemon Squeezy checkout overlay URL.
-app.post('/api/lemon-checkout', _paymentLimiter, async (req, res) => {
-  const { product, email, name, ref } = req.body;
-  const apiKey = process.env.LEMONSQUEEZY_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'Lemon Squeezy not configured' });
-  const storeId = await _getLemonStoreId();
-  const variantId = product === 'apex-forex'
-    ? process.env.LEMON_VARIANT_FOREX
-    : process.env.LEMON_VARIANT_CRYPTO;
-  if (!storeId || !variantId) {
-    console.error('[LEMON] Missing config — storeId:', storeId, 'variantId:', variantId, 'product:', product);
-    return res.status(500).json({ error: 'Lemon Squeezy products not configured (store=' + (storeId||'?') + ' variant=' + (variantId||'?') + ')' });
-  }
-  try {
-    const resp = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/vnd.api+json',
-        'Accept': 'application/vnd.api+json'
-      },
-      body: JSON.stringify({
-        data: {
-          type: 'checkouts',
-          attributes: {
-            checkout_data: {
-              email: email || undefined,
-              name: name || undefined,
-              custom: { product: product || 'apex-bot', ref: ref || 'direct' }
-            },
-            product_options: { redirect_url: 'https://aicashsystem.space/thank-you.html?order_id={order_id}&product=' + (product === 'apex-forex' ? 'apex-forex' : 'apex-bot') }
-          },
-          relationships: {
-            store: { data: { type: 'stores', id: storeId } },
-            variant: { data: { type: 'variants', id: variantId } }
-          }
-        }
-      })
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      const detail = data.errors?.[0]?.detail || JSON.stringify(data.errors || data);
-      console.error('[LEMON] Checkout API error:', resp.status, detail);
-      return res.status(resp.status).json({ error: detail });
-    }
-    const checkoutUrl = data.data?.attributes?.url;
-    if (!checkoutUrl) return res.status(500).json({ error: 'No checkout URL returned' });
-    res.json({ url: checkoutUrl });
-  } catch (e) {
-    console.error('[LEMON] Checkout error:', e.message);
-    res.status(500).json({ error: 'Checkout creation failed' });
-  }
-});
-
-// ── ORDER STATUS — polled by the thank-you page after checkout.
-// Supports both Stripe session_id and Lemon Squeezy order_id. ──
+// ── ORDER STATUS — polled by the thank-you page after checkout (Stripe path). ──
 app.get('/api/order-status', async (req, res) => {
   const sessionId = String(req.query.session_id || '').trim();
-  const lemonOrderId = String(req.query.order_id || '').trim();
   if (!supabase) return res.status(500).json({ error: 'Database not configured' });
-  // Lemon Squeezy path — look up by lemon_<orderId>
-  if (lemonOrderId) {
-    try {
-      const { data: lic } = await supabase.from('licenses')
-        .select('key,product,email').eq('payment_intent_id', `lemon_${lemonOrderId}`).maybeSingle();
-      if (!lic?.key) return res.json({ ready: false });
-      return res.json({ ready: true, licenseKey: lic.key, product: lic.product, email: lic.email || '' });
-    } catch (e) { return res.status(400).json({ error: e.message }); }
-  }
-  // Stripe path (legacy)
-  if (!sessionId) return res.status(400).json({ error: 'Missing session_id or order_id' });
+  if (!sessionId) return res.status(400).json({ error: 'Missing session_id' });
   if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe not configured' });
   try {
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
