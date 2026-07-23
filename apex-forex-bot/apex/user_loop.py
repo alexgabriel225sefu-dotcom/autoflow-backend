@@ -437,7 +437,7 @@ def _loop(user_id, alert_fn, gen=None):
                     if est_pnl is not None:
                         strategies.record_trade(est_pnl > 0, est_pnl,
                                                 dash.get("startBalance") or paper_balance,
-                                                user_id=user_id)
+                                                user_id=user_id, symbol=det.get("symbol", cs))
                     pos_details.pop(cs, None)
                     if alert_fn:
                         alert_fn(user_id, {"action": "BROKER_CLOSE_MULTI", "symbol": det.get("symbol", cs),
@@ -683,7 +683,7 @@ def _loop(user_id, alert_fn, gen=None):
                     if pnl_est is not None:
                         strategies.record_trade(pnl_est > 0, pnl_est,
                                                 dash.get("startBalance") or paper_balance,
-                                                user_id=user_id)
+                                                user_id=user_id, symbol=symbol)
                     result = {"action": "BROKER_CLOSE", "symbol": symbol,
                               "side": prev_pos.get("side", ""), "price": price,
                               "entryPrice": prev_pos.get("entryPrice"),
@@ -724,7 +724,7 @@ def _loop(user_id, alert_fn, gen=None):
                         _persist_risk_state()
                         strategies.record_trade(False, 0.0,
                                                 dash.get("startBalance") or paper_balance,
-                                                user_id=user_id)
+                                                user_id=user_id, symbol=symbol)
                         open_pos = None
                         dash["openPosition"] = None
             else:
@@ -797,7 +797,7 @@ def _loop(user_id, alert_fn, gen=None):
                     _persist_risk_state()
                     strategies.record_trade(net > 0, net,
                                             dash.get("startBalance") or paper_balance,
-                                            user_id=user_id)
+                                            user_id=user_id, symbol=symbol)
                     open_pos = None
                     dash["openPosition"] = None
                     dash["balance"] = paper_balance
@@ -846,7 +846,7 @@ def _loop(user_id, alert_fn, gen=None):
                 max_daily_loss_pct=getattr(cfg, "MAX_DAILY_LOSS_PCT", 3.0),
                 max_dd_pct=getattr(cfg, "MAX_DD_PCT", 20.0),
                 max_trades_day=getattr(cfg, "MAX_TRADES_DAY", 10),
-                user_id=user_id)
+                user_id=user_id, symbol=symbol)
             if stop_check["stop"]:
                 print(f"[UserLoop:{user_id}] Strategy stop: {stop_check['reasons']}")
                 if alert_fn:
@@ -1235,7 +1235,7 @@ def _loop(user_id, alert_fn, gen=None):
                 _persist_risk_state()
                 strategies.record_trade(net > 0, net,
                                         dash.get("startBalance") or paper_balance,
-                                        user_id=user_id)
+                                        user_id=user_id, symbol=symbol)
                 open_pos = None
                 dash["openPosition"] = None
                 dash["balance"] = paper_balance

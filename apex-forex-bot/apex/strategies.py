@@ -7,6 +7,7 @@ import time
 from datetime import date
 
 _sessions = {}  # user_id → per-user session dict (thread-safe: each user has its own)
+_symbol_sessions = {}  # (user_id, symbol) → per-symbol loss-streak dict
 
 def _default_session():
     return {
@@ -52,6 +53,40 @@ def _persist_session(user_id):
         print(f"[STRATEGY:{user_id}] session persist failed: {e}")
 
 
+def _default_symbol_session():
+    return {"consecutiveLosses": 0, "consecutiveWins": 0, "lastLossAt": 0.0}
+
+
+def _symbol_key(user_id, symbol):
+    return f"{user_id}::{(symbol or '').upper()}"
+
+
+def get_symbol_session(user_id, symbol):
+    """Per-(user, symbol) loss streak — a whipsaw on one instrument must not
+    freeze trading on every other instrument the account watches."""
+    key = _symbol_key(user_id, symbol)
+    if key not in _symbol_sessions:
+        s = _default_symbol_session()
+        try:
+            from apex import user_store
+            saved = user_store.load(key).get("symbol_session")
+            if isinstance(saved, dict):
+                s.update({k: saved[k] for k in s if k in saved})
+        except Exception:
+            pass
+        _symbol_sessions[key] = s
+    return _symbol_sessions[key]
+
+
+def _persist_symbol_session(user_id, symbol):
+    key = _symbol_key(user_id, symbol)
+    try:
+        from apex import user_store
+        user_store.update(key, {"symbol_session": dict(get_symbol_session(user_id, symbol))})
+    except Exception as e:
+        print(f"[STRATEGY:{key}] symbol session persist failed: {e}")
+
+
 def _reset_daily_if_needed(user_id=None):
     s = get_session(user_id)
     today = date.today().isoformat()
@@ -67,26 +102,36 @@ _SEYKOTA_COOLDOWN_MIN = 60  # after 3 losses in a row, stand aside this long, th
 
 
 def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
-                max_dd_pct=20.0, max_trades_day=10, user_id=None,
+                max_dd_pct=20.0, max_trades_day=10, user_id=None, symbol=None,
                 seykota_cooldown_min=_SEYKOTA_COOLDOWN_MIN):
-    """Circuit breaker — per-user when user_id is provided."""
+    """Circuit breaker — per-user when user_id is provided.
+
+    The Seykota "3 losses in a row" rule is scoped to `symbol` (when given):
+    a whipsaw on one instrument stands aside on THAT instrument only, instead
+    of freezing the whole account while a completely different pair might
+    have a perfectly good setup right now. Daily loss %, drawdown from peak
+    and the trades/day cap stay account-wide — those protect total capital,
+    not a single instrument.
+    """
     _reset_daily_if_needed(user_id)
     s = get_session(user_id)
     reasons = []
     if s["peakBalance"] is None or balance > s["peakBalance"]:
         s["peakBalance"] = balance
-    if s["consecutiveLosses"] >= 3:
+    loss_s = get_symbol_session(user_id, symbol) if symbol else s
+    if loss_s["consecutiveLosses"] >= 3:
         # Time-boxed, not permanent: this only clears on a WIN, and the bot
         # can't win a trade it's forbidden from entering — that deadlocked a
         # user for 37+ hours in production. Stand aside for the cooldown, then
         # clear the streak so a fresh run of losses is needed to re-trigger it.
-        elapsed_min = (time.time() - s["lastLossAt"]) / 60 if s["lastLossAt"] else seykota_cooldown_min
+        elapsed_min = (time.time() - loss_s["lastLossAt"]) / 60 if loss_s["lastLossAt"] else seykota_cooldown_min
         if elapsed_min >= seykota_cooldown_min:
-            s["consecutiveLosses"] = 0
-            _persist_session(user_id)
+            loss_s["consecutiveLosses"] = 0
+            _persist_session(user_id) if not symbol else _persist_symbol_session(user_id, symbol)
         else:
             left = int(seykota_cooldown_min - elapsed_min) + 1
-            reasons.append(f"3 consecutive losses — standing aside {left}m more (Seykota rule)")
+            where = f"{symbol}: " if symbol else ""
+            reasons.append(f"{where}3 consecutive losses — standing aside {left}m more (Seykota rule)")
     daily_dd_pct = (s["dailyPnL"] / start_balance) * 100 if start_balance else 0
     if daily_dd_pct < -abs(max_daily_loss_pct):
         reasons.append(f"Daily loss exceeded -{abs(max_daily_loss_pct):g}% "
@@ -202,24 +247,42 @@ def druckenmiller_multiplier(confidence, criteria_score, livermore, turtle):
     return min(1.2, max(0.4, mult))
 
 
-def record_trade(won, pnl_amount, start_balance, user_id=None):
+def record_trade(won, pnl_amount, start_balance, user_id=None, symbol=None):
+    """Account-wide daily P&L/trade counters always update here. The
+    consecutive-loss streak (Seykota rule) is tracked per `symbol` when given,
+    so it no longer bleeds across instruments."""
     s = get_session(user_id)
     s["totalTrades"] += 1
     s["dailyTrades"] += 1
     s["dailyPnL"] += pnl_amount
     s["dailyPnLPct"] = (s["dailyPnL"] / start_balance) * 100 if start_balance else 0
+    loss_s = get_symbol_session(user_id, symbol) if symbol else s
     if won:
-        s["consecutiveWins"] += 1
-        s["consecutiveLosses"] = 0
+        loss_s["consecutiveWins"] += 1
+        loss_s["consecutiveLosses"] = 0
     else:
-        s["consecutiveLosses"] += 1
-        s["consecutiveWins"] = 0
-        s["lastLossAt"] = time.time()
+        loss_s["consecutiveLosses"] += 1
+        loss_s["consecutiveWins"] = 0
+        loss_s["lastLossAt"] = time.time()
     icon = "✅" if won else "❌"
-    print(f"[STRATEGY:{user_id or '?'}] {icon} Streak: {s['consecutiveLosses']} losses / "
-          f"{s['consecutiveWins']} wins | Today: {s['dailyTrades']} trades | "
+    tag = f"{symbol} " if symbol else ""
+    print(f"[STRATEGY:{user_id or '?'}] {icon} {tag}Streak: {loss_s['consecutiveLosses']} losses / "
+          f"{loss_s['consecutiveWins']} wins | Today: {s['dailyTrades']} trades | "
           f"Daily PnL: {'+' if s['dailyPnL'] >= 0 else ''}${s['dailyPnL']:.4f}")
     _persist_session(user_id)
+    if symbol:
+        _persist_symbol_session(user_id, symbol)
+
+
+def cooldown_remaining(cooldown_min, user_id=None, symbol=None):
+    """Ed Seykota: after a loss, the worst trade is the revenge trade.
+    Returns minutes left until entries are allowed again (0 = clear).
+    Scoped to `symbol` when given (see should_stop/record_trade)."""
+    s = get_symbol_session(user_id, symbol) if symbol else get_session(user_id)
+    if not s["lastLossAt"] or cooldown_min <= 0:
+        return 0
+    elapsed = (time.time() - s["lastLossAt"]) / 60
+    return 0 if elapsed >= cooldown_min else int(cooldown_min - elapsed) + 1
 
 
 def cooldown_remaining(cooldown_min, user_id=None):
