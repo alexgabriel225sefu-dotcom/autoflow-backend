@@ -28,8 +28,8 @@
 > else paper → Yahoo. The owner trades via cTrader/Pepperstone. (Cleaning the
 > stale OANDA-worded defaults/help to say cTrader is a nice-to-do, not urgent.)
 
-  - `server.js` + `public/` — Node sales site, Stripe checkout, license delivery, affiliate API.
-  - `apex-affiliate-bot/` — Telegram bot for affiliates (30% commission).
+  - `server.js` + `public/` — Node sales site, Digistore24 checkout/IPN, license delivery, affiliate API.
+  - Affiliates are recruited via the Digistore24 marketplace (30% commission) — no in-house affiliate bot.
 
 ## Render services (deploys from the working branch)
 - `autoflow-backend` — the Node site (`server.js`). `/api/health` → `sale_ready:true`.
