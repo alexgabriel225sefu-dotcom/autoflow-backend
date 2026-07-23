@@ -16,10 +16,9 @@ app.use(cors({
   origin: ['https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'],
   credentials: true
 }));
-// Skip JSON body parsing for Stripe/Digistore24 webhooks — Stripe needs the raw
-// Buffer for signature verification, Digistore24 posts form-urlencoded.
+// Skip JSON body parsing for the Digistore24 webhook — it posts form-urlencoded.
 app.use((req, res, next) => {
-  if (req.path === '/stripe-webhook' || req.path === '/webhook' || req.path === '/digistore24-webhook') return next();
+  if (req.path === '/digistore24-webhook') return next();
   express.json()(req, res, next);
 });
 // Serve static assets (JS, CSS, images) but NOT HTML — HTML goes through route handlers
@@ -61,8 +60,7 @@ app.get('/api/health', async (req, res) => {
 
   const checks = {
     // CRITICAL — purchase → license → email flow cannot work without these
-    stripe_secret:        has('STRIPE_SECRET_KEY'),
-    stripe_webhook_secret: has('STRIPE_WEBHOOK_SECRET'),
+    digistore24_ipn_passphrase: has('DIGISTORE24_IPN_PASSPHRASE'),
     license_signing_key:  has('BOT_EMAIL_SECRET'),
     supabase_url:         has('SUPABASE_URL'),
     supabase_key:         has('SUPABASE_SERVICE_KEY'),
@@ -74,7 +72,7 @@ app.get('/api/health', async (req, res) => {
     session_secrets:      has('JWT_SECRET') && has('COOKIE_SECRET'),
   };
 
-  const critical = ['stripe_secret','stripe_webhook_secret','license_signing_key','supabase_url','supabase_key','supabase_connects','email_delivery'];
+  const critical = ['digistore24_ipn_passphrase','license_signing_key','supabase_url','supabase_key','supabase_connects','email_delivery'];
   const missing = critical.filter(k => !checks[k]);
   const saleReady = missing.length === 0;
 
@@ -181,39 +179,12 @@ app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
     return res.json({ reply: staticFallback(message) });
   }
 });
-app.get('/api/stripe-config', auth, async (req, res) => {
-  const key = process.env.STRIPE_SECRET_KEY || '';
-  const isLive = key.startsWith('sk_live_');
-  const isTest = key.startsWith('sk_test_');
-  let accountInfo = null;
-  if (key) {
-    try {
-      const stripe = require('stripe')(key);
-      const account = await stripe.accounts.retrieve();
-      accountInfo = {
-        name: account.settings?.dashboard?.display_name || account.business_profile?.name || 'N/A',
-        email: account.email,
-        country: account.country,
-        payouts_enabled: account.payouts_enabled,
-        charges_enabled: account.charges_enabled,
-        currency: account.default_currency,
-      };
-    } catch(e) { accountInfo = { error: e.message }; }
-  }
-  res.json({
-    key_present: !!key,
-    mode: isLive ? '🟢 LIVE — banii intra real' : isTest ? '🟡 TEST — banii nu sunt reali' : '❌ Nicio cheie',
-    webhook_secret: !!process.env.STRIPE_WEBHOOK_SECRET,
-    account: accountInfo,
-  });
-});
 app.get('/api/app-status', auth, (req, res) => res.json({
   ai_openai:       !!process.env.OPENAI_API_KEY,
   ai_anthropic:    !!process.env.ANTHROPIC_API_KEY,
   ai_works:        !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY),
   email_works:     !!(process.env.BREVO_API_KEY || (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_PASS)),
-  stripe_live:     (process.env.STRIPE_SECRET_KEY||'').startsWith('sk_live_'),
-  stripe_webhook:  !!process.env.STRIPE_WEBHOOK_SECRET,
+  digistore24_ipn: !!process.env.DIGISTORE24_IPN_PASSPHRASE,
   supabase:        !!process.env.SUPABASE_URL,
   verdict: !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY) ? '✅ Aplicatia functioneaza complet' : '❌ Lipseste cheia AI — Wizard/Chat/Email nu merg'
 }));
@@ -223,7 +194,6 @@ app.get('/api/email-config', auth, (req, res) => res.json({
   brevo_smtp_pass: !!process.env.BREVO_SMTP_PASS,
   sender_email:   !!process.env.SENDER_EMAIL,
   supabase:       !!process.env.SUPABASE_URL,
-  stripe:         !!process.env.STRIPE_SECRET_KEY,
   email_will_send: !!(process.env.BREVO_API_KEY || (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_PASS)),
 }));
 
@@ -359,12 +329,6 @@ try {
   }
 } catch(e) { console.error('Nodemailer init error:', e.message); }
 
-// ── PENDING LICENSES (payment_intent_id → key) — cleared after 2h ──
-const _pendingLicenses = new Map();
-// ── PENDING AFFILIATE REFS (payment_intent_id → ref code) — set by checkout.session.completed,
-// consumed by payment_intent.succeeded, since Stripe Payment Links don't copy client_reference_id
-// onto the Payment Intent's own metadata. ──
-const _pendingRefs = new Map();
 // ── RECENT CLICK DEDUPE (ref|ip → ts) — collapse refreshes within 30 min so a
 // single visitor reloading the page doesn't inflate an affiliate's click count. ──
 const _recentClicks = new Map();
@@ -1211,67 +1175,6 @@ app.get('/api/logout', (req, res) => {
   res.redirect('/access.html');
 });
 
-// POST /create-payment-intent — Stripe
-const VALID_AMOUNTS = [3700, 9700, 19700, 29700, 49700]; // $37 starter, $97 pro, $197 legacy, $297 crypto, $497 forex (in cents)
-app.post('/create-payment-intent', _paymentLimiter, async (req, res) => {
-  const { amount, currency, email, name, product, ref } = req.body;
-  const affCode = (ref || '').toString().trim().toLowerCase().slice(0, 40);
-  const safeAmount = VALID_AMOUNTS.includes(Number(amount)) ? Number(amount) : 3700;
-  // Enforce product/amount consistency
-  if (product === 'apex-bot'   && safeAmount !== 29700) return res.status(400).json({ error: 'Invalid amount for apex-bot' });
-  if (product === 'apex-forex' && safeAmount !== 49700) return res.status(400).json({ error: 'Invalid amount for apex-forex' });
-  if (safeAmount === 29700 && product && product !== 'apex-bot')   return res.status(400).json({ error: 'Invalid product for this amount' });
-  if (safeAmount === 49700 && product && product !== 'apex-forex') return res.status(400).json({ error: 'Invalid product for this amount' });
-  // Server-side email format validation
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
-  const isApexBot   = (product === 'apex-bot')   || safeAmount === 29700;
-  const isApexForex = (product === 'apex-forex')  || safeAmount === 49700;
-  const isBotProduct = isApexBot || isApexForex;
-  try {
-    if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe not configured' });
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
-    // Pre-generate the license key BEFORE creating the intent so it can be stored
-    // in the PaymentIntent metadata. The Telegram bot grants access by searching
-    // Stripe for a succeeded payment whose metadata['pendingKey'] matches.
-    let pendingKey = null;
-    if (isBotProduct) pendingKey = isApexForex ? generateForexKey() : generateLicenseKey();
-
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: safeAmount,
-      currency: currency || 'usd',
-      automatic_payment_methods: { enabled: true },
-      receipt_email: email || undefined,
-      metadata: {
-        product: product || (safeAmount === 29700 ? 'apex-bot' : safeAmount === 49700 ? 'apex-forex' : 'course'),
-        email: email || '',
-        name: name || '',
-        ref: affCode,
-        ...(pendingKey ? { pendingKey } : {})
-      }
-    });
-
-    // Store pending license so buyer gets it immediately on success
-    if (isBotProduct) {
-      _pendingLicenses.set(paymentIntent.id, { key: pendingKey, email: email || '', name: name || '', product: isApexForex ? 'apex-forex' : 'apex-bot' });
-      setTimeout(() => _pendingLicenses.delete(paymentIntent.id), 2 * 3600 * 1000);
-      if (supabase) {
-        const { error: insErr } = await supabase.from('licenses').insert([{
-          key: pendingKey, email: email || '', name: name || '', product: isApexForex ? 'apex-forex' : 'apex-bot',
-          active: false, payment_intent_id: paymentIntent.id
-        }]);
-        if (insErr) console.error('Pending license insert error:', insErr.message);
-      }
-      addLog(`Pending ${isApexForex ? 'forex' : 'crypto'} license generated for ${email} — ${pendingKey}`, 'license', 'success');
-    }
-
-    res.json({ clientSecret: paymentIntent.client_secret, pendingKey });
-  } catch (e) {
-    console.error('create-payment-intent error:', e.message);
-    res.status(500).json({ error: 'Payment processing failed' });
-  }
-});
-
 // ── LICENSE KEY HELPERS ──────────────────────────────────────────────────────
 // Crypto keys:  APEX-XXXX-XXXX-XXXX  (verified by crypto bot only)
 // Forex keys:   FORX-XXXX-XXXX-XXXX  (verified by forex bot only)
@@ -1587,7 +1490,7 @@ app.post('/api/affiliates/admin-list', async (req, res) => {
 // real query-string flags or look like system values).
 const _RESERVED_CODES = new Set(['ref','admin','api','www','direct','intro','affiliate','login','signup','apex','forex','crypto']);
 // Validate a user-chosen affiliate handle. Returns { ok, code } or { ok:false, error }.
-// Pattern is also Stripe client_reference_id-safe (letters, numbers, _ and -).
+// Pattern: letters, numbers, _ and - only.
 function _validateCustomCode(raw) {
   const code = String(raw || '').toLowerCase().trim();
   if (!/^[a-z0-9_-]{3,20}$/.test(code)) return { ok: false, error: 'Your link name must be 3–20 characters: letters, numbers, - or _ only (no spaces).' };
@@ -1897,38 +1800,18 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
     if (claimedProduct && hmacResult.product && claimedProduct !== hmacResult.product) {
       return res.json({ valid: false, message: `Wrong license type. This key is for ${hmacResult.product}. Purchase the correct bot at aicashsystem.space` });
     }
-    // A valid signature is NOT proof of payment. /create-payment-intent hands the
-    // buyer a correctly-signed key BEFORE they pay and stores it active:false until
-    // the webhook flips it on payment_intent.succeeded. Without this gate, anyone
-    // could call create-payment-intent, read pendingKey from the JSON response and
-    // activate the bot for free. So: if the key exists in our DB as not-yet-paid,
-    // reject it — UNLESS Stripe confirms the payment actually succeeded (which also
-    // covers the race where the buyer taps the deep link before our webhook runs).
+    // A valid signature is NOT proof of payment. The Digistore24 IPN handler is the
+    // only place that upserts a license as active:true, on event=on_payment. So: if
+    // the key exists in our DB as not-yet-paid, reject it.
     if (supabase) {
       try {
         const { data: row } = await supabase.from('licenses')
-          .select('active,refunded,payment_intent_id').eq('key', key).maybeSingle();
-        // Refunded / charged-back keys are revoked for good — a Stripe PaymentIntent
-        // stays status:'succeeded' after a refund, so we must gate on our own
-        // refunded flag here, not on Stripe's payment status.
+          .select('active,refunded').eq('key', key).maybeSingle();
         if (row && row.refunded === true) {
           return res.json({ valid: false, message: 'This license was refunded and is no longer active. Repurchase at aicashsystem.space' });
         }
         if (row && row.active === false) {
-          let paid = false;
-          if (row.payment_intent_id && process.env.STRIPE_SECRET_KEY) {
-            try {
-              const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-              const pi = await stripe.paymentIntents.retrieve(row.payment_intent_id);
-              paid = pi && pi.status === 'succeeded';
-            } catch (_) { paid = false; }
-          }
-          if (!paid) {
-            return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
-          }
-          // Just paid but the webhook hasn't run yet — activate now so the buyer gets in.
-          supabase.from('licenses').update({ active: true, activated_at: new Date().toISOString() })
-            .eq('key', key).then(() => {}).catch(() => {});
+          return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
         }
         // row.active === true, or no row at all (legacy/manual key) → allow through.
       } catch (_) { /* DB hiccup → fall through to fail-open allow below */ }
@@ -1958,185 +1841,6 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
   return res.json({ valid: false, message: 'Invalid license key. Purchase at aicashsystem.space' });
 });
 
-// ════════════════════════════════════════
-// STRIPE WEBHOOK
-// ════════════════════════════════════════
-// Stripe webhook handler — responds to both /stripe-webhook AND /webhook
-// (Stripe Dashboard configured with /webhook; /stripe-webhook kept for backward compat)
-async function handleStripeWebhook(req, res) {
-  const sig = req.headers['stripe-signature'];
-  try {
-    if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
-      console.error('[STRIPE] Missing keys — webhook rejected');
-      return res.status(400).json({ error: 'Webhook not configured' });
-    }
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-    const event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      const ref = (session.client_reference_id || '').toLowerCase().trim();
-      const piId = session.payment_intent;
-      if (ref && piId) _pendingRefs.set(piId, ref);
-      // Stripe Payment Links (forex $497) carry the buyer's email/name ONLY on the
-      // Checkout Session, not on the Payment Intent. Stash them so payment_intent.succeeded
-      // can actually email the FORX- license — otherwise the key is generated but never delivered.
-      if (piId) {
-        const cEmail = session.customer_details?.email || session.customer_email || '';
-        const cName = session.customer_details?.name || '';
-        if (cEmail || cName) {
-          const prev = _pendingLicenses.get(piId) || {};
-          _pendingLicenses.set(piId, { ...prev, email: prev.email || cEmail, name: prev.name || cName });
-          setTimeout(() => { const e = _pendingLicenses.get(piId); if (e && !e.key) _pendingLicenses.delete(piId); }, 2 * 3600 * 1000);
-        }
-      }
-      return res.json({ received: true });
-    }
-
-    // ── REFUND / CHARGEBACK ── claws back the affiliate commission AND revokes the
-    // bot license, so a buyer who gets their money back also loses access. The bot
-    // re-checks /api/verify-license on first contact; a deactivated key (active:false
-    // with no succeeded payment) is rejected, and returning users are re-validated on
-    // the next redeploy. We only deactivate keys we actually issued (HMAC-valid).
-    if (event.type === 'charge.refunded' || event.type === 'charge.dispute.created') {
-      const obj = event.data.object; // charge or dispute — both carry payment_intent
-      const piId = obj.payment_intent;
-      if (piId && supabase) {
-        const { data: updated } = await supabase.from('referral_sales')
-          .update({ refunded: true, refunded_at: new Date().toISOString() })
-          .eq('payment_intent_id', piId).select('affiliate_code');
-        if (updated && updated.length) addLog(`Affiliate commission clawed back (${event.type}) for ${updated[0].affiliate_code} — PI ${piId}`, 'affiliate', 'warn');
-
-        // Revoke the license tied to this payment.
-        const { data: revoked } = await supabase.from('licenses')
-          .update({ active: false, refunded: true, refunded_at: new Date().toISOString() })
-          .eq('payment_intent_id', piId).select('key,product');
-        if (revoked && revoked.length) {
-          addLog(`License revoked (${event.type}): ${revoked[0].key} (${revoked[0].product}) — PI ${piId}`, 'license', 'warn');
-        }
-      }
-      return res.json({ received: true });
-    }
-
-    if (event.type === 'payment_intent.succeeded') {
-      const pi = event.data.object;
-      // Carry-over from checkout.session.completed (Payment Link path stashes email/name here).
-      const pending = _pendingLicenses.get(pi.id);
-      // Payment Link buyers may not populate receipt_email — fall back to the Checkout Session
-      // details captured earlier, then charge billing details.
-      const email = pi.metadata?.email || pi.receipt_email
-        || pending?.email
-        || pi.charges?.data?.[0]?.billing_details?.email || '';
-      // Detect product from metadata (inline checkout) or amount (Payment Link)
-      const product = pi.metadata?.product === 'apex-forex' || pi.amount === 49700
-        ? 'apex-forex'
-        : (pi.metadata?.product === 'apex-bot' || pi.amount === 29700)
-          ? 'apex-bot'
-          : (pi.metadata?.product || 'course');
-      const buyerName = pi.metadata?.name || pending?.name || 'there';
-
-      // ── BOT LICENSE DELIVERY (crypto + forex) ──
-      if (product === 'apex-bot' || product === 'apex-forex') {
-        const isForex = product === 'apex-forex';
-        let licenseKey;
-
-        if (pending?.key) {
-          licenseKey = pending.key;
-          _pendingLicenses.delete(pi.id);
-        } else if (supabase) {
-          const { data: dbRow } = await supabase.from('licenses')
-            .select('key').eq('payment_intent_id', pi.id).single();
-          if (dbRow?.key) {
-            licenseKey = dbRow.key;
-            addLog(`License recovered from DB for ${email} — ${licenseKey}`, 'license', 'info');
-          }
-        }
-        if (!licenseKey) {
-          licenseKey = isForex ? generateForexKey() : generateLicenseKey();
-          addLog(`License generated (last-resort): ${licenseKey} for ${email}`, 'license', 'warn');
-        }
-        if (supabase) {
-          const { error } = await supabase.from('licenses')
-            .upsert([{ key: licenseKey, active: true, activated_at: new Date().toISOString(), email: email || '', name: buyerName, product, payment_intent_id: pi.id }], { onConflict: 'key' });
-          if (error) addLog(`License activate DB error: ${error.message}`, 'license', 'error');
-        }
-        addLog(`License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
-
-        // ── Affiliate commission attribution ──
-        const refCode = (pi.metadata?.ref || _pendingRefs.get(pi.id) || '').toLowerCase().trim();
-        _pendingRefs.delete(pi.id);
-        if (refCode && supabase) {
-          try {
-            const { data: aff } = await supabase.from('affiliates').select('code,commission_percent,status').eq('code', refCode).maybeSingle();
-            if (aff && aff.status === 'active') {
-              // Fall back to the documented 30% if the column default is missing —
-              // otherwise null * amount = 0 and the affiliate silently earns nothing.
-              const pct = Number(aff.commission_percent) > 0 ? Number(aff.commission_percent) : 30;
-              const commission = Math.round(pi.amount * pct / 100);
-              await supabase.from('referral_sales').upsert([{
-                affiliate_code: aff.code, license_key: licenseKey, payment_intent_id: pi.id,
-                product, amount: pi.amount, commission_amount: commission
-              }], { onConflict: 'payment_intent_id' });
-              addLog(`Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}`, 'affiliate', 'success');
-              _notifyAffiliateSale(aff.code, product, commission);  // ping the affiliate's Telegram bot
-            }
-          } catch (e) { addLog(`Affiliate attribution error: ${e.message}`, 'affiliate', 'error'); }
-        }
-
-        if (email) {
-          const html = isForex
-            ? _buildForexEmailHtml(_he(buyerName), _he(email), licenseKey)
-            : _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey);
-          const subject = isForex
-            ? '🤖 Your Apex Forex Bot — License Key inside'
-            : '🤖 Your Apex Trade Bot — License Key inside';
-          const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
-          if (!result.ok) addLog(`Bot email NOT sent for ${email} — ${result.error}`, 'email', 'error');
-          else addLog(`${isForex ? 'Forex' : 'Crypto'} Bot email sent via ${result.method} to ${email}`, 'email', 'success');
-        }
-        const price = isForex ? '$497' : '$297';
-        addLog(`${isForex ? 'Forex' : 'Crypto'} Bot sold: ${email} — ${price} — key: ${licenseKey}`, 'payment', 'success');
-        return res.json({ received: true });
-      }
-
-      // ── COURSE DELIVERY (existing) ──
-      const plan = pi.amount >= 9700 ? 'pro' : 'starter';
-      const code = crypto.randomBytes(4).toString('hex').toUpperCase();
-
-      if (email && supabase) {
-        await supabase.from('purchases').insert([{ email, code, plan, amount: pi.amount, created_at: new Date().toISOString() }]);
-      }
-
-      // Send access email — use unified _sendEmail() (Resend → Brevo → SMTP)
-      if (email) {
-        const courseUrl = plan === 'pro' ? 'https://aicashsystem.space/course-pro.html' : 'https://aicashsystem.space/course-starter.html';
-        const emailHtml = `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:32px;background:#0a0a0a;color:#F5F0E8">
-            <h2 style="color:#C8A96E;font-family:Georgia,serif">Welcome to AI Cash Systems!</h2>
-            <p>Your ${_he(plan.toUpperCase())} course access is ready.</p>
-            <p style="margin-top:20px">Click below to access your course anytime:</p>
-            <a href="${_he(courseUrl)}" style="background:#C8A96E;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:bold">Access My Course →</a>
-            <p style="margin-top:24px">Need the access code to log in manually? Use: <strong style="letter-spacing:3px;color:#C8A96E">${_he(code)}</strong></p>
-            <p style="color:#7A7060;font-size:12px;margin-top:12px">Enter the code at <a href="https://aicashsystem.space/access.html" style="color:#7A7060">aicashsystem.space/access.html</a> if prompted.</p>
-          </div>`;
-        const result = await _sendEmail({
-          to: email,
-          subject: '🎉 Your AI Cash Systems Course Access',
-          html: emailHtml,
-        });
-        if (!result.ok) addLog(`Course email NOT sent for ${email} — ${result.error}`, 'email', 'error');
-        else addLog(`Course email sent via ${result.method} to ${email}`, 'email', 'success');
-      }
-
-      addLog(`Payment succeeded: ${email} — ${plan} plan — Code: ${code}`, 'payment', 'success');
-    }
-    res.json({ received: true });
-  } catch (e) {
-    console.error('Webhook error:', e);
-    res.status(400).json({ error: e.message });
-  }
-}
-app.post('/stripe-webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
-app.post('/webhook',        express.raw({ type: 'application/json' }), handleStripeWebhook);
 
 // ── DIGISTORE24 IPN (webhook) ───────────────────────────────────────────────
 // Merchant of Record — D24 handles EU VAT/taxes/invoices, we just deliver the
@@ -2265,26 +1969,6 @@ async function handleDigistore24Webhook(req, res) {
   }
 }
 app.post('/digistore24-webhook', express.urlencoded({ extended: true }), handleDigistore24Webhook);
-
-// ── ORDER STATUS — polled by the thank-you page after checkout (Stripe path). ──
-app.get('/api/order-status', async (req, res) => {
-  const sessionId = String(req.query.session_id || '').trim();
-  if (!supabase) return res.status(500).json({ error: 'Database not configured' });
-  if (!sessionId) return res.status(400).json({ error: 'Missing session_id' });
-  if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe not configured' });
-  try {
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-    const piId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
-    if (!piId) return res.json({ ready: false });
-    const { data: lic } = await supabase.from('licenses')
-      .select('key,product,email').eq('payment_intent_id', piId).maybeSingle();
-    if (!lic?.key) return res.json({ ready: false });
-    res.json({ ready: true, licenseKey: lic.key, product: lic.product, email: lic.email || session.customer_details?.email || '' });
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
-});
 
 // ════════════════════════════════════════
 // VIDEO DOWNLOAD ROUTES (Veo 3 generated)
