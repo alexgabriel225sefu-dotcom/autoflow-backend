@@ -1853,14 +1853,15 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
 // docs — D24's own docs site is unreachable from here; verified against the
 // first real IPN hit, see the [D24] signature-mismatch log line if it's off.)
 function _digistore24VerifySignature(params, passphrase) {
-  const { sha_sign, ...rest } = params;
+  const { sha_sign, SHASIGN, ...rest } = params;
   if (!sha_sign || !passphrase) return false;
-  const keys = Object.keys(rest).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  const keys = Object.keys(rest)
+    .filter(k => rest[k] !== '' && rest[k] !== null && rest[k] !== undefined)
+    .sort((a, b) => (a > b ? 1 : a < b ? -1 : 0));
   let buf = '';
-  for (const k of keys) buf += `${k.toUpperCase()}=${rest[k]}`;
-  buf += `$${passphrase}`;
-  const computed = crypto.createHash('sha512').update(buf, 'utf8').digest('hex');
-  return computed.toLowerCase() === String(sha_sign).toLowerCase();
+  for (const k of keys) buf += `${k}=${rest[k]}${passphrase}`;
+  const computed = crypto.createHash('sha512').update(buf, 'utf8').digest('hex').toUpperCase();
+  return computed === String(sha_sign).toUpperCase();
 }
 
 async function handleDigistore24Webhook(req, res) {
