@@ -4,6 +4,7 @@ Run: python tests/test_strategies.py
 """
 import os
 import sys
+import time
 from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -99,8 +100,16 @@ check("clean session → no stop", r["stop"] is False, r)
 
 fresh_session()
 strategies.session["consecutiveLosses"] = 3
+strategies.session["lastLossAt"] = time.time()  # just lost — still inside cooldown
 r = strategies.should_stop(1000, 1000)
 check("3 consecutive losses → stop (Seykota)", r["stop"] and any("consecutive" in x for x in r["reasons"]), r)
+
+fresh_session()
+strategies.session["consecutiveLosses"] = 3
+strategies.session["lastLossAt"] = time.time() - 61 * 60  # cooldown elapsed
+r = strategies.should_stop(1000, 1000)
+check("Seykota cooldown expires → streak clears, no stop",
+      r["stop"] is False and strategies.session["consecutiveLosses"] == 0, r)
 
 fresh_session()
 strategies.session["dailyPnL"] = -50.0
