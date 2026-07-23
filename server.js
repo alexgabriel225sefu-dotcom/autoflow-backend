@@ -2353,8 +2353,8 @@ a{text-decoration:none}
 <tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 20px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
     ${step(1, 'Open the bot on Telegram', 'Press the red button above. The bot sends you a welcome message and activates your license automatically.')}
-    ${step(2, 'Connect your cTrader account', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/settings</span> in the chat. Enter your cTID credentials &mdash; the bot guides you step by step.')}
-    ${step(3, 'Start trading in paper mode', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/start</span> to begin. Paper mode uses simulated money with real signals. Run it 7-14 days before going live.')}
+    ${step(2, 'Connect your cTrader account', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/ctrader</span> in the chat. Log in with your cTID &mdash; the bot guides you step by step.')}
+    ${step(3, 'Start trading', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/start</span> to go live on your connected cTrader account &mdash; real signals, real trades from the first run.')}
   </table>
 </td></tr>
 
@@ -2446,8 +2446,8 @@ a{text-decoration:none}
 <tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 20px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
     ${step(1, 'Open the bot on Telegram', 'Press the red button above. The bot sends you a welcome message and activates your license automatically.')}
-    ${step(2, 'Connect your cTrader account', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/settings</span> in the chat. Enter your cTID credentials (email &amp; password) &mdash; the bot guides you step by step.')}
-    ${step(3, 'Start trading in paper mode', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/start</span> to begin. Paper mode uses simulated money with real signals. Run it 7-14 days before going live.')}
+    ${step(2, 'Connect your cTrader account', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/ctrader</span> in the chat. Log in with your cTID &mdash; the bot guides you step by step.')}
+    ${step(3, 'Start trading', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/start</span> to go live on your connected cTrader account &mdash; real signals, real trades from the first run.')}
   </table>
 </td></tr>
 
