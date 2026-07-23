@@ -1,93 +1,86 @@
-# AI Cash Systems — Master Context
+# Apex Trading Suite (AI Cash System) — Master Context
 
 ## Business Overview
-- **Brand:** AI Cash Systems
-- **Website:** https://www.aicashsystem.space
-- **Type:** Online education platform — AI automation skills
-- **Tagline:** "Stop Chasing Trends. Start Building Systems."
-- **Mission:** Teach people to build AI automations that businesses pay for and turn a simple skill into recurring income.
+- **Brand:** Apex Trading Suite, by AI Cash System
+- **Website:** https://aicashsystem.space
+- **Type:** Hosted AI trading bots, sold as a one-time license
+- **Tagline:** Fully-hosted AI trading bots, controlled from Telegram — nothing to install.
+- **Mission:** Give traders a 24/7 AI-powered bot that trades their own broker account for them, with zero setup friction.
 
 ## Products & Pricing
 
 | Product | Price | Description |
 |---------|-------|-------------|
-| **Starter — AI Automation Foundations** | $37 | 24 lessons, 8 modules. Foundations to first paying client. |
-| **PRO — AI Agency Mastery PRO** | $97 | Everything in Starter + 6 advanced modules + AutoFlow App access |
+| **Apex Crypto Bot** | $297 one-time | AI-powered crypto trading bot, hosted by us 24/7. Trades BTC, ETH, SOL, XRP, LTC, ADA, DOGE, DOT, LINK, BCH via cTrader. |
+| **Apex Forex Bot** | $497 one-time | AI-powered forex trading bot, hosted by us 24/7. Trades major/minor FX pairs + gold via cTrader. |
 
-### Starter Modules (8 modules, 24 lessons)
-1. The AI Automation Opportunity
-2. Building Your First Automation (Make.com + GPT-4o)
-3. Getting Your First Client ($300–$800 first deal)
-4. Scaling to $3K/Month
-5. WhatsApp Bot — Automated Replies 24/7 ($500–$2,000)
-6. Instagram Auto-Reply — AI DM Bot ($600–$1,200)
-7. Cold Email Automation — 50 Emails/Day
-8. Google Sheets CRM — Client Management
+## How it works
+- Customer buys a license (via Digistore24 checkout) → gets a license key + Telegram activation link by email.
+- Customer opens the bot in Telegram, connects their own cTrader account (any cTrader-compatible broker — IC Markets, Pepperstone, FxPro, etc.) with a single command (`/ctrader`), demo or live.
+- The bot analyzes the market with AI (Claude/Groq) using multiple strategies (trend following, mean reversion, breakout) and trades automatically — no VPS, no computer left running, fully hosted on our servers.
+- Everything is controlled from Telegram: risk %, stop-loss/take-profit, strategy, pairs, on/off.
 
-### PRO-Only Modules (6 additional)
-9. AutoFlow App — Full Access (personal AI automation platform)
-10. Voice AI Agent (Bland.ai/Vapi.ai — sells for $2,000+)
-11. Webhook Mastery
-12. AI Proposal Generator
-13. Stripe Recurring Billing (automated monthly retainers)
-14. Agency Website + Enterprise Clients ($5,000–$15,000 deals)
+## What this is NOT
+- **Not source code delivered.** Customers do not receive or self-host any code — this is a hosted SaaS/license model.
+- **Not Binance/OANDA.** Both bots connect exclusively through cTrader.
+- **Not a course.** There is no "AI Automation" education product anymore — that business was retired. Do not reference courses, modules, Make.com, or WhatsApp/Instagram bot training in any marketing content.
+- **Not a guaranteed-profit system.** Trading carries real risk of loss; never imply guaranteed returns or a "100% win rate."
 
 ## Target Audience
-- Age: 18–35
-- Background: No coding experience required
-- Goals: Make money online, freelance income, escape 9-to-5
-- Pain points: Don't know where to start, tried dropshipping/affiliate and failed
-- Platforms: TikTok, Instagram, YouTube Shorts
+- Retail traders (18–45) who want automated trading without coding or constant monitoring
+- Both total beginners (want simplicity) and experienced traders (want a tool they can tune)
+- Pain points: don't have time to watch charts all day, don't trust "black box" bots, don't want to run a VPS
+- Platforms: TikTok, Instagram, YouTube Shorts, X/Twitter
 
 ## Brand Voice
-- **Tone:** Direct, confident, results-focused, zero fluff
-- **Style:** Street-smart meets professional. Like a friend who figured it out and is telling you how.
-- **Language:** English (primary), occasional Romanian for local market
-- **Avoid:** Corporate speak, overpromising, get-rich-quick language
+- **Tone:** Direct, confident, results-focused, zero fluff — but honest about risk (never overpromise returns)
+- **Style:** Street-smart meets professional, like a friend who found a genuinely useful tool
+- **Language:** English (primary marketing), Romanian for local/direct communication
+- **Avoid:** "Guaranteed profits," "100% win rate," "get rich quick," corporate speak, hype with no substance
 
 ## Aesthetic / Visual Identity
-- **Colors:** Dark background (#080808), gold gradient (#8A6A2E → #E8CB8A), cream text (#F5F0E8)
-- **Fonts:** Playfair Display (serif, headings), Syne (sans-serif, UI)
-- **Style:** Premium, luxurious, dark-mode, minimalist
+- **Colors:** Dark background (#09090b), red/coral accent (#e63946 → #ff6b7a), light text (#e4e4e7)
+- **Style:** Premium, dark-mode, minimalist, modern SaaS aesthetic — hooded/masked trader figure with neon-glow crypto/forex motifs is the established visual identity (see bot avatar art)
+- **Fonts:** system-ui / Clash Display + Satoshi (site-dependent)
 
 ## Key Selling Points
-1. No coding required
-2. First client possible within 30 days
-3. Recurring income (retainer model)
-4. Real automations (Make.com, GPT-4o, WhatsApp API, Instagram API)
-5. Access to AutoFlow App (PRO only)
+1. Fully hosted 24/7 — nothing to install, no VPS, no computer left running
+2. Connects to the customer's own cTrader broker account — never touches their funds (trade-only, no withdrawal access)
+3. AI-driven signals (Claude/Groq) combined with proven strategies (trend, mean-reversion, breakout)
+4. Controlled entirely from Telegram — simple commands, no dashboard login needed
+5. One-time payment, no subscription
+6. Demo account first, switch to live whenever ready
 
 ## Competitive Advantage
-- Hands-on builds (not theory)
-- Tools businesses actually pay for
-- Specific scripts, templates, and outreach formulas included
-- Price: $37 entry point (very accessible)
+- No self-hosting/VPS required (unlike most retail trading bots)
+- Real AI signal generation, not just fixed indicator rules
+- Per-instrument risk protection (a bad streak on one pair doesn't freeze the whole account)
+- Transparent trade journal (`/report`) for every closed trade
 
 ## Revenue Model
-- One-time course sales ($37 Starter, $97 PRO)
-- Upsell path: Starter → PRO ($60 upgrade gap)
+- One-time license sales: $297 (crypto), $497 (forex)
+- Affiliate marketplace via Digistore24 (30% commission), not an in-house program
 
 ## Tech Stack (Backend)
-- **Runtime:** Node.js / Express
-- **Database:** Supabase (PostgreSQL)
-- **AI:** Anthropic Claude (claude-sonnet), OpenAI GPT-4o
-- **Payments:** Stripe
-- **Email:** Brevo SMTP
-- **Deployment:** server.js on port configured via ENV
+- **Runtime:** Node.js / Express (server.js) + two separate Python trading bots (crypto, forex)
+- **Database:** Supabase (PostgreSQL) + Redis (bot session state)
+- **AI:** Anthropic Claude (Haiku), Groq (Llama fallback)
+- **Payments:** Digistore24 (Merchant of Record — NOT Stripe, that was fully retired)
+- **Email:** Brevo
+- **Broker integration:** cTrader Open API (both bots)
+- **Deployment:** Render (three services — main site, forex bot, crypto bot)
 
 ## API Keys (stored in .env — NEVER commit)
-- `GOOGLE_AI_API_KEY` — Google AI Studio (Gemini, Imagen 4, Veo)
+- `ARCADS_API_KEY` — Arcads video/image generation
 - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
-- `ANTHROPIC_API_KEY`
-- `OPENAI_API_KEY`
-- `STRIPE_SECRET_KEY`
-- `BREVO_SMTP_USER`, `BREVO_SMTP_PASS`
+- `ANTHROPIC_API_KEY`, `GROQ_API_KEY`
+- `DIGISTORE24_IPN_PASSPHRASE`
+- `BREVO_API_KEY`
 
 ## Marketing Goals
-- Drive traffic to aicashsystem.space
-- Convert visitors to Starter ($37)
-- Upsell Starter buyers to PRO ($97)
-- Build audience on TikTok, Instagram, YouTube Shorts
+- Drive traffic to aicashsystem.space (homepage sells both bots directly)
+- Convert visitors to a $297 crypto bot or $497 forex bot purchase
+- Build audience on TikTok, Instagram, YouTube Shorts showing the bot actually trading
 
 ## Content Channels
 - TikTok (primary — UGC style, 9:16)
@@ -96,4 +89,4 @@
 - Email list (Brevo)
 
 ## Disclaimer
-Results disclaimer: Income figures are examples only and not guarantees. Results vary based on individual effort and market conditions.
+Trading carries a real risk of loss, including total loss of capital. Past or simulated results do not guarantee future performance. This is automation software, not financial advice — never imply guaranteed returns in any generated content.
