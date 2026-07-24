@@ -656,11 +656,22 @@ class CtraderBroker:
                 except Exception:
                     protected = True
             if not protected and sl:
+                # Do NOT raise here: the position already opened and filled at
+                # the broker — an exception at this point used to get caught
+                # by the caller as "order failed" and silently discarded, so
+                # this real open+forced-close round trip (and its P&L) never
+                # reached the trade log or the user. Return it as a completed
+                # trade instead so the caller can price and report it.
+                close_res = None
                 try:
-                    self.close_position(instrument)
-                finally:
-                    raise RuntimeError("could not attach stop-loss at the broker — "
-                                       "position closed immediately for safety")
+                    close_res = self.close_position(instrument)
+                except Exception:
+                    pass
+                return {"orderId": str(getattr(res.order, "orderId", "")),
+                        "status": "SAFETY_CLOSED", "fillPrice": fill,
+                        "exitFillPrice": (close_res or {}).get("fillPrice"),
+                        "reason": "could not attach stop-loss at the broker — "
+                                  "position closed immediately for safety"}
         return {"orderId": str(getattr(res.order, "orderId", "")),
                 "status": "FILLED", "fillPrice": fill}
 

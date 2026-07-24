@@ -1187,11 +1187,56 @@ def _loop(user_id, alert_fn, gen=None):
                         except Exception:
                             pass
                         order_ok = True
+                        _order_res = None
                         try:
-                            broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
+                            _order_res = broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
                         except Exception as oe:
                             order_ok = False
                             print(f"[UserLoop:{user_id}] place_order error: {oe}")
+
+                        if _order_res and _order_res.get("status") == "SAFETY_CLOSED":
+                            # A real position opened and was immediately closed
+                            # at the broker because the stop-loss couldn't be
+                            # attached — this used to vanish as a swallowed
+                            # exception (no P&L logged, entry retried next
+                            # cycle on the same broken symbol every ~5min).
+                            # Price and log it like any other closed trade.
+                            order_ok = False
+                            entry_fill = _order_res.get("fillPrice") or price
+                            exit_fill = _order_res.get("exitFillPrice") or entry_fill
+                            gross = forex.pnl_usd(action, entry_fill, exit_fill, units, symbol)
+                            pv = forex.pip_value_per_unit(symbol, exit_fill)
+                            cost_usd = spread * pv * units
+                            net = gross - cost_usd
+                            if cfg.PAPER_TRADING:
+                                paper_balance += net
+                            if net < 0:
+                                last_loss_at = time.time()
+                                loss_streak += 1
+                            elif net > 0:
+                                loss_streak = 0
+                            result = {"action": "CLOSE", "symbol": symbol, "price": exit_fill,
+                                      "entryPrice": entry_fill, "grossPnl": round(gross, 2),
+                                      "costUsd": round(cost_usd, 2), "netPnl": round(net, 2),
+                                      "balance": round(paper_balance, 2), "time": now_str,
+                                      "reasoning": "broker rejected the stop-loss attach — "
+                                                   "position closed immediately for safety"}
+                            _log_trade(user_id, result)
+                            if cfg.PAPER_TRADING:
+                                user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
+                            last_close_at = time.time()
+                            _persist_risk_state()
+                            strategies.record_trade(net > 0, net,
+                                                    dash.get("startBalance") or paper_balance,
+                                                    user_id=user_id, symbol=symbol)
+                            dash["trades"].insert(0, result)
+                            dash["trades"] = dash["trades"][:50]
+                            if alert_fn:
+                                alert_fn(user_id, result)
+                            # Stand aside on this symbol so Auto-Pilot rotates
+                            # away instead of retrying the same broker-side
+                            # rejection every cycle.
+                            spread_blocked[_nrm(symbol)] = time.time() + 900
 
                         if order_ok:
                             if cfg.PAPER_TRADING:
