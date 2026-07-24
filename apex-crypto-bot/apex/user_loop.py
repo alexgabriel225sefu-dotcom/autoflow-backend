@@ -278,6 +278,21 @@ def _loop(user_id, alert_fn, gen=None):
                                         "loss_streak": loss_streak})
         except Exception as e:
             print(f"[UserLoop:{user_id}] risk-state persist failed: {e}")
+
+    def _persist_open_snapshot(pos):
+        """open_pos lives in memory only — wiped by every restart. If the
+        broker closes the position during the exact gap between the old
+        process dying and the new one's first tick, no process ever sees the
+        transition, so the tick-to-tick BROKER_CLOSE check (comparing prev
+        vs current) has nothing to compare against and the close goes
+        completely unlogged. Persisting the last known open position lets
+        startup recovery detect that gap and journal it retroactively."""
+        if cfg.PAPER_TRADING:
+            return
+        try:
+            user_store.update(user_id, {"open_position_snapshot": pos})
+        except Exception as e:
+            print(f"[UserLoop:{user_id}] open-position snapshot persist failed: {e}")
     prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
     pos_details = {}    # nrm(symbol) -> {symbol, side, entry, units} for P&L on close
     spread_blocked = {}  # nrm(symbol) -> retry_ts: Auto-Pilot avoids symbols whose
@@ -318,6 +333,72 @@ def _loop(user_id, alert_fn, gen=None):
                           for t in reversed(_j[-15:])]
     except Exception as e:
         print(f"[UserLoop:{user_id}] journal seed failed: {e}")
+
+    # Startup position recovery. open_pos is wiped to None on every restart
+    # with nothing to reconcile against. If the position was STILL open at
+    # the broker, the next tick's own get_open_position()/watchlist scan
+    # finds it — but if it closed at the broker during the restart gap
+    # itself (old process dead, new one not ticking yet), nobody was ever
+    # alive to see the transition and it used to vanish: no BROKER_CLOSE, no
+    # journal entry, no Telegram alert — just a balance drop nobody could
+    # explain. Compare the broker's current truth against the last position
+    # this process persisted before it went down.
+    if not cfg.PAPER_TRADING:
+        _snap = user.get("open_position_snapshot")
+        if _snap and _snap.get("symbol"):
+            try:
+                _live = broker.get_open_position(_snap["symbol"])
+            except Exception as e:
+                _live = None
+                print(f"[UserLoop:{user_id}] startup position check failed: {e}")
+            if _live:
+                symbol = _snap["symbol"]
+                open_pos = _live
+                dash["symbol"] = symbol
+                dash["openPosition"] = open_pos
+                print(f"[UserLoop:{user_id}] restart recovery: adopted still-open {symbol} position")
+            else:
+                # Gone — it closed at the broker while nothing was watching.
+                # The real fill is unknowable now; price it against the next
+                # available quote so the client isn't left thinking it's
+                # still open, and the loss/win still counts toward risk state.
+                try:
+                    _c = broker.get_candles(_snap["symbol"], cfg.TIMEFRAME, 2)
+                    exit_price = _c[-1]["close"] if _c else None
+                except Exception:
+                    exit_price = None
+                units_ = _snap.get("units") or _snap.get("quantity", 0)
+                net = None
+                if exit_price and _snap.get("entryPrice") and units_:
+                    net = round(forex.pnl_usd(_snap.get("side", "BUY"), _snap["entryPrice"],
+                                              exit_price, units_, _snap["symbol"]), 2)
+                result = {"action": "BROKER_CLOSE", "symbol": _snap["symbol"],
+                          "side": _snap.get("side", ""), "price": exit_price,
+                          "entryPrice": _snap.get("entryPrice"), "netPnl": net,
+                          "grossPnl": net, "costUsd": 0.0,
+                          "balance": round(paper_balance, 2),
+                          "openedAt": _snap.get("openedAt"),
+                          "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                          "reasoning": "closed at the broker during a restart — exact fill "
+                                       "unknown, priced against the next available quote"}
+                _log_trade(user_id, result)
+                dash["trades"].insert(0, result)
+                dash["trades"] = dash["trades"][:50]
+                if net is not None and net < 0:
+                    last_loss_at = time.time()
+                    loss_streak += 1
+                elif net is not None and net > 0:
+                    loss_streak = 0
+                last_close_at = time.time()
+                _persist_risk_state()
+                if net is not None:
+                    strategies.record_trade(net > 0, net, dash.get("startBalance") or paper_balance,
+                                            user_id=user_id, symbol=_snap["symbol"])
+                if alert_fn:
+                    alert_fn(user_id, result)
+                print(f"[UserLoop:{user_id}] restart recovery: journaled a close missed during the outage on {_snap['symbol']}")
+            _persist_open_snapshot(None)
+
     with _lock:
         if user_id in _loops:
             _loops[user_id]["dash"] = dash
@@ -668,6 +749,12 @@ def _loop(user_id, alert_fn, gen=None):
                     time.sleep(30)
                     continue
                 data_fails = 0
+                if open_pos and not prev_pos:
+                    # Newly recognized position this tick (manual open, or the
+                    # watchlist fallback above finding it on another symbol) —
+                    # keep the restart-recovery snapshot current so a redeploy
+                    # right after this tick can still find it.
+                    _persist_open_snapshot({**open_pos, "symbol": symbol})
 
                 # Trailing-stop / break-even management for the open position
                 # (Strategy Builder exit modes). Fail-soft; real-broker only.
@@ -721,6 +808,7 @@ def _loop(user_id, alert_fn, gen=None):
                     _log_trade(user_id, result)
                     dash["trades"].insert(0, result)
                     dash["trades"] = dash["trades"][:50]
+                    _persist_open_snapshot(None)
                     if alert_fn:
                         alert_fn(user_id, result)
 
@@ -781,6 +869,7 @@ def _loop(user_id, alert_fn, gen=None):
                         dash["trades"] = dash["trades"][:50]
                         open_pos = None
                         dash["openPosition"] = None
+                        _persist_open_snapshot(None)
             else:
                 if open_pos and open_pos.get("symbol") and open_pos["symbol"] != symbol:
                     symbol = open_pos["symbol"]
@@ -945,6 +1034,7 @@ def _loop(user_id, alert_fn, gen=None):
                                             user_id=user_id, symbol=symbol)
                     open_pos = None
                     dash["openPosition"] = None
+                    _persist_open_snapshot(None)
                     dash["balance"] = paper_balance
                     dash["trades"].insert(0, result)
                     dash["trades"] = dash["trades"][:50]
@@ -1367,6 +1457,7 @@ def _loop(user_id, alert_fn, gen=None):
                                                         "takeProfit": tp_price, "openedAt": now_str}
 
                             dash["openPosition"] = open_pos
+                            _persist_open_snapshot(open_pos)
                             result = {"action": action, "symbol": symbol, "confidence": confidence,
                                       "price": price, "spreadPips": round(spread, 1), "time": now_str,
                                       "stopLoss": sl_price, "takeProfit": tp_price,
@@ -1432,6 +1523,7 @@ def _loop(user_id, alert_fn, gen=None):
                                         user_id=user_id, symbol=symbol)
                 open_pos = None
                 dash["openPosition"] = None
+                _persist_open_snapshot(None)
                 dash["balance"] = paper_balance
                 dash["trades"].insert(0, result)
                 dash["trades"] = dash["trades"][:50]
