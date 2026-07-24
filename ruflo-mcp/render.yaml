@@ -5,6 +5,16 @@ services:
     plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: python server.py
+    # Scope auto-deploy to this folder only. This repo also holds
+    # apex-forex-bot/ and apex-crypto-bot/ — without this filter, ANY commit
+    # to the branch (even one only touching a bot's code) redeploys this
+    # server too, killing the live connector session out from under an
+    # already-open Claude chat. That's what made the connector look like it
+    # "kept disconnecting" all day: it was actually restarting on every
+    # unrelated bot fix.
+    buildFilter:
+      paths:
+        - ruflo-mcp/**
     envVars:
       - key: UPSTASH_REDIS_REST_URL
         sync: false          # forex Upstash

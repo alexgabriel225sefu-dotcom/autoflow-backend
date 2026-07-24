@@ -14,6 +14,15 @@ services:
     startCommand: python -u main.py
     plan: starter
     autoDeploy: true
+    # Scope auto-deploy to this folder only. This repo also holds
+    # apex-forex-bot/ and ruflo-mcp/ — without this filter, a commit to
+    # either of THOSE also restarts this live trading loop for no reason,
+    # which is exactly the kind of unnecessary restart that can silently
+    # orphan an open position mid-trade (see user_loop.py's startup
+    # recovery comment).
+    buildFilter:
+      paths:
+        - apex-crypto-bot/**
     envVars:
       # Flip the shared engine to its crypto profile: 24/7 market, crypto-CFD
       # Auto-Pilot universe, "Apex Crypto Bot" branding, CRPT-… license keys.
