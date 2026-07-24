@@ -344,7 +344,7 @@ def _loop(user_id, alert_fn, gen=None):
     if not cfg.PAPER_TRADING:
         _snap = user.get("open_position_snapshot")
         if _snap and _snap.get("symbol"):
-            _live, _check_failed = None, False
+            _live, _got_answer = None, False
             # This is the very first broker call a fresh process makes — the
             # connection may not be warmed up yet. Retry before concluding
             # anything: an exception here is NOT the same fact as "the
@@ -352,12 +352,24 @@ def _loop(user_id, alert_fn, gen=None):
             # itself a bug — a transient hiccup at exactly this moment would
             # get read as "position closed" and abandon tracking of a
             # position that's actually still open and unmanaged from then on.
+            #
+            # _got_answer (NOT "did any attempt fail") is what must gate the
+            # "confirmed gone" branch below — simulating this caught a real
+            # bug: with a "did any attempt fail" flag, failing once or twice
+            # and then getting a clean, definitive "flat" answer on the final
+            # retry still fell into the "unreachable, keep tracked" branch,
+            # because that flag stayed set from the earlier failures even
+            # though the broker DID answer by the end. That left the loop
+            # believing a position was still open when the broker had just
+            # said, authoritatively, that it wasn't — which then misfires
+            # the tick loop's own BROKER_CLOSE detector with a bogus estimate
+            # on the very next tick.
             for _attempt in range(3):
                 try:
                     _live = broker.get_open_position(_snap["symbol"])
+                    _got_answer = True
                     break
                 except Exception as e:
-                    _check_failed = True
                     print(f"[UserLoop:{user_id}] startup position check failed "
                           f"(attempt {_attempt + 1}/3): {e}")
                     if _attempt < 2:
@@ -373,7 +385,7 @@ def _loop(user_id, alert_fn, gen=None):
                 # be back to the exact bug this is fixing.
                 _persist_open_snapshot({**open_pos, "symbol": symbol})
                 print(f"[UserLoop:{user_id}] restart recovery: adopted still-open {symbol} position")
-            elif _check_failed:
+            elif not _got_answer:
                 # Never got a definitive answer from the broker — don't guess
                 # "closed." Keep tracking it from the snapshot; the very next
                 # tick's own position-sync (which is allowed to keep retrying)
