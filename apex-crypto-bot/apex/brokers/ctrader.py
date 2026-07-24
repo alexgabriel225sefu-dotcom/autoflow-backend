@@ -632,6 +632,24 @@ class CtraderBroker:
                     try:
                         if _try > 0:
                             time.sleep(0.5 * _try)
+                            # Fast-moving crypto can cross the intended stop
+                            # during the retry delay — the broker then rejects
+                            # the amend as an invalid price every time, and we
+                            # burn the rest of the retry budget (and exposure
+                            # time) on a request that can never succeed. Bail
+                            # out to the immediate safety-close instead.
+                            try:
+                                bid, ask = self.get_bid_ask(instrument)
+                                cur = (bid + ask) / 2 if (bid and ask) else 0
+                                if cur:
+                                    if sl and ((side == "BUY" and cur <= sl) or
+                                               (side == "SELL" and cur >= sl)):
+                                        print(f"[cTrader] price already crossed "
+                                              f"intended stop for {sym} — "
+                                              f"skipping remaining amend retries")
+                                        break
+                            except Exception:
+                                pass
                         am = ProtoOAAmendPositionSLTPReq()
                         am.ctidTraderAccountId = self._ctid()
                         am.positionId = int(pid)
