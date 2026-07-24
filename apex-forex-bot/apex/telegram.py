@@ -2180,6 +2180,18 @@ def _user_alert(uid, result):
                 f"🛡️ <b>Stop moved</b> — {sym} {side}\n"
                 f"Locking in the trade — stop trailed to <b>{_fmt_px(sl)}</b>. "
                 "Profit is being protected as price moves your way.")
+    elif action == "WEEKEND_CLOSE":
+        send_to(uid,
+                "🌙 <b>Market closed for the weekend</b>\n"
+                "Any open position was closed to avoid gap risk over Sat/Sun — "
+                "no new trades until it reopens. I'll message you the moment "
+                "it's back.")
+    elif action == "WEEKEND_REOPEN":
+        send_to(uid,
+                "🔔 <b>Market's back open</b>\n"
+                "Trading resumes automatically. If your cTrader connection "
+                "shows any error over the next few minutes, send /ctrader to "
+                "reconnect your account.")
     else:
         send_to(uid, f"⚡ <b>{action}</b> — {sym}")
 

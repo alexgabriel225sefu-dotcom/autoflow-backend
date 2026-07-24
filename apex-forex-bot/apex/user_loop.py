@@ -277,6 +277,9 @@ def _loop(user_id, alert_fn, gen=None):
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
     last_mkt_tick = -_SKIP_WARN_THROTTLE      # market-pulse heads-up (throttled)
+    was_weekend_closed = market.is_weekend_close_window()  # fire the Telegram
+                         # notice only on the Fri→closed and Sun→open EDGE,
+                         # not every tick for the whole weekend
 
     acct_env = (user.get("ctrader_env") or "demo").lower()
     mode_label = ("📝 Simulation" if cfg.PAPER_TRADING
@@ -877,7 +880,17 @@ def _loop(user_id, alert_fn, gen=None):
             # stop-loss, so force-close before the close and stand aside
             # (the unconditional `continue` below also blocks new entries)
             # until the market is back.
-            if market.is_weekend_close_window():
+            in_weekend_window = market.is_weekend_close_window()
+            if in_weekend_window and not was_weekend_closed:
+                was_weekend_closed = True
+                if alert_fn:
+                    alert_fn(user_id, {"action": "WEEKEND_CLOSE", "symbol": symbol})
+            elif not in_weekend_window and was_weekend_closed:
+                was_weekend_closed = False
+                if alert_fn:
+                    alert_fn(user_id, {"action": "WEEKEND_REOPEN", "symbol": symbol})
+
+            if in_weekend_window:
                 if open_pos:
                     _close_res = None
                     if not cfg.PAPER_TRADING:
