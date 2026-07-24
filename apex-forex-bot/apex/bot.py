@@ -320,7 +320,16 @@ def _start_dashboard_server():
                     u = user_store.load(chat_id)
                     udash = user_loop.get_dash(chat_id) or {}
                     br, ucfg = user_loop._make_broker(u)
-                    candles = br.get_candles(ucfg.SYMBOL, ucfg.TIMEFRAME, 150) or []
+                    # Auto-Pilot rotates the traded symbol live, in-memory,
+                    # without ever persisting it back to the user record —
+                    # ucfg.SYMBOL is only the ORIGINAL stored default. Reading
+                    # candles/position/P&L off ucfg.SYMBOL here made the
+                    # Terminal show a stale symbol with no position the moment
+                    # Auto-Pilot moved to anything else — which is most of the
+                    # time. dash["symbol"] is what the loop is ACTUALLY
+                    # watching/trading right now.
+                    live_symbol = udash.get("symbol") or ucfg.SYMBOL
+                    candles = br.get_candles(live_symbol, ucfg.TIMEFRAME, 150) or []
                     pos = udash.get("openPosition")
                     from apex import stats as stats_mod, forex as fx_mod
                     balance_live = udash.get("balance", u.get("paper_balance", 0))
@@ -328,7 +337,7 @@ def _start_dashboard_server():
                     # for a terminal. Read position + balance live per poll.
                     if not u.get("paper", True):
                         try:
-                            pos = br.get_open_position(ucfg.SYMBOL)
+                            pos = br.get_open_position(live_symbol)
                         except Exception:
                             pass
                         try:
@@ -341,11 +350,11 @@ def _start_dashboard_server():
                         d_ = 1 if pos.get("side") == "BUY" else -1
                         pos = dict(pos)
                         pos["pnlPips"] = round(fx_mod.to_pips(
-                            (last_px - pos["entryPrice"]) * d_, ucfg.SYMBOL, last_px), 1)
+                            (last_px - pos["entryPrice"]) * d_, live_symbol, last_px), 1)
                         units_ = pos.get("units") or pos.get("quantity") or 0
                         if units_:
                             pos["pnlUsd"] = round(fx_mod.pnl_usd(
-                                pos["side"], pos["entryPrice"], last_px, units_, ucfg.SYMBOL), 2)
+                                pos["side"], pos["entryPrice"], last_px, units_, live_symbol), 2)
                     # Live account money, exactly like a cTrader terminal:
                     #   Equity = Balance + floating (unrealized) P&L.
                     # Floating from every open position, priced at the freshest
@@ -357,7 +366,7 @@ def _start_dashboard_server():
                         except Exception:
                             all_pos = []
                         for ap in all_pos or []:
-                            if ap.get("symbol") == ucfg.SYMBOL:
+                            if ap.get("symbol") == live_symbol:
                                 continue  # already counted via the focused pos
                             try:
                                 apx = br.get_candles(ap["symbol"], ucfg.TIMEFRAME, 2)
@@ -374,7 +383,7 @@ def _start_dashboard_server():
                     journal = user_store.load_trades(chat_id)
                     st = stats_mod.compute(journal, udash.get("skipsToday", 0))
                     body = json.dumps({
-                        "symbol": ucfg.SYMBOL, "timeframe": ucfg.TIMEFRAME,
+                        "symbol": live_symbol, "timeframe": ucfg.TIMEFRAME,
                         "mode": udash.get("mode", "📝 PAPER" if u.get("paper", True) else "🔴 REAL"),
                         "strategy": udash.get("strategy", "Mean Reversion"),
                         "broker": udash.get("broker", ""),
