@@ -718,12 +718,21 @@ class CtraderBroker:
             # buying it back (pay the ask), closing a BUY means selling (get
             # the bid) — this produced a real P&L sign flip on a SOLUSD close
             # (reported +$33.57, broker's actual fill made it -$27.65).
-            try:
-                bid, ask = self.get_bid_ask(instrument)
-                if bid and ask:
-                    fill = ask if pos.get("side") == "SELL" else bid
-            except Exception:
-                pass
+            for _attempt in range(2):  # one retry — a single transient blip
+                                       # here used to fall all the way through
+                                       # to the caller's stale candle price,
+                                       # which carries no spread adjustment at
+                                       # all and reintroduces the same class of
+                                       # P&L inaccuracy this fallback exists to
+                                       # fix.
+                try:
+                    bid, ask = self.get_bid_ask(instrument)
+                    if bid and ask:
+                        fill = ask if pos.get("side") == "SELL" else bid
+                    break
+                except Exception:
+                    if _attempt == 0:
+                        time.sleep(0.5)
         return {"orderId": str(getattr(res.order, "orderId", "")),
                 "status": "FILLED", "fillPrice": fill,
                 "commissionUsd": _extract_commission(res)}

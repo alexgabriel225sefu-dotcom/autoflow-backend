@@ -849,6 +849,18 @@ def _loop(user_id, alert_fn, gen=None):
                         net = gross - cost_usd
                         if cfg.PAPER_TRADING:
                             paper_balance += net
+                        else:
+                            # LIVE: this branch used to leave paper_balance (the
+                            # displayed "balance") completely untouched on a
+                            # real close — it's only bumped by `net` in paper
+                            # mode above, so the Telegram message reported the
+                            # PRE-close balance while claiming a P&L for the
+                            # trade that supposedly just happened to it. A
+                            # fresh broker read is the authoritative number.
+                            try:
+                                paper_balance = broker.get_balance()
+                            except Exception:
+                                paper_balance += net
                         last_loss_at = time.time()
                         last_close_at = time.time()
                         loss_streak += 1
@@ -1013,6 +1025,14 @@ def _loop(user_id, alert_fn, gen=None):
                     net = gross - cost_usd
                     if cfg.PAPER_TRADING:
                         paper_balance += net
+                    else:
+                        # LIVE: read the real post-close balance instead of
+                        # leaving it at whatever it was before this close —
+                        # see the identical fix on the protective-stop close.
+                        try:
+                            paper_balance = broker.get_balance()
+                        except Exception:
+                            paper_balance += net
                     if net < 0:
                         last_loss_at = time.time()
                         loss_streak += 1
@@ -1407,6 +1427,14 @@ def _loop(user_id, alert_fn, gen=None):
                             net = gross - cost_usd
                             if cfg.PAPER_TRADING:
                                 paper_balance += net
+                            else:
+                                # SAFETY_CLOSED only ever happens on a real
+                                # broker order — read the real post-close
+                                # balance instead of leaving it stale.
+                                try:
+                                    paper_balance = broker.get_balance()
+                                except Exception:
+                                    paper_balance += net
                             if net < 0:
                                 last_loss_at = time.time()
                                 loss_streak += 1
@@ -1496,6 +1524,16 @@ def _loop(user_id, alert_fn, gen=None):
                 net = gross - cost_usd
                 if cfg.PAPER_TRADING:
                     paper_balance += net
+                else:
+                    # LIVE: this is the exact bug behind a client seeing a
+                    # "Net P&L +$X, Balance $Y" message where Y didn't move
+                    # by X at all — this branch bumped paper_balance only in
+                    # PAPER mode, so a live close reported the balance from
+                    # BEFORE the trade closed. Read the real one instead.
+                    try:
+                        paper_balance = broker.get_balance()
+                    except Exception:
+                        paper_balance += net
                 if net < 0:
                     last_loss_at = time.time()
                     loss_streak += 1
@@ -1806,7 +1844,17 @@ def force_close(user_id):
     if loop_data:
         d = loop_data.get("dash", {})
         old_bal = d.get("balance", cfg.PAPER_BALANCE)
-        new_bal = round(old_bal + net, 2)
+        if cfg.PAPER_TRADING:
+            new_bal = round(old_bal + net, 2)
+        else:
+            # LIVE: read the real post-close balance instead of adding our
+            # own P&L estimate on top of a cached one — same fix as _loop's
+            # close paths, same bug (a stale balance next to a fresh P&L
+            # line in the same message).
+            try:
+                new_bal = round(broker.get_balance(), 2)
+            except Exception:
+                new_bal = round(old_bal + net, 2)
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         result = {"action": "CLOSE", "symbol": sym, "price": price,
                   "entryPrice": open_pos.get("entryPrice"),
