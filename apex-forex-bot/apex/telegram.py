@@ -2251,9 +2251,10 @@ def _user_alert(uid, result):
     elif action == "WEEKEND_REOPEN":
         send_to(uid,
                 "🔔 <b>Market's back open</b>\n"
-                "Trading resumes automatically. If your cTrader connection "
-                "shows any error over the next few minutes, send /ctrader to "
-                "reconnect your account.")
+                "Trading resumes automatically. As a precaution after the "
+                "weekend break, send /ctrader now to reconnect your broker "
+                "account — takes a second, and makes sure the connection "
+                "is fresh before the first trade of the week.")
     else:
         send_to(uid, f"⚡ <b>{action}</b> — {sym}")
 
