@@ -5,6 +5,7 @@ const { createClient } = require('@supabase/supabase-js');
 const Anthropic = require('@anthropic-ai/sdk');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const marketingAgent = require('./agent/marketingAgent');
 
 process.on('uncaughtException', err => console.error('UNCAUGHT EXCEPTION:', err.stack || err));
 process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION:', err));
@@ -3111,6 +3112,32 @@ app.post('/api/railway-deploy', async (req, res) => {
 
 
 // ════════════════════════════════════════
+// MARKETING AGENT — free, Groq-powered promo bot
+// ════════════════════════════════════════
+// POST /api/agent/run { highlight?: string } — manual trigger (owner only)
+app.post('/api/agent/run', auth, async (req, res) => {
+  try {
+    const emailRecipients = (process.env.AGENT_EMAIL_RECIPIENTS || '')
+      .split(',').map(s => s.trim()).filter(Boolean);
+    const result = await marketingAgent.runMarketingCycle({
+      highlight: req.body?.highlight || '',
+      sendEmailFn: _sendEmail,
+      emailRecipients,
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+// GET /api/agent/status — quick config check (owner only)
+app.get('/api/agent/status', auth, (req, res) => res.json({
+  groq_configured: !!process.env.GROQ_API_KEY,
+  telegram_configured: !!(process.env.MARKETING_TELEGRAM_BOT_TOKEN && process.env.MARKETING_TELEGRAM_CHAT_ID),
+  email_recipients: (process.env.AGENT_EMAIL_RECIPIENTS || '').split(',').map(s => s.trim()).filter(Boolean).length,
+  interval_hours: Number(process.env.AGENT_INTERVAL_HOURS) || 24,
+}));
+
+// ════════════════════════════════════════
 // CATCH-ALL 404  (must be after ALL routes)
 // ════════════════════════════════════════
 app.use((req, res) => {
@@ -3131,6 +3158,11 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Blueprint Studio server running on port ${PORT} (0.0.0.0)`);
   addLog('Server started', 'system', 'success');
+  marketingAgent.startScheduler({
+    intervalHours: Number(process.env.AGENT_INTERVAL_HOURS) || 24,
+    sendEmailFn: _sendEmail,
+    emailRecipients: (process.env.AGENT_EMAIL_RECIPIENTS || '').split(',').map(s => s.trim()).filter(Boolean),
+  });
   // Self-test so we can see in Render logs if routes work
   fetch(`http://localhost:${PORT}/ping`)
     .then(r => r.json())
