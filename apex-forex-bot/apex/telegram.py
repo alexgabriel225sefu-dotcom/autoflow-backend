@@ -1017,7 +1017,7 @@ def _finish_onboard(chat_id):
             f"Symbol: <b>{u.get('symbol', 'EUR_USD')}</b>\n"
             f"Method: <b>{strat}</b>\n"
             f"Mode: <b>{mode}</b>\n"
-            f"Risk: <b>{float(u.get('risk', 0.005)) * 100:g}%</b> per trade\n\n"
+            f"Risk: <b>{float(u.get('risk', 0.025)) * 100:g}%</b> per trade\n\n"
             "It trades automatically when a valid setup appears.\n"
             "<i>Fine-tune:</i> /pairs · /strategy · /risk",
             _dashboard_keyboard(chat_id))

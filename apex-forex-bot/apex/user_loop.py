@@ -57,7 +57,7 @@ def _make_broker(user):
         PAPER_BALANCE    = float(user.get("paper_balance", 1000)),
         STOP_LOSS_PIPS   = float(user.get("sl_pips", 20)),
         TAKE_PROFIT_PIPS = float(user.get("tp_pips", 40)),
-        RISK_PER_TRADE   = float(user.get("risk", 0.01)),  # 1% default (was 0.5%) — bigger, still safe
+        RISK_PER_TRADE   = float(user.get("risk", 0.025)),  # 2.5% default (was 1%) — bigger profit per trade, still bounded by the caps below
         # Crypto CFDs are leveraged far lower than FX (retail ~2-5x vs 30x), so
         # the margin cap must assume less leverage or it sizes positions the
         # account can't actually margin.
@@ -82,8 +82,13 @@ def _make_broker(user):
         NEWS_FILTER      = bool(user.get("news_filter", _appcfg.PRODUCT != "crypto")),
         SESSION_FILTER   = list(user.get("session_filter") or []),  # [] = all sessions
         MAX_TRADES_DAY   = int(user.get("max_trades_day", 10)),
-        MAX_DD_PCT       = float(user.get("max_dd_pct", 20)),
-        MAX_DAILY_LOSS_PCT = float(user.get("max_daily_loss_pct", 3)),
+        # Caps scaled with RISK_PER_TRADE above (2.5x risk) so the bot still
+        # tolerates roughly the same number of consecutive losses per day/from
+        # peak before standing aside — not a full linear scale-up, which would
+        # make the caps meaningless (matches the product's existing Medium→High
+        # risk-tier progression in builder.py).
+        MAX_DD_PCT       = float(user.get("max_dd_pct", 25)),
+        MAX_DAILY_LOSS_PCT = float(user.get("max_daily_loss_pct", 4)),
     )
     return _CtraderBroker(fake_cfg), fake_cfg
 
