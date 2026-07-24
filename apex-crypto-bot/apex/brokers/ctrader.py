@@ -709,6 +709,21 @@ class CtraderBroker:
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):
             fill = res.order.executionPrice
+        if fill is None:
+            # The execution event didn't carry a fill price (happens on some
+            # close confirmations) — the caller's fallback used to be the
+            # trading loop's `price`, which can be a full tick-interval stale
+            # on a fast-moving instrument. A fresh quote taken THIS instant is
+            # much closer to the real fill than that: closing a SELL means
+            # buying it back (pay the ask), closing a BUY means selling (get
+            # the bid) — this produced a real P&L sign flip on a SOLUSD close
+            # (reported +$33.57, broker's actual fill made it -$27.65).
+            try:
+                bid, ask = self.get_bid_ask(instrument)
+                if bid and ask:
+                    fill = ask if pos.get("side") == "SELL" else bid
+            except Exception:
+                pass
         return {"orderId": str(getattr(res.order, "orderId", "")),
                 "status": "FILLED", "fillPrice": fill,
                 "commissionUsd": _extract_commission(res)}
