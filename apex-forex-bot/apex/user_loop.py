@@ -300,6 +300,8 @@ def _loop(user_id, alert_fn, gen=None):
     was_weekend_closed = market.is_weekend_close_window()  # fire the Telegram
                          # notice only on the Fri→closed and Sun→open EDGE,
                          # not every tick for the whole weekend
+    was_stopped = False  # fire the "Trading paused" alert once per stop, not
+                         # every tick for the rest of the day it stays true
 
     acct_env = (user.get("ctrader_env") or "demo").lower()
     mode_label = ("📝 Simulation" if cfg.PAPER_TRADING
@@ -1101,10 +1103,15 @@ def _loop(user_id, alert_fn, gen=None):
                 user_id=user_id, symbol=symbol)
             if stop_check["stop"]:
                 print(f"[UserLoop:{user_id}] Strategy stop: {stop_check['reasons']}")
-                if alert_fn:
+                # Alert once on the edge into the stop, not every tick for the
+                # rest of the day it stays true — this used to spam "Trading
+                # paused" every 5 minutes non-stop once a daily limit hit.
+                if alert_fn and not was_stopped:
                     alert_fn(user_id, {"action": "STOP", "reasons": stop_check["reasons"]})
+                was_stopped = True
                 time.sleep(_LOOP_INTERVAL)
                 continue
+            was_stopped = False
 
             # Heartbeat — let user know bot is alive even during quiet markets
             if tick % _HEARTBEAT_TICKS == 0 and alert_fn:
