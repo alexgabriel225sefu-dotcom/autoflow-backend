@@ -45,6 +45,7 @@ _lock = threading.Lock()
 _wizards = {}      # per-chat wizard state: {chat_id: {step: str, data: dict}}
                    # MUST be per-chat — many clients run /setup on the same shared
                    # bot at once; a single global dict would clobber their flows.
+_purge_pending = {}  # chat_id -> target user_id awaiting /purgebad confirmation
 _bot_control = {}  # callbacks: {set_paused, get_paused, reload_broker}
 
 _PAIR_RE = re.compile(r"^[A-Z]{3}_[A-Z]{3}$")
@@ -1241,6 +1242,26 @@ def _handle_cb(chat_id, data):
     elif data == "cp:n":
         user_loop.clear_suggestion(str(chat_id))
         send_to(chat_id, "❌ Skipped. I'll keep watching and suggest the next setup.")
+    elif data == "purgebad:yes":
+        with _lock:
+            target = _purge_pending.pop(str(chat_id), None)
+        if not target:
+            return send_to(chat_id, "⌛ That request expired — send /purgebad again.")
+        trades = user_store.load_trades(target)
+        good = [t for t in trades if abs(t.get("netPnl") or 0) <= _PURGE_THRESHOLD
+                and abs(t.get("grossPnl") or 0) <= _PURGE_THRESHOLD]
+        removed = len(trades) - len(good)
+        key = f"{user_store._NS}:trades:{target}"
+        if user_store._USE_REDIS:
+            user_store._redis_set(key, json.dumps(good))
+        else:
+            with open(user_store._path(target) + ".trades", "w") as f:
+                f.write(json.dumps(good))
+        send_to(chat_id, f"✅ Removed {removed} corrupted record(s) — {len(good)} remain in the journal.")
+    elif data == "purgebad:no":
+        with _lock:
+            _purge_pending.pop(str(chat_id), None)
+        send_to(chat_id, "✖️ Cancelled — nothing changed.")
     elif data.startswith("tr:"):
         parts = data.split(":")
         if len(parts) == 3:
@@ -2021,6 +2042,34 @@ def _handle_revoke(chat_id, args):
         send_to(chat_id, f"ℹ️ <code>{target}</code> not found or is an admin.")
 
 
+_PURGE_THRESHOLD = 50000.0  # a real trade on these account sizes never gets near this
+
+
+def _handle_purge_bad(chat_id, args):
+    """Admin-only, mobile-friendly cleanup: find + (with confirmation) remove
+    corrupted trade-journal records — no shell, no typing beyond the command
+    itself. Defaults to the sender's own account if no user_id is given."""
+    target = (args or "").strip() or str(chat_id)
+    trades = user_store.load_trades(target)
+    bad = [t for t in trades if abs(t.get("netPnl") or 0) > _PURGE_THRESHOLD
+           or abs(t.get("grossPnl") or 0) > _PURGE_THRESHOLD]
+    if not bad:
+        return send_to(chat_id,
+                f"✅ Journal for <code>{target}</code> looks clean — nothing above "
+                f"${_PURGE_THRESHOLD:,.0f}.")
+    lines = "\n".join(
+        f"• {t.get('time', '?')} {t.get('symbol', '?')} netPnl={t.get('netPnl')}"
+        for t in bad[:10])
+    with _lock:
+        _purge_pending[str(chat_id)] = target
+    send_to(chat_id,
+            f"⚠️ <b>Found {len(bad)} corrupted record(s)</b> for <code>{target}</code>:\n{lines}\n\n"
+            "Remove just these? The rest of the journal stays untouched.",
+            extra={"reply_markup": {"inline_keyboard": [[
+                {"text": "🗑 Remove these", "callback_data": "purgebad:yes"},
+                {"text": "✖️ Cancel", "callback_data": "purgebad:no"}]]}})
+
+
 def _handle_users(chat_id):
     admins  = access.list_admins()
     clients = access.list_clients()
@@ -2408,6 +2457,7 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "/grant &lt;id&gt; — give client access\n"
                "/revoke &lt;id&gt; — remove access\n"
                "/users — list clients\n"
+               "/purgebad [id] — clean up corrupted journal records (defaults to your own)\n"
                "/help — this list\n\n"
                "💬 <i>Free text → AI assistant (any language)</i>")
 
@@ -2672,6 +2722,8 @@ def _poll_loop():
                     _handle_grant(chat_id, args)
                 elif cmd_l == "/revoke" and is_adm:
                     _handle_revoke(chat_id, args)
+                elif cmd_l == "/purgebad" and is_adm:
+                    _handle_purge_bad(chat_id, args)
                 elif cmd_l == "/setup":
                     # Every paying client self-configures their OWN trading via the
                     # wizard (writes only their user record); admin extras apply
