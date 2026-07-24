@@ -2171,6 +2171,7 @@ def _user_alert(uid, result):
             "side": action, "entryPrice": result.get("price"),
             "stopLoss": result.get("stopLoss"), "takeProfit": result.get("takeProfit")},
             caption=f"{d} {sym} — entry, SL &amp; TP on the chart")
+        _handle_terminal(uid)  # one-tap live view right after every open — no digging for /terminal
     elif action == "CLOSE":
         net = result.get("netPnl")
         _reason_lbl = {"STOP_LOSS": "🛑 Stop loss hit",
