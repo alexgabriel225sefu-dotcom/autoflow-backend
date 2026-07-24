@@ -745,11 +745,15 @@ def _extract_commission(res):
 
     cTrader tracks commission on the position (cumulative — both the entry
     and exit legs, by the time the position closes) and/or the individual
-    deal, scaled like balance (integer, moneyDigits decimal places — almost
-    always 2/cents for USD/EUR accounts). Field presence and exact scaling
-    aren't verifiable from this environment (no live cTrader connection to
-    test against) — any lookup failure here just returns 0, i.e. the P&L
-    cost stays exactly what it was before this existed. Never raises.
+    deal (that ONE deal's leg only — roughly half the round-trip cost).
+    Position must be tried first: a real USDCHF close showed cTrader's true
+    fee at $2.34 while this function (deal-first) had been returning $1.17 —
+    exactly half — because res.deal was present with its own single-leg
+    commission and the loop returned that before ever reaching the correct,
+    cumulative res.position value. Scaled like balance (integer, moneyDigits
+    decimal places — almost always 2/cents for USD/EUR accounts). Any lookup
+    failure here just returns 0, i.e. the P&L cost stays exactly what it was
+    before this existed. Never raises.
     """
     money_digits = 2
     try:
@@ -758,8 +762,8 @@ def _extract_commission(res):
     except Exception:
         pass
     for getter in (
-        lambda: res.deal.commission if res.HasField("deal") else None,
         lambda: res.position.commission if res.HasField("position") else None,
+        lambda: res.deal.commission if res.HasField("deal") else None,
     ):
         try:
             raw = getter()
