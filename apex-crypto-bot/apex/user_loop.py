@@ -1109,7 +1109,6 @@ def _loop(user_id, alert_fn, gen=None):
                 paper_balance, dash["startBalance"],
                 max_daily_loss_pct=getattr(cfg, "MAX_DAILY_LOSS_PCT", 3.0),
                 max_dd_pct=getattr(cfg, "MAX_DD_PCT", 20.0),
-                max_trades_day=getattr(cfg, "MAX_TRADES_DAY", 10),
                 user_id=user_id, symbol=symbol)
             if stop_check["stop"]:
                 print(f"[UserLoop:{user_id}] Strategy stop: {stop_check['reasons']}")

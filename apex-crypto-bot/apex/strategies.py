@@ -102,16 +102,17 @@ _SEYKOTA_COOLDOWN_MIN = 60  # after 3 losses in a row, stand aside this long, th
 
 
 def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
-                max_dd_pct=20.0, max_trades_day=10, user_id=None, symbol=None,
+                max_dd_pct=20.0, user_id=None, symbol=None,
                 seykota_cooldown_min=_SEYKOTA_COOLDOWN_MIN):
     """Circuit breaker — per-user when user_id is provided.
 
     The Seykota "3 losses in a row" rule is scoped to `symbol` (when given):
     a whipsaw on one instrument stands aside on THAT instrument only, instead
     of freezing the whole account while a completely different pair might
-    have a perfectly good setup right now. Daily loss %, drawdown from peak
-    and the trades/day cap stay account-wide — those protect total capital,
-    not a single instrument.
+    have a perfectly good setup right now. Daily loss % and drawdown from
+    peak stay account-wide — those protect total capital, not a single
+    instrument. No cap on trades/day — a good setup is a good setup
+    regardless of how many came before it today.
     """
     _reset_daily_if_needed(user_id)
     s = get_session(user_id)
@@ -139,8 +140,6 @@ def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
     peak_dd = ((balance - s["peakBalance"]) / s["peakBalance"]) * 100 if s["peakBalance"] else 0
     if peak_dd < -abs(max_dd_pct):
         reasons.append(f"Drawdown from peak: {peak_dd:.1f}% (limit {abs(max_dd_pct):g}%) — capital protection stop")
-    if s["dailyTrades"] >= max_trades_day:
-        reasons.append(f"{max_trades_day} trades/day limit reached")
     if balance < 1:
         reasons.append("Balance under $1 — cannot trade")
     return {"stop": len(reasons) > 0, "reasons": reasons}
