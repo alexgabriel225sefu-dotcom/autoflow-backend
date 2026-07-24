@@ -1210,7 +1210,17 @@ def _loop(user_id, alert_fn, gen=None):
                     risk_mult *= 0.5
                 if regime.get("regime") == "volatile":
                     risk_mult *= 0.5
-                units = forex.calc_units(paper_balance, per_trade_risk,
+                # Size off the account's starting balance (adjusted only for
+                # real deposits/withdrawals — see where startBalance shifts
+                # above), not the live balance. Sizing from the live balance
+                # made the same setup produce a different position every
+                # time as ordinary trading P&L nudged it up or down; a client
+                # comparing two AUDUSD trades a day apart shouldn't see two
+                # different lot sizes for the exact same risk. Loss-streak and
+                # volatile-regime reductions (risk_mult below) still shrink it
+                # when conditions call for it — that's a safety cut, not drift.
+                sizing_balance = dash.get("startBalance") or paper_balance
+                units = forex.calc_units(sizing_balance, per_trade_risk,
                                          stop_pips_eff, symbol, price,
                                          leverage=cfg.LEVERAGE, mult=risk_mult)
                 floor = forex.safe_min_units(symbol, paper_balance, price,
