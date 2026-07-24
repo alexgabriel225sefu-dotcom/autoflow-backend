@@ -688,6 +688,7 @@ class CtraderBroker:
                 return {"orderId": str(getattr(res.order, "orderId", "")),
                         "status": "SAFETY_CLOSED", "fillPrice": fill,
                         "exitFillPrice": (close_res or {}).get("fillPrice"),
+                        "commissionUsd": (close_res or {}).get("commissionUsd", 0.0),
                         "reason": "could not attach stop-loss at the broker — "
                                   "position closed immediately for safety"}
         return {"orderId": str(getattr(res.order, "orderId", "")),
@@ -709,10 +710,41 @@ class CtraderBroker:
         if res.HasField("order") and res.order.HasField("executionPrice"):
             fill = res.order.executionPrice
         return {"orderId": str(getattr(res.order, "orderId", "")),
-                "status": "FILLED", "fillPrice": fill}
+                "status": "FILLED", "fillPrice": fill,
+                "commissionUsd": _extract_commission(res)}
 
 
 # ── Module-level helpers (parity with other connectors) ──────────────────────
+
+def _extract_commission(res):
+    """Best-effort real broker commission from a close's execution event.
+
+    cTrader tracks commission on the position (cumulative — both the entry
+    and exit legs, by the time the position closes) and/or the individual
+    deal, scaled like balance (integer, moneyDigits decimal places — almost
+    always 2/cents for USD/EUR accounts). Field presence and exact scaling
+    aren't verifiable from this environment (no live cTrader connection to
+    test against) — any lookup failure here just returns 0, i.e. the P&L
+    cost stays exactly what it was before this existed. Never raises.
+    """
+    money_digits = 2
+    try:
+        if res.HasField("trader"):
+            money_digits = getattr(res.trader, "moneyDigits", 2) or 2
+    except Exception:
+        pass
+    for getter in (
+        lambda: res.deal.commission if res.HasField("deal") else None,
+        lambda: res.position.commission if res.HasField("position") else None,
+    ):
+        try:
+            raw = getter()
+            if raw:
+                return abs(raw) / (10 ** money_digits)
+        except Exception:
+            continue
+    return 0.0
+
 
 def is_configured() -> bool:
     return bool(getattr(cfg, "CTRADER_CLIENT_ID", "")

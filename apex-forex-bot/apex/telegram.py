@@ -1856,8 +1856,20 @@ def _handle_terminal(chat_id):
     base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
     if not base:
         return send_to(chat_id, "⚠️ Terminal URL not configured (RENDER_EXTERNAL_URL).")
+    # Show the symbol actually being traded RIGHT NOW in the message itself —
+    # not just once the Mini App is opened — so this is never stale relative
+    # to Auto-Pilot's live symbol rotation.
+    dash = user_loop.get_dash(chat_id) or {}
+    sym = dash.get("symbol")
+    pos = dash.get("openPosition")
+    if sym and pos:
+        sym_line = f"📡 Currently trading: <b>{sym}</b> — {pos.get('side', '')} position open\n\n"
+    elif sym:
+        sym_line = f"📡 Currently watching: <b>{sym}</b> — no open position\n\n"
+    else:
+        sym_line = ""
     send_to(chat_id,
-            "📈 <b>Apex Terminal</b>\n\n"
+            "📈 <b>Apex Terminal</b>\n\n" + sym_line +
             "Live interactive chart (pinch to zoom, drag to pan), your position with "
             "entry/SL/TP lines, balance, upcoming market events and your trade history — "
             "all in one screen.",

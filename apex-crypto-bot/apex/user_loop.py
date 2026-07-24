@@ -739,6 +739,7 @@ def _loop(user_id, alert_fn, gen=None):
                                           (side_ == "SELL" and price >= stop_))
                     if breached:
                         exit_price = price
+                        _close_res = None
                         try:
                             _close_res = broker.close_position(symbol)
                             exit_price = (_close_res or {}).get("fillPrice") or price
@@ -751,7 +752,12 @@ def _loop(user_id, alert_fn, gen=None):
                         units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
                         gross = forex.pnl_usd(side_, open_pos["entryPrice"], exit_price, units_, symbol)
                         pv = forex.pip_value_per_unit(symbol, exit_price)
-                        cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                        # Spread estimate + real broker commission (when the
+                        # broker reports one) — cost was silently always $0
+                        # before, since a live open_pos read straight from the
+                        # broker never carries an "entrySpreadPips" estimate.
+                        cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                                   + (_close_res or {}).get("commissionUsd", 0.0))
                         net = gross - cost_usd
                         if cfg.PAPER_TRADING:
                             paper_balance += net
@@ -913,7 +919,8 @@ def _loop(user_id, alert_fn, gen=None):
                     gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
                                           exit_price, units_, symbol)
                     pv = forex.pip_value_per_unit(symbol, exit_price)
-                    cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                    cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                               + (_close_res or {}).get("commissionUsd", 0.0))
                     net = gross - cost_usd
                     if cfg.PAPER_TRADING:
                         paper_balance += net
@@ -1311,7 +1318,7 @@ def _loop(user_id, alert_fn, gen=None):
                             exit_fill = _order_res.get("exitFillPrice") or entry_fill
                             gross = forex.pnl_usd(action, entry_fill, exit_fill, units, symbol)
                             pv = forex.pip_value_per_unit(symbol, exit_fill)
-                            cost_usd = spread * pv * units
+                            cost_usd = spread * pv * units + _order_res.get("commissionUsd", 0.0)
                             net = gross - cost_usd
                             if cfg.PAPER_TRADING:
                                 paper_balance += net
@@ -1392,7 +1399,14 @@ def _loop(user_id, alert_fn, gen=None):
                 gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
                                       exit_price, units_, symbol)
                 pv = forex.pip_value_per_unit(symbol, exit_price)
-                cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                # Spread estimate + real broker commission — a live open_pos
+                # read straight from the broker never carries an
+                # "entrySpreadPips" estimate, so cost silently read $0 on
+                # every real close; commissionUsd (best-effort, see
+                # ctrader._extract_commission) closes that gap when the
+                # broker reports one.
+                cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                           + (_close_res or {}).get("commissionUsd", 0.0))
                 net = gross - cost_usd
                 if cfg.PAPER_TRADING:
                     paper_balance += net
@@ -1693,7 +1707,8 @@ def force_close(user_id):
         units_ = open_pos.get("units", 1000)
         gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"], price, units_, sym)
         pv = forex.pip_value_per_unit(sym, price)
-        cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+        cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                   + (_close_res or {}).get("commissionUsd", 0.0))
         net = gross - cost_usd
 
     with _lock:
