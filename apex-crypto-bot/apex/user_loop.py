@@ -351,11 +351,24 @@ def _loop(user_id, alert_fn, gen=None):
     if not cfg.PAPER_TRADING:
         _snap = user.get("open_position_snapshot")
         if _snap and _snap.get("symbol"):
-            try:
-                _live = broker.get_open_position(_snap["symbol"])
-            except Exception as e:
-                _live = None
-                print(f"[UserLoop:{user_id}] startup position check failed: {e}")
+            _live, _check_failed = None, False
+            # This is the very first broker call a fresh process makes — the
+            # connection may not be warmed up yet. Retry before concluding
+            # anything: an exception here is NOT the same fact as "the
+            # broker confirmed you're flat," and treating them as equal was
+            # itself a bug — a transient hiccup at exactly this moment would
+            # get read as "position closed" and abandon tracking of a
+            # position that's actually still open and unmanaged from then on.
+            for _attempt in range(3):
+                try:
+                    _live = broker.get_open_position(_snap["symbol"])
+                    break
+                except Exception as e:
+                    _check_failed = True
+                    print(f"[UserLoop:{user_id}] startup position check failed "
+                          f"(attempt {_attempt + 1}/3): {e}")
+                    if _attempt < 2:
+                        time.sleep(2)
             if _live:
                 symbol = _snap["symbol"]
                 open_pos = _live
@@ -367,6 +380,18 @@ def _loop(user_id, alert_fn, gen=None):
                 # be back to the exact bug this is fixing.
                 _persist_open_snapshot({**open_pos, "symbol": symbol})
                 print(f"[UserLoop:{user_id}] restart recovery: adopted still-open {symbol} position")
+            elif _check_failed:
+                # Never got a definitive answer from the broker — don't guess
+                # "closed." Keep tracking it from the snapshot; the very next
+                # tick's own position-sync (which is allowed to keep retrying)
+                # will resolve the real state either way.
+                symbol = _snap["symbol"]
+                open_pos = dict(_snap)
+                dash["symbol"] = symbol
+                dash["openPosition"] = open_pos
+                _persist_open_snapshot(open_pos)
+                print(f"[UserLoop:{user_id}] restart recovery: broker unreachable at startup — "
+                      f"keeping {symbol} tracked pending the next tick")
             else:
                 # Gone — it closed at the broker while nothing was watching.
                 # The real fill is unknowable now; price it against the next
