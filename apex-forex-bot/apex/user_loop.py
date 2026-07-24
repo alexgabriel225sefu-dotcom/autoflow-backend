@@ -38,6 +38,23 @@ def _log_trade(user_id, record):
         print(f"[UserLoop:{user_id}] trade-log failed: {e}")
 
 
+def _persist_open_position(user_id, cfg, pos):
+    """Restart-recovery snapshot of the currently open position (or None when
+    flat) — see _loop's startup recovery. Positions don't only open/close
+    inside the loop's own tick cycle: force_trade/force_close (manual /buy,
+    /sell, /close, and the MCP open_trade/force_close tools) open and close
+    real positions directly against the broker too, so this is a standalone
+    function both the loop and those two call, instead of a loop-only
+    closure — a manual trade needs the exact same restart protection as an
+    autonomous one."""
+    if getattr(cfg, "PAPER_TRADING", False):
+        return
+    try:
+        user_store.update(user_id, {"open_position_snapshot": pos})
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] open-position snapshot persist failed: {e}")
+
+
 def _make_broker(user):
     """Create the per-user broker with isolated config — cTrader exclusively."""
     import types
@@ -271,19 +288,7 @@ def _loop(user_id, alert_fn, gen=None):
             print(f"[UserLoop:{user_id}] risk-state persist failed: {e}")
 
     def _persist_open_snapshot(pos):
-        """open_pos lives in memory only — wiped by every restart. If the
-        broker closes the position during the exact gap between the old
-        process dying and the new one's first tick, no process ever sees the
-        transition, so the tick-to-tick BROKER_CLOSE check (comparing prev
-        vs current) has nothing to compare against and the close goes
-        completely unlogged. Persisting the last known open position lets
-        startup recovery detect that gap and journal it retroactively."""
-        if cfg.PAPER_TRADING:
-            return
-        try:
-            user_store.update(user_id, {"open_position_snapshot": pos})
-        except Exception as e:
-            print(f"[UserLoop:{user_id}] open-position snapshot persist failed: {e}")
+        _persist_open_position(user_id, cfg, pos)
     prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
     pos_details = {}    # nrm(symbol) -> {symbol, side, entry, units} for P&L on close
     spread_blocked = {}  # nrm(symbol) -> retry_ts: Auto-Pilot avoids symbols whose
@@ -347,6 +352,11 @@ def _loop(user_id, alert_fn, gen=None):
                 open_pos = _live
                 dash["symbol"] = symbol
                 dash["openPosition"] = open_pos
+                # Still open — re-persist it (don't clear!). If we wiped the
+                # snapshot here, a SECOND restart while this same position is
+                # still open would find nothing to compare against and we'd
+                # be back to the exact bug this is fixing.
+                _persist_open_snapshot({**open_pos, "symbol": symbol})
                 print(f"[UserLoop:{user_id}] restart recovery: adopted still-open {symbol} position")
             else:
                 # Gone — it closed at the broker while nothing was watching.
@@ -388,7 +398,7 @@ def _loop(user_id, alert_fn, gen=None):
                 if alert_fn:
                     alert_fn(user_id, result)
                 print(f"[UserLoop:{user_id}] restart recovery: journaled a close missed during the outage on {_snap['symbol']}")
-            _persist_open_snapshot(None)
+                _persist_open_snapshot(None)
 
     with _lock:
         if user_id in _loops:
@@ -1734,6 +1744,7 @@ def force_trade(user_id, side, symbol=None, lots=None):
     open_pos = {"side": side, "entryPrice": price, "symbol": sym,
                 "units": units, "stopLoss": sl_price, "takeProfit": tp_price,
                 "entrySpreadPips": spread, "openedAt": now_str}
+    _persist_open_position(user_id, cfg, open_pos)
 
     with _lock:
         loop_data = _loops.get(user_id, {})
@@ -1775,6 +1786,7 @@ def force_close(user_id):
         _close_res = broker.close_position(sym)
     except Exception as e:
         return {"ok": False, "error": str(e)}
+    _persist_open_position(user_id, cfg, None)
     # Prefer the broker's actual fill price over the last fetched candle —
     # the candle close is a stale proxy and can diverge from the real
     # execution price by real spread/slippage.
