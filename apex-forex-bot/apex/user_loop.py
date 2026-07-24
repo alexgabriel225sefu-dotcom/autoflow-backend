@@ -631,6 +631,16 @@ def _loop(user_id, alert_fn, gen=None):
                                 dash["symbol"] = symbol
                                 open_pos = p_
                                 candles = broker.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES) or candles
+                                # `price` must move with the symbol switch — it's
+                                # compared against THIS position's stop/entry a few
+                                # lines down (protective-stop check). Left stale
+                                # from the old symbol, a mismatched price always
+                                # reads as "breached", forcing a close whose P&L is
+                                # computed from a price that belongs to a different
+                                # pair entirely (this produced a six-figure phantom
+                                # netPnl that also corrupted the daily-loss tracker).
+                                if candles:
+                                    price = candles[-1]["close"]
                                 break
                 except Exception as e:
                     data_fails += 1
