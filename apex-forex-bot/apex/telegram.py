@@ -2582,20 +2582,19 @@ def _poll_loop():
                             "• Start on a <b>demo account</b> first to test risk-free\n\n"
                             "Ready? Follow these steps 👇")
                     broker_rows = _broker_signup_rows()
-                    step1_kb = []
-                    if broker_rows:
-                        step1_kb.extend(broker_rows)
-                    step1_kb.append([{"text": "🔗 Connect cTrader account", "callback_data": "go:connect"}])
                     send_to(chat_id,
                             "📌 <b>Step 1 — Create a broker account</b>\n\n"
                             "You need a cTrader account with a supported broker. "
                             "If you don't have one yet, create a free demo account "
                             "below (takes 2 minutes).\n\n"
                             "Supported brokers: IC Markets, Pepperstone, FxPro, "
-                            "RoboForex, and any broker that offers cTrader.\n\n"
+                            "RoboForex, and any broker that offers cTrader.",
+                            extra={"reply_markup": {"inline_keyboard": broker_rows}} if broker_rows else None)
+                    send_to(chat_id,
                             "📌 <b>Step 2 — Connect your account</b>\n\n"
                             "Once you have an account, tap the button below to link it.",
-                            extra={"reply_markup": {"inline_keyboard": step1_kb}})
+                            extra={"reply_markup": {"inline_keyboard": [[
+                                {"text": "🔗 Connect cTrader account", "callback_data": "go:connect"}]]}})
                     gurl = _guide_url()
                     tips_kb = []
                     if gurl:
