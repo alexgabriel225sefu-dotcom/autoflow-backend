@@ -67,3 +67,21 @@ def session(hour=None):
                 "note": "Asian session — quiet, majors barely move. London opens 07:00 UTC."}
     return {"label": "Between sessions", "vol": "very low", "active": active,
             "note": "Market is quiet between sessions."}
+
+
+def is_weekend_close_window(dt=None):
+    """True from Friday evening through Sunday's reopen. The cTrader CFD feed
+    (both forex AND crypto here — crypto runs 24/5 on this broker, not 24/7)
+    goes quiet over the weekend, and a position held through that gap can
+    reopen Sunday far from where it closed Friday, past any stop-loss. A 1h
+    buffer on each side absorbs broker-to-broker variance in the exact close/
+    reopen time (~21:00-22:00 UTC)."""
+    dt = dt or datetime.now(timezone.utc)
+    wd, h = dt.weekday(), dt.hour  # Monday=0 ... Sunday=6
+    if wd == 4 and h >= 20:   # Friday from 20:00 UTC
+        return True
+    if wd == 5:               # all Saturday
+        return True
+    if wd == 6 and h < 21:    # Sunday until reopen
+        return True
+    return False

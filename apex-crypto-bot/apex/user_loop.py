@@ -865,6 +865,58 @@ def _loop(user_id, alert_fn, gen=None):
                 if mp.get("notable"):
                     last_mkt_tick = tick
 
+            # Weekend gap protection: this CFD feed goes quiet Fri evening to
+            # Sun evening (crypto included — it's 24/5 here, not 24/7). A
+            # position ridden into the gap can reopen Sunday far past its own
+            # stop-loss, so force-close before the close and stand aside
+            # (the unconditional `continue` below also blocks new entries)
+            # until the market is back.
+            if market.is_weekend_close_window():
+                if open_pos:
+                    _close_res = None
+                    if not cfg.PAPER_TRADING:
+                        try:
+                            _close_res = broker.close_position(symbol)
+                        except Exception:
+                            pass
+                    exit_price = (_close_res or {}).get("fillPrice") or price
+                    units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
+                    gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
+                                          exit_price, units_, symbol)
+                    pv = forex.pip_value_per_unit(symbol, exit_price)
+                    cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                    net = gross - cost_usd
+                    if cfg.PAPER_TRADING:
+                        paper_balance += net
+                    if net < 0:
+                        last_loss_at = time.time()
+                        loss_streak += 1
+                    else:
+                        loss_streak = 0
+                    result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
+                              "entryPrice": open_pos.get("entryPrice"),
+                              "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
+                              "netPnl": round(net, 2), "balance": round(paper_balance, 2),
+                              "openedAt": open_pos.get("openedAt"), "time": now_str,
+                              "reasoning": "Closed before the weekend — avoiding gap risk over Sat/Sun."}
+                    _log_trade(user_id, result)
+                    if cfg.PAPER_TRADING:
+                        user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
+                    last_close_at = time.time()
+                    _persist_risk_state()
+                    strategies.record_trade(net > 0, net,
+                                            dash.get("startBalance") or paper_balance,
+                                            user_id=user_id, symbol=symbol)
+                    open_pos = None
+                    dash["openPosition"] = None
+                    dash["balance"] = paper_balance
+                    dash["trades"].insert(0, result)
+                    dash["trades"] = dash["trades"][:50]
+                    if alert_fn:
+                        alert_fn(user_id, result)
+                time.sleep(_LOOP_INTERVAL)
+                continue
+
             # Check risk limits (per-user, from the Strategy Builder)
             # user_id makes the circuit breakers PER-USER. Without it every
             # client shared one global session: user A's peak balance made
