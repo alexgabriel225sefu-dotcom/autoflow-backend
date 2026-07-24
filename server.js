@@ -3133,9 +3133,36 @@ app.post('/api/agent/run', auth, async (req, res) => {
 app.get('/api/agent/status', auth, (req, res) => res.json({
   groq_configured: !!process.env.GROQ_API_KEY,
   telegram_configured: !!(process.env.MARKETING_TELEGRAM_BOT_TOKEN && process.env.MARKETING_TELEGRAM_CHAT_ID),
+  telegram_webhook_secret_set: !!process.env.TELEGRAM_WEBHOOK_SECRET,
   email_recipients: (process.env.AGENT_EMAIL_RECIPIENTS || '').split(',').map(s => s.trim()).filter(Boolean).length,
   interval_hours: Number(process.env.AGENT_INTERVAL_HOURS) || 24,
 }));
+
+// POST /api/agent/telegram-webhook — Telegram delivers incoming DMs here.
+// One-time setup after deploy (run once from your own machine, replacing
+// the placeholders — never paste real tokens into chat/AI tools):
+//   curl -F "url=https://<your-render-url>/api/agent/telegram-webhook" \
+//        -F "secret_token=<TELEGRAM_WEBHOOK_SECRET>" \
+//        https://api.telegram.org/bot<MARKETING_TELEGRAM_BOT_TOKEN>/setWebhook
+// TELEGRAM_WEBHOOK_SECRET is optional but recommended — Telegram echoes it
+// back in a header on every callback so randoms can't spam this endpoint.
+app.post('/api/agent/telegram-webhook', (req, res) => {
+  res.sendStatus(200); // ack immediately — Telegram expects a fast response
+  (async () => {
+    try {
+      const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+      if (expectedSecret && req.headers['x-telegram-bot-api-secret-token'] !== expectedSecret) return;
+      const msg = req.body?.message;
+      const text = msg?.text;
+      const chatId = msg?.chat?.id;
+      if (!text || !chatId) return;
+      const reply = await marketingAgent.answerChatMessage(chatId, text);
+      await marketingAgent.sendTelegramMessage(chatId, reply);
+    } catch (e) {
+      console.error('[TelegramWebhook] error:', e.message);
+    }
+  })();
+});
 
 // ════════════════════════════════════════
 // CATCH-ALL 404  (must be after ALL routes)

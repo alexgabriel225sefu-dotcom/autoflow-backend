@@ -68,18 +68,59 @@ async function generatePromoPost({ channel = 'telegram', highlight = '' } = {}) 
   return groqChat(messages, { temperature: 0.9, max_tokens: 300 });
 }
 
-async function sendTelegramBroadcast(text) {
-  if (!MARKETING_TELEGRAM_BOT_TOKEN || !MARKETING_TELEGRAM_CHAT_ID) {
-    return { ok: false, skipped: true, error: 'MARKETING_TELEGRAM_BOT_TOKEN / MARKETING_TELEGRAM_CHAT_ID not set' };
+// Low-level send to any chat (used both for the broadcast and for replying
+// to whoever DMs the bot).
+async function sendTelegramMessage(chatId, text) {
+  if (!MARKETING_TELEGRAM_BOT_TOKEN) {
+    return { ok: false, skipped: true, error: 'MARKETING_TELEGRAM_BOT_TOKEN not set' };
   }
   const res = await fetch(`https://api.telegram.org/bot${MARKETING_TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: MARKETING_TELEGRAM_CHAT_ID, text }),
+    body: JSON.stringify({ chat_id: chatId, text }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.ok) return { ok: false, error: data.description || `HTTP ${res.status}` };
   return { ok: true, message_id: data.result?.message_id };
+}
+
+async function sendTelegramBroadcast(text) {
+  if (!MARKETING_TELEGRAM_CHAT_ID) {
+    return { ok: false, skipped: true, error: 'MARKETING_TELEGRAM_CHAT_ID not set' };
+  }
+  return sendTelegramMessage(MARKETING_TELEGRAM_CHAT_ID, text);
+}
+
+// ── Conversational side: replies to whoever DMs the bot ─────
+// Tiny in-memory per-chat history (resets on restart — fine for a v1;
+// swap for a DB table later if longer memory is needed).
+const CHAT_HISTORY = new Map();
+const MAX_HISTORY_TURNS = 6;
+
+async function answerChatMessage(chatId, userText) {
+  const history = CHAT_HISTORY.get(chatId) || [];
+  const messages = [
+    {
+      role: 'system',
+      content:
+        'Esti asistentul conversational al Apex, un bot automat de trading (forex ' +
+        'prin cTrader, crypto prin Binance). Raspunzi in romana, prietenos, clar si ' +
+        'concis (sub 100 cuvinte de obicei). Ajuti oamenii sa inteleaga produsul si ' +
+        'sa porneasca. Nu promiti niciodata castiguri garantate — mentionezi ca ' +
+        'tradingul implica risc atunci cand e relevant. Daca nu esti sigur de un ' +
+        'raspuns tehnic exact (preturi, integrari), spui sincer ca nu esti sigur si ' +
+        'recomanzi sa astepte un raspuns de la echipa.' +
+        `\n\nDescriere produs:\n${PRODUCT_BRIEF}`,
+    },
+    ...history,
+    { role: 'user', content: userText },
+  ];
+  const reply = await groqChat(messages, { temperature: 0.7, max_tokens: 350 });
+
+  const updated = [...history, { role: 'user', content: userText }, { role: 'assistant', content: reply }];
+  CHAT_HISTORY.set(chatId, updated.slice(-MAX_HISTORY_TURNS * 2));
+
+  return reply;
 }
 
 // One full agent cycle: write -> send on every configured channel -> report.
@@ -136,4 +177,11 @@ function startScheduler({ intervalHours = 24, ...cycleOpts } = {}) {
   return { stop: () => { clearTimeout(bootTimer); clearInterval(interval); } };
 }
 
-module.exports = { runMarketingCycle, generatePromoPost, sendTelegramBroadcast, startScheduler };
+module.exports = {
+  runMarketingCycle,
+  generatePromoPost,
+  sendTelegramBroadcast,
+  sendTelegramMessage,
+  answerChatMessage,
+  startScheduler,
+};
