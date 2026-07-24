@@ -202,3 +202,31 @@ def upcoming(currencies=None, hours=24, limit=8):
         return out[:limit]
     except Exception:
         return []
+
+
+def today(currencies=None, limit=12):
+    """High-impact events for TODAY (UTC) — both already-released and still
+    upcoming, in chronological order. `mins` is negative for a released event
+    (minutes ago) and positive for one still to come (for the Mini App's
+    'today's news' view — a same-day recap, not just what's coming up).
+    Fail-open like every other lookup here."""
+    try:
+        now = datetime.now(timezone.utc)
+        today_str = now.date().isoformat()
+        curset = {str(c).upper() for c in currencies} if currencies else None
+        out = []
+        for e in _load():
+            if not _impact_high(e.get("impact")):
+                continue
+            if curset and e.get("currency") not in curset:
+                continue
+            t = _parse_time(e.get("time"))
+            if not t or t.date().isoformat() != today_str:
+                continue
+            mins = int((t - now).total_seconds() / 60.0)
+            out.append({"title": e["title"], "currency": e["currency"],
+                        "mins": mins, "released": mins <= 0, "time": e["time"]})
+        out.sort(key=lambda x: x["mins"])
+        return out[:limit]
+    except Exception:
+        return []

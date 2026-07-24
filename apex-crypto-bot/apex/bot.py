@@ -368,6 +368,7 @@ def _start_dashboard_server():
                                 pass
                     equity_live = round(float(balance_live or 0) + floating, 2)
                     events = news_mod.upcoming(hours=24) or []
+                    news_today = news_mod.today() or []
                     journal = user_store.load_trades(chat_id)
                     st = stats_mod.compute(journal, udash.get("skipsToday", 0))
                     body = json.dumps({
@@ -387,6 +388,7 @@ def _start_dashboard_server():
                                   for k, v in st.items() if k != "equity"},
                         "equity": st.get("equity") or [],
                         "events": events,
+                        "newsToday": news_today,
                         "candles": [{"time": c["time"], "open": c["open"], "high": c["high"],
                                      "low": c["low"], "close": c["close"]} for c in candles],
                     }).encode()
