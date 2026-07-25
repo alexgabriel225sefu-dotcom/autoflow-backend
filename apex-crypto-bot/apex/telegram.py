@@ -1985,8 +1985,14 @@ def _trade_sym_kb(side):
     return rows
 
 
+def _size_word(n, label):
+    """Pluralize a size label — 'oz' doesn't take a trailing 's'."""
+    return label if label == "oz" else label + ("s" if n != 1 else "")
+
+
 def _trade_lots_kb(side, sym):
-    """Lot size picker buttons after symbol is chosen."""
+    """Size picker buttons after symbol is chosen — coins for crypto, so plain
+    numbers already read fine, but the confirmation text below spells it out."""
     rows = []
     for i in range(0, len(_LOT_SIZES_CRYPTO), 3):
         row = [{"text": f"{l}", "callback_data": f"tr:{side}:{sym}:{l}"}
@@ -1997,7 +2003,7 @@ def _trade_lots_kb(side, sym):
 
 
 def _exec_trade(chat_id, side, sym, lots):
-    lots_lbl = f" ({lots} lots)" if lots else ""
+    lots_lbl = f" ({lots} {_size_word(lots, forex.unit_label(sym))})" if lots else ""
     send_to(chat_id, f"⚡ Opening <b>{side} {sym}</b>{lots_lbl}…")
     result = user_loop.force_trade(str(chat_id), side, sym, lots=lots)
     if result.get("ok"):

@@ -1278,7 +1278,7 @@ def _handle_cb(chat_id, data):
         parts = data.split(":")
         if len(parts) == 3:
             _, side, sym = parts
-            send_to(chat_id, f"📊 <b>{side} {sym}</b> — choose lot size:",
+            send_to(chat_id, f"📊 <b>{side} {sym}</b> — choose size ({forex.unit_label(sym)}):",
                     extra={"reply_markup": {"inline_keyboard": _trade_lots_kb(side, sym)}})
         elif len(parts) == 4:
             _, side, sym, lot_str = parts
@@ -2001,11 +2001,18 @@ def _trade_sym_kb(side):
     return rows
 
 
+def _size_word(n, label):
+    """Pluralize a size label — 'oz' doesn't take a trailing 's'."""
+    return label if label == "oz" else label + ("s" if n != 1 else "")
+
+
 def _trade_lots_kb(side, sym):
-    """Lot size picker buttons after symbol is chosen."""
+    """Size picker buttons after symbol is chosen — 'lot' for FX, 'oz' for
+    metals, 'unit' for anything else (crypto/indices), per forex.unit_label."""
+    label = forex.unit_label(sym)
     rows = []
     for i in range(0, len(_LOT_SIZES_FX), 3):
-        row = [{"text": f"{l} lot{'s' if l != 1 else ''}", "callback_data": f"tr:{side}:{sym}:{l}"}
+        row = [{"text": f"{l} {_size_word(l, label)}", "callback_data": f"tr:{side}:{sym}:{l}"}
                for l in _LOT_SIZES_FX[i:i+3]]
         rows.append(row)
     rows.append([{"text": "🤖 Auto (risk-based)", "callback_data": f"tr:{side}:{sym}:auto"}])
@@ -2013,7 +2020,7 @@ def _trade_lots_kb(side, sym):
 
 
 def _exec_trade(chat_id, side, sym, lots):
-    lots_lbl = f" ({lots} lots)" if lots else ""
+    lots_lbl = f" ({lots} {_size_word(lots, forex.unit_label(sym))})" if lots else ""
     send_to(chat_id, f"⚡ Opening <b>{side} {sym}</b>{lots_lbl}…")
     result = user_loop.force_trade(str(chat_id), side, sym, lots=lots)
     if result.get("ok"):
@@ -2031,7 +2038,7 @@ def _handle_buy(chat_id, args):
     if sym and lots is not None:
         return _exec_trade(chat_id, "BUY", sym, lots)
     if sym:
-        return send_to(chat_id, f"📊 <b>BUY {sym}</b> — choose lot size:",
+        return send_to(chat_id, f"📊 <b>BUY {sym}</b> — choose size ({forex.unit_label(sym)}):",
                         extra={"reply_markup": {"inline_keyboard": _trade_lots_kb("BUY", sym)}})
     return send_to(chat_id, "📊 <b>BUY</b> — choose a pair:",
                     extra={"reply_markup": {"inline_keyboard": _trade_sym_kb("BUY")}})
@@ -2042,7 +2049,7 @@ def _handle_sell(chat_id, args):
     if sym and lots is not None:
         return _exec_trade(chat_id, "SELL", sym, lots)
     if sym:
-        return send_to(chat_id, f"📊 <b>SELL {sym}</b> — choose lot size:",
+        return send_to(chat_id, f"📊 <b>SELL {sym}</b> — choose size ({forex.unit_label(sym)}):",
                         extra={"reply_markup": {"inline_keyboard": _trade_lots_kb("SELL", sym)}})
     return send_to(chat_id, "📊 <b>SELL</b> — choose a pair:",
                     extra={"reply_markup": {"inline_keyboard": _trade_sym_kb("SELL")}})

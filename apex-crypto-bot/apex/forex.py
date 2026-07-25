@@ -260,5 +260,18 @@ def lots_to_units(lots: float, instrument: str) -> float:
     return lots
 
 
+def unit_label(instrument: str) -> str:
+    """Human label for a manual-trade size, matching what lots_to_units actually
+    does: 'lot' for FX (100,000 units each), 'oz' for metals, 'unit' for
+    everything else (crypto coins, index contracts) — those pass straight
+    through as raw quantities, not classic 100-unit-style lots."""
+    s = _norm(instrument)
+    if _is_fx(s) or s.endswith("JPY"):
+        return "lot"
+    if s[:3] in _METALS:
+        return "oz"
+    return "unit"
+
+
 def spread_pips(bid: float, ask: float, instrument: str) -> float:
     return to_pips(ask - bid, instrument, bid)
