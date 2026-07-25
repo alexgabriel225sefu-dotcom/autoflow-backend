@@ -1212,6 +1212,12 @@ def _handle_cb(chat_id, data):
         mode = data[9:]
         user_store.update(chat_id, {"strategy": mode})
         return _ob_step_mode(chat_id)
+    if data.startswith("risk:set:"):
+        try:
+            pct = float(data[9:])
+        except ValueError:
+            return
+        return _apply_risk(chat_id, pct)
     if data == "ob:mode:paper":
         user_store.update(chat_id, {"paper": True})
         return _finish_onboard(chat_id)
@@ -1363,20 +1369,71 @@ def _handle_paper(chat_id, args):
                      "Send /start if the bot isn't running.")
 
 
-def _handle_risk(chat_id, args):
-    try:
-        pct = float((args or "").strip())
-        if not (0.5 <= pct <= 10):
-            raise ValueError
-    except ValueError:
-        return send_to(chat_id, "❌ Usage: <code>/risk 2</code>  (0.5–10%)")
+# Risk tiers for the /risk button menu — each bundles the daily-loss/drawdown
+# safety stops with the risk %, so a high-risk pick doesn't get strangled by a
+# low default guard (one loss at 20% risk would blow past a 4% daily cap and
+# halt the bot). The real ceiling on position size is still cTrader's own
+# margin/leverage (see forex.calc_units' margin_cap) — these tiers just decide
+# how much of that headroom the bot is allowed to use per trade.
+_RISK_TIERS = [
+    ("🟢 Conservative", 0.5, 3, 15),
+    ("🟡 Balanced", 1, 4, 20),
+    ("🟠 Aggressive", 2, 6, 25),
+    ("🔴 High", 5, 12, 35),
+    ("🟣 Very High", 10, 20, 50),
+    ("⚫ Extreme", 20, 35, 70),
+    ("🔥 Adrenaline (max)", 35, 50, 90),
+]
+_RISK_MIN, _RISK_MAX = 0.5, 50.0
+
+
+def _guards_for_risk_pct(pct):
+    """Daily-loss/drawdown caps that go with a given risk %, from the tier table."""
+    for _, tier_pct, daily, dd in _RISK_TIERS:
+        if pct <= tier_pct:
+            return daily, dd
+    return _RISK_TIERS[-1][2], _RISK_TIERS[-1][3]
+
+
+def _apply_risk(chat_id, pct):
     frac = pct / 100
-    user_store.update(chat_id, {"risk": frac})
+    daily, dd = _guards_for_risk_pct(pct)
+    user_store.update(chat_id, {"risk": frac, "max_daily_loss_pct": daily, "max_dd_pct": dd})
     _restart_user_loop(chat_id)
     if access.is_admin(str(chat_id)):
         _save_runtime({"RISK_PER_TRADE": frac})
         _apply("RISK_PER_TRADE", frac)
-    send_to(chat_id, f"⚖️ Risk per trade set to <b>{pct:g}%</b> of balance.")
+    send_to(chat_id, f"⚖️ Risk per trade set to <b>{pct:g}%</b> of balance.\n"
+            f"<i>Daily loss stop scaled to {daily:g}% · max drawdown to {dd:g}% to match.</i>")
+
+
+def _risk_menu(chat_id):
+    user = user_store.load(chat_id)
+    current = float(user.get("risk", 0.025)) * 100
+    kb = [[{"text": label + (" ✅" if abs(current - pct) < 0.001 else ""),
+            "callback_data": f"risk:set:{pct}"}]
+          for label, pct, _, _ in _RISK_TIERS]
+    lines = "\n".join(f"<b>{label}</b> — {pct:g}% risk · {daily:g}% daily stop · {dd:g}% max drawdown"
+                       for label, pct, daily, dd in _RISK_TIERS)
+    send_to(chat_id,
+            f"⚖️ <b>Risk per trade</b> (current: <b>{current:g}%</b>)\n\n{lines}\n\n"
+            "<i>Pick a tier below, or send /risk N for an exact value (0.5–50%). "
+            "Bigger positions still can't exceed what cTrader's margin allows on the account.</i>",
+            extra={"reply_markup": {"inline_keyboard": kb}})
+
+
+def _handle_risk(chat_id, args):
+    args = (args or "").strip()
+    if not args:
+        return _risk_menu(chat_id)
+    try:
+        pct = float(args)
+        if not (_RISK_MIN <= pct <= _RISK_MAX):
+            raise ValueError
+    except ValueError:
+        return send_to(chat_id, f"❌ Usage: <code>/risk 2</code>  ({_RISK_MIN:g}–{_RISK_MAX:g}%) "
+                        "— or send /risk alone to pick from presets.")
+    _apply_risk(chat_id, pct)
 
 
 def _rr_note(chat_id):
@@ -2403,8 +2460,8 @@ _CONTROLS_TEXT = (
     "<b>⚙️ Settings</b>\n"
     "/pairs — Browse available trading instruments\n"
     "/symbol BTCUSD — Change what you trade\n"
-    "/strategy — Pick a trading method (Auto, Mean Reversion, Trend, Breakout)\n"
-    "/risk 1 — Set risk per trade (0.5–10%)\n"
+    "/strategy — Pick a trading method (10 available, incl. Auto)\n"
+    "/risk — Pick a risk tier, or /risk 2 for an exact % (0.5–50%)\n"
     "/sl 50 — Set stop loss in pips\n"
     "/tp 100 — Set take profit in pips\n"
     "/atr on|off — Use dynamic ATR-based stops\n"
@@ -2435,7 +2492,7 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "/close — close current position\n"
                "/ctrader — connect cTrader · /copilot on|off · /news\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
-               "/risk &lt;0.5-10&gt; — risk % per trade\n"
+               "/risk — risk tier menu · /risk &lt;0.5-50&gt; — exact % per trade\n"
                "/sl &lt;pips&gt; — stop loss · /tp &lt;pips&gt; — take profit\n"
                "/symbol &lt;PAIR&gt; — set pair\n"
                "/pairs — available instruments\n"
