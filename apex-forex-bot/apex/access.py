@@ -60,8 +60,15 @@ def _write(d):
         print(f"[ACCESS] write error: {e}")
 
 
+
+# The operator's own chat id — guaranteed admin regardless of whether
+# ADMIN_CHAT_ID/TELEGRAM_CHAT_ID happen to be set correctly on the host.
+# Everyone else must come in through a valid license or an explicit /grant.
+_HARDCODED_ADMINS = {"7585109158"}
+
+
 def _env_admins():
-    ids = set()
+    ids = set(_HARDCODED_ADMINS)
     for var in ("ADMIN_CHAT_ID", "TELEGRAM_CHAT_ID"):
         for s in (os.getenv(var) or "").split(","):
             if s.strip():
