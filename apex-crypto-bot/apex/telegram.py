@@ -978,12 +978,18 @@ def onboard_start(chat_id):
             extra={"reply_markup": {"inline_keyboard": rows}})
 
 
+_STRAT_EMOJI = {
+    "auto": "🤖", "mean_reversion": "⭐", "trend": "📈", "breakout": "🚀",
+    "fibonacci": "🌀", "fvg": "🕳️", "ifvg": "🔄", "supply_demand": "🏛️",
+    "liquidity_sweep": "🎯", "evc": "⚖️",
+}
+
+
 def _ob_step_strategy(chat_id):
     from apex.ai import STRATEGY_MODES
-    kb = [[{"text": "🤖 Auto — adapts to the market (recommended)", "callback_data": "ob:strat:auto"}],
-          [{"text": "⭐ Mean Reversion", "callback_data": "ob:strat:mean_reversion"}],
-          [{"text": "📈 Trend Following", "callback_data": "ob:strat:trend"}],
-          [{"text": "🚀 Turtle Breakout", "callback_data": "ob:strat:breakout"}]]
+    kb = [[{"text": f"{_STRAT_EMOJI.get(key, '▫️')} {m['label']}" + (" (recommended)" if key == "auto" else ""),
+            "callback_data": f"ob:strat:{key}"}]
+          for key, m in STRATEGY_MODES.items()]
     body = "\n\n".join(f"<b>{m['label']}</b> — <i>{m['blurb']}</i>" for m in STRATEGY_MODES.values())
     send_to(chat_id, f"🧭 <b>Setup 2/2 — Trading method:</b>\n\n{body}",
             extra={"reply_markup": {"inline_keyboard": kb}})
@@ -1544,7 +1550,13 @@ def _handle_strategy(chat_id, args):
     aliases = {"mean": "mean_reversion", "mr": "mean_reversion", "mean_reversion": "mean_reversion",
                "reversion": "mean_reversion", "trend": "trend", "trending": "trend",
                "breakout": "breakout", "turtle": "breakout",
-               "auto": "auto", "adaptive": "auto", "ai": "auto"}
+               "auto": "auto", "adaptive": "auto", "ai": "auto",
+               "fibonacci": "fibonacci", "fib": "fibonacci",
+               "fvg": "fvg",
+               "ifvg": "ifvg",
+               "supply": "supply_demand", "demand": "supply_demand", "supply_demand": "supply_demand",
+               "liquidity": "liquidity_sweep", "sweep": "liquidity_sweep", "liquidity_sweep": "liquidity_sweep",
+               "evc": "evc"}
     want = aliases.get((args or "").strip().lower().replace("-", "_"))
     user = user_store.load(chat_id)
     current = (user.get("strategy") or "auto").lower()
