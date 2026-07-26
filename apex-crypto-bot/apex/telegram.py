@@ -2085,7 +2085,11 @@ def _handle_grant(chat_id, args):
         return send_to(chat_id, "❌ Usage: <code>/grant 123456789</code>")
     if access.grant(target):
         send_to(chat_id, f"✅ Access granted to <code>{target}</code>.")
-        send_to(target, f"✅ <b>You now have access to {cfg.BOT_NAME}!</b>\nSend /status to check trading.")
+        send_to(target, f"✅ <b>You now have access to {cfg.BOT_NAME}!</b>\n"
+                "The admin just gave you access. Tap below to connect your cTrader "
+                "account and get set up.",
+                extra={"reply_markup": {"inline_keyboard": [[
+                    {"text": "🔗 Connect my cTrader account", "callback_data": "go:connect"}]]}})
     else:
         send_to(chat_id, f"ℹ️ <code>{target}</code> already has access.")
 
