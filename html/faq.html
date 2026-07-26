@@ -51,9 +51,10 @@ body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoo
 .page-header h1{font:700 clamp(28px,4.5vw,44px)/1.1 var(--d);letter-spacing:-.04em;color:#fff;margin-bottom:14px}
 .page-header p{font:400 16px/1.6 var(--f);color:var(--t1);max-width:500px;margin:0 auto}
 
-.faq-section{max-width:720px;margin:0 auto;padding:0 24px 80px;position:relative;z-index:1}
+.faq-section{max-width:720px;margin:0 auto 80px;padding:8px 32px;position:relative;z-index:1;background:rgba(12,12,15,.55);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:1.5rem}
 .faq-radio{display:none}
 .faq-item{border-bottom:1px solid var(--border)}
+.faq-item:last-child{border-bottom:none}
 .faq-question{display:flex;align-items:center;justify-content:space-between;padding:22px 0;cursor:pointer;font:500 clamp(15px,2vw,17px)/1.4 var(--f);color:var(--t0);transition:color .25s;-webkit-tap-highlight-color:transparent;user-select:none}
 .faq-question:hover{color:#fff}
 .faq-question::after{content:'+';font:300 24px/1 var(--f);color:var(--t2);flex-shrink:0;margin-left:16px;transition:transform .35s var(--ease),color .25s}
