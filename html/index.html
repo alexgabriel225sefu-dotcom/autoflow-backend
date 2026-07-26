@@ -93,7 +93,7 @@ a{color:inherit;text-decoration:none}
 .map-shell{position:relative;border-radius:1.5rem;padding:1.5px;background:var(--border)}
 .map-shell::before{content:'';position:absolute;inset:-1px;border-radius:inherit;background:conic-gradient(from 0deg,transparent 0%,rgba(230,57,70,.3) 12%,transparent 24%,transparent 50%,rgba(230,57,70,.2) 62%,transparent 74%,transparent 100%);opacity:0;z-index:0;transition:opacity .6s cubic-bezier(.32,.72,0,1)}
 .map-shell:hover::before{opacity:1}
-.map-core{position:relative;z-index:1;border-radius:calc(1.5rem - 1.5px);background:rgba(22,22,25,.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);overflow:hidden}
+.map-core{position:relative;z-index:1;border-radius:calc(1.5rem - 1.5px);background:rgba(255,255,255,.05);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);border:1px solid rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);overflow:hidden}
 .map-core::before{content:'';position:absolute;inset:0;z-index:0;background:radial-gradient(ellipse 30% 50% at 28% 30%,rgba(230,57,70,.06),transparent),radial-gradient(ellipse 25% 40% at 88% 65%,rgba(230,57,70,.04),transparent),radial-gradient(ellipse 50% 60% at 50% 40%,rgba(255,255,255,.015),transparent);pointer-events:none}
 .map-core::after{content:'';position:absolute;inset:0;z-index:3;background:radial-gradient(ellipse 75% 70% at 50% 50%,transparent 50%,rgba(9,9,11,.6));pointer-events:none}
 .map-inner{position:relative;z-index:1;padding:40px 36px 28px}

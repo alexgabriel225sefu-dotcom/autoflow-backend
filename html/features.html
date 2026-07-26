@@ -78,7 +78,7 @@ body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoo
 .gi{position:relative;border-radius:1.5rem;padding:2px;background:var(--border2);-webkit-tap-highlight-color:transparent}
 .gi::before{content:'';position:absolute;inset:-1px;border-radius:inherit;background:conic-gradient(from 0deg,transparent 0%,rgba(230,57,70,.4) 20%,transparent 40%,transparent 60%,rgba(155,29,234,.3) 80%,transparent 100%);opacity:0;z-index:0;transition:opacity .4s}
 .gi:hover::before{opacity:1}
-.gi-inner{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:space-between;gap:24px;height:100%;border-radius:calc(1.5rem - 2px);background:rgba(12,12,15,.55);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding:24px;overflow:hidden}
+.gi-inner{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:space-between;gap:24px;height:100%;border-radius:calc(1.5rem - 2px);background:rgba(255,255,255,.055);backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);border:1px solid rgba(255,255,255,.1);box-shadow:0 8px 32px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.09);padding:24px;overflow:hidden}
 .gi-icon{width:40px;height:40px;border-radius:10px;border:.75px solid var(--border2);background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center}
 .gi-icon svg{width:18px;height:18px;stroke:var(--t1);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .gi-content{display:flex;flex-direction:column;gap:12px}
