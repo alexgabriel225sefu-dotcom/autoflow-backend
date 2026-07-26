@@ -1224,6 +1224,18 @@ def _handle_cb(chat_id, data):
         except ValueError:
             return
         return _apply_risk(chat_id, pct)
+    if data == "reset:yes":
+        try:
+            user_loop.stop(chat_id)
+        except Exception:
+            pass
+        user_store.save(chat_id, {})
+        return send_to(chat_id,
+            "✅ <b>Reset complete.</b>\n\n"
+            "Your cTrader connection and all bot settings have been cleared. "
+            "Send /start whenever you're ready to connect an account and set up again.")
+    if data == "reset:no":
+        return send_to(chat_id, "Cancelled — nothing changed.")
     if data == "ob:mode:paper":
         user_store.update(chat_id, {"paper": True})
         return _finish_onboard(chat_id)
@@ -2423,6 +2435,22 @@ def _handle_stop(chat_id):
         _dashboard_keyboard(chat_id))
 
 
+def _handle_reset(chat_id):
+    """Client self-service full reset: disconnects cTrader and wipes every bot
+    setting back to defaults. Does NOT touch bot access —/grant'd or licensed
+    users stay allowed, they just start the setup over from scratch."""
+    send_to(chat_id,
+        "⚠️ <b>Full reset — are you sure?</b>\n\n"
+        "This disconnects your cTrader account from the bot and resets every "
+        "setting (strategy, risk, pairs, symbol — everything) back to default. "
+        "Your broker account itself is untouched — this only clears the bot's "
+        "link to it.\n\n"
+        "<i>This can't be undone.</i>",
+        extra={"reply_markup": {"inline_keyboard": [[
+            {"text": "⚠️ Yes, reset everything", "callback_data": "reset:yes"},
+            {"text": "Cancel", "callback_data": "reset:no"}]]}})
+
+
 def _handle_config(chat_id):
     keys = _BROKER_KEYS.get(cfg.BROKER, [])
     key_lines = "\n".join(
@@ -2504,6 +2532,8 @@ _CONTROLS_TEXT = (
     "<b>🔄 Demo ↔ Live</b>\n"
     "Start on a demo account. When you're confident, send /ctrader "
     "and connect your live broker account.\n\n"
+    "<b>♻️ Starting over</b>\n"
+    "/reset — Disconnect cTrader and wipe all settings back to default\n\n"
     "💬 <i>You can also talk to me in any language — just type your question.</i>")
 
 _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
@@ -2533,7 +2563,7 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "/stats — performance report\n"
                "/chart — quick chart snapshot\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
-               "/start — resume · /stop — pause\n"
+               "/start — resume · /stop — pause · /reset — wipe cTrader link + all settings\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "👑 <b>Admin</b>\n"
                "/grant &lt;id&gt; — give client access\n"
@@ -2811,6 +2841,8 @@ def _poll_loop():
                     # wizard (writes only their user record); admin extras apply
                     # globally inside _handle_wizard_reply.
                     _handle_setup(chat_id)
+                elif cmd_l == "/reset":
+                    _handle_reset(chat_id)
                 elif cmd_l == "/cancel":
                     with _lock:
                         _had = _wizards.pop(chat_id, None)
