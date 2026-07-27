@@ -55,6 +55,7 @@ try:
         ProtoOAReconcileReq, ProtoOAReconcileRes,
         ProtoOAClosePositionReq, ProtoOAErrorRes, ProtoOAOrderErrorEvent,
         ProtoOASymbolByIdReq, ProtoOASymbolByIdRes, ProtoOAAmendPositionSLTPReq,
+        ProtoOADealListReq, ProtoOADealListRes,
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
@@ -486,6 +487,47 @@ class CtraderBroker:
         # pins down whether the API sent it or we mis-scaled it.
         print(f"[cTrader] balance ctid={self._ctid()} raw={res.trader.balance} digits={money_digits} -> {bal:.2f}")
         return bal
+
+    def get_closed_deal_pnl(self, position_id, lookback_ms=None):
+        """Authoritative net P&L for a position that just closed at the broker
+        (SL/TP hit server-side), read straight from cTrader's own deal
+        history — the exact same number the client sees in the cTrader app's
+        History tab. Callers were estimating this from the account balance
+        delta between polling ticks, which silently mixes in any OTHER
+        position that also closed in the same window (multi-position mode)
+        and doesn't include swap — this is the real one. Never raises;
+        returns None so callers fall back to their own estimate.
+        """
+        if getattr(self._c, "PAPER_TRADING", True):
+            return None
+        try:
+            now_ms = int(time.time() * 1000)
+            req = ProtoOADealListReq()
+            req.ctidTraderAccountId = self._ctid()
+            req.toTimestamp = now_ms
+            req.fromTimestamp = now_ms - (lookback_ms or 20 * 60 * 1000)
+            req.maxRows = 50
+            res = self._rpc(req, ProtoOADealListRes)
+            for d in res.deal:
+                if d.positionId != int(position_id):
+                    continue
+                if not d.HasField("closePositionDetail"):
+                    continue  # this is the opening leg, not the close
+                cpd = d.closePositionDetail
+                money_digits = (getattr(cpd, "moneyDigits", 0)
+                                or getattr(d, "moneyDigits", 0) or 2)
+                scale = 10 ** money_digits
+                gross = cpd.grossProfit / scale
+                swap = cpd.swap / scale
+                commission = abs(cpd.commission) / scale
+                net = round(gross + swap - commission, 2)
+                print(f"[cTrader] closed-deal pnl positionId={position_id} "
+                      f"gross={gross:.2f} swap={swap:.2f} commission={commission:.2f} -> net={net:.2f}")
+                return {"netPnl": net, "grossPnl": round(gross, 2),
+                        "swap": round(swap, 2), "commissionUsd": round(commission, 2)}
+        except Exception as e:
+            print(f"[cTrader] get_closed_deal_pnl lookup failed: {e}")
+        return None
 
     # -- positions ------------------------------------------------------------
     def get_open_position(self, instrument=None):

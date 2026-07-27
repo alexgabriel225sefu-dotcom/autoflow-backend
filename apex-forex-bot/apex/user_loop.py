@@ -399,28 +399,45 @@ def _loop(user_id, alert_fn, gen=None):
                       f"keeping {symbol} tracked pending the next tick")
             else:
                 # Gone — it closed at the broker while nothing was watching.
-                # The real fill is unknowable now; price it against the next
-                # available quote so the client isn't left thinking it's
-                # still open, and the loss/win still counts toward risk state.
-                try:
-                    _c = broker.get_candles(_snap["symbol"], cfg.TIMEFRAME, 2)
-                    exit_price = _c[-1]["close"] if _c else None
-                except Exception:
+                # Ask the broker for the actual closed-deal record first (same
+                # number cTrader's own History tab shows); only fall back to
+                # pricing against the next quote if that lookup can't find it.
+                _deal = None
+                _pos_id = _snap.get("positionId")
+                if _pos_id:
+                    try:
+                        _deal = broker.get_closed_deal_pnl(_pos_id)
+                    except Exception as e:
+                        print(f"[UserLoop:{user_id}] closed-deal lookup failed: {e}")
+                if _deal is not None:
+                    net = _deal["netPnl"]
+                    gross_pnl = _deal["grossPnl"]
+                    cost_usd = _deal["commissionUsd"]
                     exit_price = None
-                units_ = _snap.get("units") or _snap.get("quantity", 0)
-                net = None
-                if exit_price and _snap.get("entryPrice") and units_:
-                    net = round(forex.pnl_usd(_snap.get("side", "BUY"), _snap["entryPrice"],
-                                              exit_price, units_, _snap["symbol"]), 2)
+                    reasoning = "closed at the broker during a restart — exact P&L from cTrader's deal history"
+                else:
+                    try:
+                        _c = broker.get_candles(_snap["symbol"], cfg.TIMEFRAME, 2)
+                        exit_price = _c[-1]["close"] if _c else None
+                    except Exception:
+                        exit_price = None
+                    units_ = _snap.get("units") or _snap.get("quantity", 0)
+                    net = None
+                    if exit_price and _snap.get("entryPrice") and units_:
+                        net = round(forex.pnl_usd(_snap.get("side", "BUY"), _snap["entryPrice"],
+                                                  exit_price, units_, _snap["symbol"]), 2)
+                    gross_pnl = net
+                    cost_usd = 0.0
+                    reasoning = ("closed at the broker during a restart — exact fill "
+                                 "unknown, priced against the next available quote")
                 result = {"action": "BROKER_CLOSE", "symbol": _snap["symbol"],
                           "side": _snap.get("side", ""), "price": exit_price,
                           "entryPrice": _snap.get("entryPrice"), "netPnl": net,
-                          "grossPnl": net, "costUsd": 0.0,
+                          "grossPnl": gross_pnl, "costUsd": cost_usd,
                           "balance": round(paper_balance, 2),
                           "openedAt": _snap.get("openedAt"),
                           "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                          "reasoning": "closed at the broker during a restart — exact fill "
-                                       "unknown, priced against the next available quote"}
+                          "reasoning": reasoning}
                 _log_trade(user_id, result)
                 dash["trades"].insert(0, result)
                 dash["trades"] = dash["trades"][:50]
@@ -529,7 +546,8 @@ def _loop(user_id, alert_fn, gen=None):
                     for p in all_positions:
                         pos_details[_nrm(p["symbol"])] = {
                             "symbol": p["symbol"], "side": p["side"],
-                            "entry": p.get("entryPrice"), "units": p.get("units", 0)}
+                            "entry": p.get("entryPrice"), "units": p.get("units", 0),
+                            "positionId": p.get("positionId")}
                 except Exception as e:
                     all_positions = None  # unknown → don't open blind this tick
                     print(f"[UserLoop:{user_id}] positions read: {e}")
@@ -546,21 +564,40 @@ def _loop(user_id, alert_fn, gen=None):
                     # reported as BTCUSD — corrupting P&L and the tax journal.
                     if not det or not det.get("entry"):
                         continue
+                    # Ask the broker for this position's actual closed-deal
+                    # P&L first — matches cTrader's History tab exactly, and
+                    # unlike the candle-close estimate below, includes the
+                    # real fill/commission/swap regardless of how many other
+                    # positions also closed in this same polling window.
+                    _deal = None
+                    if det.get("positionId"):
+                        try:
+                            _deal = broker.get_closed_deal_pnl(det["positionId"])
+                        except Exception as e:
+                            print(f"[UserLoop:{user_id}] closed-deal lookup failed: {e}")
                     est_pnl = None
                     xp = None
-                    try:
-                        if det.get("entry") and det.get("units"):
-                            xc = broker.get_candles(det["symbol"], cfg.TIMEFRAME, 2)
-                            xp = xc[-1]["close"] if xc else None
-                            if xp:
-                                est_pnl = round(forex.pnl_usd(det["side"], det["entry"], xp,
-                                                              det["units"], det["symbol"]), 2)
-                    except Exception:
-                        est_pnl = None
+                    gross_pnl = None
+                    cost_usd = 0.0
+                    if _deal is not None:
+                        est_pnl = _deal["netPnl"]
+                        gross_pnl = _deal["grossPnl"]
+                        cost_usd = _deal["commissionUsd"]
+                    else:
+                        try:
+                            if det.get("entry") and det.get("units"):
+                                xc = broker.get_candles(det["symbol"], cfg.TIMEFRAME, 2)
+                                xp = xc[-1]["close"] if xc else None
+                                if xp:
+                                    est_pnl = round(forex.pnl_usd(det["side"], det["entry"], xp,
+                                                                  det["units"], det["symbol"]), 2)
+                                    gross_pnl = est_pnl
+                        except Exception:
+                            est_pnl = None
                     now2 = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     rec = {"action": "CLOSE", "symbol": det.get("symbol", cs),
                            "entryPrice": det.get("entry"), "price": xp,
-                           "grossPnl": est_pnl, "costUsd": 0.0, "netPnl": est_pnl,
+                           "grossPnl": gross_pnl, "costUsd": cost_usd, "netPnl": est_pnl,
                            "balance": round(paper_balance, 2), "time": now2}
                     _log_trade(user_id, rec)
                     dash["trades"].insert(0, {**rec, "reasoning": "closed at broker (target/stop)"})
@@ -827,7 +864,27 @@ def _loop(user_id, alert_fn, gen=None):
                 # here made broker-side exits invisible in Telegram.
                 if prev_pos and not open_pos:
                     last_close_at = time.time()  # re-entry lock (churn guard)
-                    pnl_est = round(paper_balance - prev_balance, 2) if not dash.get("balStale") else None
+                    # Ask the broker for THIS position's actual closed-deal
+                    # P&L (matches cTrader's own History tab exactly) instead
+                    # of estimating from the account balance delta — the
+                    # delta silently mixes in any OTHER position that also
+                    # closed in the same polling window (multi-position mode)
+                    # and never included swap.
+                    _deal = None
+                    _pos_id = prev_pos.get("positionId")
+                    if _pos_id and not cfg.PAPER_TRADING:
+                        try:
+                            _deal = broker.get_closed_deal_pnl(_pos_id)
+                        except Exception as e:
+                            print(f"[UserLoop:{user_id}] closed-deal lookup failed: {e}")
+                    if _deal is not None:
+                        pnl_est = _deal["netPnl"]
+                        gross_pnl = _deal["grossPnl"]
+                        cost_usd = _deal["commissionUsd"]
+                    else:
+                        pnl_est = round(paper_balance - prev_balance, 2) if not dash.get("balStale") else None
+                        gross_pnl = pnl_est
+                        cost_usd = 0.0
                     if pnl_est is not None and pnl_est < 0:
                         last_loss_at = time.time()
                         loss_streak += 1
@@ -842,7 +899,7 @@ def _loop(user_id, alert_fn, gen=None):
                               "side": prev_pos.get("side", ""), "price": price,
                               "entryPrice": prev_pos.get("entryPrice"),
                               "netPnl": pnl_est, "balance": round(paper_balance, 2),
-                              "grossPnl": pnl_est, "costUsd": 0.0,
+                              "grossPnl": gross_pnl, "costUsd": cost_usd,
                               "openedAt": prev_pos.get("openedAt"), "time": now_str}
                     _log_trade(user_id, result)
                     dash["trades"].insert(0, result)
