@@ -1,9 +1,13 @@
 """Strategy Builder — a guided setup assistant.
 
-The client composes a strategy from realistic building blocks (style → setup →
+The client composes a strategy from realistic building blocks (style →
 confirmation → risk → exit). Every choice maps to a REAL engine parameter that
 changes how the bot trades — nothing here is decorative. One-tap presets bundle
 coherent settings for the two markets.
+
+Trading method (the entry engine — Auto, Mean Reversion, Fibonacci, FVG, etc.)
+is set once via onboarding or /strategy, never here — so Builder can't
+silently override a choice the client already made elsewhere.
 
 This is a *setup assistant*, not signal advice: the bot executes exactly what
 the user selected, and the user owns the outcome.
@@ -13,6 +17,7 @@ pip-based stops + session filters; crypto uses ATR/%-based stops, wider bands,
 no session filter (runs whenever the broker feed is open).
 """
 from apex import config as cfg
+from apex import ai
 
 
 def _is_crypto():
@@ -30,7 +35,7 @@ def presets():
                 "label": "⚡ Crypto-Scalp",
                 "desc": "1m, fast in/out, ATR stops, wide spread tolerance",
                 "patch": {
-                    "style": "scalping", "strategy": "auto", "timeframe": "1m",
+                    "style": "scalping", "timeframe": "1m",
                     "risk": 0.005, "min_confidence": 55, "atr_stops": True,
                     "sl_pips": 200, "tp_pips": 300,
                     "exit_mode": "fixed", "trailing": False, "breakeven_r": 0,
@@ -42,7 +47,7 @@ def presets():
                 "label": "📈 Crypto-Swing",
                 "desc": "1h, trend-following, wider ATR stops, trailing + break-even",
                 "patch": {
-                    "style": "swing", "strategy": "trend", "timeframe": "1h",
+                    "style": "swing", "timeframe": "1h",
                     "risk": 0.005, "min_confidence": 60, "atr_stops": True,
                     "sl_pips": 400, "tp_pips": 900,
                     "exit_mode": "trail", "trailing": True, "breakeven_r": 1.0,
@@ -56,7 +61,7 @@ def presets():
             "label": "⚡ Forex-Scalping",
             "desc": "1m, tight pip stops, London/NY sessions, news guard",
             "patch": {
-                "style": "scalping", "strategy": "auto", "timeframe": "1m",
+                "style": "scalping", "timeframe": "1m",
                 "risk": 0.005, "min_confidence": 55, "atr_stops": False,
                 "sl_pips": 15, "tp_pips": 30,
                 "exit_mode": "fixed", "trailing": False, "breakeven_r": 0,
@@ -68,7 +73,7 @@ def presets():
             "label": "📈 Forex-Swing",
             "desc": "1h, wider stops, all sessions, trailing + break-even",
             "patch": {
-                "style": "swing", "strategy": "trend", "timeframe": "1h",
+                "style": "swing", "timeframe": "1h",
                 "risk": 0.005, "min_confidence": 60, "atr_stops": True,
                 "sl_pips": 25, "tp_pips": 60,
                 "exit_mode": "trail", "trailing": True, "breakeven_r": 1.0,
@@ -108,22 +113,9 @@ def _style_step():
     }
 
 
-_SETUP_STEP = {
-    "key": "strategy",
-    "title": "2️⃣ Entry setup",
-    "sub": "The engine that decides WHEN to enter.",
-    "options": [
-        {"label": "🤖 Auto (regime-adaptive)", "patch": {"strategy": "auto"}},
-        {"label": "🚀 Breakout", "patch": {"strategy": "breakout"}},
-        {"label": "📈 Pullback / Trend", "patch": {"strategy": "trend"}},
-        {"label": "⭐ Range / Mean-reversion", "patch": {"strategy": "mean_reversion"}},
-        {"label": "🔄 Reversal (S/R)", "patch": {"strategy": "mean_reversion"}},
-    ],
-}
-
 _CONFIRM_STEP = {
     "key": "confirm",
-    "title": "3️⃣ Confirmation",
+    "title": "2️⃣ Confirmation",
     "sub": "How strict the filters are before a trade fires.",
     "options": [
         {"label": "🎯 Price action only", "patch": {"confirm": "price", "min_confidence": 50, "htf": False}},
@@ -135,7 +127,7 @@ _CONFIRM_STEP = {
 
 _RISK_STEP = {
     "key": "risk",
-    "title": "4️⃣ Risk per trade",
+    "title": "3️⃣ Risk per trade",
     "sub": "How much of the balance is risked on each trade — and the safety limits.",
     "options": [
         {"label": "🟢 Low (0.5%)", "patch": {"risk": 0.005, "max_daily_loss_pct": 3, "max_dd_pct": 15, "max_trades_day": 6}},
@@ -146,7 +138,7 @@ _RISK_STEP = {
 
 _EXIT_STEP = {
     "key": "exit_mode",
-    "title": "5️⃣ Exit management",
+    "title": "4️⃣ Exit management",
     "sub": "How the trade is closed once it's open.",
     "options": [
         {"label": "🎯 Fixed TP/SL", "patch": {"exit_mode": "fixed", "trailing": False, "breakeven_r": 0}},
@@ -157,7 +149,7 @@ _EXIT_STEP = {
 
 _SESSION_STEP = {  # forex only
     "key": "session_filter",
-    "title": "6️⃣ Trading sessions",
+    "title": "5️⃣ Trading sessions",
     "sub": "When the bot is allowed to trade (forex reacts to session opens).",
     "options": [
         {"label": "🌍 All sessions", "patch": {"session_filter": []}},
@@ -168,16 +160,16 @@ _SESSION_STEP = {  # forex only
 
 
 def steps():
-    """Ordered wizard steps for this build."""
-    s = [_style_step(), _SETUP_STEP, _CONFIRM_STEP, _RISK_STEP, _EXIT_STEP]
+    """Ordered wizard steps for this build. Trading method (the entry engine)
+    is set once via onboarding / /strategy — Builder never touches it, so it
+    can't silently override a choice made elsewhere."""
+    s = [_style_step(), _CONFIRM_STEP, _RISK_STEP, _EXIT_STEP]
     if not _is_crypto():
         s.append(_SESSION_STEP)
     return s
 
 
 # ─── Summary ───────────────────────────────────────────────
-_STRAT_LABEL = {"auto": "Auto (regime-adaptive)", "breakout": "Breakout",
-                "trend": "Pullback / Trend", "mean_reversion": "Range / Mean-reversion"}
 _EXIT_LABEL = {"fixed": "Fixed TP/SL", "trail": "Trailing stop",
                "be_trail": "Break-even + trail"}
 _CONFIRM_LABEL = {"price": "Price action", "indicator": "Indicators",
@@ -194,7 +186,7 @@ def summary(d):
         f"📋 <b>Your strategy — {market}</b>",
         "━━━━━━━━━━━━━━━━━━━━",
         f"• Style: <b>{(d.get('style') or 'swing').title()}</b> · {d.get('timeframe', '5m')}",
-        f"• Setup: <b>{_STRAT_LABEL.get(d.get('strategy', 'auto'), 'Auto')}</b>",
+        f"• Trading method: <b>{ai.STRATEGY_MODES.get((d.get('strategy') or 'auto').lower(), ai.STRATEGY_MODES['auto'])['label']}</b> <i>(set via /strategy)</i>",
         f"• Confirmation: <b>{_CONFIRM_LABEL.get(d.get('confirm', 'indicator'), 'Indicators')}</b>",
         f"• Risk: <b>{risk_pct:g}%</b> per trade",
         f"• Exit: <b>{_EXIT_LABEL.get(d.get('exit_mode', 'fixed'), 'Fixed TP/SL')}</b>",
