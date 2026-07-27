@@ -1000,6 +1000,52 @@ def _ob_step_strategy(chat_id):
             extra={"reply_markup": {"inline_keyboard": kb}})
 
 
+def _ob_step_risk(chat_id):
+    """Manual-symbol pickers set their own risk per trade — Auto-Pilot skips
+    this and uses the account default, since the bot is already choosing
+    the instrument for them."""
+    lines = "\n\n".join(f"<b>{label}</b> — {pct:g}% risk · {daily:g}% daily stop · {dd:g}% max drawdown"
+                        for label, pct, daily, dd in _RISK_TIERS)
+    kb = [[{"text": label, "callback_data": f"ob:risk:{pct}"}] for label, pct, _, _ in _RISK_TIERS]
+    send_to(chat_id,
+            f"🧭 <b>Risk per trade:</b>\n\n{lines}\n\n"
+            "<i>How much of your balance is risked if a trade hits its stop-loss. "
+            "You picked the pair — you decide the risk. Change it any time with /risk.</i>",
+            extra={"reply_markup": {"inline_keyboard": kb}})
+
+
+# Take-profit choices offered during manual setup — each with what it actually
+# means, so the client is the one deciding the trade-off, not guessing.
+_OB_TP_OPTIONS = [
+    ("tp20", "🎯 Conservative — 20 pips",
+     "Closes quickly once price moves a little in your favor. Wins more often, but each win is smaller.",
+     {"tp_pips": 20, "tp_target_pct": 0}),
+    ("tp40", "📊 Balanced — 40 pips",
+     "The default target. Waits for a moderate move before closing — a middle ground between how often "
+     "you win and how much each win pays.",
+     {"tp_pips": 40, "tp_target_pct": 0}),
+    ("tp80", "🚀 Aggressive — 80 pips",
+     "Waits for a bigger move before closing. Wins less often, but each win pays roughly double the "
+     "Balanced option.",
+     {"tp_pips": 80, "tp_target_pct": 0}),
+    ("tp5pct", "📈 Scales with balance — 5%",
+     "Recalculated every trade to target 5% of your CURRENT balance — grows automatically as your "
+     "account grows, instead of sitting at a fixed pip count.",
+     {"tp_target_pct": 5}),
+]
+
+
+def _ob_step_tp(chat_id):
+    """Manual-symbol pickers also set their own take-profit, with what each
+    option means spelled out — Auto-Pilot skips this too."""
+    lines = "\n\n".join(f"<b>{label}</b> — <i>{blurb}</i>" for _, label, blurb, _ in _OB_TP_OPTIONS)
+    kb = [[{"text": label, "callback_data": f"ob:tp:{key}"}] for key, label, _, _ in _OB_TP_OPTIONS]
+    send_to(chat_id,
+            f"🧭 <b>Take-profit target:</b>\n\n{lines}\n\n"
+            "<i>This decides when the bot closes a winning trade. Change it any time with /tp or /tptarget.</i>",
+            extra={"reply_markup": {"inline_keyboard": kb}})
+
+
 def _ob_step_mode(chat_id):
     u = user_store.load(chat_id)
     if not u.get("risk_accepted"):
@@ -1217,6 +1263,29 @@ def _handle_cb(chat_id, data):
     if data.startswith("ob:strat:"):
         mode = data[9:]
         user_store.update(chat_id, {"strategy": mode})
+        # Auto-Pilot already picks the instrument for you — let the bot
+        # manage risk/TP too. Manual symbol pickers get to set both
+        # themselves, with what each choice means spelled out, so they're
+        # the ones who decided the risk on their trades.
+        if user_store.load(chat_id).get("autopilot"):
+            return _ob_step_mode(chat_id)
+        return _ob_step_risk(chat_id)
+    if data.startswith("ob:risk:"):
+        try:
+            pct = float(data[8:])
+        except ValueError:
+            return
+        _apply_risk(chat_id, pct)
+        return _ob_step_tp(chat_id)
+    if data.startswith("ob:tp:"):
+        key = data[6:]
+        opt = next((o for o in _OB_TP_OPTIONS if o[0] == key), None)
+        if not opt:
+            return
+        _, label, blurb, patch = opt
+        user_store.update(chat_id, patch)
+        _restart_user_loop(chat_id)
+        send_to(chat_id, f"🎯 Take-profit set to <b>{label}</b>.\n<i>{blurb}</i>")
         return _ob_step_mode(chat_id)
     if data.startswith("risk:set:"):
         try:
