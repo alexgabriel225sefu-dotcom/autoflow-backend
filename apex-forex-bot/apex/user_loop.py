@@ -74,6 +74,12 @@ def _make_broker(user):
         PAPER_BALANCE    = float(user.get("paper_balance", 1000)),
         STOP_LOSS_PIPS   = float(user.get("sl_pips", 20)),
         TAKE_PROFIT_PIPS = float(user.get("tp_pips", 40)),
+        # 0 = off (use TAKE_PROFIT_PIPS/ATR as normal). >0 = target this % of
+        # the account balance as profit on a full winning trade — TP widens
+        # or narrows automatically as the balance (and position size) moves,
+        # instead of sitting at a fixed pip count that stops meaning anything
+        # once the account has grown or shrunk. See /tptarget.
+        TP_TARGET_PCT    = float(user.get("tp_target_pct", 0) or 0),
         RISK_PER_TRADE   = float(user.get("risk", 0.025)),  # 2.5% default (was 1%) — bigger profit per trade, still bounded by the caps below
         # Crypto CFDs are leveraged far lower than FX (retail ~2-5x vs 30x), so
         # the margin cap must assume less leverage or it sizes positions the
@@ -1472,6 +1478,25 @@ def _loop(user_id, alert_fn, gen=None):
                     pass  # margin too small — skip to CLOSE handling below
                 else:
                     units = forex.round_units(max(units, floor), symbol)
+
+                    # Balance-relative TP: instead of a fixed pip count that
+                    # means less and less as the account grows (or more and
+                    # more as it shrinks), size the TP distance so a full win
+                    # nets TP_TARGET_PCT of the current balance for THIS
+                    # trade's actual position size. Clamped to 2x-20x the SL
+                    # distance so it can't collapse below the RR guard or
+                    # stretch out to a target the trade will realistically
+                    # never reach.
+                    tgt_pct = getattr(cfg, "TP_TARGET_PCT", 0)
+                    if tgt_pct > 0 and units > 0:
+                        pv = forex.pip_value_per_unit(symbol, price)
+                        pip_sz = forex.pip_size(symbol, price)
+                        if pv > 0 and pip_sz > 0:
+                            target_usd = sizing_balance * (tgt_pct / 100.0)
+                            needed_pips = target_usd / (units * pv)
+                            tp_dist_dyn = needed_pips * pip_sz
+                            tp_dist = max(2.0 * sl_dist, min(tp_dist_dyn, 20.0 * sl_dist))
+                            tp_price = round(price + tp_dist if action == "BUY" else price - tp_dist, 6)
 
                     # Spread re-check: verify spread is still acceptable
                     # right before execution — it may have widened since analysis.

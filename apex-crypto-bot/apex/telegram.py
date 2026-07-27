@@ -1491,6 +1491,42 @@ def _handle_tp(chat_id, args):
     send_to(chat_id, f"🎯 Take profit set to <b>{pips:g} pips</b>." + _rr_note(chat_id))
 
 
+def _handle_tptarget(chat_id, args):
+    """Balance-relative TP: instead of a fixed pip count, target a % of the
+    current balance as profit on a full win — recalculated fresh every trade
+    off that trade's actual position size, so it grows with the account."""
+    args = (args or "").strip().lower()
+    user = user_store.load(chat_id)
+    current = float(user.get("tp_target_pct", 0) or 0)
+    if not args:
+        if current > 0:
+            return send_to(chat_id,
+                f"🎯 <b>Balance-target TP</b> is <b>ON</b> — targeting <b>{current:g}%</b> of your balance "
+                "per full winning trade. It widens or narrows automatically as your balance moves, "
+                "instead of sitting at a fixed pip count.\n\n"
+                "Send <code>/tptarget 8</code> to change it, or <code>/tptarget off</code> to go back to a fixed /tp.")
+        return send_to(chat_id,
+            "🎯 <b>Balance-target TP</b> is currently <b>off</b> — using your fixed /tp pip count.\n\n"
+            "Send <code>/tptarget 5</code> to make TP scale with your account instead (5% of balance per "
+            "full win, recalculated every trade) — up to 25%.")
+    if args in ("off", "0", "no"):
+        user_store.update(chat_id, {"tp_target_pct": 0})
+        _restart_user_loop(chat_id)
+        return send_to(chat_id, "✅ Balance-target TP turned <b>off</b> — back to your fixed /tp pip count.")
+    try:
+        pct = float(args)
+        if not (0.5 <= pct <= 25):
+            raise ValueError
+    except ValueError:
+        return send_to(chat_id, "❌ Usage: <code>/tptarget 5</code>  (0.5–25% of balance), or <code>/tptarget off</code>.")
+    user_store.update(chat_id, {"tp_target_pct": pct})
+    _restart_user_loop(chat_id)
+    send_to(chat_id,
+        f"🎯 Balance-target TP set to <b>{pct:g}%</b> of your balance per full winning trade.\n"
+        "<i>Recalculated fresh on every trade — grows with your account automatically. "
+        "Still bounded 2×-20× your stop-loss distance so it stays realistic.</i>")
+
+
 def _handle_symbol(chat_id, args):
     sym = (args or "").strip().upper().replace("/", "_").replace("-", "_").replace(" ", "")
     user = user_store.load(chat_id)
@@ -2504,6 +2540,7 @@ _CONTROLS_TEXT = (
     "/risk — Pick a risk tier, or /risk 2 for an exact % (0.5–50%)\n"
     "/sl 50 — Set stop loss in pips\n"
     "/tp 100 — Set take profit in pips\n"
+    "/tptarget 5 — Or target a % of your balance per win instead (scales with the account)\n"
     "/atr on|off — Use dynamic ATR-based stops\n"
     "/aiconfirm on|off — AI double-checks each entry (on) or pure rules (off)\n"
     "/copilot on|off — Approve each trade before it opens\n"
@@ -2534,6 +2571,7 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "/risk — risk tier menu · /risk &lt;0.5-50&gt; — exact % per trade\n"
                "/sl &lt;pips&gt; — stop loss · /tp &lt;pips&gt; — take profit\n"
+               "/tptarget &lt;pct&gt; — TP as % of balance instead (scales with account)\n"
                "/symbol &lt;PAIR&gt; — set pair\n"
                "/pairs — available instruments\n"
                "/watch — scan a basket, trade the strongest setup\n"
@@ -2858,6 +2896,8 @@ def _poll_loop():
                     _handle_sl(chat_id, args)
                 elif cmd_l == "/tp":
                     _handle_tp(chat_id, args)
+                elif cmd_l == "/tptarget":
+                    _handle_tptarget(chat_id, args)
                 elif cmd_l == "/symbol":
                     _handle_symbol(chat_id, args)
                 elif cmd_l in ("/pairs", "/symbols"):
