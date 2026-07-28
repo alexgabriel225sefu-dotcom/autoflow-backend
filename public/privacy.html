@@ -1,50 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Privacy Policy — AI Cash Systems</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900" rel="stylesheet"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — Apex Trading Suite</title>
+<meta name="description" content="How Apex Trading Suite collects, uses, and protects your data — GDPR compliant.">
+<link rel="canonical" href="https://aicashsystem.space/privacy">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://api.fontshare.com"><link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#080808;color:#f5f5f5;font-family:'Inter',sans-serif;line-height:1.8}
-nav{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid rgba(229,62,46,.08)}
-.logo{font-family:'Inter',sans-serif;font-size:18px;font-weight:900;color:#E53E2E;text-decoration:none}
-.back{padding:8px 18px;border:1px solid rgba(229,62,46,.2);border-radius:6px;color:#999999;font-size:12px;text-decoration:none;transition:all .2s}
-.back:hover{border-color:#E53E2E;color:#E53E2E}
-.container{max-width:760px;margin:0 auto;padding:48px 32px 80px}
-h1{font-family:'Inter',sans-serif;font-size:36px;font-weight:900;color:#f5f5f5;margin-bottom:8px}
-.date{font-size:12px;color:#7A7060;letter-spacing:1px;text-transform:uppercase;margin-bottom:40px}
-h2{font-family:'Inter',sans-serif;font-size:22px;font-weight:700;color:#E53E2E;margin:36px 0 14px}
-p{font-size:14px;color:#999999;margin-bottom:14px}
-ul{font-size:14px;color:#999999;padding-left:20px;margin-bottom:14px}
-ul li{margin-bottom:6px}
-a{color:#E53E2E}
-.highlight{background:rgba(229,62,46,.08);border:1px solid rgba(229,62,46,.2);border-radius:8px;padding:20px 24px;margin:20px 0}
-.highlight p{margin:0;color:#f5f5f5;font-size:14px;line-height:1.75}
-.divider{height:1px;background:rgba(229,62,46,.08);margin:32px 0}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060608;--bg1:#0b0b0e;--panel:#111115;--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.13);
+  --t0:#f5f5f7;--t1:#9696a0;--t2:#56565f;--acc:#ff2d4f;--acc3:#ff97a8;--accdim:rgba(255,45,79,.12);
+  --d:'Clash Display',system-ui,sans-serif;--f:'Satoshi',system-ui,sans-serif;--m:'JetBrains Mono',monospace;--ease:cubic-bezier(.32,.72,0,1);
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoothing:antialiased;letter-spacing:-.011em;min-height:100vh}
+a{color:inherit;text-decoration:none}
+nav{position:sticky;top:0;z-index:300;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,46px);background:rgba(6,6,8,.82);backdrop-filter:blur(20px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font:600 15px/1 var(--d)}
+.logo{width:32px;height:32px;display:block;filter:drop-shadow(0 0 12px rgba(255,45,79,.5))}
+.nav-back{font:500 14px/1 var(--f);color:var(--t1)}
+.nav-back:hover{color:var(--t0)}
+.wrap{max-width:760px;margin:0 auto;padding:0 clamp(16px,4vw,46px)}
+main{padding:56px 0 50px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--accdim);border:1px solid rgba(255,45,79,.24);color:var(--acc3);border-radius:100px;padding:6px 14px;font:500 11px/1 var(--m);letter-spacing:.1em;text-transform:uppercase;margin-bottom:18px}
+h1{font:600 clamp(28px,4vw,40px)/1.06 var(--d);letter-spacing:-.025em;margin-bottom:8px}
+.updated{color:var(--t2);font:400 13px/1 var(--m);margin-bottom:26px}
+h2{font:600 13px/1 var(--m);color:var(--acc3);text-transform:uppercase;letter-spacing:.12em;margin:34px 0 12px}
+p,li{color:var(--t1);font:400 15px/1.75 var(--f)}
+p{margin-bottom:12px}
+ul{margin:0 0 12px 20px}
+li{margin-bottom:8px}
+strong{color:var(--t0);font-weight:600}
+a.inline{color:var(--acc3)}
+.hr{height:1px;background:var(--line);margin:32px 0}
+footer{border-top:1px solid var(--line);padding:34px 0;font:400 12px/1.7 var(--f);color:var(--t2);margin-top:20px}
 </style>
 </head>
 <body>
-<nav>
-  <a href="/" class="logo">AI Cash Systems</a>
-  <a href="/" class="back">← Back to Home</a>
-  <button class="af-lang-btn" onclick="AF_openLang()"><span id="langFlag">🌐</span> <span id="langCode">EN</span></button>
-</nav>
-<div class="container">
-  <h1>Privacy Policy</h1>
-  <div class="date">Last updated: May 7, 2026</div>
 
-  <p>AI Cash Systems ("we", "our", or "us"), operated by Alex Otvos, based in the European Union, is committed to protecting your personal data in accordance with the General Data Protection Regulation (GDPR) and applicable EU privacy laws. This Privacy Policy explains how we collect, use, store, and protect your personal information when you visit aicashsystem.space or purchase our digital products.</p>
+<nav>
+  <a href="/" class="brand">
+    <svg class="logo" viewBox="0 0 32 32" fill="none">
+      <rect x="3" y="19" width="5" height="10" rx="2.5" fill="#ff2d4f" opacity=".45"/>
+      <rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="#ff2d4f" opacity=".72"/>
+      <rect x="20" y="6" width="5" height="23" rx="2.5" fill="#ff2d4f"/>
+      <circle cx="22.5" cy="5" r="3.1" fill="#ff5c74"/>
+    </svg>
+    Apex Trading Suite
+  </a>
+  <a href="/" class="nav-back">← Back to home</a>
+</nav>
+
+<main class="wrap">
+  <span class="eyebrow">Legal</span>
+  <h1>Privacy Policy</h1>
+  <div class="updated">Last updated: May 7, 2026</div>
+
+  <p>This Privacy Policy explains how we collect, use, store, and protect your personal information when you visit aicashsystem.space or purchase our digital products, in accordance with the General Data Protection Regulation (GDPR) and applicable EU privacy laws. The service is operated by Alex Otvos, based in Romania, European Union.</p>
 
   <h2>1. Data Controller</h2>
-  <p>The data controller responsible for your personal data is:</p>
-  <ul>
-    <li><strong>Business name:</strong> AI Cash Systems</li>
-    <li><strong>Operated by:</strong> Alex Otvos</li>
-    <li><strong>Location:</strong> Târgu Mureș, Romania, European Union</li>
-    <li><strong>Contact:</strong> <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a></li>
-  </ul>
+  <p>The data controller responsible for your personal data is Alex Otvos, operating as Apex Trading Suite / AI Cash Systems, based in Târgu Mureș, Romania, European Union. Contact: <a class="inline" href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a>. Full identification details are available on our <a class="inline" href="/impressum">Legal Notice</a> page.</p>
 
   <h2>2. What Data We Collect</h2>
   <p>We collect only the minimum data necessary to provide our services:</p>
@@ -56,28 +76,26 @@ a{color:#E53E2E}
   </ul>
   <p>We do not collect sensitive personal data (race, health, religion, etc.) and we do not use your data for advertising profiling.</p>
 
-  <h2>2a. Trading Bot Products (Apex Trade Bot / Apex Forex Bot)</h2>
+  <h2>3. Trading Bot Products (Apex Trade Bot / Apex Forex Bot)</h2>
   <p>If you purchase our trading bot software, the following applies in addition:</p>
   <ul>
-    <li><strong>Hosted trading service:</strong> the bots are fully hosted — we run them 24/7 on our servers. To trade on your behalf you connect your own <strong>cTrader</strong> account (any cTrader-compatible broker) via secure authentication. This connection is used solely to place the trades you configure. We never request withdrawal permissions and never have access to your funds; you can revoke access at your broker at any time.</li>
+    <li><strong>Hosted trading service:</strong> the bots are fully hosted — we run them 24/7 on our servers. To trade on your behalf you connect your own cTrader account (any cTrader-compatible broker) via secure authentication. This connection is used solely to place the trades you configure. We never request withdrawal permissions and never have access to your funds; you can revoke access at your broker at any time.</li>
     <li><strong>Trading data we process:</strong> to operate your bot we process your account balance, open positions, and trade history. This is used only to run and display your bot — it is never sold or shared for marketing.</li>
     <li><strong>Third-party services the bot uses on your behalf:</strong> your connected cTrader broker, AI providers (Anthropic, with Groq as fallback) for signal generation, and Telegram for notifications. These connections are governed by those providers' privacy policies in addition to ours.</li>
     <li><strong>What we store about bot customers:</strong> your purchase email, your license key, payment records (via Digistore24), your encrypted cTrader connection credentials, and your bot configuration (pairs, risk settings).</li>
   </ul>
 
-  <h2>3. Legal Basis for Processing (GDPR)</h2>
-  <p>We process your personal data on the following legal bases:</p>
+  <h2>4. Legal Basis for Processing (GDPR)</h2>
   <ul>
-    <li><strong>Contract performance (Art. 6(1)(b)):</strong> to deliver your purchased course and manage your account</li>
+    <li><strong>Contract performance (Art. 6(1)(b)):</strong> to deliver your purchased product and manage your account</li>
     <li><strong>Legitimate interests (Art. 6(1)(f)):</strong> for security, fraud prevention, and platform improvement</li>
     <li><strong>Legal obligation (Art. 6(1)(c)):</strong> to comply with applicable tax and financial regulations</li>
     <li><strong>Consent (Art. 6(1)(a)):</strong> for optional marketing communications (you can withdraw consent at any time)</li>
   </ul>
 
-  <h2>4. How We Use Your Data</h2>
-  <p>Your data is used exclusively to:</p>
+  <h2>5. How We Use Your Data</h2>
   <ul>
-    <li>Deliver your purchased course and access credentials</li>
+    <li>Deliver your purchased product and access credentials</li>
     <li>Send transactional emails (access codes, receipts, important account notifications)</li>
     <li>Provide customer support and resolve issues</li>
     <li>Prevent fraud and ensure platform security</li>
@@ -86,53 +104,50 @@ a{color:#E53E2E}
   </ul>
   <p>We never sell, rent, or share your personal data with third parties for their marketing purposes.</p>
 
-  <h2>5. Data Sharing and Third-Party Processors</h2>
+  <h2>6. Data Sharing and Third-Party Processors</h2>
   <p>We share your data only with trusted processors who help us deliver our services, all bound by data processing agreements:</p>
   <ul>
-    <li><strong>Digistore24</strong> (EU) — payment processing and merchant of record. Privacy policy: digistore24.com/privacy-policy</li>
-    <li><strong>Supabase, Inc.</strong> (USA) — database hosting. Data stored on EU servers where possible. Privacy policy: supabase.com/privacy</li>
-    <li><strong>Brevo SAS</strong> (France) — transactional email delivery. EU-based processor. Privacy policy: brevo.com/legal/privacypolicy</li>
-    <li><strong>Anthropic, PBC</strong> (USA) — AI trading-signal generation for the hosted bots. Privacy policy: anthropic.com/legal/privacy</li>
-    <li><strong>Groq, Inc.</strong> (USA) — fallback AI signal generation for the hosted bots. Privacy policy: groq.com/privacy-policy</li>
-    <li><strong>OpenAI, Inc.</strong> (USA) — AI features within the Blueprint Studio platform. Privacy policy: openai.com/privacy</li>
-    <li><strong>Render Services, Inc.</strong> (USA) — hosting infrastructure. Privacy policy: render.com/privacy</li>
+    <li><strong>Digistore24</strong> (EU) — payment processing and merchant of record. <a class="inline" href="https://www.digistore24.com/privacy-policy" target="_blank" rel="noopener">digistore24.com/privacy-policy</a></li>
+    <li><strong>Supabase, Inc.</strong> (USA) — database hosting, EU servers where possible. <a class="inline" href="https://supabase.com/privacy" target="_blank" rel="noopener">supabase.com/privacy</a></li>
+    <li><strong>Brevo SAS</strong> (France) — transactional email delivery. <a class="inline" href="https://www.brevo.com/legal/privacypolicy" target="_blank" rel="noopener">brevo.com/legal/privacypolicy</a></li>
+    <li><strong>Anthropic, PBC</strong> (USA) — AI trading-signal generation for the hosted bots. <a class="inline" href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener">anthropic.com/legal/privacy</a></li>
+    <li><strong>Groq, Inc.</strong> (USA) — fallback AI signal generation for the hosted bots. <a class="inline" href="https://groq.com/privacy-policy" target="_blank" rel="noopener">groq.com/privacy-policy</a></li>
+    <li><strong>OpenAI, Inc.</strong> (USA) — AI features within the Blueprint Studio platform. <a class="inline" href="https://openai.com/privacy" target="_blank" rel="noopener">openai.com/privacy</a></li>
+    <li><strong>Render Services, Inc.</strong> (USA) — hosting infrastructure. <a class="inline" href="https://render.com/privacy" target="_blank" rel="noopener">render.com/privacy</a></li>
   </ul>
 
-  <h2 id="cookies">6. Cookies and Local Storage</h2>
+  <h2 id="cookies">7. Cookies and Local Storage</h2>
   <p>We use only strictly necessary cookies and browser storage. We do not use advertising, tracking, or profiling cookies.</p>
   <ul>
-    <li><strong>Digistore24 payment cookies:</strong> Set by Digistore24 when you interact with our checkout. These are strictly necessary to process payments securely and for fraud-prevention. Digistore24's privacy policy: <a href="https://www.digistore24.com/privacy-policy" target="_blank" rel="noopener">digistore24.com/privacy-policy</a>.</li>
-    <li><strong>Access cookie (<code>af_access</code>):</strong> An HttpOnly, signed cookie that verifies your course purchase — required for access to course content.</li>
-    <li><strong>Consent cookie (<code>ck_consent</code>):</strong> Stored in your browser's <code>localStorage</code> to remember whether you have acknowledged this cookie notice. Not a tracking cookie; never transmitted to any server.</li>
-    <li><strong>Session storage:</strong> Short-lived browser-side data (e.g. affiliate referral code) used to complete the current checkout. Not a cookie; cleared when your browser tab closes.</li>
+    <li><strong>Digistore24 payment cookies:</strong> set when you interact with our checkout, strictly necessary for secure payment processing and fraud prevention.</li>
+    <li><strong>Access cookie (<code>af_access</code>):</strong> an HttpOnly, signed cookie that verifies your purchase — required for access to purchased content.</li>
+    <li><strong>Consent cookie (<code>ck_consent</code>):</strong> stored in your browser's localStorage to remember whether you have acknowledged this cookie notice. Not a tracking cookie; never transmitted to any server.</li>
+    <li><strong>Session storage:</strong> short-lived browser-side data (e.g. affiliate referral code) used to complete the current checkout. Cleared when your browser tab closes.</li>
   </ul>
-  <p>Page fonts are loaded from Google Fonts and Fontshare (fonts.googleapis.com, api.fontshare.com), which may process your IP address as part of the font request; no personal data beyond the IP is shared with these services for advertising purposes.</p>
-  <p>Because we use only strictly necessary cookies (payment processing), no cookie consent is required under EU ePrivacy rules. The consent banner on our pages is informational — you can dismiss it at any time.</p>
+  <p>Because we use only strictly necessary cookies, no cookie consent is required under EU ePrivacy rules — the notice on our pages is informational and can be dismissed at any time.</p>
 
-  <h2>7. Data Retention</h2>
-  <p>We retain your personal data as follows:</p>
+  <h2>8. Data Retention</h2>
   <ul>
-    <li><strong>Account and course data:</strong> for the lifetime of your account plus 2 years after account closure</li>
+    <li><strong>Account and product data:</strong> for the lifetime of your account plus 2 years after account closure</li>
     <li><strong>Payment records:</strong> 7 years as required by EU tax regulations</li>
     <li><strong>Support communications:</strong> 2 years after the last interaction</li>
   </ul>
   <p>Upon account deletion request, we delete all personal data within 30 days, except data we are legally required to retain.</p>
 
-  <h2>8. Your Rights Under GDPR</h2>
-  <p>As an EU resident, you have the following rights which you can exercise at any time by contacting us:</p>
+  <h2>9. Your Rights Under GDPR</h2>
+  <p>As an EU resident, you have the following rights, which you can exercise at any time by contacting us:</p>
   <ul>
-    <li><strong>Right of access (Art. 15):</strong> request a copy of all personal data we hold about you</li>
-    <li><strong>Right to rectification (Art. 16):</strong> request correction of inaccurate or incomplete data</li>
-    <li><strong>Right to erasure (Art. 17):</strong> request deletion of your personal data ("right to be forgotten")</li>
-    <li><strong>Right to restriction (Art. 18):</strong> request that we restrict processing of your data</li>
-    <li><strong>Right to data portability (Art. 20):</strong> receive your data in a machine-readable format</li>
-    <li><strong>Right to object (Art. 21):</strong> object to processing based on legitimate interests</li>
-    <li><strong>Right to withdraw consent:</strong> withdraw consent at any time without affecting prior processing</li>
+    <li><strong>Right of access (Art. 15)</strong> — request a copy of all personal data we hold about you</li>
+    <li><strong>Right to rectification (Art. 16)</strong> — request correction of inaccurate or incomplete data</li>
+    <li><strong>Right to erasure (Art. 17)</strong> — request deletion of your personal data</li>
+    <li><strong>Right to restriction (Art. 18)</strong> — request that we restrict processing of your data</li>
+    <li><strong>Right to data portability (Art. 20)</strong> — receive your data in a machine-readable format</li>
+    <li><strong>Right to object (Art. 21)</strong> — object to processing based on legitimate interests</li>
+    <li><strong>Right to withdraw consent</strong> — at any time, without affecting prior processing</li>
   </ul>
-  <p>To exercise any of these rights, email us at <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a>. We will respond within 30 days. You also have the right to lodge a complaint with your national data protection authority.</p>
+  <p>To exercise any of these rights, email <a class="inline" href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a>. We will respond within 30 days. You also have the right to lodge a complaint with your national data protection authority.</p>
 
-  <h2>9. Data Security</h2>
-  <p>We implement appropriate technical and organizational security measures including:</p>
+  <h2>10. Data Security</h2>
   <ul>
     <li>HTTPS encryption for all data in transit</li>
     <li>Encrypted database storage via Supabase</li>
@@ -142,27 +157,23 @@ a{color:#E53E2E}
   </ul>
   <p>In the event of a data breach that poses a risk to your rights and freedoms, we will notify the relevant supervisory authority within 72 hours and affected users without undue delay, as required by GDPR Art. 33-34.</p>
 
-  <h2>10. International Data Transfers</h2>
-  <p>Some of our service providers are based outside the EU (USA). All transfers are conducted with appropriate safeguards including Standard Contractual Clauses (SCCs) approved by the European Commission, or equivalent mechanisms such as the EU-US Data Privacy Framework.</p>
+  <h2>11. International Data Transfers</h2>
+  <p>Some of our service providers are based outside the EU (USA). All transfers are conducted with appropriate safeguards including Standard Contractual Clauses (SCCs) or equivalent mechanisms such as the EU-US Data Privacy Framework.</p>
 
-  <h2>11. Children's Privacy</h2>
-  <p>Our Services are intended for individuals aged 18 and over. We do not knowingly collect personal data from minors under 18. If you believe a minor has provided us with personal information, please contact us immediately and we will delete it promptly.</p>
+  <h2>12. Children's Privacy</h2>
+  <p>Our Services are intended for individuals aged 18 and over. We do not knowingly collect personal data from minors under 18. If you believe a minor has provided us with personal information, contact us and we will delete it promptly.</p>
 
-  <h2>12. Changes to This Policy</h2>
-  <p>We may update this Privacy Policy to reflect changes in our practices or applicable law. We will notify you of material changes via email or a prominent notice on our website at least 7 days before the changes take effect. The "Last updated" date at the top of this page indicates when the policy was last revised.</p>
+  <h2>13. Changes to This Policy</h2>
+  <p>We may update this Privacy Policy to reflect changes in our practices or applicable law. We will notify you of material changes via email or a prominent notice on our website at least 7 days before they take effect.</p>
 
-  <h2>13. Contact and Complaints</h2>
-  <p>For privacy-related questions, data subject requests, or complaints:</p>
+  <h2>14. Contact and Complaints</h2>
   <ul>
-    <li><strong>Email:</strong> <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a></li>
-    <li><strong>Response time:</strong> within 30 days (as required by GDPR)</li>
-    <li><strong>Supervisory authority:</strong> You have the right to file a complaint with the Romanian National Supervisory Authority for Personal Data Processing (ANSPDCP) at dataprotection.ro, or with the supervisory authority in your country of residence.</li>
+    <li>Email: <a class="inline" href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a></li>
+    <li>Response time: within 30 days (as required by GDPR)</li>
+    <li>Supervisory authority: Romanian National Supervisory Authority for Personal Data Processing (ANSPDCP), <a class="inline" href="https://www.dataprotection.ro" target="_blank" rel="noopener">dataprotection.ro</a>, or the authority in your country of residence</li>
   </ul>
+</main>
 
-  <div class="divider"></div>
-  <p style="font-size:12px;color:#7A7060">© 2026 AI Cash Systems. All rights reserved. This Privacy Policy was last reviewed by our team on May 7, 2026.</p>
-</div>
-<script src="/lang.js"></script>
-<script src="/cookie-banner.js"></script>
+<footer><div class="wrap">© Apex Trading Suite · Algorithmic Trading Software · <a href="/terms" style="color:var(--t1)">Terms</a> · <a href="/impressum" style="color:var(--t1)">Legal Notice</a></div></footer>
 </body>
 </html>
