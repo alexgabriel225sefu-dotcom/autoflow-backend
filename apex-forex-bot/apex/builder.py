@@ -1,13 +1,14 @@
 """Strategy Builder — a guided setup assistant.
 
-The client composes a strategy from realistic building blocks (style →
-confirmation → risk → exit). Every choice maps to a REAL engine parameter that
-changes how the bot trades — nothing here is decorative. One-tap presets bundle
-coherent settings for the two markets.
+The client composes a strategy from realistic building blocks (style → entry
+setup → confirmation → risk → exit). Every choice maps to a REAL engine
+parameter that changes how the bot trades — nothing here is decorative.
+One-tap presets bundle coherent settings for the two markets.
 
-Trading method (the entry engine — Auto, Mean Reversion, Fibonacci, FVG, etc.)
-is set once via onboarding or /strategy, never here — so Builder can't
-silently override a choice the client already made elsewhere.
+The entry-setup step mirrors the full onboarding method list (ai.STRATEGY_MODES)
+exactly — generated from that single source of truth so every method (Auto,
+Mean Reversion, Fibonacci, FVG, iFVG, Supply & Demand, Liquidity Sweep, EVC...)
+is always selectable here too, never a stale subset.
 
 This is a *setup assistant*, not signal advice: the bot executes exactly what
 the user selected, and the user owns the outcome.
@@ -113,9 +114,30 @@ def _style_step():
     }
 
 
+_STRAT_EMOJI = {
+    "auto": "🤖", "mean_reversion": "⭐", "trend": "📈", "breakout": "🚀",
+    "fibonacci": "🌀", "fvg": "🕳️", "ifvg": "🔄", "supply_demand": "🏛️",
+    "liquidity_sweep": "🎯", "evc": "⚖️",
+}
+
+
+def _setup_step():
+    """Entry-setup step — built straight from ai.STRATEGY_MODES so it always
+    lists every real engine, not a hand-copied subset that goes stale."""
+    return {
+        "key": "strategy",
+        "title": "2️⃣ Entry setup",
+        "sub": "The engine that decides WHEN to enter.",
+        "options": [
+            {"label": f"{_STRAT_EMOJI.get(key, '▫️')} {m['label']}", "patch": {"strategy": key}}
+            for key, m in ai.STRATEGY_MODES.items()
+        ],
+    }
+
+
 _CONFIRM_STEP = {
     "key": "confirm",
-    "title": "2️⃣ Confirmation",
+    "title": "3️⃣ Confirmation",
     "sub": "How strict the filters are before a trade fires.",
     "options": [
         {"label": "🎯 Price action only", "patch": {"confirm": "price", "min_confidence": 50, "htf": False}},
@@ -127,7 +149,7 @@ _CONFIRM_STEP = {
 
 _RISK_STEP = {
     "key": "risk",
-    "title": "3️⃣ Risk per trade",
+    "title": "4️⃣ Risk per trade",
     "sub": "How much of the balance is risked on each trade — and the safety limits.",
     "options": [
         {"label": "🟢 Low (0.5%)", "patch": {"risk": 0.005, "max_daily_loss_pct": 3, "max_dd_pct": 15, "max_trades_day": 6}},
@@ -138,7 +160,7 @@ _RISK_STEP = {
 
 _EXIT_STEP = {
     "key": "exit_mode",
-    "title": "4️⃣ Exit management",
+    "title": "5️⃣ Exit management",
     "sub": "How the trade is closed once it's open.",
     "options": [
         {"label": "🎯 Fixed TP/SL", "patch": {"exit_mode": "fixed", "trailing": False, "breakeven_r": 0}},
@@ -149,7 +171,7 @@ _EXIT_STEP = {
 
 _SESSION_STEP = {  # forex only
     "key": "session_filter",
-    "title": "5️⃣ Trading sessions",
+    "title": "6️⃣ Trading sessions",
     "sub": "When the bot is allowed to trade (forex reacts to session opens).",
     "options": [
         {"label": "🌍 All sessions", "patch": {"session_filter": []}},
@@ -160,10 +182,8 @@ _SESSION_STEP = {  # forex only
 
 
 def steps():
-    """Ordered wizard steps for this build. Trading method (the entry engine)
-    is set once via onboarding / /strategy — Builder never touches it, so it
-    can't silently override a choice made elsewhere."""
-    s = [_style_step(), _CONFIRM_STEP, _RISK_STEP, _EXIT_STEP]
+    """Ordered wizard steps for this build."""
+    s = [_style_step(), _setup_step(), _CONFIRM_STEP, _RISK_STEP, _EXIT_STEP]
     if not _is_crypto():
         s.append(_SESSION_STEP)
     return s
@@ -186,7 +206,7 @@ def summary(d):
         f"📋 <b>Your strategy — {market}</b>",
         "━━━━━━━━━━━━━━━━━━━━",
         f"• Style: <b>{(d.get('style') or 'swing').title()}</b> · {d.get('timeframe', '5m')}",
-        f"• Trading method: <b>{ai.STRATEGY_MODES.get((d.get('strategy') or 'auto').lower(), ai.STRATEGY_MODES['auto'])['label']}</b> <i>(set via /strategy)</i>",
+        f"• Entry setup: <b>{ai.STRATEGY_MODES.get((d.get('strategy') or 'auto').lower(), ai.STRATEGY_MODES['auto'])['label']}</b>",
         f"• Confirmation: <b>{_CONFIRM_LABEL.get(d.get('confirm', 'indicator'), 'Indicators')}</b>",
         f"• Risk: <b>{risk_pct:g}%</b> per trade",
         f"• Exit: <b>{_EXIT_LABEL.get(d.get('exit_mode', 'fixed'), 'Fixed TP/SL')}</b>",
