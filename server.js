@@ -17,8 +17,13 @@ app.use(cors({
   credentials: true
 }));
 // Skip JSON body parsing for the Digistore24 webhook — it posts form-urlencoded.
+// The Meta webhook needs the raw body preserved too (HMAC signature check in
+// _metaVerifySignature can't hash a body that's already been re-serialized).
 app.use((req, res, next) => {
   if (req.path === '/digistore24-webhook') return next();
+  if (req.path === '/webhooks/meta') {
+    return express.json({ verify: (req2, res2, buf) => { req2.rawBody = buf; } })(req, res, next);
+  }
   express.json()(req, res, next);
 });
 // Serve static assets (JS, CSS, images) but NOT HTML — HTML goes through route handlers
@@ -3109,6 +3114,208 @@ app.post('/api/railway-deploy', async (req, res) => {
   }
 });
 
+
+// ════════════════════════════════════════
+// SOCIAL MEDIA INTEGRATIONS — Facebook / Instagram (Meta Graph API) + TikTok
+// ════════════════════════════════════════
+// Legit, official-API-only automation: scheduled/manual posting to Alex's own
+// Page/Business accounts, and auto-reply to inbound DMs on Facebook/Instagram.
+// Deliberately does NOT do outbound cold-DM/mass-messaging — that violates
+// every platform's ToS and gets accounts banned. See social_accounts,
+// social_posts, social_dm_log tables (Supabase).
+//
+// Required env vars (set in Render once the Meta/TikTok apps exist):
+//   META_APP_ID, META_APP_SECRET, META_PAGE_ACCESS_TOKEN, META_PAGE_ID,
+//   META_IG_BUSINESS_ID, META_WEBHOOK_VERIFY_TOKEN (any string you pick)
+//   TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_REDIRECT_URI
+// Admin endpoints are protected by the same owner secret as the payout
+// export above (BOT_EMAIL_SECRET), via ?secret= or X-Owner-Secret header.
+
+const _AUTO_REPLY_TEXT = "Hey! Thanks for reaching out 🙌 We're running a free Apex Trading Bot demo for the first testers — no cost, no risk (demo account only). Want in? Reply here and I'll get you set up.";
+
+// ── Facebook/Instagram: post to the Page or IG Business account ──
+async function _metaPost(platform, content, mediaUrl) {
+  const token = process.env.META_PAGE_ACCESS_TOKEN;
+  if (!token) throw new Error('META_PAGE_ACCESS_TOKEN not configured');
+  if (platform === 'facebook') {
+    const pageId = process.env.META_PAGE_ID;
+    if (!pageId) throw new Error('META_PAGE_ID not configured');
+    const endpoint = mediaUrl
+      ? `https://graph.facebook.com/v20.0/${pageId}/photos`
+      : `https://graph.facebook.com/v20.0/${pageId}/feed`;
+    const body = mediaUrl
+      ? { url: mediaUrl, caption: content, access_token: token }
+      : { message: content, access_token: token };
+    const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error.message || 'Facebook post failed');
+    return data.post_id || data.id;
+  }
+  if (platform === 'instagram') {
+    const igId = process.env.META_IG_BUSINESS_ID;
+    if (!igId) throw new Error('META_IG_BUSINESS_ID not configured');
+    if (!mediaUrl) throw new Error('Instagram posts require an image/video URL (media_url)');
+    // Two-step: create a media container, then publish it.
+    const createR = await fetch(`https://graph.facebook.com/v20.0/${igId}/media`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_url: mediaUrl, caption: content || '', access_token: token }),
+    });
+    const created = await createR.json();
+    if (created.error) throw new Error(created.error.message || 'IG media container failed');
+    const pubR = await fetch(`https://graph.facebook.com/v20.0/${igId}/media_publish`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creation_id: created.id, access_token: token }),
+    });
+    const pub = await pubR.json();
+    if (pub.error) throw new Error(pub.error.message || 'IG publish failed');
+    return pub.id;
+  }
+  throw new Error('Unknown platform: ' + platform);
+}
+
+// POST /api/admin/social/post — { platform: 'facebook'|'instagram', content, media_url? }
+app.post('/api/admin/social/post', async (req, res) => {
+  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  const { platform, content, media_url } = req.body || {};
+  if (!['facebook', 'instagram'].includes(platform)) return res.status(400).json({ error: "platform must be 'facebook' or 'instagram'" });
+  let postRow = null;
+  try {
+    if (supabase) {
+      const { data } = await supabase.from('social_posts').insert([{ platform, content, media_url: media_url || null, status: 'queued' }]).select().single();
+      postRow = data;
+    }
+    const externalId = await _metaPost(platform, content, media_url);
+    if (supabase && postRow) {
+      await supabase.from('social_posts').update({ status: 'posted', external_post_id: externalId, posted_at: new Date().toISOString() }).eq('id', postRow.id);
+    }
+    res.json({ ok: true, external_post_id: externalId });
+  } catch (e) {
+    if (supabase && postRow) await supabase.from('social_posts').update({ status: 'failed', error: e.message }).eq('id', postRow.id);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Meta webhook: verification handshake + inbound DM auto-reply ──
+// GET is Meta's one-time subscription verification (hub.challenge echo).
+app.get('/webhooks/meta', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode === 'subscribe' && token === process.env.META_WEBHOOK_VERIFY_TOKEN) {
+    return res.status(200).send(challenge);
+  }
+  res.sendStatus(403);
+});
+
+// POST carries real events (messages, comments). Signature-verified so only
+// Meta can trigger auto-replies — mirrors _digistore24VerifySignature's
+// approach (HMAC over the raw body, compared to the header Meta sends).
+function _metaVerifySignature(req) {
+  const sig = req.headers['x-hub-signature-256'];
+  const secret = process.env.META_APP_SECRET;
+  if (!sig || !secret || !req.rawBody) return false;
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(req.rawBody).digest('hex');
+  try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); } catch (e) { return false; }
+}
+
+app.post('/webhooks/meta', async (req, res) => {
+  if (!_metaVerifySignature(req)) return res.sendStatus(401);
+  res.sendStatus(200); // ack immediately — Meta retries on timeout/non-200
+  try {
+    const entries = (req.body && req.body.entry) || [];
+    for (const entry of entries) {
+      const messaging = entry.messaging || [];
+      for (const evt of messaging) {
+        const senderId = evt.sender && evt.sender.id;
+        const text = evt.message && evt.message.text;
+        if (!senderId || !text) continue;
+        const platform = entry.messaging_product === 'instagram' || req.body.object === 'instagram' ? 'instagram' : 'facebook';
+        const token = process.env.META_PAGE_ACCESS_TOKEN;
+        try {
+          await fetch(`https://graph.facebook.com/v20.0/me/messages?access_token=${token}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipient: { id: senderId }, message: { text: _AUTO_REPLY_TEXT } }),
+          });
+          if (supabase) await supabase.from('social_dm_log').insert([{ platform, sender_id: senderId, message_text: text, reply_text: _AUTO_REPLY_TEXT }]);
+        } catch (e) { console.error('[Meta webhook] auto-reply failed:', e.message); }
+      }
+    }
+  } catch (e) { console.error('[Meta webhook] processing error:', e.message); }
+});
+
+// ── TikTok: OAuth connect + Content Posting API ──
+// TikTok requires a real OAuth2 authorization-code flow (no manual long-lived
+// token like Meta's Graph API Explorer) — Alex opens /auth/tiktok/start once,
+// approves, and the token lands in social_accounts.
+app.get('/auth/tiktok/start', (req, res) => {
+  const clientKey = process.env.TIKTOK_CLIENT_KEY;
+  const redirectUri = process.env.TIKTOK_REDIRECT_URI;
+  if (!clientKey || !redirectUri) return res.status(500).send('TikTok not configured — set TIKTOK_CLIENT_KEY / TIKTOK_REDIRECT_URI');
+  const state = crypto.randomBytes(16).toString('hex');
+  const url = `https://www.tiktok.com/v2/auth/authorize/?client_key=${encodeURIComponent(clientKey)}&scope=video.publish,video.upload&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+  res.redirect(url);
+});
+
+app.get('/auth/tiktok/callback', async (req, res) => {
+  const { code } = req.query;
+  if (!code) return res.status(400).send('Missing code');
+  try {
+    const r = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_key: process.env.TIKTOK_CLIENT_KEY,
+        client_secret: process.env.TIKTOK_CLIENT_SECRET,
+        code: String(code),
+        grant_type: 'authorization_code',
+        redirect_uri: process.env.TIKTOK_REDIRECT_URI,
+      }),
+    });
+    const data = await r.json();
+    if (data.error) return res.status(500).send('TikTok auth failed: ' + (data.error_description || data.error));
+    if (supabase) {
+      await supabase.from('social_accounts').upsert([{
+        platform: 'tiktok', account_id: data.open_id,
+        access_token: data.access_token,
+        token_expires_at: new Date(Date.now() + (data.expires_in || 0) * 1000).toISOString(),
+      }], { onConflict: 'platform,account_id' });
+    }
+    res.send('TikTok connected! You can close this tab.');
+  } catch (e) { res.status(500).send('TikTok auth error: ' + e.message); }
+});
+
+// POST /api/admin/social/tiktok/post — { content } — posts a text-caption video
+// draft is NOT supported here (needs a video file upload, not just a URL, per
+// TikTok's Content Posting API) — this posts via PULL_FROM_URL for a hosted
+// video file. { video_url, content }
+app.post('/api/admin/social/tiktok/post', async (req, res) => {
+  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  const { video_url, content } = req.body || {};
+  if (!video_url) return res.status(400).json({ error: 'video_url is required (TikTok posts video, not text/images)' });
+  let postRow = null;
+  try {
+    if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+    const { data: acct } = await supabase.from('social_accounts').select('access_token').eq('platform', 'tiktok').order('connected_at', { ascending: false }).limit(1).maybeSingle();
+    if (!acct) return res.status(400).json({ error: 'No TikTok account connected — visit /auth/tiktok/start first' });
+    const { data } = await supabase.from('social_posts').insert([{ platform: 'tiktok', content, media_url: video_url, status: 'queued' }]).select().single();
+    postRow = data;
+    const r = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${acct.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        post_info: { title: content || '', privacy_level: 'SELF_ONLY' },
+        source_info: { source: 'PULL_FROM_URL', video_url },
+      }),
+    });
+    const result = await r.json();
+    if (result.error && result.error.code !== 'ok') throw new Error(result.error.message || 'TikTok post init failed');
+    const publishId = result.data && result.data.publish_id;
+    await supabase.from('social_posts').update({ status: 'posted', external_post_id: publishId, posted_at: new Date().toISOString() }).eq('id', postRow.id);
+    res.json({ ok: true, publish_id: publishId, note: 'privacy_level is SELF_ONLY (TikTok default for unaudited apps) — switch to PUBLIC_TO_EVERYONE once your app passes Content Posting API review.' });
+  } catch (e) {
+    if (supabase && postRow) await supabase.from('social_posts').update({ status: 'failed', error: e.message }).eq('id', postRow.id);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ════════════════════════════════════════
 // CATCH-ALL 404  (must be after ALL routes)
