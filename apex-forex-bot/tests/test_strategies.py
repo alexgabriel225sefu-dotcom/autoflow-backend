@@ -87,7 +87,10 @@ weak = {"breakoutStr": "NONE"}
 bull = {"strength": 0.85}
 flat_lv = {"strength": 0.2}
 m = strategies.druckenmiller_multiplier(90, 5, bull, strong)
-check("high conviction → capped at 2.0", m == 2.0, m)
+# Cap was walked down 2.0 → 1.5 → 1.2 (a1c08bfd, "ATR stops widened + caps
+# tightened"). This is a sizing multiplier: conviction may add 20% to a
+# position, never double it. Raising it again is a real risk decision.
+check("high conviction → capped at 1.2", m == 1.2, m)
 m = strategies.druckenmiller_multiplier(60, 1, flat_lv, weak)
 check("low conviction → floored at 0.4+", 0.4 <= m <= 0.6, m)
 m = strategies.druckenmiller_multiplier(78, 3, flat_lv, weak)
@@ -124,7 +127,15 @@ check("drawdown > 20% from peak → stop", r["stop"] and any("Drawdown" in x for
 fresh_session()
 strategies.session["dailyTrades"] = 10
 r = strategies.should_stop(1000, 1000)
-check("10 trades/day → stop (Turtle)", r["stop"] and any("10 trades" in x for x in r["reasons"]), r)
+# The trades/day cap was removed on purpose (6a0bc7af) — a good setup is a
+# good setup regardless of how many came before it. Asserted as a REQUIREMENT,
+# not an omission: re-adding a silent cap here would stop a live account
+# mid-session with no other circuit breaker having fired.
+check("trade count alone never stops trading (cap removed by design)",
+      r["stop"] is False and not r["reasons"], r)
+strategies.session["dailyTrades"] = 999
+check("still no stop at an absurd trade count",
+      strategies.should_stop(1000, 1000)["stop"] is False)
 
 fresh_session()
 r = strategies.should_stop(0.5, 1000)
