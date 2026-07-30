@@ -19,16 +19,27 @@ Env:
   RUFLO_MCP_SECRET                                    (path secret for the URL)
   PORT                                                (Render sets this)
 """
+import functools
 import json
 import os
 import time
 import uuid
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.server import TransportSecuritySettings
+
+# One shared session so a transient network blip (DNS hiccup, Upstash/Telegram
+# 502) gets retried with backoff instead of turning into an unhandled
+# exception on every single call to that host.
+_session = requests.Session()
+_retries = Retry(total=3, backoff_factor=0.5, status_forcelist=(429, 500, 502, 503, 504))
+_session.mount("https://", HTTPAdapter(max_retries=_retries))
+_session.mount("http://", HTTPAdapter(max_retries=_retries))
 
 _REDIS = {
     "forex": {
@@ -62,9 +73,12 @@ def _ns(product: str) -> str:
 
 def _redis(product: str, *parts):
     cfg = _REDIS.get(product, _REDIS["forex"])
-    r = requests.post(cfg["url"], json=[str(p) for p in parts],
-                      headers={"Authorization": f"Bearer {cfg['token']}"}, timeout=10)
-    r.raise_for_status()
+    try:
+        r = _session.post(cfg["url"], json=[str(p) for p in parts],
+                          headers={"Authorization": f"Bearer {cfg['token']}"}, timeout=10)
+        r.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Upstash request failed: {e}") from e
     return r.json().get("result")
 
 
@@ -77,7 +91,12 @@ def _call(product: str, action: str, args: dict = None, timeout: float = 20.0):
     deadline = time.time() + timeout
     key = f"{ns}:cmdresult:{cid}"
     while time.time() < deadline:
-        raw = _redis(ns, "GET", key)
+        try:
+            raw = _redis(ns, "GET", key)
+        except RuntimeError:
+            # A transient Upstash blip mid-poll shouldn't fail the whole
+            # command — keep polling until the deadline.
+            raw = None
         if raw:
             try:
                 return json.loads(raw)
@@ -113,8 +132,26 @@ mcp = FastMCP(
 )
 
 
+def _tool_safe(fn):
+    """Turn any unexpected exception (bad input, Upstash/Telegram outage,
+    malformed data) into a plain error dict instead of an unhandled
+    traceback — one flaky call must never look like the connector is down."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except ValueError as e:
+            return {"error": str(e)}
+        except RuntimeError as e:
+            return {"error": str(e)}
+        except Exception as e:
+            return {"error": f"unexpected error in {fn.__name__}: {e}"}
+    return wrapper
+
+
 # ─── Read tools ────────────────────────────────────────────
 @mcp.tool()
+@_tool_safe
 def bot_alive(product: str) -> dict:
     """Is the crypto/forex bot alive? Returns seconds since its last heartbeat."""
     ns = _ns(product)
@@ -126,6 +163,7 @@ def bot_alive(product: str) -> dict:
 
 
 @mcp.tool()
+@_tool_safe
 def bot_status(product: str) -> dict:
     """Live snapshot: active users and each one's symbol, strategy, running
     state, balance and connected cTrader account. product = crypto | forex."""
@@ -133,12 +171,14 @@ def bot_status(product: str) -> dict:
 
 
 @mcp.tool()
+@_tool_safe
 def user_detail(product: str, user_id: str) -> dict:
     """Full (token-redacted) settings + dashboard for one user."""
     return _call(product, "user_detail", {"user_id": user_id})
 
 
 @mcp.tool()
+@_tool_safe
 def ctrader_account(product: str, user_id: str) -> dict:
     """Live cTrader balance + all open positions for a user, read fresh from
     the broker."""
@@ -146,6 +186,7 @@ def ctrader_account(product: str, user_id: str) -> dict:
 
 
 @mcp.tool()
+@_tool_safe
 def recent_events(product: str, limit: int = 40) -> dict:
     """Recent notable events (errors, closes, health, stops) — newest first.
     Read straight from Redis, so it works even if the bot is down."""
@@ -153,12 +194,14 @@ def recent_events(product: str, limit: int = 40) -> dict:
 
 
 @mcp.tool()
+@_tool_safe
 def audit_log(product: str, limit: int = 40) -> dict:
     """Every remote command executed on the bot — the tamper-evident trail."""
     return {"audit": _lrange(product, "audit", limit)}
 
 
 @mcp.tool()
+@_tool_safe
 def recent_commands(product: str, limit: int = 60) -> dict:
     """What clients sent in Telegram (level tg_in) and the exact orders the bot
     sent to cTrader (level order) — newest first."""
@@ -169,24 +212,28 @@ def recent_commands(product: str, limit: int = 60) -> dict:
 
 # ─── Action tools (need MCP_CONTROL_ENABLED=true on the bot) ──
 @mcp.tool()
+@_tool_safe
 def restart_user(product: str, user_id: str) -> dict:
     """Restart a user's trading loop (heals a stuck/desynced loop)."""
     return _call(product, "restart_loop", {"user_id": user_id})
 
 
 @mcp.tool()
+@_tool_safe
 def bot_power(product: str, user_id: str, on: bool) -> dict:
     """Turn a user's bot ON (start trading) or OFF (pause)."""
     return _call(product, "bot_on" if on else "bot_off", {"user_id": user_id})
 
 
 @mcp.tool()
+@_tool_safe
 def refresh_ctrader_token(product: str, user_id: str) -> dict:
     """Force a cTrader token refresh + reconnect for a user (heals auth errors)."""
     return _call(product, "refresh_token", {"user_id": user_id})
 
 
 @mcp.tool()
+@_tool_safe
 def set_user_setting(product: str, user_id: str, key: str, value) -> dict:
     """Change one strategy/risk setting for a user (e.g. strategy, risk, symbol,
     timeframe, trailing, max_trades_day) and restart their loop. Auth/token/
@@ -195,18 +242,21 @@ def set_user_setting(product: str, user_id: str, key: str, value) -> dict:
 
 
 @mcp.tool()
+@_tool_safe
 def send_telegram(product: str, user_id: str, text: str) -> dict:
     """Send a Telegram message to a user from the bot."""
     return _call(product, "send_message", {"user_id": user_id, "text": text})
 
 
 @mcp.tool()
+@_tool_safe
 def force_close(product: str, user_id: str) -> dict:
     """Immediately close a user's open position at the broker."""
     return _call(product, "force_close", {"user_id": user_id})
 
 
 @mcp.tool()
+@_tool_safe
 def open_trade(product: str, user_id: str, side: str, symbol: str = None) -> dict:
     """Open a trade on command: side = BUY or SELL, optional symbol (defaults to
     the user's current symbol). SAFETY: demo accounts only — the bot refuses on a
@@ -219,7 +269,7 @@ def open_trade(product: str, user_id: str, side: str, symbol: str = None) -> dic
 
 # ─── Affiliate / referral bot (over the website API) ─────────
 def _site_post(path: str, body: dict, timeout: float = 15.0):
-    r = requests.post(f"{_SITE}{path}", json=body, timeout=timeout)
+    r = _session.post(f"{_SITE}{path}", json=body, timeout=timeout)
     try:
         return r.json()
     except Exception:
@@ -227,6 +277,7 @@ def _site_post(path: str, body: dict, timeout: float = 15.0):
 
 
 @mcp.tool()
+@_tool_safe
 def affiliates_overview() -> dict:
     """All affiliates with their sales totals (paid / pending / refunded) —
     the referral program at a glance."""
@@ -242,6 +293,7 @@ def affiliates_overview() -> dict:
 
 
 @mcp.tool()
+@_tool_safe
 def affiliate_stats(chat_id: str) -> dict:
     """Live earnings/clicks/sales for one affiliate by their Telegram chat id."""
     if not _AFF_SECRET:
@@ -251,11 +303,12 @@ def affiliate_stats(chat_id: str) -> dict:
 
 
 @mcp.tool()
+@_tool_safe
 def message_affiliate(chat_id: str, text: str) -> dict:
     """Send a Telegram message to an affiliate from the referral bot."""
     if not _AFF_TOKEN:
         return {"error": "AFFILIATE_BOT_TOKEN not set on the MCP server"}
-    r = requests.post(f"https://api.telegram.org/bot{_AFF_TOKEN}/sendMessage",
+    r = _session.post(f"https://api.telegram.org/bot{_AFF_TOKEN}/sendMessage",
                       json={"chat_id": chat_id, "text": text[:3500],
                             "parse_mode": "HTML", "disable_web_page_preview": True},
                       timeout=10)
