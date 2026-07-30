@@ -46,11 +46,13 @@ class _StubBroker:
         return True
 
 
-def _live_trail(side, entry, cur_sl, price, trailing, breakeven_r):
+def _live_trail(side, entry, cur_sl, price, trailing, breakeven_r,
+                initial_risk=None):
     """Whatever the REAL user_loop._manage_trailing() decides."""
     cfg = types.SimpleNamespace(TRAILING_STOP=trailing, BREAKEVEN_AT_R=breakeven_r)
     pos = {"positionId": 1, "entryPrice": entry, "stopLoss": cur_sl, "side": side}
-    return user_loop._manage_trailing(_StubBroker(), cfg, pos, "EUR_USD", price)
+    return user_loop._manage_trailing(_StubBroker(), cfg, pos, "EUR_USD", price,
+                                      initial_risk=initial_risk)
 
 
 print("\n1. trail_stop() matches user_loop._manage_trailing()")
@@ -69,18 +71,40 @@ for side, entry in (("BUY", 1.1000), ("SELL", 1.1000)):
 
 mismatches = []
 for side, entry, cur_sl, price, trailing, be_r in cases:
-    live = _live_trail(side, entry, cur_sl, price, trailing, be_r)
-    mirror = position.trail_stop(side, entry, cur_sl, price,
-                                 trailing=trailing, breakeven_r=be_r)
-    both_none = live is None and mirror is None
-    if not (both_none or (live is not None and mirror is not None
-                          and abs(live - mirror) < 1e-9)):
-        mismatches.append(
-            f"side={side} sl={cur_sl:.5f} px={price:.5f} trail={trailing} "
-            f"be={be_r} → live={live} mirror={mirror}")
+    # Both the derived-R path (initial_risk=None) and the pinned-R path, so
+    # the mirror stays honest for positions opened before the fix shipped as
+    # well as for the ones opened after it.
+    for init_r in (None, 0.0020):
+        live = _live_trail(side, entry, cur_sl, price, trailing, be_r, init_r)
+        mirror = position.trail_stop(side, entry, cur_sl, price,
+                                     trailing=trailing, breakeven_r=be_r,
+                                     initial_risk=init_r)
+        both_none = live is None and mirror is None
+        if not (both_none or (live is not None and mirror is not None
+                              and abs(live - mirror) < 1e-9)):
+            mismatches.append(
+                f"side={side} sl={cur_sl:.5f} px={price:.5f} trail={trailing} "
+                f"be={be_r} R={init_r} → live={live} mirror={mirror}")
 
-check(f"all {len(cases)} trailing scenarios agree",
+check(f"all {len(cases) * 2} trailing scenarios agree",
       not mismatches, "; ".join(mismatches[:4]))
+
+print("\n1b. pinned R removes the noise-tight ratchet")
+# The regression this fix exists for: once the stop crosses entry, derived R
+# collapses and the trail snaps to a few pips behind price.
+_e, _sl0 = 1.1000, 1.0975          # 25 pip initial risk
+_cur_derived = _cur_pinned = _sl0
+for _px in (1.1030, 1.1040, 1.1045):
+    _d = position.trail_stop("BUY", _e, _cur_derived, _px)
+    _p = position.trail_stop("BUY", _e, _cur_pinned, _px, initial_risk=0.0025)
+    _cur_derived = _d if _d else _cur_derived
+    _cur_pinned = _p if _p else _cur_pinned
+_gap_derived = (1.1045 - _cur_derived) * 10000
+_gap_pinned = (1.1045 - _cur_pinned) * 10000
+check(f"derived R leaves a distorted trail ({_gap_derived:.0f}p, not 25p)",
+      abs(_gap_derived - 25.0) > 5.0, _gap_derived)
+check(f"pinned R holds a constant 25p trail ({_gap_pinned:.0f}p)",
+      abs(_gap_pinned - 25.0) < 0.5, _gap_pinned)
 
 print("\n2. trail_stop() honours the documented contract")
 check("no move while the trade is under water",

@@ -36,6 +36,14 @@ def _plausible_exit_price(entry_price, exit_price):
     return abs(exit_price - entry_price) / entry_price <= _MAX_PLAUSIBLE_GAP_MOVE
 
 
+def _nrm(x):
+    """Broker-agnostic symbol key (EUR_USD / EUR/USD / eurusd → EURUSD).
+    Module-level so the startup recovery can key off it too — it used to be
+    re-defined inside every tick of the loop, below the point where recovery
+    runs."""
+    return (x or "").upper().replace("_", "").replace("/", "").replace("-", "")
+
+
 _LOOP_INTERVAL = 300  # 5 minutes between ticks
 _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
@@ -191,11 +199,32 @@ def _refresh_ctrader_token(user_id, cfg) -> bool:
         return False
 
 
-def _manage_trailing(broker, cfg, pos, symbol, price):
+def _manage_trailing(broker, cfg, pos, symbol, price, initial_risk=None):
     """Trailing stop + break-even (Strategy Builder exit modes). Moves the SL
     only in the favourable direction — never loosens it, never closes the trade.
     Real-broker only (needs a live positionId + amend_sltp). Returns the new SL
-    if it moved, else None. Fail-soft everywhere."""
+    if it moved, else None. Fail-soft everywhere.
+
+    initial_risk is the trade's ORIGINAL entry-to-stop distance and must stay
+    constant for its lifetime. It has to be supplied by the caller because the
+    broker only ever reports the CURRENT stop: deriving R from
+    abs(entry - cur_sl) — as this did — silently stops measuring risk the
+    moment the stop ratchets past entry, because from then on that distance is
+    locked profit. The first ratchet past breakeven collapsed R toward zero and
+    pinned the trail a few pips behind price, where ordinary spread-sized noise
+    closed the trade:
+
+        BUY entry 1.1000, stop 1.0975 (25p risk), price walking up
+          1.1030 -> R 25.0p -> stop 1.1005   trail 25p, as intended
+          1.1040 -> R  5.0p -> stop 1.1035   trail 5p, inside the noise
+          1.1045 -> R 35.0p -> stop 1.1035   trail 10p, and now loose again
+
+    Winners were cut at noise distance while losers still ran the full stop.
+
+    None keeps the old derivation. That is the fallback for a position whose
+    opening this process never saw (adopted mid-life after a restart with no
+    snapshot, or opened before this change shipped) — those keep today's
+    behaviour rather than trailing off a risk figure we cannot know."""
     try:
         if not pos or not price or not hasattr(broker, "amend_sltp"):
             return None
@@ -209,7 +238,8 @@ def _manage_trailing(broker, cfg, pos, symbol, price):
         side = pos.get("side")
         if not (pid and entry and cur_sl and side in ("BUY", "SELL")):
             return None
-        risk = abs(float(entry) - float(cur_sl))
+        risk = (abs(float(initial_risk)) if initial_risk
+                else abs(float(entry) - float(cur_sl)))
         if risk <= 0:
             return None
         profit = (price - entry) if side == "BUY" else (entry - price)
@@ -320,6 +350,25 @@ def _loop(user_id, alert_fn, gen=None):
 
     def _persist_open_snapshot(pos):
         _persist_open_position(user_id, cfg, pos)
+
+    def _with_initial_stop(pos, sym):
+        """Re-persist a broker-read position without losing its original stop.
+
+        The broker only ever reports the CURRENT stop, so any snapshot rebuilt
+        from a broker read would drop the original one and the next restart
+        would fall back to noise-tight trailing. Reconstruct it from the risk
+        this process pinned at entry."""
+        out = {**pos, "symbol": sym}
+        r = entry_risk_by_sym.get(_nrm(sym))
+        if r and pos.get("entryPrice") and not out.get("initialStop"):
+            e = float(pos["entryPrice"])
+            out["initialStop"] = e - r if pos.get("side") == "BUY" else e + r
+        return out
+    # nrm(symbol) -> the trade's ORIGINAL entry-to-stop distance. Keyed by
+    # symbol because the focus can move between ticks (maxpos=1 adopts a
+    # position found on another pair), and a trail sized off the wrong pair's
+    # risk is worse than no trail at all. See _manage_trailing's initial_risk.
+    entry_risk_by_sym = {}
     prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
     pos_details = {}    # nrm(symbol) -> {symbol, side, entry, units} for P&L on close
     spread_blocked = {}  # nrm(symbol) -> retry_ts: Auto-Pilot avoids symbols whose
@@ -414,8 +463,18 @@ def _loop(user_id, alert_fn, gen=None):
                 # snapshot here, a SECOND restart while this same position is
                 # still open would find nothing to compare against and we'd
                 # be back to the exact bug this is fixing.
-                _persist_open_snapshot({**open_pos, "symbol": symbol})
-                print(f"[UserLoop:{user_id}] restart recovery: adopted still-open {symbol} position")
+                # Carry the ORIGINAL stop across the restart, not the live one:
+                # if this position has already trailed, its current stop is no
+                # longer its risk, and re-deriving R from it would resume the
+                # noise-tight trailing this fix removes.
+                _init_stop = _snap.get("initialStop")
+                if _init_stop and open_pos.get("entryPrice"):
+                    entry_risk_by_sym[_nrm(symbol)] = abs(
+                        float(open_pos["entryPrice"]) - float(_init_stop))
+                _persist_open_snapshot({**open_pos, "symbol": symbol,
+                                        "initialStop": _init_stop})
+                print(f"[UserLoop:{user_id}] restart recovery: adopted still-open {symbol} position"
+                      f"{'' if _init_stop else ' (no initial stop on record — trailing falls back to the live stop)'}")
             elif not _got_answer:
                 # Never got a definitive answer from the broker — don't guess
                 # "closed." Keep tracking it from the snapshot; the very next
@@ -425,6 +484,9 @@ def _loop(user_id, alert_fn, gen=None):
                 open_pos = dict(_snap)
                 dash["symbol"] = symbol
                 dash["openPosition"] = open_pos
+                if _snap.get("initialStop") and _snap.get("entryPrice"):
+                    entry_risk_by_sym[_nrm(symbol)] = abs(
+                        float(_snap["entryPrice"]) - float(_snap["initialStop"]))
                 _persist_open_snapshot(open_pos)
                 print(f"[UserLoop:{user_id}] restart recovery: broker unreachable at startup — "
                       f"keeping {symbol} tracked pending the next tick")
@@ -570,9 +632,6 @@ def _loop(user_id, alert_fn, gen=None):
             max_total_risk = float(user_store.load(user_id).get("max_total_risk", 0.05))
             per_trade_risk = min(cfg.RISK_PER_TRADE, max_total_risk / maxpos)
 
-            def _nrm(x):
-                return (x or "").upper().replace("_", "").replace("/", "").replace("-", "")
-
             rate_ok = time.time() >= rate_limit_until
             all_positions = None
             open_syms, open_exposure = set(), []
@@ -663,6 +722,13 @@ def _loop(user_id, alert_fn, gen=None):
                         alert_fn(user_id, {"action": "BROKER_CLOSE_MULTI", "symbol": det.get("symbol", cs),
                                            "netPnl": est_pnl, "balance": round(paper_balance, 2)})
                 prev_open_syms = set(open_syms)
+                # Drop pinned risk for anything no longer open, so a later
+                # trade on the same pair never trails off a dead position's R.
+                # Done here, against the broker's own list, rather than at each
+                # close site — SL/TP, manual /close, weekend flatten and the
+                # protective stop all converge on this one truth.
+                for _gone in [k for k in entry_risk_by_sym if k not in open_syms]:
+                    entry_risk_by_sym.pop(_gone, None)
             open_count = len(open_syms)
             dash["openCount"] = open_count
             dash["maxpos"] = maxpos
@@ -875,12 +941,24 @@ def _loop(user_id, alert_fn, gen=None):
                     # watchlist fallback above finding it on another symbol) —
                     # keep the restart-recovery snapshot current so a redeploy
                     # right after this tick can still find it.
-                    _persist_open_snapshot({**open_pos, "symbol": symbol})
+                    if _nrm(symbol) not in entry_risk_by_sym:
+                        # force_trade (/buy, /sell, MCP open_trade) records the
+                        # original stop in the snapshot from a different call
+                        # path, so adopt it instead of falling back to the live
+                        # stop — a manual entry deserves the same exit quality.
+                        _s = (user_store.load(user_id) or {}).get("open_position_snapshot") or {}
+                        if (_s.get("initialStop") and _s.get("entryPrice")
+                                and _nrm(_s.get("symbol")) == _nrm(symbol)):
+                            entry_risk_by_sym[_nrm(symbol)] = abs(
+                                float(_s["entryPrice"]) - float(_s["initialStop"]))
+                    _persist_open_snapshot(_with_initial_stop(open_pos, symbol))
 
                 # Trailing-stop / break-even management for the open position
                 # (Strategy Builder exit modes). Fail-soft; real-broker only.
                 if open_pos and not cfg.PAPER_TRADING:
-                    moved = _manage_trailing(broker, cfg, open_pos, symbol, price)
+                    moved = _manage_trailing(
+                        broker, cfg, open_pos, symbol, price,
+                        initial_risk=entry_risk_by_sym.get(_nrm(symbol)))
                     if moved is not None:
                         open_pos["stopLoss"] = open_pos["sl"] = moved
                         if alert_fn:
@@ -1644,7 +1722,13 @@ def _loop(user_id, alert_fn, gen=None):
                                                         "takeProfit": tp_price, "openedAt": now_str}
 
                             dash["openPosition"] = open_pos
-                            _persist_open_snapshot(open_pos)
+                            # Pin R now, off the REAL fill and the stop we sent.
+                            # This is the only moment both are known: from the
+                            # next tick on the broker reports the current stop,
+                            # which starts moving as soon as the trail engages.
+                            _fill = open_pos.get("entryPrice") or price
+                            entry_risk_by_sym[_nrm(symbol)] = abs(float(_fill) - float(sl_price))
+                            _persist_open_snapshot({**open_pos, "initialStop": sl_price})
                             result = {"action": action, "symbol": symbol, "confidence": confidence,
                                       "price": price, "spreadPips": round(spread, 1), "time": now_str,
                                       "stopLoss": sl_price, "takeProfit": tp_price,
@@ -1945,6 +2029,10 @@ def force_trade(user_id, side, symbol=None, lots=None):
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     open_pos = {"side": side, "entryPrice": price, "symbol": sym,
                 "units": units, "stopLoss": sl_price, "takeProfit": tp_price,
+                # Record the original stop so the loop trails this manual trade
+                # off its real R too — a /buy gets the same exit quality as an
+                # autonomous entry.
+                "initialStop": sl_price,
                 "entrySpreadPips": spread, "openedAt": now_str}
     _persist_open_position(user_id, cfg, open_pos)
 
