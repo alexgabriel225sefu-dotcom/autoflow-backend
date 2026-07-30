@@ -122,6 +122,25 @@ def fetch_candles():
         return synthetic_candles(CANDLES + 300)
     from apex.brokers import get_broker
     broker = get_broker()
+    # get_broker() always hands back a MODULE. Most connectors (yahoo,
+    # twelvedata, mtbridge) expose get_candles at module level, but ctrader —
+    # the default BROKER — only exposes the CtraderBroker class, so the plain
+    # module call raised AttributeError and no real-data backtest could run on
+    # the default settings at all.
+    if not hasattr(broker, "get_candles"):
+        cls = getattr(broker, "CtraderBroker", None)
+        if cls is None:
+            raise SystemExit(
+                f"BROKER={cfg.BROKER} exposes neither get_candles() nor "
+                f"CtraderBroker — cannot fetch history.")
+        if not (getattr(cfg, "CTRADER_ACCESS_TOKEN", "")
+                and getattr(cfg, "CTRADER_ACCOUNT_ID", "")):
+            raise SystemExit(
+                "BROKER=ctrader needs CTRADER_ACCESS_TOKEN + CTRADER_ACCOUNT_ID "
+                "in the environment (they are per-user in Redis at runtime, not "
+                "in cfg). Either export them, or run with BROKER=yahoo for free "
+                "history, or BT_SYNTHETIC=true to validate the engine only.")
+        broker = cls(cfg)
     return broker.get_candles(SYMBOL, cfg.TIMEFRAME, min(CANDLES + 300, 5000))
 
 
