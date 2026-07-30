@@ -11,6 +11,31 @@ from apex.brokers.ctrader import CtraderBroker as _CtraderBroker
 _loops = {}   # user_id → {"thread": Thread, "running": bool, "dash": dict}
 _lock  = threading.Lock()
 
+# The candle-close fallback used when a broker-side close is discovered with no
+# get_closed_deal_pnl() record (restart gap, multi-position sweep) prices the
+# exit off broker.get_candles(symbol, ...) — if that ever returns another
+# instrument's candle (bad cache key, symbol-ID collision), entryPrice and
+# exit_price belong to two different assets and forex.pnl_usd() reports a
+# nonsense PnL. A same-symbol close during a single bot-downtime gap never
+# legitimately moves more than this — treat anything past it as an
+# untrustworthy estimate rather than a fact worth alerting on.
+_MAX_PLAUSIBLE_GAP_MOVE = 0.5  # 50% — generous even for a bad gap
+
+
+def _plausible_exit_price(entry_price, exit_price):
+    """True if exit_price could plausibly be the SAME symbol's price as
+    entry_price (guards the candle-close PnL fallback against fetching the
+    wrong instrument)."""
+    try:
+        entry_price = float(entry_price)
+        exit_price = float(exit_price)
+    except (TypeError, ValueError):
+        return False
+    if entry_price <= 0 or exit_price <= 0:
+        return False
+    return abs(exit_price - entry_price) / entry_price <= _MAX_PLAUSIBLE_GAP_MOVE
+
+
 _LOOP_INTERVAL = 300  # 5 minutes between ticks
 _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
@@ -430,12 +455,21 @@ def _loop(user_id, alert_fn, gen=None):
                     units_ = _snap.get("units") or _snap.get("quantity", 0)
                     net = None
                     if exit_price and _snap.get("entryPrice") and units_:
-                        net = round(forex.pnl_usd(_snap.get("side", "BUY"), _snap["entryPrice"],
-                                                  exit_price, units_, _snap["symbol"]), 2)
+                        if _plausible_exit_price(_snap["entryPrice"], exit_price):
+                            net = round(forex.pnl_usd(_snap.get("side", "BUY"), _snap["entryPrice"],
+                                                      exit_price, units_, _snap["symbol"]), 2)
+                        else:
+                            print(f"[UserLoop:{user_id}] BROKER_CLOSE fallback rejected implausible "
+                                  f"exit_price={exit_price} vs entryPrice={_snap['entryPrice']} "
+                                  f"for {_snap['symbol']}")
+                            exit_price = None
                     gross_pnl = net
                     cost_usd = 0.0
                     reasoning = ("closed at the broker during a restart — exact fill "
-                                 "unknown, priced against the next available quote")
+                                 "unknown, priced against the next available quote"
+                                 if net is not None else
+                                 "closed at the broker during a restart — exact P&L "
+                                 "couldn't be verified safely, check cTrader history")
                 result = {"action": "BROKER_CLOSE", "symbol": _snap["symbol"],
                           "side": _snap.get("side", ""), "price": exit_price,
                           "entryPrice": _snap.get("entryPrice"), "netPnl": net,
@@ -594,10 +628,15 @@ def _loop(user_id, alert_fn, gen=None):
                             if det.get("entry") and det.get("units"):
                                 xc = broker.get_candles(det["symbol"], cfg.TIMEFRAME, 2)
                                 xp = xc[-1]["close"] if xc else None
-                                if xp:
+                                if xp and _plausible_exit_price(det["entry"], xp):
                                     est_pnl = round(forex.pnl_usd(det["side"], det["entry"], xp,
                                                                   det["units"], det["symbol"]), 2)
                                     gross_pnl = est_pnl
+                                elif xp:
+                                    print(f"[UserLoop:{user_id}] BROKER_CLOSE_MULTI fallback rejected "
+                                          f"implausible exit_price={xp} vs entry={det['entry']} "
+                                          f"for {det['symbol']}")
+                                    xp = None
                         except Exception:
                             est_pnl = None
                     now2 = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
