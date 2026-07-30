@@ -323,6 +323,15 @@ def _loop(user_id, alert_fn, gen=None):
     if not cfg.PAPER_TRADING:
         try:
             paper_balance = broker.get_balance()
+            # Money moved while the loop was DOWN. If we were flat when it went
+            # down, no trade can account for it, so it is a deposit or a
+            # withdrawal and the drawdown peak has to follow it. (A position
+            # that closed during the outage is the other case, and the restart
+            # recovery below journals that as a real trade instead.)
+            _prev_seed = float(cfg.PAPER_BALANCE or 0)
+            _flat_when_down = not (user.get("open_position_snapshot") or {}).get("symbol")
+            if _prev_seed and _flat_when_down and abs(paper_balance - _prev_seed) >= 0.01:
+                strategies.rebase_peak(paper_balance - _prev_seed, user_id=user_id)
             user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
         except Exception as e:
             print(f"[UserLoop:{user_id}] initial balance read failed: {e}")
@@ -981,7 +990,13 @@ def _loop(user_id, alert_fn, gen=None):
                 # Shift the baseline so profit % keeps measuring TRADING only.
                 if (abs(paper_balance - prev_balance) >= 0.01
                         and not (prev_pos and not open_pos)):
-                    dash["startBalance"] = dash.get("startBalance", prev_balance) + (paper_balance - prev_balance)
+                    _cash_delta = paper_balance - prev_balance
+                    dash["startBalance"] = dash.get("startBalance", prev_balance) + _cash_delta
+                    # The drawdown breaker reads strategy_session["peakBalance"],
+                    # which this used to leave untouched — so a withdrawal made
+                    # the account look like it had crashed and halted the bot
+                    # with no way to clear it.
+                    strategies.rebase_peak(_cash_delta, user_id=user_id)
                 # cTrader executed the SL/TP server-side: the position we were
                 # managing vanished between ticks. Tell the client — silence
                 # here made broker-side exits invisible in Telegram.

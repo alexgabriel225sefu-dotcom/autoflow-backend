@@ -53,6 +53,47 @@ def _persist_session(user_id):
         print(f"[STRATEGY:{user_id}] session persist failed: {e}")
 
 
+def rebase_peak(delta, user_id=None):
+    """Shift the drawdown peak by an external cash movement.
+
+    peakBalance exists to measure TRADING drawdown, so a deposit or withdrawal
+    has to move it too. Leaving it alone means the breaker compares the new
+    account against a peak that included money the user has since taken out:
+    withdrawing a $6,309 account down to $10 reads as -99.8%, trips "capital
+    protection stop" on every tick, and nothing clears it — not /resetstats,
+    not a restart, and no setting the operator can change. The loop already
+    rebases dash["startBalance"] on the same event; this is the half that was
+    missing.
+
+    Withdrawing below the old peak floors it at the new balance rather than
+    going negative, so the breaker starts measuring from the real capital base.
+    """
+    s = get_session(user_id)
+    if s.get("peakBalance") is None:
+        return
+    try:
+        s["peakBalance"] = max(0.0, float(s["peakBalance"]) + float(delta))
+    except (TypeError, ValueError):
+        return
+    _persist_session(user_id)
+    print(f"[STRATEGY:{user_id or '?'}] drawdown peak rebased by {float(delta):+.2f} "
+          f"→ {s['peakBalance']:.2f} (deposit/withdrawal, not a trading loss)")
+
+
+def reset_peak(balance, user_id=None):
+    """Drop the drawdown peak to `balance` — the clean-slate path behind
+    /resetstats, which promises stats "start fresh from this moment" but used
+    to leave the persisted peak untouched, so a stale peak could keep the bot
+    halted straight through a reset the user believed had cleared it."""
+    s = get_session(user_id)
+    try:
+        s["peakBalance"] = max(0.0, float(balance))
+    except (TypeError, ValueError):
+        return
+    _persist_session(user_id)
+    print(f"[STRATEGY:{user_id or '?'}] drawdown peak reset → {s['peakBalance']:.2f}")
+
+
 def _default_symbol_session():
     return {"consecutiveLosses": 0, "consecutiveWins": 0, "lastLossAt": 0.0}
 

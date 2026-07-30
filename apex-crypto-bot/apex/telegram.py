@@ -2008,6 +2008,16 @@ def _handle_resetstats(chat_id):
         dash["skips"] = []
         dash["skipsToday"] = 0
         dash["startBalance"] = dash.get("balance", dash.get("startBalance", 0))
+    # The persisted drawdown peak has to go too. It lives in strategy_session,
+    # not dash, so it used to survive this "clean slate" — a stale peak (after
+    # a withdrawal, say) then kept the drawdown breaker tripping on every tick
+    # and the bot stayed halted straight through a reset the user believed had
+    # cleared it, with no other way out.
+    from apex import strategies as _st
+    _bal = (dash or {}).get("balance")
+    if _bal is None:
+        _bal = user_store.load(chat_id).get("paper_balance") or 0
+    _st.reset_peak(_bal, user_id=str(chat_id))
     send_to(chat_id,
         "🧹 <b>Journal reset — clean slate.</b>\n\n"
         "Performance stats now start fresh from this moment. Let the bot run "
