@@ -381,18 +381,35 @@ footer .right{font:400 11px/1.6 var(--sans);color:var(--muted);max-width:500px}
 </footer>
 
 <script>
-var CHECKOUT_URLS = {
-  'apex-crypto': 'https://www.checkout-ds24.com/product/714550',
-  'apex-forex': 'https://www.checkout-ds24.com/product/714638'
-};
-function openCheckout(e, product) {
-  e.preventDefault();
-  var url = CHECKOUT_URLS[product];
-  if (url) {
-    window.location.href = url;
-  } else {
-    alert('This product is not available for purchase yet — check back soon.');
+// Affiliate ref capture + click beacon (same pattern as forex.html)
+(function(){
+  var p=new URLSearchParams(window.location.search);
+  var code=p.get('ref')||p.get('r_id')||p.get('rfsn');
+  if(code) sessionStorage.setItem('rfrsn_ref',code);
+  if(code && !sessionStorage.getItem('ref_click_sent')){
+    sessionStorage.setItem('ref_click_sent','1');
+    try{ fetch('/api/affiliates/click?ref='+encodeURIComponent(code),{keepalive:true}).catch(function(){}); }catch(e){}
   }
+})();
+
+async function openCheckout(e, product) {
+  e.preventDefault();
+  var btn = e.currentTarget;
+  var origText = btn.innerHTML;
+  btn.style.pointerEvents = 'none';
+  try {
+    var ref = sessionStorage.getItem('rfrsn_ref') || '';
+    var r = await fetch('/api/checkout/create-session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product: product, ref: ref })
+    });
+    var d = await r.json();
+    if (d.url) { window.location.href = d.url; return; }
+    alert(d.error || 'This product is not available for purchase yet — check back soon.');
+  } catch (err) {
+    alert('Could not start checkout. Please try again.');
+  }
+  btn.style.pointerEvents = '';
 }
 </script>
 </body>

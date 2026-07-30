@@ -462,7 +462,7 @@ footer .disc{max-width:560px}
     <div class="rv">
       <button class="btn btn-primary" onclick="gotoCheckout()" style="font-size:17px;padding:17px 32px;margin-top:8px">Get Apex Forex Bot — $497 →</button>
     </div>
-    <p class="rv" style="font:400 12px/1.6 var(--m);color:var(--t2);margin-top:16px">Secure checkout via Digistore24 · Instant license delivery · Forex trading involves risk of loss</p>
+    <p class="rv" style="font:400 12px/1.6 var(--m);color:var(--t2);margin-top:16px">Secure checkout via Stripe · Instant license delivery · Forex trading involves risk of loss</p>
   </div>
 </section>
 
@@ -503,9 +503,8 @@ footer .disc{max-width:560px}
   }
 })();
 
-// Digistore24 checkout redirect — requires consent checkboxes; scrolls to price card if not checked
-var FOREX_CHECKOUT_URL = 'https://www.checkout-ds24.com/product/714638';
-function gotoCheckout(){
+// Stripe checkout — requires consent checkboxes; scrolls to price card if not checked
+async function gotoCheckout(){
   var c1=document.getElementById('fxck1');
   var c2=document.getElementById('fxck2');
   var c3=document.getElementById('fxck3');
@@ -514,8 +513,18 @@ function gotoCheckout(){
     if(card)card.scrollIntoView({behavior:'smooth',block:'center'});
     return;
   }
-  if(!FOREX_CHECKOUT_URL){ alert('This product is not available for purchase yet — check back soon.'); return; }
-  window.location.href=FOREX_CHECKOUT_URL;
+  try {
+    var ref = sessionStorage.getItem('rfrsn_ref') || '';
+    var r = await fetch('/api/checkout/create-session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product: 'apex-forex', ref: ref })
+    });
+    var d = await r.json();
+    if (d.url) { window.location.href = d.url; return; }
+    alert(d.error || 'This product is not available for purchase yet — check back soon.');
+  } catch (err) {
+    alert('Could not start checkout. Please try again.');
+  }
 }
 
 function updateForexBtn(){
