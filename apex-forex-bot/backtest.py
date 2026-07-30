@@ -20,7 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault("PAPER_TRADING", "true")
 
 from apex import config as cfg, forex, indicators, strategies, logger  # noqa: E402
-from apex.position import calc_sltp, check_position  # noqa: E402
+from apex import position as position_mod  # noqa: E402
+from apex.position import calc_entry_sltp, trail_stop, exit_trigger  # noqa: E402
 
 SYMBOL = os.getenv("BT_SYMBOL") or cfg.SYMBOL
 START_BAL = float(os.getenv("BT_BALANCE") or 1000)
@@ -29,6 +30,14 @@ SLIPPAGE_PIPS = float(os.getenv("BT_SLIPPAGE_PIPS") or 0.3)
 SPREAD_PIPS = float(os.getenv("BT_SPREAD_PIPS") or 1.0)
 SYNTHETIC = os.getenv("BT_SYNTHETIC") == "true"
 MIN_CRITERIA = int(os.getenv("MIN_CRITERIA") or 4)
+# Per-user settings live in Redis, not cfg — the live loop reads them off the
+# user record, so they have to be injectable here or the backtest silently
+# simulates a different account than the one trading (e.g. cfg risk 1.25% vs
+# the 35% actually configured on the forex bot).
+RISK = float(os.getenv("BT_RISK") or cfg.RISK_PER_TRADE)
+TRAILING = (os.getenv("BT_TRAILING") or "true") != "false"
+BREAKEVEN_R = float(os.getenv("BT_BREAKEVEN_R") or 0)
+HTF_ON = (os.getenv("BT_HTF") or ("true" if cfg.HTF_FILTER else "false")) != "false"
 # BT_STRATEGY: criteria (rubrica AI istorică) | mean_reversion | trend | breakout
 BT_STRATEGY = (os.getenv("BT_STRATEGY") or "criteria").lower().replace("mean", "mean_reversion") if (os.getenv("BT_STRATEGY") or "criteria").lower() == "mean" else (os.getenv("BT_STRATEGY") or "criteria").lower()  # 4/5 — forex: mc4>mc5 (mc5 prea puține semnale pe 3000 lumânări)
 
@@ -117,10 +126,14 @@ def run():
     half_spread = SPREAD_PIPS / 2 * pip
     slip = SLIPPAGE_PIPS * pip
     print("\n" + "═" * 64)
-    print(f"  📊 APEX FOREX BACKTEST — metoda: {BT_STRATEGY} (exituri live)")
+    print(f"  📊 APEX FOREX BACKTEST — metoda: {BT_STRATEGY} (exituri user_loop)")
     print(f"  {'⚠️  DATE SINTETICE — validare motor, NU concluzii de profit' if SYNTHETIC else f'Symbol: {SYMBOL} | TF: {cfg.TIMEFRAME}'}")
-    print(f"  Balanță: ${START_BAL:.0f} | SL {cfg.STOP_LOSS_PIPS:g}p / TP {cfg.TAKE_PROFIT_PIPS:g}p | "
-          f"risc {cfg.RISK_PER_TRADE * 100:g}% | spread {SPREAD_PIPS:g}p | slippage {SLIPPAGE_PIPS:g}p")
+    print(f"  Balanță: ${START_BAL:.0f} | SL {position_mod.USERLOOP_SL_ATR_MULT:g}×ATR / "
+          f"TP {position_mod.USERLOOP_TP_ATR_MULT:g}×ATR | risc {RISK * 100:g}% (pe startBalance) | "
+          f"spread {SPREAD_PIPS:g}p | slippage {SLIPPAGE_PIPS:g}p")
+    print(f"  Trailing: {'1R' if TRAILING else 'off'} | breakeven: "
+          f"{f'{BREAKEVEN_R:g}R' if BREAKEVEN_R else 'off'} | HTF: {'on' if HTF_ON else 'off'} | "
+          f"exit SL/TP intrabar (high/low)")
     print("═" * 64)
 
     candles = fetch_candles()
@@ -129,7 +142,9 @@ def run():
 
     balance, position, trades = START_BAL, None, []
     last_loss_idx = -10 ** 9
-    cooldown_bars = max(1, cfg.COOLDOWN_AFTER_LOSS_MIN // 5)
+    # Live blocks re-entry for _LOSS_COOLDOWN_MIN (15) after a losing close,
+    # not cfg.COOLDOWN_AFTER_LOSS_MIN (3 in scalp mode) — another silent gap.
+    cooldown_bars = max(1, int(os.getenv("BT_COOLDOWN_MIN") or 15) // 5)
     peak, max_dd, spread_cost = START_BAL, 0.0, 0.0
 
     def close(exit_mid, reason, i):
@@ -140,8 +155,10 @@ def run():
                             position["quantity"], SYMBOL)
         spread_cost += (half_spread + slip) * position["quantity"] * (1 if SYMBOL.endswith("_USD") else 1 / exit_mid)
         balance += pnl
+        pips = forex.to_pips(
+            (exit_px - position["entryPrice"]) * d, SYMBOL, exit_px)
         trades.append({"side": position["side"], "pnl": pnl, "reason": reason,
-                       "pips": position.get("pnlPips", 0)})
+                       "pips": round(pips, 1)})
         if pnl < 0:
             last_loss_idx = i
         position = None
@@ -150,13 +167,28 @@ def run():
 
     for i in range(300, len(candles)):
         window = candles[:i + 1]
-        mid = candles[i]["close"]
+        bar = candles[i]
+        mid = bar["close"]
 
         if position:
-            trigger = check_position(position, mid)
+            # Order matters and mirrors live: cTrader holds SL/TP server-side,
+            # so they fill intrabar against THIS bar's range using the stop
+            # that was already resting when the bar opened. Only after that
+            # does the bot's own 5-min tick get to trail the stop, and it sees
+            # the close — never the wick it would have needed to react to.
+            trigger = exit_trigger(position["side"], position["stopLoss"],
+                                   position["takeProfit"], bar["high"], bar["low"])
             if trigger:
-                close(mid, trigger, i)
+                # Broker fills AT the resting order's level, not at the close.
+                level = (position["stopLoss"] if trigger == "STOP_LOSS"
+                         else position["takeProfit"])
+                close(level, trigger, i)
                 continue
+            moved = trail_stop(position["side"], position["entryPrice"],
+                               position["stopLoss"], mid,
+                               trailing=TRAILING, breakeven_r=BREAKEVEN_R)
+            if moved is not None:
+                position["stopLoss"] = moved
         if position or balance < 10:
             continue
         if i - last_loss_idx < cooldown_bars:
@@ -180,7 +212,7 @@ def run():
                   else "SELL" if liv["trend"] == "BULLISH" and tur.get("signal") == "BUY" else None)
         if liv.get("strength", 0) >= 0.8 and sig["action"] == contra:
             continue
-        if cfg.HTF_FILTER:
+        if HTF_ON:
             htf = strategies.htf_trend(resample_1h(window[-720:]))
             if os.getenv("BT_HTF_STRICT") == "true" or cfg.HTF_STRICT:
                 # strict: intră DOAR pe direcția trendului 1h (NEUTRAL = HOLD)
@@ -192,18 +224,28 @@ def run():
 
         d = 1 if sig["action"] == "BUY" else -1
         entry = mid + d * (half_spread + slip)  # intrarea plătește spread + slippage
-        sltp = calc_sltp(sig["action"], entry, float(ind["atr"]), SYMBOL)
-        stop_pips = forex.to_pips(abs(entry - sltp["stopLoss"]), SYMBOL)
+        sl_px, tp_px = calc_entry_sltp(sig["action"], entry, float(ind["atr"]),
+                                       SYMBOL, spread_pips=SPREAD_PIPS,
+                                       sl_pips=cfg.STOP_LOSS_PIPS,
+                                       tp_pips=cfg.TAKE_PROFIT_PIPS)
+        stop_pips = forex.to_pips(abs(entry - sl_px), SYMBOL)
         mult = strategies.druckenmiller_multiplier(70, sig["criteriaScore"], liv, tur)
-        units = forex.calc_units(balance, cfg.RISK_PER_TRADE, stop_pips, SYMBOL,
-                                 entry, cfg.LEVERAGE, cfg.MARGIN_CAP, mult)
+        # Live sizes off startBalance, never the running balance — deliberately,
+        # so the same setup keeps the same lot size instead of drifting with
+        # P&L. Compounding off `balance` here (as this did) inflates results
+        # against a bot that does not compound.
+        units = forex.calc_units(START_BAL, RISK, stop_pips, SYMBOL, entry,
+                                 leverage=cfg.LEVERAGE, mult=mult)
+        floor = forex.safe_min_units(SYMBOL, balance, entry, cfg.LEVERAGE,
+                                     cfg.MARGIN_CAP)
+        if floor == 0:  # account can't margin even one micro-lot — live skips
+            continue
+        units = forex.round_units(max(units, floor), SYMBOL)
         if units <= 0:
             continue
         position = {"symbol": SYMBOL, "side": sig["action"], "entryPrice": entry,
-                    "quantity": units, "stopLoss": sltp["stopLoss"],
-                    "takeProfit": sltp["takeProfit"], "initialStop": sltp["stopLoss"],
-                    "trailHigh": entry if d == 1 else None,
-                    "trailLow": entry if d == -1 else None}
+                    "quantity": units, "stopLoss": sl_px, "takeProfit": tp_px,
+                    "initialStop": sl_px}
     if position:
         close(candles[-1]["close"], "END", len(candles) - 1)
 
