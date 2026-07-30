@@ -23,6 +23,53 @@ _REDACT = {"ctrader_access_token", "ctrader_refresh_token",
            "ctrader_accounts"}
 
 
+# The control-plane transport hands every value over as a STRING, but the loop
+# reads these settings with bool() / list() and never re-parses them.
+#   bool("false") is True  → switching trailing, news_filter, atr_stops, htf,
+#     copilot, autopilot or paper OFF remotely did nothing; the setting still
+#     read as ON and the operator had no way to tell.
+#   list("EURUSD") is ['E','U','R','U','S','D'] → a watchlist set remotely
+#     would hand the scanner six one-letter symbols.
+# Numbers happened to survive because the loop wraps them in float()/int(),
+# which parse strings — they are typed here anyway so what is stored matches
+# what was meant.
+_BOOL_KEYS = {"autopilot", "paper", "trailing", "news_filter", "atr_stops",
+              "htf", "copilot"}
+_LIST_KEYS = {"autopilot_universe", "watchlist", "session_filter"}
+_INT_KEYS = {"min_confidence", "max_trades_day", "maxpos"}
+_FLOAT_KEYS = {"risk", "sl_pips", "tp_pips", "leverage", "max_dd_pct",
+               "max_daily_loss_pct", "breakeven_r"}
+
+_FALSEY = {"false", "0", "no", "off", "none", "null", ""}
+
+
+def coerce_setting(key, val):
+    """Type a control-plane value by its key, so what gets stored is what the
+    loop will actually read. Unknown keys pass through untouched."""
+    if key in _BOOL_KEYS:
+        if isinstance(val, bool):
+            return val
+        return str(val).strip().lower() not in _FALSEY
+    if key in _LIST_KEYS:
+        if isinstance(val, (list, tuple)):
+            return [str(v).strip() for v in val if str(v).strip()]
+        raw = str(val).strip()
+        if raw.startswith("["):  # JSON array over a string transport
+            try:
+                import json
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    return [str(v).strip() for v in parsed if str(v).strip()]
+            except (ValueError, TypeError):
+                pass
+        return [p.strip() for p in raw.replace(";", ",").split(",") if p.strip()]
+    if key in _INT_KEYS:
+        return int(float(val))
+    if key in _FLOAT_KEYS:
+        return float(val)
+    return val
+
+
 def _summarize(uid):
     u = user_store.load(uid)
     dash = user_loop.get_dash(uid) or {}
@@ -113,7 +160,7 @@ def build():
         key = str(args["key"])
         if key not in _SETTABLE:
             raise ValueError(f"'{key}' is not remotely settable")
-        val = args["value"]
+        val = coerce_setting(key, args["value"])
         user_store.update(uid, {key: val})
         tg._restart_user_loop(uid)
         return {"user": uid, "set": {key: val}, "running": user_loop.is_running(uid)}
