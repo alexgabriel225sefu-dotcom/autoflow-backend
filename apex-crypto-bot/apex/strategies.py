@@ -53,31 +53,40 @@ def _persist_session(user_id):
         print(f"[STRATEGY:{user_id}] session persist failed: {e}")
 
 
-def rebase_peak(delta, user_id=None):
-    """Shift the drawdown peak by an external cash movement.
+def rescale_peak(old_balance, new_balance, user_id=None):
+    """Move the drawdown peak onto a new capital base after a deposit or a
+    withdrawal.
 
-    peakBalance exists to measure TRADING drawdown, so a deposit or withdrawal
-    has to move it too. Leaving it alone means the breaker compares the new
-    account against a peak that included money the user has since taken out:
-    withdrawing a $6,309 account down to $10 reads as -99.8%, trips "capital
-    protection stop" on every tick, and nothing clears it — not /resetstats,
-    not a restart, and no setting the operator can change. The loop already
-    rebases dash["startBalance"] on the same event; this is the half that was
-    missing.
+    Cash in or out changes how big the account is, not how well it has traded,
+    so the peak has to follow — PROPORTIONALLY. Scaling preserves the drawdown
+    percentage the account was actually carrying; shifting the peak by the cash
+    delta instead does not, and leaves it stranded far above the new base
+    whenever the account was already below its peak:
 
-    Withdrawing below the old peak floors it at the new balance rather than
-    going negative, so the breaker starts measuring from the real capital base.
+        peak 6309.44, balance 6256.97 (a real -0.83% drawdown), withdraw to 10.74
+          by delta        -> peak   63.21  -> reads as -83.0%  (still halted)
+          proportionally  -> peak   10.83  -> reads as  -0.83% (the truth)
+
+    This matters because should_stop() halts on that percentage and the peak
+    only ever ratchets upward. Get it wrong and the account is bricked: no
+    trade can run to recover it, a restart reloads the same peak, and no
+    operator setting reaches it. A client who grows a small deposit, withdraws
+    the profit and starts again would hit that every time.
     """
     s = get_session(user_id)
-    if s.get("peakBalance") is None:
-        return
+    peak = s.get("peakBalance")
     try:
-        s["peakBalance"] = max(0.0, float(s["peakBalance"]) + float(delta))
+        peak, old_balance, new_balance = (float(peak), float(old_balance),
+                                          float(new_balance))
     except (TypeError, ValueError):
         return
+    if peak <= 0 or old_balance <= 0 or new_balance <= 0:
+        return
+    s["peakBalance"] = max(peak * (new_balance / old_balance), new_balance)
     _persist_session(user_id)
-    print(f"[STRATEGY:{user_id or '?'}] drawdown peak rebased by {float(delta):+.2f} "
-          f"→ {s['peakBalance']:.2f} (deposit/withdrawal, not a trading loss)")
+    print(f"[STRATEGY:{user_id or '?'}] capital base {old_balance:.2f} -> "
+          f"{new_balance:.2f} (deposit/withdrawal, not a trading loss) — "
+          f"drawdown peak rescaled {peak:.2f} -> {s['peakBalance']:.2f}")
 
 
 def reset_peak(balance, user_id=None):
@@ -91,7 +100,7 @@ def reset_peak(balance, user_id=None):
     except (TypeError, ValueError):
         return
     _persist_session(user_id)
-    print(f"[STRATEGY:{user_id or '?'}] drawdown peak reset → {s['peakBalance']:.2f}")
+    print(f"[STRATEGY:{user_id or '?'}] drawdown peak reset -> {s['peakBalance']:.2f}")
 
 
 def _default_symbol_session():

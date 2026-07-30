@@ -169,6 +169,67 @@ out = strategies.analyze(make_candles([100 + i for i in range(30)]))
 keys = {"turtle", "livermore", "soros", "meanReversion", "session"}
 check("contains all strategy blocks", keys.issubset(out.keys()), sorted(out.keys()))
 
+print("\n10. Capital-base changes must never brick an account")
+# The client journey that used to kill the bot: grow a small deposit, withdraw
+# the profit, start again. peakBalance only ratchets upward, so the fresh
+# deposit reads as a near-total drawdown, should_stop() halts every tick, no
+# trade can run to recover it and no setting reaches the peak.
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 100.0
+strategies.should_stop(100.0, 100.0, max_dd_pct=20)          # peak = 100
+check("withdrawal to 10 would halt the account outright",
+      strategies.should_stop(10.0, 10.0, max_dd_pct=20)["stop"] is True)
+
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 100.0
+strategies.rescale_peak(100.0, 10.0)                          # withdrew 90
+r = strategies.should_stop(10.0, 10.0, max_dd_pct=20)
+check("after rescale it trades again on the smaller base", r["stop"] is False, r)
+check("peak follows the capital base (100 -> 10)",
+      abs(strategies.get_session(None)["peakBalance"] - 10.0) < 1e-9,
+      strategies.get_session(None)["peakBalance"])
+
+# Proportional, not by cash delta: shifting by the delta strands the peak far
+# above the new base whenever the account was already below its peak.
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 6309.44
+strategies.rescale_peak(6256.97, 10.74)                       # the real case
+_p = strategies.get_session(None)["peakBalance"]
+check("a real -0.83% drawdown is preserved across the withdrawal",
+      abs((10.74 - _p) / _p * 100 + 0.83) < 0.05, (10.74 - _p) / _p * 100)
+check("delta-shifting would have left it at 63.21 and still halted",
+      _p < 11.0, _p)
+
+# A deposit is the same event in reverse.
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 120.0
+strategies.rescale_peak(100.0, 200.0)                         # doubled the account
+check("deposit scales the peak up too",
+      abs(strategies.get_session(None)["peakBalance"] - 240.0) < 1e-9,
+      strategies.get_session(None)["peakBalance"])
+
+print("\n11. A REAL drawdown is still protected")
+# The whole point of the breaker. Losing money by trading must keep halting,
+# including across the restarts Render performs on every deploy.
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 100.0
+check("-25% from peak still stops (limit 20%)",
+      strategies.should_stop(75.0, 100.0, max_dd_pct=20)["stop"] is True)
+check("peak is NOT quietly lowered by the stop check",
+      strategies.get_session(None)["peakBalance"] == 100.0,
+      strategies.get_session(None)["peakBalance"])
+check("-15% from peak keeps trading (inside the limit)",
+      strategies.should_stop(85.0, 100.0, max_dd_pct=20)["stop"] is False)
+
+print("\n12. reset_peak is the manual escape hatch (/resetstats)")
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 6309.44
+check("stale peak halts", strategies.should_stop(10.74, 10.74, max_dd_pct=90)["stop"] is True)
+strategies.reset_peak(10.74)
+check("after /resetstats it trades",
+      strategies.should_stop(10.74, 10.74, max_dd_pct=90)["stop"] is False)
+
+
 # ─── Result ───────────────────────────────────────────────
 print("\n" + "=" * 50)
 if check.failed == 0:

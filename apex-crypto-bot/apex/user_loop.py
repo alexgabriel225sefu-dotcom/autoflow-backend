@@ -333,7 +333,7 @@ def _loop(user_id, alert_fn, gen=None):
             _prev_seed = float(cfg.PAPER_BALANCE or 0)
             _flat_when_down = not (user.get("open_position_snapshot") or {}).get("symbol")
             if _prev_seed and _flat_when_down and abs(paper_balance - _prev_seed) >= 0.01:
-                strategies.rebase_peak(paper_balance - _prev_seed, user_id=user_id)
+                strategies.rescale_peak(_prev_seed, paper_balance, user_id=user_id)
             user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
         except Exception as e:
             print(f"[UserLoop:{user_id}] initial balance read failed: {e}")
@@ -1002,7 +1002,7 @@ def _loop(user_id, alert_fn, gen=None):
                     # which this used to leave untouched — so a withdrawal made
                     # the account look like it had crashed and halted the bot
                     # with no way to clear it.
-                    strategies.rebase_peak(_cash_delta, user_id=user_id)
+                    strategies.rescale_peak(prev_balance, paper_balance, user_id=user_id)
                 # cTrader executed the SL/TP server-side: the position we were
                 # managing vanished between ticks. Tell the client — silence
                 # here made broker-side exits invisible in Telegram.
@@ -1391,6 +1391,24 @@ def _loop(user_id, alert_fn, gen=None):
                         if same_dir >= 2:
                             entry_ok = False
                             _skip(f"correlation guard — already {same_dir} {'USD-long' if new_exp>0 else 'USD-short'} positions")
+            # Daily trade cap. The Strategy Builder shows every client a
+            # "Max trades/day" figure and bakes one into each risk preset
+            # (Low 6 / Medium 10 / High 15), but nothing read the setting —
+            # someone who picked Low risk was told 6 and got unlimited.
+            #
+            # Enforced HERE rather than in strategies.should_stop(): a trade
+            # count is a reason to stop OPENING, not to halt the account. The
+            # breaker there fires a STOP alert and stands the whole loop down,
+            # which would also abandon management of an open position.
+            # 0 = unlimited, so the cap can be switched off deliberately
+            # instead of by accident.
+            if entry_ok:
+                _max_td = int(getattr(cfg, "MAX_TRADES_DAY", 0) or 0)
+                if _max_td > 0:
+                    _done = strategies.get_session(user_id).get("dailyTrades", 0)
+                    if _done >= _max_td:
+                        entry_ok = False
+                        _skip(f"daily trade cap reached ({_done}/{_max_td})")
             # Quiet regime (AUTO): no edge, no trade.
             if entry_ok and regime_block:
                 entry_ok = False
