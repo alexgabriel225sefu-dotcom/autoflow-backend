@@ -38,10 +38,11 @@ RISK = float(os.getenv("BT_RISK") or cfg.RISK_PER_TRADE)
 TRAILING = (os.getenv("BT_TRAILING") or "true") != "false"
 BREAKEVEN_R = float(os.getenv("BT_BREAKEVEN_R") or 0)
 HTF_ON = (os.getenv("BT_HTF") or ("true" if cfg.HTF_FILTER else "false")) != "false"
-# Trail one CONSTANT risk-unit behind price instead of live's recomputed
-# abs(entry - cur_sl). See position.trail_stop() — off by default so the
-# baseline run stays a faithful mirror of what trades today.
-FIXED_R_TRAIL = os.getenv("BT_FIXED_R_TRAIL") == "true"
+# Live now pins R at entry and holds it for the trade's life, so that is the
+# default here too — the whole point of this file is to simulate what actually
+# trades. BT_LEGACY_TRAIL=true restores the old derived-R behaviour
+# (abs(entry - cur_sl), recomputed every tick) purely for A/B comparison.
+FIXED_R_TRAIL = os.getenv("BT_LEGACY_TRAIL") != "true"
 # BT_STRATEGY: criteria (rubrica AI istorică) | mean_reversion | trend | breakout
 BT_STRATEGY = (os.getenv("BT_STRATEGY") or "criteria").lower().replace("mean", "mean_reversion") if (os.getenv("BT_STRATEGY") or "criteria").lower() == "mean" else (os.getenv("BT_STRATEGY") or "criteria").lower()  # 4/5 — forex: mc4>mc5 (mc5 prea puține semnale pe 3000 lumânări)
 
@@ -157,7 +158,7 @@ def run():
     print(f"  Trailing: {'1R' if TRAILING else 'off'} | breakeven: "
           f"{f'{BREAKEVEN_R:g}R' if BREAKEVEN_R else 'off'} | HTF: {'on' if HTF_ON else 'off'} | "
           f"exit SL/TP intrabar (high/low)"
-          f"{' | trail=1R FIX' if FIXED_R_TRAIL else ''}")
+          f"{' | R pinned at entry' if FIXED_R_TRAIL else ' | R derived (LEGACY)'}")
     print("═" * 64)
 
     candles = fetch_candles()
