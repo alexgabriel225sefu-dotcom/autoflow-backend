@@ -123,7 +123,8 @@ def calc_entry_sltp(side, price, atr_value, symbol, spread_pips=0.0,
             round(price + tp_dist if buy else price - tp_dist, 6))
 
 
-def trail_stop(side, entry, cur_sl, price, trailing=True, breakeven_r=0.0):
+def trail_stop(side, entry, cur_sl, price, trailing=True, breakeven_r=0.0,
+               initial_risk=None):
     """New stop from user_loop._manage_trailing(), or None if it shouldn't move.
 
     Tighten-only, and only while the trade is in profit. Break-even locks the
@@ -131,19 +132,33 @@ def trail_stop(side, entry, cur_sl, price, trailing=True, breakeven_r=0.0):
     stop one risk-unit behind price. A move smaller than 5% of risk is ignored
     (live skips the broker amend call there).
 
-    NOTE — faithful reproduction of a live quirk: `risk` is recomputed every
-    call as abs(entry - cur_sl). Once the stop ratchets past entry that is no
-    longer risk but locked-in profit, so the trail distance starts tracking
-    profit instead of volatility and the ratchet becomes erratic. Mirrored
-    deliberately: the backtest must show the real consequence, not a
-    corrected version of it.
+    initial_risk — the trade's ORIGINAL entry-to-stop distance, held constant
+    for its lifetime. Omit it (the default) to reproduce live exactly.
+
+    Live omits it, and that is the quirk this parameter exists to measure:
+    `risk` is recomputed every call as abs(entry - cur_sl), so it stops being
+    risk the moment the stop ratchets past entry — from then on it is locked
+    profit. The first ratchet past breakeven collapses it to near zero and the
+    trail snaps to a few pips behind price, where ordinary spread-sized noise
+    closes the trade. That is the "many tiny wins, occasional full-stop loss"
+    signature: winners get cut at noise distance while losers still run the
+    full stop.
+
+        BUY entry 1.1000, stop 1.0975 (25p risk), price walking up:
+          1.1030 → risk 25.0p → stop 1.1005   (trail 25p — as intended)
+          1.1040 → risk  5.0p → stop 1.1035   (trail 5p — noise-tight)
+          1.1045 → risk 35.0p → stop 1.1035   (trail 10p — and now loose)
+
+    Passing initial_risk keeps the trail a constant 1R behind price for the
+    whole trade, which is what "trail one risk-unit" was meant to mean.
     """
     if not (entry and cur_sl and side in ("BUY", "SELL")) or not price:
         return None
     if not (trailing or breakeven_r > 0):
         return None
     buy = side == "BUY"
-    risk = abs(float(entry) - float(cur_sl))
+    risk = (abs(float(initial_risk)) if initial_risk
+            else abs(float(entry) - float(cur_sl)))
     if risk <= 0:
         return None
     profit = (price - entry) if buy else (entry - price)

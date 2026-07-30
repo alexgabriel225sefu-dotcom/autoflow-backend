@@ -38,6 +38,10 @@ RISK = float(os.getenv("BT_RISK") or cfg.RISK_PER_TRADE)
 TRAILING = (os.getenv("BT_TRAILING") or "true") != "false"
 BREAKEVEN_R = float(os.getenv("BT_BREAKEVEN_R") or 0)
 HTF_ON = (os.getenv("BT_HTF") or ("true" if cfg.HTF_FILTER else "false")) != "false"
+# Trail one CONSTANT risk-unit behind price instead of live's recomputed
+# abs(entry - cur_sl). See position.trail_stop() — off by default so the
+# baseline run stays a faithful mirror of what trades today.
+FIXED_R_TRAIL = os.getenv("BT_FIXED_R_TRAIL") == "true"
 # BT_STRATEGY: criteria (rubrica AI istorică) | mean_reversion | trend | breakout
 BT_STRATEGY = (os.getenv("BT_STRATEGY") or "criteria").lower().replace("mean", "mean_reversion") if (os.getenv("BT_STRATEGY") or "criteria").lower() == "mean" else (os.getenv("BT_STRATEGY") or "criteria").lower()  # 4/5 — forex: mc4>mc5 (mc5 prea puține semnale pe 3000 lumânări)
 
@@ -133,7 +137,8 @@ def run():
           f"spread {SPREAD_PIPS:g}p | slippage {SLIPPAGE_PIPS:g}p")
     print(f"  Trailing: {'1R' if TRAILING else 'off'} | breakeven: "
           f"{f'{BREAKEVEN_R:g}R' if BREAKEVEN_R else 'off'} | HTF: {'on' if HTF_ON else 'off'} | "
-          f"exit SL/TP intrabar (high/low)")
+          f"exit SL/TP intrabar (high/low)"
+          f"{' | trail=1R FIX' if FIXED_R_TRAIL else ''}")
     print("═" * 64)
 
     candles = fetch_candles()
@@ -186,7 +191,9 @@ def run():
                 continue
             moved = trail_stop(position["side"], position["entryPrice"],
                                position["stopLoss"], mid,
-                               trailing=TRAILING, breakeven_r=BREAKEVEN_R)
+                               trailing=TRAILING, breakeven_r=BREAKEVEN_R,
+                               initial_risk=(position["initialRisk"]
+                                             if FIXED_R_TRAIL else None))
             if moved is not None:
                 position["stopLoss"] = moved
         if position or balance < 10:
@@ -245,7 +252,8 @@ def run():
             continue
         position = {"symbol": SYMBOL, "side": sig["action"], "entryPrice": entry,
                     "quantity": units, "stopLoss": sl_px, "takeProfit": tp_px,
-                    "initialStop": sl_px}
+                    "initialStop": sl_px,
+                    "initialRisk": abs(entry - sl_px)}
     if position:
         close(candles[-1]["close"], "END", len(candles) - 1)
 
