@@ -6,6 +6,12 @@ const Anthropic = require('@anthropic-ai/sdk');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
+const DodoPayments = require('dodopayments');
+const dodopayments = process.env.DODO_PAYMENTS_API_KEY ? new DodoPayments({
+  bearerToken: process.env.DODO_PAYMENTS_API_KEY,
+  webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_KEY || undefined,
+  environment: process.env.DODO_PAYMENTS_ENV === 'test' ? 'test_mode' : 'live_mode',
+}) : null;
 
 process.on('uncaughtException', err => console.error('UNCAUGHT EXCEPTION:', err.stack || err));
 process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION:', err));
@@ -25,6 +31,8 @@ app.use((req, res, next) => {
   // Stripe needs the untouched raw body Buffer to verify its signature —
   // skip JSON parsing entirely here; the route below applies express.raw() itself.
   if (req.path === '/stripe-webhook') return next();
+  // Same deal for Dodo Payments — its webhook signature is computed over the raw body.
+  if (req.path === '/dodo-webhook') return next();
   if (req.path === '/webhooks/meta') {
     return express.json({ verify: (req2, res2, buf) => { req2.rawBody = buf; } })(req, res, next);
   }
@@ -78,6 +86,8 @@ app.get('/api/health', async (req, res) => {
     // RECOMMENDED — degraded experience if missing, but sale still completes
     ai_fallback:          has('GROQ_API_KEY') || has('ANTHROPIC_API_KEY') || has('GOOGLE_AI_API_KEY'),
     affiliate_bot:        has('AFFILIATE_BOT_TOKEN'),
+    dodo_payments_api_key:     has('DODO_PAYMENTS_API_KEY'),
+    dodo_payments_webhook_key: has('DODO_PAYMENTS_WEBHOOK_KEY'),
     session_secrets:      has('JWT_SECRET') && has('COOKIE_SECRET'),
   };
 
@@ -2019,15 +2029,44 @@ const STRIPE_PRICE_IDS = {
   'apex-forex': process.env.STRIPE_PRICE_FOREX || ''
 };
 
+// ── DODO PAYMENTS CHECKOUT ──────────────────────────────────────────────────
+// Dodo Payments is the Merchant of Record — same "we just deliver the license"
+// model as Digistore24, but with our own product listing + our own affiliate
+// ref tracking (unlike D24's marketplace affiliates). Product IDs default to
+// the ones created for this account; override via env if you ever recreate them.
+const DODO_PRODUCT_IDS = {
+  'apex-crypto': process.env.DODO_PRODUCT_CRYPTO || 'pdt_0NkMezDmL7t5NGc8rxrXc',
+  'apex-forex': process.env.DODO_PRODUCT_FOREX || 'pdt_0NkMezHBscxIfkG8CA7X7'
+};
+
 // POST /api/checkout/create-session — { product: 'apex-crypto'|'apex-forex', ref? } -> { url }
+// Dodo Payments is the primary/default processor. Stripe only runs as a fallback
+// for as long as DODO_PAYMENTS_API_KEY isn't set yet.
 app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
-  if (!stripe) return res.status(500).json({ error: 'Stripe is not configured' });
   const product = String(req.body?.product || '');
   const ref = String(req.body?.ref || '').toLowerCase().trim().slice(0, 40);
+  const origin = req.headers.origin || 'https://aicashsystem.space';
+
+  if (dodopayments) {
+    const productId = DODO_PRODUCT_IDS[product];
+    if (!productId) return res.status(400).json({ error: 'Unknown or unavailable product' });
+    try {
+      const session = await dodopayments.checkoutSessions.create({
+        product_cart: [{ product_id: productId, quantity: 1 }],
+        return_url: `${origin}/thank-you?product=${encodeURIComponent(product)}`,
+        metadata: { product, ref }
+      });
+      return res.json({ url: session.checkout_url });
+    } catch (e) {
+      addLog(`[Dodo] Checkout session error: ${e.message}`, 'payment', 'error');
+      return res.status(500).json({ error: 'Could not start checkout. Please try again.' });
+    }
+  }
+
+  if (!stripe) return res.status(500).json({ error: 'Payments are not configured' });
   const priceId = STRIPE_PRICE_IDS[product];
   if (!priceId) return res.status(400).json({ error: 'Unknown or unavailable product' });
   try {
-    const origin = req.headers.origin || 'https://aicashsystem.space';
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [{ price: priceId, quantity: 1 }],
@@ -2043,9 +2082,10 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
   }
 });
 
-// Fulfillment shared by the Stripe webhook — mirrors handleDigistore24Webhook's
-// on_payment path (license generation, affiliate commission, license email).
-async function _fulfillStripeOrder({ piRef, product, email, buyerName, amountCents, ref }) {
+// Fulfillment shared by the Stripe and Dodo Payments webhooks — mirrors
+// handleDigistore24Webhook's on_payment path (license generation, affiliate
+// commission, license email). `provider` only controls the log/alert prefix.
+async function _fulfillOrder({ provider, piRef, product, email, buyerName, amountCents, ref }) {
   const isForex = product === 'apex-forex';
   let licenseKey;
   if (supabase) {
@@ -2060,9 +2100,9 @@ async function _fulfillStripeOrder({ piRef, product, email, buyerName, amountCen
       key: licenseKey, active: true, activated_at: new Date().toISOString(),
       email: email || '', name: buyerName || 'there', product, payment_intent_id: piRef
     }], { onConflict: 'key' });
-    if (error) addLog(`[Stripe] License DB error: ${error.message}`, 'license', 'error');
+    if (error) addLog(`[${provider}] License DB error: ${error.message}`, 'license', 'error');
   }
-  addLog(`[Stripe] License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
+  addLog(`[${provider}] License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
 
   if (isNew && ref && supabase) {
     try {
@@ -2074,10 +2114,10 @@ async function _fulfillStripeOrder({ piRef, product, email, buyerName, amountCen
           affiliate_code: aff.code, license_key: licenseKey, payment_intent_id: piRef,
           product, amount: amountCents, commission_amount: commission
         }], { onConflict: 'payment_intent_id' });
-        addLog(`[Stripe] Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}`, 'affiliate', 'success');
+        addLog(`[${provider}] Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}`, 'affiliate', 'success');
         _notifyAffiliateSale(aff.code, product, commission);
       }
-    } catch (e) { addLog(`[Stripe] Affiliate error: ${e.message}`, 'affiliate', 'error'); }
+    } catch (e) { addLog(`[${provider}] Affiliate error: ${e.message}`, 'affiliate', 'error'); }
   }
 
   if (isNew && email) {
@@ -2089,16 +2129,18 @@ async function _fulfillStripeOrder({ piRef, product, email, buyerName, amountCen
       : '🤖 Your Apex Trade Bot — License Key inside';
     const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
     if (!result.ok) {
-      addLog(`[Stripe] Email NOT sent for ${email} — ${result.error}`, 'email', 'error');
+      addLog(`[${provider}] Email NOT sent for ${email} — ${result.error}`, 'email', 'error');
       _notifyAdminAlert(
-        `⚠️ Customer paid (Stripe) but the license email FAILED to send.\n\n` +
+        `⚠️ Customer paid (${provider}) but the license email FAILED to send.\n\n` +
         `Product: ${isForex ? 'Forex' : 'Crypto'}\nEmail: ${email}\nRef: ${piRef}\n` +
         `License key: ${licenseKey}\nError: ${result.error}\n\nSend the key to them manually until this is fixed.`
       );
-    } else addLog(`[Stripe] ${isForex ? 'Forex' : 'Crypto'} email sent to ${email}`, 'email', 'success');
+    } else addLog(`[${provider}] ${isForex ? 'Forex' : 'Crypto'} email sent to ${email}`, 'email', 'success');
   }
-  if (isNew) addLog(`[Stripe] ${isForex ? 'Forex' : 'Crypto'} Bot sold: ${email} — key: ${licenseKey}`, 'payment', 'success');
+  if (isNew) addLog(`[${provider}] ${isForex ? 'Forex' : 'Crypto'} Bot sold: ${email} — key: ${licenseKey}`, 'payment', 'success');
 }
+const _fulfillStripeOrder = (args) => _fulfillOrder({ provider: 'Stripe', ...args });
+const _fulfillDodoOrder = (args) => _fulfillOrder({ provider: 'Dodo', ...args });
 
 app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   if (!stripe) return res.status(500).send('Stripe not configured');
@@ -2144,6 +2186,57 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
     res.json({ received: true });
   } catch (e) {
     console.error('[Stripe] Webhook error:', e);
+    res.status(500).send('Internal error');
+  }
+});
+
+// ── DODO PAYMENTS WEBHOOK ───────────────────────────────────────────────────
+// Dodo signs webhooks per the Standard Webhooks spec (webhook-id/webhook-timestamp/
+// webhook-signature headers), verified here via the SDK's webhooks.unwrap(), which
+// falls back to the webhookKey passed at client construction when `key` is omitted.
+app.post('/dodo-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!dodopayments) return res.status(500).send('Dodo Payments not configured');
+  let event;
+  try {
+    event = await dodopayments.webhooks.unwrap(req.body.toString('utf8'), { headers: req.headers });
+  } catch (e) {
+    addLog(`[Dodo] Webhook signature verification failed: ${e.message}`, 'payment', 'error');
+    return res.status(400).send(`Webhook Error: ${e.message}`);
+  }
+
+  try {
+    const type = event.type || '';
+    const data = event.data || {};
+
+    if (type === 'payment.succeeded') {
+      const productId = data.product_cart?.[0]?.product_id || '';
+      const product = Object.keys(DODO_PRODUCT_IDS).find(k => DODO_PRODUCT_IDS[k] === productId) || '';
+      if (product) {
+        const piRef = `dodo_${data.payment_id}`;
+        const email = data.customer?.email || '';
+        const buyerName = data.customer?.name || 'there';
+        const amountCents = Number(data.total_amount || 0);
+        const ref = data.metadata?.ref || '';
+        await _fulfillDodoOrder({ piRef, product, email, buyerName, amountCents, ref });
+      } else {
+        addLog(`[Dodo] payment.succeeded for unmapped product_id="${productId}" payment=${data.payment_id}`, 'payment', 'warn');
+      }
+    } else if (type === 'refund.succeeded' || type === 'dispute.opened') {
+      const paymentId = data.payment_id || '';
+      if (paymentId && supabase) {
+        const piRef = `dodo_${paymentId}`;
+        const { data: revoked } = await supabase.from('licenses')
+          .update({ active: false, refunded: true, refunded_at: new Date().toISOString() })
+          .eq('payment_intent_id', piRef).select('key,product');
+        if (revoked?.length) addLog(`[Dodo] License revoked (${type}): ${revoked[0].key} (${revoked[0].product})`, 'license', 'warn');
+        await supabase.from('referral_sales')
+          .update({ refunded: true, refunded_at: new Date().toISOString() })
+          .eq('payment_intent_id', piRef);
+      }
+    }
+    res.json({ received: true });
+  } catch (e) {
+    console.error('[Dodo] Webhook error:', e);
     res.status(500).send('Internal error');
   }
 });
