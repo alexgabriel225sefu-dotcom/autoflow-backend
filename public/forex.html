@@ -518,7 +518,7 @@ async function gotoCheckout(){
     var ref = sessionStorage.getItem('rfrsn_ref') || '';
     var r = await fetch('/api/checkout/create-session', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product: 'apex-forex', ref: ref })
+      body: JSON.stringify({ product: 'apex-forex', ref: ref, endorsely_referral: window.endorsely_referral || '' })
     });
     var d = await r.json();
     if (d.url) { window.location.href = d.url; return; }
