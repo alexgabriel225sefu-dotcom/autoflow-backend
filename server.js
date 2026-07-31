@@ -2056,7 +2056,7 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${origin}/thank-you?product=${encodeURIComponent(product)}`,
+        success_url: `${origin}/thank-you?product=${encodeURIComponent(product)}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/${product === 'apex-forex' ? 'forex' : ''}`,
         customer_creation: 'always',
         metadata: { product, ref }
@@ -2087,6 +2087,36 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
   return res.status(500).json({ error: 'Payments are not configured' });
 });
 
+// GET /api/order-status?session_id=cs_...|order_id=... -> { ready, licenseKey? }
+// Polled by thank-you.html. Only returns data for a piRef the caller can already
+// prove (a Stripe session_id or D24 order_id from their own redirect) — not a
+// general lookup surface.
+app.get('/api/order-status', _codeLimiter, async (req, res) => {
+  const sessionId = String(req.query?.session_id || '');
+  const orderId = String(req.query?.order_id || '');
+  if (!sessionId && !orderId) return res.status(400).json({ ready: false, error: 'Missing session_id or order_id' });
+  if (!supabase) return res.json({ ready: false });
+
+  try {
+    let piRef;
+    if (sessionId) {
+      if (!stripe) return res.json({ ready: false });
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if (!session.payment_intent) return res.json({ ready: false });
+      piRef = `stripe_${session.payment_intent}`;
+    } else {
+      piRef = `d24_${orderId}`;
+    }
+
+    const { data } = await supabase.from('licenses').select('key,active').eq('payment_intent_id', piRef).maybeSingle();
+    if (data?.key && data.active) return res.json({ ready: true, licenseKey: data.key });
+    return res.json({ ready: false });
+  } catch (e) {
+    addLog(`[order-status] ${e.message}`, 'payment', 'error');
+    return res.json({ ready: false });
+  }
+});
+
 // TEMPORARY — verifies the full fulfillment pipeline (webhook -> license ->
 // email) for $0.50 instead of full price. Metadata marks it as a real
 // apex-crypto purchase so /stripe-webhook fulfills it exactly like a real
@@ -2101,7 +2131,7 @@ app.post('/api/checkout/test-session', _authLimiter, async (req, res) => {
         price_data: { currency: 'usd', product_data: { name: 'Apex Crypto Bot — PIPELINE TEST ($0.50)' }, unit_amount: 50 },
         quantity: 1
       }],
-      success_url: `${origin}/thank-you?product=apex-crypto`,
+      success_url: `${origin}/thank-you?product=apex-crypto&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/`,
       customer_creation: 'always',
       metadata: { product: 'apex-crypto', ref: '' }

@@ -105,12 +105,12 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
         </div>
 
         <div class="state" id="stateError">
-          <span class="chip" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:var(--gold)">&#9888; Almost there</span>
-          <h1>Your order is being processed.</h1>
-          <p class="err">Payment was received &mdash; your license key and setup email will arrive in your inbox within 1-2 minutes. If you don't see it, check your spam folder.</p>
+          <span class="chip">&#10003; Payment confirmed</span>
+          <h1>Your license is on its way.</h1>
+          <p class="err">We've received your payment and your license is being finalized on our end. You'll get an email at the address you used at checkout with your license key and Telegram activation link &mdash; usually within a couple of minutes, occasionally a little longer at peak times.</p>
           <button class="retry" onclick="location.reload()">&#x21bb; Check again</button>
           <div class="support-box">
-            <p>Didn't receive it? Contact us and we'll sort it out right away:</p>
+            <p>Nothing after 10 minutes? We'll sort it out right away &mdash; just reach out:</p>
             <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a>
           </div>
         </div>
