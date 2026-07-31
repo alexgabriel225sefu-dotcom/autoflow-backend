@@ -2117,31 +2117,6 @@ app.get('/api/order-status', _codeLimiter, async (req, res) => {
   }
 });
 
-// TEMPORARY — verifies the full fulfillment pipeline (webhook -> license ->
-// email) for $0.50 instead of full price. Metadata marks it as a real
-// apex-crypto purchase so /stripe-webhook fulfills it exactly like a real
-// sale. Remove this route once the test is done.
-app.post('/api/checkout/test-session', _authLimiter, async (req, res) => {
-  if (!stripe) return res.status(500).json({ error: 'Stripe not configured' });
-  try {
-    const origin = 'https://aicashsystem.space';
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: [{
-        price_data: { currency: 'usd', product_data: { name: 'Apex Crypto Bot — PIPELINE TEST ($0.50)' }, unit_amount: 50 },
-        quantity: 1
-      }],
-      success_url: `${origin}/thank-you?product=apex-crypto&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/`,
-      customer_creation: 'always',
-      metadata: { product: 'apex-crypto', ref: '' }
-    });
-    res.json({ url: session.url });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // Fulfillment shared by the Stripe and Dodo Payments webhooks — mirrors
 // handleDigistore24Webhook's on_payment path (license generation, affiliate
 // commission, license email). `provider` only controls the log/alert prefix.
