@@ -88,6 +88,8 @@ app.get('/api/health', async (req, res) => {
     affiliate_bot:        has('AFFILIATE_BOT_TOKEN'),
     dodo_payments_api_key:     has('DODO_PAYMENTS_API_KEY'),
     dodo_payments_webhook_key: has('DODO_PAYMENTS_WEBHOOK_KEY'),
+    stripe_secret_key:         has('STRIPE_SECRET_KEY'),
+    stripe_webhook_secret:     has('STRIPE_WEBHOOK_SECRET'),
     session_secrets:      has('JWT_SECRET') && has('COOKIE_SECRET'),
   };
 
@@ -2024,28 +2026,47 @@ app.post('/digistore24-webhook', (req, res, next) => {
 // We are the merchant of record here (unlike D24) — Stripe just processes the
 // card. Below the Romanian VAT-exemption threshold this needs no special tax
 // handling; see the affiliate/PFA discussion elsewhere for when that changes.
+// Stripe is the primary/default processor now — ApexTradingSuite (acct_1TSAWQGpBbs5xtI5),
+// business profile corrected to match what's actually sold, live and charges_enabled.
+// Price IDs default to the ones created on that account; override via env if recreated.
 const STRIPE_PRICE_IDS = {
-  'apex-crypto': process.env.STRIPE_PRICE_CRYPTO || '',
-  'apex-forex': process.env.STRIPE_PRICE_FOREX || ''
+  'apex-crypto': process.env.STRIPE_PRICE_CRYPTO || 'price_1TfI9IGpBbs5xtI5IhufmuL8',
+  'apex-forex': process.env.STRIPE_PRICE_FOREX || 'price_1Tge4PGpBbs5xtI5jAjgndKZ'
 };
 
 // ── DODO PAYMENTS CHECKOUT ──────────────────────────────────────────────────
-// Dodo Payments is the Merchant of Record — same "we just deliver the license"
-// model as Digistore24, but with our own product listing + our own affiliate
-// ref tracking (unlike D24's marketplace affiliates). Product IDs default to
-// the ones created for this account; override via env if you ever recreate them.
+// Dodo Payments permanently rejected this business ("We do not support auto
+// trading bots and related services") — this path is dead and only kept as an
+// inert fallback in case DODO_PAYMENTS_API_KEY is ever repurposed for something else.
 const DODO_PRODUCT_IDS = {
   'apex-crypto': process.env.DODO_PRODUCT_CRYPTO || 'pdt_0NkMezDmL7t5NGc8rxrXc',
   'apex-forex': process.env.DODO_PRODUCT_FOREX || 'pdt_0NkMezHBscxIfkG8CA7X7'
 };
 
 // POST /api/checkout/create-session — { product: 'apex-crypto'|'apex-forex', ref? } -> { url }
-// Dodo Payments is the primary/default processor. Stripe only runs as a fallback
-// for as long as DODO_PAYMENTS_API_KEY isn't set yet.
 app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
   const product = String(req.body?.product || '');
   const ref = String(req.body?.ref || '').toLowerCase().trim().slice(0, 40);
   const origin = req.headers.origin || 'https://aicashsystem.space';
+
+  if (stripe) {
+    const priceId = STRIPE_PRICE_IDS[product];
+    if (!priceId) return res.status(400).json({ error: 'Unknown or unavailable product' });
+    try {
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${origin}/thank-you?product=${encodeURIComponent(product)}`,
+        cancel_url: `${origin}/${product === 'apex-forex' ? 'forex' : ''}`,
+        customer_creation: 'always',
+        metadata: { product, ref }
+      });
+      return res.json({ url: session.url });
+    } catch (e) {
+      addLog(`[Stripe] Checkout session error: ${e.message}`, 'payment', 'error');
+      return res.status(500).json({ error: 'Could not start checkout. Please try again.' });
+    }
+  }
 
   if (dodopayments) {
     const productId = DODO_PRODUCT_IDS[product];
@@ -2063,23 +2084,7 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
     }
   }
 
-  if (!stripe) return res.status(500).json({ error: 'Payments are not configured' });
-  const priceId = STRIPE_PRICE_IDS[product];
-  if (!priceId) return res.status(400).json({ error: 'Unknown or unavailable product' });
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/thank-you?product=${encodeURIComponent(product)}`,
-      cancel_url: `${origin}/${product === 'apex-forex' ? 'forex' : ''}`,
-      customer_creation: 'always',
-      metadata: { product, ref }
-    });
-    res.json({ url: session.url });
-  } catch (e) {
-    addLog(`[Stripe] Checkout session error: ${e.message}`, 'payment', 'error');
-    res.status(500).json({ error: 'Could not start checkout. Please try again.' });
-  }
+  return res.status(500).json({ error: 'Payments are not configured' });
 });
 
 // Fulfillment shared by the Stripe and Dodo Payments webhooks — mirrors
