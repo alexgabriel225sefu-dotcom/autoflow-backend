@@ -108,8 +108,8 @@ footer .wrap{max-width:1280px}
   <div class="card">
     <h2 style="font:600 13px/1 var(--m);margin:0 0 6px;color:var(--acc3);text-transform:uppercase;letter-spacing:.12em">How it works</h2>
     <div class="steps">
-      <div class="step"><span class="n">1</span><span class="tx"><b>Sign up</b> above — you'll land straight in your dashboard.</span></div>
-      <div class="step"><span class="n">2</span><span class="tx"><b>Connect your Stripe account</b> in one click, or pick a payout method instead.</span></div>
+      <div class="step"><span class="n">1</span><span class="tx"><b>Sign up</b> above — you'll be sent straight into Stripe to create your payout account.</span></div>
+      <div class="step"><span class="n">2</span><span class="tx">Finish Stripe's quick setup — or skip it and pick another payout method from your dashboard.</span></div>
       <div class="step"><span class="n">3</span><span class="tx">Share your <b>referral link</b> anywhere.</span></div>
       <div class="step"><span class="n">4</span><span class="tx">Get <b style="color:var(--up)">paid automatically</b> on every sale — track everything from your dashboard.</span></div>
     </div>
@@ -141,6 +141,14 @@ async function doJoin(e){
     var d = await r.json();
     if (d.error) { showMsg(msg, d.error, false); btn.disabled=false; btn.textContent='Create my account →'; return false; }
     localStorage.setItem('apex_affiliate_token', d.token);
+    // Straight into Stripe Connect onboarding — that's how you actually get paid.
+    btn.textContent = 'Opening Stripe…';
+    try {
+      var cr = await fetch('/api/affiliates/connect-onboard', { method:'POST', headers:{'Authorization':'Bearer '+d.token} });
+      var cd = await cr.json();
+      if (cd.url) { window.location.href = cd.url; return false; }
+    } catch (_) {}
+    // Fallback if Connect onboarding couldn't be started — land in the dashboard instead.
     window.location.href = '/affiliate-dashboard';
   } catch (err) {
     showMsg(msg, 'Error: ' + err.message, false); btn.disabled=false; btn.textContent='Create my account →';
