@@ -1616,7 +1616,7 @@ app.get('/api/affiliates/me', async (req, res) => {
   const code = _affiliateFromAuth(req);
   if (!code) return res.status(401).json({ error: 'Not authenticated' });
   try {
-    const { data: affiliate, error: affErr } = await supabase.from('affiliates').select('code,name,email,commission_percent,status,payout_method,payout_details').eq('code', code).maybeSingle();
+    const { data: affiliate, error: affErr } = await supabase.from('affiliates').select('code,name,email,commission_percent,status,payout_method,payout_details,stripe_account_id').eq('code', code).maybeSingle();
     if (affErr) { addLog(`Affiliate /me lookup error for code "${code}": ${affErr.message}`, 'affiliate', 'error'); return res.status(500).json({ error: affErr.message }); }
     if (!affiliate) { addLog(`Affiliate /me: no row found for code "${code}"`, 'affiliate', 'warn'); return res.status(404).json({ error: `Affiliate not found (code: ${code})` }); }
     const { data: pendingReq } = await supabase.from('payout_requests').select('amount_cents,requested_at').eq('affiliate_code', code).eq('status', 'requested').order('requested_at', { ascending: false }).maybeSingle();
@@ -1653,9 +1653,48 @@ app.get('/api/affiliates/me', async (req, res) => {
       payoutMethod: affiliate.payout_method || '',
       payoutDetails: affiliate.payout_details || '',
       pendingPayout: pendingReq ? { amountCents: pendingReq.amount_cents, requestedAt: pendingReq.requested_at } : null,
+      stripeConnected: !!affiliate.stripe_account_id,
       sales
     });
   } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/affiliates/connect-onboard — (Bearer token) -> { url }
+// Creates (or reuses) a Stripe Connect Express account for the logged-in
+// affiliate and returns an onboarding link. Once onboarding completes, their
+// commissions are paid automatically at time of sale — no manual payout.
+app.post('/api/affiliates/connect-onboard', _authLimiter, async (req, res) => {
+  if (!stripe || !supabase) return res.status(500).json({ error: 'Not configured' });
+  const code = _affiliateFromAuth(req);
+  if (!code) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    const { data: aff } = await supabase.from('affiliates').select('code,email,name,stripe_account_id').eq('code', code).maybeSingle();
+    if (!aff) return res.status(404).json({ error: 'Affiliate not found' });
+
+    let accountId = aff.stripe_account_id;
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        email: aff.email || undefined,
+        business_type: 'individual',
+        capabilities: { transfers: { requested: true } }
+      });
+      accountId = account.id;
+      await supabase.from('affiliates').update({ stripe_account_id: accountId }).eq('code', code);
+    }
+
+    const origin = req.headers.origin || 'https://aicashsystem.space';
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${origin}/affiliate-dashboard?connect=refresh`,
+      return_url: `${origin}/affiliate-dashboard?connect=done`,
+      type: 'account_onboarding'
+    });
+    res.json({ url: accountLink.url });
+  } catch (e) {
+    addLog(`[Stripe Connect] Onboarding error for "${code}": ${e.message}`, 'affiliate', 'error');
     res.status(500).json({ error: e.message });
   }
 });
@@ -2033,6 +2072,9 @@ const STRIPE_PRICE_IDS = {
   'apex-crypto': process.env.STRIPE_PRICE_CRYPTO || 'price_1TfI9IGpBbs5xtI5IhufmuL8',
   'apex-forex': process.env.STRIPE_PRICE_FOREX || 'price_1Tge4PGpBbs5xtI5jAjgndKZ'
 };
+// Matches the one_time_price unit_amount on each Stripe Price above — used to
+// compute an affiliate's application_fee_amount without an extra API round-trip.
+const STRIPE_PRODUCT_AMOUNTS_CENTS = { 'apex-crypto': 29700, 'apex-forex': 49700 };
 
 // ── DODO PAYMENTS CHECKOUT ──────────────────────────────────────────────────
 // Dodo Payments permanently rejected this business ("We do not support auto
@@ -2053,14 +2095,39 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
     const priceId = STRIPE_PRICE_IDS[product];
     if (!priceId) return res.status(400).json({ error: 'Unknown or unavailable product' });
     try {
-      const session = await stripe.checkout.sessions.create({
+      const sessionParams = {
         mode: 'payment',
         line_items: [{ price: priceId, quantity: 1 }],
         success_url: `${origin}/thank-you?product=${encodeURIComponent(product)}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/${product === 'apex-forex' ? 'forex' : ''}`,
-        customer_creation: 'always',
-        metadata: { product, ref }
-      });
+        customer_creation: 'always'
+      };
+
+      // Stripe Connect: if this ref belongs to an affiliate who finished onboarding
+      // their own Stripe account, split the commission off at time of payment —
+      // it lands in their account directly, no manual payout tracking needed.
+      let connectApplied = false;
+      if (ref && supabase) {
+        const { data: aff } = await supabase.from('affiliates')
+          .select('stripe_account_id,commission_percent,status').eq('code', ref).maybeSingle();
+        if (aff?.status === 'active' && aff.stripe_account_id) {
+          try {
+            const acct = await stripe.accounts.retrieve(aff.stripe_account_id);
+            if (acct.capabilities?.transfers === 'active') {
+              const pct = Number(aff.commission_percent) > 0 ? Number(aff.commission_percent) : 30;
+              const unitAmount = STRIPE_PRODUCT_AMOUNTS_CENTS[product] || 0;
+              sessionParams.payment_intent_data = {
+                application_fee_amount: Math.round(unitAmount * pct / 100),
+                transfer_data: { destination: aff.stripe_account_id }
+              };
+              connectApplied = true;
+            }
+          } catch (e) { addLog(`[Stripe] Connect lookup failed for ref "${ref}": ${e.message}`, 'affiliate', 'warn'); }
+        }
+      }
+      sessionParams.metadata = { product, ref, connectApplied: connectApplied ? '1' : '0' };
+
+      const session = await stripe.checkout.sessions.create(sessionParams);
       return res.json({ url: session.url });
     } catch (e) {
       addLog(`[Stripe] Checkout session error: ${e.message}`, 'payment', 'error');
@@ -2120,7 +2187,7 @@ app.get('/api/order-status', _codeLimiter, async (req, res) => {
 // Fulfillment shared by the Stripe and Dodo Payments webhooks — mirrors
 // handleDigistore24Webhook's on_payment path (license generation, affiliate
 // commission, license email). `provider` only controls the log/alert prefix.
-async function _fulfillOrder({ provider, piRef, product, email, buyerName, amountCents, ref }) {
+async function _fulfillOrder({ provider, piRef, product, email, buyerName, amountCents, ref, connectApplied }) {
   const isForex = product === 'apex-forex';
   let licenseKey;
   if (supabase) {
@@ -2147,9 +2214,12 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
         const commission = Math.round(amountCents * pct / 100);
         await supabase.from('referral_sales').upsert([{
           affiliate_code: aff.code, license_key: licenseKey, payment_intent_id: piRef,
-          product, amount: amountCents, commission_amount: commission
+          product, amount: amountCents, commission_amount: commission,
+          // Stripe Connect already transferred this commission directly to the
+          // affiliate's own account at time of payment — no manual payout owed.
+          paid: !!connectApplied
         }], { onConflict: 'payment_intent_id' });
-        addLog(`[${provider}] Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}`, 'affiliate', 'success');
+        addLog(`[${provider}] Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}${connectApplied ? ' (auto-paid via Stripe Connect)' : ''}`, 'affiliate', 'success');
         _notifyAffiliateSale(aff.code, product, commission);
       }
     } catch (e) { addLog(`[${provider}] Affiliate error: ${e.message}`, 'affiliate', 'error'); }
@@ -2195,12 +2265,13 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
       const session = event.data.object;
       const product = session.metadata?.product || '';
       const ref = session.metadata?.ref || '';
+      const connectApplied = session.metadata?.connectApplied === '1';
       if (STRIPE_PRICE_IDS[product]) {
         const piRef = `stripe_${session.payment_intent || session.id}`;
         const email = session.customer_details?.email || '';
         const buyerName = session.customer_details?.name || 'there';
         const amountCents = Number(session.amount_total || 0);
-        await _fulfillStripeOrder({ piRef, product, email, buyerName, amountCents, ref });
+        await _fulfillStripeOrder({ piRef, product, email, buyerName, amountCents, ref, connectApplied });
       } else {
         addLog(`[Stripe] checkout.session.completed for unmapped product="${product}" session=${session.id}`, 'payment', 'warn');
       }
