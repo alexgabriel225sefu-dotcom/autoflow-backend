@@ -181,6 +181,13 @@ footer .wrap{max-width:1280px}
       <div id="payoutMsg" class="msg"></div>
     </div>
 
+    <div class="card" id="connectCard">
+      <h2 class="section">Get paid automatically</h2>
+      <div class="hint" id="connectHint">Connect your own Stripe account — your commission is transferred there directly at the moment of each sale. No manual payout requests, no waiting on us.</div>
+      <button id="connectBtn" onclick="connectStripe()">Connect Stripe account</button>
+      <div id="connectMsg" class="msg"></div>
+    </div>
+
     <div class="card">
       <h2 class="section">Payout method</h2>
       <label for="pMethod">Method</label>
@@ -335,6 +342,14 @@ function renderDashboard(d){
     document.getElementById('pDetails').value = d.payoutDetails || '';
   }
 
+  var connectBtn = document.getElementById('connectBtn');
+  if (d.stripeConnected) {
+    document.getElementById('connectHint').textContent = 'Stripe connected — your commission is transferred to your account automatically at the moment of each sale.';
+    connectBtn.textContent = 'Manage Stripe account';
+  } else {
+    connectBtn.textContent = 'Connect Stripe account';
+  }
+
   var wrap = document.getElementById('salesTableWrap');
   if (!d.sales || !d.sales.length) {
     wrap.innerHTML = '<div class="empty">No sales yet — share your link!</div>';
@@ -367,6 +382,18 @@ async function savePayoutMethod(){
     if (d.error) { showMsg(msg, d.error, false); return; }
     showMsg(msg, 'Payout method saved.', true);
   } catch (err) { showMsg(msg, 'Error: ' + err.message, false); }
+}
+
+async function connectStripe(){
+  var msg = document.getElementById('connectMsg');
+  var btn = document.getElementById('connectBtn');
+  btn.disabled = true;
+  try {
+    var r = await fetch('/api/affiliates/connect-onboard', { method:'POST', headers: authHeaders() });
+    var d = await r.json();
+    if (d.error) { showMsg(msg, d.error, false); btn.disabled = false; return; }
+    window.location.href = d.url;
+  } catch (err) { showMsg(msg, 'Error: ' + err.message, false); btn.disabled = false; }
 }
 
 async function requestPayout(){
