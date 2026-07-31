@@ -59,13 +59,14 @@
 
 ## Revenue Model
 - One-time license sales: $297 (crypto), $497 (forex)
-- Affiliate marketplace via Digistore24 (30% commission), not an in-house program
+- In-house affiliate program (Supabase `affiliates`/`referral_sales` tables, own signup/dashboard/payout flow at `/api/affiliates/*`) — commission tracked via the `ref` query param captured on the homepage and passed through Dodo Payments checkout metadata. Default 30% commission unless overridden per affiliate.
+- Separate: outside Telegram trading-signal channels/traders each get their own Dodo Payments discount-tracking code + dedicated checkout links (0.01% discount, `times_used` counter only) — these are informal one-off partners, not signed up in the in-house program.
 
 ## Tech Stack (Backend)
 - **Runtime:** Node.js / Express (server.js) + two separate Python trading bots (crypto, forex)
 - **Database:** Supabase (PostgreSQL) + Redis (bot session state)
 - **AI:** Anthropic Claude (Haiku), Groq (Llama fallback)
-- **Payments:** Digistore24 (Merchant of Record — NOT Stripe, that was fully retired)
+- **Payments:** Dodo Payments (Merchant of Record, primary — integrated in `server.js` via `/api/checkout/create-session` + `/dodo-webhook`). Digistore24 code kept in place but dormant (CopeCart account was abandoned mid-KYC). Stripe code kept only as a fallback for as long as `DODO_PAYMENTS_API_KEY` is unset — fully retired otherwise.
 - **Email:** Brevo
 - **Broker integration:** cTrader Open API (both bots)
 - **Deployment:** Render (three services — main site, forex bot, crypto bot)
