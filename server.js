@@ -2104,34 +2104,12 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
         customer_creation: 'always'
       };
 
-      // Stripe Connect: if this ref belongs to an affiliate who finished onboarding
-      // their own Stripe account, split the commission off at time of payment —
-      // it lands in their account directly, no manual payout tracking needed.
-      let connectApplied = false;
-      if (ref && supabase) {
-        const { data: aff } = await supabase.from('affiliates')
-          .select('stripe_account_id,commission_percent,status').eq('code', ref).maybeSingle();
-        if (aff?.status === 'active' && aff.stripe_account_id) {
-          try {
-            const acct = await stripe.accounts.retrieve(aff.stripe_account_id);
-            if (acct.capabilities?.transfers === 'active') {
-              const pct = Number(aff.commission_percent) > 0 ? Number(aff.commission_percent) : 30;
-              const unitAmount = STRIPE_PRODUCT_AMOUNTS_CENTS[product] || 0;
-              // transfer_data[amount] is what the AFFILIATE receives; we keep the rest.
-              // (Do NOT use application_fee_amount here — that is the platform's cut,
-              // so setting it to the commission would pay the affiliate the inverse.)
-              const commission = Math.round(unitAmount * pct / 100);
-              if (commission > 0 && commission < unitAmount) {
-                sessionParams.payment_intent_data = {
-                  transfer_data: { destination: aff.stripe_account_id, amount: commission }
-                };
-                connectApplied = true;
-              }
-            }
-          } catch (e) { addLog(`[Stripe] Connect lookup failed for ref "${ref}": ${e.message}`, 'affiliate', 'warn'); }
-        }
-      }
-      sessionParams.metadata = { product, ref, connectApplied: connectApplied ? '1' : '0' };
+      // Affiliate commissions are tracked and paid out through Endorsely, which
+      // reads endorsely_referral off this session. Deliberately NO Stripe Connect
+      // split here: Endorsely has no API to mark a commission as already settled,
+      // so splitting at charge time would leave its ledger showing the commission
+      // as unpaid and risk paying the same affiliate twice.
+      sessionParams.metadata = { product, ref };
       if (endorselyReferral) sessionParams.metadata.endorsely_referral = endorselyReferral;
 
       const session = await stripe.checkout.sessions.create(sessionParams);
