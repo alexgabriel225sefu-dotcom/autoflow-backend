@@ -1362,7 +1362,15 @@ app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
 // which generates their link and tracks sales. The deep-link carries a signed
 // connect token = hmac12(code) + code, so the bot can prove which affiliate it is.
 const AFFILIATE_BOT_USERNAME = process.env.AFFILIATE_BOT_USERNAME || 'AICASHSYSTEM_REF_BOT';
-const AFFILIATE_BOT_SECRET   = process.env.AFFILIATE_BOT_SECRET || process.env.JWT_SECRET || 'apex-affiliate-bridge';
+// This secret gates the admin endpoints (affiliate list, Telegram linking,
+// payout reporting). It must never fall back to a literal: this repository is
+// public, so a hardcoded default is a published password. With nothing set we
+// generate a random one instead, which fails closed — the admin endpoints stop
+// answering until AFFILIATE_BOT_SECRET is configured here and on the bot.
+const AFFILIATE_BOT_SECRET = process.env.AFFILIATE_BOT_SECRET || process.env.JWT_SECRET || (() => {
+  console.warn('[WARN] AFFILIATE_BOT_SECRET not set — admin endpoints are disabled this session. Set it in Render env vars (and give the bot the same value).');
+  return crypto.randomBytes(32).toString('hex');
+})();
 function _affConnectSig(code) {
   return crypto.createHmac('sha256', AFFILIATE_BOT_SECRET).update(String(code)).digest('hex').slice(0, 12);
 }
