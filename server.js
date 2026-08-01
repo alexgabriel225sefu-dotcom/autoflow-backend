@@ -2116,11 +2116,16 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
             if (acct.capabilities?.transfers === 'active') {
               const pct = Number(aff.commission_percent) > 0 ? Number(aff.commission_percent) : 30;
               const unitAmount = STRIPE_PRODUCT_AMOUNTS_CENTS[product] || 0;
-              sessionParams.payment_intent_data = {
-                application_fee_amount: Math.round(unitAmount * pct / 100),
-                transfer_data: { destination: aff.stripe_account_id }
-              };
-              connectApplied = true;
+              // transfer_data[amount] is what the AFFILIATE receives; we keep the rest.
+              // (Do NOT use application_fee_amount here — that is the platform's cut,
+              // so setting it to the commission would pay the affiliate the inverse.)
+              const commission = Math.round(unitAmount * pct / 100);
+              if (commission > 0 && commission < unitAmount) {
+                sessionParams.payment_intent_data = {
+                  transfer_data: { destination: aff.stripe_account_id, amount: commission }
+                };
+                connectApplied = true;
+              }
             }
           } catch (e) { addLog(`[Stripe] Connect lookup failed for ref "${ref}": ${e.message}`, 'affiliate', 'warn'); }
         }
