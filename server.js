@@ -2652,7 +2652,16 @@ app.post('/api/heygen/photo-generate', async (req, res) => {
 // hosted crypto page so buyers never see the stale copy.
 app.get(['/apex-bot', '/apex-bot.html'], (req, res) => res.redirect(301, '/index'));
 
-const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','affiliate','affiliate-dashboard','affiliate-terms','thank-you','thank-you-d24','chart','free','promo','guide'];
+// The affiliate program now runs on Endorsely, which hosts the signup portal and
+// the affiliate's own dashboard. Send the old in-house pages there so nobody
+// signs up into a system we no longer track commissions in. The pages and the
+// /api/affiliates/* routes are left in place (the Telegram bot still uses them);
+// they are simply no longer reachable from the site.
+const ENDORSELY_PORTAL = 'https://aicashsystemspace-65f1.endorsely.com';
+app.get(['/affiliate', '/affiliate.html', '/affiliate-dashboard', '/affiliate-dashboard.html'],
+  (req, res) => res.redirect(302, ENDORSELY_PORTAL));
+
+const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','affiliate-terms','thank-you','thank-you-d24','chart','free','promo','guide'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
