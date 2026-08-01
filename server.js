@@ -2639,7 +2639,7 @@ const ENDORSELY_PORTAL = 'https://aicashsystemspace-65f1.endorsely.com';
 app.get(['/affiliate', '/affiliate.html', '/affiliate-dashboard', '/affiliate-dashboard.html'],
   (req, res) => res.redirect(302, ENDORSELY_PORTAL));
 
-const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','affiliate-terms','thank-you','thank-you-d24','chart','free','promo','guide'];
+const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','thank-you','thank-you-d24','chart','free','promo','guide'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
