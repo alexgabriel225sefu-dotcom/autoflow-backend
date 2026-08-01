@@ -1421,16 +1421,47 @@ app.post('/api/affiliates/start', _authLimiter, async (req, res) => {
 // their license email — the D24 IPN itself still returns 'OK' in that case
 // (the payment really did go through), so Digistore24 won't retry it and
 // nothing else will surface the failure.
-async function _notifyAdminAlert(text) {
+// These alerts carry things the owner must act on — a customer who paid but
+// never got their licence, a commission cancelled by a refund. Telegram was the
+// only channel and its failures were swallowed, so deleting the bot silently
+// took the alerts with it. Now it cascades and stops at the first channel that
+// actually confirms delivery:
+//   1. MAKE_ALERT_WEBHOOK — Make fans one POST out to email/WhatsApp/whatever,
+//      so channels can be changed there without touching this code.
+//   2. Telegram — only if a bot token is still configured and the API accepts it.
+//   3. Email — always available, since the licence flow already depends on it.
+async function _notifyAdminAlert(text, subject = 'Apex Trading Suite — alertă') {
+  const hook = process.env.MAKE_ALERT_WEBHOOK;
+  if (hook) {
+    try {
+      const r = await fetch(hook, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, text, site: 'aicashsystem.space', at: new Date().toISOString() })
+      });
+      if (r.ok) return;
+      addLog(`Admin alert: Make webhook rejected (HTTP ${r.status}) — trying next channel`, 'system', 'warn');
+    } catch (e) { addLog(`Admin alert: Make webhook error: ${e.message} — trying next channel`, 'system', 'warn'); }
+  }
+
   const botToken = process.env.AFFILIATE_BOT_TOKEN;
-  const chatId = process.env.ADMIN_CHAT_ID || '7585109158';
-  if (!botToken) return;
+  if (botToken) {
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: process.env.ADMIN_CHAT_ID || '7585109158', text })
+      });
+      if (r.ok) return;
+      addLog(`Admin alert: Telegram rejected (HTTP ${r.status}) — trying email`, 'system', 'warn');
+    } catch (e) { addLog(`Admin alert: Telegram error: ${e.message} — trying email`, 'system', 'warn'); }
+  }
+
   try {
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text })
+    const res = await _sendEmail({
+      to: process.env.ADMIN_EMAIL || 'alexgabriel225sefu@gmail.com', subject, fromName: 'Apex Alerts',
+      html: `<pre style="font:14px/1.6 -apple-system,Segoe UI,sans-serif;white-space:pre-wrap">${_he(text)}</pre>`
     });
-  } catch (e) { addLog(`Admin TG alert error: ${e.message}`, 'system', 'warn'); }
+    if (!res.ok) addLog(`Admin alert undeliverable on every channel: ${res.error}`, 'system', 'error');
+  } catch (e) { addLog(`Admin alert email error: ${e.message}`, 'system', 'error'); }
 }
 
 async function _notifyAffiliateSale(code, product, commissionCents) {
