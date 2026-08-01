@@ -498,6 +498,10 @@ footer .disc{max-width:560px}
   var p=new URLSearchParams(window.location.search);
   var code=p.get('ref')||p.get('r_id')||p.get('rfsn');
   if(code) sessionStorage.setItem('rfrsn_ref',code);
+  // Endorsely links use ?via= — keep the handle itself, not just the referral
+  // id their script stores, so a sale can be tied back to a named affiliate.
+  var via=p.get('via')||p.get('aff');
+  if(via) sessionStorage.setItem('endorsely_code',via);
   if(code && !sessionStorage.getItem('ref_click_sent')){
     sessionStorage.setItem('ref_click_sent','1');
     try{ fetch('/api/affiliates/click?ref='+encodeURIComponent(code),{keepalive:true}).catch(function(){}); }catch(e){}
@@ -518,7 +522,9 @@ async function gotoCheckout(){
     var ref = sessionStorage.getItem('rfrsn_ref') || '';
     var r = await fetch('/api/checkout/create-session', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product: 'apex-forex', ref: ref, endorsely_referral: window.endorsely_referral || '' })
+      body: JSON.stringify({ product: 'apex-forex', ref: ref,
+        endorsely_referral: window.endorsely_referral || '',
+        endorsely_code: sessionStorage.getItem('endorsely_code') || '' })
     });
     var d = await r.json();
     if (d.url) { window.location.href = d.url; return; }

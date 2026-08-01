@@ -1501,6 +1501,64 @@ app.post('/api/affiliates/telegram-stats', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/endorsely/payout-check?secret=… — the daily payout report.
+// Called on a schedule (Make) so the owner is told what has matured, what it
+// nets after withholding, and which documents are still missing. It only
+// reports: no money moves from here, that stays a deliberate action in Endorsely.
+app.get('/api/endorsely/payout-check', async (req, res) => {
+  if (req.query?.secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
+  const { ready, upcoming, error } = await _buildEndorselyPayoutReport();
+  if (error) return res.status(500).json({ error });
+
+  const usd = (c) => '$' + (c / 100).toFixed(2);
+  const lines = [];
+  if (ready.length) {
+    lines.push('💰 Comisioane mature — de plătit în Endorsely:');
+    for (const a of ready) {
+      lines.push(
+        `\n• ${a.code} — ${a.salesCount} vânz., brut ${usd(a.grossCents)}` +
+        `\n  Reținere ${a.withholdPct}% (${a.withholdReason})` +
+        `\n  → de virat: ${usd(a.netCents)}` +
+        (a.blocked ? '\n  ⛔ NU plăti încă — lipsește factura' : '')
+      );
+    }
+    lines.push('\nCotele sunt orientative — confirmă-le cu contabilul.');
+  }
+  if (upcoming.length) {
+    lines.push(`\n⏳ În așteptare (încă în fereastra de 30 zile): ` +
+      upcoming.map(a => `${a.code} ${usd(a.grossCents)}`).join(', '));
+  }
+  const text = lines.join('\n');
+  if (text && String(req.query?.notify || '') === '1') await _notifyAdminAlert(text);
+  res.json({ ready, upcoming, text, hasWork: ready.length > 0 });
+});
+
+// POST /api/endorsely/affiliate-tax — record what we hold on file for an
+// affiliate (country, business or individual, invoice, residence certificate),
+// which is what decides the withholding rate. Body: { secret, code, … }.
+app.post('/api/endorsely/affiliate-tax', async (req, res) => {
+  const { secret, code, email, country, entity_type, has_invoice, tax_cert_year, notes } = req.body || {};
+  if (secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
+  if (!supabase) return res.status(500).json({ error: 'not configured' });
+  const clean = String(code || '').toLowerCase().trim();
+  if (!clean) return res.status(400).json({ error: 'code required' });
+  if (entity_type && !['business', 'individual'].includes(entity_type)) {
+    return res.status(400).json({ error: "entity_type must be 'business' or 'individual'" });
+  }
+  try {
+    const { error } = await supabase.from('endorsely_affiliate_tax').upsert([{
+      code: clean, email: email || null,
+      country: country ? String(country).toUpperCase().slice(0, 2) : null,
+      entity_type: entity_type || null,
+      has_invoice: !!has_invoice,
+      tax_cert_year: tax_cert_year ? Number(tax_cert_year) : null,
+      notes: notes || null, updated_at: new Date().toISOString()
+    }], { onConflict: 'code' });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, code: clean, suggested: _suggestWithholding({ country, entity_type, has_invoice, tax_cert_year }) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/affiliates/admin-list — bot fetches all affiliates + their sales for admin view.
 // Body: { secret }. Gated by AFFILIATE_BOT_SECRET; bot enforces admin chat_id check.
 app.post('/api/affiliates/admin-list', async (req, res) => {
@@ -2090,6 +2148,7 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
   const product = String(req.body?.product || '');
   const ref = String(req.body?.ref || '').toLowerCase().trim().slice(0, 40);
   const endorselyReferral = String(req.body?.endorsely_referral || '').slice(0, 200);
+  const endorselyCode = String(req.body?.endorsely_code || '').toLowerCase().trim().slice(0, 60);
   const origin = req.headers.origin || 'https://aicashsystem.space';
 
   if (stripe) {
@@ -2111,6 +2170,7 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
       // as unpaid and risk paying the same affiliate twice.
       sessionParams.metadata = { product, ref };
       if (endorselyReferral) sessionParams.metadata.endorsely_referral = endorselyReferral;
+      if (endorselyCode) sessionParams.metadata.endorsely_code = endorselyCode;
 
       const session = await stripe.checkout.sessions.create(sessionParams);
       return res.json({ url: session.url });
@@ -2232,6 +2292,76 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
 const _fulfillStripeOrder = (args) => _fulfillOrder({ provider: 'Stripe', ...args });
 const _fulfillDodoOrder = (args) => _fulfillOrder({ provider: 'Dodo', ...args });
 
+// ── ENDORSELY PAYOUT TRACKER ────────────────────────────────────────────────
+// Endorsely owns the affiliate-facing ledger and the payout button, but it
+// collects nothing about where an affiliate is tax-resident. These helpers keep
+// our own record of what is owed and when, so the owner can be told which
+// documents are still missing before money moves.
+const ENDORSELY_COMMISSION_PCT = 30;
+const ENDORSELY_NET_DAYS = 30;               // Endorsely's payout term is Net-30
+
+// Suggested withholding, based on what we hold on file. Advisory only — the
+// final call is the accountant's, so the report always states what it assumed.
+function _suggestWithholding(tax) {
+  if (!tax) return { pct: 16, why: 'nothing on file — no country, no certificate' };
+  if (tax.entity_type === 'business' && tax.has_invoice) return { pct: 0, why: 'registered business, invoice on file' };
+  if (tax.entity_type === 'business') return { pct: 0, why: 'registered business — WAITING ON INVOICE' };
+  const year = new Date().getUTCFullYear();
+  if (String(tax.country || '').toUpperCase() === 'RO') return { pct: 10, why: 'Romanian individual — withholding at source' };
+  if (tax.tax_cert_year && Number(tax.tax_cert_year) >= year) return { pct: 10, why: `tax residence certificate on file (${tax.country || 'country not set'})` };
+  return { pct: 16, why: 'no valid tax residence certificate for this year' };
+}
+
+async function _recordEndorselySale({ piRef, product, amountCents, code, referralId }) {
+  if (!supabase || !code) return;                 // nothing to attribute
+  try {
+    const commission = Math.round(amountCents * ENDORSELY_COMMISSION_PCT / 100);
+    const matures = new Date(Date.now() + ENDORSELY_NET_DAYS * 864e5).toISOString();
+    const { error } = await supabase.from('endorsely_sales').upsert([{
+      affiliate_code: code, referral_id: referralId || null, payment_intent_id: piRef,
+      product, amount_cents: amountCents, commission_cents: commission, matures_at: matures
+    }], { onConflict: 'payment_intent_id' });
+    if (error) return addLog(`[Endorsely] Could not record sale ${piRef}: ${error.message}`, 'affiliate', 'error');
+    addLog(`[Endorsely] Affiliate sale: ${code} — $${(commission / 100).toFixed(2)} matures ${matures.slice(0, 10)}`, 'affiliate', 'success');
+  } catch (e) {
+    addLog(`[Endorsely] Sale record error: ${e.message}`, 'affiliate', 'error');
+  }
+}
+
+// Builds the payout report: every matured, unpaid, unrefunded commission with
+// the documents we hold and the rate that implies.
+async function _buildEndorselyPayoutReport() {
+  if (!supabase) return { ready: [], upcoming: [], error: 'Supabase not configured' };
+  const nowIso = new Date().toISOString();
+  const { data: sales, error } = await supabase.from('endorsely_sales')
+    .select('affiliate_code,commission_cents,matures_at,product,sold_at')
+    .eq('status', 'pending').eq('refunded', false).order('matures_at');
+  if (error) return { ready: [], upcoming: [], error: error.message };
+
+  const { data: taxRows } = await supabase.from('endorsely_affiliate_tax').select('*');
+  const taxBy = Object.fromEntries((taxRows || []).map(t => [t.code, t]));
+
+  const group = (rows) => Object.values(rows.reduce((acc, s) => {
+    const k = s.affiliate_code;
+    (acc[k] ||= { code: k, salesCount: 0, grossCents: 0, nextMatures: s.matures_at })[k];
+    acc[k].salesCount++; acc[k].grossCents += s.commission_cents;
+    if (s.matures_at < acc[k].nextMatures) acc[k].nextMatures = s.matures_at;
+    return acc;
+  }, {}));
+
+  const ready = group((sales || []).filter(s => s.matures_at <= nowIso)).map(a => {
+    const tax = taxBy[a.code];
+    const w = _suggestWithholding(tax);
+    const withheld = Math.round(a.grossCents * w.pct / 100);
+    return { ...a, country: tax?.country || null, entityType: tax?.entity_type || null,
+             withholdPct: w.pct, withholdReason: w.why,
+             withheldCents: withheld, netCents: a.grossCents - withheld,
+             blocked: tax?.entity_type === 'business' && !tax?.has_invoice };
+  });
+  const upcoming = group((sales || []).filter(s => s.matures_at > nowIso));
+  return { ready, upcoming, error: null };
+}
+
 app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   if (!stripe) return res.status(500).send('Stripe not configured');
   const sig = req.headers['stripe-signature'];
@@ -2257,6 +2387,11 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
         const buyerName = session.customer_details?.name || 'there';
         const amountCents = Number(session.amount_total || 0);
         await _fulfillStripeOrder({ piRef, product, email, buyerName, amountCents, ref, connectApplied });
+        await _recordEndorselySale({
+          piRef, product, amountCents,
+          code: session.metadata?.endorsely_code || '',
+          referralId: session.metadata?.endorsely_referral || ''
+        });
       } else {
         addLog(`[Stripe] checkout.session.completed for unmapped product="${product}" session=${session.id}`, 'payment', 'warn');
       }
@@ -2272,6 +2407,19 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
         await supabase.from('referral_sales')
           .update({ refunded: true, refunded_at: new Date().toISOString() })
           .eq('payment_intent_id', piRef);
+        // Kill the affiliate commission too — a refunded sale must never show
+        // up as payable, or we would pay out on money we gave back.
+        const { data: killed } = await supabase.from('endorsely_sales')
+          .update({ refunded: true, refunded_at: new Date().toISOString(), status: 'cancelled' })
+          .eq('payment_intent_id', piRef).select('affiliate_code,commission_cents');
+        if (killed?.length) {
+          addLog(`[Endorsely] Commission cancelled on refund: ${killed[0].affiliate_code} — $${(killed[0].commission_cents / 100).toFixed(2)}`, 'affiliate', 'warn');
+          _notifyAdminAlert(
+            `↩️ Refund — comision anulat\n\nAfiliat: ${killed[0].affiliate_code}\n` +
+            `Comision anulat: $${(killed[0].commission_cents / 100).toFixed(2)}\n\n` +
+            `Dacă i-ai plătit deja acest comision în Endorsely, trebuie recuperat.`
+          );
+        }
       }
     }
     res.json({ received: true });
