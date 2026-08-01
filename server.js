@@ -2089,6 +2089,7 @@ const DODO_PRODUCT_IDS = {
 app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
   const product = String(req.body?.product || '');
   const ref = String(req.body?.ref || '').toLowerCase().trim().slice(0, 40);
+  const endorselyReferral = String(req.body?.endorsely_referral || '').slice(0, 200);
   const origin = req.headers.origin || 'https://aicashsystem.space';
 
   if (stripe) {
@@ -2131,6 +2132,7 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
         }
       }
       sessionParams.metadata = { product, ref, connectApplied: connectApplied ? '1' : '0' };
+      if (endorselyReferral) sessionParams.metadata.endorsely_referral = endorselyReferral;
 
       const session = await stripe.checkout.sessions.create(sessionParams);
       return res.json({ url: session.url });

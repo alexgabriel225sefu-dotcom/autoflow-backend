@@ -8,6 +8,7 @@
 <meta property="og:title" content="Apex Forex Bot — AI Forex Trading System">
 <meta property="og:description" content="Runs 24/7. cTrader practice &amp; live. Paper trading to test risk-free. Fully hosted — control from Telegram. One-time $497.">
 <meta property="og:type" content="website">
+<script async src="https://assets.endorsely.com/endorsely.js" data-endorsely="7a115a28-d792-43a2-8187-18b16921f51d"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
@@ -517,7 +518,7 @@ async function gotoCheckout(){
     var ref = sessionStorage.getItem('rfrsn_ref') || '';
     var r = await fetch('/api/checkout/create-session', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product: 'apex-forex', ref: ref })
+      body: JSON.stringify({ product: 'apex-forex', ref: ref, endorsely_referral: window.endorsely_referral || '' })
     });
     var d = await r.json();
     if (d.url) { window.location.href = d.url; return; }
