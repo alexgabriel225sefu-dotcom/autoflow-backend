@@ -1979,9 +1979,13 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
     if (supabase) {
       try {
         const { data: row } = await supabase.from('licenses')
-          .select('active,refunded').eq('key', key).maybeSingle();
+          .select('active,refunded,trial,expires_at').eq('key', key).maybeSingle();
         if (row && row.refunded === true) {
           return res.json({ valid: false, message: 'This license was refunded and is no longer active. Repurchase at aicashsystem.space' });
+        }
+        if (row && row.trial === true && row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) {
+          if (row.active !== false) supabase.from('licenses').update({ active: false }).eq('key', key).then(() => {}).catch(() => {});
+          return res.json({ valid: false, message: 'Your free trial has ended. For full access, get your bot at aicashsystem.space' });
         }
         if (row && row.active === false) {
           return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
@@ -2014,6 +2018,41 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
   return res.json({ valid: false, message: 'Invalid license key. Purchase at aicashsystem.space' });
 });
 
+// POST /api/admin/trial/issue?secret=... — { email, product, days? } -> { key, telegramLink, expiresAt }
+// Issues a free-trial license: same key format/verification path as a paid one,
+// but flagged trial:true with an expires_at that /api/verify-license enforces.
+app.post('/api/admin/trial/issue', async (req, res) => {
+  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const email = String(req.body?.email || '').trim().slice(0, 200);
+  const product = req.body?.product === 'apex-forex' ? 'apex-forex' : 'apex-bot';
+  const days = Math.min(Math.max(parseInt(req.body?.days, 10) || 5, 1), 30);
+  const key = product === 'apex-forex' ? generateForexKey() : generateLicenseKey();
+  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await supabase.from('licenses').insert([{
+    key, email, active: true, activated_at: null, product, trial: true, expires_at: expiresAt
+  }]);
+  if (error) return res.status(500).json({ error: error.message });
+  const botHandle = product === 'apex-forex' ? 'FOREX_APEX_BOT' : 'ApexTradeBot_official_bot';
+  addLog(`Trial issued: ${key} (${product}, ${days}d) for ${email || 'no email'}`, 'license', 'success');
+  res.json({ key, product, expiresAt, telegramLink: `https://t.me/${botHandle}?start=${key}` });
+});
+
+// POST /api/admin/trial/finish?secret=... — cuts off every still-active trial license at once.
+// The bot's next /api/verify-license check (on startup/restart) will then reject them with
+// the "trial ended, get full access at aicashsystem.space" message.
+app.post('/api/admin/trial/finish', async (req, res) => {
+  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const { data: rows } = await supabase.from('licenses')
+    .select('key,email,product').eq('trial', true).eq('active', true);
+  if (rows?.length) {
+    const keys = rows.map(r => r.key);
+    await supabase.from('licenses').update({ active: false }).in('key', keys);
+  }
+  addLog(`Trial /finish: cut off ${rows?.length || 0} active trial(s)`, 'license', 'success');
+  res.json({ cutOff: rows?.length || 0, licenses: rows || [] });
+});
 
 // ── DIGISTORE24 IPN (webhook) ───────────────────────────────────────────────
 // Merchant of Record — D24 handles EU VAT/taxes/invoices, we just deliver the
