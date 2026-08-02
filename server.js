@@ -19,6 +19,16 @@ process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION:', er
 const app = express();
 app.set('trust proxy', 1);
 const rateLimit = require('express-rate-limit');
+const _ALLOWED_ORIGINS = new Set([
+  'https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'
+]);
+// req.headers.origin is client-controlled — never use it directly to build a
+// redirect URL. Restrict to the known site origins before it feeds success/
+// return/cancel URLs (checkout, Stripe Connect onboarding, etc).
+function _safeOrigin(req) {
+  const requested = req.headers.origin || '';
+  return _ALLOWED_ORIGINS.has(requested) ? requested : 'https://aicashsystem.space';
+}
 app.use(cors({
   origin: ['https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'],
   credentials: true
@@ -360,6 +370,13 @@ const logs = [];
 function addLog(msg, type = 'info', status = 'success') {
   logs.unshift({ msg, type, status, time: new Date().toISOString() });
   if (logs.length > 200) logs.pop();
+}
+// Mask a customer email before it goes into the (dashboard-readable) log store.
+function _maskEmail(email) {
+  const s = String(email || '');
+  const at = s.indexOf('@');
+  if (at <= 0) return s ? '***' : '';
+  return `${s[0]}***${s.slice(at)}`;
 }
 
 // ── SIGNED TOKEN ──
@@ -1367,7 +1384,7 @@ const AFFILIATE_BOT_USERNAME = process.env.AFFILIATE_BOT_USERNAME || 'AICASHSYST
 // public, so a hardcoded default is a published password. With nothing set we
 // generate a random one instead, which fails closed — the admin endpoints stop
 // answering until AFFILIATE_BOT_SECRET is configured here and on the bot.
-const AFFILIATE_BOT_SECRET = process.env.AFFILIATE_BOT_SECRET || process.env.JWT_SECRET || (() => {
+const AFFILIATE_BOT_SECRET = process.env.AFFILIATE_BOT_SECRET || (() => {
   console.warn('[WARN] AFFILIATE_BOT_SECRET not set — admin endpoints are disabled this session. Set it in Render env vars (and give the bot the same value).');
   return crypto.randomBytes(32).toString('hex');
 })();
@@ -1436,7 +1453,8 @@ async function _notifyAdminAlert(text, subject = 'Apex Trading Suite — alertă
     try {
       const r = await fetch(hook, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, text, site: 'aicashsystem.space', at: new Date().toISOString() })
+        body: JSON.stringify({ subject, text, site: 'aicashsystem.space', at: new Date().toISOString() }),
+        signal: AbortSignal.timeout(10000)
       });
       if (r.ok) return;
       addLog(`Admin alert: Make webhook rejected (HTTP ${r.status}) — trying next channel`, 'system', 'warn');
@@ -1448,7 +1466,8 @@ async function _notifyAdminAlert(text, subject = 'Apex Trading Suite — alertă
     try {
       const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: process.env.ADMIN_CHAT_ID || '7585109158', text })
+        body: JSON.stringify({ chat_id: process.env.ADMIN_CHAT_ID || '7585109158', text }),
+        signal: AbortSignal.timeout(10000)
       });
       if (r.ok) return;
       addLog(`Admin alert: Telegram rejected (HTTP ${r.status}) — trying email`, 'system', 'warn');
@@ -1782,7 +1801,7 @@ app.post('/api/affiliates/connect-onboard', _authLimiter, async (req, res) => {
       await supabase.from('affiliates').update({ stripe_account_id: accountId }).eq('code', code);
     }
 
-    const origin = req.headers.origin || 'https://aicashsystem.space';
+    const origin = _safeOrigin(req);
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
       refresh_url: `${origin}/affiliate-dashboard?connect=refresh`,
@@ -2126,7 +2145,7 @@ async function handleDigistore24Webhook(req, res) {
         }], { onConflict: 'key' });
         if (error) addLog(`[D24] License DB error: ${error.message}`, 'license', 'error');
       }
-      addLog(`[D24] License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
+      addLog(`[D24] License activated: ${licenseKey} for ${_maskEmail(email)} (${product})`, 'license', 'success');
 
       // Affiliate commission — D24's own affiliate marketplace already pays its
       // affiliates directly, so this only applies to refs from our own funnel.
@@ -2156,7 +2175,7 @@ async function handleDigistore24Webhook(req, res) {
           : '🤖 Your Apex Trade Bot — License Key inside';
         const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
         if (!result.ok) {
-          addLog(`[D24] Email NOT sent for ${email} — ${result.error}`, 'email', 'error');
+          addLog(`[D24] Email NOT sent for ${_maskEmail(email)} — ${result.error}`, 'email', 'error');
           _notifyAdminAlert(
             `⚠️ Customer paid but the license email FAILED to send.\n\n` +
             `Product: ${isForex ? 'Forex' : 'Crypto'}\nEmail: ${email}\nOrder: ${orderId}\n` +
@@ -2227,7 +2246,7 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
   const ref = String(req.body?.ref || '').toLowerCase().trim().slice(0, 40);
   const endorselyReferral = String(req.body?.endorsely_referral || '').slice(0, 200);
   const endorselyCode = String(req.body?.endorsely_code || '').toLowerCase().trim().slice(0, 60);
-  const origin = req.headers.origin || 'https://aicashsystem.space';
+  const origin = _safeOrigin(req);
 
   if (stripe) {
     const priceId = STRIPE_PRICE_IDS[product];
@@ -2327,7 +2346,7 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
     }], { onConflict: 'key' });
     if (error) addLog(`[${provider}] License DB error: ${error.message}`, 'license', 'error');
   }
-  addLog(`[${provider}] License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
+  addLog(`[${provider}] License activated: ${licenseKey} for ${_maskEmail(email)} (${product})`, 'license', 'success');
 
   if (isNew && ref && supabase) {
     try {
@@ -2357,7 +2376,7 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
       : '🤖 Your Apex Trade Bot — License Key inside';
     const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
     if (!result.ok) {
-      addLog(`[${provider}] Email NOT sent for ${email} — ${result.error}`, 'email', 'error');
+      addLog(`[${provider}] Email NOT sent for ${_maskEmail(email)} — ${result.error}`, 'email', 'error');
       _notifyAdminAlert(
         `⚠️ Customer paid (${provider}) but the license email FAILED to send.\n\n` +
         `Product: ${isForex ? 'Forex' : 'Crypto'}\nEmail: ${email}\nRef: ${piRef}\n` +
@@ -2460,6 +2479,9 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
       const ref = session.metadata?.ref || '';
       const connectApplied = session.metadata?.connectApplied === '1';
       if (STRIPE_PRICE_IDS[product]) {
+        if (!session.payment_intent) {
+          addLog(`[Stripe] session=${session.id} has no payment_intent — refund revocation will not match`, 'payment', 'warn');
+        }
         const piRef = `stripe_${session.payment_intent || session.id}`;
         const email = session.customer_details?.email || '';
         const buyerName = session.customer_details?.name || 'there';

@@ -45,6 +45,17 @@ def _nrm(x):
     return (x or "").upper().replace("_", "").replace("/", "").replace("-", "")
 
 
+def _risk_from_snapshot(entry_price, initial_stop):
+    """abs(entry - stop) from a persisted snapshot, or None if either value is
+    missing/unusable. The snapshot is external state (Redis/disk) that can be
+    partially written or corrupted, so this must never raise into a caller
+    that isn't itself wrapped (restart recovery runs before any try/except)."""
+    try:
+        return abs(float(entry_price) - float(initial_stop))
+    except (TypeError, ValueError):
+        return None
+
+
 _LOOP_INTERVAL = 300  # 5 minutes between ticks
 _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
@@ -479,9 +490,9 @@ def _loop(user_id, alert_fn, gen=None):
                 # longer its risk, and re-deriving R from it would resume the
                 # noise-tight trailing this fix removes.
                 _init_stop = _snap.get("initialStop")
-                if _init_stop and open_pos.get("entryPrice"):
-                    entry_risk_by_sym[_nrm(symbol)] = abs(
-                        float(open_pos["entryPrice"]) - float(_init_stop))
+                _risk = _risk_from_snapshot(open_pos.get("entryPrice"), _init_stop)
+                if _risk is not None:
+                    entry_risk_by_sym[_nrm(symbol)] = _risk
                 _persist_open_snapshot({**open_pos, "symbol": symbol,
                                         "initialStop": _init_stop})
                 print(f"[UserLoop:{user_id}] restart recovery: adopted still-open {symbol} position"
@@ -962,10 +973,10 @@ def _loop(user_id, alert_fn, gen=None):
                         # path, so adopt it instead of falling back to the live
                         # stop — a manual entry deserves the same exit quality.
                         _s = (user_store.load(user_id) or {}).get("open_position_snapshot") or {}
-                        if (_s.get("initialStop") and _s.get("entryPrice")
-                                and _nrm(_s.get("symbol")) == _nrm(symbol)):
-                            entry_risk_by_sym[_nrm(symbol)] = abs(
-                                float(_s["entryPrice"]) - float(_s["initialStop"]))
+                        if _nrm(_s.get("symbol")) == _nrm(symbol):
+                            _risk = _risk_from_snapshot(_s.get("entryPrice"), _s.get("initialStop"))
+                            if _risk is not None:
+                                entry_risk_by_sym[_nrm(symbol)] = _risk
                     _persist_open_snapshot(_with_initial_stop(open_pos, symbol))
 
                 # Trailing-stop / break-even management for the open position
@@ -1772,7 +1783,8 @@ def _loop(user_id, alert_fn, gen=None):
                             # which starts moving as soon as the trail engages.
                             _fill = open_pos.get("entryPrice") or price
                             entry_risk_by_sym[_nrm(symbol)] = abs(float(_fill) - float(sl_price))
-                            _persist_open_snapshot({**open_pos, "initialStop": sl_price})
+                            _persist_open_snapshot({**open_pos, "symbol": symbol,
+                                                    "initialStop": sl_price})
                             result = {"action": action, "symbol": symbol, "confidence": confidence,
                                       "price": price, "spreadPips": round(spread, 1), "time": now_str,
                                       "stopLoss": sl_price, "takeProfit": tp_price,
