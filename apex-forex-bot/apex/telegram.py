@@ -868,6 +868,13 @@ def _apply_account(chat_id, ctid):
     acc = next((a for a in (user.get("ctrader_accounts") or []) if str(a["ctid"]) == str(ctid)), None)
     if not acc:
         return send_to(chat_id, "❌ Account not found. Tap Connect a different account.")
+    from apex import ctrader_oauth
+    gate_reason = ctrader_oauth.broker_gate_reason(acc, user.get("ctrader_access_token", ""))
+    if gate_reason:
+        live_link = os.getenv("BROKER_LIVE_LINK", "").strip()
+        link_line = f"\n\n👉 {live_link}" if live_link else ""
+        return send_to(chat_id, f"❌ <b>Account not eligible</b>\n\n"
+                                f"Account <code>{ctid}</code> — {gate_reason}.{link_line}")
     ct_env = "live" if acc.get("live") else "demo"
     updates = {"ctrader_account_id": acc["ctid"], "ctrader_env": ct_env}
     # LIVE = real money: turn OFF the internal simulation so orders actually execute.
@@ -924,6 +931,13 @@ def _handle_ctaccount(chat_id, args):
     match = next((a for a in accounts if str(a["ctid"]) == want), None)
     if not match:
         return send_to(chat_id, f"❌ No linked account with id <code>{want}</code>.")
+    from apex import ctrader_oauth
+    gate_reason = ctrader_oauth.broker_gate_reason(match, user.get("ctrader_access_token", ""))
+    if gate_reason:
+        live_link = os.getenv("BROKER_LIVE_LINK", "").strip()
+        link_line = f"\n\n👉 {live_link}" if live_link else ""
+        return send_to(chat_id, f"❌ <b>Account not eligible</b>\n\n"
+                                f"Account <code>{want}</code> — {gate_reason}.{link_line}")
     ct_env = "live" if match.get("live") else "demo"
     updates = {"ctrader_account_id": match["ctid"], "ctrader_env": ct_env}
     try:

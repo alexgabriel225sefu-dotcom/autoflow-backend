@@ -836,6 +836,20 @@ def account_balance(access_token: str, ctid, env: str = "demo") -> float:
     return res.trader.balance / (10 ** money_digits)
 
 
+def get_broker_name(access_token: str, ctid, env: str = "demo") -> str:
+    """The broker name cTrader has on file for this account (e.g. 'FP Markets
+    LLC') — used to gate onboarding to a specific partner broker. Not present
+    on the account-list response; only ProtoOATraderRes carries it."""
+    req = ProtoOATraderReq()
+    req.ctidTraderAccountId = int(ctid)
+    try:
+        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOATraderRes)
+    except (ConnectionError, OSError, TimeoutError):
+        _drop_conn(env, int(ctid))
+        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOATraderRes)
+    return getattr(res.trader, "brokerName", "") or ""
+
+
 def list_accounts(access_token: str) -> list:
     """Trading accounts authorized by this token — used after OAuth to let the
     client pick which account to trade. Opens a short-lived demo connection."""
