@@ -32,6 +32,9 @@ _STATE_TTL = 600  # 10 minutes to complete the authorization
 # account, demo or live" — e.g. for going back to the paid, broker-agnostic model.
 _REQUIRE_LIVE_BROKER = (os.getenv("REQUIRE_LIVE_FP_MARKETS", "true").strip().lower() not in ("0", "false", "no"))
 _ALLOWED_BROKER_SUBSTR = (os.getenv("REQUIRED_BROKER_NAME", "fp markets") or "").strip().lower()
+# Owner's own test/demo accounts always pass the gate regardless of broker or
+# live/demo — comma-separated ctids, e.g. "4258018,18000057".
+_GATE_ALLOWLIST = {s.strip() for s in os.getenv("BROKER_GATE_ALLOWLIST", "").split(",") if s.strip()}
 
 
 def broker_gate_reason(account: dict, access_token: str) -> str:
@@ -40,6 +43,8 @@ def broker_gate_reason(account: dict, access_token: str) -> str:
     cTrader call (brokerName isn't on the account-list response) only when
     the account is live — no point paying that cost for a demo account."""
     if not _REQUIRE_LIVE_BROKER:
+        return ""
+    if str(account.get("ctid")) in _GATE_ALLOWLIST:
         return ""
     if not account.get("live"):
         return ("demo accounts aren't eligible right now — free access requires a "
