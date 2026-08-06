@@ -2695,6 +2695,11 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
 
 _VERIFY_URL = f"{cfg.LICENSE_SERVER}/api/verify-license"
 _DEPLOY_URL = ""
+# Open-access mode (free-for-everyone growth phase): set REQUIRE_LICENSE=true
+# on Render to bring the license-key gate back on for new users. Existing
+# already-granted users are unaffected either way — this only decides
+# whether a brand-new chat_id needs a valid key to get past _license_ok.
+_LICENSE_REQUIRED = (os.getenv("REQUIRE_LICENSE", "false").strip().lower() in ("1", "true", "yes"))
 
 
 def _license_ok(chat_id, text):
@@ -2878,11 +2883,15 @@ def _poll_loop():
                     # Gate access behind a valid purchase license (fail-open on
                     # server errors). Admins are already is_allowed, so they skip
                     # this. _license_ok sends the prompt/error on refusal.
-                    if not _license_ok(chat_id, raw):
+                    # Growth phase: REQUIRE_LICENSE unset/false skips the gate
+                    # entirely — anyone's first message grants access.
+                    if _LICENSE_REQUIRED and not _license_ok(chat_id, raw):
                         continue
                     access.grant(chat_id_str)
+                    welcome_head = ("🎉 <b>Welcome — your license is active!</b>" if _LICENSE_REQUIRED
+                                    else "🎉 <b>Welcome — you're in!</b>")
                     send_to(chat_id,
-                            "🎉 <b>Welcome — your license is active!</b>\n\n"
+                            f"{welcome_head}\n\n"
                             "You now own a fully-hosted AI trading bot that runs on "
                             "<b>your own</b> trading account, controlled entirely from "
                             "this Telegram chat. No apps to install, no PC required.\n\n"
