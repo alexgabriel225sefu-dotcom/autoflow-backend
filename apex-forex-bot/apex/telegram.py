@@ -2818,6 +2818,7 @@ def _poll_loop():
     except Exception as e:
         print(f"[TELEGRAM] getMe error: {e}")
     print(f"[TELEGRAM] Poll loop started. TOKEN={bool(TOKEN)} CHAT_ID={CHAT_ID}")
+    _conflict_streak = 0
     while True:
         try:
             r = requests.get(f"{_API}/getUpdates",
@@ -2826,9 +2827,28 @@ def _poll_loop():
                              timeout=15)
             data = r.json()
             if not data.get("ok"):
+                if data.get("error_code") == 409:
+                    # Another process is polling this same bot token — Telegram
+                    # only lets one getUpdates caller win at a time. Retrying
+                    # every 10s forever just spams the log without ever
+                    # resolving it; back off (capped at 2 min) and say plainly
+                    # where to look, since a flat retry loop makes this look
+                    # like a bug in THIS process when it's actually a second
+                    # instance running somewhere else (e.g. a leftover Railway
+                    # deployment of this same bot — see Railway refs in bot.py).
+                    _conflict_streak += 1
+                    wait = min(120, 10 * _conflict_streak)
+                    if _conflict_streak == 1 or _conflict_streak % 6 == 0:
+                        print(f"[TELEGRAM] 409 Conflict — another instance of this bot token is "
+                              f"polling (streak={_conflict_streak}). Find and stop it (check for a "
+                              f"leftover Railway deployment or a second Render service). "
+                              f"Backing off {wait}s.")
+                    time.sleep(wait)
+                    continue
                 print(f"[TELEGRAM] API error: {data.get('description')} (code {data.get('error_code')})")
                 time.sleep(10)
                 continue
+            _conflict_streak = 0
             for u in data.get("result", []):
                 _update_id = u["update_id"] + 1
                 # Inline button presses (copilot approve/reject)
