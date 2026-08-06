@@ -981,9 +981,26 @@ _RISK_TEXT = ("⚠️ <b>Risk disclaimer</b>\n\n"
 
 def onboard_start(chat_id):
     """Guided setup after the broker is connected: symbol → method → mode → go."""
+    syms = _OB_SYMS
+    try:
+        u = user_store.load(chat_id)
+        token, ctid = u.get("ctrader_access_token"), u.get("ctrader_account_id")
+        if token and ctid:
+            from apex.brokers import ctrader as _ct
+            offered = _ct.available_symbol_names(token, ctid, u.get("ctrader_env", "demo"))
+            filtered = [(label, code) for label, code in _OB_SYMS if code in offered]
+            # Only narrow the list if the broker actually offers a useful
+            # subset — an empty/near-empty result usually means the lookup
+            # itself is unreliable (e.g. thin demo symbol set), not that
+            # nothing is tradeable, so fall back to the full list instead
+            # of showing the client almost no options.
+            if len(filtered) >= 3:
+                syms = filtered
+    except Exception as e:
+        print(f"[TELEGRAM] onboard symbol filter failed, using full list: {e}")
     rows = [[{"text": "🤖 Auto-Pilot — let the bot pick everything (recommended)", "callback_data": "ob:sym:__auto__"}]]
     row = []
-    for label, code in _OB_SYMS:
+    for label, code in syms:
         row.append({"text": label, "callback_data": f"ob:sym:{code}"})
         if len(row) == 3:
             rows.append(row)

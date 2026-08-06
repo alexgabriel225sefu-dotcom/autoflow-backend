@@ -850,6 +850,21 @@ def get_broker_name(access_token: str, ctid, env: str = "demo") -> str:
     return getattr(res.trader, "brokerName", "") or ""
 
 
+def available_symbol_names(access_token: str, ctid, env: str = "demo") -> set:
+    """Normalized (no '/' or '_', uppercase) symbol names this account's
+    broker actually lists — e.g. {"EURUSD", "XAUUSD", ...}. Used to filter
+    the onboarding quick-pick buttons down to what will actually place an
+    order, instead of guessing which CFDs a given broker/account offers."""
+    req = ProtoOASymbolsListReq()
+    req.ctidTraderAccountId = int(ctid)
+    try:
+        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOASymbolsListRes)
+    except (ConnectionError, OSError, TimeoutError):
+        _drop_conn(env, int(ctid))
+        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOASymbolsListRes)
+    return {s.symbolName.replace("/", "").replace("_", "").upper() for s in res.symbol}
+
+
 def list_accounts(access_token: str) -> list:
     """Trading accounts authorized by this token — used after OAuth to let the
     client pick which account to trade. Opens a short-lived demo connection."""
