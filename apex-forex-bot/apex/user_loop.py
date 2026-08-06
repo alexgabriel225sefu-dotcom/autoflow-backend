@@ -157,7 +157,17 @@ def _make_broker(user):
         MAX_DD_PCT       = float(user.get("max_dd_pct", 25)),
         MAX_DAILY_LOSS_PCT = float(user.get("max_daily_loss_pct", 4)),
     )
-    return _CtraderBroker(fake_cfg), fake_cfg
+    broker = _CtraderBroker(fake_cfg)
+    # Refine the LEVERAGE guess with the broker's real, per-instrument value
+    # (regulated brokers cap crypto/indices far lower than FX majors — see
+    # CtraderBroker.leverage_for) — but only when the client didn't set one
+    # explicitly and we're actually margining real money against it.
+    if not paper and ct_token and ct_account and "leverage" not in user:
+        try:
+            fake_cfg.LEVERAGE = broker.leverage_for(fake_cfg.SYMBOL)
+        except Exception as e:
+            print(f"[UserLoop] leverage_for failed, keeping default {fake_cfg.LEVERAGE}: {e}")
+    return broker, fake_cfg
 
 
 def _broker_label(user, cfg):

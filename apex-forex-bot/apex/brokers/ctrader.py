@@ -56,6 +56,7 @@ try:
         ProtoOAClosePositionReq, ProtoOAErrorRes, ProtoOAOrderErrorEvent,
         ProtoOASymbolByIdReq, ProtoOASymbolByIdRes, ProtoOAAmendPositionSLTPReq,
         ProtoOADealListReq, ProtoOADealListRes,
+        ProtoOAGetDynamicLeverageByIDReq, ProtoOAGetDynamicLeverageByIDRes,
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
@@ -356,6 +357,8 @@ class CtraderBroker:
             self._vol_cache = {}
         if not hasattr(self, "_digits_cache"):
             self._digits_cache = {}
+        if not hasattr(self, "_leverageid_cache"):
+            self._leverageid_cache = {}
         if sid in self._vol_cache:
             return self._vol_cache[sid]
         req = ProtoOASymbolByIdReq()
@@ -366,10 +369,52 @@ class CtraderBroker:
         mn = int(getattr(sym, "minVolume", 0) or 0) or 100_000
         st = int(getattr(sym, "stepVolume", 0) or 0) or mn
         dg = int(getattr(sym, "digits", 0) or 0)
+        lev_id = int(getattr(sym, "leverageId", 0) or 0)
         self._vol_cache[sid] = (mn, st)
         if dg:
             self._digits_cache[sid] = dg
+        if lev_id:
+            self._leverageid_cache[sid] = lev_id
         return mn, st
+
+    def leverage_for(self, instrument=None) -> float:
+        """Real leverage the broker allows on `instrument`, in the account's
+        actual currency — NOT a flat assumption. Regulated brokers (e.g.
+        CySEC/ESMA) cap crypto CFDs and indices far lower than FX majors
+        (crypto ~1:2 vs FX ~1:30), so sizing every instrument off one global
+        LEVERAGE constant can ask for far more margin than the broker will
+        actually give, especially for EU clients on FP Markets' Cyprus
+        entity. Picks the most conservative (lowest) tier when the symbol
+        has volume-tiered leverage. Raises on any failure — callers must
+        catch and fall back to the existing static default; this is a
+        best-effort refinement, never a hard dependency."""
+        sid = self._symbol_id(instrument)
+        self._vol_rules(sid)  # populates _leverageid_cache for this symbol
+        lev_id = self._leverageid_cache.get(sid)
+        leverage = None
+        if lev_id:
+            lreq = ProtoOAGetDynamicLeverageByIDReq()
+            lreq.ctidTraderAccountId = self._ctid()
+            lreq.leverageId = lev_id
+            lres = self._rpc(lreq, ProtoOAGetDynamicLeverageByIDRes)
+            tiers = list(lres.leverage.tiers)
+            if tiers:
+                leverage = min(t.leverage for t in tiers)
+        if not leverage:
+            # No per-symbol tier data — fall back to the account's own
+            # nominal leverage rather than a hard-coded guess.
+            treq = ProtoOATraderReq()
+            treq.ctidTraderAccountId = self._ctid()
+            tres = self._rpc(treq, ProtoOATraderRes)
+            leverage = (getattr(tres.trader, "leverageInCents", 0) or 0) / 100
+        # Documented as a plain multiplier (unlike *InCents fields); a value
+        # in the hundreds/thousands means it's actually scaled by 100 and we
+        # misread it — recover rather than size positions off a bogus number.
+        if leverage and leverage > 500:
+            leverage = leverage / 100
+        if not leverage or leverage <= 0:
+            raise ValueError(f"no usable leverage from broker for {instrument}")
+        return leverage
 
     def _symbol_id(self, instrument):
         self._load_symbols()
