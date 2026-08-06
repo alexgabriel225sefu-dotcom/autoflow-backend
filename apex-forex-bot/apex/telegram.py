@@ -2722,13 +2722,13 @@ def _license_ok(chat_id, text):
         send_to(chat_id,
             "🔒 <b>Activation required</b>\n\n"
             "Open the activation link from your purchase email to unlock the bot.\n\n"
-            f"Don't have {cfg.BOT_NAME} yet? Get it at https://aicashsystem.space")
+            f"Don't have {cfg.BOT_NAME} yet? Join https://t.me/Apex4Traders to get access")
         return False
     if not re.match(rf'^{cfg.LICENSE_KEY_PREFIX}-[A-Z2-9]{{4}}-[A-Z2-9]{{4}}-[A-Z2-9]{{4}}$', key):
         send_to(chat_id,
             "❌ <b>That doesn't look like a valid key.</b>\n\n"
             f"Use the <code>{cfg.LICENSE_KEY_PREFIX}-XXXX-XXXX-XXXX</code> key from your purchase email, "
-            "or buy at https://aicashsystem.space")
+            "or join https://t.me/Apex4Traders to get one")
         return False
     try:
         r = requests.post(_VERIFY_URL, json={"key": key, "product": cfg.LICENSE_PRODUCT}, timeout=8)
