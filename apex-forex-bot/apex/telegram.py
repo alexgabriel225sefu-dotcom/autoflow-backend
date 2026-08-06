@@ -24,6 +24,13 @@ CHAT_ID = (cfg.TELEGRAM_CHAT_ID or "").strip()
 DASHBOARD_URL = cfg.DASHBOARD_URL
 _API = f"https://api.telegram.org/bot{TOKEN}"
 
+# Growth-phase gate mirror (see ctrader_oauth.broker_gate_reason) — used only
+# to keep static help/onboarding copy honest: while this is on, a demo
+# account (or a live account at any other broker) never qualifies for free
+# access, so nothing shown to a new client should suggest otherwise.
+_LIVE_BROKER_REQUIRED = (os.getenv("REQUIRE_LIVE_FP_MARKETS", "true").strip().lower() not in ("0", "false", "no"))
+_REQUIRED_BROKER_LABEL = (os.getenv("REQUIRED_BROKER_NAME", "").strip() or "FP Markets")
+
 
 def refresh_from_config():
     # TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are also settable from the web
@@ -504,15 +511,26 @@ def _handle_status(chat_id):
 def _handle_setup(chat_id):
     with _lock:
         _wizards[chat_id] = {"step": "MODE", "data": {}}
-    send_to(chat_id,
-            f"🛠️ <b>{cfg.BOT_NAME.upper()} SETUP</b>\n\n"
-            "1/5 — <b>How do you want to trade?</b>\n\n"
-            "Reply <code>1</code> or <code>2</code>:\n"
-            "  <code>1</code> — 🧪 <b>Demo</b> (free demo account on cTrader — "
-            "real market data, no risk).\n"
-            "  <code>2</code> — 🔴 <b>Live</b> (real money via <b>cTrader</b> — any broker "
-            "worldwide).\n\n"
-            "<i>Most people start with 1 (demo) to test the bot risk-free.</i>")
+    if _LIVE_BROKER_REQUIRED:
+        send_to(chat_id,
+                f"🛠️ <b>{cfg.BOT_NAME.upper()} SETUP</b>\n\n"
+                "1/5 — <b>How do you want to trade?</b>\n\n"
+                "Reply <code>1</code> or <code>2</code>:\n"
+                "  <code>1</code> — 🧪 <b>Demo</b> (test the bot risk-free — note: free access "
+                f"needs a <b>live {_REQUIRED_BROKER_LABEL}</b> account, so this won't unlock trading).\n"
+                f"  <code>2</code> — 🔴 <b>Live</b> (real money via a live <b>{_REQUIRED_BROKER_LABEL}</b> "
+                "account — required for free access).\n\n"
+                f"<i>Free access requires a live {_REQUIRED_BROKER_LABEL} account — most people pick 2.</i>")
+    else:
+        send_to(chat_id,
+                f"🛠️ <b>{cfg.BOT_NAME.upper()} SETUP</b>\n\n"
+                "1/5 — <b>How do you want to trade?</b>\n\n"
+                "Reply <code>1</code> or <code>2</code>:\n"
+                "  <code>1</code> — 🧪 <b>Demo</b> (free demo account on cTrader — "
+                "real market data, no risk).\n"
+                "  <code>2</code> — 🔴 <b>Live</b> (real money via <b>cTrader</b> — any broker "
+                "worldwide).\n\n"
+                "<i>Most people start with 1 (demo) to test the bot risk-free.</i>")
 
 
 def _handle_wizard_reply(chat_id, raw, msg_id):
@@ -531,23 +549,41 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                 w["data"]["paper"] = False
                 w["data"]["env"] = "demo"
                 _wizards.pop(chat_id, None)
-            send_to(chat_id,
-                    "🧪 <b>Demo mode</b>\n\n"
-                    "Create a free demo account on any <b>cTrader</b> broker "
-                    "(IC Markets, Pepperstone, FxPro…) and link it here.\n\n"
-                    "<b>Next:</b> Send <b>/ctrader</b> to connect your account.")
+            if _LIVE_BROKER_REQUIRED:
+                send_to(chat_id,
+                        "🧪 <b>Demo mode</b>\n\n"
+                        f"⚠️ Free access needs a <b>live {_REQUIRED_BROKER_LABEL}</b> account — "
+                        "a demo account won't unlock trading. Create a demo only if you want "
+                        f"to test the bot first, then open a live {_REQUIRED_BROKER_LABEL} "
+                        "account when you're ready.\n\n"
+                        "<b>Next:</b> Send <b>/ctrader</b> to connect your account.")
+            else:
+                send_to(chat_id,
+                        "🧪 <b>Demo mode</b>\n\n"
+                        "Create a free demo account on any <b>cTrader</b> broker "
+                        "(IC Markets, Pepperstone, FxPro…) and link it here.\n\n"
+                        "<b>Next:</b> Send <b>/ctrader</b> to connect your account.")
         else:
             with _lock:
                 w["data"]["paper"] = False
                 w["data"]["env"] = "live"
                 _wizards.pop(chat_id, None)
-            send_to(chat_id,
-                    "🔴 <b>Live trading — via cTrader</b>\n\n"
-                    "Real money runs through your own <b>cTrader</b> account (works with "
-                    "any cTrader broker worldwide — IC Markets, Pepperstone, FxPro…).\n\n"
-                    "<b>Next step:</b>\n"
-                    "1️⃣ Send <b>/ctrader</b> → tap <b>Authorize</b> → log in and approve\n\n"
-                    "<i>Send /ctrader now to link your account.</i>")
+            if _LIVE_BROKER_REQUIRED:
+                send_to(chat_id,
+                        "🔴 <b>Live trading — via cTrader</b>\n\n"
+                        f"Free access runs through a live <b>{_REQUIRED_BROKER_LABEL}</b> "
+                        "account specifically — that's who verifies and funds your free bot.\n\n"
+                        "<b>Next step:</b>\n"
+                        "1️⃣ Send <b>/ctrader</b> → tap <b>Authorize</b> → log in and approve\n\n"
+                        "<i>Send /ctrader now to link your account.</i>")
+            else:
+                send_to(chat_id,
+                        "🔴 <b>Live trading — via cTrader</b>\n\n"
+                        "Real money runs through your own <b>cTrader</b> account (works with "
+                        "any cTrader broker worldwide — IC Markets, Pepperstone, FxPro…).\n\n"
+                        "<b>Next step:</b>\n"
+                        "1️⃣ Send <b>/ctrader</b> → tap <b>Authorize</b> → log in and approve\n\n"
+                        "<i>Send /ctrader now to link your account.</i>")
 
     elif step == "SYMBOL":
         sym = raw.strip().upper().replace("/", "_").replace("-", "_")
@@ -820,10 +856,13 @@ def _broker_signup_rows():
         name = os.getenv("BROKER_NAME", "").strip()
         demo = os.getenv("BROKER_DEMO_LINK", "").strip()
         live = os.getenv("BROKER_LIVE_LINK", "").strip()
-        if name and demo:
+        # Growth-phase gate: a demo account never qualifies for free access, so
+        # don't hand new clients a button that leads straight to a rejection.
+        if name and demo and not _LIVE_BROKER_REQUIRED:
             rows.append([{"text": f"🧪 Create a free {name} DEMO account", "url": demo}])
         if name and live:
-            rows.append([{"text": f"🏦 Open a {name} live account", "url": live}])
+            label = "🏦 Open a LIVE account (required for free access)" if _LIVE_BROKER_REQUIRED else f"🏦 Open a {name} live account"
+            rows.append([{"text": label, "url": live}])
     return rows
 
 
@@ -845,11 +884,19 @@ def _handle_ctrader(chat_id):
                   "⚠️ Access requested: <b>accounts — READ-ONLY</b>. Orders will be rejected! "
                   "The operator must set <code>CTRADER_SCOPE=trading</code> and redeploy first.\n\n")
     broker_rows = _broker_signup_rows()
-    tip = ("💡 <b>New here?</b> Start on a demo account — test the bot risk-free, "
-           "switch to live when you're confident.\n\n")
+    if _LIVE_BROKER_REQUIRED:
+        tip = (f"💡 <b>New here?</b> Free access requires a <b>live</b> account with our "
+               f"partner broker, <b>{_REQUIRED_BROKER_LABEL}</b> — a demo account or another "
+               "broker won't unlock trading.\n\n")
+    else:
+        tip = ("💡 <b>New here?</b> Start on a demo account — test the bot risk-free, "
+               "switch to live when you're confident.\n\n")
     if broker_rows:
         tip += "Don't have a cTrader account yet? Create one below, then come back and Authorize.\n\n"
     kb = broker_rows + [[{"text": "🔗 Authorize cTrader", "url": link}]]
+    broker_line = (f"Free access needs a live <b>{_REQUIRED_BROKER_LABEL}</b> account specifically.\n\n"
+                   if _LIVE_BROKER_REQUIRED else
+                   "Works with any cTrader broker (IC Markets, Pepperstone, FxPro…).\n\n")
     send_to(chat_id,
         "🟢 <b>Connect your cTrader account</b>\n\n"
         f"{tip}"
@@ -857,7 +904,7 @@ def _handle_ctrader(chat_id):
         "2. Log in to cTrader and approve access\n"
         "3. You'll be sent back here automatically\n\n"
         f"{scope_line}"
-        "Works with any cTrader broker (IC Markets, Pepperstone, FxPro…).\n\n"
+        f"{broker_line}"
         "<i>The link is valid for 10 minutes.</i>",
         extra={"reply_markup": {"inline_keyboard": kb}})
 
@@ -909,8 +956,7 @@ def _handle_switch(chat_id):
     rows.append([{"text": "🔗 Connect a DIFFERENT account", "callback_data": "acct:new"}])
     send_to(chat_id,
         "🔄 <b>Switch trading account</b>\n\n"
-        "Tested on demo and ready for real money? Connect your live account below. "
-        "Or pick one of your linked accounts.\n\n"
+        "Connect your live account below, or pick one of your linked accounts.\n\n"
         "<i>🧪 Demo · 🔴 LIVE</i>",
         extra={"reply_markup": {"inline_keyboard": rows}})
 
@@ -1675,7 +1721,7 @@ def _handle_symbol(chat_id, args):
         warn += ("\n💡 <i>Pip conventions for metals, indices and crypto CFDs are handled "
                 "automatically. Volatile instruments need wider stops than FX"
                 + (f" — suggested here: <b>{sugg}</b>" if sugg else "")
-                + ". Watch the first trades on a demo account.</i>")
+                + ". Watch the first few trades closely.</i>")
     send_to(chat_id, f"💱 Trading symbol set to <b>{sym}</b>.{warn}")
 
 
@@ -1782,7 +1828,7 @@ def _handle_strategy(chat_id, args):
             for key, m in STRATEGY_MODES.items())
         return send_to(chat_id,
             f"🎯 <b>Trading method</b> (current: <b>{STRATEGY_MODES[current]['label']}</b>)\n\n{lines}\n\n"
-            "<i>Switching restarts your loop instantly. Test a new method on demo first.</i>")
+            "<i>Switching restarts your loop instantly — watch the first few trades closely.</i>")
     user_store.update(chat_id, {"strategy": want})
     running = _restart_user_loop(chat_id)
     m = STRATEGY_MODES[want]
@@ -2620,9 +2666,35 @@ def _handle_config(chat_id):
             f"🔑 {key_title} keys:\n{key_lines or '  (none set — use /setup)'}")
 
 
+# Growth-phase copy: while the live-broker gate is on, "start on demo" is
+# actively wrong advice (demo never unlocks free access) — swap it for the
+# real requirement instead of leaving stale text next to the working gate.
+_SETUP_LINE_CLIENT = ("/setup — choose pair, risk, strategy\n" if _LIVE_BROKER_REQUIRED else
+                      "/setup — choose demo/live, pair, risk\n")
+_SETUP_LINE_CONTROLS = ("/setup — Guided setup: pick your pair, risk, strategy\n\n" if _LIVE_BROKER_REQUIRED else
+                        "/setup — Guided setup: pick your pair, strategy, mode\n\n")
+_DEMO_LIVE_HELP = ((
+    "<b>🟢 Getting free access:</b>\n"
+    f"Free access requires a <b>live {_REQUIRED_BROKER_LABEL}</b> account — "
+    "run /setup, then /ctrader to connect it.\n\n"
+) if _LIVE_BROKER_REQUIRED else (
+    "<b>🔄 Demo ↔ Live:</b>\n"
+    "Start on a demo account with /setup. When you're ready, "
+    "send /ctrader and switch to your live account.\n\n"
+))
+_DEMO_LIVE_CONTROLS = ((
+    "<b>🟢 Getting free access</b>\n"
+    f"Free access requires a <b>live {_REQUIRED_BROKER_LABEL}</b> account. Connect it "
+    "with /ctrader.\n\n"
+) if _LIVE_BROKER_REQUIRED else (
+    "<b>🔄 Demo ↔ Live</b>\n"
+    "Start on a demo account. When you're confident, send /ctrader "
+    "and connect your live broker account.\n\n"
+))
+
 _HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "/setup — choose demo/live, pair, risk\n"
+                f"{_SETUP_LINE_CLIENT}"
                 "/status — live trading snapshot\n"
                 "/ctrader — connect your cTrader account\n"
                 "/start — resume trading\n"
@@ -2637,9 +2709,7 @@ _HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "/copilot on|off — approve trades yourself\n"
                 "/builder — build your strategy\n"
                 "/news — high-impact events\n\n"
-                "<b>🔄 Demo ↔ Live:</b>\n"
-                "Start on a demo account with /setup. When you're ready, "
-                "send /ctrader and switch to your live account.\n\n"
+                f"{_DEMO_LIVE_HELP}"
                 "💬 <i>Or just talk to me in any language!</i>")
 
 _CONTROLS_TEXT = (
@@ -2647,7 +2717,7 @@ _CONTROLS_TEXT = (
     "━━━━━━━━━━━━━━━━━━━━\n\n"
     "<b>🟢 Getting Started</b>\n"
     "/ctrader — Connect your cTrader broker account\n"
-    "/setup — Guided setup: pick your pair, strategy, mode\n\n"
+    f"{_SETUP_LINE_CONTROLS}"
     "<b>⏯ ON / OFF</b>\n"
     "/start — Turn the bot ON (it watches the market and trades automatically)\n"
     "/stop — Pause the bot (no new trades; open positions keep their safety stop)\n\n"
@@ -2676,9 +2746,7 @@ _CONTROLS_TEXT = (
     "/news — Upcoming high-impact economic events\n"
     "/guide — How the bot works (visual guide)\n"
     "/help — Quick command list\n\n"
-    "<b>🔄 Demo ↔ Live</b>\n"
-    "Start on a demo account. When you're confident, send /ctrader "
-    "and connect your live broker account.\n\n"
+    f"{_DEMO_LIVE_CONTROLS}"
     "<b>♻️ Starting over</b>\n"
     "/reset — Disconnect cTrader and wipe all settings back to default\n\n"
     "💬 <i>You can also talk to me in any language — just type your question.</i>")
@@ -2921,6 +2989,9 @@ def _poll_loop():
                     access.grant(chat_id_str)
                     welcome_head = ("🎉 <b>Welcome — your license is active!</b>" if _LICENSE_REQUIRED
                                     else "🎉 <b>Welcome — you're in!</b>")
+                    risk_bullet = (f"• Free access requires a <b>live {_REQUIRED_BROKER_LABEL}</b> account\n"
+                                   if _LIVE_BROKER_REQUIRED else
+                                   "• Start on a <b>demo account</b> first to test risk-free\n")
                     send_to(chat_id,
                             f"{welcome_head}\n\n"
                             "You now own a fully-hosted AI trading bot that runs on "
@@ -2930,16 +3001,26 @@ def _poll_loop():
                             "• Trading involves risk — profits are not guaranteed\n"
                             "• Losses are possible and they are <b>yours</b>\n"
                             "• This is software, not financial advice\n"
-                            "• Start on a <b>demo account</b> first to test risk-free\n\n"
+                            f"{risk_bullet}\n"
                             "Ready? Follow these steps 👇")
                     broker_rows = _broker_signup_rows()
-                    send_to(chat_id,
+                    if _LIVE_BROKER_REQUIRED:
+                        step1_body = (
+                            "📌 <b>Step 1 — Open a broker account</b>\n\n"
+                            f"You need a <b>live</b> cTrader account with <b>{_REQUIRED_BROKER_LABEL}</b> "
+                            "— that's who verifies and funds your free bot. If you don't have one yet, "
+                            "open one below (takes 2 minutes).\n\n"
+                            f"Only <b>live {_REQUIRED_BROKER_LABEL}</b> accounts qualify for free access — "
+                            "demo accounts and other brokers won't unlock trading.")
+                    else:
+                        step1_body = (
                             "📌 <b>Step 1 — Create a broker account</b>\n\n"
                             "You need a cTrader account with a supported broker. "
                             "If you don't have one yet, create a free demo account "
                             "below (takes 2 minutes).\n\n"
                             "Supported brokers: IC Markets, Pepperstone, FxPro, "
-                            "RoboForex, and any broker that offers cTrader.",
+                            "RoboForex, and any broker that offers cTrader.")
+                    send_to(chat_id, step1_body,
                             extra={"reply_markup": {"inline_keyboard": broker_rows}} if broker_rows else None)
                     send_to(chat_id,
                             "📌 <b>Step 2 — Connect your account</b>\n\n"

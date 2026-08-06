@@ -40,6 +40,25 @@ def _asset_swaps(html: str) -> str:
         out = out.replace("24/5", "24/7")
         out = out.replace("across gold, currencies and more",
                           "across Bitcoin, Ethereum, Solana and more")
+    out = _broker_gate_swaps(out)
+    return out
+
+
+def _broker_gate_swaps(html: str) -> str:
+    """While the live-broker growth-phase gate is on (see
+    ctrader_oauth.broker_gate_reason), a demo account never unlocks free
+    access — so the guide shouldn't tell a new client to 'start' on one."""
+    import os
+    if os.getenv("REQUIRE_LIVE_FP_MARKETS", "true").strip().lower() in ("0", "false", "no"):
+        return html
+    broker = (os.getenv("REQUIRED_BROKER_NAME", "").strip() or "FP Markets")
+    out = html.replace("Test first, then go real", f"Connect your live {broker} account")
+    out = out.replace(
+        '<div class="test"><h4>\U0001f9ea Demo</h4><p>Test the bot risk-free on a demo account. Start here.</p></div>',
+        '<div class="test"><h4>\U0001f9ea Demo</h4><p>For testing only — free access needs a live account.</p></div>')
+    out = out.replace(
+        "<p>Real money. Switch when you're confident.</p>",
+        f"<p>Required for free access — live {broker} account. Start here.</p>")
     return out
 
 
