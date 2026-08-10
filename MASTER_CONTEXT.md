@@ -1,18 +1,19 @@
-# Apex Trading Suite (AI Cash System) — Master Context
+# Apex4Traders (formerly Apex Trading Suite / AI Cash System) — Master Context
 
 ## Business Overview
-- **Brand:** Apex Trading Suite, by AI Cash System
-- **Website:** https://aicashsystem.space
-- **Type:** Hosted AI trading bots, sold as a one-time license
-- **Tagline:** Fully-hosted AI trading bots, controlled from Telegram — nothing to install.
+- **Brand:** Apex4Traders (rebrand in progress — old brand was Apex Trading Suite, by AI Cash System)
+- **Website:** aicashsystem.space is CLOSED/inactive (owner shut it down). No live site currently — rebranding to apex4traders, new site not yet built.
+- **Type:** Hosted AI trading bot, sold as a one-time license
+- **Tagline:** Fully-hosted AI trading bot, controlled from Telegram — nothing to install.
 - **Mission:** Give traders a 24/7 AI-powered bot that trades their own broker account for them, with zero setup friction.
 
 ## Products & Pricing
 
 | Product | Price | Description |
 |---------|-------|-------------|
-| **Apex Crypto Bot** | $297 one-time | AI-powered crypto trading bot, hosted by us 24/7. Trades BTC, ETH, SOL, XRP, LTC, ADA, DOGE, DOT, LINK, BCH via cTrader. |
-| **Apex Forex Bot** | $497 one-time | AI-powered forex trading bot, hosted by us 24/7. Trades major/minor FX pairs + gold via cTrader. |
+| **Apex Forex Bot** | ~$500 one-time (unconfirmed exact figure, was $497) | AI-powered forex trading bot, hosted by us 24/7. Trades major/minor FX pairs + gold via cTrader. |
+
+**Crypto bot retired — not offered anymore.** Ignore/remove references to "Apex Crypto Bot" in any new marketing content going forward.
 
 ## How it works
 - Customer buys a license (via Digistore24 checkout) → gets a license key + Telegram activation link by email.
@@ -79,8 +80,8 @@
 - `BREVO_API_KEY`
 
 ## Marketing Goals
-- Drive traffic to aicashsystem.space (homepage sells both bots directly)
-- Convert visitors to a $297 crypto bot or $497 forex bot purchase
+- No live site currently (old site closed, rebrand to apex4traders not yet built) — current focus is finding a growth/marketing co-founder, not direct-to-site traffic
+- Convert future visitors to a ~$500 forex bot purchase (crypto bot retired)
 - Build audience on TikTok, Instagram, YouTube Shorts showing the bot actually trading
 
 ## Content Channels
