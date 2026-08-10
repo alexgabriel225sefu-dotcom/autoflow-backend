@@ -67,7 +67,7 @@
 - **Runtime:** Node.js / Express (server.js) + two separate Python trading bots (crypto, forex)
 - **Database:** Supabase (PostgreSQL) + Redis (bot session state)
 - **AI:** Anthropic Claude (Haiku), Groq (Llama fallback)
-- **Payments:** Dodo Payments (Merchant of Record, primary — integrated in `server.js` via `/api/checkout/create-session` + `/dodo-webhook`). Digistore24 code kept in place but dormant (CopeCart account was abandoned mid-KYC). Stripe code kept only as a fallback for as long as `DODO_PAYMENTS_API_KEY` is unset — fully retired otherwise.
+- **Payments:** Dodo Payments (Merchant of Record, primary — integrated in `server.js` via `/api/checkout/create-session` + `/dodo-webhook`). Dodo has NO built-in affiliate marketplace (would need a third-party like Affonso/Rewardful to expose the offer to outside affiliates). Digistore24 code kept in place but the account was REJECTED for this product (not just "dormant" — reason not yet confirmed, ask owner before assuming why). CopeCart account was separately abandoned mid-KYC. Stripe code kept only as a fallback for as long as `DODO_PAYMENTS_API_KEY` is unset — fully retired otherwise.
 - **Email:** Brevo
 - **Broker integration:** cTrader Open API (both bots)
 - **Deployment:** Render (three services — main site, forex bot, crypto bot)
