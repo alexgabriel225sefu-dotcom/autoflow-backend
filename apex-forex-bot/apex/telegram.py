@@ -2024,12 +2024,13 @@ def _trade_err(err):
     return e
 
 
-def send_photo(chat_id, png, caption=""):
-    """Send a PNG to the chat (used for /chart and entry snapshots)."""
+def send_photo(chat_id, png, caption="", filename="chart.png", content_type="image/png"):
+    """Send an image to the chat (used for /chart, entry snapshots, and the
+    static onboarding proof screenshots)."""
     try:
         requests.post(f"{_API}/sendPhoto",
                       data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
-                      files={"photo": ("chart.png", png, "image/png")}, timeout=25)
+                      files={"photo": (filename, png, content_type)}, timeout=25)
     except Exception as e:
         print(f"[TELEGRAM] send_photo failed: {e}")
 
@@ -2551,12 +2552,38 @@ def _user_alert(uid, result):
 _PURCHASE_LINK = "https://buy.stripe.com/4gMeVdcnn7AX5Xp5TU2Ji01"
 
 
+_PROOF_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "proof")
+# (filename, caption) — real closed-trade screenshots from this bot's own
+# Telegram output, shown before anything else to build trust with proof
+# instead of claims.
+_PROOF_SHOTS = [
+    ("IMG_7107.jpeg", "📈 Real signal — NZDUSD, AI confidence 66%"),
+    ("IMG_7108.jpeg", "✅ Same trade, closed: <b>+$199.23</b>"),
+    ("IMG_7105.jpeg", "✅ XAUUSD (gold) — entry, chart, and result: <b>+$127.36</b>"),
+]
+
+
+def send_proof_shots(chat_id):
+    """Send a few real trade-result screenshots. Best-effort — a missing
+    file or Telegram hiccup should never block onboarding."""
+    for filename, caption in _PROOF_SHOTS:
+        path = os.path.join(_PROOF_DIR, filename)
+        try:
+            with open(path, "rb") as f:
+                send_photo(chat_id, f.read(), caption,
+                           filename=filename, content_type="image/jpeg")
+        except Exception as e:
+            print(f"[TELEGRAM] proof shot {filename} failed: {e}")
+
+
 def send_activation_sequence(chat_id, paid: bool):
-    """Full onboarding in one shot: welcome, FP Markets signup link, and the
-    real cTrader authorize link — sent immediately, no extra taps needed to
-    get to the link. Used both for free-growth-phase first contact and for
-    instant post-payment activation (paid=True skips the free-access framing).
+    """Full onboarding in one shot: proof screenshots, welcome, FP Markets
+    signup link, and the real cTrader authorize link — sent immediately, no
+    extra taps needed to get to the link. Used both for free-growth-phase
+    first contact and for instant post-payment activation (paid=True skips
+    the free-access framing).
     """
+    send_proof_shots(chat_id)
     welcome_head = ("🎉 <b>Payment received — you're in!</b>" if paid else
                      "🎉 <b>Welcome — you're in!</b>")
     risk_bullet = (f"• Free access requires a <b>live {_REQUIRED_BROKER_LABEL}</b> account\n"
@@ -2907,10 +2934,11 @@ def _license_ok(chat_id, text):
     cmd, _, karg = first.partition(" ")
     key = karg.strip().upper()
     if cmd.lower().split("@")[0] != "/start" or not key:
+        send_proof_shots(chat_id)
         send_to(chat_id,
             "🔒 <b>Activation required</b>\n\n"
-            "Open the activation link from your purchase email to unlock the bot.\n\n"
-            f"Don't have {cfg.BOT_NAME} yet? Join https://t.me/Apex4Traders to get access")
+            "Already bought? Open the activation link from your purchase email.\n\n"
+            f"New here? Send /purchase — instant access, no waiting.")
         return False
     if not re.match(rf'^{cfg.LICENSE_KEY_PREFIX}-[A-Z2-9]{{4}}-[A-Z2-9]{{4}}-[A-Z2-9]{{4}}$', key):
         send_to(chat_id,
