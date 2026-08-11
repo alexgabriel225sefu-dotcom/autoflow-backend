@@ -486,7 +486,15 @@ class CtraderBroker:
         bid, ask = self.get_bid_ask(instrument)
         return round((bid + ask) / 2, 6)
 
-    def get_candles(self, instrument=None, interval=None, limit=None):
+    def get_candles(self, instrument=None, interval=None, limit=None, to_ts=None):
+        """Trendbars, oldest first.
+
+        `to_ts` (unix seconds) ends the window somewhere other than now, which
+        is what lets a caller page backwards through history: fetch, then ask
+        again ending one second before the oldest bar received. Without it the
+        window is always anchored to the present and only ever returns the most
+        recent `limit` bars, so no amount of calling could build a corpus.
+        """
         sym = _to_ct_symbol(instrument or self._c.SYMBOL)
         sid = self._symbol_id(instrument)
         period_name = _period().get(interval or self._c.TIMEFRAME, "M5")
@@ -497,12 +505,13 @@ class CtraderBroker:
         req.period = getattr(ProtoOATrendbarPeriod, period_name)
         req.count = count
         # fromTimestamp/toTimestamp are REQUIRED protobuf fields — omitting
-        # `from` rejects every request. Window = count bars back from now.
+        # `from` rejects every request. Window = count bars back from `to_ts`
+        # (default now).
         period_sec = {"M1": 60, "M5": 300, "M15": 900, "M30": 1800,
                       "H1": 3600, "H4": 14400, "D1": 86400}.get(period_name, 300)
-        now_ms = int(time.time() * 1000)
-        req.toTimestamp = now_ms
-        req.fromTimestamp = now_ms - (count + 5) * period_sec * 1000
+        end_ms = int((to_ts if to_ts else time.time()) * 1000)
+        req.toTimestamp = end_ms
+        req.fromTimestamp = end_ms - (count + 5) * period_sec * 1000
         res = self._rpc(req, ProtoOAGetTrendbarsRes, timeout=20)
         scale = self._scale(sym)
         out = []

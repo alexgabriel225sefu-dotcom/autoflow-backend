@@ -27,6 +27,14 @@ def check(name, cond, detail=""):
         failures.append(name)
 
 
+def _refuses(fn):
+    """True if fn() raises — used to assert a guard actually guards."""
+    try:
+        fn()
+        return False
+    except Exception:
+        return True
+
 print("\n── splits are chronological and non-overlapping in test ──")
 s = list(wf.splits(100, train=40, validate=10, test=10, step=10))
 check("produces the expected number of windows", len(s) == 5, str(len(s)))
@@ -175,6 +183,54 @@ check("missing file is an empty corpus, not an error",
       ch.load("NOPE", "1min") == [])
 check("a re-save after merge does not duplicate",
       len(ch.merge(ch.load("EURUSD", "1min"), A)) == 3)
+
+
+print("\n── cTrader paging: the window must move, not stay anchored to now ──")
+import types as _types  # noqa: E402
+
+_reqs = []
+
+
+class _FakeTB:
+    def __init__(self, minute, price=100000):
+        self.utcTimestampInMinutes = minute
+        self.low = price
+        self.deltaOpen = 1
+        self.deltaHigh = 2
+        self.deltaClose = 1
+        self.volume = 5
+
+
+class _FakeCtrader:
+    """Records the requested window and serves bars ending at toTimestamp."""
+
+    def get_candles(self, instrument=None, interval=None, limit=None, to_ts=None):
+        import time as _time
+        end = int(to_ts if to_ts else _time.time())
+        _reqs.append(end)
+        step = 60
+        return [{"time": end - (n + 1) * step, "open": 1.1, "high": 1.2,
+                 "low": 1.0, "close": 1.15, "volume": 3}
+                for n in reversed(range(limit or 10))]
+
+
+ch.DATA_DIR = tempfile.mkdtemp(prefix="apex-ct-test-")
+_reqs.clear()
+r = ch.collect_ctrader("EURUSD", "1min", days=1, broker=_FakeCtrader(),
+                       max_calls=5)
+check("more than one request was made (it paged)", len(_reqs) > 1, str(len(_reqs)))
+check("each request ends strictly earlier than the last",
+      all(b < a for a, b in zip(_reqs, _reqs[1:])), str(_reqs))
+check("bars accumulate across pages", r["bars"] > 10, str(r["bars"]))
+check("the corpus is sorted and deduped",
+      [c["time"] for c in ch.load("EURUSD", "1min")]
+      == sorted({c["time"] for c in ch.load("EURUSD", "1min")}))
+check("rerunning adds nothing new", ch.collect_ctrader(
+    "EURUSD", "1min", days=1, broker=_FakeCtrader(), max_calls=5)["bars"]
+    >= r["bars"])
+check("an unsupported interval is refused, not silently wrong",
+      _refuses(lambda: ch.collect_ctrader("EURUSD", "3min", 1,
+                                          _FakeCtrader(), 2)))
 
 print("\n" + "=" * 50)
 if failures:

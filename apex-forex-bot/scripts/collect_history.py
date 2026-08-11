@@ -151,6 +151,80 @@ def _fetch(symbol, interval, end_dt, api_key):
     return bars
 
 
+# ── cTrader source ───────────────────────────────────────────────────────
+# Preferred over Twelve Data when an account is linked: the bars come from the
+# same broker the bot executes on, so backtests price against the venue that
+# will actually fill the orders, and no extra API key is involved. cTrader caps
+# a single request at 1000 bars, so depth comes from paging rather than from
+# one big response.
+_CT_INTERVALS = {"1min": "1m", "5min": "5m", "15min": "15m", "30min": "30m",
+                 "1h": "1h", "4h": "4h", "1day": "1d"}
+
+
+def _ctrader_broker(user_id=None):
+    """A broker bound to a linked cTrader account, or None with a reason."""
+    from apex import user_store, user_loop
+    uid = user_id
+    if not uid:
+        actives = user_store.all_active() or []
+        if not actives:
+            return None, "no active user with a linked cTrader account"
+        uid = actives[0]
+    user = user_store.load(uid)
+    if not user.get("ctrader_access_token"):
+        return None, f"user {uid} has no cTrader token"
+    broker, _cfg = user_loop._make_broker(user)
+    return broker, str(uid)
+
+
+def collect_ctrader(symbol, interval, days, broker, max_calls=40):
+    """Extend the corpus backwards using the broker's own trendbars."""
+    ct_interval = _CT_INTERVALS.get(interval)
+    if not ct_interval:
+        raise RuntimeError(f"cTrader has no period for interval {interval!r}")
+
+    existing = load(symbol, interval)
+    target_start = time.time() - days * 86400
+    added = calls = 0
+
+    # Recent end first — that is what a daily top-up needs.
+    try:
+        fresh = broker.get_candles(symbol, ct_interval, 1000)
+        calls += 1
+        before = len(existing)
+        existing = merge(existing, fresh or [])
+        added += len(existing) - before
+    except Exception as e:
+        print(f"  ! recent fetch failed: {e}")
+
+    while calls < max_calls and existing:
+        if existing[0]["time"] <= target_start:
+            break
+        try:
+            page = broker.get_candles(symbol, ct_interval, 1000,
+                                      to_ts=existing[0]["time"] - 1)
+        except Exception as e:
+            print(f"  ! backfill stopped: {e}")
+            break
+        calls += 1
+        if not page:
+            print("  broker returned no older bars — corpus is as deep as it goes")
+            break
+        before = len(existing)
+        existing = merge(existing, page)
+        gained = len(existing) - before
+        added += gained
+        if gained == 0:
+            print("  no new bars in that page — reached the broker's limit")
+            break
+        print(f"    +{gained:,} bars, now back to "
+              f"{datetime.fromtimestamp(existing[0]['time'], timezone.utc):%Y-%m-%d}")
+
+    if existing:
+        save(symbol, interval, existing)
+    return {"symbol": symbol, "bars": len(existing), "added": added, "calls": calls}
+
+
 def collect(symbol, interval, days, api_key, max_calls=40):
     """Extend the corpus backwards until it reaches `days` of history.
 
@@ -246,6 +320,12 @@ def main():
                     help="request budget per symbol per run")
     ap.add_argument("--status", action="store_true",
                     help="report what is already stored and exit")
+    ap.add_argument("--source", choices=("auto", "ctrader", "td"), default="auto",
+                    help="auto prefers the linked cTrader account and falls "
+                         "back to Twelve Data")
+    ap.add_argument("--user", default=None,
+                    help="cTrader account to borrow (defaults to the first "
+                         "active user)")
     args = ap.parse_args()
 
     symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
@@ -254,19 +334,40 @@ def main():
         status(symbols, args.interval)
         return 0
 
-    key = cfg.TWELVE_DATA_KEY
-    if not key:
-        print("TWELVE_DATA_KEY is not set. Add it to .env — the free tier at "
-              "twelvedata.com is enough to build this corpus.")
-        return 1
+    # Prefer the broker the bot actually trades on: same prices, same venue,
+    # no extra API key. Twelve Data stays as the fallback for when no account
+    # is linked.
+    broker = None
+    if args.source in ("auto", "ctrader"):
+        broker, note = _ctrader_broker(args.user)
+        if broker:
+            print(f"Source: cTrader (account of user {note})")
+        elif args.source == "ctrader":
+            print(f"cTrader unavailable — {note}")
+            return 1
+        else:
+            print(f"cTrader unavailable ({note}) — falling back to Twelve Data")
 
-    print(f"Collecting {args.interval} history for {len(symbols)} symbols, "
+    key = cfg.TWELVE_DATA_KEY
+    if not broker:
+        if not key:
+            print("No cTrader account linked and TWELVE_DATA_KEY is not set. "
+                  "Either link a cTrader account (the bot already uses one to "
+                  "trade) or add a free key from twelvedata.com to .env.")
+            return 1
+        print("Source: Twelve Data")
+
+    print(f"\nCollecting {args.interval} history for {len(symbols)} symbols, "
           f"target {args.days} days\n")
     total_added = total_calls = 0
     for s in symbols:
         print(f"{s}")
         try:
-            r = collect(s, args.interval, args.days, key, args.max_calls)
+            if broker:
+                r = collect_ctrader(s, args.interval, args.days, broker,
+                                    args.max_calls)
+            else:
+                r = collect(s, args.interval, args.days, key, args.max_calls)
         except Exception as e:
             print(f"  ! {e}\n")
             continue
