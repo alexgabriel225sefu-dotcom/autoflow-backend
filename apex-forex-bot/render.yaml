@@ -40,6 +40,13 @@ services:
       # Optional license — leave empty to run open (access via Telegram).
       - key: LICENSE_KEY
         sync: false
+      # Monetization gate: true = new contacts must /purchase (Stripe) before
+      # getting access. false = free-growth phase, first message grants access.
+      # NOTE: this only affects the render.yaml Blueprint default — this
+      # service was renamed off-Blueprint, so also set it directly in the
+      # Render dashboard for it to take effect on the live service.
+      - key: REQUIRE_LICENSE
+        value: "true"
       # Encrypts broker tokens + user AI keys at rest in Redis/Upstash.
       # Fernet key — generate with: python3 -c "import os,base64;print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
       - key: TOKEN_ENCRYPTION_KEY
