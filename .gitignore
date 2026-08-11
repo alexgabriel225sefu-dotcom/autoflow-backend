@@ -18,3 +18,6 @@ web/node_modules/
 __pycache__/
 *.pyc
 *.pyo
+
+# Collected OHLC history — rebuildable from the provider, not source.
+apex-forex-bot/data/history/
