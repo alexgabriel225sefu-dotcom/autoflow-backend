@@ -2551,6 +2551,63 @@ def _user_alert(uid, result):
 _PURCHASE_LINK = "https://buy.stripe.com/4gMeVdcnn7AX5Xp5TU2Ji01"
 
 
+def send_activation_sequence(chat_id, paid: bool):
+    """Full onboarding in one shot: welcome, FP Markets signup link, and the
+    real cTrader authorize link — sent immediately, no extra taps needed to
+    get to the link. Used both for free-growth-phase first contact and for
+    instant post-payment activation (paid=True skips the free-access framing).
+    """
+    welcome_head = ("🎉 <b>Payment received — you're in!</b>" if paid else
+                     "🎉 <b>Welcome — you're in!</b>")
+    risk_bullet = (f"• Free access requires a <b>live {_REQUIRED_BROKER_LABEL}</b> account\n"
+                   if (_LIVE_BROKER_REQUIRED and not paid) else
+                   "• Start on a <b>demo account</b> first to test risk-free\n")
+    send_to(chat_id,
+            f"{welcome_head}\n\n"
+            "You now own a fully-hosted AI trading bot that runs on "
+            "<b>your own</b> trading account, controlled entirely from "
+            "this Telegram chat. No apps to install, no PC required.\n\n"
+            "⚠️ <b>Important — please read:</b>\n"
+            "• Trading involves risk — profits are not guaranteed\n"
+            "• Losses are possible and they are <b>yours</b>\n"
+            "• This is software, not financial advice\n"
+            f"{risk_bullet}")
+    broker_rows = _broker_signup_rows()
+    if _LIVE_BROKER_REQUIRED:
+        step1_body = (
+            "📌 <b>Step 1 — Open a broker account</b>\n\n"
+            f"You need a <b>live</b> cTrader account with <b>{_REQUIRED_BROKER_LABEL}</b> "
+            "— that's who verifies and funds your bot. If you don't have one yet, "
+            "open one below (takes 2 minutes).")
+    else:
+        step1_body = (
+            "📌 <b>Step 1 — Create a broker account</b>\n\n"
+            "You need a cTrader account with a supported broker. "
+            "If you don't have one yet, create one below (takes 2 minutes).\n\n"
+            "Supported brokers: IC Markets, Pepperstone, FxPro, "
+            "RoboForex, and any broker that offers cTrader.")
+    send_to(chat_id, step1_body,
+            extra={"reply_markup": {"inline_keyboard": broker_rows}} if broker_rows else None)
+    # Step 2 — send the REAL authorize link directly, not a button that makes
+    # them tap again to get it. That's the whole point of "instant".
+    send_to(chat_id, "📌 <b>Step 2 — Connect your account</b>")
+    _handle_ctrader(chat_id)
+    gurl = _guide_url()
+    tips_kb = []
+    if gurl:
+        tips_kb.append([{"text": "📖 How it works — 2 min guide", "web_app": {"url": gurl}}])
+    tips_kb.append([{"text": "🎛 See all controls", "callback_data": "go:controls"}])
+    send_to(chat_id,
+            "💡 <b>Helpful links</b>\n\n"
+            "• /controls — see every command and what it does\n"
+            "• /guide — how the bot works (visual guide)\n"
+            "• /help — quick command list\n"
+            "• /terminal — live trading dashboard",
+            extra={"reply_markup": {"inline_keyboard": tips_kb}})
+    label = "Paid client" if paid else "New client"
+    send(f"🆕 <b>{label} activated!</b>\nID: <code>{chat_id}</code>")
+
+
 def _handle_purchase(chat_id):
     # client_reference_id round-trips through Stripe Checkout and lands on the
     # session in the webhook payload — that's how stripe_license.handle_webhook
@@ -3014,59 +3071,7 @@ def _poll_loop():
                     if _LICENSE_REQUIRED and not _license_ok(chat_id, raw):
                         continue
                     access.grant(chat_id_str)
-                    welcome_head = ("🎉 <b>Welcome — your license is active!</b>" if _LICENSE_REQUIRED
-                                    else "🎉 <b>Welcome — you're in!</b>")
-                    risk_bullet = (f"• Free access requires a <b>live {_REQUIRED_BROKER_LABEL}</b> account\n"
-                                   if _LIVE_BROKER_REQUIRED else
-                                   "• Start on a <b>demo account</b> first to test risk-free\n")
-                    send_to(chat_id,
-                            f"{welcome_head}\n\n"
-                            "You now own a fully-hosted AI trading bot that runs on "
-                            "<b>your own</b> trading account, controlled entirely from "
-                            "this Telegram chat. No apps to install, no PC required.\n\n"
-                            "⚠️ <b>Important — please read:</b>\n"
-                            "• Trading involves risk — profits are not guaranteed\n"
-                            "• Losses are possible and they are <b>yours</b>\n"
-                            "• This is software, not financial advice\n"
-                            f"{risk_bullet}\n"
-                            "Ready? Follow these steps 👇")
-                    broker_rows = _broker_signup_rows()
-                    if _LIVE_BROKER_REQUIRED:
-                        step1_body = (
-                            "📌 <b>Step 1 — Open a broker account</b>\n\n"
-                            f"You need a <b>live</b> cTrader account with <b>{_REQUIRED_BROKER_LABEL}</b> "
-                            "— that's who verifies and funds your free bot. If you don't have one yet, "
-                            "open one below (takes 2 minutes).\n\n"
-                            f"Only <b>live {_REQUIRED_BROKER_LABEL}</b> accounts qualify for free access — "
-                            "demo accounts and other brokers won't unlock trading.")
-                    else:
-                        step1_body = (
-                            "📌 <b>Step 1 — Create a broker account</b>\n\n"
-                            "You need a cTrader account with a supported broker. "
-                            "If you don't have one yet, create a free demo account "
-                            "below (takes 2 minutes).\n\n"
-                            "Supported brokers: IC Markets, Pepperstone, FxPro, "
-                            "RoboForex, and any broker that offers cTrader.")
-                    send_to(chat_id, step1_body,
-                            extra={"reply_markup": {"inline_keyboard": broker_rows}} if broker_rows else None)
-                    send_to(chat_id,
-                            "📌 <b>Step 2 — Connect your account</b>\n\n"
-                            "Once you have an account, tap the button below to link it.",
-                            extra={"reply_markup": {"inline_keyboard": [[
-                                {"text": "🔗 Connect cTrader account", "callback_data": "go:connect"}]]}})
-                    gurl = _guide_url()
-                    tips_kb = []
-                    if gurl:
-                        tips_kb.append([{"text": "📖 How it works — 2 min guide", "web_app": {"url": gurl}}])
-                    tips_kb.append([{"text": "🎛 See all controls", "callback_data": "go:controls"}])
-                    send_to(chat_id,
-                            "💡 <b>Helpful links</b>\n\n"
-                            "• /controls — see every command and what it does\n"
-                            "• /guide — how the bot works (visual guide)\n"
-                            "• /help — quick command list\n"
-                            "• /terminal — live trading dashboard",
-                            extra={"reply_markup": {"inline_keyboard": tips_kb}})
-                    send(f"🆕 <b>New client activated!</b>\nID: <code>{chat_id_str}</code>")
+                    send_activation_sequence(chat_id, paid=_LICENSE_REQUIRED)
                     continue
 
                 # Refunded/charged-back licenses lose access (fail-open re-check).

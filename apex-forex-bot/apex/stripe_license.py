@@ -84,10 +84,9 @@ def handle_webhook(raw_body: bytes, sig_header: str):
     try:
         from apex import access, telegram as tg
         access.grant(str(chat_id))
-        tg.send_to(chat_id,
-                   f"🎉 <b>Payment received — you're activated!</b>\n\n"
-                   f"Your license: <code>{key}</code> (saved automatically, no need to re-enter it)\n\n"
-                   "Send /ctrader to connect your broker account and get started.")
+        # Full instant sequence: welcome + FP Markets signup link + the real
+        # cTrader authorize link, all in one shot — no /ctrader typing needed.
+        tg.send_activation_sequence(chat_id, paid=True)
     except Exception as e:
         print(f"[Stripe] activation notify failed for {chat_id}: {e}")
 
