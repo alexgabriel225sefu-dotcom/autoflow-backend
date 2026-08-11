@@ -66,7 +66,7 @@
 - **Runtime:** Node.js / Express (server.js) + two separate Python trading bots (crypto, forex)
 - **Database:** Supabase (PostgreSQL) + Redis (bot session state)
 - **AI:** Anthropic Claude (Haiku), Groq (Llama fallback)
-- **Payments:** Dodo Payments (Merchant of Record, primary — integrated in `server.js` via `/api/checkout/create-session` + `/dodo-webhook`). Digistore24 code kept in place but dormant (CopeCart account was abandoned mid-KYC). Stripe code kept only as a fallback for as long as `DODO_PAYMENTS_API_KEY` is unset — fully retired otherwise.
+- **Payments:** Stripe is the PRIMARY/working processor (verified directly in `server.js` ~line 2165 — "Stripe is the primary/default processor now", account acct_1TSAWQGpBbs5xtI5 / ApexTradingSuite). `/api/checkout/create-session` tries Stripe first, only falls back to Dodo Payments `if (!stripe)`. Owner confirmed Stripe is a working, approved account — do not assume Dodo is primary, that's stale. Digistore24 was REJECTED (not "dormant"). CopeCart was abandoned mid-KYC. Stripe is NOT usable as a native in-Telegram payment provider (owner confirmed via BotFather — not in the provider list), so Telegram checkout has to be a Stripe Checkout link opened in-browser, not a native sendInvoice flow.
 - **Email:** Brevo
 - **Broker integration:** cTrader Open API (both bots)
 - **Deployment:** Render (three services — main site, forex bot, crypto bot)
