@@ -2543,6 +2543,25 @@ def _user_alert(uid, result):
         send_to(uid, f"⚡ <b>{action}</b> — {sym}")
 
 
+# Live Stripe Payment Link (plink_1Tge4jGpBbs5xtI52jgQQx7F) for the Apex Forex
+# Bot one-time license, $497. Static, no backend required to serve it — but
+# fulfillment (issuing the license key back to the buyer) still goes through
+# the site's /stripe-webhook, so it only auto-activates while that service is
+# up. If it's down, confirm manually via Stripe Dashboard + /grant <chat_id>.
+_PURCHASE_LINK = "https://buy.stripe.com/4gMeVdcnn7AX5Xp5TU2Ji01"
+
+
+def _handle_purchase(chat_id):
+    send_to(chat_id,
+            f"💳 <b>Get {cfg.BOT_NAME}</b>\n\n"
+            "One-time payment, $497 — lifetime access, no subscription.\n\n"
+            "Tap below to pay securely via Stripe. After paying, send your "
+            "Stripe confirmation here in this chat and we'll activate your "
+            "access.",
+            extra={"reply_markup": {"inline_keyboard": [[
+                {"text": "💳 Buy now — $497", "url": _PURCHASE_LINK}]]}})
+
+
 def _handle_report(chat_id):
     """Trade journal summary — net P&L, costs, win rate. For tax reporting."""
     trades = user_store.load_trades(chat_id)
@@ -2700,6 +2719,7 @@ _HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "/start — resume trading\n"
                 "/stop — pause your bot\n"
                 "/controls — all controls explained\n"
+                "/purchase — buy your license ($497)\n"
                 "/help — this list\n\n"
                 "<b>📊 Trading</b>\n"
                 f"/buy — open a BUY · /sell — open a SELL\n"
@@ -2745,6 +2765,7 @@ _CONTROLS_TEXT = (
     "<b>📰 Info</b>\n"
     "/news — Upcoming high-impact economic events\n"
     "/guide — How the bot works (visual guide)\n"
+    "/purchase — Buy your license ($497 one-time)\n"
     "/help — Quick command list\n\n"
     f"{_DEMO_LIVE_CONTROLS}"
     "<b>♻️ Starting over</b>\n"
@@ -2780,6 +2801,8 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "/chart — quick chart snapshot\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "/start — resume · /stop — pause · /reset — wipe cTrader link + all settings\n"
+               "━━━━━━━━━━━━━━━━━━━━\n"
+               "/purchase — buy license link ($497)\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "👑 <b>Admin</b>\n"
                "/grant &lt;id&gt; — give client access\n"
@@ -3086,6 +3109,8 @@ def _poll_loop():
                     send_to(chat_id, _HELP_ADMIN if is_adm else _HELP_CLIENT)
                 elif cmd_l == "/controls":
                     send_to(chat_id, _CONTROLS_TEXT)
+                elif cmd_l in ("/purchase", "/buylicense", "/pay"):
+                    _handle_purchase(chat_id)
                 elif cmd_l == "/users" and is_adm:
                     _handle_users(chat_id)
                 elif cmd_l == "/grant" and is_adm:
