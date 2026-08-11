@@ -82,6 +82,18 @@ def _log_trade(user_id, record, pos=None):
     omit it; those rows are still written for accounting, just unlabelled and
     skipped by the calibrator.
     """
+    # Never let one instrument's entry data be filed under another's. A
+    # mismatch here means the caller's `symbol` and its position disagree —
+    # the journal row would carry the wrong entry price (and the P&L computed
+    # upstream is already suspect), so drop the position-derived fields and say
+    # so loudly rather than writing a plausible-looking lie into the record the
+    # calibrator and the tax export both read.
+    if pos and record.get("symbol") and pos.get("symbol"):
+        if _nrm(pos["symbol"]) != _nrm(record["symbol"]):
+            print(f"[UserLoop:{user_id}] REFUSED mismatched trade log: record is "
+                  f"{record['symbol']} but position is {pos['symbol']} — "
+                  f"entry fields dropped")
+            pos = None
     src = {**(pos or {}), **record}   # record wins on any overlapping key
     try:
         user_store.append_trade(user_id, {
@@ -1184,7 +1196,46 @@ def _loop(user_id, alert_fn, gen=None):
                 # hand — otherwise the loop's local state clobbers it next tick.
                 dash_pos = dash.get("openPosition")
                 if dash_pos and not open_pos:
-                    open_pos = dash_pos
+                    # The adopted position may belong to a DIFFERENT pair than
+                    # the one being scanned — a manual /buy on another symbol,
+                    # or a stale entry left in the dash by an earlier tick.
+                    # Adopting it without moving the loop's focus leaves
+                    # `symbol` and `open_pos` describing two different
+                    # instruments, and every close built from that pair reports
+                    # THIS symbol with the OTHER one's entry price. That is what
+                    # put rows like "USDJPY entry 0.81256 exit 158.377" in the
+                    # journal: the exit is right, the entry belongs to AUDUSD.
+                    # It corrupts realised P&L and the daily-loss tracker too,
+                    # because pnl_usd() then prices one pair's move with the
+                    # other pair's pip size.
+                    #
+                    # The symbol reconciliation above runs BEFORE this adoption,
+                    # so it never sees the mismatch. Switch focus here instead,
+                    # exactly as the single-position sync does, and re-read the
+                    # price so stop/target comparisons run against the right
+                    # instrument (a stale price always reads as "breached").
+                    _dp_sym = dash_pos.get("symbol")
+                    if _dp_sym and _nrm(_dp_sym) != _nrm(symbol):
+                        _c = None
+                        try:
+                            _c = broker.get_candles(_dp_sym, cfg.TIMEFRAME, cfg.CANDLES)
+                        except Exception as e:
+                            print(f"[UserLoop:{user_id}] adopt {_dp_sym}: "
+                                  f"candle re-read failed: {e}")
+                        if _c:
+                            symbol = _dp_sym
+                            dash["symbol"] = symbol
+                            candles = _c
+                            price = candles[-1]["close"]
+                            open_pos = dash_pos
+                        else:
+                            # No fresh price for that pair — skip the adoption
+                            # this tick rather than manage a position using
+                            # another instrument's price. The next tick retries.
+                            print(f"[UserLoop:{user_id}] deferred adopting {_dp_sym} "
+                                  f"position — no fresh candles while scanning {symbol}")
+                    else:
+                        open_pos = dash_pos
                 elif open_pos and dash_pos is None and dash.get("_manualClose"):
                     open_pos = None
                     dash["_manualClose"] = False
