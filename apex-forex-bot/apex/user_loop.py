@@ -40,6 +40,21 @@ def _plausible_exit_price(entry_price, exit_price):
     return abs(exit_price - entry_price) / entry_price <= _MAX_PLAUSIBLE_GAP_MOVE
 
 
+def _currency_legs(symbol):
+    """The ISO currency codes a symbol is exposed to, for the news calendar.
+
+    Handles both spellings the bot uses: EUR_USD (manual /symbol) and EURUSD
+    (every Auto-Pilot symbol). Metals map to their quote currency plus the
+    metal code, so XAUUSD is still guarded against USD releases. Anything that
+    is not a recognisable 6-character pair returns no legs rather than a
+    garbage one, leaving the guard fail-open as designed.
+    """
+    s = (symbol or "").upper().replace("_", "").replace("/", "").replace("-", "")
+    if len(s) == 6 and s.isalpha():
+        return [s[:3], s[3:]]
+    return []
+
+
 def _nrm(x):
     """Broker-agnostic symbol key (EUR_USD / EUR/USD / eurusd → EURUSD).
     Module-level so the startup recovery can key off it too — it used to be
@@ -169,7 +184,12 @@ def _make_broker(user):
         # account can't actually margin.
         LEVERAGE         = float(user.get("leverage", 5 if _appcfg.PRODUCT == "crypto" else 30)),
         MARGIN_CAP       = 0.5,
-        MAX_SPREAD_PIPS  = 3.0,
+        # Hard-coded 3.0 here overrode the product config, so the strict scalp
+        # ceiling (1.2p) never reached a live account — every entry was admitted
+        # up to 3 pips. On a 15-pip stop that is a 24.7% cost-to-stop toll and
+        # pushes the break-even win rate from 37.1% to 41.6%.
+        MAX_SPREAD_PIPS  = float(user.get(
+            "max_spread_pips", getattr(_appcfg, "MAX_SPREAD_PIPS", 3.0))),
         PRODUCT          = _appcfg.PRODUCT,  # so the loop's crypto branches fire
         # Asset-class-aware spread/volatility guards (crypto uses a %-of-price
         # spread limit + higher flash-spike bar; forex keeps the pip limit).
@@ -195,6 +215,14 @@ def _make_broker(user):
         # risk-tier progression in builder.py).
         MAX_DD_PCT       = float(user.get("max_dd_pct", 25)),
         MAX_DAILY_LOSS_PCT = float(user.get("max_daily_loss_pct", 4)),
+        # EV gate. The loop reads its config off THIS object, not the global
+        # module, so keys missing here are silently unreachable: without them
+        # `getattr(cfg, "EV_GATE_MODE", "shadow")` returned "shadow" forever and
+        # EV_GATE_MODE=enforce in the environment did nothing on any account.
+        EV_GATE_MODE       = getattr(_appcfg, "EV_GATE_MODE", "shadow"),
+        EV_MIN_PROBABILITY = float(user.get(
+            "ev_min_probability", getattr(_appcfg, "EV_MIN_PROBABILITY", 0.55))),
+        EV_MIN_SAMPLES     = int(getattr(_appcfg, "EV_MIN_SAMPLES", 30)),
     )
     broker = _CtraderBroker(fake_cfg)
     # Refine the LEVERAGE guess with the broker's real, per-instrument value
@@ -1684,7 +1712,15 @@ def _loop(user_id, alert_fn, gen=None):
             # currency in the pair. Fail-open (no event / feed down → trades).
             # Gated by the user's news_filter toggle (Strategy Builder).
             if entry_ok and getattr(cfg, "NEWS_FILTER", True):
-                ev = news.high_impact_window(symbol.split("_"))
+                # The calendar matches on ISO currency codes ("USD", "EUR"), so
+                # the symbol has to be split into its two legs. split("_") only
+                # does that for an underscore symbol like EUR_USD — every
+                # Auto-Pilot symbol is written EURUSD, where it returns
+                # ["EURUSD"], matches no currency, and the guard silently passed
+                # every high-impact release. A 15-pip stop on 1m bars is exactly
+                # what NFP/CPI/FOMC destroys, so this guard was doing nothing
+                # precisely where it mattered most.
+                ev = news.high_impact_window(_currency_legs(symbol))
                 if ev:
                     entry_ok = False
                     _skip(f"news guard: {ev.get('title', 'high-impact event') if isinstance(ev, dict) else ev}")
@@ -1699,67 +1735,7 @@ def _loop(user_id, alert_fn, gen=None):
                 _suggest_trade(user_id, signal, symbol, price, alert_fn)
                 entry_ok = False
 
-            # ── EV gate (V2 decision core) ──
-            # Last gate before sizing: converts the signal's confidence into a
-            # probability measured from this account's own closed trades, then
-            # refuses the entry if expected value after real costs is negative.
-            #
-            # Runs in shadow mode by default — it records the verdict it WOULD
-            # have reached without changing behaviour, so the filter can be
-            # judged on real data before it is allowed to block a live trade.
             ev_verdict = None
-            _ev_mode = getattr(cfg, "EV_GATE_MODE", "shadow")
-            if entry_ok and _ev_mode != "off":
-                try:
-                    _atr_pips = 0.0
-                    try:
-                        _atr_raw = float(ind.get("atr") or 0)
-                        if _atr_raw > 0:
-                            _atr_pips = forex.to_pips(_atr_raw, symbol, price)
-                    except (TypeError, ValueError):
-                        _atr_pips = 0.0
-                    _dd_pct = 0.0
-                    try:
-                        _peak = float(strategies.get_session(user_id).get("peakBalance") or 0)
-                        if _peak > 0:
-                            _dd_pct = (paper_balance - _peak) / _peak * 100.0
-                    except Exception:
-                        _dd_pct = 0.0
-                    ev_verdict = ev_engine.evaluate(
-                        confidence=confidence,
-                        calibration=ev_calibration,
-                        atr_pips=_atr_pips,
-                        spread_pips=spread,
-                        regime=(regime or {}).get("regime"),
-                        equity=paper_balance,
-                        drawdown_pct=_dd_pct,
-                        min_probability=getattr(cfg, "EV_MIN_PROBABILITY", 0.55),
-                    )
-                    if not ev_verdict["approved"]:
-                        if _ev_mode == "enforce":
-                            entry_ok = False
-                            _skip(f"EV gate: {ev_verdict['reason']} "
-                                  f"(p={ev_verdict['probability']}, "
-                                  f"EV={ev_verdict['ev_r']}R)")
-                        else:
-                            print(f"[UserLoop:{user_id}] EV shadow: WOULD BLOCK "
-                                  f"{action} {symbol} — {ev_verdict['reason']} "
-                                  f"(conf={confidence}, p={ev_verdict['probability']}, "
-                                  f"EV={ev_verdict['ev_r']}R, "
-                                  f"cost={ev_verdict['cost_r']}R)")
-                    else:
-                        print(f"[UserLoop:{user_id}] EV {_ev_mode}: allow {action} "
-                              f"{symbol} p={ev_verdict['probability']} "
-                              f"EV={ev_verdict['ev_r']}R")
-                except Exception as e:
-                    # A gate that crashes must never take the bot down with it;
-                    # in enforce mode a broken gate means stand aside, not
-                    # trade blind.
-                    print(f"[UserLoop:{user_id}] EV gate error: {e}")
-                    if _ev_mode == "enforce":
-                        entry_ok = False
-                        _skip("EV gate unavailable")
-
             if entry_ok:
                 pip = forex.pip_size(symbol, price)
                 _crypto = _crypto_build
@@ -1810,6 +1786,74 @@ def _loop(user_id, alert_fn, gen=None):
                 # 0.7017249999999999-style prices in orders and alerts.
                 sl_price = round(price - sl_dist if action == "BUY" else price + sl_dist, 6)
                 tp_price = round(price + tp_dist if action == "BUY" else price - tp_dist, 6)
+
+                # ── EV gate (V2 decision core) ──
+                # Placed HERE, after the stop and target are decided, so it
+                # scores the trade the bot is actually about to send. Run
+                # earlier it had to invent its own SL/TP, and its internal
+                # model produces a ~4-pip stop where this loop places 15 —
+                # which quadruples the cost in R and made the gate demand a
+                # 52% win rate for a trade that breaks even at 38%.
+                #
+                # Shadow by default: it records the verdict it WOULD have
+                # reached without changing behaviour, so the filter can be
+                # judged on real data before it may block a live trade.
+                _ev_mode = getattr(cfg, "EV_GATE_MODE", "shadow")
+                if _ev_mode != "off":
+                    try:
+                        _atr_pips = 0.0
+                        try:
+                            _atr_raw = float(ind.get("atr") or 0)
+                            if _atr_raw > 0:
+                                _atr_pips = forex.to_pips(_atr_raw, symbol, price)
+                        except (TypeError, ValueError):
+                            _atr_pips = 0.0
+                        _dd_pct = 0.0
+                        try:
+                            _peak = float(strategies.get_session(user_id).get("peakBalance") or 0)
+                            if _peak > 0:
+                                _dd_pct = (paper_balance - _peak) / _peak * 100.0
+                        except Exception:
+                            _dd_pct = 0.0
+                        ev_verdict = ev_engine.evaluate(
+                            confidence=confidence,
+                            calibration=ev_calibration,
+                            atr_pips=_atr_pips,
+                            spread_pips=spread,
+                            regime=(regime or {}).get("regime"),
+                            equity=paper_balance,
+                            drawdown_pct=_dd_pct,
+                            sl_pips=stop_pips_eff,
+                            tp_pips=forex.to_pips(tp_dist, symbol, price),
+                            min_probability=getattr(cfg, "EV_MIN_PROBABILITY", None),
+                        )
+                        if not ev_verdict["approved"]:
+                            if _ev_mode == "enforce":
+                                entry_ok = False
+                                _skip(f"EV gate: {ev_verdict['reason']} "
+                                      f"(p={ev_verdict['probability']}, "
+                                      f"EV={ev_verdict['ev_r']}R)")
+                            else:
+                                print(f"[UserLoop:{user_id}] EV shadow: WOULD BLOCK "
+                                      f"{action} {symbol} — {ev_verdict['reason']} "
+                                      f"(conf={confidence}, p={ev_verdict['probability']}, "
+                                      f"need>{ev_verdict['min_probability']}, "
+                                      f"EV={ev_verdict['ev_r']}R, "
+                                      f"cost={ev_verdict['cost_r']}R, "
+                                      f"BE={ev_verdict['breakeven_p']})")
+                        else:
+                            print(f"[UserLoop:{user_id}] EV {_ev_mode}: allow {action} "
+                                  f"{symbol} p={ev_verdict['probability']} "
+                                  f"EV={ev_verdict['ev_r']}R")
+                    except Exception as e:
+                        # A gate that crashes must never take the bot down with
+                        # it; in enforce mode a broken gate means stand aside,
+                        # not trade blind.
+                        print(f"[UserLoop:{user_id}] EV gate error: {e}")
+                        if _ev_mode == "enforce":
+                            entry_ok = False
+                            _skip("EV gate unavailable")
+
                 risk_mult = strategies.druckenmiller_multiplier(
                     confidence, signal.get("criteriaScore", 0),
                     strat_data.get("livermore"), strat_data.get("turtle"))

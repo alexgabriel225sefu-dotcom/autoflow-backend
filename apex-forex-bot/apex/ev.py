@@ -368,24 +368,45 @@ def monte_carlo_r_paths(r_multiples, simulations=2000, seed=None):
 # ── Top-level evaluation ─────────────────────────────────────────────────
 def evaluate(confidence, calibration, atr_pips, spread_pips,
              structure_distance_pips=0.0, regime=None, equity=0.0,
-             drawdown_pct=0.0, risk_ok=True, min_probability=0.55,
-             rr=1.7, max_risk_pct=0.5, require_regime=True):
+             drawdown_pct=0.0, risk_ok=True, min_probability=None,
+             rr=1.7, max_risk_pct=0.5, require_regime=True,
+             sl_pips=None, tp_pips=None, min_edge=0.03):
     """Run the whole decision chain for one candidate entry.
+
+    Pass `sl_pips`/`tp_pips` — the stop and target the caller is ACTUALLY going
+    to place. Without them this falls back to its own `dynamic_sl_tp`, which
+    describes a different trade: on a typical 1m entry the internal model
+    produces a 4-pip stop where the loop places 15, and a 4-pip stop turns a
+    1-pip spread into 0.40R of cost instead of 0.15R. The gate then demands a
+    51.9% win rate for a trade that really breaks even at 38.4% and refuses
+    profitable entries.
+
+    `min_probability` defaults to the trade's own break-even probability plus
+    `min_edge`. A flat threshold cannot be right across different R:R — at
+    TP=2R break-even is 38%, so a fixed 0.55 is not "slightly strict", it is
+    17 points above the point where the trade starts making money.
 
     Returns a dict that is safe to log verbatim — it records not just the
     verdict but every number behind it, which is what makes a later
     post-mortem possible.
     """
     p = calibrated_probability(confidence, calibration)
-    sl_pips, tp_pips = dynamic_sl_tp(
-        atr_pips, structure_distance_pips, spread_pips, rr=rr)
+    if sl_pips is None or tp_pips is None:
+        sl_pips, tp_pips = dynamic_sl_tp(
+            atr_pips, structure_distance_pips, spread_pips, rr=rr)
+    sl_pips = float(sl_pips)
+    tp_pips = float(tp_pips)
     c_r = cost_in_r(spread_pips, sl_pips)
     tp_r = tp_pips / sl_pips if sl_pips else 0.0
     ev = expected_value(p, tp_r, 1.0, c_r) if p is not None else None
 
+    be_p = breakeven_probability(tp_r, 1.0, c_r)
+    thr = (be_p + float(min_edge)) if min_probability is None \
+        else float(min_probability)
+
     ok, reason = approve_trade(
         p, ev, regime=regime, spread_pips=spread_pips, atr_pips=atr_pips,
-        risk_ok=risk_ok, min_probability=min_probability,
+        risk_ok=risk_ok, min_probability=thr,
         require_regime=require_regime)
 
     risk_cash, risk_pct = (0.0, 0.0)
@@ -408,7 +429,8 @@ def evaluate(confidence, calibration, atr_pips, spread_pips,
         "tp_r": round(tp_r, 3),
         "cost_r": round(c_r, 4),
         "ev_r": round(ev, 4) if ev is not None else None,
-        "breakeven_p": round(breakeven_probability(tp_r, 1.0, c_r), 4),
+        "breakeven_p": round(be_p, 4),
+        "min_probability": round(thr, 4),
         "risk_pct": round(risk_pct, 4),
         "risk_cash": round(risk_cash, 2),
         "calibrated": bool(calibration),

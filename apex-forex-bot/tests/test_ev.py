@@ -212,6 +212,43 @@ check("matches calibrate's own threshold view",
       ev.labelled_count([{"confidence": 76, "netPnl": 1.0}] * 29) == 29
       and ev.calibrate([{"confidence": 76, "netPnl": 1.0}] * 29) is None)
 
+
+print("\n── real SL/TP must override the internal model ──")
+# The loop places 15/30 pips. The internal dynamic_sl_tp model would invent
+# ~4 pips, quadrupling cost in R and inflating the required win rate.
+real = ev.evaluate(confidence=84, calibration=cal, atr_pips=1.2, spread_pips=1.0,
+                   regime="trending", equity=5000.0, sl_pips=15.0, tp_pips=30.0)
+invented = ev.evaluate(confidence=84, calibration=cal, atr_pips=1.2, spread_pips=1.0,
+                       regime="trending", equity=5000.0)
+check("uses the stop it was given", real["sl_pips"] == 15.0, str(real["sl_pips"]))
+check("uses the target it was given", real["tp_pips"] == 30.0, str(real["tp_pips"]))
+check("internal model really does invent a much tighter stop",
+      invented["sl_pips"] < 8.0, str(invented["sl_pips"]))
+check("real stop makes cost far smaller in R",
+      real["cost_r"] < invented["cost_r"] / 2,
+      f"{real['cost_r']} vs {invented['cost_r']}")
+check("real trade breaks even at a much lower win rate",
+      real["breakeven_p"] < invented["breakeven_p"] - 0.10,
+      f"{real['breakeven_p']} vs {invented['breakeven_p']}")
+
+print("\n── threshold derives from break-even, not a flat constant ──")
+wide = ev.evaluate(confidence=84, calibration=cal, atr_pips=10.0, spread_pips=1.0,
+                   regime="trending", equity=5000.0, sl_pips=15.0, tp_pips=45.0)
+tight = ev.evaluate(confidence=84, calibration=cal, atr_pips=10.0, spread_pips=1.0,
+                    regime="trending", equity=5000.0, sl_pips=15.0, tp_pips=18.0)
+check("a wider target needs a lower win rate",
+      wide["min_probability"] < tight["min_probability"],
+      f"{wide['min_probability']} vs {tight['min_probability']}")
+check("threshold sits just above break-even",
+      abs(wide["min_probability"] - wide["breakeven_p"] - 0.03) < 1e-6,
+      f"{wide['min_probability']} vs BE {wide['breakeven_p']}")
+check("an explicit min_probability still wins",
+      ev.evaluate(confidence=84, calibration=cal, atr_pips=10.0, spread_pips=1.0,
+                  regime="trending", equity=5000.0, sl_pips=15.0, tp_pips=30.0,
+                  min_probability=0.90)["reason"] == "LOW_PROBABILITY")
+check("a 2R trade breaks even near 38%, not 52%",
+      0.36 < real["breakeven_p"] < 0.40, str(real["breakeven_p"]))
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")
