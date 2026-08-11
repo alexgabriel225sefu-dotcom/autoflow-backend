@@ -82,6 +82,48 @@ _LOSS_COOLDOWN_MIN = 15   # pause after a loss — avoid revenge trades in the s
 _CLOSE_COOLDOWN_MIN = 10  # pause after ANY close — prevent open/close churn
 
 
+_DEDUPE_WINDOW_S = 900  # 15 min — two paths racing on one close land seconds apart
+
+
+def _already_journaled(journal, row):
+    """True if this exact close is already in the journal.
+
+    Two independent paths can journal the same broker-side close: the restart
+    recovery (which fires when the persisted snapshot says open but the broker
+    says closed) and the in-loop detection (prev_pos set, open_pos now None).
+    Around a redeploy both run, seconds apart, and the trade was written twice
+    — observed live as two BROKER_CLOSE events 14s apart with identical P&L.
+
+    The cost is not just a duplicated row: loss_streak counts each close twice,
+    so the "3 consecutive losses" rule cuts risk to a quarter after what were
+    really two losses, and the duplicate becomes a second training label for a
+    trade that only happened once.
+
+    positionId is the exact key when the broker gave us one. Otherwise fall
+    back to symbol + entry + P&L inside a short window: two genuinely distinct
+    trades matching to five decimals on entry AND to the cent on P&L within
+    fifteen minutes does not happen.
+    """
+    pid = row.get("positionId")
+    for old in reversed(journal[-40:]):
+        if pid and old.get("positionId") == pid:
+            return True
+        if (old.get("symbol") == row.get("symbol")
+                and old.get("entry") is not None
+                and old.get("entry") == row.get("entry")
+                and old.get("netPnl") == row.get("netPnl")):
+            try:
+                t_old = datetime.strptime(old["time"], "%Y-%m-%d %H:%M:%S")
+                t_new = datetime.strptime(row["time"], "%Y-%m-%d %H:%M:%S")
+                if abs((t_new - t_old).total_seconds()) <= _DEDUPE_WINDOW_S:
+                    return True
+            except (KeyError, TypeError, ValueError):
+                # No usable timestamps — treat an otherwise exact match as a
+                # duplicate rather than risk double-counting a loss.
+                return True
+    return False
+
+
 def _log_trade(user_id, record, pos=None):
     """Persist a closed trade to the per-user tax journal (date, entry, exit,
     fees/spread cost, gross & net PnL) — exportable for tax reporting.
@@ -110,30 +152,39 @@ def _log_trade(user_id, record, pos=None):
                   f"entry fields dropped")
             pos = None
     src = {**(pos or {}), **record}   # record wins on any overlapping key
+    row = {
+        "time":      record.get("time"),
+        "symbol":    record.get("symbol"),
+        "entry":     record.get("entryPrice"),
+        "exit":      record.get("price"),
+        "grossPnl":  record.get("grossPnl"),
+        "costUsd":   record.get("costUsd"),
+        "netPnl":    record.get("netPnl"),
+        "balance":   record.get("balance"),
+        "openedAt":  record.get("openedAt"),
+        # Broker's own id for the closed position — the exact dedupe key.
+        "positionId": src.get("positionId"),
+        # ── decision snapshot (for ev.calibrate) ──
+        "confidence":  src.get("entryConfidence"),
+        "regime":      src.get("entryRegime"),
+        "spreadPips":  src.get("entrySpreadPips"),
+        "atr":         src.get("entryAtr"),
+        "slPips":      src.get("entrySlPips"),
+        "tpPips":      src.get("entryTpPips"),
+        "probability": src.get("entryProbability"),
+        "evR":         src.get("entryEvR"),
+        "side":        src.get("entrySide"),
+    }
     try:
-        user_store.append_trade(user_id, {
-            "time":      record.get("time"),
-            "symbol":    record.get("symbol"),
-            "entry":     record.get("entryPrice"),
-            "exit":      record.get("price"),
-            "grossPnl":  record.get("grossPnl"),
-            "costUsd":   record.get("costUsd"),
-            "netPnl":    record.get("netPnl"),
-            "balance":   record.get("balance"),
-            "openedAt":  record.get("openedAt"),
-            # ── decision snapshot (for ev.calibrate) ──
-            "confidence":  src.get("entryConfidence"),
-            "regime":      src.get("entryRegime"),
-            "spreadPips":  src.get("entrySpreadPips"),
-            "atr":         src.get("entryAtr"),
-            "slPips":      src.get("entrySlPips"),
-            "tpPips":      src.get("entryTpPips"),
-            "probability": src.get("entryProbability"),
-            "evR":         src.get("entryEvR"),
-            "side":        src.get("entrySide"),
-        })
+        if _already_journaled(user_store.load_trades(user_id), row):
+            print(f"[UserLoop:{user_id}] duplicate close ignored: "
+                  f"{row.get('symbol')} netPnl={row.get('netPnl')}")
+            return False
+        user_store.append_trade(user_id, row)
+        return True
     except Exception as e:
         print(f"[UserLoop:{user_id}] trade-log failed: {e}")
+        return False
 
 
 def _persist_open_position(user_id, cfg, pos):
@@ -657,21 +708,27 @@ def _loop(user_id, alert_fn, gen=None):
                 # _snap is the persisted open-position snapshot, which carries
                 # the entry decision fields — so a trade closed during a
                 # restart still lands in the journal labelled.
-                _log_trade(user_id, result, _snap)
-                dash["trades"].insert(0, result)
-                dash["trades"] = dash["trades"][:50]
-                if net is not None and net < 0:
-                    last_loss_at = time.time()
-                    loss_streak += 1
-                elif net is not None and net > 0:
-                    loss_streak = 0
-                last_close_at = time.time()
-                _persist_risk_state()
-                if net is not None:
-                    strategies.record_trade(net > 0, net, dash.get("startBalance") or paper_balance,
-                                            user_id=user_id, symbol=_snap["symbol"])
-                if alert_fn:
-                    alert_fn(user_id, result)
+                # Gate every side effect on the journal actually accepting this
+                # close. The in-loop detection below can reach the same close a
+                # few seconds later; counting it twice pushes loss_streak to 3
+                # after two real losses and cuts risk to a quarter for no
+                # reason, and double-counts the day's P&L.
+                _fresh = _log_trade(user_id, result, _snap)
+                if _fresh:
+                    dash["trades"].insert(0, result)
+                    dash["trades"] = dash["trades"][:50]
+                    if net is not None and net < 0:
+                        last_loss_at = time.time()
+                        loss_streak += 1
+                    elif net is not None and net > 0:
+                        loss_streak = 0
+                    last_close_at = time.time()
+                    _persist_risk_state()
+                    if net is not None:
+                        strategies.record_trade(net > 0, net, dash.get("startBalance") or paper_balance,
+                                                user_id=user_id, symbol=_snap["symbol"])
+                    if alert_fn:
+                        alert_fn(user_id, result)
                 print(f"[UserLoop:{user_id}] restart recovery: journaled a close missed during the outage on {_snap['symbol']}")
                 _persist_open_snapshot(None)
 
@@ -1131,28 +1188,34 @@ def _loop(user_id, alert_fn, gen=None):
                         pnl_est = round(paper_balance - prev_balance, 2) if not dash.get("balStale") else None
                         gross_pnl = pnl_est
                         cost_usd = 0.0
-                    if pnl_est is not None and pnl_est < 0:
-                        last_loss_at = time.time()
-                        loss_streak += 1
-                    elif pnl_est is not None and pnl_est > 0:
-                        loss_streak = 0
-                    _persist_risk_state()
-                    if pnl_est is not None:
-                        strategies.record_trade(pnl_est > 0, pnl_est,
-                                                dash.get("startBalance") or paper_balance,
-                                                user_id=user_id, symbol=symbol)
                     result = {"action": "BROKER_CLOSE", "symbol": symbol,
                               "side": prev_pos.get("side", ""), "price": price,
                               "entryPrice": prev_pos.get("entryPrice"),
                               "netPnl": pnl_est, "balance": round(paper_balance, 2),
                               "grossPnl": gross_pnl, "costUsd": cost_usd,
                               "openedAt": prev_pos.get("openedAt"), "time": now_str}
-                    _log_trade(user_id, result, prev_pos)
-                    dash["trades"].insert(0, result)
-                    dash["trades"] = dash["trades"][:50]
+                    # Journal FIRST, then apply the side effects only if it was
+                    # a new close. The restart recovery can already have booked
+                    # this same close moments earlier; the risk ladder and the
+                    # daily P&L must each see it exactly once.
+                    _fresh = _log_trade(user_id, result, prev_pos)
+                    if _fresh:
+                        if pnl_est is not None and pnl_est < 0:
+                            last_loss_at = time.time()
+                            loss_streak += 1
+                        elif pnl_est is not None and pnl_est > 0:
+                            loss_streak = 0
+                        _persist_risk_state()
+                        if pnl_est is not None:
+                            strategies.record_trade(pnl_est > 0, pnl_est,
+                                                    dash.get("startBalance") or paper_balance,
+                                                    user_id=user_id, symbol=symbol)
+                        dash["trades"].insert(0, result)
+                        dash["trades"] = dash["trades"][:50]
+                        if alert_fn:
+                            alert_fn(user_id, result)
+                    # Clear the snapshot either way — the position is gone.
                     _persist_open_snapshot(None)
-                    if alert_fn:
-                        alert_fn(user_id, result)
 
                 # Client-side protective stop: if the broker somehow holds the
                 # position without a stop — or price already crossed it — close

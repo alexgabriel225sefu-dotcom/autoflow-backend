@@ -94,18 +94,28 @@ check("decision fields are None, not crashes", row.get("confidence") is None)
 
 print("\n── journal → calibrate round-trip ──")
 user_store.clear_trades(UID)
+
+
+def _synth(i, conf, win):
+    """One distinct closed trade. Each needs its own positionId and entry —
+    the close deduper (correctly) collapses identical closes on the same pair,
+    so a fixture of N byte-identical rows would write exactly one."""
+    return (
+        {**close_record,
+         "netPnl": 20.0 if win else -12.0,
+         "entryPrice": round(1.0850 + i * 0.0001, 5),
+         "time": f"2026-08-11 {9 + i // 60:02d}:{i % 60:02d}:00"},
+        {**position,
+         "entryConfidence": conf,
+         "positionId": 900000 + i,
+         "entryPrice": round(1.0850 + i * 0.0001, 5)},
+    )
+
+
 for i in range(60):
-    win = i % 5 != 0                       # 80% hit rate at high confidence
-    user_loop._log_trade(
-        UID,
-        {**close_record, "netPnl": 20.0 if win else -12.0},
-        {**position, "entryConfidence": 84})
-for i in range(40):
-    win = i % 4 == 0                       # 25% hit rate at low confidence
-    user_loop._log_trade(
-        UID,
-        {**close_record, "netPnl": 20.0 if win else -12.0},
-        {**position, "entryConfidence": 55})
+    user_loop._log_trade(UID, *_synth(i, 84, i % 5 != 0))      # 80% hit rate
+for i in range(60, 100):
+    user_loop._log_trade(UID, *_synth(i, 55, i % 4 == 0))      # 25% hit rate
 
 journal = user_store.load_trades(UID)
 check("journal holds all trades", len(journal) == 100, f"got {len(journal)}")
@@ -133,8 +143,11 @@ if cal:
 
 print("\n── calibration refuses to guess before there is data ──")
 user_store.clear_trades(UID)
-for _ in range(10):
-    user_loop._log_trade(UID, close_record, position)
+for i in range(10):
+    user_loop._log_trade(UID, *_synth(i, 84, i % 3 != 0))
+check("ten distinct trades really were written",
+      len(user_store.load_trades(UID)) == 10,
+      str(len(user_store.load_trades(UID))))
 check("too little history → no calibration",
       ev.calibrate(user_store.load_trades(UID)) is None)
 check("and the gate stands aside rather than inventing a probability",
