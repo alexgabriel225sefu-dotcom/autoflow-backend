@@ -155,6 +155,10 @@ PAPER_BALANCE = float(os.getenv("PAPER_BALANCE") or 1000)
 # ─── License ────────────────────────────────────────────
 LICENSE_KEY = os.getenv("LICENSE_KEY", "")
 LICENSE_SERVER = os.getenv("LICENSE_SERVER") or "https://aicashsystem.space"
+# Signing secret for the Stripe webhook endpoint registered against THIS bot's
+# own /api/stripe/webhook (separate from the main site's /stripe-webhook —
+# each registered endpoint in the Stripe Dashboard gets its own secret).
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
 # ─── Storage encryption ─────────────────────────────────
 # Fernet key (Fernet.generate_key()) used to encrypt broker tokens and

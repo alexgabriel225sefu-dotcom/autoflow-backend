@@ -2552,14 +2552,18 @@ _PURCHASE_LINK = "https://buy.stripe.com/4gMeVdcnn7AX5Xp5TU2Ji01"
 
 
 def _handle_purchase(chat_id):
+    # client_reference_id round-trips through Stripe Checkout and lands on the
+    # session in the webhook payload — that's how stripe_license.handle_webhook
+    # knows which Telegram chat to activate.
+    link = f"{_PURCHASE_LINK}?client_reference_id={chat_id}"
     send_to(chat_id,
             f"💳 <b>Get {cfg.BOT_NAME}</b>\n\n"
             "One-time payment, $497 — lifetime access, no subscription.\n\n"
-            "Tap below to pay securely via Stripe. After paying, send your "
-            "Stripe confirmation here in this chat and we'll activate your "
-            "access.",
+            "Tap below to pay securely via Stripe. Your access activates "
+            "automatically the moment payment goes through — no key to copy, "
+            "no waiting.",
             extra={"reply_markup": {"inline_keyboard": [[
-                {"text": "💳 Buy now — $497", "url": _PURCHASE_LINK}]]}})
+                {"text": "💳 Buy now — $497", "url": link}]]}})
 
 
 def _handle_report(chat_id):
