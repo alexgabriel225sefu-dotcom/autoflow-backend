@@ -5,6 +5,10 @@ import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
 from apex import config as cfg_mod
+# Imported under an alias: `ev` is already a local variable inside _loop (the
+# news-window event), and a module-level `ev` would be shadowed for the whole
+# function scope.
+from apex import ev as ev_engine
 from apex.brokers.ctrader import CtraderBroker as _CtraderBroker
 
 
@@ -63,9 +67,22 @@ _LOSS_COOLDOWN_MIN = 15   # pause after a loss — avoid revenge trades in the s
 _CLOSE_COOLDOWN_MIN = 10  # pause after ANY close — prevent open/close churn
 
 
-def _log_trade(user_id, record):
+def _log_trade(user_id, record, pos=None):
     """Persist a closed trade to the per-user tax journal (date, entry, exit,
-    fees/spread cost, gross & net PnL) — exportable for tax reporting."""
+    fees/spread cost, gross & net PnL) — exportable for tax reporting.
+
+    `pos` is the position being closed. Its `entry*` keys are the DECISION
+    snapshot, and they are what turns a closed trade into a labelled training
+    example rather than just an accounting row: without the confidence, regime
+    and spread that were true AT ENTRY, there is no way to measure afterwards
+    how often a given kind of setup actually reached TP before SL, and
+    ev.calibrate() has nothing to learn from.
+
+    Callers that no longer hold the position (broker-side reconciliation) may
+    omit it; those rows are still written for accounting, just unlabelled and
+    skipped by the calibrator.
+    """
+    src = {**(pos or {}), **record}   # record wins on any overlapping key
     try:
         user_store.append_trade(user_id, {
             "time":      record.get("time"),
@@ -77,6 +94,16 @@ def _log_trade(user_id, record):
             "netPnl":    record.get("netPnl"),
             "balance":   record.get("balance"),
             "openedAt":  record.get("openedAt"),
+            # ── decision snapshot (for ev.calibrate) ──
+            "confidence":  src.get("entryConfidence"),
+            "regime":      src.get("entryRegime"),
+            "spreadPips":  src.get("entrySpreadPips"),
+            "atr":         src.get("entryAtr"),
+            "slPips":      src.get("entrySlPips"),
+            "tpPips":      src.get("entryTpPips"),
+            "probability": src.get("entryProbability"),
+            "evR":         src.get("entryEvR"),
+            "side":        src.get("entrySide"),
         })
     except Exception as e:
         print(f"[UserLoop:{user_id}] trade-log failed: {e}")
@@ -403,6 +430,23 @@ def _loop(user_id, alert_fn, gen=None):
     was_stopped = False  # fire the "Trading paused" alert once per stop, not
                          # every tick for the rest of the day it stays true
 
+    # Confidence → P(win) map, measured from this account's own closed trades.
+    # Rebuilt periodically rather than every tick: it only moves when a trade
+    # closes, and re-reading the journal on each tick is pointless I/O.
+    ev_calibration = None
+    ev_cal_tick = -10 ** 9
+
+    def _refresh_ev_calibration():
+        """(Re)build the calibration table. Returns it, or None when there is
+        not yet enough labelled history to say anything honest."""
+        try:
+            return ev_engine.calibrate(
+                user_store.load_trades(user_id),
+                min_total=getattr(cfg, "EV_MIN_SAMPLES", 30))
+        except Exception as e:
+            print(f"[UserLoop:{user_id}] EV calibration failed: {e}")
+            return None
+
     acct_env = (user.get("ctrader_env") or "demo").lower()
     mode_label = ("📝 Simulation" if cfg.PAPER_TRADING
                   else ("🧪 Demo" if acct_env in ("demo", "practice")
@@ -560,7 +604,10 @@ def _loop(user_id, alert_fn, gen=None):
                           "openedAt": _snap.get("openedAt"),
                           "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                           "reasoning": reasoning}
-                _log_trade(user_id, result)
+                # _snap is the persisted open-position snapshot, which carries
+                # the entry decision fields — so a trade closed during a
+                # restart still lands in the journal labelled.
+                _log_trade(user_id, result, _snap)
                 dash["trades"].insert(0, result)
                 dash["trades"] = dash["trades"][:50]
                 if net is not None and net < 0:
@@ -1050,7 +1097,7 @@ def _loop(user_id, alert_fn, gen=None):
                               "netPnl": pnl_est, "balance": round(paper_balance, 2),
                               "grossPnl": gross_pnl, "costUsd": cost_usd,
                               "openedAt": prev_pos.get("openedAt"), "time": now_str}
-                    _log_trade(user_id, result)
+                    _log_trade(user_id, result, prev_pos)
                     dash["trades"].insert(0, result)
                     dash["trades"] = dash["trades"][:50]
                     _persist_open_snapshot(None)
@@ -1119,7 +1166,7 @@ def _loop(user_id, alert_fn, gen=None):
                                   "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                                   "openedAt": open_pos.get("openedAt"), "time": now_str,
                                   "reasoning": "protective stop — closed at market"}
-                        _log_trade(user_id, result)
+                        _log_trade(user_id, result, open_pos)
                         if cfg.PAPER_TRADING:
                             user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                         dash["trades"].insert(0, result)
@@ -1190,7 +1237,7 @@ def _loop(user_id, alert_fn, gen=None):
                               "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                               "reason": hit, "openedAt": open_pos.get("openedAt"),
                               "time": now_str}
-                    _log_trade(user_id, result)
+                    _log_trade(user_id, result, open_pos)
                     # Persist so the simulated balance survives a restart.
                     user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                     last_close_at = time.time()
@@ -1215,6 +1262,19 @@ def _loop(user_id, alert_fn, gen=None):
             # violent markets and stands aside in dead ones (premium spec #1).
             regime = strategies.detect_regime(candles)
             dash["regime"] = regime
+
+            # Refresh the probability calibration roughly every 60 ticks (and
+            # once on the first pass), so newly closed trades feed back into
+            # the gate without re-reading the journal every few seconds.
+            if tick - ev_cal_tick >= 60:
+                ev_cal_tick = tick
+                ev_calibration = _refresh_ev_calibration()
+                dash["evCalibration"] = (
+                    {"samples": ev_calibration["samples"],
+                     "overall": ev_calibration["overall"]}
+                    if ev_calibration else
+                    {"samples": 0, "overall": None,
+                     "note": "collecting labelled trades"})
             active_mode = cfg.STRATEGY
             regime_block = False
             if active_mode == "auto":
@@ -1289,7 +1349,7 @@ def _loop(user_id, alert_fn, gen=None):
                               "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                               "openedAt": open_pos.get("openedAt"), "time": now_str,
                               "reasoning": "Closed before the weekend — avoiding gap risk over Sat/Sun."}
-                    _log_trade(user_id, result)
+                    _log_trade(user_id, result, open_pos)
                     if cfg.PAPER_TRADING:
                         user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                     last_close_at = time.time()
@@ -1368,6 +1428,15 @@ def _loop(user_id, alert_fn, gen=None):
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)
 
+            # NOTE on MIN_CONFIDENCE: this gate is weaker than it looks. The
+            # rule engine only emits BUY/SELL at |score| >= 3, which maps to
+            # confidence 76 (ai.py: 52 + 8*score); the AI paths adjust that to
+            # 84 when they agree and 71 when neutral. So the LOWEST confidence
+            # any firing signal can carry is 71 — at the default threshold of
+            # 68 this comparison never rejects anything. It only starts
+            # filtering above 71, and only bites the pure rule path above 76.
+            # Real entry quality control lives in the EV gate below, which
+            # scores on a measured probability instead of an indicator count.
             entry_ok = action in ("BUY", "SELL") and not open_pos and confidence >= cfg.MIN_CONFIDENCE
             # Signal TTL: if analysis took too long the market moved on. The AI
             # confirmation itself takes 2-8s when it runs (only on BUY/SELL
@@ -1558,6 +1627,67 @@ def _loop(user_id, alert_fn, gen=None):
                 _suggest_trade(user_id, signal, symbol, price, alert_fn)
                 entry_ok = False
 
+            # ── EV gate (V2 decision core) ──
+            # Last gate before sizing: converts the signal's confidence into a
+            # probability measured from this account's own closed trades, then
+            # refuses the entry if expected value after real costs is negative.
+            #
+            # Runs in shadow mode by default — it records the verdict it WOULD
+            # have reached without changing behaviour, so the filter can be
+            # judged on real data before it is allowed to block a live trade.
+            ev_verdict = None
+            _ev_mode = getattr(cfg, "EV_GATE_MODE", "shadow")
+            if entry_ok and _ev_mode != "off":
+                try:
+                    _atr_pips = 0.0
+                    try:
+                        _atr_raw = float(ind.get("atr") or 0)
+                        if _atr_raw > 0:
+                            _atr_pips = forex.to_pips(_atr_raw, symbol, price)
+                    except (TypeError, ValueError):
+                        _atr_pips = 0.0
+                    _dd_pct = 0.0
+                    try:
+                        _peak = float(strategies.get_session(user_id).get("peakBalance") or 0)
+                        if _peak > 0:
+                            _dd_pct = (paper_balance - _peak) / _peak * 100.0
+                    except Exception:
+                        _dd_pct = 0.0
+                    ev_verdict = ev_engine.evaluate(
+                        confidence=confidence,
+                        calibration=ev_calibration,
+                        atr_pips=_atr_pips,
+                        spread_pips=spread,
+                        regime=(regime or {}).get("regime"),
+                        equity=paper_balance,
+                        drawdown_pct=_dd_pct,
+                        min_probability=getattr(cfg, "EV_MIN_PROBABILITY", 0.55),
+                    )
+                    if not ev_verdict["approved"]:
+                        if _ev_mode == "enforce":
+                            entry_ok = False
+                            _skip(f"EV gate: {ev_verdict['reason']} "
+                                  f"(p={ev_verdict['probability']}, "
+                                  f"EV={ev_verdict['ev_r']}R)")
+                        else:
+                            print(f"[UserLoop:{user_id}] EV shadow: WOULD BLOCK "
+                                  f"{action} {symbol} — {ev_verdict['reason']} "
+                                  f"(conf={confidence}, p={ev_verdict['probability']}, "
+                                  f"EV={ev_verdict['ev_r']}R, "
+                                  f"cost={ev_verdict['cost_r']}R)")
+                    else:
+                        print(f"[UserLoop:{user_id}] EV {_ev_mode}: allow {action} "
+                              f"{symbol} p={ev_verdict['probability']} "
+                              f"EV={ev_verdict['ev_r']}R")
+                except Exception as e:
+                    # A gate that crashes must never take the bot down with it;
+                    # in enforce mode a broken gate means stand aside, not
+                    # trade blind.
+                    print(f"[UserLoop:{user_id}] EV gate error: {e}")
+                    if _ev_mode == "enforce":
+                        entry_ok = False
+                        _skip("EV gate unavailable")
+
             if entry_ok:
                 pip = forex.pip_size(symbol, price)
                 _crypto = _crypto_build
@@ -1732,7 +1862,7 @@ def _loop(user_id, alert_fn, gen=None):
                                       "balance": round(paper_balance, 2), "time": now_str,
                                       "reasoning": "broker rejected the stop-loss attach — "
                                                    "position closed immediately for safety"}
-                            _log_trade(user_id, result)
+                            _log_trade(user_id, result, open_pos)
                             if cfg.PAPER_TRADING:
                                 user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                             last_close_at = time.time()
@@ -1764,6 +1894,33 @@ def _loop(user_id, alert_fn, gen=None):
                                                         "symbol": symbol, "units": units,
                                                         "quantity": units, "stopLoss": sl_price,
                                                         "takeProfit": tp_price, "openedAt": now_str}
+
+                            # Decision snapshot — what was true when we decided
+                            # to enter. _log_trade copies these onto the closed
+                            # trade so ev.calibrate() has labelled examples to
+                            # learn from; without it every closed trade is an
+                            # unlabelled accounting row and the probability
+                            # model can never be built.
+                            #
+                            # entrySpreadPips also feeds the realised-cost
+                            # calculation on close. A live position read back
+                            # from the broker never carries it, so before this
+                            # the cost of every live trade was booked as 0.
+                            try:
+                                open_pos.setdefault("entrySpreadPips", spread)
+                                open_pos.update({
+                                    "entryConfidence": confidence,
+                                    "entryRegime": (regime or {}).get("regime"),
+                                    "entryAtr": atr_v or None,
+                                    "entrySlPips": round(float(stop_pips_eff), 2),
+                                    "entryTpPips": round(
+                                        forex.to_pips(tp_dist, symbol, price), 2),
+                                    "entrySide": action,
+                                    "entryProbability": (ev_verdict or {}).get("probability"),
+                                    "entryEvR": (ev_verdict or {}).get("ev_r"),
+                                })
+                            except Exception as _e:
+                                print(f"[UserLoop:{user_id}] entry snapshot failed: {_e}")
 
                             dash["openPosition"] = open_pos
                             # Pin R now, off the REAL fill and the stop we sent.
@@ -1838,7 +1995,7 @@ def _loop(user_id, alert_fn, gen=None):
                           "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                           "openedAt": open_pos.get("openedAt"), "time": now_str,
                           "reasoning": signal.get("reasoning", "")}
-                _log_trade(user_id, result)
+                _log_trade(user_id, result, open_pos)
                 if cfg.PAPER_TRADING:
                     # Persist so the simulated balance survives a restart.
                     user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
@@ -2158,7 +2315,7 @@ def force_close(user_id):
                   "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
                   "netPnl": round(net, 2), "balance": new_bal,
                   "openedAt": open_pos.get("openedAt"), "time": now_str}
-        _log_trade(user_id, result)
+        _log_trade(user_id, result, open_pos)
         if cfg.PAPER_TRADING:
             # Persist so the simulated balance survives a restart.
             user_store.update(user_id, {"paper_balance": new_bal})

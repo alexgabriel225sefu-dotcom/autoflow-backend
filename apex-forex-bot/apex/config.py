@@ -112,6 +112,28 @@ RISK_PER_TRADE = float(_scalp("RISK_PER_TRADE", 0.025, 0.0125))  # scalp: 2.5% �
 STOP_LOSS_PIPS = float(_scalp("STOP_LOSS_PIPS", 15, 25))        # scalp: 15p · swing: 25p — room to breathe past spread+noise
 TAKE_PROFIT_PIPS = float(_scalp("TAKE_PROFIT_PIPS", 30, 50))   # scalp: 30p (RR 1:2) · swing: 50p (RR 2:1)
 MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 68)
+
+# ─── EV gate (V2 decision core — see apex/ev.py) ─────────
+# The signal engine's "confidence" is an indicator count (52 + 8×score), not a
+# probability, and at the default MIN_CONFIDENCE=68 it gates nothing: the
+# lowest confidence any firing signal can carry is 71. The EV engine replaces
+# that with a probability measured from the account's own closed trades, and
+# refuses entries whose expected value is negative after real costs.
+#
+#   off     — engine never runs (pre-V2 behaviour)
+#   shadow  — engine runs and logs its verdict, but never blocks a trade.
+#             Use this first: it shows what WOULD have been filtered, with no
+#             risk to a live account.
+#   enforce — engine can veto entries.
+EV_GATE_MODE = (os.getenv("EV_GATE_MODE") or "shadow").strip().lower()
+# The win-rate dial. Higher = fewer trades, a higher share of them winners.
+# Set too high the bot simply stops trading, so raise it in small steps and
+# read the shadow log before enforcing.
+EV_MIN_PROBABILITY = float(os.getenv("EV_MIN_PROBABILITY") or 0.55)
+# Minimum labelled closed trades before calibration is trusted at all. Below
+# this the engine reports NO_PROBABILITY and (in enforce mode) stands aside.
+EV_MIN_SAMPLES = int(os.getenv("EV_MIN_SAMPLES") or 30)
+
 LEVERAGE = float(os.getenv("LEVERAGE") or 30)
 MARGIN_CAP = float(os.getenv("MARGIN_CAP") or 0.5)             # use ≤50% of available margin
 MAX_SPREAD_PIPS = float(_scalp("MAX_SPREAD_PIPS", 1.2, 3.0))   # scalp: strict 1.2p — wide spread kills tight targets
