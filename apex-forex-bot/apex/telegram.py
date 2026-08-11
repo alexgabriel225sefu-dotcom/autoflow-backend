@@ -2604,7 +2604,19 @@ _PROOF_VIDEO = ("ScreenRecording_08-01-2026 17-15-50_1.mov",
 def send_proof_shots(chat_id):
     """Send the trade-result screenshots + full-week recording as ONE
     swipeable album, not stacked separate messages. Best-effort — a missing
-    file or Telegram hiccup should never block onboarding."""
+    file or Telegram hiccup should never block onboarding.
+
+    Shown at most ONCE per chat_id — a not-yet-licensed user hits the gate
+    on every message they send (/start again, /help, whatever), and without
+    this it resent the whole album each time, which is exactly the
+    "repeats every time I hit start" spam this guards against.
+    """
+    cid = str(chat_id)
+    try:
+        if user_store.load(cid).get("proof_shown"):
+            return
+    except Exception:
+        pass
     items = []
     for filename, caption in _PROOF_SHOTS:
         path = os.path.join(_PROOF_DIR, filename)
@@ -2622,6 +2634,10 @@ def send_proof_shots(chat_id):
         print(f"[TELEGRAM] proof video failed: {e}")
     if items:
         send_media_group(chat_id, items)
+    try:
+        user_store.update(cid, {"proof_shown": True})
+    except Exception:
+        pass
 
 
 def send_activation_sequence(chat_id, paid: bool):
