@@ -2035,6 +2035,16 @@ def send_photo(chat_id, png, caption="", filename="chart.png", content_type="ima
         print(f"[TELEGRAM] send_photo failed: {e}")
 
 
+def send_video(chat_id, mp4, caption="", filename="video.mp4", content_type="video/mp4"):
+    """Send a video to the chat (used for the onboarding proof recording)."""
+    try:
+        requests.post(f"{_API}/sendVideo",
+                      data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
+                      files={"video": (filename, mp4, content_type)}, timeout=60)
+    except Exception as e:
+        print(f"[TELEGRAM] send_video failed: {e}")
+
+
 def _send_chart_async(chat_id, symbol=None, position=None, caption=""):
     """Render + send the chart without blocking the caller (alerts, commands)."""
     def run():
@@ -2561,11 +2571,18 @@ _PROOF_SHOTS = [
     ("IMG_7108.jpeg", "✅ Same trade, closed: <b>+$199.23</b>"),
     ("IMG_7105.jpeg", "✅ XAUUSD (gold) — entry, chart, and result: <b>+$127.36</b>"),
 ]
+# Full week of trading, wins AND losses — shown deliberately, not just the
+# best individual trades above, because a real track record (including the
+# losers) builds more trust than a highlight reel alone.
+_PROOF_VIDEO = ("ScreenRecording_08-01-2026 17-15-50_1.mov",
+                "🎥 A full week, unedited — wins <b>and</b> losses. "
+                "This is what actually running the bot looks like.")
 
 
 def send_proof_shots(chat_id):
-    """Send a few real trade-result screenshots. Best-effort — a missing
-    file or Telegram hiccup should never block onboarding."""
+    """Send a few real trade-result screenshots plus a full-week recording.
+    Best-effort — a missing file or Telegram hiccup should never block
+    onboarding."""
     for filename, caption in _PROOF_SHOTS:
         path = os.path.join(_PROOF_DIR, filename)
         try:
@@ -2574,6 +2591,14 @@ def send_proof_shots(chat_id):
                            filename=filename, content_type="image/jpeg")
         except Exception as e:
             print(f"[TELEGRAM] proof shot {filename} failed: {e}")
+    vid_filename, vid_caption = _PROOF_VIDEO
+    vid_path = os.path.join(_PROOF_DIR, vid_filename)
+    try:
+        with open(vid_path, "rb") as f:
+            send_video(chat_id, f.read(), vid_caption,
+                       filename=vid_filename, content_type="video/quicktime")
+    except Exception as e:
+        print(f"[TELEGRAM] proof video failed: {e}")
 
 
 def send_activation_sequence(chat_id, paid: bool):
