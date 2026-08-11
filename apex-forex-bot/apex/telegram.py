@@ -2045,6 +2045,28 @@ def send_video(chat_id, mp4, caption="", filename="video.mp4", content_type="vid
         print(f"[TELEGRAM] send_video failed: {e}")
 
 
+def send_media_group(chat_id, items):
+    """Send photos/video together as one swipeable album instead of stacked
+    separate messages. items: list of (bytes, filename, content_type,
+    caption, kind) — kind is 'photo' or 'video'. Max 10 items (Telegram
+    limit)."""
+    media, files = [], {}
+    for i, (data, filename, content_type, caption, kind) in enumerate(items):
+        key = f"file{i}"
+        entry = {"type": kind, "media": f"attach://{key}"}
+        if caption:
+            entry["caption"] = caption
+            entry["parse_mode"] = "HTML"
+        media.append(entry)
+        files[key] = (filename, data, content_type)
+    try:
+        requests.post(f"{_API}/sendMediaGroup",
+                      data={"chat_id": chat_id, "media": json.dumps(media)},
+                      files=files, timeout=60)
+    except Exception as e:
+        print(f"[TELEGRAM] send_media_group failed: {e}")
+
+
 def _send_chart_async(chat_id, symbol=None, position=None, caption=""):
     """Render + send the chart without blocking the caller (alerts, commands)."""
     def run():
@@ -2580,25 +2602,26 @@ _PROOF_VIDEO = ("ScreenRecording_08-01-2026 17-15-50_1.mov",
 
 
 def send_proof_shots(chat_id):
-    """Send a few real trade-result screenshots plus a full-week recording.
-    Best-effort — a missing file or Telegram hiccup should never block
-    onboarding."""
+    """Send the trade-result screenshots + full-week recording as ONE
+    swipeable album, not stacked separate messages. Best-effort — a missing
+    file or Telegram hiccup should never block onboarding."""
+    items = []
     for filename, caption in _PROOF_SHOTS:
         path = os.path.join(_PROOF_DIR, filename)
         try:
             with open(path, "rb") as f:
-                send_photo(chat_id, f.read(), caption,
-                           filename=filename, content_type="image/jpeg")
+                items.append((f.read(), filename, "image/jpeg", caption, "photo"))
         except Exception as e:
             print(f"[TELEGRAM] proof shot {filename} failed: {e}")
     vid_filename, vid_caption = _PROOF_VIDEO
     vid_path = os.path.join(_PROOF_DIR, vid_filename)
     try:
         with open(vid_path, "rb") as f:
-            send_video(chat_id, f.read(), vid_caption,
-                       filename=vid_filename, content_type="video/quicktime")
+            items.append((f.read(), vid_filename, "video/quicktime", vid_caption, "video"))
     except Exception as e:
         print(f"[TELEGRAM] proof video failed: {e}")
+    if items:
+        send_media_group(chat_id, items)
 
 
 def send_activation_sequence(chat_id, paid: bool):
@@ -2957,8 +2980,16 @@ def _license_ok(chat_id, text):
 
     first = (text or "").splitlines()[0].strip()
     cmd, _, karg = first.partition(" ")
+    cmd_l = cmd.lower().split("@")[0]
     key = karg.strip().upper()
-    if cmd.lower().split("@")[0] != "/start" or not key:
+    # /purchase (and aliases) must work for a not-yet-licensed user — that's
+    # the whole point of the command. Without this it hit the generic
+    # "activation required" branch below and just re-showed the proof shots,
+    # never the actual payment link.
+    if cmd_l in ("/purchase", "/buylicense", "/pay"):
+        _handle_purchase(chat_id)
+        return False
+    if cmd_l != "/start" or not key:
         send_proof_shots(chat_id)
         send_to(chat_id,
             "🔒 <b>Activation required</b>\n\n"
