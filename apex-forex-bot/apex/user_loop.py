@@ -1511,7 +1511,13 @@ def _loop(user_id, alert_fn, gen=None):
             try:
                 if getattr(cfg, "AI_CONFIRM", True):
                     signal = ai.get_signal(ind, paper_balance, open_pos, strat_data,
-                                           mode=active_mode)
+                                           mode=active_mode,
+                                           symbol=symbol,
+                                           timeframe=cfg.TIMEFRAME,
+                                           sl_pips=cfg.STOP_LOSS_PIPS,
+                                           tp_pips=cfg.TAKE_PROFIT_PIPS,
+                                           risk_pct=cfg.RISK_PER_TRADE,
+                                           min_confidence=cfg.MIN_CONFIDENCE)
                 else:
                     signal = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
             except Exception as e:

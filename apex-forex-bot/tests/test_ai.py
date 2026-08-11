@@ -12,6 +12,7 @@ os.environ.setdefault("PAPER_TRADING", "true")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from apex import ai, strategies, indicators  # noqa: E402
+from apex import config as cfg  # noqa: E402
 
 
 def check(label, condition, detail=""):
@@ -149,6 +150,46 @@ for _mode in ai.STRATEGY_MODES:
 check(f"no provider call in any of the {len(ai.STRATEGY_MODES)} modes while in a trade",
       "prompt" not in captured, list(captured))
 ai._call_anthropic = _orig_anthropic
+
+
+print("\n── the prompt describes the instrument actually being traded ──")
+# Reuse buy_ind/strat, the fixture that actually produces a firing signal —
+# a HOLD returns before the provider is ever called and captures nothing.
+_cap = {}
+
+
+def _cap_prompt(prompt):
+    _cap["prompt"] = prompt
+    return {"action": "HOLD", "confidence": 0}
+
+
+ai._call_anthropic = _cap_prompt
+ai.get_signal(buy_ind, 5000.0, None, strat, mode="mean_reversion",
+              symbol="XAUUSD", timeframe="1m", sl_pips=15, tp_pips=30,
+              risk_pct=0.02, min_confidence=50)
+p2 = _cap["prompt"]
+head = p2.split("## ACCOUNT")[0]
+check("prompt names the traded symbol", "XAUUSD" in p2)
+check("prompt does NOT mislabel it as the global default",
+      "EUR_USD" not in head, head[:120])
+check("prompt carries the caller's timeframe", "(1m)" in p2)
+check("prompt quotes the caller's SL", "SL: 15 pips" in p2)
+check("prompt quotes the caller's TP", "TP: 30 pips" in p2)
+check("prompt quotes the caller's risk", "Risk: 2% per trade" in p2)
+check("prompt quotes the caller's confidence floor",
+      "Minimum confidence: 50%" in p2)
+
+# Without the context arguments it must still work, falling back to config.
+_cap.clear()
+ai.get_signal(buy_ind, 5000.0, None, strat, mode="mean_reversion")
+check("falls back to config when no context is passed",
+      cfg.SYMBOL in _cap["prompt"])
+ai._call_anthropic = _orig_anthropic
+
+print("\n── currency legs resolve for the news context ──")
+check("_context_line accepts a symbol without raising",
+      isinstance(ai._context_line("XAUUSD"), str))
+check("and still works with no symbol", isinstance(ai._context_line(), str))
 
 # ─── Result ───────────────────────────────────────────────
 print("\n" + "=" * 50)

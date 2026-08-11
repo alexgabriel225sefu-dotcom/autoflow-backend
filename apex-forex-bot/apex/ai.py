@@ -8,11 +8,16 @@ from apex import forex
 _anthropic_client = None
 
 
-def _context_line():
+def _context_line(symbol=None):
     """One extra line of market context for the AI prompt — sentiment for
     crypto (Fear & Greed), upcoming high-impact events for forex. This is
     informational context the AI weighs alongside the technicals, never a
-    standalone prediction and never a hard block on its own."""
+    standalone prediction and never a hard block on its own.
+
+    `symbol` is the instrument actually being evaluated. Without it this fell
+    back to the process-global cfg.SYMBOL, so an Auto-Pilot account scanning
+    eight pairs got EUR_USD's news calendar attached to every one of them.
+    """
     try:
         if getattr(cfg, "PRODUCT", "forex") == "crypto":
             from apex import sentiment
@@ -24,7 +29,10 @@ def _context_line():
                     "but do not treat this as a standalone signal")
         else:
             from apex import news
-            currencies = [c for c in re.split(r"[_/]", cfg.SYMBOL) if c]
+            _sym = (symbol or cfg.SYMBOL or "").upper()
+            _flat = _sym.replace("_", "").replace("/", "").replace("-", "")
+            currencies = ([_flat[:3], _flat[3:]] if len(_flat) == 6 and _flat.isalpha()
+                          else [c for c in re.split(r"[_/]", _sym) if c])
             events = news.upcoming(currencies, hours=12, limit=3)
             if not events:
                 return "- Upcoming high-impact news (next 12h): none scheduled"
@@ -157,8 +165,20 @@ _MODE_RULES = {
 }
 
 
-def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_reversion"):
-    """Rule-based signal is PRIMARY. AI confirms or blocks — never initiates."""
+def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_reversion",
+               symbol=None, timeframe=None, sl_pips=None, tp_pips=None,
+               risk_pct=None, min_confidence=None):
+    """Rule-based signal is PRIMARY. AI confirms or blocks — never initiates.
+
+    The trade context arguments matter more than they look. Without them the
+    prompt was built from the process-global config, so an Auto-Pilot account
+    scanning eight instruments described every single one as EUR_USD: the model
+    was shown gold's prices (3350.42, EMA 3349.8) under the heading "EUR_USD",
+    an instrument that trades at 1.08, and asked to judge the setup. It was
+    also told the global SL/TP/risk and confidence floor rather than this
+    user's. Since the AI can veto an entry outright, that was an arbitrary
+    verdict on seven symbols out of eight.
+    """
     mode = (mode or "mean_reversion").lower()
     if mode not in _MODE_INTRO:
         mode = "mean_reversion"
@@ -192,9 +212,20 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
                 else "- Volume: N/A (this data source has no forex tick volume — judge on price action, do NOT treat as low liquidity)")
     vol_crit = "tick volume>1.2x" if has_volume else "Stoch RSI K aligned with direction"
 
+    # Trade context for the prompt. Each falls back to the process-global
+    # config only when the caller did not supply it — which is what used to
+    # happen for every call, labelling all eight Auto-Pilot instruments
+    # "EUR_USD" and quoting the wrong SL/TP/risk back to the model.
+    _sym_lbl = symbol or cfg.SYMBOL
+    _tf_lbl = timeframe or cfg.TIMEFRAME
+    _sl_lbl = float(cfg.STOP_LOSS_PIPS if sl_pips is None else sl_pips)
+    _tp_lbl = float(cfg.TAKE_PROFIT_PIPS if tp_pips is None else tp_pips)
+    _risk_lbl = float(cfg.RISK_PER_TRADE if risk_pct is None else risk_pct)
+    _minconf_lbl = int(cfg.MIN_CONFIDENCE if min_confidence is None else min_confidence)
+
     prompt = f"""You are a professional FOREX trader with 20 years of experience. {_MODE_INTRO[mode]} Analyze ALL the data and give a precise signal.
 
-## MARKET DATA — {cfg.SYMBOL} ({cfg.TIMEFRAME})
+## MARKET DATA — {_sym_lbl} ({_tf_lbl})
 - Active sessions: {sessions} (liquidity is best when London/New York overlap)
 ### Price & Trend
 - Current price: {ind['price']}
@@ -227,15 +258,15 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
 {recent}
 
 ### Market Context
-{_context_line()}
+{_context_line(_sym_lbl)}
 
 ## ACCOUNT
 - Balance: ${balance:.2f} USD | Leverage: 1:{cfg.LEVERAGE:g}
 - Open position: {pos}
 
 ## ENTRY RULES — {STRATEGY_MODES[mode]['label'].upper() if mode in STRATEGY_MODES else 'MEAN REVERSION'}
-- SL: {cfg.STOP_LOSS_PIPS:g} pips | TP: {cfg.TAKE_PROFIT_PIPS:g} pips | Risk: {cfg.RISK_PER_TRADE * 100:g}% per trade
-- Minimum confidence: {cfg.MIN_CONFIDENCE}%
+- SL: {_sl_lbl:g} pips | TP: {_tp_lbl:g} pips | Risk: {_risk_lbl * 100:g}% per trade
+- Minimum confidence: {_minconf_lbl}%
 {_MODE_RULES[mode]}
 - Leverage is 1:{cfg.LEVERAGE:g} — size for stability, not for chasing volatility
 - Weigh the Market Context line above like any other input: it can lower your
