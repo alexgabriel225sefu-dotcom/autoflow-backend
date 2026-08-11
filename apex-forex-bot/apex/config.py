@@ -134,6 +134,15 @@ EV_MIN_PROBABILITY = float(os.getenv("EV_MIN_PROBABILITY") or 0.55)
 # this the engine reports NO_PROBABILITY and (in enforce mode) stands aside.
 EV_MIN_SAMPLES = int(os.getenv("EV_MIN_SAMPLES") or 30)
 
+# Show the AI the actual chart, not just indicator values. Structure — where
+# price keeps failing, whether a level was tested once or five times, whether
+# the approach looks impulsive or exhausted — does not survive being flattened
+# into a list of numbers. Costs image tokens on every candidate entry (never on
+# an idle tick, the AI is only consulted on a BUY/SELL candidate), so it is
+# opt-in. Falls back to text-only if rendering fails or the fallback provider
+# is used.
+AI_VISION = _truthy(os.getenv("AI_VISION"))
+
 LEVERAGE = float(os.getenv("LEVERAGE") or 30)
 MARGIN_CAP = float(os.getenv("MARGIN_CAP") or 0.5)             # use ≤50% of available margin
 MAX_SPREAD_PIPS = float(_scalp("MAX_SPREAD_PIPS", 1.2, 3.0))   # scalp: strict 1.2p — wide spread kills tight targets

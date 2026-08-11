@@ -1592,7 +1592,8 @@ def _loop(user_id, alert_fn, gen=None):
                                            sl_pips=cfg.STOP_LOSS_PIPS,
                                            tp_pips=cfg.TAKE_PROFIT_PIPS,
                                            risk_pct=cfg.RISK_PER_TRADE,
-                                           min_confidence=cfg.MIN_CONFIDENCE)
+                                           min_confidence=cfg.MIN_CONFIDENCE,
+                                           candles=candles)
                 else:
                     signal = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
             except Exception as e:

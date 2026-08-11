@@ -192,6 +192,62 @@ check("_context_line accepts a symbol without raising",
 check("and still works with no symbol", isinstance(ai._context_line(), str))
 
 # ─── Result ───────────────────────────────────────────────
+
+print("\n── vision: the model is shown the chart, not just numbers ──")
+import apex.config as _cfg  # noqa: E402
+
+_seen = {}
+
+
+def _cap_vision(prompt, image_png=None):
+    _seen["prompt"] = prompt
+    _seen["image"] = image_png
+    return {"action": "HOLD", "confidence": 0}
+
+
+_bars = [{"time": 1700000000 + i * 60,
+          "open": 1.10 + i * 0.0001, "high": 1.1010 + i * 0.0001,
+          "low": 1.0990 + i * 0.0001, "close": 1.1005 + i * 0.0001}
+         for i in range(120)]
+
+ai._call_anthropic = _cap_vision
+
+# Off by default: no image, no chart instruction, no extra cost.
+_cfg.AI_VISION = False
+_seen.clear()
+ai.get_signal(buy_ind, 5000.0, None, strat, symbol="EURUSD", candles=_bars)
+check("vision off → no image attached", _seen["image"] is None)
+check("vision off → no chart section in the prompt",
+      "### CHART" not in _seen["prompt"])
+
+# On: the chart is rendered and attached, and the prompt tells the model to read it.
+_cfg.AI_VISION = True
+_seen.clear()
+ai.get_signal(buy_ind, 5000.0, None, strat, symbol="EURUSD", candles=_bars)
+check("vision on → a PNG is attached",
+      isinstance(_seen["image"], (bytes, bytearray)) and len(_seen["image"]) > 1000,
+      str(type(_seen["image"])))
+check("the attachment really is a PNG",
+      bytes(_seen["image"][:8]) == b"\x89PNG\r\n\x1a\n")
+check("the prompt instructs the model to read the chart",
+      "### CHART" in _seen["prompt"] and "market structure" in _seen["prompt"])
+
+# Degrade, never fail: no candles, too few candles, or a broken renderer must
+# all fall back to a text-only call rather than costing the account a trade.
+_seen.clear()
+ai.get_signal(buy_ind, 5000.0, None, strat, symbol="EURUSD", candles=None)
+check("no candles → text-only, still answers", _seen["image"] is None)
+
+_seen.clear()
+ai.get_signal(buy_ind, 5000.0, None, strat, symbol="EURUSD", candles=_bars[:5])
+check("too few candles → text-only", _seen["image"] is None)
+
+check("a broken renderer degrades instead of raising",
+      ai._chart_png("not candles at all", "EURUSD", "1m") is None)
+
+_cfg.AI_VISION = False
+ai._call_anthropic = _orig_anthropic
+
 print("\n" + "=" * 50)
 if check.failed == 0:
     print("✅ ALL TESTS PASSED — AI signal layer works.")
