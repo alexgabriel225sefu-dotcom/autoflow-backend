@@ -213,6 +213,28 @@ def _bucket_of(confidence):
     return _BUCKETS[-1]
 
 
+def labelled_count(journal):
+    """How many closed trades carry both a confidence and a P&L.
+
+    This is the progress counter toward `calibrate()` returning anything: rows
+    written before decision-logging existed, or by broker-side reconciliation
+    paths that never saw the position, are accounting-only and don't count.
+    """
+    n = 0
+    for t in journal or []:
+        pnl = t.get("netPnl")
+        if pnl is None:
+            pnl = t.get("grossPnl")
+        if t.get("confidence") is None or pnl is None:
+            continue
+        try:
+            float(t["confidence"]), float(pnl)
+        except (TypeError, ValueError):
+            continue
+        n += 1
+    return n
+
+
 def calibrate(journal, prior=0.45, min_total=30):
     """Build a confidence → P(win) table from closed trades.
 

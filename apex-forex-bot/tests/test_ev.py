@@ -197,6 +197,21 @@ check("min_probability dial filters harder",
       not res_strict["approved"] and res_strict["reason"] == "LOW_PROBABILITY",
       res_strict["reason"])
 
+
+print("\n── labelled_count ──")
+check("counts only labelled rows",
+      ev.labelled_count([{"confidence": 76, "netPnl": 1.0},
+                         {"netPnl": 1.0},                       # no confidence
+                         {"confidence": 76},                    # no pnl
+                         {"confidence": 80, "grossPnl": -2.0}]) == 2)
+check("empty journal", ev.labelled_count([]) == 0)
+check("None journal", ev.labelled_count(None) == 0)
+check("garbage values skipped",
+      ev.labelled_count([{"confidence": "abc", "netPnl": 1.0}]) == 0)
+check("matches calibrate's own threshold view",
+      ev.labelled_count([{"confidence": 76, "netPnl": 1.0}] * 29) == 29
+      and ev.calibrate([{"confidence": 76, "netPnl": 1.0}] * 29) is None)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")

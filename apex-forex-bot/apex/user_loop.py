@@ -1269,12 +1269,23 @@ def _loop(user_id, alert_fn, gen=None):
             if tick - ev_cal_tick >= 60:
                 ev_cal_tick = tick
                 ev_calibration = _refresh_ev_calibration()
+                # Report the real labelled count even before the threshold is
+                # reached — otherwise the operator sees a flat 0 the whole time
+                # the bot is collecting and cannot tell progress from a fault.
+                _need = getattr(cfg, "EV_MIN_SAMPLES", 30)
+                try:
+                    _have = ev_engine.labelled_count(user_store.load_trades(user_id))
+                except Exception:
+                    _have = 0
                 dash["evCalibration"] = (
-                    {"samples": ev_calibration["samples"],
-                     "overall": ev_calibration["overall"]}
+                    {"ready": True, "samples": ev_calibration["samples"],
+                     "overall": ev_calibration["overall"], "needed": _need,
+                     "mode": getattr(cfg, "EV_GATE_MODE", "shadow")}
                     if ev_calibration else
-                    {"samples": 0, "overall": None,
-                     "note": "collecting labelled trades"})
+                    {"ready": False, "samples": _have, "needed": _need,
+                     "overall": None,
+                     "mode": getattr(cfg, "EV_GATE_MODE", "shadow"),
+                     "note": f"collecting labelled trades ({_have}/{_need})"})
             active_mode = cfg.STRATEGY
             regime_block = False
             if active_mode == "auto":
