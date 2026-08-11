@@ -17,6 +17,12 @@ _SETTABLE = {
     "max_trades_day", "max_dd_pct", "max_daily_loss_pct", "trailing",
     "breakeven_r", "news_filter", "session_filter", "exit_mode", "style",
     "atr_stops", "htf", "confirm", "maxpos", "copilot",
+    # Risk-ladder state, not a strategy knob. Settable because a miscounted
+    # streak silently quarters every position and there was no way to correct
+    # it short of waiting for a winning trade — a duplicate-journaling bug once
+    # pushed it to 4 after two real losses, and the account traded at a quarter
+    # size until it was noticed.
+    "loss_streak",
 }
 
 _REDACT = {"ctrader_access_token", "ctrader_refresh_token",
@@ -35,7 +41,7 @@ _REDACT = {"ctrader_access_token", "ctrader_refresh_token",
 _BOOL_KEYS = {"autopilot", "paper", "trailing", "news_filter", "atr_stops",
               "htf", "copilot"}
 _LIST_KEYS = {"autopilot_universe", "watchlist", "session_filter"}
-_INT_KEYS = {"min_confidence", "max_trades_day", "maxpos"}
+_INT_KEYS = {"min_confidence", "max_trades_day", "maxpos", "loss_streak"}
 _FLOAT_KEYS = {"risk", "sl_pips", "tp_pips", "leverage", "max_dd_pct",
                "max_daily_loss_pct", "breakeven_r"}
 

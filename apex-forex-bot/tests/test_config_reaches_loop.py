@@ -87,6 +87,40 @@ check("the bug is real — 'EURUSD'.split('_') matches no ISO code",
       "EURUSD".split("_") == ["EURUSD"]
       and "EURUSD" not in ("EUR", "USD"))
 
+
+print("\n── the risk ladder can be corrected and expires with the day ──")
+from apex import control_actions  # noqa: E402
+
+check("loss_streak is remotely settable",
+      "loss_streak" in control_actions._SETTABLE)
+check("and is coerced to an int over the string transport",
+      control_actions.coerce_setting("loss_streak", "2") == 2)
+
+import time as _t  # noqa: E402
+
+_YESTERDAY = _t.time() - 26 * 3600
+_u_old = {"ctrader_access_token": "x", "ctrader_account_id": "1",
+          "loss_streak": 4, "last_loss_at": _YESTERDAY}
+_u_today = {"ctrader_access_token": "x", "ctrader_account_id": "1",
+            "loss_streak": 4, "last_loss_at": _t.time() - 600}
+
+
+def _streak_after_start(user):
+    """Mirror the loop's startup rule without spinning a real loop."""
+    from datetime import datetime as _dt
+    ls = int(user.get("loss_streak") or 0)
+    lla = float(user.get("last_loss_at") or 0)
+    if ls and lla:
+        if (_dt.fromtimestamp(lla).strftime("%Y-%m-%d")
+                != _dt.now().strftime("%Y-%m-%d")):
+            return 0
+    return ls
+
+
+check("a streak from a previous day is cleared",
+      _streak_after_start(_u_old) == 0)
+check("today's streak is kept", _streak_after_start(_u_today) == 4)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")

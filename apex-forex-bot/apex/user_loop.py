@@ -487,6 +487,18 @@ def _loop(user_id, alert_fn, gen=None):
     last_loss_at = float(user.get("last_loss_at") or 0)   # entry cooldown anchor (any losing close)
     last_close_at = float(user.get("last_close_at") or 0) # re-entry lock after ANY close — kills open/close churn
     loss_streak = int(user.get("loss_streak") or 0)       # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
+    # The ladder is a within-session brake, but nothing ever cleared it: a
+    # streak survived indefinitely, so losses from days ago still quartered
+    # today's position size and the only escape was a winning trade. Everything
+    # else that counts losses (dailyTrades, dailyPnL, consecutiveLosses) resets
+    # on a new trading day; this now does too. Longer-horizon protection is
+    # already covered by max_dd_pct and max_daily_loss_pct.
+    if loss_streak and last_loss_at:
+        _last_loss_day = datetime.fromtimestamp(last_loss_at).strftime("%Y-%m-%d")
+        if _last_loss_day != datetime.now().strftime("%Y-%m-%d"):
+            print(f"[UserLoop:{user_id}] loss streak of {loss_streak} was from "
+                  f"{_last_loss_day} — cleared for the new trading day")
+            loss_streak = 0
 
     def _persist_risk_state():
         try:
