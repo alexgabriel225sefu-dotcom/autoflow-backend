@@ -261,7 +261,18 @@ def _start_dashboard_server():
             return bearer == token
 
         def do_POST(self):
-            if self.path == "/api/mt/sync":
+            if self.path == "/api/stripe/webhook":
+                from apex import stripe_license
+                length = int(self.headers.get("Content-Length") or 0)
+                raw = self.rfile.read(min(length, 1_000_000))
+                status, text = stripe_license.handle_webhook(
+                    raw, self.headers.get("Stripe-Signature", ""))
+                self.send_response(status)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(text)))
+                self.end_headers()
+                self.wfile.write(text)
+            elif self.path == "/api/mt/sync":
                 from apex.brokers import mtbridge
                 length = int(self.headers.get("Content-Length") or 0)
                 body = self.rfile.read(min(length, 1_000_000)).decode("utf-8", "replace")

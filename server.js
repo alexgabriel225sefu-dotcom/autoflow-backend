@@ -1978,6 +1978,44 @@ app.get('/api/owner-license', async (req, res) => {
   res.json({ key, product, message: `Add this as LICENSE_KEY for your ${product} bot`, supabase: dbStatus });
 });
 
+// POST /api/admin/grant-license?secret=... — { email, name?, product: 'apex-crypto'|'apex-forex'|'both' }
+// Manually grants full, non-expiring access to anyone the owner chooses — no
+// checkout involved. Mints a real license key per product (same format/
+// verification path as a paid one) and sends the exact same activation email
+// a paying customer gets, so the recipient's experience (license + the
+// "Open your bot on Telegram" button) is identical either way.
+app.post('/api/admin/grant-license', async (req, res) => {
+  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const email = String(req.body?.email || '').trim().slice(0, 200);
+  const name = String(req.body?.name || 'there').trim().slice(0, 100) || 'there';
+  const want = String(req.body?.product || '').toLowerCase();
+  const products = want === 'both' ? ['apex-bot', 'apex-forex']
+    : want === 'apex-forex' ? ['apex-forex'] : ['apex-bot'];
+  if (!email) return res.status(400).json({ error: 'email is required' });
+
+  const results = [];
+  for (const product of products) {
+    const isForex = product === 'apex-forex';
+    const key = isForex ? generateForexKey() : generateLicenseKey();
+    const { error } = await supabase.from('licenses').insert([{
+      key, email, name, active: true, activated_at: null, product, trial: false
+    }]);
+    if (error) {
+      addLog(`Grant-license DB error (${product}) for ${_maskEmail(email)}: ${error.message}`, 'license', 'error');
+      results.push({ product, error: error.message });
+      continue;
+    }
+    const html = isForex ? _buildForexEmailHtml(_he(name), _he(email), key) : _buildBotEmailHtml(_he(name), _he(email), key);
+    const subject = isForex ? '🤖 Your Apex Forex Bot — License Key inside' : '🤖 Your Apex Trade Bot — License Key inside';
+    const sent = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
+    const botHandle = isForex ? 'FOREX_APEX_BOT' : 'ApexTradeBot_official_bot';
+    addLog(`Granted ${product} license: ${key} for ${_maskEmail(email)}${sent.ok ? '' : ' (email FAILED to send)'}`, 'license', sent.ok ? 'success' : 'warn');
+    results.push({ product, key, emailSent: sent.ok, telegramLink: `https://t.me/${botHandle}?start=${key}` });
+  }
+  res.json({ email, results });
+});
+
 // POST /api/verify-license — called by the bot on every startup
 // Body: { key, product? }  — product is 'apex-bot' | 'apex-forex'
 // Primary: HMAC signature check (no DB). Fallback: Supabase for legacy keys.

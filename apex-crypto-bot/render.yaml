@@ -55,3 +55,7 @@ services:
       # Optional license — leave empty to run open (access via Telegram).
       - key: LICENSE_KEY
         sync: false
+      # Encrypts broker tokens + user AI keys at rest in Redis/Upstash.
+      # Fernet key — generate with: python3 -c "import os,base64;print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false

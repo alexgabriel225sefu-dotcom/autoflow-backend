@@ -1,6 +1,7 @@
 requests>=2.31
 redis>=5.0
 python-dotenv>=1.0
+cryptography>=42
 anthropic>=0.18
 groq>=0.4
 yfinance>=0.2

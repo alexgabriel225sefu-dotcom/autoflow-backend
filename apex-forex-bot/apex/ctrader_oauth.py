@@ -14,6 +14,7 @@ Security: state is HMAC-signed with the Telegram bot token (always secret and
 present), so a third party cannot forge a callback that binds tokens to someone
 else's chat. Codes are single-use and short-lived on cTrader's side.
 """
+import os
 import hmac
 import time
 import base64
@@ -24,6 +25,38 @@ from apex import user_store
 from apex.brokers import ctrader
 
 _STATE_TTL = 600  # 10 minutes to complete the authorization
+
+# Growth-phase gate: only a live account at the partner broker counts (demo
+# accounts and other brokers don't generate IB rebate). Set
+# REQUIRE_LIVE_FP_MARKETS=false on Render to lift this back to "any cTrader
+# account, demo or live" — e.g. for going back to the paid, broker-agnostic model.
+_REQUIRE_LIVE_BROKER = (os.getenv("REQUIRE_LIVE_FP_MARKETS", "true").strip().lower() not in ("0", "false", "no"))
+_ALLOWED_BROKER_SUBSTR = (os.getenv("REQUIRED_BROKER_NAME", "fp markets") or "").strip().lower()
+# Owner's own test/demo accounts always pass the gate regardless of broker or
+# live/demo — comma-separated ctids, e.g. "4258018,18000057".
+_GATE_ALLOWLIST = {s.strip() for s in os.getenv("BROKER_GATE_ALLOWLIST", "").split(",") if s.strip()}
+
+
+def broker_gate_reason(account: dict, access_token: str) -> str:
+    """Empty string if `account` is allowed under the current growth-phase
+    gate, else a short client-facing reason it was rejected. Does one extra
+    cTrader call (brokerName isn't on the account-list response) only when
+    the account is live — no point paying that cost for a demo account."""
+    if not _REQUIRE_LIVE_BROKER:
+        return ""
+    if str(account.get("ctid")) in _GATE_ALLOWLIST:
+        return ""
+    if not account.get("live"):
+        return ("demo accounts aren't eligible right now — free access requires a "
+                "<b>live</b> account with our partner broker")
+    try:
+        broker = ctrader.get_broker_name(access_token, account["ctid"], "live")
+    except Exception as e:
+        return f"couldn't verify your broker ({str(e)[:80]}) — try again in a moment"
+    if _ALLOWED_BROKER_SUBSTR not in broker.lower():
+        return (f"this account is with <b>{broker or 'an unrecognized broker'}</b> — free access "
+                f"requires a live account with our partner broker specifically")
+    return ""
 
 # Fallback for the case where cTrader does not echo the `state` param back to
 # the redirect (it's standard OAuth2 but undocumented for cTrader). When a user
@@ -148,19 +181,21 @@ def handle_callback(query: dict):
         "ctrader_refresh_token": refresh,
         "ctrader_accounts": accounts,
     }
-    bal, bal_err = None, None
+    bal, bal_err, gate_reason = None, None, ""
     if len(accounts) == 1:
         a = accounts[0]
-        updates["ctrader_account_id"] = a["ctid"]
-        updates["ctrader_env"] = "live" if a["live"] else "demo"
-        # Mirror the account's real balance into paper mode so the client sees
-        # THEIR money, not an arbitrary $1000. Also a live connection check:
-        # if this fails, candles/orders will fail identically — surface it now.
-        try:
-            bal = ctrader.account_balance(access, a["ctid"], updates["ctrader_env"])
-            updates["paper_balance"] = bal
-        except Exception as e:
-            bal_err = str(e)
+        gate_reason = broker_gate_reason(a, access)
+        if not gate_reason:
+            updates["ctrader_account_id"] = a["ctid"]
+            updates["ctrader_env"] = "live" if a["live"] else "demo"
+            # Mirror the account's real balance into paper mode so the client sees
+            # THEIR money, not an arbitrary $1000. Also a live connection check:
+            # if this fails, candles/orders will fail identically — surface it now.
+            try:
+                bal = ctrader.account_balance(access, a["ctid"], updates["ctrader_env"])
+                updates["paper_balance"] = bal
+            except Exception as e:
+                bal_err = str(e)
     user_store.update(chat_id, updates)
     _pending.pop(str(chat_id), None)
 
@@ -176,7 +211,16 @@ def handle_callback(query: dict):
     # Notify the client in Telegram (best-effort).
     try:
         from apex import telegram as tg
-        if len(accounts) == 1:
+        if len(accounts) == 1 and gate_reason:
+            a = accounts[0]
+            live_link = os.getenv("BROKER_LIVE_LINK", "").strip()
+            link_line = f"\n\n👉 {live_link}" if live_link else ""
+            tg.send_to(chat_id,
+                       f"❌ <b>Account not eligible</b>\n\n"
+                       f"Account <code>{a['ctid']}</code> — {gate_reason}."
+                       f"{link_line}\n\n"
+                       "Once you have the right account, send /ctrader again.")
+        elif len(accounts) == 1:
             a = accounts[0]
             env = "LIVE 🔴" if a["live"] else "demo 🧪"
             bal_line = (f"💰 Balance: <b>${bal:,.2f}</b>\n"
