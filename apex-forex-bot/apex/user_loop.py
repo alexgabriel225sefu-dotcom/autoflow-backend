@@ -4,7 +4,7 @@ import threading
 import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
-from apex import access, sentinel, institutional, cot
+from apex import access, sentinel, institutional, cot, ledger
 from apex import config as cfg_mod
 # Imported under an alias: `ev` is already a local variable inside _loop (the
 # news-window event), and a module-level `ev` would be shadowed for the whole
@@ -2696,11 +2696,35 @@ def _loop(user_id, alert_fn, gen=None):
                             pass
                         order_ok = True
                         _order_res = None
-                        try:
-                            _order_res = broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
-                        except Exception as oe:
+                        # Idempotency claim: the last thing between an intent
+                        # and a real position. Two Render instances overlap
+                        # during a deploy and both drive this account, so the
+                        # loop's generation token — which only sees threads in
+                        # THIS process — cannot prevent a double entry.
+                        _claim_ok, _claim_why, _rid = ledger.claim(
+                            user_id, symbol, action, units, sl_price, tp_price)
+                        if not _claim_ok:
                             order_ok = False
-                            print(f"[UserLoop:{user_id}] place_order error: {oe}")
+                            print(f"[UserLoop:{user_id}] BLOCKED {action} {symbol}: "
+                                  f"{_claim_why} — an identical order was just sent")
+                            _skip(f"duplicate order blocked ({_claim_why})")
+                            if alert_fn:
+                                alert_fn(user_id, {
+                                    "action": "DUPLICATE_BLOCKED", "symbol": symbol,
+                                    "side": action, "units": units,
+                                    "reason": _claim_why})
+                        else:
+                            try:
+                                _order_res = broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
+                                ledger.record(_rid, _order_res)
+                            except Exception as oe:
+                                order_ok = False
+                                # The claim stands. A submit that raised may
+                                # still have reached the broker, and retrying
+                                # in the next few seconds is exactly how one
+                                # intent becomes two positions. The next tick
+                                # reads the real position list and settles it.
+                                print(f"[UserLoop:{user_id}] place_order error: {oe}")
 
                         if _order_res and _order_res.get("status") == "SAFETY_CLOSED":
                             # A real position opened and was immediately closed
@@ -3186,8 +3210,16 @@ def force_trade(user_id, side, symbol=None, lots=None):
                    f"SL={sl_price} TP={tp_price} (manual)", user_id=user_id)
     except Exception:
         pass
+    _claim_ok, _claim_why, _rid = ledger.claim(
+        user_id, sym, side, units, sl_price, tp_price)
+    if not _claim_ok:
+        # Manual /buy and the MCP open_trade land here. A double-tap on the
+        # Telegram button is the everyday version of the same bug.
+        return {"ok": False, "error": "duplicate order blocked — an identical "
+                                      "order was sent moments ago"}
     try:
-        broker.place_order(side, units, sym, sl=sl_price, tp=tp_price)
+        ledger.record(_rid, broker.place_order(side, units, sym,
+                                               sl=sl_price, tp=tp_price))
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

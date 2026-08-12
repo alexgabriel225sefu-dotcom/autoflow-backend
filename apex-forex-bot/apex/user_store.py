@@ -134,6 +134,35 @@ def _redis_set(key, value_str):
     return _upstash(["SET", key, value_str])
 
 
+def claim(key, ttl_s=120):
+    """Atomically claim `key` for `ttl_s` seconds. True only for the winner.
+
+    SET NX is the one primitive that works across PROCESSES, which is the
+    entire point: this service runs more than one instance during a Render
+    deploy (observed live — the old instance was still ticking seven seconds
+    after the new one started its loop), and both drive the same cTrader
+    account. An in-process guard cannot see the other instance at all.
+
+    Returns None — neither True nor False — when there is no shared backend or
+    the backend errored, so the caller can tell "somebody else has it" from
+    "I could not ask" and decide accordingly rather than reading a failure as
+    a denial.
+    """
+    if not _USE_REDIS:
+        return None
+    try:
+        if _BACKEND == "redis":
+            got = _r.set(key, "1", nx=True, ex=int(ttl_s))
+            return bool(got)
+        res = _upstash(["SET", key, "1", "NX", "EX", int(ttl_s)])
+        if res is None:
+            return None          # command failed — unknown, not "taken"
+        return str(res).upper() == "OK"
+    except Exception as e:
+        print(f"[Redis] claim failed: {e}")
+        return None
+
+
 def _redis_sadd(key, member):
     if _BACKEND == "redis":
         try:
