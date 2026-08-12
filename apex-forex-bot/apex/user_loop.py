@@ -1940,8 +1940,28 @@ def _loop(user_id, alert_fn, gen=None):
                         ttl_s=_ttl,
                         price=price, atr=(ind or {}).get("atr"),
                         spread_pips=_recent_spread(), bar_time=_bar)
+                    # Alert on a CHANGE of mind, never on the state itself.
+                    # This loop ticks every few minutes; a message per tick
+                    # would be a notification every 5 minutes forever, and the
+                    # useful signal — "the AI just flipped on EURUSD" — would
+                    # be buried in it. Compare against the previous published
+                    # action for this symbol, before overwriting it.
+                    _prev = _signals.get(symbol)
+                    _prev_act = (_prev or {}).get("action")
                     _signals.publish(_state)
                     dash["sentinel"] = sentinel.describe(_state)
+                    if (alert_fn and _prev_act and _prev_act != action
+                            and "HOLD" not in (_prev_act, action)):
+                        # HOLD↔BUY/SELL churns constantly as indicators wobble
+                        # around their thresholds. Only a genuine reversal —
+                        # BUY→SELL or SELL→BUY — is worth interrupting someone.
+                        alert_fn(user_id, {
+                            "action": "SENTINEL_FLIP", "symbol": symbol,
+                            "from": _prev_act, "to": action,
+                            "conf": _state.get("confidence"),
+                            "regime": _state.get("regime"),
+                            "reasoning": signal.get("reasoning", ""),
+                        })
                 except Exception as e:
                     print(f"[UserLoop:{user_id}] sentinel publish failed: {e}")
 
@@ -2377,6 +2397,16 @@ def _loop(user_id, alert_fn, gen=None):
                                 print(f"[UserLoop:{user_id}] Sentinel shadow: "
                                       f"WOULD BLOCK {action} {symbol} — "
                                       f"{_sreason} ({sentinel.describe(_sig)})")
+                            # A refusal is rare (it needs an entry candidate)
+                            # and always tells you something, so unlike the
+                            # state itself it is worth a message every time.
+                            if alert_fn:
+                                alert_fn(user_id, {
+                                    "action": "SENTINEL_BLOCK", "symbol": symbol,
+                                    "wanted": action, "reason": _sreason,
+                                    "mode": _sentinel_mode,
+                                    "state": sentinel.describe(_sig),
+                                })
                     except Exception as e:
                         # A broken gate must never stop a live account.
                         print(f"[UserLoop:{user_id}] sentinel gate error: {e}")

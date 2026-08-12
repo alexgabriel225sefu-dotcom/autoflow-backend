@@ -2455,6 +2455,36 @@ def _user_alert(uid, result):
     elif action == "STOP":
         reasons = ", ".join(result.get("reasons", ["risk limit"]))
         send_to(uid, f"🛑 <b>Trading paused — risk limit hit</b>\n{reasons}")
+    elif action == "SENTINEL_FLIP":
+        _arrow = {"BUY": "🟢", "SELL": "🔴"}.get(result.get("to"), "⚪")
+        _c = result.get("conf")
+        _conf_txt = f"  ·  {_c:.0%} confidence" if isinstance(_c, (int, float)) else ""
+        send_to(uid,
+                f"{_arrow} <b>AI changed its read — {result.get('symbol', sym)}</b>\n"
+                f"<b>{result.get('from', '?')}</b> → <b>{result.get('to', '?')}</b>"
+                f"{_conf_txt}\n"
+                f"Regime: <i>{_esc(str(result.get('regime', '—')))}</i>\n"
+                f"{_esc(str(result.get('reasoning', ''))[:200])}\n\n"
+                "<i>This is the Sentinel's view, not an order. "
+                "The risk engine still decides.</i>")
+    elif action == "SENTINEL_BLOCK":
+        _why = {
+            "NO_FRESH_AI_SIGNAL": "no fresh AI read — the last one expired",
+            "AI_DISAGREES": "the AI wants the other direction",
+            "LOW_CONFIDENCE": "the AI isn't confident enough",
+            "LOW_EV": "expected value too low",
+            "RISK_BLOCK": "the risk engine said no",
+            "AI_SAYS_HOLD": "the AI says stay out",
+        }.get(result.get("reason"), result.get("reason", "refused"))
+        _mode = result.get("mode", "shadow")
+        send_to(uid,
+                f"🛑 <b>Sentinel {'blocked' if _mode == 'enforce' else 'would block'} "
+                f"{result.get('wanted', '?')} {result.get('symbol', sym)}</b>\n"
+                f"{_esc(_why)}\n"
+                f"<code>{_esc(str(result.get('state', '')))}</code>"
+                + ("" if _mode == "enforce" else
+                   "\n\n<i>Shadow mode — the trade still went through. "
+                   "This is what it WOULD have stopped.</i>"))
     elif action == "SHADOW_OPEN":
         send_to(uid,
                 f"🔍 <b>Setup refused — {result.get('symbol', sym)}</b>\n"
