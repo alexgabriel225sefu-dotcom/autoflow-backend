@@ -153,6 +153,24 @@ def _load():
     return events
 
 
+def has_data():
+    """True when the calendar actually holds events right now.
+
+    high_impact_window() returns None both for "no event is near" and for "the
+    feed is dead and we know nothing", which is the right fail-open answer for
+    a trading guard — absent data must not block a trade. It is the wrong
+    answer for anything that wants to RECORD the absence of macro risk as an
+    observation: a 403 from the calendar provider would otherwise be published
+    as the confident fact that no releases are due.
+
+    Callers that need to tell the two apart check this first.
+    """
+    try:
+        return bool(enabled() and _load())
+    except Exception:
+        return False
+
+
 def high_impact_window(currencies, window=None):
     """Nearest high-impact event within ±window minutes for any of `currencies`,
     as {title, currency, mins, time}, else None. Fail-open on any error."""

@@ -162,6 +162,39 @@ check("observation with a broken expiry is dropped",
                      "source": "x", "confidence": 1.0, "ts": T0,
                      "expires_at": "never"}], now=T0)["usable"] is False)
 
+print("\n── THE COLLECTOR MUST NOT PUBLISH A DEAD FEED AS A FACT ──")
+# Caught live: the calendar provider returned 403, news.high_impact_window()
+# fail-opened to None exactly as it does when no event is near, and the
+# collector recorded +0.2 "nothing due". That is a dead feed asserting a fact,
+# and it RAISED data_quality for a source that knew nothing.
+import tempfile  # noqa: E402
+
+os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="apex-inst-test-"))
+from apex import news, user_loop  # noqa: E402
+
+_IND = {"rsi": 66.9, "ema50": 0.8130, "ema200": 0.8100,
+        "macd": 0.0004, "macdSignal": 0.0002, "atr": 0.0006}
+_RG = {"regime": "ranging", "vol_ratio": 1.18}
+_orig_load = news._load
+
+news._load = lambda: []          # feed down / never fetched
+dead = I.build("USDCHF", user_loop._institutional_observations(
+    "USDCHF", _IND, _RG, 0.1))
+check("a dead calendar contributes NO macro_risk observation",
+      "macro_risk" not in dead["features"], str(sorted(dead["features"])))
+check("and it is reported as missing", "macro_risk" in dead["missing"])
+
+news._load = lambda: [{"impact": "High", "currency": "USD", "title": "CPI",
+                       "time": "2026-09-01T12:00:00Z"}]
+alive = I.build("USDCHF", user_loop._institutional_observations(
+    "USDCHF", _IND, _RG, 0.1))
+check("a live calendar does contribute one",
+      "macro_risk" in alive["features"])
+check("so a dead feed lowers data_quality instead of inflating it",
+      dead["data_quality"] < alive["data_quality"],
+      f"dead={dead['data_quality']} alive={alive['data_quality']}")
+news._load = _orig_load
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")

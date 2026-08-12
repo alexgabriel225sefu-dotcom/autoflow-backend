@@ -445,9 +445,14 @@ def _institutional_observations(symbol, ind, regime, spread_pips, now=None):
         pass
 
     # ── macro_risk: negative near a high-impact release, for either leg ──
+    # Only emitted when the calendar actually holds events. Without the
+    # has_data() check this published +0.2 ("nothing due") whenever the feed
+    # was down — observed live as a 403 from the calendar provider, which would
+    # have been recorded as the confident fact that no releases were pending,
+    # and would have RAISED data_quality for a source that knew nothing.
     try:
         legs = _currency_legs(symbol)
-        if legs:
+        if legs and news.has_data():
             hit = news.high_impact_window(legs)
             add("macro_risk", -1.0 if hit else 0.2, "calendar", ttl=1800)
     except Exception:
