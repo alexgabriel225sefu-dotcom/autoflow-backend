@@ -4,7 +4,7 @@ import threading
 import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
-from apex import access
+from apex import access, sentinel
 from apex import config as cfg_mod
 # Imported under an alias: `ev` is already a local variable inside _loop (the
 # news-window event), and a module-level `ev` would be shadowed for the whole
@@ -530,6 +530,11 @@ def _make_broker(user):
         STRUCTURAL_STOPS   = bool(user.get(
             "structural_stops", getattr(_appcfg, "STRUCTURAL_STOPS", False))),
         STRUCTURAL_MIN_RR  = float(getattr(_appcfg, "STRUCTURAL_MIN_RR", 1.3)),
+        # Sentinel. Same warning as the EV block above: absent here means the
+        # env var is unreachable from inside the loop.
+        SENTINEL_MODE      = getattr(_appcfg, "SENTINEL_MODE", "shadow"),
+        SENTINEL_MIN_CONFIDENCE = getattr(_appcfg, "SENTINEL_MIN_CONFIDENCE", None),
+        SENTINEL_TTL_S     = int(getattr(_appcfg, "SENTINEL_TTL_S", 0) or 0),
     )
     broker = _CtraderBroker(fake_cfg)
     # Refine the LEVERAGE guess with the broker's real, per-instrument value
@@ -808,6 +813,12 @@ def _loop(user_id, alert_fn, gen=None):
     # Confidence → P(win) map, measured from this account's own closed trades.
     # Rebuilt periodically rather than every tick: it only moves when a trade
     # closes, and re-reading the journal on each tick is pointless I/O.
+    # Sentinel: this loop's persistent, expiring view of every symbol it
+    # watches. Per-loop rather than global — two users on the same pair have
+    # different accounts, risk and strategy, so they do not share an opinion.
+    _signals = sentinel.SignalStore()
+    _sentinel_mode = str(getattr(cfg, "SENTINEL_MODE", "shadow")).lower()
+
     ev_calibration = None
     ev_cal_tick = -10 ** 9
 
@@ -1912,6 +1923,28 @@ def _loop(user_id, alert_fn, gen=None):
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)
 
+            # ── Publish the Sentinel's view of this symbol ──
+            # Until now the AI's opinion existed only for the duration of the
+            # call above. Storing it — with an expiry — is what makes "what
+            # does the bot currently think about EURUSD" a question with an
+            # answer, and what stops a stale read being acted on later.
+            if _sentinel_mode != "off":
+                try:
+                    _ttl = (getattr(cfg, "SENTINEL_TTL_S", 0)
+                            or sentinel.default_ttl(cfg.TIMEFRAME))
+                    _bar = candles[-1].get("time") if candles else None
+                    _state = sentinel.build_state(
+                        symbol=symbol, action=action, confidence=confidence,
+                        regime=(regime or {}).get("regime"),
+                        reasoning=signal.get("reasoning", ""),
+                        ttl_s=_ttl,
+                        price=price, atr=(ind or {}).get("atr"),
+                        spread_pips=_recent_spread(), bar_time=_bar)
+                    _signals.publish(_state)
+                    dash["sentinel"] = sentinel.describe(_state)
+                except Exception as e:
+                    print(f"[UserLoop:{user_id}] sentinel publish failed: {e}")
+
             # ── Refused setups: follow what we did NOT take ──
             # A filter is invisible from outside. Recording the blocked entry
             # as a phantom and following it on the same prices turns "the AI
@@ -2318,6 +2351,35 @@ def _loop(user_id, alert_fn, gen=None):
                         if _ev_mode == "enforce":
                             entry_ok = False
                             _skip("EV gate unavailable")
+
+                # ── Sentinel decision gate ──
+                # The last word before the order goes out: is there a FRESH AI
+                # read for this symbol, and does it agree with what we are
+                # about to send? Without the freshness half, a verdict computed
+                # against a chart that has since moved on is indistinguishable
+                # from one computed a second ago.
+                if _sentinel_mode != "off":
+                    try:
+                        _sig = _signals.get(symbol)
+                        _sok, _sreason = sentinel.decide(
+                            _sig, action,
+                            min_confidence=getattr(
+                                cfg, "SENTINEL_MIN_CONFIDENCE", None),
+                            min_ev_r=None,   # the EV gate above owns this
+                            risk_ok=True)    # and the risk engine owns this
+                        dash["sentinelGate"] = _sreason
+                        if not _sok:
+                            if _sentinel_mode == "enforce":
+                                entry_ok = False
+                                _skip(f"Sentinel: {_sreason} "
+                                      f"({sentinel.describe(_sig)})")
+                            else:
+                                print(f"[UserLoop:{user_id}] Sentinel shadow: "
+                                      f"WOULD BLOCK {action} {symbol} — "
+                                      f"{_sreason} ({sentinel.describe(_sig)})")
+                    except Exception as e:
+                        # A broken gate must never stop a live account.
+                        print(f"[UserLoop:{user_id}] sentinel gate error: {e}")
 
                 risk_mult = strategies.druckenmiller_multiplier(
                     confidence, signal.get("criteriaScore", 0),

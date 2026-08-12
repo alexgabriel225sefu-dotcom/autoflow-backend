@@ -151,6 +151,21 @@ MIN_EXIT_R = float(os.getenv("MIN_EXIT_R") or 1.0)
 RIDE_AT_R = float(os.getenv("RIDE_AT_R") or 2.0)
 RIDE_LOCK = float(os.getenv("RIDE_LOCK") or 0.6)
 
+# ─── Permanent Market Sentinel (see apex/sentinel.py) ────
+# A persistent, EXPIRING view of each symbol, so "what the AI thinks about
+# EURUSD" outlives the single function call that produced it — and so a stale
+# opinion is never acted on. Same three modes as the EV gate, same reason:
+#   off     — no sentinel state is kept
+#   shadow  — state is published and the gate's verdict logged, never blocking
+#   enforce — an entry the Sentinel refuses does not go through
+SENTINEL_MODE = (os.getenv("SENTINEL_MODE") or "shadow").strip().lower()
+# Confidence is 0-1 here, not the engine's 0-100 score. None = not enforced.
+SENTINEL_MIN_CONFIDENCE = float(os.getenv("SENTINEL_MIN_CONFIDENCE") or 0.0) or None
+# Signal lifetime. 0 = derive it from the timeframe (one candle), which is what
+# you want: a fixed 60s TTL on a 15m chart leaves every signal stale on arrival
+# and the bot stops trading entirely.
+SENTINEL_TTL_S = int(os.getenv("SENTINEL_TTL_S") or 0)
+
 # Show the AI the actual chart, not just indicator values. Structure — where
 # price keeps failing, whether a level was tested once or five times, whether
 # the approach looks impulsive or exhausted — does not survive being flattened
