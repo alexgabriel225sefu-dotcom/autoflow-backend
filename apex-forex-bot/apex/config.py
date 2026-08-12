@@ -142,6 +142,15 @@ EV_MIN_SAMPLES = int(os.getenv("EV_MIN_SAMPLES") or 30)
 # strategy bailing out of a losing trade is never held. 0 disables.
 MIN_EXIT_R = float(os.getenv("MIN_EXIT_R") or 1.0)
 
+# The other half of the same problem: MIN_EXIT_R stops winners being cut short,
+# these let them RUN. Once a trade is this many R in profit and the trend still
+# agrees with it, a strategy's discretionary exit is converted into a stop
+# ratchet instead of a close — the bot keeps RIDE_LOCK of the open profit and
+# lets the market end the trade. Requires TRAILING_STOP; if the stop cannot be
+# moved the trade is closed as before, never held unprotected.
+RIDE_AT_R = float(os.getenv("RIDE_AT_R") or 2.0)
+RIDE_LOCK = float(os.getenv("RIDE_LOCK") or 0.6)
+
 # Show the AI the actual chart, not just indicator values. Structure — where
 # price keeps failing, whether a level was tested once or five times, whether
 # the approach looks impulsive or exhausted — does not survive being flattened

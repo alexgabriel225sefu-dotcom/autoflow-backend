@@ -293,6 +293,88 @@ def _profit_too_small_to_take(pos, price, symbol, initial_risk, user_id=""):
     return True
 
 
+def _ride_instead_of_close(broker, cfg, pos, symbol, price, initial_risk,
+                           ind=None, user_id=""):
+    """Hand a strongly-running winner to the trailing stop instead of closing it.
+
+    _profit_too_small_to_take stops the bot cutting winners short. It does not
+    make the bot let winners RUN — nothing did. A live XAUUSD trade closed at
+    +$26.88 on a $9 risk (2.99R) with the reason "price overshot past mean",
+    while gold kept going. The exit was not premature by the 1R rule, but it
+    was still the strategy capping a trend trade at its own midline.
+
+    Mean reversion's exit says "price reached the mean, my thesis is done". In
+    a trending instrument that thesis is finished but the MOVE is not. So once
+    a trade is running well AND the trend still agrees with it, don't take the
+    money off the table — pull the stop up behind price and let the market
+    decide when it is over.
+
+    Returns True only when the stop has actually been tightened, i.e. when the
+    profit is genuinely protected. Every failure path returns False so the
+    caller closes normally: a position we could not protect must never be held
+    open on the strength of an intention.
+    """
+    if not getattr(cfg, "TRAILING_STOP", False):
+        return False        # nothing to hand the trade to
+    try:
+        ride_r = float(os.getenv("RIDE_AT_R") or getattr(cfg_mod, "RIDE_AT_R", 2.0))
+        lock = float(os.getenv("RIDE_LOCK") or getattr(cfg_mod, "RIDE_LOCK", 0.6))
+    except (TypeError, ValueError):
+        return False
+    if ride_r <= 0 or not (0 < lock < 1):
+        return False
+
+    try:
+        entry = float(pos.get("entryPrice"))
+        side = pos.get("side")
+        px = float(price)
+        pid = pos.get("positionId")
+        cur_sl = float(pos.get("stopLoss") or pos.get("sl") or 0)
+        risk = abs(float(initial_risk or 0))
+    except (TypeError, ValueError):
+        return False
+    if not (pid and entry and cur_sl and risk > 0 and side in ("BUY", "SELL")):
+        return False
+    if not hasattr(broker, "amend_sltp"):
+        return False
+
+    profit = (px - entry) if side == "BUY" else (entry - px)
+    if profit < ride_r * risk:
+        return False        # not running hard enough to be worth the give-back
+
+    # The trend must still be behind the trade. Riding a reversal is how a 3R
+    # winner becomes a scratch — if the move is over, take the money.
+    try:
+        ema50 = float((ind or {}).get("ema50") or 0)
+    except (TypeError, ValueError):
+        ema50 = 0
+    if ema50:
+        aligned = px > ema50 if side == "BUY" else px < ema50
+        if not aligned:
+            return False
+
+    # Lock most of the open profit. The give-back is bounded and known:
+    # (1 - lock) x profit, versus unlimited upside if the move continues.
+    keep = entry + profit * lock if side == "BUY" else entry - profit * lock
+    improved = (keep - cur_sl) if side == "BUY" else (cur_sl - keep)
+    if improved <= 0:
+        return False        # trail is already tighter — leave it alone
+
+    try:
+        if not broker.amend_sltp(pid, sl=round(keep, 6), instrument=symbol):
+            return False    # could not protect it → fall through and close
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] ride amend failed on {symbol}: {e}")
+        return False
+
+    pos["stopLoss"] = round(keep, 6)
+    if user_id:
+        print(f"[UserLoop:{user_id}] riding {symbol}: {profit / risk:.1f}R and "
+              f"trend still aligned — stop moved to {keep:.5f}, locking "
+              f"{lock:.0%} of the move instead of closing")
+    return True
+
+
 def _log_trade(user_id, record, pos=None):
     """Persist a closed trade to the per-user tax journal (date, entry, exit,
     fees/spread cost, gross & net PnL) — exportable for tax reporting.
@@ -2464,6 +2546,13 @@ def _loop(user_id, alert_fn, gen=None):
                     user_id):
                 # Winner cut short. Hold instead — see _profit_too_small_to_take.
                 pass
+            elif action == "CLOSE" and open_pos and _ride_instead_of_close(
+                    broker, cfg, open_pos, symbol, price,
+                    entry_risk_by_sym.get(_nrm(symbol)), ind, user_id):
+                # Running hard with the trend behind it — the stop has been
+                # pulled up to protect the gain and the trade keeps running.
+                dash["openPosition"] = open_pos
+                _persist_open_snapshot(_with_initial_stop(open_pos, symbol))
             elif action == "CLOSE" and open_pos:
                 # A strategy exit is NOT always a win — label it honestly.
                 _close_res = None
