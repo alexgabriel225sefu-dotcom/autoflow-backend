@@ -9,6 +9,7 @@ from apex import config as cfg_mod
 # news-window event), and a module-level `ev` would be shadowed for the whole
 # function scope.
 from apex import ev as ev_engine
+from apex import shadow
 from apex.brokers.ctrader import CtraderBroker as _CtraderBroker
 
 
@@ -38,6 +39,36 @@ def _plausible_exit_price(entry_price, exit_price):
     if entry_price <= 0 or exit_price <= 0:
         return False
     return abs(exit_price - entry_price) / entry_price <= _MAX_PLAUSIBLE_GAP_MOVE
+
+
+
+def _phantom_levels(price, side, ind, symbol):
+    """Stop and target a refused entry would have been given.
+
+    Mirrors the live SL/TP rule rather than sharing it: that block runs inside
+    `if entry_ok`, which by definition never executes for a blocked trade.
+    Approximate is fine here — the phantom only has to answer "target or stop
+    first", and both branches use the same distances the real order would.
+    """
+    pip = forex.pip_size(symbol, price)
+    atr_v = 0.0
+    try:
+        atr_v = float((ind or {}).get("atr") or 0)
+    except (TypeError, ValueError):
+        atr_v = 0.0
+    if getattr(cfg_mod, "ATR_STOPS", False) and atr_v > 0:
+        sl_dist, tp_dist = 2.5 * atr_v, 5.0 * atr_v
+        floor_abs = 20.0 * pip
+        if sl_dist < floor_abs:
+            sl_dist, tp_dist = floor_abs, 2.0 * floor_abs
+    else:
+        sl_dist = cfg_mod.STOP_LOSS_PIPS * pip
+        tp_dist = cfg_mod.TAKE_PROFIT_PIPS * pip
+        if tp_dist < sl_dist:
+            tp_dist = 2.0 * sl_dist
+    if side == "BUY":
+        return round(price - sl_dist, 6), round(price + tp_dist, 6)
+    return round(price + sl_dist, 6), round(price - tp_dist, 6)
 
 
 def _currency_legs(symbol):
@@ -1609,6 +1640,44 @@ def _loop(user_id, alert_fn, gen=None):
 
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)
+
+            # ── Refused setups: follow what we did NOT take ──
+            # A filter is invisible from outside. Recording the blocked entry
+            # as a phantom and following it on the same prices turns "the AI
+            # blocked 14 trades" into "those 14 would have lost 9R" — the only
+            # way to tell a filter that saves money from one that is removing
+            # the profitable setups.
+            if signal.get("blockedAction") and not open_pos:
+                try:
+                    _psl, _ptp = _phantom_levels(
+                        price, signal["blockedAction"], ind, symbol)
+                    _ph = shadow.open_shadow(
+                        user_id, symbol, signal["blockedAction"], price,
+                        _psl, _ptp,
+                        blocked_by=signal.get("blockedBy", "filter"),
+                        reasoning=signal.get("blockedReasoning", ""),
+                        confidence=signal.get("blockedConfidence"))
+                    if _ph and alert_fn:
+                        alert_fn(user_id, {"action": "SHADOW_OPEN", **_ph})
+                except Exception as e:
+                    print(f"[UserLoop:{user_id}] shadow open failed: {e}")
+
+            # Advance any phantom on this symbol against the latest bar.
+            try:
+                _bar = candles[-1] if candles else {}
+                for _evt in shadow.update(user_id, symbol, _bar.get("high"),
+                                          _bar.get("low"), price):
+                    if not alert_fn:
+                        continue
+                    _p = _evt["phantom"]
+                    if _evt["kind"] == "milestone":
+                        alert_fn(user_id, {"action": "SHADOW_MOVE",
+                                           "symbol": _p["symbol"], "r": _evt["r"]})
+                    else:
+                        alert_fn(user_id, {"action": "SHADOW_RESULT", **_p,
+                                           "scoreboard": shadow.scoreboard(user_id)})
+            except Exception as e:
+                print(f"[UserLoop:{user_id}] shadow update failed: {e}")
 
             # NOTE on MIN_CONFIDENCE: this gate is weaker than it looks. The
             # rule engine only emits BUY/SELL at |score| >= 3, which maps to

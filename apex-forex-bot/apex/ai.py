@@ -356,9 +356,17 @@ Respond ONLY with valid JSON:
         return rule_sig
     # AI contradicts → block
     print(f"[AI] {mode} rule {rule_action} BLOCKED by AI ({ai_action})")
+    # blockedAction carries the direction the rule engine wanted, which the
+    # HOLD would otherwise discard. The loop uses it to follow the refused
+    # setup and report whether refusing was right — a filter nobody can audit
+    # is indistinguishable from a filter that is wrong.
     return {"action": "HOLD", "confidence": 45, "criteriaScore": 1,
             "reasoning": f"Rule {rule_action} blocked — AI sees {ai_action}",
-            "riskLevel": "LOW", "keyFactors": ["rule-AI disagreement"]}
+            "riskLevel": "LOW", "keyFactors": ["rule-AI disagreement"],
+            "blockedAction": rule_action,
+            "blockedConfidence": rule_conf,
+            "blockedBy": "AI disagreed with the setup",
+            "blockedReasoning": str(ai_sig.get("reasoning", ""))[:300]}
 
 
 def rule_based_fallback(ind, open_position=None):

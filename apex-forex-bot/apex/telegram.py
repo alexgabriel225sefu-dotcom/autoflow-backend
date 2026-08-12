@@ -2455,6 +2455,42 @@ def _user_alert(uid, result):
     elif action == "STOP":
         reasons = ", ".join(result.get("reasons", ["risk limit"]))
         send_to(uid, f"🛑 <b>Trading paused — risk limit hit</b>\n{reasons}")
+    elif action == "SHADOW_OPEN":
+        send_to(uid,
+                f"🔍 <b>Setup refused — {result.get('symbol', sym)}</b>\n"
+                f"Would have been <b>{result.get('side')}</b> @ "
+                f"<code>{result.get('entry')}</code>\n"
+                f"SL <code>{result.get('sl')}</code> · TP <code>{result.get('tp')}</code>\n"
+                f"Blocked by: <i>{_esc(result.get('blockedBy', 'filter'))}</i>\n"
+                f"{_esc(result.get('reasoning', ''))}\n\n"
+                "I'll follow it and tell you whether skipping was right.")
+    elif action == "SHADOW_MOVE":
+        r = result.get("r", 0)
+        send_to(uid,
+                f"📊 <b>Refused {result.get('symbol', sym)} — now {r:+.1f}R</b>\n"
+                f"<i>{'Moving our way — skipping may have cost us.' if r > 0 else 'Moving against — skipping looks right so far.'}</i>")
+    elif action == "SHADOW_RESULT":
+        out, pips, r = result.get("outcome"), result.get("pips", 0), result.get("r", 0)
+        if out == "TAKE_PROFIT":
+            head = (f"❌ <b>Skipping that one cost us</b>\n"
+                    f"{result.get('symbol', sym)} reached target: "
+                    f"<b>+{abs(pips):.0f} pips ({r:+.1f}R)</b>")
+        elif out == "STOP_LOSS":
+            head = (f"✅ <b>Good call skipping that</b>\n"
+                    f"{result.get('symbol', sym)} would have stopped out: "
+                    f"<b>−{abs(pips):.0f} pips ({r:+.1f}R)</b>")
+        else:
+            head = (f"➖ <b>{result.get('symbol', sym)} went nowhere</b>\n"
+                    f"Stopped watching at <b>{pips:+.0f} pips ({r:+.1f}R)</b> — "
+                    "neither target nor stop reached")
+        sc = result.get("scoreboard") or {}
+        tail = ""
+        if sc.get("n"):
+            tail = (f"\n\n<b>Refused setups tracked:</b> {sc['n']} · "
+                    f"{sc.get('wouldHaveWon', 0)} would have won · "
+                    f"{sc.get('wouldHaveLost', 0)} would have lost\n"
+                    f"<i>{_esc(sc.get('verdict', ''))}</i>")
+        send_to(uid, head + tail)
     elif action == "SKIP_WARN":
         send_to(uid, f"⚠️ <b>Holding off on {result.get('symbol', sym)}</b>\n"
                      f"<i>{_esc(result.get('reason', 'market conditions are unfavourable right now'))}.</i>\n"
