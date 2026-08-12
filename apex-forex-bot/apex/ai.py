@@ -716,14 +716,51 @@ def fibonacci_signal(ind, strat=None, open_position=None):
                 "reasoning": f"No Fibonacci level reaction (nearest: {nearest})",
                 "riskLevel": "LOW", "keyFactors": []}
 
-    factors = [f"price at Fib {nearest}", f"swing trend {trend}"]
+    # RSI and the EMA trend used to be READ, formatted into a string, and
+    # discarded — the action was the raw level signal and the confidence was a
+    # hardcoded 72 no matter what. They now carry weight, which also gives this
+    # engine a confidence that varies with setup quality instead of a constant
+    # that makes MIN_CONFIDENCE, the position-size multiplier and the EV
+    # calibration all meaningless.
+    factors = [f"price rejected Fib {nearest}", f"swing trend {trend}"]
+    score = 0
+
     rsi_v = float(ind.get("rsi") or 50)
     if signal == "BUY" and rsi_v < 45:
-        factors.append(f"RSI supports ({rsi_v:.0f})")
+        score += 1
+        factors.append(f"RSI oversold ({rsi_v:.0f})")
     elif signal == "SELL" and rsi_v > 55:
-        factors.append(f"RSI supports ({rsi_v:.0f})")
+        score += 1
+        factors.append(f"RSI overbought ({rsi_v:.0f})")
+    elif (signal == "BUY" and rsi_v > 70) or (signal == "SELL" and rsi_v < 30):
+        # Buying a bounce into an already-overbought tape, or selling into an
+        # oversold one, is the setup working against itself.
+        score -= 1
+        factors.append(f"RSI disagrees ({rsi_v:.0f})")
 
-    return {"action": signal, "confidence": 72, "criteriaScore": 3,
+    ema20 = float(ind.get("ema20") or 0)
+    ema50 = float(ind.get("ema50") or 0)
+    if ema20 and ema50:
+        if (signal == "BUY" and ema20 > ema50) or (signal == "SELL" and ema20 < ema50):
+            score += 1
+            factors.append("EMA20/50 aligned")
+        else:
+            score -= 1
+            factors.append("EMA20/50 against the setup")
+
+    macd_h = float(ind.get("macdHist") or 0)
+    if (signal == "BUY" and macd_h > 0) or (signal == "SELL" and macd_h < 0):
+        score += 1
+        factors.append("MACD momentum agrees")
+
+    if score <= -1:
+        return {"action": "HOLD", "confidence": 45, "criteriaScore": 1,
+                "reasoning": f"Fibonacci {signal} rejected — {', '.join(factors)}",
+                "riskLevel": "LOW", "keyFactors": factors}
+
+    confidence = min(88, 66 + score * 7)
+    return {"action": signal, "confidence": confidence,
+            "criteriaScore": min(5, 2 + score),
             "reasoning": f"Fibonacci {signal}: {', '.join(factors)}",
             "riskLevel": "MEDIUM", "keyFactors": factors}
 

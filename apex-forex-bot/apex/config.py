@@ -143,6 +143,22 @@ EV_MIN_SAMPLES = int(os.getenv("EV_MIN_SAMPLES") or 30)
 # is used.
 AI_VISION = _truthy(os.getenv("AI_VISION"))
 
+# Derive the stop and target from the structure the signal was built on,
+# instead of a fixed pip count that has nothing to do with it. On M1 the
+# fibonacci swing is a median ~17 pips wide, so a flat 15-pip stop is 0.9x the
+# entire swing and a 30-pip target is 1.8x it — while the setup's own objective
+# (price returning to the swing extreme) sits a median 6 pips away. The trade
+# is asked to do something the signal never predicted.
+#
+# On: stop goes a buffer beyond the swing origin, target to the swing extreme,
+# and the RR that comes out is whatever the structure actually offers. Off: the
+# fixed sl_pips/tp_pips behaviour. Reversible, because it changes both trade
+# frequency and average R.
+STRUCTURAL_STOPS = _truthy(os.getenv("STRUCTURAL_STOPS"))
+# Never accept a structural trade worse than this — a level sitting right next
+# to its target offers no room and should simply be skipped.
+STRUCTURAL_MIN_RR = float(os.getenv("STRUCTURAL_MIN_RR") or 1.3)
+
 LEVERAGE = float(os.getenv("LEVERAGE") or 30)
 MARGIN_CAP = float(os.getenv("MARGIN_CAP") or 0.5)             # use ≤50% of available margin
 MAX_SPREAD_PIPS = float(_scalp("MAX_SPREAD_PIPS", 1.2, 3.0))   # scalp: strict 1.2p — wide spread kills tight targets

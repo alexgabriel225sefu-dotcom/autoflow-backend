@@ -60,6 +60,7 @@ try:
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
+        ProtoOAExecutionType,
     )
     _SDK_OK = True
     _SDK_ERR = ""
@@ -140,6 +141,40 @@ def refresh_access_token(refresh_token: str) -> dict:
     })
 
 
+
+# ── Execution-event filtering ────────────────────────────────────────────────
+# One order produces several ExecutionEvents. ORDER_ACCEPTED arrives first and
+# carries no executionPrice and no position, so treating it as the fill means
+# reporting a price of None and then hunting for a position the broker has not
+# opened yet — during which the position is live with no stop attached. Wait
+# for a frame that actually settles the order.
+_TERMINAL_EXEC = {"ORDER_FILLED", "ORDER_PARTIAL_FILL",
+                  "ORDER_REJECTED", "ORDER_CANCELLED", "ORDER_EXPIRED"}
+
+
+def _exec_name(value):
+    """Name of an ProtoOAExecutionType value, or '' when it cannot be resolved."""
+    if value is None:
+        return ""
+    try:
+        return ProtoOAExecutionType.Name(value)
+    except Exception:
+        return ""
+
+
+def _is_terminal_execution(evt):
+    """True once this event settles the order one way or the other.
+
+    Unknown or unresolvable types are accepted rather than skipped: an enum we
+    do not recognise must not make the caller wait out the full timeout on an
+    order that has already filled.
+    """
+    name = _exec_name(getattr(evt, "executionType", None))
+    if not name:
+        return True
+    return name in _TERMINAL_EXEC
+
+
 # ── Synchronous protobuf client ──────────────────────────────────────────────
 
 class _Conn:
@@ -192,7 +227,7 @@ class _Conn:
             raise ConnectionError("cTrader connection closed")
         return chunk
 
-    def _await(self, want_client_id, res_cls, timeout=15):
+    def _await(self, want_client_id, res_cls, timeout=15, accept=None):
         """Read frames until the response for want_client_id arrives. Raises on
         ProtoOAErrorRes. Transparently skips heartbeats and spot/exec events the
         caller did not ask for (caller handles those explicitly when needed)."""
@@ -231,13 +266,21 @@ class _Conn:
             if pm.payloadType == res_cls().payloadType:
                 out = res_cls()
                 out.ParseFromString(pm.payload)
+                # A single request can produce several frames of the same type.
+                # An order emits ORDER_ACCEPTED before ORDER_FILLED, and taking
+                # the first one means reporting a fill that has not happened:
+                # no executionPrice, no positionId, and the caller then hunts
+                # for a position that may not exist yet. `accept` lets the
+                # caller keep reading until the frame it actually needs.
+                if accept is not None and not accept(out):
+                    continue
                 return out
         raise TimeoutError(f"cTrader: no response for {res_cls.__name__}")
 
-    def _request(self, req, res_cls, timeout=15):
+    def _request(self, req, res_cls, timeout=15, accept=None):
         with self._lock:
             cid = self._send(req)
-            return self._await(cid, res_cls, timeout)
+            return self._await(cid, res_cls, timeout, accept=accept)
 
     # -- lifecycle ------------------------------------------------------------
     def connect(self):
@@ -699,7 +742,11 @@ class CtraderBroker:
         # the relative value fails 'invalid precision'). Instead the position
         # is amended with ABSOLUTE prices (rounded to the symbol's digits)
         # immediately after the fill, then verified — see below.
-        res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20)
+        res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20,
+                                    accept=_is_terminal_execution)
+        _et = _exec_name(getattr(res, "executionType", None))
+        if _et in ("ORDER_REJECTED", "ORDER_CANCELLED", "ORDER_EXPIRED"):
+            raise RuntimeError(f"cTrader rejected the order: {_et}")
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):
             fill = res.order.executionPrice

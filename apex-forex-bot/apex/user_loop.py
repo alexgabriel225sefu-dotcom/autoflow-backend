@@ -317,6 +317,10 @@ def _make_broker(user):
         EV_MIN_PROBABILITY = float(user.get(
             "ev_min_probability", getattr(_appcfg, "EV_MIN_PROBABILITY", 0.55))),
         EV_MIN_SAMPLES     = int(getattr(_appcfg, "EV_MIN_SAMPLES", 30)),
+        AI_VISION          = bool(getattr(_appcfg, "AI_VISION", False)),
+        STRUCTURAL_STOPS   = bool(user.get(
+            "structural_stops", getattr(_appcfg, "STRUCTURAL_STOPS", False))),
+        STRUCTURAL_MIN_RR  = float(getattr(_appcfg, "STRUCTURAL_MIN_RR", 1.3)),
     )
     broker = _CtraderBroker(fake_cfg)
     # Refine the LEVERAGE guess with the broker's real, per-instrument value
@@ -1905,13 +1909,56 @@ def _loop(user_id, alert_fn, gen=None):
                 stop_pips_eff = cfg.STOP_LOSS_PIPS
                 # Dynamic ATR stops (premium spec #10): SL = 1.5×ATR, TP = 3×ATR
                 # — distances that breathe with the instrument's volatility.
+                # ── Structural stops: let the setup define the trade ──
+                # The fibonacci swing on M1 is a median ~17 pips wide, so a flat
+                # 15/30 stop-and-target is 0.9x and 1.8x the ENTIRE swing the
+                # signal came from, while the setup's own objective — price
+                # returning to the swing extreme — sits a median 6 pips away.
+                # The trade is asked to do something the signal never predicted.
+                # Here the stop goes a buffer beyond the swing origin and the
+                # target to the swing extreme, so RR is whatever the structure
+                # actually offers rather than a number picked in advance.
+                _structural = False
+                if getattr(cfg, "STRUCTURAL_STOPS", False):
+                    _fib = (ind or {}).get("fibonacci") or {}
+                    _tgt = _fib.get("target")
+                    _rng = _fib.get("swingRange") or 0
+                    if _tgt and _rng > 0:
+                        # Stop beyond the swing origin the level retraced from,
+                        # plus room for spread and noise — a stop sitting exactly
+                        # on structure gets taken by the wick that confirms it.
+                        _buf = max(4.0 * spread * pip, 0.15 * _rng)
+                        if action == "BUY":
+                            _sl = min(_fib.get("swingLow", price), price) - _buf
+                            _sl_d, _tp_d = price - _sl, _tgt - price
+                        else:
+                            _sl = max(_fib.get("swingHigh", price), price) + _buf
+                            _sl_d, _tp_d = _sl - price, price - _tgt
+                        _min_rr = float(getattr(cfg, "STRUCTURAL_MIN_RR", 1.3))
+                        if _sl_d > 0 and _tp_d > 0 and (_tp_d / _sl_d) >= _min_rr:
+                            sl_dist, tp_dist = _sl_d, _tp_d
+                            stop_pips_eff = forex.to_pips(sl_dist, symbol, price)
+                            _structural = True
+                        else:
+                            # No room between the level and its objective. Skip
+                            # rather than fall back to a target the structure
+                            # does not support.
+                            entry_ok = False
+                            _skip(f"structural RR too low "
+                                  f"({(_tp_d / _sl_d) if _sl_d > 0 else 0:.2f} "
+                                  f"< {_min_rr})")
+
+                # Structure already set the levels; ATR and the fixed-pip
+                # fallbacks below only run when it did not.
                 atr_v = 0.0
-                if getattr(cfg, "ATR_STOPS", False):
+                if not _structural and getattr(cfg, "ATR_STOPS", False):
                     try:
                         atr_v = float(ind.get("atr") or 0)
                     except (TypeError, ValueError):
                         atr_v = 0.0
-                if atr_v > 0:
+                if _structural:
+                    pass
+                elif atr_v > 0:
                     # Wider stop + far target so trades breathe and profits run.
                     sl_dist, tp_dist = 2.5 * atr_v, 5.0 * atr_v
                     # FLOOR: on a 5-min candle the ATR of a calm FX pair is only
