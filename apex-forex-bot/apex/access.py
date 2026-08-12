@@ -39,17 +39,24 @@ def _read():
                 return d
             except Exception:
                 pass
-        return {"admins": [], "allowed": []}
+        # Empty here is ambiguous: either nobody is granted yet, or Redis just
+        # failed. Callers that only need a bool cannot tell, and for a read-only
+        # check that is fine. Anything about to STOP a paying client's bot must
+        # tell the difference — see allowed_state.
+        return {"admins": [], "allowed": [], "_degraded": True}
     try:
         d = json.loads(open(_FILE).read())
         d.setdefault("admins", [])
         d.setdefault("allowed", [])
         return d
     except Exception:
-        return {"admins": [], "allowed": []}
+        # The local file is wiped on every redeploy, so a miss here says
+        # nothing about entitlement.
+        return {"admins": [], "allowed": [], "_degraded": True}
 
 
 def _write(d):
+    d = {k: v for k, v in d.items() if k != "_degraded"}
     if _USE_REDIS:
         _redis(["SET", _ACCESS_KEY, json.dumps(d)])
         return
@@ -99,6 +106,27 @@ def claim_admin(chat_id):
 def is_allowed(chat_id):
     chat_id = str(chat_id)
     return is_admin(chat_id) or chat_id in _read()["allowed"]
+
+
+def allowed_state(chat_id):
+    """"allowed" | "denied" | "unknown" — the three-way answer is_allowed cannot give.
+
+    is_allowed() collapses "this chat is not entitled" and "the access store is
+    unreachable" into the same False. That is safe for refusing a command (the
+    worst case is one rejected message the client can retry) but not for
+    deciding whether a trading loop may run: the same False would silently kill
+    every paying client's bot during a Redis hiccup, and the local-JSON backend
+    is wiped on every redeploy so a miss there means nothing at all.
+
+    Callers should treat "unknown" as allow-and-log, and act only on "denied".
+    """
+    chat_id = str(chat_id)
+    if is_admin(chat_id):
+        return "allowed"       # env/hardcoded admins never depend on the store
+    d = _read()
+    if chat_id in d["allowed"] or chat_id in d["admins"]:
+        return "allowed"
+    return "unknown" if d.get("_degraded") else "denied"
 
 
 def grant(chat_id):

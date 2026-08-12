@@ -4,6 +4,7 @@ import threading
 import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
+from apex import access
 from apex import config as cfg_mod
 # Imported under an alias: `ev` is already a local variable inside _loop (the
 # news-window event), and a module-level `ev` would be shadowed for the whole
@@ -2626,8 +2627,57 @@ def _loop(user_id, alert_fn, gen=None):
         time.sleep(_LOOP_INTERVAL)
 
 
+def _entitled(user_id):
+    """May this user have a live trading loop at all?
+
+    Access was enforced on the COMMAND path and nowhere else. A chat that is not
+    entitled got "🔒 Activation required" for every command it sent — while
+    start_all() on boot and the watchdog every 180s happily kept its trading
+    loop alive off `active: True`, sending "Bot alive" heartbeats and taking
+    positions. Observed live: a chat whose /terminal and /restart were both
+    refused was still receiving heartbeats for a $27k account.
+
+    Two independent reasons a legitimate client can look unlisted, and neither
+    may cost them their bot:
+      • the access store is unreachable (Redis hiccup) → allowed_state says
+        "unknown", never "denied";
+      • the local-JSON backend is wiped on every redeploy → fall back to the
+        stored license_key, exactly as _license_ok does on the command path.
+
+    Only a definite "denied" with no license on file stops a loop.
+    """
+    user_id = str(user_id)
+    try:
+        state = access.allowed_state(user_id)
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] access check failed ({e}) — allowing")
+        return True
+    if state == "allowed":
+        return True
+    if state == "unknown":
+        print(f"[UserLoop:{user_id}] access store unreachable — allowing "
+              f"(a store outage must not stop a paying client's bot)")
+        return True
+    try:
+        if user_store.load(user_id).get("license_key"):
+            return True     # returning customer, access store wiped by a redeploy
+    except Exception:
+        pass
+    return False
+
+
 def start(user_id, alert_fn=None):
     user_id = str(user_id)
+    if not _entitled(user_id):
+        # Clear `active` too, or the watchdog resurrects this every 180s.
+        print(f"[UserLoop] REFUSED start for {user_id}: not entitled "
+              f"(no access grant and no license on file)")
+        try:
+            user_store.update(user_id, {"active": False})
+        except Exception:
+            pass
+        stop(user_id)
+        return False
     with _lock:
         if user_id in _loops and _loops[user_id]["running"]:
             return False
@@ -2692,7 +2742,12 @@ def get_dash(user_id):
 
 
 def start_all(alert_fn=None):
-    """Restart loops for all previously active users (after server reboot)."""
+    """Restart loops for all previously active users (after server reboot).
+
+    start() does the entitlement check, so a chat that lost access is not
+    resurrected here either — a redeploy used to hand every stale `active: True`
+    record a fresh trading loop regardless of whether the chat could still use
+    the bot."""
     for uid in user_store.all_active():
         start(uid, alert_fn)
 
@@ -2707,6 +2762,22 @@ def start_watchdog(alert_fn=None, interval=180):
             time.sleep(interval)
             try:
                 for uid in (user_store.all_active() or []):
+                    # Enforcement sweep. start() refuses new loops for chats
+                    # that lost access, but a loop ALREADY running when the
+                    # grant was revoked kept trading forever — nothing ever
+                    # re-checked it. This is the only place that notices.
+                    if not _entitled(uid):
+                        print(f"[Watchdog] {uid} is no longer entitled — "
+                              f"stopping its loop")
+                        try:
+                            stop(uid)
+                            user_store.update(uid, {"active": False})
+                            from apex import control as _ctl
+                            _ctl.event("watchdog", "stopped unentitled loop",
+                                       user_id=uid)
+                        except Exception as e:
+                            print(f"[Watchdog] stop failed for {uid}: {e}")
+                        continue
                     if not is_running(uid):
                         print(f"[Watchdog] active loop for {uid} is down — restarting")
                         try:
