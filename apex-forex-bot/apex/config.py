@@ -166,6 +166,13 @@ SENTINEL_MIN_CONFIDENCE = float(os.getenv("SENTINEL_MIN_CONFIDENCE") or 0.0) or 
 # and the bot stops trading entirely.
 SENTINEL_TTL_S = int(os.getenv("SENTINEL_TTL_S") or 0)
 
+# Institutional contradiction gate (see apex/institutional.py). Separately
+# switchable from SENTINEL_MODE because it answers a different question: not
+# "is the AI's read fresh and in agreement" but "does the wider picture point
+# the other way". Only fires on a contradiction from a state that is itself
+# usable — thin coverage is handled inside institutional.build().
+INSTITUTIONAL_GATE = (os.getenv("INSTITUTIONAL_GATE") or "shadow").strip().lower()
+
 # Show the AI the actual chart, not just indicator values. Structure — where
 # price keeps failing, whether a level was tested once or five times, whether
 # the approach looks impulsive or exhausted — does not survive being flattened

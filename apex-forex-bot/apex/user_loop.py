@@ -4,7 +4,7 @@ import threading
 import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
-from apex import access, sentinel, institutional
+from apex import access, sentinel, institutional, cot
 from apex import config as cfg_mod
 # Imported under an alias: `ev` is already a local variable inside _loop (the
 # news-window event), and a module-level `ev` would be shadowed for the whole
@@ -453,6 +453,20 @@ def _institutional_observations(symbol, ind, regime, spread_pips, now=None):
     except Exception:
         pass
 
+    # ── cot_bias: CFTC speculative positioning, the one free institutional
+    # source. Weekly and days old by construction, so it carries a reduced
+    # confidence rather than being treated as a current reading.
+    try:
+        legs = _currency_legs(symbol)
+        cb = cot.pair_bias(symbol, legs=tuple(legs) if legs else None)
+        if cb is not None:
+            _age = cot.age_days(symbol, legs=tuple(legs) if legs else None)
+            # A reading loses weight as it ages toward the next release.
+            _conf = 0.8 if (_age or 0) <= 7 else 0.5
+            add("cot_bias", cb, "cftc_cot", conf=_conf, ttl=8 * 86400)
+    except Exception:
+        pass
+
     # ── sentiment: fear & greed, rescaled from 0..100 to -1..+1 ──
     try:
         fg = sentiment.fear_greed()
@@ -625,6 +639,7 @@ def _make_broker(user):
         SENTINEL_MODE      = getattr(_appcfg, "SENTINEL_MODE", "shadow"),
         SENTINEL_MIN_CONFIDENCE = getattr(_appcfg, "SENTINEL_MIN_CONFIDENCE", None),
         SENTINEL_TTL_S     = int(getattr(_appcfg, "SENTINEL_TTL_S", 0) or 0),
+        INSTITUTIONAL_GATE = getattr(_appcfg, "INSTITUTIONAL_GATE", "shadow"),
     )
     broker = _CtraderBroker(fake_cfg)
     # Refine the LEVERAGE guess with the broker's real, per-instrument value
@@ -908,6 +923,13 @@ def _loop(user_id, alert_fn, gen=None):
     # different accounts, risk and strategy, so they do not share an opinion.
     _signals = sentinel.SignalStore()
     _sentinel_mode = str(getattr(cfg, "SENTINEL_MODE", "shadow")).lower()
+    _inst_mode = str(getattr(cfg, "INSTITUTIONAL_GATE", "shadow")).lower()
+    # nrm(symbol) -> the features and verdict of the last ACTUAL AI call.
+    # Deliberately not the last published state: the state is republished every
+    # tick with the current price, so comparing against it would reset the
+    # "price moved" test on every pass and let price drift arbitrarily far
+    # without ever triggering a refresh.
+    _last_ai = {}
 
     ev_calibration = None
     ev_cal_tick = -10 ** 9
@@ -1984,9 +2006,38 @@ def _loop(user_id, alert_fn, gen=None):
             # (can block weak setups, costs a few seconds per candidate);
             # OFF = pure rule engine — instant, zero API cost.
             _sig_t0 = time.time()
+            _ai_reused = False
             try:
                 if getattr(cfg, "AI_CONFIRM", True):
-                    signal = ai.get_signal(ind, paper_balance, open_pos, strat_data,
+                    # get_signal already returns early on CLOSE/HOLD without
+                    # touching the model, so the only call worth avoiding is a
+                    # repeat on a candidate that has not changed — the rule
+                    # engine saying BUY on the same bar, at the same price,
+                    # tick after tick while some other gate holds the entry.
+                    _rule_pre = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
+                    _rule_act = _rule_pre.get("action", "HOLD")
+                    _now_feat = {
+                        "price": price, "atr": (ind or {}).get("atr"),
+                        "spread_pips": _recent_spread(),
+                        "regime": (regime or {}).get("regime"),
+                        "bar_time": candles[-1].get("time") if candles else None,
+                        "expires_at": time.time() + max(
+                            60, sentinel.default_ttl(cfg.TIMEFRAME)),
+                    }
+                    _prev_ai = _last_ai.get(_nrm(symbol))
+                    _need, _why = (True, "no_prior")
+                    if _prev_ai and _prev_ai.get("rule_action") == _rule_act:
+                        _need, _why = sentinel.should_refresh(
+                            _prev_ai.get("features"), _now_feat)
+                    if _rule_act not in ("BUY", "SELL"):
+                        signal = _rule_pre          # no AI call would happen
+                    elif not _need:
+                        signal = dict(_prev_ai["signal"])
+                        _ai_reused = True
+                        print(f"[UserLoop:{user_id}] AI read reused for {symbol} "
+                              f"({_rule_act}, nothing changed) — no API call")
+                    else:
+                        signal = ai.get_signal(ind, paper_balance, open_pos, strat_data,
                                            mode=active_mode,
                                            symbol=symbol,
                                            timeframe=cfg.TIMEFRAME,
@@ -1997,6 +2048,9 @@ def _loop(user_id, alert_fn, gen=None):
                                            candles=candles,
                                            regime=regime,
                                            spread_pips=_recent_spread())
+                        _last_ai[_nrm(symbol)] = {
+                            "features": _now_feat, "signal": dict(signal),
+                            "rule_action": _rule_act}
                 else:
                     signal = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
             except Exception as e:
@@ -2511,6 +2565,39 @@ def _loop(user_id, alert_fn, gen=None):
                     except Exception as e:
                         # A broken gate must never stop a live account.
                         print(f"[UserLoop:{user_id}] sentinel gate error: {e}")
+
+                # ── Institutional contradiction check ──
+                # Separate from the Sentinel gate and separately switchable,
+                # because it answers a different question: not "is the AI's
+                # read fresh and in agreement" but "does the wider picture —
+                # positioning, rates, macro, liquidity — point the other way".
+                # It only ever fires on a CONTRADICTION from a state that is
+                # itself usable. Thin coverage is already handled inside
+                # institutional.build(); refusing on low data quality here
+                # would stop trading whenever a feed hiccups, which is a
+                # denial of service dressed up as caution.
+                if _inst_mode != "off":
+                    try:
+                        _ib = institutional.action_bias(_inst)
+                        if (_inst.get("usable") and _ib in ("BUY", "SELL")
+                                and _ib != action):
+                            _imsg = (f"institutional read is {_ib} "
+                                     f"({institutional.describe(_inst)})")
+                            if _inst_mode == "enforce":
+                                entry_ok = False
+                                _skip(f"Institutional: {_imsg}")
+                            else:
+                                print(f"[UserLoop:{user_id}] Institutional shadow: "
+                                      f"WOULD BLOCK {action} {symbol} — {_imsg}")
+                            if alert_fn:
+                                alert_fn(user_id, {
+                                    "action": "SENTINEL_BLOCK", "symbol": symbol,
+                                    "wanted": action, "reason": "AI_DISAGREES",
+                                    "mode": _inst_mode,
+                                    "state": institutional.describe(_inst),
+                                })
+                    except Exception as e:
+                        print(f"[UserLoop:{user_id}] institutional gate error: {e}")
 
                 risk_mult = strategies.druckenmiller_multiplier(
                     confidence, signal.get("criteriaScore", 0),
