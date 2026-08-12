@@ -209,6 +209,90 @@ def _reattach_entry_meta(pos, meta):
     return pos
 
 
+def _profit_too_small_to_take(pos, price, symbol, initial_risk, user_id=""):
+    """True when a strategy's discretionary exit would cut a winner short.
+
+    This is the single biggest money-loser found in the live account. A week
+    of real trades, converted to pips:
+
+        wins   +0.6, +1.7                    (mean 1.15 pips)
+        losses -0.7, -2.4, -9.3, -10.8       (mean 5.8 pips)
+
+    SL was 15 pips and TP was 30 — 2:1 on paper. The realised ratio was 1:5
+    AGAINST, because losers ran to the full stop while winners were closed by
+    mean_reversion's "price overshot past mean" rule the moment price touched
+    the Bollinger midline, typically 1 pip in. At 1:5 you need an 83% win rate
+    to break even. The account did 33%.
+
+    Worse, that rule fires on band position alone and never looks at P&L: one
+    live trade was SOLD at 0.70581 and "took profit" at 0.70583 — price had
+    moved AGAINST the position and it was still booked as a profitable exit.
+
+    So: a discretionary profit-take must capture at least MIN_EXIT_R of the
+    risk the trade put up, and must clear its own round-trip cost. Below that
+    it is not profit, it is churn that pays the spread.
+
+    The rule is deliberately ASYMMETRIC — it only ever blocks exits that are
+    in profit. A strategy closing an UNDERWATER trade is saying its thesis
+    broke, and holding that to a full stop would turn a small loss into a big
+    one. Those exits always pass.
+
+    MIN_EXIT_R defaults to 1.0, which pairs with the breakeven trail: below 1R
+    the stop has not moved to breakeven yet, so there is nothing to protect and
+    no reason to take crumbs; at or above 1R the downside is already covered
+    and a discretionary exit is free.
+    """
+    try:
+        entry = float(pos.get("entryPrice"))
+        side = pos.get("side")
+        if not entry or side not in ("BUY", "SELL"):
+            return False
+        px = float(price)
+    except (TypeError, ValueError):
+        return False
+
+    move = (px - entry) if side == "BUY" else (entry - px)
+    if move <= 0:
+        return False        # losing or flat — thesis broke, let it out
+
+    min_r = float(os.getenv("MIN_EXIT_R") or getattr(cfg_mod, "MIN_EXIT_R", 1.0))
+    if min_r <= 0:
+        return False        # feature off
+
+    # Round-trip cost floor: the exit must at minimum pay for itself. Uses the
+    # spread measured at entry (the only spread we know for this trade) and
+    # doubles it for the return leg.
+    cost_move = 0.0
+    try:
+        sp = float(pos.get("entrySpreadPips") or 0.0)
+        if sp > 0:
+            cost_move = forex.from_pips(sp * 2, symbol, px)
+    except Exception:
+        cost_move = 0.0
+
+    floor = cost_move
+    if initial_risk:
+        try:
+            floor = max(floor, float(initial_risk) * min_r)
+        except (TypeError, ValueError):
+            pass
+
+    # Compare in pips, not raw price. 15 pips of AUDUSD is 0.0015 one way and
+    # 0.0014999999999999 the other depending on which subtraction produced it,
+    # and a trade sitting exactly on the threshold must not be decided by the
+    # last bit of a float. A twentieth of a pip is far below any real spread.
+    move_pips = forex.to_pips(move, symbol, px)
+    floor_pips = forex.to_pips(floor, symbol, px)
+    if move_pips >= floor_pips - 0.05:
+        return False
+
+    if user_id:
+        print(f"[UserLoop:{user_id}] held {symbol}: strategy wanted out at "
+              f"{move_pips:.1f} pips, needs {floor_pips:.1f} "
+              f"({min_r}R + cost) — not cutting the winner short")
+    return True
+
+
 def _log_trade(user_id, record, pos=None):
     """Persist a closed trade to the per-user tax journal (date, entry, exit,
     fees/spread cost, gross & net PnL) — exportable for tax reporting.
@@ -2374,6 +2458,11 @@ def _loop(user_id, alert_fn, gen=None):
                 # /buy - /sell trades belong to the USER: the strategy engine
                 # must not close them (a mean-reversion bot would instantly
                 # exit a manual entry placed near the mean). SL/TP rule them.
+                pass
+            elif action == "CLOSE" and open_pos and _profit_too_small_to_take(
+                    open_pos, price, symbol, entry_risk_by_sym.get(_nrm(symbol)),
+                    user_id):
+                # Winner cut short. Hold instead — see _profit_too_small_to_take.
                 pass
             elif action == "CLOSE" and open_pos:
                 # A strategy exit is NOT always a win — label it honestly.

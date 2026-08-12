@@ -134,6 +134,14 @@ EV_MIN_PROBABILITY = float(os.getenv("EV_MIN_PROBABILITY") or 0.55)
 # this the engine reports NO_PROBABILITY and (in enforce mode) stands aside.
 EV_MIN_SAMPLES = int(os.getenv("EV_MIN_SAMPLES") or 30)
 
+# Smallest profit, as a multiple of the trade's own risk, that a strategy is
+# allowed to take voluntarily. Measured on the live account: winners were being
+# closed at ~1 pip by mean_reversion's midline rule while losers ran the full
+# 15-pip stop — a realised 1:5 that needs an 83% win rate to break even. This
+# is the floor that stops it. Only ever blocks exits that are IN PROFIT; a
+# strategy bailing out of a losing trade is never held. 0 disables.
+MIN_EXIT_R = float(os.getenv("MIN_EXIT_R") or 1.0)
+
 # Show the AI the actual chart, not just indicator values. Structure — where
 # price keeps failing, whether a level was tested once or five times, whether
 # the approach looks impulsive or exhausted — does not survive being flattened
