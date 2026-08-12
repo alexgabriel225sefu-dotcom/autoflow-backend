@@ -167,6 +167,48 @@ def _already_journaled(journal, row):
     return False
 
 
+# What was true when we DECIDED to enter. These keys live only in this
+# process (and in the persisted open-position snapshot) — the broker knows
+# nothing about them, so every live position read hands back a dict without
+# them. See _reattach_entry_meta.
+_ENTRY_META_KEYS = (
+    "entryConfidence", "entryRegime", "entryAtr", "entrySlPips",
+    "entryTpPips", "entrySide", "entryProbability", "entryEvR",
+    "entrySpreadPips", "openedAt",
+)
+
+
+def _entry_meta(pos):
+    """Extract the decision snapshot from a position dict."""
+    return {k: pos[k] for k in _ENTRY_META_KEYS
+            if pos and pos.get(k) is not None}
+
+
+def _reattach_entry_meta(pos, meta):
+    """Put the decision snapshot back onto a freshly broker-read position.
+
+    In LIVE mode every tick replaces the tracked position with
+    `broker.get_open_position(symbol)`. That dict is the broker's truth about
+    price/size/stop — and it carries none of the entry* fields we recorded
+    when the trade was opened. So the snapshot written at entry survived
+    exactly one tick, and by the time the position closed it was gone:
+    _log_trade wrote `confidence: None`, ev.labelled_count() didn't count the
+    row, and evCalibration sat at 1/30 no matter how many trades closed.
+
+    entrySpreadPips is in the same set, which is why the spread half of
+    realised cost read $0 on every live close.
+
+    The broker's own values always win — this only fills in what it cannot
+    know.
+    """
+    if not pos or not meta:
+        return pos
+    for k, v in meta.items():
+        if pos.get(k) is None:
+            pos[k] = v
+    return pos
+
+
 def _log_trade(user_id, record, pos=None):
     """Persist a closed trade to the per-user tax journal (date, entry, exit,
     fees/spread cost, gross & net PnL) — exportable for tax reporting.
@@ -576,6 +618,12 @@ def _loop(user_id, alert_fn, gen=None):
     # position found on another pair), and a trail sized off the wrong pair's
     # risk is worse than no trail at all. See _manage_trailing's initial_risk.
     entry_risk_by_sym = {}
+    # nrm(symbol) -> the trade's decision snapshot (confidence, regime, ATR,
+    # SL/TP, EV probability, spread at entry). Kept out-of-band for the same
+    # reason as entry_risk_by_sym: the live position dict is re-read from the
+    # broker every tick and comes back stripped of everything the broker
+    # doesn't store. Without this the calibrator never gets a labelled trade.
+    entry_meta_by_sym = {}
     prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
     pos_details = {}    # nrm(symbol) -> {symbol, side, entry, units} for P&L on close
     spread_blocked = {}  # nrm(symbol) -> retry_ts: Auto-Pilot avoids symbols whose
@@ -681,6 +729,12 @@ def _loop(user_id, alert_fn, gen=None):
             if _live:
                 symbol = _snap["symbol"]
                 open_pos = _live
+                # The persisted snapshot is the only surviving record of WHY
+                # this trade was taken — the broker read that just replaced it
+                # carries none of it. A redeploy mid-trade must not cost us the
+                # label.
+                entry_meta_by_sym[_nrm(symbol)] = _entry_meta(_snap)
+                _reattach_entry_meta(open_pos, entry_meta_by_sym[_nrm(symbol)])
                 dash["symbol"] = symbol
                 dash["openPosition"] = open_pos
                 # Still open — re-persist it (don't clear!). If we wiped the
@@ -706,6 +760,7 @@ def _loop(user_id, alert_fn, gen=None):
                 # will resolve the real state either way.
                 symbol = _snap["symbol"]
                 open_pos = dict(_snap)
+                entry_meta_by_sym[_nrm(symbol)] = _entry_meta(_snap)
                 dash["symbol"] = symbol
                 dash["openPosition"] = open_pos
                 if _snap.get("initialStop") and _snap.get("entryPrice"):
@@ -950,7 +1005,14 @@ def _loop(user_id, alert_fn, gen=None):
                            "entryPrice": det.get("entry"), "price": xp,
                            "grossPnl": gross_pnl, "costUsd": cost_usd, "netPnl": est_pnl,
                            "balance": round(paper_balance, 2), "time": now2}
-                    _log_trade(user_id, rec)
+                    # These are the SL/TP hits — the single most informative
+                    # label the calibrator can get, and the one path that was
+                    # journalling them unlabelled because the position object
+                    # is long gone by the time the broker reports it closed.
+                    # The out-of-band snapshot is still here.
+                    _meta = entry_meta_by_sym.get(cs)
+                    _log_trade(user_id, rec,
+                               {**_meta, "symbol": det.get("symbol", cs)} if _meta else None)
                     dash["trades"].insert(0, {**rec, "reasoning": "closed at broker (target/stop)"})
                     dash["trades"] = dash["trades"][:50]
                     if est_pnl is not None and est_pnl < 0:
@@ -976,6 +1038,11 @@ def _loop(user_id, alert_fn, gen=None):
                 # protective stop all converge on this one truth.
                 for _gone in [k for k in entry_risk_by_sym if k not in open_syms]:
                     entry_risk_by_sym.pop(_gone, None)
+                # Same for the decision snapshot — but only AFTER the close has
+                # been journalled above, which is why this sits at the end of
+                # the reconciliation block and not beside the broker read.
+                for _gone in [k for k in entry_meta_by_sym if k not in open_syms]:
+                    entry_meta_by_sym.pop(_gone, None)
             open_count = len(open_syms)
             dash["openCount"] = open_count
             dash["maxpos"] = maxpos
@@ -1149,6 +1216,10 @@ def _loop(user_id, alert_fn, gen=None):
                     # SL/TP. In single-position mode (maxpos 1) fall back to
                     # whatever symbol currently holds the one position.
                     open_pos = broker.get_open_position(symbol)
+                    # The broker's dict has no idea why we took this trade.
+                    # Put the decision snapshot back before anything reads it,
+                    # or it is lost for good the moment the position closes.
+                    _reattach_entry_meta(open_pos, entry_meta_by_sym.get(_nrm(symbol)))
                     if maxpos == 1 and watchlist and not open_pos:
                         for ws in watchlist:
                             if ws == symbol:
@@ -1157,7 +1228,8 @@ def _loop(user_id, alert_fn, gen=None):
                             if p_:
                                 symbol = ws
                                 dash["symbol"] = symbol
-                                open_pos = p_
+                                open_pos = _reattach_entry_meta(
+                                    p_, entry_meta_by_sym.get(_nrm(ws)))
                                 candles = broker.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES) or candles
                                 # `price` must move with the symbol switch — it's
                                 # compared against THIS position's stop/entry a few
@@ -2270,6 +2342,12 @@ def _loop(user_id, alert_fn, gen=None):
                                     "entryProbability": (ev_verdict or {}).get("probability"),
                                     "entryEvR": (ev_verdict or {}).get("ev_r"),
                                 })
+                                # Keep a copy OUTSIDE the position dict. The
+                                # next tick throws this dict away and replaces
+                                # it with a fresh broker read; without the copy
+                                # the snapshot lives for one tick and every
+                                # closed trade is journalled unlabelled.
+                                entry_meta_by_sym[_nrm(symbol)] = _entry_meta(open_pos)
                             except Exception as _e:
                                 print(f"[UserLoop:{user_id}] entry snapshot failed: {_e}")
 
