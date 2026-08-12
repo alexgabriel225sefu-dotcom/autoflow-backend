@@ -206,7 +206,8 @@ _MODE_RULES = {
 
 def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_reversion",
                symbol=None, timeframe=None, sl_pips=None, tp_pips=None,
-               risk_pct=None, min_confidence=None, candles=None):
+               risk_pct=None, min_confidence=None, candles=None,
+               regime=None, spread_pips=None):
     """Rule-based signal is PRIMARY. AI confirms or blocks — never initiates.
 
     The trade context arguments matter more than they look. Without them the
@@ -255,6 +256,60 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
     # config only when the caller did not supply it — which is what used to
     # happen for every call, labelling all eight Auto-Pilot instruments
     # "EUR_USD" and quoting the wrong SL/TP/risk back to the model.
+    # Everything below is already computed every tick and was never shown to
+    # the model. The AI is the last thing standing between a signal and a live
+    # order, and it was the least-informed component in the loop: it saw price
+    # and oscillators, but not what kind of market it was looking at, not the
+    # strategy engines' own structural read, and not what the trade would cost.
+    _rg = regime or {}
+    _regime_line = "- Market regime: unknown"
+    if _rg.get("regime"):
+        _regime_line = (f"- Market regime: <b>{_rg['regime']}</b> "
+                        f"(volatility {_rg.get('vol_ratio', '?')}x its own recent norm)"
+                        f" — {_rg.get('label', '')}").replace("<b>", "").replace("</b>", "")
+
+    _sd = strategy_data or {}
+    _turtle = _sd.get("turtle") or {}
+    _liv = _sd.get("livermore") or {}
+    _soros = _sd.get("soros") or {}
+    _mr = _sd.get("mean_reversion") or {}
+    _strategy_block = "\n".join(filter(None, [
+        f"- Turtle (20-bar channel): signal={_turtle.get('signal', 'NONE')}, "
+        f"strength={_turtle.get('breakoutStr', 'N/A')}" if _turtle else None,
+        f"- Livermore (structure): trend={_liv.get('trend', 'N/A')}, "
+        f"strength={_liv.get('strength', 'N/A')}" if _liv else None,
+        f"- Soros (momentum/velocity): signal={_soros.get('signal', 'NONE')}"
+        if _soros else None,
+        f"- Mean-reversion z-score: {_mr.get('zscore', 'N/A')} "
+        f"(stretched={_mr.get('stretched', False)})" if _mr else None,
+    ])) or "- (strategy engines produced no read this bar)"
+
+    # Indicator values arrive as floats, None, or occasionally strings — coerce
+    # rather than trust, or a stray type takes down the whole signal path.
+    _adx_line = "- ADX: N/A"
+    try:
+        _adx = float(ind.get("adx"))
+    except (TypeError, ValueError):
+        _adx = None
+    if _adx is not None:
+        _strength = ("no trend" if _adx < 20 else "developing" if _adx < 25
+                     else "trending" if _adx < 40 else "strong trend")
+        _adx_line = (f"- ADX: {_adx:.1f} ({_strength}) | "
+                     f"+DI {ind.get('plus_di', 'N/A')} / -DI {ind.get('minus_di', 'N/A')}")
+
+    # What the trade costs, in the only unit that matters: how much of the stop
+    # is spent before the trade can be right.
+    _cost_line = "- Spread: unknown"
+    if spread_pips is not None and sl_pips:
+        try:
+            _cost_pct = (float(spread_pips) / float(sl_pips)) * 100
+            _cost_line = (f"- Recent spread: {float(spread_pips):.1f} pips — "
+                          f"{_cost_pct:.0f}% of the {float(sl_pips):g}-pip stop is "
+                          f"paid up front. A setup must beat that before it is "
+                          f"worth taking.")
+        except (TypeError, ValueError, ZeroDivisionError):
+            pass
+
     _sym_lbl = symbol or cfg.SYMBOL
     _tf_lbl = timeframe or cfg.TIMEFRAME
     _sl_lbl = float(cfg.STOP_LOSS_PIPS if sl_pips is None else sl_pips)
@@ -302,6 +357,18 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
 - Supply/Demand: signal={ind.get('supplyDemand', {}).get('signal', 'NONE')}
 - Liquidity Sweep: signal={ind.get('liquiditySweep', {}).get('signal', 'NONE')}, type={ind.get('liquiditySweep', {}).get('type', 'none')}, swept={ind.get('liquiditySweep', {}).get('swept', 'N/A')}
 - EVC (Equilibrium Volume): signal={ind.get('evc', {}).get('signal', 'NONE')}, equilibrium={ind.get('evc', {}).get('equilibrium', False)}
+
+### Trend strength
+{_adx_line}
+
+### Market regime
+{_regime_line}
+
+### What the strategy engines see
+{_strategy_block}
+
+### Cost of trading right now
+{_cost_line}
 
 ### Last 5 candles
 {recent}

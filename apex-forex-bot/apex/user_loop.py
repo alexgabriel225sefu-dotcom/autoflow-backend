@@ -835,6 +835,20 @@ def _loop(user_id, alert_fn, gen=None):
                                    "symbol": symbol})
         return health["degraded"]
 
+    def _recent_spread():
+        """Median of recently observed spreads, or None.
+
+        The AI runs before the entry block fetches bid/ask, so the live spread
+        does not exist yet at that point — reading it there would be a stale
+        value from some earlier tick, or an unbound name on the first one. The
+        health monitor already keeps a rolling window of real observations,
+        which is both available and more representative than one quote.
+        """
+        sps = sorted(health.get("spreads") or [])
+        if not sps:
+            return None
+        return sps[len(sps) // 2]
+
     def _skip(reason):
         """Journal every rejected entry (premium spec #12) — clients see the
         discipline, not just the trades: 'refused 14 weak setups today'."""
@@ -1640,7 +1654,9 @@ def _loop(user_id, alert_fn, gen=None):
                                            tp_pips=cfg.TAKE_PROFIT_PIPS,
                                            risk_pct=cfg.RISK_PER_TRADE,
                                            min_confidence=cfg.MIN_CONFIDENCE,
-                                           candles=candles)
+                                           candles=candles,
+                                           regime=regime,
+                                           spread_pips=_recent_spread())
                 else:
                     signal = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
             except Exception as e:

@@ -191,6 +191,46 @@ check("_context_line accepts a symbol without raising",
       isinstance(ai._context_line("XAUUSD"), str))
 check("and still works with no symbol", isinstance(ai._context_line(), str))
 
+
+
+print("\n── the model is told what kind of market it is looking at ──")
+_ctx = {}
+
+
+def _cap_ctx(prompt, image_png=None):
+    _ctx["p"] = prompt
+    return {"action": "HOLD", "confidence": 0}
+
+
+ai._call_anthropic = _cap_ctx
+ai.get_signal(buy_ind, 5000.0, None,
+              {"turtle": {"signal": "BUY", "breakoutStr": "STRONG"},
+               "livermore": {"trend": "BULLISH", "strength": 0.82},
+               "soros": {"signal": "BUY"},
+               "mean_reversion": {"zscore": -2.4, "stretched": True}},
+              symbol="EURUSD", sl_pips=15,
+              regime={"regime": "trending", "vol_ratio": 1.4,
+                      "label": "bullish trend — trend following"},
+              spread_pips=1.2)
+p3 = _ctx["p"]
+check("regime reaches the prompt", "trending" in p3 and "1.4" in p3)
+check("regime label reaches it too", "trend following" in p3)
+check("Turtle read reaches the prompt", "STRONG" in p3)
+check("Livermore structure reaches the prompt", "0.82" in p3)
+check("mean-reversion z-score reaches the prompt", "-2.4" in p3)
+check("ADX reaches the prompt", "ADX" in p3)
+check("cost is expressed against the stop, not in isolation",
+      "8% of the 15-pip stop" in p3, p3[p3.find("Recent spread"):][:90])
+
+# None of it may crash the call when the loop has nothing to give.
+_ctx.clear()
+ai.get_signal(buy_ind, 5000.0, None, {}, symbol="EURUSD")
+check("missing context degrades to 'unknown' rather than failing",
+      "Market regime: unknown" in _ctx["p"])
+check("and says the engines had no read",
+      "no read this bar" in _ctx["p"] or "N/A" in _ctx["p"])
+ai._call_anthropic = _orig_anthropic
+
 # ─── Result ───────────────────────────────────────────────
 
 print("\n── vision: the model is shown the chart, not just numbers ──")
