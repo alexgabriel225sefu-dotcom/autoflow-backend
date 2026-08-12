@@ -105,7 +105,19 @@ def _risk_from_snapshot(entry_price, initial_stop):
         return None
 
 
-_LOOP_INTERVAL = 300  # 5 minutes between ticks
+# Tick cadence. This was hardcoded to 300 while config computed
+# LOOP_INTERVAL_MS (60s in scalp mode) and used it only for DISPLAY —
+# telegram.py and logger.py told the client "Interval: 1m" while the loop ran
+# every five minutes. On a 1m strategy that decides entries up to five bars
+# late, and it biases WHICH setups get seen: a level touch that lasts one bar
+# is usually missed, while price stalling at a level across several bars is
+# nearly always caught — and stalling at a level is the failed-rejection case.
+# Sampling every fifth bar systematically over-represents the worse half.
+_LOOP_INTERVAL = max(30, int(getattr(cfg_mod, "LOOP_INTERVAL_MS", 300_000) / 1000))
+# Re-pick the focus symbol on a TIME cadence, not a tick count. Tick-based
+# meant shortening the interval silently multiplied broker calls; at 300s x 3
+# forex re-scanned every 15 minutes, which on 1m bars is most of the day blind.
+_SCAN_INTERVAL_S = int(os.getenv("SCAN_INTERVAL_S") or 180)
 _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
 _SKIP_WARN_THROTTLE = 36  # "don't trade now" warnings — only every ~3h (was 30m)
@@ -964,7 +976,7 @@ def _loop(user_id, alert_fn, gen=None):
             # most setups. Requests are spaced 0.35s to respect cTrader's limit.
             # Also rescan immediately when the focus is spread-blocked so the bot
             # doesn't camp on a dead symbol.
-            _scan_every = 1 if _crypto_build else 3
+            _scan_every = max(1, round(_SCAN_INTERVAL_S / max(1, _LOOP_INTERVAL)))
             due_to_scan = (tick % _scan_every == 0) or (
                 spread_blocked.get(_nrm(symbol), 0) > time.time())
             if watchlist and slot_free and due_to_scan and rate_ok:
@@ -2072,7 +2084,16 @@ def _loop(user_id, alert_fn, gen=None):
                             _skip_exec = True
                             _skip(f"spread widened before exec ({_rs:.1f}p > {_msp_pip:g}p)")
                         else:
-                            price = round((_rb + _ra) / 2, 6)
+                            # Anchor to the side we actually fill on, not the
+                            # mid. A cTrader long fills at the ASK and its
+                            # SL/TP trigger on the BID, so a stop placed
+                            # sl_dist below the mid is really sl_dist + half a
+                            # spread away, and the target is half a spread
+                            # nearer than intended. That silently turns a 30/15
+                            # trade into ~29/16 — RR 2.00 becomes 1.82 and the
+                            # break-even win rate moves 33.3% → 35.4%. Same
+                            # trade, same win rate, strictly better expectancy.
+                            price = round(_ra if action == "BUY" else _rb, 6)
                             sl_price = round(price - sl_dist if action == "BUY" else price + sl_dist, 6)
                             tp_price = round(price + tp_dist if action == "BUY" else price - tp_dist, 6)
                     except Exception:

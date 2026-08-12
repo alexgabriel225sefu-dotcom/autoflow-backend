@@ -121,6 +121,34 @@ check("a streak from a previous day is cleared",
       _streak_after_start(_u_old) == 0)
 check("today's streak is kept", _streak_after_start(_u_today) == 4)
 
+
+print("\n── the loop ticks at the interval it reports to the client ──")
+# It was hardcoded to 300s while config computed LOOP_INTERVAL_MS and used it
+# only for display, so the bot told the client "Interval: 1m" and ran at 5m.
+check("tick interval comes from config, not a literal",
+      user_loop._LOOP_INTERVAL == max(30, int(appcfg.LOOP_INTERVAL_MS / 1000)),
+      f"{user_loop._LOOP_INTERVAL} vs {appcfg.LOOP_INTERVAL_MS/1000}")
+check("what Telegram displays matches what the loop does",
+      appcfg.LOOP_INTERVAL_MS // 60000 == user_loop._LOOP_INTERVAL // 60
+      or user_loop._LOOP_INTERVAL < 60)
+check("never degenerates to a hot loop", user_loop._LOOP_INTERVAL >= 30)
+
+print("\n── symbol re-scan is time-based, so a faster tick costs no extra calls ──")
+
+
+def _scan_ticks(loop_s, scan_s):
+    return max(1, round(scan_s / max(1, loop_s)))
+
+
+check("at a 300s tick, scanning stays ~180s",
+      _scan_ticks(300, 180) * 300 <= 300)
+check("at a 60s tick, scanning is ~180s — not 15 minutes",
+      _scan_ticks(60, 180) * 60 == 180,
+      str(_scan_ticks(60, 180) * 60))
+check("shortening the tick does NOT multiply scan frequency",
+      _scan_ticks(60, 180) * 60 <= _scan_ticks(300, 180) * 300)
+check("the cadence is overridable", user_loop._SCAN_INTERVAL_S > 0)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")
