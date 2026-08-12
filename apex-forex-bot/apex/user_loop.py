@@ -4,7 +4,7 @@ import threading
 import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
-from apex import access, sentinel
+from apex import access, sentinel, institutional
 from apex import config as cfg_mod
 # Imported under an alias: `ev` is already a local variable inside _loop (the
 # news-window event), and a module-level `ev` would be shadowed for the whole
@@ -374,6 +374,96 @@ def _ride_instead_of_close(broker, cfg, pos, symbol, price, initial_risk,
               f"trend still aligned — stop moved to {keep:.5f}, locking "
               f"{lock:.0%} of the move instead of closing")
     return True
+
+
+def _institutional_observations(symbol, ind, regime, spread_pips, now=None):
+    """Map what this bot can actually see onto the Institutional State features.
+
+    Five of the spec's nine features have a free source the bot already
+    reaches; four do not:
+
+        price_momentum      RSI / EMA / MACD          ✓ (critical)
+        volatility          regime vol_ratio          ✓
+        liquidity_quality   spread + trading session  ✓
+        macro_risk          economic calendar         ✓
+        sentiment           fear & greed              ✓
+        futures_positioning licensed futures feed     ✗
+        cot_bias            CFTC weekly (free, TODO)  ✗
+        rate_differential   yield curves              ✗
+        central_bank_bias   policy statements         ✗
+
+    The four without a source are simply not emitted. That is the point: they
+    show up in `missing`, they pull `data_quality` down to what it honestly is,
+    and nothing pretends they are neutral. Adding a COT adapter later means
+    appending one observation here — no other code changes.
+    """
+    out = []
+
+    def add(feature, value, source, conf=1.0, ttl=3600):
+        o = institutional.observe(feature, value, source,
+                                  confidence=conf, ttl_s=ttl, now=now)
+        if o["value"] is not None:
+            out.append(o)
+
+    ind = ind or {}
+
+    # ── price_momentum: agreement between RSI, the EMA stack and MACD ──
+    try:
+        score, n = 0.0, 0
+        rsi = float(ind.get("rsi") or 0) or None
+        if rsi:
+            score += max(-1.0, min(1.0, (rsi - 50.0) / 25.0)); n += 1
+        e50, e200 = ind.get("ema50"), ind.get("ema200")
+        if e50 and e200:
+            score += 1.0 if float(e50) > float(e200) else -1.0; n += 1
+        macd, sig = ind.get("macd"), ind.get("macdSignal")
+        if macd is not None and sig is not None:
+            score += 1.0 if float(macd) > float(sig) else -1.0; n += 1
+        if n:
+            add("price_momentum", score / n, "indicators", ttl=1800)
+    except (TypeError, ValueError):
+        pass
+
+    # ── volatility: signed away from "normal", not a raw magnitude ──
+    try:
+        vr = float((regime or {}).get("vol_ratio") or 0)
+        if vr > 0:
+            add("volatility", (vr - 1.0), "regime", ttl=1800)
+    except (TypeError, ValueError):
+        pass
+
+    # ── liquidity_quality: tight spread in a live session is good liquidity ──
+    try:
+        sp = float(spread_pips or 0)
+        if sp > 0:
+            tight = max(-1.0, min(1.0, (1.5 - sp) / 1.5))
+            sess = market.session()
+            in_session = bool(sess) and "closed" not in str(sess).lower()
+            add("liquidity_quality", tight if in_session else min(tight, 0.0),
+                "spread+session", ttl=900)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+    # ── macro_risk: negative near a high-impact release, for either leg ──
+    try:
+        legs = _currency_legs(symbol)
+        if legs:
+            hit = news.high_impact_window(legs)
+            add("macro_risk", -1.0 if hit else 0.2, "calendar", ttl=1800)
+    except Exception:
+        pass
+
+    # ── sentiment: fear & greed, rescaled from 0..100 to -1..+1 ──
+    try:
+        fg = sentiment.fear_greed()
+        val = (fg or {}).get("value")
+        if val is not None:
+            add("sentiment", (float(val) - 50.0) / 50.0, "fear_greed",
+                conf=0.6, ttl=6 * 3600)
+    except Exception:
+        pass
+
+    return out
 
 
 def _log_trade(user_id, record, pos=None):
@@ -1933,13 +2023,24 @@ def _loop(user_id, alert_fn, gen=None):
                     _ttl = (getattr(cfg, "SENTINEL_TTL_S", 0)
                             or sentinel.default_ttl(cfg.TIMEFRAME))
                     _bar = candles[-1].get("time") if candles else None
+                    # Institutional read: one composite number per symbol,
+                    # carrying the coverage that produced it. Attached to the
+                    # Sentinel state so the AI's verdict and the data behind it
+                    # travel together and expire together.
+                    _inst = institutional.build(symbol,
+                        _institutional_observations(
+                            symbol, ind, regime, _recent_spread()))
+                    dash["institutional"] = institutional.describe(_inst)
                     _state = sentinel.build_state(
                         symbol=symbol, action=action, confidence=confidence,
                         regime=(regime or {}).get("regime"),
                         reasoning=signal.get("reasoning", ""),
                         ttl_s=_ttl,
                         price=price, atr=(ind or {}).get("atr"),
-                        spread_pips=_recent_spread(), bar_time=_bar)
+                        spread_pips=_recent_spread(), bar_time=_bar,
+                        institutional_proxy=_inst.get("institutional_proxy"),
+                        data_quality=_inst.get("data_quality"),
+                        institutional_usable=_inst.get("usable"))
                     # Alert on a CHANGE of mind, never on the state itself.
                     # This loop ticks every few minutes; a message per tick
                     # would be a notification every 5 minutes forever, and the
