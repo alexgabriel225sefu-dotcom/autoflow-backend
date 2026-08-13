@@ -89,8 +89,101 @@ check("but logging that URL redacts it", SECRET not in news._redact(url),
       news._redact(url))
 os.environ.pop("NEWS_API_KEY", None)
 
+
+# ── silence is not success ──────────────────────────────────────────────
+# Appended: the leak fix above was only half the story. Chasing why
+# macro_risk never appeared turned up two bugs that make a feed which
+# answers 200 with nothing in it indistinguishable from a healthy one.
+print("\n── a 200 that parses to zero events must SAY so ──")
+
+import io                          # noqa: E402
+import contextlib                  # noqa: E402
+
+
+class FakeResp:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._payload
+
+
+def fetch_with(payload):
+    """Run one _do_fetch against a canned payload, return what it printed."""
+    news._cache["events"] = []
+    news._cache["ts"] = 0.0
+    news._state.update({"fetching": False, "fails": 0, "next_retry": 0.0})
+    real_get = news.requests.get
+    news.requests.get = lambda *a, **k: FakeResp(payload)
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            news._do_fetch()
+    finally:
+        news.requests.get = real_get
+    return buf.getvalue()
+
+
+out = fetch_with([])
+check("an empty list is reported, not swallowed", "ZERO events" in out, out.strip())
+check("and the shape is named so it can be diagnosed", "list[0]" in out, out.strip())
+
+out = fetch_with({"message": "upgrade your plan"})
+check("a dict payload is reported too", "ZERO events" in out, out.strip())
+check("its keys are shown", "message" in out, out.strip())
+
+good = [{"title": "Core CPI m/m", "country": "USD", "impact": "High",
+         "date": "2026-08-12T08:30:00-04:00"},
+        {"title": "Bank Lending", "country": "JPY", "impact": "Low",
+         "date": "2026-08-09T19:50:00-04:00"}]
+out = fetch_with(good)
+check("a healthy fetch reports its counts", "2 events" in out, out.strip())
+check("including how many are high-impact", "1 high-impact" in out, out.strip())
+check("and does NOT cry zero", "ZERO" not in out, out.strip())
+
+print("\n── an empty answer is still an answer (no refetch storm) ──")
+# Before: fresh = bool(events) and ..., so an empty-but-successful fetch was
+# never fresh, and the success path had reset next_retry to 0 — every _load()
+# spawned another thread, one round-trip per tick per symbol, forever.
+spawned = []
+real_thread = news.threading.Thread
+
+
+class CountingThread:
+    def __init__(self, *a, **k):
+        spawned.append(k.get("name"))
+
+    def start(self):
+        pass
+
+
+news._cache["events"] = []
+news._cache["ts"] = __import__("time").time()   # just fetched, came back empty
+news._state.update({"fetching": False, "fails": 0, "next_retry": 0.0})
+news.threading.Thread = CountingThread
+try:
+    for _ in range(25):
+        news._load()
+finally:
+    news.threading.Thread = real_thread
+check("25 loads after an empty fetch spawn no refetches", spawned == [],
+      f"{len(spawned)} spawned")
+
+# A stale cache must still refresh — the fix must not freeze the feed.
+news._cache["ts"] = __import__("time").time() - (news._TTL + 1)
+news.threading.Thread = CountingThread
+try:
+    news._load()
+finally:
+    news.threading.Thread = real_thread
+check("but once the TTL expires it does refetch", len(spawned) == 1,
+      f"{len(spawned)} spawned")
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")
     sys.exit(1)
-print("✅ ALL NEWS-REDACTION CHECKS PASSED.")
+print("✅ ALL NEWS CHECKS PASSED.")

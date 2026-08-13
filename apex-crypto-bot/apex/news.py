@@ -149,6 +149,22 @@ def _do_fetch():
             _cache["ts"] = time.time()
             _state["fails"] = 0
             _state["next_retry"] = 0.0
+        # Silence is not success. A 200 that parses to nothing looks exactly
+        # like a healthy feed from the outside — no exception, no log line, and
+        # every downstream consumer just sees "no events". Say what happened
+        # either way, so a feed that answers but carries nothing is visible.
+        host = _feed_url().split("/")[2] if "//" in _feed_url() else "?"
+        if events:
+            highs = sum(1 for e in events if _impact_high(e.get("impact")))
+            print(f"[NEWS] calendar ok — {len(events)} events "
+                  f"({highs} high-impact) from {host}")
+        else:
+            shape = (f"list[{len(data)}]" if isinstance(data, list)
+                     else f"{type(data).__name__}"
+                     + (f" keys={sorted(data)[:6]}" if isinstance(data, dict) else ""))
+            print(f"[NEWS] calendar answered 200 but parsed to ZERO events "
+                  f"from {host} — payload was {_redact(shape)}. Macro risk "
+                  f"stays unknown; the guard fail-opens.")
     except Exception as ex:
         with _lock:
             _state["fails"] += 1
@@ -173,7 +189,13 @@ def _load():
     tick once the background fetch completes."""
     now = time.time()
     with _lock:
-        fresh = bool(_cache["events"]) and now - _cache["ts"] < _TTL
+        # Freshness is about WHEN we last asked, not whether the answer had
+        # anything in it. Keying it on `bool(events)` meant an empty-but-
+        # successful fetch was never fresh: the success path resets next_retry
+        # to 0, so every single call spawned another fetch thread, forever, at
+        # one network round-trip per tick per symbol. An empty answer is still
+        # an answer and holds for the TTL like any other.
+        fresh = _cache["ts"] > 0 and now - _cache["ts"] < _TTL
         should_fetch = not fresh and not _state["fetching"] and now >= _state["next_retry"]
         if should_fetch:
             _state["fetching"] = True
