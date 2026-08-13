@@ -2522,9 +2522,17 @@ def _user_alert(uid, result):
                     f"<i>{_esc(sc.get('verdict', ''))}</i>")
         send_to(uid, head + tail)
     elif action == "SKIP_WARN":
-        send_to(uid, f"⚠️ <b>Holding off on {result.get('symbol', sym)}</b>\n"
+        # One message per distinct refusal, then silence until it changes — so
+        # this line has to carry the state the repeats used to imply. "3rd time
+        # today" says the condition is persisting without another notification,
+        # and naming the scan says the bot is working rather than stuck.
+        n = result.get("countToday")
+        nth = f" · {n}{'st' if n == 1 else 'nd' if n == 2 else 'rd' if n == 3 else 'th'} skip today" \
+            if isinstance(n, int) and n > 0 else ""
+        send_to(uid, f"⚠️ <b>Holding off on {result.get('symbol', sym)}</b>{nth}\n"
                      f"<i>{_esc(result.get('reason', 'market conditions are unfavourable right now'))}.</i>\n"
-                     "I'll take the trade as soon as conditions normalise.")
+                     "Still scanning — I'll take the trade as soon as conditions "
+                     "normalise, and I won't repeat this unless something changes.")
     elif action == "MARKET_PULSE":
         vol = f" · Volume: <b>{result['volume']}</b>" if result.get("volume") else ""
         send_to(uid,

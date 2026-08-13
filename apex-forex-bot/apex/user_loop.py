@@ -1245,6 +1245,17 @@ def _loop(user_id, alert_fn, gen=None):
 
         `alert=False` is for the two sites that send their own richer message
         (flash-crash, news) and would otherwise double up.
+
+        The cooldown is held in REDIS, not in this dict. Holding it in memory
+        looked equivalent and was not: every restart emptied it, and the next
+        tick re-sent everything it had already sent. Three deploys inside six
+        minutes produced three identical "Holding off on XAUUSD" messages —
+        the throttle was working perfectly and being reset out from under it.
+        Deploys are not the only restarts either; the watchdog restarts loops
+        too, and during a deploy two instances run at once and would each
+        notify. A shared key with a TTL fixes all three at once, and is the
+        same primitive the order ledger uses. The dict stays as the fallback
+        for when there is no Redis configured.
         """
         today = datetime.now().strftime("%Y-%m-%d")
         if dash.get("skipsDay") != today:
@@ -1258,16 +1269,22 @@ def _loop(user_id, alert_fn, gen=None):
         if not (alert and alert_fn):
             return
         try:
-            key = (_nrm(symbol), str(reason)[:60])
-            now_s = time.time()
-            if now_s - _skip_alerted.get(key, 0) < _SKIP_ALERT_COOLDOWN_S:
-                return
-            _skip_alerted[key] = now_s
-            if len(_skip_alerted) > 200:
-                for k in sorted(_skip_alerted, key=_skip_alerted.get)[:100]:
-                    _skip_alerted.pop(k, None)
+            key = f"{_nrm(symbol)}|{str(reason)[:60]}"
+            shared = user_store.claim(f"skipalert:{user_id}:{key}",
+                                      ttl_s=_SKIP_ALERT_COOLDOWN_S)
+            if shared is False:
+                return                      # already announced, still cooling
+            if shared is None:              # no shared store — in-memory only
+                now_s = time.time()
+                if now_s - _skip_alerted.get(key, 0) < _SKIP_ALERT_COOLDOWN_S:
+                    return
+                _skip_alerted[key] = now_s
+                if len(_skip_alerted) > 200:
+                    for k in sorted(_skip_alerted, key=_skip_alerted.get)[:100]:
+                        _skip_alerted.pop(k, None)
             alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
-                               "reason": str(reason)[:200]})
+                               "reason": str(reason)[:200],
+                               "countToday": dash.get("skipsToday", 1)})
         except Exception as e:
             print(f"[UserLoop:{user_id}] skip alert failed: {e}")
 

@@ -181,6 +181,71 @@ user_store.update = _orig_update
 user_store.save(UID, {})
 
 
+print("\n── THE COOLDOWN MUST SURVIVE A RESTART ──")
+# Live: three identical "Holding off on XAUUSD" messages at 09:35, 09:39 and
+# 09:41 — the exact minutes of three deploys. The throttle was working and
+# being wiped out from under it on every restart. Deploys are not the only
+# restarts (the watchdog restarts loops too), and during a deploy two
+# instances run at once and would each notify.
+_shared_store = {}
+
+
+def shared_claim(key, ttl_s=0):
+    if key in _shared_store:
+        return False
+    _shared_store[key] = ttl_s
+    return True
+
+
+def skip_with_shared(symbol, reason, claim=shared_claim):
+    key = f"{symbol.upper().replace('_', '')}|{reason[:60]}"
+    got = claim(f"skipalert:u1:{key}", COOLDOWN)
+    return got is not False
+
+
+sent = [skip_with_shared("XAUUSD", "HTF gate: BUY blocked by H1 BEARISH trend")]
+# ...deploy. New process, empty local dict, but the shared key is still there.
+_shared_store_snapshot = dict(_shared_store)
+sent.append(skip_with_shared("XAUUSD", "HTF gate: BUY blocked by H1 BEARISH trend"))
+sent.append(skip_with_shared("XAUUSD", "HTF gate: BUY blocked by H1 BEARISH trend"))
+check("first message goes out", sent[0] is True)
+check("a restart does NOT re-send it", sent[1] is False)
+check("nor does a second restart", sent[2] is False)
+check("one message across three deploys, not three",
+      sum(1 for x in sent if x) == 1, str(sent))
+
+print("\n── two instances during a deploy overlap only notify once ──")
+_shared_store.clear()
+a = skip_with_shared("XAUUSD", "HTF gate: BUY blocked")   # old instance
+b = skip_with_shared("XAUUSD", "HTF gate: BUY blocked")   # new instance
+check("exactly one of them sends", (a, b) == (True, False))
+
+print("\n── no shared store → falls back to in-memory, still throttles ──")
+def no_claim(key, ttl_s=0):
+    return None
+
+
+local = {}
+
+
+def skip_local(symbol, reason, now):
+    if no_claim("x") is None:
+        key = f"{symbol}|{reason[:60]}"
+        if now - local.get(key, 0) < COOLDOWN:
+            return False
+        local[key] = now
+    return True
+
+
+# Real wall-clock values: the "never seen" default of 0 is epoch, which is
+# only ever inside the cooldown if the test invents a tiny clock.
+T = 1_786_600_000.0
+check("first sends", skip_local("XAUUSD", "HTF gate", T) is True)
+check("repeat suppressed", skip_local("XAUUSD", "HTF gate", T + 300) is False)
+check("after the cooldown it sends again",
+      skip_local("XAUUSD", "HTF gate", T + COOLDOWN + 1) is True)
+
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")
