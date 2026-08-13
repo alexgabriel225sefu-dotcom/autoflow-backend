@@ -97,6 +97,47 @@ def _call_groq(prompt):
     return _extract_json(text)
 
 
+_VALID_ACTIONS = ("BUY", "SELL", "HOLD")
+
+
+def _validate_verdict(raw):
+    """Normalise a model's reply into a verdict, or None if it isn't one.
+
+    `_extract_json` only guarantees the text contained *some* JSON object. What
+    reached the caller after that was trusted completely, and two real ways a
+    model breaks the contract were being read as deliberate decisions:
+
+      * `{"action": "buy"}` — lowercase. It matches neither the rule action
+        ("BUY") nor "HOLD", so it fell through to the contradiction branch and
+        BLOCKED the trade. The model agreed and the bot read agreement as a
+        veto. Temperature 0 makes this rare, not impossible, and "Buy" or
+        "BUY " with a trailing space do the same thing.
+      * `{"reasoning": "..."}` with no action at all — `.get("action", "HOLD")`
+        turned an unparseable answer into a confident neutral one, complete
+        with the confidence penalty that a real HOLD earns.
+
+    None means "the model did not give a usable verdict", which is a different
+    thing from HOLD and must be handled as such by the caller.
+    """
+    if not isinstance(raw, dict):
+        return None
+    action = raw.get("action")
+    if not isinstance(action, str):
+        return None
+    action = action.strip().upper()
+    if action not in _VALID_ACTIONS:
+        return None
+    out = {"action": action, "reasoning": str(raw.get("reasoning", ""))[:300]}
+    # Confidence is advisory here — the rule engine owns the number — so an
+    # unusable one is dropped rather than failing the whole verdict.
+    try:
+        c = float(raw.get("confidence"))
+        out["confidence"] = c * 100.0 if c <= 1.0 else c
+    except (TypeError, ValueError):
+        pass
+    return out
+
+
 def _call_anthropic(prompt, image_png=None):
     """Ask Anthropic. `image_png` attaches a rendered chart to the question.
 
@@ -107,6 +148,14 @@ def _call_anthropic(prompt, image_png=None):
     tokens per call, so it is opt-in (AI_VISION) and only ever fires on a
     candidate entry, never on every tick.
     """
+    # No key means no attempt. Without this the SDK was constructed with an
+    # empty key and every one of the three models below failed instantly on
+    # "Could not resolve authentication method" — three error lines per AI
+    # call, forever, burying the real failures in the log. Observed live: the
+    # account had no ANTHROPIC_API_KEY set and had been running on the Groq
+    # fallback for its entire life while the logs screamed about Anthropic.
+    if not cfg.ANTHROPIC_API_KEY:
+        raise RuntimeError("ANTHROPIC_API_KEY not set — skipping Anthropic")
     models = ["claude-haiku-4-5-20251001", "claude-3-5-haiku-20241022", "claude-3-haiku-20240307"]
     if image_png:
         import base64
@@ -407,11 +456,20 @@ Respond ONLY with valid JSON:
         except Exception as err:
             print(f"[AI ❌] AI unavailable ({err}) — using rule signal")
 
-    if ai_sig is None:
+    # A reply that does not carry a usable decision is NOT a decision. It is
+    # the same situation as the model being unreachable, and is handled the
+    # same way — never as a HOLD, and never as a contradiction.
+    verdict = _validate_verdict(ai_sig)
+    if ai_sig is not None and verdict is None:
+        print(f"[AI ❌] {mode} reply had no usable verdict "
+              f"({str(ai_sig)[:120]}) — treating as unavailable")
+
+    if verdict is None:
         print(f"[AI] {mode} rule-only: {rule_action} {rule_conf}%")
         return rule_sig
 
-    ai_action = ai_sig.get("action", "HOLD")
+    ai_sig = verdict
+    ai_action = verdict["action"]
     if ai_action == rule_action:
         rule_sig["confidence"] = min(88, rule_conf + 8)
         rule_sig.setdefault("keyFactors", []).append("AI confirms")
