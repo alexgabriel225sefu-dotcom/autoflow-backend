@@ -196,6 +196,13 @@ def validate():
               "Add ANTHROPIC_API_KEY or GROQ_API_KEY for AI-enhanced signals.")
     elif not has_anthropic and has_groq:
         print("ℹ️  ANTHROPIC_API_KEY missing — using Groq (free).")
+    # Say where each AI credential came from. "Which key am I trading on, and
+    # who can revoke it" is not answerable from the outside once a value can
+    # arrive from an env var, an env group, or a mounted secret file.
+    for _k in ("ANTHROPIC_API_KEY", "GROQ_API_KEY", "GEMINI_API_KEY"):
+        _src = cfg.secret_provenance(_k)
+        if _src != "unset":
+            print(f"[Keys] {_k} ← {_src}")
     if cfg.BROKER == "ctrader":
         if cfg.CTRADER_CLIENT_ID and cfg.CTRADER_CLIENT_SECRET:
             print("🔗 cTrader mode — clients connect via /ctrader (OAuth).")

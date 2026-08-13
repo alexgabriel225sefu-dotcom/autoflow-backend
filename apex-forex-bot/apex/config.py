@@ -1,8 +1,33 @@
 """Configuration loaded from environment (.env supported)."""
 import os
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
+# Snapshot what the PLATFORM handed us before a .env file can add to it.
+# Without this there is no way to answer "where did this credential come
+# from", and that question came up for real: the bot was trading on a Groq
+# key the account owner could not find in Render's environment variables or
+# in Telegram. A key of unknown origin is a key nobody can rotate, revoke, or
+# reason about — the provenance matters even when the value is fine.
+#
+# Render mounts Secret Files onto the filesystem, and they are listed in a
+# different place from environment variables; load_dotenv() picks one up
+# silently. So "not in the env var list" does not mean "not configured".
+_PLATFORM_ENV = frozenset(os.environ)
+_DOTENV_PATH = ""
+try:
+    _DOTENV_PATH = find_dotenv(usecwd=True)
+except Exception:
+    pass
 load_dotenv()
+
+
+def secret_provenance(name):
+    """Where the value of `name` came from. Never returns the value itself."""
+    if not os.getenv(name):
+        return "unset"
+    if name in _PLATFORM_ENV:
+        return "platform environment (Render env var / env group)"
+    return f"file on disk: {_DOTENV_PATH or 'a .env found by python-dotenv'}"
 
 
 def _truthy(v: str) -> bool:
