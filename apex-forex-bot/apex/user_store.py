@@ -177,6 +177,59 @@ def claim(key, ttl_s=120):
         return None
 
 
+def incr(key, ttl_s=60):
+    """Atomically bump a counter, giving it a TTL the first time it appears.
+
+    Returns the new count, or None when there is no shared backend or the
+    command failed — same contract as claim(): the caller can tell "I counted"
+    from "I could not ask", and must not read a failure as a limit breach.
+
+    INCR is the primitive a rate limit needs: read-modify-write on a JSON blob
+    loses increments whenever two of anything race, and during a Render deploy
+    two instances serve the same users at once.
+    """
+    if not _USE_REDIS:
+        return None
+    try:
+        if _BACKEND == "redis":
+            n = _r.incr(key)
+            if n == 1:
+                _r.expire(key, int(ttl_s))
+            return int(n)
+        n = _upstash(["INCR", key])
+        if n is None:
+            return None
+        n = int(n)
+        if n == 1:
+            _upstash(["EXPIRE", key, int(ttl_s)])
+        return n
+    except Exception as e:
+        print(f"[Redis] incr failed: {e}")
+        return None
+
+
+def get_blob(key):
+    """Raw string at `key`, or None. For data that is not a user record."""
+    if not _USE_REDIS:
+        return None
+    return _redis_get(key)
+
+
+def set_blob(key, value_str, ttl_s=None):
+    """Write a raw string, optionally expiring. No-op without a shared store."""
+    if not _USE_REDIS:
+        return None
+    if not ttl_s:
+        return _redis_set(key, value_str)
+    if _BACKEND == "redis":
+        try:
+            return _r.set(key, value_str, ex=int(ttl_s))
+        except Exception as e:
+            print(f"[Redis] SET ex failed: {e}")
+            return None
+    return _upstash(["SET", key, value_str, "EX", int(ttl_s)])
+
+
 def _redis_sadd(key, member):
     if _BACKEND == "redis":
         try:

@@ -12,11 +12,10 @@ Provider priority (shared owner key covers ALL clients):
 """
 import json
 import threading
+from apex import chat_memory
 from apex import config as cfg
 
-_conv: dict = {}       # user_id → [{"role", "content"}]
 _clients: dict = {}    # api_key → anthropic.Anthropic client (cached)
-_MAX_HISTORY = 10
 _lock = threading.Lock()
 
 _TOOLS = [
@@ -112,16 +111,17 @@ Current account context is injected after this system prompt."""
 
 
 def _load_history(user_id: str):
-    with _lock:
-        return list(_conv.get(user_id, []))
+    """Bounded history for this user, from the shared store (spec §8).
+
+    Was a process-local dict: every deploy wiped every client's conversation,
+    and during a deploy two instances answered the same user from two
+    different halves of the history.
+    """
+    return chat_memory.load(user_id)
 
 
 def _save_exchange(user_id: str, user_msg: str, assistant_msg: str):
-    with _lock:
-        conv = list(_conv.get(user_id, []))
-        conv.append({"role": "user", "content": user_msg})
-        conv.append({"role": "assistant", "content": assistant_msg})
-        _conv[user_id] = conv[-_MAX_HISTORY:]
+    chat_memory.save_exchange(user_id, user_msg, assistant_msg)
 
 
 def _get_anthropic_client(api_key: str):
@@ -317,7 +317,7 @@ def _chat_anthropic(user_id: str, message: str, api_key: str, send_fn, send_stat
 
     history = _load_history(user_id)
     history.append({"role": "user", "content": message})
-    messages = history[-_MAX_HISTORY:]
+    messages = history[-chat_memory.MAX_HISTORY:]
 
     for _ in range(5):
         try:
@@ -375,7 +375,7 @@ def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None) -> 
     history.append({"role": "user", "content": message})
 
     contents = []
-    for m in history[-_MAX_HISTORY:]:
+    for m in history[-chat_memory.MAX_HISTORY:]:
         role = "model" if m["role"] == "assistant" else "user"
         contents.append({"role": role, "parts": [{"text": m["content"]}]})
 
@@ -438,7 +438,7 @@ def _chat_groq(user_id: str, message: str, api_key: str = "") -> str:
 
     history = _load_history(user_id)
     history.append({"role": "user", "content": message})
-    messages = [{"role": "system", "content": system}] + history[-_MAX_HISTORY:]
+    messages = [{"role": "system", "content": system}] + history[-chat_memory.MAX_HISTORY:]
 
     try:
         r = requests.post(
@@ -496,6 +496,18 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
     """Route to the best available AI, execute tools, send reply."""
     send_status = send_status or (lambda _: None)
     user_id = str(user_id)
+
+    # Spec §10/§11: "unlimited" is a promise to the client, not to the
+    # hardware. Every provider here draws on a shared free-tier quota, and the
+    # trading signal draws on the same one — so an unbounded chat loop does
+    # not just spam the assistant, it can starve the bot of its ability to
+    # decide. Checked before any provider is touched, and before the work is
+    # handed to a thread, so a flood costs one Redis INCR rather than a
+    # thread and an API call.
+    ok, why = chat_memory.allow(user_id)
+    if not ok:
+        send_fn(why)
+        return
 
     def _run():
         try:
@@ -638,6 +650,4 @@ def test_gemini_key(key: str):
 
 
 def clear_history(user_id: str) -> None:
-    user_id = str(user_id)
-    with _lock:
-        _conv.pop(user_id, None)
+    chat_memory.clear(user_id)
