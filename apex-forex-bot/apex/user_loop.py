@@ -1266,6 +1266,16 @@ def _loop(user_id, alert_fn, gen=None):
         lst.insert(0, {"time": datetime.now().strftime("%H:%M"), "reason": str(reason)[:120]})
         del lst[30:]
 
+        # Every refusal goes to stdout too. The dashboard keeps the last 30 and
+        # Telegram deliberately shows each distinct reason once per three
+        # hours — both are the right behaviour for a person, and both make the
+        # logs useless for debugging: searching Render for why the bot went
+        # quiet returned nothing at all, because no refusal was ever written
+        # there. This line is NOT throttled; the log is where the full,
+        # unsummarised sequence belongs.
+        print(f"[UserLoop:{user_id}] SKIP {symbol}: {reason} "
+              f"(#{dash['skipsToday']} today)")
+
         if not (alert and alert_fn):
             return
         try:
@@ -1490,6 +1500,23 @@ def _loop(user_id, alert_fn, gen=None):
                 data_err = None if candles else "broker returned no candles"
             except Exception as e:
                 candles, data_err = None, str(e)
+            # Observe the spread every tick, not only when an entry is being
+            # attempted. The only other caller of _health_check(spread=...)
+            # sits inside the entry block, past every gate — so on a tick the
+            # HTF gate refuses, no spread is ever recorded. `health` is rebuilt
+            # per process, so after each restart liquidity_quality was missing
+            # from the institutional read until the first entry attempt, which
+            # can be hours. That is 0.6 of 6.9 weight lost for no reason,
+            # dragging the composite toward UNUSABLE while the quote sat one
+            # call away. Fail-soft: a bad quote just leaves the window as it is.
+            try:
+                _b, _a = broker.get_bid_ask(symbol)
+                _sp = forex.spread_pips(_b, _a, symbol)
+                if _sp and _sp > 0:
+                    _health_check(spread=_sp)
+            except Exception:
+                pass
+
             if not candles:
                 data_fails += 1
                 print(f"[UserLoop:{user_id}] data error ({data_fails}): {data_err}")
@@ -2450,6 +2477,40 @@ def _loop(user_id, alert_fn, gen=None):
             if entry_ok and user_store.load(user_id).get("copilot"):
                 _suggest_trade(user_id, signal, symbol, price, alert_fn)
                 entry_ok = False
+
+            # A shadow gate needs candidates, and every candidate was being
+            # thrown away before it got one. The Sentinel and institutional
+            # checks live inside `if entry_ok:` below — deliberately, since in
+            # enforce mode they must be the last word before an order goes
+            # out. The side effect is that in SHADOW mode they only ever saw
+            # setups that had already cleared every other gate. The HTF gate
+            # refuses most candidates long before that (eight in a row on one
+            # symbol today), so the shadow sample was a single verdict.
+            #
+            # Evaluate the verdict on refused candidates too, for the record
+            # only: entry_ok is already False, nothing downstream reads this,
+            # and no Telegram message is sent — these fire on ordinary refused
+            # ticks and would be pure noise. The log is the right home for a
+            # sample you intend to count later.
+            if (not entry_ok and _sentinel_mode != "off"
+                    and action in ("BUY", "SELL")):
+                try:
+                    _sig_sh = _signals.get(symbol)
+                    _sok_sh, _sreason_sh = sentinel.decide(
+                        _sig_sh, action,
+                        min_confidence=getattr(
+                            cfg, "SENTINEL_MIN_CONFIDENCE", None),
+                        min_ev_r=None, risk_ok=True)
+                    dash["sentinelGate"] = (f"{_sreason_sh} "
+                                            f"(moot — entry already refused)")
+                    print(f"[UserLoop:{user_id}] Sentinel shadow on a refused "
+                          f"candidate: would "
+                          f"{'ALLOW' if _sok_sh else 'BLOCK'} {action} "
+                          f"{symbol} — {_sreason_sh} "
+                          f"({sentinel.describe(_sig_sh)})")
+                except Exception as e:
+                    # Observability must never be able to break a live loop.
+                    print(f"[UserLoop:{user_id}] sentinel shadow error: {e}")
 
             ev_verdict = None
             if entry_ok:

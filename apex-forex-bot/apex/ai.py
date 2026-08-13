@@ -590,13 +590,46 @@ def mean_reversion_signal(ind, open_position=None):
     # has overshot well past the mean (profit-taking zone, not midline).
     if open_position:
         side = open_position.get("side")
+
+        def _exit_reason():
+            """Say whether the exit is actually in profit, instead of assuming.
+
+            This rule fires on Bollinger position alone and used to label every
+            exit "taking profit" — including exits where price had moved
+            AGAINST the trade. Live examples: a SELL at 0.70581 booked as
+            "taking profit" at 0.70583, and a USDCHF BUY at 0.8132 closed at
+            0.81306 for -$2.14 under the same words. The P&L accounting was
+            right both times; only the sentence the user reads was false, which
+            is worse than useless — it teaches you to trust a number that is
+            not being measured.
+
+            The band said the thesis is finished. Whether that is a profit is a
+            separate fact, and it is right here in entryPrice.
+            """
+            entry = open_position.get("entryPrice") or open_position.get("entry_price")
+            try:
+                entry, now_px = float(entry), float(price)
+            except (TypeError, ValueError):
+                # No usable entry price: describe the trigger, claim nothing
+                # about the outcome.
+                return "Mean reversion: price reached the mean — thesis done"
+            if not entry or not now_px:
+                return "Mean reversion: price reached the mean — thesis done"
+            gain = (now_px - entry) if side == "BUY" else (entry - now_px)
+            if gain > 0:
+                return "Mean reversion: price overshot past mean — taking profit"
+            if gain < 0:
+                return ("Mean reversion: price reached the mean against the "
+                        "position — closing at a loss, thesis broke")
+            return "Mean reversion: price reached the mean — closing flat"
+
         if side == "BUY" and bb_pos >= 65:
             return {"action": "CLOSE", "confidence": 72, "criteriaScore": 3,
-                    "reasoning": "Mean reversion: price overshot past mean — taking profit",
+                    "reasoning": _exit_reason(),
                     "riskLevel": "LOW", "keyFactors": ["overshot mean"]}
         if side == "SELL" and bb_pos <= 35:
             return {"action": "CLOSE", "confidence": 72, "criteriaScore": 3,
-                    "reasoning": "Mean reversion: price overshot past mean — taking profit",
+                    "reasoning": _exit_reason(),
                     "riskLevel": "LOW", "keyFactors": ["overshot mean"]}
         return {"action": "HOLD", "confidence": 55, "criteriaScore": 2,
                 "reasoning": "Holding mean-reversion trade — riding to TP",
