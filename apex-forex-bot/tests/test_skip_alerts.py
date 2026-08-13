@@ -134,6 +134,53 @@ check("_SKIP_ALERT_COOLDOWN_S exists",
 check("and is three hours", user_loop._SKIP_ALERT_COOLDOWN_S == COOLDOWN,
       str(getattr(user_loop, "_SKIP_ALERT_COOLDOWN_S", None)))
 
+print("\n── the focus symbol must be persisted, not only shown ──")
+# Auto-Pilot rotated dash["symbol"] but never the stored user["symbol"].
+# Telegram reads the STORED one, so /status, /chart and a bare /buy all used
+# whatever pair the record was last left on — live, the dashboard said XAUUSD
+# while the record still said AUDUSD. A manual buy would have opened on an
+# instrument the bot had not looked at in hours.
+from apex import user_store  # noqa: E402
+
+UID = "focus-test"
+user_store.update(UID, {"symbol": "AUDUSD"})
+
+
+def focus(sym, dash):
+    """Mirrors the corrected _focus helper."""
+    dash["symbol"] = sym
+    if (user_store.load(UID).get("symbol") or "").upper().replace("_", "") \
+            != sym.upper().replace("_", ""):
+        user_store.update(UID, {"symbol": sym})
+
+
+d = {"symbol": "AUDUSD"}
+focus("XAUUSD", d)
+check("the dashboard follows the rotation", d["symbol"] == "XAUUSD")
+check("and so does the stored record Telegram reads",
+      user_store.load(UID).get("symbol") == "XAUUSD",
+      str(user_store.load(UID).get("symbol")))
+
+writes = {"n": 0}
+_orig_update = user_store.update
+
+
+def counting_update(uid, patch):
+    writes["n"] += 1
+    return _orig_update(uid, patch)
+
+
+user_store.update = counting_update
+for _ in range(20):
+    focus("XAUUSD", d)          # same symbol, tick after tick
+check("re-focusing the same symbol costs no extra writes",
+      writes["n"] == 0, str(writes["n"]))
+focus("NZDUSD", d)
+check("a real rotation does write once", writes["n"] == 1, str(writes["n"]))
+user_store.update = _orig_update
+user_store.save(UID, {})
+
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")

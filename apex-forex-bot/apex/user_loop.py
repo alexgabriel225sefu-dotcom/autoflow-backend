@@ -1202,6 +1202,28 @@ def _loop(user_id, alert_fn, gen=None):
             return None
         return sps[len(sps) // 2]
 
+    def _focus(sym):
+        """Move the Auto-Pilot focus, and persist it.
+
+        The rotation only ever wrote dash["symbol"], which is in-memory. Every
+        Telegram command reads the STORED user["symbol"] instead, so the two
+        drifted apart the moment Auto-Pilot moved: the dashboard and heartbeat
+        showed XAUUSD while /status, /chart and — worst — a bare /buy still
+        used whatever pair the record was last left on. A manual buy would open
+        a position on an instrument the bot had not looked at in hours.
+
+        Written only on an actual change, so this costs one store write per
+        rotation rather than one per tick.
+        """
+        nonlocal symbol
+        symbol = sym
+        dash["symbol"] = sym
+        if _nrm(user_store.load(user_id).get("symbol")) != _nrm(sym):
+            try:
+                user_store.update(user_id, {"symbol": sym})
+            except Exception as e:
+                print(f"[UserLoop:{user_id}] focus persist failed: {e}")
+
     _skip_alerted = {}   # (symbol, reason) -> when it was last sent
 
     def _skip(reason, alert=True):
@@ -1427,8 +1449,7 @@ def _loop(user_id, alert_fn, gen=None):
                     except Exception as e:
                         print(f"[UserLoop:{user_id}] scan {ws}: {e}")
                 if best:
-                    symbol = best[0]
-                    dash["symbol"] = symbol
+                    _focus(best[0])
                 elif (spread_blocked.get(_nrm(symbol), 0) > time.time()
                       or _nrm(symbol) in open_syms):
                     # Nothing signalled this scan AND the current focus is
@@ -1440,8 +1461,7 @@ def _loop(user_id, alert_fn, gen=None):
                             continue
                         if spread_blocked.get(_nrm(ws), 0) > time.time():
                             continue
-                        symbol = ws
-                        dash["symbol"] = symbol
+                        _focus(ws)
                         break
 
             # Data fetch is the loop's lifeline — if it fails silently the user
