@@ -7,6 +7,7 @@ Triple-backend (first match wins):
 """
 import json
 import os
+from urllib.parse import quote as _quote
 
 import requests as _req
 
@@ -104,8 +105,21 @@ _ACTIVE_SET = f"{_NS}:active_users"
 
 # ─── Redis helpers ────────────────────────────────────────
 def _upstash(cmd_parts):
+    """Upstash REST: each command argument is one path segment.
+
+    Arguments MUST be percent-encoded. Without it a key or value containing a
+    slash silently becomes two arguments — "at max positions (1/1)" turns a
+    3-argument SET into a 4-argument one, which either errors or writes under a
+    truncated key. Spaces were being encoded by requests as a side effect;
+    slashes never were. Every key used so far happened to be alphanumeric, so
+    the bug stayed latent until a skip-alert key carried a human-readable
+    reason.
+
+    `safe=":"` is load-bearing: the namespace separator in `forex:user:123`
+    must stay literal, or every existing key changes and the store looks empty.
+    """
     try:
-        url = f"{_UPD_URL}/{'/'.join(str(p) for p in cmd_parts)}"
+        url = f"{_UPD_URL}/{'/'.join(_quote(str(p), safe=':') for p in cmd_parts)}"
         r = _req.get(url, headers={"Authorization": f"Bearer {_UPD_TOKEN}"}, timeout=8)
         r.raise_for_status()
         return r.json().get("result")
