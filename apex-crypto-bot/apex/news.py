@@ -16,6 +16,7 @@ Config (env):
     NEWS_WINDOW_MIN=<int>        minutes around an event to stay flat (default 30)
 """
 import os
+import re
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -48,7 +49,14 @@ def window_min() -> int:
         return 30
 
 
-_FMP = "https://financialmodelingprep.com/api/v3/economic_calendar"
+# FMP's economic calendar. The old /api/v3/economic_calendar was retired on
+# 2025-08-31 and now answers 403 "Legacy Endpoint" to every key issued after
+# that date — a valid key looks exactly like a broken one. /stable/ is the
+# live replacement, but it is a PAID endpoint: a free key gets 402 "Restricted
+# Endpoint". So NEWS_API_KEY only buys anything on a paid FMP plan; without one
+# leave it unset and the free Forex Factory feed below is used instead (it is
+# reachable from datacenter IPs and carries the same high-impact releases).
+_FMP = "https://financialmodelingprep.com/stable/economic-calendar"
 
 # Country code → currency, so a US/EU/GB event matches USD/EUR/GBP filters.
 _CCY = {"US": "USD", "USA": "USD", "EU": "EUR", "EMU": "EUR", "DE": "EUR",
@@ -76,6 +84,27 @@ def _feed_url() -> str:
         to = (today + timedelta(days=8)).isoformat()
         return f"{_FMP}?from={frm}&to={to}&apikey={key}"
     return _DEFAULT_FEED  # Forex Factory — often blocked on datacenter IPs
+
+
+_SECRET_PARAMS = ("apikey", "api_key", "token", "key", "secret", "password")
+
+
+def _redact(text) -> str:
+    """Strip secret query-string values out of anything bound for the logs.
+
+    requests puts the full request URL into the text of an HTTPError, so
+    `print(f"...({ex})")` on a failing keyed feed publishes the API key in
+    plaintext to the log stream — which is exactly what happened here: a 403
+    from the calendar provider wrote the FMP key into Render's logs every 30
+    minutes for days. Redacting at the point of logging means no future feed,
+    keyed however it likes, can repeat it.
+    """
+    s = str(text)
+    for p in _SECRET_PARAMS:
+        # Match `p=<value>` case-insensitively, keeping the delimiter that ends
+        # the value (& or whitespace or the closing paren requests adds).
+        s = re.sub(rf"({re.escape(p)}=)[^&\s)\"']+", r"\1***", s, flags=re.I)
+    return s
 
 
 def _parse_time(raw):
@@ -127,7 +156,8 @@ def _do_fetch():
             _state["next_retry"] = time.time() + backoff
         # Fail-open: keep any stale cache; if empty it stays empty → the guard
         # reports "no event" and trading continues normally.
-        print(f"[NEWS] feed unavailable ({ex}) — guard fail-open, retry in ~{int(backoff)}s")
+        print(f"[NEWS] feed unavailable ({_redact(ex)}) — guard fail-open, "
+              f"retry in ~{int(backoff)}s")
     finally:
         with _lock:
             _state["fetching"] = False
