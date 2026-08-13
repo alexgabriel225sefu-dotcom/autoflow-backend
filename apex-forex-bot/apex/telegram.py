@@ -2612,10 +2612,21 @@ def _user_alert(uid, result):
         icon = "✅" if (pnl or 0) >= 0 else "❌"
         pnl_line = (f"{icon} Realized P&amp;L: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>\n"
                     if pnl is not None else "")
+        # The exit price is absent when Auto-Pilot had already rotated to
+        # another instrument by the time this close was noticed — the loop
+        # refuses to pass the new focus pair's price off as this one's. Say
+        # that, rather than printing an arrow pointing at an em-dash. The P&L
+        # is the broker's own figure and is unaffected either way.
+        _exit = result.get("price")
+        move = (f"{result.get('side', '')} from <b>{_fmt_px(result.get('entryPrice'))}</b> → "
+                f"≈ <b>{_fmt_px(_exit)}</b> (stop-loss or take-profit executed at cTrader)"
+                if _exit is not None else
+                f"{result.get('side', '')} from <b>{_fmt_px(result.get('entryPrice'))}</b> — "
+                f"closed at cTrader (stop-loss or take-profit); exact exit price "
+                f"not captured, P&amp;L below is the broker's own figure")
         send_to(uid,
                 f"🎯 <b>Your broker closed the position</b> — {sym}\n"
-                f"{result.get('side', '')} from <b>{_fmt_px(result.get('entryPrice'))}</b> → "
-                f"≈ <b>{_fmt_px(result.get('price'))}</b> (stop-loss or take-profit executed at cTrader)\n"
+                f"{move}\n"
                 f"{pnl_line}"
                 f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>")
     elif action == "STOP_MOVED":
