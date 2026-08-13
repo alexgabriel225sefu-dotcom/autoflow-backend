@@ -234,7 +234,13 @@ def describe(state):
     bits = [state.get("symbol", "?")]
     bits.append(f"proxy {p:+.2f}" if p is not None else "proxy n/a")
     bits.append(f"quality {state.get('data_quality', 0):.0%}")
-    bits.append(f"{len(state.get('features') or {})}/{len(WEIGHTS)} features")
+    # Name the features, don't just count them. "4/9" cannot answer the only
+    # question anyone asks of this line — WHICH four — so diagnosing a missing
+    # source meant reverse-engineering the count from the quality percentage
+    # and the weight table, which is guesswork. The names are already here.
+    feats = state.get("features") or {}
+    bits.append(f"{len(feats)}/{len(WEIGHTS)}: "
+                + (", ".join(f for f in FEATURES if f in feats) or "none"))
     if not state.get("usable"):
         bits.append(f"UNUSABLE ({state.get('reason')})")
     return " · ".join(bits)

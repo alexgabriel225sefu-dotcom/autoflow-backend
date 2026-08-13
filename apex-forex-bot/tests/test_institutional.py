@@ -195,8 +195,37 @@ check("so a dead feed lowers data_quality instead of inflating it",
       f"dead={dead['data_quality']} alive={alive['data_quality']}")
 news._load = _orig_load
 
+
+# ── describe() must name the features, not just count them ──────────────
+# "4/9 features" cannot answer the only question the line is ever read for:
+# WHICH four. Diagnosing a missing macro_risk meant reverse-engineering the
+# count from the quality percentage against the weight table — twice, and
+# wrongly. The names were already in the state.
+print("\n── describe() names its coverage ──")
+
+_now = 1000.0
+_obs = [
+    I.observe("price_momentum", 0.4, "indicators", now=_now),
+    I.observe("volatility", -0.03, "regime", now=_now),
+    I.observe("macro_risk", 0.2, "calendar", now=_now),
+]
+_line = I.describe(I.build("USDCHF", _obs, now=_now))
+check("the count is still there", "3/9" in _line, _line)
+for _f in ("price_momentum", "volatility", "macro_risk"):
+    check(f"{_f} is named", _f in _line, _line)
+check("an absent feature is not named", "cot_bias" not in _line, _line)
+check("the symbol still leads", _line.startswith("USDCHF"), _line)
+check("names are listed in FEATURES order",
+      _line.index("price_momentum") < _line.index("volatility")
+      < _line.index("macro_risk"), _line)
+
+_empty = I.describe(I.build("EURUSD", [], now=_now))
+check("no features reads as 'none', not an empty list", "0/9: none" in _empty,
+      _empty)
+check("and it is still flagged unusable", "UNUSABLE" in _empty, _empty)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")
     sys.exit(1)
-print("✅ ALL INSTITUTIONAL-STATE CHECKS PASSED.")
+print("✅ ALL INSTITUTIONAL CHECKS PASSED.")
