@@ -122,6 +122,9 @@ _SCAN_INTERVAL_S = int(os.getenv("SCAN_INTERVAL_S") or 180)
 _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
 _SKIP_WARN_THROTTLE = 36  # "don't trade now" warnings — only every ~3h (was 30m)
+# Per (symbol, reason) cooldown for refusal alerts. Distinct reasons are never
+# suppressed by each other — only the identical one repeating tick after tick.
+_SKIP_ALERT_COOLDOWN_S = 3 * 3600
 _LOSS_COOLDOWN_MIN = 15   # pause after a loss — avoid revenge trades in the same move
 _CLOSE_COOLDOWN_MIN = 10  # pause after ANY close — prevent open/close churn
 
@@ -1199,16 +1202,52 @@ def _loop(user_id, alert_fn, gen=None):
             return None
         return sps[len(sps) // 2]
 
-    def _skip(reason):
+    _skip_alerted = {}   # (symbol, reason) -> when it was last sent
+
+    def _skip(reason, alert=True):
         """Journal every rejected entry (premium spec #12) — clients see the
-        discipline, not just the trades: 'refused 14 weak setups today'."""
+        discipline, not just the trades: 'refused 14 weak setups today'.
+
+        This wrote to the dashboard and nowhere else, so of the 25 places that
+        refuse an entry only six ever reached Telegram, and the HTF gate — the
+        one doing most of the refusing — was not among them. A client watching
+        their phone saw the bot go quiet for a day with no explanation.
+
+        Those six also shared ONE `last_warn_tick`, so a "market too quiet"
+        notice at 08:00 silenced a spread warning at 08:05 and an EV veto at
+        08:10 for the next three hours. Throttling is per (symbol, reason)
+        instead: each distinct refusal gets through once, and only the identical
+        one repeating on the next tick is suppressed. The HTF gate fired eight
+        times on one symbol with one reason today — that is one message, not
+        eight, and not zero.
+
+        `alert=False` is for the two sites that send their own richer message
+        (flash-crash, news) and would otherwise double up.
+        """
         today = datetime.now().strftime("%Y-%m-%d")
         if dash.get("skipsDay") != today:
             dash["skipsDay"], dash["skipsToday"] = today, 0
+            _skip_alerted.clear()
         dash["skipsToday"] = dash.get("skipsToday", 0) + 1
         lst = dash.setdefault("skips", [])
         lst.insert(0, {"time": datetime.now().strftime("%H:%M"), "reason": str(reason)[:120]})
         del lst[30:]
+
+        if not (alert and alert_fn):
+            return
+        try:
+            key = (_nrm(symbol), str(reason)[:60])
+            now_s = time.time()
+            if now_s - _skip_alerted.get(key, 0) < _SKIP_ALERT_COOLDOWN_S:
+                return
+            _skip_alerted[key] = now_s
+            if len(_skip_alerted) > 200:
+                for k in sorted(_skip_alerted, key=_skip_alerted.get)[:100]:
+                    _skip_alerted.pop(k, None)
+            alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
+                               "reason": str(reason)[:200]})
+        except Exception as e:
+            print(f"[UserLoop:{user_id}] skip alert failed: {e}")
 
     while True:
         with _lock:
@@ -1628,8 +1667,30 @@ def _loop(user_id, alert_fn, gen=None):
                         pnl_est = round(paper_balance - prev_balance, 2) if not dash.get("balStale") else None
                         gross_pnl = pnl_est
                         cost_usd = 0.0
-                    result = {"action": "BROKER_CLOSE", "symbol": symbol,
-                              "side": prev_pos.get("side", ""), "price": price,
+                    # The closed position's OWN symbol and price — never the
+                    # loop's current focus. Auto-Pilot rotates between ticks, so
+                    # by the time a broker-side close is noticed the focus can
+                    # already be on a different instrument, and this recorded
+                    # the close under it. Live proof from last night:
+                    #
+                    #   symbol AUDUSD · entry 0.81169 (USDCHF) · exit 0.70484
+                    #
+                    # A +$24.99 USDCHF win filed as an AUDUSD trade with one
+                    # pair's entry and another's exit. _log_trade's symbol guard
+                    # caught the contradiction and dropped the entry fields, so
+                    # it never poisoned the calibrator — but the label was lost
+                    # too, which is why a clean win left the sample count where
+                    # it was. `price` belongs to the focus instrument, so it is
+                    # only a valid exit when the two agree; the P&L itself comes
+                    # from the broker's own closed-deal record either way.
+                    _closed_sym = prev_pos.get("symbol") or symbol
+                    _exit_px = price if _nrm(_closed_sym) == _nrm(symbol) else None
+                    if _exit_px is None:
+                        print(f"[UserLoop:{user_id}] {_closed_sym} closed at the broker "
+                              f"while focus moved to {symbol} — logging without an "
+                              f"exit price rather than {symbol}'s")
+                    result = {"action": "BROKER_CLOSE", "symbol": _closed_sym,
+                              "side": prev_pos.get("side", ""), "price": _exit_px,
                               "entryPrice": prev_pos.get("entryPrice"),
                               "netPnl": pnl_est, "balance": round(paper_balance, 2),
                               "grossPnl": gross_pnl, "costUsd": cost_usd,
@@ -2222,10 +2283,6 @@ def _loop(user_id, alert_fn, gen=None):
             if entry_ok and regime_block:
                 entry_ok = False
                 _skip(regime.get("label", "market too quiet"))
-                if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
-                    last_warn_tick = tick
-                    alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
-                                       "reason": regime.get("label", "market too quiet")})
             if entry_ok and getattr(cfg, "HTF_CONFIRM", False):
                 htf_c = None
                 try:
@@ -2244,10 +2301,6 @@ def _loop(user_id, alert_fn, gen=None):
                 left = int((_LOSS_COOLDOWN_MIN * 60 - (time.time() - last_loss_at)) / 60) + 1
                 entry_ok = False
                 _skip(f"post-loss cooldown ({left}m left)")
-                if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
-                    last_warn_tick = tick
-                    alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
-                                       "reason": f"cooling down after a loss — entries resume in ~{left}m"})
             if entry_ok and last_close_at and last_loss_at and last_close_at == last_loss_at and \
                time.time() - last_close_at < _CLOSE_COOLDOWN_MIN * 60:
                 left = int((_CLOSE_COOLDOWN_MIN * 60 - (time.time() - last_close_at)) / 60) + 1
@@ -2295,11 +2348,6 @@ def _loop(user_id, alert_fn, gen=None):
                     if not was_blocked:  # arm ONCE — don't renew the 30-min TTL every tick
                         spread_blocked[_nrm(symbol)] = time.time() + 1800
                     _skip(f"spread too wide ({spread_pct:.2f}% > {max_spread_pct:g}%)")
-                    if alert_fn and not was_blocked and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
-                        last_warn_tick = tick
-                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
-                                           "reason": f"spread is unusually wide ({spread_pct:.2f}%) — "
-                                                     "entering now would hand the edge to the broker"})
                 elif max_spread_pct <= 0 and spread > max_spread:
                     print(f"[UserLoop:{user_id}] skip entry — spread {spread:.1f}p > {max_spread}p limit")
                     entry_ok = False
@@ -2307,11 +2355,6 @@ def _loop(user_id, alert_fn, gen=None):
                     if not was_blocked:
                         spread_blocked[_nrm(symbol)] = time.time() + 1800
                     _skip(f"spread too wide ({spread:.1f}p > {max_spread:g}p)")
-                    if alert_fn and not was_blocked and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
-                        last_warn_tick = tick
-                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
-                                           "reason": f"spread is unusually wide ({spread:.1f} pips) — "
-                                                     "entering now would hand the edge to the broker"})
                 # Break-even guard (pip-based) only applies to the forex pip model;
                 # crypto's %-spread guard above already ensures the edge clears costs.
                 elif max_spread_pct <= 0 and cfg.TAKE_PROFIT_PIPS <= (spread + comm_pips) * 1.5:
@@ -2324,7 +2367,7 @@ def _loop(user_id, alert_fn, gen=None):
             # so the threshold is raised via FLASH_SPIKE_PCT).
             if entry_ok and _flash_spike(candles, getattr(cfg, "FLASH_SPIKE_PCT", 0.012)):
                 entry_ok = False
-                _skip("flash-crash guard: extreme candle range")
+                _skip("flash-crash guard: extreme candle range", alert=False)
                 if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                     last_warn_tick = tick
                     alert_fn(user_id, {"action": "FLASH_WARN", "symbol": symbol})
@@ -2358,7 +2401,8 @@ def _loop(user_id, alert_fn, gen=None):
                 ev = news.high_impact_window(_currency_legs(symbol))
                 if ev:
                     entry_ok = False
-                    _skip(f"news guard: {ev.get('title', 'high-impact event') if isinstance(ev, dict) else ev}")
+                    _skip(f"news guard: {ev.get('title', 'high-impact event') if isinstance(ev, dict) else ev}",
+                          alert=False)
                     if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
                         alert_fn(user_id, {"action": "NEWS_WARN", "symbol": symbol, "event": ev})

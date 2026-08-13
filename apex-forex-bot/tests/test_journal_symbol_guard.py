@@ -89,6 +89,53 @@ check("no symbol on the position → fields still copied",
 
 user_store.clear_trades(UID)
 
+print("\n── THE ROOT CAUSE: a broker close logged under the focus symbol ──")
+# Last night, live: USDCHF closed at the broker for +$24.99 while Auto-Pilot
+# had already rotated the focus to AUDUSD. The journal row said
+#   symbol AUDUSD · entry 0.81169 (USDCHF) · exit 0.70484 (AUDUSD)
+# The guard below caught it and dropped the entry fields, so the calibrator was
+# never poisoned — but the label was lost with them, which is why a clean win
+# left the sample count unmoved. The fix is upstream: use the CLOSED
+# position's own symbol, and refuse to pass off the focus instrument's price
+# as its exit.
+def broker_close_record(prev_pos, focus_symbol, focus_price):
+    """Mirrors the corrected construction in _loop."""
+    closed_sym = prev_pos.get("symbol") or focus_symbol
+    exit_px = focus_price if _nrm(closed_sym) == _nrm(focus_symbol) else None
+    return {"action": "BROKER_CLOSE", "symbol": closed_sym, "price": exit_px,
+            "entryPrice": prev_pos.get("entryPrice"), "netPnl": 24.99,
+            "time": "2026-08-13 03:41:23"}
+
+
+def _nrm(x):
+    return (x or "").upper().replace("_", "").replace("/", "").replace("-", "")
+
+
+CHF_POS = {"symbol": "USDCHF", "side": "BUY", "entryPrice": 0.81169,
+           "entryConfidence": 73, "entryRegime": "ranging", "entrySlPips": 35.0}
+
+user_store.clear_trades(UID)
+rec = broker_close_record(CHF_POS, "AUDUSD", 0.70484)
+check("the close is filed under USDCHF, not the focus symbol",
+      rec["symbol"] == "USDCHF", rec["symbol"])
+check("AUDUSD's price is NOT passed off as USDCHF's exit",
+      rec["price"] is None, str(rec["price"]))
+user_loop._log_trade(UID, rec, CHF_POS)
+row = user_store.load_trades(UID)[0]
+check("no mismatch, so the entry snapshot survives",
+      row.get("confidence") == 73, str(row.get("confidence")))
+check("and the win finally counts toward calibration",
+      __import__("apex.ev", fromlist=["ev"]).labelled_count(
+          user_store.load_trades(UID)) == 1)
+
+user_store.clear_trades(UID)
+rec2 = broker_close_record(CHF_POS, "USDCHF", 0.81420)
+check("when focus and position agree, the exit price is kept",
+      rec2["price"] == 0.81420)
+
+user_store.clear_trades(UID)
+
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")
