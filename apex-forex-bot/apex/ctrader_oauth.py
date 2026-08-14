@@ -191,11 +191,29 @@ def handle_callback(query: dict):
             # Mirror the account's real balance into paper mode so the client sees
             # THEIR money, not an arbitrary $1000. Also a live connection check:
             # if this fails, candles/orders will fail identically — surface it now.
-            try:
-                bal = ctrader.account_balance(access, a["ctid"], updates["ctrader_env"])
-                updates["paper_balance"] = bal
-            except Exception as e:
-                bal_err = str(e)
+            # Right after OAuth the pooled socket is cold: connect, app auth,
+            # account auth and the trader request all happen on a brand-new
+            # TLS session, and the whole chain has been observed timing out
+            # twice in a row (account_balance already retries once itself) —
+            # the client then gets "Balance unavailable: timed out" while the
+            # trading loop reads the same balance fine seconds later.
+            #
+            # One more attempt after a short pause covers the cold-start case
+            # without making the browser wait through another full timeout in
+            # the common path, where the first call simply works.
+            for _attempt in (1, 2):
+                try:
+                    bal = ctrader.account_balance(access, a["ctid"],
+                                                  updates["ctrader_env"])
+                    updates["paper_balance"] = bal
+                    bal_err = None
+                    break
+                except Exception as e:
+                    bal_err = str(e)
+                    print(f"[cTrader OAuth] balance attempt {_attempt} failed "
+                          f"for {a['ctid']}: {e}")
+                    if _attempt == 1:
+                        time.sleep(2)
     user_store.update(chat_id, updates)
     _pending.pop(str(chat_id), None)
 
@@ -238,10 +256,21 @@ def handle_callback(query: dict):
         elif len(accounts) == 1:
             a = accounts[0]
             env = "LIVE 🔴" if a["live"] else "demo 🧪"
-            bal_line = (f"💰 Balance: <b>${bal:,.2f}</b>\n"
-                        if bal is not None else
-                        (f"⚠️ Balance unavailable: <i>{bal_err[:80]}</i>\n"
-                         if bal_err else ""))
+            # Even after the retry, a cold connection can still time out. The
+            # client does not need an error string for that — the number is
+            # already known from the last successful read, and the loop will
+            # refresh it within a tick. Showing a stale-but-labelled figure
+            # beats showing a warning that reads like the account is broken.
+            if bal is not None:
+                bal_line = f"💰 Balance: <b>${bal:,.2f}</b>\n"
+            else:
+                _known = user_store.load(chat_id).get("paper_balance")
+                if isinstance(_known, (int, float)) and _known:
+                    bal_line = (f"💰 Balance: <b>${_known:,.2f}</b> "
+                                f"<i>(last known — refreshing)</i>\n")
+                else:
+                    bal_line = (f"⏳ Balance loading… <i>{(bal_err or '')[:60]}</i>\n"
+                                if bal_err else "")
             # A RECONNECT is not a first run. onboard_start() used to fire
             # unconditionally here, so re-authorising cTrader — a token
             # refresh, a re-link, tapping /ctrader again — threw an

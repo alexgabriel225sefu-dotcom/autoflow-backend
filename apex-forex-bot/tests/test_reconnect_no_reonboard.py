@@ -97,8 +97,49 @@ print("\n── the page still confirms success to the browser either way ──
 check("the duplicate path still renders Connected",
       head.count("Connected") >= 1)
 
+
+# ── balance: retry, then fall back to what we already know ─────────────
+# "⚠️ Balance unavailable: timed out" reached a client. account_balance
+# already retries once internally, so that message means TWO attempts failed
+# — the cold TLS session right after OAuth (connect + app auth + account auth
+# + request) does not always finish inside the window, while the trading loop
+# reads the same balance fine seconds later.
+print("\n── the balance fetch retries before giving up ──")
+_bal = SRC[SRC.index("if not gate_reason:"):SRC.index("user_store.update(chat_id, updates)")]
+check("there is a retry loop", "for _attempt in (1, 2):" in _bal, _bal[:200])
+check("it pauses between attempts", "time.sleep(2)" in _bal)
+check("it does not pause after the last attempt",
+      "if _attempt == 1:" in _bal, _bal[-300:])
+check("a success clears the earlier error", "bal_err = None" in _bal)
+check("and stops retrying", "break" in _bal)
+check("each failure is logged with its attempt number",
+      "balance attempt {_attempt} failed" in _bal)
+
+print("\n── a still-failing balance shows a number, not an alarm ──")
+_msg = SRC[SRC.index("if bal is not None:"):SRC.index("# A RECONNECT is not a first run.")]
+check("the last known balance is used as a fallback",
+      'user_store.load(chat_id).get("paper_balance")' in _msg, _msg[:200])
+check("and is labelled as last known, not passed off as live",
+      "last known" in _msg)
+# Scoped to the message-building code: the phrase also appears in a comment
+# that documents what the client used to see.
+_TG = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "apex", "telegram.py")).read()
+check("the scary wording is gone from the OAuth message",
+      "Balance unavailable" not in _msg)
+check("and from the /ctaccount path, which had the same bug",
+      'bal_line = f"⚠️ Balance unavailable' not in _TG)
+check("/ctaccount also stopped re-onboarding a configured client",
+      'user.get("symbol") and user.get("strategy")' in _TG)
+check("/ctaccount retries the balance too",
+      _TG.count("for _attempt in (1, 2):") >= 1)
+check("a client with no known balance sees 'loading', not an error",
+      "Balance loading" in _msg)
+check("a real number is still preferred when the call works",
+      "${bal:,.2f}" in _msg)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")
     sys.exit(1)
-print("✅ ALL RECONNECT CHECKS PASSED.")
+print("✅ ALL RECONNECT + BALANCE CHECKS PASSED.")

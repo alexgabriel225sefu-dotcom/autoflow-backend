@@ -1127,19 +1127,51 @@ def _handle_ctaccount(chat_id, args):
                                 f"Account <code>{want}</code> — {gate_reason}.{link_line}")
     ct_env = "live" if match.get("live") else "demo"
     updates = {"ctrader_account_id": match["ctid"], "ctrader_env": ct_env}
-    try:
-        from apex.brokers import ctrader as _ct
-        bal = _ct.account_balance(user.get("ctrader_access_token", ""), match["ctid"], ct_env)
-        updates["paper_balance"] = bal
+    # Same two problems the single-account OAuth path had, in the
+    # multi-account one: a cold connection right after linking can time out
+    # even though the loop reads the balance fine moments later, and
+    # onboard_start() fired unconditionally — so switching accounts threw an
+    # already-configured client back into "what do you want to trade?".
+    bal, bal_err = None, None
+    for _attempt in (1, 2):
+        try:
+            from apex.brokers import ctrader as _ct
+            bal = _ct.account_balance(user.get("ctrader_access_token", ""),
+                                      match["ctid"], ct_env)
+            updates["paper_balance"] = bal
+            bal_err = None
+            break
+        except Exception as e:
+            bal_err = str(e)
+            print(f"[TELEGRAM] balance attempt {_attempt} failed for "
+                  f"{match['ctid']}: {e}")
+            if _attempt == 1:
+                time.sleep(2)
+    if bal is not None:
         bal_line = f"💰 Balance: <b>${bal:,.2f}</b>\n"
-    except Exception as e:
-        bal_line = f"⚠️ Balance unavailable: <i>{str(e)[:80]}</i>\n"
+    else:
+        _known = user.get("paper_balance")
+        bal_line = (f"💰 Balance: <b>${_known:,.2f}</b> <i>(last known — refreshing)</i>\n"
+                    if isinstance(_known, (int, float)) and _known
+                    else f"⏳ Balance loading… <i>{(bal_err or '')[:60]}</i>\n")
     user_store.update(chat_id, updates)
     _restart_user_loop(chat_id)
     env = "LIVE 🔴" if match.get("live") else "demo 🧪"
-    send_to(chat_id, f"✅ Account <code>{match['ctid']}</code> ({env}) linked.\n{bal_line}"
-                     "Setting up — 2 quick taps. 👇")
-    onboard_start(chat_id)
+    if user.get("symbol") and user.get("strategy"):
+        pos = user.get("open_position_snapshot") or {}
+        pos_line = (f"📊 Open position kept: <b>{pos.get('entrySide') or pos.get('side')} "
+                    f"{pos['symbol']}</b> @ {pos.get('entryPrice')}\n"
+                    if pos.get("symbol") else "📊 No open position.\n")
+        what = "🤖 Auto-Pilot" if user.get("autopilot") else f"📈 {user.get('symbol')}"
+        send_to(chat_id,
+                f"✅ Account <code>{match['ctid']}</code> ({env}) linked.\n{bal_line}"
+                f"{pos_line}\nYour setup is unchanged — {what}, "
+                f"{user.get('strategy')}. Nothing was reset.\n"
+                "Send /settings to change anything.")
+    else:
+        send_to(chat_id, f"✅ Account <code>{match['ctid']}</code> ({env}) linked.\n{bal_line}"
+                         "Setting up — 2 quick taps. 👇")
+        onboard_start(chat_id)
 
 
 # Quick-pick trade symbols — asset-class aware (crypto majors first for the
@@ -2982,7 +3014,7 @@ def send_activation_sequence(chat_id, paid: bool):
     tips_kb.append([{"text": "🎛 See all controls", "callback_data": "go:controls"}])
     send_to(chat_id,
             "💡 <b>Helpful links</b>\n\n"
-            "• /controls — see every command and what it does\n"
+            "• /controls (or /settings) — see every command and what it does\n"
             "• /guide — how the bot works (visual guide)\n"
             "• /help — quick command list\n"
             "• /terminal — live trading dashboard",
@@ -3162,7 +3194,7 @@ _HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "/ctrader — connect your cTrader account\n"
                 "/start — resume trading\n"
                 "/stop — pause your bot\n"
-                "/controls — all controls explained\n"
+                "/controls or /settings — all controls explained\n"
                 "/purchase — buy your license ($497)\n"
                 "/help — this list\n\n"
                 "<b>📊 Trading</b>\n"
@@ -3508,7 +3540,10 @@ def _poll_loop():
                     _handle_report(chat_id)
                 elif cmd_l == "/help":
                     send_to(chat_id, _HELP_ADMIN if is_adm else _HELP_CLIENT)
-                elif cmd_l == "/controls":
+                elif cmd_l in ("/controls", "/settings"):
+                    # /settings is an alias, not a nicety: it is the name
+                    # people reach for first, and the reconnect message told
+                    # clients to send it while no such command existed.
                     send_to(chat_id, _CONTROLS_TEXT)
                 elif cmd_l in ("/purchase", "/buylicense", "/pay"):
                     _handle_purchase(chat_id)
