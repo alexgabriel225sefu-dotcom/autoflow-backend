@@ -50,6 +50,42 @@ def _encrypt_sensitive(data: dict) -> dict:
     return out
 
 
+def encrypt_value(value):
+    """Encrypt one secret for at-rest storage, or return it unchanged when no
+    TOKEN_ENCRYPTION_KEY is configured.
+
+    Exposed because runtime.json wrote broker secrets to disk in plaintext
+    while this module had been encrypting the very same values for the user
+    store all along — two stores, one threat model, one of them ignoring it.
+    """
+    if not _fernet or not isinstance(value, str) or not value:
+        return value
+    if value.startswith(_ENC_PREFIX):
+        return value
+    return _ENC_PREFIX + _fernet.encrypt(value.encode()).decode()
+
+
+def decrypt_value(value):
+    """Inverse of encrypt_value. Plaintext (legacy, or no key) passes through.
+
+    Returns "" for a value that IS encrypted but cannot be opened — a missing
+    or rotated key must not hand a caller ciphertext to use as a credential.
+    """
+    if not isinstance(value, str) or not value.startswith(_ENC_PREFIX):
+        return value
+    if not _fernet:
+        print("[Store] ⛔ a runtime secret is encrypted but TOKEN_ENCRYPTION_KEY "
+              "is not set — treating it as absent")
+        return ""
+    try:
+        return _fernet.decrypt(value[len(_ENC_PREFIX):].encode()).decode()
+    except Exception as e:
+        print(f"[Store] ⛔ failed to decrypt a runtime secret ({e}) — treating "
+              f"it as absent. If TOKEN_ENCRYPTION_KEY was rotated, restore the "
+              f"old key or re-enter the secret.")
+        return ""
+
+
 def _decrypt_sensitive(data: dict) -> dict:
     """Decrypt sensitive fields in place. Values not in enc: form (legacy
     plaintext, or no key configured) are left untouched."""

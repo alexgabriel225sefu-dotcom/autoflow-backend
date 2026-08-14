@@ -380,7 +380,7 @@ def _delete_message(chat_id, message_id):
 
 # ─── Runtime config persistence ──────────────────────────
 
-def _load_runtime() -> dict:
+def _load_runtime_raw() -> dict:
     try:
         with open(_RUNTIME) as f:
             return json.load(f)
@@ -389,10 +389,47 @@ def _load_runtime() -> dict:
 
 
 def _save_runtime(updates: dict):
-    data = _load_runtime()
-    data.update(updates)
+    """Persist settings to runtime.json, with broker secrets encrypted at rest.
+
+    This file used to hold CTRADER_CLIENT_SECRET and MT_BRIDGE_SECRET in
+    plaintext on disk, while user_store had been Fernet-encrypting the very
+    same class of value all along — two stores, one threat model, one of them
+    ignoring it. Anyone with the filesystem (a stray backup, a shared volume,
+    a container image layer) could read live broker credentials.
+
+    Encryption needs TOKEN_ENCRYPTION_KEY. Without it there is nothing to
+    encrypt WITH, so a secret is refused rather than written in the clear:
+    losing a setting is recoverable, leaking a broker credential is not.
+    """
+    # RAW, not the decrypting reader: re-reading decrypted and writing the
+    # whole dict back would put every previously-encrypted secret on disk in
+    # plaintext — the exact leak this function exists to close.
+    data = _load_runtime_raw()
+    safe = {}
+    for k, v in updates.items():
+        if is_secret_key(k):
+            enc = user_store.encrypt_value(str(v))
+            if enc == str(v):          # unchanged → no key configured
+                print(f"[Telegram] refusing to persist {k}: TOKEN_ENCRYPTION_KEY "
+                      f"is not set, so it would be written in plaintext. It is "
+                      f"live for this process; set it as a platform env var to "
+                      f"make it survive a restart.")
+                continue
+            safe[k] = enc
+        else:
+            safe[k] = v
+    data.update(safe)
     with open(_RUNTIME, "w") as f:
         json.dump(data, f, indent=2)
+
+
+def _load_runtime() -> dict:
+    """runtime.json with any encrypted secret opened back up."""
+    raw = _load_runtime_raw()
+    for k in list(raw):
+        if is_secret_key(k):
+            raw[k] = user_store.decrypt_value(raw[k])
+    return raw
 
 
 

@@ -105,6 +105,17 @@ def _load_runtime_config():
     except Exception as e:
         print(f"[BOT] runtime.json error: {e}")
         return
+    # Broker secrets in this file are encrypted at rest (see
+    # telegram._save_runtime). Applying the ciphertext as a credential would
+    # fail broker auth in a way that looks like a wrong password.
+    try:
+        from apex import user_store as _us
+        from apex import telegram as _tg
+        for _k in list(data):
+            if _tg.is_secret_key(_k):
+                data[_k] = _us.decrypt_value(data[_k])
+    except Exception as e:
+        print(f"[BOT] runtime.json: could not decrypt secrets ({e})")
     n = _apply_config(data, "runtime.json")
     print(f"[BOT] runtime.json loaded ({n} settings)")
 
