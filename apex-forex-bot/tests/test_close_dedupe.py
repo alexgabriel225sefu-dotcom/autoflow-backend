@@ -72,7 +72,7 @@ drifted = user_loop._log_trade(
 check("same positionId is the same trade", drifted is False)
 check("still one row", len(user_store.load_trades(UID)) == 1)
 
-print("\n── without a positionId, match on symbol + entry + P&L in a window ──")
+print("\n── without a positionId, match on symbol + entry in a window ──")
 user_store.clear_trades(UID)
 nopid = {k: v for k, v in POS.items() if k != "positionId"}
 user_loop._log_trade(UID, A, nopid)
@@ -85,8 +85,15 @@ check("same close hours later is treated as a NEW trade",
 print("\n── genuinely different trades are never merged ──")
 user_store.clear_trades(UID)
 user_loop._log_trade(UID, A, nopid)
-check("different P&L on the same pair is a new trade",
-      user_loop._log_trade(UID, {**B, "netPnl": -22.4}, nopid) is True)
+# This assertion used to read the other way, and it was wrong. Live on
+# 2026-08-14 one EURUSD close was journalled twice a second apart: +$2.89 from
+# the broker's own fill, then $0.00 from the balance-delta estimate. Keying the
+# dedupe on P&L meant it only caught duplicates that AGREED — while the one
+# worth catching is exactly the one that disagrees. Same pair, same entry,
+# seconds apart: that is one trade reported twice, whatever the second path
+# computed for it.
+check("a duplicate whose P&L DISAGREES is still a duplicate",
+      user_loop._log_trade(UID, {**B, "netPnl": -22.4}, nopid) is False)
 user_store.clear_trades(UID)
 user_loop._log_trade(UID, A, nopid)
 check("different entry price is a new trade",
@@ -95,6 +102,13 @@ user_store.clear_trades(UID)
 user_loop._log_trade(UID, A, nopid)
 check("different symbol is a new trade",
       user_loop._log_trade(UID, {**B, "symbol": "EURUSD"}, nopid) is True)
+# Two ids settle it the other way too: the entry price no longer gets a vote
+# once the broker has named both positions, so a genuine re-entry at the same
+# price is never swallowed as a duplicate.
+user_store.clear_trades(UID)
+user_loop._log_trade(UID, A, POS)
+check("a different positionId is a different trade, same entry or not",
+      user_loop._log_trade(UID, B, {**POS, "positionId": 99999999}) is True)
 
 print("\n── a losing close is counted once by the risk ladder ──")
 # _log_trade's return value is what the loop gates loss_streak on, so this is
@@ -113,3 +127,4 @@ if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")
     sys.exit(1)
 print("✅ ALL CLOSE-DEDUPE CHECKS PASSED.")
+

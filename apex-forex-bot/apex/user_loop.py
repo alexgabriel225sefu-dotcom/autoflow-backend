@@ -235,19 +235,31 @@ def _already_journaled(journal, row):
     really two losses, and the duplicate becomes a second training label for a
     trade that only happened once.
 
-    positionId is the exact key when the broker gave us one. Otherwise fall
-    back to symbol + entry + P&L inside a short window: two genuinely distinct
-    trades matching to five decimals on entry AND to the cent on P&L within
-    fifteen minutes does not happen.
+    positionId is the exact key when the broker gave us one, and two DIFFERENT
+    ids settle it the other way: those are genuinely different trades.
+
+    Otherwise: same symbol, same entry price, inside a short window. P&L used
+    to be part of that key, and that was backwards. The duplicate worth
+    catching is the one whose P&L DISAGREES — the second path estimates from a
+    balance delta and books $0.00 — so requiring the numbers to match deduped
+    only the harmless case and let the wrong one through. Observed live: the
+    same EURUSD close journalled twice one second apart, +$2.89 from the
+    broker's own fill and $0.00 from the estimate, both kept.
+
+    Two genuinely distinct trades on one pair matching to five decimals on
+    entry within fifteen minutes does not happen; that was already the
+    argument, and P&L was never carrying it.
     """
     pid = row.get("positionId")
     for old in reversed(journal[-40:]):
-        if pid and old.get("positionId") == pid:
-            return True
+        old_pid = old.get("positionId")
+        if pid and old_pid:
+            if old_pid == pid:
+                return True
+            continue          # different positions — not a duplicate
         if (old.get("symbol") == row.get("symbol")
                 and old.get("entry") is not None
-                and old.get("entry") == row.get("entry")
-                and old.get("netPnl") == row.get("netPnl")):
+                and old.get("entry") == row.get("entry")):
             try:
                 t_old = datetime.strptime(old["time"], "%Y-%m-%d %H:%M:%S")
                 t_new = datetime.strptime(row["time"], "%Y-%m-%d %H:%M:%S")
