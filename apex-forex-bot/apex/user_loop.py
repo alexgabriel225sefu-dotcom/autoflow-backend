@@ -112,6 +112,48 @@ def _risk_from_snapshot(entry_price, initial_stop):
         return None
 
 
+def _position_still_open(broker, pos, focus_symbol, user_id):
+    """True when `pos` is still open at the broker despite being absent from
+    this tick's read.
+
+    The single-position sync reads only the FOCUSED instrument. Auto-Pilot
+    rotates focus between ticks, so a position on the previous instrument
+    stops appearing the moment focus moves — and the loop read that absence as
+    "the broker closed it". Live proof: USDCAD 54303026 was declared closed at
+    netPnl 0.00 six seconds after focus moved to EURUSD, while the position was
+    open at the broker the whole time. The invented close booked a losing
+    trade, pushed the day's count from 3 to 4, and cleared the snapshot the
+    still-open position needs to survive the next restart.
+
+    Asking about the position's OWN symbol is the question that was missing.
+    Only called once focus has moved, so it costs one extra broker read per
+    rotation, not per tick.
+
+    A failed read means "unknown", and unknown must never be reported as
+    still-open: the branch this guards is how a client finds out their trade
+    hit its stop, and silence there is worse than a spurious close.
+    """
+    sym = pos.get("symbol")
+    if not sym or _nrm(sym) == _nrm(focus_symbol):
+        return False
+    try:
+        live = broker.get_open_position(sym)
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] re-check of {sym} failed ({e}) — "
+              f"treating it as closed")
+        return False
+    if not live:
+        return False
+    # Same instrument is not the same trade: one can close and another open
+    # on the pair between ticks. The broker's own id settles it.
+    pid, live_pid = pos.get("positionId"), live.get("positionId")
+    if pid and live_pid and pid != live_pid:
+        return False
+    print(f"[UserLoop:{user_id}] {sym} is still open at the broker — focus "
+          f"moved to {focus_symbol}, this is not a close")
+    return True
+
+
 def _price_open_position(pos, symbol, price):
     """Attach floating (unrealised) P&L to an open position, in pips and USD.
 
@@ -1823,6 +1865,12 @@ def _loop(user_id, alert_fn, gen=None):
                 # cTrader executed the SL/TP server-side: the position we were
                 # managing vanished between ticks. Tell the client — silence
                 # here made broker-side exits invisible in Telegram.
+                if (prev_pos and not open_pos
+                        and _position_still_open(broker, prev_pos, symbol, user_id)):
+                    # Focus rotated off a live position. Not a close — keep
+                    # managing it and leave the journal, the risk ladder and
+                    # the persisted snapshot alone.
+                    prev_pos = None
                 if prev_pos and not open_pos:
                     last_close_at = time.time()  # re-entry lock (churn guard)
                     # Ask the broker for THIS position's actual closed-deal
@@ -1889,7 +1937,7 @@ def _loop(user_id, alert_fn, gen=None):
                         if pnl_est is not None:
                             strategies.record_trade(pnl_est > 0, pnl_est,
                                                     dash.get("startBalance") or paper_balance,
-                                                    user_id=user_id, symbol=symbol)
+                                                    user_id=user_id, symbol=_closed_sym)
                         dash["trades"].insert(0, result)
                         dash["trades"] = dash["trades"][:50]
                         if alert_fn:
