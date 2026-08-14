@@ -27,6 +27,10 @@ ESSENTIAL = {
     "CLOSE", "BROKER_CLOSE", "BROKER_CLOSE_MULTI",
     "STOP",                        # the bot stopped itself
     "WEEKEND_CLOSE", "WEEKEND_REOPEN",
+    # The bot tried to exit and could not: the client is still in the
+    # trade and needs to know, whatever their alert preference.
+    "EXIT_FAILED",
+    "UNPROTECTED",           # a live position with no stop at the broker
     "DAILY_SUMMARY",
     "STOP_BREAKEVEN",              # "this trade can no longer lose"
 }

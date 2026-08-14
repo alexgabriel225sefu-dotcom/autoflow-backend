@@ -823,11 +823,26 @@ class CtraderBroker:
                 # this real open+forced-close round trip (and its P&L) never
                 # reached the trade log or the user. Return it as a completed
                 # trade instead so the caller can price and report it.
-                close_res = None
+                close_res, close_err = None, None
                 try:
                     close_res = self.close_position(instrument)
-                except Exception:
-                    pass
+                except Exception as ce:
+                    close_err = ce
+                if close_err is not None or not close_res:
+                    # The safety close ITSELF failed. Swallowing this and
+                    # still returning SAFETY_CLOSED was the worst reachable
+                    # state in the codebase: a real position, open at the
+                    # broker with NO stop-loss attached, reported upstream as
+                    # safely closed — so nothing retried it and nothing told
+                    # the client. Name it for what it is.
+                    print(f"[cTrader] {sym}: stop-loss attach failed AND the "
+                          f"safety close failed ({close_err}) — position is "
+                          f"OPEN AND UNPROTECTED")
+                    return {"orderId": str(getattr(res.order, "orderId", "")),
+                            "status": "UNPROTECTED", "fillPrice": fill,
+                            "reason": "the broker rejected the stop-loss and the "
+                                      "safety close did not go through — the "
+                                      "position is open with no stop"}
                 return {"orderId": str(getattr(res.order, "orderId", "")),
                         "status": "SAFETY_CLOSED", "fillPrice": fill,
                         "exitFillPrice": (close_res or {}).get("fillPrice"),

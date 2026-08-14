@@ -1045,6 +1045,10 @@ def _loop(user_id, alert_fn, gen=None):
     was_weekend_closed = market.is_weekend_close_window()  # fire the Telegram
                          # notice only on the Fri→closed and Sun→open EDGE,
                          # not every tick for the whole weekend
+    weekend_failed = set()   # symbols the weekend flatten could not close, as
+                             # last reported. Re-alert when this CHANGES — a
+                             # position still open going into the gap is worth
+                             # a second message, but not one every tick.
     was_stopped = False  # fire the "Trading paused" alert once per stop, not
                          # every tick for the rest of the day it stays true
 
@@ -2264,28 +2268,63 @@ def _loop(user_id, alert_fn, gen=None):
             # (the unconditional `continue` below also blocks new entries)
             # until the market is back.
             in_weekend_window = market.is_weekend_close_window()
-            if in_weekend_window and not was_weekend_closed:
-                was_weekend_closed = True
-                if alert_fn:
-                    alert_fn(user_id, {"action": "WEEKEND_CLOSE", "symbol": symbol})
-            elif not in_weekend_window and was_weekend_closed:
+            if not in_weekend_window and was_weekend_closed:
                 was_weekend_closed = False
+                weekend_failed = set()
                 if alert_fn:
                     alert_fn(user_id, {"action": "WEEKEND_REOPEN", "symbol": symbol})
 
             if in_weekend_window:
-                if open_pos:
+                # Flatten EVERY open position, then report what ACTUALLY
+                # happened. This block used to announce "any open position was
+                # closed" before attempting anything, close only the FOCUSED
+                # symbol, and swallow a broker failure with a bare `pass` while
+                # still journalling the trade as closed. The result on a live
+                # account: the client is told they are flat for the weekend
+                # while the position sits open at the broker, carrying exactly
+                # the Sunday-gap risk this feature exists to remove.
+                _wk_targets = []
+                if cfg.PAPER_TRADING:
+                    if open_pos:
+                        _wk_targets = [{**open_pos,
+                                        "symbol": open_pos.get("symbol") or symbol}]
+                else:
+                    try:
+                        _wk_targets = list(broker.get_all_positions() or [])
+                    except Exception as e:
+                        print(f"[UserLoop:{user_id}] weekend: position list failed "
+                              f"({e}) — falling back to the tracked position")
+                        if open_pos:
+                            _wk_targets = [{**open_pos,
+                                            "symbol": open_pos.get("symbol") or symbol}]
+                _wk_failed, _wk_closed = set(), 0
+                for _wp in _wk_targets:
+                    _wsym = _wp.get("symbol") or symbol
                     _close_res = None
                     if not cfg.PAPER_TRADING:
                         try:
-                            _close_res = broker.close_position(symbol)
-                        except Exception:
-                            pass
-                    exit_price = (_close_res or {}).get("fillPrice") or price
+                            _close_res = broker.close_position(_wsym)
+                        except Exception as e:
+                            # Do NOT book a close that did not happen. The
+                            # position is still live and still exposed, and
+                            # saying otherwise is the whole bug.
+                            print(f"[UserLoop:{user_id}] weekend flatten of "
+                                  f"{_wsym} FAILED: {e}")
+                            _wk_failed.add(_wsym)
+                            continue
+                        if (_close_res or {}).get("status") == "FLAT":
+                            continue   # already gone — nothing to journal
+                    _wk_closed += 1
+                    open_pos = _wp
+                    # `price` belongs to the focused instrument; for any other
+                    # position it is the wrong number to value a fill with.
+                    exit_price = ((_close_res or {}).get("fillPrice")
+                                  or (price if _nrm(_wsym) == _nrm(symbol)
+                                      else _wp.get("entryPrice")))
                     units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
                     gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
-                                          exit_price, units_, symbol)
-                    pv = forex.pip_value_per_unit(symbol, exit_price)
+                                          exit_price, units_, _wsym)
+                    pv = forex.pip_value_per_unit(_wsym, exit_price)
                     cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
                                + (_close_res or {}).get("commissionUsd", 0.0))
                     net = gross - cost_usd
@@ -2304,7 +2343,7 @@ def _loop(user_id, alert_fn, gen=None):
                         loss_streak += 1
                     else:
                         loss_streak = 0
-                    result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
+                    result = {"action": "CLOSE", "symbol": _wsym, "price": exit_price,
                               "entryPrice": open_pos.get("entryPrice"),
                               "side": open_pos.get("entrySide") or open_pos.get("side"),
                               "initialStop": open_pos.get("initialStop"),
@@ -2319,7 +2358,7 @@ def _loop(user_id, alert_fn, gen=None):
                     _persist_risk_state()
                     strategies.record_trade(net > 0, net,
                                             dash.get("startBalance") or paper_balance,
-                                            user_id=user_id, symbol=symbol)
+                                            user_id=user_id, symbol=_wsym)
                     open_pos = None
                     dash["openPosition"] = None
                     _persist_open_snapshot(None)
@@ -2328,6 +2367,17 @@ def _loop(user_id, alert_fn, gen=None):
                     dash["trades"] = dash["trades"][:50]
                     if alert_fn:
                         alert_fn(user_id, result)
+                # Now — and only now — say what happened. Re-announce when the
+                # set of positions we could NOT close changes: still being
+                # exposed to the gap is worth a second message, and so is
+                # finally getting flat. Neither is worth one every tick.
+                if alert_fn and (not was_weekend_closed
+                                 or _wk_failed != weekend_failed):
+                    alert_fn(user_id, {"action": "WEEKEND_CLOSE", "symbol": symbol,
+                                       "closed": _wk_closed,
+                                       "failed": sorted(_wk_failed)})
+                was_weekend_closed = True
+                weekend_failed = _wk_failed
                 time.sleep(_LOOP_INTERVAL)
                 continue
 
@@ -3110,7 +3160,19 @@ def _loop(user_id, alert_fn, gen=None):
                                 # reads the real position list and settles it.
                                 print(f"[UserLoop:{user_id}] place_order error: {oe}")
 
-                        if _order_res and _order_res.get("status") == "SAFETY_CLOSED":
+                        if _order_res and _order_res.get("status") == "UNPROTECTED":
+                            # Open at the broker with no stop attached, and the
+                            # safety close did not go through. Nothing here can
+                            # fix it remotely — the client has to be told, now,
+                            # and told exactly what to do.
+                            order_ok = False
+                            print(f"[UserLoop:{user_id}] {symbol} is OPEN AND "
+                                  f"UNPROTECTED — alerting the client")
+                            if alert_fn:
+                                alert_fn(user_id, {"action": "UNPROTECTED",
+                                                   "symbol": symbol,
+                                                   "price": _order_res.get("fillPrice")})
+                        elif _order_res and _order_res.get("status") == "SAFETY_CLOSED":
                             # A real position opened and was immediately closed
                             # at the broker because the stop-loss couldn't be
                             # attached — this used to vanish as a swallowed
@@ -3256,72 +3318,88 @@ def _loop(user_id, alert_fn, gen=None):
                 _persist_open_snapshot(_with_initial_stop(open_pos, symbol))
             elif action == "CLOSE" and open_pos:
                 # A strategy exit is NOT always a win — label it honestly.
-                _close_res = None
+                # And a close the broker never confirmed is not an exit at
+                # all: this used to swallow the error with a bare `pass`,
+                # then journal the trade, move the balance and alert the
+                # client for a position still open at the broker. Same
+                # defect the weekend flatten had, on the path that runs far
+                # more often.
+                _close_res, _close_ok = None, True
                 try:
                     _close_res = broker.close_position(symbol)
-                except Exception:
-                    pass
-                # Use the broker's actual execution price when it gives us one —
-                # the last fetched candle close is a stale proxy and can differ
-                # from the real fill by real spread/slippage, quietly
-                # misreporting P&L (this is why a client's own broker showed a
-                # different result than what the bot logged for the same trade).
-                exit_price = (_close_res or {}).get("fillPrice") or price
-                units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
-                gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
-                                      exit_price, units_, symbol)
-                pv = forex.pip_value_per_unit(symbol, exit_price)
-                # Spread estimate + real broker commission — a live open_pos
-                # read straight from the broker never carries an
-                # "entrySpreadPips" estimate, so cost silently read $0 on
-                # every real close; commissionUsd (best-effort, see
-                # ctrader._extract_commission) closes that gap when the
-                # broker reports one.
-                cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
-                           + (_close_res or {}).get("commissionUsd", 0.0))
-                net = gross - cost_usd
-                if cfg.PAPER_TRADING:
-                    paper_balance += net
+                except Exception as _ce:
+                    _close_ok = False
+                    print(f"[UserLoop:{user_id}] strategy exit on {symbol} "
+                          f"FAILED: {_ce} — position stays open, retrying next tick")
+                if not _close_ok:
+                    # Keep managing it. The next tick tries again, and the
+                    # broker-side stop is still in force meanwhile.
+                    dash["openPosition"] = open_pos
+                    _persist_open_snapshot(_with_initial_stop(open_pos, symbol))
+                    if alert_fn:
+                        alert_fn(user_id, {"action": "EXIT_FAILED", "symbol": symbol})
                 else:
-                    # LIVE: this is the exact bug behind a client seeing a
-                    # "Net P&L +$X, Balance $Y" message where Y didn't move
-                    # by X at all — this branch bumped paper_balance only in
-                    # PAPER mode, so a live close reported the balance from
-                    # BEFORE the trade closed. Read the real one instead.
-                    try:
-                        paper_balance = broker.get_balance()
-                    except Exception:
+                    # Use the broker's actual execution price when it gives us one —
+                    # the last fetched candle close is a stale proxy and can differ
+                    # from the real fill by real spread/slippage, quietly
+                    # misreporting P&L (this is why a client's own broker showed a
+                    # different result than what the bot logged for the same trade).
+                    exit_price = (_close_res or {}).get("fillPrice") or price
+                    units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
+                    gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
+                                          exit_price, units_, symbol)
+                    pv = forex.pip_value_per_unit(symbol, exit_price)
+                    # Spread estimate + real broker commission — a live open_pos
+                    # read straight from the broker never carries an
+                    # "entrySpreadPips" estimate, so cost silently read $0 on
+                    # every real close; commissionUsd (best-effort, see
+                    # ctrader._extract_commission) closes that gap when the
+                    # broker reports one.
+                    cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                               + (_close_res or {}).get("commissionUsd", 0.0))
+                    net = gross - cost_usd
+                    if cfg.PAPER_TRADING:
                         paper_balance += net
-                if net < 0:
-                    last_loss_at = time.time()
-                    loss_streak += 1
-                elif net > 0:
-                    loss_streak = 0
-                result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
-                          "entryPrice": open_pos.get("entryPrice"),
-                          "side": open_pos.get("entrySide") or open_pos.get("side"),
-                          "initialStop": open_pos.get("initialStop"),
-                          "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
-                          "netPnl": round(net, 2), "balance": round(paper_balance, 2),
-                          "openedAt": open_pos.get("openedAt"), "time": now_str,
-                          "reasoning": signal.get("reasoning", "")}
-                _log_trade(user_id, result, open_pos)
-                if cfg.PAPER_TRADING:
-                    # Persist so the simulated balance survives a restart.
-                    user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
-                last_close_at = time.time()
-                _persist_risk_state()
-                strategies.record_trade(net > 0, net,
-                                        dash.get("startBalance") or paper_balance,
-                                        user_id=user_id, symbol=symbol)
-                open_pos = None
-                dash["openPosition"] = None
-                _persist_open_snapshot(None)
-                dash["balance"] = paper_balance
-                dash["trades"].insert(0, result)
-                dash["trades"] = dash["trades"][:50]
-                if alert_fn:
-                    alert_fn(user_id, result)
+                    else:
+                        # LIVE: this is the exact bug behind a client seeing a
+                        # "Net P&L +$X, Balance $Y" message where Y didn't move
+                        # by X at all — this branch bumped paper_balance only in
+                        # PAPER mode, so a live close reported the balance from
+                        # BEFORE the trade closed. Read the real one instead.
+                        try:
+                            paper_balance = broker.get_balance()
+                        except Exception:
+                            paper_balance += net
+                    if net < 0:
+                        last_loss_at = time.time()
+                        loss_streak += 1
+                    elif net > 0:
+                        loss_streak = 0
+                    result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
+                              "entryPrice": open_pos.get("entryPrice"),
+                              "side": open_pos.get("entrySide") or open_pos.get("side"),
+                              "initialStop": open_pos.get("initialStop"),
+                              "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
+                              "netPnl": round(net, 2), "balance": round(paper_balance, 2),
+                              "openedAt": open_pos.get("openedAt"), "time": now_str,
+                              "reasoning": signal.get("reasoning", "")}
+                    _log_trade(user_id, result, open_pos)
+                    if cfg.PAPER_TRADING:
+                        # Persist so the simulated balance survives a restart.
+                        user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
+                    last_close_at = time.time()
+                    _persist_risk_state()
+                    strategies.record_trade(net > 0, net,
+                                            dash.get("startBalance") or paper_balance,
+                                            user_id=user_id, symbol=symbol)
+                    open_pos = None
+                    dash["openPosition"] = None
+                    _persist_open_snapshot(None)
+                    dash["balance"] = paper_balance
+                    dash["trades"].insert(0, result)
+                    dash["trades"] = dash["trades"][:50]
+                    if alert_fn:
+                        alert_fn(user_id, result)
 
         except Exception as e:
             print(f"[UserLoop:{user_id}] Error: {e}")

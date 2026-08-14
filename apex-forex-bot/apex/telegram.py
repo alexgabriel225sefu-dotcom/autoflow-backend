@@ -3257,12 +3257,54 @@ def _user_alert(uid, result):
         side = "🟢 LONG" if result.get("side") == "BUY" else "🔴 SHORT"
         send_to(uid,
                 f"🛡️ <b>Stop trailed</b> — {sym} {side} → <b>{_fmt_px(sl)}</b>")
-    elif action == "WEEKEND_CLOSE":
+    elif action == "UNPROTECTED":
+        # The rarest and worst state: a live position with no stop-loss at the
+        # broker, because the attach was rejected and the safety close failed
+        # too. There is nothing to do remotely — say so plainly.
         send_to(uid,
-                "🌙 <b>Market closed for the weekend</b>\n"
-                "Any open position was closed to avoid gap risk over Sat/Sun — "
-                "no new trades until it reopens. I'll message you the moment "
-                "it's back.")
+                f"🚨 <b>{_esc(sym)} is open with NO stop-loss</b>\n"
+                "The broker rejected the stop and my emergency close didn't go "
+                "through either.\n\n"
+                "<b>Open cTrader and close it, or set a stop yourself — now.</b> "
+                "Until then this trade has no downside limit.\n"
+                "<i>I've stopped opening anything new on it.</i>")
+    elif action == "EXIT_FAILED":
+        # The strategy wanted out and the broker refused the close. Silence
+        # here is how a client ends up holding a trade the bot has already
+        # decided against, believing it was exited.
+        send_to(uid,
+                f"⚠️ <b>Couldn't close {_esc(sym)}</b>\n"
+                "The strategy called an exit and the broker didn't confirm it, "
+                "so the position is <b>still open</b>. Your stop-loss is still "
+                "with the broker and still protecting it.\n\n"
+                "I'm retrying automatically. Close it yourself with /close if "
+                "you'd rather not wait.")
+    elif action == "WEEKEND_CLOSE":
+        # Say what actually happened. This used to claim "any open position was
+        # closed" unconditionally — and it was sent BEFORE the close was even
+        # attempted, so a client could be told they were flat while the
+        # position sat open at the broker over the weekend gap.
+        _closed = int(result.get("closed") or 0)
+        _failed = result.get("failed") or []
+        if _failed:
+            send_to(uid,
+                    "⚠️ <b>Couldn't close before the weekend — please check</b>\n"
+                    f"Still open: <b>{_esc(', '.join(_failed))}</b>\n\n"
+                    "Close it yourself in cTrader. A position held through the "
+                    "weekend gap can reopen Sunday well past its stop, which is "
+                    "the exact risk this is meant to avoid.\n"
+                    "<i>I'll keep retrying and tell you if it goes through.</i>")
+        elif _closed:
+            send_to(uid,
+                    "🌙 <b>Market closed for the weekend</b>\n"
+                    f"Closed {_closed} position{'s' if _closed != 1 else ''} to "
+                    "avoid gap risk over Sat/Sun — no new trades until it "
+                    "reopens. I'll message you the moment it's back.")
+        else:
+            send_to(uid,
+                    "🌙 <b>Market closed for the weekend</b>\n"
+                    "Nothing was open, so there was nothing to close. No new "
+                    "trades until it reopens — I'll message you when it's back.")
     elif action == "WEEKEND_REOPEN":
         send_to(uid,
                 "🔔 <b>Market's back open</b>\n"
