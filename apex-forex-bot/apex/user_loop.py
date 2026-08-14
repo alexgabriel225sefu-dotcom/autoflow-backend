@@ -189,6 +189,11 @@ _ENTRY_META_KEYS = (
     # Carried on the position so it is still known at CLOSE time, hours later
     # and possibly after a restart or an Auto-Pilot rotation to another mode.
     "entryStrategyId", "entryStrategyVersion",
+    # Whether "this trade can no longer lose" has already been announced.
+    # Without this the flag dies with the position dict on the next broker
+    # re-read and the message fires again on every tick once the stop is
+    # past entry — which is the exact repetition it exists to stop.
+    "breakevenAnnounced",
 )
 
 
@@ -1276,8 +1281,18 @@ def _loop(user_id, alert_fn, gen=None):
         """
         today = datetime.now().strftime("%Y-%m-%d")
         if dash.get("skipsDay") != today:
+            # Day rolled over. Send yesterday's recap BEFORE the counters are
+            # cleared — a summary is only worth sending while the day it
+            # describes still exists.
+            _prev = dash.get("skipsDay")
             dash["skipsDay"], dash["skipsToday"] = today, 0
             _skip_alerted.clear()
+            if _prev:
+                try:
+                    from apex import telegram as _tg
+                    _tg.send_daily_summary(user_id)
+                except Exception as e:
+                    print(f"[UserLoop:{user_id}] daily summary failed: {e}")
         dash["skipsToday"] = dash.get("skipsToday", 0) + 1
         lst = dash.setdefault("skips", [])
         lst.insert(0, {"time": datetime.now().strftime("%H:%M"), "reason": str(reason)[:120]})
@@ -1695,9 +1710,31 @@ def _loop(user_id, alert_fn, gen=None):
                         initial_risk=entry_risk_by_sym.get(_nrm(symbol)))
                     if moved is not None:
                         open_pos["stopLoss"] = open_pos["sl"] = moved
+                        # A trailing stop moves many times per trade — nine
+                        # times on one position yesterday, nine near-identical
+                        # messages. Exactly ONE of those moves is worth
+                        # telling the client about: the one that takes the
+                        # stop past the entry, after which the trade cannot
+                        # lose. Announce that once; the rest are diagnostic.
+                        try:
+                            _entry_px = float(open_pos.get("entryPrice") or 0)
+                        except (TypeError, ValueError):
+                            _entry_px = 0.0
+                        _side = open_pos.get("side")
+                        _safe = bool(_entry_px) and (
+                            (_side == "BUY" and moved >= _entry_px)
+                            or (_side == "SELL" and moved <= _entry_px))
+                        _already = open_pos.get("breakevenAnnounced")
+                        if _safe and not _already:
+                            open_pos["breakevenAnnounced"] = True
+                            _meta = entry_meta_by_sym.setdefault(_nrm(symbol), {})
+                            _meta["breakevenAnnounced"] = True
+                            _act = "STOP_BREAKEVEN"
+                        else:
+                            _act = "STOP_MOVED"
                         if alert_fn:
-                            alert_fn(user_id, {"action": "STOP_MOVED", "symbol": symbol,
-                                               "sl": moved, "side": open_pos.get("side")})
+                            alert_fn(user_id, {"action": _act, "symbol": symbol,
+                                               "sl": moved, "side": _side})
                 prev_balance = paper_balance
                 try:
                     paper_balance = broker.get_balance()

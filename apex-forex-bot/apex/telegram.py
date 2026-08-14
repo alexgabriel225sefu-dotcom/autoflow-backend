@@ -1171,6 +1171,40 @@ _RISK_TEXT = ("⚠️ <b>Risk disclaimer</b>\n\n"
               "<i>Demo 🧪 · Live 🔴</i>")
 
 
+# Plain-language names, because a beginner who just connected an account does
+# not know what an Inverse Fair Value Gap is. The technical id stays visible
+# underneath — an experienced client wants it, and it is what /strategy takes.
+FRIENDLY_LABEL = {
+    "auto":            "🤖 Automatic — the bot picks the method",
+    "trend":           "📈 Trend Follower — rides sustained moves",
+    "mean_reversion":  "↩️ Bounce Trader — buys dips, sells spikes",
+    "breakout":        "🚀 Breakout — enters when price escapes a range",
+    "momentum":        "⚡ Momentum — joins a move already running",
+    "session_breakout": "🌍 Session Breakout — trades the London/NY open",
+    "opening_range":   "🕐 Opening Range — first move of the session",
+    "zscore":          "📐 Statistical — fades unusual deviations",
+    "vol_regime":      "🌊 Volatility — waits for quiet, trades the burst",
+    "fibonacci":       "🌀 Fibonacci — enters at retracement levels",
+    "fvg":             "🕳 Gap Filler — trades unfilled price gaps",
+    "ifvg":            "🔄 Reverse Gap — trades gaps that failed",
+    "supply_demand":   "🏦 Supply & Demand — trades institutional zones",
+    "liquidity_sweep": "🎣 Stop Hunt — enters after the market grabs stops",
+    "evc":             "📊 Volume Balance — trades volume imbalances",
+    "grid":            "⚠️ Grid — many small entries (high risk)",
+    "martingale":      "⚠️ Martingale — larger after a loss (high risk)",
+}
+
+
+def friendly_strategy(key):
+    """(display name, technical id). Falls back to the registry label."""
+    nice = FRIENDLY_LABEL.get(key)
+    if nice:
+        return nice, key
+    from apex import strategy_api
+    cls = strategy_api._REGISTRY.get(key)
+    return (getattr(cls, "label", key) if cls else key), key
+
+
 def balance_line(access_token, ctid, env, last_known=None):
     """(balance_or_None, one display line) for a freshly linked account.
 
@@ -2121,22 +2155,23 @@ def _handle_strategy(chat_id, args):
         indexing it directly raised KeyError for every strategy added after
         that — including the one the client had just selected.
         """
+        nice, _ = friendly_strategy(key)
         m = STRATEGY_MODES.get(key)
         if m:
-            return m["label"], m.get("blurb", "")
+            return nice, m.get("blurb", "")
         cls = strategy_api._REGISTRY.get(key)
         if cls:
             doc = (cls.__doc__ or "").strip().split("\n")[0]
-            return cls.label or key, doc
-        return key, ""
+            return nice, doc
+        return nice, ""
 
     if not want:
         _SPECIAL = {"grid", "martingale"}
         ordinary, special = [], []
         for key in strategy_api.available():
             label, blurb = _meta(key)
-            row = (f"{'✅ ' if key == current else ''}<b>{label}</b> — "
-                   f"<code>/strategy {key}</code>\n<i>{blurb}</i>")
+            row = (f"{'✅ ' if key == current else ''}<b>{label}</b>\n"
+                   f"<code>/strategy {key}</code> — <i>{blurb}</i>")
             (special if key in _SPECIAL else ordinary).append(row)
         body = "\n\n".join(ordinary)
         if special:
@@ -2747,6 +2782,81 @@ def _fx_close_why(reason: str) -> str:
     return f"\n🧠 <i>{txt}</i>" if txt else ""
 
 
+def daily_summary_text(user_id):
+    """The end-of-day recap, or None when there is nothing to report.
+
+    Built from the closed-trade journal, so it can only ever state what
+    actually happened. Returns None on a day with no closed trades — a
+    "0 trades today" message every evening is exactly the kind of noise this
+    whole change is trying to remove.
+    """
+    from datetime import datetime
+    try:
+        rows = user_store.load_trades(user_id) or []
+    except Exception:
+        return None
+    today = datetime.now().strftime("%Y-%m-%d")
+    day = [r for r in rows if str(r.get("time", "")).startswith(today)]
+    if not day:
+        return None
+    wins = [r for r in day if float(r.get("netPnl") or 0) > 0]
+    losses = [r for r in day if float(r.get("netPnl") or 0) < 0]
+    net = sum(float(r.get("netPnl") or 0) for r in day)
+    bal = next((float(r["balance"]) for r in reversed(day)
+                if r.get("balance") is not None), None)
+    pct = (net / (bal - net) * 100) if bal and (bal - net) else 0
+    icon = "✅" if net >= 0 else "❌"
+    lines = [f"📊 <b>Today's summary</b>",
+             f"Trades: <b>{len(day)}</b> ({len(wins)} won, {len(losses)} lost)",
+             f"{icon} Net: <b>{'+' if net >= 0 else ''}${net:.2f}</b>"
+             + (f" ({'+' if pct >= 0 else ''}{pct:.2f}%)" if pct else "")]
+    if bal is not None:
+        lines.append(f"💼 Balance: <b>${bal:.2f}</b>")
+    # Name the strategies that traded — this is what §14 provenance is for.
+    strats = [r.get("strategyId") for r in day if r.get("strategyId")]
+    if strats:
+        uniq = sorted(set(strats))
+        lines.append("🎯 Strategy: <b>"
+                     + ", ".join(friendly_strategy(x)[0] for x in uniq) + "</b>")
+    lines.append("\n<i>Results vary day to day — past performance does not "
+                 "guarantee future results. Adjust risk any time with "
+                 "/risk.</i>")
+    return "\n".join(lines)
+
+
+def send_daily_summary(user_id):
+    text = daily_summary_text(user_id)
+    if text:
+        _user_alert(user_id, {"action": "DAILY_SUMMARY", "text": text})
+    return bool(text)
+
+
+def _r_multiple_line(result):
+    """" (+1.2R)" — the result in units of the risk that was taken.
+
+    Dollars alone cannot be compared between trades: +$25 on a $10 risk and
+    +$25 on a $200 risk are not the same outcome. R is the unit the whole
+    exit logic already runs on (MIN_EXIT_R, RIDE_AT_R), and it was the one
+    number the client could not see. Silent when the risk is unknown —
+    inventing an R is worse than omitting it.
+    """
+    try:
+        entry = float(result.get("entryPrice") or 0)
+        stop = float(result.get("initialStop") or result.get("stopLoss") or 0)
+        exit_px = float(result.get("price") or 0)
+        if not (entry and stop and exit_px):
+            return ""
+        risk = abs(entry - stop)
+        if risk <= 0:
+            return ""
+        side = (result.get("side") or "").upper()
+        move = (exit_px - entry) if side == "BUY" else (entry - exit_px)
+        r = move / risk
+        return f" <b>({'+' if r >= 0 else ''}{r:.2f}R)</b>"
+    except (TypeError, ValueError, ZeroDivisionError):
+        return ""
+
+
 def _user_alert(uid, result):
     """Per-user trade/heartbeat/error alert — module-level so setup auto-start,
     /start and auto-restore all share the same notification formatting."""
@@ -2757,7 +2867,18 @@ def _user_alert(uid, result):
         pass
     action = result.get("action", "")
     sym = result.get("symbol", cfg.SYMBOL)
-    if action == "HEARTBEAT":
+    # One gate for all 22 alert types. The bot used to send every diagnostic
+    # it produced to every client; the volume is what made the channel
+    # unreadable, not any single message.
+    try:
+        from apex import alert_policy
+        if not alert_policy.allowed(action, user_store.load(uid)):
+            return
+    except Exception as e:
+        print(f"[TELEGRAM] alert policy failed for {action}: {e}")
+    if action == "DAILY_SUMMARY":
+        send_to(uid, result.get("text", ""))
+    elif action == "HEARTBEAT":
         send_to(uid,
                 f"💓 <b>Bot alive</b> — {sym}\n"
                 f"Price: <b>{result.get('price', '—')}</b> | "
@@ -2916,7 +3037,8 @@ def _user_alert(uid, result):
             send_to(uid,
                     f"{head}\n"
                     f"Exit: <b>{_fmt_px(result.get('price'))}</b>\n"
-                    f"{icon} Net P&amp;L: <b>{'+' if net >= 0 else ''}${net:.2f}</b> "
+                    f"{icon} Net P&amp;L: <b>{'+' if net >= 0 else ''}${net:.2f}</b>"
+                    f"{_r_multiple_line(result)} "
                     f"<i>(gross ${result.get('grossPnl', 0):.2f} − cost ${result.get('costUsd', 0):.2f})</i>\n"
                     f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>"
                     + why)
@@ -2960,13 +3082,21 @@ def _user_alert(uid, result):
                 f"{move}\n"
                 f"{pnl_line}"
                 f"💼 Balance: <b>${result.get('balance', 0):.2f}</b>")
+    elif action == "STOP_BREAKEVEN":
+        # The one trail worth a sentence: past this point the trade cannot
+        # lose. Every later trail is silent unless /verbose is on.
+        sl = result.get("sl")
+        side = "🟢 LONG" if result.get("side") == "BUY" else "🔴 SHORT"
+        send_to(uid,
+                f"🛡️ <b>This trade can no longer lose</b> — {sym} {side}\n"
+                f"The stop is now past your entry (at <b>{_fmt_px(sl)}</b>), so "
+                "the worst case is breaking even. It keeps trailing as price "
+                "moves your way — I won't message you for each step.")
     elif action == "STOP_MOVED":
         sl = result.get("sl")
         side = "🟢 LONG" if result.get("side") == "BUY" else "🔴 SHORT"
         send_to(uid,
-                f"🛡️ <b>Stop moved</b> — {sym} {side}\n"
-                f"Locking in the trade — stop trailed to <b>{_fmt_px(sl)}</b>. "
-                "Profit is being protected as price moves your way.")
+                f"🛡️ <b>Stop trailed</b> — {sym} {side} → <b>{_fmt_px(sl)}</b>")
     elif action == "WEEKEND_CLOSE":
         send_to(uid,
                 "🌙 <b>Market closed for the weekend</b>\n"
@@ -3624,6 +3754,23 @@ def _poll_loop():
                     _handle_report(chat_id)
                 elif cmd_l == "/help":
                     send_to(chat_id, _HELP_ADMIN if is_adm else _HELP_CLIENT)
+                elif cmd_l == "/verbose":
+                    _u = user_store.load(chat_id)
+                    _on = not _u.get("verbose_alerts")
+                    user_store.update(chat_id, {"verbose_alerts": _on})
+                    send_to(chat_id,
+                            "🔊 <b>Detailed alerts ON</b> — you'll now also see "
+                            "every skipped setup, each stop trail and the "
+                            "bot's internal checks.\nSend /verbose again to go "
+                            "back to quiet."
+                            if _on else
+                            "🔇 <b>Quiet mode</b> — you'll get trades, the "
+                            "daily summary and anything that needs you. "
+                            "Diagnostics are hidden.\nSend /verbose to see "
+                            "everything.")
+                elif cmd_l == "/summary":
+                    if not send_daily_summary(chat_id):
+                        send_to(chat_id, "📊 No closed trades today yet.")
                 elif cmd_l in ("/controls", "/settings"):
                     # /settings is an alias, not a nicety: it is the name
                     # people reach for first, and the reconnect message told
@@ -3718,7 +3865,9 @@ def _poll_loop():
                     _handle_sell(chat_id, args)
                 elif cmd_l == "/close":
                     _handle_close(chat_id)
-                elif cmd_l == "/start":
+                elif cmd_l in ("/start", "/resume"):
+                    # /resume is what people type after /stop, and what the
+                    # onboarding copy promised. It did not exist.
                     _handle_start(chat_id)
                 elif cmd_l == "/stop":
                     # Per-user: stops only this client's loop (admin also pauses global).
