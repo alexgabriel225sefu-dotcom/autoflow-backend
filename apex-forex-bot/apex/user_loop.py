@@ -112,6 +112,47 @@ def _risk_from_snapshot(entry_price, initial_stop):
         return None
 
 
+def _price_open_position(pos, symbol, price):
+    """Attach floating (unrealised) P&L to an open position, in pips and USD.
+
+    bot.py — the single-account loop — has always done this, but the per-user
+    loop that actually runs in production never did, and every reader of that
+    number defaulted it to zero: Telegram's /status printed `PnL: +$0.00` on a
+    position that was $22 down, and the web terminal read `pnlUsd`/`pnlPips`
+    that were simply absent. A trade showing exactly $0.00 the whole time it is
+    open reads as a broken bot, and it hides the one number the client most
+    wants while a position is live.
+
+    Returns the position (a copy, so the broker's dict is never mutated) or
+    None. Never raises: this decorates the dashboard and must not be able to
+    take the trading loop down.
+    """
+    if not pos:
+        return pos
+    try:
+        entry = float(pos.get("entryPrice"))
+        px = float(price)
+    except (TypeError, ValueError):
+        return pos
+    if not entry or not px:
+        return pos
+    sym = pos.get("symbol") or symbol
+    side = pos.get("side")
+    if side not in ("BUY", "SELL"):
+        return pos
+    out = dict(pos)
+    try:
+        d = 1 if side == "BUY" else -1
+        out["pnlPips"] = round(forex.to_pips((px - entry) * d, sym, px), 1)
+        units = pos.get("units") or pos.get("quantity") or 0
+        if units:
+            out["pnlUsd"] = round(
+                forex.pnl_usd(side, entry, px, units, sym), 2)
+    except Exception as e:
+        print(f"[UserLoop] floating P&L for {sym} failed: {e}")
+    return out
+
+
 # Tick cadence. This was hardcoded to 300 while config computed
 # LOOP_INTERVAL_MS (60s in scalp mode) and used it only for DISPLAY —
 # telegram.py and logger.py told the client "Interval: 1m" while the loop ran
@@ -1988,7 +2029,12 @@ def _loop(user_id, alert_fn, gen=None):
                     dash["_manualBal"] = False
 
             dash["balance"] = paper_balance
-            dash["openPosition"] = open_pos
+            # Price the position before publishing it: /status and the web
+            # terminal both show floating P&L, and both read it off this dict.
+            dash["openPosition"] = _price_open_position(open_pos, symbol, price)
+            _float = float((dash["openPosition"] or {}).get("pnlUsd") or 0.0)
+            dash["floatingPnl"] = round(_float, 2)
+            dash["equityLive"] = round(float(paper_balance or 0) + _float, 2)
 
             # ── Paper SL/TP enforcement ──
             # In LIVE mode the broker holds the stop/target server-side, so a hit

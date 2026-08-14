@@ -548,10 +548,22 @@ def _build_status(dash, chart=""):
     if dash.get("openPosition"):
         op = dash["openPosition"]
         d = "🟢 LONG" if op["side"] == "BUY" else "🔴 SHORT"
-        pnl = op.get("currentPnl", 0)
+        # Floating P&L, written by user_loop._price_open_position. This used to
+        # read `currentPnl`, a key nothing in the codebase has ever written, so
+        # every open position reported exactly +$0.00 for its whole life. When
+        # the number genuinely isn't there yet (first tick after a restart),
+        # say so instead of printing a zero that looks like a real result.
+        pnl = op.get("pnlUsd")
+        pips = op.get("pnlPips")
+        if pnl is None:
+            pnl_txt = "…" if pips is None else f"{pips:+.1f} pips"
+        else:
+            pnl_txt = f"{'+' if pnl >= 0 else '−'}${abs(pnl):.2f}"
+            if pips is not None:
+                pnl_txt += f"  ({pips:+.1f} pips)"
         pos_line = (f"{d} <b>{op['symbol']}</b>\n  Entry: {op['entryPrice']}  "
                     f"SL: {_fmt_px(op.get('stopLoss') or 0)}\n"
-                    f"  PnL: <b>{'+' if pnl >= 0 else ''}${pnl:.2f}</b>")
+                    f"  PnL: <b>{pnl_txt}</b>")
         if oc > 1:
             pos_line += f"\n  <i>+{oc - 1} more open — see the terminal / cTrader</i>"
     elif oc > 0:
@@ -1557,7 +1569,7 @@ def _handle_cb(chat_id, data):
     if data == "go:connect":
         return _handle_ctrader(chat_id)
     if data == "go:controls":
-        return send_to(chat_id, _CONTROLS_TEXT)
+        return send_to(chat_id, _with_counts(_CONTROLS_TEXT))
     if data == "go:status":
         return _handle_status(chat_id)
     if data == "go:risk":
@@ -3484,7 +3496,7 @@ _CONTROLS_TEXT = (
     "<b>⚙️ Settings</b>\n"
     "/pairs — Browse available trading instruments\n"
     "/symbol EURUSD — Change what you trade\n"
-    "/strategy — Pick a trading method (10 available, incl. Auto)\n"
+    "/strategy — Pick a trading method (STRATCOUNT available, incl. Auto)\n"
     "/risk — Pick a risk tier, or /risk 2 for an exact % (0.5–50%)\n"
     "/sl 50 — Set stop loss in pips\n"
     "/tp 100 — Set take profit in pips\n"
@@ -3512,6 +3524,10 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "/setup — guided setup wizard\n"
                "/config — show current settings\n"
                "/report — trade journal + net P&amp;L\n"
+               "/summary — today's results in one message\n"
+               "/controls or /settings — every control explained\n"
+               "/guide — visual walkthrough\n"
+               "/verbose — show or hide diagnostic alerts\n"
                "━━━━━━━━━━━━━━━━━━━━\n"
                "/buy &lt;PAIR&gt; — open BUY manually\n"
                "/sell &lt;PAIR&gt; — open SELL manually\n"
@@ -3526,7 +3542,7 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "/watch — scan a basket, trade the strongest setup\n"
                "/autopilot on — bot picks instruments too\n"
                "/maxpos 5 — hold several trades at once\n"
-               "/strategy — method (auto · mean reversion · trend · breakout)\n"
+               "/strategy — pick from STRATCOUNT methods (send it to see them)\n"
                "/builder — build a full strategy or 1-tap preset\n"
                "/atr on|off — dynamic ATR stops\n"
                "/terminal — live trading terminal\n"
@@ -3544,6 +3560,24 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "/purgebad [id] — clean up corrupted journal records (defaults to your own)\n"
                "/help — this list\n\n"
                "💬 <i>Free text → AI assistant (any language)</i>")
+
+
+def _with_counts(text):
+    """Fill the STRATCOUNT placeholder from the registry, at send time.
+
+    The help copy used to name the number itself — "10 available", "auto ·
+    mean reversion · trend · breakout". Both went stale the moment §2 added
+    the momentum/session/z-score/volatility families and grid/martingale: the
+    guide promised ten while the picker listed sixteen. Asking the same source
+    /strategy asks means the two can no longer disagree.
+    """
+    try:
+        from apex import strategy_api
+        strategy_api.load_builtins()
+        n = len(strategy_api.available())
+    except Exception:
+        n = 0
+    return text.replace("STRATCOUNT", str(n) if n else "several")
 
 
 # ─── Poll loop ────────────────────────────────────────────
@@ -3826,7 +3860,7 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
     elif cmd_l == "/help":
         _handle_quick_help(chat_id)
     elif cmd_l == "/allcommands":
-        send_to(chat_id, _HELP_ADMIN if is_adm else _HELP_CLIENT)
+        send_to(chat_id, _with_counts(_HELP_ADMIN if is_adm else _HELP_CLIENT))
     elif cmd_l == "/verbose":
         _u = user_store.load(chat_id)
         _on = not _u.get("verbose_alerts")
@@ -3848,7 +3882,7 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         # /settings is an alias, not a nicety: it is the name
         # people reach for first, and the reconnect message told
         # clients to send it while no such command existed.
-        send_to(chat_id, _CONTROLS_TEXT)
+        send_to(chat_id, _with_counts(_CONTROLS_TEXT))
     elif cmd_l in ("/purchase", "/buylicense", "/pay"):
         _handle_purchase(chat_id)
     elif cmd_l == "/users" and is_adm:

@@ -203,7 +203,7 @@ function poll(){
     const gl=Math.abs(losses.reduce((s,t)=>s+(t.pnl||0),0));
     const pf=gl>0?(gp/gl).toFixed(2):(gp>0?'∞':'—');
     const wr=trades.length?Math.round(wins.length/trades.length*100):null;
-    const openPnl=pos?pos.currentPnl||0:0;
+    const openPnl=pos?(pos.pnlUsd!=null?pos.pnlUsd:0):0;
 
     $('sym').textContent=(d.currentSymbol||'—').replace('_','/');
     const priceEl=$('price');
