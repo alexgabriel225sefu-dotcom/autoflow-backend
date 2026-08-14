@@ -195,6 +195,54 @@ def build():
             raise ValueError("refused: force_trade is demo-only (real-money account)")
         return {"user": uid, "result": user_loop.force_trade(uid, side, symbol)}
 
+
+    # Commands that are destructive, irreversible, or move real money are NOT
+    # reachable this way. The point of client_message is to let the operator
+    # WALK a client's flow and see what the bot really replies — not to hand
+    # the control plane a remote shell over somebody's account. force_trade
+    # and force_close already exist as deliberate, separately-audited actions;
+    # anything on this list has to be typed by the person whose account it is.
+    _MSG_DENY = {
+        "/reset",        # disconnects the broker and wipes every setting
+        "/paper",        # paper OFF is the real-money switch
+        "/env",          # routes to /paper
+        "/setkeys",      # credential rotation
+        "/deploy",       # ships code
+        "/purgebad",     # destroys journal rows
+        "/grant", "/revoke",   # access control
+        "/buy", "/sell", "/close",   # use force_trade / force_close instead
+    }
+
+    def h_client_message(args):
+        """Deliver `text` to the bot as if the client had typed it.
+
+        The bot's command dispatch lived inside the getUpdates loop, so the
+        only way to exercise a command was for a human to type it — which
+        meant remote verification was reading code and hoping. This runs the
+        IDENTICAL dispatch a real message runs: same handlers, same replies
+        sent to the client's own Telegram.
+
+        It genuinely acts as the client, so it is deliberately narrower than
+        the client is: see _MSG_DENY.
+        """
+        uid = str(args["user_id"])
+        text = str(args.get("text") or "").strip()
+        if not text:
+            raise ValueError("text is required")
+        if len(text) > 400:
+            raise ValueError("text too long")
+        cmd = text.split()[0].lower().split("@")[0]
+        if cmd in _MSG_DENY:
+            raise ValueError(
+                f"refused: {cmd} is not available through the control plane — "
+                f"it is destructive or moves real money, so it has to be sent "
+                f"by the account owner")
+        from apex import control
+        control.event("mcp_msg", text[:120], user_id=uid)
+        tg.dispatch_command(uid, text)
+        return {"user": uid, "delivered": text,
+                "note": "the bot replied in the client's Telegram"}
+
     return {
         "status": h_status,
         "user_detail": h_user_detail,
@@ -208,4 +256,5 @@ def build():
         "send_message": h_send_message,
         "force_close": h_force_close,
         "force_trade": h_force_trade,
+        "client_message": h_client_message,
     }

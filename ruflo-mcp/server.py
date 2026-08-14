@@ -217,6 +217,24 @@ def open_trade(product: str, user_id: str, side: str, symbol: str = None) -> dic
     return _call(product, "force_trade", args)
 
 
+@mcp.tool()
+def client_message(product: str, user_id: str, text: str) -> dict:
+    """Send `text` to the bot AS THE CLIENT — the bot handles it and replies in
+    their Telegram, exactly as if they had typed it.
+
+    This drives the real command dispatch (same access checks, same handlers,
+    same replies), so it is the way to verify what a client actually gets
+    rather than reading the code and hoping. Use it for read-only and
+    configuration commands: /status, /help, /strategy, /risk, /summary,
+    /verbose, /report, /news, or plain-language questions.
+
+    REFUSED, by design: /reset, /paper, /env, /setkeys, /deploy, /purgebad,
+    /grant, /revoke, /buy, /sell, /close. Those are destructive or move real
+    money and must be sent by the account owner. Use open_trade / force_close
+    for trades — they are separately audited and demo-only."""
+    return _call(product, "client_message", {"user_id": user_id, "text": text})
+
+
 # ─── Affiliate / referral bot (over the website API) ─────────
 def _site_post(path: str, body: dict, timeout: float = 15.0):
     r = requests.post(f"{_SITE}{path}", json=body, timeout=timeout)

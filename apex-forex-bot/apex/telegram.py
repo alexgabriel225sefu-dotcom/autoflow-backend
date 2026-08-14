@@ -3779,171 +3779,198 @@ def _poll_loop():
                 cmd_l = cmd.lower().split("@")[0]  # strip @botname suffix
                 args = args.split("\n")[0].strip()  # first line of args only
 
-                is_adm = access.is_admin(chat_id_str)
-
-                # Log inbound Telegram commands to the control-plane feed so the
-                # operator (via MCP) can see exactly what clients are sending.
-                try:
-                    from apex import control
-                    control.event("tg_in", first_line[:120], user_id=chat_id_str)
-                except Exception:
-                    pass
-
-                if cmd_l == "/deploy" and is_adm:
-                    _handle_deploy(chat_id)
-                elif cmd_l in ("/status", "/s"):
-                    _handle_status(chat_id)
-                elif cmd_l == "/report":
-                    _handle_report(chat_id)
-                elif cmd_l == "/help":
-                    _handle_quick_help(chat_id)
-                elif cmd_l == "/allcommands":
-                    send_to(chat_id, _HELP_ADMIN if is_adm else _HELP_CLIENT)
-                elif cmd_l == "/verbose":
-                    _u = user_store.load(chat_id)
-                    _on = not _u.get("verbose_alerts")
-                    user_store.update(chat_id, {"verbose_alerts": _on})
-                    send_to(chat_id,
-                            "🔊 <b>Detailed alerts ON</b> — you'll now also see "
-                            "every skipped setup, each stop trail and the "
-                            "bot's internal checks.\nSend /verbose again to go "
-                            "back to quiet."
-                            if _on else
-                            "🔇 <b>Quiet mode</b> — you'll get trades, the "
-                            "daily summary and anything that needs you. "
-                            "Diagnostics are hidden.\nSend /verbose to see "
-                            "everything.")
-                elif cmd_l == "/summary":
-                    if not send_daily_summary(chat_id):
-                        send_to(chat_id, "📊 No closed trades today yet.")
-                elif cmd_l in ("/controls", "/settings"):
-                    # /settings is an alias, not a nicety: it is the name
-                    # people reach for first, and the reconnect message told
-                    # clients to send it while no such command existed.
-                    send_to(chat_id, _CONTROLS_TEXT)
-                elif cmd_l in ("/purchase", "/buylicense", "/pay"):
-                    _handle_purchase(chat_id)
-                elif cmd_l == "/users" and is_adm:
-                    _handle_users(chat_id)
-                elif cmd_l == "/grant" and is_adm:
-                    _handle_grant(chat_id, args)
-                elif cmd_l == "/revoke" and is_adm:
-                    _handle_revoke(chat_id, args)
-                elif cmd_l == "/purgebad" and is_adm:
-                    _handle_purge_bad(chat_id, args)
-                elif cmd_l == "/setup":
-                    # Every paying client self-configures their OWN trading via the
-                    # wizard (writes only their user record); admin extras apply
-                    # globally inside _handle_wizard_reply.
-                    _handle_setup(chat_id)
-                elif cmd_l == "/reset":
-                    _handle_reset(chat_id)
-                elif cmd_l == "/cancel":
-                    with _lock:
-                        _had = _wizards.pop(chat_id, None)
-                    send_to(chat_id, "✖️ Setup cancelled." if _had else "Nothing to cancel.")
-                elif cmd_l == "/config" and is_adm:
-                    _handle_config(chat_id)
-                elif cmd_l == "/setkeys" and is_adm:
-                    _handle_setkeys(chat_id, args, msg_id)
-                elif cmd_l == "/broker" and is_adm:
-                    _handle_broker(chat_id, args)
-                elif cmd_l == "/env" and is_adm:
-                    _handle_env(chat_id, args)
-                elif cmd_l == "/ctrader":
-                    _handle_ctrader(chat_id)
-                elif cmd_l == "/ctaccount":
-                    _handle_ctaccount(chat_id, args)
-                elif cmd_l in ("/switch", "/account", "/golive"):
-                    _handle_switch(chat_id)
-                elif cmd_l == "/copilot":
-                    _handle_copilot(chat_id, args)
-                elif cmd_l == "/news":
-                    _handle_news(chat_id)
-                elif cmd_l in ("/market", "/m"):
-                    _handle_market(chat_id)
-                elif cmd_l == "/paper":
-                    _handle_paper(chat_id, args)
-                elif cmd_l == "/risk":
-                    _handle_risk(chat_id, args)
-                elif cmd_l == "/sl":
-                    _handle_sl(chat_id, args)
-                elif cmd_l == "/tp":
-                    _handle_tp(chat_id, args)
-                elif cmd_l == "/tptarget":
-                    _handle_tptarget(chat_id, args)
-                elif cmd_l == "/symbol":
-                    _handle_symbol(chat_id, args)
-                elif cmd_l in ("/pairs", "/symbols"):
-                    _handle_pairs(chat_id)
-                elif cmd_l == "/watch":
-                    _handle_watch(chat_id, args)
-                elif cmd_l in ("/autopilot", "/auto"):
-                    _handle_autopilot(chat_id, args)
-                elif cmd_l in ("/maxpos", "/positions"):
-                    _handle_maxpos(chat_id, args)
-                elif cmd_l in ("/builder", "/build", "/strategybuilder"):
-                    _handle_builder(chat_id)
-                elif cmd_l in ("/strategy", "/method"):
-                    _handle_strategy(chat_id, args)
-                elif cmd_l == "/backtest":
-                    _handle_backtest(chat_id, args)
-                elif cmd_l == "/wizard":
-                    onboard_start(chat_id)
-                elif cmd_l == "/chart":
-                    _handle_chart(chat_id, args)
-                elif cmd_l in ("/terminal", "/app"):
-                    _handle_terminal(chat_id)
-                elif cmd_l in ("/guide", "/help2", "/manual", "/howto"):
-                    _handle_guide(chat_id)
-                elif cmd_l == "/atr":
-                    _handle_atr(chat_id, args)
-                elif cmd_l == "/aiconfirm":
-                    _handle_aiconfirm(chat_id, args)
-                elif cmd_l in ("/stats", "/performance"):
-                    _handle_stats(chat_id)
-                elif cmd_l in ("/resetstats", "/resetjournal"):
-                    _handle_resetstats(chat_id)
-                elif cmd_l == "/buy":
-                    _handle_buy(chat_id, args)
-                elif cmd_l == "/sell":
-                    _handle_sell(chat_id, args)
-                elif cmd_l == "/close":
-                    _handle_close(chat_id)
-                elif cmd_l in ("/start", "/resume"):
-                    # /resume is what people type after /stop, and what the
-                    # onboarding copy promised. It did not exist.
-                    _handle_start(chat_id)
-                elif cmd_l == "/stop":
-                    # Per-user: stops only this client's loop (admin also pauses global).
-                    _handle_stop(chat_id)
-                elif cmd_l == "/ai":
-                    _handle_ai_setup(chat_id)
-                elif cmd_l in ("/groq", "/gemini", "/claude", "/key"):
-                    # Explicit key command — the key is the argument.
-                    _handle_ai_key(chat_id, args, msg_id)
-                elif not raw.startswith("/"):
-                    # A bare pasted AI key → connect it (and keep it out of chat history).
-                    if _detect_ai_key(raw.strip()):
-                        _handle_ai_key(chat_id, raw.strip(), msg_id)
-                        continue
-                    # Intent detection first (works with zero AI key)
-                    handled = _handle_trade_intent_fx(chat_id, raw)
-                    if not handled:
-                        # Fall through to AI assistant
-                        def _typing_reply(reply, cid=chat_id):
-                            send_to(cid, reply)
-                        def _typing_status(status, cid=chat_id):
-                            send_to(cid, status)
-                        assistant.chat(
-                            chat_id, raw,
-                            send_fn=_typing_reply,
-                            send_status=_typing_status,
-                        )
-                # Unknown /commands → silently ignored
+                dispatch_command(chat_id, raw, msg_id, first_line, cmd_l, args)
         except Exception as e:
             print(f"[TELEGRAM] Poll error: {e}")
         time.sleep(2)
+
+
+def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
+                     cmd_l=None, args=None):
+    """Run one client command. The body of the Telegram poll loop.
+
+    Extracted so the exact dispatch a real message goes through can also
+    be driven from the control plane. Nothing here changed: the poll loop
+    calls this with the same arguments it used to compute inline, and an
+    injected message takes the identical path — same access checks, same
+    handlers, same replies. A test that ran a private copy of this logic
+    would prove nothing about what a client actually gets.
+    """
+    chat_id_str = str(chat_id)
+    if first_line is None:
+        first_line = (raw or "").splitlines()[0].strip() if raw else ""
+    if cmd_l is None:
+        _cmd, _, _args = first_line.partition(" ")
+        cmd_l = _cmd.lower().split("@")[0]
+        if args is None:
+            args = _args.split("\n")[0].strip()
+    if args is None:
+        args = ""
+
+    is_adm = access.is_admin(chat_id_str)
+
+    # Log inbound Telegram commands to the control-plane feed so the
+    # operator (via MCP) can see exactly what clients are sending.
+    try:
+        from apex import control
+        control.event("tg_in", first_line[:120], user_id=chat_id_str)
+    except Exception:
+        pass
+
+    if cmd_l == "/deploy" and is_adm:
+        _handle_deploy(chat_id)
+    elif cmd_l in ("/status", "/s"):
+        _handle_status(chat_id)
+    elif cmd_l == "/report":
+        _handle_report(chat_id)
+    elif cmd_l == "/help":
+        _handle_quick_help(chat_id)
+    elif cmd_l == "/allcommands":
+        send_to(chat_id, _HELP_ADMIN if is_adm else _HELP_CLIENT)
+    elif cmd_l == "/verbose":
+        _u = user_store.load(chat_id)
+        _on = not _u.get("verbose_alerts")
+        user_store.update(chat_id, {"verbose_alerts": _on})
+        send_to(chat_id,
+                "🔊 <b>Detailed alerts ON</b> — you'll now also see "
+                "every skipped setup, each stop trail and the "
+                "bot's internal checks.\nSend /verbose again to go "
+                "back to quiet."
+                if _on else
+                "🔇 <b>Quiet mode</b> — you'll get trades, the "
+                "daily summary and anything that needs you. "
+                "Diagnostics are hidden.\nSend /verbose to see "
+                "everything.")
+    elif cmd_l == "/summary":
+        if not send_daily_summary(chat_id):
+            send_to(chat_id, "📊 No closed trades today yet.")
+    elif cmd_l in ("/controls", "/settings"):
+        # /settings is an alias, not a nicety: it is the name
+        # people reach for first, and the reconnect message told
+        # clients to send it while no such command existed.
+        send_to(chat_id, _CONTROLS_TEXT)
+    elif cmd_l in ("/purchase", "/buylicense", "/pay"):
+        _handle_purchase(chat_id)
+    elif cmd_l == "/users" and is_adm:
+        _handle_users(chat_id)
+    elif cmd_l == "/grant" and is_adm:
+        _handle_grant(chat_id, args)
+    elif cmd_l == "/revoke" and is_adm:
+        _handle_revoke(chat_id, args)
+    elif cmd_l == "/purgebad" and is_adm:
+        _handle_purge_bad(chat_id, args)
+    elif cmd_l == "/setup":
+        # Every paying client self-configures their OWN trading via the
+        # wizard (writes only their user record); admin extras apply
+        # globally inside _handle_wizard_reply.
+        _handle_setup(chat_id)
+    elif cmd_l == "/reset":
+        _handle_reset(chat_id)
+    elif cmd_l == "/cancel":
+        with _lock:
+            _had = _wizards.pop(chat_id, None)
+        send_to(chat_id, "✖️ Setup cancelled." if _had else "Nothing to cancel.")
+    elif cmd_l == "/config" and is_adm:
+        _handle_config(chat_id)
+    elif cmd_l == "/setkeys" and is_adm:
+        _handle_setkeys(chat_id, args, msg_id)
+    elif cmd_l == "/broker" and is_adm:
+        _handle_broker(chat_id, args)
+    elif cmd_l == "/env" and is_adm:
+        _handle_env(chat_id, args)
+    elif cmd_l == "/ctrader":
+        _handle_ctrader(chat_id)
+    elif cmd_l == "/ctaccount":
+        _handle_ctaccount(chat_id, args)
+    elif cmd_l in ("/switch", "/account", "/golive"):
+        _handle_switch(chat_id)
+    elif cmd_l == "/copilot":
+        _handle_copilot(chat_id, args)
+    elif cmd_l == "/news":
+        _handle_news(chat_id)
+    elif cmd_l in ("/market", "/m"):
+        _handle_market(chat_id)
+    elif cmd_l == "/paper":
+        _handle_paper(chat_id, args)
+    elif cmd_l == "/risk":
+        _handle_risk(chat_id, args)
+    elif cmd_l == "/sl":
+        _handle_sl(chat_id, args)
+    elif cmd_l == "/tp":
+        _handle_tp(chat_id, args)
+    elif cmd_l == "/tptarget":
+        _handle_tptarget(chat_id, args)
+    elif cmd_l == "/symbol":
+        _handle_symbol(chat_id, args)
+    elif cmd_l in ("/pairs", "/symbols"):
+        _handle_pairs(chat_id)
+    elif cmd_l == "/watch":
+        _handle_watch(chat_id, args)
+    elif cmd_l in ("/autopilot", "/auto"):
+        _handle_autopilot(chat_id, args)
+    elif cmd_l in ("/maxpos", "/positions"):
+        _handle_maxpos(chat_id, args)
+    elif cmd_l in ("/builder", "/build", "/strategybuilder"):
+        _handle_builder(chat_id)
+    elif cmd_l in ("/strategy", "/method"):
+        _handle_strategy(chat_id, args)
+    elif cmd_l == "/backtest":
+        _handle_backtest(chat_id, args)
+    elif cmd_l == "/wizard":
+        onboard_start(chat_id)
+    elif cmd_l == "/chart":
+        _handle_chart(chat_id, args)
+    elif cmd_l in ("/terminal", "/app"):
+        _handle_terminal(chat_id)
+    elif cmd_l in ("/guide", "/help2", "/manual", "/howto"):
+        _handle_guide(chat_id)
+    elif cmd_l == "/atr":
+        _handle_atr(chat_id, args)
+    elif cmd_l == "/aiconfirm":
+        _handle_aiconfirm(chat_id, args)
+    elif cmd_l in ("/stats", "/performance"):
+        _handle_stats(chat_id)
+    elif cmd_l in ("/resetstats", "/resetjournal"):
+        _handle_resetstats(chat_id)
+    elif cmd_l == "/buy":
+        _handle_buy(chat_id, args)
+    elif cmd_l == "/sell":
+        _handle_sell(chat_id, args)
+    elif cmd_l == "/close":
+        _handle_close(chat_id)
+    elif cmd_l in ("/start", "/resume"):
+        # /resume is what people type after /stop, and what the
+        # onboarding copy promised. It did not exist.
+        _handle_start(chat_id)
+    elif cmd_l == "/stop":
+        # Per-user: stops only this client's loop (admin also pauses global).
+        _handle_stop(chat_id)
+    elif cmd_l == "/ai":
+        _handle_ai_setup(chat_id)
+    elif cmd_l in ("/groq", "/gemini", "/claude", "/key"):
+        # Explicit key command — the key is the argument.
+        _handle_ai_key(chat_id, args, msg_id)
+    elif not raw.startswith("/"):
+        # A bare pasted AI key → connect it (and keep it out of chat history).
+        if _detect_ai_key(raw.strip()):
+            _handle_ai_key(chat_id, raw.strip(), msg_id)
+            # Was `continue` when this lived in the poll loop; in a function
+            # the same meaning is "this update is finished".
+            return
+        # Intent detection first (works with zero AI key)
+        handled = _handle_trade_intent_fx(chat_id, raw)
+        if not handled:
+            # Fall through to AI assistant
+            def _typing_reply(reply, cid=chat_id):
+                send_to(cid, reply)
+            def _typing_status(status, cid=chat_id):
+                send_to(cid, status)
+            assistant.chat(
+                chat_id, raw,
+                send_fn=_typing_reply,
+                send_status=_typing_status,
+            )
+    # Unknown /commands → silently ignored
 
 
 def start_polling(get_dash, broker, control=None):
