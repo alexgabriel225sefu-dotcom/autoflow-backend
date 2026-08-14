@@ -1648,8 +1648,44 @@ def _handle_copilot(chat_id, args):
         "Use <code>/copilot on</code> or <code>/copilot off</code>.")
 
 
+# Turning paper OFF on a LIVE account starts sending real-money orders. The
+# only thing standing in front of that was a risk acceptance clicked once,
+# possibly months earlier — so a single mistyped command, or a Telegram
+# session in the wrong hands, was enough. Activation now needs a fresh,
+# short-lived token the user has to type back, after seeing the account and
+# the risk settings it will trade with.
+_LIVE_CONFIRM_TTL_S = 300
+# And it lands with a hard ceiling on risk-per-trade regardless of what the
+# account was configured with while it was only ever simulating.
+_LIVE_INITIAL_RISK_CAP = float(os.getenv("LIVE_INITIAL_RISK_CAP") or 0.01)
+
+
+def _live_activation_summary(chat_id, u, token):
+    bal = (user_loop.get_dash(chat_id) or {}).get("balance")
+    risk = float(u.get("risk", cfg.RISK_PER_TRADE) or 0)
+    capped = min(risk, _LIVE_INITIAL_RISK_CAP)
+    return (
+        "🔴 <b>REAL MONEY ACTIVATION</b>\n\n"
+        "You are about to let the bot place orders with real funds.\n\n"
+        f"<b>Account:</b> <code>{u.get('ctrader_account_id', '—')}</code> (LIVE)\n"
+        f"<b>Balance:</b> {('$%.2f' % bal) if isinstance(bal, (int, float)) else '—'}\n"
+        f"<b>Risk / trade:</b> {capped:.2%}"
+        + (f"  <i>(capped down from {risk:.2%} for activation)</i>" if capped < risk else "")
+        + f"\n<b>Stop / target:</b> {u.get('sl_pips', cfg.STOP_LOSS_PIPS)}p / "
+        f"{u.get('tp_pips', cfg.TAKE_PROFIT_PIPS)}p\n"
+        f"<b>Max trades/day:</b> {u.get('max_trades_day', '—')}\n"
+        f"<b>Max daily loss:</b> {u.get('max_daily_loss_pct', '—')}%\n"
+        f"<b>Max drawdown:</b> {u.get('max_dd_pct', '—')}%\n\n"
+        "Losses are real and are yours. To confirm, send exactly:\n"
+        f"<code>/paper off {token}</code>\n\n"
+        f"<i>This code expires in {_LIVE_CONFIRM_TTL_S // 60} minutes. "
+        "Ignore this message to stay in simulation.</i>")
+
+
 def _handle_paper(chat_id, args):
-    on = (args or "").strip().lower() in ("on", "true", "yes", "1")
+    parts = (args or "").strip().split()
+    on = (parts[0].lower() if parts else "") in ("on", "true", "yes", "1")
+    supplied_token = parts[1].strip().upper() if len(parts) > 1 else ""
     # Real-order mode is gated behind an explicit, recorded risk acceptance —
     # the client owns the strategy, the settings and every loss.
     if not on:
@@ -1658,6 +1694,36 @@ def _handle_paper(chat_id, args):
             return send_to(chat_id, _RISK_TEXT,
                 extra={"reply_markup": {"inline_keyboard": [[
                     {"text": "✅ I understand — I accept the risk", "callback_data": "risk:ok"}]]}})
+
+        # Second gate, only where real money is at stake. A demo account keeps
+        # the old one-step behaviour — friction there protects nothing.
+        if (u0.get("ctrader_env") or "demo").lower() == "live":
+            import secrets
+            pending = u0.get("live_confirm") or {}
+            fresh = (pending.get("token")
+                     and time.time() - float(pending.get("ts") or 0) < _LIVE_CONFIRM_TTL_S)
+            if not (fresh and supplied_token
+                    and secrets.compare_digest(supplied_token, str(pending["token"]))):
+                token = "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+                                for _ in range(6))
+                user_store.update(chat_id, {"live_confirm": {"token": token,
+                                                             "ts": time.time()}})
+                return send_to(chat_id, _live_activation_summary(chat_id, u0, token))
+
+            # Confirmed. Burn the token so it cannot be replayed, and cap risk.
+            capped = min(float(u0.get("risk", cfg.RISK_PER_TRADE) or 0),
+                         _LIVE_INITIAL_RISK_CAP)
+            user_store.update(chat_id, {"live_confirm": None, "risk": capped})
+            try:
+                from apex import control
+                control._audit({"ts": int(time.time()), "actor": str(chat_id),
+                                "action": "live_trading_activated",
+                                "account": str(u0.get("ctrader_account_id", "")),
+                                "risk_per_trade": capped})
+            except Exception as e:
+                print(f"[Telegram] live activation audit failed: {e}")
+            print(f"[Telegram] LIVE trading activated by {chat_id} "
+                  f"on account {u0.get('ctrader_account_id')} at risk {capped}")
     # Per-user first — the client's loop reads the user record, not the global cfg.
     user_store.update(chat_id, {"paper": on})
     _restart_user_loop(chat_id)

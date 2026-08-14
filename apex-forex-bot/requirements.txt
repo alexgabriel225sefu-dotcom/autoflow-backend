@@ -1,9 +1,22 @@
-requests>=2.31
-redis>=5.0
-python-dotenv>=1.0
-cryptography>=42
-anthropic>=0.18
-groq>=0.4
-yfinance>=0.2
-ctrader-open-api>=0.9
-matplotlib>=3.7
+# Pinned to the versions currently running in production, read from the live
+# Render build log — so these are known to resolve and install on the
+# deployment's Python, not guessed.
+#
+# Why exact pins and not ">=": Render runs `pip install -r requirements.txt`
+# on every build, so a floor alone means any upstream release ships itself
+# straight into a live trading bot with no review. Twice in one day a
+# transitive upgrade broke this project's own tooling. Reproducible builds are
+# the point — bump these deliberately, not by accident.
+#
+# Every entry below is imported at runtime; the list was checked against the
+# actual import graph. The `groq` SDK used to be here and was never imported:
+# the Groq calls go out over plain `requests`.
+
+requests==2.32.3
+redis==8.1.0
+python-dotenv==1.2.2
+cryptography==42.0.8      # field-level encryption of broker tokens at rest
+anthropic==0.122.0
+yfinance==1.6.0
+ctrader-open-api==0.9.2
+matplotlib==3.11.1
