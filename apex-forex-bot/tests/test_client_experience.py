@@ -274,6 +274,46 @@ for _word, _rx, _lbl in (("cumpara", tg._RE_BUY_FX, "BUY"),
                          ("short it", tg._RE_SELL_FX, "SELL")):
     check(f"'{_word}' still reads as {_lbl}", bool(_rx.search(_word)))
 
+print("\n── a free-text order names its own instrument ──")
+# _RE_PAIR_FX wanted EUR/USD or a lone EUR. A bare six-letter pair has no word
+# boundary in the middle, so "cumpara EURUSD" matched nothing and the order
+# fell back to whatever Auto-Pilot was focused on — a real position on the
+# wrong instrument, silently. It only looked correct in testing because focus
+# and request happened to agree.
+for _txt, _want in (("cumpara EURUSD", "EUR_USD"),
+                    ("buy me some eurusd", "EUR_USD"),
+                    ("long usdjpy", "USD_JPY"),
+                    ("sell usdcad", "USD_CAD"),
+                    ("short eurusd", "EUR_USD"),
+                    ("intru pe gbpusd", "GBP_USD"),
+                    ("buy EUR/USD", "EUR_USD"),
+                    ("buy EUR_USD", "EUR_USD"),
+                    ("buy gold", "XAU_USD"),
+                    ("cumpara silver", "XAG_USD")):
+    check(f"'{_txt}' → {_want}", tg._pair_from_text(_txt) == _want,
+          f"got {tg._pair_from_text(_txt)}")
+for _txt in ("cumpără", "vinde", "go short", "buy now", "close it",
+             "buy usd", "sell me something"):
+    check(f"'{_txt}' names no pair → keeps the current one",
+          tg._pair_from_text(_txt) is None, f"got {tg._pair_from_text(_txt)}")
+
+print("\n── asking about closing must not close ──")
+# The close-math pattern needed a Romanian second half, so the English
+# hypothetical fell through to the branch that actually shuts the position.
+_math = lambda t: bool(  # noqa: E731  - mirrors the gate in _handle_trade_intent_fx
+    tg._RE_CLOSE_MATH_FX.search(t)
+    or (tg._RE_CLOSE_FX.search(t) and tg._RE_HYPOTHETICAL_FX.search(t)))
+for _q in ("if i close now how much would i have",
+           "how much if i close right now",
+           "what would i get if i close",
+           "daca inchid acum cat am?",
+           "daca inchid cat pierd",
+           "close?"):
+    check(f"question: '{_q}' → preview, not a close", _math(_q))
+for _o in ("close it", "close the trade", "inchide", "exit now",
+           "iesi din tranzactie"):
+    check(f"order: '{_o}' → still closes", not _math(_o))
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")

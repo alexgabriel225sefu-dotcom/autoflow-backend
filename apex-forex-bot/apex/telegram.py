@@ -82,7 +82,46 @@ _RE_CLOSE_MATH_FX = re.compile(
     r"(inchide|close|iesi|exit|dac[aă]).{0,30}(cât|cat|cati|câți|rămâne|ramane|profit|pierd|lose)",
     re.IGNORECASE,
 )
-_RE_PAIR_FX = re.compile(r"\b([A-Z]{3})[/_]([A-Z]{3})\b|\b(XAU|XAG|EUR|GBP|USD|JPY|AUD|CAD|CHF|NZD)\b")
+_CCY_FX = "XAU|XAG|EUR|GBP|USD|JPY|AUD|CAD|CHF|NZD"
+_RE_PAIR_FX = re.compile(
+    rf"\b({_CCY_FX})\s*[/_-]?\s*({_CCY_FX})\b"   # EURUSD, EUR/USD, EUR_USD
+    rf"|\b(GOLD|SILVER)\b"                        # what people actually type
+    rf"|\b({_CCY_FX})\b",                         # a lone currency → vs USD
+    re.IGNORECASE)
+
+# A question about closing is not an instruction to close. The original
+# close-math pattern needed a Romanian second half (cat/profit/pierd/lose), so
+# "if i close now how much would i have" missed it, fell through to the close
+# branch and shut a live position — in English only.
+_RE_HYPOTHETICAL_FX = re.compile(
+    r"\?|\b(dac[aă]|if|how\s+much|c[âa]t|c[âa]ți|cati|would|ar\s+fi|"
+    r"a[șs]\s+avea|r[ăa]m[âa]ne)\b", re.IGNORECASE)
+
+
+def _pair_from_text(text):
+    """The instrument named in a free-text order, or None to keep the current one.
+
+    `cumpara EURUSD` used to match nothing — the pattern wanted EUR/USD or a
+    lone EUR, and a bare six-letter pair has no word boundary in the middle.
+    The order then fell back to whatever Auto-Pilot happened to be focused on,
+    silently. Asking for EURUSD while the loop sat on USDCAD bought USDCAD: a
+    real position, on the wrong instrument, with no warning. It only looked
+    right in testing because focus and request happened to agree.
+    """
+    m = _RE_PAIR_FX.search((text or "").upper())
+    if not m:
+        return None
+    base, quote, metal, single = m.group(1), m.group(2), m.group(3), m.group(4)
+    if base and quote:
+        raw = f"{base}_{quote}"
+    elif metal:
+        raw = "XAU_USD" if metal == "GOLD" else "XAG_USD"
+    else:
+        raw = f"{single}_USD"
+    # "buy USD" is not an instrument. Nor is any pair against itself.
+    if raw.split("_")[0] == raw.split("_")[1]:
+        return None
+    return raw if _PAIR_RE.match(raw) else None
 
 
 def _user_symbol(chat_id) -> str:
@@ -98,7 +137,8 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
     t = text.strip()
 
     # "if I close now, how much would I have?"
-    if _RE_CLOSE_MATH_FX.search(t):
+    if (_RE_CLOSE_MATH_FX.search(t)
+            or (_RE_CLOSE_FX.search(t) and _RE_HYPOTHETICAL_FX.search(t))):
         dash = user_loop.get_dash(chat_id) or {}
         open_pos = dash.get("openPosition")
         if not open_pos:
@@ -165,15 +205,7 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
 
     # BUY intent
     if _RE_BUY_FX.search(t):
-        sym = _user_symbol(chat_id)
-        # detect pair in message
-        pm = _RE_PAIR_FX.search(t.upper())
-        if pm:
-            raw = pm.group(0).replace("/", "_").replace("-", "_")
-            if "_" not in raw:
-                raw = raw + "_USD"
-            if _PAIR_RE.match(raw):
-                sym = raw
+        sym = _pair_from_text(t) or _user_symbol(chat_id)
         send_to(chat_id, f"⚡ Opening <b>BUY {sym}</b>…")
         result = user_loop.force_trade(str(chat_id), "BUY", sym)
         _send_fx_trade_result(chat_id, result, sym)
@@ -181,14 +213,7 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
 
     # SELL/SHORT intent
     if _RE_SELL_FX.search(t):
-        sym = _user_symbol(chat_id)
-        pm = _RE_PAIR_FX.search(t.upper())
-        if pm:
-            raw = pm.group(0).replace("/", "_").replace("-", "_")
-            if "_" not in raw:
-                raw = raw + "_USD"
-            if _PAIR_RE.match(raw):
-                sym = raw
+        sym = _pair_from_text(t) or _user_symbol(chat_id)
         send_to(chat_id, f"⚡ Opening <b>SELL {sym}</b>…")
         result = user_loop.force_trade(str(chat_id), "SELL", sym)
         _send_fx_trade_result(chat_id, result, sym)
