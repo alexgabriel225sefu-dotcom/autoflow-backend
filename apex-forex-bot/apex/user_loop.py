@@ -2069,8 +2069,22 @@ def _loop(user_id, alert_fn, gen=None):
                         return _strategy.signal(_frame)
                     except Exception as e:
                         print(f"[UserLoop:{user_id}] strategy module "
-                              f"{active_mode} signal() failed ({e}) — "
-                              f"using the engine directly")
+                              f"{active_mode} signal() failed ({e})")
+                        # ai.signal_for_mode() answers an UNKNOWN mode with
+                        # mean_reversion. For a registry-only strategy that
+                        # turns "my strategy broke" into "silently trade a
+                        # different strategy", which is worse than not
+                        # trading: the client picked one method and would get
+                        # another, journalled under the name they chose.
+                        if active_mode not in ai.STRATEGY_MODES:
+                            return {"action": "HOLD", "confidence": 0,
+                                    "criteriaScore": 0, "riskLevel": "LOW",
+                                    "reasoning": f"{active_mode} module failed "
+                                                 f"({str(e)[:80]}) — holding "
+                                                 f"rather than trading a "
+                                                 f"different strategy",
+                                    "keyFactors": []}
+                        print(f"[UserLoop:{user_id}] using the engine directly")
                 return ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
 
             # Market Pulse: store a plain-language read for /market, and ping the

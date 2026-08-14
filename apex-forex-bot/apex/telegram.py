@@ -2085,6 +2085,12 @@ def _handle_backtest(chat_id, args):
 def _handle_strategy(chat_id, args):
     """Pick the trading method — the per-user loop and the AI prompt follow it."""
     from apex.ai import STRATEGY_MODES
+    from apex import strategy_api
+    strategy_api.load_builtins()
+    # Selectable = whatever the registry holds. Sourcing this from
+    # STRATEGY_MODES meant a registered strategy with no engine in ai.py was
+    # invisible to clients — which is every strategy added after V1.
+    _registered = {sid: sid for sid in strategy_api.available()}
     aliases = {"mean": "mean_reversion", "mr": "mean_reversion", "mean_reversion": "mean_reversion",
                "reversion": "mean_reversion", "trend": "trend", "trending": "trend",
                "breakout": "breakout", "turtle": "breakout",
@@ -2094,23 +2100,64 @@ def _handle_strategy(chat_id, args):
                "ifvg": "ifvg",
                "supply": "supply_demand", "demand": "supply_demand", "supply_demand": "supply_demand",
                "liquidity": "liquidity_sweep", "sweep": "liquidity_sweep", "liquidity_sweep": "liquidity_sweep",
-               "evc": "evc"}
+               "evc": "evc",
+               # blueprint §2 families added after V1
+               "momentum": "momentum", "mom": "momentum",
+               "session": "session_breakout", "session_breakout": "session_breakout",
+               "london": "session_breakout", "asian": "session_breakout",
+               "opening_range": "opening_range", "orb": "opening_range",
+               "zscore": "zscore", "z": "zscore", "stat": "zscore",
+               "vol_regime": "vol_regime", "volatility": "vol_regime",
+               "squeeze": "vol_regime",
+               "grid": "grid", "martingale": "martingale"}
+    aliases.update(_registered)
     want = aliases.get((args or "").strip().lower().replace("-", "_"))
     user = user_store.load(chat_id)
     current = (user.get("strategy") or "auto").lower()
+    def _meta(key):
+        """Label + blurb for any registered strategy.
+
+        STRATEGY_MODES only describes the ten with an engine in ai.py, and
+        indexing it directly raised KeyError for every strategy added after
+        that — including the one the client had just selected.
+        """
+        m = STRATEGY_MODES.get(key)
+        if m:
+            return m["label"], m.get("blurb", "")
+        cls = strategy_api._REGISTRY.get(key)
+        if cls:
+            doc = (cls.__doc__ or "").strip().split("\n")[0]
+            return cls.label or key, doc
+        return key, ""
+
     if not want:
-        lines = "\n\n".join(
-            f"{'✅ ' if key == current else ''}<b>{m['label']}</b> — <code>/strategy {key.split('_')[0]}</code>\n<i>{m['blurb']}</i>"
-            for key, m in STRATEGY_MODES.items())
+        _SPECIAL = {"grid", "martingale"}
+        ordinary, special = [], []
+        for key in strategy_api.available():
+            label, blurb = _meta(key)
+            row = (f"{'✅ ' if key == current else ''}<b>{label}</b> — "
+                   f"<code>/strategy {key}</code>\n<i>{blurb}</i>")
+            (special if key in _SPECIAL else ordinary).append(row)
+        body = "\n\n".join(ordinary)
+        if special:
+            body += ("\n\n⚠️ <b>High risk — add size to losing positions</b>\n"
+                     "<i>Capped at 1.2x and halted after 3 consecutive losses, "
+                     "but they can still lose faster than the others.</i>\n\n"
+                     + "\n\n".join(special))
+        cur_label, _ = _meta(current)
         return send_to(chat_id,
-            f"🎯 <b>Trading method</b> (current: <b>{STRATEGY_MODES[current]['label']}</b>)\n\n{lines}\n\n"
+            f"🎯 <b>Trading method</b> (current: <b>{cur_label}</b>)\n\n{body}\n\n"
             "<i>Switching restarts your loop instantly — watch the first few trades closely.</i>")
     user_store.update(chat_id, {"strategy": want})
     running = _restart_user_loop(chat_id)
-    m = STRATEGY_MODES[want]
+    label, blurb = _meta(want)
+    warn = ("\n\n⚠️ <b>This strategy adds size after a loss.</b> It is capped at "
+            "1.2x and stops after 3 losses in a row, but it is still the "
+            "riskiest option here."
+            if want in ("grid", "martingale") else "")
     tail = ("Applied immediately — check /status." if running
             else "⏸ The bot is currently <b>stopped</b> — send /start to begin trading with it.")
-    send_to(chat_id, f"🎯 Method set to <b>{m['label']}</b>.\n<i>{m['blurb']}</i>\n\n{tail}")
+    send_to(chat_id, f"🎯 Method set to <b>{label}</b>.\n<i>{blurb}</i>{warn}\n\n{tail}")
 
 
 # Curated liquid universe the Auto-Pilot scans — asset-class aware (FX majors +

@@ -271,6 +271,14 @@ def provenance_for(strategy_id):
 
 
 def load_builtins():
-    """Import the shipped modules so they register themselves."""
-    from apex import strategy_modules  # noqa: F401
+    """Import the shipped modules so they register themselves.
+
+    strategy_modules  — the ten engines the bot already traded
+    strategy_extra    — momentum, session breakout, quant/statistical
+    strategy_specialized — grid and martingale, capped (blueprint §2 keeps
+                        these separate on purpose)
+    """
+    from apex import strategy_modules      # noqa: F401
+    from apex import strategy_extra        # noqa: F401
+    from apex import strategy_specialized  # noqa: F401
     return available()

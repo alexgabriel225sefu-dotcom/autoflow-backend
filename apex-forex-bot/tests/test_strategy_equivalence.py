@@ -104,18 +104,38 @@ def strip(verdict):
     return {k: v for k, v in verdict.items() if k not in PROVENANCE}
 
 
+# Equivalence applies to the V1 ADAPTERS only — the ten modules that wrap an
+# ai.py engine. Strategies added later (momentum, session breakout, z-score,
+# volatility regime, grid, martingale) are NEW logic with no engine to be
+# equivalent to; they are covered by tests/test_new_strategies.py, which
+# asserts a different property: that each decides, and refuses what its
+# family loses money in.
+#
+# This check used to be "no module invents a mode that does not exist in
+# ai.py". It failed the moment a genuinely new strategy was added, which is
+# what it was there to catch — inverted deliberately rather than deleted.
+from apex import strategy_modules  # noqa: E402
+_ADAPTERS = {cls.strategy_id for cls in vars(strategy_modules).values()
+             if isinstance(cls, type)
+             and issubclass(cls, strategy_api.Strategy)
+             and getattr(cls, "strategy_id", "")}
+registered = _ADAPTERS
+modes = set(ai.STRATEGY_MODES)
+
 print("\n🧪 STRATEGY MODULE ↔ LIVE ENGINE EQUIVALENCE\n")
 print(f"  {len(FIXTURES)} market shapes × {len(POSITIONS)} position states "
-      f"× {len(strategy_api.available())} strategy modules")
+      f"× {len(_ADAPTERS)} V1 adapter modules")
 
 # ── 1. Every shipped engine has a module, and vice versa ──────────
 print("\n1. The registry covers exactly the engines the bot ships")
-registered = set(strategy_api.available())
-modes = set(ai.STRATEGY_MODES)
+
 check("every cfg.STRATEGY mode has a registered module",
       modes <= registered, sorted(modes - registered))
-check("no module invents a mode that does not exist in ai.py",
+check("every V1 adapter maps to a real ai.py engine",
       registered <= modes, sorted(registered - modes))
+check("and the new-logic strategies are registered but NOT claimed as adapters",
+      {"momentum", "zscore", "grid", "martingale"} <= set(strategy_api.available())
+      and not ({"momentum", "zscore", "grid", "martingale"} & registered))
 
 # ── 2. signal() ═ ai.signal_for_mode(...) ─────────────────────────
 print("\n2. signal() is the live call, verdict for verdict")
