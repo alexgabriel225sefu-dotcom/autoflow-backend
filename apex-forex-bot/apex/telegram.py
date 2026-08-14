@@ -462,6 +462,33 @@ def _handle_guide(chat_id):
         _guide_button())
 
 
+_QUICK_HELP = (
+    "❓ <b>How this works</b>\n"
+    "━━━━━━━━━━━━━━━━━━\n"
+    "The bot watches the market for you and trades on its own. You don't need "
+    "to keep anything open — it runs in the cloud, 24/5.\n\n"
+    "<b>You only need three things:</b>\n"
+    "▶️ <b>Turn it ON</b> — it starts looking for setups\n"
+    "📈 <b>How am I doing</b> — balance, open trade, results\n"
+    "🛡 <b>Risk</b> — how much of your account each trade may lose\n\n"
+    "I message you when a trade opens, when it closes, and once at the end of "
+    "the day. Nothing else, unless you ask for it with /verbose.\n\n"
+    "<i>Trading carries risk. You can stop the bot any time with /stop — an "
+    "open trade keeps its protective stop.</i>"
+)
+
+
+def _handle_quick_help(chat_id):
+    """What a beginner needs, in a card they can read in ten seconds.
+
+    /controls lists 24 commands. That is the right reference and the wrong
+    first thing to hand somebody — it reads as "this is complicated", which
+    is the opposite of true here.
+    """
+    send_to(chat_id, _QUICK_HELP, extra={"reply_markup": {"inline_keyboard": [
+        [{"text": "📋 See every command", "callback_data": "go:controls"}]]}})
+
+
 def _dashboard_keyboard(chat_id=None):
     """One clear control surface: a big ON/OFF toggle + the live terminal.
     The toggle reflects the real running state so nobody has to remember
@@ -477,6 +504,14 @@ def _dashboard_keyboard(chat_id=None):
     if term_url:
         rows.append([{"text": "📊 Open Terminal", "web_app": {"url": term_url}}])
     if chat_id is not None:
+        # The three questions a beginner actually has, as taps rather than
+        # commands they must first discover in a 24-line list: how am I
+        # doing, how do I change what it trades, how do I change how much it
+        # risks. "Build strategy" answered none of them.
+        rows.append([{"text": "📈 How am I doing?", "callback_data": "go:status"},
+                     {"text": "🛡 Risk", "callback_data": "go:risk"}])
+        rows.append([{"text": "🎯 Trading method", "callback_data": "go:strategy"},
+                     {"text": "❓ Help", "callback_data": "go:help"}])
         rows.append([{"text": "⚙️ Build strategy", "callback_data": "bld:open"}])
     # Discoverable path from demo → real money without knowing a command.
     if chat_id is not None:
@@ -1523,6 +1558,14 @@ def _handle_cb(chat_id, data):
         return _handle_ctrader(chat_id)
     if data == "go:controls":
         return send_to(chat_id, _CONTROLS_TEXT)
+    if data == "go:status":
+        return _handle_status(chat_id)
+    if data == "go:risk":
+        return _handle_risk(chat_id, "")
+    if data == "go:strategy":
+        return _handle_strategy(chat_id, "")
+    if data == "go:help":
+        return _handle_quick_help(chat_id)
     if data == "acct:switch":
         return _handle_switch(chat_id)
     if data == "acct:new":
@@ -3753,6 +3796,8 @@ def _poll_loop():
                 elif cmd_l == "/report":
                     _handle_report(chat_id)
                 elif cmd_l == "/help":
+                    _handle_quick_help(chat_id)
+                elif cmd_l == "/allcommands":
                     send_to(chat_id, _HELP_ADMIN if is_adm else _HELP_CLIENT)
                 elif cmd_l == "/verbose":
                     _u = user_store.load(chat_id)
