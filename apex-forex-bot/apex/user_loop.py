@@ -2035,6 +2035,15 @@ def _loop(user_id, alert_fn, gen=None):
             _float = float((dash["openPosition"] or {}).get("pnlUsd") or 0.0)
             dash["floatingPnl"] = round(_float, 2)
             dash["equityLive"] = round(float(paper_balance or 0) + _float, 2)
+            # openCount is read off the broker at the top of the tick; a close
+            # that happens later in the SAME tick clears openPosition but
+            # leaves the count at 1, and /status falls through to "1 position
+            # open — managed by their broker stops" for a position that no
+            # longer exists. Only correct it when a single slot is in play:
+            # with maxpos > 1 an unfocused position is a real state, not a
+            # leftover.
+            if dash["openPosition"] is None and dash.get("openCount", 0) <= 1:
+                dash["openCount"] = 0
 
             # ── Paper SL/TP enforcement ──
             # In LIVE mode the broker holds the stop/target server-side, so a hit
