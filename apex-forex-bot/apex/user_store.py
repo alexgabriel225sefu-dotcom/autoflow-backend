@@ -57,11 +57,28 @@ def _decrypt_sensitive(data: dict) -> dict:
         val = data.get(field)
         if isinstance(val, str) and val.startswith(_ENC_PREFIX):
             if not _fernet:
-                continue  # can't decrypt without the key; leave as-is
+                # Encrypted data and no key to open it. Returning the value
+                # unchanged hands the caller the literal string "enc:gAAAA..."
+                # and lets it be used as a broker token — the bot then fails
+                # authentication with no indication that the real cause is a
+                # missing TOKEN_ENCRYPTION_KEY. That is the failure mode of
+                # rotating or dropping the key after data has been encrypted,
+                # and it must be loud.
+                print(f"[Store] ⛔ {field} is ENCRYPTED but TOKEN_ENCRYPTION_KEY "
+                      f"is not set — cannot decrypt. Restore the key that was "
+                      f"used to write it, or the user must re-link their "
+                      f"broker account.")
+                data[field] = ""
+                continue
             try:
                 data[field] = _fernet.decrypt(val[len(_ENC_PREFIX):].encode()).decode()
             except Exception as e:
-                print(f"[Store] failed to decrypt {field}: {e}")
+                # Wrong key, or corrupt value. Same reasoning: an unusable
+                # credential must read as absent, never as itself.
+                print(f"[Store] ⛔ failed to decrypt {field} ({e}) — treating as "
+                      f"absent. If TOKEN_ENCRYPTION_KEY was rotated, restore "
+                      f"the previous key.")
+                data[field] = ""
     return data
 
 # ─── Backend selection ───────────────────────────────────

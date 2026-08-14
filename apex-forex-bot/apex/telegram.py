@@ -290,18 +290,6 @@ def _save_runtime(updates: dict):
         json.dump(data, f, indent=2)
 
 
-# Env-key → (cfg attribute, cast)
-_CFG_MAP = {
-    "BROKER":           ("BROKER",           lambda v: str(v).lower()),
-    "PAPER_TRADING":    ("PAPER_TRADING",    lambda v: str(v).lower() in ("true", "1", "yes", "on")),
-    "TRADE_SYMBOL":     ("SYMBOL",           str),
-    "RISK_PER_TRADE":   ("RISK_PER_TRADE",   float),
-    "STOP_LOSS_PIPS":   ("STOP_LOSS_PIPS",   float),
-    "TAKE_PROFIT_PIPS": ("TAKE_PROFIT_PIPS", float),
-    "MIN_CONFIDENCE":   ("MIN_CONFIDENCE",   int),
-    "CTRADER_ENV":      ("CTRADER_ENV",      lambda v: str(v).lower()),
-    "LEVERAGE":         ("LEVERAGE",         float),
-}
 
 _BROKER_KEYS = {
     "ctrader": ["CTRADER_CLIENT_ID", "CTRADER_CLIENT_SECRET"],
@@ -317,14 +305,124 @@ def _broker_label():
     return f"cTrader ({cfg.CTRADER_ENV})"
 
 
+# ─── Strict settings allowlist ───────────────────────────
+# /setkeys used to accept ANY key: it uppercased whatever was typed, wrote it
+# to os.environ, setattr'd it onto the cfg module, and persisted it to
+# runtime.json. Nine keys had a type cast; everything else went through raw.
+# That is a generic mutation surface over live trading configuration, and
+# admin-only is not a substitute for validation — a fat-fingered
+# RISK_PER_TRADE=50 was as accepted as a typo'd key that silently did nothing.
+#
+# Every settable value now declares its own validator. Unknown keys are
+# rejected, out-of-range values are rejected, and credentials are a separate
+# category from trading settings so rotating a secret is never mixed up with
+# changing risk.
+
+def _num(cast, lo, hi):
+    def check(v):
+        try:
+            x = cast(str(v).strip())
+        except (TypeError, ValueError):
+            raise ValueError(f"expected a number between {lo} and {hi}")
+        if not (lo <= x <= hi):
+            raise ValueError(f"must be between {lo} and {hi}, got {x}")
+        return x
+    return check
+
+
+def _choice(*allowed):
+    def check(v):
+        s = str(v).strip().lower()
+        if s not in allowed:
+            raise ValueError("must be one of: " + ", ".join(allowed))
+        return s
+    return check
+
+
+def _flag(v):
+    s = str(v).strip().lower()
+    if s not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
+        raise ValueError("must be true or false")
+    return s in ("true", "1", "yes", "on")
+
+
+def _symbol(v):
+    s = re.sub(r"[^A-Z0-9]", "", str(v).strip().upper())
+    if not (5 <= len(s) <= 8) or not s.isalnum():
+        raise ValueError("expected a symbol like EURUSD or XAUUSD")
+    return s
+
+
+def _secret(min_len):
+    def check(v):
+        s = str(v).strip()
+        if len(s) < min_len:
+            raise ValueError(f"too short — expected at least {min_len} characters")
+        if any(c.isspace() for c in s):
+            raise ValueError("must not contain whitespace")
+        return s
+    return check
+
+
+# key → (cfg attribute, validator). Trading settings: safe to echo back.
+_SETTABLE = {
+    "BROKER":           ("BROKER",           _choice("ctrader", "mt")),
+    "PAPER_TRADING":    ("PAPER_TRADING",    _flag),
+    "TRADE_SYMBOL":     ("SYMBOL",           _symbol),
+    "RISK_PER_TRADE":   ("RISK_PER_TRADE",   _num(float, 0.0001, 0.10)),
+    "STOP_LOSS_PIPS":   ("STOP_LOSS_PIPS",   _num(float, 1.0, 500.0)),
+    "TAKE_PROFIT_PIPS": ("TAKE_PROFIT_PIPS", _num(float, 1.0, 1000.0)),
+    "MIN_CONFIDENCE":   ("MIN_CONFIDENCE",   _num(int, 0, 100)),
+    "CTRADER_ENV":      ("CTRADER_ENV",      _choice("demo", "live")),
+    "LEVERAGE":         ("LEVERAGE",         _num(float, 1.0, 500.0)),
+}
+
+# Credentials: same validation discipline, but the VALUE is never echoed,
+# logged or audited — only the fact that it changed.
+_SETTABLE_SECRETS = {
+    "CTRADER_CLIENT_ID":     ("CTRADER_CLIENT_ID",     _secret(6)),
+    "CTRADER_CLIENT_SECRET": ("CTRADER_CLIENT_SECRET", _secret(12)),
+    "MT_BRIDGE_SECRET":      ("MT_BRIDGE_SECRET",      _secret(16)),
+}
+
+_ALL_SETTABLE = {**_SETTABLE, **_SETTABLE_SECRETS}
+
+
+def is_secret_key(key):
+    return str(key).strip().upper() in _SETTABLE_SECRETS
+
+
+def validate_setting(key, raw):
+    """(canonical_key, coerced_value) or raise ValueError. Rejects unknown keys."""
+    k = str(key).strip().upper()
+    if k not in _ALL_SETTABLE:
+        raise ValueError("unknown setting")
+    _attr, check = _ALL_SETTABLE[k]
+    return k, check(raw)
+
+
+def _safe_repr(key, value):
+    """What may appear in a message or an audit record."""
+    return "***" if is_secret_key(key) else str(value)
+
+
 def _apply(env_key: str, value):
-    """Set a key on cfg module and os.environ so it takes effect immediately."""
-    os.environ[env_key] = str(value)
-    if env_key in _CFG_MAP:
-        attr, cast = _CFG_MAP[env_key]
-        setattr(cfg, attr, cast(value))
-    else:
-        setattr(cfg, env_key, str(value))
+    """Set a key on cfg module and os.environ so it takes effect immediately.
+
+    Allowlist-only. Callers inside this module pass keys from _SETTABLE, so
+    this is not a behaviour change for them — it closes the path where an
+    arbitrary attribute could be written onto the live cfg module.
+    """
+    env_key = str(env_key).strip().upper()
+    if env_key not in _ALL_SETTABLE:
+        raise ValueError(f"refusing to set unknown config key {env_key!r}")
+    attr, check = _ALL_SETTABLE[env_key]
+    # Coerce through the same validator the command path uses, so an
+    # internal caller cannot install a type the rest of the code will not
+    # expect (PAPER_TRADING must be a bool, RISK_PER_TRADE a float).
+    coerced = check(value)
+    os.environ[env_key] = str(coerced)
+    setattr(cfg, attr, coerced)
 
 
 def _mask(v: str) -> str:
@@ -670,13 +768,26 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                 "MIN_CONFIDENCE": str(d.get("min_confidence", 62)),
             }
             if d.get("keys"):
-                updates.update(d["keys"])
-                updates["BROKER"] = "ctrader"
-            else:
-                updates["BROKER"] = "ctrader"
-            _save_runtime(updates)
+                # The configurator posts whatever it likes here. Keep only
+                # keys this bot actually recognises, validated -- an unknown
+                # or malformed one used to be written straight onto cfg.
+                for rk, rv in (d["keys"] or {}).items():
+                    try:
+                        ck, _cv = validate_setting(rk, rv)
+                        updates[ck] = rv
+                    except ValueError as e:
+                        print(f"[Telegram] /setup ignoring {rk}: {e}")
+            updates["BROKER"] = "ctrader"
+            applied = {}
             for k, v in updates.items():
-                _apply(k, v)
+                try:
+                    ck, cv = validate_setting(k, v)
+                except ValueError as e:
+                    print(f"[Telegram] /setup ignoring {k}: {e}")
+                    continue
+                applied[ck] = cv
+                _apply(ck, cv)
+            _save_runtime({k: str(v) for k, v in applied.items()})
             if _bot_control.get("reload_broker"):
                 _bot_control["reload_broker"]()
 
@@ -717,13 +828,43 @@ def _handle_setkeys(chat_id, args_text, msg_id):
             pairs[k.strip().upper()] = v.strip()
     if not pairs:
         return send_to(chat_id, "❌ Format: <code>/setkeys KEY=value KEY2=value2</code>")
-    _save_runtime(pairs)
+
+    # Validate EVERYTHING before applying ANYTHING. A half-applied batch
+    # leaves the bot in a state the operator did not ask for and cannot see.
+    accepted, rejected = {}, []
     for k, v in pairs.items():
+        try:
+            ck, cv = validate_setting(k, v)
+            accepted[ck] = cv
+        except ValueError as e:
+            rejected.append(f"  {k} — {e}")
+
+    if rejected:
+        known = ", ".join(sorted(_SETTABLE)) + "\nSecrets: " + ", ".join(sorted(_SETTABLE_SECRETS))
+        return send_to(
+            chat_id,
+            "❌ <b>Nothing was changed.</b> Rejected:\n<code>"
+            + "\n".join(rejected)
+            + f"</code>\n\nAllowed settings:\n<code>{known}</code>")
+
+    _save_runtime({k: str(v) for k, v in accepted.items()})
+    for k, v in accepted.items():
         _apply(k, v)
     if _bot_control.get("reload_broker"):
         _bot_control["reload_broker"]()
-    masked = "\n".join(f"  {k} = {_mask(v)}" for k, v in pairs.items())
-    send_to(chat_id, f"🔑 <b>{len(pairs)} credential(s) updated:</b>\n<code>{masked}</code>")
+
+    # Audit: who, when, what changed — with secret VALUES never recorded.
+    try:
+        from apex import control
+        control._audit({
+            "ts": int(time.time()), "actor": str(chat_id), "action": "setkeys",
+            "changed": {k: _safe_repr(k, v) for k, v in accepted.items()},
+        })
+    except Exception as e:
+        print(f"[Telegram] setkeys audit failed: {e}")
+
+    shown = "\n".join(f"  {k} = {_safe_repr(k, v)}" for k, v in accepted.items())
+    send_to(chat_id, f"🔑 <b>{len(accepted)} setting(s) updated:</b>\n<code>{shown}</code>")
 
 
 _AI_KB = {"reply_markup": json.dumps({"inline_keyboard": [
