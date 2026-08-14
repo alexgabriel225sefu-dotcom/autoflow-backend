@@ -937,6 +937,34 @@ def account_balance(access_token: str, ctid, env: str = "demo") -> float:
     return res.trader.balance / (10 ** money_digits)
 
 
+def account_balance_retry(access_token: str, ctid, env: str = "demo",
+                          attempts: int = 2, pause: float = 2.0):
+    """account_balance() with a cold-start retry. Returns (balance, error).
+
+    Right after a link or re-auth the pooled socket does not exist yet, so a
+    single call has to complete connect + TLS + app auth + account auth + the
+    request. That chain has been seen timing out twice in a row in production
+    (account_balance already retries once internally) while the trading loop
+    read the same balance fine seconds later, and the client was shown
+    "Balance unavailable: timed out".
+
+    Every caller that links an account needs exactly this, and there were
+    three of them, each with its own wording and its own idea of whether to
+    retry. One of the three had no retry at all.
+    """
+    err = None
+    for attempt in range(1, max(1, attempts) + 1):
+        try:
+            return account_balance(access_token, ctid, env), None
+        except Exception as e:
+            err = str(e)
+            print(f"[cTrader] balance attempt {attempt}/{attempts} failed "
+                  f"for {ctid}: {e}")
+            if attempt < attempts:
+                time.sleep(pause)
+    return None, err
+
+
 def get_broker_name(access_token: str, ctid, env: str = "demo") -> str:
     """The broker name cTrader has on file for this account (e.g. 'FP Markets
     LLC') — used to gate onboarding to a specific partner broker. Not present

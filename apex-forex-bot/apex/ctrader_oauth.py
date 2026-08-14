@@ -201,19 +201,10 @@ def handle_callback(query: dict):
             # One more attempt after a short pause covers the cold-start case
             # without making the browser wait through another full timeout in
             # the common path, where the first call simply works.
-            for _attempt in (1, 2):
-                try:
-                    bal = ctrader.account_balance(access, a["ctid"],
-                                                  updates["ctrader_env"])
-                    updates["paper_balance"] = bal
-                    bal_err = None
-                    break
-                except Exception as e:
-                    bal_err = str(e)
-                    print(f"[cTrader OAuth] balance attempt {_attempt} failed "
-                          f"for {a['ctid']}: {e}")
-                    if _attempt == 1:
-                        time.sleep(2)
+            bal, bal_err = ctrader.account_balance_retry(
+                access, a["ctid"], updates["ctrader_env"])
+            if bal is not None:
+                updates["paper_balance"] = bal
     user_store.update(chat_id, updates)
     _pending.pop(str(chat_id), None)
 
@@ -256,32 +247,10 @@ def handle_callback(query: dict):
         elif len(accounts) == 1:
             a = accounts[0]
             env = "LIVE 🔴" if a["live"] else "demo 🧪"
-            # Even after the retry, a cold connection can still time out. The
-            # client does not need an error string for that — the number is
-            # already known from the last successful read, and the loop will
-            # refresh it within a tick. Showing a stale-but-labelled figure
-            # beats showing a warning that reads like the account is broken.
-            if bal is not None:
-                bal_line = f"💰 Balance: <b>${bal:,.2f}</b>\n"
-            else:
-                _known = user_store.load(chat_id).get("paper_balance")
-                if isinstance(_known, (int, float)) and _known:
-                    bal_line = (f"💰 Balance: <b>${_known:,.2f}</b> "
-                                f"<i>(last known — refreshing)</i>\n")
-                else:
-                    bal_line = (f"⏳ Balance loading… <i>{(bal_err or '')[:60]}</i>\n"
-                                if bal_err else "")
-            # A RECONNECT is not a first run. onboard_start() used to fire
-            # unconditionally here, so re-authorising cTrader — a token
-            # refresh, a re-link, tapping /ctrader again — threw an
-            # already-configured client back into "Setup 1/2: what do you want
-            # to trade?". Nothing was actually lost, but from the client's
-            # side it is indistinguishable from the bot forgetting their
-            # settings and abandoning an open position. That is a support
-            # ticket every time, and worse on a live account.
             u_now = user_store.load(chat_id)
-            already_set_up = bool(u_now.get("symbol") and u_now.get("strategy"))
-            if not already_set_up:
+            bal_line = tg.balance_line_from(bal, bal_err,
+                                            u_now.get("paper_balance"))
+            if not tg.already_onboarded(u_now):
                 tg.send_to(chat_id,
                            f"✅ <b>cTrader connected!</b>\n\n"
                            f"Account <code>{a['ctid']}</code> ({env})\n"
@@ -289,25 +258,10 @@ def handle_callback(query: dict):
                            "Setting up your bot — 2 quick taps. 👇")
                 tg.onboard_start(chat_id)
             else:
-                # Say what is still running, and name the open position — that
-                # is the question a reconnect actually raises.
-                pos = u_now.get("open_position_snapshot") or {}
-                if pos.get("symbol"):
-                    pos_line = (f"📊 Open position kept: <b>{pos.get('entrySide') or pos.get('side')} "
-                                f"{pos['symbol']}</b> @ {pos.get('entryPrice')}\n"
-                                f"   SL {pos.get('sl')} · TP {pos.get('tp')}\n")
-                else:
-                    pos_line = "📊 No open position.\n"
-                what = ("🤖 Auto-Pilot" if u_now.get("autopilot")
-                        else f"📈 {u_now.get('symbol')}")
-                tg.send_to(chat_id,
-                           f"✅ <b>cTrader reconnected!</b>\n\n"
-                           f"Account <code>{a['ctid']}</code> ({env})\n"
-                           f"{bal_line}"
-                           f"{pos_line}\n"
-                           f"Your setup is unchanged — {what}, "
-                           f"{u_now.get('strategy')}, risk {float(u_now.get('risk', 0)):.1%}.\n"
-                           "Nothing was reset. Send /settings to change anything.")
+                tg.send_to(chat_id, tg.reconnect_summary(
+                    u_now,
+                    f"✅ <b>cTrader reconnected!</b>\n\n"
+                    f"Account <code>{a['ctid']}</code> ({env})\n{bal_line}"))
         elif accounts:
             lines = "\n".join(
                 f"• <code>{a['ctid']}</code> — {'LIVE 🔴' if a['live'] else 'demo 🧪'}"

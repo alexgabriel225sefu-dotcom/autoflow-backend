@@ -40,6 +40,9 @@ def is_set_up(user):
     return bool(user.get("symbol") and user.get("strategy"))
 
 
+_TG_EARLY = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "apex", "telegram.py")).read()
+
 print("\n── who counts as already set up ──")
 returning = {"symbol": "EURUSD", "strategy": "mean_reversion", "autopilot": True,
              "risk": 0.02}
@@ -55,25 +58,31 @@ check("an empty record is a first run", is_set_up({}) is False)
 print("\n── the callback branches on it ──")
 block = SRC[SRC.index("elif len(accounts) == 1:"):SRC.index("elif accounts:")]
 check("onboarding is now conditional",
-      "if not already_set_up:" in block, block[:200])
-check("and gated on symbol AND strategy",
-      'u_now.get("symbol") and u_now.get("strategy")' in block)
+      "if not tg.already_onboarded(u_now):" in block, block[:300])
+check("the condition is the shared helper, not a local copy",
+      'u_now.get("symbol") and u_now.get("strategy")' not in block)
 check("onboard_start is inside the first-run branch",
-      block.index("if not already_set_up:") < block.index("tg.onboard_start(chat_id)"))
+      block.index("if not tg.already_onboarded") < block.index("tg.onboard_start(chat_id)"))
 check("a returning client gets a different headline",
       "cTrader reconnected!" in block)
 check("...and is told nothing was reset",
-      "Nothing was reset" in block, block[-400:])
+      "Nothing was reset" in _TG_EARLY)
 
 print("\n── the reconnect message answers 'did it lose my trade?' ──")
+_sum = _TG_EARLY[_TG_EARLY.index("def reconnect_summary"):_TG_EARLY.index("def onboard_start")]
 check("it reads the persisted position snapshot",
-      'u_now.get("open_position_snapshot")' in block)
-check("it names the side and symbol", "Open position kept" in block)
-check("it shows the stop and target", "SL {pos.get('sl')}" in block)
-check("and says so explicitly when there is none",
-      "No open position" in block)
+      'get("open_position_snapshot")' in _sum)
+check("it names the side and symbol", "Open position kept" in _sum)
+check("it shows the stop and target", "SL {pos.get('sl')}" in _sum)
+check("and says so explicitly when there is none", "No open position" in _sum)
 check("it restates the live settings rather than asking again",
-      "Your setup is unchanged" in block)
+      "Your setup is unchanged" in _sum)
+check("it points at a command that exists", "/settings" in _sum
+      and 'cmd_l in ("/controls", "/settings")' in _TG_EARLY)
+check("the summary exists once and both paths use it",
+      _TG_EARLY.count("def reconnect_summary") == 1
+      and "tg.reconnect_summary(" in SRC
+      and _TG_EARLY.count("reconnect_summary(") >= 2)
 
 print("\n── a first run still onboards exactly as before ──")
 check("the original headline is kept for new clients",
@@ -105,34 +114,45 @@ check("the duplicate path still renders Connected",
 # + request) does not always finish inside the window, while the trading loop
 # reads the same balance fine seconds later.
 print("\n── the balance fetch retries before giving up ──")
-_bal = SRC[SRC.index("if not gate_reason:"):SRC.index("user_store.update(chat_id, updates)")]
-check("there is a retry loop", "for _attempt in (1, 2):" in _bal, _bal[:200])
-check("it pauses between attempts", "time.sleep(2)" in _bal)
+_CT = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "apex", "brokers", "ctrader.py")).read()
+_bal = _CT[_CT.index("def account_balance_retry"):_CT.index("def get_broker_name")]
+check("the retry lives in ONE place", "def account_balance_retry" in _CT)
+check("it loops over attempts", "for attempt in range(1" in _bal, _bal[:200])
+check("it pauses between attempts", "time.sleep(pause)" in _bal)
 check("it does not pause after the last attempt",
-      "if _attempt == 1:" in _bal, _bal[-300:])
-check("a success clears the earlier error", "bal_err = None" in _bal)
-check("and stops retrying", "break" in _bal)
+      "if attempt < attempts:" in _bal)
+check("it returns (balance, error) rather than raising",
+      "return account_balance(access_token, ctid, env), None" in _bal)
 check("each failure is logged with its attempt number",
-      "balance attempt {_attempt} failed" in _bal)
+      "balance attempt {attempt}/{attempts}" in _bal)
+check("all three linking paths use it",
+      _CT.count("def account_balance_retry") == 1
+      and (SRC.count("account_balance_retry") + _TG_EARLY.count("balance_line("))>= 2)
 
 print("\n── a still-failing balance shows a number, not an alarm ──")
-_msg = SRC[SRC.index("if bal is not None:"):SRC.index("# A RECONNECT is not a first run.")]
+_msg = _TG_EARLY[_TG_EARLY.index("def balance_line_from"):_TG_EARLY.index("def already_onboarded")]
 check("the last known balance is used as a fallback",
-      'user_store.load(chat_id).get("paper_balance")' in _msg, _msg[:200])
+      "last_known" in _msg, _msg[:200])
 check("and is labelled as last known, not passed off as live",
       "last known" in _msg)
+check("the formatter exists exactly once",
+      _TG_EARLY.count("def balance_line_from") == 1)
+check("the OAuth path reuses it instead of its own copy",
+      "tg.balance_line_from(" in SRC and "last known" not in SRC)
 # Scoped to the message-building code: the phrase also appears in a comment
 # that documents what the client used to see.
-_TG = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "apex", "telegram.py")).read()
-check("the scary wording is gone from the OAuth message",
-      "Balance unavailable" not in _msg)
-check("and from the /ctaccount path, which had the same bug",
-      'bal_line = f"⚠️ Balance unavailable' not in _TG)
-check("/ctaccount also stopped re-onboarding a configured client",
-      'user.get("symbol") and user.get("strategy")' in _TG)
-check("/ctaccount retries the balance too",
-      _TG.count("for _attempt in (1, 2):") >= 1)
+check("the scary wording is gone", "Balance unavailable" not in _msg)
+check("no linking path keeps its own wording",
+      'Balance unavailable' not in _TG_EARLY
+      and "Couldn't read the balance yet" not in _TG_EARLY)
+check("the onboarded check exists once and is shared",
+      _TG_EARLY.count("def already_onboarded") == 1)
+check("both telegram linking paths call it",
+      _TG_EARLY.count("already_onboarded(") >= 2)
+check("the OAuth path calls it too", "tg.already_onboarded(" in SRC)
+check("/wizard still re-runs setup on purpose",
+      'cmd_l == "/wizard"' in _TG_EARLY)
 check("a client with no known balance sees 'loading', not an error",
       "Balance loading" in _msg)
 check("a real number is still preferred when the call works",

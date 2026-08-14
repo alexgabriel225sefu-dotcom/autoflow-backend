@@ -1068,13 +1068,11 @@ def _apply_account(chat_id, ctid):
     # LIVE = real money: turn OFF the internal simulation so orders actually execute.
     if acc.get("live"):
         updates["paper"] = False
-    try:
-        from apex.brokers import ctrader as _ct
-        bal = _ct.account_balance(user.get("ctrader_access_token", ""), acc["ctid"], ct_env)
+    bal, bal_line = balance_line(user.get("ctrader_access_token", ""),
+                                 acc["ctid"], ct_env,
+                                 last_known=user.get("paper_balance"))
+    if bal is not None:
         updates["paper_balance"] = bal
-        bal_line = f"💰 Balance: <b>${bal:,.2f}</b>\n"
-    except Exception as e:
-        bal_line = f"⚠️ Couldn't read the balance yet: <i>{str(e)[:120]}</i>\n"
     user_store.update(chat_id, updates)
     _restart_user_loop(chat_id)
     tag = "🔴 LIVE · real money" if acc.get("live") else "🧪 Practice · demo"
@@ -1132,42 +1130,17 @@ def _handle_ctaccount(chat_id, args):
     # even though the loop reads the balance fine moments later, and
     # onboard_start() fired unconditionally — so switching accounts threw an
     # already-configured client back into "what do you want to trade?".
-    bal, bal_err = None, None
-    for _attempt in (1, 2):
-        try:
-            from apex.brokers import ctrader as _ct
-            bal = _ct.account_balance(user.get("ctrader_access_token", ""),
-                                      match["ctid"], ct_env)
-            updates["paper_balance"] = bal
-            bal_err = None
-            break
-        except Exception as e:
-            bal_err = str(e)
-            print(f"[TELEGRAM] balance attempt {_attempt} failed for "
-                  f"{match['ctid']}: {e}")
-            if _attempt == 1:
-                time.sleep(2)
+    bal, bal_line = balance_line(user.get("ctrader_access_token", ""),
+                                 match["ctid"], ct_env,
+                                 last_known=user.get("paper_balance"))
     if bal is not None:
-        bal_line = f"💰 Balance: <b>${bal:,.2f}</b>\n"
-    else:
-        _known = user.get("paper_balance")
-        bal_line = (f"💰 Balance: <b>${_known:,.2f}</b> <i>(last known — refreshing)</i>\n"
-                    if isinstance(_known, (int, float)) and _known
-                    else f"⏳ Balance loading… <i>{(bal_err or '')[:60]}</i>\n")
+        updates["paper_balance"] = bal
     user_store.update(chat_id, updates)
     _restart_user_loop(chat_id)
     env = "LIVE 🔴" if match.get("live") else "demo 🧪"
-    if user.get("symbol") and user.get("strategy"):
-        pos = user.get("open_position_snapshot") or {}
-        pos_line = (f"📊 Open position kept: <b>{pos.get('entrySide') or pos.get('side')} "
-                    f"{pos['symbol']}</b> @ {pos.get('entryPrice')}\n"
-                    if pos.get("symbol") else "📊 No open position.\n")
-        what = "🤖 Auto-Pilot" if user.get("autopilot") else f"📈 {user.get('symbol')}"
-        send_to(chat_id,
-                f"✅ Account <code>{match['ctid']}</code> ({env}) linked.\n{bal_line}"
-                f"{pos_line}\nYour setup is unchanged — {what}, "
-                f"{user.get('strategy')}. Nothing was reset.\n"
-                "Send /settings to change anything.")
+    if already_onboarded(user):
+        send_to(chat_id, reconnect_summary(
+            user, f"✅ Account <code>{match['ctid']}</code> ({env}) linked.\n{bal_line}"))
     else:
         send_to(chat_id, f"✅ Account <code>{match['ctid']}</code> ({env}) linked.\n{bal_line}"
                          "Setting up — 2 quick taps. 👇")
@@ -1196,6 +1169,70 @@ _RISK_TEXT = ("⚠️ <b>Risk disclaimer</b>\n\n"
               "• Losses are possible and they are <b>yours</b>\n"
               "• We provide software, not financial advice\n\n"
               "<i>Demo 🧪 · Live 🔴</i>")
+
+
+def balance_line(access_token, ctid, env, last_known=None):
+    """(balance_or_None, one display line) for a freshly linked account.
+
+    The single place that decides what a client is told about their balance
+    while an account is being linked. There were three, and they disagreed:
+    different wording, different amount of retrying, and two of them printed
+    a raw exception string that reads like the account is broken when the
+    real cause is a cold connection that succeeds moments later.
+
+    A failed read falls back to the last known figure, LABELLED as such —
+    a number the client recognises beats an error they cannot act on, and
+    pretending it is live would be worse than either.
+    """
+    from apex.brokers import ctrader as _ct
+    bal, err = _ct.account_balance_retry(access_token, ctid, env)
+    return bal, balance_line_from(bal, err, last_known)
+
+
+def balance_line_from(bal, err=None, last_known=None):
+    """The same line, from a value someone else already fetched.
+
+    The OAuth callback needs the balance BEFORE it builds the message (it has
+    to persist it), so it cannot use balance_line()'s fetch — but it must not
+    grow a fourth private copy of this formatting either.
+    """
+    if bal is not None:
+        return f"💰 Balance: <b>${bal:,.2f}</b>\n"
+    if isinstance(last_known, (int, float)) and last_known:
+        return (f"💰 Balance: <b>${last_known:,.2f}</b> "
+                f"<i>(last known — refreshing)</i>\n")
+    return f"⏳ Balance loading… <i>{(err or '')[:60]}</i>\n"
+
+
+def already_onboarded(user):
+    """True when this client has completed setup and must not be re-asked.
+
+    Linking or re-linking an account is not a first run. Every path that
+    connects a broker used to call onboard_start() unconditionally, so a
+    reconnect or an account switch threw a configured client back into
+    "what do you want to trade?" while holding an open position — which is
+    indistinguishable from the bot having reset itself.
+    """
+    return bool((user or {}).get("symbol") and (user or {}).get("strategy"))
+
+
+def reconnect_summary(user, header):
+    """The message a RETURNING client gets: what is running, and the position."""
+    pos = (user or {}).get("open_position_snapshot") or {}
+    if pos.get("symbol"):
+        pos_line = (f"📊 Open position kept: <b>{pos.get('entrySide') or pos.get('side')} "
+                    f"{pos['symbol']}</b> @ {pos.get('entryPrice')}\n"
+                    f"   SL {pos.get('sl')} · TP {pos.get('tp')}\n")
+    else:
+        pos_line = "📊 No open position.\n"
+    what = "🤖 Auto-Pilot" if user.get("autopilot") else f"📈 {user.get('symbol')}"
+    try:
+        risk_txt = f", risk {float(user.get('risk', 0)):.1%}"
+    except (TypeError, ValueError):
+        risk_txt = ""
+    return (f"{header}{pos_line}\n"
+            f"Your setup is unchanged — {what}, {user.get('strategy')}{risk_txt}.\n"
+            "Nothing was reset. Send /settings to change anything.")
 
 
 def onboard_start(chat_id):
