@@ -208,7 +208,22 @@ def handle_callback(query: dict):
     except Exception as e:
         print(f"[cTrader OAuth] loop restart failed: {e}")
 
-    # Notify the client in Telegram (best-effort).
+    # Notify the client in Telegram (best-effort), ONCE.
+    #
+    # The whole block below fired twice in production — the client saw
+    # "cTrader connected!" and the setup card duplicated. This endpoint is a
+    # browser redirect target, so a reload, a prefetch, or a double tap
+    # replays it, and during a Render deploy two instances are live and both
+    # poll the same bot token. A shared claim collapses those into one
+    # message; keyed on the account so linking a DIFFERENT account still
+    # notifies. Short TTL: this guards a burst, not a later reconnect.
+    _notify_key = f"ctconnect:{chat_id}:{updates.get('ctrader_account_id', '?')}"
+    if user_store.claim(_notify_key, ttl_s=90) is False:
+        print(f"[cTrader OAuth] duplicate callback for {chat_id} — not notifying twice")
+        return 200, _html("cTrader",
+                          "<div class='h ok'>✅ Connected</div>"
+                          "<div class='p'>Your cTrader account is linked. "
+                          "You can close this page and return to Telegram.</div>")
     try:
         from apex import telegram as tg
         if len(accounts) == 1 and gate_reason:
@@ -227,12 +242,43 @@ def handle_callback(query: dict):
                         if bal is not None else
                         (f"⚠️ Balance unavailable: <i>{bal_err[:80]}</i>\n"
                          if bal_err else ""))
-            tg.send_to(chat_id,
-                       f"✅ <b>cTrader connected!</b>\n\n"
-                       f"Account <code>{a['ctid']}</code> ({env})\n"
-                       f"{bal_line}\n"
-                       "Setting up your bot — 2 quick taps. 👇")
-            tg.onboard_start(chat_id)
+            # A RECONNECT is not a first run. onboard_start() used to fire
+            # unconditionally here, so re-authorising cTrader — a token
+            # refresh, a re-link, tapping /ctrader again — threw an
+            # already-configured client back into "Setup 1/2: what do you want
+            # to trade?". Nothing was actually lost, but from the client's
+            # side it is indistinguishable from the bot forgetting their
+            # settings and abandoning an open position. That is a support
+            # ticket every time, and worse on a live account.
+            u_now = user_store.load(chat_id)
+            already_set_up = bool(u_now.get("symbol") and u_now.get("strategy"))
+            if not already_set_up:
+                tg.send_to(chat_id,
+                           f"✅ <b>cTrader connected!</b>\n\n"
+                           f"Account <code>{a['ctid']}</code> ({env})\n"
+                           f"{bal_line}\n"
+                           "Setting up your bot — 2 quick taps. 👇")
+                tg.onboard_start(chat_id)
+            else:
+                # Say what is still running, and name the open position — that
+                # is the question a reconnect actually raises.
+                pos = u_now.get("open_position_snapshot") or {}
+                if pos.get("symbol"):
+                    pos_line = (f"📊 Open position kept: <b>{pos.get('entrySide') or pos.get('side')} "
+                                f"{pos['symbol']}</b> @ {pos.get('entryPrice')}\n"
+                                f"   SL {pos.get('sl')} · TP {pos.get('tp')}\n")
+                else:
+                    pos_line = "📊 No open position.\n"
+                what = ("🤖 Auto-Pilot" if u_now.get("autopilot")
+                        else f"📈 {u_now.get('symbol')}")
+                tg.send_to(chat_id,
+                           f"✅ <b>cTrader reconnected!</b>\n\n"
+                           f"Account <code>{a['ctid']}</code> ({env})\n"
+                           f"{bal_line}"
+                           f"{pos_line}\n"
+                           f"Your setup is unchanged — {what}, "
+                           f"{u_now.get('strategy')}, risk {float(u_now.get('risk', 0)):.1%}.\n"
+                           "Nothing was reset. Send /settings to change anything.")
         elif accounts:
             lines = "\n".join(
                 f"• <code>{a['ctid']}</code> — {'LIVE 🔴' if a['live'] else 'demo 🧪'}"
