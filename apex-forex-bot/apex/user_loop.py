@@ -5,6 +5,12 @@ import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
 from apex import access, sentinel, institutional, cot, ledger
+from apex import strategy_api
+# Registering the shipped modules is what makes strategy_api.get() return
+# anything. Without this the registry is empty, every lookup misses, and the
+# loop silently falls back to calling the engine directly -- working, but with
+# no §14 provenance on any trade.
+strategy_api.load_builtins()
 from apex import config as cfg_mod
 # Imported under an alias: `ev` is already a local variable inside _loop (the
 # news-window event), and a module-level `ev` would be shadowed for the whole
@@ -179,6 +185,10 @@ _ENTRY_META_KEYS = (
     "entryConfidence", "entryRegime", "entryAtr", "entrySlPips",
     "entryTpPips", "entrySide", "entryProbability", "entryEvR",
     "entrySpreadPips", "openedAt",
+    # §14 reproducibility: which strategy, at which version, opened this.
+    # Carried on the position so it is still known at CLOSE time, hours later
+    # and possibly after a restart or an Auto-Pilot rotation to another mode.
+    "entryStrategyId", "entryStrategyVersion",
 )
 
 
@@ -538,6 +548,13 @@ def _log_trade(user_id, record, pos=None):
         "probability": src.get("entryProbability"),
         "evR":         src.get("entryEvR"),
         "side":        src.get("entrySide"),
+        # ── §14 reproducibility ──
+        # Which strategy, at which version, opened this trade. Without both,
+        # comparing strategies on real results is guesswork: the journal knows
+        # the outcome but not what produced it, and a strategy whose logic
+        # changed last week is indistinguishable from the one that traded.
+        "strategyId":      src.get("entryStrategyId"),
+        "strategyVersion": src.get("entryStrategyVersion"),
     }
     try:
         if _already_journaled(user_store.load_trades(user_id), row):
@@ -2016,6 +2033,46 @@ def _loop(user_id, alert_fn, gen=None):
                 active_mode = picked or _default_mode
                 dash["strategy"] = f"Auto → {ai.STRATEGY_MODES[active_mode]['label']}"
 
+            # ── The strategy module for this tick (blueprint §3/§14) ──
+            # The decision now goes through the registry rather than straight
+            # into ai.signal_for_mode. The module is a thin adapter over that
+            # same engine — equivalence is asserted across 644 comparisons in
+            # tests/test_strategy_equivalence.py — so this changes WHERE the
+            # decision is made, not WHAT it decides. What it buys is §14:
+            # every signal now carries the strategy_id and strategy_version
+            # that produced it, so a trade can be traced back to an exact
+            # version of an exact strategy.
+            #
+            # NOT named `market`: that is the apex.market module, used a few
+            # lines below for the Market Pulse read.
+            _strategy, _frame = None, None
+            try:
+                _strategy = strategy_api.get(active_mode)
+                if _strategy is not None:
+                    _frame = strategy_api.Market(
+                        candles, symbol=symbol, indicators=ind,
+                        strat=strat_data, open_position=open_pos, price=price,
+                        balance=paper_balance, timeframe=cfg.TIMEFRAME)
+            except Exception as e:
+                # Market() validates its inputs and can raise. A registry
+                # problem must never stop a live account from trading — fall
+                # through to the engine call this replaced.
+                print(f"[UserLoop:{user_id}] strategy module unavailable for "
+                      f"{active_mode} ({e}) — using the engine directly")
+                _strategy, _frame = None, None
+            _provenance = strategy_api.provenance_for(active_mode) or {}
+
+            def _rule_signal():
+                """This tick's rule verdict, through the module when there is one."""
+                if _strategy is not None and _frame is not None:
+                    try:
+                        return _strategy.signal(_frame)
+                    except Exception as e:
+                        print(f"[UserLoop:{user_id}] strategy module "
+                              f"{active_mode} signal() failed ({e}) — "
+                              f"using the engine directly")
+                return ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
+
             # Market Pulse: store a plain-language read for /market, and ping the
             # user (throttled) when the market gets notable (elevated volatility).
             mp = market.pulse(ind, strat_data, symbol)
@@ -2144,7 +2201,7 @@ def _loop(user_id, alert_fn, gen=None):
                     # repeat on a candidate that has not changed — the rule
                     # engine saying BUY on the same bar, at the same price,
                     # tick after tick while some other gate holds the entry.
-                    _rule_pre = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
+                    _rule_pre = _rule_signal()
                     _rule_act = _rule_pre.get("action", "HOLD")
                     _now_feat = {
                         "price": price, "atr": (ind or {}).get("atr"),
@@ -2182,7 +2239,7 @@ def _loop(user_id, alert_fn, gen=None):
                             "features": _now_feat, "signal": dict(signal),
                             "rule_action": _rule_act}
                 else:
-                    signal = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
+                    signal = _rule_signal()
             except Exception as e:
                 print(f"[UserLoop:{user_id}] AI error: {e}")
                 if tick - last_ai_error_tick >= _AI_ERROR_THROTTLE and alert_fn:
@@ -2192,7 +2249,14 @@ def _loop(user_id, alert_fn, gen=None):
                         "symbol": symbol,
                     })
                     last_ai_error_tick = tick
-                signal = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
+                signal = _rule_signal()
+
+            # §14: whichever branch produced this verdict — the module, a
+            # reused AI read, or the AI-enhanced path through ai.get_signal —
+            # it carries the strategy that produced it. Stamped here rather
+            # than in each branch so a new branch cannot forget to.
+            if _provenance:
+                signal = {**signal, **_provenance}
 
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)
@@ -2959,6 +3023,13 @@ def _loop(user_id, alert_fn, gen=None):
                                     "entrySide": action,
                                     "entryProbability": (ev_verdict or {}).get("probability"),
                                     "entryEvR": (ev_verdict or {}).get("ev_r"),
+                                    # §14: read off the signal rather than
+                                    # active_mode, so what is recorded is what
+                                    # actually decided — including the case
+                                    # where the verdict came from a reused AI
+                                    # read taken under an earlier mode.
+                                    "entryStrategyId": signal.get("strategy_id"),
+                                    "entryStrategyVersion": signal.get("strategy_version"),
                                 })
                                 # Keep a copy OUTSIDE the position dict. The
                                 # next tick throws this dict away and replaces

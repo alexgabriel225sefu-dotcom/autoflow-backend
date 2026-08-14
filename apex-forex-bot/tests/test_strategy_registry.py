@@ -301,20 +301,37 @@ check("the strategy bundle is computed lazily too",
       "turtle" in ok.strat and "livermore" in ok.strat)
 check("regime is available on the frame", "regime" in ok.regime)
 
-# ── 6. V1 is additive: the live loop still decides on its own ─────
-print("\n6. V1 is additive — the live decision path is untouched")
+# ── 6. The loop IS wired to the registry — and keeps a way back ────
+print("\n6. The live decision path goes through the registry")
 _loop = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                      "apex", "user_loop.py")
 with open(_loop, encoding="utf-8") as f:
     loop_src = f.read()
-# Wiring the loop to the registry is a LATER phase. Until it is done
-# deliberately (and re-verified against a live account), the registry must not
-# be able to influence what the running bot trades. If you are the one doing
-# that wiring: update this check on purpose, in the same change.
-check("user_loop.py does not import the strategy registry",
-      "strategy_api" not in loop_src and "strategy_modules" not in loop_src)
-check("...so registering a strategy cannot change what the bot trades",
-      "ai.signal_for_mode(active_mode" in loop_src)
+# This check used to assert the OPPOSITE — that the loop did not import the
+# registry — because V1 shipped additive on purpose: prove equivalence first,
+# switch second. That switch has now been made deliberately, so the guard is
+# inverted rather than deleted. What it protects has changed shape, not
+# disappeared: the registry is in the decision path, and every path through it
+# still has a way back to the engine, because a registry problem must never
+# stop a live account from trading.
+check("user_loop.py imports the registry", "strategy_api" in loop_src)
+check("and populates it, or every lookup would miss silently",
+      "strategy_api.load_builtins()" in loop_src)
+check("the rule verdict goes through the module",
+      "_strategy.signal(_frame)" in loop_src)
+check("with a fallback to the engine if the module is missing or raises",
+      loop_src.count("ai.signal_for_mode(active_mode, ind, strat_data, open_pos)") >= 1)
+check("the frame is NOT named `market` — that name is the apex.market module",
+      "market = strategy_api.Market(" not in loop_src
+      and "_frame = strategy_api.Market(" in loop_src)
+check("§14: the signal is stamped with its strategy",
+      "_provenance" in loop_src and "signal = {**signal, **_provenance}" in loop_src)
+check("§14: the opening strategy is carried on the position",
+      '"entryStrategyId"' in loop_src and '"entryStrategyVersion"' in loop_src)
+check("§14: and reaches the closed-trade journal",
+      '"strategyId":' in loop_src and '"strategyVersion":' in loop_src)
+check("the entry snapshot survives a broker re-read",
+      '"entryStrategyId", "entryStrategyVersion",' in loop_src)
 
 strategy_api.unregister("_probe")
 check("test strategies clean up after themselves",
