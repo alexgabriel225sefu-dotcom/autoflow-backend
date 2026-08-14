@@ -18,6 +18,7 @@ from apex import user_loop
 from apex import assistant
 from apex import affiliate_store
 from apex import builder
+from apex import quick_answers
 
 TOKEN = (cfg.TELEGRAM_BOT_TOKEN or "").strip()
 CHAT_ID = (cfg.TELEGRAM_CHAT_ID or "").strip()
@@ -220,6 +221,85 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
         return True
 
     return False
+
+
+def _handle_why_no_trade(chat_id):
+    """"Why isn't it trading?" — the question a waiting client actually asks.
+
+    Answered from what the loop already recorded: whether it is on, whether a
+    position is already open, and the reasons it refused today's candidates.
+    Silence here is what makes a working bot look broken.
+    """
+    dash = user_loop.get_dash(chat_id) or {}
+    if not user_loop.is_running(chat_id):
+        return send_to(chat_id,
+                       "⏸ <b>The bot is OFF</b> — that's why nothing is "
+                       "happening. Send /start to switch it on.",
+                       _dashboard_keyboard(chat_id))
+    lines = ["🔍 <b>Why no trade right now</b>", ""]
+    if dash.get("openPosition"):
+        lines.append(f"You already have a position open on "
+                     f"<b>{dash['openPosition'].get('symbol', '—')}</b>, and "
+                     f"the limit is {dash.get('maxpos', 1)} at a time. It "
+                     f"looks for the next setup once this one closes.")
+    else:
+        lines.append("It's on and watching — it only enters when a setup "
+                     "passes every check, which is the point. Most candidates "
+                     "are refused.")
+    skips = dash.get("skips") or []
+    if skips:
+        lines.append(f"\n<b>Refused today ({dash.get('skipsToday', len(skips))}):</b>")
+        for s in skips[:4]:
+            lines.append(f"• {_esc(s.get('time', ''))} — {_esc(s.get('reason', ''))}")
+    market = "open" if forex.is_market_open() else "closed (weekend)"
+    lines.append(f"\n🕐 Market: <b>{market}</b>")
+    lines.append("\n<i>No setup is better than a bad one — a refused trade "
+                 "costs nothing.</i>")
+    send_to(chat_id, "\n".join(lines), _dashboard_keyboard(chat_id))
+
+
+# Common questions → the handler that already answers them. Routing rather
+# than re-answering: a second copy of /status drifts from the real one, which
+# is how /ctaccount ended up with three different formatters.
+_QUICK_ROUTES = {
+    "status":       lambda cid: _handle_status(cid),
+    "why_no_trade": lambda cid: _handle_why_no_trade(cid),
+    "strategy":     lambda cid: _handle_strategy(cid, ""),
+    "risk":         lambda cid: _handle_risk(cid, ""),
+    "news":         lambda cid: _handle_news(cid),
+    "market":       lambda cid: _handle_market(cid),
+    "help":         lambda cid: _handle_quick_help(cid),
+    "summary":      lambda cid: (send_daily_summary(cid)
+                                 or send_to(cid, "📊 No closed trades today yet.")),
+    "greeting":     lambda cid: _handle_quick_help(cid),
+    "thanks":       lambda cid: send_to(cid, "👍 Any time."),
+}
+
+
+def _handle_quick_answer(chat_id, text) -> bool:
+    """Answer from the dashboard when the question is a plain lookup.
+
+    Every AI provider here shares one free-tier quota with the trading signal,
+    so spending a model call on "what's my balance" takes budget from the
+    decision the client is paying for. Returns False for anything that is a
+    real question — the assistant is better at those, and a canned reply in
+    its place is a downgrade, not a saving.
+    """
+    try:
+        key = quick_answers.resolve(text)
+    except Exception as e:
+        print(f"[QuickAnswer] resolve failed: {e}")
+        return False
+    route = _QUICK_ROUTES.get(key)
+    if not route:
+        return False
+    try:
+        route(chat_id)
+    except Exception as e:
+        # Never swallow the message: fall back to the assistant.
+        print(f"[QuickAnswer] '{key}' failed: {e}")
+        return False
+    return True
 
 
 def _send_fx_trade_result(chat_id, result, sym):
@@ -4018,6 +4098,8 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
             return
         # Intent detection first (works with zero AI key)
         handled = _handle_trade_intent_fx(chat_id, raw)
+        if not handled:
+            handled = _handle_quick_answer(chat_id, raw)
         if not handled:
             # Fall through to AI assistant
             def _typing_reply(reply, cid=chat_id):
