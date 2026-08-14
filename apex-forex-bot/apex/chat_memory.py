@@ -128,10 +128,10 @@ def allow(user_id):
     """(ok, message). `message` is client-facing text when ok is False."""
     user_id = str(user_id)
     if _window_count(user_id, 60, PER_MIN):
-        return False, ("⏳ Prea multe mesaje pe minut. Așteaptă puțin — "
-                       "limita există ca botul să aibă mereu resurse "
-                       "pentru tranzacționare.")
+        return False, ("⏳ Too many messages in a row. Give it a moment — the "
+                       "limit exists so the bot always has capacity left for "
+                       "trading.")
     if _window_count(user_id, 3600, PER_HOUR):
-        return False, ("⏳ Ai atins limita orară de mesaje. Se resetează în "
-                       "cel mult o oră. Tranzacționarea nu e afectată.")
+        return False, ("⏳ You've hit the hourly message limit. It resets "
+                       "within the hour. Your trading is unaffected.")
     return True, ""

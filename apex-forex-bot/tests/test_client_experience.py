@@ -145,6 +145,49 @@ TG = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 for cmd in ("/resume", "/settings", "/verbose", "/summary"):
     check(f"{cmd} is handled", f'"{cmd}"' in TG, "promised but missing")
 
+
+# ── one language, everywhere ────────────────────────────────────────────
+# The bot's own messages were English while the AI assistant mirrored
+# whatever the client wrote, so a single Telegram thread came out bilingual:
+# an English "Position closed" answered in Romanian. Each message was
+# individually well-matched and the conversation as a whole read as broken.
+print("\n── the interface speaks one language ──")
+import re as _re  # noqa: E402
+
+_CLIENT_FACING = ("telegram.py", "ctrader_oauth.py", "assistant.py",
+                  "chat_memory.py", "webapp.py")
+_ROMANIAN = _re.compile(
+    r'\b(nicio|deschis[ăa]|pentru a|folose[șs]te|închide|pre[țt] curent|'
+    r'balan[țt][ăa]|tranzac[țt]i|riscul|apas[ăa]|momentan|a[șs]teapt[ăa])\b',
+    _re.I)
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+for fname in _CLIENT_FACING:
+    path = os.path.join(_root, "apex", fname)
+    if not os.path.exists(path):
+        continue
+    hits = []
+    for i, line in enumerate(open(path, encoding="utf-8"), 1):
+        stripped = line.lstrip()
+        if stripped.startswith("#"):
+            continue
+        # Raw strings here are INPUT patterns — the bot still understands
+        # "închide" or "cumpără" typed by a client. Only its own OUTPUT has
+        # to be English, so regex definitions are not a violation.
+        if 'r"' in line or "r'" in line or "re.compile" in line:
+            continue
+        if _ROMANIAN.search(line):
+            hits.append(f"{fname}:{i}")
+    check(f"{fname} has no leftover Romanian in client text",
+          not hits, ", ".join(hits[:4]))
+
+ASSIST = open(os.path.join(_root, "apex", "assistant.py"), encoding="utf-8").read()
+check("the assistant is pinned to English, not mirroring the client",
+      "ALWAYS reply in English" in ASSIST)
+check("and the old mirroring instruction is gone",
+      "mirror whatever the user wrote" not in ASSIST)
+check("it still understands other languages, it just answers in one",
+      "understand it fully" in ASSIST)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")

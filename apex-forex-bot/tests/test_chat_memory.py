@@ -124,10 +124,10 @@ check(f"the first {chat_memory.PER_MIN} messages all pass",
       allowed == chat_memory.PER_MIN, str(allowed))
 ok, why = chat_memory.allow("555")
 check("the next one is refused", ok is False)
-check("and the client is told why, in their language",
-      "limita" in why.lower() or "prea multe" in why.lower(), why)
+check("and the client is told why, in plain English",
+      "too many" in why.lower() or "limit" in why.lower(), why)
 check("the refusal reassures them trading is unaffected",
-      "tranzac" in why.lower(), why)
+      "trading" in why.lower(), why)
 
 print("\n── one client's flood does not silence another ──")
 ok, _ = chat_memory.allow("556")

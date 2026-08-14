@@ -102,7 +102,7 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
         dash = user_loop.get_dash(chat_id) or {}
         open_pos = dash.get("openPosition")
         if not open_pos:
-            send_to(chat_id, "📭 Nicio poziție deschisă momentan.")
+            send_to(chat_id, "📭 No open position right now.")
             return True
         from apex.brokers.ctrader import CtraderBroker
         import types as _types
@@ -135,20 +135,20 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
         bal = dash.get("balance", 1000.0) + net
         sign = "+" if net >= 0 else ""
         send_to(chat_id,
-                f"📊 <b>Dacă închizi acum:</b>\n"
-                f"Preț curent: <b>{_fmt_px(price)}</b>\n"
-                f"P&amp;L brut: <b>{sign}${gross:.2f}</b>\n"
-                f"Cost spread: <b>−${cost:.2f}</b>\n"
+                f"📊 <b>If you close right now:</b>\n"
+                f"Current price: <b>{_fmt_px(price)}</b>\n"
+                f"Gross P&amp;L: <b>{sign}${gross:.2f}</b>\n"
+                f"Spread cost: <b>−${cost:.2f}</b>\n"
                 f"Net: <b>{sign}${net:.2f}</b>\n"
-                f"Balanță după: <b>${bal:.2f}</b>\n\n"
-                f"<i>Folosește</i> <code>/close</code> <i>pentru a închide efectiv.</i>")
+                f"Balance after: <b>${bal:.2f}</b>\n\n"
+                f"<i>Send</i> <code>/close</code> <i>to actually close it.</i>")
         return True
 
     # Close intent
     if _RE_CLOSE_FX.search(t) and not _RE_BUY_FX.search(t):
         dash = user_loop.get_dash(chat_id) or {}
         if not dash.get("openPosition"):
-            send_to(chat_id, "📭 Nicio poziție deschisă.")
+            send_to(chat_id, "📭 No open position.")
             return True
         _handle_close(chat_id)
         return True
@@ -200,14 +200,14 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
 def _send_fx_trade_result(chat_id, result, sym):
     if result.get("ok"):
         send_to(chat_id,
-                f"✅ <b>{result['side']} {sym}</b> deschis\n"
-                f"Preț: <b>{_fmt_px(result['price'])}</b> | Unități: {result.get('units', '—')}\n"
+                f"✅ <b>{result['side']} {sym}</b> opened\n"
+                f"Price: <b>{_fmt_px(result['price'])}</b> | Units: {result.get('units', '—')}\n"
                 f"SL: {_fmt_px(result['sl'])} | TP: {_fmt_px(result['tp'])}\n"
                 f"Spread: {result.get('spread', '—')}p\n"
-                f"<i>Închide cu</i> <code>/close</code>")
+                f"<i>Close it with</i> <code>/close</code>")
     else:
         err = result.get("error", "unknown error")
-        send_to(chat_id, f"❌ Nu am putut deschide tranzacția: <i>{err}</i>")
+        send_to(chat_id, f"❌ Couldn't open the trade: <i>{err}</i>")
 
 
 # ─── Telegram API helpers ─────────────────────────────────
