@@ -3463,7 +3463,7 @@ _HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "/builder — build your strategy\n"
                 "/news — high-impact events\n\n"
                 f"{_DEMO_LIVE_HELP}"
-                "💬 <i>Or just talk to me in any language!</i>")
+                "💬 <i>Or just ask me a question — write in any language, I answer in English.</i>")
 
 _CONTROLS_TEXT = (
     f"🎛 <b>{cfg.BOT_NAME.upper()} — Controls Guide</b>\n"
@@ -3503,7 +3503,7 @@ _CONTROLS_TEXT = (
     f"{_DEMO_LIVE_CONTROLS}"
     "<b>♻️ Starting over</b>\n"
     "/reset — Disconnect cTrader and wipe all settings back to default\n\n"
-    "💬 <i>You can also talk to me in any language — just type your question.</i>")
+    "💬 <i>You can also just ask me a question. Write in any language you like — I understand it and reply in English.</i>")
 
 _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "━━━━━━━━━━━━━━━━━━━━\n"

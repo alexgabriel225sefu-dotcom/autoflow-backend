@@ -220,7 +220,12 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
 
     if name == "analyze_market":
         symbol = inp.get("symbol", "EUR_USD").upper().replace("/", "_").replace("-", "_")
-        send_status(f"🔍 Analyzing <b>{symbol}</b>…")
+        # Show it the way every other message spells it. The status
+        # line said "EUR_USD" one bubble above a reply saying
+        # "EURUSD" — same instrument, two names, consecutive
+        # messages. The underscore form stays internally because the
+        # broker lookup wants it.
+        send_status(f"🔍 Analyzing <b>{symbol.replace(chr(95), '')}</b>…")
         try:
             from apex.brokers.ctrader import CtraderBroker
             import types

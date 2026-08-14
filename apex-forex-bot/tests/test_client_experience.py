@@ -188,6 +188,22 @@ check("and the old mirroring instruction is gone",
 check("it still understands other languages, it just answers in one",
       "understand it fully" in ASSIST)
 
+
+print("\n── the copy does not promise a reply in the client's language ──")
+TG2 = open(os.path.join(_root, "apex", "telegram.py"), encoding="utf-8").read()
+check("no line still offers to talk 'in any language' unqualified",
+      "talk to me in any language!" not in TG2
+      and "any language — just type your question" not in TG2)
+check("it says plainly which language the answer comes back in",
+      TG2.count("reply in English") + TG2.count("I answer in English") >= 2, "")
+check("and still invites other languages as INPUT",
+      "any language" in TG2)
+
+ASSIST2 = open(os.path.join(_root, "apex", "assistant.py"), encoding="utf-8").read()
+check("the symbol is shown the same way in the status line as everywhere else",
+      "symbol.replace(chr(95), '')" in ASSIST2,
+      "status line would say EUR_USD next to a reply saying EURUSD")
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")
