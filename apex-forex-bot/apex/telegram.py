@@ -158,7 +158,7 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
         sym = _user_symbol(chat_id)
         dash = user_loop.get_dash(chat_id) or {}
         bal = dash.get("balance", 1000.0)
-        send_to(chat_id, f"⚡ <b>ALL IN</b> — BUY <b>{sym}</b> cu <b>${bal * 0.98:.0f}</b>…")
+        send_to(chat_id, f"⚡ <b>ALL IN</b> — BUY <b>{sym}</b> with <b>${bal * 0.98:.0f}</b>…")
         result = user_loop.force_trade(str(chat_id), "BUY", sym)
         _send_fx_trade_result(chat_id, result, sym)
         return True
@@ -174,7 +174,7 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
                 raw = raw + "_USD"
             if _PAIR_RE.match(raw):
                 sym = raw
-        send_to(chat_id, f"⚡ Deschid <b>BUY {sym}</b>…")
+        send_to(chat_id, f"⚡ Opening <b>BUY {sym}</b>…")
         result = user_loop.force_trade(str(chat_id), "BUY", sym)
         _send_fx_trade_result(chat_id, result, sym)
         return True
@@ -189,7 +189,7 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
                 raw = raw + "_USD"
             if _PAIR_RE.match(raw):
                 sym = raw
-        send_to(chat_id, f"⚡ Deschid <b>SELL {sym}</b>…")
+        send_to(chat_id, f"⚡ Opening <b>SELL {sym}</b>…")
         result = user_loop.force_trade(str(chat_id), "SELL", sym)
         _send_fx_trade_result(chat_id, result, sym)
         return True

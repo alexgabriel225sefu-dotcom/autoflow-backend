@@ -235,6 +235,45 @@ check("so the R line has its inputs",
                            "price": 1.15547, "side": "SELL"}) != "",
       "the live close showed dollars with no R")
 
+print("\n── everything the client is shown is in English ──")
+# The bot is asked in any language and answers in English. That was done once,
+# and the natural-language trading path was missed: "⚡ Deschid BUY EURUSD…"
+# went out in Romanian on a live account for weeks, right before an English
+# confirmation. Understanding stays multilingual — only OUTPUT is pinned.
+import re as _re  # noqa: E402
+
+_RO_WORDS = _re.compile(
+    r"(?<![A-Za-z])(?:cu|și|si|pentru|acum|dar|către|catre|tranzacție|"
+    r"tranzactie|poziție|pozitie|deschid|închid|inchid|piața|piata|"
+    r"câștig|castig|pierdere|bani|tău|tau|vinde|cumpără|cumpara|"
+    r"contul|niciodată|niciodata)(?![A-Za-z])", _re.I)
+
+_TG = TG   # telegram.py, already read above
+_ro_out = []
+for _i, _line in enumerate(_TG.split("\n"), 1):
+    if _line.strip().startswith("#") or "send_to(" not in _line and "send(" not in _line:
+        continue
+    for _a, _b in _re.findall(r'"([^"\n]{8,})"|\'([^\'\n]{8,})\'', _line):
+        _txt = _a or _b
+        if _RO_WORDS.search(_txt):
+            _ro_out.append(f"telegram.py:{_i} {_txt[:60]}")
+            break
+check("no Romanian in anything sent to a client", not _ro_out, str(_ro_out))
+check("the trade acks are English",
+      'f"⚡ Opening <b>BUY {sym}</b>…"' in _TG
+      and 'f"⚡ Opening <b>SELL {sym}</b>…"' in _TG)
+check("and the all-in ack too", '</b> with <b>${bal * 0.98:.0f}</b>' in _TG)
+
+print("\n── but it still UNDERSTANDS other languages ──")
+for _word, _rx, _lbl in (("cumpara", tg._RE_BUY_FX, "BUY"),
+                         ("cumpără EURUSD", tg._RE_BUY_FX, "BUY"),
+                         ("buy eurusd", tg._RE_BUY_FX, "BUY"),
+                         ("intru long", tg._RE_BUY_FX, "BUY"),
+                         ("vinde USDCAD", tg._RE_SELL_FX, "SELL"),
+                         ("sell now", tg._RE_SELL_FX, "SELL"),
+                         ("short it", tg._RE_SELL_FX, "SELL")):
+    check(f"'{_word}' still reads as {_lbl}", bool(_rx.search(_word)))
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")
