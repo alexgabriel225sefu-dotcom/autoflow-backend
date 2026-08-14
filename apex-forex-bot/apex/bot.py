@@ -2,6 +2,7 @@
 import os
 import sys
 import time
+import hmac
 import json
 import threading
 from datetime import datetime
@@ -251,21 +252,51 @@ def _start_dashboard_server():
     port = int(os.getenv("PORT") or os.getenv("DASHBOARD_PORT") or 3000)
     token = os.getenv("DASHBOARD_TOKEN") or ""
     if not token:
-        print("⚠️  DASHBOARD_TOKEN not set — the dashboard (balance + trade history) "
-              "is PUBLIC on your Railway URL.")
+        print("🔒 DASHBOARD_TOKEN not set — the dashboard and its data APIs are "
+              "DISABLED (503). Set DASHBOARD_TOKEN to enable them.")
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
 
         def _authorized(self):
+            """Fail CLOSED.
+
+            This used to `return True` whenever DASHBOARD_TOKEN was unset, so a
+            single missing environment variable silently published /api/status
+            — balance, open position and the trade journal — to anyone who
+            knew the URL, with no warning beyond one startup line. Verified
+            live: an unauthenticated GET returned 200.
+
+            A missing secret is a misconfiguration, not permission. The caller
+            turns that into a 503 so the operator can tell "I forgot to set the
+            token" apart from "my token is wrong".
+
+            compare_digest keeps the comparison constant-time: plain `==` on
+            secrets leaks their length and prefix through timing.
+            """
             if not token:
-                return True
+                return False
             qs = parse_qs(urlparse(self.path).query)
-            if qs.get("token", [""])[0] == token:
-                return True
-            bearer = (self.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
-            return bearer == token
+            supplied = qs.get("token", [""])[0]
+            if not supplied:
+                supplied = (self.headers.get("Authorization") or
+                            "").removeprefix("Bearer ").strip()
+            return hmac.compare_digest(supplied, token)
+
+        def _deny(self):
+            """401 when the token is wrong, 503 when there is no token at all."""
+            if not token:
+                body = (b"503 - dashboard disabled. DASHBOARD_TOKEN is not set "
+                        b"on this deployment, so these endpoints serve nothing.")
+                self.send_response(503)
+            else:
+                body = b"401 - unauthorized. Open with ?token=YOUR_DASHBOARD_TOKEN"
+                self.send_response(401)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
         def do_POST(self):
             if self.path == "/api/stripe/webhook":
@@ -447,10 +478,7 @@ def _start_dashboard_server():
                 self.wfile.write(payload)
                 return
             if not self._authorized():
-                self.send_response(401)
-                self.send_header("Content-Type", "text/plain")
-                self.end_headers()
-                self.wfile.write(b"Unauthorized - open with ?token=YOUR_DASHBOARD_TOKEN")
+                self._deny()
                 return
             if self.path.startswith("/api/status"):
                 body = json.dumps({**dash, "tickCount": tick_count, "candles": []}).encode()

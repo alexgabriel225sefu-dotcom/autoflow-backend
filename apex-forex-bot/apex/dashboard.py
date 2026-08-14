@@ -132,7 +132,15 @@ function parseTime(t){
 }
 
 function loadCandles(){
-  fetch('/api/candles').then(r=>r.json()).then(d=>{
+
+// Forward the dashboard token to every data call. The shell is served behind
+// the same auth as the APIs, but its fetches carried no token -- so the moment
+// DASHBOARD_TOKEN was set, the page loaded and then every panel 401'd. That
+// made "set a token" look like "break the dashboard", which is why running
+// without one felt like the only option.
+const _tok = new URLSearchParams(location.search).get('token') || '';
+const _api = (p) => _tok ? p + (p.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(_tok) : p;
+  fetch(_api('/api/candles')).then(r=>r.json()).then(d=>{
     if(!d.candles||!d.candles.length) return;
     const data = d.candles.map(c=>({
       time: parseTime(c.time),
@@ -186,7 +194,7 @@ function updateSLTP(pos){
 }
 
 function poll(){
-  fetch('/api/status').then(r=>r.json()).then(d=>{
+  fetch(_api('/api/status')).then(r=>r.json()).then(d=>{
     const bal=d.balance||0, trades=d.trades||[], pos=d.openPosition;
     const start=d.startBalance||bal;
     const wins=trades.filter(t=>t.win), losses=trades.filter(t=>!t.win);
