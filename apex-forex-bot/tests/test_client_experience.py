@@ -204,6 +204,37 @@ check("the symbol is shown the same way in the status line as everywhere else",
       "symbol.replace(chr(95), '')" in ASSIST2,
       "status line would say EUR_USD next to a reply saying EURUSD")
 
+# ── the two bugs the live screenshots caught ────────────────────────────
+print("\n── /status must name the strategy that is actually running ──")
+LOOP2 = open(os.path.join(_root, "apex", "user_loop.py"), encoding="utf-8").read()
+check("the dash label no longer defaults through STRATEGY_MODES",
+      'ai.STRATEGY_MODES.get(cfg.STRATEGY' not in LOOP2,
+      "would report Mean Reversion for every post-V1 strategy")
+check("it resolves through the registry instead",
+      "_strategy_label(cfg.STRATEGY)" in LOOP2)
+check("the auto-mode label uses it too",
+      "_strategy_label(active_mode)" in LOOP2)
+
+from apex import user_loop as _ul  # noqa: E402
+check("a registry-only strategy resolves to its real name",
+      "Momentum" in _ul._strategy_label("momentum"),
+      _ul._strategy_label("momentum"))
+check("a V1 strategy still resolves",
+      _ul._strategy_label("mean_reversion") != "mean_reversion",
+      _ul._strategy_label("mean_reversion"))
+check("an unknown key degrades to the key, not to a wrong strategy",
+      _ul._strategy_label("_nope") == "_nope", _ul._strategy_label("_nope"))
+
+print("\n── a closed trade carries what the R figure needs ──")
+_closes = LOOP2.count('"initialStop": open_pos.get("initialStop")')
+check("every close payload passes the original stop", _closes >= 3, str(_closes))
+check("and the side", LOOP2.count('"side": open_pos.get("entrySide")') >= 3,
+      str(LOOP2.count('"side": open_pos.get("entrySide")')))
+check("so the R line has its inputs",
+      tg._r_multiple_line({"entryPrice": 1.15311, "initialStop": 1.15661,
+                           "price": 1.15547, "side": "SELL"}) != "",
+      "the live close showed dollars with no R")
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")

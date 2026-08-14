@@ -197,6 +197,26 @@ _ENTRY_META_KEYS = (
 )
 
 
+def _strategy_label(key):
+    """Display name for a strategy, from the registry.
+
+    Reading this out of ai.STRATEGY_MODES defaulted to mean_reversion
+    for anything without an ai.py engine, so /status reported the wrong
+    method for every strategy added after V1 -- while the trade alerts,
+    which come from the module itself, named the right one. Two answers
+    to "what is it trading" in the same conversation.
+    """
+    try:
+        from apex import telegram as _tg
+        return _tg.friendly_strategy(key)[0]
+    except Exception:
+        pass
+    try:
+        return ai.STRATEGY_MODES[key]["label"]
+    except Exception:
+        return str(key)
+
+
 def _entry_meta(pos):
     """Extract the decision snapshot from a position dict."""
     return {k: pos[k] for k in _ENTRY_META_KEYS
@@ -982,7 +1002,7 @@ def _loop(user_id, alert_fn, gen=None):
     dash = {
         "broker": _broker_label(user, cfg),
         "mode": mode_label,
-        "strategy": ai.STRATEGY_MODES.get(cfg.STRATEGY, ai.STRATEGY_MODES["mean_reversion"])["label"],
+        "strategy": _strategy_label(cfg.STRATEGY),
         "balance": paper_balance,
         "startBalance": paper_balance,
         "symbol": symbol,
@@ -1894,6 +1914,8 @@ def _loop(user_id, alert_fn, gen=None):
                                                 user_id=user_id, symbol=symbol)
                         result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
                                   "entryPrice": open_pos.get("entryPrice"),
+                                  "side": open_pos.get("entrySide") or open_pos.get("side"),
+                                  "initialStop": open_pos.get("initialStop"),
                                   "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
                                   "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                                   "openedAt": open_pos.get("openedAt"), "time": now_str,
@@ -2068,7 +2090,7 @@ def _loop(user_id, alert_fn, gen=None):
                 # not fading (the forex default).
                 _default_mode = "trend" if _crypto_build else "mean_reversion"
                 active_mode = picked or _default_mode
-                dash["strategy"] = f"Auto → {ai.STRATEGY_MODES[active_mode]['label']}"
+                dash["strategy"] = f"Auto → {_strategy_label(active_mode)}"
 
             # ── The strategy module for this tick (blueprint §3/§14) ──
             # The decision now goes through the registry rather than straight
@@ -2181,6 +2203,8 @@ def _loop(user_id, alert_fn, gen=None):
                         loss_streak = 0
                     result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
                               "entryPrice": open_pos.get("entryPrice"),
+                              "side": open_pos.get("entrySide") or open_pos.get("side"),
+                              "initialStop": open_pos.get("initialStop"),
                               "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
                               "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                               "openedAt": open_pos.get("openedAt"), "time": now_str,
@@ -3172,6 +3196,8 @@ def _loop(user_id, alert_fn, gen=None):
                     loss_streak = 0
                 result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
                           "entryPrice": open_pos.get("entryPrice"),
+                          "side": open_pos.get("entrySide") or open_pos.get("side"),
+                          "initialStop": open_pos.get("initialStop"),
                           "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
                           "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                           "openedAt": open_pos.get("openedAt"), "time": now_str,
