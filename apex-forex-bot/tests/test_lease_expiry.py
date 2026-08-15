@@ -133,6 +133,41 @@ try:
 finally:
     restore()
 
+print("\n3b. A loss does not outlive the restart that fixes it")
+# The bug this pins: the loop breaks on was_lost() WITHOUT going through
+# stop(), so nothing cleared the flag. The watchdog then restarted the loop
+# every 180s, and each restart alerted and broke again on its first tick — an
+# OWNERSHIP_LOST message every three minutes from a container that had just
+# successfully taken the lease.
+try:
+    fake = Fake()
+    install(fake)
+    ownership.acquire("u9")
+    fake.kv["own:user:u9"] = "other-container"
+    ownership.heartbeat("u9")
+    ownership.mark_lost("u9")
+    check("the loop is told to stand down", ownership.was_lost("u9") is True)
+
+    # The other container goes away; the watchdog restarts this one.
+    fake.kv.clear()
+    check("it can take the lease again", ownership.acquire("u9") is True)
+    check("and the stale loss is cleared by that",
+          ownership.was_lost("u9") is False,
+          "restart would alert and break again on its first tick")
+
+    # Re-entrant acquire (our own container already holds it) clears it too.
+    ownership.mark_lost("u9")
+    check("a re-entrant acquire also clears it",
+          ownership.acquire("u9") is True and ownership.was_lost("u9") is False)
+finally:
+    restore()
+
+check("the break path cleans up after itself",
+      "ownership.stop_renewer(user_id)" in open(
+          os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "apex", "user_loop.py"), encoding="utf-8"
+      ).read().split("lease taken over")[1][:1200])
+
 print("\n4. Renewal does not depend on the trading tick")
 LSRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                          "apex", "user_loop.py"), encoding="utf-8").read()

@@ -1501,6 +1501,14 @@ def _loop(user_id, alert_fn, gen=None):
                                        "reason": "another instance took over"})
             except Exception:
                 pass
+            # This path leaves the loop WITHOUT going through stop(), so it has
+            # to clean up after itself. Leaving the renewer registered and the
+            # lost-flag set made the next watchdog restart alert and break on
+            # its first tick, forever.
+            try:
+                ownership.stop_renewer(user_id)
+            except Exception:
+                pass
             break
         try:
             if not forex.is_market_open():

@@ -98,6 +98,13 @@ def acquire(user_id):
     if got is True:
         with _lock:
             _held[user_id] = time.time()
+            # Holding the lease again makes any previous loss history. Without
+            # this the flag survived the restart that fixed it: the loop broke
+            # on was_lost() without going through stop(), so nothing cleared
+            # the set, and every watchdog restart re-alerted and re-broke on
+            # the very first tick — an OWNERSHIP_LOST message every 180s from
+            # a container that had just successfully taken the lease.
+            _lost.discard(user_id)
         print(f"[Ownership] {INSTANCE_ID} acquired {user_id}")
         return True
     if got is False:
@@ -106,6 +113,7 @@ def acquire(user_id):
         if str(user_store.get_blob(_key(user_id)) or "") == INSTANCE_ID:
             with _lock:
                 _held[user_id] = time.time()
+                _lost.discard(user_id)
             return True
         print(f"[Ownership] {user_id} is owned by another instance — standing down")
         return False
