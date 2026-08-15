@@ -429,17 +429,39 @@ def system_health():
     if unknown_brokers:
         out["broker_unknown"] = unknown_brokers
 
-    out["redis"] = "HEALTHY" if getattr(user_store, "_USE_REDIS", False) else "NOT_CONFIGURED"
-    out["ownership_backend"] = ("HEALTHY" if ownership.shared_backed()
-                                else "NOT_CONFIGURED")
+    # A REAL probe, not a configuration flag. `_USE_REDIS` answers "was a
+    # backend configured", which stays True through an outage — so a backend
+    # that died at 03:00 reported HEALTHY until someone noticed by other means.
+    try:
+        rh = user_store.redis_health()
+    except Exception as e:
+        rh = {"status": UNKNOWN, "detail": str(e)[:120], "reachable": False,
+              "configured": bool(getattr(user_store, "_USE_REDIS", False))}
+    out["redis"] = rh.get("status", UNKNOWN)
+    out["redis_detail"] = {k: rh.get(k) for k in
+                           ("configured", "reachable", "latency_ms",
+                            "last_success", "failure_count", "detail")
+                           if rh.get(k) is not None}
+    # Ownership rides the same backend, so it cannot be healthier than Redis is.
+    if not ownership.shared_backed():
+        out["ownership_backend"] = "NOT_CONFIGURED"
+    elif rh.get("status") in ("DOWN", UNKNOWN):
+        out["ownership_backend"] = rh.get("status")
+    else:
+        out["ownership_backend"] = rh.get("status", UNKNOWN)
     errs = recent_errors(limit=50)
     out["recent_errors"] = (len(errs.get("errors", []))
                             if errs.get("status") == "OK" else UNKNOWN)
 
-    degraded = [v for v in (out["store"], out["redis"]) if v == UNKNOWN]
-    if degraded or out["recent_errors"] == UNKNOWN:
+    # A backend that is DOWN is not a degraded system, it is a system whose
+    # coordination is gone — entitlement, ownership and order idempotency all
+    # ride on it. It outranks every other signal here.
+    if out["redis"] == "DOWN":
+        out["overall"] = "DOWN"
+    elif out["store"] == UNKNOWN or out["redis"] == UNKNOWN \
+            or out["recent_errors"] == UNKNOWN:
         out["overall"] = UNKNOWN
-    elif uids and running < len(uids):
+    elif out["redis"] == "DEGRADED" or (uids and running < len(uids)):
         out["overall"] = DEGRADED
     else:
         out["overall"] = HEALTHY

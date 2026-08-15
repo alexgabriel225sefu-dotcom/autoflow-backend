@@ -175,9 +175,21 @@ def restore(snapshot, dry_run=False):
     locks out the one that does, which turns a recovery into an outage.
     """
     ok, problems = verify(snapshot)
+    # Expected counts are computed BEFORE anything is written, so "restored"
+    # can be compared against "should have been restored". Without that, a
+    # restore that skipped half the users still returned a report that read
+    # like success — the skipped list was there, but nothing forced anyone to
+    # look at it.
+    expected = {
+        "users": len(snapshot.get("users") or {}),
+        "journals": sum(len(v or []) for v in (snapshot.get("journals") or {}).values()),
+        "access": len(snapshot.get("access") or []),
+    }
     report = {"verified": ok, "problems": problems, "users": 0, "journals": 0,
-              "access": 0, "skipped": [], "dry_run": bool(dry_run)}
+              "access": 0, "skipped": [], "dry_run": bool(dry_run),
+              "expected": expected, "result": "FAILED"}
     if not ok:
+        report["detail"] = "snapshot did not verify; nothing was written"
         return report
     ns = _ns()
 
@@ -226,6 +238,33 @@ def restore(snapshot, dry_run=False):
         except Exception as e:
             report["skipped"].append(f"access {uid}: {str(e)[:120]}")
 
+    # READ BACK. A write that reported success and is not there is the failure
+    # mode a restore cannot afford to discover later, so every user record is
+    # loaded again and compared. Skipped here rather than in dry-run, which
+    # wrote nothing to read.
+    if not dry_run:
+        for uid in (snapshot.get("users") or {}):
+            try:
+                if not user_store.load(uid):
+                    report["skipped"].append(f"user {uid}: not readable after restore")
+                    report["users"] = max(0, report["users"] - 1)
+            except Exception as e:
+                report["skipped"].append(f"user {uid}: readback failed ({str(e)[:80]})")
+                report["users"] = max(0, report["users"] - 1)
+
+    got = {k: report[k] for k in ("users", "journals", "access")}
+    report["restored"] = got
+    report["failed"] = {k: max(0, expected[k] - got[k]) for k in expected}
+    total_missing = sum(report["failed"].values())
+    if total_missing == 0 and not report["skipped"]:
+        report["result"] = "COMPLETE"
+    elif got["users"] == 0 and expected["users"] > 0:
+        report["result"] = "FAILED"
+    else:
+        report["result"] = "PARTIAL"
+        report["detail"] = (f"{total_missing} record(s) did not restore — this is "
+                            f"NOT a successful restore. Investigate before "
+                            f"starting the application.")
     report["next_steps"] = [
         "start the application (reconnects Redis)",
         "the loop reconnects each broker account",
@@ -250,7 +289,9 @@ def _main(argv):
             return 0 if ok else 1
         rep = restore(snap, dry_run="--dry-run" in argv)
         print(json.dumps(rep, indent=2))
-        return 0 if rep["verified"] else 1
+        # A PARTIAL restore must not exit 0. An operator scripting this needs
+        # the shell to tell them, not a field buried in JSON they may not read.
+        return 0 if rep.get("result") == "COMPLETE" else 1
     print(__doc__.strip().split("Usage:")[-1].strip(), file=sys.stderr)
     return 2
 

@@ -146,6 +146,52 @@ try:
     rep2 = backup.restore(snap, dry_run=True)
     check("it reports what it would do", rep2["users"] == 1 and rep2["dry_run"])
     check("but wrote nothing", user_store.load(UID) == {})
+
+    print("\n8. A restore reports COMPLETE, PARTIAL or FAILED — never just 'done'")
+    rep3 = backup.restore(snap)
+    check("a clean restore is COMPLETE", rep3["result"] == "COMPLETE", rep3)
+    check("with expected and restored counts", rep3["expected"]["users"] == 1
+          and rep3["restored"]["users"] == 1, rep3)
+    check("and nothing failed", sum(rep3["failed"].values()) == 0, rep3["failed"])
+
+    # A write that fails must NOT read as a successful restore.
+    _set = user_store._redis_set
+    _use = user_store._USE_REDIS
+    try:
+        user_store._USE_REDIS = True
+        user_store._redis_set = lambda *a, **k: False     # write not confirmed
+        user_store._redis_sadd = lambda *a, **k: None
+        rep4 = backup.restore(snap)
+        check("a restore whose writes fail is FAILED, not COMPLETE",
+              rep4["result"] == "FAILED", rep4["result"])
+        check("and it says how many are missing",
+              rep4["failed"]["users"] == 1, rep4["failed"])
+        check("and lists what was skipped", rep4["skipped"], rep4)
+    finally:
+        user_store._redis_set = _set
+        user_store._USE_REDIS = _use
+
+    # Two users, one of which cannot be read back afterwards.
+    snap2 = json.loads(json.dumps(snap))
+    snap2["users"]["9999"] = dict(snap2["users"][UID])
+    snap2["journals"]["9999"] = []
+    _load = user_store.load
+    try:
+        user_store.load = lambda uid: {} if str(uid) == "9999" else _load(uid)
+        rep5 = backup.restore(snap2)
+        check("a record that vanishes on readback makes it PARTIAL",
+              rep5["result"] == "PARTIAL", rep5["result"])
+        check("and the detail says not to start the app", "NOT a successful"
+              in rep5.get("detail", ""), rep5.get("detail"))
+    finally:
+        user_store.load = _load
+
+    BSRC2 = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "apex", "backup.py"), encoding="utf-8").read()
+    check("the CLI exits non-zero on anything but COMPLETE",
+          'rep.get("result") == "COMPLETE"' in BSRC2)
+    check("and the restore reads records back after writing",
+          "not readable after restore" in BSRC2)
 finally:
     user_store._DIR = _olddir
     shutil.rmtree(WORK, ignore_errors=True)

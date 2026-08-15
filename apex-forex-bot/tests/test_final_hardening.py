@@ -265,6 +265,43 @@ try:
 finally:
     restore()
 
+
+print("\n   the two close policies, stated separately")
+# A normal close and an emergency close cannot share one idempotency rule. The
+# first must refuse when it cannot prove uniqueness across containers; the
+# second exists precisely for the case where exiting matters more.
+try:
+    install(Store(down=True))          # shared idempotency unreachable
+    # A LIVE account is refused earlier still — ownership cannot be verified
+    # with the backend down, and that gate comes first. Both are fail-closed;
+    # this records WHICH one fires so a later reordering is visible.
+    d, _ = gates.authorize_close("77", position_id="P1", origin="manual",
+                                 user={"paper": False})
+    check("NORMAL close on a LIVE account + backend DOWN → refused",
+          d.allowed is False, d.reason)
+    check("   ...at the ownership gate, which comes first",
+          d.reason == "NOT_OWNER", d.reason)
+    # On demo, ownership is permissive on unknown, so the CLOSE IDEMPOTENCY
+    # policy is the one that decides — which is what this finding is about.
+    d, _ = gates.authorize_close("77", position_id="P2", origin="manual",
+                                 user={"paper": True})
+    check("NORMAL close + shared idempotency DOWN → refused",
+          d.allowed is False and d.reason == "CLOSE_COORDINATION_UNAVAILABLE",
+          d.reason)
+    check("and the refusal names the emergency path",
+          "emergency" in d.detail.lower(), d.detail)
+    d, _ = gates.authorize_close("77", position_id="P1", origin="operator",
+                                 user={"paper": False}, emergency=True)
+    check("EMERGENCY close + same outage → proceeds", d.allowed is True, d.reason)
+    check("and records that it was an emergency",
+          "emergency" in d.detail, d.detail)
+finally:
+    restore()
+GSRC2 = open(os.path.join(ROOT, "apex", "gates.py"), encoding="utf-8").read()
+check("the policy is one expression, not two code paths",
+      "fail_closed=not emergency" in GSRC2)
+check("and both are audited either way", "gates.audit(" in LSRC)
+
 # ── 7 ────────────────────────────────────────────────────
 print("\n7. OAuth fails closed when replay protection is unavailable")
 from apex import ctrader_oauth as oauth  # noqa: E402
@@ -372,6 +409,63 @@ check("the MCP server sends an operator field", '"operator": OPERATOR' in MSRC)
 check("and signs the envelope", "_sign(envelope)" in MSRC)
 check("using the same canonical form as the verifier",
       'sort_keys=True, separators=(",", ":")' in MSRC)
+
+
+print("\n   6. the full chain: transport → operator → capability → execution")
+# The chain the audit asks to be proven, link by link. A break in any one of
+# them must stop the command, and each is asserted separately so a future
+# change cannot satisfy the test by strengthening a different link.
+_s1 = os.environ.get("MCP_SIGNING_SECRET")
+_o1 = os.environ.get("MCP_OPERATORS")
+try:
+    os.environ["MCP_SIGNING_SECRET"] = "S3CRET"
+    os.environ["MCP_OPERATORS"] = "owner"
+    os.environ["MCP_CONTROL_ENABLED"] = "true"
+    os.environ.pop("MCP_FINANCIAL_ENABLED", None)
+
+    # LINK 1 — transport identity. A forged name fails the signature.
+    forged = _envelope("S3CRET", operator="attacker", tamper={"operator": "owner"})
+    ok, why = control.verify_envelope(forged)
+    check("forged operator: signature check FAILS", ok is False, why)
+
+    # An attacker who signs honestly as themselves passes link 1...
+    honest = _envelope("S3CRET", operator="attacker")
+    ok, _ = control.verify_envelope(honest)
+    check("an attacker signing as THEMSELVES passes the signature", ok is True)
+    # ...and is stopped at LINK 2 — operator authorization.
+    ok, why = control.authorize("restart_loop", {"confirm": True},
+                                operator="attacker")
+    check("...but is refused at operator authorization",
+          ok is False and why == "OPERATOR_NOT_AUTHORIZED", why)
+
+    # LINK 3 — capability authorization. The real operator still cannot reach
+    # a financial action while that capability is off.
+    ok, why = control.authorize("force_trade", {"confirm": True}, operator="owner")
+    check("the REAL operator is refused a financial action when it is disabled",
+          ok is False and "FINANCIAL_DISABLED" in why, why)
+    # ...and cannot skip the confirmation either.
+    ok, why = control.authorize("restart_loop", {}, operator="owner")
+    check("nor skip the confirmation",
+          ok is False and "CONFIRMATION_REQUIRED" in why, why)
+
+    # LINK 4 — execution, only when every link holds.
+    ok, why = control.authorize("restart_loop", {"confirm": True}, operator="owner")
+    check("all four links hold → authorized", ok is True, why)
+
+    # An attacker without the secret cannot forge a signature at all.
+    ok, why = control.verify_envelope(_envelope("not-the-secret", operator="owner"))
+    check("without the shared secret no valid envelope can be produced",
+          ok is False and why == "SIGNATURE_INVALID", why)
+    # And a bare name with no signature is refused outright.
+    ok, why = control.verify_envelope(
+        {"id": "x", "action": "force_trade", "args": {}, "ts": 1,
+         "operator": "admin"})
+    check('operator="admin" with no signature is not authentication',
+          ok is False and why == "SIGNATURE_MISSING", why)
+finally:
+    for k, v in (("MCP_SIGNING_SECRET", _s1), ("MCP_OPERATORS", _o1)):
+        os.environ.pop(k, None) if v is None else os.environ.update({k: v})
+    os.environ.pop("MCP_CONTROL_ENABLED", None)
 
 # ── 10 ───────────────────────────────────────────────────
 print("\n10. Entitlement writes are strict")

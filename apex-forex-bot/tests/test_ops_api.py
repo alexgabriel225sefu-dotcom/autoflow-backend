@@ -28,6 +28,8 @@ os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 
 from apex import control, ops_api, ownership, user_loop, user_store  # noqa: E402
 
+DEGRADED_ST = ops_api.DEGRADED
+
 failures = []
 
 
@@ -99,6 +101,62 @@ check("no action is in two levels at once",
       and not (control.LEVEL_2_CONTROLLED & control.LEVEL_3_FINANCIAL))
 
 # ─────────────────────────────────────────────────────────────
+
+print("\n1b. system_health uses the REAL Redis probe, not a config flag")
+# Was: `_USE_REDIS == True` -> "HEALTHY". Configured is not reachable, so a
+# backend that died at 03:00 reported healthy until somebody noticed by other
+# means.
+_rh = user_store.redis_health
+try:
+    user_store.redis_health = lambda **k: {
+        "configured": True, "reachable": True, "latency_ms": 12,
+        "last_success": 1786800000, "failure_count": 0, "status": "HEALTHY"}
+    h = ops_api.system_health()
+    check("a healthy probe reports HEALTHY", h["redis"] == "HEALTHY", h["redis"])
+    check("and carries the probe detail", h["redis_detail"]["latency_ms"] == 12, h)
+
+    user_store.redis_health = lambda **k: {
+        "configured": True, "reachable": False, "status": "DOWN",
+        "failure_count": 3, "detail": "connection refused"}
+    h = ops_api.system_health()
+    check("an unreachable backend reports DOWN, not HEALTHY", h["redis"] == "DOWN", h)
+    check("and the whole system is DOWN, not merely degraded",
+          h["overall"] == "DOWN", h["overall"])
+    check("ownership cannot be healthier than the backend it rides on",
+          h["ownership_backend"] in ("DOWN", "NOT_CONFIGURED"), h)
+
+    user_store.redis_health = lambda **k: {
+        "configured": True, "reachable": True, "status": "DEGRADED",
+        "latency_ms": 4200, "failure_count": 0,
+        "detail": "round trip 4200ms exceeds 3000ms"}
+    h = ops_api.system_health()
+    check("a slow backend is DEGRADED, not HEALTHY", h["redis"] == "DEGRADED")
+    check("and drags the overall verdict down", h["overall"] == DEGRADED_ST,
+          h["overall"])
+
+    def _boom(**k):
+        raise RuntimeError("probe itself failed")
+    user_store.redis_health = _boom
+    h = ops_api.system_health()
+    check("a probe that raises reports UNKNOWN, never HEALTHY",
+          h["redis"] == ops_api.UNKNOWN, h["redis"])
+    check("and the overall verdict is UNKNOWN", h["overall"] == ops_api.UNKNOWN)
+
+    # Recovery.
+    user_store.redis_health = lambda **k: {
+        "configured": True, "reachable": True, "latency_ms": 8,
+        "last_success": 1786800100, "failure_count": 0, "status": "HEALTHY"}
+    h = ops_api.system_health()
+    check("after recovery it reports healthy again", h["redis"] == "HEALTHY")
+finally:
+    user_store.redis_health = _rh
+
+OPS2 = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "apex", "ops_api.py"), encoding="utf-8").read()
+check("system_health no longer derives health from _USE_REDIS",
+      '_USE_REDIS", False) else "NOT_CONFIGURED"' not in OPS2)
+check("it calls the probe", "user_store.redis_health()" in OPS2)
+
 print("\n2. No generic escape hatches exist")
 from apex import control_actions  # noqa: E402
 

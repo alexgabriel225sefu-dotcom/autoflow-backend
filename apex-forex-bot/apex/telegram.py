@@ -4909,16 +4909,38 @@ def _license_ok(chat_id, text):
             f"Use the <code>{cfg.LICENSE_KEY_PREFIX}-XXXX-XXXX-XXXX</code> key from your purchase email, "
             "or join https://t.me/Apex4Traders to get one")
         return False
+    # FAIL CLOSED for a first-time chat. Everything above this point has
+    # already let through the two populations that deserve grace: an admin, and
+    # a returning customer whose stored key we still hold. Anything reaching
+    # here has never been validated, so an unreachable verifier is not evidence
+    # in their favour — and treating it as such made the outage itself the way
+    # in. Whoever messaged during a verifier outage got the product.
+    #
+    # The cost is bounded and recoverable: a real buyer during an outage is
+    # told to retry, and their key still works minutes later. The cost of the
+    # other direction is unbounded — every key-shaped string is accepted for
+    # as long as the verifier is down.
     try:
         r = requests.post(_VERIFY_URL, json={"key": key, "product": cfg.LICENSE_PRODUCT}, timeout=8)
+        if r.status_code >= 500:
+            raise RuntimeError(f"verifier returned HTTP {r.status_code}")
         data = r.json()
+        if not isinstance(data, dict):
+            raise RuntimeError("verifier returned a non-object body")
         if not data.get("valid"):
             send_to(chat_id,
                 f"❌ <b>{data.get('message', 'License not found.')}</b>\n\n"
                 "Need help? supportaicashsystem@gmail.com")
             return False
     except Exception as e:
-        print(f"[TELEGRAM] verify-license unreachable ({e}) — fail-open grant for {key}")
+        print(f"[TELEGRAM] ⛔ verify-license unavailable ({e}) — DENYING a "
+              f"first-time activation. An unverifiable licence is not a licence.")
+        send_to(chat_id,
+            "⏳ <b>We can't check that key right now.</b>\n\n"
+            "Our licence service isn't responding. Your key is fine — please "
+            "try the activation link again in a few minutes.\n\n"
+            "Still stuck after that? supportaicashsystem@gmail.com")
+        return False
     try:
         user_store.update(cid, {"license_key": key})
     except Exception:

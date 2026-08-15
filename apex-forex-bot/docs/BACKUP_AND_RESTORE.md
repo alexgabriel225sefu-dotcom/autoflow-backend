@@ -92,6 +92,26 @@ python -m apex.backup restore --dry-run < apex-backup-2026-08-15.json   # inspec
 python -m apex.backup restore < apex-backup-2026-08-15.json             # commit
 ```
 
+### Reading the result — this is the part that matters
+
+`restore` returns an explicit verdict, not a log to interpret:
+
+| `result` | Meaning | Exit code |
+|---|---|---|
+| `COMPLETE` | Every expected record restored and read back | 0 |
+| `PARTIAL` | Some records did not restore. **This is not a successful restore.** | 1 |
+| `FAILED` | The snapshot did not verify, or nothing restored | 1 |
+
+The report carries `expected`, `restored` and `failed` counts per category, so
+"how much of it worked" is a number rather than a judgement. Every user record
+is **read back** after writing — a write that reported success and is not there
+is the failure a restore cannot afford to discover later.
+
+The CLI exits non-zero on anything but `COMPLETE`, so a script that ignores the
+JSON still fails loudly. **Do not start the application on a PARTIAL restore.**
+Investigate first: a half-restored deployment has clients whose entitlement and
+broker links disagree with each other.
+
 `restore` writes state only. Steps 3–10 below are the **normal startup path**;
 this module deliberately does not short-circuit any of them.
 

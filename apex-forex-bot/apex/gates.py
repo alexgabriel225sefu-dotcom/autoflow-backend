@@ -173,9 +173,30 @@ def authorize_close(user_id, *, position_id=None, symbol=None, origin="unknown",
     # Keyed on the position, not on a generated id, so two processes asking to
     # close the same position agree on the key without talking to each other.
     intent = position_id or symbol or "flat"
+    #
+    # TWO POLICIES, because one rule cannot serve both cases.
+    #
+    # NORMAL CLOSE — fails CLOSED when shared idempotency is unavailable. The
+    # in-process ledger cannot see another container, so during a backend
+    # outage two instances would each believe they were the first to close the
+    # same position. The second close lands on whatever was reopened after the
+    # first, which is a new position closed without anyone asking.
+    #
+    # EMERGENCY OPERATOR CLOSE — may proceed, because the situation it exists
+    # for is "get me out of this position now" and a coordination outage is
+    # not a reason to refuse that. It is never silent: ownership was already
+    # waived above, the decision records `emergency`, and gates.audit writes it
+    # whether it succeeded or not. The residual risk is a duplicate close
+    # request, which the broker answers with "no such position" — bounded, and
+    # smaller than being unable to exit.
     ok, why, rid = ledger.claim(user_id, f"CLOSE:{intent}", "CLOSE", 0,
-                                None, None, fail_closed=False)
+                                None, None, fail_closed=not emergency)
     if not ok:
+        if why == "COORDINATION_UNAVAILABLE":
+            return Decision(False, "CLOSE_COORDINATION_UNAVAILABLE",
+                            "shared idempotency is unreachable; a normal close "
+                            "cannot be proven unique. Use the emergency path if "
+                            "exiting now matters more than the duplicate risk."), rid
         prior = ledger.result_for(rid)
         return Decision(False, "DUPLICATE_CLOSE",
                         f"already requested; prior result: {prior!r}"), rid
