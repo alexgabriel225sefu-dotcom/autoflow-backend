@@ -1480,23 +1480,28 @@ def _loop(user_id, alert_fn, gen=None):
             if not entry.get("running") or (gen is not None and entry.get("gen") != gen):
                 break  # stopped, or replaced by a newer loop (restart race)
 
-        # Ownership heartbeat. The generation check above only sees threads in
-        # THIS process; this is what sees the other container. Renewed at a
-        # third of the TTL, so two consecutive transport failures still leave
-        # a full renewal interval before the lease actually lapses.
-        if ownership.due(user_id):
-            if ownership.heartbeat(user_id) is False:
-                # Another instance holds the lease. Stand down rather than
-                # trade alongside it — the replacement is already running and
-                # has read the broker's real positions for itself.
-                print(f"[UserLoop:{user_id}] lease lost — this instance is standing down")
-                try:
-                    if alert_fn:
-                        alert_fn(user_id, {"action": "OWNERSHIP_LOST",
-                                           "reason": "another instance took over"})
-                except Exception:
-                    pass
-                break
+        # Ownership. The generation check above only sees threads in THIS
+        # process; the lease is what sees the other container.
+        #
+        # Renewal does NOT happen here. This tick is five minutes long and can
+        # block far longer inside a broker read, so renewing from the top of
+        # the tick left the lease expired for most of its life — and the next
+        # renewal then read the missing key as a takeover and shut the loop
+        # down on a single uncontended container. A dedicated thread renews on
+        # wall-clock time; this only reacts to a takeover it has confirmed.
+        if ownership.was_lost(user_id):
+            # Another instance genuinely holds the lease — not "the key
+            # expired", which the renewer re-acquires instead. Stand down
+            # rather than trade alongside the new owner, which has already
+            # read the broker's real positions for itself.
+            print(f"[UserLoop:{user_id}] lease taken over — standing down")
+            try:
+                if alert_fn:
+                    alert_fn(user_id, {"action": "OWNERSHIP_LOST",
+                                       "reason": "another instance took over"})
+            except Exception:
+                pass
+            break
         try:
             if not forex.is_market_open():
                 time.sleep(60)
@@ -3575,6 +3580,8 @@ def start(user_id, alert_fn=None):
     if ownership.acquire(user_id) is False:
         print(f"[UserLoop] REFUSED start for {user_id}: another instance owns it")
         return False
+    # Renew on a thread of its own, not from the trading tick.
+    ownership.start_renewer(user_id, on_lost=ownership.mark_lost)
 
     with _lock:
         if user_id in _loops and _loops[user_id]["running"]:
@@ -3607,6 +3614,7 @@ def stop(user_id):
     # release_claim only deletes a key that is still ours, so a stop() racing
     # a takeover cannot revoke the new owner's lease.
     try:
+        ownership.stop_renewer(user_id)
         ownership.release(user_id)
     except Exception as e:
         print(f"[UserLoop:{user_id}] lease release failed (expires on its own): {e}")

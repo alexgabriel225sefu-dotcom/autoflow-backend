@@ -43,10 +43,28 @@ import uuid
 
 from apex import user_store
 
-# Long enough to ride out a slow tick and a GC pause, short enough that a
-# container killed mid-deploy frees its users well inside a minute.
-TTL_S = 90
-RENEW_EVERY_S = TTL_S // 3          # renew at a third — two misses before loss
+# The lease must outlive whatever the loop is doing between renewals, and the
+# loop tick is FIVE MINUTES. The first version renewed from the top of the tick
+# with a fixed 90s TTL, so the lease was dead for 210 of every 300 seconds; the
+# next heartbeat then found the key gone, read that as "another instance took
+# over", and shut the loop down. One container, no competition, and it stopped
+# itself every tick — the alert clients saw as OWNERSHIP_LOST.
+#
+# Two changes make that impossible rather than unlikely:
+#   * renewal runs on its own thread, so a slow tick or a blocking broker read
+#     cannot delay it;
+#   * the TTL is derived from the loop interval instead of guessed, so it
+#     survives several missed renewals even if that thread stalls.
+def _loop_interval_s():
+    try:
+        from apex import config as _cfg
+        return max(30, int(getattr(_cfg, "LOOP_INTERVAL_MS", 300_000) / 1000))
+    except Exception:
+        return 300
+
+
+TTL_S = max(180, _loop_interval_s() * 2)
+RENEW_EVERY_S = max(15, TTL_S // 6)     # five misses before the lease lapses
 
 # Stable for the life of the process. RENDER_INSTANCE_ID when Render provides
 # it (it appears in the logs, which makes an incident traceable to a container);
@@ -56,6 +74,8 @@ INSTANCE_ID = (os.getenv("RENDER_INSTANCE_ID")
 
 _lock = threading.Lock()
 _held = {}                          # user_id -> last successful renew ts
+_renewers = {}                      # user_id -> {"alive": bool}
+_lost = set()                       # users a renewer confirmed we lost
 
 
 def _key(user_id):
@@ -93,7 +113,14 @@ def acquire(user_id):
 
 
 def heartbeat(user_id):
-    """Renew the lease. False means it is gone and the caller must stand down."""
+    """Renew the lease. False ONLY when another instance genuinely holds it.
+
+    An expired key and a stolen key are not the same event, and conflating them
+    is what made a single uncontended container shut itself down: the renew
+    script returns 0 both when somebody else owns the key and when the key is
+    simply gone. A key that is GONE is unowned, so the right move is to take it
+    again — standing down hands the user to nobody.
+    """
     user_id = str(user_id)
     if not shared_backed():
         return None
@@ -102,12 +129,30 @@ def heartbeat(user_id):
         with _lock:
             _held[user_id] = time.time()
         return True
-    if ok is False:
+    if ok is None:
+        return None                 # transport failure — unknown, not lost
+
+    # renew said no. Find out which kind of no it was.
+    cur = user_store.get_blob(_key(user_id))
+    if cur is None:
+        # Nobody holds it. Re-acquire rather than abandon the user.
+        again = user_store.claim_value(_key(user_id), INSTANCE_ID, ttl_s=TTL_S)
+        if again is True:
+            with _lock:
+                _held[user_id] = time.time()
+            print(f"[Ownership] lease for {user_id} had lapsed — reacquired")
+            return True
+        if again is None:
+            return None
+        cur = user_store.get_blob(_key(user_id))    # somebody beat us to it
+    if str(cur or "") == INSTANCE_ID:
         with _lock:
-            _held.pop(user_id, None)
-        print(f"[Ownership] LOST lease for {user_id} — another instance has it")
-        return False
-    return None                     # transport failure — unknown, not lost
+            _held[user_id] = time.time()
+        return True
+    with _lock:
+        _held.pop(user_id, None)
+    print(f"[Ownership] LOST lease for {user_id} — held by {cur!r}")
+    return False
 
 
 def due(user_id):
@@ -115,6 +160,72 @@ def due(user_id):
     with _lock:
         last = _held.get(str(user_id))
     return last is None or (time.time() - last) >= RENEW_EVERY_S
+
+
+def start_renewer(user_id, on_lost=None):
+    """Renew this user's lease on a thread of its own.
+
+    Renewal must not be driven by the trading tick. The tick is five minutes
+    long and can block far longer than that inside a broker read, so a lease
+    renewed from the top of the tick is a lease that spends most of its life
+    expired. This thread renews on wall-clock time regardless of what the loop
+    is doing, and calls `on_lost` exactly once if the lease is genuinely taken.
+    """
+    user_id = str(user_id)
+    if not shared_backed():
+        return None
+    with _lock:
+        if _renewers.get(user_id, {}).get("alive"):
+            return None
+        _renewers[user_id] = {"alive": True}
+
+    def _run():
+        while True:
+            time.sleep(RENEW_EVERY_S)
+            with _lock:
+                if not _renewers.get(user_id, {}).get("alive"):
+                    return
+            try:
+                if heartbeat(user_id) is False:
+                    with _lock:
+                        _renewers.pop(user_id, None)
+                    if on_lost:
+                        try:
+                            on_lost(user_id)
+                        except Exception as e:
+                            print(f"[Ownership] on_lost failed for {user_id}: {e}")
+                    return
+            except Exception as e:
+                # Never let the renewer die on a transient error — that would
+                # silently stop renewing and lose the lease by attrition.
+                print(f"[Ownership] renewer error for {user_id}: {e}")
+
+    threading.Thread(target=_run, daemon=True,
+                     name=f"lease-{user_id}").start()
+    return True
+
+
+def stop_renewer(user_id):
+    with _lock:
+        _renewers.pop(str(user_id), None)
+        _lost.discard(str(user_id))
+
+
+def mark_lost(user_id):
+    with _lock:
+        _lost.add(str(user_id))
+
+
+def was_lost(user_id):
+    """True only after a renewer confirmed another instance holds the lease.
+
+    Deliberately NOT a live read. The trading loop asks this once per tick, and
+    a network round trip there would make the answer depend on Redis latency at
+    exactly the moment the loop is deciding whether to keep managing open
+    positions. The renewer already knows.
+    """
+    with _lock:
+        return str(user_id) in _lost
 
 
 def holds(user_id):
