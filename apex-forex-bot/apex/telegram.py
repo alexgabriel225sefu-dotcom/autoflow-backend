@@ -697,7 +697,15 @@ def _handle_menu(chat_id):
 # answer.
 
 def _mode_label(user):
-    """Demo / Live / Paper, from the account actually configured."""
+    """Demo / Live / Paper, from the account actually configured.
+
+    `None` means the record could not be read, and that is NOT the same as an
+    empty record. `{}.get("paper", True)` is True, so falling back to a bare
+    dict would print "Paper · simulated" across a live account whenever the
+    store hiccuped — the one direction this badge must never be wrong in.
+    """
+    if user is None:
+        return "⚠️ account mode unknown"
     u = user or {}
     if u.get("paper", True):
         return "📝 Paper · simulated"
@@ -723,15 +731,34 @@ def _guard_label(chat_id):
 
 
 def _state_line(chat_id, guard=False):
-    """The one-line state banner. `guard=True` on screens where money moves."""
+    """The one-line state banner. `guard=True` on screens where money moves.
+
+    Total by construction. This runs inside the trade alerts, so every part of
+    it is wrapped: a decorative banner must never be the reason a client is not
+    told that their money moved. `_guard_label` in particular reads the
+    published dash, which is a network hop on Upstash — one timeout there would
+    otherwise take the whole "position opened" message down with it.
+
+    Each piece degrades to an honest shorter line. None of them degrade to a
+    reassuring one.
+    """
+    from apex import automation
     try:
         u = user_store.load(chat_id)
-    except Exception:
-        u = {}
-    from apex import automation
-    line = f"{_mode_label(u)}  ·  {automation.label(automation.mode(u))}"
+    except Exception as e:
+        print(f"[Telegram] state banner: could not read user {chat_id}: {e}")
+        u = None                      # unknown — not "an empty paper account"
+    try:
+        line = f"{_mode_label(u)}  ·  {automation.label(automation.mode(u or {}))}"
+    except Exception as e:
+        print(f"[Telegram] state banner: could not resolve mode for {chat_id}: {e}")
+        line = "⚠️ account state unavailable"
     if guard:
-        line += f"\n{_guard_label(chat_id)}"
+        try:
+            line += f"\n{_guard_label(chat_id)}"
+        except Exception as e:
+            print(f"[Telegram] state banner: risk guard unreadable for {chat_id}: {e}")
+            line += "\n🛡 Risk Guard: <i>no report yet</i>"
     return line
 
 
