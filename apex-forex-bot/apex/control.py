@@ -18,6 +18,8 @@ Safety:
   • Handlers are injected by bot.py, so this module stays dependency-free and
     can't import the bot in a cycle.
 """
+import hashlib
+import hmac
 import json
 import os
 import threading
@@ -144,6 +146,46 @@ def operator_ok(operator) -> bool:
     if not allowed:
         return False
     return str(operator or "").strip() in allowed
+
+
+def _signing_secret():
+    return (os.getenv("MCP_SIGNING_SECRET") or "").strip()
+
+
+def verify_envelope(cmd):
+    """Is the operator name in this command actually proven? (ok, reason).
+
+    A name in a JSON payload is not identity — anyone who can write to the
+    command queue can type one. When MCP_SIGNING_SECRET is configured the
+    sender signs the canonical envelope and this checks it, so the name cannot
+    be forged without the secret.
+
+    When no secret is configured this returns "unsigned" rather than failing.
+    That is a deliberate, layered position and not an oversight: reaching the
+    queue at all already requires the Upstash credentials, level 2 additionally
+    requires MCP_CONTROL_ENABLED and an allowlisted name, and level 3 requires
+    its own switch on top. Making the secret mandatory before it is deployed
+    would lock the operator out of their own bot — which is exactly what
+    happened when operator identity was first enforced without a sender that
+    could provide one.
+    """
+    secret = _signing_secret()
+    if not secret:
+        return True, "UNSIGNED_NO_SECRET_CONFIGURED"
+    sig = str((cmd or {}).get("sig") or "")
+    if not sig:
+        return False, "SIGNATURE_MISSING"
+    try:
+        payload = json.dumps(
+            {k: cmd.get(k) for k in ("id", "action", "args", "ts", "operator")},
+            sort_keys=True, separators=(",", ":"))
+        expect = hmac.new(secret.encode(), payload.encode(),
+                          hashlib.sha256).hexdigest()
+    except Exception as e:
+        return False, f"SIGNATURE_UNVERIFIABLE ({type(e).__name__})"
+    if not hmac.compare_digest(expect, sig):
+        return False, "SIGNATURE_INVALID"
+    return True, "SIGNATURE_OK"
 
 
 def authorize(action, args=None, operator=None):
@@ -352,6 +394,18 @@ def start_consumer(handlers, poll=10.0, heartbeat_interval=60.0):
                 # Authorization is decided in ONE place and recorded whether it
                 # passed or failed. A refusal nobody can see is indistinguishable
                 # from a request nobody made.
+                # Prove the operator NAME before trusting it. Reads are
+                # unaffected — they carry no identity claim worth forging.
+                if lvl > 1:
+                    _sig_ok, _sig_why = verify_envelope(cmd)
+                    if not _sig_ok:
+                        _record_result(cid, False, _sig_why)
+                        _audit({"ts": int(time.time()), "cid": cid,
+                                "action": action, "level": lvl,
+                                "operator": operator, "authorized": False,
+                                "args": _safe_args(args), "ok": False,
+                                "err": _sig_why})
+                        continue
                 allowed, why = authorize(action, args, operator=operator)
                 if not allowed:
                     _record_result(cid, False, why)

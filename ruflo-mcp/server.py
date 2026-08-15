@@ -19,6 +19,8 @@ Env:
   RUFLO_MCP_SECRET                                    (path secret for the URL)
   PORT                                                (Render sets this)
 """
+import hashlib
+import hmac
 import json
 import os
 import time
@@ -68,12 +70,38 @@ def _redis(product: str, *parts):
     return r.json().get("result")
 
 
+# Who this server acts as, and the secret that proves it.
+#
+# The bot refuses level 2 and level 3 commands from an operator it cannot
+# identify. A name alone is not identification — anyone who can write to the
+# command queue could type one — so when MCP_SIGNING_SECRET is set the envelope
+# is signed and the bot verifies it. The secret is shared between this server
+# and the bot, and nothing else needs it.
+OPERATOR = (os.getenv("MCP_OPERATOR_NAME") or "").strip()
+SIGNING_SECRET = (os.getenv("MCP_SIGNING_SECRET") or "").strip()
+
+
+def _sign(envelope: dict) -> str:
+    """HMAC over the canonical envelope. Empty when no secret is configured."""
+    if not SIGNING_SECRET:
+        return ""
+    payload = json.dumps({k: envelope[k] for k in ("id", "action", "args", "ts",
+                                                   "operator")},
+                         sort_keys=True, separators=(",", ":"))
+    return hmac.new(SIGNING_SECRET.encode(), payload.encode(),
+                    hashlib.sha256).hexdigest()
+
+
 def _call(product: str, action: str, args: dict = None, timeout: float = 20.0):
     """Send a command to the bot and wait for its result."""
     ns = _ns(product)
     cid = uuid.uuid4().hex[:16]
-    _redis(ns, "LPUSH", f"{ns}:commands", json.dumps(
-        {"id": cid, "action": action, "args": args or {}, "ts": int(time.time())}))
+    envelope = {"id": cid, "action": action, "args": args or {},
+                "ts": int(time.time()), "operator": OPERATOR}
+    sig = _sign(envelope)
+    if sig:
+        envelope["sig"] = sig
+    _redis(ns, "LPUSH", f"{ns}:commands", json.dumps(envelope))
     deadline = time.time() + timeout
     key = f"{ns}:cmdresult:{cid}"
     while time.time() < deadline:

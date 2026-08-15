@@ -17,7 +17,7 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 
-from apex import access, gates, ledger, ownership, user_store  # noqa: E402
+from apex import access, control, gates, ledger, ownership, user_store  # noqa: E402
 
 failures = []
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -306,6 +306,72 @@ check("consumption is a compare-and-set, not read-then-write",
       "two concurrent confirmations could both read the token as valid")
 check("it is claimed through the shared store",
       "user_store.claim(" in TG)
+
+
+# ── 9 ────────────────────────────────────────────────────
+print("\n9. The operator name is PROVEN, not merely stated")
+# Enforcing operator identity without a sender that could provide one locked the
+# operator out of their own control plane — observed live: every level 2 command
+# returned NO_OPERATORS_CONFIGURED because ruflo-mcp sent {id, action, args, ts}
+# with no operator field at all. The sender now signs the envelope.
+import hashlib as _hl, hmac as _hm, json as _js  # noqa: E402
+
+def _envelope(secret, operator="owner", action="restart_loop", tamper=None):
+    env = {"id": "c1", "action": action, "args": {"user_id": "1"},
+           "ts": 1786800000, "operator": operator}
+    payload = _js.dumps({k: env[k] for k in ("id", "action", "args", "ts",
+                                             "operator")},
+                        sort_keys=True, separators=(",", ":"))
+    env["sig"] = _hm.new(secret.encode(), payload.encode(), _hl.sha256).hexdigest()
+    if tamper:
+        env.update(tamper)
+    return env
+
+_s0 = os.environ.get("MCP_SIGNING_SECRET")
+try:
+    os.environ["MCP_SIGNING_SECRET"] = "shared-secret-abc"
+    check("a correctly signed envelope verifies",
+          control.verify_envelope(_envelope("shared-secret-abc"))[0] is True)
+    ok, why = control.verify_envelope(_envelope("wrong-secret"))
+    check("a signature from the wrong secret is refused",
+          ok is False and why == "SIGNATURE_INVALID", why)
+    ok, why = control.verify_envelope({"id": "c1", "action": "restart_loop",
+                                       "args": {}, "ts": 1, "operator": "owner"})
+    check("an UNSIGNED envelope is refused once a secret exists",
+          ok is False and why == "SIGNATURE_MISSING", why)
+    # The whole point: the operator field cannot be forged.
+    ok, why = control.verify_envelope(
+        _envelope("shared-secret-abc", operator="attacker",
+                  tamper={"operator": "owner"}))
+    check("swapping the operator name AFTER signing is refused",
+          ok is False and why == "SIGNATURE_INVALID", why)
+    ok, why = control.verify_envelope(
+        _envelope("shared-secret-abc", tamper={"action": "force_trade"}))
+    check("swapping the action after signing is refused",
+          ok is False and why == "SIGNATURE_INVALID", why)
+    ok, why = control.verify_envelope(
+        _envelope("shared-secret-abc", tamper={"args": {"user_id": "999"}}))
+    check("swapping the target user after signing is refused",
+          ok is False and why == "SIGNATURE_INVALID", why)
+    os.environ.pop("MCP_SIGNING_SECRET")
+    ok, why = control.verify_envelope({"id": "c1", "action": "restart_loop"})
+    check("with no secret configured it degrades to the allowlist, and says so",
+          ok is True and why == "UNSIGNED_NO_SECRET_CONFIGURED", why)
+finally:
+    if _s0 is None:
+        os.environ.pop("MCP_SIGNING_SECRET", None)
+    else:
+        os.environ["MCP_SIGNING_SECRET"] = _s0
+
+CSRC2 = open(os.path.join(ROOT, "apex", "control.py"), encoding="utf-8").read()
+check("only level 2/3 are signature-checked; reads are not",
+      "if lvl > 1:" in CSRC2 and "verify_envelope(cmd)" in CSRC2)
+MSRC = open(os.path.join(os.path.dirname(ROOT), "ruflo-mcp", "server.py"),
+            encoding="utf-8").read()
+check("the MCP server sends an operator field", '"operator": OPERATOR' in MSRC)
+check("and signs the envelope", "_sign(envelope)" in MSRC)
+check("using the same canonical form as the verifier",
+      'sort_keys=True, separators=(",", ":")' in MSRC)
 
 # ── 10 ───────────────────────────────────────────────────
 print("\n10. Entitlement writes are strict")
