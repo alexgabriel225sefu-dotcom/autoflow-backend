@@ -234,6 +234,69 @@ def claim(key, ttl_s=120):
         return None
 
 
+def claim_value(key, value, ttl_s=120):
+    """Like claim(), but records WHO won so the winner can renew it.
+
+    claim() writes a bare "1", which is enough to answer "is this taken" but
+    not "is this still mine" — and a lease that cannot be renewed by its owner
+    is a lease that expires under a healthy worker. Same tri-state contract:
+    True (won), False (somebody else holds it), None (could not ask).
+    """
+    if not _USE_REDIS:
+        return None
+    try:
+        if _BACKEND == "redis":
+            return bool(_r.set(key, str(value), nx=True, ex=int(ttl_s)))
+        res = _upstash(["SET", key, str(value), "NX", "EX", int(ttl_s)])
+        if res is None:
+            return None          # command failed — unknown, not "taken"
+        return str(res).upper() == "OK"
+    except Exception as e:
+        print(f"[Redis] claim_value failed: {e}")
+        return None
+
+
+def renew_claim(key, value, ttl_s=120):
+    """Extend a lease we already hold. True only if `value` is still the owner.
+
+    Read-then-write rather than a compare-and-set script, because the Upstash
+    REST transport has no EVAL here. The seam is real but narrow and it fails
+    SAFE: the only way another instance can take the key between the read and
+    the write is if the key had already expired, which means the lease was
+    already lost — and the caller renews at a third of the TTL precisely so
+    that has not happened yet. A lost renewal is reported as lost.
+    """
+    if not _USE_REDIS:
+        return None
+    try:
+        cur = _redis_get(key)
+        if cur is None:
+            return False         # expired or gone — no longer ours to extend
+        if str(cur) != str(value):
+            return False         # somebody else owns it now
+        return bool(set_blob(key, str(value), ttl_s=int(ttl_s)))
+    except Exception as e:
+        print(f"[Redis] renew_claim failed: {e}")
+        return None
+
+
+def release_claim(key, value):
+    """Drop a lease we hold, so a replacement worker need not wait out the TTL.
+    Only deletes when the key is still ours — never steals somebody else's."""
+    if not _USE_REDIS:
+        return None
+    try:
+        cur = _redis_get(key)
+        if cur is None or str(cur) != str(value):
+            return False
+        if _BACKEND == "redis":
+            return bool(_r.delete(key))
+        return _upstash(["DEL", key]) is not None
+    except Exception as e:
+        print(f"[Redis] release_claim failed: {e}")
+        return None
+
+
 def incr(key, ttl_s=60):
     """Atomically bump a counter, giving it a TTL the first time it appears.
 

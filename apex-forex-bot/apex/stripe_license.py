@@ -74,6 +74,45 @@ def handle_webhook(raw_body: bytes, sig_header: str):
               f"(session={session.get('id')}) — can't attribute to a Telegram user")
         return 200, b"no chat id"
 
+    # Stripe retries a delivery it did not get a 2xx for, and it may deliver the
+    # same event more than once by design. Without this, every retry minted a
+    # SECOND license key and overwrote the first — so the key in the buyer's
+    # first activation message stopped working, and they got the whole welcome
+    # sequence again. Two defences, because they fail in different directions:
+    #
+    #   1. The event id, claimed atomically (SET NX EX). This is the only thing
+    #      that stops two containers processing the same retry concurrently.
+    #      Held well past Stripe's ~3-day retry schedule.
+    #   2. The stored license itself. A claim needs Redis; this does not, so a
+    #      redelivery still cannot mint a second key when there is no shared
+    #      backend at all.
+    event_id = str(event.get("id") or "").strip()
+    if event_id:
+        seen = user_store.claim(f"stripe:evt:{event_id}", ttl_s=7 * 24 * 3600)
+        if seen is False:
+            print(f"[Stripe] duplicate delivery of {event_id} — already handled")
+            return 200, b"duplicate"
+        # seen is None => no shared backend; defence 2 below still applies.
+
+    try:
+        existing = (user_store.load(chat_id) or {}).get("license_key")
+    except Exception as e:
+        print(f"[Stripe] could not read existing license for {chat_id}: {e}")
+        existing = None
+
+    if existing:
+        # Already provisioned by an earlier delivery of this purchase. Re-grant
+        # access (cheap, idempotent) but keep the key the buyer already has and
+        # do not re-send the activation sequence.
+        try:
+            from apex import access
+            access.grant(str(chat_id))
+        except Exception as e:
+            print(f"[Stripe] re-grant failed for {chat_id}: {e}")
+        print(f"[Stripe] {chat_id} already licensed — kept existing key "
+              f"(session={session.get('id')})")
+        return 200, b"already active"
+
     key = generate_license_key()
     try:
         user_store.update(chat_id, {"license_key": key})

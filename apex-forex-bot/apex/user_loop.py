@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
 from apex import access, sentinel, institutional, cot, ledger
-from apex import automation
+from apex import automation, ownership
 from apex import strategy_api
 # Registering the shipped modules is what makes strategy_api.get() return
 # anything. Without this the registry is empty, every lookup misses, and the
@@ -1479,6 +1479,24 @@ def _loop(user_id, alert_fn, gen=None):
             entry = _loops.get(user_id, {})
             if not entry.get("running") or (gen is not None and entry.get("gen") != gen):
                 break  # stopped, or replaced by a newer loop (restart race)
+
+        # Ownership heartbeat. The generation check above only sees threads in
+        # THIS process; this is what sees the other container. Renewed at a
+        # third of the TTL, so two consecutive transport failures still leave
+        # a full renewal interval before the lease actually lapses.
+        if ownership.due(user_id):
+            if ownership.heartbeat(user_id) is False:
+                # Another instance holds the lease. Stand down rather than
+                # trade alongside it — the replacement is already running and
+                # has read the broker's real positions for itself.
+                print(f"[UserLoop:{user_id}] lease lost — this instance is standing down")
+                try:
+                    if alert_fn:
+                        alert_fn(user_id, {"action": "OWNERSHIP_LOST",
+                                           "reason": "another instance took over"})
+                except Exception:
+                    pass
+                break
         try:
             if not forex.is_market_open():
                 time.sleep(60)
@@ -3185,14 +3203,51 @@ def _loop(user_id, alert_fn, gen=None):
                             pass
                         order_ok = True
                         _order_res = None
+                        # Ownership, revalidated at the last possible moment.
+                        # The lease is renewed on a timer, so between that
+                        # renewal and this order another container may have
+                        # taken over — the deploy overlap is measured in
+                        # seconds and so is this gap. On a real-money account
+                        # an unreadable lease counts as NOT owned: a second
+                        # container managing the same positions is worse than
+                        # a missed entry.
+                        _live_acct = not user_store.load(user_id).get("paper", True)
+                        _own_ok, _own_why = ownership.may_trade(
+                            user_id, live=_live_acct)
+                        # Entitlement, re-checked at the order gate rather than
+                        # only by the 180s watchdog sweep. A refund or a revoked
+                        # grant left up to three minutes in which the loop could
+                        # still open a NEW position; closing that window here
+                        # costs one cached lookup. Existing positions stay
+                        # managed either way — this blocks entries, it does not
+                        # abandon what is already open.
+                        if _own_ok and not _entitled(user_id):
+                            _own_ok, _own_why = False, "NOT_ENTITLED"
+                        if not _own_ok:
+                            order_ok = False
+                            print(f"[UserLoop:{user_id}] BLOCKED {action} {symbol}: "
+                                  f"{_own_why} — this instance does not own the account")
+                            _skip(f"not the owning instance ({_own_why})")
+                            if alert_fn:
+                                alert_fn(user_id, {
+                                    "action": "OWNERSHIP_BLOCKED", "symbol": symbol,
+                                    "side": action, "units": units,
+                                    "reason": _own_why})
                         # Idempotency claim: the last thing between an intent
                         # and a real position. Two Render instances overlap
                         # during a deploy and both drive this account, so the
                         # loop's generation token — which only sees threads in
                         # THIS process — cannot prevent a double entry.
-                        _claim_ok, _claim_why, _rid = ledger.claim(
-                            user_id, symbol, action, units, sl_price, tp_price)
-                        if not _claim_ok:
+                        # Not reached when ownership already refused: claiming
+                        # an id we will not use would block the real owner.
+                        _claim_ok, _claim_why, _rid = (
+                            ledger.claim(user_id, symbol, action, units,
+                                         sl_price, tp_price,
+                                         fail_closed=_live_acct)
+                            if _own_ok else (False, _own_why, None))
+                        if not _own_ok:
+                            pass                    # already reported above
+                        elif not _claim_ok:
                             order_ok = False
                             print(f"[UserLoop:{user_id}] BLOCKED {action} {symbol}: "
                                   f"{_claim_why} — an identical order was just sent")
@@ -3513,6 +3568,14 @@ def start(user_id, alert_fn=None):
             pass
         stop(user_id)
         return False
+    # Take the cross-container lease BEFORE spawning anything. A deploy overlaps
+    # the old and new containers, and without this both start a loop for the
+    # same cTrader account — the generation token below cannot see the other
+    # process. None means no shared backend: uncontended, so carry on.
+    if ownership.acquire(user_id) is False:
+        print(f"[UserLoop] REFUSED start for {user_id}: another instance owns it")
+        return False
+
     with _lock:
         if user_id in _loops and _loops[user_id]["running"]:
             return False
@@ -3540,6 +3603,13 @@ def stop(user_id):
             return False
         _loops[user_id]["running"] = False
     user_store.update(user_id, {"active": False})
+    # Hand the lease back rather than making a replacement wait out the TTL.
+    # release_claim only deletes a key that is still ours, so a stop() racing
+    # a takeover cannot revoke the new owner's lease.
+    try:
+        ownership.release(user_id)
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] lease release failed (expires on its own): {e}")
     print(f"[UserLoop] Stopped for user {user_id}")
     return True
 
@@ -3766,8 +3836,18 @@ def force_trade(user_id, side, symbol=None, lots=None):
                    f"SL={sl_price} TP={tp_price} (manual)", user_id=user_id)
     except Exception:
         pass
+    # Same ownership gate as the automatic path. A manual order from the
+    # control plane is still a real order, and the instance handling the HTTP
+    # request is not necessarily the one that owns this user's account.
+    _own_ok, _own_why = ownership.may_trade(
+        user_id, live=not user.get("paper", True))
+    if not _own_ok:
+        print(f"[UserLoop:{user_id}] manual {side} {sym} refused: {_own_why}")
+        return {"ok": False, "error": f"not the owning instance ({_own_why})"}
+
     _claim_ok, _claim_why, _rid = ledger.claim(
-        user_id, sym, side, units, sl_price, tp_price)
+        user_id, sym, side, units, sl_price, tp_price,
+        fail_closed=not user.get("paper", True))
     if not _claim_ok:
         # Manual /buy and the MCP open_trade land here. A double-tap on the
         # Telegram button is the everyday version of the same bug.

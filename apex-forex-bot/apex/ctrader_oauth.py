@@ -71,14 +71,33 @@ def _record_pending(chat_id):
 
 
 def _recent_pending():
-    """Most recent chat_id that started authorization within the TTL, else None."""
+    """The pending chat_id, but ONLY when there is exactly one.
+
+    This used to return `max(fresh)` — the most recent of however many people
+    were mid-authorization. That is an account-linking bug, not a tie-break:
+    with two clients running /ctrader inside the same ten minutes, a callback
+    that arrives without a usable state binds one person's broker tokens to
+    the other person's Telegram chat. Whoever tapped /ctrader last wins, and
+    neither of them can tell it happened — the loser starts trading an account
+    that is not theirs.
+
+    Refusing an ambiguous callback costs the client one retry. Guessing costs
+    them somebody else's account, so ambiguity is resolved as failure. The
+    single-pending case keeps the original purpose intact: cTrader does not
+    reliably echo `state` back, and without this fallback onboarding breaks
+    for the one person who is actually authorizing.
+    """
     now = int(time.time())
     fresh = {c: t for c, t in _pending.items() if now - t <= _STATE_TTL}
     _pending.clear()
     _pending.update(fresh)
-    if not fresh:
+    if len(fresh) != 1:
+        if fresh:
+            print(f"[cTrader OAuth] callback without usable state and "
+                  f"{len(fresh)} authorizations pending — refusing to guess "
+                  f"which client it belongs to")
         return None
-    return max(fresh, key=fresh.get)
+    return next(iter(fresh))
 
 
 def _secret() -> bytes:

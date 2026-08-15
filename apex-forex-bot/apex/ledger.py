@@ -84,11 +84,19 @@ def _local_claim(rid, now):
 
 
 def claim(user_id, symbol, side, units, sl=None, tp=None,
-          window_s=DEFAULT_WINDOW_S, now=None):
+          window_s=DEFAULT_WINDOW_S, now=None, fail_closed=False):
     """Claim the right to send this order. Returns (ok, reason, request_id).
 
     ok=False means an identical order is already in flight or was just sent —
     the caller must NOT submit.
+
+    `fail_closed` overrides the module's default fail-open policy for the case
+    the policy was never meant to cover: a REAL-MONEY account whose shared
+    backend is unreachable. The docstring above argues, correctly, that halting
+    all trading on a Redis hiccup is its own denial of service — but that
+    argument is about a simulation losing a signal, not about a live account
+    opening a second position at double risk with no cross-container check
+    left standing. Demo keeps the permissive default; live fails closed.
     """
     now = time.time() if now is None else float(now)
     rid = request_id(user_id, symbol, side, units, sl, tp, window_s, now)
@@ -109,6 +117,13 @@ def claim(user_id, symbol, side, units, sl=None, tp=None,
             # No shared backend, or it errored. The in-process ledger still
             # catches a retry inside this container; cross-container duplicates
             # are not detectable in this mode and the caller is told so.
+            if fail_closed and shared_backed():
+                # Configured but unreachable, on a live account. There is no
+                # cross-container duplicate check left, so do not open a real
+                # position on trust. (A backend that is not configured at all
+                # is a different case: nothing to be unreachable, and the
+                # single-instance setup it implies has no second writer.)
+                return False, "COORDINATION_UNAVAILABLE", rid
             if not _local_claim(candidate, now):
                 return False, "DUPLICATE_ORDER_LOCAL", rid
             taken.append(candidate)
