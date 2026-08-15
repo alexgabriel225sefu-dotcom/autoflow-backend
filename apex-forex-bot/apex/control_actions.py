@@ -6,7 +6,7 @@ own module so control.py stays dependency-free; bot.py wires this in at startup.
 Read handlers are always available. Write handlers only actually run when
 MCP_CONTROL_ENABLED is set (enforced in control.py before dispatch).
 """
-from apex import user_store, user_loop
+from apex import automation, user_store, user_loop
 from apex import config as cfg
 
 # Settings the operator may change remotely — the Strategy-Builder / risk knobs.
@@ -48,6 +48,11 @@ _LIST_KEYS = {"autopilot_universe", "watchlist", "session_filter"}
 _INT_KEYS = {"min_confidence", "max_trades_day", "maxpos", "loss_streak"}
 _FLOAT_KEYS = {"risk", "sl_pips", "tp_pips", "leverage", "max_dd_pct",
                "max_daily_loss_pct", "breakeven_r"}
+# Keys whose value is one of a fixed set. Passing these through untyped is not
+# harmless: apex.automation.mode() falls back to the MOST PERMISSIVE level for
+# anything it does not recognise, so `automation=aproval` (typo) would have
+# stored fine and silently traded the account unattended.
+_ENUM_KEYS = {"automation": automation.MODES}
 
 _FALSEY = {"false", "0", "no", "off", "none", "null", ""}
 
@@ -76,6 +81,12 @@ def coerce_setting(key, val):
         return int(float(val))
     if key in _FLOAT_KEYS:
         return float(val)
+    if key in _ENUM_KEYS:
+        v = str(val).strip().lower()
+        if v not in _ENUM_KEYS[key]:
+            raise ValueError(
+                f"'{key}' must be one of {', '.join(_ENUM_KEYS[key])} (got {val!r})")
+        return v
     return val
 
 
@@ -90,6 +101,9 @@ def _summarize(uid):
         "symbol": dash.get("symbol") or u.get("symbol"),
         "strategy": u.get("strategy", "auto"),
         "autopilot": bool(u.get("autopilot")),
+        # Resolved, not raw: the operator needs to know what the loop will
+        # actually do, which is not always what either stored key says alone.
+        "automation": automation.mode(u),
         "balance": dash.get("balance"),
         "mode": dash.get("mode"),
         "broker": dash.get("broker"),
@@ -170,9 +184,30 @@ def build():
         if key not in _SETTABLE:
             raise ValueError(f"'{key}' is not remotely settable")
         val = coerce_setting(key, args["value"])
-        user_store.update(uid, {key: val})
+        # `automation` and `copilot` are two views of ONE setting, and mode()
+        # lets the boolean win when they disagree. So whichever half is
+        # written, write both — otherwise a stale counterpart quietly overrules
+        # the instruction just given, and user_detail reports one level while
+        # the loop runs another.
+        #
+        # The boolean cannot express `signals`, so `copilot=False` must NOT be
+        # read as "go full automation": on an account already set to Signals
+        # Only that would hand execution to the bot on a write that never
+        # mentioned execution. It means "not approval" — which of the two
+        # non-approval levels applies is whatever the account already had.
+        if key == "automation":
+            patch = automation.patch(val)
+        elif key == "copilot":
+            if val:
+                patch = automation.patch("approval")
+            else:
+                _cur = automation.mode(user_store.load(uid))
+                patch = automation.patch("signals" if _cur == "signals" else "full")
+        else:
+            patch = {key: val}
+        user_store.update(uid, patch)
         tg._restart_user_loop(uid)
-        return {"user": uid, "set": {key: val}, "running": user_loop.is_running(uid)}
+        return {"user": uid, "set": patch, "running": user_loop.is_running(uid)}
 
     def h_send_message(args):
         uid = str(args["user_id"])
