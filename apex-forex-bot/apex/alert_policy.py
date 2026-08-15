@@ -39,7 +39,11 @@ USEFUL = {
     "NEWS_WARN",                   # standing aside for a release
     "FLASH_WARN",                  # violent candle
     "BROKER_HEALTH",               # the broker feed is degraded
-    "SUGGEST",                     # copilot proposal awaiting approval
+    "SUGGEST",                     # approval-required proposal awaiting a tap
+    # Signals-Only: the bot found a setup and placed nothing. For a client on
+    # that level this message IS the product, so it must never be classed as
+    # a diagnostic — muting diagnostics would mute the whole service.
+    "SIGNAL",
 }
 
 DIAGNOSTIC = {

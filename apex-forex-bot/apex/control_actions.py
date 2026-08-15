@@ -17,6 +17,10 @@ _SETTABLE = {
     "max_trades_day", "max_dd_pct", "max_daily_loss_pct", "trailing",
     "breakeven_r", "news_filter", "session_filter", "exit_mode", "style",
     "atr_stops", "htf", "confirm", "maxpos", "copilot",
+    # The three-way automation level (signals / approval / full). `copilot`
+    # stays settable for anything that still speaks the old two-way boolean —
+    # apex.automation reconciles the pair, so setting either one is coherent.
+    "automation",
     # Risk-ladder state, not a strategy knob. Settable because a miscounted
     # streak silently quarters every position and there was no way to correct
     # it short of waiting for a winning trade — a duplicate-journaling bug once

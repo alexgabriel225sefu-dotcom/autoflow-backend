@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
 from apex import access, sentinel, institutional, cot, ledger
+from apex import automation
 from apex import strategy_api
 # Registering the shipped modules is what makes strategy_api.get() return
 # anything. Without this the registry is empty, every lookup misses, and the
@@ -2427,6 +2428,14 @@ def _loop(user_id, alert_fn, gen=None):
                 max_daily_loss_pct=getattr(cfg, "MAX_DAILY_LOSS_PCT", 3.0),
                 max_dd_pct=getattr(cfg, "MAX_DD_PCT", 20.0),
                 user_id=user_id, symbol=symbol)
+            # Publish the verdict for the UI. strategies.should_stop() advances
+            # the peak-balance and daily-reset state as a side effect, so the
+            # Telegram screens must NEVER call it themselves just to draw a
+            # badge — they read this instead. Observability only: nothing
+            # downstream branches on it.
+            dash["riskGuard"] = {"halted": bool(stop_check["stop"]),
+                                 "reasons": list(stop_check["reasons"]),
+                                 "ts": time.time()}
             if stop_check["stop"]:
                 print(f"[UserLoop:{user_id}] Strategy stop: {stop_check['reasons']}")
                 # Alert once on the edge into the stop, not every tick for the
@@ -2799,12 +2808,22 @@ def _loop(user_id, alert_fn, gen=None):
                         last_warn_tick = tick
                         alert_fn(user_id, {"action": "NEWS_WARN", "symbol": symbol, "event": ev})
 
-            # Copilot mode: propose the trade and wait for approval instead of
-            # auto-executing. Re-read the flag each time so /copilot takes effect
-            # without a restart (entry_ok is rare, so the extra load is cheap).
-            if entry_ok and user_store.load(user_id).get("copilot"):
-                _suggest_trade(user_id, signal, symbol, price, alert_fn)
-                entry_ok = False
+            # Automation level: how much this client lets the bot do alone.
+            # Re-read it each time so a change takes effect without a restart
+            # (entry_ok is rare, so the extra load is cheap).
+            #
+            # Both non-full levels REFUSE the entry — they can only ever stop
+            # an order that would otherwise have gone out, never cause one.
+            #   approval → propose it and wait for a tap  (the old copilot)
+            #   signals  → post the setup and place nothing at all
+            if entry_ok:
+                _auto = automation.mode(user_store.load(user_id))
+                if _auto == "approval":
+                    _suggest_trade(user_id, signal, symbol, price, alert_fn)
+                    entry_ok = False
+                elif _auto == "signals":
+                    _signal_only(user_id, signal, symbol, price, alert_fn)
+                    entry_ok = False
 
             # A shadow gate needs candidates, and every candidate was being
             # thrown away before it got one. The Sentinel and institutional
@@ -3637,6 +3656,36 @@ def _suggest_trade(user_id, signal, symbol, price, alert_fn):
                            "keyFactors": signal.get("keyFactors", [])})
 
 
+_SIGNAL_REPEAT_S = 300
+
+
+def _signal_only(user_id, signal, symbol, price, alert_fn):
+    """Signals-Only mode: report the setup and place NOTHING.
+
+    Deliberately not a copilot suggestion with the buttons removed. A pending
+    suggestion is a promise the bot will act when tapped; here there is nothing
+    to tap and nothing is stored to execute later, so the record must not grow
+    a `pending_suggestion` that a stale ✅ Approve button could still redeem.
+
+    Throttled per (symbol, side): a setup that stays valid re-qualifies on
+    every tick, and a client who asked for signals wants the setup once, not
+    once every five minutes for an hour.
+    """
+    side = signal.get("action")
+    now = time.time()
+    last = user_store.load(user_id).get("last_signal") or {}
+    if (last.get("symbol") == symbol and last.get("side") == side
+            and now - float(last.get("ts") or 0) < _SIGNAL_REPEAT_S):
+        return
+    user_store.update(user_id, {"last_signal": {"symbol": symbol, "side": side,
+                                                "ts": now}})
+    if alert_fn:
+        alert_fn(user_id, {"action": "SIGNAL", "symbol": symbol, "side": side,
+                           "price": price, "confidence": signal.get("confidence"),
+                           "reasoning": signal.get("reasoning", ""),
+                           "keyFactors": signal.get("keyFactors", [])})
+
+
 def pending_suggestion(user_id):
     """Return the user's pending copilot suggestion ({side,symbol,ts}) or None."""
     return user_store.load(str(user_id)).get("pending_suggestion")
@@ -3832,3 +3881,69 @@ def force_close(user_id):
     return {"ok": True, "symbol": sym, "price": price,
             "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
             "netPnl": round(net, 2)}
+
+
+def open_position_count(user_id):
+    """How many positions are open RIGHT NOW, or None when it cannot be known.
+
+    None is not zero. The emergency screen asks the client to confirm closing
+    "N positions", and printing 0 because the loop has not ticked yet — or
+    because the account is not the tracked one — would be a lie at the exact
+    moment it is most expensive. The caller shows "unknown" instead.
+    """
+    user_id = str(user_id)
+    with _lock:
+        dash = dict(_loops.get(user_id, {}).get("dash", {}))
+    if not dash:
+        return None
+    n = dash.get("openCount")
+    if isinstance(n, int):
+        return n
+    return 1 if dash.get("openPosition") else None
+
+
+def force_close_all(user_id):
+    """Close every open position on this account. The emergency stop.
+
+    Deliberately built on force_close() rather than a fresh order path: that
+    function already prices the exit off the broker's own fill, journals the
+    trade, corrects the balance and clears the persisted snapshot. A second
+    implementation would be a second set of those bugs.
+
+    force_close() only knows the ONE position the loop tracks, so anything
+    else on the account (multi-position mode, or a trade opened by hand in
+    cTrader) is swept afterwards through the broker's existing
+    close_position(). Failures are collected, never swallowed: a position the
+    bot could not close is the single most important thing to say back.
+    """
+    user_id = str(user_id)
+    closed, failed = [], []
+
+    first = force_close(user_id)
+    if first.get("ok"):
+        closed.append(first.get("symbol"))
+    elif "No open position" not in str(first.get("error", "")):
+        failed.append({"symbol": first.get("symbol"), "error": first.get("error")})
+
+    user = user_store.load(user_id)
+    broker, fcfg = _make_broker(user)
+    try:
+        remaining = broker.get_all_positions() or []
+    except Exception as e:
+        return {"ok": not failed, "closed": closed, "failed": failed,
+                "sweepError": str(e)[:160]}
+
+    for pos in remaining:
+        sym = pos.get("symbol")
+        if not sym or sym in closed:
+            continue
+        try:
+            res = broker.close_position(sym) or {}
+            if str(res.get("status")) in ("FILLED", "FLAT"):
+                closed.append(sym)
+            else:
+                failed.append({"symbol": sym, "error": str(res.get("reason") or res)[:120]})
+        except Exception as e:
+            failed.append({"symbol": sym, "error": str(e)[:120]})
+
+    return {"ok": not failed, "closed": closed, "failed": failed}
