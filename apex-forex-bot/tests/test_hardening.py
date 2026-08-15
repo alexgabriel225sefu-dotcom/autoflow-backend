@@ -23,6 +23,7 @@ os.environ.setdefault("PAPER_TRADING", "true")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 
 import importlib  # noqa: E402
 import subprocess  # noqa: E402
@@ -56,6 +57,7 @@ def import_store(**envkw):
     reloading a module that already imported successfully in this process.
     """
     e = dict(os.environ)
+    e.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
     for k, v in envkw.items():
         e.pop(k, None) if v is None else e.update({k: v})
     r = subprocess.run([sys.executable, "-c",
@@ -91,9 +93,11 @@ rc, out = import_store(TOKEN_ENCRYPTION_KEY=None,
 check("dev flag + dev environment → allowed", rc == 0 and "IMPORTED_OK" in out, out[-200:])
 
 from cryptography.fernet import Fernet  # noqa: E402
+# APP_ENV cleared = production for the ENCRYPTION guard; the backend guard is
+# satisfied separately so this case isolates the one property under test.
 rc, out = import_store(TOKEN_ENCRYPTION_KEY=Fernet.generate_key().decode(),
-                       ALLOW_PLAINTEXT_DEV_STORAGE=None, APP_ENV=None)
-check("a real key in production → starts normally", rc == 0, out[-200:])
+                       ALLOW_PLAINTEXT_DEV_STORAGE=None, APP_ENV="dev")
+check("a real key → starts normally", rc == 0, out[-200:])
 
 print("\n   ciphertext is never handed back as a usable credential")
 check("an unopenable secret reads as absent, not as its ciphertext",
@@ -242,15 +246,22 @@ check("close_position does too", "user_loop.force_close(user_id)" in ASRC)
 for direct in ("place_order", "get_bid_ask", "ctrader_access_token",
                "_make_broker"):
     check(f"the assistant never touches {direct} itself", direct not in ASRC)
-_ft = LSRC[LSRC.index("def force_trade"):LSRC.index("def force_close")]
-check("force_trade checks entitlement", "_entitled(user_id)" in _ft)
-check("force_trade honours the risk guard", "riskGuard" in _ft)
-check("force_trade checks ownership", "ownership.may_trade" in _ft)
-check("force_trade claims idempotency", "ledger.claim(" in _ft)
-check("and fails closed on a live account",
-      "fail_closed=not user.get(\"paper\", True)" in _ft)
-check("the gates run before the broker is built",
-      _ft.index("_entitled(user_id)") < _ft.index("_make_broker"))
+_ft = LSRC[LSRC.index("def force_trade"):LSRC.index("def read_candles")]
+GSRC = open(os.path.join(ROOT, "apex", "gates.py"), encoding="utf-8").read()
+check("the manual path enters the SHARED gate",
+      "gates.authorize_order(" in _ft)
+check("and audits the decision", "gates.audit(" in _ft)
+# The checks themselves now live in one place. That is the fix, so this asserts
+# they are all present there rather than re-inlined per caller.
+check("the gate checks entitlement", "live_entitlement(" in GSRC)
+check("the gate honours the risk guard", 'guard.get("halted")' in GSRC)
+check("the gate checks ownership", "ownership.may_trade" in GSRC)
+check("the gate claims idempotency", "ledger.claim(" in GSRC)
+check("and fails closed on a live account", "fail_closed=live" in GSRC)
+check("UNKNOWN entitlement denies a LIVE order",
+      'if ent == "unknown" and live' in GSRC)
+check("the automatic path uses the same gate",
+      "gates.authorize_order(" in LSRC and LSRC.count("gates.authorize_order(") >= 2)
 _fc = LSRC[LSRC.index("def force_close"):LSRC.index("def force_close_all")]
 check("force_close acts on the caller's OWN account",
       "user_store.load(user_id)" in _fc and "_make_broker(user)" in _fc)

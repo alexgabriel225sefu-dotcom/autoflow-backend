@@ -26,6 +26,7 @@ import tempfile
 os.environ.setdefault("PAPER_TRADING", "true")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 # A real key, so the round trip exercises encryption rather than skipping it.
 from cryptography.fernet import Fernet  # noqa: E402
 os.environ.setdefault("TOKEN_ENCRYPTION_KEY", Fernet.generate_key().decode())

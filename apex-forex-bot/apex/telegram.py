@@ -2614,6 +2614,34 @@ def _handle_copilot(chat_id, args):
 # short-lived token the user has to type back, after seeing the account and
 # the risk settings it will trade with.
 _LIVE_CONFIRM_TTL_S = 300
+
+
+def consume_live_confirm(chat_id, token) -> bool:
+    """Burn a live-activation token exactly once, atomically.
+
+    The check was read-then-write: read the stored token, compare, then clear
+    it. Two confirmations arriving together both read the same valid token,
+    both compare equal, and both activate — and the second one activates an
+    account whose risk cap the first had already applied.
+
+    SET NX on the token itself decides it in one step, in the shared store, so
+    two processes cannot both win. An unreachable store means we cannot prove
+    this token is unused, and an unprovable confirmation must not switch an
+    account to real money — so that is a refusal, not a fallback.
+    """
+    key = f"liveconfirm:{chat_id}:{token}"
+    got = user_store.claim(key, ttl_s=_LIVE_CONFIRM_TTL_S * 2)
+    if got is True:
+        return True
+    if got is False:
+        print(f"[LIVE] confirmation token for {chat_id} was already used")
+        return False
+    if getattr(user_store, "_USE_REDIS", False):
+        print(f"[LIVE] ⛔ cannot verify the confirmation token for {chat_id} — "
+              f"refusing to activate live trading on an unprovable confirmation")
+        return False
+    return True          # declared single-process development only
+
 # And it lands with a hard ceiling on risk-per-trade regardless of what the
 # account was configured with while it was only ever simulating.
 _LIVE_INITIAL_RISK_CAP = float(os.getenv("LIVE_INITIAL_RISK_CAP") or 0.01)
@@ -2662,7 +2690,8 @@ def _handle_paper(chat_id, args):
             fresh = (pending.get("token")
                      and time.time() - float(pending.get("ts") or 0) < _LIVE_CONFIRM_TTL_S)
             if not (fresh and supplied_token
-                    and secrets.compare_digest(supplied_token, str(pending["token"]))):
+                    and secrets.compare_digest(supplied_token, str(pending["token"]))
+                    and consume_live_confirm(chat_id, str(pending["token"]))):
                 token = "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
                                 for _ in range(6))
                 user_store.update(chat_id, {"live_confirm": {"token": token,

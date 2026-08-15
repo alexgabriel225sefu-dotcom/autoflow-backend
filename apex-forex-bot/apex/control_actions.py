@@ -13,7 +13,13 @@ from apex import config as cfg
 # Deliberately EXCLUDES tokens, account ids, license, and anything auth-related.
 _SETTABLE = {
     "strategy", "risk", "symbol", "autopilot", "autopilot_universe", "watchlist",
-    "timeframe", "sl_pips", "tp_pips", "leverage", "min_confidence", "paper",
+    "timeframe", "sl_pips", "tp_pips", "leverage", "min_confidence",
+    # "paper" is DELIBERATELY ABSENT. Setting it false is live activation, and
+    # the Telegram path that owns that transition also demands risk acceptance,
+    # a typed confirmation code and an initial risk cap. Exposing it here made
+    # a second activation route that skipped all three — one generic setter
+    # call and a demo client is trading real money. There is exactly one
+    # authoritative live-activation path, and it is not this one.
     "max_trades_day", "max_dd_pct", "max_daily_loss_pct", "trailing",
     "breakeven_r", "news_filter", "session_filter", "exit_mode", "style",
     "atr_stops", "htf", "confirm", "maxpos", "copilot",
@@ -43,7 +49,8 @@ _REDACT = {"ctrader_access_token", "ctrader_refresh_token",
 # which parse strings — they are typed here anyway so what is stored matches
 # what was meant.
 _BOOL_KEYS = {"autopilot", "paper", "trailing", "news_filter", "atr_stops",
-              "htf", "copilot"}
+              "htf", "copilot"}   # "paper" typed here only for legacy callers;
+                                  # it is not in _SETTABLE, so MCP cannot set it
 _LIST_KEYS = {"autopilot_universe", "watchlist", "session_filter"}
 _INT_KEYS = {"min_confidence", "max_trades_day", "maxpos", "loss_streak"}
 _FLOAT_KEYS = {"risk", "sl_pips", "tp_pips", "leverage", "max_dd_pct",
@@ -181,6 +188,11 @@ def build():
     def h_set_setting(args):
         uid = str(args["user_id"])
         key = str(args["key"])
+        if key == "paper":
+            raise ValueError(
+                "'paper' is not remotely settable. Switching to live money is "
+                "an activation, not a setting: it requires risk acceptance and "
+                "a typed confirmation from the account holder in Telegram.")
         if key not in _SETTABLE:
             raise ValueError(f"'{key}' is not remotely settable")
         val = coerce_setting(key, args["value"])

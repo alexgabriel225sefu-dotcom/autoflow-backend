@@ -22,7 +22,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # REFUSES to start without TOKEN_ENCRYPTION_KEY rather than falling back to
 # plaintext, and that refusal is the behaviour under test elsewhere.
 os.environ.setdefault("APP_ENV", "test")
+# The owner is CONFIGURED now, not hardcoded in access.py — that was
+# finding 3. This is the configuration the fix requires.
+os.environ.setdefault("ADMIN_CHAT_IDS", "7585109158")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-access-test-")
 os.environ.pop("UPSTASH_REDIS_REST_URL", None)
@@ -42,7 +46,7 @@ def check(name, cond, detail=""):
 
 
 CLIENT = "8963896517"       # the chat from the screenshot
-OWNER = "7585109158"        # hardcoded admin
+OWNER = "7585109158"        # admin via ADMIN_CHAT_IDS, set above
 STRANGER = "1111111111"
 
 # Keep the real store out of this; drive access through a stub we control.
@@ -63,12 +67,12 @@ print("\n── allowed_state gives the three-way answer is_allowed cannot ─�
 _state["allowed"] = [CLIENT]
 check("granted client → allowed", access.allowed_state(CLIENT) == "allowed")
 check("stranger → denied", access.allowed_state(STRANGER) == "denied")
-check("hardcoded owner → allowed", access.allowed_state(OWNER) == "allowed")
+check("configured owner → allowed", access.allowed_state(OWNER) == "allowed")
 _degraded["on"] = True
 check("store unreachable → unknown, NOT denied",
       access.allowed_state(CLIENT) == "unknown",
       access.allowed_state(CLIENT))
-check("owner still allowed with the store down (never depends on it)",
+check("configured owner still allowed with the store down",
       access.allowed_state(OWNER) == "allowed")
 _degraded["on"] = False
 

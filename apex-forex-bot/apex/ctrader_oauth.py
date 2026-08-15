@@ -133,27 +133,47 @@ _used_states = {}          # state -> ts, for the no-Redis single-instance case
 
 
 def _consume_state(state) -> bool:
-    """Redeem a state exactly once. False means it was already used.
+    """Redeem a state exactly once. False means it was already used — or that
+    we could not establish that it wasn't.
 
-    Claimed atomically in Redis so a replay cannot be processed twice by two
-    containers, with an in-process set as the fallback when there is no shared
-    backend. A claim that cannot be reached at all (returns None) is allowed
-    through: refusing would mean a Redis outage blocks every new client from
-    connecting a broker, and the signature and TTL checks still stand.
+    Replay protection has to be AUTHORITATIVE, which means shared. The previous
+    version fell back to an in-process set when the claim could not be made,
+    and that set cannot see another container: instance A consumes the state,
+    Redis blips, instance B receives the same signed state and its own memory
+    says nothing about it. The state is accepted twice, and the second
+    acceptance links a broker account.
+
+    So an unavailable claim is now a REJECTION, not a fallback. The cost is
+    that a client authorizing during a Redis outage must retry; the cost of the
+    alternative is a broker account bound twice.
+
+    The in-process set remains only for the declared local-development case,
+    where there is exactly one process and nothing to disagree with it.
     """
     from apex import user_store
     h = hashlib.sha256(str(state).encode()).hexdigest()[:32]
     got = user_store.claim(f"oauth:state:{h}", ttl_s=_STATE_TTL * 2)
     if got is False:
         return False
-    if got is None:
-        now = int(time.time())
-        for k, t in list(_used_states.items()):
-            if now - t > _STATE_TTL * 2:
-                _used_states.pop(k, None)
-        if h in _used_states:
-            return False
-        _used_states[h] = now
+    if got is True:
+        return True
+
+    # got is None: no shared backend, or it errored.
+    if getattr(user_store, "_USE_REDIS", False):
+        print("[cTrader OAuth] ⛔ replay protection unavailable — REJECTING the "
+              "callback. A state that cannot be proven unused must not link an "
+              "account.")
+        return False
+    # Single-process development only. user_store refuses to start without a
+    # shared backend unless ALLOW_LOCAL_BACKEND_DEV was declared, so reaching
+    # here means there is genuinely only one process.
+    now = int(time.time())
+    for k, t in list(_used_states.items()):
+        if now - t > _STATE_TTL * 2:
+            _used_states.pop(k, None)
+    if h in _used_states:
+        return False
+    _used_states[h] = now
     return True
 
 

@@ -7,6 +7,7 @@ Triple-backend (first match wins):
 """
 import json
 import os
+import time
 from urllib.parse import quote as _quote
 
 import requests as _req
@@ -200,6 +201,91 @@ if _BACKEND == "none":
     print("[Store] Using local JSON files (no Redis configured)")
 
 _USE_REDIS = _BACKEND in ("redis", "upstash")
+
+# ─── Production requires a SHARED backend ─────────────────
+# The local JSON fallback is genuinely useful for development and genuinely
+# dangerous in production, and the danger is not obvious: it engages silently.
+# REDIS_URL set but unreachable at import fell through to Upstash, and with
+# neither configured the process kept running on local files. On Render that
+# means instance A and instance B each have their own idea of who is entitled,
+# who owns which user, and which orders have been claimed — with no error
+# anywhere, because from each process's point of view the store works.
+#
+# So: development mode is DECLARED, never inferred. "Redis failed" is not
+# evidence that this is a laptop.
+class SharedBackendRequired(RuntimeError):
+    """Production needs one shared source of truth, and does not have one."""
+
+
+def _local_backend_allowed() -> bool:
+    flag = (os.getenv("ALLOW_LOCAL_BACKEND_DEV") or "").strip().lower()
+    return flag in ("1", "true", "yes", "on") and not _is_production()
+
+
+if not _USE_REDIS and not _local_backend_allowed():
+    raise SharedBackendRequired(
+        "No shared Redis backend is available and this is not a declared "
+        "development environment, so startup is refused.\n"
+        f"  REDIS_URL configured: {bool(_REDIS_URL)}\n"
+        f"  Upstash configured:   {bool(_UPD_URL and _UPD_TOKEN)}\n"
+        "A local JSON store cannot be shared between instances: entitlement, "
+        "ownership and order idempotency would each be per-container, which is "
+        "worse than having none of them. Fix the backend, or for local "
+        "development set ALLOW_LOCAL_BACKEND_DEV=true together with APP_ENV=dev."
+    )
+if not _USE_REDIS:
+    print("[Store] ⚠️  local JSON backend — DEVELOPMENT ONLY. Ownership, "
+          "entitlement and order idempotency are per-process and do not "
+          "coordinate with any other instance.")
+
+
+# ─── Runtime health ───────────────────────────────────────
+# `_USE_REDIS` answers "was a backend configured", which is not the question a
+# health check asks. A backend that was reachable at import and died at 03:00
+# still reads True, so a health screen built on it reports HEALTHY through an
+# outage. This performs a real, bounded, non-destructive round trip.
+_health = {"last_success": None, "failures": 0, "last_error": ""}
+
+
+def redis_health(timeout_s=3.0):
+    """A real connectivity probe. Never writes anything a caller depends on."""
+    out = {"configured": bool(_USE_REDIS), "backend": _BACKEND,
+           "reachable": False, "latency_ms": None,
+           "last_success": _health["last_success"],
+           "failure_count": _health["failures"]}
+    if not _USE_REDIS:
+        out["status"] = "NOT_CONFIGURED"
+        return out
+    key = f"{_NS}:health:probe"
+    t0 = time.time()
+    try:
+        if _BACKEND == "redis":
+            _r.set(key, str(int(t0)), ex=30)
+            got = _r.get(key)
+        else:
+            _upstash(["SET", key, str(int(t0)), "EX", 30])
+            got = _upstash(["GET", key])
+        ms = int((time.time() - t0) * 1000)
+        if got is None:
+            raise RuntimeError("probe write/read returned nothing")
+        _health["last_success"] = int(time.time())
+        _health["failures"] = 0
+        out.update(reachable=True, latency_ms=ms,
+                   last_success=_health["last_success"], failure_count=0)
+        # Slow is not the same as down, and calling it HEALTHY hides the
+        # condition that precedes an outage.
+        out["status"] = "HEALTHY" if ms < int(timeout_s * 1000) else "DEGRADED"
+        if out["status"] == "DEGRADED":
+            out["detail"] = f"round trip {ms}ms exceeds {int(timeout_s * 1000)}ms"
+        return out
+    except Exception as e:
+        _health["failures"] += 1
+        _health["last_error"] = str(e)[:160]
+        out.update(reachable=False, status="DOWN",
+                   failure_count=_health["failures"],
+                   detail=_health["last_error"])
+        return out
+
 
 _NS = os.getenv("PRODUCT", "").strip().lower()
 if not _NS:

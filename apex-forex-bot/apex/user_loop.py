@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
 from apex import access, sentinel, institutional, cot, ledger
-from apex import automation, ownership
+from apex import automation, gates, ownership
 from apex import strategy_api
 # Registering the shipped modules is what makes strategy_api.get() return
 # anything. Without this the registry is empty, every lookup misses, and the
@@ -3224,52 +3224,27 @@ def _loop(user_id, alert_fn, gen=None):
                         # an unreadable lease counts as NOT owned: a second
                         # container managing the same positions is worse than
                         # a missed entry.
-                        _live_acct = not user_store.load(user_id).get("paper", True)
-                        _own_ok, _own_why = ownership.may_trade(
-                            user_id, live=_live_acct)
-                        # Entitlement, re-checked at the order gate rather than
-                        # only by the 180s watchdog sweep. A refund or a revoked
-                        # grant left up to three minutes in which the loop could
-                        # still open a NEW position; closing that window here
-                        # costs one cached lookup. Existing positions stay
-                        # managed either way — this blocks entries, it does not
-                        # abandon what is already open.
-                        if _own_ok and not _entitled(user_id):
-                            _own_ok, _own_why = False, "NOT_ENTITLED"
-                        if not _own_ok:
+                        # The automatic path uses the SAME gate as manual, AI
+                        # and control-plane orders. One definition of a safe
+                        # order, entered from four places.
+                        _decision, _rid = gates.authorize_order(
+                            user_id, symbol=symbol, side=action, units=units,
+                            sl=sl_price, tp=tp_price, origin="signal",
+                            dash=dash)
+                        gates.audit(user_id, f"{action} {symbol}", _decision,
+                                    origin="signal", rid=_rid)
+                        if not _decision:
                             order_ok = False
                             print(f"[UserLoop:{user_id}] BLOCKED {action} {symbol}: "
-                                  f"{_own_why} — this instance does not own the account")
-                            _skip(f"not the owning instance ({_own_why})")
+                                  f"{_decision.reason} — {_decision.detail}")
+                            _skip(f"{_decision.reason}")
                             if alert_fn:
                                 alert_fn(user_id, {
-                                    "action": "OWNERSHIP_BLOCKED", "symbol": symbol,
-                                    "side": action, "units": units,
-                                    "reason": _own_why})
-                        # Idempotency claim: the last thing between an intent
-                        # and a real position. Two Render instances overlap
-                        # during a deploy and both drive this account, so the
-                        # loop's generation token — which only sees threads in
-                        # THIS process — cannot prevent a double entry.
-                        # Not reached when ownership already refused: claiming
-                        # an id we will not use would block the real owner.
-                        _claim_ok, _claim_why, _rid = (
-                            ledger.claim(user_id, symbol, action, units,
-                                         sl_price, tp_price,
-                                         fail_closed=_live_acct)
-                            if _own_ok else (False, _own_why, None))
-                        if not _own_ok:
-                            pass                    # already reported above
-                        elif not _claim_ok:
-                            order_ok = False
-                            print(f"[UserLoop:{user_id}] BLOCKED {action} {symbol}: "
-                                  f"{_claim_why} — an identical order was just sent")
-                            _skip(f"duplicate order blocked ({_claim_why})")
-                            if alert_fn:
-                                alert_fn(user_id, {
-                                    "action": "DUPLICATE_BLOCKED", "symbol": symbol,
-                                    "side": action, "units": units,
-                                    "reason": _claim_why})
+                                    "action": ("DUPLICATE_BLOCKED"
+                                               if "DUPLICATE" in _decision.reason
+                                               else "OWNERSHIP_BLOCKED"),
+                                    "symbol": symbol, "side": action,
+                                    "units": units, "reason": _decision.reason})
                         else:
                             try:
                                 _order_res = broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
@@ -3788,19 +3763,11 @@ def force_trade(user_id, side, symbol=None, lots=None):
     user_id = str(user_id)
     user = user_store.load(user_id)
 
-    # The same gates the automatic path passes, in the same order. This is the
-    # entry point for the AI assistant, /buy and /sell, and the control plane's
-    # force_trade — three callers that all reached the broker without the
-    # entitlement and risk checks the trading loop applies to every signal. An
-    # order placed here is indistinguishable from one the strategy produced, so
-    # it has to clear the same bar.
-    if not _entitled(user_id):
-        return {"ok": False, "error": "not entitled — no access grant or licence on file"}
-    _guard = (get_dash(user_id) or {}).get("riskGuard")
-    if isinstance(_guard, dict) and _guard.get("halted"):
-        _why = "; ".join(str(r) for r in (_guard.get("reasons") or [])) or "risk limit hit"
-        return {"ok": False, "error": f"risk guard is holding: {_why}"}
-
+    # Every order origin converges here, on the same financial safety layer the
+    # automatic path uses. Manual trades do not have to invent a strategy
+    # signal — but they do have to clear the same entitlement, risk, ownership
+    # and idempotency checks, because an order is an order whoever asked.
+    # (Sizing happens below; the gate is re-entered with the real units.)
     broker, cfg = _make_broker(user)
     sym = (symbol or cfg.SYMBOL).upper()
     if getattr(cfg, "PRODUCT", "forex") == "crypto":
@@ -3875,9 +3842,11 @@ def force_trade(user_id, side, symbol=None, lots=None):
         print(f"[UserLoop:{user_id}] manual {side} {sym} refused: {_own_why}")
         return {"ok": False, "error": f"not the owning instance ({_own_why})"}
 
-    _claim_ok, _claim_why, _rid = ledger.claim(
-        user_id, sym, side, units, sl_price, tp_price,
-        fail_closed=not user.get("paper", True))
+    _decision, _rid = gates.authorize_order(
+        user_id, symbol=sym, side=side, units=units, sl=sl_price, tp=tp_price,
+        origin="manual", user=user)
+    gates.audit(user_id, f"{side} {sym}", _decision, origin="manual", rid=_rid)
+    _claim_ok, _claim_why = _decision.allowed, _decision.reason
     if not _claim_ok:
         # Manual /buy and the MCP open_trade land here. A double-tap on the
         # Telegram button is the everyday version of the same bug.
@@ -3938,17 +3907,37 @@ def read_candles(user_id, symbol=None, count=50, timeframe=None):
         return []
 
 
-def force_close(user_id):
-    """Close the open position immediately (called from AI assistant or /close command)."""
+def force_close(user_id, origin="manual", emergency=False):
+    """Close the open position immediately (AI assistant, /close, control plane).
+
+    Routed through gates.authorize_close so every close origin gets the same
+    controls. Before this it reached the broker with none: a non-owning
+    instance could close a position the owner was managing, and a timed-out
+    close could be retried into closing a position that had been reopened in
+    between — the response was lost, not the execution.
+
+    `emergency=True` is a deliberate, audited override of the ownership check
+    for the operator's emergency path. It does not remove idempotency.
+    """
     user_id = str(user_id)
     user = user_store.load(user_id)
-    broker, cfg = _make_broker(user)
 
     with _lock:
         dash = _loops.get(user_id, {}).get("dash", {})
     open_pos = dash.get("openPosition")
     if not open_pos:
         return {"ok": False, "error": "No open position to close"}
+
+    _decision, _close_rid = gates.authorize_close(
+        user_id, position_id=open_pos.get("positionId"),
+        symbol=open_pos.get("symbol"), origin=origin, user=user,
+        emergency=emergency)
+    gates.audit(user_id, "CLOSE", _decision, origin=origin, rid=_close_rid)
+    if not _decision:
+        return {"ok": False, "error": _decision.reason,
+                "detail": _decision.detail}
+
+    broker, cfg = _make_broker(user)
 
     sym = open_pos.get("symbol", cfg.SYMBOL)
     try:
@@ -3960,7 +3949,14 @@ def force_close(user_id):
     try:
         _close_res = broker.close_position(sym)
     except Exception as e:
+        # The claim STANDS. A close that raised may still have reached the
+        # broker, and retrying it seconds later can close a position that was
+        # reopened in between. The next tick re-reads the broker and settles it.
         return {"ok": False, "error": str(e)}
+    # Record the outcome against the intent, so a duplicate request is answered
+    # with what actually happened instead of a bare refusal the caller might
+    # respond to by trying again.
+    ledger.record(_close_rid, {"closed": True, "symbol": sym})
     _persist_open_position(user_id, cfg, None)
     # Prefer the broker's actual fill price over the last fetched candle —
     # the candle close is a stale proxy and can diverge from the real

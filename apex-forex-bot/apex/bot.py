@@ -533,6 +533,28 @@ def _start_dashboard_server():
 def main():
     global start_balance, paper_balance, open_position, broker
     print(f"[{getattr(cfg, 'BOT_NAME', 'Apex Forex Bot').upper()}] Starting... Python {sys.version.split()[0]}")
+
+    # Privileged operator configuration. The admin id used to be a constant in
+    # access.py, which meant the repository carried a privileged identity and
+    # changing the operator needed a deploy. It now comes from ADMIN_CHAT_IDS /
+    # ADMIN_CHAT_ID / TELEGRAM_CHAT_ID.
+    #
+    # This WARNS rather than refusing to start, and the asymmetry is deliberate:
+    # a bot with no configured admin is recoverable — the first /start claims
+    # ownership through the existing bootstrap — while a bot that refuses to
+    # boot over a missing variable is not recoverable from Telegram at all. The
+    # count is printed, never the ids.
+    try:
+        from apex import access as _access
+        _n = len(_access._env_admins())
+        if _n:
+            print(f"[Bot] {_n} privileged operator(s) configured")
+        else:
+            print("[Bot] ⚠️  NO ADMIN CONFIGURED — set ADMIN_CHAT_IDS to your "
+                  "Telegram chat id. Until then nobody is an operator and the "
+                  "first /start will claim ownership.")
+    except Exception as e:
+        print(f"[Bot] could not check operator configuration: {e}")
     load_remote()           # config saved in the configurator (broker keys, env, risk)
     _load_runtime_config()  # Telegram-saved overrides take precedence
     broker = get_broker()   # re-init with the now-loaded settings

@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # plaintext, and that refusal is the behaviour under test elsewhere.
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 
 SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         "apex", "ctrader_oauth.py")).read()

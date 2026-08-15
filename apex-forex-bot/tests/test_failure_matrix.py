@@ -29,6 +29,7 @@ os.environ.setdefault("PAPER_TRADING", "true")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 
 from apex import (control, ctrader_oauth as oauth, ledger, ops_api,  # noqa: E402
                   ownership, user_loop, user_store)
@@ -337,12 +338,19 @@ finally:
 print("\nAI assistant")
 ASRC = open(os.path.join(ROOT, "apex", "assistant.py"), encoding="utf-8").read()
 _ft = LSRC[LSRC.index("def force_trade"):LSRC.index("def read_candles")]
+GSRC = open(os.path.join(ROOT, "apex", "gates.py"), encoding="utf-8").read()
 row("AI trade request → goes through user_loop, not the broker",
     "user_loop.force_trade(user_id" in ASRC and "place_order" not in ASRC)
 row("AI close request → same", "user_loop.force_close(user_id)" in ASRC)
 row("AI has no broker credential path", "ctrader_access_token" not in ASRC)
-for gate in ("_entitled(user_id)", "riskGuard", "ownership.may_trade", "ledger.claim("):
-    row(f"AI trade passes {gate}", gate in _ft)
+# The checks are centralised in apex/gates.py — one definition entered from
+# four origins, rather than four copies that drift.
+row("AI/manual trade enters the SHARED gate", "gates.authorize_order(" in _ft)
+for gate, where in (("entitlement", "live_entitlement("),
+                    ("risk guard", 'guard.get("halted")'),
+                    ("ownership", "ownership.may_trade"),
+                    ("idempotency", "ledger.claim(")):
+    row(f"the shared gate enforces {gate}", where in GSRC)
 
 # ── ops reporting ────────────────────────────────────────
 print("\nops reporting")
@@ -401,12 +409,16 @@ for _f in sorted(_glob.glob(os.path.join(ROOT, "apex", "*.py"))):
 row("no module outside the trading core imports a broker directly",
     _offenders == [], _offenders)
 
-for _gate, _where in (("license", "_entitled"), ("risk", "riskGuard"),
+for _gate, _where in (("license", "live_entitlement("), ("risk", 'guard.get("halted")'),
                       ("ownership", "ownership.may_trade"),
                       ("idempotency", "ledger.claim(")):
-    row(f"the {_gate} gate is on the single order path", _where in _ft)
+    row(f"the {_gate} gate lives in the single shared gate", _where in GSRC)
 row("and there is only ONE manual order path",
     LSRC.count("def force_trade") == 1)
+row("every order origin enters that gate",
+    LSRC.count("gates.authorize_order(") >= 2)
+row("every close origin enters the close gate",
+    "gates.authorize_close(" in LSRC)
 # The token NAME appears in ops_api — as a presence check, `if not
 # u.get("ctrader_access_token")`, which is how "is a broker connected" is
 # answered. What must never happen is the VALUE being bound or returned, so
