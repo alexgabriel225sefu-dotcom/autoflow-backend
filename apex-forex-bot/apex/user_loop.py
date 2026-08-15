@@ -3891,9 +3891,7 @@ def open_position_count(user_id):
     because the account is not the tracked one — would be a lie at the exact
     moment it is most expensive. The caller shows "unknown" instead.
     """
-    user_id = str(user_id)
-    with _lock:
-        dash = dict(_loops.get(user_id, {}).get("dash", {}))
+    dash = get_dash(user_id) or {}
     if not dash:
         return None
     n = dash.get("openCount")
