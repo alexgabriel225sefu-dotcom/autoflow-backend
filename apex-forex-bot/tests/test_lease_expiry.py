@@ -207,6 +207,41 @@ finally:
     ownership.RENEW_EVERY_S = _real
     restore()
 
+
+print("\n6. Shutdown hands the leases back")
+# Observed on the 17:07 deploy: the retiring container kept its lease, and the
+# incoming one — correctly refusing to trade a user it did not own — sat idle
+# until the TTL expired. Releasing on SIGTERM turns that wait into seconds.
+try:
+    fake = Fake()
+    install(fake)
+    ownership.acquire("s1")
+    ownership.acquire("s2")
+    check("two leases held", len([k for k in fake.kv if k.startswith("own:user:")]) == 2,
+          fake.kv)
+    freed = ownership.release_all()
+    check("both are handed back", freed == 2, freed)
+    check("and the keys are actually gone",
+          not [k for k in fake.kv if k.startswith("own:user:")], fake.kv)
+    check("so a replacement can take over immediately",
+          ownership.acquire("s1") is True)
+
+    # A store that cannot be reached must not hang or crash the shutdown.
+    fake.down = True
+    ownership.acquire("s3")
+    try:
+        ownership.release_all()
+        check("a failing release does not break shutdown", True)
+    except Exception as e:
+        check("a failing release does not break shutdown", False, e)
+finally:
+    restore()
+
+BOT = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "apex", "bot.py"), encoding="utf-8").read()
+check("SIGTERM is handled", "signal.SIGTERM" in BOT or "_signal.SIGTERM" in BOT)
+check("and it releases the leases", "release_all()" in BOT)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")

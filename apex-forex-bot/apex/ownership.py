@@ -285,3 +285,31 @@ def release(user_id):
     if not shared_backed():
         return None
     return user_store.release_claim(_key(user_id), INSTANCE_ID)
+
+
+def release_all():
+    """Hand back every lease this process holds. For shutdown.
+
+    Render terminates the old container on every deploy, and nothing released
+    its leases — so the replacement, which correctly stood down behind a lease
+    it did not own, then had to wait out the full TTL before it could take
+    over. Observed on the 17:07 deploy: the new instance stood down at 17:09
+    behind a lease held by an instance Render was already draining.
+
+    Releasing on SIGTERM turns that wait into seconds. It is best-effort by
+    design: a shutdown that hangs trying to reach Redis is worse than a lease
+    that expires on its own, so every failure is swallowed after being logged.
+    """
+    with _lock:
+        held = list(_held.keys()) + list(_renewers.keys())
+        _renewers.clear()
+    freed = 0
+    for uid in dict.fromkeys(held):
+        try:
+            if release(uid):
+                freed += 1
+        except Exception as e:
+            print(f"[Ownership] could not release {uid} on shutdown: {e}")
+    if held:
+        print(f"[Ownership] released {freed}/{len(set(held))} lease(s) on shutdown")
+    return freed

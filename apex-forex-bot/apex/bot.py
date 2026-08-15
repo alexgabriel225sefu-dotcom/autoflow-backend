@@ -544,6 +544,27 @@ def main():
     # ownership through the existing bootstrap — while a bot that refuses to
     # boot over a missing variable is not recoverable from Telegram at all. The
     # count is printed, never the ids.
+    # Give leases back when the platform stops us. Without this, Render's
+    # deploy left the retiring container's leases held for their full TTL and
+    # the incoming container — which correctly refuses to trade a user it does
+    # not own — sat idle waiting for them to expire.
+    try:
+        import signal as _signal
+
+        def _graceful(signum, _frame):
+            print(f"[Bot] signal {signum} — releasing ownership leases")
+            try:
+                from apex import ownership as _own
+                _own.release_all()
+            except Exception as e:
+                print(f"[Bot] lease release on shutdown failed: {e}")
+            raise SystemExit(0)
+
+        for _sig in (_signal.SIGTERM, _signal.SIGINT):
+            _signal.signal(_sig, _graceful)
+    except Exception as e:
+        print(f"[Bot] could not install shutdown handler: {e}")
+
     try:
         from apex import access as _access
         _n = len(_access._env_admins())
