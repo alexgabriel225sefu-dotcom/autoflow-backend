@@ -382,11 +382,18 @@ def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None) -> 
     return "⚠️ Could not complete the request. Please try again."
 
 
-def _chat_groq(user_id: str, message: str, api_key: str = "") -> str:
+def _chat_openai_compatible(user_id, message, *, url, key, model, label,
+                            timeout=15) -> str:
+    """One chat turn against any OpenAI-compatible /chat/completions endpoint.
+
+    Groq speaks this, and so does OmniRoute — which is the whole point of
+    putting a gateway in front: it is the same wire format, so adding it costs
+    a URL rather than a second copy of this function. A near-duplicate is how
+    /ctaccount ended up with three formatters that slowly disagreed.
+    """
     import requests
-    key = api_key or cfg.GROQ_API_KEY
-    if not key:
-        raise _ProviderDown("no groq key")
+    if not url:
+        raise _ProviderDown(f"no {label} url")
 
     context = _build_context(user_id)
     system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
@@ -395,16 +402,18 @@ def _chat_groq(user_id: str, message: str, api_key: str = "") -> str:
     history.append({"role": "user", "content": message})
     messages = [{"role": "system", "content": system}] + history[-chat_memory.MAX_HISTORY:]
 
+    headers = {"Content-Type": "application/json"}
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
     try:
         r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={"model": "llama-3.3-70b-versatile", "messages": messages,
+            url,
+            json={"model": model, "messages": messages,
                   "max_tokens": 400, "temperature": 0.3},
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            timeout=15,
+            headers=headers, timeout=timeout,
         )
         if r.status_code == 429:
-            raise _ProviderDown("groq quota")
+            raise _ProviderDown(f"{label} quota")
         r.raise_for_status()
         reply = r.json()["choices"][0]["message"]["content"].strip()
         _save_exchange(user_id, message, reply)
@@ -412,7 +421,36 @@ def _chat_groq(user_id: str, message: str, api_key: str = "") -> str:
     except _ProviderDown:
         raise
     except Exception as e:
-        raise _ProviderDown(f"groq {e}")
+        raise _ProviderDown(f"{label} {e}")
+
+
+def _chat_groq(user_id: str, message: str, api_key: str = "") -> str:
+    key = api_key or cfg.GROQ_API_KEY
+    if not key:
+        raise _ProviderDown("no groq key")
+    return _chat_openai_compatible(
+        user_id, message,
+        url="https://api.groq.com/openai/v1/chat/completions",
+        key=key, model="llama-3.3-70b-versatile", label="groq")
+
+
+def _chat_gateway(user_id: str, message: str) -> str:
+    """OmniRoute (or any OpenAI-compatible gateway) in front of everything else.
+
+    It fans one request out across hundreds of providers and re-routes on a
+    quota or an outage, which is the problem this bot actually has: every
+    client shares one Groq key, and the trading signal draws on the same quota.
+
+    The longer timeout is deliberate. On Render's free plan the gateway sleeps
+    after fifteen idle minutes and a cold start takes most of a minute — but a
+    failure here is not a failure for the client, it just falls through to
+    Gemini while the gateway wakes up behind them.
+    """
+    return _chat_openai_compatible(
+        user_id, message,
+        url=cfg.AI_GATEWAY_URL, key=cfg.AI_GATEWAY_KEY,
+        model=cfg.AI_GATEWAY_MODEL, label="gateway",
+        timeout=float(getattr(cfg, "AI_GATEWAY_TIMEOUT_S", 20)))
 
 
 def _local_status(user_id: str) -> str:
@@ -477,6 +515,12 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
             groq_key = u.get("groq_key") or cfg.GROQ_API_KEY
 
             chain = []
+            # The gateway goes first when configured: it is the only link that
+            # can survive one provider's quota without the client noticing.
+            # Everything below it stays as the backstop, so a gateway that is
+            # down, cold or misconfigured costs a few seconds, never an answer.
+            if cfg.AI_GATEWAY_URL:
+                chain.append(("Gateway", lambda: _chat_gateway(user_id, message)))
             if gemini_key:
                 chain.append(("Gemini", lambda: _chat_gemini(user_id, message, gemini_key, send_status)))
             if groq_key:

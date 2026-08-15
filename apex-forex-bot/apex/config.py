@@ -66,6 +66,17 @@ METAAPI_ACCOUNT_ID = os.getenv("METAAPI_ACCOUNT_ID", "")
 # ─── AI providers ───────────────────────────────────────
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+# ── AI gateway (OmniRoute or any OpenAI-compatible router) ──
+# One endpoint in front of many providers, so a single quota is no longer the
+# ceiling: every client shares one Groq key today, and the trading signal
+# draws on that same quota. Unset = the chain behaves exactly as before.
+AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "").strip()
+AI_GATEWAY_KEY = os.getenv("AI_GATEWAY_KEY", "").strip()
+AI_GATEWAY_MODEL = os.getenv("AI_GATEWAY_MODEL", "").strip() or "auto"
+# Generous: on a free-tier host the gateway sleeps and a cold start eats most
+# of a minute. Falling through to Gemini meanwhile is the designed behaviour.
+AI_GATEWAY_TIMEOUT_S = float(os.getenv("AI_GATEWAY_TIMEOUT_S", "20"))
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # ─── Telegram ───────────────────────────────────────────
