@@ -196,6 +196,29 @@ _CONFIRM_LABEL = {"price": "Price action", "indicator": "Indicators",
                   "volume": "Volume + volatility", "mtf": "Multi-timeframe"}
 
 
+def _strategy_label(key):
+    """Display name for any strategy, V1 or later.
+
+    STRATEGY_MODES only describes the ten methods with an engine in ai.py, and
+    `.get(key, STRATEGY_MODES['auto'])` therefore reported *Auto* for every
+    method added after V1 — so a client who had just picked Momentum read back
+    a summary saying the bot would choose for them. Same class of bug as the
+    one /status had. Ask the registry, which knows all of them.
+    """
+    k = (key or "auto").lower()
+    m = ai.STRATEGY_MODES.get(k)
+    if m:
+        return m["label"]
+    try:
+        from apex import strategy_api
+        cls = strategy_api._REGISTRY.get(k)
+        if cls:
+            return getattr(cls, "label", k)
+    except Exception:
+        pass
+    return k
+
+
 def summary(d):
     """Human-readable recap of a composed strategy (dict of fields)."""
     market = "Crypto" if _is_crypto() else "Forex"
@@ -206,7 +229,7 @@ def summary(d):
         f"📋 <b>Your strategy — {market}</b>",
         "━━━━━━━━━━━━━━━━━━━━",
         f"• Style: <b>{(d.get('style') or 'swing').title()}</b> · {d.get('timeframe', '5m')}",
-        f"• Entry setup: <b>{ai.STRATEGY_MODES.get((d.get('strategy') or 'auto').lower(), ai.STRATEGY_MODES['auto'])['label']}</b>",
+        f"• Entry setup: <b>{_strategy_label(d.get('strategy'))}</b>",
         f"• Confirmation: <b>{_CONFIRM_LABEL.get(d.get('confirm', 'indicator'), 'Indicators')}</b>",
         f"• Risk: <b>{risk_pct:g}%</b> per trade",
         f"• Exit: <b>{_EXIT_LABEL.get(d.get('exit_mode', 'fixed'), 'Fixed TP/SL')}</b>",

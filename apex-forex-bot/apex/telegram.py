@@ -1566,8 +1566,183 @@ def reconnect_summary(user, header):
             "Nothing was reset. Send /settings to change anything.")
 
 
+# ─── Onboarding ───────────────────────────────────────────
+#
+# One wizard, five steps, numbered the same way the whole distance. It used to
+# announce "Setup 1/2" and then "Setup 2/2" and then ask three more questions,
+# which tells a new client on their first minute with the product that the
+# counter cannot be trusted.
+#
+# The five steps are the five decisions, in the order they have to be made:
+#
+#   1  Account Mode     demo or real money
+#   2  Connect cTrader  the broker account itself
+#   3  Trading Style    how fast it trades (timeframe + stop scale)
+#   4  Trading Method   what it looks for, and on what
+#   5  Risk             how much of the balance one loss may cost
+#
+# It resumes rather than restarts. Every step knows whether it is already
+# satisfied, so a client arriving from the OAuth callback — who has by then
+# made decisions 1 and 2 by connecting an account — lands on step 3 and is
+# told 1 and 2 are done, instead of being asked to choose an account mode it
+# can already see.
+
+_OB_STEPS = ("mode", "connect", "style", "method", "risk")
+_OB_TOTAL = len(_OB_STEPS)
+
+_OB_TITLES = {
+    "mode":    "Account Mode",
+    "connect": "Connect cTrader",
+    "style":   "Trading Style",
+    "method":  "Trading Method",
+    "risk":    "Risk",
+}
+
+
+def _ob_satisfied(u, step):
+    """Whether this client has already made this decision.
+
+    Connecting an account IS choosing demo-or-live, so step 1 counts as made
+    once a broker is linked — asking again would be asking about something
+    already on screen.
+    """
+    u = u or {}
+    if step == "mode":
+        return bool(u.get("account_mode") or u.get("ctrader_access_token"))
+    if step == "connect":
+        return bool(u.get("ctrader_access_token") and u.get("ctrader_account_id"))
+    if step == "style":
+        return bool(u.get("style"))
+    if step == "method":
+        return bool(u.get("strategy")) and bool(u.get("symbol") or u.get("autopilot"))
+    if step == "risk":
+        return bool(u.get("risk_tier"))
+    return True
+
+
+def _ob_trail(u, upto):
+    """The 'done so far' line. Names the choice, not just a tick — a client
+    who is four screens in should not have to remember what they picked."""
+    done = []
+    for s in _OB_STEPS[:upto]:
+        if not _ob_satisfied(u, s):
+            continue
+        if s == "mode":
+            what = "Live" if (u.get("ctrader_env") or u.get("account_mode")) == "live" else "Demo"
+        elif s == "connect":
+            what = "connected"
+        elif s == "style":
+            what = str(u.get("style", "")).title()
+        elif s == "method":
+            what = ("Auto-Pilot" if u.get("autopilot")
+                    else friendly_strategy(u.get("strategy"))[0].split(" — ")[0])
+        else:
+            what = str(u.get("risk_tier", ""))
+        done.append(f"✅ {_OB_TITLES[s]}: <b>{_esc(what)}</b>")
+    return ("\n".join(done) + "\n\n") if done else ""
+
+
+def _ob_head(chat_id, step):
+    i = _OB_STEPS.index(step)
+    u = user_store.load(chat_id)
+    return (f"🧭 <b>Setup — Step {i + 1} of {_OB_TOTAL}: {_OB_TITLES[step]}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n" + _ob_trail(u, i))
+
+
 def onboard_start(chat_id):
-    """Guided setup after the broker is connected: symbol → method → mode → go."""
+    """Guided setup. Renders the first step this client has not yet made.
+
+    This is the single entry point every caller uses — the OAuth callback,
+    /wizard and the account-switch path — so there is exactly one wizard and
+    one place its numbering is defined.
+    """
+    return _ob_render(chat_id)
+
+
+def _ob_render(chat_id):
+    u = user_store.load(chat_id)
+    for step in _OB_STEPS:
+        if not _ob_satisfied(u, step):
+            return _OB_RENDER[step](chat_id)
+    return _ob_summary(chat_id)
+
+
+# ── Step 1: Account Mode ──
+
+def _ob_step_mode_choice(chat_id):
+    if _LIVE_BROKER_REQUIRED:
+        note = (f"⚠️ Free access needs a <b>live {_REQUIRED_BROKER_LABEL}</b> "
+                "account. A demo account lets you watch the bot work, but it "
+                "will not unlock trading.")
+    else:
+        note = ("Most people start on demo — real market data, no money at "
+                "risk — and switch when they've seen it work.")
+    send_to(chat_id,
+            _ob_head(chat_id, "mode") +
+            "<b>How do you want to trade?</b>\n\n"
+            "🧪 <b>Demo</b> — real prices, simulated money. Nothing you can lose.\n"
+            "🔴 <b>Live</b> — real money, real orders, real results.\n\n"
+            f"<i>{note}</i>\n\n"
+            "You can change this later — switching to live has its own "
+            "confirmation, so you can never land on real money by accident.",
+            _kb([[("🧪 Demo", "ob:acct:demo")], [("🔴 Live", "ob:acct:live")]]))
+
+
+# ── Step 2: Connect cTrader ──
+
+def _ob_step_connect(chat_id):
+    u = user_store.load(chat_id)
+    want = (u.get("account_mode") or "demo")
+    send_to(chat_id,
+            _ob_head(chat_id, "connect") +
+            "<b>Connect your broker account.</b>\n\n"
+            "The bot never holds your money — it places orders on your own "
+            "cTrader account, which stays yours and which you can disconnect "
+            "at any time with /reset.\n\n"
+            f"<i>You chose {'live' if want == 'live' else 'demo'}. "
+            "Authorize the matching account below — it takes about 30 "
+            "seconds, and I'll pick the setup back up here.</i>",
+            _kb([[("🔗 Connect my account", "go:connect")]]))
+
+
+# ── Step 3: Trading Style ──
+
+def _ob_style_options():
+    """The Strategy Builder's own style step, reused verbatim.
+
+    These four patches are what the builder already applies, so onboarding and
+    /builder cannot recommend different timeframes for the same word. Adding a
+    second table here is how "Scalping" ends up meaning 1m in one place and 5m
+    in another.
+    """
+    return builder._style_step()["options"]
+
+
+def _ob_step_style(chat_id):
+    opts = _ob_style_options()
+    rows = [[(o["label"], f"ob:style:{i}")] for i, o in enumerate(opts)]
+    rows.append([("🛠 Custom — set it up myself", "ob:style:c")])
+    body = "\n".join(
+        f"<b>{o['label']}</b> — stop {o['patch'].get('sl_pips', 'ATR')}"
+        + (f" / target {o['patch']['tp_pips']}" if o["patch"].get("tp_pips") else "")
+        + (" pips" if o["patch"].get("sl_pips") else " (volatility-scaled)")
+        for o in opts)
+    send_to(chat_id,
+            _ob_head(chat_id, "style") +
+            "<b>How fast should it trade?</b>\n\n" + body + "\n\n"
+            "<i>This sets the timeframe it reads and how wide its stops are. "
+            "Faster means more trades and smaller moves; slower means fewer "
+            "trades and wider swings. Neither is safer by itself — the risk "
+            "per trade is step 5, and that is the one that decides what a "
+            "loss costs.</i>",
+            _kb(rows))
+
+
+# ── Step 4: Trading Method ──
+
+def _ob_step_instrument(chat_id):
+    """What to trade. Part of the Method step — a method has to be applied to
+    something, and splitting them would make the counter lie again."""
     syms = _OB_SYMS
     try:
         u = user_store.load(chat_id)
@@ -1595,9 +1770,12 @@ def onboard_start(chat_id):
     if row:
         rows.append(row)
     send_to(chat_id,
-            "🧭 <b>Setup 1/2 — What do you want to trade?</b>\n\n"
-            "🤖 <b>Auto-Pilot</b> = the bot picks the best setups.\n"
-            "Or choose one instrument.",
+            _ob_head(chat_id, "method") +
+            "<b>What should it trade?</b>\n\n"
+            "🤖 <b>Auto-Pilot</b> — the bot scans a basket of liquid "
+            "instruments and takes the strongest setup anywhere, one position "
+            "at a time.\n\n"
+            "Or pick a single instrument and it watches only that.",
             extra={"reply_markup": {"inline_keyboard": rows}})
 
 
@@ -1614,21 +1792,37 @@ def _ob_step_strategy(chat_id):
             "callback_data": f"ob:strat:{key}"}]
           for key, m in STRATEGY_MODES.items()]
     body = "\n\n".join(f"<b>{m['label']}</b> — <i>{m['blurb']}</i>" for m in STRATEGY_MODES.values())
-    send_to(chat_id, f"🧭 <b>Setup 2/2 — Trading method:</b>\n\n{body}",
+    send_to(chat_id,
+            _ob_head(chat_id, "method") +
+            f"<b>What should it look for?</b>\n\n{body}\n\n"
+            "<i>Not sure? Take Automatic — it picks the method that suits "
+            "current conditions, and /strategy can change it at any time.</i>",
             extra={"reply_markup": {"inline_keyboard": kb}})
 
 
+# ── Step 5: Risk ──
+#
+# First-run shows three tiers and nothing else. The full ladder goes to 35%
+# per trade, which is a real setting a client may deliberately want — but
+# offering it on the screen where somebody is still learning what "risk per
+# trade" means is not offering a choice, it is offering a mistake. The rest
+# live behind Advanced Risk, which says what they do.
+
 def _ob_step_risk(chat_id):
-    """Manual-symbol pickers set their own risk per trade — Auto-Pilot skips
-    this and uses the account default, since the bot is already choosing
-    the instrument for them."""
-    lines = "\n\n".join(f"<b>{label}</b> — {pct:g}% risk · {daily:g}% daily stop · {dd:g}% max drawdown"
-                        for label, pct, daily, dd in _RISK_TIERS)
-    kb = [[{"text": label, "callback_data": f"ob:risk:{pct}"}] for label, pct, _, _ in _RISK_TIERS]
+    lines = "\n\n".join(
+        f"<b>{label}</b> — {pct:g}% per trade · {daily:g}% daily stop · "
+        f"{dd:g}% max drawdown"
+        for label, pct, daily, dd in _RISK_TIERS_CORE)
+    kb = [[{"text": label, "callback_data": f"ob:risk:{pct}"}]
+          for label, pct, _, _ in _RISK_TIERS_CORE]
+    kb.append([{"text": "⚙️ Custom / advanced", "callback_data": "risk:adv"}])
     send_to(chat_id,
-            f"🧭 <b>Risk per trade:</b>\n\n{lines}\n\n"
-            "<i>How much of your balance is risked if a trade hits its stop-loss. "
-            "You picked the pair — you decide the risk. Change it any time with /risk.</i>",
+            _ob_head(chat_id, "risk") +
+            "<b>How much may one trade lose?</b>\n\n" + lines + "\n\n"
+            "<i>This is the share of your balance at stake if a trade hits its "
+            "stop. It is the setting that decides what a bad run costs, so it "
+            "is yours to choose — not a default you inherited. Change it any "
+            "time with /risk.</i>",
             extra={"reply_markup": {"inline_keyboard": kb}})
 
 
@@ -1665,32 +1859,93 @@ def _ob_step_tp(chat_id):
 
 
 def _ob_step_mode(chat_id):
+    """The risk acknowledgment, kept on the path it has always been on.
+
+    Reached from the take-profit sub-screen and from stale buttons in older
+    chats. It ends at the configuration summary rather than starting the bot
+    directly — nothing should begin trading from a screen whose last word was
+    about take-profit.
+    """
     u = user_store.load(chat_id)
     if not u.get("risk_accepted"):
         return send_to(chat_id, _RISK_TEXT,
                        extra={"reply_markup": {"inline_keyboard": [[
                            {"text": "✅ I understand — I accept the risk", "callback_data": "ob:risk"}]]}})
-    user_store.update(chat_id, {"paper": False})
-    return _finish_onboard(chat_id)
+    return _ob_summary(chat_id)
+
+
+# The five step renderers, by key. Defined after all of them exist.
+_OB_RENDER = {
+    "mode":    lambda cid: _ob_step_mode_choice(cid),
+    "connect": lambda cid: _ob_step_connect(cid),
+    "style":   lambda cid: _ob_step_style(cid),
+    "method":  lambda cid: _ob_step_instrument(cid),
+    "risk":    lambda cid: _ob_step_risk(cid),
+}
+
+
+def _ob_summary(chat_id):
+    """Everything that was chosen, on one screen, before anything runs.
+
+    The wizard used to start trading straight off the last question. That is
+    the one moment a client can still catch a mis-tap for free, and it was
+    spent on a congratulations message. Nothing here is computed for display —
+    every line is read back out of the record the loop will actually use.
+    """
+    from apex import automation
+    u = user_store.load(chat_id)
+    strat = friendly_strategy(u.get("strategy") or "auto")[0]
+    what = "🤖 Auto-Pilot — bot picks the instrument" if u.get("autopilot") \
+        else f"<b>{_esc(u.get('symbol', '—'))}</b>"
+    try:
+        risk_pct = float(u.get("risk", cfg.RISK_PER_TRADE) or 0) * 100
+    except (TypeError, ValueError):
+        risk_pct = 0.0
+    send_to(chat_id,
+            "🧭 <b>Setup — your configuration</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"Account: <b>{_mode_label(u)}</b>\n"
+            f"Trades: {what}\n"
+            f"Style: <b>{str(u.get('style', '—')).title()}</b> · "
+            f"{u.get('timeframe', '—')} charts\n"
+            f"Method: <b>{_esc(strat)}</b>\n"
+            f"Risk: <b>{risk_pct:g}%</b> per trade "
+            f"({u.get('risk_tier', 'custom')})\n"
+            f"Stop / target: <b>{u.get('sl_pips', cfg.STOP_LOSS_PIPS)}p / "
+            f"{u.get('tp_pips', cfg.TAKE_PROFIT_PIPS)}p</b>\n"
+            f"Daily loss stop: <b>{u.get('max_daily_loss_pct', '—')}%</b> · "
+            f"Max drawdown: <b>{u.get('max_dd_pct', '—')}%</b>\n"
+            f"Automation: <b>{automation.label(automation.mode(u))}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>Check it over. Nothing is running yet — the bot starts when "
+            "you tap Start, and every line above can be changed afterwards.</i>",
+            _kb([[("▶️ Start trading", "ob:go")],
+                 [("🎯 Change method", "nav:strat"), ("🛡 Change risk", "nav:risk")],
+                 [("🤖 Automation", "nav:auto")]]))
 
 
 def _finish_onboard(chat_id):
-    from apex.ai import STRATEGY_MODES
+    """Start the bot, and say exactly what is now running."""
+    from apex import automation
     u = user_store.load(chat_id)
-    strat = STRATEGY_MODES.get((u.get("strategy") or "mean_reversion").lower(),
-                               STRATEGY_MODES["mean_reversion"])["label"]
-    ct_env = u.get("ctrader_env", "demo")
-    mode = "🧪 Demo" if ct_env == "demo" else "🔴 Live"
+    strat = friendly_strategy(u.get("strategy") or "mean_reversion")[0]
+    user_store.update(chat_id, {"onboarded": True})
     user_loop.stop(chat_id)
     user_loop.start(chat_id, alert_fn=_user_alert)
+    mode = automation.mode(u)
+    doing = ("It reports every setup it finds and places nothing."
+             if mode == "signals" else
+             "It asks you before opening anything." if mode == "approval" else
+             "It trades automatically when a valid setup appears.")
     send_to(chat_id,
-            "✅ <b>Bot is ON</b>\n\n"
-            f"Symbol: <b>{u.get('symbol', 'EUR_USD')}</b>\n"
-            f"Method: <b>{strat}</b>\n"
-            f"Mode: <b>{mode}</b>\n"
+            "✅ <b>Bot is ON</b>\n"
+            f"{_state_line(chat_id)}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"Trading: <b>{_esc(u.get('symbol', 'EUR_USD')) if not u.get('autopilot') else 'Auto-Pilot'}</b>\n"
+            f"Method: <b>{_esc(strat)}</b>\n"
             f"Risk: <b>{float(u.get('risk', 0.025)) * 100:g}%</b> per trade\n\n"
-            "It trades automatically when a valid setup appears.\n"
-            "<i>Fine-tune:</i> /pairs · /strategy · /risk",
+            f"{doing}\n"
+            "<i>Everything is one tap away in</i> ☰ <i>Menu.</i>",
             _dashboard_keyboard(chat_id))
 
 
@@ -1937,6 +2192,34 @@ def _handle_cb(chat_id, data):
             "⏸ <b>Bot is OFF.</b>\nNo new trades will open. Any open position stays protected by its stop. "
             "Tap ▶️ to turn it back on.",
             _dashboard_keyboard(chat_id))
+    # ── Onboarding. Every step ends by asking the wizard what comes next,
+    # so the order lives in _OB_STEPS alone and cannot drift per-branch. ──
+    if data in ("ob:acct:demo", "ob:acct:live"):
+        want = data.split(":")[2]
+        # Records the INTENT only. It never flips a live account on by itself
+        # — that still needs the connected account plus the /paper off gate.
+        user_store.update(chat_id, {"account_mode": want})
+        send_to(chat_id, f"✅ Account mode: <b>{'🔴 Live' if want == 'live' else '🧪 Demo'}</b>")
+        return _ob_render(chat_id)
+    if data.startswith("ob:style:"):
+        key = data[9:]
+        if key == "c":
+            # Custom hands straight to the Strategy Builder rather than
+            # growing a second builder inside onboarding.
+            _builder_drafts[chat_id] = {"i": 0, "d": {}}
+            return _builder_render_step(chat_id)
+        try:
+            opt = _ob_style_options()[int(key)]
+        except (ValueError, IndexError):
+            return
+        user_store.update(chat_id, opt["patch"])
+        send_to(chat_id, f"✅ Style: <b>{_esc(opt['label'])}</b>")
+        return _ob_render(chat_id)
+    if data == "ob:go":
+        return _finish_onboard(chat_id)
+    if data == "risk:adv":
+        return _screen_risk_advanced(chat_id)
+
     if data == "ob:sym:__auto__":
         _handle_autopilot(chat_id, "on")
         return _ob_step_strategy(chat_id)
@@ -1952,20 +2235,18 @@ def _handle_cb(chat_id, data):
     if data.startswith("ob:strat:"):
         mode = data[9:]
         user_store.update(chat_id, {"strategy": mode})
-        # Auto-Pilot already picks the instrument for you — let the bot
-        # manage risk/TP too. Manual symbol pickers get to set both
-        # themselves, with what each choice means spelled out, so they're
-        # the ones who decided the risk on their trades.
-        if user_store.load(chat_id).get("autopilot"):
-            return _ob_step_mode(chat_id)
-        return _ob_step_risk(chat_id)
+        # Auto-Pilot no longer skips the risk step. It picks the instrument;
+        # it does not get to pick what a losing trade costs the client. That
+        # question belongs to the person whose money it is, and skipping it
+        # meant the busiest configuration was the one nobody consented to.
+        return _ob_render(chat_id)
     if data.startswith("ob:risk:"):
         try:
             pct = float(data[8:])
         except ValueError:
             return
         _apply_risk(chat_id, pct)
-        return _ob_step_tp(chat_id)
+        return _ob_render(chat_id)
     if data.startswith("ob:tp:"):
         key = data[6:]
         opt = next((o for o in _OB_TP_OPTIONS if o[0] == key), None)
@@ -1994,16 +2275,19 @@ def _handle_cb(chat_id, data):
             "Send /start whenever you're ready to connect an account and set up again.")
     if data == "reset:no":
         return send_to(chat_id, "Cancelled — nothing changed.")
+    # Buttons from older chats. They still work, and they now land on the
+    # configuration summary rather than starting the bot from a message the
+    # client may have scrolled back to weeks later.
     if data == "ob:mode:paper":
         user_store.update(chat_id, {"paper": True})
-        return _finish_onboard(chat_id)
+        return _ob_summary(chat_id)
     if data == "ob:mode:real":
         user_store.update(chat_id, {"paper": False})
-        return _finish_onboard(chat_id)
+        return _ob_summary(chat_id)
     if data == "ob:risk":
         from datetime import datetime as _dt
-        user_store.update(chat_id, {"risk_accepted": _dt.utcnow().isoformat(), "paper": False})
-        return _finish_onboard(chat_id)
+        user_store.update(chat_id, {"risk_accepted": _dt.utcnow().isoformat()})
+        return _ob_summary(chat_id)
     if data == "risk:ok":
         from datetime import datetime as _dt
         user_store.update(chat_id, {"risk_accepted": _dt.utcnow().isoformat()})
@@ -2405,6 +2689,28 @@ _RISK_TIERS = [
 ]
 _RISK_MIN, _RISK_MAX = 0.5, 50.0
 
+# The ladder is split for display only — _RISK_TIERS above stays the single
+# source for _guards_for_risk_pct, so the daily-loss and drawdown caps that go
+# with any given percentage are unchanged.
+#
+# Everything past Aggressive is a real setting somebody may deliberately want,
+# and none of it is hidden: /risk N still reaches all of it, and the Advanced
+# screen lists it in full. What it is not is an option on the screen where a
+# beginner is still working out what "risk per trade" means. At 35% per trade
+# three losses in a row take roughly three quarters of the account, and a
+# first-run menu that puts that one tap from Conservative is not presenting a
+# choice — it is presenting a mistake.
+_RISK_TIERS_CORE = _RISK_TIERS[:3]        # Conservative · Balanced · Aggressive
+_RISK_TIERS_ADVANCED = _RISK_TIERS[3:]    # High · Very High · Extreme · Adrenaline
+
+
+def _risk_tier_name(pct):
+    """The tier label a percentage falls in — for reading a setting back."""
+    for label, tier_pct, _, _ in _RISK_TIERS:
+        if pct <= tier_pct:
+            return label
+    return _RISK_TIERS[-1][0]
+
 
 def _guards_for_risk_pct(pct):
     """Daily-loss/drawdown caps that go with a given risk %, from the tier table."""
@@ -2417,7 +2723,12 @@ def _guards_for_risk_pct(pct):
 def _apply_risk(chat_id, pct):
     frac = pct / 100
     daily, dd = _guards_for_risk_pct(pct)
-    user_store.update(chat_id, {"risk": frac, "max_daily_loss_pct": daily, "max_dd_pct": dd})
+    user_store.update(chat_id, {"risk": frac, "max_daily_loss_pct": daily,
+                                "max_dd_pct": dd,
+                                # Records that this was CHOSEN, not inherited.
+                                # The wizard needs to know the difference: a
+                                # default is not an answer to step 5.
+                                "risk_tier": _risk_tier_name(pct)})
     _restart_user_loop(chat_id)
     if access.is_admin(str(chat_id)):
         _save_runtime({"RISK_PER_TRADE": frac})
@@ -2426,19 +2737,75 @@ def _apply_risk(chat_id, pct):
             f"<i>Daily loss stop scaled to {daily:g}% · max drawdown to {dd:g}% to match.</i>")
 
 
+def _risk_rows(tiers, current):
+    return [[{"text": label + (" ✅" if abs(current - pct) < 0.001 else ""),
+              "callback_data": f"risk:set:{pct}"}]
+            for label, pct, _, _ in tiers]
+
+
+def _risk_lines(tiers):
+    return "\n".join(f"<b>{label}</b> — {pct:g}% risk · {daily:g}% daily stop · "
+                     f"{dd:g}% max drawdown"
+                     for label, pct, daily, dd in tiers)
+
+
 def _risk_menu(chat_id):
     user = user_store.load(chat_id)
     current = float(user.get("risk", 0.025)) * 100
-    kb = [[{"text": label + (" ✅" if abs(current - pct) < 0.001 else ""),
-            "callback_data": f"risk:set:{pct}"}]
-          for label, pct, _, _ in _RISK_TIERS]
-    lines = "\n".join(f"<b>{label}</b> — {pct:g}% risk · {daily:g}% daily stop · {dd:g}% max drawdown"
-                       for label, pct, daily, dd in _RISK_TIERS)
+    tiers = list(_RISK_TIERS_CORE)
+    # A client already ON an advanced tier must see it, ticked. Showing three
+    # options none of which is the live setting reads as "your setting is
+    # gone" and invites a tap that quietly halves the account's risk.
+    if current > _RISK_TIERS_CORE[-1][1]:
+        tiers += [t for t in _RISK_TIERS_ADVANCED
+                  if abs(current - t[1]) < 0.001] or [
+            (f"⚙️ Current — {current:g}%", current,
+             *_guards_for_risk_pct(current))]
+    kb = _risk_rows(tiers, current)
+    kb.append([{"text": "⚙️ Advanced risk (higher tiers)", "callback_data": "risk:adv"}])
     send_to(chat_id,
-            f"⚖️ <b>Risk per trade</b> (current: <b>{current:g}%</b>)\n\n{lines}\n\n"
-            "<i>Pick a tier below, or send /risk N for an exact value (0.5–50%). "
-            "Bigger positions still can't exceed what cTrader's margin allows on the account.</i>",
+            f"🛡 <b>Risk per trade</b> (current: <b>{current:g}%</b>)\n"
+            f"{_state_line(chat_id, guard=True)}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{_risk_lines(tiers)}\n\n"
+            "<i>This is what one losing trade costs you. The daily-loss and "
+            "drawdown stops move with it, so a bigger appetite does not get "
+            "strangled by a cap set for a smaller one. Position size is still "
+            "capped by your broker's margin on top of this.</i>",
             extra={"reply_markup": {"inline_keyboard": kb}})
+
+
+def _screen_risk_advanced(chat_id):
+    """The high tiers, with the arithmetic that makes them what they are.
+
+    Not a warning banner — the actual numbers. "Extreme" means nothing; "three
+    losses in a row costs 49% of the account" is a fact somebody can decide
+    against.
+    """
+    user = user_store.load(chat_id)
+    current = float(user.get("risk", 0.025)) * 100
+    rows = []
+    for label, pct, daily, dd in _RISK_TIERS_ADVANCED:
+        after3 = (1 - pct / 100) ** 3
+        rows.append(f"<b>{label}</b> — {pct:g}% per trade\n"
+                    f"   Three losses in a row: <b>−{(1 - after3) * 100:.0f}%</b> "
+                    f"of the account\n"
+                    f"   Daily stop {daily:g}% · max drawdown {dd:g}%")
+    kb = _risk_rows(_RISK_TIERS_ADVANCED, current)
+    send_to(chat_id,
+            "⚠️ <b>Advanced risk</b>\n"
+            f"{_state_line(chat_id, guard=True)}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            + "\n\n".join(rows) +
+            "\n\n<i>These are real settings and they are yours to pick. They "
+            "are here rather than on the first screen because the difference "
+            "between 2% and 20% is not a matter of taste — it is the "
+            "difference between a bad week and a closed account.</i>\n\n"
+            "<i>Or send</i> <code>/risk 7.5</code> <i>for any exact value "
+            f"between {_RISK_MIN:g}% and {_RISK_MAX:g}%.</i>",
+            {"reply_markup": {"inline_keyboard": kb + [
+                [{"text": "🛡 Back to the standard tiers", "callback_data": "nav:risk"}],
+                [{"text": "☰ Menu", "callback_data": "nav:menu"}]]}})
 
 
 def _handle_risk(chat_id, args):
