@@ -64,7 +64,6 @@ METAAPI_TOKEN      = os.getenv("METAAPI_TOKEN", "")
 METAAPI_ACCOUNT_ID = os.getenv("METAAPI_ACCOUNT_ID", "")
 
 # ─── AI providers ───────────────────────────────────────
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
@@ -205,7 +204,6 @@ INSTITUTIONAL_GATE = (os.getenv("INSTITUTIONAL_GATE") or "shadow").strip().lower
 # an idle tick, the AI is only consulted on a BUY/SELL candidate), so it is
 # opt-in. Falls back to text-only if rendering fails or the fallback provider
 # is used.
-AI_VISION = _truthy(os.getenv("AI_VISION"))
 
 # Derive the stop and target from the structure the signal was built on,
 # instead of a fixed pip count that has nothing to do with it. On M1 the

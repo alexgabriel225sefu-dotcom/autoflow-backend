@@ -83,33 +83,36 @@ check("a 5000-char essay is truncated",
 check("non-string reasoning does not crash",
       V({"action": "BUY", "reasoning": {"a": 1}})["action"] == "BUY")
 
-print("\n── Anthropic is skipped entirely when no key is configured ──")
-_orig = ai.cfg.ANTHROPIC_API_KEY
-ai.cfg.ANTHROPIC_API_KEY = ""
+print("\n── the provider is skipped entirely when no key is configured ──")
+# This block used to assert the same property for Anthropic. Anthropic was
+# removed: its key was never set on this deployment, so every call raised and
+# fell through to Groq anyway. Groq is now the only provider, and the property
+# still has to hold — fail before the network, with a reason.
+_orig = ai.cfg.GROQ_API_KEY
+ai.cfg.GROQ_API_KEY = ""
 try:
-    ai._call_anthropic("hi")
+    ai._call_groq("hi")
     check("raises without a key", False, "no exception")
 except RuntimeError as e:
     check("raises without a key", True)
     check("and says why, before any network attempt",
-          "ANTHROPIC_API_KEY" in str(e), str(e))
+          "GROQ_API_KEY" in str(e), str(e))
 except Exception as e:
     check("raises a RuntimeError, not an SDK error", False, repr(e))
-ai.cfg.ANTHROPIC_API_KEY = _orig
+ai.cfg.GROQ_API_KEY = _orig
 
 print("\n── end to end through get_signal ──")
 _calls = {"n": 0}
 
 
-def fake_ai(prompt, image_png=None):
+def fake_ai(prompt):
     _calls["n"] += 1
     return {"action": "buy", "reasoning": "agrees"}
 
 
-_oa, _og = ai._call_anthropic, ai._call_groq
-ai._call_anthropic = fake_ai
+_og = ai._call_groq
 ai._call_groq = fake_ai
-ai.cfg.ANTHROPIC_API_KEY = "test-key"
+ai.cfg.GROQ_API_KEY = "test-key"
 
 # Build the indicator bundle from the real analyzer rather than hand-rolling
 # it: the prompt reads a couple of dozen keys and a literal dict silently rots
@@ -141,11 +144,10 @@ check("a lowercase agreement is NOT treated as a block",
 check("the AI was actually consulted", _calls["n"] > 0)
 
 
-def junk_ai(prompt, image_png=None):
+def junk_ai(prompt):
     return {"thoughts": "hmm"}
 
 
-ai._call_anthropic = junk_ai
 ai._call_groq = junk_ai
 sig2 = ai.get_signal(IND, 3000.0, None, STRAT, mode="mean_reversion",
                      symbol="EURUSD", timeframe="15m")
@@ -154,8 +156,8 @@ check("a verdict-less reply does not silently become a block",
 check("and does not earn an 'AI confirms' factor it never gave",
       "AI confirms" not in (sig2.get("keyFactors") or []))
 
-ai._call_anthropic, ai._call_groq = _oa, _og
-ai.cfg.ANTHROPIC_API_KEY = _orig
+ai._call_groq = _og
+ai.cfg.GROQ_API_KEY = _orig
 
 print("\n" + "=" * 50)
 if failures:

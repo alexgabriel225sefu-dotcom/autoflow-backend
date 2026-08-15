@@ -201,17 +201,13 @@ def verify_license():
 
 
 def validate():
-    has_anthropic = bool(cfg.ANTHROPIC_API_KEY)
-    has_groq = bool(cfg.GROQ_API_KEY)
-    if not has_anthropic and not has_groq:
-        print("⚠️  No AI key — using rule-based signals (RSI/MACD/EMA). "
-              "Add ANTHROPIC_API_KEY or GROQ_API_KEY for AI-enhanced signals.")
-    elif not has_anthropic and has_groq:
-        print("ℹ️  ANTHROPIC_API_KEY missing — using Groq (free).")
+    if not cfg.GROQ_API_KEY:
+        print("⚠️  No GROQ_API_KEY — using rule-based signals (RSI/MACD/EMA). "
+              "Add GROQ_API_KEY for the AI second opinion.")
     # Say where each AI credential came from. "Which key am I trading on, and
     # who can revoke it" is not answerable from the outside once a value can
     # arrive from an env var, an env group, or a mounted secret file.
-    for _k in ("ANTHROPIC_API_KEY", "GROQ_API_KEY", "GEMINI_API_KEY"):
+    for _k in ("GROQ_API_KEY", "GEMINI_API_KEY"):
         _src = cfg.secret_provenance(_k)
         if _src != "unset":
             print(f"[Keys] {_k} ← {_src}")

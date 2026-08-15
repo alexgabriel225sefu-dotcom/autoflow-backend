@@ -22,6 +22,10 @@ _DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "users")
 # never in the store itself.
 _SENSITIVE_FIELDS = {
     "ctrader_access_token", "ctrader_refresh_token",
+    # anthropic_key is no longer read anywhere — Anthropic was removed as a
+    # provider. It stays listed so any value a client already pasted keeps
+    # being handled as a secret rather than silently reverting to plaintext
+    # on the next save.
     "anthropic_key", "groq_key", "gemini_key",
 }
 _ENC_PREFIX = "enc:"

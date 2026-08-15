@@ -5,7 +5,6 @@ understands the user's intent, fetches live market data, and can execute trades
 directly. Falls back gracefully when AI providers are unavailable.
 
 Provider priority (shared owner key covers ALL clients):
-  1. Claude (Anthropic) — full tool-use + execution
   2. Gemini              — FREE, full tool-use + execution
   3. Groq               — free chat + analysis only
   4. Local status       — always works, no AI needed
@@ -15,7 +14,6 @@ import threading
 from apex import chat_memory
 from apex import config as cfg
 
-_clients: dict = {}    # api_key → anthropic.Anthropic client (cached)
 _lock = threading.Lock()
 
 _TOOLS = [
@@ -126,17 +124,6 @@ def _load_history(user_id: str):
 
 def _save_exchange(user_id: str, user_msg: str, assistant_msg: str):
     chat_memory.save_exchange(user_id, user_msg, assistant_msg)
-
-
-def _get_anthropic_client(api_key: str):
-    with _lock:
-        client = _clients.get(api_key)
-    if client is None:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-        with _lock:
-            _clients[api_key] = client
-    return client
 
 
 def _build_context(user_id: str) -> str:
@@ -319,47 +306,6 @@ class _ProviderDown(Exception):
     pass
 
 
-def _chat_anthropic(user_id: str, message: str, api_key: str, send_fn, send_status) -> str:
-    client = _get_anthropic_client(api_key)
-    context = _build_context(user_id)
-    system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
-
-    history = _load_history(user_id)
-    history.append({"role": "user", "content": message})
-    messages = history[-chat_memory.MAX_HISTORY:]
-
-    for _ in range(5):
-        try:
-            response = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=600,
-                system=system,
-                messages=messages,
-                tools=_TOOLS,
-            )
-        except Exception as e:
-            raise _ProviderDown(f"claude: {e}")
-
-        if response.stop_reason != "tool_use":
-            text = "".join(b.text for b in response.content if hasattr(b, "text")).strip()
-            _save_exchange(user_id, message, text)
-            return text
-
-        tool_results = []
-        for block in response.content:
-            if block.type == "tool_use":
-                result = _run_tool(block.name, block.input, user_id, send_status)
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result,
-                })
-        messages.append({"role": "assistant", "content": response.content})
-        messages.append({"role": "user", "content": tool_results})
-
-    return "⚠️ Could not complete request. Please try again."
-
-
 def _to_gemini_tools():
     decls = []
     for t in _TOOLS:
@@ -527,13 +473,10 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
                 u = user_store.load(user_id)
             except Exception:
                 u = {}
-            anthropic_key = u.get("anthropic_key") or cfg.ANTHROPIC_API_KEY
             gemini_key = u.get("gemini_key") or cfg.GEMINI_API_KEY
             groq_key = u.get("groq_key") or cfg.GROQ_API_KEY
 
             chain = []
-            if anthropic_key:
-                chain.append(("Claude", lambda: _chat_anthropic(user_id, message, anthropic_key, send_fn, send_status)))
             if gemini_key:
                 chain.append(("Gemini", lambda: _chat_gemini(user_id, message, gemini_key, send_status)))
             if groq_key:
@@ -558,7 +501,7 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
                          "It needs an API key — <b>your choice</b>, free or paid:\n"
                          "🥇 <b>Gemini</b> (free, 1,500/day) → aistudio.google.com/apikey\n"
                          "🥈 <b>Groq</b> (free, fast) → console.groq.com/keys\n"
-                         "🥉 <b>Claude</b> (paid, smartest) → console.anthropic.com\n"
+
                          "Then send <code>/ai</code> and paste your key. "
                          "<i>Trading runs fine without it — this only powers the chat.</i>")
             send_fn(reply)
@@ -576,28 +519,6 @@ def _gemini_url() -> str:
     model = getattr(cfg, "GEMINI_MODEL", "") or "gemini-2.5-flash"
     return (f"https://generativelanguage.googleapis.com/v1beta/models/"
             f"{model}:generateContent")
-
-
-def test_key(key: str):
-    """Quick liveness check for a client's Anthropic key. Returns (ok, message)."""
-    if not key or not key.startswith("sk-ant-"):
-        return False, "Key must start with sk-ant-"
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=key)
-        client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=5,
-            messages=[{"role": "user", "content": "Reply with the single word OK."}],
-        )
-        return True, "Key works"
-    except Exception as e:
-        status = getattr(e, "status_code", None)
-        if status == 401:
-            return False, "Key rejected (401) — copy it again from console.anthropic.com"
-        if status == 429:
-            return False, "Key is valid but out of credits/rate-limited"
-        return False, f"Could not verify key ({e})"
 
 
 def test_groq_key(key: str):

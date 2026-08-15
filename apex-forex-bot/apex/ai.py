@@ -1,11 +1,10 @@
-"""AI signal generation (port of ai.js). Anthropic primary, Groq free fallback."""
+"""AI signal generation (port of ai.js). Groq (free) provides the second opinion."""
 import re
 import json
 import requests
 from apex import config as cfg
 from apex import forex
 
-_anthropic_client = None
 
 
 def _context_line(symbol=None):
@@ -41,38 +40,6 @@ def _context_line(symbol=None):
                     "reduce confidence or stand aside if entry timing lands near release time")
     except Exception:
         return "- Market context: unavailable this tick — weigh technicals only"
-
-
-def _chart_png(candles, symbol, timeframe):
-    """Rendered chart for the vision prompt, or None.
-
-    Never raises: a rendering failure must downgrade the call to text-only, not
-    cost the account a trade. matplotlib is already a dependency (the bot draws
-    this same chart for Telegram) — the only new thing here is that the model
-    gets to see it too.
-    """
-    if not getattr(cfg, "AI_VISION", False):
-        return None
-    if not candles or len(candles) < 30:
-        return None
-    try:
-        from apex import chart
-        return chart.render(candles, symbol, timeframe)
-    except Exception as e:
-        print(f"[AI] chart render failed, continuing text-only: {e}")
-        return None
-
-
-def _get_anthropic():
-    global _anthropic_client
-    if _anthropic_client is None:
-        import anthropic
-        # The SDK's default timeout is 600s — a slow/hung Anthropic call would
-        # stall a user's trading tick that long before falling back to Groq
-        # (get_signal only falls back on an exception, not on latency). Cap it
-        # short so a slow API degrades to the fallback instead of freezing.
-        _anthropic_client = anthropic.Anthropic(api_key=cfg.ANTHROPIC_API_KEY, timeout=20.0)
-    return _anthropic_client
 
 
 def _extract_json(text):
@@ -138,51 +105,6 @@ def _validate_verdict(raw):
     return out
 
 
-def _call_anthropic(prompt, image_png=None):
-    """Ask Anthropic. `image_png` attaches a rendered chart to the question.
-
-    Indicator values describe a chart the way a table of coordinates describes
-    a face: everything is technically present, and the shape is gone. Structure,
-    the slope of a trend, where price keeps failing, whether a level was tested
-    three times or once — those live in the picture. Sending it costs more
-    tokens per call, so it is opt-in (AI_VISION) and only ever fires on a
-    candidate entry, never on every tick.
-    """
-    # No key means no attempt. Without this the SDK was constructed with an
-    # empty key and every one of the three models below failed instantly on
-    # "Could not resolve authentication method" — three error lines per AI
-    # call, forever, burying the real failures in the log. Observed live: the
-    # account had no ANTHROPIC_API_KEY set and had been running on the Groq
-    # fallback for its entire life while the logs screamed about Anthropic.
-    if not cfg.ANTHROPIC_API_KEY:
-        raise RuntimeError("ANTHROPIC_API_KEY not set — skipping Anthropic")
-    models = ["claude-haiku-4-5-20251001", "claude-3-5-haiku-20241022", "claude-3-haiku-20240307"]
-    if image_png:
-        import base64
-        content = [
-            {"type": "image", "source": {"type": "base64",
-                                         "media_type": "image/png",
-                                         "data": base64.b64encode(image_png).decode()}},
-            {"type": "text", "text": prompt},
-        ]
-    else:
-        content = prompt
-    for model in models:
-        try:
-            msg = _get_anthropic().messages.create(
-                model=model, max_tokens=400, temperature=0,
-                messages=[{"role": "user", "content": content}])
-            text = msg.content[0].text.strip()
-            print(f"[AI] ✅ Anthropic {model}")
-            return _extract_json(text)
-        except Exception as err:
-            status = getattr(err, "status_code", None) or getattr(getattr(err, "response", None), "status_code", "N/A")
-            print(f"[AI ❌] Anthropic {model} | Status: {status} | {err}")
-            if status in (400, 401):
-                break
-    raise RuntimeError("Anthropic unavailable")
-
-
 _MODE_INTRO = {
     "mean_reversion": ("Forex ranges far more than it trends, so your PRIMARY edge is MEAN REVERSION: "
                        "fade overbought/oversold extremes back to the mean (RSI + Bollinger Bands), and only "
@@ -212,6 +134,7 @@ _MODE_INTRO = {
             "buyer/seller volume at key price levels (small body, equal wicks, average volume), signaling "
             "indecision that resolves into a directional move. Enter on the resolution."),
 }
+
 
 _MODE_RULES = {
     "mean_reversion": """- BUY (fade oversold dip, min 3/5): price in lower BB (<30%), RSI≤35 or bullish divergence, Stoch RSI K low, price stretched below EMA20, no strong downtrend
@@ -366,15 +289,12 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
     _risk_lbl = float(cfg.RISK_PER_TRADE if risk_pct is None else risk_pct)
     _minconf_lbl = int(cfg.MIN_CONFIDENCE if min_confidence is None else min_confidence)
 
-    _vision = bool(getattr(cfg, "AI_VISION", False)) and bool(candles)
-    _chart_note = ("\n\n### CHART\nA candlestick chart of the last ~120 bars is "
-                   "attached, with EMA20 and EMA50 drawn. Read it as a trader "
-                   "would: market structure (higher highs/lows or lower), where "
-                   "price has repeatedly failed or held, whether this level has "
-                   "been tested once or many times, and whether the move into it "
-                   "looks impulsive or exhausted. Where the picture disagrees "
-                   "with the indicator readings below, say so in your reasoning "
-                   "and let the structure decide.\n" if _vision else "")
+    # No chart section: the only provider that could receive an image was
+    # Anthropic, and Groq's llama-3.3-70b is text-only. Leaving this wired to
+    # AI_VISION would have been worse than removing it — switching the flag on
+    # would tell the model "a chart is attached" while nothing was ever sent,
+    # and it would answer as though it had looked at one.
+    _chart_note = ""
 
     prompt = f"""You are a professional FOREX trader with 20 years of experience. {_MODE_INTRO[mode]} Analyze ALL the data and give a precise signal.
 
@@ -443,18 +363,17 @@ Respond ONLY with valid JSON:
 {{"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 sentences>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}}"""
 
     ai_sig = None
+    # Groq is the only signal provider. Anthropic used to sit in front of it,
+    # but the key was never set on this deployment: every single call raised
+    # "ANTHROPIC_API_KEY not set", was swallowed, and fell through to Groq.
+    # A first choice that has never once been reachable is not a fallback
+    # chain, it is a branch that only ever costs an exception — and it kept
+    # the boot log warning about a missing key nobody intended to add.
+    # The chart is dropped here: Groq's Llama path is text-only.
     try:
-        # Only widen the call when there is actually a chart to send, so the
-        # ordinary text path keeps its original one-argument shape.
-        _img = _chart_png(candles, _sym_lbl, _tf_lbl)
-        ai_sig = _call_anthropic(prompt, _img) if _img else _call_anthropic(prompt)
-    except Exception:
-        try:
-            # Groq's Llama fallback is text-only — the chart is simply dropped
-            # rather than failing the call. A degraded second opinion beats none.
-            ai_sig = _call_groq(prompt)
-        except Exception as err:
-            print(f"[AI ❌] AI unavailable ({err}) — using rule signal")
+        ai_sig = _call_groq(prompt)
+    except Exception as err:
+        print(f"[AI ❌] AI unavailable ({err}) — using rule signal")
 
     # A reply that does not carry a usable decision is NOT a decision. It is
     # the same situation as the model being unreachable, and is handled the

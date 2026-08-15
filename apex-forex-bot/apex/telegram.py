@@ -1002,7 +1002,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                 f"plus a heartbeat so you always know the bot is awake.\n"
                 f"Change anything with /setup · /status to check · /stop to pause.\n\n"
                 f"🧠 <b>Want AI chat to help you trade?</b> Send /ai to connect a free "
-                f"Gemini/Groq key (or paid Claude) — your choice.",
+                f"Gemini or Groq key — your choice, both free.",
                 _dashboard_keyboard())
 
 
@@ -1065,7 +1065,7 @@ _AI_KB = {"reply_markup": json.dumps({"inline_keyboard": [
 def _handle_ai_setup(chat_id):
     """Explain the AI-chat key options — client connects their OWN free/paid key."""
     u = user_store.load(chat_id)
-    if u.get("groq_key") or u.get("gemini_key") or u.get("anthropic_key"):
+    if u.get("groq_key") or u.get("gemini_key"):
         return send_to(chat_id,
                        "🧠 <b>AI chat is already connected</b> on your own key. ✅\n"
                        "Just talk to me — \"analyze EUR_USD\", \"should I buy gold?\".\n"
@@ -1078,7 +1078,7 @@ def _handle_ai_setup(chat_id):
             "⚠️ <b>AI chat needs a key — your choice, free or paid:</b>\n"
             "🥇 <b>Gemini</b> — free, 1,500/day → aistudio.google.com/apikey\n"
             "🥈 <b>Groq</b> — free, fast (key starts <code>gsk_</code>) → console.groq.com/keys\n"
-            "🥉 <b>Claude</b> — paid, smartest (key starts <code>sk-ant-</code>) → console.anthropic.com\n\n"
+
             "📋 <b>Just paste your key here</b> — I auto-detect which one it is and verify it.\n"
             "<i>Trading works fine without a key; this only powers the chat.</i>",
             _AI_KB)
@@ -1086,8 +1086,6 @@ def _handle_ai_setup(chat_id):
 
 def _detect_ai_key(key):
     k = (key or "").strip()
-    if k.startswith("sk-ant-"):
-        return "claude"
     if k.startswith("gsk_"):
         return "groq"
     if k.startswith("AIza"):
@@ -1104,14 +1102,12 @@ def _handle_ai_key(chat_id, key, msg_id):
         return send_to(chat_id,
                        "🤔 <b>I couldn't tell which provider that key is for.</b>\n"
                        "Gemini keys start with <code>AIza</code>, Groq with <code>gsk_</code>, "
-                       "Claude with <code>sk-ant-</code>.\n"
+
                        "Copy the full key again, or tap a button below to get a free one.",
                        _AI_KB)
-    label = {"claude": "Claude", "groq": "Groq", "gemini": "Gemini"}[kind]
+    label = {"groq": "Groq", "gemini": "Gemini"}[kind]
     send_to(chat_id, f"🔍 Testing your {label} key…")
-    if kind == "claude":
-        ok, why = assistant.test_key(key); field = "anthropic_key"
-    elif kind == "groq":
+    if kind == "groq":
         ok, why = assistant.test_groq_key(key); field = "groq_key"
     else:
         ok, why = assistant.test_gemini_key(key); field = "gemini_key"
@@ -3884,6 +3880,13 @@ def _revalidate_license(chat_id):
     return True
 
 
+# How long after start a 409 still counts as our own deploy handing over.
+# Render overlaps the new instance with the draining old one; observed
+# handovers on this service clear well inside a minute, and a second
+# deployment never clears at all.
+_CONFLICT_GRACE_S = float(os.getenv("TELEGRAM_CONFLICT_GRACE_S", "90"))
+
+
 def _poll_loop():
     global _update_id
     # Clear any webhook — getUpdates returns 409 while a webhook is active,
@@ -3906,6 +3909,7 @@ def _poll_loop():
         print(f"[TELEGRAM] getMe error: {e}")
     print(f"[TELEGRAM] Poll loop started. TOKEN={bool(TOKEN)} CHAT_ID={CHAT_ID}")
     _conflict_streak = 0
+    _started_at = time.time()
     while True:
         try:
             r = requests.get(f"{_API}/getUpdates",
@@ -3915,26 +3919,46 @@ def _poll_loop():
             data = r.json()
             if not data.get("ok"):
                 if data.get("error_code") == 409:
-                    # Another process is polling this same bot token — Telegram
-                    # only lets one getUpdates caller win at a time. Retrying
-                    # every 10s forever just spams the log without ever
-                    # resolving it; back off (capped at 2 min) and say plainly
-                    # where to look, since a flat retry loop makes this look
-                    # like a bug in THIS process when it's actually a second
-                    # instance running somewhere else (e.g. a leftover Railway
-                    # deployment of this same bot — see Railway refs in bot.py).
+                    # Another process is polling this same token — Telegram
+                    # only lets one getUpdates caller win at a time. Back off
+                    # (capped at 2 min) rather than retrying flat forever.
+                    #
+                    # Nearly every one of these is our OWN deploy. Render
+                    # starts the new instance before draining the old one, so
+                    # for a few seconds both poll and one loses. The old copy
+                    # exits on its own and the conflict clears with no action.
+                    # The message used to send the operator hunting for "a
+                    # leftover Railway deployment or a second Render service"
+                    # every single deploy — an accusation of a misconfiguration
+                    # that did not exist, which is how a real one would have
+                    # been dismissed as the usual noise.
+                    #
+                    # So: quiet while a handover is plausible, loud only once
+                    # it has outlived one. A second deployment does not drain.
                     _conflict_streak += 1
                     wait = min(120, 10 * _conflict_streak)
-                    if _conflict_streak == 1 or _conflict_streak % 6 == 0:
-                        print(f"[TELEGRAM] 409 Conflict — another instance of this bot token is "
-                              f"polling (streak={_conflict_streak}). Find and stop it (check for a "
-                              f"leftover Railway deployment or a second Render service). "
-                              f"Backing off {wait}s.")
+                    _age = time.time() - _started_at
+                    _handover = _age < _CONFLICT_GRACE_S
+                    if _handover:
+                        if _conflict_streak == 1:
+                            print(f"[TELEGRAM] 409 Conflict {_age:.0f}s after start — the "
+                                  f"previous instance is still draining. Normal during a "
+                                  f"deploy; waiting {wait}s for it to exit.")
+                    elif _conflict_streak == 1 or _conflict_streak % 6 == 0:
+                        print(f"[TELEGRAM] 409 Conflict — another process has been polling "
+                              f"this bot token for {_age:.0f}s (streak={_conflict_streak}). "
+                              f"This is no longer a deploy handover: something else is "
+                              f"running the same TELEGRAM_BOT_TOKEN. Check for a second "
+                              f"Render service, a leftover Railway deployment, or a copy "
+                              f"running locally. Backing off {wait}s.")
                     time.sleep(wait)
                     continue
                 print(f"[TELEGRAM] API error: {data.get('description')} (code {data.get('error_code')})")
                 time.sleep(10)
                 continue
+            if _conflict_streak:
+                print(f"[TELEGRAM] conflict cleared after {_conflict_streak} "
+                      f"attempt(s) — this instance now owns the poll.")
             _conflict_streak = 0
             for u in data.get("result", []):
                 _update_id = u["update_id"] + 1
@@ -4165,7 +4189,7 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         _handle_stop(chat_id)
     elif cmd_l == "/ai":
         _handle_ai_setup(chat_id)
-    elif cmd_l in ("/groq", "/gemini", "/claude", "/key"):
+    elif cmd_l in ("/groq", "/gemini", "/key"):
         # Explicit key command — the key is the argument.
         _handle_ai_key(chat_id, args, msg_id)
     elif not raw.startswith("/"):
