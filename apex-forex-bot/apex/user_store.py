@@ -185,6 +185,43 @@ def _upstash(cmd_parts):
         return None
 
 
+def _upstash_post(cmd_parts):
+    """Upstash REST via POST with a JSON body.
+
+    The GET form above puts each argument in a path segment, which cannot carry
+    a Lua script: the script contains slashes, quotes and newlines, and even
+    percent-encoded it runs into URL length limits and proxy normalisation. The
+    POST form takes the command as a JSON array and has none of those problems.
+    Used only where the GET form genuinely cannot express the command.
+    """
+    try:
+        r = _req.post(_UPD_URL, json=[str(p) for p in cmd_parts],
+                      headers={"Authorization": f"Bearer {_UPD_TOKEN}"}, timeout=8)
+        r.raise_for_status()
+        return r.json().get("result")
+    except Exception as e:
+        print(f"[Redis] POST command failed {cmd_parts[0]}: {e}")
+        return None
+
+
+def _eval(script, keys, args):
+    """Run a Lua script server-side. None means the call itself failed.
+
+    This is what makes compare-and-set possible at all. Without it, "renew the
+    lease only if it is still mine" has to be a GET followed by a SET, and
+    between those two calls the lease can expire and be taken by another
+    container — which then has its lease silently overwritten by the process
+    that just lost it. Two owners, no error anywhere.
+    """
+    if _BACKEND == "redis":
+        try:
+            return _r.eval(script, len(keys), *keys, *args)
+        except Exception as e:
+            print(f"[Redis] EVAL failed: {e}")
+            return None
+    return _upstash_post(["EVAL", script, len(keys), *keys, *args])
+
+
 def _redis_get(key):
     if _BACKEND == "redis":
         try:
@@ -196,13 +233,24 @@ def _redis_get(key):
 
 
 def _redis_set(key, value_str):
+    """Write a key. Returns True ONLY when the server confirmed the write.
+
+    The old version returned whatever the driver handed back and callers threw
+    it away, so a Redis outage looked exactly like a successful save: a licence
+    key, a broker token or a risk setting would be "stored" and simply not
+    exist. Every write now reports honestly and every failure is logged.
+    """
     if _BACKEND == "redis":
         try:
-            return _r.set(key, value_str)
+            return bool(_r.set(key, value_str))
         except Exception as e:
-            print(f"[Redis] SET failed: {e}")
-            return None
-    return _upstash(["SET", key, value_str])
+            print(f"[Redis] SET failed for {key}: {e}")
+            return False
+    res = _upstash(["SET", key, value_str])
+    if res is None:
+        print(f"[Redis] SET returned no result for {key} — treating as FAILED")
+        return False
+    return str(res).upper() == "OK"
 
 
 def claim(key, ttl_s=120):
@@ -256,45 +304,49 @@ def claim_value(key, value, ttl_s=120):
         return None
 
 
+# Compare-and-set, server-side, so ownership cannot be decided by two calls
+# with a gap in the middle. These are the standard Redlock primitives.
+#
+# The gap was not theoretical. renew was GET-then-SET: if the lease expired
+# between the two, another container could win it with SET NX and then have
+# that lease silently overwritten by the SET from the process that had just
+# lost it. Both processes then believe they own the user, and the loser's
+# heartbeat keeps renewing a lease that is no longer its own — the exact
+# double-ownership the lease exists to prevent, produced by the lease itself.
+_LUA_RENEW = ("if redis.call('GET', KEYS[1]) == ARGV[1] then "
+              "return redis.call('EXPIRE', KEYS[1], ARGV[2]) else return 0 end")
+_LUA_RELEASE = ("if redis.call('GET', KEYS[1]) == ARGV[1] then "
+                "return redis.call('DEL', KEYS[1]) else return 0 end")
+
+
 def renew_claim(key, value, ttl_s=120):
     """Extend a lease we already hold. True only if `value` is still the owner.
 
-    Read-then-write rather than a compare-and-set script, because the Upstash
-    REST transport has no EVAL here. The seam is real but narrow and it fails
-    SAFE: the only way another instance can take the key between the read and
-    the write is if the key had already expired, which means the lease was
-    already lost — and the caller renews at a third of the TTL precisely so
-    that has not happened yet. A lost renewal is reported as lost.
+    Atomic: the check and the extension happen in one server-side step, so
+    there is no window in which the key can change hands between them.
+    Returns None when the call itself failed — unknown, not lost.
     """
     if not _USE_REDIS:
         return None
-    try:
-        cur = _redis_get(key)
-        if cur is None:
-            return False         # expired or gone — no longer ours to extend
-        if str(cur) != str(value):
-            return False         # somebody else owns it now
-        return bool(set_blob(key, str(value), ttl_s=int(ttl_s)))
-    except Exception as e:
-        print(f"[Redis] renew_claim failed: {e}")
-        return None
+    res = _eval(_LUA_RENEW, [key], [str(value), int(ttl_s)])
+    if res is None:
+        return None              # transport failure — caller decides
+    return int(res) == 1
 
 
 def release_claim(key, value):
     """Drop a lease we hold, so a replacement worker need not wait out the TTL.
-    Only deletes when the key is still ours — never steals somebody else's."""
+
+    Atomic for the same reason as renew: a GET-then-DEL could delete a lease
+    that another container acquired in between, handing a third process a free
+    key while two others think they own it.
+    """
     if not _USE_REDIS:
         return None
-    try:
-        cur = _redis_get(key)
-        if cur is None or str(cur) != str(value):
-            return False
-        if _BACKEND == "redis":
-            return bool(_r.delete(key))
-        return _upstash(["DEL", key]) is not None
-    except Exception as e:
-        print(f"[Redis] release_claim failed: {e}")
+    res = _eval(_LUA_RELEASE, [key], [str(value)])
+    if res is None:
         return None
+    return int(res) == 1
 
 
 def incr(key, ttl_s=60):
@@ -405,24 +457,54 @@ def load(user_id):
         return {}
 
 
-def save(user_id, data):
+class PersistenceError(RuntimeError):
+    """A write that was asked to be certain, and was not."""
+
+
+def save(user_id, data, strict=False):
+    """Persist a user record. Returns True only if the write actually landed.
+
+    This used to return None unconditionally: `_redis_set`'s result was
+    discarded, so a Redis outage was indistinguishable from a successful save.
+    A licence minted during an outage, a broker token stored right after OAuth,
+    a client turning risk down before the weekend — all of them would report
+    success and be gone.
+
+    `strict=True` raises instead of returning False. Use it wherever losing the
+    write is worse than failing the operation: money, credentials, entitlement.
+    The default stays non-raising because most callers are loop bookkeeping,
+    and turning a Redis blip into an unhandled exception inside the trading
+    loop trades a silent bug for a louder one.
+    """
     user_id = str(user_id)
     stored = _encrypt_sensitive(data)
     if _USE_REDIS:
-        _redis_set(f"{_NS}:user:{user_id}", json.dumps(stored))
+        ok = _redis_set(f"{_NS}:user:{user_id}", json.dumps(stored))
         if data.get("active"):
             _redis_sadd(_ACTIVE_SET, user_id)
         else:
             _redis_srem(_ACTIVE_SET, user_id)
-        return
-    with open(_path(user_id), "w") as f:
-        json.dump(stored, f, indent=2)
+        if not ok:
+            print(f"[Store] WRITE LOST for user {user_id} — Redis did not "
+                  f"confirm the save")
+            if strict:
+                raise PersistenceError(f"could not persist user {user_id}")
+        return bool(ok)
+    try:
+        with open(_path(user_id), "w") as f:
+            json.dump(stored, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"[Store] WRITE LOST for user {user_id}: {e}")
+        if strict:
+            raise PersistenceError(f"could not persist user {user_id}: {e}")
+        return False
 
 
-def update(user_id, updates):
+def update(user_id, updates, strict=False):
     d = load(user_id)
     d.update(updates)
-    save(user_id, d)
+    return save(user_id, d, strict=strict)
 
 
 def clear_trades(user_id):

@@ -46,6 +46,34 @@ def _verify_signature(payload: bytes, sig_header: str, secret: str) -> bool:
     return hmac.compare_digest(expected, v1)
 
 
+def _event_key(event_id):
+    return f"stripe:evt:{event_id}"
+
+
+def _drop_event_claim(event_id):
+    """Give the idempotency claim back after a delivery we could not complete.
+
+    Without this the two defences deadlock against each other: the claim says
+    "this event is handled" while the licence was never written, so every
+    Stripe retry is answered with "duplicate" and the buyer — who has paid —
+    is never provisioned. The claim must only outlive the delivery when the
+    delivery actually succeeded.
+    """
+    if not event_id:
+        return
+    try:
+        # Best effort by design: if this fails the claim expires on its own,
+        # and Stripe's retry window is long enough that a later delivery still
+        # lands. Warn loudly either way, because until it clears, retries of
+        # THIS event are being refused.
+        user_store.set_blob(_event_key(event_id), "", ttl_s=1)
+        print(f"[Stripe] released idempotency claim for {event_id} so a retry "
+              f"can provision the buyer")
+    except Exception as e:
+        print(f"[Stripe] could not release claim for {event_id} ({e}) — "
+              f"retries of this event will be refused until it expires")
+
+
 def handle_webhook(raw_body: bytes, sig_header: str):
     """Returns (http_status, response_bytes)."""
     if not cfg.STRIPE_WEBHOOK_SECRET:
@@ -88,10 +116,17 @@ def handle_webhook(raw_body: bytes, sig_header: str):
     #      backend at all.
     event_id = str(event.get("id") or "").strip()
     if event_id:
-        seen = user_store.claim(f"stripe:evt:{event_id}", ttl_s=7 * 24 * 3600)
+        seen = user_store.claim(_event_key(event_id), ttl_s=7 * 24 * 3600)
         if seen is False:
-            print(f"[Stripe] duplicate delivery of {event_id} — already handled")
-            return 200, b"duplicate"
+            # Held by a delivery that got further than this one. Only answer
+            # "handled" if it actually finished — a claim taken by an attempt
+            # that then failed to write must not lock the buyer out. Defence 2
+            # is the evidence: the licence either exists or it does not.
+            if (user_store.load(chat_id) or {}).get("license_key"):
+                print(f"[Stripe] duplicate delivery of {event_id} — already handled")
+                return 200, b"duplicate"
+            print(f"[Stripe] {event_id} was claimed but {chat_id} has no licence "
+                  f"— a previous delivery failed part-way; provisioning now")
         # seen is None => no shared backend; defence 2 below still applies.
 
     try:
@@ -114,20 +149,53 @@ def handle_webhook(raw_body: bytes, sig_header: str):
         return 200, b"already active"
 
     key = generate_license_key()
+    # STRICT: the buyer has already been charged. A write that quietly does not
+    # land leaves them paid and unlicensed, and returning 200 here tells Stripe
+    # the event is handled so it never retries — the one combination there is
+    # no recovery path for. Fail loudly instead and let Stripe redeliver.
     try:
-        user_store.update(chat_id, {"license_key": key})
+        stored_ok = user_store.update(chat_id, {"license_key": key}, strict=True)
     except Exception as e:
-        print(f"[Stripe] failed to store license for {chat_id}: {e}")
+        print(f"[Stripe] LICENSE WRITE FAILED for {chat_id} ({e}) — returning "
+              f"500 so Stripe retries; buyer is paid and NOT yet provisioned")
+        _drop_event_claim(event_id)
+        return 500, b"store failed"
+    if not stored_ok:
+        print(f"[Stripe] LICENSE WRITE not confirmed for {chat_id} — returning "
+              f"500 so Stripe retries")
+        _drop_event_claim(event_id)
         return 500, b"store failed"
 
+    # Read it back. `strict` covers a write that reported failure; this covers
+    # one that reported success and still is not there.
+    if (user_store.load(chat_id) or {}).get("license_key") != key:
+        print(f"[Stripe] LICENSE READBACK MISMATCH for {chat_id} — returning "
+              f"500 so Stripe retries")
+        _drop_event_claim(event_id)
+        return 500, b"store failed"
+
+    granted = False
     try:
-        from apex import access, telegram as tg
-        access.grant(str(chat_id))
-        # Full instant sequence: welcome + FP Markets signup link + the real
-        # cTrader authorize link, all in one shot — no /ctrader typing needed.
+        from apex import access
+        granted = access.grant(str(chat_id)) is not False
+    except Exception as e:
+        print(f"[Stripe] access grant FAILED for {chat_id}: {e}")
+    if not granted:
+        # The licence is stored, so a retry takes the "already licensed" path
+        # above and re-grants without minting a second key. Ask for that retry.
+        print(f"[Stripe] {chat_id} licensed but not granted — returning 500 "
+              f"so Stripe retries the grant")
+        return 500, b"grant failed"
+
+    # Messaging is best-effort on purpose: it is the only step whose failure
+    # does not leave the buyer unprovisioned, and forcing a Stripe retry over a
+    # Telegram hiccup would re-send the welcome to everyone it did reach.
+    try:
+        from apex import telegram as tg
         tg.send_activation_sequence(chat_id, paid=True)
     except Exception as e:
-        print(f"[Stripe] activation notify failed for {chat_id}: {e}")
+        print(f"[Stripe] activation notify failed for {chat_id} "
+              f"(licence IS active): {e}")
 
     print(f"[Stripe] activated {chat_id} with license {key} "
           f"(session={session.get('id')})")

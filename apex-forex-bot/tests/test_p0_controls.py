@@ -189,8 +189,12 @@ from apex import stripe_license  # noqa: E402
 _records, _sent = {}, []
 
 
-def _fake_update(uid, updates):
+def _fake_update(uid, updates, strict=False):
+    # `strict` mirrors the real signature: provisioning asks for a write it can
+    # be certain of, and a fake that cannot accept the flag would fail the call
+    # for the wrong reason.
     _records.setdefault(str(uid), {}).update(updates)
+    return True
 
 
 def _fake_load(uid):
@@ -257,8 +261,14 @@ check("no pending authorization → nothing to bind to",
 
 oauth._pending.clear()
 oauth._record_pending("111")
-check("exactly one pending → that is unambiguous, bind it",
-      oauth._recent_pending() == "111")
+# This check previously asserted that a single pending authorization WAS bound.
+# That was the first fix and it was not enough: it removed the two-client case
+# but kept the premise, which is that an unsigned callback is trusted at all.
+# Anyone who can reach the public callback URL while one client happens to be
+# authorizing could still have their own broker account bound to that client.
+# The fallback is now off unless an operator explicitly turns it on.
+check("exactly one pending is STILL not enough without a signed state",
+      oauth._recent_pending() is None, oauth._recent_pending())
 
 # The bug: two clients mid-authorization. The old code returned the most
 # RECENT one, so whoever tapped /ctrader last was handed the other person's

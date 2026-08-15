@@ -58,46 +58,103 @@ def broker_gate_reason(account: dict, access_token: str) -> str:
                 f"requires a live account with our partner broker specifically")
     return ""
 
-# Fallback for the case where cTrader does not echo the `state` param back to
-# the redirect (it's standard OAuth2 but undocumented for cTrader). When a user
-# runs /ctrader we record their chat_id here; if the callback arrives without a
-# usable state, we bind it to the most recent pending authorization. The bot's
-# poll loop and HTTP callback run in the SAME process, so this dict is shared.
+# Who is mid-authorization, for observability and for the escape hatch below.
+# The bot's poll loop and the HTTP callback run in the SAME process, so this
+# dict is shared between them.
 _pending = {}  # chat_id -> ts
+
+# A callback with no verifiable state cannot be attributed to anyone. There is
+# no amount of care that turns "somebody authorized a broker account" into
+# "THIS Telegram user authorized it" without a signed correlation value, and
+# the consequence of getting it wrong is that one client's broker account —
+# real money — is wired to another client's chat.
+#
+# So the fallback is OFF. Only a valid signed state links an account.
+#
+# The escape hatch exists because cTrader's echoing of `state` is undocumented,
+# and if a broker-side change ever stops it, onboarding breaks for everyone
+# with no way in. Setting CTRADER_ALLOW_STATELESS_CALLBACK=true re-enables the
+# single-pending fallback — never the multi-pending guess, which was the actual
+# vulnerability. It is a deliberate operator decision, logged on every use,
+# not a default.
+ALLOW_STATELESS = (os.getenv("CTRADER_ALLOW_STATELESS_CALLBACK", "")
+                   .strip().lower() in ("1", "true", "yes", "on"))
 
 
 def _record_pending(chat_id):
     _pending[str(chat_id)] = int(time.time())
 
 
-def _recent_pending():
-    """The pending chat_id, but ONLY when there is exactly one.
-
-    This used to return `max(fresh)` — the most recent of however many people
-    were mid-authorization. That is an account-linking bug, not a tie-break:
-    with two clients running /ctrader inside the same ten minutes, a callback
-    that arrives without a usable state binds one person's broker tokens to
-    the other person's Telegram chat. Whoever tapped /ctrader last wins, and
-    neither of them can tell it happened — the loser starts trading an account
-    that is not theirs.
-
-    Refusing an ambiguous callback costs the client one retry. Guessing costs
-    them somebody else's account, so ambiguity is resolved as failure. The
-    single-pending case keeps the original purpose intact: cTrader does not
-    reliably echo `state` back, and without this fallback onboarding breaks
-    for the one person who is actually authorizing.
-    """
+def _fresh_pending():
+    """Prune expired entries and return what is still in flight."""
     now = int(time.time())
     fresh = {c: t for c, t in _pending.items() if now - t <= _STATE_TTL}
     _pending.clear()
     _pending.update(fresh)
-    if len(fresh) != 1:
+    return fresh
+
+
+def _recent_pending():
+    """Identify a stateless callback. Returns None unless explicitly enabled.
+
+    The original returned `max(fresh)` — the most recent of however many people
+    were mid-authorization. That is not a tie-break, it is an account-linking
+    vulnerability: with two clients running /ctrader in the same ten minutes,
+    a callback without a usable state binds one person's broker tokens to the
+    other person's Telegram chat, and neither can tell it happened.
+
+    Narrowing it to "exactly one pending" removed the two-client case but not
+    the premise, which is that an unauthenticated callback is trusted at all:
+    anyone who can reach the public callback URL while one client happens to
+    be authorizing can still have their own broker account bound to that
+    client's chat. Nothing in a stateless callback proves otherwise.
+    """
+    fresh = _fresh_pending()
+    if not ALLOW_STATELESS:
         if fresh:
-            print(f"[cTrader OAuth] callback without usable state and "
-                  f"{len(fresh)} authorizations pending — refusing to guess "
-                  f"which client it belongs to")
+            print(f"[cTrader OAuth] REFUSED a callback with no valid state "
+                  f"({len(fresh)} authorization(s) pending). An unsigned "
+                  f"callback cannot be attributed to a client; the user must "
+                  f"retry /ctrader.")
         return None
-    return next(iter(fresh))
+    if len(fresh) != 1:
+        print(f"[cTrader OAuth] stateless callback allowed by config but "
+              f"{len(fresh)} authorizations are pending — still refusing, "
+              f"there is no way to tell which client this belongs to")
+        return None
+    who = next(iter(fresh))
+    print(f"[cTrader OAuth] WARNING: binding a stateless callback to {who} "
+          f"because CTRADER_ALLOW_STATELESS_CALLBACK is on. This trusts an "
+          f"unauthenticated callback — turn it off once state round-trips.")
+    return who
+
+
+_used_states = {}          # state -> ts, for the no-Redis single-instance case
+
+
+def _consume_state(state) -> bool:
+    """Redeem a state exactly once. False means it was already used.
+
+    Claimed atomically in Redis so a replay cannot be processed twice by two
+    containers, with an in-process set as the fallback when there is no shared
+    backend. A claim that cannot be reached at all (returns None) is allowed
+    through: refusing would mean a Redis outage blocks every new client from
+    connecting a broker, and the signature and TTL checks still stand.
+    """
+    from apex import user_store
+    h = hashlib.sha256(str(state).encode()).hexdigest()[:32]
+    got = user_store.claim(f"oauth:state:{h}", ttl_s=_STATE_TTL * 2)
+    if got is False:
+        return False
+    if got is None:
+        now = int(time.time())
+        for k, t in list(_used_states.items()):
+            if now - t > _STATE_TTL * 2:
+                _used_states.pop(k, None)
+        if h in _used_states:
+            return False
+        _used_states[h] = now
+    return True
 
 
 def _secret() -> bytes:
@@ -175,9 +232,19 @@ def handle_callback(query: dict):
 
     code = _q("code")
     state = _q("state")
-    # Prefer the signed state; fall back to the most recent pending /ctrader if
-    # cTrader didn't echo state back (so onboarding works either way).
-    chat_id = parse_state(state) or _recent_pending()
+    # A signed state is the ONLY thing that attributes this callback to a
+    # client. The stateless path is off unless an operator turns it on, and it
+    # says so loudly when it fires.
+    chat_id = parse_state(state)
+    if chat_id and not _consume_state(state):
+        # Valid signature, but this exact state has already been redeemed.
+        # The signature alone does not make a state single-use: it stays valid
+        # for its whole TTL, so a captured callback URL could be replayed to
+        # re-link an account.
+        print(f"[cTrader OAuth] REFUSED a replayed state for {chat_id}")
+        chat_id = None
+    if not chat_id:
+        chat_id = _recent_pending()
     if not code or not chat_id:
         return 400, _html("cTrader", "<div class='h err'>Invalid or expired link</div>"
                           "<div class='p'>Please return to Telegram and send /ctrader to get a fresh link.</div>")
@@ -224,7 +291,19 @@ def handle_callback(query: dict):
                 access, a["ctid"], updates["ctrader_env"])
             if bal is not None:
                 updates["paper_balance"] = bal
-    user_store.update(chat_id, updates)
+    # STRICT: this is the only moment these tokens exist. The authorization
+    # code has already been exchanged and cannot be replayed, so a write that
+    # silently does not land leaves the client looking connected while the bot
+    # holds no credentials — and the only way back is to authorize again, which
+    # nothing tells them to do. Fail visibly instead.
+    try:
+        user_store.update(chat_id, updates, strict=True)
+    except Exception as e:
+        print(f"[cTrader OAuth] CREDENTIAL WRITE FAILED for {chat_id}: {e}")
+        return 500, _html("cTrader", "<div class='h err'>Could not save the connection</div>"
+                          "<div class='p'>Your broker authorized us, but we could not store "
+                          "the connection. Nothing was linked. Please return to Telegram and "
+                          "send /ctrader to try again.</div>")
     _pending.pop(str(chat_id), None)
 
     # A loop that was already running (auto-restore at boot) still holds the OLD
