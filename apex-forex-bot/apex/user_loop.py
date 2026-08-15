@@ -221,6 +221,20 @@ _CLOSE_COOLDOWN_MIN = 10  # pause after ANY close — prevent open/close churn
 _DEDUPE_WINDOW_S = 900  # 15 min — two paths racing on one close land seconds apart
 
 
+def _mode_of(user_id):
+    """"demo" or "live" for this client, or None when it cannot be known.
+
+    None rather than a guess: a trade filed under the wrong account mode is
+    worse than one filed under none, because the report looks complete while
+    being wrong.
+    """
+    try:
+        return "demo" if user_store.load(user_id).get("paper", True) else "live"
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] could not read account mode: {e}")
+        return None
+
+
 def _already_journaled(journal, row):
     """True if this exact close is already in the journal.
 
@@ -675,6 +689,16 @@ def _log_trade(user_id, record, pos=None):
         # changed last week is indistinguishable from the one that traded.
         "strategyId":      src.get("entryStrategyId"),
         "strategyVersion": src.get("entryStrategyVersion"),
+        # Demo and live results mixed together make a report useless exactly
+        # when it matters. Recorded per trade because the account can switch:
+        # reading the CURRENT mode at report time would relabel every past
+        # demo trade as live the moment a client goes live.
+        #
+        # Read from THIS user's record, not the process-global config. Each
+        # client runs their own loop with their own mode, so the global flag
+        # would stamp every client's trades with whatever the process default
+        # happened to be.
+        "mode":            _mode_of(user_id),
     }
     try:
         if _already_journaled(user_store.load_trades(user_id), row):
