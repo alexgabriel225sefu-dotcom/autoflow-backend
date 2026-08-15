@@ -631,6 +631,110 @@ def _handle_quick_help(chat_id):
         [{"text": "📋 See every command", "callback_data": "go:controls"}]]}})
 
 
+# ─── Navigation ───────────────────────────────────────────
+#
+# Buttons first, commands second. Every command still works — they are the
+# power-user path and several people rely on them — but nobody should have to
+# discover a 24-line list to find out how much their bot is risking.
+#
+# Callback payloads are short, stable and say nothing about the internals: a
+# screen is `nav:<screen>`, an action is `<verb>:<what>`. No user ids, no
+# account numbers, no strategy-registry keys that would leak the shape of the
+# engine into a string the client can read off a button.
+
+
+def _kb(rows):
+    """`extra` for a list of rows of (label, callback) pairs. Empty → no markup."""
+    kb = [[{"text": t, "callback_data": d} for t, d in row] for row in rows if row]
+    return {"reply_markup": {"inline_keyboard": kb}} if kb else None
+
+
+def _menu_rows(chat_id=None):
+    """The main menu. Pause/Resume reflects the real running state."""
+    running = False
+    if chat_id is not None:
+        try:
+            running = bool(user_loop.is_running(chat_id))
+        except Exception:
+            running = False
+    return [
+        [("📊 Overview", "nav:over"), ("📈 Positions", "nav:pos")],
+        [("🎯 Strategy", "nav:strat"), ("🛡 Risk", "nav:risk")],
+        [("🤖 Automation", "nav:auto"), ("📒 Performance", "nav:perf")],
+        [("📡 Market", "nav:mkt"), ("📰 News", "nav:news")],
+        [("⚙️ Settings", "nav:set"), ("❓ Help", "nav:help")],
+        [("⏸ Pause Trading", "nav:pause")] if running
+        else [("▶️ Resume Trading", "nav:resume")],
+        [("🚨 Emergency", "nav:emg")],
+    ]
+
+
+def _menu_kb(chat_id=None):
+    return _kb(_menu_rows(chat_id))
+
+
+def _back_kb(chat_id=None, extra_rows=None):
+    """Every screen has a way back. A screen you can only leave by typing a
+    command is a dead end, and dead ends are where clients stop exploring."""
+    return _kb(list(extra_rows or []) + [[("☰ Menu", "nav:menu")]])
+
+
+def _handle_menu(chat_id):
+    send_to(chat_id,
+            f"☰ <b>{cfg.BOT_NAME.upper()} — Menu</b>\n"
+            f"{_state_line(chat_id)}\n\n"
+            "<i>Everything the bot does, in one place. You can also type any "
+            "command directly — /allcommands lists them.</i>",
+            _menu_kb(chat_id))
+
+
+# ─── Always-visible state ─────────────────────────────────
+#
+# Three facts have to be on every screen where a client might act: whether
+# this is real money, how much the bot may do without asking, and whether the
+# risk guard is currently holding trading. Each is read from real state; when
+# a fact is not known yet it says so rather than defaulting to the reassuring
+# answer.
+
+def _mode_label(user):
+    """Demo / Live / Paper, from the account actually configured."""
+    u = user or {}
+    if u.get("paper", True):
+        return "📝 Paper · simulated"
+    return ("🔴 LIVE · real money"
+            if (u.get("ctrader_env") or "demo").lower() == "live"
+            else "🧪 Demo")
+
+
+def _guard_label(chat_id):
+    """Risk Guard state, or an honest 'not reported yet'.
+
+    Read from what the loop published. Recomputing it here would mean calling
+    strategies.should_stop(), which advances the peak-balance and daily-reset
+    state — drawing a badge must not move the risk engine.
+    """
+    g = (user_loop.get_dash(chat_id) or {}).get("riskGuard")
+    if not isinstance(g, dict):
+        return "🛡 Risk Guard: <i>no report yet</i>"
+    if g.get("halted"):
+        why = "; ".join(str(r) for r in (g.get("reasons") or [])) or "risk limit hit"
+        return f"🛑 Risk Guard: <b>HOLDING</b> — {_esc(why)}"
+    return "🛡 Risk Guard: <b>active</b>"
+
+
+def _state_line(chat_id, guard=False):
+    """The one-line state banner. `guard=True` on screens where money moves."""
+    try:
+        u = user_store.load(chat_id)
+    except Exception:
+        u = {}
+    from apex import automation
+    line = f"{_mode_label(u)}  ·  {automation.label(automation.mode(u))}"
+    if guard:
+        line += f"\n{_guard_label(chat_id)}"
+    return line
+
+
 def _dashboard_keyboard(chat_id=None):
     """One clear control surface: a big ON/OFF toggle + the live terminal.
     The toggle reflects the real running state so nobody has to remember
@@ -655,6 +759,9 @@ def _dashboard_keyboard(chat_id=None):
         rows.append([{"text": "🎯 Trading method", "callback_data": "go:strategy"},
                      {"text": "❓ Help", "callback_data": "go:help"}])
         rows.append([{"text": "⚙️ Build strategy", "callback_data": "bld:open"}])
+        # Everything else lives one tap away rather than behind a command the
+        # client would first have to find in /allcommands.
+        rows.append([{"text": "☰ Menu — everything else", "callback_data": "nav:menu"}])
     # Discoverable path from demo → real money without knowing a command.
     if chat_id is not None:
         try:
@@ -764,7 +871,7 @@ def _handle_status(chat_id):
             header = ("✅ <b>BOT IS ON</b> — watching the market.\n\n" if running
                       else "⏸ <b>BOT IS OFF</b> — tap ▶️ below to start.\n\n")
             send_to(chat_id,
-                    header +
+                    header + _state_line(chat_id) + "\n\n" +
                     f"{cfg.ASSET_EMOJI} <b>{cfg.BOT_NAME.upper()}</b>  {mode_label}\n"
                     f"━━━━━━━━━━━━━━━━━━━━\n"
                     f"💰 Balance: <b>${bal:.2f}</b>\n"
@@ -790,7 +897,12 @@ def _handle_status(chat_id):
     header = ("✅ <b>BOT IS ON</b> — watching the market, it trades automatically when a valid setup appears.\n\n"
               if running else
               "⏸ <b>BOT IS OFF</b> — tap ▶️ below to start.\n\n")
-    send_to(chat_id, header + _build_status(dash, chart), _dashboard_keyboard(chat_id))
+    # Demo-or-live, how much the bot may do alone, and whether the risk guard
+    # is holding — the three things that must be visible wherever a client
+    # might act on what they are reading.
+    send_to(chat_id,
+            header + _state_line(chat_id, guard=True) + "\n\n"
+            + _build_status(dash, chart), _dashboard_keyboard(chat_id))
 
 
 # ─── Setup wizard ─────────────────────────────────────────
@@ -1704,6 +1816,69 @@ def _handle_cb(chat_id, data):
         except ValueError:
             return
         return _builder_pick(chat_id, step_i, opt_i)
+    # ── Navigation. Screens only; nothing here moves money or settings. ──
+    if data == "nav:menu":
+        return _handle_menu(chat_id)
+    if data == "nav:over":
+        return _handle_status(chat_id)
+    if data == "nav:pos":
+        return _screen_positions(chat_id)
+    if data == "nav:strat":
+        return _handle_strategy(chat_id, "")
+    if data == "nav:risk":
+        return _handle_risk(chat_id, "")
+    if data == "nav:auto":
+        return _screen_automation(chat_id)
+    if data == "nav:perf":
+        return _screen_performance(chat_id, "today")
+    if data == "nav:mkt":
+        return _handle_market(chat_id)
+    if data == "nav:news":
+        return _handle_news(chat_id)
+    if data == "nav:set":
+        return send_to(chat_id, _with_counts(_CONTROLS_TEXT), _back_kb(chat_id))
+    if data == "nav:help":
+        return _handle_quick_help(chat_id)
+    if data == "nav:acct":
+        return _screen_account(chat_id)
+    if data == "nav:emg":
+        return _screen_emergency(chat_id)
+    if data in ("nav:pause", "emg:pause"):
+        return _handle_stop(chat_id)
+    if data == "nav:resume":
+        return _handle_start(chat_id)
+
+    # ── Automation ──
+    if data.startswith("am:go:"):
+        return _apply_automation(chat_id, data[6:])
+    if data.startswith("am:"):
+        return _set_automation(chat_id, data[3:])
+
+    # ── Performance ──
+    if data in ("pf:today", "pf:week", "pf:month", "pf:all"):
+        return _screen_performance(chat_id, data[3:])
+    if data == "pf:strat":
+        return _screen_perf_split(chat_id, "strategy")
+    if data == "pf:sym":
+        return _screen_perf_split(chat_id, "symbol")
+
+    # ── Emergency. Close All is confirmed on its own screen, never in one tap. ──
+    if data == "emg:closeall":
+        return _screen_emergency_confirm(chat_id)
+    if data == "emg:go":
+        return _emergency_close_all(chat_id)
+    if data == "emg:cancel":
+        return send_to(chat_id, "↩️ Cancelled — your positions are untouched.",
+                       _back_kb(chat_id, [[("📈 Positions", "nav:pos")]]))
+    if data == "pos:close":
+        return _handle_close(chat_id)
+
+    # ── Live activation. Both of these lead INTO the existing gate. ──
+    if data == "live:start":
+        return _screen_live_activation(chat_id)
+    if data == "live:go":
+        return _handle_paper(chat_id, "off")
+
     if data == "go:connect":
         return _handle_ctrader(chat_id)
     if data == "go:controls":
@@ -1926,22 +2101,199 @@ def _handle_news(chat_id):
             + "\n\n<i>⭐ = affects your pair. The bot stays flat around these.</i>")
 
 
+# ─── Positions ────────────────────────────────────────────
+
+def _screen_positions(chat_id):
+    """What is open right now, priced from what the loop actually recorded.
+
+    Every figure here comes off the dashboard the trading loop writes. When a
+    number is not there yet — the first tick after a restart has not landed —
+    this says so. `PnL: +$0.00` on a position $22 down shipped once because a
+    missing key read as a zero; a blank is honest and a zero is not.
+    """
+    user_loop.live_balance(chat_id)
+    dash = user_loop.get_dash(chat_id) or {}
+    op = dash.get("openPosition")
+    oc = dash.get("openCount", 0)
+    head = ("📈 <b>Positions</b>\n" + _state_line(chat_id, guard=True) + "\n"
+            "━━━━━━━━━━━━━━━━━━━━\n")
+
+    if not op and not oc:
+        return send_to(chat_id, head +
+                       "📭 <b>Nothing open.</b>\n\n"
+                       "The bot opens a position only when a setup passes every "
+                       "check. Most candidates are refused — that is the point, "
+                       "and a refused trade costs nothing.",
+                       _back_kb(chat_id, [[("📊 Overview", "nav:over"),
+                                           ("🎯 Strategy", "nav:strat")]]))
+
+    lines = []
+    if op:
+        side = "🟢 LONG" if op.get("side") == "BUY" else "🔴 SHORT"
+        pnl, pips = op.get("pnlUsd"), op.get("pnlPips")
+        if pnl is None:
+            pnl_txt = "…" if pips is None else f"{pips:+.1f} pips"
+        else:
+            pnl_txt = f"{'+' if pnl >= 0 else '−'}${abs(pnl):.2f}"
+            if pips is not None:
+                pnl_txt += f"  ({pips:+.1f} pips)"
+        sl = op.get("stopLoss")
+        lines += [
+            f"{side} <b>{_esc(op.get('symbol', '—'))}</b>",
+            f"  Entry: <b>{_fmt_px(op.get('entryPrice'))}</b>"
+            f"   Size: {op.get('units', '—')}",
+            f"  Stop: <b>{_fmt_px(sl) if sl else '⚠️ none at the broker'}</b>"
+            f"   Target: {_fmt_px(op.get('takeProfit')) if op.get('takeProfit') else '—'}",
+            f"  P&amp;L: <b>{pnl_txt}</b>",
+        ]
+    if oc and oc > (1 if op else 0):
+        extra = oc - (1 if op else 0)
+        lines.append(f"\n📊 <b>+{extra} more open</b> on this account, each managed "
+                     f"by its own stop at the broker. The bot tracks one at a "
+                     f"time here — the terminal and cTrader show them all.")
+    fl = dash.get("floatingPnl")
+    if isinstance(fl, (int, float)):
+        lines.append(f"\n💵 Floating P&amp;L: <b>{'+' if fl >= 0 else '−'}${abs(fl):.2f}</b>")
+
+    send_to(chat_id, head + "\n".join(lines),
+            _back_kb(chat_id, [[("🔒 Close position", "pos:close")],
+                               [("📊 Overview", "nav:over"),
+                                ("🚨 Emergency", "nav:emg")]]))
+
+
+# ─── Automation ───────────────────────────────────────────
+#
+# The protection stack, spelled out. This is the list a client is entitled to
+# see BEFORE handing over execution, and every line of it names a mechanism
+# that is really in the loop — not a reassurance written for the screen.
+
+def _protection_stack(chat_id):
+    u = user_store.load(chat_id)
+    try:
+        risk_pct = float(u.get("risk", cfg.RISK_PER_TRADE) or 0) * 100
+    except (TypeError, ValueError):
+        risk_pct = 0.0
+    return (
+        "<b>What stands between a setup and your balance:</b>\n"
+        f"• Every trade risks <b>{risk_pct:g}%</b> of the balance and no more — "
+        "the size is computed from your stop, not guessed\n"
+        "• A stop-loss is attached at the broker. If it cannot be attached, the "
+        "position is closed immediately\n"
+        f"• Daily loss stop at <b>{u.get('max_daily_loss_pct', '—')}%</b> and "
+        f"drawdown stop at <b>{u.get('max_dd_pct', '—')}%</b> — both halt new "
+        "trades on their own\n"
+        "• Three losses in a row on an instrument stands the bot aside on it\n"
+        "• High-impact news and violent candles suspend entries\n"
+        "• Positions are flattened before the weekend gap\n\n"
+        "<i>None of this makes a loss impossible. It caps how fast one can "
+        "happen.</i>")
+
+
+def _screen_automation(chat_id):
+    from apex import automation
+    u = user_store.load(chat_id)
+    cur = automation.mode(u)
+    body = "\n\n".join(
+        f"{'✅ ' if m == cur else ''}<b>{automation.LABEL[m]}</b>\n"
+        f"<i>{automation.BLURB[m]}</i>"
+        for m in automation.MODES)
+    rows = [[(automation.LABEL[m] + (" ✅" if m == cur else ""), f"am:{m}")]
+            for m in automation.MODES]
+    send_to(chat_id,
+            "🤖 <b>Automation</b>\n"
+            f"{_state_line(chat_id, guard=True)}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{body}\n\n"
+            "<i>You can change this at any time, including with a position "
+            "open — it only decides what happens to the NEXT setup.</i>",
+            _back_kb(chat_id, rows))
+
+
+def _set_automation(chat_id, m):
+    """Apply a level. Full Automation shows the protection stack first."""
+    from apex import automation
+    if m not in automation.MODES:
+        return
+    if m == "full" and automation.mode(user_store.load(chat_id)) != "full":
+        # Handing over execution is the one change worth a second screen. Not
+        # a scare — a statement of what is actually protecting the account,
+        # so the decision is made with the mechanisms in view.
+        return send_to(chat_id,
+                       "🚀 <b>Turn on Full Automation?</b>\n"
+                       f"{_state_line(chat_id, guard=True)}\n"
+                       "━━━━━━━━━━━━━━━━━━━━\n\n"
+                       "The bot will open and manage trades without asking you "
+                       "first.\n\n" + _protection_stack(chat_id),
+                       _back_kb(chat_id, [
+                           [("✅ Yes — full automation", "am:go:full")],
+                           [("↩️ Keep asking me first", "nav:auto")]]))
+    return _apply_automation(chat_id, m)
+
+
+def _apply_automation(chat_id, m):
+    from apex import automation
+    user_store.update(chat_id, automation.patch(m))
+    running = _restart_user_loop(chat_id)
+    tail = ("" if running or user_loop.is_running(chat_id)
+            else "\n\n⏸ <i>The bot is off — tap ▶️ to start it.</i>")
+    send_to(chat_id,
+            f"✅ Automation set to <b>{automation.LABEL[m]}</b>.\n"
+            f"<i>{automation.BLURB[m]}</i>{tail}",
+            _back_kb(chat_id, [[("🤖 Automation", "nav:auto"),
+                                ("📊 Overview", "nav:over")]]))
+
+
+def _handle_automation(chat_id, args):
+    """/automation [signals|approval|full] — the command behind the screen."""
+    from apex import automation
+    arg = (args or "").strip().lower().replace("-", "_").replace(" ", "_")
+    alias = {"signals": "signals", "signal": "signals", "signals_only": "signals",
+             "alerts": "signals", "off": "signals",
+             "approval": "approval", "approve": "approval", "copilot": "approval",
+             "approval_required": "approval", "ask": "approval",
+             "full": "full", "auto": "full", "autopilot": "full",
+             "full_automation": "full", "on": "full"}
+    want = alias.get(arg)
+    if not want:
+        return _screen_automation(chat_id)
+    return _set_automation(chat_id, want)
+
+
 def _handle_copilot(chat_id, args):
+    """The original two-way toggle, kept working exactly as documented.
+
+    `/copilot on` has meant "ask me before every trade" for the whole life of
+    this bot and people have it in their muscle memory. It now writes through
+    the same three-way setting so the two can never disagree, and on/off keep
+    their old meanings.
+
+    With one carve-out. `off` is a two-way word and there are now three levels,
+    so it cannot mean "full automation" unconditionally: on an account set to
+    Signals Only, a command whose entire text is "off" would start placing real
+    orders. It means "stop asking me" — and on an account that was never going
+    to trade, there is nothing to stop asking about.
+    """
+    from apex import automation
     arg = (args or "").strip().lower()
+    cur = automation.mode(user_store.load(chat_id))
     if arg in ("on", "1", "yes", "true"):
-        user_store.update(chat_id, {"copilot": True})
-        return send_to(chat_id,
-            "🤖 <b>Copilot mode ON.</b>\nThe bot will <b>suggest</b> trades and wait for your "
-            "✅ Approve before opening anything. You stay in control.\n\n<i>Turn off with /copilot off.</i>")
+        return _apply_automation(chat_id, "approval")
     if arg in ("off", "0", "no", "false"):
-        user_store.update(chat_id, {"copilot": False})
-        return send_to(chat_id,
-            "🚀 <b>Autopilot mode ON.</b>\nThe bot opens trades automatically when a setup meets your "
-            "thresholds. (Use /copilot on to require approval.)")
-    cur = user_store.load(chat_id).get("copilot")
+        if cur == "signals":
+            return send_to(chat_id,
+                "📣 You're on <b>Signals Only</b> — I already don't ask, "
+                "because I don't trade. Nothing changed.\n\n"
+                "<i>If you meant \"start trading for me\", that is Full "
+                "Automation — pick it below so the change is deliberate.</i>",
+                _back_kb(chat_id, [[("🤖 Automation", "nav:auto")]]))
+        return _apply_automation(chat_id, "full")
     return send_to(chat_id,
-        f"🤖 Copilot is currently <b>{'ON (approval required)' if cur else 'OFF (autopilot)'}</b>.\n"
-        "Use <code>/copilot on</code> or <code>/copilot off</code>.")
+        f"🤖 Automation is <b>{automation.LABEL[cur]}</b> — "
+        f"<i>{automation.BLURB[cur]}</i>\n\n"
+        "<code>/copilot on</code> — ask me before every trade\n"
+        "<code>/copilot off</code> — full automation\n"
+        "<code>/automation signals</code> — tell me, place nothing",
+        _back_kb(chat_id, [[("🤖 Automation", "nav:auto")]]))
 
 
 # Turning paper OFF on a LIVE account starts sending real-money orders. The
@@ -2729,6 +3081,283 @@ def _handle_stats(chat_id):
             f"<i>Full breakdown, equity curve &amp; rejection journal: /terminal</i>")
 
 
+# ─── Performance ──────────────────────────────────────────
+#
+# Every figure on these screens comes from apex.performance, which in turn
+# reuses ev.metrics. There is deliberately no arithmetic here: a second
+# expectancy formula that drifts from the first is worse than no expectancy at
+# all, and this file has already grown three private copies of one balance
+# formatter once.
+
+def _money(v):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return "—"
+    return f"+${v:,.2f}" if v >= 0 else f"−${abs(v):,.2f}"
+
+
+def _pf(v):
+    if v == float("inf"):
+        return "∞"
+    try:
+        return f"{float(v):.2f}"
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _perf_body(s):
+    """One summarize() dict, rendered. Returns None when there is nothing."""
+    if not s or not s.get("trades"):
+        return None
+    lines = [
+        f"📈 <b>{s['trades']}</b> trades · {s['wins']}W/{s['losses']}L · "
+        f"Win rate <b>{s['win_rate']:g}%</b>",
+        f"💰 Net: <b>{_money(s['net'])}</b>   ·   Expectancy: "
+        f"<b>{_money(s['expectancy'])}</b>/trade",
+        f"⚖️ Profit factor: <b>{_pf(s['profit_factor'])}</b>   ·   "
+        f"Max drawdown: <b>{_money(-abs(s['max_drawdown']))}</b>",
+        f"🏆 Best {_money(s['best'])} · 💥 Worst {_money(s['worst'])}",
+    ]
+    r = s.get("r")
+    if r:
+        # R answers a different question from dollars: whether the edge is
+        # real. It carries its OWN trade count on purpose — rows written
+        # before the stop distance was journalled cannot produce an R, and
+        # borrowing the dollar count would overstate the sample.
+        lines.append(
+            f"\n📐 <b>In R</b> <i>(the {r['trades']} trades that recorded their "
+            f"risk)</i>\nExpectancy <b>{r['expectancy_R']:+.2f}R</b> · "
+            f"PF <b>{_pf(r['profit_factor_R'])}</b> · "
+            f"Max DD <b>{abs(r['max_drawdown_R']):.2f}R</b>")
+    return "\n".join(lines)
+
+
+_PERF_TABS = [("Today", "pf:today"), ("Week", "pf:week"), ("Month", "pf:month"),
+              ("All", "pf:all")]
+
+
+def _perf_kb(chat_id):
+    return _back_kb(chat_id, [
+        [(lbl, cb) for lbl, cb in _PERF_TABS],
+        [("🎯 By strategy", "pf:strat"), ("💱 By symbol", "pf:sym")],
+    ])
+
+
+def _screen_performance(chat_id, span="today"):
+    from apex import performance
+    from datetime import datetime, timedelta
+    rows = user_store.load_trades(chat_id) or []
+    titles = {"today": "Today", "week": "Last 7 days", "month": "Last 30 days",
+              "all": "All time"}
+    if span == "all":
+        sel = rows
+    else:
+        days = {"today": 0, "week": 6, "month": 29}[span]
+        day = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        sel = performance.since(rows, day)
+    head = (f"📒 <b>Performance — {titles.get(span, span)}</b>\n"
+            f"{_state_line(chat_id)}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n")
+    body = _perf_body(performance.summarize(sel))
+    if body is None:
+        return send_to(chat_id, head +
+                       ("📭 No closed trades yet — this fills up as positions "
+                        "close." if not rows else
+                        "📭 No closed trades in this period. Try a wider one."),
+                       _perf_kb(chat_id))
+    send_to(chat_id, head + body +
+            "\n\n<i>Closed trades only. An open position is not a result yet.</i>",
+            _perf_kb(chat_id))
+
+
+def _screen_perf_split(chat_id, by="strategy"):
+    """Which method / which instrument is actually working on THIS account.
+
+    Seventeen methods with no report saying which one works is a menu, not an
+    advantage. Groups too thin to mean anything are shown last and labelled —
+    ranking on three trades recommends whichever one got lucky.
+    """
+    from apex import performance
+    rows = user_store.load_trades(chat_id) or []
+    groups = (performance.by_strategy(rows) if by == "strategy"
+              else performance.by_symbol(rows))
+    title = "By strategy" if by == "strategy" else "By symbol"
+    head = (f"📒 <b>Performance — {title}</b>\n{_state_line(chat_id)}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n")
+    if not groups:
+        return send_to(chat_id, head + "📭 No closed trades yet.", _perf_kb(chat_id))
+    out, thin_any = [], False
+    for name, s in performance.ranked(groups):
+        if by == "strategy":
+            # The friendly label carries an explanation after an em-dash
+            # ("Bounce Trader — buys dips, sells spikes"). That belongs on the
+            # picker, not in a ranked list where it triples every row.
+            label = (friendly_strategy(name)[0].split(" — ")[0]
+                     if name != performance.UNLABELLED else "Unlabelled (older trades)")
+        else:
+            label = name
+        thin = s.get("thin")
+        thin_any = thin_any or thin
+        out.append(f"{'⚪' if thin else ('✅' if s['net'] >= 0 else '❌')} "
+                   f"<b>{_esc(label)}</b>\n"
+                   f"   {s['trades']} trade{'s' if s['trades'] != 1 else ''} · "
+                   f"{s['win_rate']:g}% won · "
+                   f"net <b>{_money(s['net'])}</b> · "
+                   f"expectancy {_money(s['expectancy'])}"
+                   + ("  <i>— too few to judge</i>" if thin else ""))
+    tail = ("\n\n<i>⚪ = fewer than 3 trades. Three trades is not evidence, so "
+            "these are listed but not ranked.</i>" if thin_any else "")
+    send_to(chat_id, head + "\n\n".join(out) + tail, _perf_kb(chat_id))
+
+
+# ─── Emergency ────────────────────────────────────────────
+
+def _screen_emergency(chat_id):
+    n = user_loop.open_position_count(chat_id)
+    count_line = ("<i>Open positions: not known yet — the bot has not reported "
+                  "since it last started.</i>" if n is None else
+                  f"<b>Open right now: {n} position{'s' if n != 1 else ''}</b>")
+    running = user_loop.is_running(chat_id)
+    send_to(chat_id,
+            "🚨 <b>Emergency</b>\n"
+            f"{_state_line(chat_id, guard=True)}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{count_line}\n\n"
+            "<b>⏸ Stop New Trades</b>\n"
+            "The bot stops looking for setups. Anything already open stays "
+            "open and keeps its stop-loss at the broker. Reversible — tap "
+            "Resume whenever you want.\n\n"
+            "<b>🔴 Close All Positions</b>\n"
+            "Closes everything open, at the market price, immediately. "
+            "<b>This cannot be undone:</b> a closed trade cannot be reopened "
+            "at its entry, and whatever it is showing right now — profit or "
+            "loss — becomes real.",
+            _back_kb(chat_id, [
+                [("⏸ Stop New Trades", "emg:pause")] if running
+                else [("▶️ Resume Trading", "nav:resume")],
+                [("🔴 Close All Positions", "emg:closeall")],
+            ]))
+
+
+def _screen_emergency_confirm(chat_id):
+    n = user_loop.open_position_count(chat_id)
+    if n == 0:
+        return send_to(chat_id,
+                       "📭 <b>Nothing is open</b> — there is nothing to close.",
+                       _back_kb(chat_id, [[("🚨 Emergency", "nav:emg")]]))
+    what = ("every open position" if n is None
+            else f"{n} open position{'s' if n != 1 else ''}")
+    unknown = ("\n\n⚠️ <i>The bot has not reported a position count since it "
+               "last started, so it will close whatever it finds at the "
+               "broker — which may be more than it is tracking.</i>"
+               if n is None else "")
+    send_to(chat_id,
+            f"⚠️ <b>Close {what} now?</b>\n"
+            f"{_state_line(chat_id, guard=True)}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "This closes at the current market price, immediately, and "
+            "<b>cannot be undone</b>. Any unrealised profit or loss becomes "
+            "real the moment you tap.\n\n"
+            "The bot keeps running afterwards unless you also stop it."
+            + unknown,
+            _back_kb(chat_id, [
+                [(f"⚠️ Yes — close {'all' if n is None else n} now", "emg:go")],
+                [("↩️ Cancel — leave them open", "emg:cancel")]]))
+
+
+def _emergency_close_all(chat_id):
+    send_to(chat_id, "🔴 Closing every open position…")
+    try:
+        res = user_loop.force_close_all(chat_id)
+    except Exception as e:
+        return send_to(chat_id,
+                       "❌ <b>The close did not go through.</b>\n"
+                       f"<i>{_esc(str(e)[:160])}</i>\n\n"
+                       "<b>Your positions may still be open.</b> Check cTrader "
+                       "and close them there.",
+                       _back_kb(chat_id, [[("📈 Positions", "nav:pos")]]))
+    try:
+        from apex import control
+        control._audit({"ts": int(time.time()), "actor": str(chat_id),
+                        "action": "emergency_close_all",
+                        "closed": res.get("closed"), "failed": res.get("failed")})
+    except Exception as e:
+        print(f"[Telegram] emergency close audit failed: {e}")
+    closed = [c for c in (res.get("closed") or []) if c]
+    failed = res.get("failed") or []
+    parts = []
+    if closed:
+        parts.append(f"✅ Closed: <b>{_esc(', '.join(str(c) for c in closed))}</b>")
+    if not closed and not failed:
+        parts.append("📭 Nothing was open.")
+    if failed:
+        # The one outcome that must never be softened: still exposed.
+        names = ", ".join(str(f.get("symbol") or "?") for f in failed)
+        parts.append(f"\n🚨 <b>STILL OPEN: {_esc(names)}</b>\n"
+                     "The broker did not confirm the close, so you are still "
+                     "in these trades. <b>Open cTrader and close them "
+                     "yourself.</b>")
+    if res.get("sweepError"):
+        parts.append(f"\n⚠️ <i>Could not read the full position list: "
+                     f"{_esc(str(res['sweepError']))}. Check cTrader.</i>")
+    send_to(chat_id, "🔴 <b>Emergency close</b>\n" + "\n".join(parts),
+            _back_kb(chat_id, [[("📈 Positions", "nav:pos"),
+                                ("📊 Overview", "nav:over")]]))
+
+
+# ─── Account ──────────────────────────────────────────────
+
+def _screen_account(chat_id):
+    u = user_store.load(chat_id)
+    accounts = u.get("ctrader_accounts") or []
+    cur_id = str(u.get("ctrader_account_id", "") or "")
+    dash = user_loop.get_dash(chat_id) or {}
+    bal = dash.get("balance")
+    lines = ["👤 <b>Account</b>", _state_line(chat_id), "━━━━━━━━━━━━━━━━━━━━"]
+    if not u.get("ctrader_access_token"):
+        return send_to(chat_id,
+                       "\n".join(lines) + "\n\n🔗 <b>No broker connected yet.</b>\n"
+                       "Connect a cTrader account and the bot can start.",
+                       _back_kb(chat_id, [[("🔗 Connect my account", "go:connect")]]))
+    lines.append(f"Broker account: <code>{_esc(cur_id or '—')}</code>")
+    lines.append(f"Balance: <b>{('$%.2f' % bal) if isinstance(bal, (int, float)) else '—'}</b>")
+    if len(accounts) > 1:
+        lines.append(f"\nYou have <b>{len(accounts)}</b> linked accounts.")
+    rows = [[("🔄 Switch account", "acct:switch")]]
+    if (u.get("ctrader_env") or "demo").lower() == "live" and u.get("paper", True):
+        rows.insert(0, [("🔴 Activate real-money trading", "live:start")])
+    send_to(chat_id, "\n".join(lines), _back_kb(chat_id, rows))
+
+
+def _screen_live_activation(chat_id):
+    """The door to real money. It does not open it — /paper off still does.
+
+    Deliberately a thin wrapper: the token, the TTL, the risk cap and the
+    audit entry all live in _handle_paper, and a second activation path is
+    exactly the kind of thing that ends up missing one of them.
+    """
+    u = user_store.load(chat_id)
+    if (u.get("ctrader_env") or "demo").lower() != "live":
+        return send_to(chat_id,
+                       "🧪 <b>This is a demo account.</b>\n\n"
+                       "Real-money activation applies to a LIVE broker account. "
+                       "Connect or switch to one first.",
+                       _back_kb(chat_id, [[("🔄 Switch account", "acct:switch")]]))
+    send_to(chat_id,
+            "🔴 <b>Real-money trading</b>\n"
+            f"{_state_line(chat_id, guard=True)}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "The bot is connected to a LIVE account but is still simulating. "
+            "Turning that off means the next setup places a real order.\n\n"
+            + _protection_stack(chat_id) +
+            "\n\nActivation needs a confirmation code you type back, and lands "
+            f"with risk capped at <b>{_LIVE_INITIAL_RISK_CAP:.0%}</b> per trade "
+            "whatever it was set to while simulating.",
+            _back_kb(chat_id, [[("🔴 Start activation", "live:go")],
+                               [("↩️ Stay in simulation", "nav:acct")]]))
+
+
 def _handle_terminal(chat_id):
     """Open the Telegram Mini App — live interactive chart, position, news."""
     base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
@@ -3166,7 +3795,12 @@ def _user_alert(uid, result):
         n = result.get("countToday")
         nth = f" · {n}{'st' if n == 1 else 'nd' if n == 2 else 'rd' if n == 3 else 'th'} skip today" \
             if isinstance(n, int) and n > 0 else ""
-        send_to(uid, f"⚠️ <b>Holding off on {result.get('symbol', sym)}</b>{nth}\n"
+        # Trade Blocked — a setup existed and a guard refused it. Naming the
+        # guard is what turns "the bot isn't doing anything" into "the bot is
+        # working and this is why".
+        send_to(uid, f"⚠️ <b>Trade blocked — {result.get('symbol', sym)}</b>{nth}\n"
+                     f"{_state_line(uid, guard=True)}\n"
+                     "━━━━━━━━━━━━━━━━━━━━\n"
                      f"<i>{_esc(result.get('reason', 'market conditions are unfavourable right now'))}.</i>\n"
                      "Still scanning — I'll take the trade as soon as conditions "
                      "normalise, and I won't repeat this unless something changes.")
@@ -3187,14 +3821,34 @@ def _user_alert(uid, result):
                      f"<i>{ev.get('currency', '')} · {ev.get('title', 'event')} in ~{ev.get('mins', 0)} min.</i>\n"
                      "Spreads blow out and price gaps around releases — I'll resume once it passes.")
     elif action == "SUGGEST":
+        # Trade Opportunity — the approval-required variant. The state banner
+        # is not decoration: "is this my demo or my real account" is the first
+        # thing anyone wants to know before tapping Approve.
         d = "🟢 BUY" if result.get("side") == "BUY" else "🔴 SELL"
         send_to(uid,
-                f"🤖 <b>Copilot suggestion</b>\n{d} <b>{sym}</b> @ {result.get('price', '—')}"
+                f"⚡ <b>Trade opportunity</b>\n{_state_line(uid, guard=True)}\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"{d} <b>{sym}</b> @ {_fmt_px(result.get('price'))}"
                 + _fx_why_block(result) +
-                "\n\n<i>You're in copilot mode — approve to execute, or reject to skip.</i>",
+                "\n\n<i>Nothing opens until you tap Approve.</i>",
                 extra={"reply_markup": {"inline_keyboard": [[
                     {"text": "✅ Approve", "callback_data": "cp:y"},
                     {"text": "❌ Reject", "callback_data": "cp:n"}]]}})
+    elif action == "SIGNAL":
+        # Signals Only — there is deliberately no Approve button, because
+        # there is nothing stored to approve. Saying so plainly is the whole
+        # point: the client must never be left wondering whether the bot took
+        # this one.
+        d = "🟢 BUY" if result.get("side") == "BUY" else "🔴 SELL"
+        send_to(uid,
+                f"📣 <b>Signal</b> — no order placed\n{_state_line(uid)}\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"{d} <b>{sym}</b> @ {_fmt_px(result.get('price'))}"
+                + _fx_why_block(result) +
+                "\n\n<i>You're on Signals Only, so I placed nothing. Trade it "
+                "yourself, or change what I'm allowed to do below.</i>",
+                _back_kb(uid, [[("🤖 Automation", "nav:auto"),
+                                ("📡 Market", "nav:mkt")]]))
     elif action in ("BUY", "SELL"):
         spread = result.get("spreadPips")
         spread_line = f" | Spread: {spread}p" if spread is not None else ""
@@ -3206,8 +3860,11 @@ def _user_alert(uid, result):
                 rr_line = f"\n🎯 SL <b>{sl_:g}</b> · TP <b>{tp_:g}</b> · RR <b>1:{abs(tp_ - px_) / abs(px_ - sl_):.1f}</b>"
         except (TypeError, ValueError):
             pass
+        # Trade Executed. The state banner says whose money just moved.
         send_to(uid,
                 f"{d} <b>{action}</b> — {sym}\n"
+                f"{_state_line(uid, guard=True)}\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
                 f"Price: <b>{_fmt_px(result.get('price'))}</b> | "
                 f"Confidence: <b>{result.get('confidence', 0)}%</b>{spread_line}{rr_line}"
                 + _fx_why_block(result))
@@ -3646,13 +4303,19 @@ _HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "/controls or /settings — all controls explained\n"
                 "/purchase — buy your license ($497)\n"
                 "/help — this list\n\n"
+                "/menu — every screen, as buttons\n\n"
                 "<b>📊 Trading</b>\n"
                 f"/buy — open a BUY · /sell — open a SELL\n"
                 "/close — close current position\n"
-                "/report — trade journal + P&amp;L\n\n"
+                "/open — what's open right now\n"
+                "/performance — results by period, method and pair\n"
+                "/report — trade journal + P&amp;L\n"
+                "/emergency — stop new trades, or close everything\n\n"
                 "<b>⚙️ Settings</b>\n"
+                "/automation — signals only, approval, or full\n"
                 "/copilot on|off — approve trades yourself\n"
                 "/builder — build your strategy\n"
+                "/account — broker account and live activation\n"
                 "/news — high-impact events\n\n"
                 f"{_DEMO_LIVE_HELP}"
                 "💬 <i>Or just ask me a question — write in any language, I answer in English.</i>")
@@ -3663,11 +4326,17 @@ _CONTROLS_TEXT = (
     "<b>🟢 Getting Started</b>\n"
     "/ctrader — Connect your cTrader broker account\n"
     f"{_SETUP_LINE_CONTROLS}"
+    "<b>☰ Everything, as buttons</b>\n"
+    "/menu — Overview, Positions, Strategy, Risk, Automation, Performance, "
+    "Market, News, Settings, Help, Pause, Emergency\n\n"
     "<b>⏯ ON / OFF</b>\n"
     "/start — Turn the bot ON (it watches the market and trades automatically)\n"
-    "/stop — Pause the bot (no new trades; open positions keep their safety stop)\n\n"
+    "/stop — Pause the bot (no new trades; open positions keep their safety stop)\n"
+    "/emergency — Stop new trades, or close every open position at once\n\n"
     "<b>📊 Trading</b>\n"
     "/status — See your current position, balance, and bot state\n"
+    "/open — Every position open right now, with live P&amp;L\n"
+    "/performance — Results by day, week, month, method and instrument\n"
     "/report — Full trade journal with profit/loss breakdown\n"
     "/terminal — Open the live dashboard (chart, equity, stats)\n"
     "/buy — Manually open a BUY trade\n"
@@ -3683,7 +4352,11 @@ _CONTROLS_TEXT = (
     "/tptarget 5 — Or target a % of your balance per win instead (scales with the account)\n"
     "/atr on|off — Use dynamic ATR-based stops\n"
     "/aiconfirm on|off — AI double-checks each entry (on) or pure rules (off)\n"
-    "/copilot on|off — Approve each trade before it opens\n"
+    "/automation — How much the bot may do alone: Signals Only (it tells you "
+    "and places nothing), Approval Required (it asks first), Full Automation\n"
+    "/copilot on|off — Approve each trade before it opens (same setting, "
+    "older name)\n"
+    "/account — Which broker account you're on, and real-money activation\n"
     "/builder — Build a custom strategy step by step\n"
     "/autopilot on — Let the bot pick the best instruments too\n"
     "/maxpos 3 — Allow multiple positions at once\n\n"
@@ -4124,10 +4797,25 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         _handle_ctrader(chat_id)
     elif cmd_l == "/ctaccount":
         _handle_ctaccount(chat_id, args)
-    elif cmd_l in ("/switch", "/account", "/golive"):
+    elif cmd_l == "/switch":
         _handle_switch(chat_id)
     elif cmd_l == "/copilot":
         _handle_copilot(chat_id, args)
+    elif cmd_l in ("/automation", "/mode"):
+        _handle_automation(chat_id, args)
+    elif cmd_l == "/menu":
+        _handle_menu(chat_id)
+    elif cmd_l == "/open":
+        # NOT /positions — that has meant "how many at once" since /maxpos
+        # shipped, and quietly repointing it would change what an existing
+        # client's muscle memory does.
+        _screen_positions(chat_id)
+    elif cmd_l in ("/emergency", "/panic"):
+        _screen_emergency(chat_id)
+    elif cmd_l == "/account":
+        _screen_account(chat_id)
+    elif cmd_l == "/golive":
+        _screen_live_activation(chat_id)
     elif cmd_l == "/news":
         _handle_news(chat_id)
     elif cmd_l in ("/market", "/m"):
@@ -4170,8 +4858,14 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         _handle_atr(chat_id, args)
     elif cmd_l == "/aiconfirm":
         _handle_aiconfirm(chat_id, args)
-    elif cmd_l in ("/stats", "/performance"):
+    elif cmd_l == "/stats":
         _handle_stats(chat_id)
+    elif cmd_l == "/performance":
+        # Repointed off /stats deliberately. Both read the same journal, but
+        # only this one can answer "which of my seventeen methods is actually
+        # working" — and that is the question the number of methods creates.
+        # /stats is untouched for anyone who has it in muscle memory.
+        _screen_performance(chat_id, "today")
     elif cmd_l in ("/resetstats", "/resetjournal"):
         _handle_resetstats(chat_id)
     elif cmd_l == "/buy":
