@@ -282,6 +282,38 @@ def build():
         return {"user": uid, "delivered": text,
                 "note": "the bot replied in the client's Telegram"}
 
+    # ── Operations API (apex/ops_api.py) ──────────────────
+    # Small, explicit, read-only tools rather than one powerful generic one.
+    # There is deliberately no ops_execute(action, params) and no ops_query(sql):
+    # a generic tool is only as safe as the caller's restraint, and the caller
+    # is a language model reading a chat message.
+    from apex import ops_api
+
+    def _uid_arg(args):
+        return args.get("user_id")
+
+    ops = {
+        "ops_system_health":        lambda a: ops_api.system_health(),
+        "ops_user_health":          lambda a: ops_api.user_health(_uid_arg(a)),
+        "ops_user_license":         lambda a: ops_api.user_license(_uid_arg(a)),
+        "ops_user_broker_status":   lambda a: ops_api.user_broker_status(_uid_arg(a)),
+        "ops_user_risk":            lambda a: ops_api.user_risk(_uid_arg(a)),
+        "ops_user_positions":       lambda a: ops_api.user_positions(_uid_arg(a)),
+        "ops_user_orders":          lambda a: ops_api.user_orders(_uid_arg(a),
+                                                                  a.get("limit", 10)),
+        "ops_user_worker_status":   lambda a: ops_api.user_worker_status(_uid_arg(a)),
+        "ops_user_ownership":       lambda a: ops_api.user_ownership(_uid_arg(a)),
+        "ops_user_incidents":       lambda a: ops_api.user_incidents(_uid_arg(a),
+                                                                     a.get("limit", 20)),
+        "ops_recent_errors":        lambda a: ops_api.recent_errors(a.get("user_id"),
+                                                                    a.get("limit", 20)),
+        "ops_reconcile_status":     lambda a: ops_api.reconcile_status(_uid_arg(a)),
+        "ops_investigate":          lambda a: ops_api.investigate(_uid_arg(a)),
+        "ops_degraded_users":       lambda a: ops_api.degraded_users(a.get("limit", 50)),
+        "ops_unprotected_positions": lambda a: ops_api.unprotected_positions(
+                                                   a.get("limit", 50)),
+    }
+
     return {
         "status": h_status,
         "user_detail": h_user_detail,
@@ -296,4 +328,5 @@ def build():
         "force_close": h_force_close,
         "force_trade": h_force_trade,
         "client_message": h_client_message,
+        **ops,
     }

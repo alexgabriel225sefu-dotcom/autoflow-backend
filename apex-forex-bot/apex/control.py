@@ -61,9 +61,80 @@ _RESULT    = lambda cid: f"{_NS}:cmdresult:{cid}"
 WRITE_ACTIONS = {"restart_loop", "bot_on", "bot_off", "refresh_token",
                  "set_setting", "send_message", "force_close", "force_trade"}
 
+# ─── Capability levels ────────────────────────────────────
+# An operations assistant reads state; it does not move money. Before this,
+# `force_trade` and `force_close` rode the SAME switch as `restart_loop`, so
+# turning on remote restarts also handed out order placement and position
+# closing. Levels split them, and each level has its own gate.
+#
+#   1 READ ONLY            always available
+#   2 CONTROLLED OPS       MCP_CONTROL_ENABLED, and the caller must confirm
+#   3 FINANCIAL            MCP_FINANCIAL_ENABLED, off by default, separately
+#
+# Anything not listed is treated as level 3. An action nobody classified is an
+# action nobody thought about, and the safe reading of that is "the dangerous
+# kind" — a new handler cannot become remotely callable by being forgotten.
+LEVEL_1_READ = {
+    "status", "user_detail", "events", "ctrader_account", "audit_log",
+    "affiliates_overview", "affiliate_stats", "recent_commands", "recent_events",
+    "bot_alive", "bot_status",
+    # The ops API (see apex/ops_api.py). All read-only by construction.
+    "ops_system_health", "ops_user_health", "ops_user_license",
+    "ops_user_broker_status", "ops_user_risk", "ops_user_positions",
+    "ops_user_orders", "ops_user_worker_status", "ops_user_ownership",
+    "ops_user_incidents", "ops_recent_errors", "ops_reconcile_status",
+    "ops_investigate", "ops_degraded_users", "ops_unprotected_positions",
+}
+LEVEL_2_CONTROLLED = {
+    "restart_loop", "bot_on", "bot_off", "refresh_token", "set_setting",
+    "send_message", "message_affiliate", "client_message",
+}
+LEVEL_3_FINANCIAL = {"force_close", "force_trade"}
+
+# Level-2 actions that change what the bot DOES rather than merely restarting
+# it still need MCP_CONTROL_ENABLED; confirmation is enforced per-call.
+CONFIRM_REQUIRED = LEVEL_2_CONTROLLED
+
+
+def level_of(action) -> int:
+    if action in LEVEL_1_READ:
+        return 1
+    if action in LEVEL_2_CONTROLLED:
+        return 2
+    return 3                     # unlisted == financial == denied by default
+
 
 def actions_enabled() -> bool:
     return (os.getenv("MCP_CONTROL_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def financial_enabled() -> bool:
+    """Level 3 needs its OWN switch, deliberately separate from level 2.
+
+    An operator who turns on remote restarts has not thereby agreed to let a
+    chat assistant place orders. Financial capability is never a side effect of
+    enabling operations.
+    """
+    return (os.getenv("MCP_FINANCIAL_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def authorize(action, args=None):
+    """(ok, reason) for one command. The single place authorization is decided."""
+    lvl = level_of(action)
+    if lvl == 1:
+        return True, "LEVEL_1_READ"
+    if lvl == 2:
+        if not actions_enabled():
+            return False, "LEVEL_2_DISABLED (set MCP_CONTROL_ENABLED=true)"
+        if action in CONFIRM_REQUIRED and not (args or {}).get("confirm"):
+            return False, "CONFIRMATION_REQUIRED (resend with confirm=true)"
+        return True, "LEVEL_2_CONFIRMED"
+    if not financial_enabled():
+        return False, ("LEVEL_3_FINANCIAL_DISABLED — financial actions are not "
+                       "available to the operations interface")
+    if not (args or {}).get("confirm"):
+        return False, "CONFIRMATION_REQUIRED (resend with confirm=true)"
+    return True, "LEVEL_3_CONFIRMED"
 
 
 # ─── Redis commands (standard or Upstash REST) ────────────
@@ -147,6 +218,28 @@ def _record_result(cid, ok, data):
     _cmd("EXPIRE", _RESULT(cid), 180)
 
 
+# Argument names that must never reach the audit log. The log is read by an
+# assistant and echoed into chat, so a token landing here leaves the process
+# entirely. Matching is on the KEY, and by substring, so `ctrader_access_token`
+# and a future `access_token_v2` are both caught.
+_SECRET_ARG_HINTS = ("token", "secret", "key", "password", "passwd", "credential",
+                     "auth", "cookie", "session", "private")
+
+
+def _safe_args(args):
+    """Arguments with anything credential-shaped replaced by a marker."""
+    out = {}
+    for k, v in (args or {}).items():
+        lk = str(k).lower()
+        if any(h in lk for h in _SECRET_ARG_HINTS):
+            out[k] = "[REDACTED]"
+        elif isinstance(v, str) and len(v) > 120:
+            out[k] = v[:120] + "…"
+        else:
+            out[k] = v
+    return out
+
+
 def _audit(entry):
     _cmd("LPUSH", K_AUDIT, json.dumps(entry))
     _cmd("LTRIM", K_AUDIT, 0, 499)
@@ -183,23 +276,39 @@ def start_consumer(handlers, poll=10.0, heartbeat_interval=60.0):
                 cid = cmd.get("id") or str(int(time.time() * 1000))
                 action = cmd.get("action", "")
                 args = cmd.get("args") or {}
-                if action in WRITE_ACTIONS and not actions_enabled():
-                    _record_result(cid, False, "write actions disabled "
-                                   "(set MCP_CONTROL_ENABLED=true to allow)")
+                lvl = level_of(action)
+                operator = str(cmd.get("operator") or "unknown")[:64]
+                # Authorization is decided in ONE place and recorded whether it
+                # passed or failed. A refusal nobody can see is indistinguishable
+                # from a request nobody made.
+                allowed, why = authorize(action, args)
+                if not allowed:
+                    _record_result(cid, False, why)
+                    _audit({"ts": int(time.time()), "cid": cid, "action": action,
+                            "level": lvl, "operator": operator,
+                            "user": str(args.get("user_id") or ""),
+                            "args": _safe_args(args), "authorized": False,
+                            "confirmed": bool(args.get("confirm")),
+                            "ok": False, "err": why})
                     continue
                 fn = handlers.get(action)
                 if not fn:
                     _record_result(cid, False, f"unknown action: {action}")
                     continue
+                base = {"ts": int(time.time()), "cid": cid, "action": action,
+                        "level": lvl, "operator": operator,
+                        "user": str(args.get("user_id") or ""),
+                        "args": _safe_args(args), "authorized": True,
+                        "confirmed": bool(args.get("confirm"))}
                 try:
                     data = fn(args)
                     _record_result(cid, True, data)
-                    _audit({"ts": int(time.time()), "action": action,
-                            "args": args, "ok": True})
+                    _audit({**base, "ok": True})
                 except Exception as e:
+                    # The message only. A traceback can carry file paths, config
+                    # values and occasionally the argument that failed to parse.
                     _record_result(cid, False, str(e)[:300])
-                    _audit({"ts": int(time.time()), "action": action,
-                            "args": args, "ok": False, "err": str(e)[:200]})
+                    _audit({**base, "ok": False, "err": str(e)[:200]})
             except Exception as e:
                 print(f"[Control] consumer loop error: {e}")
                 time.sleep(poll)
