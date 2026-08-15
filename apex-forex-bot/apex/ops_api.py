@@ -23,6 +23,12 @@ from apex import access, ownership, user_loop, user_store
 
 UNKNOWN = "UNKNOWN"
 
+# Past this, the worker cache stops being reported as a position and starts
+# being reported as UNKNOWN. Two full ticks plus margin: one missed tick is a
+# slow broker read, three means the loop is not reconciling and whatever it
+# last published may no longer resemble the account.
+_STALE_AFTER_S = 900
+
 # Statuses an investigation can conclude with. Deliberately includes UNKNOWN.
 HEALTHY, DEGRADED, RECOVERY = "HEALTHY", "DEGRADED", "RECOVERY"
 SAFE_MODE, BLOCKED = "SAFE_MODE", "BLOCKED"
@@ -174,11 +180,32 @@ def user_positions(user_id):
     pos = dash.get("openPosition")
     last = dash.get("lastTickTs")
     unprotected = bool(pos and not (pos.get("stopLoss") or pos.get("sl")))
+    age = int(time.time() - last) if isinstance(last, (int, float)) and last else None
+
+    # An age is not enough on its own. "as_of_s: 900" reads as a detail next to
+    # a position list, and the position list is what gets acted on — so past
+    # the point where the data can still be trusted this stops presenting it as
+    # current and says so in the status field, which nothing skims past.
+    if age is None:
+        return _unknown("the worker has published no tick timestamp, so the age "
+                        "of this position data cannot be established",
+                        positions=[_redact(pos)] if pos else [],
+                        freshness=UNKNOWN)
+    if age > _STALE_AFTER_S:
+        return _unknown(
+            f"last worker tick was {age}s ago (> {_STALE_AFTER_S}s) — this is the "
+            f"last state the loop published, not the broker's current position",
+            positions=[_redact(pos)] if pos else [],
+            open_count=dash.get("openCount", 1 if pos else 0),
+            protection=UNKNOWN,        # cannot vouch for a stop we last saw long ago
+            as_of_s=age, freshness="STALE",
+        )
     return _ok(
         open_count=dash.get("openCount", 1 if pos else 0),
         positions=[_redact(pos)] if pos else [],
         protection="MISSING_STOP" if unprotected else ("OK" if pos else "N/A"),
-        as_of_s=int(time.time() - last) if isinstance(last, (int, float)) and last else UNKNOWN,
+        as_of_s=age, freshness="FRESH",
+        source="worker cache (last published tick), not a live broker read",
     )
 
 

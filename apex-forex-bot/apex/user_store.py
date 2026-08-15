@@ -30,16 +30,64 @@ _SENSITIVE_FIELDS = {
 }
 _ENC_PREFIX = "enc:"
 
+class EncryptionNotConfigured(RuntimeError):
+    """Credentials would be stored in plaintext. Refuse to start instead."""
+
+
+def _is_production() -> bool:
+    """Production unless a developer has explicitly said otherwise.
+
+    Deliberately inverted from the usual `if ENV == "production"`. That form
+    fails OPEN — an unset variable, a typo, a new hosting provider that names
+    the variable differently, and the process quietly decides it is a laptop.
+    Here anything unrecognised is production, so the failure is a refused
+    startup on a dev box rather than plaintext broker tokens on a live one.
+    """
+    env = (os.getenv("APP_ENV") or os.getenv("ENV") or "").strip().lower()
+    if env in ("dev", "development", "local", "test"):
+        return False
+    # Render sets this on every real deployment; its presence is proof.
+    if os.getenv("RENDER") or os.getenv("RENDER_SERVICE_ID"):
+        return True
+    return True
+
+
+def _plaintext_allowed() -> bool:
+    """Only a development box, only with an explicit opt-in, never both absent."""
+    flag = (os.getenv("ALLOW_PLAINTEXT_DEV_STORAGE") or "").strip().lower()
+    return flag in ("1", "true", "yes", "on") and not _is_production()
+
+
 _fernet = None
+_FERNET_ERROR = None
+
 if cfg.TOKEN_ENCRYPTION_KEY:
     try:
         from cryptography.fernet import Fernet
         _fernet = Fernet(cfg.TOKEN_ENCRYPTION_KEY.encode())
     except Exception as e:
-        print(f"[Store] TOKEN_ENCRYPTION_KEY set but invalid, storing in PLAINTEXT: {e}")
+        # The message only. The key itself must never reach a log line.
+        _FERNET_ERROR = f"TOKEN_ENCRYPTION_KEY is set but not a valid Fernet key ({type(e).__name__})"
 else:
-    print("⚠️  WARNING: TOKEN_ENCRYPTION_KEY not set — broker tokens & AI keys "
-          "are stored in PLAINTEXT. Set it in production (Fernet.generate_key()).")
+    _FERNET_ERROR = "TOKEN_ENCRYPTION_KEY is not set"
+
+if _fernet is None:
+    if _plaintext_allowed():
+        print(f"[Store] ⚠️  {_FERNET_ERROR}. ALLOW_PLAINTEXT_DEV_STORAGE is on and "
+              f"this is not production — broker tokens and AI keys will be stored "
+              f"in PLAINTEXT. Never set this flag on a deployed service.")
+    else:
+        # Fail closed. A warning was not enough: it scrolled past on every boot
+        # and the bot kept running, so the deployment that mattered stored live
+        # broker tokens in plaintext for as long as nobody read the logs.
+        raise EncryptionNotConfigured(
+            f"{_FERNET_ERROR}. Credentials at rest would be PLAINTEXT, so startup "
+            f"is refused. Generate one with:\n"
+            f"    python3 -c \"from cryptography.fernet import Fernet; "
+            f"print(Fernet.generate_key().decode())\"\n"
+            f"and set TOKEN_ENCRYPTION_KEY. For local development only, set "
+            f"ALLOW_PLAINTEXT_DEV_STORAGE=true together with APP_ENV=dev."
+        )
 
 
 def _encrypt_sensitive(data: dict) -> dict:
@@ -461,7 +509,56 @@ class PersistenceError(RuntimeError):
     """A write that was asked to be certain, and was not."""
 
 
-def save(user_id, data, strict=False):
+class ConflictError(RuntimeError):
+    """Somebody else changed this record since it was read."""
+
+
+# One user record is TWO Redis keys — the record itself and its membership of
+# the active set — and they were written by two separate calls. A failure
+# between them left the account in a state neither half describes: a record
+# that says active with the set saying otherwise (the watchdog never restarts
+# it) or the reverse (a revoked client keeps getting a loop). This does both,
+# plus the version bump, in one server-side step.
+#
+# The version is a separate integer key rather than a field inside the JSON,
+# because checking a field would mean parsing JSON inside Lua — cjson exists
+# but its availability across Redis and Upstash is one more thing that has to
+# be true for a credential write to land, and this needs no dependencies.
+#
+# Returns the new version, or -1 for a version mismatch (CONFLICT).
+_LUA_SAVE_USER = """
+local expected = ARGV[4]
+if expected ~= '' then
+  local cur = redis.call('GET', KEYS[3])
+  if cur == false then cur = '0' end
+  if cur ~= expected then return -1 end
+end
+redis.call('SET', KEYS[1], ARGV[1])
+if ARGV[3] == '1' then
+  redis.call('SADD', KEYS[2], ARGV[2])
+else
+  redis.call('SREM', KEYS[2], ARGV[2])
+end
+return redis.call('INCR', KEYS[3])
+"""
+
+
+def _vkey(user_id):
+    return f"{_NS}:uver:{user_id}"
+
+
+def version(user_id):
+    """The record's current version, 0 when it has never been written."""
+    if not _USE_REDIS:
+        return int((load(user_id) or {}).get("_v") or 0)
+    raw = _redis_get(_vkey(str(user_id)))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return 0
+
+
+def save(user_id, data, strict=False, expect_version=None):
     """Persist a user record. Returns True only if the write actually landed.
 
     This used to return None unconditionally: `_redis_set`'s result was
@@ -475,25 +572,50 @@ def save(user_id, data, strict=False):
     The default stays non-raising because most callers are loop bookkeeping,
     and turning a Redis blip into an unhandled exception inside the trading
     loop trades a silent bug for a louder one.
+
+    `expect_version` turns this into a compare-and-set. Pass the version read
+    alongside the record and the write only lands if nobody changed it since;
+    a mismatch raises ConflictError rather than overwriting. Without it the
+    load/modify/save pattern silently loses whichever writer finished first —
+    two operators adjusting risk, or a client tapping a button while the loop
+    writes bookkeeping, and one of the changes is simply gone.
     """
     user_id = str(user_id)
     stored = _encrypt_sensitive(data)
     if _USE_REDIS:
-        ok = _redis_set(f"{_NS}:user:{user_id}", json.dumps(stored))
-        if data.get("active"):
-            _redis_sadd(_ACTIVE_SET, user_id)
-        else:
-            _redis_srem(_ACTIVE_SET, user_id)
-        if not ok:
+        # Record, active-set membership and version in ONE step. Written as
+        # three calls, a failure between them left the two halves disagreeing.
+        res = _eval(_LUA_SAVE_USER,
+                    [f"{_NS}:user:{user_id}", _ACTIVE_SET, _vkey(user_id)],
+                    [json.dumps(stored), user_id,
+                     "1" if data.get("active") else "0",
+                     "" if expect_version is None else str(int(expect_version))])
+        if res is None:
             print(f"[Store] WRITE LOST for user {user_id} — Redis did not "
                   f"confirm the save")
             if strict:
                 raise PersistenceError(f"could not persist user {user_id}")
-        return bool(ok)
+            return False
+        if int(res) == -1:
+            print(f"[Store] CONFLICT on user {user_id} — the record changed "
+                  f"since it was read (expected v{expect_version})")
+            raise ConflictError(
+                f"user {user_id} changed since it was read "
+                f"(expected v{expect_version}, now v{version(user_id)})")
+        return True
     try:
+        if expect_version is not None:
+            cur = int((load(user_id) or {}).get("_v") or 0)
+            if cur != int(expect_version):
+                raise ConflictError(
+                    f"user {user_id} changed since it was read "
+                    f"(expected v{expect_version}, now v{cur})")
+        stored["_v"] = int((load(user_id) or {}).get("_v") or 0) + 1
         with open(_path(user_id), "w") as f:
             json.dump(stored, f, indent=2)
         return True
+    except ConflictError:
+        raise
     except Exception as e:
         print(f"[Store] WRITE LOST for user {user_id}: {e}")
         if strict:
@@ -501,10 +623,59 @@ def save(user_id, data, strict=False):
         return False
 
 
-def update(user_id, updates, strict=False):
-    d = load(user_id)
-    d.update(updates)
-    return save(user_id, d, strict=strict)
+# Fields where a lost update is a correctness or safety problem rather than a
+# stale number: entitlement, credentials, and the live/paper switch. A write
+# touching any of these goes through the compare-and-set path automatically,
+# so a caller cannot lose one by forgetting to ask.
+CRITICAL_FIELDS = {
+    "license_key", "active", "paper",
+    "ctrader_access_token", "ctrader_refresh_token", "ctrader_account_id",
+    "ctrader_env", "ctrader_accounts", "broker",
+    "risk", "max_dd_pct", "max_daily_loss_pct", "maxpos", "max_total_risk",
+    "automation", "copilot", "loss_streak",
+}
+
+# Concurrent writers are rare and the window is milliseconds, so a handful of
+# retries resolves essentially all real contention. Failing after that is
+# deliberate: at some point "somebody keeps changing this" is the answer, and
+# looping forever would hide it.
+_CAS_RETRIES = 5
+
+
+def update(user_id, updates, strict=False, expect_version=None):
+    """Merge `updates` into the record.
+
+    A plain load/modify/save races: two writers both read v1, both write v2,
+    and the first writer's change is gone with nothing reporting it. When the
+    update touches a CRITICAL_FIELD this re-reads and retries under
+    compare-and-set, so a concurrent write is merged rather than lost.
+
+    `expect_version` forces the check for any field and does NOT retry — the
+    caller has decided what it expected, so a mismatch is theirs to handle.
+    """
+    if expect_version is not None:
+        d = load(user_id)
+        d.update(updates)
+        return save(user_id, d, strict=strict, expect_version=expect_version)
+
+    if not (set(updates or {}) & CRITICAL_FIELDS) or not _USE_REDIS:
+        d = load(user_id)
+        d.update(updates)
+        return save(user_id, d, strict=strict)
+
+    last = None
+    for _attempt in range(_CAS_RETRIES):
+        v = version(user_id)
+        d = load(user_id)
+        d.update(updates)
+        try:
+            return save(user_id, d, strict=strict, expect_version=v)
+        except ConflictError as e:
+            last = e                      # somebody else won; re-read and redo
+    print(f"[Store] gave up after {_CAS_RETRIES} conflicts on user {user_id}")
+    if strict:
+        raise last or ConflictError(f"user {user_id} is being written concurrently")
+    return False
 
 
 def clear_trades(user_id):

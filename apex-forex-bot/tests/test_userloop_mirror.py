@@ -19,6 +19,11 @@ import sys
 import types
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Tests are a development environment and say so explicitly: user_store now
+# REFUSES to start without TOKEN_ENCRYPTION_KEY rather than falling back to
+# plaintext, and that refusal is the behaviour under test elsewhere.
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 
 from apex import position, user_loop  # noqa: E402
 

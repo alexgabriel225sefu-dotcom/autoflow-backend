@@ -19,6 +19,11 @@ import sys
 
 os.environ.setdefault("PAPER_TRADING", "true")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Tests are a development environment and say so explicitly: user_store now
+# REFUSES to start without TOKEN_ENCRYPTION_KEY rather than falling back to
+# plaintext, and that refusal is the behaviour under test elsewhere.
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 
 from apex import control, ops_api, ownership, user_loop, user_store  # noqa: E402
 
@@ -45,40 +50,46 @@ print("\n🧪 OPS API — authorization, isolation, safe failure\n")
 
 # ─────────────────────────────────────────────────────────────
 print("1. Capability levels")
-env(MCP_CONTROL_ENABLED=None, MCP_FINANCIAL_ENABLED=None)
+# Levels 2 and 3 also require a named, allowlisted operator (see
+# tests/test_hardening.py section 5). These checks are about the LEVEL rules,
+# so they supply a valid operator and vary only the switches.
+OP = "owner"
+env(MCP_OPERATORS=OP, MCP_CONTROL_ENABLED=None, MCP_FINANCIAL_ENABLED=None)
 check("reads work with everything switched off",
       control.authorize("ops_user_health", {"user_id": "1"})[0] is True)
-check("a controlled op is refused", control.authorize("restart_loop", {})[0] is False)
+check("a controlled op is refused",
+      control.authorize("restart_loop", {}, operator=OP)[0] is False)
 check("and says why",
-      "LEVEL_2_DISABLED" in control.authorize("restart_loop", {})[1])
+      "LEVEL_2_DISABLED" in control.authorize("restart_loop", {}, operator=OP)[1])
 check("a financial action is refused",
-      control.authorize("force_trade", {})[0] is False)
+      control.authorize("force_trade", {}, operator=OP)[0] is False)
 
 env(MCP_CONTROL_ENABLED="true")
-ok, why = control.authorize("restart_loop", {})
+ok, why = control.authorize("restart_loop", {}, operator=OP)
 check("with ops enabled it still needs confirmation",
       ok is False and "CONFIRMATION_REQUIRED" in why, why)
 check("confirmed, it passes",
-      control.authorize("restart_loop", {"confirm": True})[0] is True)
+      control.authorize("restart_loop", {"confirm": True}, operator=OP)[0] is True)
 
 # The point of the whole level split: enabling operations must not enable money.
-ok, why = control.authorize("force_trade", {"confirm": True})
+ok, why = control.authorize("force_trade", {"confirm": True}, operator=OP)
 check("enabling LEVEL 2 does NOT enable LEVEL 3",
       ok is False and "FINANCIAL_DISABLED" in why, why)
 check("closing a position is financial too",
-      control.authorize("force_close", {"confirm": True})[0] is False)
+      control.authorize("force_close", {"confirm": True}, operator=OP)[0] is False)
 
 env(MCP_FINANCIAL_ENABLED="true")
 check("financial needs its own switch AND a confirmation",
-      control.authorize("force_trade", {})[0] is False)
+      control.authorize("force_trade", {}, operator=OP)[0] is False)
 check("both present → allowed",
-      control.authorize("force_trade", {"confirm": True})[0] is True)
+      control.authorize("force_trade", {"confirm": True}, operator=OP)[0] is True)
 env(MCP_CONTROL_ENABLED=None, MCP_FINANCIAL_ENABLED=None)
 
 print("\n   an unclassified action is treated as the dangerous kind")
 check("an unknown action is level 3", control.level_of("ops_delete_everything") == 3)
 check("and is therefore refused by default",
-      control.authorize("ops_delete_everything", {"confirm": True})[0] is False)
+      control.authorize("ops_delete_everything", {"confirm": True},
+                        operator=OP)[0] is False)
 check("every registered read tool is level 1",
       all(control.level_of(a) == 1 for a in control.LEVEL_1_READ))
 check("no action is in two levels at once",
@@ -192,6 +203,42 @@ check("a blocked client always has new entries BLOCKED",
           ("worker", ops_api._ok(running=False)))))
 
 # ─────────────────────────────────────────────────────────────
+print("\n4b. Stale position data is reported as stale, not as position data")
+_ol2, _od2 = user_store.load, user_loop.get_dash
+try:
+    user_store.load = lambda _u: {"paper": True}
+    import time as _t
+    # Fresh: a tick moments ago.
+    user_loop.get_dash = lambda _u: {"openPosition": {"symbol": "EURUSD",
+                                                      "stopLoss": 1.1},
+                                     "lastTickTs": _t.time(), "openCount": 1}
+    r = ops_api.user_positions("123456")
+    check("a recent tick reports the position", r["status"] == "OK", r)
+    check("and marks it FRESH", r.get("freshness") == "FRESH", r)
+    check("and names the source rather than implying a live broker read",
+          "not a live broker read" in str(r.get("source", "")), r)
+
+    # Stale: older than the threshold.
+    user_loop.get_dash = lambda _u: {"openPosition": {"symbol": "EURUSD",
+                                                      "stopLoss": 1.1},
+                                     "lastTickTs": _t.time() - 1200,
+                                     "openCount": 1}
+    r = ops_api.user_positions("123456")
+    check("an old tick is UNKNOWN, not OK", r["status"] == ops_api.UNKNOWN, r)
+    check("marked STALE", r.get("freshness") == "STALE", r)
+    check("protection is not vouched for from stale data",
+          r.get("protection") == ops_api.UNKNOWN, r)
+    check("the reason says the age out loud", "1200s ago" in r.get("reason", ""),
+          r.get("reason"))
+
+    # No timestamp at all: age cannot be established.
+    user_loop.get_dash = lambda _u: {"openPosition": {"symbol": "EURUSD"}}
+    r = ops_api.user_positions("123456")
+    check("no timestamp → UNKNOWN rather than assumed current",
+          r["status"] == ops_api.UNKNOWN and r.get("freshness") == ops_api.UNKNOWN, r)
+finally:
+    user_store.load, user_loop.get_dash = _ol2, _od2
+
 print("\n5. Investigation changes nothing")
 check("investigate() records that it took no financial action",
       "financial_action_taken" in OPS and '"financial_action_taken": False' in OPS)

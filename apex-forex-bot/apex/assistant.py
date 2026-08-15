@@ -129,8 +129,6 @@ def _save_exchange(user_id: str, user_msg: str, assistant_msg: str):
 def _build_context(user_id: str) -> str:
     """Inject live account state so the AI talks with real numbers."""
     from apex import user_loop, user_store, forex, indicators
-    from apex.brokers.ctrader import CtraderBroker
-    import types
 
     user = user_store.load(user_id)
     dash = user_loop.get_dash(user_id) or {}
@@ -155,22 +153,11 @@ def _build_context(user_id: str) -> str:
         lines.append(f"Last price: {last_price:.5f}")
 
     try:
-        fake_cfg = types.SimpleNamespace(
-            CTRADER_ACCESS_TOKEN=user.get("ctrader_access_token", ""),
-            CTRADER_REFRESH_TOKEN=user.get("ctrader_refresh_token", ""),
-            CTRADER_ACCOUNT_ID=user.get("ctrader_account_id", ""),
-            CTRADER_ENV=ct_env,
-            SYMBOL=symbol, TIMEFRAME=cfg.TIMEFRAME, CANDLES=50,
-            PAPER_TRADING=paper, PAPER_BALANCE=balance,
-            STOP_LOSS_PIPS=float(user.get("sl_pips", cfg.STOP_LOSS_PIPS)),
-            TAKE_PROFIT_PIPS=float(user.get("tp_pips", cfg.TAKE_PROFIT_PIPS)),
-            RISK_PER_TRADE=float(user.get("risk", cfg.RISK_PER_TRADE)),
-            LEVERAGE=float(user.get("leverage", cfg.LEVERAGE)),
-            MARGIN_CAP=0.5, MAX_SPREAD_PIPS=3.0,
-            MIN_CONFIDENCE=int(user.get("min_confidence", cfg.MIN_CONFIDENCE)),
-        )
-        broker = CtraderBroker(fake_cfg)
-        candles = broker.get_candles(symbol, cfg.TIMEFRAME, 50)
+        # Market data via user_loop, which owns broker construction. This module
+        # must not handle broker credentials: it is the one that talks to a
+        # language model, and a credential path here is the kind that later
+        # grows an order call.
+        candles = user_loop.read_candles(user_id, symbol, 50)
         if candles:
             ind = indicators.analyze(candles)
             lines.append(
@@ -214,22 +201,8 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
         # broker lookup wants it.
         send_status(f"🔍 Analyzing <b>{symbol.replace(chr(95), '')}</b>…")
         try:
-            from apex.brokers.ctrader import CtraderBroker
-            import types
-            user = user_store.load(user_id)
-            fake_cfg = types.SimpleNamespace(
-                CTRADER_ACCESS_TOKEN=user.get("ctrader_access_token", ""),
-                CTRADER_REFRESH_TOKEN=user.get("ctrader_refresh_token", ""),
-                CTRADER_ACCOUNT_ID=user.get("ctrader_account_id", ""),
-                CTRADER_ENV=user.get("ctrader_env", "demo"),
-                SYMBOL=symbol, TIMEFRAME=cfg.TIMEFRAME,
-                CANDLES=100, PAPER_TRADING=user.get("paper", True), PAPER_BALANCE=1000,
-                STOP_LOSS_PIPS=cfg.STOP_LOSS_PIPS, TAKE_PROFIT_PIPS=cfg.TAKE_PROFIT_PIPS,
-                RISK_PER_TRADE=cfg.RISK_PER_TRADE, LEVERAGE=cfg.LEVERAGE,
-                MARGIN_CAP=0.5, MAX_SPREAD_PIPS=3.0, MIN_CONFIDENCE=cfg.MIN_CONFIDENCE,
-            )
-            broker = CtraderBroker(fake_cfg)
-            candles = broker.get_candles(symbol, cfg.TIMEFRAME, 100)
+            # Same rule as above: no broker credentials in this module.
+            candles = user_loop.read_candles(user_id, symbol, 100)
             if not candles:
                 return json.dumps({"error": "No market data available"})
             ind = indicators.analyze(candles)

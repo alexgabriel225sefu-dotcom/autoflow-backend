@@ -3787,6 +3787,20 @@ def force_trade(user_id, side, symbol=None, lots=None):
     If lots is specified, use that lot size instead of auto-calculating from risk."""
     user_id = str(user_id)
     user = user_store.load(user_id)
+
+    # The same gates the automatic path passes, in the same order. This is the
+    # entry point for the AI assistant, /buy and /sell, and the control plane's
+    # force_trade — three callers that all reached the broker without the
+    # entitlement and risk checks the trading loop applies to every signal. An
+    # order placed here is indistinguishable from one the strategy produced, so
+    # it has to clear the same bar.
+    if not _entitled(user_id):
+        return {"ok": False, "error": "not entitled — no access grant or licence on file"}
+    _guard = (get_dash(user_id) or {}).get("riskGuard")
+    if isinstance(_guard, dict) and _guard.get("halted"):
+        _why = "; ".join(str(r) for r in (_guard.get("reasons") or [])) or "risk limit hit"
+        return {"ok": False, "error": f"risk guard is holding: {_why}"}
+
     broker, cfg = _make_broker(user)
     sym = (symbol or cfg.SYMBOL).upper()
     if getattr(cfg, "PRODUCT", "forex") == "crypto":
@@ -3900,6 +3914,28 @@ def force_trade(user_id, side, symbol=None, lots=None):
     return {"ok": True, "side": side, "symbol": sym, "price": price,
             "units": units, "spread": round(spread, 1),
             "sl": round(sl_price, 5), "tp": round(tp_price, 5)}
+
+
+def read_candles(user_id, symbol=None, count=50, timeframe=None):
+    """Market data for one user, without handing the caller their credentials.
+
+    The AI assistant used to assemble its own broker config — access token,
+    refresh token and account id copied out of the user record into a local
+    namespace — twice, in two places, purely to read candles. That is a direct
+    broker credential path inside the module that talks to a language model,
+    and it is the kind that later grows an order call. Broker construction
+    already lives here; this exposes the read and nothing else.
+
+    Returns [] rather than raising: a chat reply degrades, it does not crash.
+    """
+    try:
+        user = user_store.load(str(user_id))
+        broker, bcfg = _make_broker(user)
+        sym = (symbol or bcfg.SYMBOL).upper()
+        return broker.get_candles(sym, timeframe or bcfg.TIMEFRAME, int(count)) or []
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] read_candles failed: {e}")
+        return []
 
 
 def force_close(user_id):

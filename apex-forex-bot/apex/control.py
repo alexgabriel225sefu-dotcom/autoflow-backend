@@ -118,11 +118,45 @@ def financial_enabled() -> bool:
     return (os.getenv("MCP_FINANCIAL_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
 
 
-def authorize(action, args=None):
+def _allowed_operators():
+    """Operators permitted to run level 2/3 commands.
+
+    MCP_OPERATORS is a comma-separated allowlist. Empty means nobody, which is
+    why levels 2 and 3 are unreachable until it is set — an env flag alone says
+    the capability exists, not who may use it.
+    """
+    raw = os.getenv("MCP_OPERATORS") or ""
+    return {p.strip() for p in raw.split(",") if p.strip()}
+
+
+def operator_ok(operator) -> bool:
+    """Is this operator on the allowlist?
+
+    The identity must be established by the TRANSPORT — whoever can write to
+    the Redis command queue is already trusted to name themselves, and this
+    allowlist is the second factor, not the first. A string in the payload is
+    never treated as proof on its own: it is checked against a list only the
+    deployment's environment can change, so a caller cannot promote itself by
+    inventing a name.
+    """
+    allowed = _allowed_operators()
+    if not allowed:
+        return False
+    return str(operator or "").strip() in allowed
+
+
+def authorize(action, args=None, operator=None):
     """(ok, reason) for one command. The single place authorization is decided."""
     lvl = level_of(action)
     if lvl == 1:
         return True, "LEVEL_1_READ"
+    # Anything that changes state needs a named, allowlisted operator. Env
+    # flags say what the deployment permits; this says who is asking.
+    if not operator_ok(operator):
+        if not _allowed_operators():
+            return False, ("NO_OPERATORS_CONFIGURED — set MCP_OPERATORS to the "
+                           "identities allowed to run level 2/3 commands")
+        return False, "OPERATOR_NOT_AUTHORIZED"
     if lvl == 2:
         if not actions_enabled():
             return False, "LEVEL_2_DISABLED (set MCP_CONTROL_ENABLED=true)"
@@ -135,6 +169,33 @@ def authorize(action, args=None):
     if not (args or {}).get("confirm"):
         return False, "CONFIRMATION_REQUIRED (resend with confirm=true)"
     return True, "LEVEL_3_CONFIRMED"
+
+
+# ─── Replay protection ────────────────────────────────────
+# The queue carries a command id and nothing stopped the same id being popped
+# and executed twice — a retry after a timeout, a redelivery, or an operator
+# tapping again because the first reply was slow. For force_trade that is a
+# second position; for force_close, closing a position that was reopened in
+# between. The id is claimed before dispatch and the stored result is replayed
+# on a repeat, so the caller gets the ORIGINAL outcome rather than a refusal
+# they might respond to by trying once more.
+_REPLAY_TTL = 24 * 3600
+
+
+def _replay_key(cid):
+    return f"{_NS}:cmdseen:{cid}"
+
+
+def _claim_command(cid):
+    """True when this id is new. False means it has already been executed."""
+    if not _ENABLED_STORE or not cid:
+        return True
+    res = _cmd("SET", _replay_key(cid), "1", "NX", "EX", _REPLAY_TTL)
+    if res is None:
+        # Cannot tell. Allowing an unverifiable retry is the lesser risk for
+        # level 1/2; the financial path refuses separately below.
+        return None
+    return str(res).upper() == "OK"
 
 
 # ─── Redis commands (standard or Upstash REST) ────────────
@@ -212,10 +273,19 @@ def event_from_alert(user_id, result):
 
 
 # ─── Command consumer ─────────────────────────────────────
-def _record_result(cid, ok, data):
+def _record_result(cid, ok, data, ttl=180):
+    """Store a command's outcome for the caller to poll.
+
+    `ttl` is 180s for a read — long enough for the MCP server to collect it.
+    A state-changing command keeps its result for the whole replay window
+    instead: replaying an id is supposed to return the ORIGINAL outcome, and
+    a result that expired first would turn a harmless duplicate into "already
+    executed, outcome unknown" — which is exactly the answer that invites the
+    operator to try again.
+    """
     payload = json.dumps({"id": cid, "ok": ok, "data": data, "ts": int(time.time())})
     _cmd("SET", _RESULT(cid), payload)
-    _cmd("EXPIRE", _RESULT(cid), 180)
+    _cmd("EXPIRE", _RESULT(cid), int(ttl))
 
 
 # Argument names that must never reach the audit log. The log is read by an
@@ -281,7 +351,7 @@ def start_consumer(handlers, poll=10.0, heartbeat_interval=60.0):
                 # Authorization is decided in ONE place and recorded whether it
                 # passed or failed. A refusal nobody can see is indistinguishable
                 # from a request nobody made.
-                allowed, why = authorize(action, args)
+                allowed, why = authorize(action, args, operator=operator)
                 if not allowed:
                     _record_result(cid, False, why)
                     _audit({"ts": int(time.time()), "cid": cid, "action": action,
@@ -295,19 +365,47 @@ def start_consumer(handlers, poll=10.0, heartbeat_interval=60.0):
                 if not fn:
                     _record_result(cid, False, f"unknown action: {action}")
                     continue
+                # Replay check AFTER authorization, so a refused command does
+                # not burn its id and block a corrected retry.
+                seen = _claim_command(cid)
+                if seen is False:
+                    prior = _cmd("GET", _RESULT(cid))
+                    print(f"[Control] replay of {cid} ({action}) — returning the "
+                          f"original result without executing again")
+                    if prior is None:
+                        _record_result(cid, False,
+                                       "duplicate command id; the original result "
+                                       "has expired")
+                    _audit({"ts": int(time.time()), "cid": cid, "action": action,
+                            "level": lvl, "operator": operator,
+                            "user": str(args.get("user_id") or ""),
+                            "args": _safe_args(args), "authorized": True,
+                            "confirmed": bool(args.get("confirm")),
+                            "ok": True, "replay": True})
+                    continue
+                if seen is None and lvl == 3:
+                    # Cannot prove this is not a replay, and the action moves
+                    # money. Refuse rather than risk a second position.
+                    _record_result(cid, False, "REPLAY_CHECK_UNAVAILABLE — "
+                                   "refusing a financial action that cannot be "
+                                   "verified as new")
+                    continue
                 base = {"ts": int(time.time()), "cid": cid, "action": action,
                         "level": lvl, "operator": operator,
                         "user": str(args.get("user_id") or ""),
                         "args": _safe_args(args), "authorized": True,
                         "confirmed": bool(args.get("confirm"))}
+                # A state-changing result outlives the poll, so a replay can
+                # return it rather than a bare "already executed".
+                _ttl = _REPLAY_TTL if lvl > 1 else 180
                 try:
                     data = fn(args)
-                    _record_result(cid, True, data)
+                    _record_result(cid, True, data, ttl=_ttl)
                     _audit({**base, "ok": True})
                 except Exception as e:
                     # The message only. A traceback can carry file paths, config
                     # values and occasionally the argument that failed to parse.
-                    _record_result(cid, False, str(e)[:300])
+                    _record_result(cid, False, str(e)[:300], ttl=_ttl)
                     _audit({**base, "ok": False, "err": str(e)[:200]})
             except Exception as e:
                 print(f"[Control] consumer loop error: {e}")
