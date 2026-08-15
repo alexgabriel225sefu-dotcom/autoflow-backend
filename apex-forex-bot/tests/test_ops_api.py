@@ -216,7 +216,7 @@ try:
     check("a recent tick reports the position", r["status"] == "OK", r)
     check("and marks it FRESH", r.get("freshness") == "FRESH", r)
     check("and names the source rather than implying a live broker read",
-          "not a live broker read" in str(r.get("source", "")), r)
+          r.get("position_source") == "last_loop_state", r)
 
     # Stale: older than the threshold.
     user_loop.get_dash = lambda _u: {"openPosition": {"symbol": "EURUSD",

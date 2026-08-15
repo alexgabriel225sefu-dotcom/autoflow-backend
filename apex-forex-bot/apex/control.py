@@ -84,6 +84,7 @@ LEVEL_1_READ = {
     "ops_user_orders", "ops_user_worker_status", "ops_user_ownership",
     "ops_user_incidents", "ops_recent_errors", "ops_reconcile_status",
     "ops_investigate", "ops_degraded_users", "ops_unprotected_positions",
+    "ops_broker_reconcile",
 }
 LEVEL_2_CONTROLLED = {
     "restart_loop", "bot_on", "bot_off", "refresh_token", "set_setting",

@@ -29,6 +29,18 @@ UNKNOWN = "UNKNOWN"
 # last published may no longer resemble the account.
 _STALE_AFTER_S = 900
 
+# Named in every position response, because "positions: 2" reads as a fact
+# about the account when it is a fact about a cache. The operator needs to know
+# which one they are looking at before they act on it.
+POSITION_SOURCE = "last_loop_state"
+
+# Reconciliation verdicts. The broker is authoritative and local state is a
+# snapshot, so the two disagreeing is a REPORTABLE condition — not something to
+# normalise away by preferring whichever side is convenient.
+RECONCILED = "RECONCILED"
+EXTERNAL_OR_UNRECONCILED_POSITION = "EXTERNAL_OR_UNRECONCILED_POSITION"
+LOCAL_POSITION_MISSING_AT_BROKER = "LOCAL_POSITION_MISSING_AT_BROKER"
+
 # Statuses an investigation can conclude with. Deliberately includes UNKNOWN.
 HEALTHY, DEGRADED, RECOVERY = "HEALTHY", "DEGRADED", "RECOVERY"
 SAFE_MODE, BLOCKED = "SAFE_MODE", "BLOCKED"
@@ -182,30 +194,34 @@ def user_positions(user_id):
     unprotected = bool(pos and not (pos.get("stopLoss") or pos.get("sl")))
     age = int(time.time() - last) if isinstance(last, (int, float)) and last else None
 
-    # An age is not enough on its own. "as_of_s: 900" reads as a detail next to
-    # a position list, and the position list is what gets acted on — so past
+    # An age alone is not enough. "as_of_seconds: 1284" reads as a detail next
+    # to a position list, and the position list is what gets acted on — so past
     # the point where the data can still be trusted this stops presenting it as
     # current and says so in the status field, which nothing skims past.
     if age is None:
         return _unknown("the worker has published no tick timestamp, so the age "
                         "of this position data cannot be established",
                         positions=[_redact(pos)] if pos else [],
-                        freshness=UNKNOWN)
+                        position_source=POSITION_SOURCE,
+                        as_of_seconds=UNKNOWN, freshness=UNKNOWN,
+                        protection=UNKNOWN, state=RECOVERY)
     if age > _STALE_AFTER_S:
         return _unknown(
-            f"last worker tick was {age}s ago (> {_STALE_AFTER_S}s) — this is the "
+            f"last broker sync was {age}s ago (> {_STALE_AFTER_S}s) — this is the "
             f"last state the loop published, not the broker's current position",
             positions=[_redact(pos)] if pos else [],
             open_count=dash.get("openCount", 1 if pos else 0),
-            protection=UNKNOWN,        # cannot vouch for a stop we last saw long ago
-            as_of_s=age, freshness="STALE",
+            position_source=POSITION_SOURCE,
+            as_of_seconds=age, freshness="STALE",
+            protection=UNKNOWN,     # cannot vouch for a stop last seen long ago
+            state=RECOVERY,
         )
     return _ok(
         open_count=dash.get("openCount", 1 if pos else 0),
         positions=[_redact(pos)] if pos else [],
         protection="MISSING_STOP" if unprotected else ("OK" if pos else "N/A"),
-        as_of_s=age, freshness="FRESH",
-        source="worker cache (last published tick), not a live broker read",
+        position_source=POSITION_SOURCE,
+        as_of_seconds=age, freshness="FRESH",
     )
 
 
@@ -293,6 +309,74 @@ def recent_errors(user_id=None, limit=20):
         if rec.get("level") in ("error", "warn"):
             out.append(_redact(rec))
     return _ok(errors=out[:n], scanned=len(raw))
+
+
+def broker_reconcile(user_id):
+    """Compare the broker against local state. The broker wins, always.
+
+    A read-only diagnostic that actually asks the broker, unlike
+    `user_positions`, which deliberately serves the worker cache. It exists
+    because the two CAN disagree and each direction means something different:
+
+      broker has a position, local does not
+          -> EXTERNAL_OR_UNRECONCILED_POSITION. Opened by hand in cTrader, or
+             opened by this bot and lost from local state. Either way something
+             is live on the account that the loop is not managing.
+
+      local has a position, broker does not
+          -> LOCAL_POSITION_MISSING_AT_BROKER. It closed while nothing was
+             watching, or was never really opened.
+
+    Neither is normalised away. Silently preferring local state hides a real
+    position; silently preferring the broker discards the only record of why a
+    trade was taken. The operator is told which one it is, and nothing here
+    changes either side — this diagnoses, the loop reconciles.
+    """
+    uid, err = _valid_user(user_id)
+    if err:
+        return {"error": err}
+    try:
+        u = user_store.load(uid) or {}
+    except Exception as e:
+        return _unknown(f"user store unreachable: {e}")
+    if not u:
+        return {"error": "no such user"}
+    if not u.get("ctrader_access_token"):
+        return _ok(reconciliation="NO_BROKER", detail="no broker connected")
+
+    try:
+        broker, _bcfg = user_loop._make_broker(u)
+        remote = broker.get_all_positions() or []
+    except Exception as e:
+        # The authoritative side is the one we could not read. Saying anything
+        # about the account now would be inventing it.
+        return _unknown(f"broker unreachable: {str(e)[:120]}",
+                        reconciliation=UNKNOWN, authority="broker")
+
+    dash = user_loop.get_dash(uid) or {}
+    local_pos = dash.get("openPosition")
+    local_syms = {str((local_pos or {}).get("symbol") or "").upper()} - {""}
+    remote_syms = {str(p.get("symbol") or "").upper() for p in remote} - {""}
+
+    findings = []
+    for sym in sorted(remote_syms - local_syms):
+        findings.append({"symbol": sym,
+                         "verdict": EXTERNAL_OR_UNRECONCILED_POSITION,
+                         "detail": "open at the broker, not tracked locally"})
+    for sym in sorted(local_syms - remote_syms):
+        findings.append({"symbol": sym,
+                         "verdict": LOCAL_POSITION_MISSING_AT_BROKER,
+                         "detail": "tracked locally, not open at the broker"})
+
+    return _ok(
+        reconciliation=RECONCILED if not findings else "MISMATCH",
+        authority="broker",
+        broker_positions=len(remote),
+        broker_symbols=sorted(remote_syms),
+        local_symbols=sorted(local_syms),
+        findings=findings,
+        action_taken="none — this is a diagnostic, the trading loop reconciles",
+    )
 
 
 def reconcile_status(user_id):

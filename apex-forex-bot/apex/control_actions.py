@@ -312,6 +312,7 @@ def build():
         "ops_degraded_users":       lambda a: ops_api.degraded_users(a.get("limit", 50)),
         "ops_unprotected_positions": lambda a: ops_api.unprotected_positions(
                                                    a.get("limit", 50)),
+        "ops_broker_reconcile":     lambda a: ops_api.broker_reconcile(_uid_arg(a)),
     }
 
     return {
