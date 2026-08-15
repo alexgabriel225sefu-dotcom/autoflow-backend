@@ -54,6 +54,24 @@ DIAGNOSTIC = {
     "AI_ERROR", "DATA_ERROR", "DUPLICATE_BLOCKED",
 }
 
+# Infrastructure events. These go to the operator's event log and NEVER to a
+# client, not even with /verbose — unlike DIAGNOSTIC, which is merely quiet.
+#
+# A client received `⚡ OWNERSHIP_LOST — EUR_USD` three times in twenty minutes.
+# Nothing had happened to their money: every deploy hands the account from the
+# retiring container to the new one, the retiring one notices within a renewal
+# interval, and standing down is exactly what it should do. The message was the
+# handover working. But it reads like a failure, names their instrument, and
+# offers nothing to act on — and there is no version of it a client could act
+# on, because the correct response is "the other container already has it".
+#
+# That is the distinction this tier draws: DIAGNOSTIC is information a curious
+# client may opt into, OPERATOR is information that is not about them at all.
+OPERATOR = {
+    "OWNERSHIP_LOST",              # a deploy handed this account to a new container
+    "OWNERSHIP_BLOCKED",           # an order deferred to the owning container
+}
+
 
 def verbose(user) -> bool:
     return bool((user or {}).get("verbose_alerts"))
@@ -68,6 +86,8 @@ def allowed(action, user) -> bool:
     notice.
     """
     a = str(action or "").upper()
+    if a in OPERATOR:
+        return False               # not about this client, at any verbosity
     if a in DIAGNOSTIC:
         return verbose(user)
     return True
@@ -81,4 +101,6 @@ def tier(action) -> str:
         return "useful"
     if a in DIAGNOSTIC:
         return "diagnostic"
+    if a in OPERATOR:
+        return "operator"
     return "unclassified"

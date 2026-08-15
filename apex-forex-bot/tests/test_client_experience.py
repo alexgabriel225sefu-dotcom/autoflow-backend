@@ -57,6 +57,32 @@ for a in ("STOP_MOVED", "SKIP_WARN", "MARKET_PULSE", "HEARTBEAT",
     check(f"{a} is quiet by default", not alert_policy.allowed(a, QUIET))
     check(f"{a} appears with /verbose", alert_policy.allowed(a, LOUD))
 
+print("\n── infrastructure events never reach a client at all ──")
+# A client received `⚡ OWNERSHIP_LOST — EUR_USD` three times in twenty minutes.
+# Nothing had happened to their money: each deploy hands the account to the new
+# container and the retiring one stands down, which is the handover working.
+# But it reads like a failure, names their instrument, and there is no action a
+# client could take — the correct response is "the other container has it".
+for a in ("OWNERSHIP_LOST", "OWNERSHIP_BLOCKED"):
+    check(f"{a} is not sent to a quiet client", not alert_policy.allowed(a, QUIET))
+    check(f"{a} is not sent with /verbose either",
+          not alert_policy.allowed(a, LOUD),
+          "OPERATOR is stronger than DIAGNOSTIC — not about them at all")
+    check(f"{a} is classified, not merely unknown",
+          alert_policy.tier(a) == "operator", alert_policy.tier(a))
+check("operator events are a separate tier from diagnostics",
+      not (alert_policy.OPERATOR & alert_policy.DIAGNOSTIC))
+# The operator must still see them: the client gate runs AFTER the event log.
+TG = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "apex", "telegram.py"), encoding="utf-8").read()
+_alert_fn = TG[TG.index("def _user_alert"):TG.index("def _user_alert") + 1200]
+check("the operator event log is written before the client gate",
+      _alert_fn.index("event_from_alert") < _alert_fn.index("alert_policy.allowed"))
+# An unclassified alert must still default to SENT — silence is the failure
+# mode that is hard to notice, so this tier is opt-IN, never a new default.
+check("an unknown alert type is still sent",
+      alert_policy.allowed("SOME_NEW_ALERT", QUIET))
+
 print("\n── the nine-messages-per-trade case ──")
 check("every trail after the first is silent by default",
       not alert_policy.allowed("STOP_MOVED", QUIET))
