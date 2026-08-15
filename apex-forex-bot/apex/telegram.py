@@ -5027,6 +5027,7 @@ def _poll_loop():
         print(f"[TELEGRAM] getMe error: {e}")
     print(f"[TELEGRAM] Poll loop started. TOKEN={bool(TOKEN)} CHAT_ID={CHAT_ID}")
     _conflict_streak = 0
+    _conflict_since = 0.0
     _started_at = time.time()
     while True:
         try:
@@ -5055,20 +5056,36 @@ def _poll_loop():
                     # it has outlived one. A second deployment does not drain.
                     _conflict_streak += 1
                     wait = min(120, 10 * _conflict_streak)
-                    _age = time.time() - _started_at
-                    _handover = _age < _CONFLICT_GRACE_S
+                    if _conflict_streak == 1:
+                        _conflict_since = time.time()
+                    # Grace is measured from the FIRST CONFLICT, not from this
+                    # process's start, and the difference is not academic: the
+                    # old instance is by definition old, so measuring from its
+                    # start put it straight into the "this is no longer a
+                    # handover" branch every single deploy. It then accused the
+                    # operator of running a second deployment — with its own
+                    # uptime quoted as how long the other process had been
+                    # polling, which is not what that number is. Verified
+                    # against the account: one service, numInstances=1, and the
+                    # only other deployment suspended.
+                    #
+                    # A handover resolves within a minute whichever side you
+                    # are on. A genuine second deployment does not resolve at
+                    # all, so a conflict that outlives the grace window is the
+                    # real signal.
+                    _conflicted_for = time.time() - _conflict_since
+                    _handover = _conflicted_for < _CONFLICT_GRACE_S
                     if _handover:
                         if _conflict_streak == 1:
-                            print(f"[TELEGRAM] 409 Conflict {_age:.0f}s after start — the "
-                                  f"previous instance is still draining. Normal during a "
-                                  f"deploy; waiting {wait}s for it to exit.")
+                            print(f"[TELEGRAM] 409 Conflict — the other instance is still "
+                                  f"draining. Normal during a deploy; waiting {wait}s.")
                     elif _conflict_streak == 1 or _conflict_streak % 6 == 0:
-                        print(f"[TELEGRAM] 409 Conflict — another process has been polling "
-                              f"this bot token for {_age:.0f}s (streak={_conflict_streak}). "
-                              f"This is no longer a deploy handover: something else is "
-                              f"running the same TELEGRAM_BOT_TOKEN. Check for a second "
-                              f"Render service, a leftover Railway deployment, or a copy "
-                              f"running locally. Backing off {wait}s.")
+                        print(f"[TELEGRAM] 409 Conflict UNRESOLVED for "
+                              f"{_conflicted_for:.0f}s (streak={_conflict_streak}). A "
+                              f"deploy handover clears in under a minute, so something "
+                              f"else is running the same TELEGRAM_BOT_TOKEN: a second "
+                              f"Render service, a leftover deployment, or a local copy. "
+                              f"Backing off {wait}s.")
                     time.sleep(wait)
                     continue
                 print(f"[TELEGRAM] API error: {data.get('description')} (code {data.get('error_code')})")

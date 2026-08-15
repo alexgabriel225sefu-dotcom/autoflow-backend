@@ -185,9 +185,15 @@ def restore(snapshot, dry_run=False):
         "journals": sum(len(v or []) for v in (snapshot.get("journals") or {}).values()),
         "access": len(snapshot.get("access") or []),
     }
+    # One shape, always. The early-return path used to omit `restored` and
+    # `failed`, so any caller that read the report uniformly — a drill script,
+    # a monitoring hook — crashed on the failure case instead of reporting it.
+    # A report that is only well-formed when things went well is not a report.
+    zero = {"users": 0, "journals": 0, "access": 0}
     report = {"verified": ok, "problems": problems, "users": 0, "journals": 0,
               "access": 0, "skipped": [], "dry_run": bool(dry_run),
-              "expected": expected, "result": "FAILED"}
+              "expected": expected, "restored": dict(zero),
+              "failed": dict(expected), "result": "FAILED"}
     if not ok:
         report["detail"] = "snapshot did not verify; nothing was written"
         return report

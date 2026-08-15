@@ -77,15 +77,18 @@ check("it does not send anyone hunting",
       "Railway" not in _handover and "second Render service" not in _handover)
 check("it says so once, not every retry", "_conflict_streak == 1" in _handover)
 
+
 print("\n── past the window: the accusation is earned ──")
 _persist = BLOCK[BLOCK.index("elif _conflict_streak == 1"):BLOCK.index("time.sleep(wait)")]
-check("it states how long it has persisted", "{_age:.0f}s" in _persist)
+check("it states how long the CONFLICT has persisted, not its own age",
+      "{_conflicted_for:.0f}s" in _persist and "{_age:" not in _persist)
 check("it rules out the innocent explanation first",
-      "no longer a deploy handover" in _persist)
+      "clears in under a minute" in _persist)
 check("and only then lists where to look",
-      "Railway" in _persist and "Render service" in _persist)
+      "second Render service" in _persist
+      and "leftover deployment" in _persist, _persist[-220:])
 check("including a local copy, the case the old text missed",
-      "locally" in _persist)
+      "local copy" in _persist, _persist[-220:])
 check("it is throttled, not per-retry", "_conflict_streak % 6 == 0" in _persist)
 
 print("\n── the backoff still backs off ──")
@@ -102,6 +105,29 @@ check("and only when there was a conflict to clear",
 print("\n── the streak still resets on a good poll ──")
 check("reset survives the new logging",
       re.search(r"_conflict_streak = 0\n\s+for u in data", BLOCK) is not None)
+
+
+print("\n── the grace window is measured from the CONFLICT, not from start ──")
+# Measuring from process start meant the OLD instance — old by definition —
+# went straight to the "no longer a handover" branch on every deploy, and
+# accused the operator of running a second deployment. Verified against the
+# Render account at the time: one service, numInstances=1, the only other
+# deployment suspended. There was never a second poller.
+SRC2 = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "apex", "telegram.py"), encoding="utf-8").read()
+_blk = SRC2[SRC2.index("_conflict_streak += 1"):]
+_blk = _blk[:_blk.index("time.sleep(wait)")]
+check("the window starts at the first conflict",
+      "_conflict_since = time.time()" in _blk)
+check("and the decision uses that, not process age",
+      "_conflicted_for = time.time() - _conflict_since" in _blk
+      and "_age < _CONFLICT_GRACE_S" not in _blk)
+check("the loud message no longer quotes its own uptime as somebody else's",
+      "another process has been polling" not in _blk)
+check("it reports how long the conflict has been UNRESOLVED",
+      "UNRESOLVED for" in _blk)
+check("the tracker resets with the streak so the next deploy starts clean",
+      "_conflict_since = 0.0" in SRC2)
 
 print("\n" + "=" * 50)
 if failures:

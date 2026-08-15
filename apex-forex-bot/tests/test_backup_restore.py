@@ -192,6 +192,32 @@ try:
           'rep.get("result") == "COMPLETE"' in BSRC2)
     check("and the restore reads records back after writing",
           "not readable after restore" in BSRC2)
+
+    print("\n9. Every report has the SAME shape, especially the failures")
+    # The drill script crashed on KeyError reading rep["restored"] because the
+    # failed-verify path returned a shorter dict. A report that is only
+    # well-formed when things went well is not a report.
+    bad2 = {"format": 99, "users": {}}
+    rep_bad = backup.restore(bad2)
+    for k in ("verified", "problems", "expected", "restored", "failed",
+              "result", "skipped", "dry_run"):
+        check(f"a FAILED report still carries {k}", k in rep_bad, sorted(rep_bad))
+    check("and it says FAILED", rep_bad["result"] == "FAILED", rep_bad["result"])
+    check("with everything counted as failed",
+          rep_bad["restored"] == {"users": 0, "journals": 0, "access": 0},
+          rep_bad["restored"])
+    check("the DR drill ships as a runnable script",
+          os.path.exists(os.path.join(
+              os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+              "scripts", "dr_drill.py")))
+    DR = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "scripts", "dr_drill.py"), encoding="utf-8").read()
+    check("the drill refuses to call a local store a drill",
+          "not a drill" in DR)
+    check("it forces the local backend before restoring, so it cannot write "
+          "to production", "user_store._USE_REDIS = False" in DR)
+    check("and it does not drop a licence-bearing file into the repo",
+          "tempfile.gettempdir()" in DR)
 finally:
     user_store._DIR = _olddir
     shutil.rmtree(WORK, ignore_errors=True)
