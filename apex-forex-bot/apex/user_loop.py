@@ -4145,13 +4145,42 @@ def force_close_all(user_id):
         sym = pos.get("symbol")
         if not sym or sym in closed:
             continue
+        # EVERY close passes the gate, including the sweep. The first close
+        # above goes through force_close() and was gated; these did not, and
+        # reached the broker directly — the one path in the codebase where a
+        # position was closed without the gate seeing it.
+        #
+        # emergency=True, so this does not weaken the emergency: ownership is
+        # still waived and a coordination outage still lets the operator out.
+        # What it adds is the idempotency claim, keyed on CLOSE:{symbol}. Two
+        # containers sweeping at once — a deploy overlap, or the operator
+        # tapping twice — would otherwise each believe they were first, and the
+        # second close lands on whatever was reopened in between. It also puts
+        # the sweep in the audit, which is where an emergency most needs to be.
+        _d, _rid = gates.authorize_close(user_id, symbol=sym, origin="emergency_sweep",
+                                         user=user, emergency=True)
+        gates.audit(user_id, "CLOSE", _d, origin="emergency_sweep", rid=_rid)
+        if not _d:
+            # A refused claim means somebody else is already closing this
+            # position, not that it is stuck. Say which it is rather than
+            # reporting a failure the operator would answer by trying again.
+            failed.append({"symbol": sym,
+                           "error": f"{_d.reason}: {_d.detail}"[:120],
+                           "gate": _d.reason})
+            continue
         try:
             res = broker.close_position(sym) or {}
-            if str(res.get("status")) in ("FILLED", "FLAT"):
-                closed.append(sym)
-            else:
-                failed.append({"symbol": sym, "error": str(res.get("reason") or res)[:120]})
         except Exception as e:
-            failed.append({"symbol": sym, "error": str(e)[:120]})
+            # The claim STANDS — same rule as force_close(). A close that raised
+            # may still have reached the broker, and retrying it can close a
+            # position that was reopened in between.
+            failed.append({"symbol": sym, "error": str(e)[:120],
+                           "ambiguous": broker_result_ambiguous(e)})
+            continue
+        if str(res.get("status")) in ("FILLED", "FLAT"):
+            closed.append(sym)
+            ledger.record(_rid, {"closed": True, "symbol": sym})
+        else:
+            failed.append({"symbol": sym, "error": str(res.get("reason") or res)[:120]})
 
     return {"ok": not failed, "closed": closed, "failed": failed}
