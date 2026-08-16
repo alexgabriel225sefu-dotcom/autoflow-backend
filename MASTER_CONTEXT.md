@@ -59,14 +59,14 @@
 
 ## Revenue Model
 - One-time license sales: $297 (crypto), $497 (forex)
-- In-house affiliate program (Supabase `affiliates`/`referral_sales` tables, own signup/dashboard/payout flow at `/api/affiliates/*`) — commission tracked via the `ref` query param captured on the homepage and passed through Dodo Payments checkout metadata. Default 30% commission unless overridden per affiliate.
-- Separate: 14 outside Telegram trading-signal channels each got their own Dodo Payments discount-tracking code + dedicated checkout links (0.01% discount, `times_used` counter only) — these are informal one-off partners, not signed up in the in-house program.
+- In-house affiliate program (Supabase `affiliates`/`referral_sales` tables, own signup/dashboard/payout flow at `/api/affiliates/*`) — commission tracked via the `ref` query param captured on the homepage and passed through Stripe Checkout metadata. Default 30% commission unless overridden per affiliate.
+- Separate: 14 outside Telegram trading-signal channels were each given a discount-tracking code + dedicated checkout link (0.01% discount, `times_used` counter only) — informal one-off partners, not signed up in the in-house program. **Those links were Dodo Payments links and are dead**: Dodo rejected the business and the integration has been removed. Re-issue them as Stripe links before pointing any partner at them again.
 
 ## Tech Stack (Backend)
 - **Runtime:** Node.js / Express (server.js) + two separate Python trading bots (crypto, forex)
 - **Database:** Supabase (PostgreSQL) + Redis (bot session state)
 - **AI:** Anthropic Claude (Haiku), Groq (Llama fallback)
-- **Payments:** Stripe is the PRIMARY/working processor (verified directly in `server.js` ~line 2165 — "Stripe is the primary/default processor now", account acct_1TSAWQGpBbs5xtI5 / ApexTradingSuite). `/api/checkout/create-session` tries Stripe first, only falls back to Dodo Payments `if (!stripe)`. Owner confirmed Stripe is a working, approved account — do not assume Dodo is primary, that's stale. Digistore24 was REJECTED (not "dormant"). CopeCart was abandoned mid-KYC. Stripe is NOT usable as a native in-Telegram payment provider (owner confirmed via BotFather — not in the provider list), so Telegram checkout has to be a Stripe Checkout link opened in-browser, not a native sendInvoice flow.
+- **Payments:** Stripe is the ONLY processor (account acct_1TSAWQGpBbs5xtI5 / ApexTradingSuite). `/api/checkout/create-session` uses Stripe; with no Stripe key configured it returns "Payments are not configured" rather than falling back to anything. Dodo Payments was REMOVED — they rejected the business ("we do not support auto trading bots and related services"), so the SDK, the `/dodo-webhook` route and the product ids are gone rather than left inert. Digistore24 was also REJECTED (not "dormant"); its webhook handler still exists and is the model the shared fulfillment mirrors. CopeCart was abandoned mid-KYC. Stripe is NOT usable as a native in-Telegram payment provider (owner confirmed via BotFather — not in the provider list), so Telegram checkout has to be a Stripe Checkout link opened in-browser, not a native sendInvoice flow.
 - **Email:** Brevo
 - **Broker integration:** cTrader Open API (both bots)
 - **Deployment:** Render (three services — main site, forex bot, crypto bot)
