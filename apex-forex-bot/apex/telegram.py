@@ -658,11 +658,13 @@ def _menu_rows(chat_id=None):
         except Exception:
             running = False
     return [
-        [("📊 Overview", "nav:over"), ("📈 Positions", "nav:pos")],
+        [("🏠 Home", "nav:home"), ("📊 Overview", "nav:over")],
+        [("📈 Positions", "nav:pos"), ("👤 Account", "nav:acct")],
         [("🎯 Strategy", "nav:strat"), ("🛡 Risk", "nav:risk")],
         [("🤖 Automation", "nav:auto"), ("📒 Performance", "nav:perf")],
         [("📡 Market", "nav:mkt"), ("📰 News", "nav:news")],
-        [("⚙️ Settings", "nav:set"), ("❓ Help", "nav:help")],
+        [("⚙️ Settings", "nav:set"), ("🔔 Notifications", "nav:notif")],
+        [("❓ Help", "nav:help")],
         [("⏸ Pause Trading", "nav:pause")] if running
         else [("▶️ Resume Trading", "nav:resume")],
         [("🚨 Emergency", "nav:emg")],
@@ -677,6 +679,39 @@ def _back_kb(chat_id=None, extra_rows=None):
     """Every screen has a way back. A screen you can only leave by typing a
     command is a dead end, and dead ends are where clients stop exploring."""
     return _kb(list(extra_rows or []) + [[("☰ Menu", "nav:menu")]])
+
+
+# ─── Authoritative account state ──────────────────────────
+#
+# `refresh=True` is passed at exactly the moments the specification names:
+# /start, connecting an account, reconnecting, switching account, refreshing
+# the dashboard, and before anything that touches real money. Everywhere else
+# reads what is already known — a screen that opened a broker socket per tap
+# would be slower than the client's patience and would still be a cache one
+# tick later.
+
+def _ui(chat_id, refresh=False, force=False):
+    from apex import ui_state
+    return ui_state.resolve(chat_id, refresh_broker=refresh, force=force)
+
+
+def _screen_home(chat_id, refresh=True):
+    """The state-aware home. One bot; which of A–H it is decides the screen."""
+    from apex import screens
+    st = _ui(chat_id, refresh=refresh)
+    dash = {}
+    try:
+        dash = user_loop.get_dash(chat_id) or {}
+    except Exception as e:
+        print(f"[Telegram] home: dash unreadable for {chat_id}: {e}")
+    bal = dash.get("balance") if st.connected else None
+    n = None
+    try:
+        n = user_loop.open_position_count(chat_id)
+    except Exception as e:
+        print(f"[Telegram] home: position count unreadable for {chat_id}: {e}")
+    send_to(chat_id, screens.home(st, balance=bal, open_count=n),
+            _kb(screens.home_rows(st)))
 
 
 def _handle_menu(chat_id):
@@ -697,7 +732,16 @@ def _handle_menu(chat_id):
 # answer.
 
 def _mode_label(user):
-    """Demo / Live / Paper, from the account actually configured.
+    """Demo / Live / Paper, read straight off a record with nothing else.
+
+    Kept deliberately record-shaped and dependency-free: it is used where a
+    single dict is all there is (the onboarding summary), and its honest-label
+    rule — an unread record is UNKNOWN, never "Paper" — is pinned by its own
+    test.
+
+    It is NOT the authoritative environment. That question is
+    `ui_state.environment`, which asks the connected broker account rather
+    than a cached flag, and it is what every screen and every alert reads.
 
     `None` means the record could not be read, and that is NOT the same as an
     empty record. `{}.get("paper", True)` is True, so falling back to a bare
@@ -741,24 +785,23 @@ def _state_line(chat_id, guard=False):
 
     Each piece degrades to an honest shorter line. None of them degrade to a
     reassuring one.
+
+    The environment half now comes from `ui_state`, which derives it from the
+    account the client actually connected rather than from the `ctrader_env`
+    flag this used to trust. The flag is writable by a command; the account is
+    not.
     """
-    from apex import automation
     try:
-        u = user_store.load(chat_id)
+        from apex import screens, ui_state
+        return screens.banner(ui_state.resolve(chat_id), guard=guard)
     except Exception as e:
-        print(f"[Telegram] state banner: could not read user {chat_id}: {e}")
-        u = None                      # unknown — not "an empty paper account"
-    try:
-        line = f"{_mode_label(u)}  ·  {automation.label(automation.mode(u or {}))}"
-    except Exception as e:
-        print(f"[Telegram] state banner: could not resolve mode for {chat_id}: {e}")
-        line = "⚠️ account state unavailable"
+        print(f"[Telegram] state banner failed for {chat_id}: {e}")
+    # Last resort. A banner is decoration and must never be the reason a
+    # client is not told their money moved, so even a total failure of the
+    # state layer still returns a string — one that claims nothing.
+    line = "🟠 VERIFICATION REQUIRED — your account state is unknown right now"
     if guard:
-        try:
-            line += f"\n{_guard_label(chat_id)}"
-        except Exception as e:
-            print(f"[Telegram] state banner: risk guard unreadable for {chat_id}: {e}")
-            line += "\n🛡 Risk Guard: <i>no report yet</i>"
+        line += "\n🛡 Risk Guard: <i>no report yet</i>"
     return line
 
 
@@ -792,12 +835,16 @@ def _dashboard_keyboard(chat_id=None):
     # Discoverable path from demo → real money without knowing a command.
     if chat_id is not None:
         try:
+            # Offered from the connected account, not from the cached flag —
+            # the same rule the rest of the interface follows. No refresh here:
+            # drawing a keyboard must not open a broker socket.
+            from apex import ui_state
             u = user_store.load(chat_id)
-            if (u.get("ctrader_access_token")
-                    and (u.get("ctrader_env") or "demo").lower() != "live"):
+            env, _p, _w = ui_state.environment(u)
+            if u.get("ctrader_access_token") and env != ui_state.LIVE:
                 rows.append([{"text": "🔴 Switch to Live", "callback_data": "acct:switch"}])
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Telegram] dashboard keyboard: state unreadable: {e}")
     if not rows:
         return {}
     return {"reply_markup": json.dumps({"inline_keyboard": rows})}
@@ -879,6 +926,11 @@ def _ago(dash):
 
 
 def _handle_status(chat_id):
+    # A dashboard refresh is one of the moments the account environment is
+    # re-established from the broker rather than from what we last stored.
+    # Nothing else on this screen means anything until "whose money is this"
+    # has a current answer.
+    st = _ui(chat_id, refresh=True)
     dash = user_loop.get_dash(chat_id)
     # REAL mode: pull the balance from the broker at REQUEST time — a cached
     # figure looked frozen the moment the client deposited/withdrew between
@@ -926,10 +978,16 @@ def _handle_status(chat_id):
               "⏸ <b>BOT IS OFF</b> — tap ▶️ below to start.\n\n")
     # Demo-or-live, how much the bot may do alone, and whether the risk guard
     # is holding — the three things that must be visible wherever a client
-    # might act on what they are reading.
+    # might act on what they are reading. Plus, when this is a live account
+    # with something critical unestablished, the fact that new real-money
+    # entries are switched off — stated on the screen the client is reading,
+    # not left for them to infer from the bot never trading.
+    from apex import screens
+    blocked = (screens._blocked_note(st)
+               if st.is_live and not st.live_orders_offered else "")
     send_to(chat_id,
             header + _state_line(chat_id, guard=True) + "\n\n"
-            + _build_status(dash, chart), _dashboard_keyboard(chat_id))
+            + _build_status(dash, chart) + blocked, _dashboard_keyboard(chat_id))
 
 
 # ─── Setup wizard ─────────────────────────────────────────
@@ -1375,11 +1433,25 @@ def _handle_ctrader(chat_id):
 
 
 def _apply_account(chat_id, ctid):
-    """Bind the bot to a linked cTrader account by id and restart the loop."""
-    user = user_store.load(chat_id)
-    acc = next((a for a in (user.get("ctrader_accounts") or []) if str(a["ctid"]) == str(ctid)), None)
+    """Bind the bot to a linked cTrader account by id and restart the loop.
+
+    Switching account is one of the moments the environment is re-read from
+    the broker. The list this picks from is the broker's own answer, so a
+    stale entry cannot decide whether the client lands on real money.
+    """
+    from apex import ui_state
+    user, _refreshed, _why = ui_state.refresh(chat_id, force=True)
+    if user is None:
+        user = user_store.load(chat_id)
+    acc = next((a for a in (user.get("ctrader_accounts") or [])
+                if str(a.get("ctid")) == str(ctid)), None)
     if not acc:
-        return send_to(chat_id, "❌ Account not found. Tap Connect a different account.")
+        return send_to(chat_id,
+                       "❌ <b>That account is no longer available</b>\n\n"
+                       "Your broker did not list it just now. Nothing changed "
+                       "— pick another below.",
+                       _kb([[("🔄 Switch account", "acct:switch")],
+                            [("☰ Menu", "nav:menu")]]))
     from apex import ctrader_oauth
     gate_reason = ctrader_oauth.broker_gate_reason(acc, user.get("ctrader_access_token", ""))
     if gate_reason:
@@ -1399,29 +1471,40 @@ def _apply_account(chat_id, ctid):
         updates["paper_balance"] = bal
     user_store.update(chat_id, updates)
     _restart_user_loop(chat_id)
-    tag = "🔴 LIVE · real money" if acc.get("live") else "🧪 Practice · demo"
-    send_to(chat_id, f"✅ <b>Now trading: {tag}</b> (account {acc['ctid']}).\n{bal_line}"
-                     "Use the buttons below to turn the bot ON/OFF.",
+    # Re-resolve AFTER the write, so the confirmation names the environment
+    # the bot is now actually on rather than the one it was asked for.
+    st = _ui(chat_id)
+    send_to(chat_id,
+            f"✅ <b>Now trading: {st.env_badge}</b> (account {acc['ctid']}).\n"
+            f"{bal_line}"
+            "Every screen from here on is about this account.",
             _dashboard_keyboard(chat_id))
 
 
 def _handle_switch(chat_id):
     """Let the client change which account the bot trades — pick a linked
-    account, or disconnect and connect a different one (e.g. demo → live)."""
-    user = user_store.load(chat_id)
+    account, or disconnect and connect a different one (e.g. demo → live).
+
+    The list is re-read from the broker first: an account removed at the
+    broker must not still be offered, and an account whose demo/live status
+    changed must not be offered under the old label.
+    """
+    from apex import screens, ui_state
+    user, refreshed, why = ui_state.refresh(chat_id, force=True)
+    if user is None:
+        user = user_store.load(chat_id)
     accounts = user.get("ctrader_accounts") or []
-    cur_id = str(user.get("ctrader_account_id", ""))
-    rows = []
-    for a in accounts:
-        tag = "🔴 LIVE (real money)" if a.get("live") else "🧪 Practice (demo)"
-        here = " ✓ current" if str(a["ctid"]) == cur_id else ""
-        rows.append([{"text": f"{tag} · {a['ctid']}{here}", "callback_data": f"acct:use:{a['ctid']}"}])
-    rows.append([{"text": "🔗 Connect a DIFFERENT account", "callback_data": "acct:new"}])
-    send_to(chat_id,
-        "🔄 <b>Switch trading account</b>\n\n"
-        "Connect your live account below, or pick one of your linked accounts.\n\n"
-        "<i>🧪 Demo · 🔴 LIVE</i>",
-        extra={"reply_markup": {"inline_keyboard": rows}})
+    if not accounts:
+        return send_to(chat_id,
+                       "🔌 <b>No accounts to switch between</b>\n\n"
+                       f"{why.capitalize()}.\n\n"
+                       "Connect an account and it will appear here.",
+                       _kb([[("🔗 Connect my account", "go:connect")],
+                            [("☰ Menu", "nav:menu")]]))
+    head, rows = screens.account_switch(accounts, user.get("ctrader_account_id"))
+    if not refreshed:
+        head += f"\n\n<i>Shown from what we last saw — {why}.</i>"
+    send_to(chat_id, head, _kb(rows))
 
 
 def _handle_ctaccount(chat_id, args):
@@ -1602,24 +1685,33 @@ def reconnect_summary(user, header):
 #
 # The five steps are the five decisions, in the order they have to be made:
 #
-#   1  Account Mode     demo or real money
-#   2  Connect cTrader  the broker account itself
+#   1  Connect cTrader  the broker account itself
+#   2  Your Account     what we detected, confirmed by the client
 #   3  Trading Style    how fast it trades (timeframe + stop scale)
 #   4  Trading Method   what it looks for, and on what
 #   5  Risk             how much of the balance one loss may cost
 #
+# THE ORDER CHANGED, AND IT MATTERS. Step 1 used to be "Demo or Live?" — a
+# question asked before any account existed, whose answer was then stored as
+# `account_mode` and shown around the product as though it were a fact. It was
+# never a fact. A client who picked "Live" and then authorised a demo account
+# was shown "Live" on every screen, and the setting they had chosen was the
+# thing telling them so.
+#
+# Nobody is asked any more. Connecting the account IS the answer, and the
+# answer comes from the broker: step 2 shows what was detected and asks only
+# whether this is the account they meant.
+#
 # It resumes rather than restarts. Every step knows whether it is already
-# satisfied, so a client arriving from the OAuth callback — who has by then
-# made decisions 1 and 2 by connecting an account — lands on step 3 and is
-# told 1 and 2 are done, instead of being asked to choose an account mode it
-# can already see.
+# satisfied, so a client arriving from the OAuth callback lands on step 3 with
+# steps 1 and 2 already ticked and named.
 
-_OB_STEPS = ("mode", "connect", "style", "method", "risk")
+_OB_STEPS = ("connect", "account", "style", "method", "risk")
 _OB_TOTAL = len(_OB_STEPS)
 
 _OB_TITLES = {
-    "mode":    "Account Mode",
     "connect": "Connect cTrader",
+    "account": "Your Account",
     "style":   "Trading Style",
     "method":  "Trading Method",
     "risk":    "Risk",
@@ -1627,17 +1719,16 @@ _OB_TITLES = {
 
 
 def _ob_satisfied(u, step):
-    """Whether this client has already made this decision.
-
-    Connecting an account IS choosing demo-or-live, so step 1 counts as made
-    once a broker is linked — asking again would be asking about something
-    already on screen.
-    """
+    """Whether this client has already made this decision."""
     u = u or {}
-    if step == "mode":
-        return bool(u.get("account_mode") or u.get("ctrader_access_token"))
     if step == "connect":
         return bool(u.get("ctrader_access_token") and u.get("ctrader_account_id"))
+    if step == "account":
+        # A client who has been trading a configured account for months has
+        # already answered this by using it. Re-asking on a reconnect would be
+        # the same "the bot reset itself" failure `already_onboarded` exists
+        # to prevent, one step further in.
+        return bool(u.get("account_confirmed") or already_onboarded(u))
     if step == "style":
         return bool(u.get("style"))
     if step == "method":
@@ -1654,8 +1745,11 @@ def _ob_trail(u, upto):
     for s in _OB_STEPS[:upto]:
         if not _ob_satisfied(u, s):
             continue
-        if s == "mode":
-            what = "Live" if (u.get("ctrader_env") or u.get("account_mode")) == "live" else "Demo"
+        if s == "account":
+            # Read from the connected account, never from a stored choice.
+            from apex import ui_state
+            env, _proven, _why = ui_state.environment(u)
+            what = ui_state.BADGE.get(env, ui_state.BADGE[ui_state.UNKNOWN])
         elif s == "connect":
             what = "connected"
         elif s == "style":
@@ -1694,42 +1788,61 @@ def _ob_render(chat_id):
     return _ob_summary(chat_id)
 
 
-# ── Step 1: Account Mode ──
+# ── Step 1: Connect cTrader ──
 
-def _ob_step_mode_choice(chat_id):
+def _ob_step_connect(chat_id):
     if _LIVE_BROKER_REQUIRED:
         note = (f"⚠️ Free access needs a <b>live {_REQUIRED_BROKER_LABEL}</b> "
                 "account. A demo account lets you watch the bot work, but it "
                 "will not unlock trading.")
     else:
-        note = ("Most people start on demo — real market data, no money at "
-                "risk — and switch when they've seen it work.")
-    send_to(chat_id,
-            _ob_head(chat_id, "mode") +
-            "<b>How do you want to trade?</b>\n\n"
-            "🧪 <b>Demo</b> — real prices, simulated money. Nothing you can lose.\n"
-            "🔴 <b>Live</b> — real money, real orders, real results.\n\n"
-            f"<i>{note}</i>\n\n"
-            "You can change this later — switching to live has its own "
-            "confirmation, so you can never land on real money by accident.",
-            _kb([[("🧪 Demo", "ob:acct:demo")], [("🔴 Live", "ob:acct:live")]]))
-
-
-# ── Step 2: Connect cTrader ──
-
-def _ob_step_connect(chat_id):
-    u = user_store.load(chat_id)
-    want = (u.get("account_mode") or "demo")
+        note = ("Most people connect a demo account first — real market data, "
+                "no money at risk — and connect a live one when they've seen "
+                "it work.")
     send_to(chat_id,
             _ob_head(chat_id, "connect") +
             "<b>Connect your broker account.</b>\n\n"
             "The bot never holds your money — it places orders on your own "
             "cTrader account, which stays yours and which you can disconnect "
             "at any time with /reset.\n\n"
-            f"<i>You chose {'live' if want == 'live' else 'demo'}. "
-            "Authorize the matching account below — it takes about 30 "
-            "seconds, and I'll pick the setup back up here.</i>",
+            f"<i>{note}</i>\n\n"
+            "<i>Whether that account is demo or real money is something I read "
+            "from the account itself once it's connected — you don't have to "
+            "tell me, and I won't take your word for it.</i>",
             _kb([[("🔗 Connect my account", "go:connect")]]))
+
+
+# ── Step 2: Your Account ──
+#
+# Not a choice. The environment is already decided by what was authorised in
+# step 1; this step exists so the client SEES what was detected and confirms
+# it is the account they meant, before anything is configured around it.
+
+def _ob_step_account(chat_id):
+    from apex import ui_state
+    st = _ui(chat_id, refresh=True, force=True)
+    u = st.user or {}
+    if st.env == ui_state.LIVE:
+        body = ("This is a <b>real-money</b> account. Nothing will trade on it "
+                "until you finish setup and activate it deliberately — and "
+                "activation asks for a code you type back.")
+    elif st.env == ui_state.DEMO:
+        body = ("This is a <b>demo</b> account. Real prices, simulated money: "
+                "nothing here can cost you anything.")
+    else:
+        body = ("We could not confirm with your broker whether this account is "
+                "demo or real money. Setup can continue, but no real-money "
+                "order will be placed while that is unresolved.")
+    send_to(chat_id,
+            _ob_head(chat_id, "account") +
+            f"<b>{st.env_badge}</b>\n"
+            f"Account: <code>{_esc(str(u.get('ctrader_account_id') or '—'))}</code>\n\n"
+            f"{body}\n\n"
+            "<i>If this is the wrong account, switch it now rather than after "
+            "everything is configured around it.</i>",
+            _kb([[("✅ Yes — use this account", "ob:acct:ok")],
+                 [("🔄 Use a different account", "acct:switch")],
+                 [("🔁 Re-check with my broker", "ob:acct:recheck")]]))
 
 
 # ── Step 3: Trading Style ──
@@ -1903,8 +2016,8 @@ def _ob_step_mode(chat_id):
 
 # The five step renderers, by key. Defined after all of them exist.
 _OB_RENDER = {
-    "mode":    lambda cid: _ob_step_mode_choice(cid),
     "connect": lambda cid: _ob_step_connect(cid),
+    "account": lambda cid: _ob_step_account(cid),
     "style":   lambda cid: _ob_step_style(cid),
     "method":  lambda cid: _ob_step_instrument(cid),
     "risk":    lambda cid: _ob_step_risk(cid),
@@ -1931,7 +2044,7 @@ def _ob_summary(chat_id):
     send_to(chat_id,
             "🧭 <b>Setup — your configuration</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            f"Account: <b>{_mode_label(u)}</b>\n"
+            f"Account: <b>{_ui(chat_id).env_badge}</b>\n"
             f"Trades: {what}\n"
             f"Style: <b>{str(u.get('style', '—')).title()}</b> · "
             f"{u.get('timeframe', '—')} charts\n"
@@ -2073,6 +2186,50 @@ def _builder_activate(chat_id):
 
 
 def _handle_cb(chat_id, data):
+    """The only entrance for a button press. Shape, then repeat, then route.
+
+    Every inline keyboard this bot has ever sent is still in somebody's chat
+    and is still pressable. So a press is treated as untrusted input twice
+    over: `callback_guard.parse` rejects anything that is not a callback this
+    bot issues before a handler reads it, and `callback_guard.once` collapses
+    the double-tap that a slow network produces into one action with one
+    answer.
+
+    Neither is a financial control. `gates.authorize_order` and
+    `gates.authorize_close` remain the only things that can permit an order,
+    and the ledger claim inside them is what makes a duplicate impossible
+    rather than merely unlikely. This layer stops the INTERFACE from lying
+    about it.
+    """
+    from apex import callback_guard, screens
+    parsed = callback_guard.parse(data)
+    if not parsed:
+        # Not a button this bot drew. Say nothing about why — the client who
+        # sent it either has a very old chat open or is probing, and neither
+        # is served by a description of the routing table.
+        print(f"[Telegram] discarded an unroutable callback from {chat_id}: {data!r}")
+        return send_to(chat_id, screens.stale_action(),
+                       _kb([[("☰ Menu", "nav:menu")]]))
+    if callback_guard.is_action(data) and not callback_guard.once(chat_id, data):
+        print(f"[Telegram] ignored a repeated action from {chat_id}: {data}")
+        return send_to(chat_id,
+                       "✅ Already done — that was counted once.\n\n"
+                       "<i>Tapping twice never does it twice.</i>",
+                       _kb([[("☰ Menu", "nav:menu")]]))
+    try:
+        return _route_cb(chat_id, data)
+    except Exception as e:
+        # A handler that raises must not leave the client staring at a button
+        # that did nothing, and must never show them a traceback.
+        print(f"[Telegram] callback {data!r} failed for {chat_id}: {e}")
+        return send_to(chat_id,
+                       "⚠️ <b>That didn't go through</b>\n\n"
+                       "Nothing was changed on your account. Open the screen "
+                       "again — it will show you where things actually stand.",
+                       _kb([[("🏠 Home", "nav:home")], [("☰ Menu", "nav:menu")]]))
+
+
+def _route_cb(chat_id, data):
     """Inline-button presses (copilot approve/reject, risk acceptance, onboarding)."""
     try:
         from apex import control
@@ -2113,6 +2270,8 @@ def _handle_cb(chat_id, data):
     # ── Navigation. Screens only; nothing here moves money or settings. ──
     if data == "nav:menu":
         return _handle_menu(chat_id)
+    if data == "nav:home":
+        return _screen_home(chat_id)
     if data == "nav:over":
         return _handle_status(chat_id)
     if data == "nav:pos":
@@ -2133,6 +2292,10 @@ def _handle_cb(chat_id, data):
         return send_to(chat_id, _with_counts(_CONTROLS_TEXT), _back_kb(chat_id))
     if data == "nav:help":
         return _handle_quick_help(chat_id)
+    if data == "nav:notif":
+        return _screen_notifications(chat_id)
+    if data == "notif:toggle":
+        return _toggle_notifications(chat_id)
     if data == "nav:acct":
         return _screen_account(chat_id)
     if data == "nav:emg":
@@ -2164,8 +2327,19 @@ def _handle_cb(chat_id, data):
     if data == "emg:cancel":
         return send_to(chat_id, "↩️ Cancelled — your positions are untouched.",
                        _back_kb(chat_id, [[("📈 Positions", "nav:pos")]]))
+
+    # ── Closing a position: two taps, and the second one carries a token. ──
+    #
+    # The token is what makes an old screen inert. Without it, a "Yes, close
+    # it" button scrolled back to an hour later still closes whatever is open
+    # NOW — which is not the position the client was looking at when they
+    # decided.
+    if data == "pos:detail":
+        return _screen_position_detail(chat_id)
     if data == "pos:close":
-        return _handle_close(chat_id)
+        return _screen_close_confirm(chat_id)
+    if data.startswith("pos:goclose:"):
+        return _do_close(chat_id, data.split(":", 2)[2])
 
     # ── Live activation. Both of these lead INTO the existing gate. ──
     if data == "live:start":
@@ -2187,6 +2361,10 @@ def _handle_cb(chat_id, data):
         return _handle_quick_help(chat_id)
     if data == "acct:switch":
         return _handle_switch(chat_id)
+    if data in ("acct:refresh", "acct:recheck"):
+        # "Ask my broker again" as a button, because the alternative was
+        # telling a client to send a command to fix a screen.
+        return _screen_account(chat_id, refresh=True)
     if data == "acct:new":
         # Disconnect the current cTrader link and start a fresh authorization
         # (e.g. moving from a demo login to a real-money broker account).
@@ -2196,10 +2374,22 @@ def _handle_cb(chat_id, data):
         return _handle_ctrader(chat_id)
     if data.startswith("acct:use:"):
         ctid = data.split(":", 2)[2]
-        u = user_store.load(chat_id)
-        acc = next((a for a in (u.get("ctrader_accounts") or []) if str(a["ctid"]) == ctid), None)
+        # This button may be years old. Re-ask the broker before labelling the
+        # account demo or live: a confirmation prompt that says "demo" from a
+        # stale list is how somebody taps through onto real money.
+        from apex import ui_state as _uis3
+        u, _r, _w = _uis3.refresh(chat_id, force=True)
+        if u is None:
+            u = user_store.load(chat_id)
+        acc = next((a for a in (u.get("ctrader_accounts") or [])
+                    if str(a.get("ctid")) == ctid), None)
         if not acc:
-            return send_to(chat_id, "❌ That account isn't linked anymore. Tap Connect a different account.")
+            return send_to(chat_id,
+                           "❌ <b>That account is no longer available</b>\n\n"
+                           "Your broker did not list it just now. Nothing "
+                           "changed.",
+                           _kb([[("🔄 Switch account", "acct:switch")],
+                                [("☰ Menu", "nav:menu")]]))
         if acc.get("live"):
             # Real money → require an explicit confirmation.
             return send_to(chat_id,
@@ -2218,6 +2408,10 @@ def _handle_cb(chat_id, data):
     if data == "bot:on":
         if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
             _bot_control["set_paused"](False)
+        try:
+            user_store.update(chat_id, {"emergency_stop": False})
+        except Exception as e:
+            print(f"[Telegram] could not clear the emergency hold for {chat_id}: {e}")
         _auto_start_user(chat_id)
         return send_to(chat_id,
             "✅ <b>Bot is ON.</b>\nIt's watching the market now and will trade automatically "
@@ -2233,12 +2427,22 @@ def _handle_cb(chat_id, data):
             _dashboard_keyboard(chat_id))
     # ── Onboarding. Every step ends by asking the wizard what comes next,
     # so the order lives in _OB_STEPS alone and cannot drift per-branch. ──
+    if data == "ob:acct:ok":
+        user_store.update(chat_id, {"account_confirmed": True})
+        return _ob_render(chat_id)
+    if data == "ob:acct:recheck":
+        return _ob_step_account(chat_id)
     if data in ("ob:acct:demo", "ob:acct:live"):
-        want = data.split(":")[2]
-        # Records the INTENT only. It never flips a live account on by itself
-        # — that still needs the connected account plus the /paper off gate.
-        user_store.update(chat_id, {"account_mode": want})
-        send_to(chat_id, f"✅ Account mode: <b>{'🔴 Live' if want == 'live' else '🧪 Demo'}</b>")
+        # Buttons from chats that predate this: the wizard used to ask the
+        # client to pick demo or live before an account existed. The answer
+        # was never evidence of anything, so it is not stored — the client is
+        # told where the answer actually comes from and put back on the step
+        # that reads it.
+        send_to(chat_id,
+                "ℹ️ <b>I read that from your account now.</b>\n\n"
+                "Whether you're on demo or real money is decided by the "
+                "account you connect, not by a setting — so I check with your "
+                "broker instead of asking you.")
         return _ob_render(chat_id)
     if data.startswith("ob:style:"):
         key = data[9:]
@@ -2332,21 +2536,33 @@ def _handle_cb(chat_id, data):
         user_store.update(chat_id, {"risk_accepted": _dt.utcnow().isoformat()})
         return _handle_paper(chat_id, "off")
     if data == "cp:y":
+        # The suggestion is cleared BEFORE the order is attempted, so a second
+        # Approve on the same alert finds nothing to approve. That is the
+        # interface half of the duplicate problem; the half that actually
+        # prevents two positions is the idempotency claim inside
+        # gates.authorize_order, which refuses an identical order whatever
+        # asked for it.
         sug = user_loop.pending_suggestion(str(chat_id))
         user_loop.clear_suggestion(str(chat_id))
         if not sug:
-            return send_to(chat_id, "⌛ That suggestion expired. I'll send a fresh one on the next setup.")
+            from apex import screens
+            return send_to(chat_id,
+                           screens.stale_action("That trade opportunity")
+                           + "\n\nI'll send a fresh one on the next setup.",
+                           _kb([[("📈 Positions", "nav:pos")],
+                                [("☰ Menu", "nav:menu")]]))
         send_to(chat_id, f"✅ Approved — opening {sug['side']} {sug['symbol']}…")
         res = user_loop.force_trade(str(chat_id), sug["side"], sug["symbol"])
-        if res.get("ok"):
+        if _report_order_result(chat_id, res, sug["side"], sug["symbol"]):
             send_to(chat_id,
                     f"✅ <b>{sug['side']} {sug['symbol']}</b> @ {_fmt_px(res['price'])} | Units: {res['units']}\n"
-                    f"SL: {_fmt_px(res['sl'])} | TP: {_fmt_px(res['tp'])}")
-        else:
-            send_to(chat_id, f"❌ Could not open: {_trade_err(res.get('error'))}")
+                    f"SL: {_fmt_px(res['sl'])} | TP: {_fmt_px(res['tp'])}",
+                    _kb([[("📈 Positions", "nav:pos")], [("☰ Menu", "nav:menu")]]))
+        return
     elif data == "cp:n":
         user_loop.clear_suggestion(str(chat_id))
-        send_to(chat_id, "❌ Skipped. I'll keep watching and suggest the next setup.")
+        send_to(chat_id, "❌ Skipped. I'll keep watching and suggest the next setup.",
+                _kb([[("🤖 Automation", "nav:auto")], [("☰ Menu", "nav:menu")]]))
     elif data == "purgebad:yes":
         with _lock:
             target = _purge_pending.pop(str(chat_id), None)
@@ -2398,22 +2614,33 @@ def _handle_market(chat_id):
         if mp.get("volume"):
             lines.append(f"🔊 Volume: <b>{mp['volume']}</b>")
         lines.append(f"🎯 Momentum: <b>{mp['momentum']}</b>  (RSI {mp['rsi']})")
+    else:
+        # An omission a client cannot see is indistinguishable from a calm
+        # market. Say the read has not been taken rather than showing fewer
+        # lines and letting them infer.
+        lines.append("\n📊 <i>Trend, volatility and momentum have not been "
+                     "computed yet — the bot writes them on its next scan.</i>")
     lines.append(f"\n💡 <i>{sess['note']}</i>")
     lines.append("<i>How the market is moving right now — read before you trade.</i>")
-    send_to(chat_id, "\n".join(lines))
+    send_to(chat_id, "\n".join(lines),
+            _back_kb(chat_id, [[("📰 News", "nav:news"), ("📈 Positions", "nav:pos")]]))
 
 
 def _handle_news(chat_id):
     from apex import news
     if not news.enabled():
-        return send_to(chat_id, "📰 News guard is <b>off</b>. The bot is not avoiding news windows.")
+        return send_to(chat_id,
+                       "📰 News guard is <b>off</b>. The bot is not avoiding "
+                       "news windows.",
+                       _back_kb(chat_id, [[("📡 Market", "nav:mkt")]]))
     user = user_store.load(chat_id)
     pair = (user.get("symbol", cfg.SYMBOL) or "").split("_")
     events = news.upcoming(hours=24)
     if not events:
         return send_to(chat_id,
             "📰 <b>No high-impact events</b> in the next 24h (or the calendar feed is "
-            "unavailable). Trading proceeds normally — the news guard is fail-open.")
+            "unavailable). Trading proceeds normally — the news guard is fail-open.",
+            _back_kb(chat_id, [[("📡 Market", "nav:mkt")]]))
     lines = []
     for e in events:
         flag = "⭐" if e["currency"] in [c.upper() for c in pair] else "•"
@@ -2421,7 +2648,8 @@ def _handle_news(chat_id):
         when = f"{h}h {m}m" if h else f"{m}m"
         lines.append(f"{flag} <b>{e['currency']}</b> · {e['title']} — in {when}")
     send_to(chat_id, "📰 <b>Upcoming high-impact news (24h)</b>\n" + "\n".join(lines)
-            + "\n\n<i>⭐ = affects your pair. The bot stays flat around these.</i>")
+            + "\n\n<i>⭐ = affects your pair. The bot stays flat around these.</i>",
+            _back_kb(chat_id, [[("📡 Market", "nav:mkt"), ("📈 Positions", "nav:pos")]]))
 
 
 # ─── Positions ────────────────────────────────────────────
@@ -2479,9 +2707,63 @@ def _screen_positions(chat_id):
         lines.append(f"\n💵 Floating P&amp;L: <b>{'+' if fl >= 0 else '−'}${abs(fl):.2f}</b>")
 
     send_to(chat_id, head + "\n".join(lines),
-            _back_kb(chat_id, [[("🔒 Close position", "pos:close")],
+            _back_kb(chat_id, [[("🔍 Position details", "pos:detail")],
+                               [("🔒 Close position", "pos:close")],
                                [("📊 Overview", "nav:over"),
                                 ("🚨 Emergency", "nav:emg")]]))
+
+
+def _screen_position_detail(chat_id):
+    """One position, in full. Blank where the loop has not priced it yet."""
+    from apex import screens
+    st = _ui(chat_id)
+    dash = user_loop.get_dash(chat_id) or {}
+    op = dash.get("openPosition")
+    if not op:
+        return send_to(chat_id,
+                       screens.unavailable(st, "Position detail",
+                                           "Nothing is open on this account "
+                                           "right now."),
+                       _kb([[("📈 Positions", "nav:pos")],
+                            [("☰ Menu", "nav:menu")]]))
+    send_to(chat_id, screens.position_detail(st, op),
+            _kb([[("🔒 Close position", "pos:close")],
+                 [("← Back", "nav:pos"), ("☰ Menu", "nav:menu")]]))
+
+
+def _screen_close_confirm(chat_id):
+    """Step one of two. The token issued here is what makes step two specific
+    to this decision rather than to whatever happens to be open later."""
+    from apex import callback_guard, screens
+    st = _ui(chat_id)
+    dash = user_loop.get_dash(chat_id) or {}
+    op = dash.get("openPosition")
+    if not op:
+        return send_to(chat_id,
+                       "📭 <b>Nothing is open</b> — there is nothing to close.",
+                       _kb([[("📈 Positions", "nav:pos")],
+                            [("☰ Menu", "nav:menu")]]))
+    token = callback_guard.issue(chat_id, "close")
+    if not token:
+        return send_to(chat_id,
+                       screens.unavailable(st, "The close confirmation",
+                                           "We could not set up a "
+                                           "confirmation for this close."),
+                       _kb([[("📈 Positions", "nav:pos")],
+                            [("☰ Menu", "nav:menu")]]))
+    send_to(chat_id, screens.close_confirm(st, op.get("symbol")),
+            _kb(screens.close_confirm_rows(token)))
+
+
+def _do_close(chat_id, token):
+    """Step two. Refuses a token that is expired, wrong, or already redeemed."""
+    from apex import callback_guard, screens
+    if not callback_guard.consume(chat_id, "close", token):
+        return send_to(chat_id,
+                       screens.stale_action("That close confirmation"),
+                       _kb([[("📈 Positions", "nav:pos")],
+                            [("☰ Menu", "nav:menu")]]))
+    return _handle_close(chat_id)
 
 
 # ─── Automation ───────────────────────────────────────────
@@ -2513,23 +2795,79 @@ def _protection_stack(chat_id):
 
 
 def _screen_automation(chat_id):
-    from apex import automation
-    u = user_store.load(chat_id)
-    cur = automation.mode(u)
+    """The three levels, and — where it applies — why the chosen one is held.
+
+    Full Automation is a PREFERENCE. It has never been permission to trade and
+    is not treated as one here: the level is shown exactly as the client set
+    it, and when a live prerequisite is unestablished the screen says the level
+    is on hold rather than rendering it as running. Both halves matter — hiding
+    the setting would be its own lie, and drawing it as active while the gate
+    refuses every order is the lie this screen existed to tell.
+    """
+    from apex import automation, screens
+    st = _ui(chat_id)
+    cur = st.automation
     body = "\n\n".join(
         f"{'✅ ' if m == cur else ''}<b>{automation.LABEL[m]}</b>\n"
         f"<i>{automation.BLURB[m]}</i>"
         for m in automation.MODES)
     rows = [[(automation.LABEL[m] + (" ✅" if m == cur else ""), f"am:{m}")]
             for m in automation.MODES]
+    held = ""
+    if cur == "full" and not st.live_orders_offered and st.is_live:
+        held = ("\n\n⚠️ <b>Full Automation is set but on hold.</b>\n"
+                + screens._blocked_note(st).lstrip("\n").replace(
+                    "⚠️ <b>New real-money trades are switched off</b>",
+                    "New real-money trades stay switched off"))
     send_to(chat_id,
             "🤖 <b>Automation</b>\n"
             f"{_state_line(chat_id, guard=True)}\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"{body}\n\n"
+            f"{body}{held}\n\n"
             "<i>You can change this at any time, including with a position "
-            "open — it only decides what happens to the NEXT setup.</i>",
+            "open — it only decides what happens to the NEXT setup. Whatever "
+            "you pick, every order still passes the same checks.</i>",
             _back_kb(chat_id, rows))
+
+
+def _screen_notifications(chat_id):
+    """What the bot will and will not message about — named, not numbered.
+
+    The tiers come from `alert_policy`, which is the module the alert path
+    actually consults. Listing them from a second hand-written table here is
+    how a screen ends up promising a message the policy silently drops.
+    """
+    from apex import alert_policy
+    u = user_store.load(chat_id) or {}
+    on = bool(u.get("verbose_alerts"))
+    send_to(chat_id,
+            "🔔 <b>Notifications</b>\n"
+            f"{_state_line(chat_id)}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "<b>Always sent</b> — what happened to your money, and whether the "
+            "bot is running:\n"
+            "<i>positions opened and closed, a stop that moved past your entry, "
+            "a position left without a stop, an exit that failed, the daily "
+            "summary, the market opening and closing.</i>\n\n"
+            "<b>Sent</b> — something changed you might want to act on:\n"
+            "<i>a setup awaiting your approval, a signal on Signals Only, news "
+            "and volatility standing the bot aside, a degraded broker feed.</i>\n\n"
+            f"<b>Diagnostics</b> — how the bot is thinking: "
+            f"<b>{'shown' if on else 'hidden'}</b>\n"
+            "<i>every trailing-stop move, skipped setups, refused-setup "
+            "tracking, market pulses, heartbeats.</i>\n\n"
+            "<i>Nothing you turn off here can hide a trade. The first group is "
+            "not optional, at any setting.</i>",
+            _back_kb(chat_id, [
+                [("🙈 Hide diagnostics" if on else "🔍 Show diagnostics",
+                  "notif:toggle")],
+                [("🤖 Automation", "nav:auto")]]))
+
+
+def _toggle_notifications(chat_id):
+    u = user_store.load(chat_id) or {}
+    user_store.update(chat_id, {"verbose_alerts": not bool(u.get("verbose_alerts"))})
+    return _screen_notifications(chat_id)
 
 
 def _set_automation(chat_id, m):
@@ -2696,7 +3034,15 @@ def _handle_paper(chat_id, args):
 
         # Second gate, only where real money is at stake. A demo account keeps
         # the old one-step behaviour — friction there protects nothing.
-        if (u0.get("ctrader_env") or "demo").lower() == "live":
+        #
+        # WHICH account this is comes from `ui_state`, which asks the broker
+        # rather than reading `ctrader_env`. That flag is writable by /env; the
+        # connected account is not, and this is the branch where getting it
+        # wrong means a client believes they are simulating.
+        from apex import ui_state as _uis
+        _u_ref, _, _ = _uis.refresh(chat_id, user=u0)
+        _env, _proven, _ = _uis.environment(_u_ref if _u_ref is not None else u0)
+        if _env == _uis.LIVE:
             import secrets
             pending = u0.get("live_confirm") or {}
             fresh = (pending.get("token")
@@ -2732,11 +3078,14 @@ def _handle_paper(chat_id, args):
         _apply("PAPER_TRADING", on)
     if on:
         return send_to(chat_id, "📝 Paper trading <b>ON</b> — simulated balance, zero risk.")
-    u = user_store.load(chat_id)
-    env = (u.get("ctrader_env") or "demo").lower()
-    where = ("your <b>demo</b> account 🧪" if env in ("demo", "practice")
-             else "your <b>LIVE</b> account 🔴")
+    from apex import ui_state as _uis2
+    _st = _ui(chat_id)
+    where = ("your <b>DEMO</b> account 🧪" if _st.env == _uis2.DEMO
+             else "your <b>LIVE</b> account 🔴" if _st.env == _uis2.LIVE
+             else "the account you connected — <b>which we could not confirm "
+                  "just now</b> 🟠")
     send_to(chat_id, f"🔴 Paper trading <b>OFF</b> — orders now execute in {where}.\n"
+                     f"{_st.env_badge}\n"
                      "Send /start if the bot isn't running.")
 
 
@@ -3694,7 +4043,10 @@ def _screen_emergency_confirm(chat_id):
             "This closes at the current market price, immediately, and "
             "<b>cannot be undone</b>. Any unrealised profit or loss becomes "
             "real the moment you tap.\n\n"
-            "The bot keeps running afterwards unless you also stop it."
+            "<b>The bot also stops opening new positions.</b> An emergency "
+            "flatten that lets the next setup re-enter thirty seconds later is "
+            "not an emergency stop — tap Resume when you want it watching "
+            "again."
             + unknown,
             _back_kb(chat_id, [
                 [(f"⚠️ Yes — close {'all' if n is None else n} now", "emg:go")],
@@ -3703,6 +4055,17 @@ def _screen_emergency_confirm(chat_id):
 
 def _emergency_close_all(chat_id):
     send_to(chat_id, "🔴 Closing every open position…")
+    # Hold FIRST, then flatten. In the other order the loop is still live
+    # while positions are closing and can open a new one into the gap it just
+    # made — which is the exact opposite of what the button says.
+    try:
+        user_loop.stop(chat_id)
+    except Exception as e:
+        print(f"[Telegram] emergency: could not stop the loop for {chat_id}: {e}")
+    try:
+        user_store.update(chat_id, {"emergency_stop": True})
+    except Exception as e:
+        print(f"[Telegram] emergency: could not record the hold for {chat_id}: {e}")
     try:
         res = user_loop.force_close_all(chat_id)
     except Exception as e:
@@ -3736,33 +4099,37 @@ def _emergency_close_all(chat_id):
     if res.get("sweepError"):
         parts.append(f"\n⚠️ <i>Could not read the full position list: "
                      f"{_esc(str(res['sweepError']))}. Check cTrader.</i>")
+    parts.append("\n⏸ <b>The bot is now holding.</b> It will not open anything "
+                 "new on this account until you resume it — that survives a "
+                 "restart, so it stays held until you say otherwise.")
     send_to(chat_id, "🔴 <b>Emergency close</b>\n" + "\n".join(parts),
-            _back_kb(chat_id, [[("📈 Positions", "nav:pos"),
-                                ("📊 Overview", "nav:over")]]))
+            _back_kb(chat_id, [[("▶️ Resume trading", "nav:resume")],
+                               [("📈 Positions", "nav:pos"),
+                                ("🏠 Home", "nav:home")]]))
 
 
 # ─── Account ──────────────────────────────────────────────
 
-def _screen_account(chat_id):
-    u = user_store.load(chat_id)
-    accounts = u.get("ctrader_accounts") or []
-    cur_id = str(u.get("ctrader_account_id", "") or "")
-    dash = user_loop.get_dash(chat_id) or {}
-    bal = dash.get("balance")
-    lines = ["👤 <b>Account</b>", _state_line(chat_id), "━━━━━━━━━━━━━━━━━━━━"]
-    if not u.get("ctrader_access_token"):
+def _screen_account(chat_id, refresh=False):
+    """Which account, which environment, and what the bot may do on it."""
+    from apex import screens
+    st = _ui(chat_id, refresh=refresh, force=refresh)
+    u = st.user or {}
+    if not st.connected:
         return send_to(chat_id,
-                       "\n".join(lines) + "\n\n🔗 <b>No broker connected yet.</b>\n"
-                       "Connect a cTrader account and the bot can start.",
-                       _back_kb(chat_id, [[("🔗 Connect my account", "go:connect")]]))
-    lines.append(f"Broker account: <code>{_esc(cur_id or '—')}</code>")
-    lines.append(f"Balance: <b>{('$%.2f' % bal) if isinstance(bal, (int, float)) else '—'}</b>")
-    if len(accounts) > 1:
-        lines.append(f"\nYou have <b>{len(accounts)}</b> linked accounts.")
-    rows = [[("🔄 Switch account", "acct:switch")]]
-    if (u.get("ctrader_env") or "demo").lower() == "live" and u.get("paper", True):
-        rows.insert(0, [("🔴 Activate real-money trading", "live:start")])
-    send_to(chat_id, "\n".join(lines), _back_kb(chat_id, rows))
+                       screens.account(st) + "\n\n"
+                       "Connect a cTrader account and the bot can start. It "
+                       "never holds your money — it places orders on your own "
+                       "account, which stays yours.",
+                       _kb([[("🔗 Connect my account", "go:connect")],
+                            [("☰ Menu", "nav:menu")]]))
+    dash = user_loop.get_dash(chat_id) or {}
+    send_to(chat_id,
+            screens.account(st,
+                            account_id=u.get("ctrader_account_id"),
+                            account_count=len(u.get("ctrader_accounts") or []),
+                            balance=dash.get("balance")),
+            _kb(screens.account_rows(st)))
 
 
 def _screen_live_activation(chat_id):
@@ -3772,17 +4139,30 @@ def _screen_live_activation(chat_id):
     audit entry all live in _handle_paper, and a second activation path is
     exactly the kind of thing that ends up missing one of them.
     """
-    u = user_store.load(chat_id)
-    if (u.get("ctrader_env") or "demo").lower() != "live":
+    # Before live activation the environment is re-established from the
+    # broker, not read off the record. This is the single screen where being
+    # wrong about demo-versus-live costs the client money.
+    from apex import ui_state
+    st = _ui(chat_id, refresh=True, force=True)
+    if st.env != ui_state.LIVE:
         return send_to(chat_id,
-                       "🧪 <b>This is a demo account.</b>\n\n"
-                       "Real-money activation applies to a LIVE broker account. "
-                       "Connect or switch to one first.",
-                       _back_kb(chat_id, [[("🔄 Switch account", "acct:switch")]]))
+                       f"{st.env_badge}\n\n"
+                       "Real-money activation applies to a real broker "
+                       "account. This one is not, or we could not confirm that "
+                       "it is — either way we will not switch it to real "
+                       "orders on a guess.\n\n"
+                       f"<i>{st.env_detail.capitalize()}.</i>",
+                       _kb([[("🔄 Switch account", "acct:switch")],
+                            [("🔁 Re-check with my broker", "acct:refresh")],
+                            [("☰ Menu", "nav:menu")]]))
+    unverified = ("\n⚠️ <i>Your broker did not re-confirm this account just "
+                  "now. The bot will still refuse a real order it cannot "
+                  "authorise.</i>\n" if not st.proven else "")
     send_to(chat_id,
             "🔴 <b>Real-money trading</b>\n"
             f"{_state_line(chat_id, guard=True)}\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"{unverified}\n"
             "The bot is connected to a LIVE account but is still simulating. "
             "Turning that off means the next setup places a real order.\n\n"
             + _protection_stack(chat_id) +
@@ -3871,18 +4251,44 @@ def _trade_lots_kb(side, sym):
     return rows
 
 
+def _report_order_result(chat_id, result, side=None, sym=None):
+    """One place that decides what a client is told about an order.
+
+    Three outcomes, not two. The third — the broker did not answer — used to
+    be reported as "❌ Could not open trade", which is a claim we cannot
+    support: the order may be sitting open in the account. It gets its own
+    screen, and that screen has no retry button.
+    """
+    from apex import screens
+    if result.get("ok"):
+        return True
+    if result.get("ambiguous"):
+        st = _ui(chat_id)
+        send_to(chat_id,
+                screens.order_unknown(st, side=side or result.get("side"),
+                                      symbol=sym or result.get("symbol"),
+                                      detail=_trade_err(result.get("error"))),
+                _kb(screens.order_unknown_rows()))
+        return False
+    send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}",
+            _kb([[("📈 Positions", "nav:pos")], [("☰ Menu", "nav:menu")]]))
+    return False
+
+
 def _exec_trade(chat_id, side, sym, lots):
     lots_lbl = f" ({lots} {_size_word(lots, forex.unit_label(sym))})" if lots else ""
     send_to(chat_id, f"⚡ Opening <b>{side} {sym}</b>{lots_lbl}…")
+    # Straight into the audited path. Telegram is a presentation layer: it does
+    # not build a broker, it does not size a position and it does not decide
+    # whether an order is allowed — force_trade enters gates.authorize_order
+    # exactly as the automatic and control-plane origins do.
     result = user_loop.force_trade(str(chat_id), side, sym, lots=lots)
-    if result.get("ok"):
+    if _report_order_result(chat_id, result, side, sym):
         send_to(chat_id,
                 f"✅ <b>{side} {sym}</b> entered\n"
                 f"Price: <b>{_fmt_px(result['price'])}</b> | Units: {result['units']}\n"
                 f"SL: {_fmt_px(result['sl'])} | TP: {_fmt_px(result['tp'])}\n"
                 f"Spread: {result.get('spread', '?')}p")
-    else:
-        send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}")
 
 
 def _handle_buy(chat_id, args):
@@ -3908,17 +4314,42 @@ def _handle_sell(chat_id, args):
 
 
 def _handle_close(chat_id):
+    from apex import screens
+    # Same rule as opening: the close goes through gates.authorize_close, and
+    # a broker that did not answer is not a close that failed.
     result = user_loop.force_close(str(chat_id))
     if result.get("ok"):
         net = result.get("netPnl", 0)
         icon = "✅" if net >= 0 else "❌"
-        send_to(chat_id,
+        return send_to(chat_id,
                 f"🔒 <b>Position closed</b>\n"
                 f"Price: <b>{result.get('price', '—')}</b>\n"
                 f"{icon} Net P&amp;L: <b>{'+' if net >= 0 else ''}${net:.2f}</b> "
-                f"<i>(gross ${result.get('grossPnl', 0):.2f} − cost ${result.get('costUsd', 0):.2f})</i>")
-    else:
-        send_to(chat_id, f"❌ {result.get('error', 'No open position')}")
+                f"<i>(gross ${result.get('grossPnl', 0):.2f} − cost ${result.get('costUsd', 0):.2f})</i>",
+                _kb([[("📈 Positions", "nav:pos")], [("☰ Menu", "nav:menu")]]))
+    if result.get("ambiguous"):
+        return send_to(chat_id,
+                       screens.close_unknown(_ui(chat_id),
+                                             symbol=result.get("symbol"),
+                                             detail=_trade_err(result.get("error"))),
+                       _kb(screens.order_unknown_rows()))
+    # A refusal from the close gate is a refusal, and it is named in words the
+    # client can act on rather than in the gate's own vocabulary.
+    reason = str(result.get("error") or "No open position")
+    friendly = {
+        "No open position to close": "There is nothing open to close.",
+        "NOT_OWNER": "Another copy of the bot is managing this account right "
+                     "now. It will close on its own — try again in a moment.",
+        "DUPLICATE_CLOSE": "That close was already requested moments ago. "
+                           "Check Positions before asking again.",
+        "CLOSE_COORDINATION_UNAVAILABLE":
+            "We cannot currently prove this close would not be sent twice, so "
+            "it was not sent. If getting out now matters more than that risk, "
+            "use Emergency → Close All.",
+    }.get(reason, reason)
+    send_to(chat_id, f"❌ {_esc(friendly)}",
+            _kb([[("📈 Positions", "nav:pos"), ("🚨 Emergency", "nav:emg")],
+                 [("☰ Menu", "nav:menu")]]))
 
 
 def _handle_deploy(chat_id):
@@ -4302,12 +4733,30 @@ def _user_alert(uid, result):
         # is not decoration: "is this my demo or my real account" is the first
         # thing anyone wants to know before tapping Approve.
         d = "🟢 BUY" if result.get("side") == "BUY" else "🔴 SELL"
+        # Approving a trade is the moment "is this my real money" costs the
+        # most to get wrong, so the demo and live variants of this alert say
+        # different things about what Approve will do — and both of them read
+        # the environment off the connected account.
+        _st = _ui(uid)
+        if _st.is_live and not _st.simulating:
+            _what = ("<i>Approve places a <b>real order</b> on your live "
+                     "account. Nothing opens until you tap it.</i>")
+        elif _st.is_live:
+            _what = ("<i>This is a real account, but the bot is still "
+                     "simulating on it — Approve records the trade and places "
+                     "nothing at your broker.</i>")
+        elif _st.is_demo:
+            _what = ("<i>Approve opens this on your demo account. Simulated "
+                     "money — nothing here can cost you anything.</i>")
+        else:
+            _what = ("<i>We could not confirm which account this is. Approve "
+                     "will be checked again before anything is placed.</i>")
         send_to(uid,
                 f"⚡ <b>Trade opportunity</b>\n{_state_line(uid, guard=True)}\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 f"{d} <b>{sym}</b> @ {_fmt_px(result.get('price'))}"
                 + _fx_why_block(result) +
-                "\n\n<i>Nothing opens until you tap Approve.</i>",
+                f"\n\n{_what}",
                 extra={"reply_markup": {"inline_keyboard": [[
                     {"text": "✅ Approve", "callback_data": "cp:y"},
                     {"text": "❌ Reject", "callback_data": "cp:n"}]]}})
@@ -4317,13 +4766,20 @@ def _user_alert(uid, result):
         # point: the client must never be left wondering whether the bot took
         # this one.
         d = "🟢 BUY" if result.get("side") == "BUY" else "🔴 SELL"
+        # Same message, two audiences. On a demo account this is practice; on
+        # a live one, acting on it by hand spends real money — and the client
+        # should not have to work out which from a badge alone.
+        _sst = _ui(uid)
+        _where = (" on your <b>real-money</b> account" if _sst.is_live
+                  else " on your <b>demo</b> account" if _sst.is_demo else "")
         send_to(uid,
                 f"📣 <b>Signal</b> — no order placed\n{_state_line(uid)}\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 f"{d} <b>{sym}</b> @ {_fmt_px(result.get('price'))}"
                 + _fx_why_block(result) +
-                "\n\n<i>You're on Signals Only, so I placed nothing. Trade it "
-                "yourself, or change what I'm allowed to do below.</i>",
+                "\n\n<i>You're on Signals Only, so I placed nothing. If you "
+                f"take this one yourself it is your own order{_where}, and "
+                "none of the bot's limits apply to it.</i>",
                 _back_kb(uid, [[("🤖 Automation", "nav:auto"),
                                 ("📡 Market", "nav:mkt")]]))
     elif action in ("BUY", "SELL"):
@@ -4674,7 +5130,21 @@ def _restart_user_loop(chat_id):
 
 
 def _handle_start(chat_id):
-    user = user_store.load(chat_id)
+    # /start is one of the moments the account environment is re-established
+    # from the broker. A client sending /start after switching accounts in
+    # cTrader must not be shown the environment they had yesterday.
+    from apex import ui_state
+    user, _ok, _why = ui_state.refresh(chat_id, force=True)
+    if user is None:
+        user = user_store.load(chat_id)
+    # Resuming is the one thing that lifts an emergency hold, and it is
+    # deliberately explicit: the hold survives a restart, so it can only be
+    # cleared by the client asking for it.
+    if user.get("emergency_stop"):
+        try:
+            user_store.update(chat_id, {"emergency_stop": False})
+        except Exception as e:
+            print(f"[Telegram] could not clear the emergency hold for {chat_id}: {e}")
     # Check user has credentials set up
     if (not access.is_admin(str(chat_id)) and not user.get("paper")
             and not (user.get("ctrader_access_token") and user.get("ctrader_account_id"))):
@@ -4695,14 +5165,36 @@ def _handle_start(chat_id):
 
 
 def _handle_stop(chat_id):
+    """The Pause screen. Says what pausing does NOT do, which is the half
+    people get wrong — an open position is still open and still exposed."""
     user_loop.stop(chat_id)
     # Also pause global bot for admin
     if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
         _bot_control["set_paused"](True)
+    n = None
+    try:
+        n = user_loop.open_position_count(chat_id)
+    except Exception as e:
+        print(f"[Telegram] pause: position count unreadable for {chat_id}: {e}")
+    if n:
+        still = (f"\n\n📈 <b>{n} position{'s' if n != 1 else ''} still open.</b> "
+                 "Pausing does not close anything — each one keeps its stop at "
+                 "your broker. Use Positions to close one, or Emergency to "
+                 "close everything.")
+    elif n == 0:
+        still = "\n\n📭 Nothing is open."
+    else:
+        still = ("\n\n<i>How many positions are open has not been reported "
+                 "since the bot last started — check Positions.</i>")
     send_to(chat_id,
-        "⏸ <b>Bot is OFF.</b> No new trades will open. Any open position stays protected by its stop.\n"
-        "Tap ▶️ below to turn it back on.",
-        _dashboard_keyboard(chat_id))
+            "⏸ <b>Trading paused</b>\n"
+            f"{_state_line(chat_id, guard=True)}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "The bot has stopped looking for setups. <b>No new position will "
+            "be opened.</b>" + still,
+            _back_kb(chat_id, [[("▶️ Resume trading", "nav:resume")],
+                               [("📈 Positions", "nav:pos"),
+                                ("🚨 Emergency", "nav:emg")]]))
 
 
 def _handle_reset(chat_id):
