@@ -3776,6 +3776,40 @@ def clear_suggestion(user_id):
     user_store.update(str(user_id), {"pending_suggestion": None})
 
 
+# A broker that answered "no" and a broker that did not answer are not the
+# same event, and collapsing them into `{"ok": False}` is how a client gets
+# told their order failed when it is sitting open in their account.
+#
+# The distinction is drawn on the transport, not on the message text: a
+# rejection arrives as a reply, while a timeout, a dropped socket or a
+# half-written frame means the request may well have been executed and the
+# answer is what went missing. Anything we cannot place in either category is
+# treated as AMBIGUOUS, because that is the reading that cannot cause a second
+# order to be sent.
+_DEFINITE_REJECTIONS = (
+    "insufficient", "not enough", "rejected", "invalid", "not found",
+    "no such", "market closed", "not tradeable", "not tradable",
+    "position not open", "forbidden", "unauthor", "denied",
+)
+_AMBIGUOUS_MARKERS = (
+    "timed out", "timeout", "connection", "reset by peer", "broken pipe",
+    "eof", "unreachable", "temporarily", "no response", "closed socket",
+    "ssl",
+)
+
+
+def broker_result_ambiguous(err) -> bool:
+    """True when the broker's answer does not establish whether it executed."""
+    text = str(err or "").lower()
+    if not text:
+        return True
+    if any(m in text for m in _DEFINITE_REJECTIONS):
+        return False
+    if any(m in text for m in _AMBIGUOUS_MARKERS):
+        return True
+    return True
+
+
 def force_trade(user_id, side, symbol=None, lots=None):
     """Open a manual trade immediately (called from AI assistant or /buy /sell commands).
     If lots is specified, use that lot size instead of auto-calculating from risk."""
@@ -3875,7 +3909,12 @@ def force_trade(user_id, side, symbol=None, lots=None):
         ledger.record(_rid, broker.place_order(side, units, sym,
                                                sl=sl_price, tp=tp_price))
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        # The idempotency claim STANDS. It was taken before the broker was
+        # called, so an identical retry is refused by the ledger rather than
+        # reaching the broker a second time — which is the whole reason the
+        # claim is taken first.
+        return {"ok": False, "error": str(e), "side": side, "symbol": sym,
+                "ambiguous": broker_result_ambiguous(e)}
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     open_pos = {"side": side, "entryPrice": price, "symbol": sym,
@@ -3902,6 +3941,29 @@ def force_trade(user_id, side, symbol=None, lots=None):
     return {"ok": True, "side": side, "symbol": sym, "price": price,
             "units": units, "spread": round(spread, 1),
             "sl": round(sl_price, 5), "tp": round(tp_price, 5)}
+
+
+def list_broker_accounts(user):
+    """The broker's own answer to "which accounts does this token hold, and is
+    each one real money" — exposed here rather than imported by the caller.
+
+    The UI layer has to be able to re-establish the environment from the
+    account itself rather than from a stored flag, and this is the same call
+    the OAuth callback makes to build that list in the first place. Putting it
+    here keeps the architectural invariant intact: broker construction lives in
+    the trading core, and everything else asks the core.
+
+    Returns [] rather than raising for a missing token; a broker that refuses
+    or times out still raises, because "we could not confirm" is a fact the
+    caller must be able to tell its client apart from "there are none".
+    """
+    token = (user or {}).get("ctrader_access_token")
+    if not token:
+        return []
+    from apex.brokers import ctrader as _ct
+    if not _ct.is_configured():
+        raise RuntimeError("broker connection is not configured")
+    return _ct.list_accounts(token) or []
 
 
 def read_candles(user_id, symbol=None, count=50, timeframe=None):
@@ -3971,7 +4033,8 @@ def force_close(user_id, origin="manual", emergency=False):
         # The claim STANDS. A close that raised may still have reached the
         # broker, and retrying it seconds later can close a position that was
         # reopened in between. The next tick re-reads the broker and settles it.
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "error": str(e), "symbol": sym,
+                "ambiguous": broker_result_ambiguous(e)}
     # Record the outcome against the intent, so a duplicate request is answered
     # with what actually happened instead of a bare refusal the caller might
     # respond to by trying again.
