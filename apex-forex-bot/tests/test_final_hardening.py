@@ -351,11 +351,14 @@ print("\n9. The operator name is PROVEN, not merely stated")
 # operator out of their own control plane — observed live: every level 2 command
 # returned NO_OPERATORS_CONFIGURED because ruflo-mcp sent {id, action, args, ts}
 # with no operator field at all. The sender now signs the envelope.
-import hashlib as _hl, hmac as _hm, json as _js  # noqa: E402
+import hashlib as _hl, hmac as _hm, json as _js, time as _t  # noqa: E402
 
-def _envelope(secret, operator="owner", action="restart_loop", tamper=None):
+def _envelope(secret, operator="owner", action="restart_loop", tamper=None,
+              ts=None):
+    # A CURRENT timestamp by default: the envelope is now age-bounded, and a
+    # fixture frozen in the past would test expiry rather than signing.
     env = {"id": "c1", "action": action, "args": {"user_id": "1"},
-           "ts": 1786800000, "operator": operator}
+           "ts": int(_t.time()) if ts is None else ts, "operator": operator}
     payload = _js.dumps({k: env[k] for k in ("id", "action", "args", "ts",
                                              "operator")},
                         sort_keys=True, separators=(",", ":"))
@@ -390,15 +393,67 @@ try:
         _envelope("shared-secret-abc", tamper={"args": {"user_id": "999"}}))
     check("swapping the target user after signing is refused",
           ok is False and why == "SIGNATURE_INVALID", why)
+    # ── Freshness. A signature alone does not bound age, and the replay claim
+    # that used to cover it EXPIRES after 24h — after which a captured envelope
+    # verifies again and no record of the original refusal survives.
+    ok, why = control.verify_envelope(
+        _envelope("shared-secret-abc", ts=int(_t.time()) - 86400 * 2))
+    check("a correctly signed but STALE command is refused",
+          ok is False and why.startswith("COMMAND_EXPIRED"), why)
+    ok, why = control.verify_envelope(
+        _envelope("shared-secret-abc", ts=int(_t.time()) + 3600))
+    check("a timestamp from the future is refused",
+          ok is False and why == "TIMESTAMP_IN_FUTURE", why)
+    _no_ts = _envelope("shared-secret-abc")
+    _no_ts.pop("ts")
+    check("an envelope with no timestamp is refused",
+          control.verify_envelope(_no_ts)[0] is False)
+    check("small clock skew is still tolerated",
+          control.verify_envelope(
+              _envelope("shared-secret-abc", ts=int(_t.time()) + 5))[0] is True)
+
+    # ── The production policy. This is the finding: a missing secret used to
+    # return True, so anyone who could write to the queue could type
+    # operator="alex" and the allowlist would agree — an allowlist can only
+    # authorize an identity something else established.
     os.environ.pop("MCP_SIGNING_SECRET")
-    ok, why = control.verify_envelope({"id": "c1", "action": "restart_loop"})
-    check("with no secret configured it degrades to the allowlist, and says so",
-          ok is True and why == "UNSIGNED_NO_SECRET_CONFIGURED", why)
+    _e0 = os.environ.get("APP_ENV")
+    try:
+        for _prod_env in ("production", "", "staging", "somethingnew"):
+            os.environ["APP_ENV"] = _prod_env
+            ok, why = control.verify_envelope({"id": "c1", "action": "restart_loop"})
+            check(f"PRODUCTION (APP_ENV={_prod_env!r}) + no secret → level 2/3 "
+                  f"REFUSED", ok is False and "SIGNING_NOT_CONFIGURED" in why, why)
+        check("...and the refusal names the fix",
+              "MCP_SIGNING_SECRET" in control.verify_envelope({"id": "c1"})[1])
+        for _dev_env in ("dev", "development", "local", "test"):
+            os.environ["APP_ENV"] = _dev_env
+            ok, why = control.verify_envelope({"id": "c1", "action": "restart_loop"})
+            check(f"explicit non-production (APP_ENV={_dev_env!r}) may run "
+                  f"unsigned", ok is True and why == "UNSIGNED_DEV_ENVIRONMENT",
+                  why)
+    finally:
+        if _e0 is None:
+            os.environ.pop("APP_ENV", None)
+        else:
+            os.environ["APP_ENV"] = _e0
 finally:
     if _s0 is None:
         os.environ.pop("MCP_SIGNING_SECRET", None)
     else:
         os.environ["MCP_SIGNING_SECRET"] = _s0
+
+# Level 1 must be untouched by all of the above — reads carry no identity claim
+# worth forging, and breaking them would take the operator's visibility away at
+# exactly the moment they need it.
+check("read-only actions never reach the signature check",
+      control.level_of("ops_system_health") == 1
+      and control.authorize("ops_system_health")[0] is True)
+
+# The audit has to be able to answer "was this proven, or merely permitted?"
+check("the audit records HOW identity was established",
+      '"identity":' in open(os.path.join(ROOT, "apex", "control.py"),
+                            encoding="utf-8").read())
 
 CSRC2 = open(os.path.join(ROOT, "apex", "control.py"), encoding="utf-8").read()
 check("only level 2/3 are signature-checked; reads are not",

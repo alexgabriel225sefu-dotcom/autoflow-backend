@@ -152,6 +152,36 @@ def _signing_secret():
     return (os.getenv("MCP_SIGNING_SECRET") or "").strip()
 
 
+# A signed command stays valid forever unless something bounds its age. Replay
+# protection claims the command id for 24h, but the claim EXPIRES — so a
+# captured envelope replayed after that window has a signature that still
+# verifies and an id nobody remembers refusing. The id is inside the signed
+# payload, so an attacker cannot mint a fresh one; bounding the age closes the
+# remaining window permanently instead of for a day.
+_MAX_COMMAND_AGE_S = int(os.getenv("MCP_MAX_COMMAND_AGE_S") or 300)
+# Two hosts, two clocks. A small negative skew is normal, a large one is a
+# forged or misconfigured sender.
+_MAX_CLOCK_SKEW_S = 60
+
+
+def unsigned_allowed() -> bool:
+    """Whether an unsigned level-2/3 command may run at all.
+
+    Only outside production, and "outside production" is decided by
+    user_store._is_production(), which is deliberately inverted: anything
+    unrecognised counts AS production. Re-deriving that here would give the
+    deployment two answers to one question, and the day they disagree is the
+    day the financial control plane accepts unsigned commands on a live box.
+
+    Imported lazily so this module keeps its no-import-cycle property.
+    """
+    try:
+        from apex import user_store
+        return not user_store._is_production()
+    except Exception:
+        return False        # cannot tell => treat as production
+
+
 def verify_envelope(cmd):
     """Is the operator name in this command actually proven? (ok, reason).
 
@@ -160,18 +190,34 @@ def verify_envelope(cmd):
     sender signs the canonical envelope and this checks it, so the name cannot
     be forged without the secret.
 
-    When no secret is configured this returns "unsigned" rather than failing.
-    That is a deliberate, layered position and not an oversight: reaching the
-    queue at all already requires the Upstash credentials, level 2 additionally
-    requires MCP_CONTROL_ENABLED and an allowlisted name, and level 3 requires
-    its own switch on top. Making the secret mandatory before it is deployed
-    would lock the operator out of their own bot — which is exactly what
-    happened when operator identity was first enforced without a sender that
-    could provide one.
+    IN PRODUCTION THE SECRET IS MANDATORY for levels 2 and 3.
+
+    It used to return "unsigned" when no secret was configured, on the argument
+    that the surrounding layers already gated the queue: Upstash credentials to
+    reach it, MCP_CONTROL_ENABLED for level 2, a separate switch for level 3.
+    Those layers are real and they all remain. But every one of them answers
+    "is this capability enabled", and none answers "who sent this". Anyone able
+    to write to the command queue could put operator="alex" in a payload and be
+    treated as that operator — the allowlist would agree, because an allowlist
+    can only authorize an identity that something else established.
+
+    The original reason for the fallback was operational and was true at the
+    time: enforcing operator identity before the sender could supply one locked
+    the operator out of their own bot. The sender signs now, and the secret is
+    deployed on both services, so the fallback is protecting nothing and
+    costing the one property that matters here.
+
+    Outside production, unsigned still works — but that requires APP_ENV to say
+    dev/development/local/test explicitly. An unset or unfamiliar environment
+    counts as production and gets the strict path.
     """
     secret = _signing_secret()
     if not secret:
-        return True, "UNSIGNED_NO_SECRET_CONFIGURED"
+        if unsigned_allowed():
+            return True, "UNSIGNED_DEV_ENVIRONMENT"
+        return False, ("SIGNING_NOT_CONFIGURED — set MCP_SIGNING_SECRET on this "
+                       "service and on the MCP sender; level 2/3 commands "
+                       "cannot be authenticated without it")
     sig = str((cmd or {}).get("sig") or "")
     if not sig:
         return False, "SIGNATURE_MISSING"
@@ -185,6 +231,16 @@ def verify_envelope(cmd):
         return False, f"SIGNATURE_UNVERIFIABLE ({type(e).__name__})"
     if not hmac.compare_digest(expect, sig):
         return False, "SIGNATURE_INVALID"
+    # Freshness is checked only now, because `ts` is only trustworthy once the
+    # signature over it has verified.
+    try:
+        age = time.time() - float(cmd.get("ts"))
+    except (TypeError, ValueError):
+        return False, "TIMESTAMP_MISSING"
+    if age > _MAX_COMMAND_AGE_S:
+        return False, f"COMMAND_EXPIRED ({int(age)}s old)"
+    if age < -_MAX_CLOCK_SKEW_S:
+        return False, "TIMESTAMP_IN_FUTURE"
     return True, "SIGNATURE_OK"
 
 
@@ -449,6 +505,13 @@ def start_consumer(handlers, poll=10.0, heartbeat_interval=60.0):
                         "level": lvl, "operator": operator,
                         "user": str(args.get("user_id") or ""),
                         "args": _safe_args(args), "authorized": True,
+                        # HOW the operator was established, not merely that it
+                        # was. The audit recorded the reason only on refusal,
+                        # so a signed command and an unsigned one that happened
+                        # to be permitted were indistinguishable after the
+                        # fact — which is the one question an audit of a
+                        # financial control plane has to be able to answer.
+                        "identity": _sig_why if lvl > 1 else "LEVEL_1_READ",
                         "confirmed": bool(args.get("confirm"))}
                 # A state-changing result outlives the poll, so a replay can
                 # return it rather than a bare "already executed".

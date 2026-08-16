@@ -215,7 +215,22 @@ def restore(snapshot, dry_run=False):
             if wrote:
                 report["users"] += 1
                 if rec.get("active"):
-                    user_store._redis_sadd(user_store._ACTIVE_SET, str(uid))
+                    # The active SET is what start_all() and the watchdog
+                    # iterate. Restoring the record but not the membership
+                    # leaves a paying client whose settings are all present and
+                    # whose loop is never started — and nothing downstream
+                    # looks for a user it was never told about, so the failure
+                    # is silent and permanent. This return used to be ignored,
+                    # which meant a flaky Redis during recovery could produce a
+                    # restore reported COMPLETE with clients quietly switched
+                    # off. Only enforced on a shared backend: the local JSON
+                    # backend derives all_active() by scanning the directory,
+                    # so there is no set to miss.
+                    added = user_store._redis_sadd(user_store._ACTIVE_SET, str(uid))
+                    if getattr(user_store, "_USE_REDIS", False) and added is None:
+                        report["skipped"].append(
+                            f"user {uid}: restored, but NOT added to the active "
+                            f"set — their loop will not start")
             else:
                 report["skipped"].append(f"user {uid}: write not confirmed")
         except Exception as e:
