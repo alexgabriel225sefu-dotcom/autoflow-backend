@@ -835,12 +835,16 @@ def _dashboard_keyboard(chat_id=None):
     # Discoverable path from demo → real money without knowing a command.
     if chat_id is not None:
         try:
+            # Offered from the connected account, not from the cached flag —
+            # the same rule the rest of the interface follows. No refresh here:
+            # drawing a keyboard must not open a broker socket.
+            from apex import ui_state
             u = user_store.load(chat_id)
-            if (u.get("ctrader_access_token")
-                    and (u.get("ctrader_env") or "demo").lower() != "live"):
+            env, _p, _w = ui_state.environment(u)
+            if u.get("ctrader_access_token") and env != ui_state.LIVE:
                 rows.append([{"text": "🔴 Switch to Live", "callback_data": "acct:switch"}])
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Telegram] dashboard keyboard: state unreadable: {e}")
     if not rows:
         return {}
     return {"reply_markup": json.dumps({"inline_keyboard": rows})}
@@ -2370,10 +2374,22 @@ def _route_cb(chat_id, data):
         return _handle_ctrader(chat_id)
     if data.startswith("acct:use:"):
         ctid = data.split(":", 2)[2]
-        u = user_store.load(chat_id)
-        acc = next((a for a in (u.get("ctrader_accounts") or []) if str(a["ctid"]) == ctid), None)
+        # This button may be years old. Re-ask the broker before labelling the
+        # account demo or live: a confirmation prompt that says "demo" from a
+        # stale list is how somebody taps through onto real money.
+        from apex import ui_state as _uis3
+        u, _r, _w = _uis3.refresh(chat_id, force=True)
+        if u is None:
+            u = user_store.load(chat_id)
+        acc = next((a for a in (u.get("ctrader_accounts") or [])
+                    if str(a.get("ctid")) == ctid), None)
         if not acc:
-            return send_to(chat_id, "❌ That account isn't linked anymore. Tap Connect a different account.")
+            return send_to(chat_id,
+                           "❌ <b>That account is no longer available</b>\n\n"
+                           "Your broker did not list it just now. Nothing "
+                           "changed.",
+                           _kb([[("🔄 Switch account", "acct:switch")],
+                                [("☰ Menu", "nav:menu")]]))
         if acc.get("live"):
             # Real money → require an explicit confirmation.
             return send_to(chat_id,
