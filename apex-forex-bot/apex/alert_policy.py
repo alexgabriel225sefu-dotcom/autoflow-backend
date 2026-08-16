@@ -26,7 +26,16 @@ ESSENTIAL = {
     "BUY", "SELL",                 # a position was opened
     "CLOSE", "BROKER_CLOSE", "BROKER_CLOSE_MULTI",
     "STOP",                        # the bot stopped itself
-    "WEEKEND_CLOSE", "WEEKEND_REOPEN",
+    # Reports what the weekend flatten actually did — including which
+    # positions it could NOT close, which is a different fact from "the
+    # market shut" and is why this stays essential while WEEKEND_REOPEN
+    # (below) does not.
+    "WEEKEND_CLOSE",
+    # The market session itself. MARKET_OPEN carries the result of the
+    # reconnect, so it is the message that says "your account answered and the
+    # bot can trade today" — or that it could not, which is the whole reason
+    # the check exists. Neither is optional information.
+    "MARKET_OPEN", "MARKET_CLOSE",
     # The bot tried to exit and could not: the client is still in the
     # trade and needs to know, whatever their alert preference.
     "EXIT_FAILED",
@@ -48,6 +57,12 @@ USEFUL = {
 
 DIAGNOSTIC = {
     "STOP_MOVED",                  # every trail after the breakeven one
+    # Superseded by MARKET_OPEN, which fires at the same minute. Both were
+    # essential and the client got two messages a week apart by seconds. The
+    # one that survives is the one that PROVES the account answered; this one
+    # asked the client to send /ctrader "as a precaution" — manual work the
+    # reconnect now does and verifies on their behalf.
+    "WEEKEND_REOPEN",
     "SKIP_WARN", "MARKET_PULSE", "HEARTBEAT",
     "SENTINEL_BLOCK", "SENTINEL_FLIP",
     "SHADOW_OPEN", "SHADOW_MOVE", "SHADOW_RESULT",

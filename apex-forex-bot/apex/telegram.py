@@ -2098,6 +2098,18 @@ def _handle_cb(chat_id, data):
         except ValueError:
             return
         return _builder_pick(chat_id, step_i, opt_i)
+    # ── Daily "keep or change it" offer (the recap's keyboard). "Change" is
+    # not handled here: those two buttons reuse the existing nav:strat picker
+    # and bld:open builder, so there is exactly one place that edits a setup.
+    if data == "strat:keep":
+        _u = user_store.load(chat_id) or {}
+        try:
+            _name = friendly_strategy(_u.get("strategy") or "auto")[0]
+        except Exception:
+            _name = _u.get("strategy") or "your current strategy"
+        return send_to(chat_id,
+                       f"✅ Sticking with <b>{_name}</b> — nothing changed.\n"
+                       f"<i>You can switch any time with /strategy.</i>")
     # ── Navigation. Screens only; nothing here moves money or settings. ──
     if data == "nav:menu":
         return _handle_menu(chat_id)
@@ -4069,10 +4081,28 @@ def daily_summary_text(user_id):
     return "\n".join(lines)
 
 
+def _strategy_choice_kb():
+    """The one-tap "keep or change it" offer that rides the daily recap.
+
+    Deliberately three buttons on an existing message rather than a new prompt
+    of its own: the end of a trading day is the moment the question is worth
+    asking, and asking it after every trade would put six keyboards a day in a
+    channel the alert policy exists to keep readable.
+    """
+    return {"reply_markup": {"inline_keyboard": [
+        [{"text": "✅ Keep this setup", "callback_data": "strat:keep"}],
+        [{"text": "🔄 Change strategy", "callback_data": "nav:strat"},
+         {"text": "⚙️ Rebuild it", "callback_data": "bld:open"}],
+    ]}}
+
+
 def send_daily_summary(user_id):
     text = daily_summary_text(user_id)
     if text:
-        _user_alert(user_id, {"action": "DAILY_SUMMARY", "text": text})
+        _user_alert(user_id, {"action": "DAILY_SUMMARY",
+                              "text": text + "\n\n<b>Keep this setup for "
+                                             "tomorrow, or change it?</b>",
+                              "extra": _strategy_choice_kb()})
     return bool(text)
 
 
@@ -4122,7 +4152,31 @@ def _user_alert(uid, result):
     except Exception as e:
         print(f"[TELEGRAM] alert policy failed for {action}: {e}")
     if action == "DAILY_SUMMARY":
-        send_to(uid, result.get("text", ""))
+        send_to(uid, result.get("text", ""), result.get("extra"))
+    elif action == "MARKET_CLOSE":
+        send_to(uid,
+                "🔴 <b>Market closed</b> — weekend.\n"
+                + ("Your broker connection has been closed.\n"
+                   if result.get("disconnected") else "")
+                + "Nothing trades until Sunday. The bot reconnects to your "
+                  "account by itself when the market reopens (~21:00 UTC) and "
+                  "will message you then.")
+    elif action == "MARKET_OPEN":
+        if result.get("ok"):
+            send_to(uid,
+                    "🟢 <b>Market open</b> — the week has started.\n"
+                    f"Account reconnected: <b>{result.get('detail', '')}</b>\n"
+                    "The bot is scanning for setups again.")
+        else:
+            # This is the message the whole reconnect check exists to produce.
+            # Saying "market open" without it would read as good news while the
+            # account is unreachable and nothing can trade.
+            send_to(uid,
+                    "🟢 <b>Market open</b> — but the bot <b>cannot reach your "
+                    "account</b>.\n"
+                    f"<i>{str(result.get('detail', ''))[:200]}</i>\n\n"
+                    "No trades will be placed until this is fixed. Send "
+                    "/ctrader to reconnect your account.")
     elif action == "HEARTBEAT":
         send_to(uid,
                 f"💓 <b>Bot alive</b> — {sym}\n"

@@ -48,7 +48,11 @@ LOUD = {"verbose_alerts": True}
 
 print("\n── a beginner still sees everything about their money ──")
 for a in ("BUY", "SELL", "CLOSE", "BROKER_CLOSE", "BROKER_CLOSE_MULTI",
-          "STOP", "WEEKEND_CLOSE", "WEEKEND_REOPEN", "DAILY_SUMMARY",
+          "STOP", "WEEKEND_CLOSE", "DAILY_SUMMARY",
+          # The market edge. MARKET_OPEN also carries whether the broker
+          # account answered — a client whose token expired over the weekend
+          # has to hear that before the first missing trade tells them.
+          "MARKET_OPEN", "MARKET_CLOSE",
           "STOP_BREAKEVEN"):
     check(f"{a} reaches a quiet client", alert_policy.allowed(a, QUIET))
 
@@ -58,6 +62,10 @@ for a in ("NEWS_WARN", "FLASH_WARN", "BROKER_HEALTH", "SUGGEST"):
 
 print("\n── the diagnostics are hidden until asked for ──")
 for a in ("STOP_MOVED", "SKIP_WARN", "MARKET_PULSE", "HEARTBEAT",
+          # Demoted: MARKET_OPEN fires in the same minute and says more. Two
+          # near-identical reopen messages is the noise this policy exists to
+          # remove, and this was the weaker of the two.
+          "WEEKEND_REOPEN",
           "SENTINEL_BLOCK", "SENTINEL_FLIP", "SHADOW_OPEN", "SHADOW_MOVE",
           "SHADOW_RESULT", "AI_ERROR", "DATA_ERROR"):
     check(f"{a} is quiet by default", not alert_policy.allowed(a, QUIET))

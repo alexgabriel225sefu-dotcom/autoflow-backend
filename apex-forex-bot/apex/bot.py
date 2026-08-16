@@ -656,6 +656,15 @@ def main():
     except Exception as e:
         logger.warn(f"boot auto-start / watchdog failed: {e}")
 
+    # Market open/close edge. Separate from the trading loops on purpose: they
+    # are gated behind is_market_open() and are asleep at exactly the moment
+    # the close has to be announced and the broker session dropped.
+    try:
+        from apex import session_watch
+        session_watch.start()
+    except Exception as e:
+        logger.warn(f"session watcher failed to start: {e}")
+
     verify_license()
     # Per-user cTrader architecture: each client runs their own isolated loop
     # (started by the Telegram poller after /ctrader OAuth).

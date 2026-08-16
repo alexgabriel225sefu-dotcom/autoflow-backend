@@ -874,6 +874,25 @@ def _refresh_ctrader_token(user_id, cfg) -> bool:
         return False
 
 
+def drop_broker_connection(user) -> bool:
+    """Close this account's pooled cTrader socket. True when there was one.
+
+    Lives here rather than in the caller because the import graph is an
+    enforced invariant: nothing outside the trading core may reach a broker
+    module, so the session watcher asks the core to do it instead of importing
+    one itself (tests/test_failure_matrix.py, item 15).
+
+    Safe to call at any time — the pool recreates and re-authenticates on the
+    next request, which is exactly how the weekend reopen path repairs itself.
+    """
+    ctid = (user or {}).get("ctrader_account_id")
+    if not ctid:
+        return False
+    from apex.brokers import ctrader as _ct
+    _ct._drop_conn(user.get("ctrader_env", "demo"), ctid)
+    return True
+
+
 def _manage_trailing(broker, cfg, pos, symbol, price, initial_risk=None):
     """Trailing stop + break-even (Strategy Builder exit modes). Moves the SL
     only in the favourable direction — never loosens it, never closes the trade.
