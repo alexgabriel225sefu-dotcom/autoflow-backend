@@ -159,9 +159,14 @@ for _field in ("risk", "symbol", "autopilot", "loss_streak", "maxpos",
 
 _SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                          "apex", "control_actions.py"), encoding="utf-8").read()
-_secret_check("the detail read filters on the shape rule, not the old list",
-              "if not _is_secret(k)" in _SRC,
+_secret_check("the detail read applies the shape rule, not the old list",
+              "_is_secret(k)" in _SRC,
               "a name list cannot cover a secret added after it was written")
+# Dropping a secret field entirely also hid WHETHER it was set, and "has this
+# client configured an AI key" is operational fact rather than secret material.
+_secret_check("a set secret is replaced, not dropped",
+              '"•set•" if v else v' in _SRC,
+              "the operator must still be able to see that a key exists")
 
 if _leaky:
     print(f"\n❌ {len(_leaky)} credential check(s) failed")

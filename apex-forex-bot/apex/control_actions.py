@@ -158,7 +158,13 @@ def build():
 
     def h_user_detail(args):
         uid = str(args["user_id"])
-        u = {k: v for k, v in user_store.load(uid).items() if not _is_secret(k)}
+        # Secrets are replaced, not dropped. Dropping them hid whether a
+        # client had configured an AI key at all — which is operational fact,
+        # not secret material, and the operator needs it to answer "why is the
+        # assistant not answering for this client". `_connected_ctrader` below
+        # has always made exactly this distinction.
+        u = {k: ("•set•" if v else v) if _is_secret(k) else v
+             for k, v in user_store.load(uid).items()}
         u["_connected_ctrader"] = bool(user_store.load(uid).get("ctrader_access_token"))
         return {"user": uid, "record": u, "summary": _summarize(uid),
                 "dash": user_loop.get_dash(uid) or {}}
