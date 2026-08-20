@@ -255,6 +255,8 @@ for forbidden in ("place_order", "close_position", "authorize_order",
 
 print("\n11. The terminal itself shows only real, escaped, backend-supplied data")
 HTML = webapp.terminal_html()
+BOT_SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "apex", "bot.py"), encoding="utf-8").read()
 check("it renders the backend's badge verdict", 'id="modeBadge"' in HTML)
 check("...and has a distinct class for unverified",
       "unver" in HTML, "an unknown account must not borrow the demo styling")
@@ -275,6 +277,30 @@ check("the client cannot ask for another account",
 check("a stale feed is visibly stale", "stale" in HTML and "freshness" in HTML)
 check("errors are sentences, not stack traces",
       "could not be found" in HTML and "temporarily unavailable" in HTML)
+
+print("\n12. It moves like a terminal, at the broker's own precision")
+# The screenshot that prompted this: a GBPUSD entry of 1.36078 rendered as
+# "1.36". Lightweight Charts formats to 2 decimals unless told otherwise, so
+# the three digits that carry the meaning were being dropped.
+check("price precision comes from the broker, not a default",
+      "applyPrecision" in HTML and "priceFormat" in HTML)
+check("...and the payload carries it", '"digits"' in BOT_SRC and '"pipSize"' in BOT_SRC)
+check("prices render at that precision", "toFixed(DIGITS)" in HTML)
+check("there is a fast tick endpoint", "/api/app/tick" in HTML and "/api/app/tick" in BOT_SRC)
+check("the tick is authenticated like every other route",
+      BOT_SRC.count("webapp.validate(init, cfg.TELEGRAM_BOT_TOKEN") >= 3)
+check("the candle GROWS instead of the series being redrawn",
+      "series.update(lastBar)" in HTML and "growBar" in HTML)
+check("a stale tick never rewrites a closed bar",
+      "never rewrites history" in HTML)
+check("the entry line carries the running P&L, cTrader style",
+      "entryTitle" in HTML and "refreshEntryLine" in HTML)
+check("money settles rather than snapping", "function glide" in HTML)
+check("a position closed between refreshes clears immediately",
+      "The position closed between full refreshes" in HTML)
+check("the tick is lighter than the full payload",
+      "candles" not in BOT_SRC[BOT_SRC.index("/api/app/tick"):BOT_SRC.index("# ── Mini App: history")],
+      "the whole point is that it does not ship candles")
 
 print("\n" + "=" * 50)
 if failures:

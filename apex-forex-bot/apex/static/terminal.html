@@ -208,15 +208,34 @@ try{
   }).observe(chartEl);
 }catch(e){console.error('chart lib unavailable',e);}
 
-let lines=[];
+let lines=[], entryLine=null;
+/* The entry line carries the running result, the way a broker terminal does:
+   the number you care about sits on the line it belongs to, not only in a card
+   further down the page. */
+function entryTitle(pos){
+  if(!pos) return 'ENTRY';
+  const p=pos.pnlPips, u=pos.pnlUsd;
+  if(p==null && u==null) return 'ENTRY';
+  const sign=(p!=null?p:u)>=0?'+':'';
+  return 'ENTRY  '+(p!=null?sign+p.toFixed(1)+' pips':'')
+       + (u!=null?'  ('+(u>=0?'+':'−')+'$'+Math.abs(u).toFixed(2)+')':'');
+}
 function setLines(pos){
   if(!series)return;
-  lines.forEach(l=>{try{series.removePriceLine(l)}catch(e){}}); lines=[];
+  lines.forEach(l=>{try{series.removePriceLine(l)}catch(e){}});
+  lines=[]; entryLine=null;
   if(!pos)return;
-  const add=(p,c,t)=>{if(p)lines.push(series.createPriceLine({price:Number(p),color:c,lineWidth:1,lineStyle:2,title:t}))};
-  add(pos.entryPrice,'#f5b544','ENTRY');
+  const add=(p,c,t,w)=>{ if(p==null||p==='')return null;
+    const l=series.createPriceLine({price:Number(p),color:c,lineWidth:w||1,
+      lineStyle:2,axisLabelVisible:true,title:t}); lines.push(l); return l; };
+  entryLine=add(pos.entryPrice,'#f5b544',entryTitle(pos),2);
   add(pos.stopLoss||pos.sl,'#ff4560','SL');
   add(pos.takeProfit||pos.tp,'#2fd575','TP');
+}
+function refreshEntryLine(pos){
+  if(!entryLine||!pos)return;
+  try{ entryLine.applyOptions({title:entryTitle(pos),
+        color:(pos.pnlUsd!=null&&pos.pnlUsd<0)?'#ff8598':'#f5b544'}); }catch(e){}
 }
 
 /* ── tabs ── */
@@ -255,6 +274,33 @@ function setBadge(acct){
 }
 
 let first=true,lastSym='—',lastOk=0;
+/* Price precision comes from the broker's symbol details. Lightweight Charts
+   defaults to 2 decimals, which renders a GBPUSD entry of 1.36078 as "1.36" —
+   the three digits that carry all the meaning, dropped. */
+let DIGITS=5, PIP=0.0001, TFSEC=900, lastBar=null, livePos=null;
+const TF_SECONDS={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400};
+function applyPrecision(d){
+  if(d==null||d===DIGITS||!series)return;
+  DIGITS=d;
+  const mv=Number(Math.pow(10,-d).toFixed(d));
+  try{ series.applyOptions({priceFormat:{type:'price',precision:d,minMove:mv}}); }catch(e){}
+}
+const px = v => v==null?'—':Number(v).toFixed(DIGITS);
+/* Money and pips settle toward the new value instead of snapping, so a moving
+   number reads as movement rather than as a page redraw. */
+function glide(el,to,fmt){
+  if(!el)return;
+  const from=el.__v==null?to:el.__v; el.__v=to;
+  if(from===to){el.textContent=fmt(to);return;}
+  const t0=performance.now(), dur=260;
+  cancelAnimationFrame(el.__raf||0);
+  const step=now=>{
+    const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3);
+    el.textContent=fmt(from+(to-from)*e);
+    if(k<1) el.__raf=requestAnimationFrame(step);
+  };
+  el.__raf=requestAnimationFrame(step);
+}
 function freshness(){
   const dot=Q('liveDot'); if(!dot)return;
   const age=(Date.now()-lastOk)/1000;
@@ -277,9 +323,12 @@ async function refresh(){
   const d = await api('/api/app/data?tf='+encodeURIComponent(TF));
   Q('err').style.display='none'; lastOk=Date.now(); freshness();
   setBadge(d.account);
+  applyPrecision(d.digits);
+  if(d.pipSize) PIP=d.pipSize;
+  TFSEC=TF_SECONDS[d.timeframeUsed||TF]||TFSEC;
   lastSym=(d.symbol||'—').replace('_','/');
   if(!document.querySelector('.tab[data-p="perf"]').classList.contains('on')) Q('cSym').textContent=lastSym;
-  Q('cMeta').innerHTML='<i id="liveDot"></i>'+(d.price?num(d.price)+' · ':'')+esc(d.timeframeUsed||d.timeframe||'')+' · '+esc(d.broker||'');
+  Q('cMeta').innerHTML='<i id="liveDot"></i><b id="livePx">'+(d.price?px(d.price):'—')+'</b> · '+esc(d.timeframeUsed||d.timeframe||'')+' · '+esc(d.broker||'');
   freshness();
 
   const eq = d.equityLive!=null?d.equityLive:(d.balance||0);
@@ -314,21 +363,23 @@ async function refresh(){
 
   if(series&&d.candles&&d.candles.length){
     series.setData(d.candles);
+    lastBar=Object.assign({},d.candles[d.candles.length-1]);
     if(first||tfDirty){chart.timeScale().fitContent();first=false;tfDirty=false;}
   }
   if(eqSeries&&d.equity&&d.equity.length) eqSeries.setData(d.equity.map((p,i)=>({time:i,value:p.value})));
-  setLines(d.position);
+  livePos=d.position?Object.assign({},d.position):null;
+  setLines(livePos);
 
   const pos=Q('pos');
   if(d.position){
     const p=d.position, dir=p.side==='BUY'?'🟢 LONG':'🔴 SHORT';
     pos.style.display='block';
     pos.innerHTML='<span class="lg">'+dir+' '+esc(lastSym)+'</span>'
-      +(p.pnlPips!=null?' · <span class="'+(p.pnlPips>=0?'pnl-up':'pnl-dn')+'">'+(p.pnlPips>=0?'+':'')+p.pnlPips+' pips'
-        +(p.pnlUsd!=null?' ('+money(p.pnlUsd)+')':'')+'</span>':'')
-      +'<div class="grid"><div>Entry<b>'+num(p.entryPrice)+'</b></div>'
-      +'<div>Stop<b>'+num(p.stopLoss||p.sl)+'</b></div>'
-      +'<div>Target<b>'+num(p.takeProfit||p.tp)+'</b></div></div>';
+      +' · <span id="posPnl" class="'+((p.pnlUsd==null?0:p.pnlUsd)>=0?'pnl-up':'pnl-dn')+'"></span>'
+      +'<div class="grid"><div>Entry<b>'+px(p.entryPrice)+'</b></div>'
+      +'<div>Stop<b>'+px(p.stopLoss||p.sl)+'</b></div>'
+      +'<div>Target<b>'+px(p.takeProfit||p.tp)+'</b></div></div>';
+    paintPnl(p);
   } else pos.style.display='none';
 
   const perf=Q('p-perf');
@@ -496,7 +547,83 @@ Q('rPlay').onclick=()=>{
   }, 55);
 };
 
-refresh(); setInterval(refresh, 2500);
+/* ── THE LIVE TICK ──────────────────────────────────────────────────────────
+   /api/app/data rebuilds candles, stats, news and the journal — far too heavy
+   to ask for at the rate a price moves. The tick asks only for what changes:
+   the price, the position's running P&L, and the money. The full refresh drops
+   to every 6s because the tick already carries everything that moves. */
+function paintPnl(p){
+  const el=Q('posPnl'); if(!el||!p)return;
+  const up=(p.pnlUsd==null?0:p.pnlUsd)>=0;
+  el.className=up?'pnl-up':'pnl-dn';
+  const pips=p.pnlPips==null?null:p.pnlPips, usd=p.pnlUsd==null?null:p.pnlUsd;
+  el.textContent=(pips!=null?(pips>=0?'+':'')+pips.toFixed(1)+' pips':'')
+                +(usd!=null?(pips!=null?'  ':'')+'('+money(usd)+')':'');
+}
+
+/* Grow the current candle instead of redrawing the series. setData() rebuilds
+   every bar and visibly resets the view; update() moves only the bar in flight,
+   which is what makes the chart breathe the way a terminal's does. */
+function growBar(price, ts){
+  if(!series||!lastBar||price==null)return;
+  const bucket=Math.floor(ts/TFSEC)*TFSEC;
+  if(bucket>lastBar.time){
+    lastBar={time:bucket,open:price,high:price,low:price,close:price};
+  }else if(bucket===lastBar.time){
+    lastBar.high=Math.max(lastBar.high,price);
+    lastBar.low=Math.min(lastBar.low,price);
+    lastBar.close=price;
+  }else return;                      // a stale tick never rewrites history
+  try{ series.update(lastBar); }catch(e){}
+}
+
+async function tick(){
+  try{
+    const t=await api('/api/app/tick');
+    lastOk=Date.now(); freshness();
+    const lp=Q('livePx');
+    if(lp&&t.price!=null){
+      const prev=lp.__p; lp.__p=t.price;
+      lp.textContent=px(t.price);
+      if(prev!=null&&t.price!==prev){
+        lp.style.color=t.price>prev?'#2fd575':'#ff4560';
+        setTimeout(()=>{lp.style.color='';},420);
+      }
+    }
+    if(t.price!=null&&t.ts) growBar(t.price, t.ts);
+
+    if(t.equityLive!=null){
+      const bv=Q('balV'), prev=bv.__v;
+      glide(bv,t.equityLive,v=>'$'+v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
+      if(prev!=null&&t.equityLive!==prev){
+        bv.classList.remove('up','dn'); void bv.offsetWidth;
+        bv.classList.add(t.equityLive>prev?'up':'dn');
+        setTimeout(()=>bv.classList.remove('up','dn'),600);
+      }
+    }
+    const fl=t.floatingPnl||0;
+    Q('balSub').innerHTML='Balance $'+(t.balance||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})
+      +(t.position?' · <span class="'+(fl>=0?'pnl-up':'pnl-dn')+'">Floating '+money(fl)+'</span>':'');
+
+    if(t.position){
+      livePos=Object.assign(livePos||{},t.position);
+      paintPnl(livePos);
+      refreshEntryLine(livePos);
+      const up=fl>=0;
+      Q('statusLine').innerHTML=(up?'🟢 In a ':'🔴 In a ')
+        +(t.position.side==='BUY'?'BUY':'SELL')+' on <b>'+esc(lastSym)+'</b> — '
+        +(up?'up $':'down $')+Math.abs(fl).toFixed(2);
+    }else if(livePos){
+      // The position closed between full refreshes — clear it now rather than
+      // leaving a dead trade on screen for the rest of the cycle.
+      livePos=null; setLines(null); Q('pos').style.display='none';
+      Q('statusLine').innerHTML='👀 Watching <b>'+esc(lastSym)+'</b> — no position, waiting for a setup';
+    }
+  }catch(e){ freshness(); }
+}
+
+refresh(); setInterval(refresh, 6000);
+tick();    setInterval(tick, 1000);
 </script>
 </body>
 </html>

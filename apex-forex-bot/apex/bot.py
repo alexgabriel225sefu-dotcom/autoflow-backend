@@ -422,6 +422,14 @@ def _start_dashboard_server():
                             balance_live = br.get_balance()
                         except Exception:
                             pass
+                    try:
+                        _digits = int(br._digits(live_symbol))
+                    except Exception:
+                        _digits = 3 if "JPY" in str(live_symbol).upper() else 5
+                    try:
+                        _pip = float(fx_mod.pip_size(live_symbol))
+                    except Exception:
+                        _pip = 0.01 if "JPY" in str(live_symbol).upper() else 0.0001
                     # Live unrealized P&L from the freshest candle close.
                     last_px = candles[-1]["close"] if candles else None
                     if pos and last_px and pos.get("entryPrice"):
@@ -474,6 +482,12 @@ def _start_dashboard_server():
                             "realMoney": _account_mode.is_real_money(_m[0]),
                         })(_account_mode.resolve(u)),
                         "timeframeUsed": tf_used,
+                        # Price precision, from the broker's own symbol details.
+                        # Without it Lightweight Charts formats to 2 decimals and
+                        # a GBPUSD entry of 1.36078 renders as "1.36" — three
+                        # digits of the number that actually matters, gone.
+                        "digits": _digits,
+                        "pipSize": _pip,
                         "strategy": udash.get("strategy", "Mean Reversion"),
                         "broker": udash.get("broker", ""),
                         "balance": balance_live,
@@ -504,6 +518,90 @@ def _start_dashboard_server():
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
                     self.wfile.write(err)
+                return
+            # ── Mini App: the fast tick ─────────────────────────────────
+            # /api/app/data rebuilds everything — candles, stats, news, journal —
+            # which is far too heavy to ask for at the rate a price moves. This
+            # returns only what changes tick to tick: the bid/ask, the open
+            # position's live P&L, and the money. Small enough to poll about
+            # once a second, which is what makes the screen feel like a terminal
+            # instead of a page that refreshes.
+            if self.path.startswith("/api/app/tick"):
+                from apex import webapp, user_loop, user_store
+                from apex import forex as fx_mod
+                qs = parse_qs(urlparse(self.path).query)
+                init = (qs.get("init") or [""])[0]
+                tg_user = webapp.validate(init, cfg.TELEGRAM_BOT_TOKEN or "")
+                if not tg_user or not tg_user.get("id"):
+                    self._json(401, {"error": "unauthorized",
+                                     "code": "TELEGRAM_AUTH_FAILED"})
+                    return
+                chat_id = str(tg_user["id"])
+                try:
+                    u = user_store.load(chat_id) or {}
+                    udash = user_loop.get_dash(chat_id) or {}
+                    br, ucfg = user_loop._make_broker(u)
+                    sym = udash.get("symbol") or ucfg.SYMBOL
+                    paper = u.get("paper", True)
+
+                    bid = ask = None
+                    try:
+                        bid, ask = br.get_bid_ask(sym)
+                    except Exception:
+                        pass
+                    price = None
+                    if bid is not None and ask is not None:
+                        price = (float(bid) + float(ask)) / 2.0
+                    if price is None:
+                        try:
+                            price = float(br.get_price(sym))
+                        except Exception:
+                            price = None
+
+                    pos = udash.get("openPosition")
+                    if not paper:
+                        try:
+                            pos = br.get_open_position(sym)
+                        except Exception:
+                            pass
+
+                    pnl_pips = pnl_usd = None
+                    if pos and price and pos.get("entryPrice"):
+                        d_ = 1 if pos.get("side") == "BUY" else -1
+                        pnl_pips = round(fx_mod.to_pips(
+                            (price - float(pos["entryPrice"])) * d_, sym, price), 1)
+                        units_ = pos.get("units") or pos.get("quantity") or 0
+                        if units_:
+                            pnl_usd = round(fx_mod.pnl_usd(
+                                pos["side"], float(pos["entryPrice"]), price,
+                                units_, sym), 2)
+
+                    balance = udash.get("balance", u.get("paper_balance", 0))
+                    if not paper:
+                        try:
+                            balance = br.get_balance()
+                        except Exception:
+                            pass
+                    floating = float(pnl_usd or 0)
+
+                    self._json(200, {
+                        "symbol": sym, "price": price, "bid": bid, "ask": ask,
+                        # Server time, so the page can tell a still price from a
+                        # stopped feed instead of showing the last one as live.
+                        "ts": int(time.time()),
+                        "balance": balance,
+                        "equityLive": (float(balance) + floating) if balance is not None else None,
+                        "floatingPnl": floating,
+                        "position": (None if not pos else {
+                            "side": pos.get("side"),
+                            "entryPrice": pos.get("entryPrice"),
+                            "stopLoss": pos.get("stopLoss") or pos.get("sl"),
+                            "takeProfit": pos.get("takeProfit") or pos.get("tp"),
+                            "pnlPips": pnl_pips, "pnlUsd": pnl_usd}),
+                    })
+                except Exception as e:
+                    print(f"[MiniApp] tick failed: {e}")
+                    self._json(502, {"error": "UNAVAILABLE", "code": "UNAVAILABLE"})
                 return
             # ── Mini App: history + replay ──────────────────────────────
             # Same authentication as /api/app/data above: the chat id comes
