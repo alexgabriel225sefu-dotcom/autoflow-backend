@@ -1258,7 +1258,23 @@ _AI_KB = {"reply_markup": json.dumps({"inline_keyboard": [
 ]})}
 
 
-def _handle_ai_setup(chat_id):
+def _handle_ai_setup(chat_id, args="", msg_id=None):
+    """The activation screen — or, if a key came with the command, the key.
+
+    `/ai <key>` is the obvious thing to type and it used to be read as a bare
+    `/ai`: the key was dropped on the floor, the instructions came back, and
+    the client was left staring at a screen telling them to do the thing they
+    had just done. Worse, the key stayed sitting in the chat history.
+    """
+    supplied = (args or "").strip().split()[0] if (args or "").strip() else ""
+    if supplied:
+        # Route it through the same verification a bare paste gets, including
+        # deleting the message so the key does not linger in the chat.
+        return _handle_ai_key(chat_id, supplied, msg_id)
+    return _ai_setup_screen(chat_id)
+
+
+def _ai_setup_screen(chat_id):
     """Explain the AI-chat key options — client connects their OWN free/paid key."""
     u = user_store.load(chat_id)
     if u.get("groq_key") or u.get("gemini_key"):
@@ -1295,11 +1311,18 @@ def _handle_ai_key(chat_id, key, msg_id):
     key = (key or "").strip().split()[0] if key else ""
     kind = _detect_ai_key(key)
     if kind is None:
+        # Name the prefix we actually got. "I couldn't tell" with no detail
+        # sends people back to copy the same wrong string again — a Google
+        # ephemeral token (AQ.…) looks like a key and is not one.
+        seen = (key[:4] + "…") if len(key) > 4 else (key or "nothing")
         return send_to(chat_id,
-                       "🤔 <b>I couldn't tell which provider that key is for.</b>\n"
-                       "Gemini keys start with <code>AIza</code>, Groq with <code>gsk_</code>, "
-
-                       "Copy the full key again, or tap a button below to get a free one.",
+                       "🤔 <b>That doesn't look like an AI key.</b>\n"
+                       f"Yours starts with <code>{_esc(seen)}</code>.\n\n"
+                       "Gemini keys start with <code>AIza</code> — on "
+                       "aistudio.google.com/apikey tap <b>Create API key</b> and "
+                       "copy the long <code>AIzaSy…</code> string, not a "
+                       "temporary token.\n"
+                       "Groq keys start with <code>gsk_</code>.",
                        _AI_KB)
     label = {"groq": "Groq", "gemini": "Gemini"}[kind]
     send_to(chat_id, f"🔍 Testing your {label} key…")
@@ -6048,7 +6071,7 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         # Per-user: stops only this client's loop (admin also pauses global).
         _handle_stop(chat_id)
     elif cmd_l == "/ai":
-        _handle_ai_setup(chat_id)
+        _handle_ai_setup(chat_id, args, msg_id)
     elif cmd_l in ("/groq", "/gemini", "/key"):
         # Explicit key command — the key is the argument.
         _handle_ai_key(chat_id, args, msg_id)

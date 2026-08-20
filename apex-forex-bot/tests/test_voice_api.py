@@ -258,6 +258,44 @@ check("both money tools are guarded",
       voice_api.FINANCIAL_TOOLS == {"execute_trade", "close_position"},
       voice_api.FINANCIAL_TOOLS)
 
+print("\n15. /ai reads the key you typed with it")
+# `/ai <key>` is the obvious thing to type. It used to be read as a bare /ai:
+# the key was dropped, the instructions came back, and the key sat in the chat
+# history. Reported live, with a Google ephemeral token (AQ.…) that also is
+# not an API key — so the refusal has to say what it actually saw.
+from apex import telegram  # noqa: E402
+
+_sent = []
+_real_send, _real_del = telegram.send_to, telegram._delete_message
+try:
+    telegram.send_to = lambda cid, text, *a, **k: _sent.append(text)
+    telegram._delete_message = lambda *a, **k: None
+
+    telegram._handle_ai_setup("900", "AQ.Ab8RN6I8FYogIlADmgna", 1)
+    wrong = _sent[-1]
+    check("a wrong-format key is rejected, not silently ignored",
+          "doesn't look like an AI key" in wrong, wrong[:120])
+    check("and the refusal names the prefix it actually saw",
+          "AQ.A" in wrong, wrong[:200])
+    check("it points at the right string to copy", "AIzaSy" in wrong)
+
+    _sent.clear()
+    telegram._handle_ai_setup("900", "", 1)
+    check("a bare /ai still shows the setup screen",
+          "Activate AI chat" in _sent[-1], _sent[-1][:80])
+finally:
+    telegram.send_to, telegram._delete_message = _real_send, _real_del
+
+check("both real key formats are still detected",
+      telegram._detect_ai_key("AIzaSyABC") == "gemini"
+      and telegram._detect_ai_key("gsk_abc") == "groq")
+check("a Google ephemeral token is not mistaken for one",
+      telegram._detect_ai_key("AQ.Ab8") is None)
+
+ROUTE = open(os.path.join(ROOT, "apex", "telegram.py"), encoding="utf-8").read()
+check("the /ai command passes its argument through",
+      "_handle_ai_setup(chat_id, args, msg_id)" in ROUTE)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")
