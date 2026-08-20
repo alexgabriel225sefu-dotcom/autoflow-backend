@@ -27,11 +27,10 @@ app.use(cors({
   origin: ['https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'],
   credentials: true
 }));
-// Skip JSON body parsing for the Digistore24 webhook — it posts form-urlencoded.
+// Skip JSON body parsing where a webhook needs its untouched raw body.
 // The Meta webhook needs the raw body preserved too (HMAC signature check in
 // _metaVerifySignature can't hash a body that's already been re-serialized).
 app.use((req, res, next) => {
-  if (req.path === '/digistore24-webhook') return next();
   // Stripe needs the untouched raw body Buffer to verify its signature —
   // skip JSON parsing entirely here; the route below applies express.raw() itself.
   if (req.path === '/stripe-webhook') return next();
@@ -79,7 +78,6 @@ app.get('/api/health', async (req, res) => {
 
   const checks = {
     // CRITICAL — purchase → license → email flow cannot work without these
-    digistore24_ipn_passphrase: has('DIGISTORE24_IPN_PASSPHRASE'),
     license_signing_key:  has('BOT_EMAIL_SECRET'),
     supabase_url:         has('SUPABASE_URL'),
     supabase_key:         has('SUPABASE_SERVICE_KEY'),
@@ -87,13 +85,15 @@ app.get('/api/health', async (req, res) => {
     email_delivery:       emailReady,
     // RECOMMENDED — degraded experience if missing, but sale still completes
     ai_fallback:          has('GROQ_API_KEY') || has('ANTHROPIC_API_KEY') || has('GOOGLE_AI_API_KEY'),
-    affiliate_bot:        has('AFFILIATE_BOT_TOKEN'),
+    // Still read: it is the Telegram transport _notifyAdminAlert falls back to
+    // for OWNER alerts. The affiliate program it was named after is gone.
+    admin_alert_bot:      has('AFFILIATE_BOT_TOKEN'),
     stripe_secret_key:         has('STRIPE_SECRET_KEY'),
     stripe_webhook_secret:     has('STRIPE_WEBHOOK_SECRET'),
     session_secrets:      has('JWT_SECRET') && has('COOKIE_SECRET'),
   };
 
-  const critical = ['digistore24_ipn_passphrase','license_signing_key','supabase_url','supabase_key','supabase_connects','email_delivery'];
+  const critical = ['license_signing_key','supabase_url','supabase_key','supabase_connects','email_delivery'];
   const missing = critical.filter(k => !checks[k]);
   const saleReady = missing.length === 0;
 
@@ -205,7 +205,6 @@ app.get('/api/app-status', auth, (req, res) => res.json({
   ai_anthropic:    !!process.env.ANTHROPIC_API_KEY,
   ai_works:        !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY),
   email_works:     !!(process.env.BREVO_API_KEY || (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_PASS)),
-  digistore24_ipn: !!process.env.DIGISTORE24_IPN_PASSPHRASE,
   supabase:        !!process.env.SUPABASE_URL,
   verdict: !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY) ? '✅ Aplicatia functioneaza complet' : '❌ Lipseste cheia AI — Wizard/Chat/Email nu merg'
 }));
@@ -351,7 +350,7 @@ try {
 } catch(e) { console.error('Nodemailer init error:', e.message); }
 
 // ── RECENT CLICK DEDUPE (ref|ip → ts) — collapse refreshes within 30 min so a
-// single visitor reloading the page doesn't inflate an affiliate's click count. ──
+// single visitor reloading the page doesn't inflate the visit count. ──
 const _recentClicks = new Map();
 const _CLICK_DEDUPE_MS = 30 * 60 * 1000;
 
@@ -1256,64 +1255,6 @@ function verifyLicenseKeyHmac(key) {
   return { valid: false, product: null };
 }
 
-// ── AFFILIATE / REFERRAL SYSTEM ──────────────────────────────────────────────
-// Program policy. Bump TERMS_VERSION whenever the affiliate terms change so we
-// can tell who accepted which version.
-const AFFILIATE_TERMS_VERSION = '2026-06-16';
-const REFUND_WINDOW_DAYS = 14;   // commission only matures (becomes payable) after this
-const MIN_PAYOUT_CENTS   = 5000; // $50 minimum before a payout can be requested
-function _generateAffiliateCode(name) {
-  const slug = (name || 'creator').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 10) || 'creator';
-  return `${slug}${crypto.randomBytes(2).toString('hex')}`;
-}
-function _hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
-  return `${salt}:${hash}`;
-}
-function _verifyPassword(password, stored) {
-  if (!stored || !stored.includes(':')) return false;
-  const [salt, hash] = stored.split(':');
-  const check = crypto.scryptSync(String(password), salt, 64).toString('hex');
-  try { return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(check, 'hex')); } catch { return false; }
-}
-function _affiliateLink(code) { return `https://aicashsystem.space/?ref=${code}`; }
-// Resolve the logged-in affiliate code from a Bearer token; null if invalid.
-function _affiliateFromAuth(req) {
-  const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const payload = verifyToken(token);
-  if (!payload || !payload.id) return null;
-  return String(payload.id).toLowerCase().trim();
-}
-
-// GET /api/affiliates/click?ref=CODE — count a referral-link visit.
-// Fired by the landing page when it sees ?ref=. Validates the code exists, then
-// inserts one row (atomic, no lost updates). Deduped per visitor for 30 min.
-app.get('/api/affiliates/click', async (req, res) => {
-  const ref = String(req.query.ref || '').toLowerCase().trim().slice(0, 40);
-  if (!ref || !supabase) return res.json({ ok: false });
-  const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString().split(',')[0].trim();
-  const dedupeKey = `${ref}|${ip}`;
-  const now = Date.now();
-  const last = _recentClicks.get(dedupeKey);
-  if (last && now - last < _CLICK_DEDUPE_MS) return res.json({ ok: true, deduped: true });
-  _recentClicks.set(dedupeKey, now);
-  // Opportunistic cleanup so the map doesn't grow unbounded.
-  if (_recentClicks.size > 5000) {
-    for (const [k, t] of _recentClicks) if (now - t > _CLICK_DEDUPE_MS) _recentClicks.delete(k);
-  }
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('code').eq('code', ref).maybeSingle();
-    if (aff) await supabase.from('affiliate_clicks').insert([{ affiliate_code: ref }]);
-  } catch (e) { /* clicks are best-effort analytics — never block the visitor */ }
-  res.json({ ok: true });
-});
-
-// POST /api/lead — { email, ref, source } capture a lead from the free funnel.
-// Cold DM traffic rarely buys on the first click; this captures the contact so
-// it can be nurtured to the sale. Best-effort store (leads table may not exist);
-// never blocks the visitor. Affiliate ref is preserved for attribution.
 app.post('/api/lead', _authLimiter, async (req, res) => {
   const email = String((req.body && req.body.email) || '').toLowerCase().trim().slice(0, 200);
   const ref = String((req.body && req.body.ref) || '').toLowerCase().trim().slice(0, 40);
@@ -1326,117 +1267,10 @@ app.post('/api/lead', _authLimiter, async (req, res) => {
       await supabase.from('leads').insert([{ email, ref: ref || null, source }]);
     }
   } catch (e) { /* leads table optional — never block the visitor */ }
-  // Fire the affiliate click too, so a lead from an affiliate link is attributed.
-  try {
-    if (supabase && ref) {
-      const { data: aff } = await supabase.from('affiliates').select('code').eq('code', ref).maybeSingle();
-      if (aff) await supabase.from('affiliate_clicks').insert([{ affiliate_code: ref }]);
-    }
-  } catch (e) { /* best-effort */ }
   console.log(`[LEAD] ${email}${ref ? ' (ref ' + ref + ')' : ''} via ${source}`);
   res.json({ ok: true });
 });
 
-// POST /api/affiliates/apply — { name, email, tiktokHandle } -> { code, link }
-app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
-  const { name, email, tiktokHandle } = req.body || {};
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const cleanEmail = email.toLowerCase().trim();
-  try {
-    const { data: existing } = await supabase.from('affiliates').select('code').eq('email', cleanEmail).maybeSingle();
-    if (existing?.code) return res.json({ code: existing.code, link: `https://aicashsystem.space/?ref=${existing.code}` });
-
-    let code;
-    for (let attempts = 0; attempts < 5; attempts++) {
-      code = _generateAffiliateCode(name);
-      const { data: clash } = await supabase.from('affiliates').select('code').eq('code', code).maybeSingle();
-      if (!clash) break;
-    }
-    const { error } = await supabase.from('affiliates').insert([{
-      code, email: cleanEmail, name: name || '', tiktok_handle: tiktokHandle || '', status: 'active'
-    }]);
-    if (error) return res.status(500).json({ error: error.message });
-    addLog(`New affiliate: ${cleanEmail} — code ${code}`, 'affiliate', 'success');
-    res.json({ code, link: `https://aicashsystem.space/?ref=${code}` });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Telegram tracking-bot bridge ─────────────────────────────────────────────
-// Affiliates sign up on the site (name+email) and then open the Telegram bot,
-// which generates their link and tracks sales. The deep-link carries a signed
-// connect token = hmac12(code) + code, so the bot can prove which affiliate it is.
-const AFFILIATE_BOT_USERNAME = process.env.AFFILIATE_BOT_USERNAME || 'AICASHSYSTEM_REF_BOT';
-// This secret gates the admin endpoints (affiliate list, Telegram linking,
-// payout reporting). It must never fall back to a literal: this repository is
-// public, so a hardcoded default is a published password. With nothing set we
-// generate a random one instead, which fails closed — the admin endpoints stop
-// answering until AFFILIATE_BOT_SECRET is configured here and on the bot.
-const AFFILIATE_BOT_SECRET = process.env.AFFILIATE_BOT_SECRET || (() => {
-  console.warn('[WARN] AFFILIATE_BOT_SECRET not set — admin endpoints are disabled this session. Set it in Render env vars (and give the bot the same value).');
-  return crypto.randomBytes(32).toString('hex');
-})();
-function _affConnectSig(code) {
-  return crypto.createHmac('sha256', AFFILIATE_BOT_SECRET).update(String(code)).digest('hex').slice(0, 12);
-}
-function _affConnectToken(code) { return _affConnectSig(code) + code; }
-function _affCodeFromToken(token) {
-  const t = String(token || '');
-  if (t.length < 15) return null;            // 12 sig + >=3 code
-  const sig = t.slice(0, 12), code = t.slice(12);
-  return _affConnectSig(code) === sig ? code : null;
-}
-function _affTelegramUrl(code) {
-  return `https://t.me/${AFFILIATE_BOT_USERNAME}?start=${_affConnectToken(code)}`;
-}
-
-// POST /api/affiliates/start — { name, email } -> { code, telegramUrl }
-// Creates (or re-uses) the affiliate, then hands off to the Telegram bot.
-app.post('/api/affiliates/start', _authLimiter, async (req, res) => {
-  const { name, email } = req.body || {};
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
-  if (!supabase) return res.status(500).json({ error: 'Affiliate system is not configured yet. Please try again later.' });
-  const cleanEmail = email.toLowerCase().trim();
-  try {
-    let code;
-    const { data: existing } = await supabase.from('affiliates').select('code').eq('email', cleanEmail).maybeSingle();
-    if (existing?.code) {
-      code = existing.code;
-    } else {
-      for (let attempts = 0; attempts < 5; attempts++) {
-        code = _generateAffiliateCode(name);
-        const { data: clash } = await supabase.from('affiliates').select('code').eq('code', code).maybeSingle();
-        if (!clash) break;
-      }
-      const { error } = await supabase.from('affiliates').insert([{
-        code, email: cleanEmail, name: name || '', status: 'active',
-        terms_accepted_at: new Date().toISOString(), terms_version: AFFILIATE_TERMS_VERSION
-      }]);
-      if (error) return res.status(500).json({ error: error.message });
-      addLog(`New affiliate (Telegram flow): ${cleanEmail} — code ${code}`, 'affiliate', 'success');
-    }
-    res.json({ code, telegramUrl: _affTelegramUrl(code), botUsername: AFFILIATE_BOT_USERNAME });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Notify an affiliate on Telegram when one of their referrals buys.
-// Alerts the owner on Telegram when a paying customer might not have gotten
-// their license email — the D24 IPN itself still returns 'OK' in that case
-// (the payment really did go through), so Digistore24 won't retry it and
-// nothing else will surface the failure.
-// These alerts carry things the owner must act on — a customer who paid but
-// never got their licence, a commission cancelled by a refund. Telegram was the
-// only channel and its failures were swallowed, so deleting the bot silently
-// took the alerts with it. Now it cascades and stops at the first channel that
-// actually confirms delivery:
-//   1. MAKE_ALERT_WEBHOOK — Make fans one POST out to email/WhatsApp/whatever,
-//      so channels can be changed there without touching this code.
-//   2. Telegram — only if a bot token is still configured and the API accepts it.
-//   3. Email — always available, since the licence flow already depends on it.
 async function _notifyAdminAlert(text, subject = 'Apex Trading Suite — alertă') {
   const hook = process.env.MAKE_ALERT_WEBHOOK;
   if (hook) {
@@ -1473,483 +1307,10 @@ async function _notifyAdminAlert(text, subject = 'Apex Trading Suite — alertă
   } catch (e) { addLog(`Admin alert email error: ${e.message}`, 'system', 'error'); }
 }
 
-async function _notifyAffiliateSale(code, product, commissionCents) {
-  const botToken = process.env.AFFILIATE_BOT_TOKEN;
-  if (!botToken || !supabase) return;
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('telegram_chat_id').eq('code', code).maybeSingle();
-    if (!aff || !aff.telegram_chat_id) return;
-    const prod = product === 'apex-forex' ? 'Forex bot ($497)' : 'Crypto bot ($297)';
-    const text = `🎉 New sale! You just earned $${(commissionCents / 100).toFixed(2)} on the ${prod}.\n\nSend /stats to see your totals.`;
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: aff.telegram_chat_id, text })
-    });
-  } catch (e) { addLog(`Affiliate TG notify error: ${e.message}`, 'affiliate', 'warn'); }
-}
-
-// POST /api/affiliates/telegram-link — bot links a Telegram chat to an affiliate.
-// Body: { token, chatId, secret }. Returns { code, name, link }.
-app.post('/api/affiliates/telegram-link', async (req, res) => {
-  const { token, chatId, secret } = req.body || {};
-  if (secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
-  if (!supabase) return res.status(500).json({ error: 'not configured' });
-  const code = _affCodeFromToken(token);
-  if (!code) return res.status(400).json({ error: 'invalid token' });
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('code,name').eq('code', code).maybeSingle();
-    if (!aff) return res.status(404).json({ error: 'affiliate not found' });
-    const { data: updated, error: updateErr } = await supabase
-      .from('affiliates').update({ telegram_chat_id: String(chatId) }).eq('code', code).select('code');
-    console.log(`[tg-link] code=${code} chatId=${chatId} updated=${JSON.stringify(updated)} err=${updateErr?.message}`);
-    if (updateErr) return res.status(500).json({ error: 'link failed: ' + updateErr.message });
-    if (!updated || updated.length === 0) return res.status(500).json({ error: 'link failed: no rows updated' });
-    addLog(`Affiliate linked Telegram: ${code} -> chat ${chatId}`, 'affiliate', 'success');
-    res.json({ ok: true, code, name: aff.name || '', link: _affiliateLink(code) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// POST /api/affiliates/telegram-stats — bot fetches a linked affiliate's stats.
-// Body: { chatId, secret }. Returns earnings + recent sales (or { linked:false }).
-app.post('/api/affiliates/telegram-stats', async (req, res) => {
-  const { chatId, secret } = req.body || {};
-  if (secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
-  if (!supabase) return res.status(500).json({ error: 'not configured' });
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('code,name,commission_percent').eq('telegram_chat_id', String(chatId)).maybeSingle();
-    console.log(`[tg-stats] chatId=${chatId} found=${!!aff} code=${aff?.code}`);
-    if (!aff) return res.json({ linked: false });
-    const { data } = await supabase.from('referral_sales').select('commission_amount,paid,refunded,created_at,product').eq('affiliate_code', aff.code).order('created_at', { ascending: false });
-    const rows = data || [];
-    const now = Date.now(), windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-    let available = 0, pending = 0, paid = 0, sales = 0;
-    rows.forEach(r => {
-      if (r.refunded) return;
-      sales++;
-      if (r.paid) paid += r.commission_amount;
-      else if (new Date(r.created_at).getTime() + windowMs <= now) available += r.commission_amount;
-      else pending += r.commission_amount;
-    });
-    // Link clicks + conversion rate (best-effort — table may not exist yet).
-    let clicks = 0;
-    try {
-      const { count } = await supabase.from('affiliate_clicks')
-        .select('id', { count: 'exact', head: true }).eq('affiliate_code', aff.code);
-      clicks = count || 0;
-    } catch (e) { /* clicks table optional */ }
-    const conversionPct = clicks > 0 ? Math.round((sales / clicks) * 1000) / 10 : 0;
-    res.json({
-      linked: true, code: aff.code, name: aff.name || '', link: _affiliateLink(aff.code),
-      commissionPercent: aff.commission_percent, totalSales: sales,
-      clicks, conversionPct,
-      availableCents: available, pendingCents: pending, paidCents: paid,
-      minPayoutCents: MIN_PAYOUT_CENTS, refundWindowDays: REFUND_WINDOW_DAYS,
-      recent: rows.slice(0, 5).map(r => ({ product: r.product, commission: r.commission_amount, paid: r.paid, refunded: !!r.refunded, date: r.created_at }))
-    });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// GET /api/endorsely/payout-check?secret=… — the daily payout report.
-// Called on a schedule (Make) so the owner is told what has matured, what it
-// nets after withholding, and which documents are still missing. It only
-// reports: no money moves from here, that stays a deliberate action in Endorsely.
-app.get('/api/endorsely/payout-check', async (req, res) => {
-  if (req.query?.secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
-  const { ready, upcoming, error } = await _buildEndorselyPayoutReport();
-  if (error) return res.status(500).json({ error });
-
-  const usd = (c) => '$' + (c / 100).toFixed(2);
-  const lines = [];
-  if (ready.length) {
-    lines.push('💰 Comisioane mature — de plătit în Endorsely:');
-    for (const a of ready) {
-      lines.push(
-        `\n• ${a.code} — ${a.salesCount} vânz., brut ${usd(a.grossCents)}` +
-        `\n  Reținere ${a.withholdPct}% (${a.withholdReason})` +
-        `\n  → de virat: ${usd(a.netCents)}` +
-        (a.blocked ? '\n  ⛔ NU plăti încă — lipsește factura' : '')
-      );
-    }
-    lines.push('\nCotele sunt orientative — confirmă-le cu contabilul.');
-  }
-  if (upcoming.length) {
-    lines.push(`\n⏳ În așteptare (încă în fereastra de 30 zile): ` +
-      upcoming.map(a => `${a.code} ${usd(a.grossCents)}`).join(', '));
-  }
-  const text = lines.join('\n');
-  if (text && String(req.query?.notify || '') === '1') await _notifyAdminAlert(text);
-  res.json({ ready, upcoming, text, hasWork: ready.length > 0 });
-});
-
-// POST /api/endorsely/affiliate-tax — record what we hold on file for an
-// affiliate (country, business or individual, invoice, residence certificate),
-// which is what decides the withholding rate. Body: { secret, code, … }.
-app.post('/api/endorsely/affiliate-tax', async (req, res) => {
-  const { secret, code, email, country, entity_type, has_invoice, tax_cert_year, notes } = req.body || {};
-  if (secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
-  if (!supabase) return res.status(500).json({ error: 'not configured' });
-  const clean = String(code || '').toLowerCase().trim();
-  if (!clean) return res.status(400).json({ error: 'code required' });
-  if (entity_type && !['business', 'individual'].includes(entity_type)) {
-    return res.status(400).json({ error: "entity_type must be 'business' or 'individual'" });
-  }
-  try {
-    const { error } = await supabase.from('endorsely_affiliate_tax').upsert([{
-      code: clean, email: email || null,
-      country: country ? String(country).toUpperCase().slice(0, 2) : null,
-      entity_type: entity_type || null,
-      has_invoice: !!has_invoice,
-      tax_cert_year: tax_cert_year ? Number(tax_cert_year) : null,
-      notes: notes || null, updated_at: new Date().toISOString()
-    }], { onConflict: 'code' });
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ ok: true, code: clean, suggested: _suggestWithholding({ country, entity_type, has_invoice, tax_cert_year }) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// POST /api/affiliates/admin-list — bot fetches all affiliates + their sales for admin view.
-// Body: { secret }. Gated by AFFILIATE_BOT_SECRET; bot enforces admin chat_id check.
-app.post('/api/affiliates/admin-list', async (req, res) => {
-  const { secret } = req.body || {};
-  if (secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
-  if (!supabase) return res.status(500).json({ error: 'not configured' });
-  try {
-    const { data: affs } = await supabase.from('affiliates').select('code,name,email,status,commission_percent,created_at').order('created_at', { ascending: false });
-    const { data: sales } = await supabase.from('referral_sales').select('affiliate_code,commission_amount,paid,refunded,product');
-    const salesByCode = {};
-    (sales || []).forEach(s => {
-      if (!salesByCode[s.affiliate_code]) salesByCode[s.affiliate_code] = { total: 0, paid: 0, pending: 0, refunded: 0 };
-      const b = salesByCode[s.affiliate_code];
-      if (s.refunded) { b.refunded++; return; }
-      b.total++;
-      if (s.paid) b.paid += s.commission_amount;
-      else b.pending += s.commission_amount;
-    });
-    res.json({ ok: true, affiliates: (affs || []).map(a => ({ ...a, sales: salesByCode[a.code] || { total: 0, paid: 0, pending: 0, refunded: 0 } })) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Reserved codes that must never become an affiliate handle (they collide with
-// real query-string flags or look like system values).
-const _RESERVED_CODES = new Set(['ref','admin','api','www','direct','intro','affiliate','login','signup','apex','forex','crypto']);
-// Validate a user-chosen affiliate handle. Returns { ok, code } or { ok:false, error }.
-// Pattern: letters, numbers, _ and - only.
-function _validateCustomCode(raw) {
-  const code = String(raw || '').toLowerCase().trim();
-  if (!/^[a-z0-9_-]{3,20}$/.test(code)) return { ok: false, error: 'Your link name must be 3–20 characters: letters, numbers, - or _ only (no spaces).' };
-  if (_RESERVED_CODES.has(code)) return { ok: false, error: 'That name is reserved — please choose another.' };
-  return { ok: true, code };
-}
-
-// POST /api/affiliates/signup — { name, email, password, code, tiktokHandle, acceptTerms } -> { token, code, link }
-app.post('/api/affiliates/signup', _authLimiter, async (req, res) => {
-  const { name, email, password, tiktokHandle, code: wantCode, acceptTerms } = req.body || {};
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
-  if (!password || String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  if (acceptTerms !== true) return res.status(400).json({ error: 'You must accept the Affiliate Program Terms to continue.' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const cleanEmail = email.toLowerCase().trim();
-  const nowIso = new Date().toISOString();
-  // The affiliate chooses their own link name; fall back to an auto code if none given.
-  let customCode = null;
-  if (wantCode != null && String(wantCode).trim() !== '') {
-    const v = _validateCustomCode(wantCode);
-    if (!v.ok) return res.status(400).json({ error: v.error });
-    customCode = v.code;
-  }
-  try {
-    const { data: existing } = await supabase.from('affiliates').select('code,password_hash').eq('email', cleanEmail).maybeSingle();
-    const pwHash = _hashPassword(password);
-    if (existing?.code) {
-      if (existing.password_hash) return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
-      // Claim a pre-existing (passwordless) affiliate row created before auth existed.
-      const { data: claimed, error: claimErr } = await supabase.from('affiliates')
-        .update({ password_hash: pwHash, name: name || '', tiktok_handle: tiktokHandle || '', terms_accepted_at: nowIso, terms_version: AFFILIATE_TERMS_VERSION })
-        .eq('code', existing.code).select('code,password_hash');
-      if (claimErr) return res.status(500).json({ error: claimErr.message });
-      if (!claimed || !claimed.length || !claimed[0].password_hash) return res.status(500).json({ error: 'Could not save your password. Please try again or contact support.' });
-      addLog(`Affiliate claimed account: ${cleanEmail} — code ${existing.code}`, 'affiliate', 'success');
-      return res.json({ token: createToken({ id: existing.code, email: cleanEmail }), code: existing.code, link: _affiliateLink(existing.code) });
-    }
-    let code;
-    if (customCode) {
-      const { data: clash } = await supabase.from('affiliates').select('code').eq('code', customCode).maybeSingle();
-      if (clash) return res.status(409).json({ error: 'That link name is already taken — please choose another.' });
-      code = customCode;
-    } else {
-      for (let attempts = 0; attempts < 5; attempts++) {
-        code = _generateAffiliateCode(name);
-        const { data: clash } = await supabase.from('affiliates').select('code').eq('code', code).maybeSingle();
-        if (!clash) break;
-      }
-    }
-    const { error } = await supabase.from('affiliates').insert([{
-      code, email: cleanEmail, name: name || '', tiktok_handle: tiktokHandle || '', status: 'active', password_hash: pwHash,
-      terms_accepted_at: nowIso, terms_version: AFFILIATE_TERMS_VERSION
-    }]);
-    if (error) {
-      if (String(error.message || '').toLowerCase().includes('duplicate')) return res.status(409).json({ error: 'That link name is already taken — please choose another.' });
-      return res.status(500).json({ error: error.message });
-    }
-    addLog(`New affiliate signup: ${cleanEmail} — code ${code}`, 'affiliate', 'success');
-    res.json({ token: createToken({ id: code, email: cleanEmail }), code, link: _affiliateLink(code) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// POST /api/affiliates/login — { email, password } -> { token, code, link }
-app.post('/api/affiliates/login', _authLimiter, async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const cleanEmail = email.toLowerCase().trim();
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('code,password_hash,status').eq('email', cleanEmail).maybeSingle();
-    if (!aff || !aff.password_hash || !_verifyPassword(password, aff.password_hash)) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-    if (aff.status !== 'active') return res.status(403).json({ error: 'This account is suspended.' });
-    res.json({ token: createToken({ id: aff.code, email: cleanEmail }), code: aff.code, link: _affiliateLink(aff.code) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// GET /api/affiliates/me — dashboard data for the logged-in affiliate (Bearer token)
-app.get('/api/affiliates/me', async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const code = _affiliateFromAuth(req);
-  if (!code) return res.status(401).json({ error: 'Not authenticated' });
-  try {
-    const { data: affiliate, error: affErr } = await supabase.from('affiliates').select('code,name,email,commission_percent,status,payout_method,payout_details,stripe_account_id').eq('code', code).maybeSingle();
-    if (affErr) { addLog(`Affiliate /me lookup error for code "${code}": ${affErr.message}`, 'affiliate', 'error'); return res.status(500).json({ error: affErr.message }); }
-    if (!affiliate) { addLog(`Affiliate /me: no row found for code "${code}"`, 'affiliate', 'warn'); return res.status(404).json({ error: `Affiliate not found (code: ${code})` }); }
-    const { data: pendingReq } = await supabase.from('payout_requests').select('amount_cents,requested_at').eq('affiliate_code', code).eq('status', 'requested').order('requested_at', { ascending: false }).maybeSingle();
-    const { data } = await supabase.from('referral_sales').select('amount,commission_amount,paid,refunded,product,created_at').eq('affiliate_code', code).order('created_at', { ascending: false });
-    const rows = data || [];
-    const now = Date.now();
-    const windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-    // Commission lifecycle: pending (inside refund window) -> available (matured, payable)
-    // -> paid. A refund/chargeback flips the sale to refunded and the commission is clawed back.
-    let availableCents = 0, pendingCents = 0, paidCents = 0, refundedCents = 0, validCount = 0;
-    const sales = rows.map(r => {
-      let status;
-      if (r.refunded) { status = 'refunded'; refundedCents += r.commission_amount; }
-      else {
-        validCount++;
-        if (r.paid) { status = 'paid'; paidCents += r.commission_amount; }
-        else if (new Date(r.created_at).getTime() + windowMs <= now) { status = 'available'; availableCents += r.commission_amount; }
-        else { status = 'pending'; pendingCents += r.commission_amount; }
-      }
-      return { amount: r.amount, commission: r.commission_amount, paid: r.paid, refunded: !!r.refunded, status, product: r.product, date: r.created_at };
-    });
-    res.json({
-      code: affiliate.code, name: affiliate.name, email: affiliate.email,
-      commissionPercent: affiliate.commission_percent, status: affiliate.status,
-      link: _affiliateLink(affiliate.code),
-      totalSales: validCount,
-      availableCommissionCents: availableCents,
-      pendingCommissionCents: pendingCents,
-      paidCommissionCents: paidCents,
-      refundedCommissionCents: refundedCents,
-      totalCommissionCents: availableCents + pendingCents + paidCents,
-      minPayoutCents: MIN_PAYOUT_CENTS,
-      refundWindowDays: REFUND_WINDOW_DAYS,
-      payoutMethod: affiliate.payout_method || '',
-      payoutDetails: affiliate.payout_details || '',
-      pendingPayout: pendingReq ? { amountCents: pendingReq.amount_cents, requestedAt: pendingReq.requested_at } : null,
-      stripeConnected: !!affiliate.stripe_account_id,
-      sales
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// POST /api/affiliates/connect-onboard — (Bearer token) -> { url }
-// Creates (or reuses) a Stripe Connect Express account for the logged-in
-// affiliate and returns an onboarding link. Once onboarding completes, their
-// commissions are paid automatically at time of sale — no manual payout.
-app.post('/api/affiliates/connect-onboard', _authLimiter, async (req, res) => {
-  if (!stripe || !supabase) return res.status(500).json({ error: 'Not configured' });
-  const code = _affiliateFromAuth(req);
-  if (!code) return res.status(401).json({ error: 'Not authenticated' });
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('code,email,name,stripe_account_id').eq('code', code).maybeSingle();
-    if (!aff) return res.status(404).json({ error: 'Affiliate not found' });
-
-    let accountId = aff.stripe_account_id;
-    if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: 'express',
-        email: aff.email || undefined,
-        business_type: 'individual',
-        capabilities: { transfers: { requested: true } }
-      });
-      accountId = account.id;
-      await supabase.from('affiliates').update({ stripe_account_id: accountId }).eq('code', code);
-    }
-
-    const origin = _safeOrigin(req);
-    const accountLink = await stripe.accountLinks.create({
-      account: accountId,
-      refresh_url: `${origin}/affiliate-dashboard?connect=refresh`,
-      return_url: `${origin}/affiliate-dashboard?connect=done`,
-      type: 'account_onboarding'
-    });
-    res.json({ url: accountLink.url });
-  } catch (e) {
-    addLog(`[Stripe Connect] Onboarding error for "${code}": ${e.message}`, 'affiliate', 'error');
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Compute an affiliate's available (matured, unpaid, non-refunded) commission in cents.
-function _availableFromSales(rows) {
-  const now = Date.now();
-  const windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-  let available = 0;
-  (rows || []).forEach(r => {
-    if (!r.refunded && !r.paid && new Date(r.created_at).getTime() + windowMs <= now) available += r.commission_amount;
-  });
-  return available;
-}
-function _validatePayout(method, details) {
-  const m = String(method || '').toLowerCase().trim();
-  if (!['paypal', 'bank', 'crypto'].includes(m)) return { ok: false, error: 'Choose a payout method: PayPal, bank or crypto.' };
-  const d = String(details || '').trim();
-  if (d.length < 3 || d.length > 200) return { ok: false, error: 'Enter valid payout details (3–200 characters).' };
-  return { ok: true, method: m, details: d };
-}
-
-// POST /api/affiliates/payout-method — save where the affiliate wants to be paid
-app.post('/api/affiliates/payout-method', _authLimiter, async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const code = _affiliateFromAuth(req);
-  if (!code) return res.status(401).json({ error: 'Not authenticated' });
-  const v = _validatePayout(req.body?.method, req.body?.details);
-  if (!v.ok) return res.status(400).json({ error: v.error });
-  try {
-    const { error } = await supabase.from('affiliates').update({ payout_method: v.method, payout_details: v.details }).eq('code', code);
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ ok: true, method: v.method, details: v.details });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// POST /api/affiliates/request-payout — request payment of the current available balance
-app.post('/api/affiliates/request-payout', _authLimiter, async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const code = _affiliateFromAuth(req);
-  if (!code) return res.status(401).json({ error: 'Not authenticated' });
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('payout_method,payout_details,status').eq('code', code).maybeSingle();
-    if (!aff) return res.status(404).json({ error: 'Affiliate not found' });
-    if (aff.status !== 'active') return res.status(403).json({ error: 'This account is suspended.' });
-    if (!aff.payout_method || !aff.payout_details) return res.status(400).json({ error: 'Add your payout method first.' });
-    const { data: pending } = await supabase.from('payout_requests').select('id').eq('affiliate_code', code).eq('status', 'requested').maybeSingle();
-    if (pending) return res.status(409).json({ error: 'You already have a payout request pending.' });
-    const { data: sales } = await supabase.from('referral_sales').select('commission_amount,paid,refunded,created_at').eq('affiliate_code', code);
-    const available = _availableFromSales(sales);
-    if (available < MIN_PAYOUT_CENTS) return res.status(400).json({ error: `You need at least $${(MIN_PAYOUT_CENTS / 100).toFixed(0)} available to request a payout.` });
-    const { error } = await supabase.from('payout_requests').insert([{ affiliate_code: code, amount_cents: available, method: aff.payout_method, details: aff.payout_details, status: 'requested' }]);
-    if (error) return res.status(500).json({ error: error.message });
-    addLog(`Payout requested: ${code} — $${(available / 100).toFixed(2)} via ${aff.payout_method}`, 'affiliate', 'info');
-    res.json({ ok: true, amountCents: available });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ── OWNER PAYOUT ADMIN (protected by BOT_EMAIL_SECRET) ──
 function _ownerSecretOk(req) {
   const secret = req.query.secret || req.headers['x-owner-secret'];
   return process.env.BOT_EMAIL_SECRET && secret === process.env.BOT_EMAIL_SECRET;
 }
-function _csvCell(v) { const s = (v == null ? '' : String(v)).replace(/"/g, '""'); return /[",\n]/.test(s) ? `"${s}"` : s; }
-
-// GET /api/admin/payout-requests.csv?secret=... — export payout requests for the accountant
-app.get('/api/admin/payout-requests.csv', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const { data: reqs } = await supabase.from('payout_requests').select('*').order('requested_at', { ascending: false });
-  const { data: affs } = await supabase.from('affiliates').select('code,name,email');
-  const map = {}; (affs || []).forEach(a => { map[a.code] = a; });
-  const header = ['id', 'requested_at', 'affiliate_code', 'name', 'email', 'amount_usd', 'method', 'details', 'status', 'processed_at', 'note'];
-  const lines = [header.join(',')];
-  (reqs || []).forEach(r => {
-    const a = map[r.affiliate_code] || {};
-    lines.push([r.id, r.requested_at, r.affiliate_code, a.name || '', a.email || '', (r.amount_cents / 100).toFixed(2), r.method || '', r.details || '', r.status, r.processed_at || '', r.note || ''].map(_csvCell).join(','));
-  });
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="payout-requests.csv"');
-  res.send(lines.join('\n'));
-});
-
-// GET /api/admin/sales.csv?secret=... — export every referral sale for the accountant
-app.get('/api/admin/sales.csv', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const { data } = await supabase.from('referral_sales').select('created_at,affiliate_code,product,amount,commission_amount,paid,refunded,payment_intent_id').order('created_at', { ascending: false });
-  const header = ['date', 'affiliate_code', 'product', 'sale_usd', 'commission_usd', 'paid', 'refunded', 'payment_intent_id'];
-  const lines = [header.join(',')];
-  (data || []).forEach(r => {
-    lines.push([r.created_at, r.affiliate_code, r.product || '', (r.amount / 100).toFixed(2), (r.commission_amount / 100).toFixed(2), r.paid ? 'yes' : 'no', r.refunded ? 'yes' : 'no', r.payment_intent_id || ''].map(_csvCell).join(','));
-  });
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="affiliate-sales.csv"');
-  res.send(lines.join('\n'));
-});
-
-// POST /api/admin/payouts/:id/paid?secret=... — mark a payout request paid + settle the sales
-app.post('/api/admin/payouts/:id/paid', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  try {
-    const { data: pr } = await supabase.from('payout_requests').select('*').eq('id', req.params.id).maybeSingle();
-    if (!pr) return res.status(404).json({ error: 'Payout request not found' });
-    if (pr.status === 'paid') return res.json({ ok: true, already: true });
-    // Settle matured, unpaid, non-refunded sales oldest-first until the paid amount is covered.
-    const { data: sales } = await supabase.from('referral_sales').select('id,commission_amount,created_at')
-      .eq('affiliate_code', pr.affiliate_code).eq('paid', false).eq('refunded', false).order('created_at', { ascending: true });
-    const now = Date.now(); const windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-    let acc = 0; const ids = [];
-    for (const s of (sales || [])) {
-      if (new Date(s.created_at).getTime() + windowMs > now) continue;
-      ids.push(s.id); acc += s.commission_amount;
-      if (acc >= pr.amount_cents) break;
-    }
-    if (ids.length) await supabase.from('referral_sales').update({ paid: true }).in('id', ids);
-    await supabase.from('payout_requests').update({ status: 'paid', processed_at: new Date().toISOString() }).eq('id', pr.id);
-    addLog(`Payout marked paid: ${pr.affiliate_code} — $${(pr.amount_cents / 100).toFixed(2)} (${ids.length} sales settled)`, 'affiliate', 'success');
-    res.json({ ok: true, settledSales: ids.length, amountCents: acc });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// GET /api/affiliates/:code/stats — sales + commission summary for one affiliate
-app.get('/api/affiliates/:code/stats', async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const code = (req.params.code || '').toLowerCase().trim();
-  try {
-    const { data: affiliate } = await supabase.from('affiliates').select('code,name,commission_percent,status').eq('code', code).maybeSingle();
-    if (!affiliate) return res.status(404).json({ error: 'Affiliate code not found' });
-    const { data } = await supabase.from('referral_sales').select('amount,commission_amount,paid,created_at').eq('affiliate_code', code).order('created_at', { ascending: false });
-    const rows = data || [];
-    const totalCommission  = rows.reduce((s, r) => s + r.commission_amount, 0);
-    const paidCommission   = rows.filter(r => r.paid).reduce((s, r) => s + r.commission_amount, 0);
-    res.json({
-      code: affiliate.code, name: affiliate.name, commissionPercent: affiliate.commission_percent, status: affiliate.status,
-      totalSales: rows.length,
-      totalCommissionCents: totalCommission,
-      paidCommissionCents: paidCommission,
-      unpaidCommissionCents: totalCommission - paidCommission,
-      sales: rows.map(r => ({ amount: r.amount, commission: r.commission_amount, paid: r.paid, date: r.created_at }))
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// GET /api/owner-license — generate a license key for the owner (requires BOT_EMAIL_SECRET)
-// ?product=apex-bot (default) or ?product=apex-forex
 app.get('/api/owner-license', async (req, res) => {
   const secret = req.query.secret || req.headers['x-owner-secret'];
   const expected = process.env.BOT_EMAIL_SECRET;
@@ -2020,7 +1381,7 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
     if (claimedProduct && hmacResult.product && claimedProduct !== hmacResult.product) {
       return res.json({ valid: false, message: `Wrong license type. This key is for ${hmacResult.product}. Purchase the correct bot at aicashsystem.space` });
     }
-    // A valid signature is NOT proof of payment. The Digistore24 IPN handler is the
+    // A valid signature is NOT proof of payment. The payment webhook is the
     // only place that upserts a license as active:true, on event=on_payment. So: if
     // the key exists in our DB as not-yet-paid, reject it.
     if (supabase) {
@@ -2101,153 +1462,10 @@ app.post('/api/admin/trial/finish', async (req, res) => {
   res.json({ cutOff: rows?.length || 0, licenses: rows || [] });
 });
 
-// ── DIGISTORE24 IPN (webhook) ───────────────────────────────────────────────
-// Merchant of Record — D24 handles EU VAT/taxes/invoices, we just deliver the
-// license. Events (sent as $_POST['event'] equivalent): on_payment (deliver
-// license), on_refund / on_chargeback (revoke license).
-//
-// Signature: sha_sign = SHA-512 of every OTHER param, sorted by key
-// (case-insensitive), concatenated as "UPPERKEY=value" per key, then
-// "$" + IPN passphrase appended, all hashed once. (Best-effort from public
-// docs — D24's own docs site is unreachable from here; verified against the
-// first real IPN hit, see the [D24] signature-mismatch log line if it's off.)
-function _digistore24VerifySignature(params, passphrase) {
-  const { sha_sign, SHASIGN, ...rest } = params;
-  if (!sha_sign || !passphrase) return false;
-  const keys = Object.keys(rest)
-    .filter(k => rest[k] !== '' && rest[k] !== null && rest[k] !== undefined)
-    .sort((a, b) => (a > b ? 1 : a < b ? -1 : 0));
-  let buf = '';
-  for (const k of keys) buf += `${k}=${rest[k]}${passphrase}`;
-  const computed = crypto.createHash('sha512').update(buf, 'utf8').digest('hex').toUpperCase();
-  return computed === String(sha_sign).toUpperCase();
-}
-
-async function handleDigistore24Webhook(req, res) {
-  const params = req.body || {};
-  const passphrase = process.env.DIGISTORE24_IPN_PASSPHRASE;
-  if (!passphrase) { console.error('[D24] Missing DIGISTORE24_IPN_PASSPHRASE'); return res.status(400).send('Webhook not configured'); }
-
-  const sigOk = _digistore24VerifySignature(params, passphrase);
-  if (!sigOk) {
-    console.error(`[D24] Signature mismatch — raw params: ${JSON.stringify(params).slice(0, 500)}`);
-    addLog(`[D24] Signature mismatch — raw params: ${JSON.stringify(params).slice(0, 500)}`, 'payment', 'error');
-    return res.status(401).send('Invalid signature');
-  }
-
-  try {
-    const event = params.event || '';
-    const email = params.email || params.buyer_email || '';
-    const buyerName = [params.first_name, params.last_name].filter(Boolean).join(' ')
-      || params.buyer_first_name || 'there';
-    const orderId = String(params.order_id || '');
-    const productId = String(params.product_id || '');
-    const amount = Number(params.amount || params.amount_netto || 0);
-
-    // Map D24 product IDs to our products.
-    //   DIGISTORE24_PRODUCT_CRYPTO=714550  (the $297 crypto bot)
-    //   DIGISTORE24_PRODUCT_FOREX=<set once the forex product is created>
-    const cryptoProductId = process.env.DIGISTORE24_PRODUCT_CRYPTO || '714550';
-    const forexProductId = process.env.DIGISTORE24_PRODUCT_FOREX || '';
-    let product = null;
-    if (productId && productId === cryptoProductId) product = 'apex-bot';
-    else if (productId && forexProductId && productId === forexProductId) product = 'apex-forex';
-
-    if (event === 'on_payment' && orderId && product) {
-      const isForex = product === 'apex-forex';
-      const piRef = `d24_${orderId}`;
-
-      // Idempotency: a retried IPN for the same order must not re-generate/re-email.
-      let licenseKey;
-      if (supabase) {
-        const { data: existing } = await supabase.from('licenses').select('key').eq('payment_intent_id', piRef).maybeSingle();
-        if (existing?.key) licenseKey = existing.key;
-      }
-      const isNew = !licenseKey;
-      if (!licenseKey) licenseKey = isForex ? generateForexKey() : generateLicenseKey();
-
-      if (supabase) {
-        const { error } = await supabase.from('licenses').upsert([{
-          key: licenseKey, active: true, activated_at: new Date().toISOString(),
-          email: email || '', name: buyerName, product, payment_intent_id: piRef
-        }], { onConflict: 'key' });
-        if (error) addLog(`[D24] License DB error: ${error.message}`, 'license', 'error');
-      }
-      addLog(`[D24] License activated: ${licenseKey} for ${_maskEmail(email)} (${product})`, 'license', 'success');
-
-      // Affiliate commission — D24's own affiliate marketplace already pays its
-      // affiliates directly, so this only applies to refs from our own funnel.
-      const ref = (params.aff || params.affiliate || params.custom_aff || '').toLowerCase().trim();
-      if (isNew && ref && supabase) {
-        try {
-          const { data: aff } = await supabase.from('affiliates').select('code,commission_percent,status').eq('code', ref).maybeSingle();
-          if (aff && aff.status === 'active') {
-            const pct = Number(aff.commission_percent) > 0 ? Number(aff.commission_percent) : 30;
-            const commission = Math.round(amount * 100 * pct / 100); // amount is in whole currency units
-            await supabase.from('referral_sales').upsert([{
-              affiliate_code: aff.code, license_key: licenseKey, payment_intent_id: piRef,
-              product, amount: Math.round(amount * 100), commission_amount: commission
-            }], { onConflict: 'payment_intent_id' });
-            addLog(`[D24] Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}`, 'affiliate', 'success');
-            _notifyAffiliateSale(aff.code, product, commission);
-          }
-        } catch (e) { addLog(`[D24] Affiliate error: ${e.message}`, 'affiliate', 'error'); }
-      }
-
-      if (isNew && email) {
-        const html = isForex
-          ? _buildForexEmailHtml(_he(buyerName), _he(email), licenseKey)
-          : _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey);
-        const subject = isForex
-          ? '🤖 Your Apex Forex Bot — License Key inside'
-          : '🤖 Your Apex Trade Bot — License Key inside';
-        const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
-        if (!result.ok) {
-          addLog(`[D24] Email NOT sent for ${_maskEmail(email)} — ${result.error}`, 'email', 'error');
-          _notifyAdminAlert(
-            `⚠️ Customer paid but the license email FAILED to send.\n\n` +
-            `Product: ${isForex ? 'Forex' : 'Crypto'}\nEmail: ${email}\nOrder: ${orderId}\n` +
-            `License key: ${licenseKey}\nError: ${result.error}\n\n` +
-            `Send the key to them manually until this is fixed.`
-          );
-        } else addLog(`[D24] ${isForex ? 'Forex' : 'Crypto'} email sent to ${email}`, 'email', 'success');
-      }
-      if (isNew) addLog(`[D24] ${isForex ? 'Forex' : 'Crypto'} Bot sold: ${email} — key: ${licenseKey}`, 'payment', 'success');
-    } else if (event === 'on_payment') {
-      addLog(`[D24] on_payment for unmapped product_id=${productId} order=${orderId} — set DIGISTORE24_PRODUCT_CRYPTO/FOREX`, 'payment', 'warn');
-    }
-
-    if ((event === 'on_refund' || event === 'on_chargeback') && orderId) {
-      const piRef = `d24_${orderId}`;
-      if (supabase) {
-        const { data: revoked } = await supabase.from('licenses')
-          .update({ active: false, refunded: true, refunded_at: new Date().toISOString() })
-          .eq('payment_intent_id', piRef).select('key,product');
-        if (revoked?.length) addLog(`[D24] License revoked (${event}): ${revoked[0].key} (${revoked[0].product})`, 'license', 'warn');
-        await supabase.from('referral_sales')
-          .update({ refunded: true, refunded_at: new Date().toISOString() })
-          .eq('payment_intent_id', piRef);
-      }
-    }
-
-    res.send('OK');
-  } catch (e) {
-    console.error('[D24] Webhook error:', e);
-    res.status(500).send('Internal error');
-  }
-}
-app.post('/digistore24-webhook', (req, res, next) => {
-  console.log(`[D24] Incoming request — content-type=${req.headers['content-type']} content-length=${req.headers['content-length']} ip=${req.ip}`);
-  next();
-}, express.urlencoded({ extended: true }), (req, res, next) => {
-  console.log(`[D24] Parsed body: ${JSON.stringify(req.body).slice(0, 500)}`);
-  next();
-}, handleDigistore24Webhook);
-
 // ── STRIPE CHECKOUT ─────────────────────────────────────────────────────────
 // We are the merchant of record here (unlike D24) — Stripe just processes the
 // card. Below the Romanian VAT-exemption threshold this needs no special tax
-// handling; see the affiliate/PFA discussion elsewhere for when that changes.
+// handling; see the PFA discussion elsewhere for when that changes.
 // Stripe is the primary/default processor now — ApexTradingSuite (acct_1TSAWQGpBbs5xtI5),
 // business profile corrected to match what's actually sold, live and charges_enabled.
 // Price IDs default to the ones created on that account; override via env if recreated.
@@ -2256,15 +1474,13 @@ const STRIPE_PRICE_IDS = {
   'apex-forex': process.env.STRIPE_PRICE_FOREX || 'price_1Tge4PGpBbs5xtI5jAjgndKZ'
 };
 // Matches the one_time_price unit_amount on each Stripe Price above — used to
-// compute an affiliate's application_fee_amount without an extra API round-trip.
+// price the order without an extra API round-trip.
 const STRIPE_PRODUCT_AMOUNTS_CENTS = { 'apex-crypto': 29700, 'apex-forex': 49700 };
 
 // POST /api/checkout/create-session — { product: 'apex-crypto'|'apex-forex', ref? } -> { url }
 app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
   const product = String(req.body?.product || '');
   const ref = String(req.body?.ref || '').toLowerCase().trim().slice(0, 40);
-  const endorselyReferral = String(req.body?.endorsely_referral || '').slice(0, 200);
-  const endorselyCode = String(req.body?.endorsely_code || '').toLowerCase().trim().slice(0, 60);
   const origin = _safeOrigin(req);
 
   if (stripe) {
@@ -2279,14 +1495,9 @@ app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
         customer_creation: 'always'
       };
 
-      // Affiliate commissions are tracked and paid out through Endorsely, which
-      // reads endorsely_referral off this session. Deliberately NO Stripe Connect
-      // split here: Endorsely has no API to mark a commission as already settled,
-      // so splitting at charge time would leave its ledger showing the commission
-      // as unpaid and risk paying the same affiliate twice.
+      // `ref` is kept as plain provenance — where the buyer came from — and is
+      // no longer an attribution key: there is no affiliate program to pay.
       sessionParams.metadata = { product, ref };
-      if (endorselyReferral) sessionParams.metadata.endorsely_referral = endorselyReferral;
-      if (endorselyCode) sessionParams.metadata.endorsely_code = endorselyCode;
 
       const session = await stripe.checkout.sessions.create(sessionParams);
       return res.json({ url: session.url });
@@ -2329,11 +1540,10 @@ app.get('/api/order-status', _codeLimiter, async (req, res) => {
   }
 });
 
-// Shared fulfillment — mirrors handleDigistore24Webhook's on_payment path
-// (license generation, affiliate commission, license email). `provider` only
-// controls the log/alert prefix, so a second processor can reuse this without
-// a second copy of the fulfillment logic.
-async function _fulfillOrder({ provider, piRef, product, email, buyerName, amountCents, ref, connectApplied }) {
+// Shared fulfillment: licence generation and the licence email. `provider` only
+// controls the log/alert prefix, so a second processor can reuse this without a
+// second copy of the fulfillment logic.
+async function _fulfillOrder({ provider, piRef, product, email, buyerName, amountCents, ref }) {
   const isForex = product === 'apex-forex';
   let licenseKey;
   if (supabase) {
@@ -2351,25 +1561,6 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
     if (error) addLog(`[${provider}] License DB error: ${error.message}`, 'license', 'error');
   }
   addLog(`[${provider}] License activated: ${licenseKey} for ${_maskEmail(email)} (${product})`, 'license', 'success');
-
-  if (isNew && ref && supabase) {
-    try {
-      const { data: aff } = await supabase.from('affiliates').select('code,commission_percent,status').eq('code', ref).maybeSingle();
-      if (aff && aff.status === 'active') {
-        const pct = Number(aff.commission_percent) > 0 ? Number(aff.commission_percent) : 30;
-        const commission = Math.round(amountCents * pct / 100);
-        await supabase.from('referral_sales').upsert([{
-          affiliate_code: aff.code, license_key: licenseKey, payment_intent_id: piRef,
-          product, amount: amountCents, commission_amount: commission,
-          // Stripe Connect already transferred this commission directly to the
-          // affiliate's own account at time of payment — no manual payout owed.
-          paid: !!connectApplied
-        }], { onConflict: 'payment_intent_id' });
-        addLog(`[${provider}] Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}${connectApplied ? ' (auto-paid via Stripe Connect)' : ''}`, 'affiliate', 'success');
-        _notifyAffiliateSale(aff.code, product, commission);
-      }
-    } catch (e) { addLog(`[${provider}] Affiliate error: ${e.message}`, 'affiliate', 'error'); }
-  }
 
   if (isNew && email) {
     const html = isForex
@@ -2392,76 +1583,6 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
 }
 const _fulfillStripeOrder = (args) => _fulfillOrder({ provider: 'Stripe', ...args });
 
-// ── ENDORSELY PAYOUT TRACKER ────────────────────────────────────────────────
-// Endorsely owns the affiliate-facing ledger and the payout button, but it
-// collects nothing about where an affiliate is tax-resident. These helpers keep
-// our own record of what is owed and when, so the owner can be told which
-// documents are still missing before money moves.
-const ENDORSELY_COMMISSION_PCT = 30;
-const ENDORSELY_NET_DAYS = 30;               // Endorsely's payout term is Net-30
-
-// Suggested withholding, based on what we hold on file. Advisory only — the
-// final call is the accountant's, so the report always states what it assumed.
-function _suggestWithholding(tax) {
-  if (!tax) return { pct: 16, why: 'nothing on file — no country, no certificate' };
-  if (tax.entity_type === 'business' && tax.has_invoice) return { pct: 0, why: 'registered business, invoice on file' };
-  if (tax.entity_type === 'business') return { pct: 0, why: 'registered business — WAITING ON INVOICE' };
-  const year = new Date().getUTCFullYear();
-  if (String(tax.country || '').toUpperCase() === 'RO') return { pct: 10, why: 'Romanian individual — withholding at source' };
-  if (tax.tax_cert_year && Number(tax.tax_cert_year) >= year) return { pct: 10, why: `tax residence certificate on file (${tax.country || 'country not set'})` };
-  return { pct: 16, why: 'no valid tax residence certificate for this year' };
-}
-
-async function _recordEndorselySale({ piRef, product, amountCents, code, referralId }) {
-  if (!supabase || !code) return;                 // nothing to attribute
-  try {
-    const commission = Math.round(amountCents * ENDORSELY_COMMISSION_PCT / 100);
-    const matures = new Date(Date.now() + ENDORSELY_NET_DAYS * 864e5).toISOString();
-    const { error } = await supabase.from('endorsely_sales').upsert([{
-      affiliate_code: code, referral_id: referralId || null, payment_intent_id: piRef,
-      product, amount_cents: amountCents, commission_cents: commission, matures_at: matures
-    }], { onConflict: 'payment_intent_id' });
-    if (error) return addLog(`[Endorsely] Could not record sale ${piRef}: ${error.message}`, 'affiliate', 'error');
-    addLog(`[Endorsely] Affiliate sale: ${code} — $${(commission / 100).toFixed(2)} matures ${matures.slice(0, 10)}`, 'affiliate', 'success');
-  } catch (e) {
-    addLog(`[Endorsely] Sale record error: ${e.message}`, 'affiliate', 'error');
-  }
-}
-
-// Builds the payout report: every matured, unpaid, unrefunded commission with
-// the documents we hold and the rate that implies.
-async function _buildEndorselyPayoutReport() {
-  if (!supabase) return { ready: [], upcoming: [], error: 'Supabase not configured' };
-  const nowIso = new Date().toISOString();
-  const { data: sales, error } = await supabase.from('endorsely_sales')
-    .select('affiliate_code,commission_cents,matures_at,product,sold_at')
-    .eq('status', 'pending').eq('refunded', false).order('matures_at');
-  if (error) return { ready: [], upcoming: [], error: error.message };
-
-  const { data: taxRows } = await supabase.from('endorsely_affiliate_tax').select('*');
-  const taxBy = Object.fromEntries((taxRows || []).map(t => [t.code, t]));
-
-  const group = (rows) => Object.values(rows.reduce((acc, s) => {
-    const k = s.affiliate_code;
-    (acc[k] ||= { code: k, salesCount: 0, grossCents: 0, nextMatures: s.matures_at })[k];
-    acc[k].salesCount++; acc[k].grossCents += s.commission_cents;
-    if (s.matures_at < acc[k].nextMatures) acc[k].nextMatures = s.matures_at;
-    return acc;
-  }, {}));
-
-  const ready = group((sales || []).filter(s => s.matures_at <= nowIso)).map(a => {
-    const tax = taxBy[a.code];
-    const w = _suggestWithholding(tax);
-    const withheld = Math.round(a.grossCents * w.pct / 100);
-    return { ...a, country: tax?.country || null, entityType: tax?.entity_type || null,
-             withholdPct: w.pct, withholdReason: w.why,
-             withheldCents: withheld, netCents: a.grossCents - withheld,
-             blocked: tax?.entity_type === 'business' && !tax?.has_invoice };
-  });
-  const upcoming = group((sales || []).filter(s => s.matures_at > nowIso));
-  return { ready, upcoming, error: null };
-}
-
 app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   if (!stripe) return res.status(500).send('Stripe not configured');
   const sig = req.headers['stripe-signature'];
@@ -2480,7 +1601,6 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
       const session = event.data.object;
       const product = session.metadata?.product || '';
       const ref = session.metadata?.ref || '';
-      const connectApplied = session.metadata?.connectApplied === '1';
       if (STRIPE_PRICE_IDS[product]) {
         if (!session.payment_intent) {
           addLog(`[Stripe] session=${session.id} has no payment_intent — refund revocation will not match`, 'payment', 'warn');
@@ -2489,12 +1609,7 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
         const email = session.customer_details?.email || '';
         const buyerName = session.customer_details?.name || 'there';
         const amountCents = Number(session.amount_total || 0);
-        await _fulfillStripeOrder({ piRef, product, email, buyerName, amountCents, ref, connectApplied });
-        await _recordEndorselySale({
-          piRef, product, amountCents,
-          code: session.metadata?.endorsely_code || '',
-          referralId: session.metadata?.endorsely_referral || ''
-        });
+        await _fulfillStripeOrder({ piRef, product, email, buyerName, amountCents, ref });
       } else {
         addLog(`[Stripe] checkout.session.completed for unmapped product="${product}" session=${session.id}`, 'payment', 'warn');
       }
@@ -2507,22 +1622,6 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
           .update({ active: false, refunded: true, refunded_at: new Date().toISOString() })
           .eq('payment_intent_id', piRef).select('key,product');
         if (revoked?.length) addLog(`[Stripe] License revoked (${event.type}): ${revoked[0].key} (${revoked[0].product})`, 'license', 'warn');
-        await supabase.from('referral_sales')
-          .update({ refunded: true, refunded_at: new Date().toISOString() })
-          .eq('payment_intent_id', piRef);
-        // Kill the affiliate commission too — a refunded sale must never show
-        // up as payable, or we would pay out on money we gave back.
-        const { data: killed } = await supabase.from('endorsely_sales')
-          .update({ refunded: true, refunded_at: new Date().toISOString(), status: 'cancelled' })
-          .eq('payment_intent_id', piRef).select('affiliate_code,commission_cents');
-        if (killed?.length) {
-          addLog(`[Endorsely] Commission cancelled on refund: ${killed[0].affiliate_code} — $${(killed[0].commission_cents / 100).toFixed(2)}`, 'affiliate', 'warn');
-          _notifyAdminAlert(
-            `↩️ Refund — comision anulat\n\nAfiliat: ${killed[0].affiliate_code}\n` +
-            `Comision anulat: $${(killed[0].commission_cents / 100).toFixed(2)}\n\n` +
-            `Dacă i-ai plătit deja acest comision în Endorsely, trebuie recuperat.`
-          );
-        }
       }
     }
     res.json({ received: true });
@@ -2830,16 +1929,7 @@ app.post('/api/heygen/photo-generate', async (req, res) => {
 // hosted crypto page so buyers never see the stale copy.
 app.get(['/apex-bot', '/apex-bot.html'], (req, res) => res.redirect(301, '/index'));
 
-// The affiliate program now runs on Endorsely, which hosts the signup portal and
-// the affiliate's own dashboard. Send the old in-house pages there so nobody
-// signs up into a system we no longer track commissions in. The pages and the
-// /api/affiliates/* routes are left in place (the Telegram bot still uses them);
-// they are simply no longer reachable from the site.
-const ENDORSELY_PORTAL = 'https://aicashsystemspace-65f1.endorsely.com';
-app.get(['/affiliate', '/affiliate.html', '/affiliate-dashboard', '/affiliate-dashboard.html'],
-  (req, res) => res.redirect(302, ENDORSELY_PORTAL));
-
-const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','thank-you','thank-you-d24','chart','free','promo','guide'];
+const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','thank-you','chart','free','promo','guide'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
@@ -3663,7 +2753,7 @@ app.post('/api/railway-deploy', async (req, res) => {
 //   META_APP_ID, META_APP_SECRET, META_PAGE_ACCESS_TOKEN, META_PAGE_ID,
 //   META_IG_BUSINESS_ID, META_WEBHOOK_VERIFY_TOKEN (any string you pick)
 //   TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_REDIRECT_URI
-// Admin endpoints are protected by the same owner secret as the payout
+// Admin endpoints are protected by the owner secret
 // export above (BOT_EMAIL_SECRET), via ?secret= or X-Owner-Secret header.
 
 const _AUTO_REPLY_TEXT = "Hey! Thanks for reaching out 🙌 We're running a free Apex Trading Bot demo for the first testers — no cost, no risk (demo account only). Want in? Reply here and I'll get you set up.";
@@ -3743,7 +2833,7 @@ app.get('/webhooks/meta', (req, res) => {
 });
 
 // POST carries real events (messages, comments). Signature-verified so only
-// Meta can trigger auto-replies — mirrors _digistore24VerifySignature's
+// Meta can trigger auto-replies — mirrors the payment webhook's
 // approach (HMAC over the raw body, compared to the header Meta sends).
 function _metaVerifySignature(req) {
   const sig = req.headers['x-hub-signature-256'];

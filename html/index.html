@@ -8,7 +8,6 @@
 <meta name="description" content="Apex Trading Suite (AI Cash System): two fully-hosted AI trading bots controlled from Telegram. Crypto & Forex on cTrader. One-time payment — $297 crypto, $497 forex. No subscriptions, nothing to install.">
 <link rel="canonical" href="https://aicashsystem.space/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<script async src="https://assets.endorsely.com/endorsely.js" data-endorsely="7a115a28-d792-43a2-8187-18b16921f51d"></script>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Apex Trading Suite · AI Cash System">
 <meta property="og:url" content="https://aicashsystem.space/">
@@ -285,7 +284,6 @@ footer .right{font:400 11px/1.6 var(--sans);color:var(--muted);max-width:500px}
     <a href="/strategies" class="fm-item" data-w="m"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg><span>Strategies</span></a>
     <a href="/faq" class="fm-item" data-w="s"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>FAQ</span></a>
     <a href="/security" class="fm-item" data-w="m"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Security</span></a>
-    <a href="https://aicashsystemspace-65f1.endorsely.com" target="_blank" rel="noopener" class="fm-item" data-w="m"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Affiliates</span></a>
   </div>
 </div>
 
@@ -499,19 +497,14 @@ footer .right{font:400 11px/1.6 var(--sans);color:var(--muted);max-width:500px}
 </footer>
 
 <script>
-// Affiliate ref capture + click beacon (same pattern as forex.html)
+// Where the visitor came from, kept for the length of the checkout and passed
+// to Stripe as plain provenance. It is no longer an attribution key: there is
+// no affiliate program, and the click beacon it used to fire pointed at an
+// endpoint that no longer exists.
 (function(){
   var p=new URLSearchParams(window.location.search);
   var code=p.get('ref')||p.get('r_id')||p.get('rfsn');
   if(code) sessionStorage.setItem('rfrsn_ref',code);
-  // Endorsely links use ?via= — keep the handle itself, not just the referral
-  // id their script stores, so a sale can be tied back to a named affiliate.
-  var via=p.get('via')||p.get('aff');
-  if(via) sessionStorage.setItem('endorsely_code',via);
-  if(code && !sessionStorage.getItem('ref_click_sent')){
-    sessionStorage.setItem('ref_click_sent','1');
-    try{ fetch('/api/affiliates/click?ref='+encodeURIComponent(code),{keepalive:true}).catch(function(){}); }catch(e){}
-  }
 })();
 
 async function openCheckout(e, product) {
@@ -524,8 +517,6 @@ async function openCheckout(e, product) {
     var r = await fetch('/api/checkout/create-session', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ product: product, ref: ref,
-        endorsely_referral: window.endorsely_referral || '',
-        endorsely_code: sessionStorage.getItem('endorsely_code') || '' })
     });
     var d = await r.json();
     if (d.url) { window.location.href = d.url; return; }

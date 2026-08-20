@@ -47,12 +47,7 @@ _REDIS = {
 _SECRET = os.getenv("RUFLO_MCP_SECRET") or "ruflo"
 _PRODUCTS = {"crypto", "forex"}
 
-# Affiliate/referral bot — its data lives in Supabase behind the website API,
-# and it's a thin Telegram front-end, so it's reached over HTTP (not the Redis
-# bus): admin-list + telegram-stats for reads, its bot token for messaging.
 _SITE = (os.getenv("SITE_URL") or "https://aicashsystem.space").rstrip("/")
-_AFF_SECRET = os.getenv("AFFILIATE_BOT_SECRET") or ""
-_AFF_TOKEN = os.getenv("AFFILIATE_BOT_TOKEN") or ""
 
 
 def _ns(product: str) -> str:
@@ -263,50 +258,12 @@ def client_message(product: str, user_id: str, text: str) -> dict:
     return _call(product, "client_message", {"user_id": user_id, "text": text})
 
 
-# ─── Affiliate / referral bot (over the website API) ─────────
 def _site_post(path: str, body: dict, timeout: float = 15.0):
     r = requests.post(f"{_SITE}{path}", json=body, timeout=timeout)
     try:
         return r.json()
     except Exception:
         return {"error": f"HTTP {r.status_code}"}
-
-
-@mcp.tool()
-def affiliates_overview() -> dict:
-    """All affiliates with their sales totals (paid / pending / refunded) —
-    the referral program at a glance."""
-    if not _AFF_SECRET:
-        return {"error": "AFFILIATE_BOT_SECRET not set on the MCP server"}
-    d = _site_post("/api/affiliates/admin-list", {"secret": _AFF_SECRET})
-    affs = d.get("affiliates") or []
-    tot = {"affiliates": len(affs),
-           "sales": sum(a["sales"]["total"] for a in affs),
-           "paid_cents": sum(a["sales"]["paid"] for a in affs),
-           "pending_cents": sum(a["sales"]["pending"] for a in affs)}
-    return {"totals": tot, "affiliates": affs}
-
-
-@mcp.tool()
-def affiliate_stats(chat_id: str) -> dict:
-    """Live earnings/clicks/sales for one affiliate by their Telegram chat id."""
-    if not _AFF_SECRET:
-        return {"error": "AFFILIATE_BOT_SECRET not set on the MCP server"}
-    return _site_post("/api/affiliates/telegram-stats",
-                      {"chatId": chat_id, "secret": _AFF_SECRET})
-
-
-@mcp.tool()
-def message_affiliate(chat_id: str, text: str) -> dict:
-    """Send a Telegram message to an affiliate from the referral bot."""
-    if not _AFF_TOKEN:
-        return {"error": "AFFILIATE_BOT_TOKEN not set on the MCP server"}
-    r = requests.post(f"https://api.telegram.org/bot{_AFF_TOKEN}/sendMessage",
-                      json={"chat_id": chat_id, "text": text[:3500],
-                            "parse_mode": "HTML", "disable_web_page_preview": True},
-                      timeout=10)
-    return {"sent": r.ok, "status": r.status_code}
-
 
 async def _health(request):
     return PlainTextResponse("ruflo-mcp ok")

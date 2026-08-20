@@ -15,7 +15,7 @@
 | **Apex Forex Bot** | $497 one-time | AI-powered forex trading bot, hosted by us 24/7. Trades major/minor FX pairs + gold via cTrader. |
 
 ## How it works
-- Customer buys a license (via Digistore24 checkout) → gets a license key + Telegram activation link by email.
+- Customer buys a license (via Stripe Checkout) → gets a license key + Telegram activation link by email.
 - Customer opens the bot in Telegram, connects their own cTrader account (any cTrader-compatible broker — IC Markets, Pepperstone, FxPro, etc.) with a single command (`/ctrader`), demo or live.
 - The bot analyzes the market with AI (Claude/Groq) using multiple strategies (trend following, mean reversion, breakout) and trades automatically — no VPS, no computer left running, fully hosted on our servers.
 - Everything is controlled from Telegram: risk %, stop-loss/take-profit, strategy, pairs, on/off.
@@ -59,14 +59,12 @@
 
 ## Revenue Model
 - One-time license sales: $297 (crypto), $497 (forex)
-- In-house affiliate program (Supabase `affiliates`/`referral_sales` tables, own signup/dashboard/payout flow at `/api/affiliates/*`) — commission tracked via the `ref` query param captured on the homepage and passed through Stripe Checkout metadata. Default 30% commission unless overridden per affiliate.
-- Separate: 14 outside Telegram trading-signal channels were each given a discount-tracking code + dedicated checkout link (0.01% discount, `times_used` counter only) — informal one-off partners, not signed up in the in-house program. **Those links were Dodo Payments links and are dead**: Dodo rejected the business and the integration has been removed. Re-issue them as Stripe links before pointing any partner at them again.
 
 ## Tech Stack (Backend)
 - **Runtime:** Node.js / Express (server.js) + two separate Python trading bots (crypto, forex)
 - **Database:** Supabase (PostgreSQL) + Redis (bot session state)
 - **AI:** Anthropic Claude (Haiku), Groq (Llama fallback)
-- **Payments:** Stripe is the ONLY processor (account acct_1TSAWQGpBbs5xtI5 / ApexTradingSuite). `/api/checkout/create-session` uses Stripe; with no Stripe key configured it returns "Payments are not configured" rather than falling back to anything. Dodo Payments was REMOVED — they rejected the business ("we do not support auto trading bots and related services"), so the SDK, the `/dodo-webhook` route and the product ids are gone rather than left inert. Digistore24 was also REJECTED (not "dormant"); its webhook handler still exists and is the model the shared fulfillment mirrors. CopeCart was abandoned mid-KYC. Stripe is NOT usable as a native in-Telegram payment provider (owner confirmed via BotFather — not in the provider list), so Telegram checkout has to be a Stripe Checkout link opened in-browser, not a native sendInvoice flow.
+- **Payments:** Stripe is the ONLY processor (account acct_1TSAWQGpBbs5xtI5 / ApexTradingSuite). `/api/checkout/create-session` uses Stripe; with no Stripe key configured it returns "Payments are not configured" rather than falling back to anything. REMOVED, and not dormant: Dodo Payments (they rejected the business), Digistore24 (also rejected — its IPN handler, signature check and thank-you page are gone), and BOTH affiliate programs. There is no affiliate program of any kind now: the in-house one (13 /api/affiliates/* routes, signup + dashboard pages, Stripe Connect onboarding, payout requests, commission ledger) and the Endorsely integration (tracking script, referral metadata, payout tracker) were both removed on 2026-08-20 — they had been running side by side on the same signup page, which put one sale in two commission ledgers. `ref` survives in Checkout metadata as plain provenance and is attributed to nobody. CopeCart was abandoned mid-KYC. Stripe is NOT usable as a native in-Telegram payment provider (owner confirmed via BotFather), so Telegram checkout has to be a Stripe Checkout link opened in-browser.
 - **Email:** Brevo
 - **Broker integration:** cTrader Open API (both bots)
 - **Deployment:** Render (three services — main site, forex bot, crypto bot)

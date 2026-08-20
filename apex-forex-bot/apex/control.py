@@ -78,7 +78,7 @@ WRITE_ACTIONS = {"restart_loop", "bot_on", "bot_off", "refresh_token",
 # kind" — a new handler cannot become remotely callable by being forgotten.
 LEVEL_1_READ = {
     "status", "user_detail", "events", "ctrader_account", "audit_log",
-    "affiliates_overview", "affiliate_stats", "recent_commands", "recent_events",
+    "recent_commands", "recent_events",
     "bot_alive", "bot_status",
     # The ops API (see apex/ops_api.py). All read-only by construction.
     "ops_system_health", "ops_user_health", "ops_user_license",
@@ -90,7 +90,7 @@ LEVEL_1_READ = {
 }
 LEVEL_2_CONTROLLED = {
     "restart_loop", "bot_on", "bot_off", "refresh_token", "set_setting",
-    "send_message", "message_affiliate", "client_message",
+    "send_message", "client_message",
 }
 LEVEL_3_FINANCIAL = {"force_close", "force_trade"}
 

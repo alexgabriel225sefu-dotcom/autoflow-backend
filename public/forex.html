@@ -8,7 +8,6 @@
 <meta property="og:title" content="Apex Forex Bot — AI Forex Trading System">
 <meta property="og:description" content="Runs 24/7. cTrader practice &amp; live. Paper trading to test risk-free. Fully hosted — control from Telegram. One-time $497.">
 <meta property="og:type" content="website">
-<script async src="https://assets.endorsely.com/endorsely.js" data-endorsely="7a115a28-d792-43a2-8187-18b16921f51d"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
@@ -493,19 +492,14 @@ footer .disc{max-width:560px}
   });
 })();
 
-// Affiliate ref capture + click beacon (same pattern as index.html)
+// Where the visitor came from, kept for the length of the checkout and passed
+// to Stripe as plain provenance. It is no longer an attribution key: there is
+// no affiliate program, and the click beacon it used to fire pointed at an
+// endpoint that no longer exists.
 (function(){
   var p=new URLSearchParams(window.location.search);
   var code=p.get('ref')||p.get('r_id')||p.get('rfsn');
   if(code) sessionStorage.setItem('rfrsn_ref',code);
-  // Endorsely links use ?via= — keep the handle itself, not just the referral
-  // id their script stores, so a sale can be tied back to a named affiliate.
-  var via=p.get('via')||p.get('aff');
-  if(via) sessionStorage.setItem('endorsely_code',via);
-  if(code && !sessionStorage.getItem('ref_click_sent')){
-    sessionStorage.setItem('ref_click_sent','1');
-    try{ fetch('/api/affiliates/click?ref='+encodeURIComponent(code),{keepalive:true}).catch(function(){}); }catch(e){}
-  }
 })();
 
 // Stripe checkout — requires consent checkboxes; scrolls to price card if not checked
@@ -523,8 +517,6 @@ async function gotoCheckout(){
     var r = await fetch('/api/checkout/create-session', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ product: 'apex-forex', ref: ref,
-        endorsely_referral: window.endorsely_referral || '',
-        endorsely_code: sessionStorage.getItem('endorsely_code') || '' })
     });
     var d = await r.json();
     if (d.url) { window.location.href = d.url; return; }

@@ -16,7 +16,6 @@ from apex import access
 from apex import user_store
 from apex import user_loop
 from apex import assistant
-from apex import affiliate_store
 from apex import builder
 from apex import quick_answers
 

@@ -856,7 +856,7 @@ document.querySelectorAll('.feat').forEach(function(el,i){el.style.transitionDel
 var STRIPE_PK='pk_live_51Rc4gqAlQbHad7Gf8FDlIABj15avXWw6doMv52iyQ2mzoKtvolzldIZZufyEIMCISk4oLoISSnq4vQTpLqwrEuDn00OGbKjPSS';
 var apexStripe,apexCardNum,apexCardExp,apexCardCvc;
 
-// Capture affiliate code from URL (?ref= or ?r_id=) and persist in sessionStorage
+// Capture the provenance code from the URL (?ref= or ?r_id=) for this session
 (function(){
   var p=new URLSearchParams(window.location.search);
   var code=p.get('ref')||p.get('r_id')||p.get('rfsn');
@@ -911,8 +911,8 @@ async function submitApexPayment(){
     }else if(result.paymentIntent.status==='succeeded'){
       document.getElementById('amForm').style.display='none';
       document.getElementById('amSuccess').style.display='block';
-      // Affiliate conversion is attributed server-side from the payment intent's
-      // ref metadata (our own affiliate system) — no third-party tracker needed.
+      // `ref` rides along as plain provenance. There is no affiliate program
+      // and nothing is attributed or paid on it.
       // Auto-activation: open the bot in Telegram with the paid token.
       // The bot verifies the token with Stripe and grants access automatically.
       var BOT_USERNAME='ApexTradeBot_official_bot';

@@ -102,7 +102,7 @@ input:focus{border-color:var(--acc)}
 </div>
 
 <script>
-// Preserve affiliate ref (?ref= / ?r_id=) across the funnel.
+// Preserve the provenance ref (?ref= / ?r_id=) across the funnel.
 var _p=new URLSearchParams(location.search);
 var REF=_p.get('ref')||_p.get('r_id')||_p.get('rfsn')||sessionStorage.getItem('rfrsn_ref')||'';
 if(REF) sessionStorage.setItem('rfrsn_ref',REF);
