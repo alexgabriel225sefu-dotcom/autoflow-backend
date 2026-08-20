@@ -181,7 +181,41 @@ try:
 finally:
     assistant.chat, assistant._run_tool = _real_chat, _real_run
 
-print("\n11. A dead or missing key gets a sentence, not a stack trace")
+print("\n11. A slow provider degrades to facts, it does not hang the phone")
+# iOS Shortcuts answered "The request timed out" against the first version of
+# this, which waited 45s: the provider chain leads with the AI gateway, which
+# carries its own 20s timeout and sleeps on Render's free plan. A phone will
+# not hold a request open that long and neither will a person standing there
+# holding it. Running out of budget must produce the account state, which
+# needs no AI at all, rather than an apology or a dead socket.
+_real_chat2, _real_local = assistant.chat, assistant._local_status
+_slow_budget = voice_api._REPLY_TIMEOUT_S
+try:
+    voice_api._REPLY_TIMEOUT_S = 0.2
+    assistant.chat = lambda *a, **k: None          # never calls back
+    assistant._local_status = lambda uid: "<b>Balance:</b> $3,214. 📭 No position."
+    import time as _t
+    t0 = _t.time()
+    slow = voice_api.ask(tok, "what's my balance")
+    took = _t.time() - t0
+    check("the caller is answered, not left waiting", slow.get("ok") is True, slow)
+    check("and answered quickly", took < 3, f"{took:.1f}s")
+    check("with real account state", "Balance: $3,214" in slow["reply"], slow)
+    check("and told the reasoning was unavailable",
+          "could not reach the assistant" in slow["reply"], slow)
+    check("the budget is short enough for a phone to wait",
+          _slow_budget <= 15, f"{_slow_budget}s")
+
+    # Only when even that fails is there nothing to say.
+    assistant._local_status = lambda uid: (_ for _ in ()).throw(RuntimeError("no dash"))
+    dead = voice_api.ask(tok, "what's my balance")
+    check("a total failure is still a sentence, not a crash",
+          dead.get("status") == 504 and "unaffected" in dead["reply"], dead)
+finally:
+    voice_api._REPLY_TIMEOUT_S = _slow_budget
+    assistant.chat, assistant._local_status = _real_chat2, _real_local
+
+print("\n12. A dead or missing key gets a sentence, not a stack trace")
 check("no token is 401", voice_api.ask("", "hello").get("status") == 401)
 check("a revoked token is 401",
       (voice_api.revoke("500"), voice_api.ask(tok, "hi").get("status"))[1] == 401)
@@ -190,12 +224,12 @@ check("the refusal is speakable",
 tok = voice_api.mint("500")
 check("an empty question is refused", voice_api.ask(tok, "  ").get("status") == 400)
 
-print("\n12. Speech cleanup")
+print("\n13. Speech cleanup")
 check("markup is removed", voice_api.speakable("<b>Balance:</b> $10") == "Balance: $10")
 check("entities are decoded", voice_api.speakable("A &amp; B") == "A & B")
 check("nothing crashes on None", voice_api.speakable(None) == "")
 
-print("\n13. Wired end to end")
+print("\n14. Wired end to end")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOT = open(os.path.join(ROOT, "apex", "bot.py"), encoding="utf-8").read()
 TG = open(os.path.join(ROOT, "apex", "telegram.py"), encoding="utf-8").read()

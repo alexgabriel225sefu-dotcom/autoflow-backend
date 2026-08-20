@@ -38,9 +38,18 @@ import time
 from apex import user_store
 
 # A voice turn waits on the assistant, which calls an AI provider and may run
-# tools. Past this the caller gets a plain "still working" rather than a socket
-# held open until a phone gives up on it.
-_REPLY_TIMEOUT_S = 45
+# tools. This was 45s, which is longer than a phone will hold a request open
+# and far longer than anyone will stand there holding a phone: iOS Shortcuts
+# reported "The request timed out" before the server had even finished
+# waiting. The provider chain leads with the AI gateway, which carries its own
+# 20s timeout and sleeps on Render's free plan, so a client with no Gemini key
+# spent that whole budget waiting for a cold gateway before falling through to
+# an answer it could have given immediately.
+#
+# So the budget is now what a person will tolerate out loud, and running out
+# of it is not an error — see `ask`, which answers from live account state
+# instead. Being fast and factual beats being slow and eloquent here.
+_REPLY_TIMEOUT_S = 12
 
 # Requests per window, per client. A voice assistant is a handful of turns a
 # minute at most; this is high enough never to be felt and low enough that a
@@ -232,6 +241,21 @@ def _ask_assistant(user_id, text, guard):
     return box.get("reply")
 
 
+def _fallback(user_id):
+    """Live account state, with no AI in the path. Always available.
+
+    This is what a slow provider degrades TO. `_local_status` reads the same
+    dashboard the trading loop writes, so it is current — it just cannot
+    reason. For "what's my balance", which is most of what anyone asks a phone,
+    it is the whole answer anyway.
+    """
+    try:
+        from apex import assistant
+        return speakable(assistant._local_status(user_id))
+    except Exception:
+        return None
+
+
 def ask(token, text):
     """A spoken question. Returns what to say back, and what is pending.
 
@@ -279,6 +303,12 @@ def ask(token, text):
         print(f"[Voice] turn failed for {user_id}: {e}")
         reply = None
     if not reply:
+        # Do not hand a phone an apology when the facts are one read away.
+        local = _fallback(user_id)
+        if local:
+            return {"ok": True, "status": 200,
+                    "reply": local + " I could not reach the assistant for "
+                                     "anything more than that."}
         return {"ok": False, "status": 504,
                 "reply": "I could not reach the assistant just now. "
                          "Your bot is unaffected."}
