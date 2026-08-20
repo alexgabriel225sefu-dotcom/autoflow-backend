@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Apex Terminal</title>
+<style>
+:root{--bg:#07090f;--card:rgba(255,255,255,.045);--line:rgba(255,255,255,.08);
+  --t0:#eef1f6;--t1:#9aa3b2;--t2:#5b6472;--up:#2fd575;--dn:#ff4560;--acc:#ff2d4f;--gold:#f5b544}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+  overflow-x:hidden;padding-bottom:34px}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(70% 32% at 50% -4%,rgba(255,45,79,.16),transparent 70%)}
+.wrap{position:relative;z-index:1}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.rise{animation:rise .5s cubic-bezier(.22,.61,.36,1) both}
+#hero{padding:16px 16px 12px}
+#brandRow{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+#brand{font-size:10.5px;font-weight:800;letter-spacing:.28em;color:var(--t2)}
+#brand b{color:var(--acc)}
+/* the badge is deliberately loud: mistaking demo for live is the worst error here */
+#modeBadge{font-size:10.5px;font-weight:800;letter-spacing:.1em;padding:5px 10px;border-radius:8px;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--t1);white-space:nowrap}
+#modeBadge.live{background:rgba(255,45,79,.16);border-color:rgba(255,45,79,.5);color:#ff8598}
+#modeBadge.demo{background:rgba(47,213,117,.13);border-color:rgba(47,213,117,.4);color:var(--up)}
+#modeBadge.sim{background:rgba(245,181,68,.13);border-color:rgba(245,181,68,.4);color:var(--gold)}
+#modeBadge.unver{background:rgba(245,181,68,.16);border-color:rgba(245,181,68,.55);color:var(--gold)}
+#statusLine{font-size:14.5px;font-weight:600;color:var(--t1);margin-bottom:14px;line-height:1.4}
+#statusLine b{color:var(--t0);font-weight:800}
+#balRow{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+#balV{font-size:34px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;transition:color .35s}
+#balV.up{color:var(--up)}#balV.dn{color:var(--dn)}
+#dayChip{font-size:13px;font-weight:700;border-radius:9px;padding:6px 10px;background:rgba(47,213,117,.12);color:var(--up)}
+#dayChip.neg{background:rgba(255,69,96,.12);color:var(--dn)}
+#badges{margin-top:10px;font-size:12.5px;color:var(--t1);font-weight:600}
+#tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:4px 16px 0}
+.tile{background:linear-gradient(165deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+  border:1px solid var(--line);border-radius:14px;padding:10px 8px;text-align:center}
+.tile b{display:block;font-size:15.5px;font-weight:800;font-variant-numeric:tabular-nums}
+.tile span{display:block;font-size:8.5px;font-weight:700;letter-spacing:.09em;color:var(--t2);
+  text-transform:uppercase;margin-top:3px}
+.card{margin:12px 16px 0;background:linear-gradient(165deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
+  border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px}
+.card-h b{font-size:13.5px;font-weight:800}
+.card-h span{font-size:10.5px;color:var(--t2);font-weight:600}
+#chart{height:40vh;min-height:230px}
+#eqChart{height:30vh;display:none}
+#tfBar{display:flex;gap:5px;padding:8px 12px 12px}
+#tfBar div{flex:1;text-align:center;font-size:11px;font-weight:700;padding:7px 2px;border-radius:9px;
+  border:1px solid var(--line);color:var(--t1);background:rgba(0,0,0,.2)}
+#tfBar div.on{color:#fff;background:rgba(255,45,79,.14);border-color:rgba(255,45,79,.45)}
+#pos{margin:0 14px 12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;
+  font-size:13px;display:none;background:rgba(0,0,0,.25)}
+#pos .lg{font-weight:800}
+#pos .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;font-size:11.5px;color:var(--t1)}
+#pos .grid b{display:block;color:var(--t0);font-size:12.5px;font-variant-numeric:tabular-nums}
+.pnl-up{color:var(--up)}.pnl-dn{color:var(--dn)}
+#tabs{display:flex;gap:6px;margin:14px 16px 10px}
+.tab{flex:1;text-align:center;padding:10px 3px;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;font-size:11px;font-weight:700;color:var(--t1);transition:all .25s}
+.tab.on{color:#fff;border-color:rgba(255,45,79,.45);background:rgba(255,45,79,.13)}
+.panel{margin:0 16px;display:none}
+.panel.on{display:block;animation:rise .35s both}
+.item{padding:11px 2px;border-bottom:1px solid var(--line);font-size:13px;line-height:1.5}
+.item:last-child{border-bottom:none}
+.item .sub{color:var(--t1);font-size:11px;margin-top:2px}
+.trow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;cursor:pointer}
+.trow .r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:800}
+.trow .chev{color:var(--t2);font-size:11px;margin-left:2px}
+.chip{display:inline-block;font-size:9.5px;font-weight:800;border-radius:5px;padding:2px 6px;
+  background:rgba(245,181,68,.14);color:var(--gold);margin-right:6px;letter-spacing:.05em}
+.chip.red{background:rgba(255,45,79,.14);color:#ff97a8}
+.chip.live{background:rgba(255,45,79,.16);color:#ff8598}
+.chip.demo{background:rgba(47,213,117,.13);color:var(--up)}
+.empty{color:var(--t2);font-size:12.5px;padding:16px 2px;text-align:center}
+.kv{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--line);font-size:13px}
+.kv:last-child{border-bottom:none}
+.kv span{color:var(--t1)}.kv b{font-variant-numeric:tabular-nums}
+#jSwitch{display:flex;gap:6px;margin-bottom:10px}
+#jSwitch div{flex:1;text-align:center;font-size:11px;font-weight:700;padding:7px;border-radius:9px;
+  border:1px solid var(--line);color:var(--t1);background:var(--card)}
+#jSwitch div.on{color:#fff;background:rgba(255,45,79,.13);border-color:rgba(255,45,79,.4)}
+#liveDot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--up);margin-right:6px;
+  animation:pulse 1.6s ease-in-out infinite}
+#liveDot.stale{background:var(--gold);animation:none}
+#liveDot.off{background:var(--dn);animation:none}
+@keyframes pulse{50%{opacity:.25}}
+#err{position:fixed;bottom:10px;left:16px;right:16px;background:rgba(255,69,96,.14);
+  border:1px solid rgba(255,69,96,.4);color:#ffb4be;font-size:11.5px;padding:8px 12px;
+  border-radius:10px;display:none;z-index:9}
+/* ── REPLAY ── */
+#replay{position:fixed;inset:0;background:var(--bg);z-index:20;display:none;overflow-y:auto;padding-bottom:30px}
+#replay.on{display:block;animation:rise .3s both}
+#rBack{padding:14px 16px 6px;font-size:12.5px;font-weight:700;color:var(--t1)}
+#rHead{padding:0 16px 10px}
+#rTitle{font-size:19px;font-weight:800}
+#rSub{font-size:12px;color:var(--t1);margin-top:3px}
+#rPnl{font-size:26px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums}
+#rChart{height:42vh;min-height:250px;margin:0 12px;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+#rCtl{display:flex;gap:8px;padding:12px 16px}
+#rCtl button{flex:1;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);
+  color:var(--t0);font-size:13px;font-weight:800}
+#rCtl button:disabled{opacity:.45}
+.sec{font-size:10px;font-weight:800;letter-spacing:.18em;color:var(--t2);margin:16px 16px 6px;text-transform:uppercase}
+.bar{margin:0 16px 10px}
+.bar .lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--t1);margin-bottom:4px}
+.bar .lbl b{color:var(--t0);font-variant-numeric:tabular-nums}
+.bar .track{height:7px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden}
+.bar .fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--acc),#ff7a8c)}
+.na{color:var(--t2);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="hero" class="rise">
+    <div id="brandRow">
+      <div id="brand">APEX <b>TERMINAL</b></div>
+      <div id="modeBadge">— — —</div>
+    </div>
+    <div id="statusLine">👀 Watching <b>—</b></div>
+    <div id="balRow">
+      <div>
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:.14em;color:var(--t2);margin-bottom:3px">EQUITY</div>
+        <div id="balV">$ —</div>
+      </div>
+      <div id="dayChip">today —</div>
+    </div>
+    <div id="balSub" style="margin-top:8px;font-size:12px;color:var(--t1);font-variant-numeric:tabular-nums">—</div>
+    <div id="badges"></div>
+  </div>
+
+  <div id="tiles" class="rise">
+    <div class="tile"><b id="tWr">—</b><span>Win rate</span></div>
+    <div class="tile"><b id="tPf">—</b><span>$ won / $ lost</span></div>
+    <div class="tile"><b id="tDd">—</b><span>Biggest dip</span></div>
+    <div class="tile"><b id="tSk">—</b><span>Skipped today</span></div>
+  </div>
+
+  <div class="card rise">
+    <div class="card-h"><b id="cSym">—</b><span id="cMeta"><i id="liveDot"></i>loading…</span></div>
+    <div id="chart"></div>
+    <div id="eqChart"></div>
+    <div id="tfBar">
+      <div data-tf="1m">1m</div><div data-tf="5m">5m</div><div class="on" data-tf="15m">15m</div>
+      <div data-tf="1h">1h</div><div data-tf="4h">4h</div><div data-tf="1d">1d</div>
+    </div>
+    <div id="pos"></div>
+  </div>
+
+  <div id="tabs" class="rise">
+    <div class="tab on" data-p="chart">📈 Chart</div>
+    <div class="tab" data-p="perf">💰 Stats</div>
+    <div class="tab" data-p="hist">🕘 History</div>
+    <div class="tab" data-p="news">📰 News</div>
+    <div class="tab" data-p="journal">🧾 Log</div>
+  </div>
+  <div class="panel on" id="p-chart"></div>
+  <div class="panel" id="p-perf"><div class="empty">Loading…</div></div>
+  <div class="panel" id="p-hist"><div class="empty">Loading your trades…</div></div>
+  <div class="panel" id="p-news"><div class="empty">Loading events…</div></div>
+  <div class="panel" id="p-journal">
+    <div id="jSwitch"><div class="on" data-j="trades">Recent</div><div data-j="skips">Skipped setups</div></div>
+    <div id="jTrades"><div class="empty">No trades yet.</div></div>
+    <div id="jSkips" style="display:none"><div class="empty">Nothing skipped yet today.</div></div>
+  </div>
+</div>
+
+<div id="replay">
+  <div id="rBack">← Back to history</div>
+  <div id="rHead"><div id="rTitle">—</div><div id="rSub">—</div><div id="rPnl">—</div></div>
+  <div id="rChart"></div>
+  <div id="rCtl"><button id="rPlay">▶ Replay</button><button id="rReset">↺ Reset</button></div>
+  <div id="rBody"></div>
+</div>
+
+<div id="err"></div>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+if(tg){tg.ready();tg.expand();try{tg.setBackgroundColor('#07090f');}catch(e){}}
+const initData = tg ? tg.initData : '';
+const Q = s => document.getElementById(s);
+const esc = s => String(s==null?'':s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const money = v => (v>=0?'+$':'−$') + Math.abs(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const num = (v,d) => (v==null||v==='')?'—':Number(v).toLocaleString(undefined,{maximumFractionDigits:d==null?5:d});
+
+const mkChart = (el,opts)=>LightweightCharts.createChart(el,Object.assign({
+  layout:{background:{color:'transparent'},textColor:'#5b6472',fontSize:10},
+  grid:{vertLines:{color:'rgba(255,255,255,.04)'},horzLines:{color:'rgba(255,255,255,.04)'}},
+  timeScale:{timeVisible:true,secondsVisible:false,borderColor:'rgba(255,255,255,.08)'},
+  rightPriceScale:{borderColor:'rgba(255,255,255,.08)'},crosshair:{mode:1}},opts||{}));
+const CANDLE_STYLE={upColor:'#2fd575',downColor:'#ff4560',borderUpColor:'#2fd575',
+  borderDownColor:'#ff4560',wickUpColor:'#2fd575',wickDownColor:'#ff4560'};
+
+let chart=null,series=null,eqChart=null,eqSeries=null;
+const chartEl=Q('chart'), eqEl=Q('eqChart');
+try{
+  chart=mkChart(chartEl); series=chart.addCandlestickSeries(CANDLE_STYLE);
+  eqChart=mkChart(eqEl,{timeScale:{timeVisible:false}});
+  eqSeries=eqChart.addAreaSeries({lineColor:'#ff2d4f',lineWidth:2,
+    topColor:'rgba(255,45,79,.25)',bottomColor:'rgba(255,45,79,0)'});
+  new ResizeObserver(()=>{
+    chart.applyOptions({width:chartEl.clientWidth,height:chartEl.clientHeight});
+    eqChart.applyOptions({width:eqEl.clientWidth,height:eqEl.clientHeight});
+  }).observe(chartEl);
+}catch(e){console.error('chart lib unavailable',e);}
+
+let lines=[];
+function setLines(pos){
+  if(!series)return;
+  lines.forEach(l=>{try{series.removePriceLine(l)}catch(e){}}); lines=[];
+  if(!pos)return;
+  const add=(p,c,t)=>{if(p)lines.push(series.createPriceLine({price:Number(p),color:c,lineWidth:1,lineStyle:2,title:t}))};
+  add(pos.entryPrice,'#f5b544','ENTRY');
+  add(pos.stopLoss||pos.sl,'#ff4560','SL');
+  add(pos.takeProfit||pos.tp,'#2fd575','TP');
+}
+
+/* ── tabs ── */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); Q('p-'+t.dataset.p).classList.add('on');
+  const perf = t.dataset.p==='perf';
+  chartEl.style.display = perf?'none':'block';
+  eqEl.style.display = perf?'block':'none';
+  Q('tfBar').style.display = perf?'none':'flex';
+  Q('cSym').textContent = perf?'Equity curve':lastSym;
+  if(t.dataset.p==='hist') loadHistory();
+  setTimeout(()=>{if(eqChart)eqChart.timeScale().fitContent();},50);
+});
+document.querySelectorAll('#jSwitch div').forEach(d=>d.onclick=()=>{
+  document.querySelectorAll('#jSwitch div').forEach(x=>x.classList.remove('on')); d.classList.add('on');
+  Q('jTrades').style.display=d.dataset.j==='trades'?'block':'none';
+  Q('jSkips').style.display=d.dataset.j==='skips'?'block':'none';
+});
+
+/* ── timeframe ── */
+let TF='15m', tfDirty=false;
+document.querySelectorAll('#tfBar div').forEach(d=>d.onclick=()=>{
+  document.querySelectorAll('#tfBar div').forEach(x=>x.classList.remove('on'));
+  d.classList.add('on'); TF=d.dataset.tf; tfDirty=true; refresh();
+});
+
+/* ── the badge. Renders the backend verdict and nothing else. ── */
+function setBadge(acct){
+  const b=Q('modeBadge');
+  if(!acct){b.className='';b.textContent='— — —';return;}
+  b.textContent=acct.badge||'—';
+  b.className = acct.mode==='LIVE'?'live' : acct.mode==='DEMO'?'demo'
+              : acct.mode==='SIMULATION'?'sim' : 'unver';
+}
+
+let first=true,lastSym='—',lastOk=0;
+function freshness(){
+  const dot=Q('liveDot'); if(!dot)return;
+  const age=(Date.now()-lastOk)/1000;
+  dot.className = lastOk===0?'off' : age>25?'off' : age>8?'stale':'';
+}
+setInterval(freshness,2000);
+
+async function api(path){
+  const sep = path.indexOf('?')<0?'?':'&';
+  const r = await fetch(path+sep+'init='+encodeURIComponent(initData));
+  if(!r.ok){
+    let code=''; try{code=(await r.json()).code||'';}catch(e){}
+    const err=new Error(code||('HTTP '+r.status)); err.status=r.status; err.code=code; throw err;
+  }
+  return r.json();
+}
+
+async function refresh(){
+ try{
+  const d = await api('/api/app/data?tf='+encodeURIComponent(TF));
+  Q('err').style.display='none'; lastOk=Date.now(); freshness();
+  setBadge(d.account);
+  lastSym=(d.symbol||'—').replace('_','/');
+  if(!document.querySelector('.tab[data-p="perf"]').classList.contains('on')) Q('cSym').textContent=lastSym;
+  Q('cMeta').innerHTML='<i id="liveDot"></i>'+(d.price?num(d.price)+' · ':'')+esc(d.timeframeUsed||d.timeframe||'')+' · '+esc(d.broker||'');
+  freshness();
+
+  const eq = d.equityLive!=null?d.equityLive:(d.balance||0);
+  const bv=Q('balV'), prev=window.__eq; window.__eq=eq;
+  bv.textContent='$'+eq.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(prev!=null&&eq!==prev){bv.classList.remove('up','dn');void bv.offsetWidth;
+    bv.classList.add(eq>prev?'up':'dn');setTimeout(()=>bv.classList.remove('up','dn'),600);}
+  const fl=d.floatingPnl||0;
+  Q('balSub').innerHTML='Balance $'+(d.balance||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})
+    +(d.position?' · <span class="'+(fl>=0?'pnl-up':'pnl-dn')+'">Floating '+money(fl)+'</span>':'');
+
+  const st=d.stats||{}, td=st.today||{};
+  const chip=Q('dayChip');
+  chip.textContent='today '+money(td.netPnl||0)+' · '+(td.trades||0)+' trades';
+  chip.className=(td.netPnl||0)<0?'neg':'';
+
+  Q('statusLine').innerHTML = d.position
+    ? ((fl>=0?'🟢 In a ':'🔴 In a ')+(d.position.side==='BUY'?'BUY':'SELL')+' on <b>'+esc(lastSym)+'</b> — '
+       +(fl>=0?'up $':'down $')+Math.abs(fl).toFixed(2))
+    : '👀 Watching <b>'+esc(lastSym)+'</b> — no position, waiting for a setup';
+
+  const bp=[];
+  if(d.strategy)bp.push(d.strategy);
+  if(d.regime&&d.regime.regime)bp.push(d.regime.regime.charAt(0).toUpperCase()+d.regime.regime.slice(1)+' market');
+  if(d.sessions&&d.sessions.length)bp.push(d.sessions.join(' + '));
+  Q('badges').innerHTML=bp.map(esc).join('  ·  ');
+
+  Q('tWr').textContent=st.winRate!=null?st.winRate.toFixed(0)+'%':'—';
+  Q('tPf').textContent=st.profitFactor!=null?st.profitFactor:'—';
+  Q('tDd').textContent=st.maxDrawdownPct!=null?st.maxDrawdownPct.toFixed(1)+'%':'—';
+  Q('tSk').textContent=td.skips!=null?td.skips:'0';
+
+  if(series&&d.candles&&d.candles.length){
+    series.setData(d.candles);
+    if(first||tfDirty){chart.timeScale().fitContent();first=false;tfDirty=false;}
+  }
+  if(eqSeries&&d.equity&&d.equity.length) eqSeries.setData(d.equity.map((p,i)=>({time:i,value:p.value})));
+  setLines(d.position);
+
+  const pos=Q('pos');
+  if(d.position){
+    const p=d.position, dir=p.side==='BUY'?'🟢 LONG':'🔴 SHORT';
+    pos.style.display='block';
+    pos.innerHTML='<span class="lg">'+dir+' '+esc(lastSym)+'</span>'
+      +(p.pnlPips!=null?' · <span class="'+(p.pnlPips>=0?'pnl-up':'pnl-dn')+'">'+(p.pnlPips>=0?'+':'')+p.pnlPips+' pips'
+        +(p.pnlUsd!=null?' ('+money(p.pnlUsd)+')':'')+'</span>':'')
+      +'<div class="grid"><div>Entry<b>'+num(p.entryPrice)+'</b></div>'
+      +'<div>Stop<b>'+num(p.stopLoss||p.sl)+'</b></div>'
+      +'<div>Target<b>'+num(p.takeProfit||p.tp)+'</b></div></div>';
+  } else pos.style.display='none';
+
+  const perf=Q('p-perf');
+  perf.innerHTML = st.trades ?
+     '<div class="kv"><span>Closed trades</span><b>'+st.trades+' ('+st.wins+'W / '+st.losses+'L)</b></div>'
+    +'<div class="kv"><span>Net P&L</span><b class="'+(st.netPnl>=0?'pnl-up':'pnl-dn')+'">'+money(st.netPnl)+'</b></div>'
+    +'<div class="kv"><span>$ won per $ lost</span><b>'+(st.profitFactor!=null?st.profitFactor:'—')+'</b></div>'
+    +'<div class="kv"><span>Average win / loss</span><b>'+money(st.avgWin)+' / '+money(st.avgLoss)+'</b></div>'
+    +'<div class="kv"><span>Best / worst trade</span><b>'+money(st.best)+' / '+money(st.worst)+'</b></div>'
+    +'<div class="kv"><span>Biggest dip from peak</span><b>'+st.maxDrawdownPct.toFixed(1)+'%</b></div>'
+    : '<div class="empty">No closed trades yet — stats build as the bot works.</div>';
+
+  const nv=Q('p-news'), today=d.newsToday||[];
+  if(today.length){
+    nv.innerHTML=today.map(e=>{const past=e.mins<=0,am=Math.abs(e.mins),h=Math.floor(am/60),m=am%60;
+      const when=past?((h?h+'h ':'')+m+'m ago'):('in '+(h?h+'h ':'')+m+'m');
+      return '<div class="item"><span class="chip'+(past?' red':'')+'">'+esc(e.currency)+'</span><b>'+esc(e.title)+'</b>'
+        +'<div class="sub">'+(past?'Released ':'')+when+' · high impact'+(past?'':' — the bot stands aside around it')+'</div></div>';}).join('');
+  } else nv.innerHTML='<div class="empty">No high-impact events today — clear runway. ✅</div>';
+
+  const jt=Q('jTrades');
+  if(d.trades&&d.trades.length){
+    jt.innerHTML=d.trades.map(t=>'<div class="item"><b>'+esc(t.action||'')+'</b> '+esc((t.symbol||'').replace('_','/'))
+      +(t.price?' @ '+num(t.price):'')
+      +(t.netPnl!=null?' · <span class="'+(t.netPnl>=0?'pnl-up':'pnl-dn')+'">'+money(t.netPnl)+'</span>':'')
+      +'<div class="sub">'+esc(t.time||'')+(t.reasoning?' — '+esc(t.reasoning):'')+'</div></div>').join('');
+  }
+  const js=Q('jSkips');
+  if(d.skips&&d.skips.length){
+    js.innerHTML=d.skips.map(k=>'<div class="item"><span class="chip red">SKIP</span>'+esc(k.reason)
+      +'<div class="sub">'+esc(k.time||'')+'</div></div>').join('');
+  }
+ }catch(e){
+  const el=Q('err'); el.style.display='block';
+  el.textContent = e.code==='TELEGRAM_AUTH_FAILED'
+    ? 'Open this from your Telegram chat to see your account.'
+    : 'Reconnecting… market data unavailable';
+  freshness();
+ }
+}
+
+/* ── HISTORY ── */
+let histCache=[];
+async function loadHistory(){
+  const el=Q('p-hist');
+  try{
+    const h=await api('/api/app/history?limit=50');
+    histCache=h.trades||[];
+    if(!histCache.length){el.innerHTML='<div class="empty">No closed trades yet.</div>';return;}
+    el.innerHTML=histCache.map(t=>{
+      const win=t.win===true, dir=(t.side==='SELL')?'🔴 SHORT':'🟢 LONG';
+      const md=(t.mode||'').toLowerCase();
+      const badge=md==='live'?'<span class="chip live">LIVE</span>'
+                 :md==='demo'?'<span class="chip demo">DEMO</span>'
+                 :md==='simulation'?'<span class="chip">SIM</span>':'';
+      return '<div class="item"><div class="trow" data-t="'+esc(t.id)+'">'
+        +'<div><b>'+dir+' '+esc((t.symbol||'').replace('_','/'))+'</b>'
+        +'<div class="sub">'+badge+esc((t.time||'').slice(0,16))
+        +(t.entry!=null&&t.exit!=null?' · '+num(t.entry)+' → '+num(t.exit):'')+'</div></div>'
+        +'<div class="r '+(t.netPnl==null?'':(win?'pnl-up':'pnl-dn'))+'">'
+        +(t.netPnl==null?'—':money(t.netPnl))+'<span class="chev"> ›</span></div></div></div>';
+    }).join('');
+    el.querySelectorAll('.trow').forEach(r=>r.onclick=()=>openReplay(r.dataset.t));
+  }catch(e){
+    el.innerHTML='<div class="empty">'+(e.code==='TELEGRAM_AUTH_FAILED'
+      ? 'Open this from your Telegram chat to see your trades.'
+      : 'Your trade history is temporarily unavailable.')+'</div>';
+  }
+}
+
+/* ── REPLAY ── */
+let rChart=null,rSeries=null,rTimer=null,rData=null;
+Q('rBack').onclick=()=>{stopReplay();Q('replay').classList.remove('on');};
+function stopReplay(){if(rTimer){clearInterval(rTimer);rTimer=null;}Q('rPlay').disabled=false;}
+
+function bar(label,value,pct,suffix){
+  if(value==null) return '<div class="bar"><div class="lbl"><span>'+label+'</span><b class="na">not recorded</b></div></div>';
+  const p=Math.max(0,Math.min(100,pct));
+  return '<div class="bar"><div class="lbl"><span>'+label+'</span><b>'+value+(suffix||'')+'</b></div>'
+    +'<div class="track"><div class="fill" style="width:'+p+'%"></div></div></div>';
+}
+
+async function openReplay(tid){
+  const scr=Q('replay'); scr.classList.add('on'); stopReplay();
+  Q('rTitle').textContent='Loading…'; Q('rSub').textContent=''; Q('rPnl').textContent='';
+  Q('rBody').innerHTML='';
+  try{
+    const d=await api('/api/app/replay?trade='+encodeURIComponent(tid)+'&timeframe='+encodeURIComponent(TF));
+    rData=d;
+    const t=d.trade, win=t.win===true;
+    const dir=(t.side==='SELL')?'🔴 SHORT':'🟢 LONG';
+    Q('rTitle').textContent=dir+' '+String(t.symbol||'').replace('_','/');
+    const md=(t.mode||'').toUpperCase();
+    Q('rSub').textContent=String(t.time||'').slice(0,16)+(md?' · '+md:'');
+    Q('rPnl').textContent=t.netPnl==null?'—':money(t.netPnl);
+    Q('rPnl').className=t.netPnl==null?'':(win?'pnl-up':'pnl-dn');
+
+    if(!rChart){
+      rChart=mkChart(Q('rChart')); rSeries=rChart.addCandlestickSeries(CANDLE_STYLE);
+      new ResizeObserver(()=>rChart.applyOptions({width:Q('rChart').clientWidth,height:Q('rChart').clientHeight})).observe(Q('rChart'));
+    }
+    drawFull();
+
+    const s=d.snapshot||{};
+    Q('rBody').innerHTML=
+       '<div class="sec">Entry snapshot</div>'
+      +bar('Confidence', s.confidence!=null?Math.round(s.confidence):null, s.confidence, '%')
+      +bar('Probability', s.probability!=null?Math.round(s.probability*100):null, s.probability*100, '%')
+      +'<div class="sec">What APEX saw</div>'
+      +'<div style="margin:0 16px">'
+      +'<div class="kv"><span>Strategy</span><b>'+esc(s.strategyId||'—')+'</b></div>'
+      +'<div class="kv"><span>Market regime</span><b>'+esc(s.regime||'not recorded')+'</b></div>'
+      +'<div class="kv"><span>Spread at entry</span><b>'+(s.spreadPips!=null?s.spreadPips+' pips':'not recorded')+'</b></div>'
+      +'<div class="kv"><span>Expected value</span><b>'+(s.evR!=null?Number(s.evR).toFixed(2)+'R':'not recorded')+'</b></div>'
+      +'</div>'
+      +'<div class="sec">Result</div>'
+      +'<div style="margin:0 16px 20px">'
+      +'<div class="kv"><span>Entry</span><b>'+num(t.entry)+'</b></div>'
+      +'<div class="kv"><span>Exit</span><b>'+num(t.exit)+'</b></div>'
+      +'<div class="kv"><span>Net P&L</span><b class="'+(win?'pnl-up':'pnl-dn')+'">'+(t.netPnl==null?'—':money(t.netPnl))+'</b></div>'
+      +'<div class="kv"><span>Trade ID</span><b>'+esc(t.id)+'</b></div>'
+      +'</div>';
+  }catch(e){
+    Q('rTitle').textContent='Unavailable';
+    Q('rSub').textContent='';
+    Q('rBody').innerHTML='<div class="empty">'+(
+      e.code==='TRADE_NOT_FOUND'||e.code==='TRADE_INCOMPLETE' ? 'This trade could not be found.'
+      : e.code==='MARKET_DATA_UNAVAILABLE' ? 'Historical market data is temporarily unavailable for this trade.'
+      : e.code==='TELEGRAM_AUTH_FAILED' ? 'Open this from your Telegram chat.'
+      : 'This replay is temporarily unavailable.')+'</div>';
+  }
+}
+
+function markerSet(upto){
+  if(!rData)return [];
+  const m=rData.markers, out=[];
+  if(m.entry&&m.entry.time!=null&&(upto==null||m.entry.time<=upto))
+    out.push({time:m.entry.time,position:'belowBar',color:'#f5b544',shape:'arrowUp',text:'ENTRY '+num(m.entry.price)});
+  if(m.exit&&m.exit.time!=null&&(upto==null||m.exit.time<=upto))
+    out.push({time:m.exit.time,position:'aboveBar',color:m.exit.win?'#2fd575':'#ff4560',
+              shape:'arrowDown',text:'EXIT '+num(m.exit.price)});
+  return out.sort((a,b)=>a.time-b.time);
+}
+function drawFull(){
+  if(!rSeries||!rData)return;
+  rSeries.setData(rData.candles);
+  rSeries.setMarkers(markerSet(null));
+  rChart.timeScale().fitContent();
+}
+Q('rReset').onclick=()=>{stopReplay();drawFull();};
+Q('rPlay').onclick=()=>{
+  if(!rSeries||!rData||!rData.candles.length)return;
+  stopReplay(); Q('rPlay').disabled=true;
+  const cs=rData.candles;
+  // Start a little before the entry so the setup is visible, then draw forward.
+  let i=Math.max(2,cs.findIndex(c=>c.time>=rData.markers.entry.time)-12);
+  if(i<2)i=2;
+  rSeries.setData(cs.slice(0,i)); rSeries.setMarkers([]);
+  rChart.timeScale().fitContent();
+  rTimer=setInterval(()=>{
+    i++;
+    if(i>cs.length){stopReplay();rChart.timeScale().fitContent();return;}
+    rSeries.setData(cs.slice(0,i));
+    rSeries.setMarkers(markerSet(cs[i-1].time));
+  }, 55);
+};
+
+refresh(); setInterval(refresh, 2500);
+</script>
+</body>
+</html>

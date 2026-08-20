@@ -223,14 +223,31 @@ _DEDUPE_WINDOW_S = 900  # 15 min — two paths racing on one close land seconds 
 
 
 def _mode_of(user_id):
-    """"demo" or "live" for this client, or None when it cannot be known.
+    """"demo", "live", "simulation", or None when it cannot be known.
 
     None rather than a guess: a trade filed under the wrong account mode is
     worse than one filed under none, because the report looks complete while
     being wrong.
+
+    This used to be `"demo" if paper else "live"`, which read the WRONG AXIS.
+    `paper` distinguishes simulated fills from broker-executed ones; it says
+    nothing about whether the broker account is real money. Account 47765456
+    runs paper=false against a cTrader DEMO account, so every trade it closed
+    was journalled "live" — and the history screen prints this field verbatim,
+    which would show a client demo trades labelled LIVE.
+
+    Deliberately does NOT call the broker: this runs inside the journal writer
+    on every close, and a network call there could fail a write that must not
+    fail. The stored env is the right axis, which was the actual defect; the
+    Mini App badge asks the broker itself (see apex/account_mode.py).
     """
     try:
-        return "demo" if user_store.load(user_id).get("paper", True) else "live"
+        from apex import account_mode
+        u = user_store.load(user_id) or {}
+        mode, _src = account_mode.resolve(u, allow_broker=False)
+        return {account_mode.LIVE: "live",
+                account_mode.DEMO: "demo",
+                account_mode.SIMULATION: "simulation"}.get(mode)
     except Exception as e:
         print(f"[UserLoop:{user_id}] could not read account mode: {e}")
         return None

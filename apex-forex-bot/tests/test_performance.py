@@ -157,8 +157,18 @@ print("\n── the loop records the mode going forward ──")
 LOOP = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                          "apex", "user_loop.py"), encoding="utf-8").read()
 check("mode is journalled per trade", '"mode":            _mode_of(user_id),' in LOOP)
+_MODE_FN = LOOP[LOOP.index("def _mode_of"):LOOP.index("def _already_journaled")]
 check("it comes from THIS user's record, not the process-global config",
-      'user_store.load(user_id).get("paper"' in LOOP)
+      "user_store.load(user_id)" in _MODE_FN and "cfg.PAPER_TRADING" not in _MODE_FN)
+# It used to be `"demo" if paper else "live"`. `paper` means simulated-vs-broker
+# fills, NOT real-vs-demo money: account 47765456 runs paper=false against a
+# cTrader DEMO account, so every close was journalled "live" and the history
+# screen would show a client demo trades labelled LIVE.
+check("the mode is NOT derived from the paper flag",
+      '.get("paper"' not in _MODE_FN,
+      "paper is the wrong axis for this question")
+check("it resolves through the shared account-mode resolver",
+      "account_mode" in _MODE_FN)
 check("an unreadable mode is None, never a guess",
       "return None" in LOOP[LOOP.index("def _mode_of"):LOOP.index("def _already_journaled")])
 

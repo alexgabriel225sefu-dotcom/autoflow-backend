@@ -5,6 +5,7 @@ sending Telegram's signed initData with every API call; validate() checks the
 HMAC per https://core.telegram.org/bots/webapps#validating-data-received so a
 client can only ever see THEIR OWN account."""
 import hmac
+import os
 import json
 import hashlib
 from urllib.parse import parse_qsl
@@ -67,6 +68,25 @@ def guide_html() -> str:
     return _asset_swaps(GUIDE_HTML)
 
 
+_STATIC_TERMINAL = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "static", "terminal.html")
+
+
 def terminal_html() -> str:
-    """The live terminal Mini App, asset-class aware."""
-    return _asset_swaps(HTML)
+    """The live terminal Mini App, asset-class aware.
+
+    Served from apex/static/terminal.html. A full terminal — chart, timeframes,
+    history, replay — does not fit legibly in an escaped Python string literal,
+    and the previous one was a single 200-column line precisely because it had
+    to. Keeping it as a real .html file is what makes it editable.
+
+    HTML falls back to the embedded string if the asset is missing, so a
+    packaging mistake degrades to the older screen instead of serving a blank
+    page to a client whose money is on the line.
+    """
+    try:
+        with open(_STATIC_TERMINAL, encoding="utf-8") as fh:
+            return _asset_swaps(fh.read())
+    except OSError as e:
+        print(f"[WebApp] terminal.html unreadable ({e}) — serving the built-in fallback")
+        return _asset_swaps(HTML)

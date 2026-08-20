@@ -291,6 +291,21 @@ def _start_dashboard_server():
                             "").removeprefix("Bearer ").strip()
             return hmac.compare_digest(supplied, token)
 
+        def _json(self, status, obj):
+            """A JSON reply with no cache and an explicit length.
+
+            The Mini App polls; a cached 200 would show a client a stale
+            account long after it changed, which is the one thing a terminal
+            must never do.
+            """
+            body = json.dumps(obj).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def _deny(self):
             """401 when the token is wrong, 503 when there is no token at all."""
             if not token:
@@ -362,6 +377,7 @@ def _start_dashboard_server():
                 return
             if self.path.startswith("/api/app/data"):
                 from apex import webapp, user_loop, user_store, news as news_mod
+                from apex import account_mode as _account_mode
                 qs = parse_qs(urlparse(self.path).query)
                 init = (qs.get("init") or [""])[0]
                 tg_user = webapp.validate(init, cfg.TELEGRAM_BOT_TOKEN or "")
@@ -385,7 +401,13 @@ def _start_dashboard_server():
                     # time. dash["symbol"] is what the loop is ACTUALLY
                     # watching/trading right now.
                     live_symbol = udash.get("symbol") or ucfg.SYMBOL
-                    candles = br.get_candles(live_symbol, ucfg.TIMEFRAME, 150) or []
+                    # The client may pick a timeframe. An unrecognised one falls
+                    # back to the loop's own rather than being passed to the
+                    # broker, so a junk value cannot become a silent M5.
+                    from apex import miniapp_api as _mapi
+                    _tf = (qs.get("tf") or [""])[0].lower()
+                    tf_used = _tf if _tf in _mapi.TIMEFRAMES else ucfg.TIMEFRAME
+                    candles = br.get_candles(live_symbol, tf_used, 150) or []
                     pos = udash.get("openPosition")
                     from apex import stats as stats_mod, forex as fx_mod
                     balance_live = udash.get("balance", u.get("paper_balance", 0))
@@ -441,6 +463,17 @@ def _start_dashboard_server():
                     body = json.dumps({
                         "symbol": live_symbol, "timeframe": ucfg.TIMEFRAME,
                         "mode": udash.get("mode", "📝 PAPER" if u.get("paper", True) else "🔴 REAL"),
+                        # The badge the terminal renders. Resolved from the
+                        # BROKER's own isLive where reachable, not from the
+                        # stored flag — and reported as unverified rather than
+                        # guessed, so a demo account can never be shown as LIVE
+                        # because a lookup failed. See apex/account_mode.py.
+                        "account": (lambda _m: {
+                            "mode": _m[0], "source": _m[1],
+                            "badge": _account_mode.badge(_m[0]),
+                            "realMoney": _account_mode.is_real_money(_m[0]),
+                        })(_account_mode.resolve(u)),
+                        "timeframeUsed": tf_used,
                         "strategy": udash.get("strategy", "Mean Reversion"),
                         "broker": udash.get("broker", ""),
                         "balance": balance_live,
@@ -471,6 +504,46 @@ def _start_dashboard_server():
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
                     self.wfile.write(err)
+                return
+            # ── Mini App: history + replay ──────────────────────────────
+            # Same authentication as /api/app/data above: the chat id comes
+            # ONLY from initData whose HMAC we verified. No route here reads a
+            # user id from the query string, so a client cannot ask for
+            # somebody else's account by editing a parameter.
+            if self.path.startswith("/api/app/history") or self.path.startswith("/api/app/replay"):
+                from apex import webapp, miniapp_api
+                qs = parse_qs(urlparse(self.path).query)
+                init = (qs.get("init") or [""])[0]
+                tg_user = webapp.validate(init, cfg.TELEGRAM_BOT_TOKEN or "")
+                if not tg_user or not tg_user.get("id"):
+                    self._json(401, {"error": "unauthorized",
+                                     "code": "TELEGRAM_AUTH_FAILED"})
+                    return
+                chat_id = str(tg_user["id"])
+                try:
+                    if self.path.startswith("/api/app/history"):
+                        body = miniapp_api.history(
+                            chat_id,
+                            limit=(qs.get("limit") or ["25"])[0],
+                            offset=(qs.get("offset") or ["0"])[0])
+                    else:
+                        body = miniapp_api.replay(
+                            chat_id,
+                            (qs.get("trade") or [""])[0],
+                            (qs.get("timeframe") or ["15m"])[0])
+                    self._json(200, body)
+                except miniapp_api.ReplayError as e:
+                    # A missing trade and somebody else's trade are the SAME
+                    # answer on purpose: distinguishing them would turn this
+                    # into an oracle for which trade ids exist on other
+                    # accounts. 404 for both, one code.
+                    status = 404 if e.code in ("TRADE_NOT_FOUND", "TRADE_INCOMPLETE") else 502
+                    if e.code == "INVALID_TIMEFRAME":
+                        status = 400
+                    self._json(status, {"error": e.code, "code": e.code})
+                except Exception as e:
+                    print(f"[MiniApp] {self.path.split('?')[0]} failed: {e}")
+                    self._json(502, {"error": "UNAVAILABLE", "code": "UNAVAILABLE"})
                 return
             # cTrader OAuth callback — no auth (state is HMAC-signed), public by design
             if self.path.startswith("/api/ctrader/callback"):
