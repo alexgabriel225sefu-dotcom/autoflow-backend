@@ -192,35 +192,40 @@ def recent_commands(product: str, limit: int = 60) -> dict:
 
 # ─── Action tools (need MCP_CONTROL_ENABLED=true on the bot) ──
 @mcp.tool()
-def restart_user(product: str, user_id: str) -> dict:
+def restart_user(product: str, user_id: str, confirm: bool = False) -> dict:
     """Restart a user's trading loop (heals a stuck/desynced loop)."""
-    return _call(product, "restart_loop", {"user_id": user_id})
+    return _call(product, "restart_loop", {"user_id": user_id, "confirm": bool(confirm)})
 
 
 @mcp.tool()
-def bot_power(product: str, user_id: str, on: bool) -> dict:
+def bot_power(product: str, user_id: str, on: bool, confirm: bool = False) -> dict:
     """Turn a user's bot ON (start trading) or OFF (pause)."""
-    return _call(product, "bot_on" if on else "bot_off", {"user_id": user_id})
+    return _call(product, "bot_on" if on else "bot_off",
+                 {"user_id": user_id, "confirm": bool(confirm)})
 
 
 @mcp.tool()
-def refresh_ctrader_token(product: str, user_id: str) -> dict:
+def refresh_ctrader_token(product: str, user_id: str, confirm: bool = False) -> dict:
     """Force a cTrader token refresh + reconnect for a user (heals auth errors)."""
-    return _call(product, "refresh_token", {"user_id": user_id})
+    return _call(product, "refresh_token", {"user_id": user_id, "confirm": bool(confirm)})
 
 
 @mcp.tool()
-def set_user_setting(product: str, user_id: str, key: str, value) -> dict:
+def set_user_setting(product: str, user_id: str, key: str, value,
+                     confirm: bool = False) -> dict:
     """Change one strategy/risk setting for a user (e.g. strategy, risk, symbol,
     timeframe, trailing, max_trades_day) and restart their loop. Auth/token/
     license fields are not settable."""
-    return _call(product, "set_setting", {"user_id": user_id, "key": key, "value": value})
+    return _call(product, "set_setting",
+                 {"user_id": user_id, "key": key, "value": value,
+                  "confirm": bool(confirm)})
 
 
 @mcp.tool()
-def send_telegram(product: str, user_id: str, text: str) -> dict:
+def send_telegram(product: str, user_id: str, text: str, confirm: bool = False) -> dict:
     """Send a Telegram message to a user from the bot."""
-    return _call(product, "send_message", {"user_id": user_id, "text": text})
+    return _call(product, "send_message",
+                 {"user_id": user_id, "text": text, "confirm": bool(confirm)})
 
 
 @mcp.tool()
@@ -241,7 +246,7 @@ def open_trade(product: str, user_id: str, side: str, symbol: str = None) -> dic
 
 
 @mcp.tool()
-def client_message(product: str, user_id: str, text: str) -> dict:
+def client_message(product: str, user_id: str, text: str, confirm: bool = False) -> dict:
     """Send `text` to the bot AS THE CLIENT — the bot handles it and replies in
     their Telegram, exactly as if they had typed it.
 
@@ -255,7 +260,8 @@ def client_message(product: str, user_id: str, text: str) -> dict:
     /grant, /revoke, /buy, /sell, /close. Those are destructive or move real
     money and must be sent by the account owner. Use open_trade / force_close
     for trades — they are separately audited and demo-only."""
-    return _call(product, "client_message", {"user_id": user_id, "text": text})
+    return _call(product, "client_message",
+                 {"user_id": user_id, "text": text, "confirm": bool(confirm)})
 
 
 def _site_post(path: str, body: dict, timeout: float = 15.0):
