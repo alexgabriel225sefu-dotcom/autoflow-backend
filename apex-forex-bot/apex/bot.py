@@ -337,6 +337,31 @@ def _start_dashboard_server():
                 self.send_header("Content-Length", str(len(text)))
                 self.end_headers()
                 self.wfile.write(text)
+            elif self.path == "/api/voice":
+                # The phone channel. Auth is the per-client voice token in the
+                # body — deliberately NOT the operator DASHBOARD_TOKEN, which
+                # reads every account, and not Telegram initData, which a
+                # Shortcut cannot produce.
+                from apex import voice_api
+                length = int(self.headers.get("Content-Length") or 0)
+                raw = self.rfile.read(min(length, 64_000)).decode("utf-8", "replace")
+                try:
+                    req = json.loads(raw or "{}")
+                except Exception:
+                    req = {}
+                tok = req.get("token") or (
+                    self.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+                if req.get("confirmId"):
+                    out = voice_api.confirm(tok, req.get("confirmId"),
+                                            bool(req.get("agreed", True)))
+                else:
+                    out = voice_api.ask(tok, req.get("text"))
+                payload = json.dumps(out).encode()
+                self.send_response(int(out.get("status", 200)))
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
             elif self.path == "/api/mt/sync":
                 from apex.brokers import mtbridge
                 length = int(self.headers.get("Content-Length") or 0)

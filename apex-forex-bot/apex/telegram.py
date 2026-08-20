@@ -2625,6 +2625,87 @@ def _handle_market(chat_id):
             _back_kb(chat_id, [[("📰 News", "nav:news"), ("📈 Positions", "nav:pos")]]))
 
 
+def _handle_voice(chat_id, args=""):
+    """The phone channel: issue, revoke, and explain the voice token.
+
+    The token is shown exactly once. Only its hash is stored, so it cannot be
+    read back later — a lost one is re-issued, and re-issuing invalidates the
+    old one, which is also the answer to "I lost my phone".
+    """
+    from apex import voice_api
+    arg = (args or "").strip().lower()
+    base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+
+    if arg in ("off", "revoke", "stop"):
+        gone = voice_api.revoke(chat_id)
+        return send_to(chat_id,
+            "🔇 Voice access <b>revoked</b>. The old key stops working "
+            "immediately — your shortcut will need a new one."
+            if gone else "🔇 There was no voice key to revoke.",
+            _back_kb(chat_id))
+
+    if arg in ("confirm on", "confirm off"):
+        want = arg.endswith("on")
+        user_store.update(chat_id, {"voice_confirm": want})
+        return send_to(chat_id,
+            ("🛡 Voice confirmation <b>ON</b> — I'll read a trade back to you "
+             "and place it only after you say yes."
+             if want else
+             "⚡ Voice confirmation <b>OFF</b> — spoken trades go straight to "
+             "the broker.\n<i>Dictation mishears 0.5 as 5 and \"close\" as "
+             "\"closed\". With this off, a misheard word is a real order.</i>"),
+            _back_kb(chat_id))
+
+    if arg in ("new", "key", "on", "setup"):
+        if not base:
+            return send_to(chat_id,
+                "⚠️ Voice isn't available — the service URL isn't configured "
+                "(RENDER_EXTERNAL_URL). Ask the operator to set it.",
+                _back_kb(chat_id))
+        token = voice_api.mint(chat_id)
+        # Sent as its own message, unformatted, so it can be copied cleanly —
+        # and never repeated anywhere, including the logs.
+        send_to(chat_id,
+            "🎙 <b>Your voice key — copy it now</b>\n"
+            "<i>Shown once. I keep only a hash, so I can't show it again.</i>")
+        send_to(chat_id, f"<code>{_esc(token)}</code>")
+        return send_to(chat_id,
+            "<b>Set it up on iPhone</b> (2 minutes)\n\n"
+            "1. Open <b>Shortcuts</b> → ➕ new shortcut\n"
+            "2. Add <b>Dictate Text</b>\n"
+            "3. Add <b>Get Contents of URL</b>\n"
+            f"   • URL: <code>{_esc(base)}/api/voice</code>\n"
+            "   • Method: <b>POST</b>, Request Body: <b>JSON</b>\n"
+            "   • Field <code>token</code> = the key above\n"
+            "   • Field <code>text</code> = <i>Dictated Text</i>\n"
+            "4. Add <b>Get Dictionary Value</b> → key <code>reply</code>\n"
+            "5. Add <b>Speak Text</b>\n"
+            "6. Name it <b>Apex</b> and save.\n\n"
+            "Then say <b>\"Hey Siri, Apex\"</b> and ask anything — balance, "
+            "positions, why it skipped a setup.\n"
+            "<i>On iPhone 15 Pro and later you can bind it to the Action "
+            "button instead.</i>\n\n"
+            "🔇 <code>/voice off</code> revokes the key if you lose the phone.",
+            _back_kb(chat_id))
+
+    user = user_store.load(chat_id)
+    on = voice_api.has_token(user)
+    guard = voice_api.confirm_required(user)
+    return send_to(chat_id,
+        "🎙 <b>Voice control</b>\n"
+        f"Key: <b>{'issued' if on else 'not set up'}</b>\n"
+        f"Trade confirmation: <b>{'ON' if guard else 'OFF'}</b>\n\n"
+        "Ask your bot anything from your phone through Siri Shortcuts — "
+        "balance, open positions, why it skipped a setup — and place or close "
+        "trades by voice.\n\n"
+        "<code>/voice new</code> — issue a key and get the setup steps\n"
+        "<code>/voice off</code> — revoke it\n"
+        "<code>/voice confirm off</code> — stop asking before spoken trades\n\n"
+        "<i>Siri itself can't be replaced — Apple doesn't allow it. This runs "
+        "as a shortcut Siri launches by name.</i>",
+        _back_kb(chat_id))
+
+
 def _handle_news(chat_id, args=""):
     """The calendar screen — and the switch for the messages it pushes.
 
@@ -5395,6 +5476,7 @@ _CONTROLS_TEXT = (
     "/maxpos 3 — Allow multiple positions at once\n\n"
     "<b>📰 Info</b>\n"
     "/news — Economic calendar · /news on|off for release alerts\n"
+    "/voice — Control the bot from your phone through Siri Shortcuts\n"
     "/guide — How the bot works (visual guide)\n"
     "/purchase — Buy your license ($497 one-time)\n"
     "/help — Quick command list\n\n"
@@ -5890,6 +5972,8 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         _screen_live_activation(chat_id)
     elif cmd_l == "/news":
         _handle_news(chat_id, args)
+    elif cmd_l in ("/voice", "/siri"):
+        _handle_voice(chat_id, args)
     elif cmd_l in ("/market", "/m"):
         _handle_market(chat_id)
     elif cmd_l == "/paper":

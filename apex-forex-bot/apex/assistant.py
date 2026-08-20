@@ -188,9 +188,22 @@ def _build_context(user_id: str) -> str:
     return "\n".join(lines)
 
 
-def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
+def _run_tool(name: str, inp: dict, user_id: str, send_status, guard=None) -> str:
+    """Run one tool for this account.
+
+    `guard`, when given, is a callable (name, input) -> str | None. Returning a
+    string means "do not run this; hand the model that answer instead", which
+    is how the voice channel holds a trade back for confirmation without this
+    module needing to know a voice channel exists. Returning None runs the tool
+    exactly as before, so the Telegram path is unchanged.
+    """
     from apex import user_loop, user_store, forex, indicators
     send_status = send_status or (lambda _: None)
+
+    if guard is not None:
+        held = guard(name, inp or {})
+        if held is not None:
+            return held
 
     if name == "analyze_market":
         symbol = inp.get("symbol", "EUR_USD").upper().replace("/", "_").replace("-", "_")
@@ -290,7 +303,8 @@ def _to_gemini_tools():
     return [{"function_declarations": decls}]
 
 
-def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None) -> str:
+def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None,
+                 guard=None) -> str:
     import requests
     send_status = send_status or (lambda _: None)
     model = getattr(cfg, "GEMINI_MODEL", "") or "gemini-2.5-flash"
@@ -346,7 +360,7 @@ def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None) -> 
         for fc in fcalls:
             name = fc.get("name", "")
             args = fc.get("args", {}) or {}
-            result = _run_tool(name, args, user_id, send_status)
+            result = _run_tool(name, args, user_id, send_status, guard)
             resp_parts.append({
                 "functionResponse": {"name": name, "response": {"result": result}}
             })
@@ -458,8 +472,27 @@ def _local_status(user_id: str) -> str:
     return "\n".join(lines)
 
 
-def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
-    """Route to the best available AI, execute tools, send reply."""
+# Providers that can actually CALL a tool. `_chat_openai_compatible` — which
+# is both Groq and the gateway — sends plain chat completions with no function
+# declarations, so on those paths the model can describe placing a trade and
+# never place one. A control channel has to know the difference.
+TOOL_CAPABLE = ("Gemini",)
+
+
+def chat(user_id: str, message: str, send_fn, send_status=None, guard=None,
+         prefer_tools=False) -> None:
+    """Route to the best available AI, execute tools, send reply.
+
+    `guard` is passed through to `_run_tool` — see there. Telegram passes
+    nothing and behaves exactly as it always has.
+
+    `prefer_tools` puts the tool-capable providers first. The chain is
+    normally ordered by resilience — the gateway leads because it survives one
+    provider's quota — but the gateway cannot call a tool, and it answers
+    first, so on a gateway-configured deployment "close my position" would come
+    back as a fluent sentence with nothing behind it. For a channel whose
+    purpose is to ACT, being able to act outranks surviving a quota.
+    """
     send_status = send_status or (lambda _: None)
     user_id = str(user_id)
 
@@ -495,9 +528,12 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
             if cfg.AI_GATEWAY_URL:
                 chain.append(("Gateway", lambda: _chat_gateway(user_id, message)))
             if gemini_key:
-                chain.append(("Gemini", lambda: _chat_gemini(user_id, message, gemini_key, send_status)))
+                chain.append(("Gemini", lambda: _chat_gemini(user_id, message, gemini_key, send_status, guard)))
             if groq_key:
                 chain.append(("Groq", lambda: _chat_groq(user_id, message, groq_key)))
+
+            if prefer_tools:
+                chain.sort(key=lambda c: c[0] not in TOOL_CAPABLE)
 
             reply = None
             for name, prov in chain:
