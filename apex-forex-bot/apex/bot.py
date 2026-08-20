@@ -337,6 +337,41 @@ def _start_dashboard_server():
                 self.send_header("Content-Length", str(len(text)))
                 self.end_headers()
                 self.wfile.write(text)
+            elif self.path == "/api/voice/say":
+                # Same turn, answered as PLAIN TEXT rather than JSON.
+                #
+                # This exists to make the shortcut three actions instead of
+                # five. With JSON the phone needs a Get Dictionary Value step
+                # and then a variable hand-wired into Speak Text — and hand-
+                # wiring a variable is precisely what kept breaking: the field
+                # silently lost its link and the shortcut spoke nothing. With
+                # plain text, Shortcuts chains Speak Text to the response on
+                # its own and there is nothing to wire.
+                #
+                # Apple closed the other door: unsigned .shortcut files can no
+                # longer be imported at all, so a ready-built file cannot be
+                # handed over and the shortcut has to be assembled by hand.
+                # Then it must be as short as it can possibly be.
+                from apex import voice_api
+                length = int(self.headers.get("Content-Length") or 0)
+                raw = self.rfile.read(min(length, 64_000)).decode("utf-8", "replace")
+                try:
+                    req = json.loads(raw or "{}")
+                except Exception:
+                    req = {}
+                tok = req.get("token") or (
+                    self.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+                out = voice_api.ask(tok, req.get("text"))
+                payload = str(out.get("reply") or "").encode("utf-8")
+                # 200 whatever happened. A non-2xx makes Shortcuts raise
+                # instead of speaking, so a refusal the client could act on —
+                # "that link is not valid any more" — would be swallowed into
+                # a generic error banner.
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
             elif self.path == "/api/voice":
                 # The phone channel. Auth is the per-client voice token in the
                 # body — deliberately NOT the operator DASHBOARD_TOKEN, which
@@ -392,39 +427,6 @@ def _start_dashboard_server():
             # also wrote no log line, so a client whose shortcut was sending
             # GET looked identical to one whose request never arrived at all —
             # two very different problems wearing the same silence.
-            # One-time shortcut download. Placed before the dashboard gate:
-            # the caller is a phone opening a link from Telegram, and it
-            # authenticates with the single-use code in the link, not with the
-            # operator token.
-            if self.path.startswith("/voice/shortcut"):
-                from apex import voice_api, voice_shortcut
-                code = parse_qs(urlparse(self.path).query).get("c", [""])[0]
-                uid = voice_api.redeem_download(code)
-                if not uid:
-                    print("[Voice] shortcut download refused — code spent or expired")
-                    msg = ("This download link has already been used or has "
-                           "expired. Send /voice new in Telegram for a fresh "
-                           "one.").encode()
-                    self.send_response(410)
-                    self.send_header("Content-Type", "text/plain; charset=utf-8")
-                    self.send_header("Content-Length", str(len(msg)))
-                    self.end_headers()
-                    self.wfile.write(msg)
-                    return
-                base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
-                # Minted here, so the key exists only inside the file that is
-                # being handed over — never in a link, a log, or a message.
-                data = voice_shortcut.build(f"{base}/api/voice",
-                                            voice_api.mint(uid))
-                print(f"[Voice] shortcut built for {uid} ({len(data)} bytes)")
-                self.send_response(200)
-                self.send_header("Content-Type", "application/x-shortcut")
-                self.send_header("Content-Disposition",
-                                 'attachment; filename="Apex.shortcut"')
-                self.send_header("Content-Length", str(len(data)))
-                self.end_headers()
-                self.wfile.write(data)
-                return
             if self.path.startswith("/api/voice"):
                 print("[Voice] GET on /api/voice — this endpoint is POST-only")
                 payload = json.dumps({

@@ -181,6 +181,54 @@ try:
 finally:
     assistant.chat, assistant._run_tool = _real_chat, _real_run
 
+print("\n10b. A spoken \"yes\" resolves the trade that was just described")
+# Apple refuses to import unsigned .shortcut files, so the shortcut has to be
+# assembled by hand — which means it must be as short as possible, which means
+# no If-branch to carry a confirmation id back. The server remembers what it
+# just described, and the next thing said resolves it. That is also how it
+# sounds out loud: "Open a BUY on GBPUSD?" — "yes".
+assistant.chat, assistant._run_tool = fake_chat, fake_run_tool
+try:
+    ran.clear()
+    tok2 = tok          # NOT a fresh mint: that would revoke the token the
+                        # sections below still use.
+    asked = voice_api.ask(tok2, "buy gbpusd")
+    check("the trade is described, not placed", ran == [] and asked["needsConfirm"])
+    done2 = voice_api.ask(tok2, "Yes.")
+    check("a bare yes places it", len(ran) == 1, ran)
+    check("and says so", "BUY" in done2.get("reply", ""), done2)
+    check("saying yes again does nothing", voice_api.ask(tok2, "yes") is not None
+          and len(ran) == 1, ran)
+
+    ran.clear()
+    voice_api.ask(tok2, "buy gbpusd")
+    stopped = voice_api.ask(tok2, "nu")
+    check("Romanian \"nu\" cancels", ran == [] and "Cancelled" in stopped["reply"], stopped)
+
+    ran.clear()
+    voice_api.ask(tok2, "buy gbpusd")
+    ok_ro = voice_api.ask(tok2, "da")
+    check("Romanian \"da\" confirms", len(ran) == 1, ran)
+
+    # With nothing pending, "yes" is just a word and goes to the assistant
+    # like any other turn, rather than being swallowed as a confirmation.
+    ran.clear()
+    seen_text = []
+
+    def echo_chat(user_id, message, send_fn, send_status=None, guard=None,
+                  prefer_tools=False):
+        seen_text.append(message)
+        send_fn("Nothing is pending.")
+
+    assistant.chat = echo_chat
+    plain = voice_api.ask(tok2, "yes")
+    check("a yes with nothing pending reaches the assistant",
+          seen_text == ["yes"], seen_text)
+    check("and nothing is executed",
+          ran == [] and not plain.get("needsConfirm"), plain)
+finally:
+    assistant.chat, assistant._run_tool = _real_chat, _real_run
+
 print("\n11. A slow provider degrades to facts, it does not hang the phone")
 # iOS Shortcuts answered "The request timed out" against the first version of
 # this, which waited 45s: the provider chain leads with the AI gateway, which
@@ -259,11 +307,35 @@ check("a GET on the voice endpoint is answered as method-not-allowed",
 check("and it is logged, so the two silences are told apart",
       "[Voice] GET on /api/voice" in BOT)
 check("/voice is routed with its argument", "_handle_voice(chat_id, args)" in TG)
+# Apple refuses to import unsigned .shortcut files — "Importing unsigned
+# shortcut files is not supported" — so a ready-built file cannot be handed
+# over, and there is no point serving one. The instructions build the SHORT
+# version instead: three actions, added top to bottom into an empty shortcut
+# so each lands at the end and nothing is ever dragged, and no variable wired
+# into Speak Text. Dragging an action and wiring that variable are the two
+# things that went wrong every time this was assembled by hand.
+check("nothing offers a downloadable shortcut file",
+      "voice/shortcut" not in TG and "voice/shortcut" not in BOT,
+      "iOS cannot import it, so it must not be advertised")
+check("the instructions point at the plain-text endpoint",
+      "/api/voice/say" in TG)
+check("they say to start from an empty shortcut",
+      "empty" in TG.split("Build it")[1][:600])
+check("and that Speak Text needs no wiring",
+      "fills itself in" in TG)
 check("the guard reaches the tool runner", "def _run_tool(name: str, inp: dict, user_id: str, send_status, guard=None)" in AS)
 check("Telegram still calls the assistant unguarded, unchanged",
       "assistant.chat(" in TG)
 check("only tool-capable providers are preferred for acting",
       assistant.TOOL_CAPABLE == ("Gemini",), assistant.TOOL_CAPABLE)
+SAY = BOT.split('elif self.path == "/api/voice/say":')[1].split(
+    'elif self.path == "/api/voice":')[0]
+check("there is a plain-text endpoint for a three-action shortcut",
+      'elif self.path == "/api/voice/say":' in BOT)
+check("it answers text, not JSON", "text/plain" in SAY and "json.dumps" not in SAY,
+      "plain text is what lets Speak Text chain itself with nothing to wire")
+check("and always 200, so a refusal is spoken rather than swallowed",
+      "self.send_response(200)" in SAY and "out.get(\"status\"" not in SAY)
 check("both money tools are guarded",
       voice_api.FINANCIAL_TOOLS == {"execute_trade", "close_position"},
       voice_api.FINANCIAL_TOOLS)

@@ -2712,27 +2712,37 @@ def _handle_voice(chat_id, args=""):
                 "⚠️ Voice isn't available — the service URL isn't configured "
                 "(RENDER_EXTERNAL_URL). Ask the operator to set it.",
                 _back_kb(chat_id))
-        # The shortcut is built and handed over ready. Assembling it by hand
-        # is eleven steps, and the two that decide whether it works — the
-        # order of the actions and which output feeds which field — are the
-        # two the Shortcuts editor makes hardest to get right.
-        code = voice_api.mint_download(chat_id)
-        link = f"{base}/voice/shortcut?c={code}"
+        token = voice_api.mint(chat_id)
+        send_to(chat_id,
+            "🎙 <b>Your voice key — copy it now</b>\n"
+            "<i>Shown once. Only a hash is kept, so it can't be shown again.</i>")
+        send_to(chat_id, f"<code>{_esc(token)}</code>")
+        # Three actions, added top to bottom into an EMPTY shortcut, so each
+        # one lands at the end and nothing ever has to be dragged. That —
+        # along with hand-wiring a variable into Speak Text — is what went
+        # wrong every time this was assembled from a longer recipe.
         return send_to(chat_id,
-            "🎙 <b>Your voice shortcut is ready</b>\n\n"
-            f"<a href=\"{_esc(link)}\">📥 Tap here to install it</a>\n"
-            "<i>Open this on your iPhone. Valid once, for 15 minutes.</i>\n\n"
-            "<b>Then:</b>\n"
-            "1. Safari downloads it → tap the download, then <b>Shortcuts</b> "
-            "opens\n"
-            "2. Scroll down → <b>Add Shortcut</b>\n"
-            "3. Say <b>\"Hey Siri, Apex\"</b>\n\n"
-            "Siri asks what you want to know, out loud, and reads the answer "
-            "back. Ask about your balance, your position, why it skipped a "
-            "setup — or tell it to open or close a trade.\n\n"
-            "<i>If iOS refuses the file, turn on Settings → Shortcuts → "
-            "Allow Untrusted Shortcuts and tap the link again.</i>\n\n"
-            "🔇 <code>/voice off</code> revokes it if you lose the phone.",
+            "<b>Build it — 3 steps, 2 minutes</b>\n\n"
+            "Open <b>Shortcuts</b> → <b>+</b> for a <b>new, empty</b> one, "
+            "then add these <b>in this order</b> (each lands at the bottom, so "
+            "nothing needs moving):\n\n"
+            "<b>1.</b> <code>Ask for Input</code>\n"
+            "   • Prompt: <i>What do you want to know?</i>\n\n"
+            "<b>2.</b> <code>Get Contents of URL</code>\n"
+            f"   • URL: <code>{_esc(base)}/api/voice/say</code>\n"
+            "   • tap <b>›</b> → Method: <b>POST</b> → Request Body: <b>JSON</b>\n"
+            "   • Add field <b>Text</b>: <code>token</code> = the key above\n"
+            "   • Add field <b>Text</b>: <code>text</code> = tap the value, then "
+            "pick <b>Provided Input</b> from the bar above the keyboard\n\n"
+            "<b>3.</b> <code>Speak Text</code>\n"
+            "   • leave it alone — it fills itself in\n\n"
+            "Rename it <b>Apex</b> (tap the title → Rename), then say "
+            "<b>\"Hey Siri, Apex\"</b>.\n\n"
+            "<i>Siri reads the question out loud, listens, and speaks the "
+            "answer. Ask about your balance, your position, why it skipped a "
+            "setup — or say \"buy gbpusd\" and it will read the trade back "
+            "and place it when you say yes.</i>\n\n"
+            "🔇 <code>/voice off</code> revokes the key if you lose the phone.",
             _back_kb(chat_id))
 
     user = user_store.load(chat_id)

@@ -146,8 +146,57 @@ def confirm_required(user) -> bool:
     return bool((user or {}).get("voice_confirm", True))
 
 
+# Words that mean "go ahead" and "don't", in both languages this bot is used
+# in. Only ever consulted when something is actually pending — a bare "yes"
+# with nothing waiting is just a word, and goes to the assistant like any
+# other.
+_YES = {"yes", "yeah", "yep", "yup", "ok", "okay", "confirm", "confirmed",
+        "do it", "go ahead", "sure", "da", "sigur", "hai", "confirma",
+        "confirmă", "bine"}
+_NO = {"no", "nope", "cancel", "stop", "don't", "dont", "nu", "anuleaza",
+       "anulează", "lasa", "lasă"}
+
+
 def _pending_key(user_id, cid):
     return f"voicepending:{user_id}:{cid}"
+
+
+def _latest_key(user_id):
+    return f"voicelatest:{user_id}"
+
+
+def _remember_latest(user_id, cid):
+    """The id a spoken "yes" refers to.
+
+    A phone cannot hold a confirmation id and hand it back — that needs an
+    If-branch in the shortcut, and the point of this path is a shortcut with
+    three actions and no branches. So the server remembers which trade it just
+    described, and the NEXT thing said resolves it. That is also how the
+    exchange sounds out loud: "Open a BUY on GBPUSD?" — "yes".
+    """
+    user_store.set_blob(_latest_key(user_id), cid, ttl_s=_PENDING_TTL_S)
+    with _lock:
+        _pending_local[_latest_key(user_id)] = (time.time() + _PENDING_TTL_S, cid)
+
+
+def _take_latest(user_id):
+    key = _latest_key(user_id)
+    cid = None
+    try:
+        cid = user_store.get_blob(key)
+    except Exception:
+        cid = None
+    with _lock:
+        exp, local = _pending_local.pop(key, (0, None))
+    if not cid and local and exp > time.time():
+        cid = local
+    if not cid:
+        return None
+    try:
+        user_store.set_blob(key, "", ttl_s=1)
+    except Exception:
+        pass
+    return cid
 
 
 def stash(user_id, intent) -> str:
@@ -185,48 +234,6 @@ def take(user_id, cid):
         return json.loads(raw)
     except Exception:
         return None
-
-
-# ─── One-time shortcut download ───────────────────────────
-
-# The download link carries a code, never the key. A key in a query string is
-# a key in every request log between here and the phone — Render records the
-# path of every request it serves. The code is single-use, short-lived, and
-# worth nothing on its own: it names an account, and the key is minted fresh
-# at the moment of download and only ever travels inside the file.
-_DOWNLOAD_TTL_S = 900
-
-
-def mint_download(user_id) -> str:
-    code = secrets.token_urlsafe(12)
-    user_store.set_blob(f"voicedl:{code}", str(user_id), ttl_s=_DOWNLOAD_TTL_S)
-    with _lock:
-        _pending_local[f"dl:{code}"] = (time.time() + _DOWNLOAD_TTL_S, str(user_id))
-    return code
-
-
-def redeem_download(code):
-    """The account this code was minted for, consumed. None when spent."""
-    code = str(code or "").strip()
-    if not code:
-        return None
-    key = f"voicedl:{code}"
-    uid = None
-    try:
-        uid = user_store.get_blob(key)
-    except Exception:
-        uid = None
-    with _lock:
-        exp, local = _pending_local.pop(f"dl:{code}", (0, None))
-    if not uid and local and exp > time.time():
-        uid = local
-    if not uid:
-        return None
-    try:
-        user_store.set_blob(key, "", ttl_s=1)
-    except Exception:
-        pass
-    return str(uid)
 
 
 def describe(intent) -> str:
@@ -328,6 +335,17 @@ def ask(token, text):
                 "reply": "Too many requests just now. Try again in a minute."}
 
     user = user_store.load(user_id) or {}
+
+    # A spoken answer to a question the bot just asked. Checked before the
+    # assistant sees it, because "yes" carries no meaning on its own — it means
+    # whatever was described a moment ago, and re-interpreting the word through
+    # a model is exactly how a confirmation stops being one.
+    spoken = text.strip().strip(".!?,").lower()
+    if spoken in _YES or spoken in _NO:
+        cid = _take_latest(user_id)
+        if cid:
+            return confirm(token, cid, agreed=spoken in _YES)
+
     held = {}
 
     def _guard(name, inp):
@@ -371,6 +389,7 @@ def ask(token, text):
           f"({len(out['reply'])} chars)")
     if held.get("intent"):
         cid = stash(user_id, held["intent"])
+        _remember_latest(user_id, cid)
         out["needsConfirm"] = True
         out["confirmId"] = cid
         out["confirmQuestion"] = describe(held["intent"])
