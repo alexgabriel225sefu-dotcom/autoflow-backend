@@ -68,6 +68,20 @@ check("it is checked after the market-open guard, not before",
       SRC.index("if not forex.is_market_open():") < SRC.index("if _clear_stale_streak():"),
       "no point rolling the day over while the market is shut")
 
+print("\n2b. What it clears at STARTUP is written down too")
+# Found by checking the live record after the first fix shipped: the loop had
+# cleared the streak in memory and the stored value still said 2. Behaviour was
+# right, the record was wrong — and the record is what every restart re-reads,
+# what the operator sees, and what a new loss today would build on.
+check("the startup clear is captured, not discarded",
+      "_cleared_at_start = _clear_stale_streak()" in SRC)
+check("...and persisted once the persister exists",
+      re.search(r"if _cleared_at_start:\s*\n\s*_persist_risk_state\(\)", SRC)
+      is not None)
+check("the persist happens AFTER _persist_risk_state is defined",
+      SRC.index("def _persist_risk_state") < SRC.index("if _cleared_at_start:"),
+      "calling it earlier is a NameError at loop start")
+
 print("\n3. The behaviour itself: yesterday clears, today does not")
 
 

@@ -1089,7 +1089,11 @@ def _loop(user_id, alert_fn, gen=None):
         loss_streak = 0
         return True
 
-    _clear_stale_streak()
+    # Cleared at startup too — but the persist has to wait until
+    # _persist_risk_state exists a few lines below, or the record keeps saying 2
+    # while the running loop believes 0. That gap is not cosmetic: the value is
+    # what every restart re-reads, and what the operator sees when they look.
+    _cleared_at_start = _clear_stale_streak()
 
     def _persist_risk_state():
         try:
@@ -1098,6 +1102,9 @@ def _loop(user_id, alert_fn, gen=None):
                                         "loss_streak": loss_streak})
         except Exception as e:
             print(f"[UserLoop:{user_id}] risk-state persist failed: {e}")
+
+    if _cleared_at_start:
+        _persist_risk_state()
 
     def _persist_open_snapshot(pos):
         _persist_open_position(user_id, cfg, pos)
