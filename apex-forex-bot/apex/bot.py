@@ -392,6 +392,39 @@ def _start_dashboard_server():
             # also wrote no log line, so a client whose shortcut was sending
             # GET looked identical to one whose request never arrived at all —
             # two very different problems wearing the same silence.
+            # One-time shortcut download. Placed before the dashboard gate:
+            # the caller is a phone opening a link from Telegram, and it
+            # authenticates with the single-use code in the link, not with the
+            # operator token.
+            if self.path.startswith("/voice/shortcut"):
+                from apex import voice_api, voice_shortcut
+                code = parse_qs(urlparse(self.path).query).get("c", [""])[0]
+                uid = voice_api.redeem_download(code)
+                if not uid:
+                    print("[Voice] shortcut download refused — code spent or expired")
+                    msg = ("This download link has already been used or has "
+                           "expired. Send /voice new in Telegram for a fresh "
+                           "one.").encode()
+                    self.send_response(410)
+                    self.send_header("Content-Type", "text/plain; charset=utf-8")
+                    self.send_header("Content-Length", str(len(msg)))
+                    self.end_headers()
+                    self.wfile.write(msg)
+                    return
+                base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+                # Minted here, so the key exists only inside the file that is
+                # being handed over — never in a link, a log, or a message.
+                data = voice_shortcut.build(f"{base}/api/voice",
+                                            voice_api.mint(uid))
+                print(f"[Voice] shortcut built for {uid} ({len(data)} bytes)")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/x-shortcut")
+                self.send_header("Content-Disposition",
+                                 'attachment; filename="Apex.shortcut"')
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
             if self.path.startswith("/api/voice"):
                 print("[Voice] GET on /api/voice — this endpoint is POST-only")
                 payload = json.dumps({

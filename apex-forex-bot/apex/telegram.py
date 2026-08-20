@@ -2712,40 +2712,27 @@ def _handle_voice(chat_id, args=""):
                 "⚠️ Voice isn't available — the service URL isn't configured "
                 "(RENDER_EXTERNAL_URL). Ask the operator to set it.",
                 _back_kb(chat_id))
-        token = voice_api.mint(chat_id)
-        # Sent as its own message, unformatted, so it can be copied cleanly —
-        # and never repeated anywhere, including the logs.
-        send_to(chat_id,
-            "🎙 <b>Your voice key — copy it now</b>\n"
-            "<i>Shown once. I keep only a hash, so I can't show it again.</i>")
-        send_to(chat_id, f"<code>{_esc(token)}</code>")
+        # The shortcut is built and handed over ready. Assembling it by hand
+        # is eleven steps, and the two that decide whether it works — the
+        # order of the actions and which output feeds which field — are the
+        # two the Shortcuts editor makes hardest to get right.
+        code = voice_api.mint_download(chat_id)
+        link = f"{base}/voice/shortcut?c={code}"
         return send_to(chat_id,
-            "<b>Set it up on iPhone</b> (2 minutes)\n\n"
-            "1. Open <b>Shortcuts</b> → ➕ new shortcut\n"
-            "2. Add <b>Dictate Text</b>\n"
-            "3. Add <b>Get Contents of URL</b>\n"
-            f"   • URL: <code>{_esc(base)}/api/voice</code>\n"
-            "   • Method: <b>POST</b>, Request Body: <b>JSON</b>\n"
-            "   • Field <code>token</code> = the key above\n"
-            "   • Field <code>text</code> = <i>Dictated Text</i>\n"
-            "4. Add <b>Get Dictionary Value</b> → key <code>reply</code>\n"
-            "5. Add <b>Speak Text</b>\n"
-            "6. Name it <b>Apex</b> and save.\n\n"
-            "Then say <b>\"Hey Siri, Apex\"</b> and ask anything — balance, "
-            "positions, why it skipped a setup.\n\n"
-            "<b>Or without saying anything</b> — pick whichever suits you:\n"
-            "• <b>Back Tap</b> — Settings → Accessibility → Touch → Back Tap → "
-            "Double Tap → Apex. Tap the back of the phone twice. Works on "
-            "iPhone 8 and later.\n"
-            "• <b>Lock Screen widget</b> — long-press the lock screen → "
-            "Customise → add the Shortcuts widget. One tap, phone still "
-            "locked.\n"
-            "• <b>Home Screen icon</b> — in Shortcuts, share the shortcut → "
-            "Add to Home Screen.\n"
-            "<i>On iOS 18 and newer you can also put it on a Lock Screen "
-            "button or in Control Centre. The Action button is iPhone 15 Pro "
-            "and later only — the options above work on any iPhone.</i>\n\n"
-            "🔇 <code>/voice off</code> revokes the key if you lose the phone.",
+            "🎙 <b>Your voice shortcut is ready</b>\n\n"
+            f"<a href=\"{_esc(link)}\">📥 Tap here to install it</a>\n"
+            "<i>Open this on your iPhone. Valid once, for 15 minutes.</i>\n\n"
+            "<b>Then:</b>\n"
+            "1. Safari downloads it → tap the download, then <b>Shortcuts</b> "
+            "opens\n"
+            "2. Scroll down → <b>Add Shortcut</b>\n"
+            "3. Say <b>\"Hey Siri, Apex\"</b>\n\n"
+            "Siri asks what you want to know, out loud, and reads the answer "
+            "back. Ask about your balance, your position, why it skipped a "
+            "setup — or tell it to open or close a trade.\n\n"
+            "<i>If iOS refuses the file, turn on Settings → Shortcuts → "
+            "Allow Untrusted Shortcuts and tap the link again.</i>\n\n"
+            "🔇 <code>/voice off</code> revokes it if you lose the phone.",
             _back_kb(chat_id))
 
     user = user_store.load(chat_id)

@@ -187,6 +187,48 @@ def take(user_id, cid):
         return None
 
 
+# ─── One-time shortcut download ───────────────────────────
+
+# The download link carries a code, never the key. A key in a query string is
+# a key in every request log between here and the phone — Render records the
+# path of every request it serves. The code is single-use, short-lived, and
+# worth nothing on its own: it names an account, and the key is minted fresh
+# at the moment of download and only ever travels inside the file.
+_DOWNLOAD_TTL_S = 900
+
+
+def mint_download(user_id) -> str:
+    code = secrets.token_urlsafe(12)
+    user_store.set_blob(f"voicedl:{code}", str(user_id), ttl_s=_DOWNLOAD_TTL_S)
+    with _lock:
+        _pending_local[f"dl:{code}"] = (time.time() + _DOWNLOAD_TTL_S, str(user_id))
+    return code
+
+
+def redeem_download(code):
+    """The account this code was minted for, consumed. None when spent."""
+    code = str(code or "").strip()
+    if not code:
+        return None
+    key = f"voicedl:{code}"
+    uid = None
+    try:
+        uid = user_store.get_blob(key)
+    except Exception:
+        uid = None
+    with _lock:
+        exp, local = _pending_local.pop(f"dl:{code}", (0, None))
+    if not uid and local and exp > time.time():
+        uid = local
+    if not uid:
+        return None
+    try:
+        user_store.set_blob(key, "", ttl_s=1)
+    except Exception:
+        pass
+    return str(uid)
+
+
 def describe(intent) -> str:
     """What the client will hear before anything happens. Plain, no markup."""
     tool = (intent or {}).get("tool")
