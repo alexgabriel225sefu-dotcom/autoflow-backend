@@ -1065,12 +1065,31 @@ def _loop(user_id, alert_fn, gen=None):
     # else that counts losses (dailyTrades, dailyPnL, consecutiveLosses) resets
     # on a new trading day; this now does too. Longer-horizon protection is
     # already covered by max_dd_pct and max_daily_loss_pct.
-    if loss_streak and last_loss_at:
-        _last_loss_day = datetime.fromtimestamp(last_loss_at).strftime("%Y-%m-%d")
-        if _last_loss_day != datetime.now().strftime("%Y-%m-%d"):
-            print(f"[UserLoop:{user_id}] loss streak of {loss_streak} was from "
-                  f"{_last_loss_day} — cleared for the new trading day")
-            loss_streak = 0
+    def _clear_stale_streak():
+        """Drop a loss streak carried over from a previous trading day.
+
+        MUST be called every tick, not once at startup. It used to run only
+        here in the setup, which meant the check was evaluated exactly once
+        per process: a loop that stayed up across midnight kept a streak from
+        the day before FOREVER, and the only escape was a winning trade or a
+        redeploy. Observed live — a streak of 2 entered on 19 Aug was still
+        halving position size on 20 Aug on a loop that had never restarted,
+        while strategy_session had rolled over to the new day as designed.
+        Two counters for the same thing, disagreeing, because only one of them
+        was ever re-read.
+        """
+        nonlocal loss_streak
+        if not (loss_streak and last_loss_at):
+            return False
+        day = datetime.fromtimestamp(last_loss_at).strftime("%Y-%m-%d")
+        if day == datetime.now().strftime("%Y-%m-%d"):
+            return False
+        print(f"[UserLoop:{user_id}] loss streak of {loss_streak} was from "
+              f"{day} — cleared for the new trading day")
+        loss_streak = 0
+        return True
+
+    _clear_stale_streak()
 
     def _persist_risk_state():
         try:
@@ -1550,6 +1569,11 @@ def _loop(user_id, alert_fn, gen=None):
             if not forex.is_market_open():
                 time.sleep(60)
                 continue
+
+            # The day can roll over under a loop that never restarts, so the
+            # streak has to be re-checked here rather than only at startup.
+            if _clear_stale_streak():
+                _persist_risk_state()
 
             # ── MULTI-POSITION: how many concurrent trades, and total-risk cap.
             # Live-only (paper stays single). Total exposure is bounded by
