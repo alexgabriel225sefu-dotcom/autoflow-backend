@@ -458,15 +458,35 @@ def _local_status(user_id: str) -> str:
         f"💱 <b>Pair:</b> {symbol} | {market}",
     ]
     if open_pos:
-        entry = open_pos.get("entryPrice", 0)
-        side = open_pos.get("side", "?")
-        sl = open_pos.get("stopLoss", 0)
-        tp = open_pos.get("takeProfit", 0)
-        lines.append(
-            f"📈 <b>Position:</b> {side} @ {entry:.5f}\n"
-            f"   SL: {sl:.5f}  TP: {tp:.5f}\n"
-            f"   Close with <code>/close</code>"
-        )
+        # `.get(key, 0)` only falls back when the key is ABSENT. These keys are
+        # present and null the moment the trade starts trailing — ride-winners
+        # clears the fixed take profit on purpose — so the default never
+        # applied and f"{None:.5f}" raised. That crash landed in the last
+        # fallback of `chat`, which calls this function again, fails again, and
+        # answers "Assistant error. Please try again." So the one reply that is
+        # supposed to work without any AI at all was the one guaranteed to fail
+        # on a winning trade.
+        def _px(v):
+            try:
+                return f"{float(v):.5f}"
+            except (TypeError, ValueError):
+                return None
+
+        side = open_pos.get("side") or "?"
+        entry, sl, tp = _px(open_pos.get("entryPrice")), \
+            _px(open_pos.get("stopLoss")), _px(open_pos.get("takeProfit"))
+        head = f"📈 <b>Position:</b> {side}"
+        if entry:
+            head += f" @ {entry}"
+        # What it is actually doing right now, which is what anyone asking out
+        # loud wants first.
+        pips, usd = open_pos.get("pnlPips"), open_pos.get("pnlUsd")
+        if pips is not None:
+            head += f" — {float(pips):+.1f} pips"
+            if usd is not None:
+                head += f" ({float(usd):+.2f} USD)"
+        levels = f"   SL: {sl or '—'}  TP: {tp or 'none — trailing'}"
+        lines.append(f"{head}\n{levels}\n   Close with <code>/close</code>")
     else:
         lines.append("📭 <b>No open position.</b> Bot is scanning automatically.")
         lines.append(f"<i>Force entry:</i> <code>/buy {symbol}</code> or <code>/sell {symbol}</code>")

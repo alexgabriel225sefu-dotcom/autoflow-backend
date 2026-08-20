@@ -435,6 +435,44 @@ check("Gemini's model is a setting too", "_gemini_model_name()" in ASRC)
 check("a retired Gemini model is not reported as a bad key",
       'r.status_code == 404 and "model" in' in ASRC)
 
+print("\n17b. The no-AI answer must survive a trade that is winning")
+# `.get(key, 0)` falls back only when the key is ABSENT. `takeProfit` is
+# present and null the moment ride-winners clears the fixed target to let a
+# trade run, so the default never applied and f"{None:.5f}" raised. That crash
+# landed in the LAST fallback of chat() — which calls this same function again,
+# fails again, and answers "Assistant error. Please try again." The one reply
+# guaranteed to work without any AI was the one guaranteed to fail on a winner.
+_real_dash = assistant.__dict__.get("_dash_probe")
+from apex import user_loop as _ul  # noqa: E402
+
+_keep = _ul.get_dash
+try:
+    _ul.get_dash = lambda uid: {
+        "balance": 3214.0, "startBalance": 3214.0, "symbol": "GBPUSD",
+        "openPosition": {"side": "BUY", "entryPrice": 1.36078,
+                         "stopLoss": 1.36178, "takeProfit": None,
+                         "pnlPips": 23.8, "pnlUsd": 11.9}}
+    out17 = assistant._local_status("500")
+    check("a trailing trade with no take profit does not crash it",
+          "BUY" in out17, out17[:120])
+    check("it says the target is gone because it is trailing",
+          "trailing" in out17, out17)
+    check("and leads with what the trade is actually doing",
+          "+23.8 pips" in out17 and "11.90" in out17, out17)
+
+    _ul.get_dash = lambda uid: {"balance": 3214.0, "symbol": "GBPUSD",
+                                "openPosition": {"side": None, "entryPrice": None,
+                                                 "stopLoss": None,
+                                                 "takeProfit": None}}
+    check("a position with no numbers at all is still answerable",
+          "Position" in assistant._local_status("500"))
+
+    _ul.get_dash = lambda uid: {"balance": 3214.0, "symbol": "GBPUSD"}
+    check("no position reads cleanly too",
+          "No open position" in assistant._local_status("500"))
+finally:
+    _ul.get_dash = _keep
+
 print("\n18. One button, and it upgrades itself when the link exists")
 # Apple refuses unsigned .shortcut files and only an Apple device can sign
 # one, so the first copy has to be built on an iPhone and shared — which
