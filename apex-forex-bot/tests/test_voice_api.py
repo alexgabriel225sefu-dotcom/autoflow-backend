@@ -18,6 +18,7 @@ money:
 
 Run: python tests/test_voice_api.py
 """
+import inspect
 import json
 import os
 import sys
@@ -100,7 +101,7 @@ def fake_run_tool(name, inp, user_id, send_status, guard=None):
 
 
 def fake_chat(user_id, message, send_fn, send_status=None, guard=None,
-              prefer_tools=False):
+              prefer_tools=False, voice=False):
     seen_prefs.append(prefer_tools)
     # Stands in for the model deciding to place a trade.
     out = fake_run_tool("execute_trade", {"side": "BUY", "symbol": "GBP_USD"},
@@ -167,7 +168,7 @@ try:
     ran.clear()
 
     def read_only_chat(user_id, message, send_fn, send_status=None, guard=None,
-                       prefer_tools=False):
+                       prefer_tools=False, voice=False):
         out = fake_run_tool("analyze_market", {"symbol": "EUR_USD"},
                             user_id, None, guard)
         send_fn("<b>RSI</b> is 60. 📈")
@@ -216,7 +217,7 @@ try:
     seen_text = []
 
     def echo_chat(user_id, message, send_fn, send_status=None, guard=None,
-                  prefer_tools=False):
+                  prefer_tools=False, voice=False):
         seen_text.append(message)
         send_fn("Nothing is pending.")
 
@@ -241,7 +242,8 @@ _slow_budget = voice_api._REPLY_TIMEOUT_S
 try:
     voice_api._REPLY_TIMEOUT_S = 0.2
     assistant.chat = lambda *a, **k: None          # never calls back
-    assistant._local_status = lambda uid: "<b>Balance:</b> $3,214. 📭 No position."
+    assistant._local_status = (lambda uid, voice=False:
+                               "<b>Balance:</b> $3,214. 📭 No position.")
     import time as _t
     t0 = _t.time()
     slow = voice_api.ask(tok, "what's my balance")
@@ -249,13 +251,17 @@ try:
     check("the caller is answered, not left waiting", slow.get("ok") is True, slow)
     check("and answered quickly", took < 3, f"{took:.1f}s")
     check("with real account state", "Balance: $3,214" in slow["reply"], slow)
+    check("the voice channel asks for the spoken variant",
+          "voice=True" in inspect.getsource(voice_api._fallback),
+          "the chat copy recites URLs and command syntax")
     check("and told the reasoning was unavailable",
           "could not reach the assistant" in slow["reply"], slow)
     check("the budget is short enough for a phone to wait",
           _slow_budget <= 15, f"{_slow_budget}s")
 
     # Only when even that fails is there nothing to say.
-    assistant._local_status = lambda uid: (_ for _ in ()).throw(RuntimeError("no dash"))
+    assistant._local_status = (lambda uid, voice=False:
+                               (_ for _ in ()).throw(RuntimeError("no dash")))
     dead = voice_api.ask(tok, "what's my balance")
     check("a total failure is still a sentence, not a crash",
           dead.get("status") == 504 and "unaffected" in dead["reply"], dead)
@@ -413,6 +419,11 @@ print("\n17. A key check must test the KEY, not a model that may be gone")
 # now runs against /models, which is authentication-only.
 import inspect  # noqa: E402
 
+check("a voice turn never gets the sign-up pitch",
+      'if voice:' in inspect.getsource(assistant.chat)
+      and "_local_status(user_id, voice=True)" in inspect.getsource(assistant.chat),
+      "Siri read the whole Gemini/Groq pitch aloud after a one-line answer")
+
 GROQ_SRC = inspect.getsource(assistant.test_groq_key)
 check("the Groq check calls the models endpoint",
       "/openai/v1/models" in GROQ_SRC, GROQ_SRC[:200])
@@ -470,6 +481,20 @@ try:
     _ul.get_dash = lambda uid: {"balance": 3214.0, "symbol": "GBPUSD"}
     check("no position reads cleanly too",
           "No open position" in assistant._local_status("500"))
+
+    # Spoken, command syntax is noise: "Force entry, slash buy GBPUSD" read
+    # aloud to someone holding a phone and talking to it. Reported live.
+    spoken = assistant._local_status("500", voice=True)
+    check("spoken, it does not recite command syntax",
+          "/buy" not in spoken and "/sell" not in spoken, spoken)
+    check("but the chat still offers them", "/buy" in assistant._local_status("500"))
+
+    _ul.get_dash = lambda uid: {
+        "balance": 3214.0, "symbol": "GBPUSD",
+        "openPosition": {"side": "BUY", "entryPrice": 1.36078,
+                         "stopLoss": 1.36178, "takeProfit": None}}
+    check("nor how to close it", "/close" not in assistant._local_status("500", voice=True))
+    check("while the chat still says how", "/close" in assistant._local_status("500"))
 finally:
     _ul.get_dash = _keep
 

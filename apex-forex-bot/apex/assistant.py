@@ -441,8 +441,13 @@ def _chat_gateway(user_id: str, message: str) -> str:
         timeout=float(getattr(cfg, "AI_GATEWAY_TIMEOUT_S", 20)))
 
 
-def _local_status(user_id: str) -> str:
-    """Rule-based reply from real state — always works, no AI needed."""
+def _local_status(user_id: str, voice: bool = False) -> str:
+    """Rule-based reply from real state — always works, no AI needed.
+
+    `voice` drops everything that only makes sense on a screen. Command
+    syntax is the obvious case: "Close with slash close" read aloud is noise
+    to someone who is holding a phone and talking to it, not typing.
+    """
     from apex import user_loop, user_store, forex
     user = user_store.load(user_id)
     dash = user_loop.get_dash(user_id) or {}
@@ -486,10 +491,13 @@ def _local_status(user_id: str) -> str:
             if usd is not None:
                 head += f" ({float(usd):+.2f} USD)"
         levels = f"   SL: {sl or '—'}  TP: {tp or 'none — trailing'}"
-        lines.append(f"{head}\n{levels}\n   Close with <code>/close</code>")
+        tail = "" if voice else "\n   Close with <code>/close</code>"
+        lines.append(f"{head}\n{levels}{tail}")
     else:
         lines.append("📭 <b>No open position.</b> Bot is scanning automatically.")
-        lines.append(f"<i>Force entry:</i> <code>/buy {symbol}</code> or <code>/sell {symbol}</code>")
+        if not voice:
+            lines.append(f"<i>Force entry:</i> <code>/buy {symbol}</code> "
+                         f"or <code>/sell {symbol}</code>")
     return "\n".join(lines)
 
 
@@ -501,7 +509,7 @@ TOOL_CAPABLE = ("Gemini",)
 
 
 def chat(user_id: str, message: str, send_fn, send_status=None, guard=None,
-         prefer_tools=False) -> None:
+         prefer_tools=False, voice=False) -> None:
     """Route to the best available AI, execute tools, send reply.
 
     `guard` is passed through to `_run_tool` — see there. Telegram passes
@@ -570,6 +578,15 @@ def chat(user_id: str, message: str, send_fn, send_status=None, guard=None,
                     continue
 
             if not reply:
+                if voice:
+                    # Spoken aloud, the sign-up pitch below is a paragraph of
+                    # URLs and provider names read out by Siri after a
+                    # one-sentence answer. Reported live: "it reads all the
+                    # example messages". Someone talking to their phone gets
+                    # the facts and nothing else; the pitch belongs in the
+                    # chat, where it is skimmable and tappable.
+                    send_fn(_local_status(user_id, voice=True))
+                    return
                 reply = (_local_status(user_id) +
                          "\n\n🧠 <b>Want AI chat to help you trade?</b>\n"
                          "It needs an API key — <b>your choice</b>, free or paid:\n"
@@ -582,7 +599,7 @@ def chat(user_id: str, message: str, send_fn, send_status=None, guard=None,
         except Exception as e:
             print(f"[ForexAssistant:{user_id}] error: {e}")
             try:
-                send_fn(_local_status(user_id))
+                send_fn(_local_status(user_id, voice=voice))
             except Exception:
                 send_fn("⚠️ Assistant error. Please try again.")
 

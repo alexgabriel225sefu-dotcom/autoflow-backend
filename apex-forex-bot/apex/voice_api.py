@@ -284,7 +284,8 @@ def _ask_assistant(user_id, text, guard):
         done.set()
 
     # prefer_tools: this channel exists to act. See assistant.chat.
-    assistant.chat(user_id, text, _sink, None, guard, prefer_tools=True)
+    assistant.chat(user_id, text, _sink, None, guard,
+                   prefer_tools=True, voice=True)
     if not done.wait(_REPLY_TIMEOUT_S):
         return None
     return box.get("reply")
@@ -300,7 +301,7 @@ def _fallback(user_id):
     """
     try:
         from apex import assistant
-        return speakable(assistant._local_status(user_id))
+        return speakable(assistant._local_status(user_id, voice=True))
     except Exception:
         return None
 
