@@ -408,13 +408,30 @@ async function refresh(){
     +'<div class="kv"><span>Biggest dip from peak</span><b>'+st.maxDrawdownPct.toFixed(1)+'%</b></div>'
     : '<div class="empty">No closed trades yet — stats build as the bot works.</div>';
 
-  const nv=Q('p-news'), today=d.newsToday||[];
-  if(today.length){
-    nv.innerHTML=today.map(e=>{const past=e.mins<=0,am=Math.abs(e.mins),h=Math.floor(am/60),m=am%60;
-      const when=past?((h?h+'h ':'')+m+'m ago'):('in '+(h?h+'h ':'')+m+'m');
-      return '<div class="item"><span class="chip'+(past?' red':'')+'">'+esc(e.currency)+'</span><b>'+esc(e.title)+'</b>'
-        +'<div class="sub">'+(past?'Released ':'')+when+' · high impact'+(past?'':' — the bot stands aside around it')+'</div></div>';}).join('');
-  } else nv.innerHTML='<div class="empty">No high-impact events today — clear runway. ✅</div>';
+  // News. Prefer the rolling feed; fall back to newsToday so a page still
+  // cached from an older deploy keeps rendering instead of going blank.
+  const nv=Q('p-news'), ev=(d.newsFeed&&d.newsFeed.length)?d.newsFeed:(d.newsToday||[]);
+  if(ev.length){
+    nv.innerHTML=ev.map(e=>{
+      const past=e.mins<=0, am=Math.abs(e.mins), h=Math.floor(am/60), m=am%60;
+      const when=(h?h+'h ':'')+m+'m'+(past?' ago':'');
+      const high=(e.impact||'high')==='high';
+      // Only high-impact releases actually hold the bot back, and only inside
+      // the guard window. Saying it on every line would claim the bot reacts
+      // to things it ignores.
+      const note=e.guarded?' — bot stands aside':'';
+      const fig=[];
+      if(e.actual!=null) fig.push('actual <b>'+esc(e.actual)+'</b>');
+      if(e.forecast!=null) fig.push('exp '+esc(e.forecast));
+      if(e.previous!=null) fig.push('prev '+esc(e.previous));
+      return '<div class="item"'+(past?' style="opacity:.62"':'')+'>'
+        +'<span class="chip'+(high?' red':'')+'">'+esc(e.currency)+'</span>'
+        +'<span class="chip">'+(high?'HIGH':'MED')+'</span>'
+        +'<b>'+esc(e.title)+'</b>'
+        +'<div class="sub">'+(past?'Released ':'In ')+when+note
+        +(fig.length?' · '+fig.join(' · '):'')+'</div></div>';
+    }).join('');
+  } else nv.innerHTML='<div class="empty">Nothing on the calendar right now — clear runway. \u2705</div>';
 
   const jt=Q('jTrades');
   if(d.trades&&d.trades.length){

@@ -125,6 +125,32 @@ def _impact_high(val) -> bool:
     return s in ("high", "3", "red") or "high" in s
 
 
+# Ordered severity, so the news PANEL can show medium-impact releases while the
+# trading GUARD keeps standing aside for high impact only. Those are different
+# questions and were previously answered by the same test: because only "High"
+# ever qualified, and a normal week carries ~8 of those against ~90 low/medium
+# ones, the panel was empty on most days by design rather than by fault.
+_RANK = {"low": 1, "1": 1, "yellow": 1,
+         "medium": 2, "2": 2, "orange": 2, "moderate": 2,
+         "high": 3, "3": 3, "red": 3}
+
+
+def _impact_rank(val) -> int:
+    s = str(val).strip().lower()
+    if s in _RANK:
+        return _RANK[s]
+    for word, rank in (("high", 3), ("medium", 2), ("moderate", 2), ("low", 1)):
+        if word in s:
+            return rank
+    return 0  # unknown/holiday markers — never surfaced, never guarded against
+
+
+def _clean(v):
+    """Feed values are strings and blanks are '' rather than absent."""
+    s = str(v).strip() if v is not None else ""
+    return s or None
+
+
 def _do_fetch():
     """Fetch + parse the calendar. Runs on a background thread so it can NEVER
     block the trading loop. Updates the shared cache on success; applies
@@ -143,6 +169,13 @@ def _do_fetch():
                 "currency": _norm_ccy(e.get("country") or e.get("currency") or ""),
                 "impact": e.get("impact") or e.get("importance"),
                 "time": e.get("date") or e.get("time") or e.get("datetime"),
+                # Carried through for the Mini App's news panel. The guard has
+                # no use for them, but throwing them away here meant the panel
+                # could only ever say THAT a release was due, never what the
+                # market expected of it.
+                "forecast": _clean(e.get("forecast") or e.get("estimate")),
+                "previous": _clean(e.get("previous")),
+                "actual": _clean(e.get("actual")),
             })
         with _lock:
             _cache["events"] = events
@@ -291,11 +324,73 @@ def today(currencies=None, limit=12):
             if curset and e.get("currency") not in curset:
                 continue
             t = _parse_time(e.get("time"))
-            if not t or t.date().isoformat() != today_str:
+            # .date() on a tz-aware datetime is the date in ITS OWN offset. The
+            # calendar publishes New York time (-04:00), so an event at 21:30
+            # on the 19th is 01:30 UTC on the 20th — genuinely today — and was
+            # dropped because "2026-08-19" != "2026-08-20". Everything between
+            # 20:00 and midnight New York was misfiled by a day, every day.
+            if not t or t.astimezone(timezone.utc).date().isoformat() != today_str:
                 continue
             mins = int((t - now).total_seconds() / 60.0)
             out.append({"title": e["title"], "currency": e["currency"],
                         "mins": mins, "released": mins <= 0, "time": e["time"]})
+        out.sort(key=lambda x: x["mins"])
+        return out[:limit]
+    except Exception:
+        return []
+
+
+def feed(currencies=None, back_hours=12, ahead_hours=36, limit=14, min_rank=2):
+    """Economic events for the Mini App's news panel.
+
+    Deliberately different from `upcoming()` and `today()`, which serve the
+    trading guard and answer "is a high-impact release near?". A panel answers
+    "what is going on?", so this one:
+
+      * spans a ROLLING window (last `back_hours` → next `ahead_hours`) instead
+        of a calendar day, so it still has something to show at 06:00 UTC when
+        the day's releases are all still ahead and yesterday's are all behind;
+      * includes MEDIUM impact by default, not high alone — a normal week holds
+        roughly 8 high-impact events against 90 low/medium ones, so a
+        high-only panel is empty on most days;
+      * carries forecast/previous/actual, so a release reads as a number the
+        market expected rather than just a name.
+
+    `mins` is negative for a released event and positive for one still to come.
+    `guarded` marks the ones the bot actually stands aside for, so the panel
+    never implies the bot reacts to every line on it. Fail-open like the rest
+    of this module: any error yields an empty list, never an exception.
+    """
+    try:
+        now = datetime.now(timezone.utc)
+        curset = {str(c).upper() for c in currencies} if currencies else None
+        win = window_min()
+        out = []
+        for e in _load():
+            rank = _impact_rank(e.get("impact"))
+            if rank < min_rank:
+                continue
+            if curset and e.get("currency") not in curset:
+                continue
+            t = _parse_time(e.get("time"))
+            if not t:
+                continue
+            mins = int((t - now).total_seconds() / 60.0)
+            if not (-abs(back_hours) * 60 <= mins <= abs(ahead_hours) * 60):
+                continue
+            out.append({
+                "title": e.get("title"),
+                "currency": e.get("currency"),
+                "impact": "high" if rank >= 3 else "medium",
+                "mins": mins,
+                "released": mins <= 0,
+                "time": e.get("time"),
+                "forecast": e.get("forecast"),
+                "previous": e.get("previous"),
+                "actual": e.get("actual"),
+                # True only where the guard would genuinely hold the bot back.
+                "guarded": bool(enabled() and rank >= 3 and abs(mins) <= win),
+            })
         out.sort(key=lambda x: x["mins"])
         return out[:limit]
     except Exception:

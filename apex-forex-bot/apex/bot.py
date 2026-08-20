@@ -489,7 +489,12 @@ def _start_dashboard_server():
                             except Exception:
                                 pass
                     equity_live = round(float(balance_live or 0) + floating, 2)
-                    events = news_mod.upcoming(hours=24) or []
+                    # The panel's own view: a rolling window, medium impact
+                    # included. `upcoming()`/`today()` answer the trading
+                    # guard's question (is a HIGH-impact release near?) and a
+                    # normal week holds ~8 of those against ~90 other releases,
+                    # so a panel built on them is empty on most days.
+                    news_feed = news_mod.feed() or []
                     news_today = news_mod.today() or []
                     journal = user_store.load_trades(chat_id)
                     st = stats_mod.compute(journal, udash.get("skipsToday", 0))
@@ -526,7 +531,9 @@ def _start_dashboard_server():
                         "stats": {k: (None if isinstance(v, float) and v != v or v == float("inf") else v)
                                   for k, v in st.items() if k != "equity"},
                         "equity": st.get("equity") or [],
-                        "events": events,
+                        "newsFeed": news_feed,
+                        # Kept so a page still cached from before this change
+                        # keeps rendering something rather than going blank.
                         "newsToday": news_today,
                         "candles": [{"time": c["time"], "open": c["open"], "high": c["high"],
                                      "low": c["low"], "close": c["close"]} for c in candles],
