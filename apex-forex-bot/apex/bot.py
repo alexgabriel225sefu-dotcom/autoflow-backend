@@ -291,13 +291,18 @@ def _start_dashboard_server():
                             "").removeprefix("Bearer ").strip()
             return hmac.compare_digest(supplied, token)
 
-        def _json(self, status, obj):
+        def _json(self, status, obj, cache=None, cache_key=None):
             """A JSON reply with no cache and an explicit length.
 
             The Mini App polls; a cached 200 would show a client a stale
             account long after it changed, which is the one thing a terminal
             must never do.
             """
+            if cache is not None and status == 200 and cache_key is not None:
+                try:
+                    cache(cache_key, obj)
+                except Exception:
+                    pass
             body = json.dumps(obj).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
@@ -529,6 +534,7 @@ def _start_dashboard_server():
             if self.path.startswith("/api/app/tick"):
                 from apex import webapp, user_loop, user_store
                 from apex import forex as fx_mod
+                from apex import miniapp_cache as _mc
                 qs = parse_qs(urlparse(self.path).query)
                 init = (qs.get("init") or [""])[0]
                 tg_user = webapp.validate(init, cfg.TELEGRAM_BOT_TOKEN or "")
@@ -537,6 +543,15 @@ def _start_dashboard_server():
                                      "code": "TELEGRAM_AUTH_FAILED"})
                     return
                 chat_id = str(tg_user["id"])
+                # Serve a very recent answer rather than asking the broker again.
+                # Every read below rides ONE pooled cTrader socket behind a lock,
+                # so two overlapping polls do not go twice as fast — they queue,
+                # and /api/app/data queues behind them. That is what turned a
+                # 1s tick into "market data unavailable".
+                _hit = _mc.get_tick(chat_id)
+                if _hit is not None:
+                    self._json(200, _hit)
+                    return
                 try:
                     u = user_store.load(chat_id) or {}
                     udash = user_loop.get_dash(chat_id) or {}
@@ -567,10 +582,17 @@ def _start_dashboard_server():
                     # the first few are priced live per tick.
                     all_pos = []
                     if not paper:
-                        try:
-                            all_pos = list(br.get_all_positions() or [])
-                        except Exception:
-                            all_pos = []
+                        # WHICH positions exist changes on a trade, not on a
+                        # tick. Their PRICES change constantly. Re-listing them
+                        # every poll was a whole extra round-trip for an answer
+                        # that is almost always identical.
+                        all_pos = _mc.get_positions(chat_id)
+                        if all_pos is None:
+                            try:
+                                all_pos = list(br.get_all_positions() or [])
+                            except Exception:
+                                all_pos = []
+                            _mc.put_positions(chat_id, all_pos)
                         _focus = next((p for p in all_pos
                                        if str(p.get("symbol", "")).replace("_", "").upper()
                                        == str(sym).replace("_", "").upper()), None)
@@ -628,10 +650,19 @@ def _start_dashboard_server():
 
                     balance = udash.get("balance", u.get("paper_balance", 0))
                     if not paper:
-                        try:
-                            balance = br.get_balance()
-                        except Exception:
-                            pass
+                        # Balance only moves when a trade CLOSES. Floating P&L
+                        # is what moves tick to tick, and that is computed from
+                        # price below — so this does not need a round-trip per
+                        # poll. The log showed it firing every 2-3 seconds.
+                        _bal = _mc.get_balance(chat_id)
+                        if _bal is None:
+                            try:
+                                _bal = br.get_balance()
+                                _mc.put_balance(chat_id, _bal)
+                            except Exception:
+                                _bal = None
+                        if _bal is not None:
+                            balance = _bal
                     # Floating is the sum across EVERY position we could price,
                     # not just the focused one — otherwise equity silently
                     # ignores the other open trade.
@@ -656,7 +687,7 @@ def _start_dashboard_server():
                             "stopLoss": pos.get("stopLoss") or pos.get("sl"),
                             "takeProfit": pos.get("takeProfit") or pos.get("tp"),
                             "pnlPips": pnl_pips, "pnlUsd": pnl_usd}),
-                    })
+                    }, cache=_mc.put_tick, cache_key=chat_id)
                 except Exception as e:
                     print(f"[MiniApp] tick failed: {e}")
                     self._json(502, {"error": "UNAVAILABLE", "code": "UNAVAILABLE"})

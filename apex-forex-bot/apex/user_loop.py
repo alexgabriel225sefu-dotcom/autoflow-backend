@@ -739,6 +739,16 @@ def _persist_open_position(user_id, cfg, pos):
     function both the loop and those two call, instead of a loop-only
     closure — a manual trade needs the exact same restart protection as an
     autonomous one."""
+    # The Mini App reads positions through a short cache. This is the one place
+    # every open and close passes through — loop, manual /buy//close, and the
+    # MCP tools alike — so it is where the cache has to be dropped. Without it a
+    # client watches a trade close and still sees it listed for seconds
+    # afterwards, which is precisely the staleness a terminal must not have.
+    try:
+        from apex import miniapp_cache
+        miniapp_cache.invalidate(user_id)
+    except Exception:
+        pass
     if getattr(cfg, "PAPER_TRADING", False):
         return
     try:

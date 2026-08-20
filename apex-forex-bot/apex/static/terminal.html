@@ -284,15 +284,20 @@ function setBadge(acct){
               : acct.mode==='SIMULATION'?'sim' : 'unver';
 }
 
-let first=true,lastSym='—',lastOk=0;
+let first=true,lastSym='—',lastOk=0,failStreak=0,everLoaded=false;
 /* Price precision comes from the broker's symbol details. Lightweight Charts
    defaults to 2 decimals, which renders a GBPUSD entry of 1.36078 as "1.36" —
    the three digits that carry all the meaning, dropped. */
 let DIGITS=5, PIP=0.0001, TFSEC=900, lastBar=null, livePos=null;
 const TF_SECONDS={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400};
+let _precisionSet=false;
 function applyPrecision(d){
-  if(d==null||d===DIGITS||!series)return;
-  DIGITS=d;
+  // `d===DIGITS` used to short-circuit here, and DIGITS defaults to 5 — so on
+  // every 5-digit pair (which is most of them) the format was never applied at
+  // all and the axis kept rendering 1.36. Skip only once it has actually been
+  // set on the series.
+  if(d==null||!series||(_precisionSet&&d===DIGITS))return;
+  DIGITS=d; _precisionSet=true;
   const mv=Number(Math.pow(10,-d).toFixed(d));
   try{ series.applyOptions({priceFormat:{type:'price',precision:d,minMove:mv}}); }catch(e){}
 }
@@ -332,7 +337,7 @@ async function api(path){
 async function refresh(){
  try{
   const d = await api('/api/app/data?tf='+encodeURIComponent(TF));
-  Q('err').style.display='none'; lastOk=Date.now(); freshness();
+  Q('err').style.display='none'; lastOk=Date.now(); failStreak=0; everLoaded=true; freshness();
   setBadge(d.account);
   applyPrecision(d.digits);
   if(d.pipSize) PIP=d.pipSize;
@@ -420,10 +425,22 @@ async function refresh(){
       +'<div class="sub">'+esc(k.time||'')+'</div></div>').join('');
   }
  }catch(e){
-  const el=Q('err'); el.style.display='block';
-  el.textContent = e.code==='TELEGRAM_AUTH_FAILED'
-    ? 'Open this from your Telegram chat to see your account.'
-    : 'Reconnecting… market data unavailable';
+  // One slow poll is not an outage. The banner used to appear on the first
+  // failure, so a single request that lost a race with the broker socket made
+  // a working terminal look broken. Auth is different — that never fixes
+  // itself by waiting, so it is said straight away.
+  failStreak++;
+  const el=Q('err');
+  if(e.code==='TELEGRAM_AUTH_FAILED'){
+    el.style.display='block';
+    el.textContent='Open this from your Telegram chat to see your account.';
+  }else if(!everLoaded){
+    el.style.display='block';
+    el.textContent='Loading your account…';
+  }else if(failStreak>=3){
+    el.style.display='block';
+    el.textContent='Reconnecting… market data unavailable';
+  }
   freshness();
  }
 }
@@ -605,7 +622,7 @@ function growBar(price, ts){
 async function tick(){
   try{
     const t=await api('/api/app/tick');
-    lastOk=Date.now(); freshness();
+    lastOk=Date.now(); failStreak=0; freshness();
     const lp=Q('livePx');
     if(lp&&t.price!=null){
       const prev=lp.__p; lp.__p=t.price;
@@ -648,7 +665,7 @@ async function tick(){
 }
 
 refresh(); setInterval(refresh, 6000);
-tick();    setInterval(tick, 1000);
+tick();    setInterval(tick, 1500);
 </script>
 </body>
 </html>

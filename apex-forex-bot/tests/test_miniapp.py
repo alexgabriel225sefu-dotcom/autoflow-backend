@@ -309,6 +309,14 @@ check("floating sums across positions, not just the focused one",
 check("only the focused symbol's levels go on the chart",
       "worse than no line at all" in HTML,
       "a GBPUSD stop on a XAUUSD scale is worse than no line")
+check("precision is applied even when it equals the default",
+      "_precisionSet" in HTML,
+      "d===DIGITS short-circuited, and DIGITS defaults to 5 — so 5-digit pairs "
+      "never got the format and the axis kept showing 1.36")
+check("a single failed poll does not cry outage",
+      "failStreak>=3" in HTML and "everLoaded" in HTML)
+check("...but a bad login says so straight away",
+      "TELEGRAM_AUTH_FAILED" in HTML)
 check("the tick is lighter than the full payload",
       "candles" not in BOT_SRC[BOT_SRC.index("/api/app/tick"):BOT_SRC.index("# ── Mini App: history")],
       "the whole point is that it does not ship candles")
