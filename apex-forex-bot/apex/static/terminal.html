@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<link rel="preconnect" href="https://telegram.org" crossorigin>
 <title>Apex Terminal</title>
 <style>
 :root{--bg:#07090f;--card:rgba(255,255,255,.045);--line:rgba(255,255,255,.08);
@@ -185,7 +186,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
 <div id="err"></div>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<!-- Served from this deployment, not unpkg: a third-party CDN round-trip sat on
+     the critical path of every cold open, and nothing could be drawn until
+     ~160KB arrived from somebody else's host. -->
+<script src="/static/lightweight-charts.js"></script>
 <script>
 const tg = window.Telegram && Telegram.WebApp;
 if(tg){tg.ready();tg.expand();try{tg.setBackgroundColor('#07090f');}catch(e){}}
@@ -664,8 +668,12 @@ async function tick(){
   }catch(e){ freshness(); }
 }
 
-refresh(); setInterval(refresh, 6000);
-tick();    setInterval(tick, 1500);
+/* TICK FIRST. It is cached server-side and returns in milliseconds, so price,
+   positions and the money are on screen while /api/app/data is still fetching
+   150 candles, stats, news and the journal. Painting the cheap thing first is
+   the difference between "instant" and "loading". */
+tick().finally(()=>{ setInterval(tick, 1500); });
+refresh().finally(()=>{ setInterval(refresh, 6000); });
 </script>
 </body>
 </html>

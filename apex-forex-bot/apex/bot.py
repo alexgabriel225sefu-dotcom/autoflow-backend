@@ -6,7 +6,7 @@ import hmac
 import json
 import threading
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import requests
 
@@ -367,6 +367,26 @@ def _start_dashboard_server():
                 payload = webapp.guide_html().encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+            # The chart library, served from here instead of unpkg. A
+            # third-party CDN round-trip was on the critical path of every
+            # cold open: nothing could be drawn until ~160KB arrived from
+            # somebody else's host. Immutable, so the browser fetches it once.
+            if self.path.startswith("/static/lightweight-charts.js"):
+                import os as _os
+                _lib = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                                     "static", "lightweight-charts.js")
+                try:
+                    with open(_lib, "rb") as fh:
+                        payload = fh.read()
+                except OSError:
+                    self.send_response(404); self.end_headers(); return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/javascript; charset=utf-8")
+                self.send_header("Cache-Control", "public, max-age=31536000, immutable")
                 self.send_header("Content-Length", str(len(payload)))
                 self.end_headers()
                 self.wfile.write(payload)
@@ -767,7 +787,18 @@ def _start_dashboard_server():
                 self.end_headers()
                 self.wfile.write(render_dashboard({**dash, "tickCount": tick_count}).encode())
 
-    server = HTTPServer(("0.0.0.0", port), Handler)
+    # THREADING, not HTTPServer. The plain one handles exactly one request at a
+    # time, so a single slow call froze the whole HTTP surface behind it: the
+    # Mini App asks for /app, then /api/app/data (broker connect, 150 candles,
+    # stats, news, journal), and every tick, the dashboard and the OAuth
+    # callback queued behind that one response. The terminal appeared to load
+    # slowly because it was waiting in line behind itself.
+    #
+    # The reads it serves are already safe to overlap: the cTrader socket has
+    # its own lock, user_store writes are atomic, and the Mini App routes are
+    # read-only.
+    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    server.daemon_threads = True      # a hung request must not block shutdown
     threading.Thread(target=server.serve_forever, daemon=True).start()
     logger.info(f"📊 Dashboard: http://localhost:{port}")
 
