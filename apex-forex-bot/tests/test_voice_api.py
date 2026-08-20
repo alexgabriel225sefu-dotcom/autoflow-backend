@@ -248,6 +248,16 @@ check("the operator's dashboard gate does not stand in for it",
       "DASHBOARD_TOKEN reads every account; this route must read exactly one")
 check("a confirmation is routed by id, never by re-reading the words",
       'req.get("confirmId")' in VOICE_BRANCH)
+# A GET used to fall through to the dashboard gate and answer "503 — dashboard
+# disabled", which is true of the dashboard and says nothing about the endpoint
+# asked for, and wrote no log line at all — so a shortcut misconfigured to send
+# GET was indistinguishable from a request that never left the phone.
+check("a GET on the voice endpoint is answered as method-not-allowed",
+      'self.path.startswith("/api/voice")' in BOT
+      and "405" in BOT.split('self.path.startswith("/api/voice")')[1][:900],
+      "a POST-only endpoint must say so, not blame the dashboard")
+check("and it is logged, so the two silences are told apart",
+      "[Voice] GET on /api/voice" in BOT)
 check("/voice is routed with its argument", "_handle_voice(chat_id, args)" in TG)
 check("the guard reaches the tool runner", "def _run_tool(name: str, inp: dict, user_id: str, send_status, guard=None)" in AS)
 check("Telegram still calls the assistant unguarded, unchanged",

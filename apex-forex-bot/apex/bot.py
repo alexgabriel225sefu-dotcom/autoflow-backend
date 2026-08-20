@@ -385,6 +385,27 @@ def _start_dashboard_server():
                 self.end_headers()
                 self.wfile.write(b"ok")
                 return
+            # The voice endpoint is POST-only. Without this, a GET fell through
+            # to the dashboard gate and answered "503 — dashboard disabled,
+            # DASHBOARD_TOKEN is not set", which is true of the dashboard and
+            # says nothing about the endpoint that was actually asked for. It
+            # also wrote no log line, so a client whose shortcut was sending
+            # GET looked identical to one whose request never arrived at all —
+            # two very different problems wearing the same silence.
+            if self.path.startswith("/api/voice"):
+                print("[Voice] GET on /api/voice — this endpoint is POST-only")
+                payload = json.dumps({
+                    "ok": False, "status": 405,
+                    "reply": "This address only accepts POST. In your shortcut, "
+                             "open Get Contents of URL and set Method to POST.",
+                }).encode()
+                self.send_response(405)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Allow", "POST")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
             # Telegram Mini App — the page is public; every DATA call inside it
             # carries Telegram's signed initData, validated per user below.
             if self.path == "/guide-app" or self.path.startswith("/guide-app?"):
