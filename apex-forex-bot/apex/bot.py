@@ -355,13 +355,24 @@ def _start_dashboard_server():
                 from apex import voice_api
                 length = int(self.headers.get("Content-Length") or 0)
                 raw = self.rfile.read(min(length, 64_000)).decode("utf-8", "replace")
+                hdr_tok = (self.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
                 try:
                     req = json.loads(raw or "{}")
+                    if not isinstance(req, dict):
+                        raise ValueError("not an object")
                 except Exception:
                     req = {}
-                tok = req.get("token") or (
-                    self.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
-                out = voice_api.ask(tok, req.get("text"))
+                if req:
+                    tok, said = req.get("token") or hdr_tok, req.get("text")
+                else:
+                    # The body was not JSON, so it IS the question, and the key
+                    # came in the header. This is the shape that needs no
+                    # variable picked by hand: Shortcuts fills a raw request
+                    # body with the previous action's output on its own, while
+                    # a JSON field has to be wired, and wiring it is what kept
+                    # silently coming undone.
+                    tok, said = hdr_tok, raw
+                out = voice_api.ask(tok, said)
                 payload = str(out.get("reply") or "").encode("utf-8")
                 # 200 whatever happened. A non-2xx makes Shortcuts raise
                 # instead of speaking, so a refusal the client could act on —

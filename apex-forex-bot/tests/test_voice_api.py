@@ -336,6 +336,12 @@ check("it answers text, not JSON", "text/plain" in SAY and "json.dumps" not in S
       "plain text is what lets Speak Text chain itself with nothing to wire")
 check("and always 200, so a refusal is spoken rather than swallowed",
       "self.send_response(200)" in SAY and "out.get(\"status\"" not in SAY)
+check("a non-JSON body is taken as the question itself",
+      "tok, said = hdr_tok, raw" in SAY,
+      "this is the shape that needs no variable picked by hand")
+check("and its key comes from the Authorization header",
+      "hdr_tok" in SAY and "Bearer" in SAY)
+check("JSON still wins when it is JSON", "if req:" in SAY)
 check("both money tools are guarded",
       voice_api.FINANCIAL_TOOLS == {"execute_trade", "close_position"},
       voice_api.FINANCIAL_TOOLS)
