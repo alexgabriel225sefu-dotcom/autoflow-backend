@@ -663,6 +663,7 @@ def _menu_rows(chat_id=None):
         [("🤖 Automation", "nav:auto"), ("📒 Performance", "nav:perf")],
         [("📡 Market", "nav:mkt"), ("📰 News", "nav:news")],
         [("⚙️ Settings", "nav:set"), ("🔔 Notifications", "nav:notif")],
+        [("🎙 Voice control", "nav:voice")],
         [("❓ Help", "nav:help")],
         [("⏸ Pause Trading", "nav:pause")] if running
         else [("▶️ Resume Trading", "nav:resume")],
@@ -2343,6 +2344,12 @@ def _route_cb(chat_id, data):
         return _handle_quick_help(chat_id)
     if data == "nav:notif":
         return _screen_notifications(chat_id)
+    if data == "nav:voice":
+        return _handle_voice(chat_id)
+    if data == "voice:new":
+        return _handle_voice(chat_id, "new")
+    if data == "voice:off":
+        return _handle_voice(chat_id, "off")
     if data == "notif:toggle":
         return _toggle_notifications(chat_id)
     if data == "nav:acct":
@@ -2717,10 +2724,31 @@ def _handle_voice(chat_id, args=""):
             "🎙 <b>Your voice key — copy it now</b>\n"
             "<i>Shown once. Only a hash is kept, so it can't be shown again.</i>")
         send_to(chat_id, f"<code>{_esc(token)}</code>")
-        # Three actions, added top to bottom into an EMPTY shortcut, so each
-        # one lands at the end and nothing ever has to be dragged. That —
-        # along with hand-wiring a variable into Speak Text — is what went
-        # wrong every time this was assembled from a longer recipe.
+
+        # One tap, once the operator has published a signed Shortcut.
+        #
+        # Apple refuses to import an unsigned .shortcut file and only an Apple
+        # device can sign one, so the first copy has to be built on an iPhone
+        # and shared — which yields a permanent iCloud link that every client
+        # afterwards installs with a single tap. Until that link exists the
+        # same button explains the three steps, so nothing here has to change
+        # later: setting VOICE_SHORTCUT_URL upgrades every client at once.
+        ready = (getattr(cfg, "VOICE_SHORTCUT_URL", "") or "").strip()
+        if ready:
+            return send_to(chat_id,
+                f"<a href=\"{_esc(ready)}\">📥 Install the Apex shortcut</a>\n"
+                "<i>Tap it, then <b>Add Shortcut</b>, and paste the key above "
+                "when it asks.</i>\n\n"
+                "Then say <b>\"Siri, Apex\"</b> — it asks what you want to "
+                "know, out loud, and reads the answer back. Ask about your "
+                "balance or your position, or say <i>buy gbpusd</i> and it "
+                "reads the trade back before placing it.\n\n"
+                "🔊 <b>To hear alerts too:</b> Settings → Notifications → "
+                "Announce Notifications → Telegram. With AirPods or CarPlay, "
+                "Siri reads every trade and news alert aloud as it arrives.\n\n"
+                "🔇 <code>/voice off</code> revokes the key.",
+                _back_kb(chat_id))
+
         return send_to(chat_id,
             "<b>Build it — 3 steps, 2 minutes</b>\n\n"
             "Open <b>Shortcuts</b> → <b>+</b> for a <b>new, empty</b> one, "
@@ -2733,26 +2761,22 @@ def _handle_voice(chat_id, args=""):
             "   • tap <b>›</b> → Method: <b>POST</b> → Request Body: <b>JSON</b>\n"
             "   • Add field <b>Text</b>: <code>token</code> = the key above\n"
             "   • Add field <b>Text</b>: <code>text</code> = tap the value, then "
-            "pick <b>Provided Input</b> from the bar above the keyboard\n\n"
-            "<i>If picking that variable gives you trouble, there is a second "
-            "way with nothing to pick: leave Request Body as <b>File</b>, add "
-            "a <b>Header</b> named <code>Authorization</code> with value "
-            "<code>Bearer YOUR-KEY</code>, and drop the JSON fields entirely. "
-            "Shortcuts fills the body with the question by itself.</i>\n\n"
-            "<b>3.</b> <code>Speak Text</code>\n"
-            "   • leave it alone — it fills itself in\n\n"
-            "Rename it <b>Apex</b> (tap the title → Rename), then say "
-            "<b>\"Hey Siri, Apex\"</b>.\n\n"
-            "<i>Siri reads the question out loud, listens, and speaks the "
-            "answer. Ask about your balance, your position, why it skipped a "
-            "setup — or say \"buy gbpusd\" and it will read the trade back "
-            "and place it when you say yes.</i>\n\n"
-            "🔇 <code>/voice off</code> revokes the key if you lose the phone.",
+            "pick <b>Provided Input</b> above the keyboard\n\n"
+            "<b>3.</b> <code>Speak Text</code> — leave it alone, it fills "
+            "itself in\n\n"
+            "Rename it <b>Apex</b>, then say <b>\"Siri, Apex\"</b>.\n\n"
+            "🔊 <b>To hear alerts too:</b> Settings → Notifications → "
+            "Announce Notifications → Telegram. With AirPods or CarPlay, Siri "
+            "reads every trade and news alert aloud as it arrives.\n\n"
+            "🔇 <code>/voice off</code> revokes the key.",
             _back_kb(chat_id))
 
     user = user_store.load(chat_id)
     on = voice_api.has_token(user)
     guard = voice_api.confirm_required(user)
+    ready = bool((getattr(cfg, "VOICE_SHORTCUT_URL", "") or "").strip())
+    btn = [[("🔁 New key", "voice:new"), ("🔇 Turn off", "voice:off")]] if on else \
+          [[("🎙 Activate voice control", "voice:new")]]
     return send_to(chat_id,
         "🎙 <b>Voice control</b>\n"
         f"Key: <b>{'issued' if on else 'not set up'}</b>\n"
@@ -2765,7 +2789,7 @@ def _handle_voice(chat_id, args=""):
         "<code>/voice confirm off</code> — stop asking before spoken trades\n\n"
         "<i>Siri itself can't be replaced — Apple doesn't allow it. This runs "
         "as a shortcut Siri launches by name.</i>",
-        _back_kb(chat_id))
+        _back_kb(chat_id, btn))
 
 
 def _handle_news(chat_id, args=""):

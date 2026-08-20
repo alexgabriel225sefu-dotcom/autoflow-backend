@@ -321,8 +321,8 @@ check("the instructions point at the plain-text endpoint",
       "/api/voice/say" in TG)
 check("they say to start from an empty shortcut",
       "empty" in TG.split("Build it")[1][:600])
-check("and that Speak Text needs no wiring",
-      "fills itself in" in TG)
+# (that Speak Text needs no wiring is asserted on the RENDERED text in
+# section 18 — a source check breaks on a string split across two lines)
 check("the guard reaches the tool runner", "def _run_tool(name: str, inp: dict, user_id: str, send_status, guard=None)" in AS)
 check("Telegram still calls the assistant unguarded, unchanged",
       "assistant.chat(" in TG)
@@ -434,6 +434,66 @@ check("the Groq chat path uses the same setting",
 check("Gemini's model is a setting too", "_gemini_model_name()" in ASRC)
 check("a retired Gemini model is not reported as a bad key",
       'r.status_code == 404 and "model" in' in ASRC)
+
+print("\n18. One button, and it upgrades itself when the link exists")
+# Apple refuses unsigned .shortcut files and only an Apple device can sign
+# one, so the first copy has to be built on an iPhone and shared — which
+# yields a permanent iCloud link every later client installs with one tap.
+# The button must not have to change when that link appears: setting
+# VOICE_SHORTCUT_URL has to upgrade everyone at once.
+from apex import config as _cfg  # noqa: E402
+
+os.environ["RENDER_EXTERNAL_URL"] = "https://example.invalid"
+_shots = []
+_rs, _rd = telegram.send_to, telegram._delete_message
+_was_url = getattr(_cfg, "VOICE_SHORTCUT_URL", "")
+try:
+    telegram.send_to = lambda cid, text, *a, **k: _shots.append(text)
+    telegram._delete_message = lambda *a, **k: None
+
+    _cfg.VOICE_SHORTCUT_URL = ""
+    telegram._handle_voice("700")
+    screen = _shots[-1]
+    check("the screen exists before anything is set up",
+          "Voice control" in screen, screen[:80])
+
+    telegram._handle_voice("700", "new")
+    manual = _shots[-1]
+    check("with no published link, it explains the three steps",
+          "3 steps" in manual and "/api/voice/say" in manual, manual[:120])
+    check("and says to start from an EMPTY shortcut", "empty" in manual)
+    check("and that Speak Text needs no variable wired into it",
+          "fills itself in" in manual,
+          "wiring that variable is what kept silently coming undone")
+
+    _cfg.VOICE_SHORTCUT_URL = "https://www.icloud.com/shortcuts/EXAMPLE"
+    _shots.clear()
+    telegram._handle_voice("700", "new")
+    oneTap = _shots[-1]
+    check("once published, the same button is a one-tap install",
+          "icloud.com/shortcuts/EXAMPLE" in oneTap, oneTap[:120])
+    check("and no longer asks anyone to build anything",
+          "3 steps" not in oneTap and "Get Contents of URL" not in oneTap)
+    check("the key is still handed over separately, once",
+          any("copy it now" in m for m in _shots))
+
+    check("both routes explain how to HEAR alerts, not just read them",
+          "Announce Notifications" in manual and "Announce Notifications" in oneTap,
+          "spoken alerts are an iOS setting, not something the bot can switch on")
+finally:
+    telegram.send_to, telegram._delete_message = _rs, _rd
+    _cfg.VOICE_SHORTCUT_URL = _was_url
+
+check("the menu carries it, so it is reachable without knowing a command",
+      '("🎙 Voice control", "nav:voice")' in TG)
+check("the screen offers activation as a button",
+      '"voice:new"' in TG and "Activate voice control" in TG)
+check("and the buttons are routed",
+      'if data == "nav:voice"' in TG and 'if data == "voice:new"' in TG
+      and 'if data == "voice:off"' in TG)
+check("the link is a setting, so publishing it needs no deploy",
+      "VOICE_SHORTCUT_URL" in open(
+          os.path.join(ROOT, "apex", "config.py"), encoding="utf-8").read())
 
 print("\n" + "=" * 50)
 if failures:

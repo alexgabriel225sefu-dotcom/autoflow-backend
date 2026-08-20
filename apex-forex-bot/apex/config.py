@@ -72,6 +72,18 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 # ceiling: every client shares one Groq key today, and the trading signal
 # draws on that same quota. Unset = the chain behaves exactly as before.
 AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "").strip()
+
+# The iCloud link to the ready-made voice Shortcut, once one exists.
+#
+# Apple refuses to import an unsigned .shortcut file, and only an Apple device
+# can sign one — so the first copy has to be built on an iPhone and shared,
+# which produces a permanent signed https://www.icloud.com/shortcuts/... link.
+# From then on every client installs it with one tap.
+#
+# Until it is set, the same button walks a client through building it. The flow
+# is identical either way; this only decides whether they tap a link or follow
+# three steps, so setting it later upgrades every client at once.
+VOICE_SHORTCUT_URL = os.getenv("VOICE_SHORTCUT_URL", "").strip()
 AI_GATEWAY_KEY = os.getenv("AI_GATEWAY_KEY", "").strip()
 AI_GATEWAY_MODEL = os.getenv("AI_GATEWAY_MODEL", "").strip() or "auto"
 # Generous: on a free-tier host the gateway sleeps and a cold start eats most

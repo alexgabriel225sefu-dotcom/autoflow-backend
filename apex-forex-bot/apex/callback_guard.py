@@ -38,7 +38,7 @@ import time
 NAMESPACES = {
     "nav", "go", "am", "pf", "emg", "pos", "live", "acct", "bot", "ob",
     "bld", "risk", "reset", "cp", "purgebad", "tr", "strat", "sig", "ui",
-    "notif",
+    "notif", "voice",
 }
 
 # Actions that change money, settings or the account binding. Navigation is
@@ -47,6 +47,10 @@ NAMESPACES = {
 ACTION_NAMESPACES = {
     "am", "emg", "pos", "live", "acct", "bot", "risk", "reset", "cp",
     "purgebad", "tr", "ob",
+    # Issuing a voice key REPLACES the previous one, so a double tap silently
+    # kills a working shortcut on a phone that is not in the room. Revoking is
+    # the same shape of change. Neither is navigation.
+    "voice",
 }
 
 # Telegram caps callback_data at 64 bytes; anything longer did not come from a
