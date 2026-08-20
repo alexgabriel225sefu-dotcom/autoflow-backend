@@ -559,11 +559,61 @@ def _start_dashboard_server():
                             price = None
 
                     pos = udash.get("openPosition")
+                    # EVERY open position, not just the focused symbol. The
+                    # account can hold up to `maxpos` at once and the terminal
+                    # was showing one of them, so a client with two trades open
+                    # could see only the one Auto-Pilot happened to be watching.
+                    # One RPC returns them all; pricing is what costs, so only
+                    # the first few are priced live per tick.
+                    all_pos = []
                     if not paper:
                         try:
-                            pos = br.get_open_position(sym)
+                            all_pos = list(br.get_all_positions() or [])
                         except Exception:
-                            pass
+                            all_pos = []
+                        _focus = next((p for p in all_pos
+                                       if str(p.get("symbol", "")).replace("_", "").upper()
+                                       == str(sym).replace("_", "").upper()), None)
+                        if _focus:
+                            pos = _focus
+
+                    def _price_for(psym):
+                        if str(psym).replace("_", "").upper() == str(sym).replace("_", "").upper():
+                            return price
+                        try:
+                            b, a = br.get_bid_ask(psym)
+                            return (float(b) + float(a)) / 2.0
+                        except Exception:
+                            return None
+
+                    def _pnl(p, px_):
+                        if not px_ or not p.get("entryPrice"):
+                            return None, None
+                        d = 1 if p.get("side") == "BUY" else -1
+                        psym = p.get("symbol") or sym
+                        pips = round(fx_mod.to_pips(
+                            (px_ - float(p["entryPrice"])) * d, psym, px_), 1)
+                        u = p.get("units") or p.get("quantity") or 0
+                        usd = (round(fx_mod.pnl_usd(p["side"], float(p["entryPrice"]),
+                                                    px_, u, psym), 2) if u else None)
+                        return pips, usd
+
+                    PRICE_BUDGET = 4          # bounded: this runs once a second
+                    positions_out, priced = [], 0
+                    for p in all_pos:
+                        psym = p.get("symbol") or sym
+                        px_ = None
+                        if priced < PRICE_BUDGET:
+                            px_ = _price_for(psym); priced += 1
+                        pp, pu = _pnl(p, px_)
+                        positions_out.append({
+                            "symbol": psym, "side": p.get("side"),
+                            "entryPrice": p.get("entryPrice"),
+                            "stopLoss": p.get("stopLoss"), "takeProfit": p.get("takeProfit"),
+                            "positionId": p.get("positionId"),
+                            "currentPrice": px_, "pnlPips": pp, "pnlUsd": pu,
+                            "focused": str(psym).replace("_", "").upper()
+                                       == str(sym).replace("_", "").upper()})
 
                     pnl_pips = pnl_usd = None
                     if pos and price and pos.get("entryPrice"):
@@ -582,7 +632,13 @@ def _start_dashboard_server():
                             balance = br.get_balance()
                         except Exception:
                             pass
-                    floating = float(pnl_usd or 0)
+                    # Floating is the sum across EVERY position we could price,
+                    # not just the focused one — otherwise equity silently
+                    # ignores the other open trade.
+                    if positions_out:
+                        floating = float(sum(p["pnlUsd"] or 0 for p in positions_out))
+                    else:
+                        floating = float(pnl_usd or 0)
 
                     self._json(200, {
                         "symbol": sym, "price": price, "bid": bid, "ask": ask,
@@ -592,6 +648,8 @@ def _start_dashboard_server():
                         "balance": balance,
                         "equityLive": (float(balance) + floating) if balance is not None else None,
                         "floatingPnl": floating,
+                        "positions": positions_out,
+                        "openCount": len(positions_out) or (1 if pos else 0),
                         "position": (None if not pos else {
                             "side": pos.get("side"),
                             "entryPrice": pos.get("entryPrice"),

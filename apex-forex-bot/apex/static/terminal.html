@@ -57,6 +57,14 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 #pos .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;font-size:11.5px;color:var(--t1)}
 #pos .grid b{display:block;color:var(--t0);font-size:12.5px;font-variant-numeric:tabular-nums}
 .pnl-up{color:var(--up)}.pnl-dn{color:var(--dn)}
+#posList{display:none;margin:0 14px 12px}
+.prow{padding:10px 12px;border:1px solid var(--line);border-radius:12px;
+  background:rgba(0,0,0,.25);margin-top:8px;font-size:13px}
+.prow.focus{border-color:rgba(255,45,79,.38)}
+.ptop{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:800}
+.pgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:7px;
+  font-size:11.5px;color:var(--t1)}
+.pgrid b{display:block;color:var(--t0);font-size:12.5px;font-variant-numeric:tabular-nums}
 #tabs{display:flex;gap:6px;margin:14px 16px 10px}
 .tab{flex:1;text-align:center;padding:10px 3px;background:var(--card);border:1px solid var(--line);
   border-radius:12px;font-size:11px;font-weight:700;color:var(--t1);transition:all .25s}
@@ -146,7 +154,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
       <div data-tf="1m">1m</div><div data-tf="5m">5m</div><div class="on" data-tf="15m">15m</div>
       <div data-tf="1h">1h</div><div data-tf="4h">4h</div><div data-tf="1d">1d</div>
     </div>
-    <div id="pos"></div>
+    <div id="posList"></div>
   </div>
 
   <div id="tabs" class="rise">
@@ -220,6 +228,9 @@ function entryTitle(pos){
   return 'ENTRY  '+(p!=null?sign+p.toFixed(1)+' pips':'')
        + (u!=null?'  ('+(u>=0?'+':'−')+'$'+Math.abs(u).toFixed(2)+')':'');
 }
+/* Only the FOCUSED symbol's levels go on the chart. The other open positions
+   are on other instruments, and a GBPUSD stop drawn on a XAUUSD price scale is
+   worse than no line at all — they get rows below instead. */
 function setLines(pos){
   if(!series)return;
   lines.forEach(l=>{try{series.removePriceLine(l)}catch(e){}});
@@ -370,17 +381,13 @@ async function refresh(){
   livePos=d.position?Object.assign({},d.position):null;
   setLines(livePos);
 
-  const pos=Q('pos');
-  if(d.position){
-    const p=d.position, dir=p.side==='BUY'?'🟢 LONG':'🔴 SHORT';
-    pos.style.display='block';
-    pos.innerHTML='<span class="lg">'+dir+' '+esc(lastSym)+'</span>'
-      +' · <span id="posPnl" class="'+((p.pnlUsd==null?0:p.pnlUsd)>=0?'pnl-up':'pnl-dn')+'"></span>'
-      +'<div class="grid"><div>Entry<b>'+px(p.entryPrice)+'</b></div>'
-      +'<div>Stop<b>'+px(p.stopLoss||p.sl)+'</b></div>'
-      +'<div>Target<b>'+px(p.takeProfit||p.tp)+'</b></div></div>';
-    paintPnl(p);
-  } else pos.style.display='none';
+  // One renderer for every position, focused or not — the single-card version
+  // it replaced could only ever describe one of them.
+  renderPositions(d.positions && d.positions.length
+                    ? d.positions
+                    : (d.position ? [Object.assign({focused:true,
+                        symbol:d.symbol}, d.position)] : []),
+                  d.openCount);
 
   const perf=Q('p-perf');
   perf.innerHTML = st.trades ?
@@ -419,6 +426,33 @@ async function refresh(){
     : 'Reconnecting… market data unavailable';
   freshness();
  }
+}
+
+/* paintPnl's single-card job is now renderPositions'. Every open position
+   gets a row. The account can hold `maxpos` at once and
+   this screen used to show only the one Auto-Pilot was watching, so a client
+   with two trades open saw one of them and an equity figure that reflected
+   both — which reads as a bug in the number rather than a gap in the list. */
+function renderPositions(list, count){
+  const host=Q('posList'); if(!host)return;
+  const rows=(list||[]).filter(p=>p&&p.symbol);
+  if(!rows.length){host.innerHTML='';host.style.display='none';return;}
+  host.style.display='block';
+  host.innerHTML=rows.map(p=>{
+    const dir=p.side==='SELL'?'🔴 SHORT':'🟢 LONG';
+    const known=p.pnlUsd!=null;
+    const up=known&&p.pnlUsd>=0;
+    const pnl=known
+      ? '<span class="'+(up?'pnl-up':'pnl-dn')+'">'
+        +(p.pnlPips!=null?(p.pnlPips>=0?'+':'')+p.pnlPips.toFixed(1)+' pips ':'')
+        +'('+money(p.pnlUsd)+')</span>'
+      : '<span class="na">price pending</span>';
+    return '<div class="prow'+(p.focused?' focus':'')+'">'
+      +'<div class="ptop"><b>'+dir+' '+esc(String(p.symbol).replace('_','/'))+'</b>'+pnl+'</div>'
+      +'<div class="pgrid"><div>Entry<b>'+px(p.entryPrice)+'</b></div>'
+      +'<div>Stop<b>'+px(p.stopLoss)+'</b></div>'
+      +'<div>Target<b>'+px(p.takeProfit)+'</b></div></div></div>';
+  }).join('');
 }
 
 /* ── HISTORY ── */
@@ -552,15 +586,6 @@ Q('rPlay').onclick=()=>{
    to ask for at the rate a price moves. The tick asks only for what changes:
    the price, the position's running P&L, and the money. The full refresh drops
    to every 6s because the tick already carries everything that moves. */
-function paintPnl(p){
-  const el=Q('posPnl'); if(!el||!p)return;
-  const up=(p.pnlUsd==null?0:p.pnlUsd)>=0;
-  el.className=up?'pnl-up':'pnl-dn';
-  const pips=p.pnlPips==null?null:p.pnlPips, usd=p.pnlUsd==null?null:p.pnlUsd;
-  el.textContent=(pips!=null?(pips>=0?'+':'')+pips.toFixed(1)+' pips':'')
-                +(usd!=null?(pips!=null?'  ':'')+'('+money(usd)+')':'');
-}
-
 /* Grow the current candle instead of redrawing the series. setData() rebuilds
    every bar and visibly resets the view; update() moves only the bar in flight,
    which is what makes the chart breathe the way a terminal's does. */
@@ -605,9 +630,9 @@ async function tick(){
     Q('balSub').innerHTML='Balance $'+(t.balance||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})
       +(t.position?' · <span class="'+(fl>=0?'pnl-up':'pnl-dn')+'">Floating '+money(fl)+'</span>':'');
 
+    renderPositions(t.positions, t.openCount);
     if(t.position){
       livePos=Object.assign(livePos||{},t.position);
-      paintPnl(livePos);
       refreshEntryLine(livePos);
       const up=fl>=0;
       Q('statusLine').innerHTML=(up?'🟢 In a ':'🔴 In a ')
@@ -616,7 +641,7 @@ async function tick(){
     }else if(livePos){
       // The position closed between full refreshes — clear it now rather than
       // leaving a dead trade on screen for the rest of the cycle.
-      livePos=null; setLines(null); Q('pos').style.display='none';
+      livePos=null; setLines(null); renderPositions([],0);
       Q('statusLine').innerHTML='👀 Watching <b>'+esc(lastSym)+'</b> — no position, waiting for a setup';
     }
   }catch(e){ freshness(); }

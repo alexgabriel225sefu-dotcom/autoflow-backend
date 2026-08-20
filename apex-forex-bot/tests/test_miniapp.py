@@ -298,6 +298,17 @@ check("the entry line carries the running P&L, cTrader style",
 check("money settles rather than snapping", "function glide" in HTML)
 check("a position closed between refreshes clears immediately",
       "The position closed between full refreshes" in HTML)
+check("EVERY open position is returned, not just the focused symbol",
+      '"positions": positions_out' in BOT_SRC and "get_all_positions()" in BOT_SRC,
+      "the account holds up to maxpos at once")
+check("...and the terminal renders all of them", "renderPositions" in HTML)
+check("pricing the extra symbols is bounded", "PRICE_BUDGET" in BOT_SRC,
+      "this runs once a second; unbounded pricing is a broker call per position")
+check("floating sums across positions, not just the focused one",
+      "sum(p[\"pnlUsd\"] or 0 for p in positions_out)" in BOT_SRC)
+check("only the focused symbol's levels go on the chart",
+      "worse than no line at all" in HTML,
+      "a GBPUSD stop on a XAUUSD scale is worse than no line")
 check("the tick is lighter than the full payload",
       "candles" not in BOT_SRC[BOT_SRC.index("/api/app/tick"):BOT_SRC.index("# ── Mini App: history")],
       "the whole point is that it does not ship candles")
