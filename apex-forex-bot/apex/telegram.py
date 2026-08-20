@@ -2625,29 +2625,59 @@ def _handle_market(chat_id):
             _back_kb(chat_id, [[("📰 News", "nav:news"), ("📈 Positions", "nav:pos")]]))
 
 
-def _handle_news(chat_id):
-    from apex import news
-    if not news.enabled():
+def _handle_news(chat_id, args=""):
+    """The calendar screen — and the switch for the messages it pushes.
+
+    This used to list `news.upcoming()`, which is the trading guard's view:
+    high impact only, still ahead of us. A normal week holds ~8 of those
+    against ~90 other releases and plenty of days have none at all, so the
+    screen answered "no high-impact events" almost every time it was opened
+    and read as a broken feed. It now shows the same rolling, medium-included
+    view as the Mini App.
+    """
+    from apex import news, news_alerts
+    arg = (args or "").strip().lower()
+    if arg in ("on", "off", "1", "0", "yes", "no", "true", "false"):
+        want = arg in ("on", "1", "yes", "true")
+        user_store.update(chat_id, {"news_alerts": want})
         return send_to(chat_id,
-                       "📰 News guard is <b>off</b>. The bot is not avoiding "
-                       "news windows.",
-                       _back_kb(chat_id, [[("📡 Market", "nav:mkt")]]))
+            ("🔔 News alerts <b>ON</b> — I'll message you before a high-impact "
+             "release on a pair you trade, and again once it passes."
+             if want else
+             "🔕 News alerts <b>OFF</b> — no more calendar messages.") +
+            "\n\n<i>This is only about the messages. Whether I stand aside "
+            "around releases is the news guard, in Strategy Builder.</i>",
+            _back_kb(chat_id, [[("📡 Market", "nav:mkt")]]))
+
     user = user_store.load(chat_id)
-    pair = (user.get("symbol", cfg.SYMBOL) or "").split("_")
-    events = news.upcoming(hours=24)
+    pair = [c.upper() for c in (user.get("symbol", cfg.SYMBOL) or "").split("_")]
+    events = news.feed()
+    alerts_on = news_alerts.enabled_for(user)
+    foot = ("\n\n<i>⭐ = affects your pair. 🔔 alerts are ON — /news off to "
+            "stop them.</i>" if alerts_on else
+            "\n\n<i>⭐ = affects your pair. 🔕 alerts are OFF — /news on to "
+            "get a heads-up before high-impact releases.</i>")
     if not events:
         return send_to(chat_id,
-            "📰 <b>No high-impact events</b> in the next 24h (or the calendar feed is "
-            "unavailable). Trading proceeds normally — the news guard is fail-open.",
+            "📰 <b>Nothing on the calendar right now.</b>\n"
+            "<i>No releases due in the next day and a half, or the feed is "
+            "unreachable — either way trading proceeds, the guard fail-opens.</i>"
+            + foot,
             _back_kb(chat_id, [[("📡 Market", "nav:mkt")]]))
     lines = []
-    for e in events:
-        flag = "⭐" if e["currency"] in [c.upper() for c in pair] else "•"
-        h, m = divmod(e["in_min"], 60)
-        when = f"{h}h {m}m" if h else f"{m}m"
-        lines.append(f"{flag} <b>{e['currency']}</b> · {e['title']} — in {when}")
-    send_to(chat_id, "📰 <b>Upcoming high-impact news (24h)</b>\n" + "\n".join(lines)
-            + "\n\n<i>⭐ = affects your pair. The bot stays flat around these.</i>",
+    for e in events[:10]:
+        flag = "⭐" if e["currency"] in pair else "•"
+        am = abs(e["mins"])
+        h, m = divmod(am, 60)
+        when = (f"{h}h {m}m" if h else f"{m}m")
+        when = f"{when} ago" if e["released"] else f"in {when}"
+        tag = "🔴" if e["impact"] == "high" else "🟠"
+        fig = ""
+        if e.get("forecast"):
+            fig = f" <i>(exp {_esc(str(e['forecast']))})</i>"
+        lines.append(f"{flag} {tag} <b>{_esc(e['currency'])}</b> · "
+                     f"{_esc(e['title'])} — {when}{fig}")
+    send_to(chat_id, "📰 <b>Economic calendar</b>\n" + "\n".join(lines) + foot,
             _back_kb(chat_id, [[("📡 Market", "nav:mkt"), ("📈 Positions", "nav:pos")]]))
 
 
@@ -4727,6 +4757,41 @@ def _user_alert(uid, result):
         send_to(uid, f"📰 <b>High-impact news — staying flat on {result.get('symbol', sym)}</b>\n"
                      f"<i>{ev.get('currency', '')} · {ev.get('title', 'event')} in ~{ev.get('mins', 0)} min.</i>\n"
                      "Spreads blow out and price gaps around releases — I'll resume once it passes.")
+    elif action in ("NEWS_AHEAD", "NEWS_CLEAR"):
+        # The calendar reaching out, rather than waiting to be looked up.
+        # NEWS_WARN above is a different message: it fires only when a setup
+        # was actually refused, so it says nothing at all on a day the bot
+        # finds no trade to hold back. These two fire on the release itself.
+        ev = result.get("event", {})
+        ccy = _esc(str(ev.get("currency") or ""))
+        title = _esc(str(ev.get("title") or "Economic release"))
+        # Only claim the pause where the guard is actually switched on for
+        # this client — the message must describe the bot they have.
+        guarded = bool(result.get("guard"))
+        if action == "NEWS_AHEAD":
+            mins = max(0, int(ev.get("mins") or 0))
+            figures = []
+            if ev.get("forecast"):
+                figures.append(f"expected <b>{_esc(str(ev['forecast']))}</b>")
+            if ev.get("previous"):
+                figures.append(f"previous {_esc(str(ev['previous']))}")
+            fig = ("\n<i>" + " · ".join(figures) + "</i>") if figures else ""
+            tail = ("\nI'm standing aside until it passes — spreads blow out "
+                    "and price gaps straight through stops around releases."
+                    if guarded else
+                    # Do NOT point at /news on here: that switches these
+                    # messages, not the guard. The guard is `news_filter`,
+                    # which lives in Strategy Builder.
+                    "\n<i>Your news guard is OFF, so I'll keep trading through "
+                    "it — turn News guard on in /builder if you'd rather I "
+                    "waited.</i>")
+            send_to(uid, f"📰 <b>{ccy} · {title}</b>\n"
+                         f"Lands in about <b>{mins} min</b>.{fig}{tail}")
+        else:
+            send_to(uid, f"✅ <b>{ccy} · {title} is out</b>\n"
+                         + ("Back to trading normally."
+                            if guarded else
+                            "The release has passed and the market is settling."))
     elif action == "SUGGEST":
         # Trade Opportunity — the approval-required variant. The state banner
         # is not decoration: "is this my demo or my real account" is the first
@@ -5329,7 +5394,7 @@ _CONTROLS_TEXT = (
     "/autopilot on — Let the bot pick the best instruments too\n"
     "/maxpos 3 — Allow multiple positions at once\n\n"
     "<b>📰 Info</b>\n"
-    "/news — Upcoming high-impact economic events\n"
+    "/news — Economic calendar · /news on|off for release alerts\n"
     "/guide — How the bot works (visual guide)\n"
     "/purchase — Buy your license ($497 one-time)\n"
     "/help — Quick command list\n\n"
@@ -5824,7 +5889,7 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
     elif cmd_l == "/golive":
         _screen_live_activation(chat_id)
     elif cmd_l == "/news":
-        _handle_news(chat_id)
+        _handle_news(chat_id, args)
     elif cmd_l in ("/market", "/m"):
         _handle_market(chat_id)
     elif cmd_l == "/paper":

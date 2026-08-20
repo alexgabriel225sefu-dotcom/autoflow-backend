@@ -22,6 +22,10 @@ _SETTABLE = {
     # authoritative live-activation path, and it is not this one.
     "max_trades_day", "max_dd_pct", "max_daily_loss_pct", "trailing",
     "breakeven_r", "news_filter", "session_filter", "exit_mode", "style",
+    # Whether the calendar PUSHES messages. Distinct from news_filter, which
+    # decides whether the bot stands aside for releases — a client can want
+    # the pause without the messages, or the messages without the pause.
+    "news_alerts",
     "atr_stops", "htf", "confirm", "maxpos", "copilot",
     # The three-way automation level (signals / approval / full). `copilot`
     # stays settable for anything that still speaks the old two-way boolean —
@@ -48,8 +52,8 @@ _REDACT = {"ctrader_access_token", "ctrader_refresh_token",
 # Numbers happened to survive because the loop wraps them in float()/int(),
 # which parse strings — they are typed here anyway so what is stored matches
 # what was meant.
-_BOOL_KEYS = {"autopilot", "paper", "trailing", "news_filter", "atr_stops",
-              "htf", "copilot"}   # "paper" typed here only for legacy callers;
+_BOOL_KEYS = {"autopilot", "paper", "trailing", "news_filter", "news_alerts",
+              "atr_stops", "htf", "copilot"}   # "paper" typed here only for legacy callers;
                                   # it is not in _SETTABLE, so MCP cannot set it
 _LIST_KEYS = {"autopilot_universe", "watchlist", "session_filter"}
 _INT_KEYS = {"min_confidence", "max_trades_day", "maxpos", "loss_streak"}

@@ -338,6 +338,7 @@ def _cmd(*parts):
 _LEVEL_FOR = {
     "AI_ERROR": "error", "DATA_ERROR": "error", "BROKER_HEALTH": "warn",
     "STOP": "warn", "NEWS_WARN": "info", "FLASH_WARN": "warn",
+    "NEWS_AHEAD": "info", "NEWS_CLEAR": "info",
     "STOP_MOVED": "info", "CLOSE": "trade", "BROKER_CLOSE": "trade",
     "BROKER_CLOSE_MULTI": "trade", "BUY": "trade", "SELL": "trade",
 }

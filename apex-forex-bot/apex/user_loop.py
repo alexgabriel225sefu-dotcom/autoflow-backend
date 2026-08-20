@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
 from apex import access, sentinel, institutional, cot, ledger
-from apex import automation, gates, ownership
+from apex import automation, gates, ownership, news_alerts
 from apex import strategy_api
 # Registering the shipped modules is what makes strategy_api.get() return
 # anything. Without this the registry is empty, every lookup misses, and the
@@ -2568,6 +2568,27 @@ def _loop(user_id, alert_fn, gen=None):
                     "tick": tick,
                     "posInfo": pos_info,
                 })
+
+            # Calendar push. NEWS_WARN, further down, only speaks when a setup
+            # was actually refused — so on a day the bot finds no trade, a
+            # release the client cares about passes in silence. This reaches
+            # out on the release itself: a heads-up while it is still ahead,
+            # and the all-clear once it passes.
+            #
+            # The tick is five minutes, which is the natural rate limit; the
+            # module claims each event so a message cannot repeat across
+            # containers or restarts. It scans the currencies this client
+            # actually trades, and never raises — a notification path must not
+            # be able to break the loop that carries it.
+            if alert_fn:
+                _news_ccy = set()
+                for _w in (list(watchlist) + [symbol]):
+                    _news_ccy.update(_currency_legs(_w))
+                for _msg in news_alerts.due(
+                        user_id, _news_ccy,
+                        user=user_store.load(user_id),
+                        guard_on=bool(getattr(cfg, "NEWS_FILTER", True))):
+                    alert_fn(user_id, _msg)
 
             # AI signal with rule-based fallback. The client chooses via
             # /aiconfirm: ON = every rule entry is double-checked by the AI

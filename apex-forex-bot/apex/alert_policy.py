@@ -46,6 +46,12 @@ ESSENTIAL = {
 
 USEFUL = {
     "NEWS_WARN",                   # standing aside for a release
+    # The calendar reaching out rather than being looked up: a high-impact
+    # release for a pair this client trades is minutes away, and then the
+    # all-clear once it passes. Useful, not essential — nothing has happened
+    # to their money, and a client who wants only money-events can mute it
+    # with /news off without losing the guard that acts on the same data.
+    "NEWS_AHEAD", "NEWS_CLEAR",
     "FLASH_WARN",                  # violent candle
     "BROKER_HEALTH",               # the broker feed is degraded
     "SUGGEST",                     # approval-required proposal awaiting a tap
