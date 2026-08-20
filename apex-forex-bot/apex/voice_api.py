@@ -263,11 +263,19 @@ def ask(token, text):
     underneath. The one thing it will not do is invent an answer — an assistant
     that could not reach its provider says so.
     """
+    t0 = time.time()
     user_id = identify(token)
     if not user_id:
+        # Logged because "nothing happens on my phone" is otherwise
+        # undiagnosable from this side: without a line per turn there is no way
+        # to tell a request that never arrived from one that arrived and was
+        # refused. The token is never printed, and neither is the question —
+        # only whether it resolved, and what came of it.
+        print("[Voice] turn REFUSED — token did not resolve to an account")
         return {"ok": False, "status": 401,
                 "reply": "That link is not valid any more. Send slash voice in "
                          "Telegram to set it up again."}
+    print(f"[Voice] turn from {user_id} — {len(str(text or ''))} chars")
     text = str(text or "").strip()
     if not text:
         return {"ok": False, "status": 400, "reply": "I did not catch that."}
@@ -305,6 +313,9 @@ def ask(token, text):
     if not reply:
         # Do not hand a phone an apology when the facts are one read away.
         local = _fallback(user_id)
+        print(f"[Voice] no assistant reply for {user_id} after "
+              f"{time.time() - t0:.1f}s — "
+              f"{'answered from account state' if local else 'nothing to fall back on'}")
         if local:
             return {"ok": True, "status": 200,
                     "reply": local + " I could not reach the assistant for "
@@ -314,6 +325,8 @@ def ask(token, text):
                          "Your bot is unaffected."}
 
     out = {"ok": True, "status": 200, "reply": speakable(reply)}
+    print(f"[Voice] answered {user_id} in {time.time() - t0:.1f}s "
+          f"({len(out['reply'])} chars)")
     if held.get("intent"):
         cid = stash(user_id, held["intent"])
         out["needsConfirm"] = True
