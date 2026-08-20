@@ -2682,9 +2682,19 @@ def _handle_voice(chat_id, args=""):
             "5. Add <b>Speak Text</b>\n"
             "6. Name it <b>Apex</b> and save.\n\n"
             "Then say <b>\"Hey Siri, Apex\"</b> and ask anything — balance, "
-            "positions, why it skipped a setup.\n"
-            "<i>On iPhone 15 Pro and later you can bind it to the Action "
-            "button instead.</i>\n\n"
+            "positions, why it skipped a setup.\n\n"
+            "<b>Or without saying anything</b> — pick whichever suits you:\n"
+            "• <b>Back Tap</b> — Settings → Accessibility → Touch → Back Tap → "
+            "Double Tap → Apex. Tap the back of the phone twice. Works on "
+            "iPhone 8 and later.\n"
+            "• <b>Lock Screen widget</b> — long-press the lock screen → "
+            "Customise → add the Shortcuts widget. One tap, phone still "
+            "locked.\n"
+            "• <b>Home Screen icon</b> — in Shortcuts, share the shortcut → "
+            "Add to Home Screen.\n"
+            "<i>On iOS 18 and newer you can also put it on a Lock Screen "
+            "button or in Control Centre. The Action button is iPhone 15 Pro "
+            "and later only — the options above work on any iPhone.</i>\n\n"
             "🔇 <code>/voice off</code> revokes the key if you lose the phone.",
             _back_kb(chat_id))
 
