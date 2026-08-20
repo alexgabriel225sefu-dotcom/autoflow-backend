@@ -39,8 +39,32 @@ _SETTABLE = {
     "loss_streak",
 }
 
+# Named secrets. Kept because two of them are not obviously credential-shaped
+# from the name alone, and `ctrader_accounts` is a broker payload rather than
+# a key.
 _REDACT = {"ctrader_access_token", "ctrader_refresh_token",
            "ctrader_accounts"}
+
+# …and the shape rule, because a denylist of names only ever covers the
+# secrets that existed when it was written. `groq_key` and `gemini_key` were
+# added to the user record long after this list, and neither was added to it —
+# so `user_detail`, documented as token-redacted, returned a client's Groq key
+# in full. Observed live, in a transcript.
+#
+# Anything whose FIELD NAME looks credential-shaped is dropped, so a secret
+# added tomorrow is covered on the day it is added rather than on the day
+# somebody notices it leaking.
+_SECRET_SUFFIXES = ("_key", "_token", "_secret", "_password", "_hash")
+_SECRET_WORDS = ("secret", "password", "passphrase", "apikey", "credential")
+
+
+def _is_secret(field) -> bool:
+    f = str(field or "").lower()
+    if f in _REDACT:
+        return True
+    if f.endswith(_SECRET_SUFFIXES):
+        return True
+    return any(w in f for w in _SECRET_WORDS)
 
 # The control-plane transport hands every value over as a STRING, but the loop
 # reads these settings with bool() / list() and never re-parses them.
@@ -134,7 +158,7 @@ def build():
 
     def h_user_detail(args):
         uid = str(args["user_id"])
-        u = {k: v for k, v in user_store.load(uid).items() if k not in _REDACT}
+        u = {k: v for k, v in user_store.load(uid).items() if not _is_secret(k)}
         u["_connected_ctrader"] = bool(user_store.load(uid).get("ctrader_access_token"))
         return {"user": uid, "record": u, "summary": _summarize(uid),
                 "dash": user_loop.get_dash(uid) or {}}

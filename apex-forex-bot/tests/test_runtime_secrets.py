@@ -124,3 +124,46 @@ if failures:
     print(f"❌ {len(failures)} check(s) failed")
     sys.exit(1)
 print("✅ ALL TESTS PASSED — no broker credential is written in the clear.")
+
+
+# ── Operator reads must not return credentials ────────────
+# `user_detail` is documented as token-redacted, and it returned a client's
+# Groq key in full — observed live, in a transcript. The redaction list named
+# three cTrader fields and had never been updated when `groq_key` and
+# `gemini_key` were added to the user record. A denylist of names only ever
+# covers the secrets that existed when it was written, so the rule is now the
+# SHAPE of the field name: anything credential-shaped is dropped on the day it
+# is added rather than on the day somebody notices it leaking.
+print("\n🔐 OPERATOR READS — credentials never leave")
+
+from apex import control_actions as _ca  # noqa: E402
+
+_leaky = []
+
+
+def _secret_check(name, cond, detail=""):
+    print(f"  ✅ {name}" if cond else f"  ❌ {name} {detail}")
+    if not cond:
+        _leaky.append(name)
+
+
+for _field in ("groq_key", "gemini_key", "ctrader_access_token",
+               "ctrader_refresh_token", "ctrader_accounts", "voice_token_hash",
+               "openai_api_key", "some_secret", "user_password", "passphrase"):
+    _secret_check(f"{_field} is withheld", _ca._is_secret(_field) is True)
+
+for _field in ("risk", "symbol", "autopilot", "loss_streak", "maxpos",
+               "news_filter", "voice_confirm", "paper_balance"):
+    _secret_check(f"{_field} is still readable", _ca._is_secret(_field) is False,
+                  "redacting settings would blind the operator")
+
+_SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "apex", "control_actions.py"), encoding="utf-8").read()
+_secret_check("the detail read filters on the shape rule, not the old list",
+              "if not _is_secret(k)" in _SRC,
+              "a name list cannot cover a secret added after it was written")
+
+if _leaky:
+    print(f"\n❌ {len(_leaky)} credential check(s) failed")
+    sys.exit(1)
+print("✅ operator reads carry no credentials")
