@@ -1296,11 +1296,35 @@ def _ai_setup_screen(chat_id):
             _AI_KB)
 
 
-def _detect_ai_key(key):
+# Credential-shaped: one unbroken token, long, mixing letters and digits.
+# Used only where the client has SAID they are handing over a key.
+_KEYISH = re.compile(r"^[A-Za-z0-9._\-]{30,200}$")
+
+
+def _detect_ai_key(key, explicit=False):
+    """Which provider a pasted key belongs to, or None.
+
+    Prefixes are a hint, not a specification. Google AI Studio issued keys
+    beginning `AIza` for years and now issues them beginning `AQ.`, and a
+    client whose brand-new key was refused as "not an AI key" has no way to
+    know the bot is simply out of date — the key is right there in their hand,
+    working. Any prefix list will go stale the same way.
+
+    So `explicit` (the client typed /ai, /gemini or /key, or tapped a button)
+    accepts anything credential-shaped and lets GOOGLE decide, since Google is
+    the only authority on whether a Gemini key is a Gemini key. `gsk_` still
+    wins outright because Groq's prefix is distinctive and unambiguous.
+
+    Without `explicit` — a bare message that might just be chat — the strict
+    prefixes still apply, so an ordinary sentence is never swallowed and
+    deleted as though it were a secret.
+    """
     k = (key or "").strip()
     if k.startswith("gsk_"):
         return "groq"
-    if k.startswith("AIza"):
+    if k.startswith("AIza") or k.startswith("AQ."):
+        return "gemini"
+    if explicit and _KEYISH.match(k):
         return "gemini"
     return None
 
@@ -1309,20 +1333,23 @@ def _handle_ai_key(chat_id, key, msg_id):
     """Verify & save a pasted AI key (any provider, auto-detected)."""
     _delete_message(chat_id, msg_id)
     key = (key or "").strip().split()[0] if key else ""
-    kind = _detect_ai_key(key)
+    # Reached only from /ai, /gemini, /groq, /key or a bare paste that already
+    # matched a known prefix — in every case the client meant "this is a key".
+    kind = _detect_ai_key(key, explicit=True)
     if kind is None:
         # Name the prefix we actually got. "I couldn't tell" with no detail
         # sends people back to copy the same wrong string again — a Google
         # ephemeral token (AQ.…) looks like a key and is not one.
         seen = (key[:4] + "…") if len(key) > 4 else (key or "nothing")
         return send_to(chat_id,
-                       "🤔 <b>That doesn't look like an AI key.</b>\n"
-                       f"Yours starts with <code>{_esc(seen)}</code>.\n\n"
-                       "Gemini keys start with <code>AIza</code> — on "
-                       "aistudio.google.com/apikey tap <b>Create API key</b> and "
-                       "copy the long <code>AIzaSy…</code> string, not a "
-                       "temporary token.\n"
-                       "Groq keys start with <code>gsk_</code>.",
+                       "🤔 <b>That doesn't look like a full key.</b>\n"
+                       f"I got <code>{_esc(seen)}</code> — {len(key)} characters.\n\n"
+                       "Copy the <b>whole</b> key, with no spaces or line "
+                       "breaks:\n"
+                       "• <b>Gemini</b> → aistudio.google.com/apikey → "
+                       "<b>Create API key</b>\n"
+                       "• <b>Groq</b> → console.groq.com/keys "
+                       "(starts <code>gsk_</code>)",
                        _AI_KB)
     label = {"groq": "Groq", "gemini": "Gemini"}[kind]
     send_to(chat_id, f"🔍 Testing your {label} key…")

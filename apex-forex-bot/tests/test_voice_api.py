@@ -271,13 +271,14 @@ try:
     telegram.send_to = lambda cid, text, *a, **k: _sent.append(text)
     telegram._delete_message = lambda *a, **k: None
 
-    telegram._handle_ai_setup("900", "AQ.Ab8RN6I8FYogIlADmgna", 1)
+    telegram._handle_ai_setup("900", "abc123", 1)
     wrong = _sent[-1]
-    check("a wrong-format key is rejected, not silently ignored",
-          "doesn't look like an AI key" in wrong, wrong[:120])
-    check("and the refusal names the prefix it actually saw",
-          "AQ.A" in wrong, wrong[:200])
-    check("it points at the right string to copy", "AIzaSy" in wrong)
+    check("a truncated key is rejected, not silently ignored",
+          "doesn't look like a full key" in wrong, wrong[:120])
+    check("and the refusal says what it actually got",
+          "abc1" in wrong and "6 characters" in wrong, wrong[:200])
+    check("it names both places to copy a real one",
+          "aistudio.google.com/apikey" in wrong and "console.groq.com" in wrong)
 
     _sent.clear()
     telegram._handle_ai_setup("900", "", 1)
@@ -286,17 +287,37 @@ try:
 finally:
     telegram.send_to, telegram._delete_message = _real_send, _real_del
 
-check("both real key formats are still detected",
-      telegram._detect_ai_key("AIzaSyABC") == "gemini"
-      and telegram._detect_ai_key("gsk_abc") == "groq")
-check("a Google ephemeral token is not mistaken for one",
-      telegram._detect_ai_key("AQ.Ab8") is None)
+print("\n16. Key formats change; a prefix list must not be the gate")
+# Google AI Studio issued keys beginning AIza for years and now issues them
+# beginning AQ. — reported live by a client whose brand-new Gemini key was
+# refused as "not an AI key" while working perfectly everywhere else. Any
+# hard-coded prefix list goes stale the same way, so where the client has
+# SAID they are handing over a key, Google decides, not us.
+check("the historic Gemini format still works",
+      telegram._detect_ai_key("AIzaSyABCDEFGHIJKLMNOPQRSTUV") == "gemini")
+check("the current Gemini format works",
+      telegram._detect_ai_key("AQ.Ab8RN6I8FYogIlADmgnaJNnDxNDD") == "gemini")
+check("Groq's prefix still wins outright",
+      telegram._detect_ai_key("gsk_abcdefghijklmnopqrstuvwxyz01") == "groq")
+check("an unrecognised format is accepted when offered explicitly",
+      telegram._detect_ai_key("zz9PlaskFooBarBaz1234567890abcdefXYZ",
+                              explicit=True) == "gemini",
+      "the next format change must not need a deploy")
+check("but a bare message is never swallowed as a secret",
+      telegram._detect_ai_key("zz9PlaskFooBarBaz1234567890abcdefXYZ") is None,
+      "a bare paste is deleted from the chat — that must need a known prefix")
+check("ordinary chat is not mistaken for a key even when explicit",
+      telegram._detect_ai_key("cum merge botul meu azi", explicit=True) is None)
+check("nor is something far too short",
+      telegram._detect_ai_key("abc123", explicit=True) is None)
 
 ROUTE = open(os.path.join(ROOT, "apex", "telegram.py"), encoding="utf-8").read()
 check("the /ai command passes its argument through",
       "_handle_ai_setup(chat_id, args, msg_id)" in ROUTE)
+check("the explicit path lets the provider decide",
+      "_detect_ai_key(key, explicit=True)" in ROUTE)
 
-print("\n16. A key check must test the KEY, not a model that may be gone")
+print("\n17. A key check must test the KEY, not a model that may be gone")
 # Reported live: a valid Groq key was refused. The check sent a chat
 # completion to a hard-coded model, so the day Groq retires that model every
 # valid key starts failing — and it was reported as "Key rejected — recreate
