@@ -10,6 +10,7 @@ Provider priority (shared owner key covers ALL clients):
   4. Local status       — always works, no AI needed
 """
 import json
+import os
 import threading
 from apex import chat_memory
 from apex import config as cfg
@@ -418,7 +419,7 @@ def _chat_groq(user_id: str, message: str, api_key: str = "") -> str:
     return _chat_openai_compatible(
         user_id, message,
         url="https://api.groq.com/openai/v1/chat/completions",
-        key=key, model="llama-3.3-70b-versatile", label="groq")
+        key=key, model=groq_model(), label="groq")
 
 
 def _chat_gateway(user_id: str, message: str) -> str:
@@ -568,35 +569,71 @@ def chat(user_id: str, message: str, send_fn, send_status=None, guard=None,
     threading.Thread(target=_run, daemon=True).start()
 
 
+def _gemini_model_name() -> str:
+    return (os.getenv("GEMINI_MODEL") or getattr(cfg, "GEMINI_MODEL", "")
+            or "gemini-2.5-flash").strip()
+
+
 def _gemini_url() -> str:
-    model = getattr(cfg, "GEMINI_MODEL", "") or "gemini-2.5-flash"
     return (f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{model}:generateContent")
+            f"{_gemini_model_name()}:generateContent")
+
+
+# Groq retires models on its own schedule, so the chat model is a setting
+# rather than a literal. Changing it must never require a deploy.
+GROQ_DEFAULT_MODEL = "llama-3.3-70b-versatile"
+
+
+def groq_model() -> str:
+    return (os.getenv("GROQ_MODEL") or getattr(cfg, "GROQ_MODEL", "")
+            or GROQ_DEFAULT_MODEL).strip()
 
 
 def test_groq_key(key: str):
-    """Quick liveness check for a Groq key. Returns (ok, message)."""
+    """Liveness check for a Groq key. Returns (ok, message).
+
+    Checked against /models, which is authentication-only, NOT against a chat
+    completion on a named model. The old check sent a completion to a
+    hard-coded model, so the day Groq retired that model every valid key
+    started failing — and the failure was reported as "key rejected", which
+    sends people off to regenerate a key that was fine all along. A key check
+    must test the key and nothing else.
+
+    A live key whose configured chat model has since been retired still
+    passes, and says so: that is a deployment setting to change, not a reason
+    to refuse a working credential.
+    """
     import requests
     key = (key or "").strip()
     if not key.startswith("gsk_"):
         return False, "Groq keys start with gsk_ — copy it from console.groq.com/keys"
     try:
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={"model": "llama-3.3-70b-versatile",
-                  "messages": [{"role": "user", "content": "Reply with the single word OK."}],
-                  "max_tokens": 5},
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            timeout=12,
-        )
+        r = requests.get(
+            "https://api.groq.com/openai/v1/models",
+            headers={"Authorization": f"Bearer {key}"}, timeout=12)
         if r.status_code == 401:
             return False, "Key rejected — recreate it at console.groq.com/keys"
         if r.status_code == 429:
             return True, "Key valid (was briefly rate-limited, that's fine)"
-        r.raise_for_status()
+        if not r.ok:
+            # Say what the API actually said. "Could not verify" on its own is
+            # indistinguishable from a bad key to the person reading it.
+            detail = ""
+            try:
+                detail = str((r.json().get("error") or {}).get("message") or "")[:120]
+            except Exception:
+                detail = (r.text or "")[:120]
+            return False, f"Groq answered {r.status_code}{': ' + detail if detail else ''}"
+        ids = [m.get("id") for m in (r.json().get("data") or [])
+               if isinstance(m, dict) and m.get("id")]
+        want = groq_model()
+        if ids and want not in ids:
+            alt = next((m for m in ids if "llama" in m.lower()), ids[0])
+            return True, (f"Key works — but the chat model {want} is no longer "
+                          f"available. Set GROQ_MODEL={alt} on the service.")
         return True, "Key works"
     except Exception as e:
-        return False, f"Could not verify key ({e})"
+        return False, f"Could not reach Groq ({e})"
 
 
 def test_gemini_key(key: str):
@@ -625,6 +662,14 @@ def test_gemini_key(key: str):
                 return False, "Google says the key is invalid. Recreate it at aistudio.google.com/apikey and copy the WHOLE key (starts with AIza)."
             if reason in ("SERVICE_DISABLED", "PERMISSION_DENIED"):
                 return False, "The Generative Language API isn't enabled for this key's project. Create the key in a NEW project at aistudio.google.com/apikey."
+            # A retired model answers 404 AFTER the key has been accepted, so
+            # this is a working credential pointed at a name that no longer
+            # exists. Same trap the Groq check used to fall into: reporting it
+            # as a bad key sends people off to regenerate a good one.
+            if r.status_code == 404 and "model" in (msg or "").lower():
+                return True, (f"Key works — but the chat model "
+                              f"{_gemini_model_name()} is no longer available. "
+                              f"Set GEMINI_MODEL on the service.")
             return False, f"Google rejected the key: {msg or reason or r.status_code}"
         r.raise_for_status()
         return True, "Key works"

@@ -296,6 +296,36 @@ ROUTE = open(os.path.join(ROOT, "apex", "telegram.py"), encoding="utf-8").read()
 check("the /ai command passes its argument through",
       "_handle_ai_setup(chat_id, args, msg_id)" in ROUTE)
 
+print("\n16. A key check must test the KEY, not a model that may be gone")
+# Reported live: a valid Groq key was refused. The check sent a chat
+# completion to a hard-coded model, so the day Groq retires that model every
+# valid key starts failing — and it was reported as "Key rejected — recreate
+# it", sending people off to regenerate a credential that was fine. The check
+# now runs against /models, which is authentication-only.
+import inspect  # noqa: E402
+
+GROQ_SRC = inspect.getsource(assistant.test_groq_key)
+check("the Groq check calls the models endpoint",
+      "/openai/v1/models" in GROQ_SRC, GROQ_SRC[:200])
+check("and does not post a completion to a named model",
+      "chat/completions" not in GROQ_SRC,
+      "a model name in a key check is the bug being fixed")
+check("a non-gsk_ string is refused before any network call",
+      assistant.test_groq_key("AQ.Ab8")[0] is False)
+check("the chat model is a setting, not a literal",
+      assistant.groq_model() == assistant.GROQ_DEFAULT_MODEL)
+os.environ["GROQ_MODEL"] = "some-newer-model"
+check("and the setting is honoured without a deploy",
+      assistant.groq_model() == "some-newer-model")
+del os.environ["GROQ_MODEL"]
+
+ASRC = open(os.path.join(ROOT, "apex", "assistant.py"), encoding="utf-8").read()
+check("the Groq chat path uses the same setting",
+      "model=groq_model()" in ASRC)
+check("Gemini's model is a setting too", "_gemini_model_name()" in ASRC)
+check("a retired Gemini model is not reported as a bad key",
+      'r.status_code == 404 and "model" in' in ASRC)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")
