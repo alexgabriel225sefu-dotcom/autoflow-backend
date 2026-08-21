@@ -6,27 +6,38 @@ Two ways to connect (3Commas-style — trades appear live in the app you already
 - **cTrader** — free Open API, works with any cTrader broker worldwide (IC Markets, Pepperstone, FxPro…). SL/TP are placed server-side and positions are reconciled automatically after a restart
 - **MetaTrader 5** — via the included ApexBridge EA: IC Markets, Pepperstone, or any MT5 broker ([guide](docs/METATRADER.md)). Paper + practice supported; live mode requires the `ALLOW_EXPERIMENTAL_LIVE=true` flag
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/alexgabriel225sefu-dotcom/autoflow-backend)
-
 ---
 
-## Deploy in 3 steps
+## How this is deployed
 
-### Step 1 — Click the button above
-- Login with GitHub (free account)
-- When Railway asks for **Root Directory** → type `apex-forex-bot`
+**Render, from GitHub.** The blueprint is [`render.yaml`](render.yaml) in this
+folder: a `web` service on the Starter plan (a trading bot must stay awake),
+building and running from `rootDir: apex-forex-bot`, with `autoDeploy` on.
 
-### Step 2 — Add 4 variables
-In the Railway **Variables** tab:
+A commit to the tracked branch that touches `apex-forex-bot/**` builds and
+restarts the service. Nothing else does — the build filter deliberately
+excludes the other projects in this monorepo, because an unrelated commit
+restarting the trading loop can orphan an open position mid-trade.
+
+There is no deploy command, and nothing in the bot can deploy itself. `/deploy`
+in Telegram reports what is running — service, branch, commit, uptime — and
+cannot change it.
+
+### Configuration
+
+Set in the Render dashboard, under the service's **Environment**:
 
 | Variable | Where to get it |
 |---|---|
+| `PRODUCT` | `forex` — the bot refuses to start without it |
 | `TELEGRAM_BOT_TOKEN` | Create a bot at [@BotFather](https://t.me/BotFather) → `/newbot` |
-| `TELEGRAM_CHAT_ID` | Message [@userinfobot](https://t.me/userinfobot) → it replies with your ID |
-| `GROQ_API_KEY` | Free key at [console.groq.com](https://console.groq.com) (takes 1 minute) |
-| `LICENSE_KEY` | From your purchase email |
+| `ADMIN_CHAT_ID` | Message [@userinfobot](https://t.me/userinfobot) → it replies with your ID |
+| `TOKEN_ENCRYPTION_KEY` | Fernet key — see [docs/CONFIG.md](docs/CONFIG.md). Startup is refused without it in production |
+| `UPSTASH_REDIS_REST_URL` / `..._TOKEN` | Shared state. Startup is refused without a shared backend in production |
+| `GEMINI_API_KEY` *(optional)* | Powers AI chat and voice control. Trading works without it |
 
-Click **Deploy**.
+Two of those refuse to start rather than degrade, on purpose: credentials in
+plaintext and per-container state are both worse than an outage you can see.
 
 ### Step 3 — Open Telegram
 Find your bot and send:
@@ -118,9 +129,15 @@ guarantee future profit — treat the backtest as a sanity check, not a promise.
 
 ## Safety
 
-Start with paper trading (the default). The bot runs on **your** Railway
-account with **your** cTrader credentials — the seller has zero access to your
-credentials. Never enable more permissions than the bot needs.
+Start on a demo account (the default). Switching to real money is an
+activation, not a setting: it needs recorded risk acceptance, the account
+environment as the BROKER reports it, and a typed single-use confirmation —
+no button, API call or operator action can flip it on your behalf.
+
+The bot connects to **your** cTrader account through the Open API, which
+grants trading access and never withdrawal access. Broker tokens are
+encrypted at rest, and the service refuses to start if the encryption key is
+missing rather than storing them in the clear.
 
 > Forex trading with leverage is risky. Past results do not guarantee future
 > performance. Never trade money you can't afford to lose.

@@ -81,6 +81,64 @@ ALLOW_STATELESS = (os.getenv("CTRADER_ALLOW_STATELESS_CALLBACK", "")
                    .strip().lower() in ("1", "true", "yes", "on"))
 
 
+class StatelessCallbackInProduction(RuntimeError):
+    """Raised at startup when production is configured to trust unsigned
+    callbacks. Refusing to boot is the point: a service that starts in this
+    configuration links broker accounts to whoever happens to be mid-flow."""
+
+
+def _production() -> bool:
+    # Imported lazily: user_store imports config, and config is imported by
+    # half the package. The rule itself lives there and must not be forked —
+    # it is deliberately inverted (unknown environment counts as production).
+    from apex import user_store
+    return user_store._is_production()
+
+
+def assert_safe_config():
+    """Refuse to start if production would accept unsigned OAuth callbacks.
+
+    The escape hatch below exists for one scenario — cTrader silently stops
+    echoing `state` and onboarding breaks for everyone with no way in. That is
+    a development-time diagnosis, not a production posture: an unsigned
+    callback cannot be attributed to a client, so accepting one in production
+    means somebody's broker account can be wired to another person's chat.
+
+    A warning would not be enough. The setting is a single environment
+    variable, and a variable left on after a debugging session is exactly how
+    this ends up live — the failure is silent, and the damage is somebody
+    else's real money. So it fails at startup, loudly, before the first
+    callback can arrive.
+    """
+    if ALLOW_STATELESS and _production():
+        raise StatelessCallbackInProduction(
+            "CTRADER_ALLOW_STATELESS_CALLBACK is on and this is production. "
+            "An unsigned OAuth callback cannot be attributed to a client, so "
+            "it can bind one person's broker account to another person's "
+            "chat. Unset it, or declare a development environment "
+            "(APP_ENV=dev).")
+
+
+def stateless_allowed() -> bool:
+    """The escape hatch, as it actually applies at runtime.
+
+    Defence in depth against `assert_safe_config` not having been called: even
+    if something starts the service without the startup check, production
+    still refuses. The startup failure is the loud path; this is the one that
+    holds when the loud path is skipped.
+    """
+    if not ALLOW_STATELESS:
+        return False
+    try:
+        if _production():
+            print("[cTrader OAuth] ⛔ stateless callback requested but this is "
+                  "production — refusing. This should have failed at startup.")
+            return False
+    except Exception:
+        return False        # cannot establish the environment → refuse
+    return True
+
+
 def _record_pending(chat_id):
     _pending[str(chat_id)] = int(time.time())
 
@@ -110,7 +168,7 @@ def _recent_pending():
     client's chat. Nothing in a stateless callback proves otherwise.
     """
     fresh = _fresh_pending()
-    if not ALLOW_STATELESS:
+    if not stateless_allowed():
         if fresh:
             print(f"[cTrader OAuth] REFUSED a callback with no valid state "
                   f"({len(fresh)} authorization(s) pending). An unsigned "

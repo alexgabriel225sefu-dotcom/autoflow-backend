@@ -10,12 +10,27 @@ services:
     startCommand: python -u main.py
     plan: starter
     autoDeploy: true
+    # The service builds and runs from INSIDE this folder. Without it the
+    # blueprint cannot recreate the running service: `pip install -r
+    # requirements.txt` and `python -u main.py` both resolve from the
+    # repository root, where neither file exists — this is a monorepo and the
+    # bot lives in apex-forex-bot/. The live service was created by hand with
+    # this set, so the running deployment is fine and the BLUEPRINT was the
+    # thing that could not reproduce it. That only shows up the day someone
+    # rebuilds from it, which is the day it matters most.
+    rootDir: apex-forex-bot
     # Scope auto-deploy to this folder only. This repo also holds
     # apex-crypto-bot/ and ruflo-mcp/ — without this filter, a commit to
     # either of THOSE also restarts this live trading loop for no reason,
     # which is exactly the kind of unnecessary restart that can silently
     # orphan an open position mid-trade (see user_loop.py's startup
     # recovery comment).
+    #
+    # NOTE: buildFilter paths are relative to the REPOSITORY ROOT, not to
+    # rootDir. So this stays `apex-forex-bot/**` and must NOT be shortened to
+    # `**` to "match" rootDir above — that would match every commit in the
+    # monorepo and restart the trading loop for changes to the crypto bot or
+    # the website.
     buildFilter:
       paths:
         - apex-forex-bot/**

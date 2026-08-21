@@ -924,6 +924,14 @@ def main():
     global start_balance, paper_balance, open_position, broker
     print(f"[{getattr(cfg, 'BOT_NAME', 'Apex Forex Bot').upper()}] Starting... Python {sys.version.split()[0]}")
 
+    # Configuration that would be unsafe in production is refused HERE, before
+    # anything can arrive. Checking it at the point of use would mean the
+    # service starts, looks healthy, and only reveals the problem when a real
+    # client's OAuth callback is already in flight — at which point refusing
+    # is a broken onboarding rather than a caught misconfiguration.
+    from apex import ctrader_oauth as _oauth
+    _oauth.assert_safe_config()
+
     # Privileged operator configuration. The admin id used to be a constant in
     # access.py, which meant the repository carried a privileged identity and
     # changing the operator needed a deploy. It now comes from ADMIN_CHAT_IDS /

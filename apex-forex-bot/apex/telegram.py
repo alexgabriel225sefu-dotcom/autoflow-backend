@@ -2577,12 +2577,23 @@ def _route_cb(chat_id, data):
     # Buttons from older chats. They still work, and they now land on the
     # configuration summary rather than starting the bot from a message the
     # client may have scrolled back to weeks later.
+    # These two used to write `paper` straight onto the record. For
+    # `ob:mode:real` that was a live-money activation with NONE of the gates
+    # the real one applies: no recorded risk acceptance, no broker-verified
+    # account environment, no single-use typed confirmation, no initial risk
+    # cap, no audit entry. And the comment above is the reason it mattered —
+    # these buttons survive in old chats, so a message from weeks ago could
+    # still flip an account to real money by being tapped, or by its
+    # callback_data being replayed.
+    #
+    # They now go through `_handle_paper`, which is the one authoritative
+    # activation path. Nothing is lost: for a demo account it is still one
+    # step, and for a live account it asks for exactly what activation has
+    # always required.
     if data == "ob:mode:paper":
-        user_store.update(chat_id, {"paper": True})
-        return _ob_summary(chat_id)
+        return _handle_paper(chat_id, "on")
     if data == "ob:mode:real":
-        user_store.update(chat_id, {"paper": False})
-        return _ob_summary(chat_id)
+        return _handle_paper(chat_id, "off")
     if data == "ob:risk":
         from datetime import datetime as _dt
         user_store.update(chat_id, {"risk_accepted": _dt.utcnow().isoformat()})
@@ -4548,31 +4559,77 @@ def _handle_close(chat_id):
                  [("☰ Menu", "nav:menu")]]))
 
 
+# Stamped when the module loads, which is process start. Reading the clock on
+# first CALL instead would report "running for 0m" on a process that had been
+# up for days, which is precisely the fact this command exists to report.
+_PROCESS_STARTED_AT = time.time()
+
+
 def _handle_deploy(chat_id):
-    import subprocess
-    import threading
-    send_to(chat_id, "🔄 <b>Deploying latest code...</b>\n<i>This takes ~30 seconds.</i>")
-    pull_cmd = " && ".join([
-        "export PATH=/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/bin:/sbin:$PATH",
-        "cd /opt/apex-forex",
-        "git fetch origin claude/arcads-external-api-gExX7",
-        "git reset --hard origin/claude/arcads-external-api-gExX7",
-        "cd apex-forex-bot",
-        "pip3 install -q -r requirements.txt",
-    ])
+    """Report what is deployed. It no longer DEPLOYS anything.
 
-    def _run():
-        result = subprocess.run(pull_cmd, shell=True, executable="/bin/bash",
-                                capture_output=True, text=True, timeout=110)
-        if result.returncode != 0:
-            send_to(chat_id, f"❌ <b>Deploy failed:</b>\n<code>{(result.stderr or result.stdout)[:500]}</code>")
-            return
-        send_to(chat_id, "✅ <b>Deploy successful!</b> Restarting Forex Bot...\n\nSend /status when ready.")
-        import time
-        time.sleep(1)
-        subprocess.run("systemctl restart apex-forex", shell=True, executable="/bin/bash")
+    This used to shell out on the production host:
 
-    threading.Thread(target=_run, daemon=True).start()
+        fetch the branch, hard-reset the working tree onto it, reinstall
+        requirements, then restart the service unit
+
+    all of it as one string handed to a shell, behind nothing but an admin
+    check. Three things are wrong with that in this architecture.
+
+    (The literal commands are deliberately not written out here. A grep for
+    them is how this class of thing gets found, and a docstring that contains
+    the strings it is describing makes that grep useless — the same way a
+    substring test can pass or fail on prose instead of code.)
+
+    It cannot work. Production is Render, deploying from GitHub on every
+    commit to the tracked branch. There is no checkout on disk to reset and no
+    service unit to restart — the paths it drove belong to a host this service
+    stopped running on.
+
+    It was a second, competing way to change what code is live, inside a
+    process that trades real money. Two deployment mechanisms mean the running
+    code can disagree with the branch everyone reads.
+
+    And it put arbitrary shell execution one compromised admin session away.
+    `is_admin` is the only thing that stood between a Telegram message and a
+    root shell on the trading host: no second factor, no confirmation, no
+    audit beyond a log line.
+
+    Deployment happens by pushing to the tracked branch. What an operator
+    actually needs from Telegram is the answer to "is the thing I pushed the
+    thing that is running", and that is a read.
+    """
+    import time as _t
+    up = int(_t.time() - _PROCESS_STARTED_AT)
+    h, rem = divmod(up, 3600)
+    uptime = f"{h}h {rem // 60}m" if h else f"{rem // 60}m {rem % 60}s"
+
+    # Render publishes these to every service it runs. Absent locally, which
+    # is itself the honest answer to "what is deployed" on a laptop.
+    svc = os.getenv("RENDER_SERVICE_NAME") or "—"
+    branch = os.getenv("RENDER_GIT_BRANCH") or "—"
+    commit = (os.getenv("RENDER_GIT_COMMIT") or "")[:8] or "—"
+    on_render = bool(os.getenv("RENDER_SERVICE_NAME") or os.getenv("RENDER"))
+
+    lines = [
+        "🚀 <b>Deployment status</b>",
+        f"Service: <b>{_esc(svc)}</b>",
+        f"Branch: <code>{_esc(branch)}</code>",
+        f"Commit: <code>{_esc(commit)}</code>",
+        f"Running for: <b>{uptime}</b>",
+        "",
+    ]
+    if on_render:
+        lines.append("<i>Deploys are automatic: push to the branch above and "
+                     "Render builds and restarts this service. There is "
+                     "nothing to trigger from here.</i>")
+    else:
+        lines.append("<i>Not running on Render — these fields are only "
+                     "populated by the deployment platform.</i>")
+    lines.append("")
+    lines.append("<i>This command is read-only. It reports what is deployed "
+                 "and cannot change it.</i>")
+    send_to(chat_id, "\n".join(lines), _back_kb(chat_id))
 
 
 def _handle_grant(chat_id, args):

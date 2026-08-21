@@ -102,6 +102,37 @@ def _nrm(x):
     return (x or "").upper().replace("_", "").replace("/", "").replace("-", "")
 
 
+# Restart recovery has exactly three outcomes, and which one is chosen is the
+# most safety-critical decision the process makes at startup. It lived inline
+# inside a two-thousand-line loop, where the only way to check it was to read
+# it. Extracted verbatim so it can be EXERCISED — the loop below calls this
+# and behaves exactly as before.
+ADOPT = "ADOPT"                    # broker says the position is still open
+KEEP_TRACKED = "KEEP_TRACKED"      # broker never answered — do not guess
+CONFIRMED_CLOSED = "CONFIRMED_CLOSED"   # broker answered, definitively flat
+
+
+def recovery_verdict(live_position, got_answer):
+    """What a restart may conclude about a position it used to hold.
+
+    The distinction that matters is between `not live_position` and "the
+    broker told us there is no position". They are not the same fact, and
+    treating them as one is how a transient hiccup at exactly the wrong moment
+    gets read as "closed" — abandoning a position that is still open and from
+    then on unmanaged.
+
+    `got_answer` is deliberately "did any attempt succeed", not "did any
+    attempt fail". With the latter, failing twice and then getting a clean
+    definitive answer on the third try still counted as unreachable, because
+    the flag stayed set from the earlier failures.
+    """
+    if live_position:
+        return ADOPT
+    if not got_answer:
+        return KEEP_TRACKED
+    return CONFIRMED_CLOSED
+
+
 def _risk_from_snapshot(entry_price, initial_stop):
     """abs(entry - stop) from a persisted snapshot, or None if either value is
     missing/unusable. The snapshot is external state (Redis/disk) that can be
@@ -1262,7 +1293,8 @@ def _loop(user_id, alert_fn, gen=None):
                           f"(attempt {_attempt + 1}/3): {e}")
                     if _attempt < 2:
                         time.sleep(2)
-            if _live:
+            _verdict = recovery_verdict(_live, _got_answer)
+            if _verdict == ADOPT:
                 symbol = _snap["symbol"]
                 open_pos = _live
                 # The persisted snapshot is the only surviving record of WHY
@@ -1289,7 +1321,7 @@ def _loop(user_id, alert_fn, gen=None):
                                         "initialStop": _init_stop})
                 print(f"[UserLoop:{user_id}] restart recovery: adopted still-open {symbol} position"
                       f"{'' if _init_stop else ' (no initial stop on record — trailing falls back to the live stop)'}")
-            elif not _got_answer:
+            elif _verdict == KEEP_TRACKED:
                 # Never got a definitive answer from the broker — don't guess
                 # "closed." Keep tracking it from the snapshot; the very next
                 # tick's own position-sync (which is allowed to keep retrying)
