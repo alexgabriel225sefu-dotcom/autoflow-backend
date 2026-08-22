@@ -13,6 +13,7 @@ pe risc 2%, spread plătit la intrare, slippage, exituri identice cu live-ul
 Ce NU simulează: judecata LLM-ului (filtru suplimentar la live → live-ul ia de
 regulă MAI PUȚINE trade-uri). Rezultatele trecute nu garantează profit.
 """
+import math
 import os
 import sys
 
@@ -145,6 +146,44 @@ def fetch_candles():
     return broker.get_candles(SYMBOL, cfg.TIMEFRAME, min(CANDLES + 300, 5000))
 
 
+def validate_candles(candles):
+    """Reject malformed rows at the boundary instead of letting them flow in
+    silently.
+
+    A malformed journal row containing the literal "x" once crashed a live
+    feature that trusted its input — same class of bug lives here: this file
+    feeds candles straight into the REAL indicators/strategy/position code,
+    so one bad bar (a NaN from a provider hiccup, a zero/negative price, a
+    wick that doesn't contain the open/close, a dropped-volume row, a
+    duplicated or out-of-order timestamp from a resumed fetch) would corrupt
+    every indicator computed on a window containing it — quietly, with no
+    crash to notice. Reject at the door and REPORT the count instead.
+    """
+    clean, rejected = [], 0
+    last_time = None
+    for c in candles:
+        try:
+            o, h, lo, cl = (float(c["open"]), float(c["high"]),
+                            float(c["low"]), float(c["close"]))
+            vol = float(c["volume"])
+            t = c["time"]
+            ok = (
+                all(math.isfinite(x) for x in (o, h, lo, cl, vol))
+                and o > 0 and h > 0 and lo > 0 and cl > 0
+                and h >= max(o, cl) and lo <= min(o, cl)
+                and vol >= 0
+                and (last_time is None or t > last_time)  # unsorted/duplicate
+            )
+        except (TypeError, ValueError, KeyError):
+            ok = False
+        if not ok:
+            rejected += 1
+            continue
+        last_time = t
+        clean.append(c)
+    return clean, rejected
+
+
 def run():
     pip = forex.pip_size(SYMBOL)
     half_spread = SPREAD_PIPS / 2 * pip
@@ -162,6 +201,10 @@ def run():
     print("═" * 64)
 
     candles = fetch_candles()
+    candles, n_rejected = validate_candles(candles)
+    if n_rejected:
+        print(f"  🧹 {n_rejected} lumânări respinse (date invalide/nesortate/duplicate) "
+              f"— {len(candles)} rămase")
     if len(candles) < 400:
         raise SystemExit(f"Doar {len(candles)} lumânări — minim 400")
 
@@ -249,8 +292,16 @@ def run():
                     or (sig["action"] == "SELL" and htf == "BULLISH")):
                 continue
 
+        if i + 1 >= len(candles):
+            # The signal is read off THIS bar's close (window ends at i), so
+            # the earliest a live bot could actually place the order is the
+            # NEXT bar's open — never this bar's own close (that would be
+            # look-ahead: filling on a price the signal itself depended on).
+            # The last bar in the series has no next bar, so it produces no
+            # entry — that is correct, not a bug.
+            continue
         d = 1 if sig["action"] == "BUY" else -1
-        entry = mid + d * (half_spread + slip)  # intrarea plătește spread + slippage
+        entry = candles[i + 1]["open"] + d * (half_spread + slip)  # fill on the NEXT bar's open + spread/slippage
         sl_px, tp_px = calc_entry_sltp(sig["action"], entry, float(ind["atr"]),
                                        SYMBOL, spread_pips=SPREAD_PIPS,
                                        sl_pips=cfg.STOP_LOSS_PIPS,
