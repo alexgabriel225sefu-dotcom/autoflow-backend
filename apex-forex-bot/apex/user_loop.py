@@ -112,6 +112,64 @@ KEEP_TRACKED = "KEEP_TRACKED"      # broker never answered — do not guess
 CONFIRMED_CLOSED = "CONFIRMED_CLOSED"   # broker answered, definitively flat
 
 
+# Leverage is a property of the INSTRUMENT, not of the build. Regulated
+# brokers cap crypto CFDs around 1:2–1:5 while FX majors get 1:30, so one
+# constant per process cannot describe an account that now holds both.
+#
+# This mattered more than it looks. `calc_units` uses leverage only for the
+# margin cap — so an assumed 30x on a 5x instrument does not merely overstate
+# capacity, it makes the cap check a different question than the one the
+# broker will ask. The position that "uses 8.7% of the account" at 30x needs
+# 52% of it at 5x, and the guard that exists to prevent exactly that reports
+# the wrong number without failing.
+_LEV_CACHE = {}
+_LEV_STATIC_CRYPTO = 5.0
+_LEV_STATIC_FX = 30.0
+
+
+def leverage_for_symbol(broker, cfg, symbol):
+    """The broker's real leverage for `symbol`, cached, with a per-INSTRUMENT
+    fallback rather than a per-build one.
+
+    An explicit client setting always wins — `cfg.LEVERAGE` is already the
+    resolved value when the user set one, and second-guessing it here would
+    silently override a deliberate choice.
+    """
+    sym = _nrm(symbol)
+    if not sym:
+        return float(getattr(cfg, "LEVERAGE", _LEV_STATIC_FX))
+    if sym in _LEV_CACHE:
+        return _LEV_CACHE[sym]
+    static = _LEV_STATIC_CRYPTO if forex.is_crypto(sym) else _LEV_STATIC_FX
+    lev = static
+    try:
+        if broker is not None and hasattr(broker, "leverage_for"):
+            got = float(broker.leverage_for(symbol) or 0)
+            if got > 0:
+                lev = got
+    except Exception as e:
+        # Best-effort refinement, never a hard dependency — but the fallback
+        # is now the right ORDER OF MAGNITUDE for the instrument, which is the
+        # part that was wrong.
+        print(f"[UserLoop] leverage_for({symbol}) failed, using {static}x: {e}")
+    _LEV_CACHE[sym] = lev
+    return lev
+
+
+def flash_spike_pct_for(cfg, symbol):
+    """Violent-candle threshold, per instrument.
+
+    The FX default is 1.2%. Ordinary BTC candles exceed that routinely, so on
+    a forex build the flash-spike guard would refuse crypto entries as a
+    matter of course — the bot would look like it simply never traded crypto,
+    with the reason buried in a skip line.
+    """
+    base = float(getattr(cfg, "FLASH_SPIKE_PCT", 0.012))
+    if forex.is_crypto(symbol) and base <= 0.02:
+        return 0.05
+    return base
+
+
 def recovery_verdict(live_position, got_answer):
     """What a restart may conclude about a position it used to hold.
 
@@ -2338,12 +2396,12 @@ def _loop(user_id, alert_fn, gen=None):
                     time.sleep(_LOOP_INTERVAL)
                     continue
 
-            ind = indicators.analyze(candles)
+            ind = indicators.analyze(candles, symbol)
             strat_data = strategies.analyze(candles)
 
             # Market regime → in AUTO mode it picks the engine, halves risk in
             # violent markets and stands aside in dead ones (premium spec #1).
-            regime = strategies.detect_regime(candles)
+            regime = strategies.detect_regime(candles, symbol)
             dash["regime"] = regime
 
             # Refresh the probability calibration roughly every 60 ticks (and
@@ -2940,7 +2998,7 @@ def _loop(user_id, alert_fn, gen=None):
             # Flash-crash circuit breaker: skip entry when the latest candle's
             # range is extreme (>1.2% for FX majors; crypto is far more volatile,
             # so the threshold is raised via FLASH_SPIKE_PCT).
-            if entry_ok and _flash_spike(candles, getattr(cfg, "FLASH_SPIKE_PCT", 0.012)):
+            if entry_ok and _flash_spike(candles, flash_spike_pct_for(cfg, symbol)):
                 entry_ok = False
                 _skip("flash-crash guard: extreme candle range", alert=False)
                 if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
@@ -3286,11 +3344,12 @@ def _loop(user_id, alert_fn, gen=None):
                 # volatile-regime reductions (risk_mult below) still shrink it
                 # when conditions call for it — that's a safety cut, not drift.
                 sizing_balance = dash.get("startBalance") or paper_balance
+                _lev = leverage_for_symbol(broker, cfg, symbol)
                 units = forex.calc_units(sizing_balance, per_trade_risk,
                                          stop_pips_eff, symbol, price,
-                                         leverage=cfg.LEVERAGE, mult=risk_mult)
+                                         leverage=_lev, mult=risk_mult)
                 floor = forex.safe_min_units(symbol, paper_balance, price,
-                                             cfg.LEVERAGE, cfg.MARGIN_CAP)
+                                             _lev, cfg.MARGIN_CAP)
                 if floor == 0:
                     _skip("account too small for minimum lot on this instrument")
                     entry_ok = False
@@ -4006,8 +4065,10 @@ def force_trade(user_id, side, symbol=None, lots=None):
     if lots is not None and lots > 0:
         units = forex.lots_to_units(lots, sym)
     else:
+        # Same per-instrument leverage as the automatic path. A manual /buy on
+        # BTCUSD must not be margined as though it were a currency pair.
         units = forex.calc_units(balance, cfg.RISK_PER_TRADE, stop_pips_eff, sym, price,
-                                 leverage=cfg.LEVERAGE)
+                                 leverage=leverage_for_symbol(broker, cfg, sym))
     units = forex.round_units(max(units, forex.min_units(sym)), sym)
 
     try:

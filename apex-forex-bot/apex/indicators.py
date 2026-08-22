@@ -479,7 +479,20 @@ def _fmt(v, n):
     return None if v is None else f"{v:.{n}f}"
 
 
-def analyze(candles):
+def analyze(candles, symbol=None):
+    """…and, when the caller knows it, WHICH instrument these are.
+
+    Several thresholds downstream are only correct for one asset class — an
+    FX "strong trend" cutoff of 0.5% that crypto clears almost always, a
+    pullback band too narrow for a crypto uptrend. They used to read the
+    build flag, which cannot answer a question about the instrument now that
+    one bot holds FX, metals and crypto at once. Carrying the symbol in the
+    indicator dict lets the signal engines ask, without threading a new
+    argument through a fixed dispatch table.
+
+    Optional on purpose: callers that do not pass it get exactly the old
+    behaviour.
+    """
     closes = [c["close"] for c in candles]
     highs = [c["high"] for c in candles]
     lows = [c["low"] for c in candles]
@@ -519,7 +532,9 @@ def analyze(candles):
     liq_sweep = liquidity_sweep(candles)
     evc_data = evc(candles)
 
+    _out_symbol = symbol
     return {
+        "symbol": _out_symbol,
         "price": price,
         "rsi": _fmt(rsi_values[last], 2),
         "macd": _fmt(macd_data["macd"][last], 6),

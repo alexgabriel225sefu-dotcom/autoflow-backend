@@ -126,6 +126,89 @@ check("the gate is not per-instrument (documented, revisit if a broker differs)"
       forex.is_market_open.__code__.co_argcount == 1,
       "if weekend crypto is ever offered, this is the function to change")
 
+print("\n10. Tuning follows the INSTRUMENT, not the build")
+# An audit of the enabling commit found this was fixed in exactly ONE place
+# (the regime default) while the documentation claimed it generally. Every
+# threshold below is a case where the FX value does not merely mistune crypto
+# — it disables it, silently, with the reason buried in a skip line.
+
+
+class _Cfg:
+    LEVERAGE = 30.0
+    MARGIN_CAP = 0.5
+    FLASH_SPIKE_PCT = 0.012
+    PRODUCT = "forex"
+
+
+_cfg = _Cfg()
+
+# Leverage. Regulated brokers cap crypto near 1:2–1:5 while FX majors get
+# 1:30, and calc_units uses leverage ONLY for the margin cap — so an assumed
+# 30x on a 5x instrument makes the cap check a different question than the one
+# the broker will ask.
+lev_btc = user_loop.leverage_for_symbol(None, _cfg, "BTCUSD")
+lev_fx = user_loop.leverage_for_symbol(None, _cfg, "EURUSD")
+check("crypto falls back to crypto-grade leverage", lev_btc == 5.0, lev_btc)
+check("FX keeps FX leverage", lev_fx == 30.0, lev_fx)
+check("they are not the same number", lev_btc != lev_fx)
+
+# The audit's own scenario: $3,200, 0.5% risk, BTC at 104k with a tight stop.
+# At the assumed 30x the position needed 52% of the account in margin while
+# the code believed it was inside its 50% cap.
+_px = 104000.0
+_stop_pips = 200.0 / forex.pip_size("BTCUSD", _px)
+_u30 = forex.calc_units(3200.0, 0.005, _stop_pips, "BTCUSD", _px, leverage=30)
+_u5 = forex.calc_units(3200.0, 0.005, _stop_pips, "BTCUSD", _px, leverage=lev_btc)
+check("the margin cap binds tighter at real crypto leverage", _u5 < _u30,
+      f"{_u5:.4f} vs {_u30:.4f}")
+check("and the sized position fits inside the cap",
+      (_u5 * _px) / lev_btc <= 3200.0 * 0.5 + 1,
+      f"${(_u5 * _px) / lev_btc:,.0f} of $1,600")
+
+# Flash-spike guard. At the FX 1.2%, ordinary BTC candles trip it — the bot
+# would refuse crypto entries as a matter of course.
+check("the violent-candle threshold is widened for crypto",
+      user_loop.flash_spike_pct_for(_cfg, "BTCUSD") > 0.02,
+      user_loop.flash_spike_pct_for(_cfg, "BTCUSD"))
+check("and left alone for FX",
+      user_loop.flash_spike_pct_for(_cfg, "EURUSD") == 0.012)
+
+# Regime detection. BTC's EMA separation clears the 0.30% FX cutoff almost
+# always, which would lock its regime to "trending" and stop mean-reversion
+# ever firing on it.
+from apex import strategies  # noqa: E402
+
+check("regime detection accepts a symbol",
+      "symbol" in strategies.detect_regime.__code__.co_varnames)
+check("so does momentum", "symbol" in strategies.soros_momentum.__code__.co_varnames)
+check("crypto is recognised by the threshold helper",
+      strategies._crypto_thresholds("BTCUSD") is True)
+check("FX is not", strategies._crypto_thresholds("EURUSD") is False)
+check("and no symbol means keep the old behaviour",
+      strategies._crypto_thresholds(None) is None,
+      "callers that never passed one must be unaffected")
+
+# The signal engines read the instrument off the indicator dict, because the
+# strategy dispatch table has a fixed three-argument shape.
+from apex import ai, indicators  # noqa: E402
+
+check("indicators carry the symbol when given one",
+      "symbol" in indicators.analyze.__code__.co_varnames)
+check("the engines read it", ai._is_crypto_ind({"symbol": "BTCUSD"}) is True)
+check("and answer FX correctly", ai._is_crypto_ind({"symbol": "EURUSD"}) is False)
+check("with no symbol they fall back to the build flag",
+      ai._is_crypto_ind({}) is (getattr(ai.cfg, "PRODUCT", "forex") == "crypto"))
+
+LOOP_SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                             "apex", "user_loop.py"), encoding="utf-8").read()
+check("the loop passes the symbol into the indicators",
+      "indicators.analyze(candles, symbol)" in LOOP_SRC)
+check("and into regime detection",
+      "detect_regime(candles, symbol)" in LOOP_SRC)
+check("no sizing site still assumes one global leverage",
+      "leverage=cfg.LEVERAGE" not in LOOP_SRC,
+      "every calc_units must resolve leverage per instrument")
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")

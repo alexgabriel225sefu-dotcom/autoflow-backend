@@ -116,11 +116,31 @@ only pulled for a shortlist. That is a project, not a constant.
 | Market hours | forex week | forex week *(broker-dependent — see above)* |
 | Safety gates | identical | identical |
 
-The regime default is decided **per symbol**, not per build. A bot holding
-both classes at once cannot answer "what kind of thing is this" from a
-process-level flag — it would fade BTC because the process happens to be the
-forex one. Crypto trends more than it ranges; fading it by default is how a
-trend-following market gets traded backwards.
+These are decided **per symbol**, not per build. A bot holding both classes at
+once cannot answer "what kind of thing is this" from a process-level flag.
+
+The first version of this document claimed that as a general property when
+only the regime default had actually been changed. An audit found the rest
+still gated on `PRODUCT == "crypto"`, and each one was a case where the FX
+value does not merely mistune crypto — it disables it:
+
+| Threshold | FX value | On crypto, if left at the FX value |
+|---|---|---|
+| Leverage (margin cap) | 30x | Cap checks a number the broker will not use. A position the code reports as 8.7% of the account needs 52% at the broker's real 5x |
+| Flash-spike guard | 1.2% | Ordinary BTC candles trip it, so entries are refused as a matter of course — the bot looks like it simply never trades crypto |
+| Regime EMA separation | 0.30% | BTC clears it almost always, so its regime reads "trending" permanently and mean-reversion never fires |
+| Mean-reversion trend cutoff | 0.5% | Same shape: turns mean-reversion into a trend-only engine |
+| Trend pullback band | ±0.05% | Never triggers on a crypto uptrend — the bot waits forever |
+| Momentum velocity | 0.3 | Mistuned rather than disabling |
+
+All are now resolved from the instrument. The signal engines read it from the
+indicator dict rather than a new argument, because the strategy dispatch table
+has a fixed three-argument shape; `indicators.analyze(candles, symbol)` stamps
+it, and callers that pass no symbol keep the previous behaviour exactly.
+
+Pinned by `tests/test_crypto_in_forex.py` §10, including the arithmetic for
+the margin case — so a future change that reintroduces a build-level flag
+fails a test rather than quietly disabling an asset class.
 
 ---
 
