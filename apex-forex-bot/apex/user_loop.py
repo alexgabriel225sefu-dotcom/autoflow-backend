@@ -1057,7 +1057,13 @@ def _loop(user_id, alert_fn, gen=None):
     # own /symbol or /watch basket is used.
     autopilot = bool(user.get("autopilot"))
     if autopilot and user.get("autopilot_universe"):
-        watchlist = [w for w in user["autopilot_universe"] if w][:8]
+        # Raised from 8 now that one universe carries FX, metals and crypto.
+        # It is a cap on WORK, not a preference: the broker connection is a
+        # single socket with a lock held across each round-trip, so every extra
+        # symbol lengthens the tick. Twelve keeps a scan comfortably inside the
+        # interval; going much past it makes the loop slower than the signals
+        # it is looking for.
+        watchlist = [w for w in user["autopilot_universe"] if w][:12]
     else:
         watchlist = [w for w in (user.get("watchlist") or []) if w][:6]
     if getattr(cfg, "PRODUCT", "forex") == "crypto":
@@ -2372,7 +2378,14 @@ def _loop(user_id, alert_fn, gen=None):
                 # Neutral default: crypto trends more than it ranges, so a
                 # warming-up/unknown regime should default to trend-following,
                 # not fading (the forex default).
-                _default_mode = "trend" if _crypto_build else "mean_reversion"
+                #
+                # Decided per SYMBOL, not per build. The bot now holds both
+                # asset classes on one account, so "what kind of thing is
+                # this" is a question about the instrument in front of it —
+                # a build-level flag would fade BTC because the process
+                # happens to be the forex one.
+                _default_mode = ("trend" if (_crypto_build or forex.is_crypto(symbol))
+                                 else "mean_reversion")
                 active_mode = picked or _default_mode
                 dash["strategy"] = f"Auto → {_strategy_label(active_mode)}"
 
@@ -3939,9 +3952,15 @@ def force_trade(user_id, side, symbol=None, lots=None):
             return {"ok": False, "error": f"{sym} isn't a crypto instrument — this is a "
                                           "crypto bot. Try e.g. BTCUSD or ETHUSD."}
     else:
+        # `is_tradeable` now covers FX, metals AND crypto. Indices, stocks and
+        # ETFs are still refused, and deliberately: they need per-exchange
+        # trading calendars and quote-currency conversion in sizing, and
+        # neither exists yet. Accepting them would not fail loudly — it would
+        # size a position in the wrong currency and trade a closed exchange.
         if not forex.is_tradeable(sym):
-            return {"ok": False, "error": f"{sym} isn't a forex/metal instrument — this is a "
-                                          "forex bot. Try e.g. EUR_USD or XAUUSD."}
+            return {"ok": False, "error": f"{sym} isn't tradeable here — this bot trades "
+                                          "forex, metals and crypto. Try e.g. EUR_USD, "
+                                          "XAUUSD or BTCUSD."}
     try:
         candles = broker.get_candles(sym, cfg.TIMEFRAME, 5)
         price = candles[-1]["close"] if candles else 0.0

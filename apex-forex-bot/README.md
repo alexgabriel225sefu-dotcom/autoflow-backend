@@ -1,6 +1,9 @@
 # 💱 Apex Forex Bot
 
-AI-powered forex trading bot. **cTrader + MetaTrader 5. Telegram-controlled. Zero config files.**
+AI-powered trading bot — **forex, metals and crypto** on one account.
+**cTrader + MetaTrader 5. Telegram-controlled. Zero config files.**
+
+What it trades and what it deliberately refuses: [docs/ASSETS.md](docs/ASSETS.md).
 
 Two ways to connect (3Commas-style — trades appear live in the app you already use):
 - **cTrader** — free Open API, works with any cTrader broker worldwide (IC Markets, Pepperstone, FxPro…). SL/TP are placed server-side and positions are reconciled automatically after a restart

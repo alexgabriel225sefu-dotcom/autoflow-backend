@@ -152,7 +152,16 @@ _CRYPTO_ONLY = {"BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "LTCUSD", "ADAUSD",
                 "DOGEUSD", "DOTUSD", "LINKUSD", "BCHUSD"}
 _FOREX_ONLY = {"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF",
                "NZDUSD", "US30", "NAS100", "US500", "GER40"}
-CROSS_PRODUCT_BLOCK = _FOREX_ONLY if _IS_CRYPTO else _CRYPTO_ONLY
+# The crypto build still refuses forex symbols — it is a narrower product and
+# a client who bought "crypto" should not find EURUSD in their journal.
+#
+# The forex build no longer refuses crypto. It is now the ONE bot: FX, metals
+# and crypto CFDs on the same account, the same safety gates, the same
+# codebase. Keeping them apart meant maintaining two forks, and the crypto one
+# fell behind by every hardening fix — order gate, ownership lease, idempotency
+# ledger — so the separation was protecting a worse product, not a different
+# one.
+CROSS_PRODUCT_BLOCK = _FOREX_ONLY if _IS_CRYPTO else set()
 
 # ─── Risk ───────────────────────────────────────────────
 RISK_PER_TRADE = float(_scalp("RISK_PER_TRADE", 0.025, 0.0125))  # scalp: 2.5% · swing: 1.25% (was 1%/0.5%)

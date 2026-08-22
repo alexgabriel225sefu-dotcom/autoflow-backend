@@ -29,17 +29,30 @@ _CRYPTO = {"BTC", "ETH", "SOL", "XRP", "LTC", "BNB", "ADA", "DOT", "DOGE",
 
 
 def is_tradeable(instrument: str) -> bool:
-    """Whitelist for the FOREX bot: spot FX pairs and metals (XAU/XAG/XPT/XPD
-    quoted vs a fiat) ONLY. Rejects crypto CFDs (BTCUSD…), indices (US30…),
-    stocks and anything else a cTrader/Pepperstone account also lists. This is a
-    forex product — crypto has its own bot — and mixing them confuses clients
-    ("crypto intră peste forex"). Accepts EUR_USD / EURUSD / XAUUSD."""
+    """What the main bot will trade: spot FX, metals, and crypto CFDs.
+
+    Crypto used to be rejected here to keep two products apart. That
+    separation cost more than it protected: the crypto build was a fork that
+    fell eight modules and every safety fix behind — no order gate, no
+    ownership lease, no idempotency ledger — so "crypto has its own bot"
+    meant "crypto has the older bot". One instrument list, one codebase, one
+    set of fixes.
+
+    Still rejected: indices, stocks, ETFs and everything else a
+    cTrader/Pepperstone account lists. Those are not a whitelist decision —
+    they need per-exchange trading calendars and quote-currency conversion in
+    sizing, neither of which exists yet.
+
+    Accepts EUR_USD / EURUSD / XAUUSD / BTCUSD.
+    """
     s = _norm(instrument)
     if len(s) != 6 or not s.isalpha():
-        return False
+        return is_crypto(s)          # BTCUSDT and friends are longer than 6
     if _is_fx(s):
         return True
-    return s[:3] in _METALS and s[3:] in _CCY
+    if s[:3] in _METALS and s[3:] in _CCY:
+        return True
+    return is_crypto(s)
 
 
 def is_crypto(instrument: str) -> bool:
