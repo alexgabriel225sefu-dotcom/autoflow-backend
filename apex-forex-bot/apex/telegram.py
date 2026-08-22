@@ -1782,7 +1782,13 @@ def _ob_satisfied(u, step):
     if step == "style":
         return bool(u.get("style"))
     if step == "method":
-        return bool(u.get("strategy")) and bool(u.get("symbol") or u.get("autopilot"))
+        # asset_class comes first inside this step. An existing client who
+        # onboarded before the question existed counts as answered — they have
+        # been trading a mixed basket, and re-asking would look like the bot
+        # resetting itself, which is exactly what `already_onboarded` guards.
+        asked = bool(u.get("asset_class")) or already_onboarded(u)
+        return (asked and bool(u.get("strategy"))
+                and bool(u.get("symbol") or u.get("autopilot")))
     if step == "risk":
         return bool(u.get("risk_tier"))
     return True
@@ -1930,12 +1936,121 @@ def _ob_step_style(chat_id):
 
 # ── Step 4: Trading Method ──
 
+# What the client wants traded. Stored on the record so every later choice —
+# the Auto-Pilot basket, the quick-pick buttons, the symbols /watch suggests —
+# can be filtered by it instead of showing a forex client ten coins.
+ASSET_CLASSES = ("forex", "crypto", "both")
+
+
+def asset_class_of(user) -> str:
+    """The client's stated preference, defaulting to everything.
+
+    "both" is the default rather than "forex" on purpose: an existing client
+    who onboarded before this question existed has already been trading a
+    mixed basket, and silently narrowing them to one class would change what
+    their bot does without anyone asking.
+    """
+    v = str((user or {}).get("asset_class") or "both").strip().lower()
+    return v if v in ASSET_CLASSES else "both"
+
+
+def candidates_for(user):
+    """Auto-Pilot candidate pool for this client's preference.
+
+    Order matters: whichever class they asked for leads, because the scan cap
+    truncates the list and the cap is a budget on a single broker socket.
+    """
+    choice = asset_class_of(user)
+    fx = list(getattr(cfg, "FX_UNIVERSE", []))
+    cr = list(getattr(cfg, "CRYPTO_UNIVERSE", []))
+    if choice == "forex":
+        return fx
+    if choice == "crypto":
+        return cr
+    # Interleave so a truncated list still carries both, rather than all the
+    # FX majors and no crypto at all.
+    out, i = [], 0
+    while i < max(len(fx), len(cr)):
+        if i < len(fx):
+            out.append(fx[i])
+        if i < len(cr):
+            out.append(cr[i])
+        i += 1
+    return out
+
+
+def _handle_assets(chat_id, args="", advance=True):
+    """Set or show which asset classes this account trades.
+
+    Changing it rebuilds the Auto-Pilot basket immediately when Auto-Pilot is
+    on. Leaving the old basket in place would mean the client is told one
+    thing and the bot scans another — the setting would look cosmetic.
+    """
+    arg = (args or "").strip().lower()
+    u = user_store.load(chat_id)
+    if arg not in ASSET_CLASSES:
+        cur = asset_class_of(u)
+        label = {"forex": "💱 Forex", "crypto": "₿ Crypto",
+                 "both": "🌐 Both"}[cur]
+        return send_to(chat_id,
+            f"📊 <b>Trading:</b> {label}\n\n"
+            "<code>/assets forex</code> · <code>/assets crypto</code> · "
+            "<code>/assets both</code>",
+            _back_kb(chat_id, [[("💱 Forex", "ob:assets:forex"),
+                                ("₿ Crypto", "ob:assets:crypto")],
+                               [("🌐 Both", "ob:assets:both")]]))
+
+    user_store.update(chat_id, {"asset_class": arg})
+    label = {"forex": "💱 Forex — currency pairs and gold",
+             "crypto": "₿ Crypto — Bitcoin, Ethereum and the liquid majors",
+             "both": "🌐 Both — everything, strongest setup wins"}[arg]
+    send_to(chat_id, f"✅ Trading: <b>{label}</b>")
+
+    if user_store.load(chat_id).get("autopilot"):
+        # Rebuild against what the broker offers, so the basket matches the
+        # sentence the client was just shown.
+        _handle_autopilot(chat_id, "on")
+    elif advance:
+        return _ob_step_instrument(chat_id)
+    return None
+
+
+def _ob_step_assets(chat_id):
+    """Asked once the broker account is linked, before anything is picked.
+
+    It comes after the connection deliberately: only then do we know which
+    instruments this particular broker actually lists, so the answer can be
+    honoured rather than promised.
+    """
+    send_to(chat_id,
+            _ob_head(chat_id, "method") +
+            "<b>What do you want to trade?</b>\n\n"
+            "💱 <b>Forex</b> — currency pairs and gold. Moves in a calmer "
+            "range, and the market closes at the weekend.\n\n"
+            "₿ <b>Crypto</b> — Bitcoin, Ethereum and the liquid majors, as "
+            "CFDs on the same account.\n\n"
+            "🌐 <b>Both</b> — the bot scans across everything and takes the "
+            "strongest setup wherever it is.\n\n"
+            "<i>You can change this any time with /assets.</i>",
+            extra={"reply_markup": {"inline_keyboard": [
+                [{"text": "💱 Forex", "callback_data": "ob:assets:forex"},
+                 {"text": "₿ Crypto", "callback_data": "ob:assets:crypto"}],
+                [{"text": "🌐 Both — recommended", "callback_data": "ob:assets:both"}],
+            ]}})
+
+
 def _ob_step_instrument(chat_id):
     """What to trade. Part of the Method step — a method has to be applied to
     something, and splitting them would make the counter lie again."""
-    syms = _OB_SYMS
+    u = user_store.load(chat_id)
+    _choice = asset_class_of(u)
+    syms = [(lbl, code) for lbl, code in _OB_SYMS
+            if _choice == "both"
+            or (_choice == "crypto") == bool(forex.is_crypto(code))
+            or code.startswith("XAU") or code.startswith("XAG")]
+    if len(syms) < 3:
+        syms = _OB_SYMS
     try:
-        u = user_store.load(chat_id)
         token, ctid = u.get("ctrader_access_token"), u.get("ctrader_account_id")
         if token and ctid:
             from apex.brokers import ctrader as _ct
@@ -2067,9 +2182,16 @@ def _ob_step_mode(chat_id):
 # The five step renderers, by key. Defined after all of them exist.
 _OB_RENDER = {
     "connect": lambda cid: _ob_step_connect(cid),
+    # "method" starts by asking WHAT to trade, then which instrument, then
+    # which strategy — see _ob_step_assets.
     "account": lambda cid: _ob_step_account(cid),
     "style":   lambda cid: _ob_step_style(cid),
-    "method":  lambda cid: _ob_step_instrument(cid),
+    # Ask WHAT before WHICH: the instrument buttons are filtered by the
+    # answer, so showing them first would offer a forex client ten coins and
+    # then narrow the list under them.
+    "method":  lambda cid: (_ob_step_assets(cid)
+                            if not user_store.load(cid).get("asset_class")
+                            else _ob_step_instrument(cid)),
     "risk":    lambda cid: _ob_step_risk(cid),
 }
 
@@ -2519,6 +2641,8 @@ def _route_cb(chat_id, data):
     if data == "risk:adv":
         return _screen_risk_advanced(chat_id)
 
+    if data.startswith("ob:assets:"):
+        return _handle_assets(chat_id, data[len("ob:assets:"):])
     if data == "ob:sym:__auto__":
         _handle_autopilot(chat_id, "on")
         return _ob_step_strategy(chat_id)
@@ -3794,14 +3918,17 @@ def _handle_autopilot(chat_id, args):
             br, _ = _ul._make_broker(user)
             br._load_symbols()
             offered = set(br._sym_id.keys())
-            universe = [c for c in _AUTOPILOT_CANDIDATES if c in offered]
+            universe = [c for c in candidates_for(user) if c in offered]
         except Exception as e:
             return send_to(chat_id, f"⚠️ Couldn't read your broker's instruments: <i>{str(e)[:120]}</i>. Try again in a minute.")
     else:
-        universe = ["EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "XAU_USD"]
+        universe = candidates_for(user)[:5]
     if not universe:
         return send_to(chat_id, "⚠️ Couldn't build the Auto-Pilot list for your broker. Use /watch to pick instruments manually.")
-    universe = universe[:8]
+    # Matches the loop's own cap. Both are a budget on ONE broker socket with
+    # a lock held per round-trip, so the two must not drift apart — a basket
+    # longer than the loop will scan is a promise the bot does not keep.
+    universe = universe[:12]
     user_store.update(chat_id, {"autopilot": True, "autopilot_universe": universe})
     running = _restart_user_loop(chat_id)
     send_to(chat_id,
@@ -5618,6 +5745,7 @@ _CONTROLS_TEXT = (
     "/autopilot on — Let the bot pick the best instruments too\n"
     "/maxpos 3 — Allow multiple positions at once\n\n"
     "<b>📰 Info</b>\n"
+    "/assets — Trade forex, crypto, or both\n"
     "/news — Economic calendar · /news on|off for release alerts\n"
     "/voice — Control the bot from your phone through Siri Shortcuts\n"
     "/guide — How the bot works (visual guide)\n"
@@ -6115,6 +6243,8 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         _screen_live_activation(chat_id)
     elif cmd_l == "/news":
         _handle_news(chat_id, args)
+    elif cmd_l in ("/assets", "/markets"):
+        _handle_assets(chat_id, args, advance=False)
     elif cmd_l in ("/voice", "/siri"):
         _handle_voice(chat_id, args)
     elif cmd_l in ("/market", "/m"):

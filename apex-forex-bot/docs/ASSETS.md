@@ -5,6 +5,21 @@ cTrader account, through one connection, behind one set of safety gates.
 
 ---
 
+## The client chooses
+
+Once the broker account is linked — and only then, because that is when the
+broker's actual instrument list is known — the client is asked what they want
+traded: **forex**, **crypto**, or **both**. `/assets` changes it later, and
+changing it rebuilds the Auto-Pilot basket on the spot rather than leaving the
+old one running behind a new label.
+
+The default for anyone who onboarded before the question existed is **both**.
+Narrowing them silently would change what their bot does without asking.
+
+A mixed basket is interleaved rather than concatenated (EURUSD, BTCUSD,
+GBPUSD, ETHUSD…). The scan cap truncates the list, so an alphabetical pool
+would hand a "both" client twelve currency pairs and no crypto at all.
+
 ## The list
 
 | Class | Examples | Traded |

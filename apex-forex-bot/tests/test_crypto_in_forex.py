@@ -209,6 +209,78 @@ check("no sizing site still assumes one global leverage",
       "leverage=cfg.LEVERAGE" not in LOOP_SRC,
       "every calc_units must resolve leverage per instrument")
 
+print("\n11. The client is asked WHAT to trade, once the account is linked")
+# Asked after the connection on purpose: only then is it known which
+# instruments this particular broker lists, so the answer can be honoured
+# rather than promised.
+from apex import telegram as tg, user_store  # noqa: E402
+
+_sent = []
+_rs, _rr = tg.send_to, tg._restart_user_loop
+try:
+    tg.send_to = lambda cid, txt, *a, **k: _sent.append(txt)
+    tg._restart_user_loop = lambda cid: True
+    user_store.save("990001", {"ctrader_access_token": "x",
+                               "ctrader_account_id": 1, "style": "swing"})
+
+    tg._OB_RENDER["method"]("990001")
+    asked = _sent[-1]
+    check("the question is asked before any instrument is offered",
+          "What do you want to trade" in asked, asked[:120])
+    for word in ("Forex", "Crypto", "Both"):
+        check(f"{word} is offered", word in asked)
+    check("it says the setting is changeable later", "/assets" in asked)
+
+    # The basket must match the sentence the client was shown.
+    for choice, expect_fx, expect_crypto in (("forex", True, False),
+                                             ("crypto", False, True),
+                                             ("both", True, True)):
+        user_store.update("990001", {"asset_class": choice})
+        pool = tg.candidates_for(user_store.load("990001"))
+        has_fx = any(not forex.is_crypto(c) for c in pool)
+        has_cr = any(forex.is_crypto(c) for c in pool)
+        check(f"{choice}: FX present={expect_fx}", has_fx is expect_fx, pool[:6])
+        check(f"{choice}: crypto present={expect_crypto}", has_cr is expect_crypto,
+              pool[:6])
+
+    # A truncated "both" basket must still carry both — the scan cap cuts the
+    # list, and an alphabetical pool would hand a client twelve FX pairs.
+    user_store.update("990001", {"asset_class": "both"})
+    top = tg.candidates_for(user_store.load("990001"))[:12]
+    check("a capped mixed basket still holds crypto",
+          any(forex.is_crypto(c) for c in top), top)
+    check("…and still holds FX", any(not forex.is_crypto(c) for c in top), top)
+
+    # Changing it later is a real change, not a label.
+    _sent.clear()
+    tg._handle_assets("990001", "crypto", advance=False)
+    check("/assets confirms the change",
+          any("Crypto" in m for m in _sent), _sent[-1][:80] if _sent else "")
+    check("and it is stored",
+          user_store.load("990001").get("asset_class") == "crypto")
+    check("an unknown value shows the current setting instead of setting it",
+          (tg._handle_assets("990001", "bananas", advance=False) or True)
+          and user_store.load("990001").get("asset_class") == "crypto")
+finally:
+    tg.send_to, tg._restart_user_loop = _rs, _rr
+
+check("existing clients are not re-asked",
+      tg._ob_satisfied({"strategy": "auto", "autopilot": True,
+                        "ctrader_account_id": 1, "symbol": "EURUSD",
+                        "risk_accepted": "2026-01-01", "style": "swing"},
+                       "method") is True,
+      "re-asking someone mid-trading looks like the bot resetting itself")
+check("the default is everything, not forex",
+      tg.asset_class_of({}) == "both",
+      "narrowing an existing client silently would change what their bot does")
+
+TG_SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "apex", "telegram.py"), encoding="utf-8").read()
+check("the Auto-Pilot basket is built from the preference",
+      "candidates_for(user)" in TG_SRC)
+check("and its cap matches the loop's", "universe[:12]" in TG_SRC,
+      "a basket longer than the loop scans is a promise the bot does not keep")
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")

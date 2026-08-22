@@ -137,10 +137,20 @@ MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
 # Curated liquid universe the Auto-Pilot scans (comma-separated env override).
 # FX majors + gold are on every cTrader broker; crypto CFDs are the liquid
 # majors. Non-FX candidates are validated per account before use.
-_DEFAULT_UNIVERSE = ("BTCUSD,ETHUSD,SOLUSD,XRPUSD,LTCUSD,ADAUSD,DOGEUSD,DOTUSD,"
-                     "LINKUSD,BCHUSD" if _IS_CRYPTO else
-                     "EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,NZDUSD,"
-                     "XAUUSD,US30,NAS100,US500,GER40")
+_FX_CANDIDATES = ("EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,NZDUSD,XAUUSD")
+_CRYPTO_CANDIDATES = ("BTCUSD,ETHUSD,SOLUSD,XRPUSD,LTCUSD,ADAUSD,"
+                      "DOGEUSD,DOTUSD,LINKUSD,BCHUSD,AVAXUSD,MATICUSD")
+# Indices are still candidates on the forex build for a client who picks one
+# by hand, but they are NOT in the Auto-Pilot default: the scan cap is a
+# budget, and the classes this bot is actually tuned for come first.
+_DEFAULT_UNIVERSE = (_CRYPTO_CANDIDATES if _IS_CRYPTO
+                     else _FX_CANDIDATES + "," + _CRYPTO_CANDIDATES)
+
+# Split candidate pools, so a client who says "just crypto" gets a basket of
+# crypto rather than a forex basket with two coins bolted on. Validated per
+# account against what the broker actually lists before any of it is used.
+FX_UNIVERSE = [s.strip().upper() for s in _FX_CANDIDATES.split(",") if s.strip()]
+CRYPTO_UNIVERSE = [s.strip().upper() for s in _CRYPTO_CANDIDATES.split(",") if s.strip()]
 AUTOPILOT_UNIVERSE = [s.strip().upper() for s in
                       (os.getenv("AUTOPILOT_UNIVERSE") or _DEFAULT_UNIVERSE).split(",") if s.strip()]
 
