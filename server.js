@@ -1405,6 +1405,46 @@ app.post('/api/admin/grant-license', async (req, res) => {
   res.json({ email, results });
 });
 
+// Why the licence store could not be read. A missing TABLE and a missing
+// NETWORK are both "cannot read", but they need opposite responses: one is a
+// deployment pointed at the wrong (or unmigrated) database and will never fix
+// itself, the other clears on its own. Reporting both as "temporarily
+// unavailable" sends the operator hunting a connectivity fault that does not
+// exist — verified by booting this server against a real Supabase project with
+// no `licenses` table: it answered "try again in a few minutes", forever.
+function _licenceStoreFault(err) {
+  const code = String(err?.code || '');
+  const msg = String(err?.message || err || '');
+  const schema = code === '42P01' || code === 'PGRST205'
+    || /does not exist|schema cache|relation .* does not exist/i.test(msg);
+  return schema ? 'SCHEMA' : 'UNREACHABLE';
+}
+
+function _licenceStoreDenial(res, err, where) {
+  const fault = _licenceStoreFault(err);
+  const detail = String(err?.message || err || '').slice(0, 200);
+  if (fault === 'SCHEMA') {
+    addLog(`verify-license: licence store MISCONFIGURED at ${where} — ${detail}`,
+           'license', 'error');
+    _notifyAdminAlert(
+      `🚨 The licence table cannot be read, and this will NOT clear on its own.\n\n` +
+      `Where: ${where}\nError: ${detail}\n\n` +
+      `SUPABASE_URL is pointing at a database with no \`licenses\` table — the ` +
+      `wrong project, or one that was never migrated. Every activation is being ` +
+      `refused until it is fixed.`,
+      'Apex — licence store misconfigured');
+  } else {
+    addLog(`verify-license: licence store unreachable at ${where} — ${detail}`,
+           'license', 'error');
+  }
+  return res.status(503).json({
+    valid: false,
+    message: fault === 'SCHEMA'
+      ? 'Licence checks are unavailable — our team has been alerted. Please contact support.'
+      : 'Licence service temporarily unavailable — please try again in a few minutes.',
+  });
+}
+
 // POST /api/verify-license — called by the bot on every startup
 // Body: { key, product? }  — product is 'apex-bot' | 'apex-forex'
 // Primary: HMAC signature check (no DB). Fallback: Supabase for legacy keys.
@@ -1448,13 +1488,11 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
     // fail-open for the most common outage shape. Verified by booting this
     // server against an unreachable SUPABASE_URL. maybeSingle() reports no
     // error for zero rows, so any error here is a real failure to read.
-    if (rowErr) {
-      addLog(`verify-license: licence store unreachable (${rowErr.message || rowErr}) — DENYING`, 'license', 'error');
-      // 503 rather than {valid:false}: the bot reads any 5xx as "cannot check
-      // right now, try again", where a false would tell a paying customer
-      // their licence is bad.
-      return res.status(503).json({ valid: false, message: 'Licence service temporarily unavailable — please try again in a few minutes.' });
-    }
+    // 503 rather than {valid:false}: the bot reads any 5xx as "cannot check
+    // right now", where a false would tell a paying customer their licence is
+    // bad. _licenceStoreDenial also tells the OPERATOR which kind of fault it
+    // is, because a missing table and a missing network need opposite fixes.
+    if (rowErr) return _licenceStoreDenial(res, rowErr, 'signed lookup');
     if (!row) {
       // NO ROW = NOT SOLD. This used to fall through to allow, as a
       // "legacy/manual key". Combined with the auto-upsert that used to sit
@@ -1530,10 +1568,7 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
     // customer their key was bad and logged nothing for the operator.
     lerr = e;
   }
-  if (lerr) {
-    addLog(`verify-license: licence store unreachable on legacy lookup (${lerr.message || lerr}) — DENYING`, 'license', 'error');
-    return res.status(503).json({ valid: false, message: 'Licence service temporarily unavailable — please try again in a few minutes.' });
-  }
+  if (lerr) return _licenceStoreDenial(res, lerr, 'legacy lookup');
   if (lrow) {
     // The legacy path answers the SAME questions as the signed path. Checking
     // only `active` here would have let a refunded or expired legacy key

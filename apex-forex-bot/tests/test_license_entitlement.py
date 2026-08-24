@@ -182,6 +182,52 @@ check("a verified re-check clears the grace marker",
       "grace cleared" in REV)
 check("admins never hit this path", "access.is_admin(cid)" in REV)
 
+print("\n6. A missing TABLE is not a missing NETWORK")
+# Both are "cannot read the licence store", but they need opposite responses:
+# a database with no `licenses` table will never fix itself, and telling the
+# operator "temporarily unavailable" sends them hunting a connectivity fault
+# that does not exist. Found by pointing this server at a real Supabase
+# project that has no tables at all.
+check("the two faults are told apart", "_licenceStoreFault" in SERVER)
+check("a schema fault is recognised by code AND by message",
+      "42P01" in SERVER and "PGRST205" in SERVER and "schema cache" in SERVER,
+      "postgres reports the code, PostgREST reports the message")
+check("a schema fault alerts the operator, not just the log",
+      "licence store MISCONFIGURED" in SERVER
+      and "will NOT clear on its own" in SERVER)
+# Count CALLS, not the declaration — `function _licenceStoreDenial(res,` also
+# matches the naive substring.
+_calls = SERVER.count("return _licenceStoreDenial(res,")
+check("both lookup paths still deny", _calls == 2 and "status(503)" in SERVER,
+      f"{_calls} call sites — diagnosing better must not mean refusing less")
+
+import subprocess  # noqa: E402
+_probe = r"""
+const fs=require('fs');
+const s=fs.readFileSync(process.argv[1],'utf8');
+eval(s.slice(s.indexOf('function _licenceStoreFault'),
+              s.indexOf('function _licenceStoreDenial')));
+const cases=[
+ [{code:'42P01',message:'relation "licenses" does not exist'},'SCHEMA'],
+ [{code:'PGRST205',message:"Could not find the table 'public.licenses' in the schema cache"},'SCHEMA'],
+ [{message:'Could not find the table public.licenses in the schema cache'},'SCHEMA'],
+ [{code:'ENOTFOUND',message:'getaddrinfo ENOTFOUND db.x.supabase.co'},'UNREACHABLE'],
+ [{message:'fetch failed'},'UNREACHABLE'],
+ [{code:'ETIMEDOUT',message:'connect ETIMEDOUT'},'UNREACHABLE'],
+ [{code:'401',message:'Invalid API key'},'UNREACHABLE'],
+ [new Error('TypeError: fetch failed'),'UNREACHABLE'],
+];
+const bad=cases.filter(([e,x])=>_licenceStoreFault(e)!==x);
+console.log(bad.length===0?'OK':'BAD '+JSON.stringify(bad));
+"""
+try:
+    _out = subprocess.run(["node", "-e", _probe, os.path.join(REPO, "server.js")],
+                          capture_output=True, text=True, timeout=60).stdout.strip()
+except Exception as _e:                       # noqa: BLE001
+    _out = f"could not run node: {_e}"
+check("the classifier answers correctly for every real error shape",
+      _out == "OK", _out)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")
