@@ -109,9 +109,23 @@ check("the committed config-encryption key is not used as a value",
       "it encrypts client bot configs at rest")
 check("config encryption refuses rather than improvises",
       "bot config encryption unavailable" in SERVER)
-check("production refuses to start without JWT_SECRET",
-      "[FATAL] JWT_SECRET is not set" in SERVER and "process.exit(1)" in SERVER,
-      "the same secret derives the config key — a per-boot value orphans data")
+check("production refuses to start without its required secrets",
+      "_requireProductionSecrets()" in SERVER and "process.exit(1)" in SERVER)
+check("JWT_SECRET is one of them",
+      "'JWT_SECRET'," in SERVER,
+      "it derives the config-encryption key; a per-boot value orphans data")
+check("BOT_EMAIL_SECRET is one of them",
+      "'BOT_EMAIL_SECRET'," in SERVER,
+      "without it licence keys are signed with a constant published here")
+check("a failed boot names EVERY missing secret, not just the first",
+      "missing.length === 0" in SERVER and "for (const [k, why] of missing)" in SERVER,
+      "one-at-a-time means finding the list one outage at a time")
+check("the committed signing salt cannot sign in production",
+      "_LEGACY_LIC_SALT" in SERVER and "_FOREX_LIC_SALT" not in SERVER,
+      "a salt anyone can read from this repo must not mint valid signatures")
+check("a signed key with no row alerts the operator",
+      "no row in" in SERVER or "no licence row" in SERVER,
+      "a locked-out legacy customer must not be discoverable only by complaint")
 for literal in ("apextrade-super-secret-key-change-in-prod",):
     check(f"no committed auth secret ({literal[:18]}…)",
           not any(literal in read(REPO, f) for f in os.listdir(REPO)

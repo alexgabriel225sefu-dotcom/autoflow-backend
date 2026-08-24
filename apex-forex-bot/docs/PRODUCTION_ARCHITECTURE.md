@@ -80,7 +80,8 @@ harm, and those exceptions are listed.
 | `PRODUCT` is not `forex` | **startup refused** | `config.py` |
 | `TOKEN_ENCRYPTION_KEY` unset in production | **startup refused** | `user_store.py` |
 | No shared Redis backend in production | **startup refused** | `user_store.py` |
-| `JWT_SECRET` unset in production | **startup refused** | `server.js` |
+| `JWT_SECRET` unset in production | **startup refused** | `server.js::_requireProductionSecrets` |
+| `BOT_EMAIL_SECRET` unset in production | **startup refused** — otherwise licence keys are signed with a constant published in this repo | `server.js::_requireProductionSecrets` |
 | No secret for config encryption | **refuses to encrypt/decrypt** | `server.js::_botConfigKey` |
 | Stateless OAuth callback in production | **startup refused** | `ctrader_oauth.py` |
 | Licence store unreachable, first activation | **503 → deny** | `server.js::/api/verify-license` |
@@ -238,10 +239,17 @@ means the licence gate is ON. Set it to `false` explicitly to run open access
 fails without it in production) and `MCP_SIGNING_SECRET` (without it the bot
 refuses every level 2/3 command, which is the correct default).
 
-**`server.js`**: `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
-`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BOT_EMAIL_SECRET`,
-`ADMIN_CHAT_ID` and/or `ADMIN_EMAIL` (without at least one, operator alerts
-are undeliverable and say so loudly).
+**`server.js`** — startup REFUSES without `JWT_SECRET` or `BOT_EMAIL_SECRET`,
+and one failed boot names both rather than one per deploy. Deliberately only
+those two: a missing Stripe key breaks checkout loudly and the site still
+serves, so refusing to boot over it would turn a degraded service into no
+service. These two are different — without them the service keeps working
+while being WRONG (orphaned encrypted configs; forgeable licence signatures).
+
+Also expected, but not fatal: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `ADMIN_CHAT_ID` and/or
+`ADMIN_EMAIL` (without at least one, operator alerts are undeliverable and say
+so loudly). `GET /api/readiness` reports all of them.
 
 No production secret has a fallback value. No admin identity is hardcoded —
 operators come from `ADMIN_CHAT_IDS` / `ADMIN_CHAT_ID` / `TELEGRAM_CHAT_ID`,

@@ -217,24 +217,37 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const HEYGEN_KEY = process.env.HEYGEN_API_KEY;
 const CREATIFY_API_ID  = process.env.CREATIFY_API_ID  || '';
 const CREATIFY_API_KEY = process.env.CREATIFY_API_KEY || '';
-// PRODUCTION REQUIRES A DURABLE JWT_SECRET — startup fails without one.
-//
-// The old fallback minted a fresh random secret per process. That is not
-// merely inconvenient: this secret also derives the AES key that encrypts
-// client bot configs at rest (see _botConfigKey), so a restart made every
-// stored config undecryptable, and two instances behind one URL could not
-// read each other's. A per-process secret in a multi-instance deployment is
-// a data-loss bug wearing a warning label.
 const _IS_PROD = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
-if (_IS_PROD && !process.env.JWT_SECRET) {
-  console.error(
-    '[FATAL] JWT_SECRET is not set and this is production. It signs sessions AND\n' +
-    '        derives the key that encrypts client bot configs at rest, so a\n' +
-    '        generated per-process value would silently orphan stored data.\n' +
-    '        Set JWT_SECRET (render.yaml already declares generateValue: true).'
-  );
+
+// Every secret whose ABSENCE is unsafe or silently destructive, checked in ONE
+// pass so a failed boot names all of them at once. Failing on the first would
+// mean discovering the list one deploy at a time, with the service down in
+// between — which is precisely the outage this is meant to prevent.
+//
+// Deliberately NOT everything the service uses. A missing Stripe key breaks
+// checkout loudly and the site still serves; refusing to boot over it would
+// turn a degraded service into no service. These two are different: without
+// them the service keeps working while being WRONG.
+function _requireProductionSecrets() {
+  const required = [
+    ['JWT_SECRET',
+     'signs sessions AND derives the key that encrypts client bot configs at ' +
+     'rest (_botConfigKey). Generating one per process silently orphans every ' +
+     'stored config on restart and across instances.'],
+    ['BOT_EMAIL_SECRET',
+     'signs licence keys. Without it they are signed with a constant published ' +
+     'in this repository, so anyone reading the source can mint a valid ' +
+     'signature.'],
+  ];
+  const missing = required.filter(([k]) => !String(process.env[k] || '').trim());
+  if (!_IS_PROD || missing.length === 0) return;
+  console.error('\n[FATAL] This is production and required secrets are missing:\n');
+  for (const [k, why] of missing) console.error(`  • ${k} — ${why}\n`);
+  console.error('Set them in the Render dashboard, then redeploy. render.yaml\n' +
+                'already declares JWT_SECRET with generateValue: true.\n');
   process.exit(1);
 }
+_requireProductionSecrets();
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
   const fallback = require('crypto').randomBytes(32).toString('hex');
   console.warn('[WARN] JWT_SECRET not set — generated a random secret for this DEV session. Sessions reset on restart and stored bot configs will not decrypt.');
@@ -1218,18 +1231,17 @@ app.get('/api/logout', (req, res) => {
 // the bot they unlocked does not exist, so accepting one would authorise
 // access to nothing.
 const _KEY_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 chars, no 0/O/1/I
-const _FOREX_LIC_SALT = 'apex-forex-2025-v1'; // forex fallback — never changes
+// Pre-BOT_EMAIL_SECRET keys were signed with this constant. It is published in
+// this repository, so anyone reading the source can forge a signature with it —
+// which is why it is NOT usable for signing and startup refuses it in
+// production (see _requireProductionSecrets). It survives only so that a key
+// issued back then can still be RECOGNISED in development; the licences row,
+// not the signature, is what actually authorises anything.
+const _LEGACY_LIC_SALT = 'apex-forex-2025-v1';
 
 function _licSecrets(product = 'apex-forex') {
   const env = process.env.BOT_EMAIL_SECRET;
-  const salt = _FOREX_LIC_SALT;
-  // When BOT_EMAIL_SECRET is set, ONLY the env-derived secret is trusted for
-  // HMAC signing/verification. The hardcoded salt is deliberately dropped so
-  // that anyone who can read this source cannot forge valid keys. Legacy keys
-  // signed with the salt (issued before BOT_EMAIL_SECRET existed) still pass
-  // through the Supabase fallback in /api/verify-license, because every real
-  // buyer's key is stored active in the licenses table.
-  return env ? [`${env}-${product}`] : [salt];
+  return env ? [`${env}-${product}`] : [_LEGACY_LIC_SALT];
 }
 
 function _hmacMac4(data, secret) {
@@ -1448,7 +1460,20 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
       // "legacy/manual key". Combined with the auto-upsert that used to sit
       // below, a signature alone both granted access AND wrote itself an
       // active licence — verification minting its own entitlement.
+      // This is the ONE denial that might be a real customer rather than an
+      // attacker: every path that mints a key also writes its row, so a signed
+      // key with no row is either forged or predates the licences table. The
+      // operator cannot tell those apart from a log line nobody reads, and the
+      // customer's version of this event is "the bot stopped working", so it
+      // is surfaced rather than merely recorded.
       addLog(`verify-license: signed key with no licence row — DENYING (${String(key).slice(0, 9)}…)`, 'license', 'warn');
+      _notifyAdminAlert(
+        `⚠️ A correctly-signed licence key was refused because it has no row in ` +
+        `the licences table.\n\nKey: ${String(key).slice(0, 9)}…\n\n` +
+        `Every path that issues a key also writes its row, so this is either a ` +
+        `forged signature (ignore it) or a key issued before that table existed ` +
+        `(a real customer, now locked out — add their row).`
+      );
       return res.json({ valid: false, message: 'This licence is not registered. If you have just paid, wait a minute and tap the link in your email.' });
     }
     if (row.refunded === true) {
