@@ -558,6 +558,33 @@ check("the link is a setting, so publishing it needs no deploy",
       "VOICE_SHORTCUT_URL" in open(
           os.path.join(ROOT, "apex", "config.py"), encoding="utf-8").read())
 
+print("\n⏳  A voice token expires")
+# It never did. `voice_token_at` was written every time one was minted and
+# read nowhere, so a token that can place and close real trades stayed valid
+# forever — and it lives in a URL the client pastes into a phone shortcut,
+# which survives phone backups, screenshots and a shared device.
+import time as _t                                            # noqa: E402
+
+_VU = "voice-exp-1"
+_tok = voice_api.mint(_VU)
+_now = int(_t.time())
+for label, issued, want in (
+        ("a fresh token works", _now, True),
+        ("just inside the window still works", _now - 89 * 86400, True),
+        ("past the window is refused", _now - 91 * 86400, False),
+        ("no issue time is refused, not grandfathered", 0, False),
+        ("a corrupt issue time is refused", "not-a-number", False)):
+    user_store.update(_VU, {voice_api.ISSUED_FIELD: issued})
+    check(label, (voice_api.identify(_tok) == _VU) is want,
+          f"identify -> {voice_api.identify(_tok)!r}")
+
+user_store.update(_VU, {voice_api.ISSUED_FIELD: _now})
+check("a wrong secret is still refused first",
+      voice_api.identify(f"{_VU}.wrong-secret") is None)
+check("revoke still works", (voice_api.revoke(_VU) or True)
+      and voice_api.identify(_tok) is None,
+      "expiry must not have replaced revocation")
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")

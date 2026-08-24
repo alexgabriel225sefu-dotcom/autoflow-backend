@@ -31,6 +31,7 @@ default because the safe default for a market order is the one that asks.
 import hashlib
 import hmac
 import json
+import os
 import secrets
 import threading
 import time
@@ -64,6 +65,13 @@ _PENDING_TTL_S = 120
 
 TOKEN_FIELD = "voice_token_hash"
 ISSUED_FIELD = "voice_token_at"
+# How long a voice token stays usable. This field was written from the start
+# and never read, so the token never expired — and it can place and close real
+# trades, while living in a URL the client pastes into a phone shortcut. That
+# URL survives phone backups, screenshots and a shared device, and there was
+# nothing to age it out. Long, because re-issuing is a manual step for the
+# client and this is a convenience feature, but bounded.
+_TOKEN_MAX_AGE_S = int(os.getenv("VOICE_TOKEN_MAX_AGE_S", str(90 * 86400)))
 
 # Everything that moves money or stops the bot from protecting it. Named here
 # rather than inferred from the request text, because the model decides what to
@@ -119,10 +127,22 @@ def identify(token):
         user_id, _, secret = raw.partition(".")
         if not user_id or not secret:
             return None
-        stored = (user_store.load(user_id) or {}).get(TOKEN_FIELD) or ""
+        rec = user_store.load(user_id) or {}
+        stored = rec.get(TOKEN_FIELD) or ""
         if not stored:
             return None
         if not hmac.compare_digest(stored, _hash(secret)):
+            return None
+        # Age is only meaningful once the secret has proved the caller owns
+        # this record. A token with no issue time is not grandfathered: the
+        # field is written whenever one is minted, so its absence means a
+        # record this code did not create, and "cannot tell how old" is not
+        # a reason to trust something that can place trades.
+        try:
+            issued = float(rec.get(ISSUED_FIELD) or 0)
+        except (TypeError, ValueError):
+            issued = 0
+        if not issued or (time.time() - issued) > _TOKEN_MAX_AGE_S:
             return None
         return user_id
     except Exception:
