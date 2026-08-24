@@ -691,9 +691,27 @@ class CtraderBroker:
         return [pos] if pos else []
 
     def amend_sltp(self, position_id, sl=None, tp=None, instrument=None):
-        """Move SL/TP on an existing position — used by the trailing-stop /
-        break-even manager. Fail-soft: a failed amend never raises into the loop
-        (the existing stop stays attached), so it can't close a good trade."""
+        """REPLACE the SL and TP on an existing position. Both of them.
+
+        This is not a partial update. ProtoOAAmendPositionSLTPReq carries
+        `stopLoss` and `takeProfit` as proto2 OPTIONAL fields, so a value the
+        caller omits is genuinely absent from the wire message — and the server
+        treats absent as "no protection", not as "leave it alone". Amending
+        only the stop therefore DELETES the take-profit.
+
+        Confirmed on the owner's live account, not inferred:
+
+            order    BUY GBPUSD units=5848 @~1.36441 SL=1.36138 TP=1.37047
+            trail    STOP_MOVED GBPUSD sl=1.36168        (amend, sl only)
+            broker   position now reports takeProfit: None
+
+        The position could no longer reach its own target; only the stop, a
+        discretionary exit or the weekend flatten could close it. Every caller
+        must pass BOTH values — pass the position's current tp to keep it —
+        and tests/test_trailing_keeps_tp.py enforces that at every call site.
+
+        Fail-soft: a failed amend never raises into the loop (the existing
+        stop stays attached), so it can't close a good trade."""
         try:
             am = ProtoOAAmendPositionSLTPReq()
             am.ctidTraderAccountId = self._ctid()

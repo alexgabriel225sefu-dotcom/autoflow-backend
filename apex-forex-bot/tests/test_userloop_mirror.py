@@ -47,8 +47,13 @@ class _StubBroker:
     def __init__(self):
         self.amended = []
 
-    def amend_sltp(self, pid, sl=None, instrument=None):
+    def amend_sltp(self, pid, sl=None, tp=None, instrument=None):
+        # Mirrors CtraderBroker.amend_sltp, `tp` included. A stub narrower
+        # than the real interface turns a caller passing more into a
+        # TypeError that the caller's except-block reads as a broker refusal.
         self.amended.append((pid, sl, instrument))
+        self.amends = getattr(self, "amends", [])
+        self.amends.append({"pid": pid, "sl": sl, "tp": tp})
         return True
 
 

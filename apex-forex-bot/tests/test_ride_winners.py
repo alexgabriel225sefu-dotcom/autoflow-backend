@@ -49,11 +49,19 @@ class Broker:
 
     def __init__(self, ok=True, boom=False):
         self.ok, self.boom, self.calls = ok, boom, []
+        self.amends = []
 
-    def amend_sltp(self, pid, sl=None, instrument=None):
+    def amend_sltp(self, pid, sl=None, tp=None, instrument=None):
+        # MIRRORS CtraderBroker.amend_sltp exactly, `tp` included. It did not,
+        # and a stub narrower than the interface it stands in for cannot catch
+        # a caller that starts passing more — it turns a signature mismatch
+        # into a TypeError swallowed by the caller's own except-block, which
+        # reads as "the broker refused" rather than "this call is malformed".
         if self.boom:
             raise RuntimeError("connection reset")
         self.calls.append((pid, sl, instrument))
+        self.amends.append({"pid": pid, "sl": sl, "tp": tp,
+                            "instrument": instrument})
         return self.ok
 
 

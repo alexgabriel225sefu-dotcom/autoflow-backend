@@ -659,7 +659,11 @@ def _ride_instead_of_close(broker, cfg, pos, symbol, price, initial_risk,
         return False        # trail is already tighter — leave it alone
 
     try:
-        if not broker.amend_sltp(pid, sl=round(keep, 6), instrument=symbol):
+        # Both sides, always: an amend replaces the pair, so leaving the
+        # take-profit out would delete it. See CtraderBroker.amend_sltp.
+        if not broker.amend_sltp(pid, sl=round(keep, 6),
+                                 tp=(pos.get("takeProfit") or pos.get("tp")),
+                                 instrument=symbol):
             return False    # could not protect it → fall through and close
     except Exception as e:
         print(f"[UserLoop:{user_id}] ride amend failed on {symbol}: {e}")
@@ -1096,7 +1100,13 @@ def _manage_trailing(broker, cfg, pos, symbol, price, initial_risk=None):
             new_sl = max(new_sl, trail) if side == "BUY" else min(new_sl, trail)
         improved = (new_sl - cur_sl) if side == "BUY" else (cur_sl - new_sl)
         if improved > risk * 0.05:  # only amend on a meaningful move
-            if broker.amend_sltp(pid, sl=new_sl, instrument=symbol):
+            # Pass the CURRENT take-profit through. An amend replaces both
+            # sides, so omitting it deletes the target — the position could
+            # then only exit by stop, by a discretionary exit, or by the
+            # weekend flatten. See CtraderBroker.amend_sltp.
+            if broker.amend_sltp(pid, sl=new_sl,
+                                 tp=(pos.get("takeProfit") or pos.get("tp")),
+                                 instrument=symbol):
                 return new_sl
     except Exception as e:
         print(f"[Trailing] manage failed: {e}")
