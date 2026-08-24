@@ -170,7 +170,15 @@ def _handle_trade_intent_fx(chat_id, text) -> bool:
         side = open_pos["side"]
         gross = forex.pnl_usd(side, entry, price, units, sym)
         pv = forex.pip_value_per_unit(sym, price)
-        cost = open_pos.get("entrySpreadPips", 0.0) * pv * units
+        # What CLOSING would still cost — not the whole round trip.
+        # LIVE: `entry` is the broker's real fill (a buy filled at the ask), so
+        # the entry half of the spread is already inside `gross`; only the exit
+        # half is still owed. PAPER: both prices are candle mids with no spread
+        # in them, so the full round trip is still owed. Charging the full
+        # spread in live over-stated this projection by half a spread.
+        _sp = float(open_pos.get("entrySpreadPips", 0.0) or 0.0)
+        _paper = bool(user.get("paper", True))
+        cost = _sp * pv * units * (1.0 if _paper else 0.5)
         net = gross - cost
         bal = dash.get("balance", 1000.0) + net
         sign = "+" if net >= 0 else ""
@@ -1619,7 +1627,14 @@ _OB_SYMS_CRYPTO = [
     ("Ð Dogecoin", "DOGEUSD"), ("⬡ Polkadot", "DOTUSD"), ("🔗 Chainlink", "LINKUSD"),
     ("Ƀ Bitcoin Cash", "BCHUSD"), ("🥇 Gold", "XAUUSD"), ("🥈 Silver", "XAGUSD"),
 ]
-_OB_SYMS = _OB_SYMS_CRYPTO if cfg.PRODUCT == "crypto" else _OB_SYMS_FOREX
+# The merged build is always PRODUCT="forex", so keying this on the build left
+# the crypto branch dead: a client who answered "₿ Crypto" was offered only
+# Bitcoin and Ethereum (plus the metals), never Solana, XRP, Litecoin, Cardano,
+# Dogecoin, Polkadot, Chainlink or Bitcoin Cash — all broker-tradeable and all
+# in cfg.CRYPTO_UNIVERSE. Offer the union and let the client's own asset-class
+# answer do the narrowing, which is the thing that actually knows.
+_OB_SYMS = _OB_SYMS_FOREX + [p for p in _OB_SYMS_CRYPTO
+                             if p not in _OB_SYMS_FOREX]
 
 _RISK_TEXT = ("⚠️ <b>Risk disclaimer</b>\n\n"
               "• No profit is guaranteed — results depend on the market\n"
@@ -2048,6 +2063,11 @@ def _ob_step_instrument(chat_id):
             if _choice == "both"
             or (_choice == "crypto") == bool(forex.is_crypto(code))
             or code.startswith("XAU") or code.startswith("XAG")]
+    if _choice == "crypto":
+        # Put the coins first — the metals are carried along as a courtesy,
+        # they are not what this client asked for.
+        syms = ([p for p in syms if forex.is_crypto(p[1])]
+                + [p for p in syms if not forex.is_crypto(p[1])])
     if len(syms) < 3:
         syms = _OB_SYMS
     try:
@@ -2055,7 +2075,10 @@ def _ob_step_instrument(chat_id):
         if token and ctid:
             from apex.brokers import ctrader as _ct
             offered = _ct.available_symbol_names(token, ctid, u.get("ctrader_env", "demo"))
-            filtered = [(label, code) for label, code in _OB_SYMS if code in offered]
+            # Narrow what the CLIENT'S asset class already selected. Reading
+            # _OB_SYMS here instead of `syms` silently threw that choice away
+            # and put the full list back.
+            filtered = [(label, code) for label, code in syms if code in offered]
             # Only narrow the list if the broker actually offers a useful
             # subset — an empty/near-empty result usually means the lookup
             # itself is unreliable (e.g. thin demo symbol set), not that
@@ -3997,7 +4020,7 @@ def _handle_pairs(chat_id):
     if not (user.get("ctrader_access_token") and user.get("ctrader_account_id")):
         return send_to(chat_id,
             "💱 <b>Available pairs</b> (connect cTrader with /ctrader to see your broker's full list):\n"
-            "EUR_USD · GBP_USD · USD_JPY · AUD_USD · USD_CAD · NZD_USD · USD_CHF · EUR_GBP")
+            "EUR_USD · GBP_USD · USD_JPY · AUD_USD · USD_CAD · NZD_USD · USD_CHF")
     try:
         from apex import user_loop as _ul
         br, _ = _ul._make_broker(user)
@@ -4553,7 +4576,10 @@ def _parse_trade_args(args):
     return sym, lots
 
 
-_QUICK_SYMS_FX = ["EUR_USD", "GBP_USD", "USD_JPY", "XAU_USD", "GBP_JPY", "AUD_USD"]
+# No GBP_JPY: crosses without a USD leg are refused by forex.is_tradeable
+# (sizing has no quote-currency conversion), so offering one on a quick-pick
+# button only produced a refusal one tap later.
+_QUICK_SYMS_FX = ["EUR_USD", "GBP_USD", "USD_JPY", "XAU_USD", "USD_CAD", "AUD_USD"]
 _LOT_SIZES_FX = [0.01, 0.05, 0.1, 0.5, 1.0, 2.0]
 
 
@@ -4603,6 +4629,32 @@ def _report_order_result(chat_id, result, side=None, sym=None):
                                       symbol=sym or result.get("symbol"),
                                       detail=_trade_err(result.get("error"))),
                 _kb(screens.order_unknown_rows()))
+        return False
+    # A gate refusal is named in words the client can act on. Before this,
+    # every one of these arrived as "an identical order was sent moments ago".
+    _reason = str(result.get("error") or "")
+    _friendly = {
+        "DUPLICATE_ORDER": "An identical order was sent moments ago. Check "
+                           "Positions before asking again.",
+        "DUPLICATE_ORDER_LOCAL": "An identical order was sent moments ago. "
+                                 "Check Positions before asking again.",
+        "NOT_ENTITLED": "This account is not active. Check your licence with "
+                        "/status.",
+        "ENTITLEMENT_UNKNOWN": "We could not verify your licence just now, so "
+                               "the order was not sent. Try again shortly.",
+        "RISK_HALTED": "Trading is halted by your own risk limits (daily loss "
+                       "or drawdown). It resumes when they reset.",
+        "NOT_OWNER": "Another copy of the bot is managing this account right "
+                     "now — try again in a moment.",
+        "STORE_UNREACHABLE": "We could not reach your account record, so the "
+                             "order was not sent. Try again shortly.",
+        "COORDINATION_UNAVAILABLE":
+            "We cannot currently prove this order would not be sent twice, so "
+            "it was not sent. Try again shortly.",
+    }.get(_reason)
+    if _friendly:
+        send_to(chat_id, f"❌ {_esc(_friendly)}",
+                _kb([[("📈 Positions", "nav:pos")], [("☰ Menu", "nav:menu")]]))
         return False
     send_to(chat_id, f"❌ Could not open trade: {_trade_err(result.get('error'))}",
             _kb([[("📈 Positions", "nav:pos")], [("☰ Menu", "nav:menu")]]))
@@ -5834,10 +5886,22 @@ def _license_ok(chat_id, text):
     """Validate the buyer's license before granting access to the bot.
 
     The activation deep link from the purchase email is `/start FORX-...`.
-    Returns True if access should be granted. FAIL-OPEN: if our verify server
-    is unreachable we still let a real-looking key through, so a server hiccup
-    never locks out a paying customer. Only a server that actively says
-    "invalid" (or a malformed/missing key) is refused.
+    Returns True if access should be granted.
+
+    FAIL-CLOSED for a first-time chat. This docstring used to say the exact
+    opposite — "we still let a real-looking key through" — describing a
+    behaviour the code below stopped having, and describing it as the safe
+    choice. It is not: an unreachable verifier is not evidence in a stranger's
+    favour, and treating it as such made the outage itself the way in. Every
+    key-shaped string is accepted for as long as the verifier is down.
+
+    Two populations get grace before that point, and only two: an admin, and a
+    returning customer whose key we already hold. Both have been verified
+    before; neither is a stranger.
+
+    A docstring that inverts a security property is worse than no docstring —
+    the next person to touch this reads it, believes the system already fails
+    open, and makes a decision on that.
     """
     cid = str(chat_id)
     # Returning customer whose access store was wiped (e.g. a redeploy) — they

@@ -89,8 +89,21 @@ def _currency_legs(symbol):
     garbage one, leaving the guard fail-open as designed.
     """
     s = (symbol or "").upper().replace("_", "").replace("/", "").replace("-", "")
-    if len(s) == 6 and s.isalpha():
+    if not s.isalpha():
+        return []
+    if len(s) == 6:
         return [s[:3], s[3:]]
+    # Crypto tickers are not 3+3. DOGEUSD, LINKUSD, AVAXUSD and MATICUSD all
+    # fell through the 6-character rule and returned NO legs, and
+    # news.high_impact_window([]) matches nothing and returns None — so four
+    # of the twelve curated coins traded straight through NFP/CPI/FOMC with
+    # NEWS_FILTER on and nothing logged. The quote currency is the half that
+    # carries the calendar risk, so split on it by name instead of by length.
+    for q in ("USDT", "USDC", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF"):
+        if len(s) > len(q) and s.endswith(q):
+            base = s[:-len(q)]
+            # USDT/USDC are dollar proxies for calendar purposes.
+            return [base, "USD" if q in ("USDT", "USDC") else q]
     return []
 
 
@@ -136,6 +149,13 @@ def leverage_for_symbol(broker, cfg, symbol):
     silently override a deliberate choice.
     """
     sym = _nrm(symbol)
+    # An explicit client setting wins for every symbol. This used to be
+    # reachable only when no symbol was passed — which never happens in real
+    # trading — so the setting was honoured nowhere but the display.
+    if getattr(cfg, "LEVERAGE_EXPLICIT", False):
+        explicit = float(getattr(cfg, "LEVERAGE", 0) or 0)
+        if explicit > 0:
+            return explicit
     if not sym:
         return float(getattr(cfg, "LEVERAGE", _LEV_STATIC_FX))
     if sym in _LEV_CACHE:
@@ -168,6 +188,25 @@ def flash_spike_pct_for(cfg, symbol):
     if forex.is_crypto(symbol) and base <= 0.02:
         return 0.05
     return base
+
+
+def max_spread_pct_for(cfg, symbol):
+    """Spread ceiling as a % of price, per INSTRUMENT rather than per build.
+
+    `cfg.MAX_SPREAD_PCT` was `0.35 if PRODUCT == "crypto" else 0` — the same
+    build-level pattern already fixed for LEVERAGE and FLASH_SPIKE_PCT, missed
+    here. On the merged forex build PRODUCT is always "forex", so it read 0 and
+    crypto entries fell back to the pip-count guard that the code's own comment
+    calls meaningless across crypto's varied pip sizes: at BTC around $104k
+    that trips near $12-30 instead of the intended ~0.35% (~$364), roughly
+    12-30x too tight, which quietly blocks most real crypto entries.
+
+    An explicit MAX_SPREAD_PCT from the operator still wins for every symbol.
+    """
+    base = float(getattr(cfg, "MAX_SPREAD_PCT", 0) or 0)
+    if base > 0:
+        return base
+    return 0.35 if forex.is_crypto(symbol) else 0.0
 
 
 def recovery_verdict(live_position, got_answer):
@@ -462,6 +501,31 @@ def _reattach_entry_meta(pos, meta):
         if pos.get(k) is None:
             pos[k] = v
     return pos
+
+
+def realized_cost_usd(open_pos, close_res, pv, units, paper):
+    """Costs to subtract from a gross P&L that was computed off FILL prices.
+
+    In LIVE the entry and the exit are the broker's own executions — a buy
+    fills at the ask and its close at the bid — so the ROUND-TRIP SPREAD IS
+    ALREADY INSIDE `gross`. Subtracting the entry-spread estimate on top of it
+    charged the client for the spread twice and made every live trade read
+    worse than the same trade in cTrader's History tab. The broker's own
+    authoritative number (`ctrader.get_closed_deal_pnl`) is
+    `grossProfit + swap - commission` — no spread term at all, for exactly
+    this reason. Commission is a genuinely separate charge and still applies.
+
+    In PAPER there are no fills: entry and exit are candle/level mid prices
+    with no spread baked in, so the estimate is the only thing modelling the
+    cost of crossing it and it MUST be charged. That asymmetry is the whole
+    point of this function — the previous code applied the paper formula to
+    live trades.
+    """
+    commission = float((close_res or {}).get("commissionUsd", 0.0) or 0.0)
+    if not paper:
+        return commission
+    spread_pips = float(open_pos.get("entrySpreadPips", 0.0) or 0.0)
+    return spread_pips * pv * units + commission
 
 
 def _profit_too_small_to_take(pos, price, symbol, initial_risk, user_id=""):
@@ -876,6 +940,10 @@ def _make_broker(user):
         # the margin cap must assume less leverage or it sizes positions the
         # account can't actually margin.
         LEVERAGE         = float(user.get("leverage", 5 if _appcfg.PRODUCT == "crypto" else 30)),
+        # Whether the number above is the CLIENT'S or just our default. Without
+        # this, leverage_for_symbol() cannot tell a deliberate 30 from the
+        # fallback 30, so it ignored the setting entirely (see its docstring).
+        LEVERAGE_EXPLICIT = "leverage" in user,
         MARGIN_CAP       = 0.5,
         # Hard-coded 3.0 here overrode the product config, so the strict scalp
         # ceiling (1.2p) never reached a live account — every entry was admitted
@@ -1163,7 +1231,7 @@ def _loop(user_id, alert_fn, gen=None):
     # exactly the moment they mattered most — right after losses.
     last_loss_at = float(user.get("last_loss_at") or 0)   # entry cooldown anchor (any losing close)
     last_close_at = float(user.get("last_close_at") or 0) # re-entry lock after ANY close — kills open/close churn
-    loss_streak = int(user.get("loss_streak") or 0)       # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
+    loss_streak = int(user.get("loss_streak") or 0)       # counted and reported only — the risk ladder it used to drive was removed
     # The ladder is a within-session brake, but nothing ever cleared it: a
     # streak survived indefinitely, so losses from days ago still quartered
     # today's position size and the only escape was a winning trade. Everything
@@ -2222,8 +2290,8 @@ def _loop(user_id, alert_fn, gen=None):
                         # broker reports one) — cost was silently always $0
                         # before, since a live open_pos read straight from the
                         # broker never carries an "entrySpreadPips" estimate.
-                        cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
-                                   + (_close_res or {}).get("commissionUsd", 0.0))
+                        cost_usd = realized_cost_usd(open_pos, _close_res, pv,
+                                                     units_, cfg.PAPER_TRADING)
                         net = gross - cost_usd
                         if cfg.PAPER_TRADING:
                             paper_balance += net
@@ -2364,7 +2432,9 @@ def _loop(user_id, alert_fn, gen=None):
                     gross = forex.pnl_usd(pside, open_pos["entryPrice"],
                                           exit_price, units_, symbol)
                     pv = forex.pip_value_per_unit(symbol, exit_price)
-                    cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                    # Paper-only: exit_price is the SL/TP LEVEL, a mid price with
+                    # no spread in it, so the estimate is the real cost here.
+                    cost_usd = realized_cost_usd(open_pos, None, pv, units_, True)
                     net = gross - cost_usd
                     paper_balance += net
                     if net < 0:
@@ -2573,8 +2643,8 @@ def _loop(user_id, alert_fn, gen=None):
                     gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
                                           exit_price, units_, _wsym)
                     pv = forex.pip_value_per_unit(_wsym, exit_price)
-                    cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
-                               + (_close_res or {}).get("commissionUsd", 0.0))
+                    cost_usd = realized_cost_usd(open_pos, _close_res, pv,
+                                                 units_, cfg.PAPER_TRADING)
                     net = gross - cost_usd
                     if cfg.PAPER_TRADING:
                         paper_balance += net
@@ -2966,7 +3036,7 @@ def _loop(user_id, alert_fn, gen=None):
                 # are meaningless across crypto's varied pip sizes); forex keeps
                 # the pip limit.
                 max_spread = getattr(cfg, "MAX_SPREAD_PIPS", 3.0)
-                max_spread_pct = getattr(cfg, "MAX_SPREAD_PCT", 0)
+                max_spread_pct = max_spread_pct_for(cfg, symbol)
                 spread_pct = ((ask - bid) / price * 100) if price > 0 else 0.0
                 if not entry_ok:
                     pass
@@ -3368,10 +3438,23 @@ def _loop(user_id, alert_fn, gen=None):
                 if floor == 0:
                     _skip("account too small for minimum lot on this instrument")
                     entry_ok = False
+                else:
+                    # The floor may be BIGGER than the risk-correct size (wide
+                    # stop, small account). Taking it anyway silently spends
+                    # more than the configured risk per trade, without limit.
+                    # This has to be decided HERE, before the branch below that
+                    # actually places the order — setting entry_ok inside that
+                    # branch would be read too late to stop anything.
+                    units = forex.round_units(max(units, floor), symbol)
+                    if not forex.floor_risk_ok(units, symbol, price,
+                                               stop_pips_eff,
+                                               sizing_balance * per_trade_risk):
+                        _skip("minimum lot on this instrument would risk more "
+                              "than the configured risk per trade")
+                        entry_ok = False
                 if not entry_ok:
                     pass  # margin too small — skip to CLOSE handling below
                 else:
-                    units = forex.round_units(max(units, floor), symbol)
 
                     # Balance-relative TP: instead of a fixed pip count that
                     # means less and less as the account grows (or more and
@@ -3399,7 +3482,7 @@ def _loop(user_id, alert_fn, gen=None):
                         _rb, _ra = broker.get_bid_ask(symbol)
                         _rs = forex.spread_pips(_rb, _ra, symbol)
                         _rs_pct = ((_ra - _rb) / price * 100) if price > 0 else 0.0
-                        _msp = getattr(cfg, "MAX_SPREAD_PCT", 0)
+                        _msp = max_spread_pct_for(cfg, symbol)
                         _msp_pip = getattr(cfg, "MAX_SPREAD_PIPS", 3.0)
                         if _msp > 0 and _rs_pct > _msp:
                             _skip_exec = True
@@ -3670,8 +3753,8 @@ def _loop(user_id, alert_fn, gen=None):
                     # every real close; commissionUsd (best-effort, see
                     # ctrader._extract_commission) closes that gap when the
                     # broker reports one.
-                    cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
-                               + (_close_res or {}).get("commissionUsd", 0.0))
+                    cost_usd = realized_cost_usd(open_pos, _close_res, pv,
+                                                 units_, cfg.PAPER_TRADING)
                     net = gross - cost_usd
                     if cfg.PAPER_TRADING:
                         paper_balance += net
@@ -4076,15 +4159,30 @@ def force_trade(user_id, side, symbol=None, lots=None):
     dash = get_dash(user_id)
     if dash:
         balance = dash.get("balance", balance)
+    # Size off the SAME baseline the automatic path uses. Reading the live
+    # balance here meant a manual /buy compounded: the identical setup produced
+    # a different lot size depending on where the account happened to stand,
+    # which is exactly the drift the autonomous path documents refusing.
+    sizing_balance = (dash or {}).get("startBalance") or balance
 
     if lots is not None and lots > 0:
         units = forex.lots_to_units(lots, sym)
     else:
         # Same per-instrument leverage as the automatic path. A manual /buy on
         # BTCUSD must not be margined as though it were a currency pair.
-        units = forex.calc_units(balance, cfg.RISK_PER_TRADE, stop_pips_eff, sym, price,
+        units = forex.calc_units(sizing_balance, cfg.RISK_PER_TRADE, stop_pips_eff,
+                                 sym, price,
                                  leverage=leverage_for_symbol(broker, cfg, sym))
     units = forex.round_units(max(units, forex.min_units(sym)), sym)
+    # Same unbounded-floor defect the automatic path had: when the risk-correct
+    # size lands below the minimum lot, taking the lot anyway spends more than
+    # the configured risk, without limit. An explicit `lots` is the client
+    # overriding sizing on purpose and is left alone.
+    if lots is None and not forex.floor_risk_ok(units, sym, price, stop_pips_eff,
+                                                sizing_balance * cfg.RISK_PER_TRADE):
+        return {"ok": False, "side": side, "symbol": sym,
+                "error": "minimum lot on this instrument would risk more than "
+                         "your configured risk per trade"}
 
     try:
         from apex import control as _ctl
@@ -4108,9 +4206,17 @@ def force_trade(user_id, side, symbol=None, lots=None):
     _claim_ok, _claim_why = _decision.allowed, _decision.reason
     if not _claim_ok:
         # Manual /buy and the MCP open_trade land here. A double-tap on the
-        # Telegram button is the everyday version of the same bug.
-        return {"ok": False, "error": "duplicate order blocked — an identical "
-                                      "order was sent moments ago"}
+        # Telegram button is the everyday version of the same bug — but it is
+        # only ONE of the reasons this gate refuses. This used to report every
+        # refusal as "an identical order was sent moments ago", so a client
+        # whose licence had lapsed (NOT_ENTITLED), who was halted by the
+        # drawdown guard (RISK_HALTED), whose ownership lease could not be
+        # read (NOT_OWNER) or whose coordination backend was down
+        # (COORDINATION_UNAVAILABLE) was told a duplicate had been sent — a
+        # statement that was simply untrue, and that hid the real problem.
+        # Pass the gate's own reason up; the caller names it in plain words.
+        return {"ok": False, "error": _claim_why or "ORDER_REFUSED",
+                "side": side, "symbol": sym}
     try:
         ledger.record(_rid, broker.place_order(side, units, sym,
                                                sl=sl_price, tp=tp_price))
@@ -4256,8 +4362,8 @@ def force_close(user_id, origin="manual", emergency=False):
         units_ = open_pos.get("units", 1000)
         gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"], price, units_, sym)
         pv = forex.pip_value_per_unit(sym, price)
-        cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
-                   + (_close_res or {}).get("commissionUsd", 0.0))
+        cost_usd = realized_cost_usd(open_pos, _close_res, pv,
+                                     units_, cfg.PAPER_TRADING)
         net = gross - cost_usd
 
     with _lock:

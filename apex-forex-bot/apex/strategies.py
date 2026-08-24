@@ -194,7 +194,6 @@ def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
     # The streak is still COUNTED (strategy_session.consecutiveLosses) so the
     # journal and the dashboard keep telling the truth about what happened.
     # It just no longer stops anything.
-    loss_s = get_symbol_session(user_id, symbol) if symbol else s
     daily_dd_pct = (s["dailyPnL"] / start_balance) * 100 if start_balance else 0
     if daily_dd_pct < -abs(max_daily_loss_pct):
         reasons.append(f"Daily loss exceeded -{abs(max_daily_loss_pct):g}% "

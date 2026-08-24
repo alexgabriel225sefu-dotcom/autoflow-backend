@@ -719,6 +719,15 @@ CRITICAL_FIELDS = {
     "ctrader_env", "ctrader_accounts", "broker",
     "risk", "max_dd_pct", "max_daily_loss_pct", "maxpos", "max_total_risk",
     "automation", "copilot", "loss_streak",
+    # The record of a live position across a restart. It was written with a
+    # plain load-merge-save, so a concurrent write to ANY unrelated field
+    # (a Telegram command touching watchlist, asset_class, ...) could clobber
+    # it back to the pre-trade value with no error. Restart recovery then read
+    # a stale "flat" snapshot, skipped reconciliation, and the real P&L was
+    # booked as a deposit/withdrawal — invisible to the drawdown guards. That
+    # is the "balance drop nobody could explain" bug, reopened through the one
+    # field the allowlist forgot.
+    "open_position_snapshot",
 }
 
 # Concurrent writers are rare and the window is milliseconds, so a handful of

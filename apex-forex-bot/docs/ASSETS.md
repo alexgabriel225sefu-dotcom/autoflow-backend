@@ -77,6 +77,15 @@ harmless. For SE Equities in SEK, JP in JPY, HK in HKD, position size would be
 wrong by the exchange rate — a risk calculation quietly off by 10x is worse
 than a refused order.
 
+The same conversion rule applies inside FX, and this was missed until the
+full-project audit: a cross with no USD leg (GBP_JPY, EUR_GBP, AUD_CHF) needs
+exactly the `quote_usd_rate` nothing passes. The margin cap valued one unit of
+GBP_JPY at $190 rather than its true ~$1.21, sizing the position at about 1/31
+of the intended risk — $0.54 where the client had asked for $16.22 — and
+refusing outright as "account too small" on smaller balances. `is_tradeable`
+now rejects them under the same rule that rejects indices and equities.
+USD_JPY and every other pair with a USD leg is unaffected.
+
 Adding those two is what "trade everything the broker offers" actually
 requires, plus a different scanning design (see below).
 

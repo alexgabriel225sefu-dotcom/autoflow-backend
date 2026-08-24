@@ -230,8 +230,19 @@ check("the close gate claims idempotency",
       "ledger.claim(" in GSRC and 'f"CLOSE:{intent}"' in GSRC)
 check("the outcome is recorded so a duplicate gets the ORIGINAL result",
       "ledger.record(_close_rid" in LSRC)
+# Asserted on the CODE, not on the comment beside it. This check used to
+# grep for the string "The claim STANDS" — which is prose. Delete the
+# behaviour, keep the comment, and it still passed. Found by scanning every
+# source-text assertion in the suite for literals that exist only inside
+# comments and docstrings; this was the one that mattered.
+#
+# The behaviour is an ABSENCE — nothing releases the claim on a failed close
+# — so the honest assertion is that no release call exists on that path at
+# all. A close that raised may still have reached the broker, and a claim
+# handed back is a retry seconds later closing whatever was reopened since.
 check("a failed close does NOT release the claim",
-      "The claim STANDS" in LSRC)
+      "ledger.release" not in LSRC,
+      "releasing on failure lets a retry close a position nobody asked to close")
 check("emergency override is explicit, not accidental", "emergency=" in GSRC)
 
 try:

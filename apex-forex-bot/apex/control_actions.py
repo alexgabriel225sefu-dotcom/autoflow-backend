@@ -31,11 +31,11 @@ _SETTABLE = {
     # stays settable for anything that still speaks the old two-way boolean —
     # apex.automation reconciles the pair, so setting either one is coherent.
     "automation",
-    # Risk-ladder state, not a strategy knob. Settable because a miscounted
-    # streak silently quarters every position and there was no way to correct
-    # it short of waiting for a winning trade — a duplicate-journaling bug once
-    # pushed it to 4 after two real losses, and the account traded at a quarter
-    # size until it was noticed.
+    # Streak state, not a strategy knob. It no longer resizes anything — the
+    # risk ladder it drove was removed — but it is still counted, journalled
+    # and shown to the client, and a duplicate-journaling bug once pushed it to
+    # 4 after two real losses. Settable so a wrong count can be corrected
+    # rather than misreported until a winning trade clears it.
     "loss_streak",
 }
 

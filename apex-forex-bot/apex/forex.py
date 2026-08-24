@@ -43,13 +43,24 @@ def is_tradeable(instrument: str) -> bool:
     they need per-exchange trading calendars and quote-currency conversion in
     sizing, neither of which exists yet.
 
+    Also rejected, for the SECOND of those two reasons alone: FX crosses with
+    no USD leg (GBP_JPY, EUR_GBP, AUD_CHF). `calc_units` needs a
+    `quote_usd_rate` to value them and nothing passes one, so the margin cap
+    read one unit of GBP_JPY as $190 instead of ~$1.21 and sized the position
+    at roughly 1/31 of the intended risk — $0.54 of risk where the client
+    asked for $16.22, or a false "account too small" refusal on a smaller
+    balance. docs/ASSETS.md already states the rule this falls under: a risk
+    calculation quietly off by 10x is worse than a refused order. Crosses were
+    simply never checked against it. USD_JPY and friends are unaffected — a
+    USD leg on either side is all the conversion needs.
+
     Accepts EUR_USD / EURUSD / XAUUSD / BTCUSD.
     """
     s = _norm(instrument)
     if len(s) != 6 or not s.isalpha():
         return is_crypto(s)          # BTCUSDT and friends are longer than 6
     if _is_fx(s):
-        return True
+        return "USD" in (s[:3], s[3:])
     if s[:3] in _METALS and s[3:] in _CCY:
         return True
     return is_crypto(s)
@@ -234,6 +245,29 @@ def calc_units(balance: float, risk_pct: float, stop_pips: float,
     # int() here silently zeroed crypto sizes below 1 unit (0.34 BTC → 0).
     return max(0.0, min(units, max_units))
 
+
+
+def floor_risk_ok(units: float, instrument: str, price: float,
+                  stop_pips: float, risk_budget_usd: float,
+                  tolerance: float = 0.10) -> bool:
+    """True when taking `units` keeps the loss at the stop inside the budget.
+
+    The minimum-lot floor (`min_units`) used to be applied as a bare
+    `max(units, floor)`, with nothing checking that the floor still respected
+    the risk budget. Whenever the risk-correct size came out BELOW the floor —
+    which happens on wide stops and on small accounts — the floor won and the
+    trade silently carried more risk than the client configured, without limit:
+    on a $3,243 account at 0.5%, a 200-pip EUR_USD stop risked 1.23x the
+    budget and a 500-pip stop 3.08x. It gets worse as the account shrinks,
+    so it bites hardest exactly after a drawdown.
+
+    `tolerance` absorbs ordinary lot-step rounding; beyond it the caller must
+    refuse the trade rather than quietly take a bigger one.
+    """
+    if not risk_budget_usd or risk_budget_usd <= 0 or not stop_pips:
+        return True
+    loss = abs(units) * pip_value_per_unit(instrument, price) * abs(stop_pips)
+    return loss <= risk_budget_usd * (1.0 + tolerance)
 
 def required_margin(units: int, instrument: str, price: float, leverage: float = 30) -> float:
     notional = units * (1.0 if instrument.upper().startswith("USD_") else price)
