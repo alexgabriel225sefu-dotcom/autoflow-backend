@@ -174,6 +174,28 @@ def leverage_for_symbol(broker, cfg, symbol):
     return lev
 
 
+def broker_min_units(broker, symbol, fallback=0.0):
+    """The broker's real minimum order size in units, or `fallback`.
+
+    forex.min_units() is a per-class guess (1,000 for FX, 0.01 for everything
+    else). The broker's actual minimum is the number that decides what gets
+    sent, and it is only knowable by asking. Cached broker-side per symbol, so
+    this is one RPC per instrument per process, not one per entry.
+
+    Unknown falls back rather than assuming zero: "the broker did not answer"
+    must not read as "there is no minimum", which would put the risk check
+    back to validating a size that gets replaced on the way out.
+    """
+    try:
+        if getattr(broker, "min_units", None) is None:
+            return fallback
+        got = broker.min_units(symbol)
+        return float(got) if got else fallback
+    except Exception as e:
+        print(f"[UserLoop] broker min_units({symbol}) failed: {e}")
+        return fallback
+
+
 def flash_spike_pct_for(cfg, symbol):
     """Violent-candle threshold. One value for every instrument this bot
     trades — FX majors and metals share the same 1.2% convention."""
@@ -3390,6 +3412,14 @@ def _loop(user_id, alert_fn, gen=None):
                                          leverage=_lev, mult=risk_mult)
                 floor = forex.safe_min_units(symbol, paper_balance, price,
                                              _lev, cfg.MARGIN_CAP)
+                # The BROKER's own minimum, when it will tell us. place_order
+                # raises anything below it up to that minimum — correct for the
+                # wire, but it happens after sizing, so without asking here the
+                # risk check below validates a number the broker will replace.
+                # 0.5% of $3,221 over a $48 stop is 0.33 oz of gold; the broker
+                # minimum is 1 oz, and the account has been trading gold at
+                # ~1.5% risk with nothing reporting it.
+                floor = max(floor, broker_min_units(broker, symbol, floor))
                 if floor == 0:
                     _skip("account too small for minimum lot on this instrument")
                     entry_ok = False
@@ -3401,11 +3431,26 @@ def _loop(user_id, alert_fn, gen=None):
                     # actually places the order — setting entry_ok inside that
                     # branch would be read too late to stop anything.
                     units = forex.round_units(max(units, floor), symbol)
+                    _budget = sizing_balance * per_trade_risk
                     if not forex.floor_risk_ok(units, symbol, price,
-                                               stop_pips_eff,
-                                               sizing_balance * per_trade_risk):
-                        _skip("minimum lot on this instrument would risk more "
-                              "than the configured risk per trade")
+                                               stop_pips_eff, _budget):
+                        # Name the numbers. "Minimum lot too big" alone leaves
+                        # the client with a symbol that silently never trades
+                        # and no way to tell whether that is a bug, a market
+                        # condition, or something they can act on. It is the
+                        # third, and the two levers are in the message.
+                        try:
+                            _would = (units * forex.pip_value_per_unit(symbol, price)
+                                      * abs(stop_pips_eff))
+                            _pct = (_would / sizing_balance * 100) if sizing_balance else 0
+                            _skip(f"{symbol}: broker minimum is "
+                                  f"{units:g} {forex.unit_label(symbol)}, which risks "
+                                  f"${_would:.2f} ({_pct:.2f}% of the account) against "
+                                  f"your ${_budget:.2f} limit — raise /risk or trade a "
+                                  f"smaller-lot instrument")
+                        except Exception:
+                            _skip("minimum lot on this instrument would risk more "
+                                  "than the configured risk per trade")
                         entry_ok = False
                 if not entry_ok:
                     pass  # margin too small — skip to CLOSE handling below

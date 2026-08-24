@@ -109,6 +109,55 @@ for stop, ok_expected in ((30, True), (200, False), (500, False)):
     check(f"EUR_USD {stop}-pip stop → {'allowed' if ok_expected else 'refused'}",
           got is ok_expected,
           f"{sized:.0f}u risks ${risk:.2f} against a ${BUDGET:.2f} budget")
+# The BROKER's own minimum, which is what actually gets sent. place_order
+# raises anything below it (`max(mn, ...)`) AFTER sizing, so a size chosen to
+# risk 0.5% arrived at the broker several times larger with nothing checking
+# it again. Live, and recorded in this repo's own history: 0.5% of $3,221 over
+# a $48 stop is 0.33 oz of gold, the broker minimum is 1 oz, and the account
+# traded gold at ~1.5% risk instead of 0.5%.
+print("\n2b. The floor that counts is the BROKER's, not our guess")
+
+
+class _BrokerMin:
+    def __init__(self, mn):
+        self._mn = mn
+
+    def min_units(self, instrument=None):
+        return self._mn
+
+
+_XAU_PX, _XAU_STOP, _BAL = 4616.43, 480.0, 3221.0
+_budget = _BAL * 0.005
+_correct = forex.calc_units(_BAL, 0.005, _XAU_STOP, "XAUUSD", _XAU_PX, leverage=30.0)
+_generic = forex.safe_min_units("XAUUSD", _BAL, _XAU_PX, 30.0, 0.5)
+
+
+def _final(broker):
+    floor = max(_generic, user_loop.broker_min_units(broker, "XAUUSD", _generic))
+    return forex.round_units(max(_correct, floor), "XAUUSD")
+
+
+_one_oz = _final(_BrokerMin(1.0))
+check("a 1 oz broker minimum is seen by the risk check",
+      forex.floor_risk_ok(_one_oz, "XAUUSD", _XAU_PX, _XAU_STOP, _budget) is False,
+      f"{_one_oz} oz risks "
+      f"${_one_oz * forex.pip_value_per_unit('XAUUSD', _XAU_PX) * _XAU_STOP:.2f} "
+      f"against a ${_budget:.2f} budget")
+check("a broker that answers small changes nothing",
+      forex.floor_risk_ok(_final(_BrokerMin(0.01)), "XAUUSD", _XAU_PX,
+                          _XAU_STOP, _budget) is True)
+check("a broker that will not answer falls back, it does not assume zero",
+      user_loop.broker_min_units(_BrokerMin(None), "XAUUSD", 0.01) == 0.01,
+      "unknown must not read as 'there is no minimum'")
+check("a broker without the method is handled",
+      user_loop.broker_min_units(object(), "XAUUSD", 0.01) == 0.01)
+check("a broker that raises is handled",
+      user_loop.broker_min_units(
+          type("B", (), {"min_units": lambda *_a, **_k: 1 / 0})(), "XAUUSD", 0.01) == 0.01)
+check("the refusal names the numbers and the lever",
+      "raise /risk" in LSRC and "of the account) against" in LSRC,
+      "'minimum lot too big' leaves a symbol that silently never trades")
+
 check("the guard is read before the order branch, not inside it",
       LSRC.index("floor_risk_ok(units, symbol, price")
       < LSRC.index("_order_res = broker.place_order("),

@@ -420,6 +420,33 @@ class CtraderBroker:
             self._leverageid_cache[sid] = lev_id
         return mn, st
 
+    def min_units(self, instrument=None):
+        """The broker's real minimum order size for `instrument`, IN UNITS.
+
+        The risk layer has to know this. `place_order` raises any order below
+        it up to the minimum (`max(mn, ...)`), which is correct for the wire —
+        the broker would reject a smaller one — but it happens AFTER position
+        sizing, so a size chosen to risk 0.5% could arrive at the broker
+        several times larger with nothing checking it again.
+
+        That is live, not hypothetical: 0.5% of $3,221 over a $48 stop is
+        0.33 oz of gold, the broker's minimum is 1 oz, and the account has
+        been trading gold at ~1.5% risk instead of the configured 0.5%.
+        forex.min_units() cannot see this — it returns a generic per-class
+        guess (0.01 for metals), so the risk check passed on a number the
+        broker was never going to accept.
+
+        Returns None when the broker cannot be asked, so the caller falls back
+        to the generic floor rather than treating "unknown" as "no minimum".
+        """
+        try:
+            sid = self._symbol_id(instrument)
+            mn, _st = self._vol_rules(sid)
+            return (mn or 0) / 100.0 or None
+        except Exception as e:
+            print(f"[cTrader] min_units({instrument}) unavailable: {e}")
+            return None
+
     def leverage_for(self, instrument=None) -> float:
         """Real leverage the broker allows on `instrument`, in the account's
         actual currency — NOT a flat assumption. Regulated brokers (e.g.
