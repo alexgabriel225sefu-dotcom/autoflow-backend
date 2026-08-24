@@ -5841,10 +5841,18 @@ def _revalidate_license(chat_id):
     """Periodically re-check a granted client's license so refunded/charged-back
     keys lose access without waiting for a redeploy.
 
-    FAIL-OPEN: any network/parse error keeps access — a server hiccup must never
-    lock out a paying customer. Only an EXPLICIT {valid: false} from the server
-    (refund, chargeback, deactivated key) revokes. Returns False if access was
-    revoked, so the caller stops handling this update.
+    FAIL-OPEN, and deliberately the opposite of _license_ok above. That is not
+    an inconsistency: a first activation is a stranger, so an unverifiable key
+    is not evidence in their favour; this client has ALREADY been verified, so
+    an unverifiable answer is not evidence against them. Unknown means "no new
+    information" in both cases — it just points opposite ways.
+
+    Only an EXPLICIT {valid: false} carried on a 2xx revokes (refund,
+    chargeback, deactivated key). A 5xx does NOT, even though the body also
+    says valid:false: the licence endpoint answers 503 with that body when its
+    store is unreachable, and reading the body without the status would revoke
+    every paying customer for the duration of a database outage. Returns False
+    if access was revoked, so the caller stops handling this update.
     """
     cid = str(chat_id)
     if access.is_admin(cid):
@@ -5860,6 +5868,9 @@ def _revalidate_license(chat_id):
         return True
     try:
         r = requests.post(_VERIFY_URL, json={"key": key, "product": cfg.LICENSE_PRODUCT}, timeout=8)
+        if r.status_code >= 500:
+            # "We cannot tell you right now", not "this licence is dead".
+            return True
         data = r.json()
     except Exception:
         return True  # fail-open

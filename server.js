@@ -217,9 +217,27 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const HEYGEN_KEY = process.env.HEYGEN_API_KEY;
 const CREATIFY_API_ID  = process.env.CREATIFY_API_ID  || '';
 const CREATIFY_API_KEY = process.env.CREATIFY_API_KEY || '';
+// PRODUCTION REQUIRES A DURABLE JWT_SECRET — startup fails without one.
+//
+// The old fallback minted a fresh random secret per process. That is not
+// merely inconvenient: this secret also derives the AES key that encrypts
+// client bot configs at rest (see _botConfigKey), so a restart made every
+// stored config undecryptable, and two instances behind one URL could not
+// read each other's. A per-process secret in a multi-instance deployment is
+// a data-loss bug wearing a warning label.
+const _IS_PROD = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+if (_IS_PROD && !process.env.JWT_SECRET) {
+  console.error(
+    '[FATAL] JWT_SECRET is not set and this is production. It signs sessions AND\n' +
+    '        derives the key that encrypts client bot configs at rest, so a\n' +
+    '        generated per-process value would silently orphan stored data.\n' +
+    '        Set JWT_SECRET (render.yaml already declares generateValue: true).'
+  );
+  process.exit(1);
+}
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
   const fallback = require('crypto').randomBytes(32).toString('hex');
-  console.warn('[WARN] JWT_SECRET not set — generated random secret for this session. Sessions will reset on restart. Set JWT_SECRET in Render env vars.');
+  console.warn('[WARN] JWT_SECRET not set — generated a random secret for this DEV session. Sessions reset on restart and stored bot configs will not decrypt.');
   return fallback;
 })();
 const COOKIE_SECRET = process.env.COOKIE_SECRET || JWT_SECRET + '-cookie';
@@ -1276,12 +1294,17 @@ async function _notifyAdminAlert(text, subject = 'Apex Trading Suite — alertă
     } catch (e) { addLog(`Admin alert: Make webhook error: ${e.message} — trying next channel`, 'system', 'warn'); }
   }
 
+  // No hardcoded operator identity. These used to fall back to one person's
+  // Telegram id and personal email address, which meant an unconfigured
+  // deployment silently delivered another operator's payment and licence
+  // alerts to them — and made ADMIN_CHAT_ID look optional when it is not.
   const botToken = process.env.AFFILIATE_BOT_TOKEN;
-  if (botToken) {
+  const adminChatId = process.env.ADMIN_CHAT_ID;
+  if (botToken && adminChatId) {
     try {
       const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: process.env.ADMIN_CHAT_ID || '7585109158', text }),
+        body: JSON.stringify({ chat_id: adminChatId, text }),
         signal: AbortSignal.timeout(10000)
       });
       if (r.ok) return;
@@ -1289,9 +1312,17 @@ async function _notifyAdminAlert(text, subject = 'Apex Trading Suite — alertă
     } catch (e) { addLog(`Admin alert: Telegram error: ${e.message} — trying email`, 'system', 'warn'); }
   }
 
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) {
+    // Loud, because an alert nobody receives is worse than no alert system:
+    // the operator believes they are being told about failed fulfilments.
+    addLog('Admin alert UNDELIVERABLE — no ADMIN_CHAT_ID and no ADMIN_EMAIL configured. ' +
+           `Alert text: ${text.slice(0, 200)}`, 'system', 'error');
+    return;
+  }
   try {
     const res = await _sendEmail({
-      to: process.env.ADMIN_EMAIL || 'alexgabriel225sefu@gmail.com', subject, fromName: 'Apex Alerts',
+      to: adminEmail, subject, fromName: 'Apex Alerts',
       html: `<pre style="font:14px/1.6 -apple-system,Segoe UI,sans-serif;white-space:pre-wrap">${_he(text)}</pre>`
     });
     if (!res.ok) addLog(`Admin alert undeliverable on every channel: ${res.error}`, 'system', 'error');
@@ -1394,7 +1425,21 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
           return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
         }
         // row.active === true, or no row at all (legacy/manual key) → allow through.
-      } catch (_) { /* DB hiccup → fall through to fail-open allow below */ }
+      } catch (e) {
+        // FAIL CLOSED. This used to swallow the error and fall through to the
+        // `valid: true` below — but the comment ten lines up is right: a valid
+        // signature is NOT proof of payment, and the DB is the only place that
+        // knows whether it was paid, refunded, or a trial that has expired. So
+        // during a Supabase outage a refunded customer, an expired trial and a
+        // never-paid checkout ALL verified as valid, and stayed valid for as
+        // long as the outage lasted.
+        //
+        // 503, not { valid: false }: the bot treats any 5xx as "can't check
+        // right now, try again shortly" and tells the client exactly that,
+        // whereas a false would tell a paying customer their licence is bad.
+        addLog(`verify-license: licence store unreachable (${e.message}) — DENYING`, 'license', 'error');
+        return res.status(503).json({ valid: false, message: 'Licence service temporarily unavailable — please try again in a few minutes.' });
+      }
     }
     if (supabase) {
       supabase.from('licenses')
@@ -2480,7 +2525,12 @@ Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsys
 // NOTE: must be registered BEFORE the catch-all 404 below.
 // ════════════════════════════════════════
 function _botConfigKey() {
-  const s = process.env.JWT_SECRET || process.env.COOKIE_SECRET || 'bot-cfg-fallback-change-me';
+  // No committed fallback. This literal used to be `bot-cfg-fallback-change-me`,
+  // published in this repository — anyone who could read the bot_configs table
+  // could decrypt every client's stored configuration with a key taken from
+  // the source. Refusing is the only safe answer when no real secret exists.
+  const s = process.env.JWT_SECRET || process.env.COOKIE_SECRET;
+  if (!s) throw new Error('bot config encryption unavailable: JWT_SECRET/COOKIE_SECRET not set');
   return crypto.createHash('sha256').update(s).digest();
 }
 function encryptBotConfig(obj) {
