@@ -1412,8 +1412,18 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
     // the key exists in our DB as not-yet-paid, reject it.
     if (supabase) {
       try {
-        const { data: row } = await supabase.from('licenses')
+        const { data: row, error: rowErr } = await supabase.from('licenses')
           .select('active,refunded,trial,expires_at').eq('key', key).maybeSingle();
+        // supabase-js reports a network/permission failure in `error`, it does
+        // NOT always throw. Destructuring only `data` made an unreachable
+        // database indistinguishable from "no such row" — and "no such row"
+        // falls through to allow, as a legacy/manual key. So the catch below
+        // never fired for the most common outage shape and the endpoint stayed
+        // fail-open. Verified by booting this server against an unreachable
+        // SUPABASE_URL: it answered {valid:true} until this line existed.
+        // maybeSingle() reports no error for zero rows, so any error here is
+        // a real failure to read.
+        if (rowErr) throw new Error(rowErr.message || 'licence lookup failed');
         if (row && row.refunded === true) {
           return res.json({ valid: false, message: 'This license was refunded and is no longer active. Repurchase at aicashsystem.space' });
         }
@@ -1449,11 +1459,32 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
     return res.json({ valid: true, message: 'License valid', product: hmacResult.product });
   }
 
-  // 2. Supabase fallback — for legacy keys or manual inserts
+  // 2. Supabase fallback — for legacy keys or manual inserts.
+  //
+  // First: a key that does not even have this product's shape cannot be a
+  // legacy key of ours, so it is definitively invalid and no database is
+  // needed to say so. Without this short-circuit an outage turned every
+  // typo — and every APEX- key from the retired crypto product — into "try
+  // again in a few minutes", which is both unhelpful and untrue.
+  //
+  // A key that DOES have the shape but fails the signature check may still be
+  // a legacy key issued before BOT_EMAIL_SECRET existed; only the database
+  // knows. That case genuinely cannot be answered while the store is down, so
+  // it gets the 503 below rather than a false "invalid".
+  if (!/^FORX-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(String(key).toUpperCase())) {
+    return res.json({ valid: false, message: 'Invalid license key. Purchase at aicashsystem.space' });
+  }
   if (supabase) {
     try {
-      const { data } = await supabase
+      // Same rule on the legacy path. `.single()` DOES error when it finds no
+      // row (PGRST116), which is an ordinary "not found" here — anything else
+      // is a failure to read and must not be reported as an invalid key.
+      const { data, error: legacyErr } = await supabase
         .from('licenses').select('active,product').eq('key', key).eq('active', true).single();
+      if (legacyErr && legacyErr.code !== 'PGRST116') {
+        addLog(`verify-license: licence store unreachable on legacy lookup (${legacyErr.message}) — DENYING`, 'license', 'error');
+        return res.status(503).json({ valid: false, message: 'Licence service temporarily unavailable — please try again in a few minutes.' });
+      }
       if (data?.active) {
         if (claimedProduct && data.product && claimedProduct !== data.product) {
           return res.json({ valid: false, message: `Wrong license type. This key is for ${data.product}.` });

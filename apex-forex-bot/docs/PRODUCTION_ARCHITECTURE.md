@@ -253,3 +253,19 @@ Stated because a limit nobody wrote down gets rediscovered as a bug.
   Auto-Pilot cap is a budget on work, not a preference.
 - **Existing `APEX-` licence holders** cannot be served by this product. That
   is a commercial decision, not a technical one — see the hardening report.
+
+- **Compare-and-set protects DELTA writes, not whole-record writes.**
+  `user_store.update()` re-reads the record immediately before saving, so a
+  caller passing a patch never holds a stale copy; CAS closes only the
+  microsecond window inside that load→save. A caller that wrote back a whole
+  previously-read record would defeat the check by construction — it would
+  re-read the version just before writing, the check would pass, and the stale
+  payload would win. No production caller does this today (every one builds an
+  explicit patch; the only whole-record write is `/reset`, which is meant to
+  wipe). It is written down because the next person to add a writer will not
+  otherwise know it is a trap.
+
+- **`open_position_snapshot`'s CAS membership is defence in depth**, not a
+  patch for an observed incident. `tests/test_integration_live.py` cannot make
+  a deterministic failure appear by removing it, and says so rather than
+  implying otherwise.
