@@ -321,6 +321,50 @@ check("the tick is lighter than the full payload",
       "candles" not in BOT_SRC[BOT_SRC.index("/api/app/tick"):BOT_SRC.index("# ── Mini App: history")],
       "the whole point is that it does not ship candles")
 
+print("\n🕒  initData must be FRESH, not merely signed")
+# Telegram signs initData once per app open and the page replays that same
+# string on every poll, so a captured one authenticated forever — and it
+# travels in a URL query string (/api/app/data?init=...), which is exactly
+# where strings leak: proxy logs, access logs, browser history, a screenshot
+# of a shared link. The holder could read that client's balance, open
+# positions and full journal indefinitely.
+import time as _time                                        # noqa: E402
+
+
+def _signed(auth_date=None, omit_date=False):
+    pairs = {"user": json.dumps({"id": 7585109158, "first_name": "A"}),
+             "query_id": "AAH"}
+    if not omit_date:
+        pairs["auth_date"] = str(auth_date if auth_date is not None
+                                 else int(_time.time()))
+    dcs = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+    sec = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+    pairs["hash"] = hmac.new(sec, dcs.encode(), hashlib.sha256).hexdigest()
+    return urlencode(pairs)
+
+
+_now = int(_time.time())
+check("a fresh signature is accepted",
+      (webapp.validate(_signed(), BOT_TOKEN) or {}).get("id") == 7585109158)
+check("a signature from within the window still works",
+      (webapp.validate(_signed(_now - 23 * 3600), BOT_TOKEN) or {}).get("id")
+      == 7585109158, "a session open all day must not be logged out")
+check("a stale one is refused", webapp.validate(_signed(_now - 25 * 3600),
+                                                BOT_TOKEN) is None)
+check("a month-old capture is refused",
+      webapp.validate(_signed(_now - 30 * 86400), BOT_TOKEN) is None,
+      "this is the replay the check exists for")
+check("a future timestamp is refused",
+      webapp.validate(_signed(_now + 3600), BOT_TOKEN) is None,
+      "no clock we should trust produces it")
+check("a MISSING auth_date is refused, not skipped",
+      webapp.validate(_signed(omit_date=True), BOT_TOKEN) is None,
+      "otherwise the check is opt-out by omitting the field")
+check("an unparseable auth_date is refused",
+      webapp.validate(_signed("not-a-number"), BOT_TOKEN) is None)
+check("a bad signature is still refused first",
+      webapp.validate(_signed()[:-4] + "0000", BOT_TOKEN) is None)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")

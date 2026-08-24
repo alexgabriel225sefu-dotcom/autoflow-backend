@@ -7,12 +7,38 @@ client can only ever see THEIR OWN account."""
 import hmac
 import os
 import json
+import time
 import hashlib
 from urllib.parse import parse_qsl
 
 
+# How long a signed initData string stays acceptable. Telegram signs it once
+# when the Mini App opens and the page reuses that same string for every poll,
+# so this has to cover a realistic session rather than a request.
+_MAX_AGE_S = int(os.getenv("MINIAPP_INITDATA_MAX_AGE_S", str(24 * 3600)))
+# Tolerance for clock skew between Telegram and this host. A timestamp further
+# ahead than this was not produced by a clock we should trust.
+_FUTURE_SKEW_S = 300
+
+
 def validate(init_data: str, bot_token: str):
-    """Return the Telegram user dict if initData is authentic, else None."""
+    """Return the Telegram user dict if initData is authentic AND FRESH.
+
+    The signature alone is not enough. Telegram signs initData once per app
+    open and the page replays that same string on every request, so a captured
+    one authenticated forever — and it travels in a URL query string
+    (/api/app/data?init=...), which is exactly the place strings leak from:
+    proxy logs, server access logs, browser history, a screenshot of a shared
+    link. Anyone holding one could read that client's balance, open positions
+    and full trade journal indefinitely.
+
+    `auth_date` is therefore checked as well, and a missing or unparseable one
+    is a refusal rather than a pass: an unsigned-for timestamp is not evidence
+    of freshness, and treating it as one would make the check skippable by
+    simply omitting the field.
+
+    Returns the user dict, or None. Never raises.
+    """
     try:
         pairs = dict(parse_qsl(init_data, keep_blank_values=True))
         their_hash = pairs.pop("hash", "")
@@ -20,6 +46,14 @@ def validate(init_data: str, bot_token: str):
         secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
         calc = hmac.new(secret, dcs.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(calc, their_hash):
+            return None
+        # Only trustworthy AFTER the signature verified — before that it is
+        # attacker-supplied text like everything else in the string.
+        try:
+            age = time.time() - float(pairs.get("auth_date"))
+        except (TypeError, ValueError):
+            return None
+        if age > _MAX_AGE_S or age < -_FUTURE_SKEW_S:
             return None
         return json.loads(pairs.get("user", "{}"))
     except Exception:
