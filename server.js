@@ -110,26 +110,27 @@ app.get('/api/health', async (req, res) => {
 const _setupChatLimiter = rateLimit({ windowMs: 60*1000, max: 15, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many messages — please wait a minute.' } });
 
-const SETUP_SYSTEM = `You are a concise support assistant for Apex Trade Bot — a crypto trading bot deployed on Railway.
-Help users set up their bot. Be short and direct (2-4 sentences max). No markdown headers. Use plain text.
-IMPORTANT: Always reply in the SAME language the user wrote in. If they write in English, reply in English. If Romanian, reply in Romanian. If Spanish, reply in Spanish. Detect the language automatically.
+const SETUP_SYSTEM = `You are a concise support assistant for Apex Forex Bot — an
+AI forex trading bot that runs on our servers and is controlled through Telegram.
+Help users get started. Be short and direct (2-4 sentences max). No markdown headers. Use plain text.
+IMPORTANT: Always reply in the SAME language the user wrote in. Detect it automatically.
+
+THERE IS NOTHING TO DEPLOY. No Railway, no Docker, no exchange API key. The bot
+is hosted; the client only opens Telegram.
 
 SETUP STEPS:
-1. Railway → New Project → New Service → Docker Image → paste: ghcr.io/alexgabriel225sefu-dotcom/apex-crypto:latest
-2. Add 2 Variables: LICENSE_KEY (from their email) and GROQ_API_KEY (free from console.groq.com → API Keys)
-3. Go to aicashsystem.space/configurator → enter license key + Groq key + exchange → Save Config
-4. Set up Telegram (optional): @BotFather for token, @userinfobot for chat ID → add TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to Railway → send /resume
+1. Open the Telegram link from the purchase email (it carries the licence key).
+2. Connect the cTrader account when the bot asks — a demo account is the default.
+3. Answer the short setup questions (instrument, style, risk).
+4. The bot starts in DEMO. Going live is a separate, explicit step.
+
+WHAT IT TRADES: forex majors with a USD leg, plus metals. Crypto, indices and
+stock CFDs are not supported.
 
 COMMON ERRORS:
-- "Invalid license key" → They must go to the configurator (aicashsystem.space/configurator) and save settings first, then restart Railway.
-- "No AI key found" → Add GROQ_API_KEY to Railway Variables. Get it free at console.groq.com.
-- "No exchange API key" → Bot auto-switches to Paper Trading (safe, no real funds). Normal for first setup.
-- "Bot is paused" → Needs Telegram /resume command. Set up Telegram first.
-- Bot restarting in loop → Normal during first deploy. Stabilizes in 1-2 min after variables are added.
-
-BINANCE API: Profile → API Management → Create API → enable Spot Trading only, Withdrawals OFF.
-GROQ: console.groq.com → Sign up free → API Keys → Create Key. No credit card.
-PAPER TRADING: Simulated mode, no real funds. Safe to test. Switch to live via configurator.
+- "Invalid license key" -> open the key via the Telegram link from the email.
+- "Not activated" -> still in demo; live activation is deliberate and separate.
+- No trades yet -> normal, forex moves at macro pace (0-3 trades a day).
 SUPPORT EMAIL: supportaicashsystem@gmail.com`;
 
 app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
@@ -144,31 +145,22 @@ app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
     const isEN = /\b(the|is|are|do|can|how|what|where|when|why|i|you|my|your|help|please|and|or|not|have|get|set|need|want|does)\b/.test(m);
     const T = (ro, en) => isEN ? en : ro;
 
-    if (m.includes('license') || m.includes('licenta') || m.includes('cheie') || (m.includes('key') && !m.includes('api key') && !m.includes('groq') && !m.includes('binance')))
-      return T('LICENSE_KEY-ul l-ai primit pe email dupa cumparare. Daca nu l-ai primit, verifica Spam sau scrie la supportaicashsystem@gmail.com.', 'Your LICENSE_KEY was sent by email after purchase. If you didn\'t receive it, check your Spam folder or email supportaicashsystem@gmail.com.');
-    if (m.includes('groq') || m.includes('llama') || m.includes('ai key'))
-      return T('GROQ_API_KEY e gratuit: console.groq.com → Sign up → API Keys → Create. Nu necesita card bancar.', 'GROQ_API_KEY is free: go to console.groq.com → Sign up → API Keys → Create a new key. No credit card needed.');
-    if (m.includes('paused') || m.includes('pause') || m.includes('pornit') || m.includes('resume') || m.includes('start the bot'))
-      return T('Botul porneste in modul PAUSED. Trimite /resume pe Telegram dupa ce ai configurat TELEGRAM_BOT_TOKEN si TELEGRAM_CHAT_ID in Railway.', 'The bot starts in PAUSED mode for safety. Send /resume on Telegram after setting TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Railway Variables.');
-    if (m.includes('invalid') || m.includes('403') || m.includes('license error'))
-      return T('Mergi la aicashsystem.space/configurator, introdu LICENSE_KEY-ul si apasa Save Config. Dupa, reporneste in Railway.', 'Go to aicashsystem.space/configurator, enter your LICENSE_KEY and click Save Config. Then restart the Railway service.');
-    if (m.includes('telegram') || m.includes('botfather') || m.includes('bot token'))
-      return T('Setup Telegram: 1) @BotFather → /newbot → copiaza tokenul. 2) @userinfobot → copiaza ID-ul. 3) Adauga TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID in Railway Variables.', 'Telegram setup: 1) @BotFather → /newbot → copy the token. 2) @userinfobot → copy your ID. 3) Add TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID in Railway Variables.');
-    if (m.includes('binance') || m.includes('exchange') || m.includes('api key') || m.includes('trading key'))
-      return T('Binance: Profile → API Management → Create API → activeaza Spot Trading, dezactiveaza Withdrawals. Adauga BINANCE_API_KEY + BINANCE_SECRET in Railway.', 'Binance: Profile → API Management → Create API → enable Spot Trading only, disable Withdrawals. Add BINANCE_API_KEY + BINANCE_SECRET in Railway Variables.');
-    if (m.includes('paper') || m.includes('bani reali') || m.includes('real money') || m.includes('live trading'))
-      return T('Fara cheia Binance, botul ruleaza in Paper Trading (bani virtuali, zero risc). Ca sa treci pe live, adauga cheile Binance in Railway.', 'Without a Binance key, the bot runs in Paper Trading mode (simulated funds, zero risk). To go live, add your Binance keys in Railway Variables.');
-    if (m.includes('railway') || m.includes('deploy') || m.includes('docker') || m.includes('image'))
-      return T('Railway: New Project → New Service → Docker Image → lipeste: ghcr.io/alexgabriel225sefu-dotcom/apex-crypto:latest → Deploy. Adauga LICENSE_KEY si GROQ_API_KEY in Variables.', 'Railway: New Project → New Service → Docker Image → paste: ghcr.io/alexgabriel225sefu-dotcom/apex-crypto:latest → Deploy. Add LICENSE_KEY and GROQ_API_KEY in Variables.');
-    if (m.includes('crash') || m.includes('restart') || m.includes('loop') || m.includes('eroare') || m.includes('error'))
-      return T('Daca botul tot restarteaza: 1) Verifica LICENSE_KEY. 2) Adauga GROQ_API_KEY in Railway. 3) Asteapta 2 minute — primele deploy-uri pot restart de 2-3 ori.', 'If the bot keeps restarting: 1) Check LICENSE_KEY is correct. 2) Add GROQ_API_KEY in Railway Variables. 3) Wait 2 minutes — first deploys can restart 2-3 times.');
+    if (m.includes('license') || m.includes('licenta') || m.includes('cheie') || m.includes('key'))
+      return T('Cheia ai primit-o pe email dupa cumparare — deschide linkul de Telegram din acel email si contul se activeaza singur. Daca nu l-ai primit, verifica Spam sau scrie la supportaicashsystem@gmail.com.', 'Your key was emailed after purchase — open the Telegram link in that email and the account activates itself. If it never arrived, check Spam or email supportaicashsystem@gmail.com.');
+    if (m.includes('ctrader') || m.includes('broker') || m.includes('cont') || m.includes('account'))
+      return T('Conectezi contul cTrader din bot, cand te intreaba. Un cont demo e perfect si e varianta implicita.', 'You connect your cTrader account from inside the bot when it asks. A demo account is fine and is the default.');
+    if (m.includes('demo') || m.includes('live') || m.includes('real money') || m.includes('bani reali'))
+      return T('Botul porneste in DEMO. Trecerea pe live e un pas separat pe care il faci tu explicit.', 'The bot starts in DEMO. Going live is a separate step you take explicitly.');
+    if (m.includes('crypto') || m.includes('bitcoin') || m.includes('btc') || m.includes('stock'))
+      return T('Botul tranzactioneaza doar forex (perechi cu USD) si metale. Crypto, indici si actiuni nu sunt suportate.', 'The bot trades forex pairs with a USD leg, plus metals. Crypto, indices and stock CFDs are not supported.');
+    if (m.includes('deploy') || m.includes('railway') || m.includes('docker') || m.includes('server'))
+      return T('Nu ai nimic de instalat — botul ruleaza pe serverele noastre. Deschizi doar Telegram.', 'There is nothing to deploy — the bot runs on our servers. You only open Telegram.');
+    if (m.includes('trade') || m.includes('tranzac') || m.includes('no trades'))
+      return T('Normal la inceput: forexul se misca lent, 0-3 tranzactii pe zi.', 'Normal early on: forex moves at macro pace, 0-3 trades a day.');
     if (m.includes('hello') || m.includes('hi') || m.includes('hey') || m.includes('salut') || m.includes('buna') || m.includes('help'))
-      return T('Salut! Sunt asistentul Apex Trade Bot. Te pot ajuta cu: Railway setup, Telegram, erori, chei API. Ce problema ai?', 'Hi! I\'m the Apex Trade Bot assistant. I can help with: Railway setup, Telegram config, errors, API keys. What\'s your issue?');
+      return T('Salut! Sunt asistentul Apex Forex Bot. Te pot ajuta cu activare, conectare cTrader, demo vs live.', 'Hi! I am the Apex Forex Bot assistant. I can help with activation, connecting cTrader, demo vs live.');
     if (m.includes('support') || m.includes('contact') || m.includes('email') || m.includes('suport'))
-      return T('Suport direct: supportaicashsystem@gmail.com. Include screenshot-uri cu erorile din Railway Logs.', 'Direct support: supportaicashsystem@gmail.com. Include screenshots of the errors from Railway Logs.');
-    if (m.includes('english') || m.includes('engleza') || m.includes('language') || m.includes('limba'))
-      return 'Yes, I speak English too! Ask me anything about the bot setup — Railway, Telegram, license key, Binance API, errors.';
-    return T('Pentru aceasta intrebare, contacteaza supportaicashsystem@gmail.com. Pot ajuta cu: Railway, Telegram, license key, Groq API, Binance.', 'For this question, contact supportaicashsystem@gmail.com. I can help with: Railway, Telegram, license key, Groq API, Binance setup.');
+      return T('Suport direct: supportaicashsystem@gmail.com.', 'Direct support: supportaicashsystem@gmail.com.');
   }
 
   try {
@@ -1203,16 +1195,16 @@ app.get('/api/logout', (req, res) => {
 });
 
 // ── LICENSE KEY HELPERS ──────────────────────────────────────────────────────
-// Crypto keys:  APEX-XXXX-XXXX-XXXX  (verified by crypto bot only)
-// Forex keys:   FORX-XXXX-XXXX-XXXX  (verified by forex bot only)
-// Both use HMAC-SHA256 with product-specific salt embedded in the prefix.
+// Forex keys: FORX-XXXX-XXXX-XXXX — HMAC-SHA256 over a random body.
+// The retired crypto product's APEX- keys are no longer minted or verified:
+// the bot they unlocked does not exist, so accepting one would authorise
+// access to nothing.
 const _KEY_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 chars, no 0/O/1/I
-const _LIC_SALT       = 'apex-bot-2025-v1';   // crypto fallback — never changes
 const _FOREX_LIC_SALT = 'apex-forex-2025-v1'; // forex fallback — never changes
 
-function _licSecrets(product = 'apex-bot') {
+function _licSecrets(product = 'apex-forex') {
   const env = process.env.BOT_EMAIL_SECRET;
-  const salt = product === 'apex-forex' ? _FOREX_LIC_SALT : _LIC_SALT;
+  const salt = _FOREX_LIC_SALT;
   // When BOT_EMAIL_SECRET is set, ONLY the env-derived secret is trusted for
   // HMAC signing/verification. The hardcoded salt is deliberately dropped so
   // that anyone who can read this source cannot forge valid keys. Legacy keys
@@ -1236,14 +1228,13 @@ function _generateKey(prefix, product) {
   return `${prefix}-${full.slice(0, 4)}-${full.slice(4, 8)}-${full.slice(8, 12)}`;
 }
 
-function generateLicenseKey() { return _generateKey('APEX', 'apex-bot'); }
 function generateForexKey()   { return _generateKey('FORX', 'apex-forex'); }
 
 // Returns { valid, product } — product is 'apex-bot' | 'apex-forex' | null
 function verifyLicenseKeyHmac(key) {
   if (!key) return { valid: false, product: null };
   const k = key.toUpperCase();
-  const prefixMap = { APEX: 'apex-bot', FORX: 'apex-forex' };
+  const prefixMap = { FORX: 'apex-forex' };
   for (const [prefix, product] of Object.entries(prefixMap)) {
     const re = new RegExp(`^${prefix}-([A-Z2-9]{4})-([A-Z2-9]{4})-([A-Z2-9]{4})$`);
     const m = k.match(re);
@@ -1316,8 +1307,8 @@ app.get('/api/owner-license', async (req, res) => {
   const expected = process.env.BOT_EMAIL_SECRET;
   if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden — secret required' });
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const product = req.query.product === 'apex-forex' ? 'apex-forex' : 'apex-bot';
-  const key = product === 'apex-forex' ? generateForexKey() : generateLicenseKey();
+  const product = 'apex-forex';
+  const key = generateForexKey();
   let dbStatus = 'skipped';
   try {
     const { error: dbErr } = await supabase.from('licenses').insert([{ key, email: 'owner@aicashsystem.space', name: 'Owner', active: true, product }]);
@@ -1329,7 +1320,7 @@ app.get('/api/owner-license', async (req, res) => {
   res.json({ key, product, message: `Add this as LICENSE_KEY for your ${product} bot`, supabase: dbStatus });
 });
 
-// POST /api/admin/grant-license?secret=... — { email, name?, product: 'apex-crypto'|'apex-forex'|'both' }
+// POST /api/admin/grant-license?secret=... — { email, name?, product: 'apex-forex' }
 // Manually grants full, non-expiring access to anyone the owner chooses — no
 // checkout involved. Mints a real license key per product (same format/
 // verification path as a paid one) and sends the exact same activation email
@@ -1341,14 +1332,18 @@ app.post('/api/admin/grant-license', async (req, res) => {
   const email = String(req.body?.email || '').trim().slice(0, 200);
   const name = String(req.body?.name || 'there').trim().slice(0, 100) || 'there';
   const want = String(req.body?.product || '').toLowerCase();
-  const products = want === 'both' ? ['apex-bot', 'apex-forex']
-    : want === 'apex-forex' ? ['apex-forex'] : ['apex-bot'];
+  // FOREX ONLY. This defaulted an unrecognised `product` to the crypto bot, so
+  // a typo minted an APEX- key and emailed a link to a bot that is gone.
+  // Unknown product is a refusal now, not a fallback.
+  if (want && want !== 'apex-forex') {
+    return res.status(400).json({ error: "Unknown product — only 'apex-forex' is sold." });
+  }
+  const products = ['apex-forex'];
   if (!email) return res.status(400).json({ error: 'email is required' });
 
   const results = [];
   for (const product of products) {
-    const isForex = product === 'apex-forex';
-    const key = isForex ? generateForexKey() : generateLicenseKey();
+    const key = generateForexKey();
     const { error } = await supabase.from('licenses').insert([{
       key, email, name, active: true, activated_at: null, product, trial: false
     }]);
@@ -1357,10 +1352,10 @@ app.post('/api/admin/grant-license', async (req, res) => {
       results.push({ product, error: error.message });
       continue;
     }
-    const html = isForex ? _buildForexEmailHtml(_he(name), _he(email), key) : _buildBotEmailHtml(_he(name), _he(email), key);
-    const subject = isForex ? '🤖 Your Apex Forex Bot — License Key inside' : '🤖 Your Apex Trade Bot — License Key inside';
+    const html = _buildForexEmailHtml(_he(name), _he(email), key);
+    const subject = '🤖 Your Apex Forex Bot — License Key inside';
     const sent = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
-    const botHandle = isForex ? 'FOREX_APEX_BOT' : 'ApexTradeBot_official_bot';
+    const botHandle = 'FOREX_APEX_BOT';
     addLog(`Granted ${product} license: ${key} for ${_maskEmail(email)}${sent.ok ? '' : ' (email FAILED to send)'}`, 'license', sent.ok ? 'success' : 'warn');
     results.push({ product, key, emailSent: sent.ok, telegramLink: `https://t.me/${botHandle}?start=${key}` });
   }
@@ -1377,7 +1372,7 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
   // 1. HMAC check — works without any database
   const hmacResult = verifyLicenseKeyHmac(key);
   if (hmacResult.valid) {
-    // Product mismatch check: FORX- key on crypto bot (or APEX- on forex) → reject
+    // Product mismatch check: a key whose product is not the caller's → reject
     if (claimedProduct && hmacResult.product && claimedProduct !== hmacResult.product) {
       return res.json({ valid: false, message: `Wrong license type. This key is for ${hmacResult.product}. Purchase the correct bot at aicashsystem.space` });
     }
@@ -1433,15 +1428,15 @@ app.post('/api/admin/trial/issue', async (req, res) => {
   if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
   const email = String(req.body?.email || '').trim().slice(0, 200);
-  const product = req.body?.product === 'apex-forex' ? 'apex-forex' : 'apex-bot';
+  const product = 'apex-forex';
   const days = Math.min(Math.max(parseInt(req.body?.days, 10) || 5, 1), 30);
-  const key = product === 'apex-forex' ? generateForexKey() : generateLicenseKey();
+  const key = generateForexKey();
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
   const { error } = await supabase.from('licenses').insert([{
     key, email, active: true, activated_at: null, product, trial: true, expires_at: expiresAt
   }]);
   if (error) return res.status(500).json({ error: error.message });
-  const botHandle = product === 'apex-forex' ? 'FOREX_APEX_BOT' : 'ApexTradeBot_official_bot';
+  const botHandle = 'FOREX_APEX_BOT';
   addLog(`Trial issued: ${key} (${product}, ${days}d) for ${email || 'no email'}`, 'license', 'success');
   res.json({ key, product, expiresAt, telegramLink: `https://t.me/${botHandle}?start=${key}` });
 });
@@ -1469,15 +1464,17 @@ app.post('/api/admin/trial/finish', async (req, res) => {
 // Stripe is the primary/default processor now — ApexTradingSuite (acct_1TSAWQGpBbs5xtI5),
 // business profile corrected to match what's actually sold, live and charges_enabled.
 // Price IDs default to the ones created on that account; override via env if recreated.
+// FOREX ONLY. The 'apex-crypto' SKU is removed, not disabled: the bot it
+// delivered no longer exists, so a completed checkout would take money for
+// something that cannot be shipped.
 const STRIPE_PRICE_IDS = {
-  'apex-crypto': process.env.STRIPE_PRICE_CRYPTO || 'price_1TfI9IGpBbs5xtI5IhufmuL8',
   'apex-forex': process.env.STRIPE_PRICE_FOREX || 'price_1Tge4PGpBbs5xtI5jAjgndKZ'
 };
 // Matches the one_time_price unit_amount on each Stripe Price above — used to
 // price the order without an extra API round-trip.
-const STRIPE_PRODUCT_AMOUNTS_CENTS = { 'apex-crypto': 29700, 'apex-forex': 49700 };
+const STRIPE_PRODUCT_AMOUNTS_CENTS = { 'apex-forex': 49700 };
 
-// POST /api/checkout/create-session — { product: 'apex-crypto'|'apex-forex', ref? } -> { url }
+// POST /api/checkout/create-session — { product: 'apex-forex', ref? } -> { url }
 app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
   const product = String(req.body?.product || '');
   const ref = String(req.body?.ref || '').toLowerCase().trim().slice(0, 40);
@@ -1544,14 +1541,25 @@ app.get('/api/order-status', _codeLimiter, async (req, res) => {
 // controls the log/alert prefix, so a second processor can reuse this without a
 // second copy of the fulfillment logic.
 async function _fulfillOrder({ provider, piRef, product, email, buyerName, amountCents, ref }) {
-  const isForex = product === 'apex-forex';
+  // Money has already changed hands here, so an unknown product must not be
+  // silently fulfilled as the retired crypto bot — that delivers a key for
+  // something that does not exist. Refuse loudly and alert the operator.
+  if (product !== 'apex-forex') {
+    addLog(`[${provider}] REFUSED fulfilment for unknown product ${product} — ref ${piRef}`, 'payment', 'error');
+    _notifyAdminAlert(
+      `⚠️ A payment (${provider}) arrived for product "${product}", which is no ` +
+      `longer sold. NOTHING was delivered and no key was minted.\n\n` +
+      `Email: ${email}\nRef: ${piRef}\n\nRefund or handle manually.`
+    );
+    return;
+  }
   let licenseKey;
   if (supabase) {
     const { data: existing } = await supabase.from('licenses').select('key').eq('payment_intent_id', piRef).maybeSingle();
     if (existing?.key) licenseKey = existing.key;
   }
   const isNew = !licenseKey;
-  if (!licenseKey) licenseKey = isForex ? generateForexKey() : generateLicenseKey();
+  if (!licenseKey) licenseKey = generateForexKey();
 
   if (supabase) {
     const { error } = await supabase.from('licenses').upsert([{
@@ -1563,23 +1571,19 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
   addLog(`[${provider}] License activated: ${licenseKey} for ${_maskEmail(email)} (${product})`, 'license', 'success');
 
   if (isNew && email) {
-    const html = isForex
-      ? _buildForexEmailHtml(_he(buyerName || 'there'), _he(email), licenseKey)
-      : _buildBotEmailHtml(_he(buyerName || 'there'), _he(email), licenseKey);
-    const subject = isForex
-      ? '🤖 Your Apex Forex Bot — License Key inside'
-      : '🤖 Your Apex Trade Bot — License Key inside';
+    const html = _buildForexEmailHtml(_he(buyerName || 'there'), _he(email), licenseKey);
+    const subject = '🤖 Your Apex Forex Bot — License Key inside';
     const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
     if (!result.ok) {
       addLog(`[${provider}] Email NOT sent for ${_maskEmail(email)} — ${result.error}`, 'email', 'error');
       _notifyAdminAlert(
         `⚠️ Customer paid (${provider}) but the license email FAILED to send.\n\n` +
-        `Product: ${isForex ? 'Forex' : 'Crypto'}\nEmail: ${email}\nRef: ${piRef}\n` +
+        `Product: Forex\nEmail: ${email}\nRef: ${piRef}\n` +
         `License key: ${licenseKey}\nError: ${result.error}\n\nSend the key to them manually until this is fixed.`
       );
-    } else addLog(`[${provider}] ${isForex ? 'Forex' : 'Crypto'} email sent to ${email}`, 'email', 'success');
+    } else addLog(`[${provider}] Forex email sent to ${email}`, 'email', 'success');
   }
-  if (isNew) addLog(`[${provider}] ${isForex ? 'Forex' : 'Crypto'} Bot sold: ${email} — key: ${licenseKey}`, 'payment', 'success');
+  if (isNew) addLog(`[${provider}] Forex Bot sold: ${email} — key: ${licenseKey}`, 'payment', 'success');
 }
 const _fulfillStripeOrder = (args) => _fulfillOrder({ provider: 'Stripe', ...args });
 
@@ -1699,7 +1703,7 @@ app.get('/debug', auth, (req, res) => {
 
 // Favicon + OG image (3-candle logo)
 const _LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#060608"/><rect x="3" y="19" width="5" height="10" rx="2.5" fill="#ff2d4f" opacity=".45"/><rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="#ff2d4f" opacity=".72"/><rect x="20" y="6" width="5" height="23" rx="2.5" fill="#ff2d4f"/><circle cx="22.5" cy="5" r="3.1" fill="#ff5c74"/></svg>';
-const _OG_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#060608"/><rect x="480" y="340" width="60" height="190" rx="12" fill="#ff2d4f" opacity=".45"/><rect x="570" y="220" width="60" height="310" rx="12" fill="#ff2d4f" opacity=".72"/><rect x="660" y="120" width="60" height="410" rx="12" fill="#ff2d4f"/><circle cx="690" cy="96" r="34" fill="#ff5c74"/><text x="600" y="520" font-family="system-ui,sans-serif" font-weight="700" font-size="38" fill="#f5f5f7" text-anchor="middle">Apex Trading Suite</text><text x="600" y="568" font-family="system-ui,sans-serif" font-size="22" fill="#9696a0" text-anchor="middle">Fully-Hosted AI Trading Bots · Crypto $297 · Forex $497</text></svg>';
+const _OG_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#060608"/><rect x="480" y="340" width="60" height="190" rx="12" fill="#ff2d4f" opacity=".45"/><rect x="570" y="220" width="60" height="310" rx="12" fill="#ff2d4f" opacity=".72"/><rect x="660" y="120" width="60" height="410" rx="12" fill="#ff2d4f"/><circle cx="690" cy="96" r="34" fill="#ff5c74"/><text x="600" y="520" font-family="system-ui,sans-serif" font-weight="700" font-size="38" fill="#f5f5f7" text-anchor="middle">Apex Trading Suite</text><text x="600" y="568" font-family="system-ui,sans-serif" font-size="22" fill="#9696a0" text-anchor="middle">Fully-Hosted AI Forex Trading Bot · $497</text></svg>';
 app.get('/favicon.svg', (req, res) => { res.setHeader('Content-Type','image/svg+xml'); res.setHeader('Cache-Control','public,max-age=86400'); res.end(_LOGO_SVG); });
 app.get('/favicon.ico', (req, res) => { res.setHeader('Content-Type','image/svg+xml'); res.setHeader('Cache-Control','public,max-age=86400'); res.end(_LOGO_SVG); });
 app.get('/og.svg', (req, res) => { res.setHeader('Content-Type','image/svg+xml'); res.setHeader('Cache-Control','public,max-age=3600'); res.end(_OG_SVG); });
@@ -1729,10 +1733,9 @@ app.get('/index.html', (req, res) => {
 // the cinematic curtain intro now lives on the homepage itself.
 app.get(['/intro', '/intro.html'], (req, res) => res.redirect(301, '/'));
 
-// Configurators (linked from bot delivery emails — license-gated client-side)
-app.get('/configurator', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'configurator.html'));
-});
+// Configurator (linked from the delivery email — license-gated client-side).
+// The crypto configurator that used to sit beside this one is gone with its
+// product; /configurator now 301s to the homepage further down.
 app.get('/configurator-forex', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'configurator-forex.html'));
 });
@@ -1924,109 +1927,25 @@ app.post('/api/heygen/photo-generate', async (req, res) => {
 
 // Explicit HTML page routes
 // Public pages — no auth required
-// Legacy crypto page (apex-bot.html) described a self-hosted "source code" product
-// that no longer matches the fully-hosted offering — redirect to the canonical
-// hosted crypto page so buyers never see the stale copy.
-app.get(['/apex-bot', '/apex-bot.html'], (req, res) => res.redirect(301, '/index'));
+// apex-bot.html sold the retired crypto product. The product is gone, so the
+// page is redirected rather than served — a live sales page for something that
+// cannot be delivered is worse than a 301.
+app.get(['/apex-bot', '/apex-bot.html', '/configurator', '/configurator.html',
+         '/bot-setup', '/bot-setup.html', '/deploy', '/deploy.html'],
+       (req, res) => res.redirect(301, '/index'));
 
-const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','thank-you','chart','free','promo','guide'];
+// 'configurator', 'bot-setup' and 'deploy' are gone with the crypto product:
+// they configured Binance keys and walked a client through deploying the
+// retired Railway image. Serving them would hand a buyer instructions for a
+// product that cannot be delivered. 'configurator-forex' is the live one.
+const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','setup-guide','configurator-forex','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','thank-you','chart','free','promo','guide'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
 });
 
 // ── BOT EMAIL HTML — funcție separată reutilizabilă ──────────────────────────
-function _buildBotEmailHtml(safeName, safeEmail, licenseKey = 'APEX-XXXX-XXXX-XXXX') {
-  const firstName = safeName.split(' ')[0];
-  const step = (n, title, body) => `<tr><td style="padding:0 0 12px"><table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#111114;border:1px solid rgba(255,255,255,0.06);border-radius:14px"><tr><td style="padding:22px 24px"><table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px"><tr><td style="background:linear-gradient(135deg,#e63946,#ff6b7a);border-radius:8px;width:28px;height:28px;text-align:center;vertical-align:middle;font-size:13px;font-weight:900;color:#fff;font-family:Arial,sans-serif">${n}</td><td style="padding:0 0 0 12px;font-size:14px;font-weight:800;color:#e4e4e7;font-family:Arial,sans-serif">${title}</td></tr></table><p style="margin:0;font-size:13px;color:#a1a1aa;font-family:Arial,sans-serif;line-height:1.75">${body}</p></td></tr></table></td></tr>`;
-
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-body,table,td,p,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
-table,td{mso-table-lspace:0;mso-table-rspace:0}
-body{margin:0;padding:0;background:#09090b}
-a{text-decoration:none}
-@media only screen and (max-width:600px){
-  .key-mono{font-size:17px!important;letter-spacing:2px!important}
-  .hero-h1{font-size:26px!important}
-  .outer-pad{padding:24px 12px 0!important}
-  .inner-pad{padding:28px 20px!important}
-  .btn-cta{padding:16px 32px!important;font-size:15px!important}
-}
-</style></head>
-<body style="margin:0;padding:0;background:#09090b">
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#09090b;min-height:100vh">
-<tr><td class="outer-pad" align="center" style="padding:40px 16px 0">
-<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%">
-
-<tr><td align="center" style="padding:0 0 24px">
-  <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:#52525b;font-family:Arial,sans-serif">APEX TRADING SUITE</p>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border:1px solid rgba(255,255,255,0.08);border-bottom:none;border-radius:20px 20px 0 0">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr><td style="background:linear-gradient(90deg,#e63946,#ff6b7a);height:3px;border-radius:19px 19px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
-    <tr><td class="inner-pad" align="center" style="padding:44px 40px 36px">
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 28px"><tr><td style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:24px;padding:7px 20px">
-        <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#22c55e;font-family:Arial,sans-serif">&#10003;&nbsp; PAYMENT CONFIRMED</p>
-      </td></tr></table>
-      <p class="hero-h1" style="margin:0 0 8px;font-size:34px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">Your Crypto bot is ready,</p>
-      <p class="hero-h1" style="margin:0 0 24px;font-size:34px;font-weight:900;color:#e63946;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">${firstName}.</p>
-      <p style="margin:0;font-size:15px;color:#a1a1aa;font-family:Arial,sans-serif;line-height:1.75;max-width:420px">One tap to activate. Follow the steps below &mdash; you can be trading in under 10 minutes.</p>
-    </td></tr>
-  </table>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 12px;text-align:center">
-  <a class="btn-cta" href="https://t.me/ApexTradeBot_official_bot?start=${licenseKey}" style="display:inline-block;background:linear-gradient(135deg,#e63946,#d62839);color:#ffffff;font-family:Arial,sans-serif;font-size:17px;font-weight:900;padding:20px 56px;border-radius:14px;text-decoration:none;letter-spacing:0.3px;box-shadow:0 4px 20px rgba(230,57,70,0.35)">&#128640; Open your Crypto Bot &rarr;</a>
-</td></tr>
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:4px 32px 32px;text-align:center">
-  <p style="margin:0;font-size:12px;color:#52525b;font-family:Arial,sans-serif">Tap the button &mdash; Telegram opens and the bot activates automatically</p>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 28px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#09090b;border:1px solid rgba(230,57,70,0.2);border-radius:14px"><tr>
-    <td style="background:linear-gradient(180deg,#e63946,#d62839);width:4px;border-radius:14px 0 0 14px;font-size:0;line-height:0">&nbsp;</td>
-    <td style="padding:24px 24px">
-      <p style="margin:0 0 16px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#ff6b7a;font-family:Arial,sans-serif">YOUR LICENSE KEY</p>
-      <p class="key-mono" style="margin:0 0 12px;font-family:'Courier New',Courier,monospace;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#111114;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:18px 14px;word-break:break-all">${licenseKey}</p>
-      <p style="margin:0;font-size:11px;color:#71717a;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Save this key &mdash; you'll need it if you contact support</p>
-    </td>
-  </tr></table>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 24px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-    <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
-    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#52525b;font-family:Arial,sans-serif">SETUP STEPS</td>
-    <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
-  </tr></table>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 20px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    ${step(1, 'Open the bot on Telegram', 'Press the red button above. The bot sends you a welcome message and activates your license automatically.')}
-    ${step(2, 'Connect your cTrader account', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/ctrader</span> in the chat. Log in with your cTID &mdash; the bot guides you step by step.')}
-    ${step(3, 'Start trading', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/start</span> to go live on your connected cTrader account &mdash; real signals, real trades from the first run.')}
-  </table>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 20px">
-  <p style="margin:0;font-size:11px;color:#3f3f46;font-family:Arial,sans-serif;line-height:1.8;text-align:center"><strong style="color:#52525b">Risk Disclosure</strong> &mdash; Crypto trading involves substantial risk. Only invest what you can afford to lose. This is an automation tool, not financial advice.</p>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 28px">
-  <p style="margin:0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you requested immediate supply and waived the 14-day withdrawal right per Art. 16(m) EU Directive 2011/83/EU. All sales final once access is delivered. <a href="https://aicashsystem.space/terms" style="color:#52525b">Terms</a></p>
-</td></tr>
-
-<tr><td align="center" style="background:#0c0c0f;border:1px solid rgba(255,255,255,0.08);border-top:1px solid rgba(255,255,255,0.05);border-radius:0 0 20px 20px;padding:28px 40px 32px">
-  <p style="margin:0 0 8px;font-size:13px;color:#71717a;font-family:Arial,sans-serif">Need help? We're here for you:</p>
-  <a href="mailto:supportaicashsystem@gmail.com" style="color:#ff6b7a;font-size:14px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">supportaicashsystem@gmail.com</a>
-  <p style="margin:20px 0 0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif">&copy; 2025 Apex Trading Suite &nbsp;&middot;&nbsp; <a href="https://aicashsystem.space" style="color:#3f3f46;text-decoration:none">aicashsystem.space</a></p>
-</td></tr>
-
-<tr><td style="height:40px;font-size:0;line-height:0">&nbsp;</td></tr>
-</table></td></tr></table></body></html>`;}
+// _buildBotEmailHtml — the crypto bot's delivery email — removed with the product.
 
 // ── FOREX BOT EMAIL ─────────────────────────────────────────────────────────
 function _buildForexEmailHtml(safeName, safeEmail, licenseKey = 'FORX-XXXX-XXXX-XXXX') {
@@ -2121,31 +2040,12 @@ a{text-decoration:none}
 <tr><td style="height:40px;font-size:0;line-height:0">&nbsp;</td></tr>
 </table></td></tr></table></body></html>`;}
 
-// ── BOT ACCESS — streams a clean ZIP; requires valid HMAC-signed license key
-app.get('/bot-access', async (req, res) => {
-  const key = req.query.key || req.headers['x-license-key'];
-  if (!key) return res.status(403).send('License key required. Add ?key=APEX-XXXX-XXXX-XXXX');
-  // Validate HMAC signature — not just format
-  if (!verifyLicenseKeyHmac(key)) {
-    return res.status(403).send('Invalid license key.');
-  }
-  console.log('[BOT-ACCESS] download with key:', key.slice(0, 9) + '…');
-  const archiver = require('archiver');
-  const botDir = path.join(__dirname, 'apex-trade-bot');
-  res.setHeader('Content-Disposition', 'attachment; filename="apex-trade-bot.zip"');
-  res.setHeader('Content-Type', 'application/zip');
-  const archive = archiver('zip', { zlib: { level: 6 } });
-  archive.on('error', (err) => {
-    console.error('[BOT-ACCESS] archive error:', err.message);
-    if (!res.headersSent) res.status(500).send('Could not generate bot package. Contact support.');
-  });
-  archive.pipe(res);
-  // Include src/, package.json, railway.json — no node_modules
-  archive.directory(path.join(botDir, 'src'), 'src');
-  archive.file(path.join(botDir, 'package.json'), { name: 'package.json' });
-  archive.file(path.join(botDir, 'railway.json'), { name: 'railway.json' });
-  archive.finalize();
-});
+// ── BOT ACCESS — REMOVED.
+// This streamed a ZIP of apex-trade-bot/ (the retired crypto product) to any
+// holder of an HMAC-valid key. That directory no longer exists, so the route
+// could only 500 — and shipping self-hosted trading source is an execution
+// path outside the canonical architecture regardless. The Forex product is
+// delivered through Telegram, never as source.
 
 // ── EMAIL STATUS — requires owner secret
 app.get('/api/email-status', (req, res) => {
@@ -2276,7 +2176,7 @@ async function _sendBotEmailHandler(req, res) {
   if (isPreview) {
     const name  = req.query.name || req.body.name || 'Alex';
     const email = req.query.email || req.body.email || 'preview@example.com';
-    const previewHtml = _buildBotEmailHtml(_he(name), _he(email), 'APEX-DEMO-PREW-2025');
+    const previewHtml = _buildForexEmailHtml(_he(name), _he(email), 'FORX-DEMO-PREW-2025');
     return res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview: Bot Delivery Email</title>
       <style>body{margin:0;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:40px 20px;font-family:sans-serif}
       .bar{background:#2d2d44;border:1px solid #444;border-radius:8px;padding:10px 20px;margin-bottom:24px;color:#aaa;font-size:13px;text-align:center;max-width:600px;width:100%}
@@ -2291,8 +2191,8 @@ async function _sendBotEmailHandler(req, res) {
   if (!email) return res.status(400).json({ error: 'email required' });
 
   // Generate a real license key for test sends
-  const testKey = generateLicenseKey();
-  const botEmailHtml = _buildBotEmailHtml(_he(name), _he(email), testKey);
+  const testKey = generateForexKey();
+  const botEmailHtml = _buildForexEmailHtml(_he(name), _he(email), testKey);
 
   // Save test license to Supabase
   if (supabase) {
@@ -2423,24 +2323,22 @@ app.post('/api/builder/logo', auth, _aiLimiter, async (req, res) => {
 
 // ════════════════════════════════════════
 // ADMIN: SYNC BOT FILES → GitHub repo
-// Usage: GET /admin/sync-bot-repo?secret=BOT_EMAIL_SECRET&token=ghp_xxx[&bot=crypto|forex]
+// Usage: GET /admin/sync-bot-repo?secret=BOT_EMAIL_SECRET&token=ghp_xxx
 // ════════════════════════════════════════
 app.get('/admin/sync-bot-repo', async (req, res) => {
   const secret = req.query.secret || '';
   // Token can come from the URL (?token=ghp_...) or, preferably, a Render env
   // var GH_TOKEN so it stays out of browser history and URLs.
   const ghToken = req.query.token || process.env.GH_TOKEN || '';
-  const bot = (req.query.bot || 'crypto').toLowerCase();
   const adminSecret = process.env.BOT_EMAIL_SECRET || '';
 
   if (!adminSecret) return res.status(500).json({ error: 'BOT_EMAIL_SECRET not set' });
   if (secret !== adminSecret) return res.status(403).json({ error: 'Wrong secret' });
   if (!ghToken) return res.status(400).json({ error: 'GitHub token required — add GH_TOKEN in Render env, or pass ?token=ghp_...' });
-  if (!['crypto', 'forex'].includes(bot)) return res.status(400).json({ error: "bot must be 'crypto' or 'forex'" });
 
   const fs = require('fs');
   const OWNER = 'alexgabriel225sefu-dotcom';
-  const REPO  = bot === 'forex' ? 'apex-forex-bot' : 'apex-trade-bot';
+  const REPO  = 'apex-forex-bot';
   const botDir = path.join(__dirname, REPO);
 
   // Recursively collect deployable source files (skips caches/tests/git noise).
@@ -2466,7 +2364,7 @@ app.get('/admin/sync-bot-repo', async (req, res) => {
   }
   const filesToPush = walk(botDir);
 
-  const readmeContent = bot === 'forex' ? `# Apex Forex Bot 🤖
+  const readmeContent = `# Apex Forex Bot 🤖
 
 AI-powered forex trading bot (OANDA + MT5 bridge). Deploy with one click on Railway — runs 24/7, never sleeps.
 
@@ -2475,23 +2373,6 @@ AI-powered forex trading bot (OANDA + MT5 bridge). Deploy with one click on Rail
 ## Setup
 The only variable you set is your license key — everything else is configured
 on [aicashsystem.space/configurator-forex](https://aicashsystem.space/configurator-forex)
-and loaded automatically at startup.
-
-| Variable | Value |
-|----------|-------|
-| \`LICENSE_KEY\` | Your key from purchase email |
-
-## License
-Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsystem.space).
-` : `# Apex Trade Bot 🤖
-
-AI-powered crypto trading bot. Deploy with one click on Railway — runs 24/7, never sleeps.
-
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/${OWNER}/${REPO})
-
-## Setup
-The only variable you set is your license key — everything else is configured
-on [aicashsystem.space/configurator](https://aicashsystem.space/configurator)
 and loaded automatically at startup.
 
 | Variable | Value |
@@ -2560,7 +2441,7 @@ Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsys
   // mistaken earlier push (e.g. apex-forex-bot/ committed inside apex-trade-bot).
   // Each bot must live in its own repo — a nested folder makes Railway build the
   // wrong service. We mirror by deleting any blob under the stray bot dir.
-  const strayDir = bot === 'forex' ? 'apex-trade-bot' : 'apex-forex-bot';
+  const strayDir = 'apex-trade-bot';
   let deleted = 0;
   try {
     const treeRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/HEAD?recursive=1`, {
@@ -2661,10 +2542,14 @@ app.post('/api/railway-deploy', async (req, res) => {
   if (!railwayToken || !licenseKey) return res.status(400).json({ error: 'railwayToken and licenseKey required' });
 
   const RAILWAY_API = 'https://backboard.railway.com/graphql/v2';
-  const image = product === 'apex-forex'
-    ? 'ghcr.io/alexgabriel225sefu-dotcom/apex-forex-bot:latest'
-    : 'ghcr.io/alexgabriel225sefu-dotcom/apex-trade-bot:latest';
-  const projectName = product === 'apex-forex' ? 'apex-forex-bot' : 'apex-trade-bot';
+  // One image. The apex-trade-bot image was the retired crypto product; it is
+  // no longer built or published, so defaulting an unknown `product` to it
+  // would deploy an image that does not exist.
+  if (product && product !== 'apex-forex') {
+    return res.status(400).json({ error: 'Unknown product — this deploys the Forex bot only.' });
+  }
+  const image = 'ghcr.io/alexgabriel225sefu-dotcom/apex-forex-bot:latest';
+  const projectName = 'apex-forex-bot';
 
   async function gql(query, variables) {
     const r = await fetch(RAILWAY_API, {

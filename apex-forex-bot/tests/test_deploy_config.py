@@ -3,7 +3,7 @@
 An audit flagged the build filter as possibly wrong for the repository
 layout. It is not: `apex-forex-bot/**` is correct, because buildFilter paths
 are relative to the REPOSITORY ROOT and this is a monorepo — the bot is one
-folder inside it, alongside apex-crypto-bot/, ruflo-mcp/ and the website.
+folder inside it, alongside ruflo-mcp/ and the website.
 
 What the audit did surface, by making us look, is a different and real defect:
 the blueprint had no `rootDir`. Its buildCommand (`pip install -r
@@ -105,7 +105,7 @@ for needed in ("apex", "tests", "main.py", "requirements.txt", "render.yaml"):
           f"{needed} is not matched by {paths}")
 
 print("\n4. Sibling projects must NOT redeploy this trading loop")
-for sibling in ("apex-crypto-bot", "ruflo-mcp", "web", "public"):
+for sibling in ("ruflo-mcp", "web", "public", "scripts"):
     if not os.path.isdir(os.path.join(REPO_ROOT, sibling)):
         continue
     hit = any(f"{sibling}/x.py".startswith(p.rstrip("*")) for p in paths)

@@ -71,7 +71,6 @@ def session(hour=None):
 
 def is_weekend_close_window(dt=None):
     """True from Friday evening through Sunday's reopen. The cTrader CFD feed
-    (both forex AND crypto here — crypto runs 24/5 on this broker, not 24/7)
     goes quiet over the weekend, and a position held through that gap can
     reopen Sunday far from where it closed Friday, past any stop-loss. A 1h
     buffer on each side absorbs broker-to-broker variance in the exact close/

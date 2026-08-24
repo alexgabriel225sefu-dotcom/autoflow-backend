@@ -123,7 +123,7 @@ def _load_runtime_config():
 def load_remote():
     """Fetch the config the client saved in the configurator and apply it.
 
-    Mirrors the crypto bot's cfg.loadRemote(): with only LICENSE_KEY set, the
+    With only LICENSE_KEY set, the
     bot pulls broker keys, CTRADER_ENV, risk and strategy from the license server
     so deployment is truly one-click. Falls back to env vars on any failure.
     """

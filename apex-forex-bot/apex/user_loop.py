@@ -93,12 +93,11 @@ def _currency_legs(symbol):
         return []
     if len(s) == 6:
         return [s[:3], s[3:]]
-    # Crypto tickers are not 3+3. DOGEUSD, LINKUSD, AVAXUSD and MATICUSD all
-    # fell through the 6-character rule and returned NO legs, and
-    # news.high_impact_window([]) matches nothing and returns None — so four
-    # of the twelve curated coins traded straight through NFP/CPI/FOMC with
-    # NEWS_FILTER on and nothing logged. The quote currency is the half that
-    # carries the calendar risk, so split on it by name instead of by length.
+    # Everything this bot trades is a 6-character pair and takes the branch
+    # above. The by-name split below is kept because returning NO legs is a
+    # silent fail-open — high_impact_window([]) matches nothing and returns
+    # None, so a symbol that slips past the 3+3 rule would trade straight
+    # through NFP/CPI/FOMC with the filter on and nothing logged.
     for q in ("USDT", "USDC", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF"):
         if len(s) > len(q) and s.endswith(q):
             base = s[:-len(q)]
@@ -125,9 +124,9 @@ KEEP_TRACKED = "KEEP_TRACKED"      # broker never answered — do not guess
 CONFIRMED_CLOSED = "CONFIRMED_CLOSED"   # broker answered, definitively flat
 
 
-# Leverage is a property of the INSTRUMENT, not of the build. Regulated
-# brokers cap crypto CFDs around 1:2–1:5 while FX majors get 1:30, so one
-# constant per process cannot describe an account that now holds both.
+# Leverage is a property of the INSTRUMENT and of the account, not of a
+# build-time constant. The broker's own per-symbol answer is preferred; this
+# static is only the fallback when it cannot be read.
 #
 # This mattered more than it looks. `calc_units` uses leverage only for the
 # margin cap — so an assumed 30x on a 5x instrument does not merely overstate
@@ -136,7 +135,6 @@ CONFIRMED_CLOSED = "CONFIRMED_CLOSED"   # broker answered, definitively flat
 # 52% of it at 5x, and the guard that exists to prevent exactly that reports
 # the wrong number without failing.
 _LEV_CACHE = {}
-_LEV_STATIC_CRYPTO = 5.0
 _LEV_STATIC_FX = 30.0
 
 
@@ -160,7 +158,7 @@ def leverage_for_symbol(broker, cfg, symbol):
         return float(getattr(cfg, "LEVERAGE", _LEV_STATIC_FX))
     if sym in _LEV_CACHE:
         return _LEV_CACHE[sym]
-    static = _LEV_STATIC_CRYPTO if forex.is_crypto(sym) else _LEV_STATIC_FX
+    static = _LEV_STATIC_FX
     lev = static
     try:
         if broker is not None and hasattr(broker, "leverage_for"):
@@ -177,36 +175,17 @@ def leverage_for_symbol(broker, cfg, symbol):
 
 
 def flash_spike_pct_for(cfg, symbol):
-    """Violent-candle threshold, per instrument.
-
-    The FX default is 1.2%. Ordinary BTC candles exceed that routinely, so on
-    a forex build the flash-spike guard would refuse crypto entries as a
-    matter of course — the bot would look like it simply never traded crypto,
-    with the reason buried in a skip line.
-    """
-    base = float(getattr(cfg, "FLASH_SPIKE_PCT", 0.012))
-    if forex.is_crypto(symbol) and base <= 0.02:
-        return 0.05
-    return base
+    """Violent-candle threshold. One value for every instrument this bot
+    trades — FX majors and metals share the same 1.2% convention."""
+    return float(getattr(cfg, "FLASH_SPIKE_PCT", 0.012))
 
 
 def max_spread_pct_for(cfg, symbol):
-    """Spread ceiling as a % of price, per INSTRUMENT rather than per build.
-
-    `cfg.MAX_SPREAD_PCT` was `0.35 if PRODUCT == "crypto" else 0` — the same
-    build-level pattern already fixed for LEVERAGE and FLASH_SPIKE_PCT, missed
-    here. On the merged forex build PRODUCT is always "forex", so it read 0 and
-    crypto entries fell back to the pip-count guard that the code's own comment
-    calls meaningless across crypto's varied pip sizes: at BTC around $104k
-    that trips near $12-30 instead of the intended ~0.35% (~$364), roughly
-    12-30x too tight, which quietly blocks most real crypto entries.
-
-    An explicit MAX_SPREAD_PCT from the operator still wins for every symbol.
-    """
-    base = float(getattr(cfg, "MAX_SPREAD_PCT", 0) or 0)
-    if base > 0:
-        return base
-    return 0.35 if forex.is_crypto(symbol) else 0.0
+    """Optional %-of-price spread ceiling. Off unless an operator sets one:
+    every instrument this bot trades has a sane pip size, so MAX_SPREAD_PIPS
+    is the real guard. Kept as a per-symbol call so a future instrument with
+    odd pip conventions has a place to be handled."""
+    return float(getattr(cfg, "MAX_SPREAD_PCT", 0) or 0)
 
 
 def recovery_verdict(live_position, got_answer):
@@ -704,7 +683,6 @@ def _institutional_observations(symbol, ind, regime, spread_pips, now=None):
         volatility          regime vol_ratio          ✓
         liquidity_quality   spread + trading session  ✓
         macro_risk          economic calendar         ✓
-        sentiment           fear & greed              ✓
         futures_positioning licensed futures feed     ✗
         cot_bias            CFTC weekly (free, TODO)  ✗
         rate_differential   yield curves              ✗
@@ -787,16 +765,6 @@ def _institutional_observations(symbol, ind, regime, spread_pips, now=None):
             # A reading loses weight as it ages toward the next release.
             _conf = 0.8 if (_age or 0) <= 7 else 0.5
             add("cot_bias", cb, "cftc_cot", conf=_conf, ttl=8 * 86400)
-    except Exception:
-        pass
-
-    # ── sentiment: fear & greed, rescaled from 0..100 to -1..+1 ──
-    try:
-        fg = sentiment.fear_greed()
-        val = (fg or {}).get("value")
-        if val is not None:
-            add("sentiment", (float(val) - 50.0) / 50.0, "fear_greed",
-                conf=0.6, ttl=6 * 3600)
     except Exception:
         pass
 
@@ -936,10 +904,7 @@ def _make_broker(user):
         # once the account has grown or shrunk. See /tptarget.
         TP_TARGET_PCT    = float(user.get("tp_target_pct", 0) or 0),
         RISK_PER_TRADE   = float(user.get("risk", 0.025)),  # 2.5% default (was 1%) — bigger profit per trade, still bounded by the caps below
-        # Crypto CFDs are leveraged far lower than FX (retail ~2-5x vs 30x), so
-        # the margin cap must assume less leverage or it sizes positions the
-        # account can't actually margin.
-        LEVERAGE         = float(user.get("leverage", 5 if _appcfg.PRODUCT == "crypto" else 30)),
+        LEVERAGE         = float(user.get("leverage", 30)),
         # Whether the number above is the CLIENT'S or just our default. Without
         # this, leverage_for_symbol() cannot tell a deliberate 30 from the
         # fallback 30, so it ignored the setting entirely (see its docstring).
@@ -951,10 +916,8 @@ def _make_broker(user):
         # pushes the break-even win rate from 37.1% to 41.6%.
         MAX_SPREAD_PIPS  = float(user.get(
             "max_spread_pips", getattr(_appcfg, "MAX_SPREAD_PIPS", 3.0))),
-        PRODUCT          = _appcfg.PRODUCT,  # so the loop's crypto branches fire
-        # Asset-class-aware spread/volatility guards (crypto uses a %-of-price
-        # spread limit + higher flash-spike bar; forex keeps the pip limit).
-        # Pulled from the global product config so PRODUCT=crypto takes effect.
+        PRODUCT          = _appcfg.PRODUCT,  # Redis namespace only — always "forex"
+        # Spread/volatility guards, operator-tunable, never build-derived.
         MAX_SPREAD_PCT   = getattr(_appcfg, "MAX_SPREAD_PCT", 0),
         FLASH_SPIKE_PCT  = getattr(_appcfg, "FLASH_SPIKE_PCT", 0.012),
         MIN_CONFIDENCE   = int(user.get("min_confidence", 70)),
@@ -966,7 +929,7 @@ def _make_broker(user):
         EXIT_MODE        = (user.get("exit_mode") or "fixed").lower(),
         TRAILING_STOP    = bool(user.get("trailing", True)),      # move SL behind price — ON by default
         BREAKEVEN_AT_R   = float(user.get("breakeven_r", 1.0)),   # move SL to entry at +1R
-        NEWS_FILTER      = bool(user.get("news_filter", _appcfg.PRODUCT != "crypto")),
+        NEWS_FILTER      = bool(user.get("news_filter", True)),
         SESSION_FILTER   = list(user.get("session_filter") or []),  # [] = all sessions
         MAX_TRADES_DAY   = int(user.get("max_trades_day", 10)),
         # Caps scaled with RISK_PER_TRADE above (2.5x risk) so the bot still
@@ -997,7 +960,7 @@ def _make_broker(user):
     )
     broker = _CtraderBroker(fake_cfg)
     # Refine the LEVERAGE guess with the broker's real, per-instrument value
-    # (regulated brokers cap crypto/indices far lower than FX majors — see
+    # (regulated brokers cap some instruments below the FX-major tier — see
     # CtraderBroker.leverage_for) — but only when the client didn't set one
     # explicitly and we're actually margining real money against it.
     if not paper and ct_token and ct_account and "leverage" not in user:
@@ -1143,9 +1106,9 @@ def _manage_trailing(broker, cfg, pos, symbol, price, initial_risk=None):
 def _loop(user_id, alert_fn, gen=None):
     user = user_store.load(user_id)
 
-    # Self-heal cross-product pollution AT THE SOURCE. When crypto & forex shared
-    # one Redis namespace, a user record could keep the OTHER product's symbols
-    # (a forex account trading SOLUSD, etc.). Scrub them out of every stored field
+    # Self-heal untradeable symbols AT THE SOURCE. A user record can still
+    # carry crypto left over from the merged build, which the order path now
+    # refuses outright. Scrub them out of every stored field
     # — symbol, watchlist, autopilot_universe — and PERSIST, so the terminal, the
     # status card and the scanner all reflect a clean, single-product account
     # without the user running any command.
@@ -1183,8 +1146,7 @@ def _loop(user_id, alert_fn, gen=None):
     # own /symbol or /watch basket is used.
     autopilot = bool(user.get("autopilot"))
     if autopilot and user.get("autopilot_universe"):
-        # Raised from 8 now that one universe carries FX, metals and crypto.
-        # It is a cap on WORK, not a preference: the broker connection is a
+        # A cap on WORK, not a preference: the broker connection is a
         # single socket with a lock held across each round-trip, so every extra
         # symbol lengthens the tick. Twelve keeps a scan comfortably inside the
         # interval; going much past it makes the loop slower than the signals
@@ -1192,14 +1154,12 @@ def _loop(user_id, alert_fn, gen=None):
         watchlist = [w for w in user["autopilot_universe"] if w][:12]
     else:
         watchlist = [w for w in (user.get("watchlist") or []) if w][:6]
-    if getattr(cfg, "PRODUCT", "forex") == "crypto":
-        watchlist = [w for w in watchlist if forex.is_crypto(w)]
-        if not forex.is_crypto(symbol):
-            symbol = watchlist[0] if watchlist else "BTCUSD"
-    else:
-        watchlist = [w for w in watchlist if forex.is_tradeable(w)]
-        if not forex.is_tradeable(symbol):
-            symbol = watchlist[0] if watchlist else "EUR_USD"
+    # Strip anything the order path would refuse — a stored watchlist can
+    # still carry a coin from the merged build, and a basket entry that can
+    # never trade is a silent dead slot in the scan budget.
+    watchlist = [w for w in watchlist if forex.is_tradeable(w)]
+    if not forex.is_tradeable(symbol):
+        symbol = watchlist[0] if watchlist else "EUR_USD"
     paper_balance = cfg.PAPER_BALANCE
     # REAL mode: the stored seed goes stale the moment a trade closes — read
     # the broker's actual balance BEFORE the first status can be asked for,
@@ -1220,7 +1180,6 @@ def _loop(user_id, alert_fn, gen=None):
         except Exception as e:
             print(f"[UserLoop:{user_id}] initial balance read failed: {e}")
     open_pos = None  # tracked locally for paper mode
-    _crypto_build = getattr(cfg, "PRODUCT", "forex") == "crypto"
     tick = 0
     data_fails = 0   # consecutive get_candles failures — alert the user at 3
     last_refresh_at = 0.0  # throttle cTrader token-refresh/reconnect attempts
@@ -1309,7 +1268,7 @@ def _loop(user_id, alert_fn, gen=None):
     prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
     pos_details = {}    # nrm(symbol) -> {symbol, side, entry, units} for P&L on close
     spread_blocked = {}  # nrm(symbol) -> retry_ts: Auto-Pilot avoids symbols whose
-                         # spread is blown out (weekend crypto) instead of camping on them
+                         # spread is blown out (weekend/illiquid) instead of camping on them
     rate_limit_until = 0.0  # while > now, do only the minimal 1-symbol fetch
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
@@ -1554,11 +1513,9 @@ def _loop(user_id, alert_fn, gen=None):
 
     def _health_check(lat=None, spread=None):
         """Broker Health Monitor (premium spec #8): when latency blows past the
-        broker's own recent norm, suspend entries and say so. The spread-based
-        check is skipped for crypto — the Auto-Pilot scans a basket whose per-
-        coin spreads differ 10x (SOL 600p vs BTC 5p), so a shared spread median
-        is meaningless and would flip-flop degraded/recovered every scan (spam).
-        The per-entry %-spread guard already blocks wide-spread entries."""
+        broker's own recent norm, suspend entries and say so. The spread check
+        needs at least 8 samples before it trusts its own median, so a thin
+        history never trips it."""
         if lat is not None:
             health["lats"] = (health["lats"] + [lat])[-30:]
         if spread is not None and spread > 0:
@@ -1569,7 +1526,7 @@ def _loop(user_id, alert_fn, gen=None):
             med = sorted(lats)[len(lats) // 2]
             if lats[-1] > max(8.0, med * 5):
                 bad = f"data latency {lats[-1]:.1f}s (normal ~{med:.1f}s)"
-        if not bad and not _crypto_build and len(sps) >= 8 and spread is not None:
+        if not bad and len(sps) >= 8 and spread is not None:
             med = sorted(sps)[len(sps) // 2]
             if spread > max(med * 4, med + 2):
                 bad = f"spread {spread:.1f}p vs normal ~{med:.1f}p"
@@ -1793,7 +1750,8 @@ def _loop(user_id, alert_fn, gen=None):
                     # Only journal positions WE opened (have details for). Without
                     # this, a position opened by another bot sharing the account
                     # is journaled here with mismatched data — e.g. a gold entry
-                    # reported as BTCUSD — corrupting P&L and the tax journal.
+                    # reported under the wrong symbol — corrupting P&L and the
+                    # tax journal.
                     if not det or not det.get("entry"):
                         continue
                     # Ask the broker for this position's actual closed-deal
@@ -1886,10 +1844,8 @@ def _loop(user_id, alert_fn, gen=None):
             # in paper, which used to freeze the scanner and pin the focus).
             slot_free = ((open_pos is None) if cfg.PAPER_TRADING
                          else ((all_positions is not None) and (open_count < maxpos)))
-            # Scan cadence: forex every 3 ticks (~15 min); crypto every 2 (~10
-            # min) because setups rotate faster across the coin basket and only
-            # the focus symbol is entered per tick, so scanning too rarely misses
-            # most setups. Requests are spaced 0.35s to respect cTrader's limit.
+            # Scan cadence: every 3 ticks (~15 min). Requests are spaced 0.35s
+            # to respect cTrader's rate limit.
             # Also rescan immediately when the focus is spread-blocked so the bot
             # doesn't camp on a dead symbol.
             _scan_every = max(1, round(_SCAN_INTERVAL_S / max(1, _LOOP_INTERVAL)))
@@ -2005,8 +1961,8 @@ def _loop(user_id, alert_fn, gen=None):
 
             # ── Frozen-feed detection ──────────────────────────────────────
             # If the newest candle's timestamp stops advancing, the broker isn't
-            # quoting this symbol (many brokers freeze crypto-CFD feeds on
-            # weekends / off-hours). A frozen feed never produces a signal, so
+            # quoting this symbol (brokers freeze feeds outside market hours).
+            # A frozen feed never produces a signal, so
             # the bot would sit silent forever. Detect it, mark the symbol so
             # Auto-Pilot rotates to a live one, and tell the user once.
             _bt = candles[-1]["time"]
@@ -2503,17 +2459,15 @@ def _loop(user_id, alert_fn, gen=None):
                 picked = {"trending": "trend", "ranging": "mean_reversion",
                           "volatile": "breakout"}.get(regime["regime"])
                 regime_block = regime["regime"] == "quiet"
-                # Neutral default: crypto trends more than it ranges, so a
-                # warming-up/unknown regime should default to trend-following,
-                # not fading (the forex default).
+                # Neutral default while the regime read is warming up: fade
+                # rather than chase. FX majors range more than they trend.
                 #
                 # Decided per SYMBOL, not per build. The bot now holds both
                 # asset classes on one account, so "what kind of thing is
                 # this" is a question about the instrument in front of it —
                 # a build-level flag would fade BTC because the process
                 # happens to be the forex one.
-                _default_mode = ("trend" if (_crypto_build or forex.is_crypto(symbol))
-                                 else "mean_reversion")
+                _default_mode = "mean_reversion"
                 active_mode = picked or _default_mode
                 dash["strategy"] = f"Auto → {_strategy_label(active_mode)}"
 
@@ -2580,7 +2534,7 @@ def _loop(user_id, alert_fn, gen=None):
                     last_mkt_tick = tick
 
             # Weekend gap protection: this CFD feed goes quiet Fri evening to
-            # Sun evening (crypto included — it's 24/5 here, not 24/7). A
+            # Sun evening. A
             # position ridden into the gap can reopen Sunday far past its own
             # stop-loss, so force-close before the close and stand aside
             # (the unconditional `continue` below also blocks new entries)
@@ -3032,9 +2986,8 @@ def _loop(user_id, alert_fn, gen=None):
                 if health["degraded"]:
                     entry_ok = False
                     _skip(f"broker health: {dash.get('brokerHealth', 'degraded')}")
-                # Spread guard — crypto uses a %-of-price limit (pip-count limits
-                # are meaningless across crypto's varied pip sizes); forex keeps
-                # the pip limit.
+                # Spread guard — the pip limit is the real one here; the
+                # %-of-price ceiling is off unless an operator sets it.
                 max_spread = getattr(cfg, "MAX_SPREAD_PIPS", 3.0)
                 max_spread_pct = max_spread_pct_for(cfg, symbol)
                 spread_pct = ((ask - bid) / price * 100) if price > 0 else 0.0
@@ -3058,16 +3011,15 @@ def _loop(user_id, alert_fn, gen=None):
                     if not was_blocked:
                         spread_blocked[_nrm(symbol)] = time.time() + 1800
                     _skip(f"spread too wide ({spread:.1f}p > {max_spread:g}p)")
-                # Break-even guard (pip-based) only applies to the forex pip model;
-                # crypto's %-spread guard above already ensures the edge clears costs.
+                # Break-even guard (pip-based). Skipped when an operator has set
+                # a %-of-price ceiling instead, which already bounds the cost.
                 elif max_spread_pct <= 0 and cfg.TAKE_PROFIT_PIPS <= (spread + comm_pips) * 1.5:
                     print(f"[UserLoop:{user_id}] skip entry — TP {cfg.TAKE_PROFIT_PIPS:g}p doesn't clear costs {spread + comm_pips:.1f}p")
                     entry_ok = False
                     _skip(f"edge too thin: TP {cfg.TAKE_PROFIT_PIPS:g}p vs real costs {spread + comm_pips:.1f}p (spread+commission)")
 
             # Flash-crash circuit breaker: skip entry when the latest candle's
-            # range is extreme (>1.2% for FX majors; crypto is far more volatile,
-            # so the threshold is raised via FLASH_SPIKE_PCT).
+            # range is extreme (>1.2% for FX majors, via FLASH_SPIKE_PCT).
             if entry_ok and _flash_spike(candles, flash_spike_pct_for(cfg, symbol)):
                 entry_ok = False
                 _skip("flash-crash guard: extreme candle range", alert=False)
@@ -3076,9 +3028,9 @@ def _loop(user_id, alert_fn, gen=None):
                     alert_fn(user_id, {"action": "FLASH_WARN", "symbol": symbol})
 
             # Session filter (Strategy Builder): only trade the sessions the user
-            # picked. [] = all sessions. Crypto ignores this (runs 24/5 on the CFD
-            # feed). Forex reacts to session opens, so honouring it is real.
-            if entry_ok and not _crypto_build:
+            # picked. [] = all sessions. Forex reacts to session opens, so
+            # honouring it is real.
+            if entry_ok:
                 want_sess = getattr(cfg, "SESSION_FILTER", []) or []
                 if want_sess:
                     try:
@@ -3164,7 +3116,6 @@ def _loop(user_id, alert_fn, gen=None):
             ev_verdict = None
             if entry_ok:
                 pip = forex.pip_size(symbol, price)
-                _crypto = _crypto_build
                 stop_pips_eff = cfg.STOP_LOSS_PIPS
                 # Dynamic ATR stops (premium spec #10): SL = 1.5×ATR, TP = 3×ATR
                 # — distances that breathe with the instrument's volatility.
@@ -3224,21 +3175,12 @@ def _loop(user_id, alert_fn, gen=None):
                     # ~2 pips, so 1.5×ATR is a sub-noise stop that the spread
                     # alone triggers instantly — the churn that bled the account.
                     # Never let the stop sit inside spread+noise: at least 4×
-                    # the current spread and a sane per-class pip floor.
-                    # Crypto's magnitude pip makes 10×pip a 0.01-0.1% sub-noise
-                    # floor; use a %-of-price floor (~0.4%) so the stop clears
-                    # crypto tick noise. Forex keeps the 10-pip floor.
-                    floor_abs = (0.004 * price) if _crypto else (20.0 * pip)
+                    # the current spread and a 20-pip floor.
+                    floor_abs = 20.0 * pip
                     min_stop = max(4.0 * spread * pip, floor_abs)
                     if sl_dist < min_stop:
                         sl_dist = min_stop
                         tp_dist = 2.0 * sl_dist  # keep RR ≥ 1:2
-                    stop_pips_eff = forex.to_pips(sl_dist, symbol, price)
-                elif _crypto:
-                    # No ATR available on crypto → %-of-price stop, not the
-                    # sub-noise fixed-pip default (20 pips = 0.02% on SOL).
-                    sl_dist = 0.012 * price   # ~1.2% stop
-                    tp_dist = 0.024 * price   # ~2.4% target (RR 1:2)
                     stop_pips_eff = forex.to_pips(sl_dist, symbol, price)
                 else:
                     sl_dist = cfg.STOP_LOSS_PIPS * pip
@@ -4104,20 +4046,14 @@ def force_trade(user_id, side, symbol=None, lots=None):
     # (Sizing happens below; the gate is re-entered with the real units.)
     broker, cfg = _make_broker(user)
     sym = (symbol or cfg.SYMBOL).upper()
-    if getattr(cfg, "PRODUCT", "forex") == "crypto":
-        if not forex.is_crypto(sym):
-            return {"ok": False, "error": f"{sym} isn't a crypto instrument — this is a "
-                                          "crypto bot. Try e.g. BTCUSD or ETHUSD."}
-    else:
-        # `is_tradeable` now covers FX, metals AND crypto. Indices, stocks and
-        # ETFs are still refused, and deliberately: they need per-exchange
-        # trading calendars and quote-currency conversion in sizing, and
-        # neither exists yet. Accepting them would not fail loudly — it would
-        # size a position in the wrong currency and trade a closed exchange.
-        if not forex.is_tradeable(sym):
-            return {"ok": False, "error": f"{sym} isn't tradeable here — this bot trades "
-                                          "forex, metals and crypto. Try e.g. EUR_USD, "
-                                          "XAUUSD or BTCUSD."}
+    # Crypto, indices, stocks, ETFs and USD-less FX crosses are all refused,
+    # each for a concrete reason — see forex.is_tradeable. Accepting one would
+    # not fail loudly: it would size a position in the wrong currency, or trade
+    # an exchange this bot has no calendar for.
+    if not forex.is_tradeable(sym):
+        return {"ok": False, "error": f"{sym} isn't tradeable here — this bot trades "
+                                      "forex majors and metals. Try e.g. EUR_USD, "
+                                      "USD_JPY or XAUUSD."}
     try:
         candles = broker.get_candles(sym, cfg.TIMEFRAME, 5)
         price = candles[-1]["close"] if candles else 0.0
@@ -4168,8 +4104,7 @@ def force_trade(user_id, side, symbol=None, lots=None):
     if lots is not None and lots > 0:
         units = forex.lots_to_units(lots, sym)
     else:
-        # Same per-instrument leverage as the automatic path. A manual /buy on
-        # BTCUSD must not be margined as though it were a currency pair.
+        # Same per-instrument leverage as the automatic path.
         units = forex.calc_units(sizing_balance, cfg.RISK_PER_TRADE, stop_pips_eff,
                                  sym, price,
                                  leverage=leverage_for_symbol(broker, cfg, sym))

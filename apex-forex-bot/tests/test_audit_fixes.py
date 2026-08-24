@@ -18,19 +18,19 @@ what they cost, worst first.
     $3,243 account at 0.5%, a 200-pip EUR_USD stop risked 1.23x and a 500-pip
     stop 3.08x — and it gets worse as the account shrinks, so it bites
     hardest right after a drawdown.
-  * NEWS PROTECTION was silently absent for any 4+/5-letter crypto ticker.
-    `_currency_legs` only split 6-character symbols, so DOGEUSD, LINKUSD,
-    AVAXUSD and MATICUSD returned no legs, and high_impact_window([]) matches
-    nothing and returns None — four of twelve curated coins traded straight
-    through NFP/CPI/FOMC with the filter on and nothing logged.
+  * NEWS PROTECTION fails open on an unrecognised symbol: `_currency_legs`
+    returning [] means high_impact_window([]) matches nothing and returns
+    None, so the symbol trades straight through NFP/CPI/FOMC with the filter
+    on and nothing logged. Everything traded today is a 6-character pair, but
+    the by-name split stays because the failure is silent.
   * EVERY ORDER-GATE REFUSAL was reported to the client as "an identical
     order was sent moments ago". A lapsed licence, a drawdown halt, an
     unreadable ownership lease and an unreachable backend all arrived as a
     duplicate-order message that was simply untrue and hid the real cause.
-  * The CRYPTO SPREAD CEILING and the ONBOARDING INSTRUMENT PICKER were still
-    keyed on the build (`PRODUCT == "crypto"`), which is never true on the
-    merged build — the same dead-branch pattern already fixed for LEVERAGE and
-    FLASH_SPIKE_PCT, missed in two more places.
+  * THRESHOLDS KEYED ON THE BUILD rather than the instrument. On a
+    single-product build such a branch is not merely mistuned, it is dead —
+    and its absence is silent. Every per-instrument value now resolves from
+    the instrument at the point of use.
   * `open_position_snapshot` — the record of a live position across a restart
     — was the one piece of money-state left out of the compare-and-set
     allowlist, so any concurrent write could clobber it back to "flat".
@@ -51,7 +51,7 @@ os.environ.setdefault("PAPER_TRADING", "true")
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-audit-")
 
-from apex import forex, user_loop, user_store  # noqa: E402
+from apex import config as cfg, forex, user_loop, user_store  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 failures = []
@@ -114,61 +114,55 @@ check("the guard is read before the order branch, not inside it",
       < LSRC.index("_order_res = broker.place_order("),
       "setting entry_ok inside the executing branch stops nothing")
 
-# ── 3. News legs for crypto tickers ───────────────────────────────────────
+# ── 3. News legs ─────────────────────────────────────────────────────────
 print("\n3. Every tradeable symbol has news legs")
-for sym, legs in (("BTCUSD", ["BTC", "USD"]), ("DOGEUSD", ["DOGE", "USD"]),
-                  ("LINKUSD", ["LINK", "USD"]), ("AVAXUSD", ["AVAX", "USD"]),
-                  ("MATICUSD", ["MATIC", "USD"]), ("BTCUSDT", ["BTC", "USD"]),
-                  ("XAUUSD", ["XAU", "USD"]), ("EUR_USD", ["EUR", "USD"])):
+for sym, legs in (("EURUSD", ["EUR", "USD"]), ("EUR_USD", ["EUR", "USD"]),
+                  ("USDJPY", ["USD", "JPY"]), ("XAUUSD", ["XAU", "USD"]),
+                  ("XAGUSD", ["XAG", "USD"]), ("NZDUSD", ["NZD", "USD"])):
     check(f"{sym} → {legs}", user_loop._currency_legs(sym) == legs,
           f"got {user_loop._currency_legs(sym)} — no legs means no news guard")
 check("nonsense still yields no legs", user_loop._currency_legs("JUNK") == []
       and user_loop._currency_legs("") == [])
-check("every curated coin is guarded",
-      all(user_loop._currency_legs(s) for s in
-          ("BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "LTCUSD", "ADAUSD",
-           "DOGEUSD", "DOTUSD", "LINKUSD", "BCHUSD", "AVAXUSD", "MATICUSD")),
-      "an unguarded coin trades through NFP with the filter on")
+check("every Auto-Pilot candidate is guarded",
+      all(user_loop._currency_legs(s) for s in cfg.FX_UNIVERSE),
+      "an unguarded symbol trades through NFP with the filter on")
 
-# ── 4. Per-instrument, not per-build ──────────────────────────────────────
+# ── 4. Per-instrument, never per-build ───────────────────────────────────
 print("\n4. Thresholds resolve from the instrument, not the build")
 
 
 class _Cfg:
     MAX_SPREAD_PCT = 0
+    FLASH_SPIKE_PCT = 0.012
     LEVERAGE = 30.0
-
-
-check("crypto gets a percentage ceiling",
-      user_loop.max_spread_pct_for(_Cfg(), "BTCUSD") == 0.35,
-      "0 here falls back to a pip count that is meaningless for crypto")
-check("forex keeps the pip-count guard",
-      user_loop.max_spread_pct_for(_Cfg(), "EUR_USD") == 0.0)
 
 
 class _CfgExplicit:
     MAX_SPREAD_PCT = 0.1
+    FLASH_SPIKE_PCT = 0.012
     LEVERAGE = 7.0
     LEVERAGE_EXPLICIT = True
 
 
-check("an explicit spread ceiling wins everywhere",
-      user_loop.max_spread_pct_for(_CfgExplicit(), "BTCUSD") == 0.1
-      and user_loop.max_spread_pct_for(_CfgExplicit(), "EUR_USD") == 0.1)
+check("the %-spread ceiling is off unless an operator sets one",
+      user_loop.max_spread_pct_for(_Cfg(), "EUR_USD") == 0.0,
+      "MAX_SPREAD_PIPS is the real guard here")
+check("an explicit ceiling wins for every symbol",
+      user_loop.max_spread_pct_for(_CfgExplicit(), "EUR_USD") == 0.1
+      and user_loop.max_spread_pct_for(_CfgExplicit(), "XAUUSD") == 0.1)
 check("an explicit leverage wins for a real symbol",
-      user_loop.leverage_for_symbol(None, _CfgExplicit(), "BTCUSD") == 7.0,
+      user_loop.leverage_for_symbol(None, _CfgExplicit(), "EUR_USD") == 7.0,
       "the docstring promised this and the code reached it nowhere")
-check("a default leverage does not override the instrument",
-      user_loop.leverage_for_symbol(None, _Cfg(), "BTCUSD") != 30.0,
-      "crypto is margined nothing like FX")
+check("flash-spike threshold is read from config, not a build flag",
+      user_loop.flash_spike_pct_for(_Cfg(), "EUR_USD") == 0.012
+      and user_loop.flash_spike_pct_for(_Cfg(), "XAUUSD") == 0.012)
 
 TG = src("telegram.py")
-check("the instrument picker is not keyed on the build",
-      '_OB_SYMS = _OB_SYMS_CRYPTO if cfg.PRODUCT == "crypto"' not in TG,
-      "that branch is dead on the merged build")
-check("the broker filter narrows the client's choice, not the full list",
-      "for label, code in syms if code in offered" in TG,
-      "reading _OB_SYMS there throws the asset-class answer away")
+check("no asset-class branch survives in the instrument picker",
+      "asset_class" not in TG,
+      "the crypto product is gone; there is nothing to choose between")
+check("the broker filter narrows the offered list",
+      "for label, code in syms if code in offered" in TG)
 
 # ── 5. Refusals are named honestly ────────────────────────────────────────
 print("\n5. A refused order says why it was refused")
@@ -193,7 +187,7 @@ print("\n7. Instruments we cannot size correctly are refused")
 for sym in ("GBP_JPY", "EUR_GBP", "AUD_CHF", "EURJPY"):
     check(f"{sym} refused", forex.is_tradeable(sym) is False,
           "no quote_usd_rate is ever passed, so the margin cap is 100x wrong")
-for sym in ("EUR_USD", "USD_JPY", "USD_CHF", "XAUUSD", "BTCUSD"):
+for sym in ("EUR_USD", "USD_JPY", "USD_CHF", "XAUUSD", "XAGUSD"):
     check(f"{sym} still accepted", forex.is_tradeable(sym) is True)
 check("no refused cross is offered on a quick-pick button",
       "GBP_JPY" not in TG.split("_QUICK_SYMS_FX")[1].split("]")[0],

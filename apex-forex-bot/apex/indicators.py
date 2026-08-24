@@ -482,13 +482,13 @@ def _fmt(v, n):
 def analyze(candles, symbol=None):
     """…and, when the caller knows it, WHICH instrument these are.
 
-    Several thresholds downstream are only correct for one asset class — an
-    FX "strong trend" cutoff of 0.5% that crypto clears almost always, a
-    pullback band too narrow for a crypto uptrend. They used to read the
-    build flag, which cannot answer a question about the instrument now that
-    one bot holds FX, metals and crypto at once. Carrying the symbol in the
-    indicator dict lets the signal engines ask, without threading a new
-    argument through a fixed dispatch table.
+    Carrying the symbol in the indicator dict lets a downstream engine ask
+    which instrument it is looking at without threading a new argument through
+    a fixed dispatch table. Nothing branches on it today — the thresholds that
+    once did belonged to the retired crypto product — but the news guard and
+    any future per-instrument tuning need the answer to be available at all,
+    and a signal engine that cannot name its own instrument is how a threshold
+    silently gets applied to the wrong thing.
 
     Optional on purpose: callers that do not pass it get exactly the old
     behaviour.

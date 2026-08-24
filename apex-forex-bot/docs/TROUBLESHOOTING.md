@@ -63,7 +63,7 @@ Check the logs — every HOLD prints its reason. The full entry checklist:
 5. **Loss cooldown** — 15 min without entries after a loss (`⏸️` in logs).
 6. **Not against strong Livermore + Turtle structure** (`⚡ Signal filtered`).
 
-Forex pairs move slower than crypto — expect 0–3 trades per day, sometimes
+Forex pairs move at macro pace — expect 0–3 trades per day, sometimes
 zero on quiet days. If it holds for **days** during active sessions, lower the
 bar: `MIN_CONFIDENCE=58`, `MIN_CRITERIA=2`.
 

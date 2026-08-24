@@ -20,7 +20,7 @@ up to ten days stale before the next one lands. It is a slow bias, not a
 trigger, and `age_days` travels with every reading so a caller can weight it
 accordingly rather than treating it as current.
 
-Same fail-open contract as news.py and sentiment.py: unreachable, empty or
+Same fail-open contract as news.py: unreachable, empty or
 malformed feed means callers get None and trading is unaffected. None here is
 correct and useful — institutional.build() reports it as a missing source and
 degrades data_quality, which is exactly true.

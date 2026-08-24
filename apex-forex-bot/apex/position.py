@@ -91,7 +91,7 @@ USERLOOP_TP_ATR_MULT = 5.0
 
 
 def calc_entry_sltp(side, price, atr_value, symbol, spread_pips=0.0,
-                    sl_pips=20.0, tp_pips=40.0, is_crypto=False):
+                    sl_pips=20.0, tp_pips=40.0):
     """Entry stop/target exactly as user_loop.py computes them.
 
     ATR path: SL = 2.5×ATR, TP = 5×ATR, with SL floored at
@@ -105,14 +105,11 @@ def calc_entry_sltp(side, price, atr_value, symbol, spread_pips=0.0,
     if atr_value and atr_value > 0:
         sl_dist = USERLOOP_SL_ATR_MULT * atr_value
         tp_dist = USERLOOP_TP_ATR_MULT * atr_value
-        floor_abs = (0.004 * price) if is_crypto else (20.0 * pip)
+        floor_abs = 20.0 * pip
         min_stop = max(4.0 * spread_pips * pip, floor_abs)
         if sl_dist < min_stop:
             sl_dist = min_stop
             tp_dist = 2.0 * sl_dist
-    elif is_crypto:
-        sl_dist = 0.012 * price
-        tp_dist = 0.024 * price
     else:
         sl_dist = sl_pips * pip
         tp_dist = tp_pips * pip

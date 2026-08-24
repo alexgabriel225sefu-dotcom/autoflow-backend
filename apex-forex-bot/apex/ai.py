@@ -8,8 +8,8 @@ from apex import forex
 
 
 def _context_line(symbol=None):
-    """One extra line of market context for the AI prompt — sentiment for
-    crypto (Fear & Greed), upcoming high-impact events for forex. This is
+    """One extra line of market context for the AI prompt — upcoming
+    high-impact calendar events for this pair. This is
     informational context the AI weighs alongside the technicals, never a
     standalone prediction and never a hard block on its own.
 
@@ -18,26 +18,17 @@ def _context_line(symbol=None):
     eight pairs got EUR_USD's news calendar attached to every one of them.
     """
     try:
-        if getattr(cfg, "PRODUCT", "forex") == "crypto":
-            from apex import sentiment
-            fg = sentiment.fear_greed()
-            if not fg:
-                return "- Market sentiment: unavailable right now — weigh technicals only"
-            return (f"- Crypto Fear & Greed Index: {fg['value']}/100 ({fg['label']}) — "
-                    "context only: extreme readings often precede mean-reversion, "
-                    "but do not treat this as a standalone signal")
-        else:
-            from apex import news
-            _sym = (symbol or cfg.SYMBOL or "").upper()
-            _flat = _sym.replace("_", "").replace("/", "").replace("-", "")
-            currencies = ([_flat[:3], _flat[3:]] if len(_flat) == 6 and _flat.isalpha()
-                          else [c for c in re.split(r"[_/]", _sym) if c])
-            events = news.upcoming(currencies, hours=12, limit=3)
-            if not events:
-                return "- Upcoming high-impact news (next 12h): none scheduled"
-            lines = "; ".join(f"{e['title']} ({e['currency']}) in {e['in_min']}m" for e in events)
-            return (f"- Upcoming high-impact news (next 12h): {lines} — "
-                    "reduce confidence or stand aside if entry timing lands near release time")
+        from apex import news
+        _sym = (symbol or cfg.SYMBOL or "").upper()
+        _flat = _sym.replace("_", "").replace("/", "").replace("-", "")
+        currencies = ([_flat[:3], _flat[3:]] if len(_flat) == 6 and _flat.isalpha()
+                      else [c for c in re.split(r"[_/]", _sym) if c])
+        events = news.upcoming(currencies, hours=12, limit=3)
+        if not events:
+            return "- Upcoming high-impact news (next 12h): none scheduled"
+        lines = "; ".join(f"{e['title']} ({e['currency']}) in {e['in_min']}m" for e in events)
+        return (f"- Upcoming high-impact news (next 12h): {lines} — "
+                "reduce confidence or stand aside if entry timing lands near release time")
     except Exception:
         return "- Market context: unavailable this tick — weigh technicals only"
 
@@ -109,7 +100,7 @@ _MODE_INTRO = {
     "mean_reversion": ("Forex ranges far more than it trends, so your PRIMARY edge is MEAN REVERSION: "
                        "fade overbought/oversold extremes back to the mean (RSI + Bollinger Bands), and only "
                        "ride a move when the higher-timeframe trend is genuinely strong. This is the opposite "
-                       "of a crypto breakout bot."),
+                       "of a breakout-chasing bot."),
     "trend": ("Your PRIMARY edge is TREND FOLLOWING (Livermore: trade WITH the tape): identify the "
               "higher-timeframe trend and enter only in its direction — buy pullbacks to value in an uptrend, "
               "sell rallies in a downtrend. NEVER fade the trend, never chase an extended move."),
@@ -480,34 +471,11 @@ def rule_based_fallback(ind, open_position=None):
             "reasoning": "Rule-based: no clear signal", "riskLevel": "LOW", "keyFactors": factors}
 
 
-def _is_crypto_ind(ind) -> bool:
-    """Is the instrument these indicators describe a crypto CFD?
-
-    Reads the symbol the indicator dict now carries, and falls back to the
-    build flag when the caller did not supply one — so nothing that used to
-    work changes, and anything that passes a symbol gets the right answer.
-
-    Both thresholds below are cases where the FX value does not merely
-    mistune crypto, it disables it: a 0.5% "strong trend" cutoff that BTC
-    clears almost always turns mean-reversion into a trend-only engine, and
-    a pullback band sized for a currency pair never triggers on a crypto
-    uptrend.
-    """
-    try:
-        sym = (ind or {}).get("symbol")
-        if sym:
-            from apex import forex as _fx
-            return bool(_fx.is_crypto(sym))
-    except Exception:
-        pass
-    return getattr(cfg, "PRODUCT", "forex") == "crypto"
-
-
 def mean_reversion_signal(ind, open_position=None):
-    """FOREX-specific MEAN REVERSION engine (the real Crypto↔Forex difference).
+    """MEAN REVERSION engine — this product's primary edge.
 
     Forex ranges far more than it trends, so this fades extremes back to the
-    mean instead of chasing breakouts like the crypto trend-following engine:
+    mean instead of chasing breakouts:
       • BUY  an oversold dip at the lower Bollinger Band (RSI/StochRSI low)
       • SELL an overbought spike at the upper band (RSI/StochRSI high)
       • EXIT when price reverts to the BB midline (target reached)
@@ -625,11 +593,8 @@ def mean_reversion_signal(ind, open_position=None):
     # Strong-trend guard: fading a strong trend is how mean-reversion bots blow up.
     # Only fade in the trend's direction (buy dips in an uptrend, sell rallies in a downtrend).
     trend_sep = abs(ema50 - ema200) / price * 100 if price else 0
-    # 0.5% is an FX "strong trend" cutoff; crypto sits above it almost always,
-    # which would turn mean-reversion into a trend-only engine and kill genuine
-    # range fades. Raise the cutoff for crypto.
-    _mr_crypto = _is_crypto_ind(ind)
-    if trend_sep > (2.0 if _mr_crypto else 0.5):
+    # 0.5% is the FX "strong trend" cutoff.
+    if trend_sep > 0.5:
         uptrend = ema50 > ema200
         if not ((score >= 3 and uptrend) or (score <= -3 and not uptrend)):
             return {"action": "HOLD", "confidence": 45, "criteriaScore": crit,
@@ -702,20 +667,10 @@ def trend_signal(ind, strat=None, open_position=None):
     elif sor.get("direction") == "BEARISH":
         score -= 1; factors.append("bearish momentum")
     # Entry timing: pullback to value, not a chase. Buy dips (price at/under
-    # EMA20 with RSI cooled off), sell rallies mirrored. Crypto trends harder
-    # and its RSI runs hotter, so a forex-tight pullback band (RSI 35-60, price
-    # ≤ EMA20+0.05%) almost never triggers on a crypto uptrend — widen the band
-    # and shave the score threshold for the crypto build so it actually rides
-    # trends instead of waiting forever.
-    _crypto = _is_crypto_ind(ind)
-    if _crypto:
-        pullback_buy = score > 0 and price <= ema20 * 1.004 and 38 <= rsi_v <= 70
-        pullback_sell = score < 0 and price >= ema20 * 0.996 and 30 <= rsi_v <= 62
-        thr = 3
-    else:
-        pullback_buy = score > 0 and price <= ema20 * 1.005 and 35 <= rsi_v <= 65
-        pullback_sell = score < 0 and price >= ema20 * 0.995 and 35 <= rsi_v <= 65
-        thr = 3
+    # EMA20 with RSI cooled off), sell rallies mirrored.
+    pullback_buy = score > 0 and price <= ema20 * 1.005 and 35 <= rsi_v <= 65
+    pullback_sell = score < 0 and price >= ema20 * 0.995 and 35 <= rsi_v <= 65
+    thr = 3
     if pullback_buy:
         score += 1; factors.append(f"pullback to EMA20 (RSI {rsi_v:.0f})")
     if pullback_sell:

@@ -1,6 +1,6 @@
 # 💱 Apex Forex Bot
 
-AI-powered trading bot — **forex, metals and crypto** on one account.
+AI-powered trading bot — **forex majors and metals** on one cTrader account.
 **cTrader + MetaTrader 5. Telegram-controlled. Zero config files.**
 
 What it trades and what it deliberately refuses: [docs/ASSETS.md](docs/ASSETS.md).

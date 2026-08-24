@@ -867,11 +867,7 @@ def _build_status(dash, chart=""):
     total = len(trades)
     win_rate = f"{wins / total * 100:.0f}%" if total else "—"
     chart_line = (f"\n<code>{chart}</code>  <b>{_fmt_px(dash.get('currentPrice', 0))}</b>") if chart else ""
-    # Crypto trades 24/7 and has no forex "sessions" — showing London/New York
-    # on a crypto bot is wrong. Forex keeps the session line.
-    if getattr(cfg, "MARKET_24_7", False):
-        market_line = "🕐 Market: 🟢 <b>24/7</b> · crypto never sleeps"
-    else:
+    if True:
         market = "🟢 OPEN" if forex.is_market_open() else "🔴 CLOSED (weekend)"
         sessions = ", ".join(forex.active_sessions()) or "—"
         market_line = f"🕐 Market: {market} · Sessions: {sessions}"
@@ -1612,29 +1608,13 @@ def _handle_ctaccount(chat_id, args):
         onboard_start(chat_id)
 
 
-# Quick-pick trade symbols — asset-class aware (crypto majors first for the
-# crypto build, FX majors first for the forex build). Clients can still type
-# any symbol their broker offers.
-_OB_SYMS_FOREX = [
+# Quick-pick trade symbols. Clients can still type any symbol their broker
+# offers — forex.is_tradeable is the gate, not this list.
+_OB_SYMS = [
     ("EUR/USD", "EURUSD"), ("GBP/USD", "GBPUSD"), ("USD/JPY", "USDJPY"),
     ("AUD/USD", "AUDUSD"), ("USD/CHF", "USDCHF"), ("USD/CAD", "USDCAD"),
-    ("🥇 Gold", "XAUUSD"), ("🥈 Silver", "XAGUSD"), ("₿ Bitcoin", "BTCUSD"),
-    ("Ξ Ethereum", "ETHUSD"), ("📈 US30", "US30"), ("📈 NAS100", "NAS100"),
+    ("NZD/USD", "NZDUSD"), ("🥇 Gold", "XAUUSD"), ("🥈 Silver", "XAGUSD"),
 ]
-_OB_SYMS_CRYPTO = [
-    ("₿ Bitcoin", "BTCUSD"), ("Ξ Ethereum", "ETHUSD"), ("◎ Solana", "SOLUSD"),
-    ("✕ XRP", "XRPUSD"), ("Ł Litecoin", "LTCUSD"), ("● Cardano", "ADAUSD"),
-    ("Ð Dogecoin", "DOGEUSD"), ("⬡ Polkadot", "DOTUSD"), ("🔗 Chainlink", "LINKUSD"),
-    ("Ƀ Bitcoin Cash", "BCHUSD"), ("🥇 Gold", "XAUUSD"), ("🥈 Silver", "XAGUSD"),
-]
-# The merged build is always PRODUCT="forex", so keying this on the build left
-# the crypto branch dead: a client who answered "₿ Crypto" was offered only
-# Bitcoin and Ethereum (plus the metals), never Solana, XRP, Litecoin, Cardano,
-# Dogecoin, Polkadot, Chainlink or Bitcoin Cash — all broker-tradeable and all
-# in cfg.CRYPTO_UNIVERSE. Offer the union and let the client's own asset-class
-# answer do the narrowing, which is the thing that actually knows.
-_OB_SYMS = _OB_SYMS_FOREX + [p for p in _OB_SYMS_CRYPTO
-                             if p not in _OB_SYMS_FOREX]
 
 _RISK_TEXT = ("⚠️ <b>Risk disclaimer</b>\n\n"
               "• No profit is guaranteed — results depend on the market\n"
@@ -1797,12 +1777,7 @@ def _ob_satisfied(u, step):
     if step == "style":
         return bool(u.get("style"))
     if step == "method":
-        # asset_class comes first inside this step. An existing client who
-        # onboarded before the question existed counts as answered — they have
-        # been trading a mixed basket, and re-asking would look like the bot
-        # resetting itself, which is exactly what `already_onboarded` guards.
-        asked = bool(u.get("asset_class")) or already_onboarded(u)
-        return (asked and bool(u.get("strategy"))
+        return (bool(u.get("strategy"))
                 and bool(u.get("symbol") or u.get("autopilot")))
     if step == "risk":
         return bool(u.get("risk_tier"))
@@ -1951,125 +1926,21 @@ def _ob_step_style(chat_id):
 
 # ── Step 4: Trading Method ──
 
-# What the client wants traded. Stored on the record so every later choice —
-# the Auto-Pilot basket, the quick-pick buttons, the symbols /watch suggests —
-# can be filtered by it instead of showing a forex client ten coins.
-ASSET_CLASSES = ("forex", "crypto", "both")
+def autopilot_candidates():
+    """Auto-Pilot candidate pool: the curated liquid FX majors plus gold.
 
-
-def asset_class_of(user) -> str:
-    """The client's stated preference, defaulting to everything.
-
-    "both" is the default rather than "forex" on purpose: an existing client
-    who onboarded before this question existed has already been trading a
-    mixed basket, and silently narrowing them to one class would change what
-    their bot does without anyone asking.
+    This used to be filtered by a per-client asset-class preference. That
+    question and its stored answer are gone with the crypto product — there is
+    one asset class now, so there is nothing to choose.
     """
-    v = str((user or {}).get("asset_class") or "both").strip().lower()
-    return v if v in ASSET_CLASSES else "both"
-
-
-def candidates_for(user):
-    """Auto-Pilot candidate pool for this client's preference.
-
-    Order matters: whichever class they asked for leads, because the scan cap
-    truncates the list and the cap is a budget on a single broker socket.
-    """
-    choice = asset_class_of(user)
-    fx = list(getattr(cfg, "FX_UNIVERSE", []))
-    cr = list(getattr(cfg, "CRYPTO_UNIVERSE", []))
-    if choice == "forex":
-        return fx
-    if choice == "crypto":
-        return cr
-    # Interleave so a truncated list still carries both, rather than all the
-    # FX majors and no crypto at all.
-    out, i = [], 0
-    while i < max(len(fx), len(cr)):
-        if i < len(fx):
-            out.append(fx[i])
-        if i < len(cr):
-            out.append(cr[i])
-        i += 1
-    return out
-
-
-def _handle_assets(chat_id, args="", advance=True):
-    """Set or show which asset classes this account trades.
-
-    Changing it rebuilds the Auto-Pilot basket immediately when Auto-Pilot is
-    on. Leaving the old basket in place would mean the client is told one
-    thing and the bot scans another — the setting would look cosmetic.
-    """
-    arg = (args or "").strip().lower()
-    u = user_store.load(chat_id)
-    if arg not in ASSET_CLASSES:
-        cur = asset_class_of(u)
-        label = {"forex": "💱 Forex", "crypto": "₿ Crypto",
-                 "both": "🌐 Both"}[cur]
-        return send_to(chat_id,
-            f"📊 <b>Trading:</b> {label}\n\n"
-            "<code>/assets forex</code> · <code>/assets crypto</code> · "
-            "<code>/assets both</code>",
-            _back_kb(chat_id, [[("💱 Forex", "ob:assets:forex"),
-                                ("₿ Crypto", "ob:assets:crypto")],
-                               [("🌐 Both", "ob:assets:both")]]))
-
-    user_store.update(chat_id, {"asset_class": arg})
-    label = {"forex": "💱 Forex — currency pairs and gold",
-             "crypto": "₿ Crypto — Bitcoin, Ethereum and the liquid majors",
-             "both": "🌐 Both — everything, strongest setup wins"}[arg]
-    send_to(chat_id, f"✅ Trading: <b>{label}</b>")
-
-    if user_store.load(chat_id).get("autopilot"):
-        # Rebuild against what the broker offers, so the basket matches the
-        # sentence the client was just shown.
-        _handle_autopilot(chat_id, "on")
-    elif advance:
-        return _ob_step_instrument(chat_id)
-    return None
-
-
-def _ob_step_assets(chat_id):
-    """Asked once the broker account is linked, before anything is picked.
-
-    It comes after the connection deliberately: only then do we know which
-    instruments this particular broker actually lists, so the answer can be
-    honoured rather than promised.
-    """
-    send_to(chat_id,
-            _ob_head(chat_id, "method") +
-            "<b>What do you want to trade?</b>\n\n"
-            "💱 <b>Forex</b> — currency pairs and gold. Moves in a calmer "
-            "range, and the market closes at the weekend.\n\n"
-            "₿ <b>Crypto</b> — Bitcoin, Ethereum and the liquid majors, as "
-            "CFDs on the same account.\n\n"
-            "🌐 <b>Both</b> — the bot scans across everything and takes the "
-            "strongest setup wherever it is.\n\n"
-            "<i>You can change this any time with /assets.</i>",
-            extra={"reply_markup": {"inline_keyboard": [
-                [{"text": "💱 Forex", "callback_data": "ob:assets:forex"},
-                 {"text": "₿ Crypto", "callback_data": "ob:assets:crypto"}],
-                [{"text": "🌐 Both — recommended", "callback_data": "ob:assets:both"}],
-            ]}})
+    return list(getattr(cfg, "FX_UNIVERSE", []))
 
 
 def _ob_step_instrument(chat_id):
     """What to trade. Part of the Method step — a method has to be applied to
     something, and splitting them would make the counter lie again."""
     u = user_store.load(chat_id)
-    _choice = asset_class_of(u)
-    syms = [(lbl, code) for lbl, code in _OB_SYMS
-            if _choice == "both"
-            or (_choice == "crypto") == bool(forex.is_crypto(code))
-            or code.startswith("XAU") or code.startswith("XAG")]
-    if _choice == "crypto":
-        # Put the coins first — the metals are carried along as a courtesy,
-        # they are not what this client asked for.
-        syms = ([p for p in syms if forex.is_crypto(p[1])]
-                + [p for p in syms if not forex.is_crypto(p[1])])
-    if len(syms) < 3:
-        syms = _OB_SYMS
+    syms = list(_OB_SYMS)
     try:
         token, ctid = u.get("ctrader_access_token"), u.get("ctrader_account_id")
         if token and ctid:
@@ -2205,16 +2076,9 @@ def _ob_step_mode(chat_id):
 # The five step renderers, by key. Defined after all of them exist.
 _OB_RENDER = {
     "connect": lambda cid: _ob_step_connect(cid),
-    # "method" starts by asking WHAT to trade, then which instrument, then
-    # which strategy — see _ob_step_assets.
     "account": lambda cid: _ob_step_account(cid),
     "style":   lambda cid: _ob_step_style(cid),
-    # Ask WHAT before WHICH: the instrument buttons are filtered by the
-    # answer, so showing them first would offer a forex client ten coins and
-    # then narrow the list under them.
-    "method":  lambda cid: (_ob_step_assets(cid)
-                            if not user_store.load(cid).get("asset_class")
-                            else _ob_step_instrument(cid)),
+    "method":  lambda cid: _ob_step_instrument(cid),
     "risk":    lambda cid: _ob_step_risk(cid),
 }
 
@@ -2352,11 +2216,7 @@ def _builder_pick(chat_id, step_i, opt_i):
 def _builder_show_summary(chat_id):
     st = _builder_drafts.get(chat_id)
     d = dict(st["d"]) if st else {}
-    # crypto build has no news/session steps — keep the engine's default news guard off
-    if builder._is_crypto():
-        d.setdefault("news_filter", False)
-    else:
-        d.setdefault("news_filter", True)
+    d.setdefault("news_filter", True)
     return send_to(chat_id, builder.summary(d),
         extra={"reply_markup": {"inline_keyboard": [
             [{"text": "✅ Activate this strategy", "callback_data": "bld:activate"}],
@@ -2367,10 +2227,7 @@ def _builder_show_summary(chat_id):
 def _builder_activate(chat_id):
     st = _builder_drafts.pop(chat_id, None)
     d = dict(st["d"]) if st else {}
-    if builder._is_crypto():
-        d.setdefault("news_filter", False)
-    else:
-        d.setdefault("news_filter", True)
+    d.setdefault("news_filter", True)
     if not d:
         return send_to(chat_id, "Nothing to activate — tap ⚙️ Build strategy to start.")
     running = _apply_builder_patch(chat_id, d)
@@ -2664,8 +2521,6 @@ def _route_cb(chat_id, data):
     if data == "risk:adv":
         return _screen_risk_advanced(chat_id)
 
-    if data.startswith("ob:assets:"):
-        return _handle_assets(chat_id, data[len("ob:assets:"):])
     if data == "ob:sym:__auto__":
         _handle_autopilot(chat_id, "on")
         return _ob_step_strategy(chat_id)
@@ -2673,8 +2528,6 @@ def _route_cb(chat_id, data):
         sym = data[7:]
         user_store.update(chat_id, {"symbol": sym, "autopilot": False})
         sugg = ("Suggested stops for gold: /sl 150 · /tp 300 (set after setup)" if sym.startswith("XAU")
-                else "Suggested stops for indices: /sl 60 · /tp 120" if sym in ("US30", "NAS100")
-                else "Suggested stops for crypto: /sl 200 · /tp 400" if sym.startswith(("BTC", "ETH"))
                 else "")
         send_to(chat_id, f"✅ Trading symbol: <b>{sym}</b>" + (f"\n💡 <i>{sugg}</i>" if sugg else ""))
         return _ob_step_strategy(chat_id)
@@ -3674,16 +3527,18 @@ def _handle_tptarget(chat_id, args):
 
 def _handle_symbol(chat_id, args):
     sym = (args or "").strip().upper().replace("/", "_").replace("-", "_").replace(" ", "")
-    # Forex + metals only — this is a forex bot; reject crypto CFDs / indices.
+    # Forex majors + metals only. See forex.is_tradeable for why each of the
+    # others is refused rather than merely absent.
     if not forex.is_tradeable(sym):
-        return send_to(chat_id, "❌ This is a forex bot — pick a forex pair or a metal "
-                                "(e.g. <code>/symbol EUR_USD</code> or <code>/symbol XAUUSD</code>). "
-                                "Crypto and indices aren't supported here (crypto has its own bot).")
+        return send_to(chat_id, "❌ Not tradeable here — pick a forex pair with a USD leg "
+                                "or a metal (e.g. <code>/symbol EUR_USD</code> or "
+                                "<code>/symbol XAUUSD</code>). Crypto, indices, stocks and "
+                                "crosses without a USD leg are not supported.")
     user = user_store.load(chat_id)
     is_ct = bool(user.get("ctrader_access_token") and user.get("ctrader_account_id"))
     if is_ct:
-        # cTrader accounts offer far more than FX majors (gold, indices, crypto
-        # CFDs…) — validate against what THIS account actually offers.
+        # cTrader accounts offer far more than this bot trades — validate the
+        # name against what THIS account actually offers.
         if not re.match(r"^[A-Z0-9_]{3,16}$", sym):
             return send_to(chat_id, "❌ Usage: <code>/symbol EUR_USD</code> — see /pairs for everything you can trade.")
         try:
@@ -3711,7 +3566,7 @@ def _handle_symbol(chat_id, args):
                 else "/sl 60 · /tp 120" if s_norm.startswith(("US30", "NAS", "GER", "SPX", "US500", "USTEC", "JPN", "UK100"))
                 else "/sl 200 · /tp 400" if s_norm.startswith(("BTC", "ETH"))
                 else None)
-        warn += ("\n💡 <i>Pip conventions for metals, indices and crypto CFDs are handled "
+        warn += ("\n💡 <i>Metal pip conventions are handled "
                 "automatically. Volatile instruments need wider stops than FX"
                 + (f" — suggested here: <b>{sugg}</b>" if sugg else "")
                 + ". Watch the first few trades closely.</i>")
@@ -3878,9 +3733,8 @@ def _handle_strategy(chat_id, args):
     send_to(chat_id, f"🎯 Method set to <b>{label}</b>.\n<i>{blurb}</i>{warn}\n\n{tail}")
 
 
-# Curated liquid universe the Auto-Pilot scans — asset-class aware (FX majors +
-# gold for the forex build, crypto-CFD majors for the crypto build). Configured
-# in config.py (AUTOPILOT_UNIVERSE, env-overridable). Non-FX candidates are
+# Curated liquid universe the Auto-Pilot scans: FX majors + gold. Configured in
+# config.py (AUTOPILOT_UNIVERSE, env-overridable). Non-FX candidates are
 # validated per account before use.
 _AUTOPILOT_CANDIDATES = cfg.AUTOPILOT_UNIVERSE
 
@@ -3941,11 +3795,11 @@ def _handle_autopilot(chat_id, args):
             br, _ = _ul._make_broker(user)
             br._load_symbols()
             offered = set(br._sym_id.keys())
-            universe = [c for c in candidates_for(user) if c in offered]
+            universe = [c for c in autopilot_candidates() if c in offered]
         except Exception as e:
             return send_to(chat_id, f"⚠️ Couldn't read your broker's instruments: <i>{str(e)[:120]}</i>. Try again in a minute.")
     else:
-        universe = candidates_for(user)[:5]
+        universe = autopilot_candidates()[:5]
     if not universe:
         return send_to(chat_id, "⚠️ Couldn't build the Auto-Pilot list for your broker. Use /watch to pick instruments manually.")
     # Matches the loop's own cap. Both are a budget on ONE broker socket with
@@ -3984,11 +3838,13 @@ def _handle_watch(chat_id, args):
         return send_to(chat_id, "👁 Watchlist cleared — back to single-symbol mode (/symbol)."
                        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot stopped — /start to run.</i>"))
     syms = [w.upper().replace("/", "_").replace("-", "_") for w in raw.split()][:6]
-    # Forex + metals only — reject crypto CFDs / indices from the basket.
+    # Forex majors + metals only — anything the order path would refuse must
+    # not reach the basket, or it becomes a dead slot in the scan budget.
     non_fx = [s for s in syms if not forex.is_tradeable(s)]
     if non_fx:
-        return send_to(chat_id, f"❌ This is a forex bot — not supported: <b>{', '.join(non_fx)}</b>. "
-                                "Use forex pairs or metals (e.g. XAUUSD, EURUSD). Crypto has its own bot.")
+        return send_to(chat_id, f"❌ Not tradeable here: <b>{', '.join(non_fx)}</b>. "
+                                "Use forex pairs with a USD leg, or metals "
+                                "(e.g. EURUSD, XAUUSD).")
     is_ct = bool(user.get("ctrader_access_token") and user.get("ctrader_account_id"))
     if is_ct:
         try:
@@ -4035,9 +3891,12 @@ def _handle_pairs(chat_id):
            "PLN", "CZK", "HUF", "TRY", "ZAR", "MXN", "SGD", "HKD", "CNH", "NOK", "RON"}
     fx      = [n for n in names if len(n) == 6 and n[:3] in ccy and n[3:] in ccy]
     metals  = [n for n in names if n.startswith(("XAU", "XAG", "XPT", "XPD"))]
-    crypto  = [n for n in names if n[:3] in {"BTC", "ETH", "SOL", "XRP", "ADA", "LTC", "BNB", "DOT", "BCH", "DOG"}]
-    indices = [n for n in names if re.match(r"^[A-Z]{2,6}\d{2,3}$", n) and n not in fx]
-    other   = len(names) - len(fx) - len(metals) - len(crypto) - len(indices)
+    # Only what the bot will actually accept is offered. Listing the broker's
+    # crypto and index CFDs under "the bot can trade any of them" promised
+    # something forex.is_tradeable refuses one tap later.
+    fx      = [n for n in fx if forex.is_tradeable(n)]
+    metals  = [n for n in metals if forex.is_tradeable(n)]
+    other   = len(names) - len(fx) - len(metals)
     def _sec(title, lst, cap):
         if not lst:
             return ""
@@ -4045,15 +3904,16 @@ def _handle_pairs(chat_id):
         extra = f" <i>+{len(lst) - cap} more</i>" if len(lst) > cap else ""
         return f"\n<b>{title}</b>\n{' · '.join(cut)}{extra}\n"
     send_to(chat_id,
-            f"💱 <b>Your broker offers {len(names)} instruments.</b> The bot can trade any of them:\n"
+            f"💱 <b>Your broker offers {len(names)} instruments — "
+            f"{len(fx) + len(metals)} of them are tradeable by this bot:</b>\n"
             + _sec("Forex", fx, 36)
             + _sec("Metals", metals, 8)
-            + _sec("Indices", indices, 14)
-            + _sec("Crypto CFDs", crypto, 14)
-            + (f"\n…plus <b>{other}</b> stock CFDs &amp; other instruments — find the code in cTrader "
-               "and set it directly.\n" if other > 0 else "")
+            + (f"\nThe other <b>{other}</b> (crypto, indices, stock CFDs, crosses without a "
+               "USD leg) are refused: sizing has no quote-currency conversion and there are "
+               "no per-exchange trading calendars, so accepting them would fail quietly "
+               "rather than loudly.\n" if other > 0 else "")
             + "\nPick one with <code>/symbol NAME</code> (e.g. <code>/symbol XAUUSD</code>).\n"
-              "<i>Metals, indices and crypto pip conventions are handled automatically — still, watch a new symbol in paper first.</i>")
+              "<i>Metal pip conventions are handled automatically — still, watch a new symbol in paper first.</i>")
 
 
 def _trade_err(err):
@@ -4600,7 +4460,7 @@ def _size_word(n, label):
 
 def _trade_lots_kb(side, sym):
     """Size picker buttons after symbol is chosen — 'lot' for FX, 'oz' for
-    metals, 'unit' for anything else (crypto/indices), per forex.unit_label."""
+    metals, 'unit' for anything else, per forex.unit_label."""
     label = forex.unit_label(sym)
     rows = []
     for i in range(0, len(_LOT_SIZES_FX), 3):
@@ -5797,7 +5657,6 @@ _CONTROLS_TEXT = (
     "/autopilot on — Let the bot pick the best instruments too\n"
     "/maxpos 3 — Allow multiple positions at once\n\n"
     "<b>📰 Info</b>\n"
-    "/assets — Trade forex, crypto, or both\n"
     "/news — Economic calendar · /news on|off for release alerts\n"
     "/voice — Control the bot from your phone through Siri Shortcuts\n"
     "/guide — How the bot works (visual guide)\n"
@@ -6307,8 +6166,6 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         _screen_live_activation(chat_id)
     elif cmd_l == "/news":
         _handle_news(chat_id, args)
-    elif cmd_l in ("/assets", "/markets"):
-        _handle_assets(chat_id, args, advance=False)
     elif cmd_l in ("/voice", "/siri"):
         _handle_voice(chat_id, args)
     elif cmd_l in ("/market", "/m"):

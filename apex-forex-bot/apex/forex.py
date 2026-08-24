@@ -29,46 +29,45 @@ _CRYPTO = {"BTC", "ETH", "SOL", "XRP", "LTC", "BNB", "ADA", "DOT", "DOGE",
 
 
 def is_tradeable(instrument: str) -> bool:
-    """What the main bot will trade: spot FX, metals, and crypto CFDs.
+    """What this bot will trade: spot FX with a USD leg, plus metals.
 
-    Crypto used to be rejected here to keep two products apart. That
-    separation cost more than it protected: the crypto build was a fork that
-    fell eight modules and every safety fix behind — no order gate, no
-    ownership lease, no idempotency ledger — so "crypto has its own bot"
-    meant "crypto has the older bot". One instrument list, one codebase, one
-    set of fixes.
+    REFUSED, each for a concrete reason rather than caution:
 
-    Still rejected: indices, stocks, ETFs and everything else a
-    cTrader/Pepperstone account lists. Those are not a whitelist decision —
-    they need per-exchange trading calendars and quote-currency conversion in
-    sizing, neither of which exists yet.
+      * CRYPTO. The crypto product is retired. It is refused here rather than
+        merely absent from the universe, so that a stored watchlist, a typed
+        /symbol or an old Auto-Pilot basket left over from the merged build
+        cannot put a coin back into the order path.
+      * INDICES, STOCKS, ETFs. They need per-exchange trading calendars that
+        do not exist here — the bot would believe Frankfurt is open at 03:00.
+      * FX CROSSES WITH NO USD LEG (GBP_JPY, EUR_GBP, AUD_CHF). `calc_units`
+        needs a `quote_usd_rate` to value them and nothing passes one, so the
+        margin cap read one unit of GBP_JPY as $190 rather than its true
+        ~$1.21 and sized the position at about 1/31 of the intended risk.
+        docs/ASSETS.md states the rule: a risk calculation quietly off by 10x
+        is worse than a refused order.
 
-    Also rejected, for the SECOND of those two reasons alone: FX crosses with
-    no USD leg (GBP_JPY, EUR_GBP, AUD_CHF). `calc_units` needs a
-    `quote_usd_rate` to value them and nothing passes one, so the margin cap
-    read one unit of GBP_JPY as $190 instead of ~$1.21 and sized the position
-    at roughly 1/31 of the intended risk — $0.54 of risk where the client
-    asked for $16.22, or a false "account too small" refusal on a smaller
-    balance. docs/ASSETS.md already states the rule this falls under: a risk
-    calculation quietly off by 10x is worse than a refused order. Crosses were
-    simply never checked against it. USD_JPY and friends are unaffected — a
-    USD leg on either side is all the conversion needs.
-
-    Accepts EUR_USD / EURUSD / XAUUSD / BTCUSD.
+    Accepts EUR_USD / EURUSD / USD_JPY / XAUUSD.
     """
     s = _norm(instrument)
     if len(s) != 6 or not s.isalpha():
-        return is_crypto(s)          # BTCUSDT and friends are longer than 6
+        return False                  # BTCUSDT and friends are longer than 6
+    if is_crypto(s):
+        return False
     if _is_fx(s):
         return "USD" in (s[:3], s[3:])
     if s[:3] in _METALS and s[3:] in _CCY:
         return True
-    return is_crypto(s)
+    return False
 
 
 def is_crypto(instrument: str) -> bool:
-    """Whitelist for the CRYPTO bot: only crypto CFDs (BTCUSD, ETHUSD, etc.).
-    Rejects forex pairs, metals, indices, stocks."""
+    """True for a crypto CFD symbol (BTCUSD, ETHUSD, DOGEUSD, BTCUSDT…).
+
+    This is a REJECTION predicate, not a whitelist. The crypto product was
+    removed; nothing trades on a True here. It exists so `is_tradeable` can
+    refuse a coin explicitly and so cfg.CROSS_PRODUCT_BLOCK can strip one out
+    of a user record that still carries it. Rejects forex pairs and metals.
+    """
     s = _norm(instrument)
     if not s or len(s) < 4:
         return False

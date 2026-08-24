@@ -110,68 +110,58 @@ def _scalp(name, scalp_default, normal_default):
     return v if v is not None else (scalp_default if SCALP_MODE else normal_default)
 
 
-# ─── Product / branding (one engine serves Forex and Crypto builds) ──
-# PRODUCT flips the asset-class defaults: "forex" (24/5, FX universe) or
-# "crypto" (24/7, crypto-CFD universe). Each is overridable individually below,
-# so a deployment can fine-tune without changing code.
+# ─── Product identity ───────────────────────────────────
+# FOREX ONLY. This engine had a second "crypto" build selected by PRODUCT;
+# that product is retired and its code is gone. PRODUCT is still read and
+# still REQUIRED, because it namespaces Redis keys and a wrong value would
+# read another deployment's state — but "forex" is now the only accepted
+# value, and anything else refuses to start rather than silently running a
+# half-configured bot.
 PRODUCT = (os.getenv("PRODUCT") or "forex").lower()
-_IS_CRYPTO = PRODUCT == "crypto"
-BOT_NAME = os.getenv("BOT_NAME") or ("Apex Crypto Bot" if _IS_CRYPTO else "Apex Forex Bot")
-ASSET_EMOJI = os.getenv("ASSET_EMOJI") or ("₿" if _IS_CRYPTO else "💱")
-ASSET_NOUN = os.getenv("ASSET_NOUN") or ("crypto" if _IS_CRYPTO else "forex")
-# Market hours: crypto trades 24/7, forex 24/5 (closed weekends).
-MARKET_24_7 = _truthy(os.getenv("MARKET_24_7") or ("true" if _IS_CRYPTO else "false"))
-LICENSE_PRODUCT = os.getenv("LICENSE_PRODUCT") or ("apex-crypto" if _IS_CRYPTO else "apex-forex")
-LICENSE_KEY_PREFIX = (os.getenv("LICENSE_KEY_PREFIX") or ("CRPT" if _IS_CRYPTO else "FORX")).upper()
+if PRODUCT != "forex":
+    raise RuntimeError(
+        f"PRODUCT={PRODUCT!r} is not supported. This is the Forex product and "
+        "it is the only one: the crypto build was removed. Set PRODUCT=forex."
+    )
+BOT_NAME = os.getenv("BOT_NAME") or "Apex Forex Bot"
+ASSET_EMOJI = os.getenv("ASSET_EMOJI") or "💱"
+ASSET_NOUN = os.getenv("ASSET_NOUN") or "forex"
+# Forex trades 24/5 — closed over the weekend. Not configurable per build any
+# more; the 24/7 branch existed only for crypto.
+MARKET_24_7 = False
+LICENSE_PRODUCT = os.getenv("LICENSE_PRODUCT") or "apex-forex"
+LICENSE_KEY_PREFIX = (os.getenv("LICENSE_KEY_PREFIX") or "FORX").upper()
 
 # ─── Trading ────────────────────────────────────────────
-SYMBOL = os.getenv("TRADE_SYMBOL") or ("BTCUSD" if _IS_CRYPTO else "EUR_USD")
+SYMBOL = os.getenv("TRADE_SYMBOL") or "EUR_USD"
 TIMEFRAME = _scalp("TIMEFRAME", "1m", "5m")
 CANDLES = 200
 
 # ─── Scanner ────────────────────────────────────────────
-_DEFAULT_SCAN = "BTCUSD,ETHUSD,SOLUSD" if _IS_CRYPTO else "NZD_USD"
+_DEFAULT_SCAN = "NZD_USD"
 SCAN_SYMBOLS = (os.getenv("SCAN_SYMBOLS") or _DEFAULT_SCAN).split(",")  # tuning r9: NZD-only (EUR/AUD/JPY/CAD all negative; NZD edge is signal-specific)
 MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
 
 # Curated liquid universe the Auto-Pilot scans (comma-separated env override).
-# FX majors + gold are on every cTrader broker; crypto CFDs are the liquid
-# majors. Non-FX candidates are validated per account before use.
+# FX majors + gold are on every cTrader broker. Every entry has a USD leg:
+# forex.is_tradeable refuses crosses without one, because sizing has no
+# quote-currency conversion (see docs/ASSETS.md).
 _FX_CANDIDATES = ("EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,NZDUSD,XAUUSD")
-_CRYPTO_CANDIDATES = ("BTCUSD,ETHUSD,SOLUSD,XRPUSD,LTCUSD,ADAUSD,"
-                      "DOGEUSD,DOTUSD,LINKUSD,BCHUSD,AVAXUSD,MATICUSD")
-# Indices are still candidates on the forex build for a client who picks one
-# by hand, but they are NOT in the Auto-Pilot default: the scan cap is a
-# budget, and the classes this bot is actually tuned for come first.
-_DEFAULT_UNIVERSE = (_CRYPTO_CANDIDATES if _IS_CRYPTO
-                     else _FX_CANDIDATES + "," + _CRYPTO_CANDIDATES)
+_DEFAULT_UNIVERSE = _FX_CANDIDATES
 
-# Split candidate pools, so a client who says "just crypto" gets a basket of
-# crypto rather than a forex basket with two coins bolted on. Validated per
-# account against what the broker actually lists before any of it is used.
 FX_UNIVERSE = [s.strip().upper() for s in _FX_CANDIDATES.split(",") if s.strip()]
-CRYPTO_UNIVERSE = [s.strip().upper() for s in _CRYPTO_CANDIDATES.split(",") if s.strip()]
 AUTOPILOT_UNIVERSE = [s.strip().upper() for s in
                       (os.getenv("AUTOPILOT_UNIVERSE") or _DEFAULT_UNIVERSE).split(",") if s.strip()]
 
-# Symbols that belong to the OTHER product. Used to self-heal a user record that
-# picked up cross-product symbols back when crypto & forex shared one Redis
-# namespace (e.g. a forex account trading SOLUSD). Gold (XAUUSD) is shared and
-# never blocked. Compared normalised (no separators, upper-case).
-_CRYPTO_ONLY = {"BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "LTCUSD", "ADAUSD",
-                "DOGEUSD", "DOTUSD", "LINKUSD", "BCHUSD"}
-_FOREX_ONLY = {"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF",
-               "NZDUSD", "US30", "NAS100", "US500", "GER40"}
-# The crypto build still refuses forex symbols — it is a narrower product and
-# a client who bought "crypto" should not find EURUSD in their journal.
-#
-# The forex build no longer refuses crypto. It is now the ONE bot: FX, metals
-# and crypto CFDs on the same account, the same safety gates, the same
-# codebase. Keeping them apart meant maintaining two forks, and the crypto one
-# fell behind by every hardening fix — order gate, ownership lease, idempotency
-# ledger — so the separation was protecting a worse product, not a different
-# one.
-CROSS_PRODUCT_BLOCK = _FOREX_ONLY if _IS_CRYPTO else set()
+# Symbols that are NOT this product's. Kept — and now non-empty again — to
+# self-heal a user record that picked up crypto symbols while the merged build
+# briefly offered them: such a record would otherwise keep a dead coin in its
+# Auto-Pilot basket that the broker path no longer accepts. Gold (XAUUSD) is
+# forex-side and never blocked. Compared normalised (no separators, upper-case).
+_CRYPTO_SYMBOLS = {"BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "LTCUSD", "ADAUSD",
+                   "DOGEUSD", "DOTUSD", "LINKUSD", "BCHUSD", "AVAXUSD",
+                   "MATICUSD"}
+CROSS_PRODUCT_BLOCK = _CRYPTO_SYMBOLS
 
 # ─── Risk ───────────────────────────────────────────────
 RISK_PER_TRADE = float(_scalp("RISK_PER_TRADE", 0.025, 0.0125))  # scalp: 2.5% · swing: 1.25% (was 1%/0.5%)
@@ -266,15 +256,14 @@ STRUCTURAL_MIN_RR = float(os.getenv("STRUCTURAL_MIN_RR") or 1.3)
 LEVERAGE = float(os.getenv("LEVERAGE") or 30)
 MARGIN_CAP = float(os.getenv("MARGIN_CAP") or 0.5)             # use ≤50% of available margin
 MAX_SPREAD_PIPS = float(_scalp("MAX_SPREAD_PIPS", 1.2, 3.0))   # scalp: strict 1.2p — wide spread kills tight targets
-# Crypto's pip conventions make spreads huge in pip terms (SOL pip=$0.01 → a
-# $0.30 spread = 30 pips), so a fixed pip limit blocks every crypto trade. For
-# crypto use a %-of-price spread limit instead: normal crypto CFD spread is
-# ~0.05-0.3%, and brokers blow it out to 1-3% on weekends (correctly skipped).
-# 0 = disabled (forex keeps the pip limit).
-MAX_SPREAD_PCT = float(os.getenv("MAX_SPREAD_PCT") or (0.35 if _IS_CRYPTO else 0))
+# Optional %-of-price spread ceiling, on top of the pip limit above. It exists
+# for instruments whose pip conventions make a pip count meaningless; every FX
+# major and metal this product trades has a sane pip size, so it defaults OFF
+# and the pip limit is the real guard. Operator-settable, never build-derived.
+MAX_SPREAD_PCT = float(os.getenv("MAX_SPREAD_PCT") or 0)
 # Flash-crash guard: an FX major moving >1.2% in one M5 candle is a violent
-# spike; crypto routinely moves that much normally, so raise the bar for crypto.
-FLASH_SPIKE_PCT = float(os.getenv("FLASH_SPIKE_PCT") or (0.05 if _IS_CRYPTO else 0.012))
+# spike and the bot stands aside.
+FLASH_SPIKE_PCT = float(os.getenv("FLASH_SPIKE_PCT") or 0.012)
 
 # ─── Trailing stop ──────────────────────────────────────
 TRAILING_STOP = os.getenv("TRAILING_STOP") != "false"  # ON by default — let winners run, exit on reversal

@@ -46,12 +46,12 @@ def obs(f, v, src="test", conf=1.0, ttl=3600, now=T0):
 FULL = [obs(f, 0.5, src=f"src_{f}") for f in I.FEATURES]
 
 print("\n── values are normalised and bad input becomes missing, not zero ──")
-check("in-range value kept", I.observe("sentiment", 0.4, "x")["value"] == 0.4)
-check("above range clamped", I.observe("sentiment", 9.0, "x")["value"] == 1.0)
-check("below range clamped", I.observe("sentiment", -9.0, "x")["value"] == -1.0)
+check("in-range value kept", I.observe("macro_risk", 0.4, "x")["value"] == 0.4)
+check("above range clamped", I.observe("macro_risk", 9.0, "x")["value"] == 1.0)
+check("below range clamped", I.observe("macro_risk", -9.0, "x")["value"] == -1.0)
 check("junk becomes None, NOT 0.0",
-      I.observe("sentiment", "bullish", "x")["value"] is None)
-check("None stays None", I.observe("sentiment", None, "x")["value"] is None)
+      I.observe("macro_risk", "bullish", "x")["value"] is None)
+check("None stays None", I.observe("macro_risk", None, "x")["value"] is None)
 
 print("\n── a full picture scores cleanly ──")
 s = I.build("EURUSD", FULL, now=T0)
@@ -63,7 +63,7 @@ check("nothing reported missing", s["missing"] == [])
 check("all sources are named", len(s["sources"]) == len(I.FEATURES))
 
 print("\n── THE TRAP: a missing source degrades quality, not the score ──")
-partial = [o for o in FULL if o["feature"] in ("price_momentum", "sentiment")]
+partial = [o for o in FULL if o["feature"] in ("price_momentum", "macro_risk")]
 p = I.build("EURUSD", partial, now=T0)
 check("the score stays +0.5 — the two feeds still say +0.5",
       abs(p["institutional_proxy"] - 0.5) < 1e-6, str(p["institutional_proxy"]))
@@ -88,7 +88,7 @@ e = I.build("EURUSD", stale, now=T0 + 999)
 check("everything expired → nothing usable", e["institutional_proxy"] is None)
 check("quality is zero", e["data_quality"] == 0.0)
 check("state refused", e["usable"] is False)
-mixed = [obs("price_momentum", 0.8, ttl=99999), obs("sentiment", -0.9, ttl=60)]
+mixed = [obs("price_momentum", 0.8, ttl=99999), obs("macro_risk", -0.9, ttl=60)]
 m = I.build("EURUSD", mixed, now=T0 + 999)
 check("the stale one is dropped, the fresh one survives",
       list(m["features"]) == ["price_momentum"], str(list(m["features"])))
@@ -105,9 +105,12 @@ check("the reason names the critical gap",
       "critical" in n["reason"] and "price_momentum" in n["reason"], n["reason"])
 
 print("\n── confidence weights a source down without silencing it ──")
-sure = I.build("X", [obs("price_momentum", 1.0), obs("sentiment", -1.0)], now=T0)
+# `cot_bias` is contributory, not critical — the same role the retired
+# `sentiment` feature played here before the crypto Fear & Greed feed was
+# removed from a forex product.
+sure = I.build("X", [obs("price_momentum", 1.0), obs("cot_bias", -1.0)], now=T0)
 unsure = I.build("X", [obs("price_momentum", 1.0),
-                       obs("sentiment", -1.0, conf=0.1)], now=T0)
+                       obs("cot_bias", -1.0, conf=0.1)], now=T0)
 check("a low-confidence bearish read moves the score less",
       unsure["institutional_proxy"] > sure["institutional_proxy"],
       f"{unsure['institutional_proxy']} vs {sure['institutional_proxy']}")
@@ -124,13 +127,13 @@ check("and its source is credited",
 
 print("\n── delta compares only what is present in BOTH states ──")
 a = I.build("EURUSD", [obs("price_momentum", 0.2), obs("cot_bias", 0.1)], now=T0)
-b = I.build("EURUSD", [obs("price_momentum", 0.6), obs("sentiment", 0.9)],
+b = I.build("EURUSD", [obs("price_momentum", 0.6), obs("macro_risk", 0.9)],
             now=T0 + 60)
 dl = I.delta(a, b)
 check("the shared feature is compared",
       abs(dl["per_feature"]["price_momentum"] - 0.4) < 1e-6)
 check("a feature that just APPEARED has no delta invented",
-      "sentiment" not in dl["per_feature"])
+      "macro_risk" not in dl["per_feature"])
 check("a feature that DISAPPEARED has no delta invented",
       "cot_bias" not in dl["per_feature"])
 check("the count of what was actually compared is reported",
@@ -216,7 +219,7 @@ _obs = [
     I.observe("macro_risk", 0.2, "calendar", now=_now),
 ]
 _line = I.describe(I.build("USDCHF", _obs, now=_now))
-check("the count is still there", "3/9" in _line, _line)
+check("the count is still there", "3/8" in _line, _line)
 for _f in ("price_momentum", "volatility", "macro_risk"):
     check(f"{_f} is named", _f in _line, _line)
 check("an absent feature is not named", "cot_bias" not in _line, _line)
@@ -226,7 +229,7 @@ check("names are listed in FEATURES order",
       < _line.index("macro_risk"), _line)
 
 _empty = I.describe(I.build("EURUSD", [], now=_now))
-check("no features reads as 'none', not an empty list", "0/9: none" in _empty,
+check("no features reads as 'none', not an empty list", "0/8: none" in _empty,
       _empty)
 check("and it is still flagged unusable", "UNUSABLE" in _empty, _empty)
 

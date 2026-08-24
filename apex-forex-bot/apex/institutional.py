@@ -43,7 +43,6 @@ FEATURES = (
     "rate_differential",
     "central_bank_bias",
     "macro_risk",
-    "sentiment",
 )
 
 # Relative weight of each feature in the composite, and whether the state is
@@ -58,7 +57,6 @@ WEIGHTS = {
     "rate_differential":   1.0,
     "central_bank_bias":   0.9,
     "macro_risk":          0.7,
-    "sentiment":           0.4,
 }
 
 # Without price there is no read at all. Everything else is contributory: the

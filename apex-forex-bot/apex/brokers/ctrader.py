@@ -423,8 +423,8 @@ class CtraderBroker:
     def leverage_for(self, instrument=None) -> float:
         """Real leverage the broker allows on `instrument`, in the account's
         actual currency — NOT a flat assumption. Regulated brokers (e.g.
-        CySEC/ESMA) cap crypto CFDs and indices far lower than FX majors
-        (crypto ~1:2 vs FX ~1:30), so sizing every instrument off one global
+        CySEC/ESMA) cap some instruments well below the FX-major tier
+        (~1:30), so sizing every instrument off one global
         LEVERAGE constant can ask for far more margin than the broker will
         actually give, especially for EU clients on FP Markets' Cyprus
         entity. Picks the most conservative (lowest) tier when the symbol
@@ -469,9 +469,10 @@ class CtraderBroker:
     def _digits(self, instrument):
         """Price decimal places for rounding SL/TP, taken from the broker's
         symbol details. A hard-coded 5 makes cTrader reject the SL/TP amend on
-        instruments with fewer digits (BTCUSD is 2) as 'invalid precision' —
-        the position then reads back unprotected and gets closed 'for safety',
-        so EVERY crypto trade opens and instantly closes."""
+        any instrument with fewer digits as 'invalid precision' — the position
+        then reads back unprotected and gets closed 'for safety', so every
+        trade on such a symbol opens and instantly closes. Metals quote to 2-3
+        digits, so this is live for XAUUSD today."""
         if not hasattr(self, "_digits_cache"):
             self._digits_cache = {}
         try:
@@ -648,7 +649,7 @@ class CtraderBroker:
             return {
                 "instrument": sym,
                 "side": side,
-                "units": round(td.volume / 100.0, 8),  # cTrader volume = units × 100; fractional for crypto
+                "units": round(td.volume / 100.0, 8),  # cTrader volume = units × 100; fractional allowed
                 "symbol": instrument or self._c.SYMBOL,
                 # position price/SL/TP are plain doubles (unlike trendbar ints)
                 "entryPrice": p.price if p.price else None,
@@ -677,7 +678,7 @@ class CtraderBroker:
             out.append({
                 "symbol": id2name.get(td.symbolId, str(td.symbolId)),
                 "side": "BUY" if td.tradeSide == ProtoOATradeSide.BUY else "SELL",
-                "units": round(td.volume / 100.0, 8),  # fractional for crypto (0.34 BTC)
+                "units": round(td.volume / 100.0, 8),  # fractional allowed
                 "entryPrice": p.price if p.price else None,
                 "stopLoss": p.stopLoss if p.HasField("stopLoss") else None,
                 "takeProfit": p.takeProfit if p.HasField("takeProfit") else None,
@@ -727,10 +728,11 @@ class CtraderBroker:
         try:
             mn, st = self._vol_rules(sid)
         except Exception:
-            # Fail SAFE per class: the FX 0.01-lot floor (100k) on a crypto
-            # symbol would turn a 0.34 BTC order into 1,000 BTC (~$100M) if the
-            # symbol-details RPC hiccups. For non-FX never inflate — use the
-            # requested size and let the broker reject a sub-minimum order.
+            # Fail SAFE per class: applying the FX 0.01-lot floor (100k) to a
+            # fractional-unit instrument would inflate the order by orders of
+            # magnitude if the symbol-details RPC hiccups. For non-FX never
+            # inflate — send the requested size and let the broker reject a
+            # sub-minimum order.
             from apex import forex as _fx
             if _fx._is_fx(_fx._norm(instrument or self._c.SYMBOL)):
                 mn, st = 100_000, 100_000
@@ -775,7 +777,7 @@ class CtraderBroker:
                     try:
                         if _try > 0:
                             time.sleep(0.5 * _try)
-                            # Fast-moving crypto can cross the intended stop
+                            # A fast market can cross the intended stop
                             # during the retry delay — the broker then rejects
                             # the amend as an invalid price every time, and we
                             # burn the rest of the retry budget (and exposure

@@ -258,14 +258,7 @@ def soros_momentum(candles, velocity_thr=None, symbol=None):
     if len(candles) < 8:
         return {"momentum": 0, "direction": "NEUTRAL", "velocity": 0}
     if velocity_thr is None:
-        try:
-            _is_crypto = _crypto_thresholds(symbol)
-            if _is_crypto is None:
-                from apex import config as _cfg
-                _is_crypto = getattr(_cfg, "PRODUCT", "forex") == "crypto"
-            velocity_thr = 1.0 if _is_crypto else 0.3
-        except Exception:
-            velocity_thr = 0.3
+        velocity_thr = 0.3
     recent = candles[-8:]
     wins = sum(1 for c in recent if c["close"] > c["open"])
     bull_pct = wins / len(recent)
@@ -401,26 +394,6 @@ def resample(candles, ratio=12):
     return out
 
 
-def _crypto_thresholds(symbol):
-    """True when `symbol` is a crypto instrument.
-
-    Thresholds used to be chosen by the BUILD (`PRODUCT == "crypto"`). One
-    bot now holds FX, metals and crypto at once, so a process-level flag
-    cannot answer a question about the instrument in front of it — and the
-    consequence is not a mistuned parameter, it is a class of instrument the
-    bot silently refuses to trade. BTC's EMA separation almost always clears
-    the 0.30% FX cutoff, so on a forex build its regime would read "trending"
-    permanently and mean-reversion would never fire on it.
-    """
-    if not symbol:
-        return None                      # caller did not say — keep old behaviour
-    try:
-        from apex import forex as _fx
-        return bool(_fx.is_crypto(symbol))
-    except Exception:
-        return None
-
-
 def detect_regime(candles, symbol=None):
     """Classify the market so the AUTO strategy can pick the right engine.
 
@@ -463,18 +436,8 @@ def detect_regime(candles, symbol=None):
     if vol_ratio <= 0.42:
         return {"regime": "quiet", "vol_ratio": round(vol_ratio, 2),
                 "label": f"very low volatility ({vol_ratio:.1f}× normal) — standing aside"}
-    # EMA-separation cutoff for "trending". 0.18% is FX-scale; crypto EMAs sit
-    # 1-5%+ apart almost always, so on crypto that gate is always true and the
-    # regime never comes back "ranging". Raise it for the crypto build so the
-    # trend/range split is meaningful.
-    try:
-        _is_crypto = _crypto_thresholds(symbol)
-        if _is_crypto is None:
-            from apex import config as _cfg
-            _is_crypto = getattr(_cfg, "PRODUCT", "forex") == "crypto"
-        sep_thr = 0.9 if _is_crypto else 0.30
-    except Exception:
-        sep_thr = 0.18
+    # EMA-separation cutoff for "trending", at FX scale.
+    sep_thr = 0.30
     if sep_pct >= sep_thr and liv.get("trend") in ("BULLISH", "BEARISH") and liv.get("strength", 0) >= 0.55:
         return {"regime": "trending", "vol_ratio": round(vol_ratio, 2),
                 "label": f"{liv['trend'].lower()} trend — trend following"}

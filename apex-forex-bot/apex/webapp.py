@@ -33,7 +33,7 @@ GUIDE_HTML = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\
 
 def _asset_swaps(html: str) -> str:
     """Rewrite the asset-class-specific wording in the shared Mini-App HTML so
-    the crypto build reads 'Bitcoin, Ethereum … 24/7' and the forex build keeps
+    the copy reads from the product config, so branding stays in one place and
     'gold, currencies … 24/5'. Driven by config so one HTML serves both."""
     from apex import config as cfg
     out = html.replace("Apex Forex Bot", cfg.BOT_NAME)
