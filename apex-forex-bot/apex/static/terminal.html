@@ -405,7 +405,7 @@ async function refresh(){
     +'<div class="kv"><span>$ won per $ lost</span><b>'+(st.profitFactor!=null?st.profitFactor:'—')+'</b></div>'
     +'<div class="kv"><span>Average win / loss</span><b>'+money(st.avgWin)+' / '+money(st.avgLoss)+'</b></div>'
     +'<div class="kv"><span>Best / worst trade</span><b>'+money(st.best)+' / '+money(st.worst)+'</b></div>'
-    +'<div class="kv"><span>Biggest dip from peak</span><b>'+st.maxDrawdownPct.toFixed(1)+'%</b></div>'
+    +'<div class="kv"><span>Biggest dip from peak</span><b>'+(st.maxDrawdownPct!=null?st.maxDrawdownPct.toFixed(1)+'%':'—')+'</b></div>'
     : '<div class="empty">No closed trades yet — stats build as the bot works.</div>';
 
   // News. Prefer the rolling feed; fall back to newsToday so a page still

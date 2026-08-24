@@ -4069,6 +4069,14 @@ def _handle_stats(chat_id):
     def money(v):
         return f"+${v:,.2f}" if v >= 0 else f"−${abs(v):,.2f}"
     t = st["today"]
+    # None means the journal's equity path went below zero, which a real
+    # brokered account cannot do — so stats.compute refuses to name a
+    # percentage rather than print an impossible one. Say why, because
+    # "—" alone reads as "no data yet" and this is the opposite: there is
+    # data, and it does not describe one consistent account.
+    dd_s = (f"<b>{st['maxDrawdownPct']:.1f}%</b>"
+            if st.get("maxDrawdownPct") is not None
+            else "<b>—</b> <i>(journal has inconsistent rows — /support)</i>")
     send_to(chat_id,
             f"📊 <b>Performance</b> — last {st['trades']} closed trades\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -4076,7 +4084,7 @@ def _handle_stats(chat_id):
             f"⚖️ Profit factor: <b>{pf_s}</b> · Net: <b>{money(st['netPnl'])}</b>\n"
             f"📈 Avg win {money(st['avgWin'])} · Avg loss {money(st['avgLoss'])}\n"
             f"🏆 Best {money(st['best'])} · 💥 Worst {money(st['worst'])}\n"
-            f"📉 Max drawdown: <b>{st['maxDrawdownPct']:.1f}%</b>\n\n"
+            f"📉 Max drawdown: {dd_s}\n\n"
             f"<b>Today:</b> {t['trades']} trades · {money(t['netPnl'])} · "
             f"{t['skips']} weak setups rejected 🛡\n\n"
             f"<i>Full breakdown, equity curve &amp; rejection journal: /terminal</i>")
