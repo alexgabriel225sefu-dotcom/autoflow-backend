@@ -126,9 +126,6 @@ if PRODUCT != "forex":
 BOT_NAME = os.getenv("BOT_NAME") or "Apex Forex Bot"
 ASSET_EMOJI = os.getenv("ASSET_EMOJI") or "💱"
 ASSET_NOUN = os.getenv("ASSET_NOUN") or "forex"
-# Forex trades 24/5 — closed over the weekend. Not configurable per build any
-# more; the 24/7 branch existed only for crypto.
-MARKET_24_7 = False
 LICENSE_PRODUCT = os.getenv("LICENSE_PRODUCT") or "apex-forex"
 LICENSE_KEY_PREFIX = (os.getenv("LICENSE_KEY_PREFIX") or "FORX").upper()
 
@@ -153,15 +150,6 @@ FX_UNIVERSE = [s.strip().upper() for s in _FX_CANDIDATES.split(",") if s.strip()
 AUTOPILOT_UNIVERSE = [s.strip().upper() for s in
                       (os.getenv("AUTOPILOT_UNIVERSE") or _DEFAULT_UNIVERSE).split(",") if s.strip()]
 
-# Symbols that are NOT this product's. Kept — and now non-empty again — to
-# self-heal a user record that picked up crypto symbols while the merged build
-# briefly offered them: such a record would otherwise keep a dead coin in its
-# Auto-Pilot basket that the broker path no longer accepts. Gold (XAUUSD) is
-# forex-side and never blocked. Compared normalised (no separators, upper-case).
-_CRYPTO_SYMBOLS = {"BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "LTCUSD", "ADAUSD",
-                   "DOGEUSD", "DOTUSD", "LINKUSD", "BCHUSD", "AVAXUSD",
-                   "MATICUSD"}
-CROSS_PRODUCT_BLOCK = _CRYPTO_SYMBOLS
 
 # ─── Risk ───────────────────────────────────────────────
 RISK_PER_TRADE = float(_scalp("RISK_PER_TRADE", 0.025, 0.0125))  # scalp: 2.5% · swing: 1.25% (was 1%/0.5%)

@@ -1106,17 +1106,20 @@ def _manage_trailing(broker, cfg, pos, symbol, price, initial_risk=None):
 def _loop(user_id, alert_fn, gen=None):
     user = user_store.load(user_id)
 
-    # Self-heal untradeable symbols AT THE SOURCE. A user record can still
-    # carry crypto left over from the merged build, which the order path now
-    # refuses outright. Scrub them out of every stored field
-    # — symbol, watchlist, autopilot_universe — and PERSIST, so the terminal, the
-    # status card and the scanner all reflect a clean, single-product account
-    # without the user running any command.
-    _block = getattr(cfg_mod, "CROSS_PRODUCT_BLOCK", set())
-
+    # Self-heal untradeable symbols AT THE SOURCE, against the ALLOWLIST rather
+    # than against a list of things to remove. A stored record can carry a
+    # symbol the order path now refuses — a coin left over from the merged
+    # build, an index, a cross with no USD leg — and every one of them is a
+    # dead slot in the scan budget that silently never trades.
+    #
+    # Asking `is_tradeable` instead of consulting a blocklist means the scrub
+    # can never drift from the gate: there is exactly one definition of what
+    # this bot accepts, and both the entry path and this cleanup read it.
+    # Scrubbed out of every stored field — symbol, watchlist,
+    # autopilot_universe — and PERSISTED, so the terminal, the status card and
+    # the scanner all agree without the client running any command.
     def _foreign(sym):
-        return bool(sym) and (sym.upper().replace("_", "").replace("/", "").replace("-", "")
-                              in _block)
+        return bool(sym) and not forex.is_tradeable(sym)
 
     _patch = {}
     if _foreign(user.get("symbol")):

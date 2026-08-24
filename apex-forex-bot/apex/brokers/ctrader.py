@@ -864,7 +864,7 @@ class CtraderBroker:
         req = ProtoOAClosePositionReq()
         req.ctidTraderAccountId = self._ctid()
         req.positionId = pos["positionId"]
-        req.volume = int(round(pos["units"] * 100))  # fractional-safe (0.34 BTC → 34)
+        req.volume = int(round(pos["units"] * 100))  # fractional-safe (0.34 oz → 34)
         res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20)
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):

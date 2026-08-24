@@ -128,12 +128,30 @@ check("an undeliverable alert is loud",
 # ── 5. crypto is removed, not disabled ────────────────────────────────────
 print("\n5. Crypto cannot come back through a stored record")
 check("PRODUCT accepts only forex", cfg.PRODUCT == "forex")
-for sym in ("BTCUSD", "ETHUSD", "DOGEUSD", "SOLUSD", "BTCUSDT"):
+# The gate is a positive ALLOWLIST now: no coin list exists to keep in sync,
+# and a symbol nobody allowed is already refused.
+check("no crypto symbol table survives in the engine",
+      not hasattr(forex, "is_crypto") and not hasattr(forex, "_CRYPTO"),
+      "a rejection list is a second definition of what is allowed")
+check("the 24/7 market branch is gone",
+      not hasattr(cfg, "MARKET_24_7"),
+      "forex is 24/5; the 24/7 branch existed only for the retired product")
+for sym in ("BTCUSD", "ETHUSD", "DOGEUSD", "SOLUSD", "BTCUSDT", "XRPUSD",
+            "LTCUSD", "BNBUSD", "ADAUSD", "DOTUSD", "LINKUSD", "BCHUSD",
+            "AVAXUSD", "MATICUSD", "BTCEUR", "ETHGBP"):
     check(f"{sym} refused by the instrument gate",
           forex.is_tradeable(sym) is False,
           "a stored watchlist must not put a coin back in the order path")
-check("crypto symbols are scrubbed from stored records",
-      "BTCUSD" in cfg.CROSS_PRODUCT_BLOCK and "MATICUSD" in cfg.CROSS_PRODUCT_BLOCK)
+# The scrub reads the ALLOWLIST, not a blocklist — so it can never drift from
+# the gate, and there is no list of coins to keep in sync.
+UL = read(ROOT, "apex", "user_loop.py")
+check("the stored-record scrub asks is_tradeable, not a blocklist",
+      "not forex.is_tradeable(sym)" in UL and "CROSS_PRODUCT_BLOCK" not in UL,
+      "two definitions of what is allowed will drift apart")
+for sym in ("EURUSD", "EUR_USD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD",
+            "USDCAD", "NZDUSD", "XAUUSD", "XAGUSD"):
+    check(f"{sym} still trades", forex.is_tradeable(sym) is True,
+          "removing crypto must not narrow the forex product")
 check("the Auto-Pilot universe is forex only",
       all(forex.is_tradeable(s) for s in cfg.AUTOPILOT_UNIVERSE),
       f"{cfg.AUTOPILOT_UNIVERSE} contains something the order path refuses")

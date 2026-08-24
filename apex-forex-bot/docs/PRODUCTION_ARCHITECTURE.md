@@ -84,11 +84,17 @@ harm, and those exceptions are listed.
 | No secret for config encryption | **refuses to encrypt/decrypt** | `server.js::_botConfigKey` |
 | Stateless OAuth callback in production | **startup refused** | `ctrader_oauth.py` |
 | Licence store unreachable, first activation | **503 → deny** | `server.js::/api/verify-license` |
+| Signed key with NO licence row | **deny** — no row means never sold | `server.js::/api/verify-license` |
+| Licence row not active / refunded / expired | **deny** | `server.js::/api/verify-license` |
+| No licence store configured at all | **503 → deny** | `server.js::/api/verify-license` |
+| `REQUIRE_LICENSE` unset in production | **licence gate ON** | `telegram.py::_license_required` |
+| `RUFLO_MCP_SECRET` unset in production | **startup refused** | `ruflo-mcp/server.py` |
+| Licence in grace (unverifiable) | **no NEW live orders** | `gates.live_entitlement` |
 | Licence verifier unreachable, first activation | **deny** | `telegram.py::_license_ok` |
 | Ownership lease unreadable, live account | **no order** | `gates.authorize_order` |
 | Redis unreachable, live account | **no order** (`COORDINATION_UNAVAILABLE`) | `ledger.claim(fail_closed=True)` |
 | Entitlement unknown | **no order** | `gates.authorize_order` |
-| Instrument not `forex.is_tradeable` | **no order** | every entry path |
+| Instrument not `forex.is_tradeable` (a positive ALLOWLIST — see below) | **no order** | every entry path |
 | Minimum lot would exceed configured risk | **no order** | `forex.floor_risk_ok` |
 | Broker response ambiguous after an order | **no retry**, reconcile first | `broker_result_ambiguous` |
 
@@ -97,12 +103,24 @@ harm, and those exceptions are listed.
 Both are documented at the point of decision, because an undocumented
 asymmetry gets "fixed" into a symmetry by the next person.
 
-1. **Licence revalidation** (`telegram.py::_revalidate_license`). A client who
-   has already been verified keeps access when the verifier cannot answer.
-   Only an explicit `{valid:false}` on a **2xx** revokes. A 5xx does not —
-   the licence endpoint answers 503 with that same body when its store is
-   unreachable, and reading the body without the status would revoke every
-   paying customer for the length of an outage.
+1. **Licence revalidation** (`telegram.py::_revalidate_license`) — fail-open
+   for the INTERFACE, never for new money. Three outcomes:
+
+   - **VALID** → clear any grace, carry on.
+   - **UNKNOWN** (verifier unreachable) → the client keeps their interface and
+     their open positions keep being managed, but `license_grace_since` is
+     stored and `gates.live_entitlement` then reads UNKNOWN, so **no NEW LIVE
+     orders** open while nobody can confirm the entitlement. Paper is
+     unaffected. Bounded by `LICENSE_GRACE_HOURS` (default 72); past that the
+     access grant is revoked outright.
+   - **INVALID** (explicit `{valid:false}` on a **2xx**) → revoke access, stop
+     the loop, no orders.
+
+   A 5xx does NOT revoke even though its body also says `valid:false`: the
+   licence endpoint answers 503 with that body when its store is unreachable,
+   and reading the body without the status would revoke every paying customer
+   for the length of an outage. The stored licence key does **not** override
+   grace — the key is precisely what could not be verified.
 2. **News / calendar feeds** (`news.py`, `cot.py`). An unreachable calendar
    does not halt trading. It does not grant anything either — it removes a
    restriction, and the risk guards are unaffected.
@@ -212,6 +230,13 @@ Startup fails without these in production.
 **`apex-forex-bot`**: `PRODUCT=forex`, `TELEGRAM_BOT_TOKEN`,
 `TOKEN_ENCRYPTION_KEY`, `ADMIN_CHAT_IDS` (or `ADMIN_CHAT_ID`), and a shared
 Redis (`REDIS_URL` or `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`).
+`REQUIRE_LICENSE` is not mandatory but IS consequential: unset in production
+means the licence gate is ON. Set it to `false` explicitly to run open access
+— an absent setting is not a decision.
+
+**`ruflo-mcp`**: `RUFLO_MCP_SECRET` (the unguessable path segment; startup
+fails without it in production) and `MCP_SIGNING_SECRET` (without it the bot
+refuses every level 2/3 command, which is the correct default).
 
 **`server.js`**: `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
 `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BOT_EMAIL_SECRET`,
@@ -237,6 +262,17 @@ and an empty admin list is reported at startup rather than defaulted.
 | `/bot-access` route | Streamed trading-bot source as a ZIP to any holder of an HMAC-valid key. |
 | `apex/sentiment.py` | The Alternative.me **crypto** Fear & Greed index, weighted 0.4 in a **forex** conviction score. |
 | crypto Stripe SKU, `APEX-` key minting and verification | The bot those keys unlocked no longer exists. |
+
+---
+
+### The instrument gate is an allowlist, not a blocklist
+
+`forex.is_tradeable()` accepts exactly `(_CCY × _CCY with a USD leg)` plus
+`(_METALS × _CCY)`. There is no list of coins, indices or anything else to
+refuse, because a symbol nobody allowed is already refused — and a blocklist
+would be a second definition of what is permitted, free to drift from the
+first. The stored-record scrub in `user_loop` asks the same function rather
+than consulting a list, so the entry path and the cleanup cannot disagree.
 
 ---
 

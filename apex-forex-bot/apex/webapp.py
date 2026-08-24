@@ -32,15 +32,13 @@ GUIDE_HTML = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\
 
 
 def _asset_swaps(html: str) -> str:
-    """Rewrite the asset-class-specific wording in the shared Mini-App HTML so
-    the copy reads from the product config, so branding stays in one place and
-    'gold, currencies … 24/5'. Driven by config so one HTML serves both."""
+    """Apply the configurable bot name to the shared Mini-App HTML.
+
+    This used to also swap the copy to a second product's wording. There is
+    one product, so there is one copy.
+    """
     from apex import config as cfg
     out = html.replace("Apex Forex Bot", cfg.BOT_NAME)
-    if getattr(cfg, "MARKET_24_7", False):
-        out = out.replace("24/5", "24/7")
-        out = out.replace("across gold, currencies and more",
-                          "across Bitcoin, Ethereum, Solana and more")
     out = _broker_gate_swaps(out)
     return out
 

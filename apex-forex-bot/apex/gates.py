@@ -76,12 +76,21 @@ def live_entitlement(user_id, user=None):
     A stored licence key still counts as entitlement. The access index is wiped
     on every redeploy when it falls back to local JSON, and a paying client
     must not lose live trading to that.
+
+    UNLESS the licence is in GRACE. `telegram._revalidate_license` sets
+    `license_grace_since` when the verifier cannot answer: the client keeps
+    their interface and their open positions keep being managed, but nobody
+    can currently confirm they are still entitled — so no NEW live risk is
+    taken on their behalf. The stored key is exactly what must NOT override
+    that, because the key is what could not be verified.
     """
     user_id = str(user_id)
     try:
         u = user if user is not None else user_store.load(user_id)
     except Exception as e:
         return "unknown", f"user store unreachable: {str(e)[:80]}"
+    if (u or {}).get("license_grace_since"):
+        return "unknown", "licence unverifiable — in grace, no new live orders"
     if (u or {}).get("license_key"):
         return "allowed", "licence on file"
     try:

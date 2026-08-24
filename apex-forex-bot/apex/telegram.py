@@ -5734,11 +5734,38 @@ def _with_counts(text):
 
 _VERIFY_URL = f"{cfg.LICENSE_SERVER}/api/verify-license"
 _DEPLOY_URL = ""
-# Open-access mode (free-for-everyone growth phase): set REQUIRE_LICENSE=true
-# on Render to bring the license-key gate back on for new users. Existing
-# already-granted users are unaffected either way — this only decides
-# whether a brand-new chat_id needs a valid key to get past _license_ok.
-_LICENSE_REQUIRED = (os.getenv("REQUIRE_LICENSE", "false").strip().lower() in ("1", "true", "yes"))
+# Whether a brand-new chat_id must present a valid licence key. Existing
+# already-granted users and admins are unaffected either way — they never
+# reach _license_ok.
+#
+# FAIL CLOSED IN PRODUCTION. This defaulted to "false", so a deployment that
+# simply forgot the variable — or had it wiped by a dashboard edit — served
+# the product free to whoever messaged it first, silently and with nothing in
+# the logs to say so. "Open access" is a real mode, but it has to be CHOSEN:
+# an absent setting is not a decision, and the expensive direction to guess
+# wrong in is the one that gives the product away.
+#
+# Outside production, open access stays the default so local work does not
+# need a licence server. `_is_production()` is deliberately inverted: an unset
+# or unfamiliar APP_ENV counts as production.
+def _license_required() -> bool:
+    raw = (os.getenv("REQUIRE_LICENSE") or "").strip().lower()
+    if raw in ("1", "true", "yes"):
+        return True
+    if raw in ("0", "false", "no"):
+        return False
+    try:
+        from apex import user_store as _us
+        return _us._is_production()
+    except Exception:
+        return True                      # cannot tell → the safe direction
+
+
+_LICENSE_REQUIRED = _license_required()
+if _LICENSE_REQUIRED and not (os.getenv("REQUIRE_LICENSE") or "").strip():
+    print("[Telegram] REQUIRE_LICENSE is not set and this is production — "
+          "the licence gate is ON. Set REQUIRE_LICENSE=false explicitly to "
+          "run open access.")
 
 
 def _license_ok(chat_id, text):
@@ -5837,22 +5864,40 @@ def _license_ok(chat_id, text):
 _REVALIDATE_SEC = 12 * 3600  # re-check a granted client's license at most this often
 
 
+# How long an already-verified client keeps trading while the licence verifier
+# cannot be reached. Bounded on purpose: "fail open until someone notices" is
+# not a policy, it is the absence of one. Past this the account is treated as
+# unverifiable rather than valid.
+_GRACE_MAX_S = int(os.getenv("LICENSE_GRACE_HOURS", "72")) * 3600
+
+
 def _revalidate_license(chat_id):
-    """Periodically re-check a granted client's license so refunded/charged-back
-    keys lose access without waiting for a redeploy.
+    """Periodically re-check a granted client's licence.
 
-    FAIL-OPEN, and deliberately the opposite of _license_ok above. That is not
-    an inconsistency: a first activation is a stranger, so an unverifiable key
-    is not evidence in their favour; this client has ALREADY been verified, so
-    an unverifiable answer is not evidence against them. Unknown means "no new
-    information" in both cases — it just points opposite ways.
+    THREE outcomes, not two. The middle one is the whole point.
 
-    Only an EXPLICIT {valid: false} carried on a 2xx revokes (refund,
-    chargeback, deactivated key). A 5xx does NOT, even though the body also
-    says valid:false: the licence endpoint answers 503 with that body when its
-    store is unreachable, and reading the body without the status would revoke
-    every paying customer for the duration of a database outage. Returns False
-    if access was revoked, so the caller stops handling this update.
+      VALID      -> clear any grace, carry on.
+      UNKNOWN    -> the verifier could not answer. The client keeps their
+                    interface and their existing positions keep being managed,
+                    but `gates.live_entitlement` reads the grace marker and
+                    refuses NEW LIVE orders while it stands. Bounded by
+                    _GRACE_MAX_S; past that the access grant is revoked too.
+      INVALID    -> an explicit {valid:false} on a 2xx (refund, chargeback,
+                    deactivated key). Revoke access, stop the loop, no orders.
+
+    This is deliberately the opposite of _license_ok for a first activation: a
+    stranger with an unverifiable key is not owed the benefit of the doubt; an
+    already-verified client with an unverifiable key has not done anything.
+    What they do NOT get is new live risk taken on their behalf while nobody
+    can confirm they are still entitled to it.
+
+    A 5xx does NOT revoke, even though its body also says valid:false: the
+    licence endpoint answers 503 with that body when its store is unreachable,
+    and reading the body without the status would revoke every paying customer
+    for the length of a database outage.
+
+    Returns False if access was revoked, so the caller stops handling this
+    update.
     """
     cid = str(chat_id)
     if access.is_admin(cid):
@@ -5866,17 +5911,57 @@ def _revalidate_license(chat_id):
         return True  # legacy grant with no stored key — nothing to re-check
     if time.time() - u.get("license_checked_at", 0) < _REVALIDATE_SEC:
         return True
+
+    def _enter_grace(reason):
+        """Unverifiable: keep the client, refuse new live risk, bound it."""
+        since = u.get("license_grace_since") or int(time.time())
+        if time.time() - float(since) > _GRACE_MAX_S:
+            try:
+                user_store.update(cid, {"license_key": None,
+                                        "license_grace_since": None})
+            except Exception:
+                pass
+            access.revoke(cid)
+            try:
+                user_loop.stop(cid)
+            except Exception:
+                pass
+            send_to(chat_id,
+                    "⛔ <b>We still cannot verify your licence.</b>\n\n"
+                    f"It has been unverifiable for over {_GRACE_MAX_S // 3600}h, "
+                    "so access is paused. Nothing was lost — contact "
+                    "supportaicashsystem@gmail.com and it is restored as soon "
+                    "as verification works again.")
+            return False
+        if not u.get("license_grace_since"):
+            try:
+                user_store.update(cid, {"license_grace_since": int(since)})
+            except Exception:
+                pass
+            print(f"[TELEGRAM] {cid}: licence unverifiable ({reason}) — GRACE "
+                  f"started; no new live orders until it clears")
+            send_to(chat_id,
+                    "⏳ <b>We can't reach the licence service right now.</b>\n\n"
+                    "Your bot keeps managing what is already open, but it will "
+                    "not open anything new on a live account until we can "
+                    "confirm your licence. Nothing for you to do — this clears "
+                    "itself.")
+        return True
+
     try:
         r = requests.post(_VERIFY_URL, json={"key": key, "product": cfg.LICENSE_PRODUCT}, timeout=8)
         if r.status_code >= 500:
-            # "We cannot tell you right now", not "this licence is dead".
-            return True
+            return _enter_grace(f"HTTP {r.status_code}")
         data = r.json()
-    except Exception:
-        return True  # fail-open
+        if not isinstance(data, dict):
+            return _enter_grace("non-object body")
+    except Exception as e:
+        return _enter_grace(type(e).__name__)
+
     if data.get("valid") is False:
         try:
-            user_store.update(cid, {"license_key": None})
+            user_store.update(cid, {"license_key": None,
+                                    "license_grace_since": None})
         except Exception:
             pass
         access.revoke(cid)
@@ -5888,8 +5973,14 @@ def _revalidate_license(chat_id):
                 f"⛔ <b>{data.get('message', 'Your license is no longer active.')}</b>\n"
                 "Questions? supportaicashsystem@gmail.com")
         return False
+
+    # Verified. Clear any grace marker so live trading resumes.
     try:
-        user_store.update(cid, {"license_checked_at": int(time.time())})
+        _patch = {"license_checked_at": int(time.time())}
+        if u.get("license_grace_since"):
+            _patch["license_grace_since"] = None
+            print(f"[TELEGRAM] {cid}: licence verified again — grace cleared")
+        user_store.update(cid, _patch)
     except Exception:
         pass
     return True

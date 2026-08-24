@@ -1400,62 +1400,75 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
   const { key, product: claimedProduct } = req.body || {};
   if (!key) return res.json({ valid: false, message: 'No license key provided' });
 
-  // 1. HMAC check — works without any database
+  // 1. Signature, then the ONLY authority on whether it was paid for.
+  //
+  // A valid HMAC proves this server minted the key. It does NOT prove the key
+  // was paid for, is still paid for, or was not refunded — a refunded
+  // customer, an expired trial and an abandoned checkout all keep a
+  // permanently valid signature. Only the licences row knows, and the payment
+  // webhook is the only thing that writes active:true to it.
+  //
+  // So ALL of these must hold: signature valid, row exists, product matches,
+  // active, not refunded, not expired. Anything missing is a denial, and an
+  // unreadable store is a denial too.
   const hmacResult = verifyLicenseKeyHmac(key);
   if (hmacResult.valid) {
-    // Product mismatch check: a key whose product is not the caller's → reject
     if (claimedProduct && hmacResult.product && claimedProduct !== hmacResult.product) {
       return res.json({ valid: false, message: `Wrong license type. This key is for ${hmacResult.product}. Purchase the correct bot at aicashsystem.space` });
     }
-    // A valid signature is NOT proof of payment. The payment webhook is the
-    // only place that upserts a license as active:true, on event=on_payment. So: if
-    // the key exists in our DB as not-yet-paid, reject it.
-    if (supabase) {
-      try {
-        const { data: row, error: rowErr } = await supabase.from('licenses')
-          .select('active,refunded,trial,expires_at').eq('key', key).maybeSingle();
-        // supabase-js reports a network/permission failure in `error`, it does
-        // NOT always throw. Destructuring only `data` made an unreachable
-        // database indistinguishable from "no such row" — and "no such row"
-        // falls through to allow, as a legacy/manual key. So the catch below
-        // never fired for the most common outage shape and the endpoint stayed
-        // fail-open. Verified by booting this server against an unreachable
-        // SUPABASE_URL: it answered {valid:true} until this line existed.
-        // maybeSingle() reports no error for zero rows, so any error here is
-        // a real failure to read.
-        if (rowErr) throw new Error(rowErr.message || 'licence lookup failed');
-        if (row && row.refunded === true) {
-          return res.json({ valid: false, message: 'This license was refunded and is no longer active. Repurchase at aicashsystem.space' });
-        }
-        if (row && row.trial === true && row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) {
-          if (row.active !== false) supabase.from('licenses').update({ active: false }).eq('key', key).then(() => {}).catch(() => {});
-          return res.json({ valid: false, message: 'Your free trial has ended. For full access, get your bot at aicashsystem.space' });
-        }
-        if (row && row.active === false) {
-          return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
-        }
-        // row.active === true, or no row at all (legacy/manual key) → allow through.
-      } catch (e) {
-        // FAIL CLOSED. This used to swallow the error and fall through to the
-        // `valid: true` below — but the comment ten lines up is right: a valid
-        // signature is NOT proof of payment, and the DB is the only place that
-        // knows whether it was paid, refunded, or a trial that has expired. So
-        // during a Supabase outage a refunded customer, an expired trial and a
-        // never-paid checkout ALL verified as valid, and stayed valid for as
-        // long as the outage lasted.
-        //
-        // 503, not { valid: false }: the bot treats any 5xx as "can't check
-        // right now, try again shortly" and tells the client exactly that,
-        // whereas a false would tell a paying customer their licence is bad.
-        addLog(`verify-license: licence store unreachable (${e.message}) — DENYING`, 'license', 'error');
-        return res.status(503).json({ valid: false, message: 'Licence service temporarily unavailable — please try again in a few minutes.' });
-      }
+    // No database configured at all is not the same as a database that cannot
+    // be read: it is a deployment that never records payments, so there is
+    // nothing to consult and nothing to grant. Refuse rather than invent an
+    // entitlement.
+    if (!supabase) {
+      addLog('verify-license: no licence store configured — DENYING', 'license', 'error');
+      return res.status(503).json({ valid: false, message: 'Licence service is not configured — please contact support.' });
     }
-    if (supabase) {
-      supabase.from('licenses')
-        .upsert([{ key, active: true, activated_at: new Date().toISOString(), product: hmacResult.product }], { onConflict: 'key' })
+    let row, rowErr;
+    try {
+      ({ data: row, error: rowErr } = await supabase.from('licenses')
+        .select('active,refunded,trial,expires_at,product').eq('key', key).maybeSingle());
+    } catch (e) {
+      rowErr = e;
+    }
+    // supabase-js reports a network/permission failure in `error` and does NOT
+    // always throw, so checking only the thrown case left the endpoint
+    // fail-open for the most common outage shape. Verified by booting this
+    // server against an unreachable SUPABASE_URL. maybeSingle() reports no
+    // error for zero rows, so any error here is a real failure to read.
+    if (rowErr) {
+      addLog(`verify-license: licence store unreachable (${rowErr.message || rowErr}) — DENYING`, 'license', 'error');
+      // 503 rather than {valid:false}: the bot reads any 5xx as "cannot check
+      // right now, try again", where a false would tell a paying customer
+      // their licence is bad.
+      return res.status(503).json({ valid: false, message: 'Licence service temporarily unavailable — please try again in a few minutes.' });
+    }
+    if (!row) {
+      // NO ROW = NOT SOLD. This used to fall through to allow, as a
+      // "legacy/manual key". Combined with the auto-upsert that used to sit
+      // below, a signature alone both granted access AND wrote itself an
+      // active licence — verification minting its own entitlement.
+      addLog(`verify-license: signed key with no licence row — DENYING (${String(key).slice(0, 9)}…)`, 'license', 'warn');
+      return res.json({ valid: false, message: 'This licence is not registered. If you have just paid, wait a minute and tap the link in your email.' });
+    }
+    if (row.refunded === true) {
+      return res.json({ valid: false, message: 'This license was refunded and is no longer active. Repurchase at aicashsystem.space' });
+    }
+    if (row.active !== true) {
+      return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
+    }
+    if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) {
+      supabase.from('licenses').update({ active: false }).eq('key', key)
         .then(() => {}).catch(() => {});
+      return res.json({ valid: false, message: row.trial === true
+        ? 'Your free trial has ended. For full access, get your bot at aicashsystem.space'
+        : 'This licence has expired. Renew at aicashsystem.space' });
     }
+    if (claimedProduct && row.product && claimedProduct !== row.product) {
+      return res.json({ valid: false, message: `Wrong license type. This key is for ${row.product}.` });
+    }
+    // Deliberately NO upsert here. Verification must not create or reactivate
+    // an entitlement; the payment webhook is the only writer of active:true.
     return res.json({ valid: true, message: 'License valid', product: hmacResult.product });
   }
 
@@ -1474,24 +1487,49 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
   if (!/^FORX-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(String(key).toUpperCase())) {
     return res.json({ valid: false, message: 'Invalid license key. Purchase at aicashsystem.space' });
   }
-  if (supabase) {
-    try {
-      // Same rule on the legacy path. `.single()` DOES error when it finds no
-      // row (PGRST116), which is an ordinary "not found" here — anything else
-      // is a failure to read and must not be reported as an invalid key.
-      const { data, error: legacyErr } = await supabase
-        .from('licenses').select('active,product').eq('key', key).eq('active', true).single();
-      if (legacyErr && legacyErr.code !== 'PGRST116') {
-        addLog(`verify-license: licence store unreachable on legacy lookup (${legacyErr.message}) — DENYING`, 'license', 'error');
-        return res.status(503).json({ valid: false, message: 'Licence service temporarily unavailable — please try again in a few minutes.' });
-      }
-      if (data?.active) {
-        if (claimedProduct && data.product && claimedProduct !== data.product) {
-          return res.json({ valid: false, message: `Wrong license type. This key is for ${data.product}.` });
-        }
-        return res.json({ valid: true, message: 'License valid (legacy)', product: data.product });
-      }
-    } catch (_) {}
+  if (!supabase) {
+    addLog('verify-license: no licence store configured — DENYING legacy lookup', 'license', 'error');
+    return res.status(503).json({ valid: false, message: 'Licence service is not configured — please contact support.' });
+  }
+  let lrow, lerr;
+  try {
+    // maybeSingle(), not single(): single() reports "no rows" as an error, so
+    // a genuine read failure and an ordinary miss arrived down the same path
+    // and had to be told apart by an error code. maybeSingle() gives null for
+    // a miss and an error only for a real failure.
+    ({ data: lrow, error: lerr } = await supabase.from('licenses')
+      .select('active,product,refunded,expires_at,trial').eq('key', key).maybeSingle());
+  } catch (e) {
+    // The old code swallowed this with `catch (_) {}` and fell through to
+    // "Invalid license key" — the safe direction, but it told a paying
+    // customer their key was bad and logged nothing for the operator.
+    lerr = e;
+  }
+  if (lerr) {
+    addLog(`verify-license: licence store unreachable on legacy lookup (${lerr.message || lerr}) — DENYING`, 'license', 'error');
+    return res.status(503).json({ valid: false, message: 'Licence service temporarily unavailable — please try again in a few minutes.' });
+  }
+  if (lrow) {
+    // The legacy path answers the SAME questions as the signed path. Checking
+    // only `active` here would have let a refunded or expired legacy key
+    // through on a route that skips the signature entirely.
+    if (lrow.refunded === true) {
+      return res.json({ valid: false, message: 'This license was refunded and is no longer active. Repurchase at aicashsystem.space' });
+    }
+    if (lrow.active !== true) {
+      return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
+    }
+    if (lrow.expires_at && new Date(lrow.expires_at).getTime() <= Date.now()) {
+      supabase.from('licenses').update({ active: false }).eq('key', key)
+        .then(() => {}).catch(() => {});
+      return res.json({ valid: false, message: lrow.trial === true
+        ? 'Your free trial has ended. For full access, get your bot at aicashsystem.space'
+        : 'This licence has expired. Renew at aicashsystem.space' });
+    }
+    if (claimedProduct && lrow.product && claimedProduct !== lrow.product) {
+      return res.json({ valid: false, message: `Wrong license type. This key is for ${lrow.product}.` });
+    }
+    return res.json({ valid: true, message: 'License valid (legacy)', product: lrow.product });
   }
 
   return res.json({ valid: false, message: 'Invalid license key. Purchase at aicashsystem.space' });

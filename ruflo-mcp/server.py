@@ -37,15 +37,28 @@ _REDIS = {
         "url": (os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/"),
         "token": os.getenv("UPSTASH_REDIS_REST_TOKEN") or "",
     },
-    "crypto": {
-        "url": (os.getenv("UPSTASH_CRYPTO_URL")
-                or os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/"),
-        "token": (os.getenv("UPSTASH_CRYPTO_TOKEN")
-                  or os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""),
-    },
 }
-_SECRET = os.getenv("RUFLO_MCP_SECRET") or "ruflo"
-_PRODUCTS = {"crypto", "forex"}
+
+# The path segment that makes this endpoint's URL unguessable. It defaulted to
+# the literal "ruflo", published in this repository — so the whole operator
+# surface sat at a URL anyone could type. Financial actions were still safe
+# (the bot refuses level 2/3 without MCP_SIGNING_SECRET), but the read tools
+# are not nothing: user_detail, audit_log and bot_status expose client
+# records. Production now refuses to start rather than serve them from a
+# guessable path.
+_SECRET = (os.getenv("RUFLO_MCP_SECRET") or "").strip()
+_IS_PROD = (os.getenv("APP_ENV") or "").strip().lower() not in (
+    "dev", "development", "local", "test")
+if not _SECRET:
+    if _IS_PROD:
+        raise SystemExit(
+            "[FATAL] RUFLO_MCP_SECRET is not set. It is the only thing making "
+            "this operator endpoint's URL unguessable, and the endpoint exposes "
+            "client records. Set it, or set APP_ENV=dev for local work."
+        )
+    _SECRET = "dev-only-unguessable-nothing"
+
+_PRODUCTS = {"forex"}
 
 _SITE = (os.getenv("SITE_URL") or "https://aicashsystem.space").rstrip("/")
 
@@ -139,7 +152,7 @@ mcp = FastMCP(
 # ─── Read tools ────────────────────────────────────────────
 @mcp.tool()
 def bot_alive(product: str) -> dict:
-    """Is the crypto/forex bot alive? Returns seconds since its last heartbeat."""
+    """Is the bot alive? Returns seconds since its last heartbeat."""
     ns = _ns(product)
     hb = _redis(ns, "GET", f"{ns}:mcp_heartbeat")
     if not hb:
@@ -151,7 +164,7 @@ def bot_alive(product: str) -> dict:
 @mcp.tool()
 def bot_status(product: str) -> dict:
     """Live snapshot: active users and each one's symbol, strategy, running
-    state, balance and connected cTrader account. product = crypto | forex."""
+    state, balance and connected cTrader account. product = forex."""
     return _call(product, "status")
 
 
