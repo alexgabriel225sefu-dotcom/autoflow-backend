@@ -107,18 +107,37 @@ fresh_session()
 r = strategies.should_stop(1000, 1000)
 check("clean session → no stop", r["stop"] is False, r)
 
+# The Seykota "3 losses in a row" stand-aside was REMOVED at the owner's
+# instruction. A streak of red results no longer halts anything — what stops
+# the account is how much money is gone, not how many outcomes in a row were
+# losses. These checks pin the removal, and pin that the money limits below
+# were not weakened along with it.
 fresh_session()
 strategies.session["consecutiveLosses"] = 3
-strategies.session["lastLossAt"] = time.time()  # just lost — still inside cooldown
+strategies.session["lastLossAt"] = time.time()      # just lost, no cooldown now
 r = strategies.should_stop(1000, 1000)
-check("3 consecutive losses → stop (Seykota)", r["stop"] and any("consecutive" in x for x in r["reasons"]), r)
+check("3 consecutive losses no longer stop trading", r["stop"] is False, r)
+check("and no Seykota reason is produced",
+      not any("Seykota" in x or "consecutive" in x for x in r["reasons"]), r)
 
 fresh_session()
-strategies.session["consecutiveLosses"] = 3
-strategies.session["lastLossAt"] = time.time() - 61 * 60  # cooldown elapsed
+strategies.session["consecutiveLosses"] = 12         # a long run of red
 r = strategies.should_stop(1000, 1000)
-check("Seykota cooldown expires → streak clears, no stop",
-      r["stop"] is False and strategies.session["consecutiveLosses"] == 0, r)
+check("nor does a much longer streak", r["stop"] is False, r)
+
+# Still COUNTED, so the journal and dashboard keep telling the truth — it
+# just no longer gates anything.
+check("the streak is still recorded",
+      strategies.session["consecutiveLosses"] == 12,
+      "removing the gate must not stop the bot knowing what happened")
+
+# The protections that remain must still bite, and they are about money.
+fresh_session()
+strategies.session["consecutiveLosses"] = 3
+strategies.session["dailyPnL"] = -50.0
+r = strategies.should_stop(950, 1000)
+check("a losing streak plus a real daily loss still stops",
+      r["stop"] and any("Daily loss" in x for x in r["reasons"]), r)
 
 fresh_session()
 strategies.session["dailyPnL"] = -50.0

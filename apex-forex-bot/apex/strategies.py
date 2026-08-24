@@ -1,7 +1,11 @@
 """Legendary-trader strategy engine (port of strategies.js).
 
-Turtle breakout, Livermore structure, Soros momentum, PTJ/Seykota defense,
-Druckenmiller position sizing.
+Turtle breakout, Livermore structure, Soros momentum, PTJ defense (daily loss
+and drawdown limits), Druckenmiller position sizing.
+
+The Seykota loss-streak defense — stand aside after three losses in a row —
+was removed at the owner's instruction. The streak is still counted; it just
+no longer stops or shrinks anything. See `should_stop`.
 """
 import time
 from datetime import date
@@ -148,41 +152,49 @@ def _reset_daily_if_needed(user_id=None):
         print(f"[STRATEGY:{user_id or '?'}] 🌅 New day — counters reset.")
 
 
-_SEYKOTA_COOLDOWN_MIN = 60  # after 3 losses in a row, stand aside this long, then clear the streak
-
-
 def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
-                max_dd_pct=20.0, user_id=None, symbol=None,
-                seykota_cooldown_min=_SEYKOTA_COOLDOWN_MIN):
+                max_dd_pct=20.0, user_id=None, symbol=None):
     """Circuit breaker — per-user when user_id is provided.
 
-    The Seykota "3 losses in a row" rule is scoped to `symbol` (when given):
-    a whipsaw on one instrument stands aside on THAT instrument only, instead
-    of freezing the whole account while a completely different pair might
-    have a perfectly good setup right now. Daily loss % and drawdown from
-    peak stay account-wide — those protect total capital, not a single
-    instrument. No cap on trades/day — a good setup is a good setup
-    regardless of how many came before it today.
+    Two limits, both measured in MONEY: the daily loss percentage and the
+    drawdown from peak. Both are account-wide, because they protect total
+    capital rather than one instrument.
+
+    There is no cap on trades per day — a good setup is a good setup however
+    many came before it — and, since the owner removed it, no limit based on
+    a run of losing RESULTS. See the note in the body for what that rule was
+    and why it existed.
+
+    `symbol` is still accepted: the per-instrument streak is counted and
+    persisted for the journal and the dashboard. It no longer gates anything.
     """
     _reset_daily_if_needed(user_id)
     s = get_session(user_id)
     reasons = []
     if s["peakBalance"] is None or balance > s["peakBalance"]:
         s["peakBalance"] = balance
+    # THE SEYKOTA "3 LOSSES IN A ROW" STAND-ASIDE IS REMOVED, at the owner's
+    # instruction. It used to halt entries on an instrument for an hour after
+    # three consecutive losses.
+    #
+    # It is worth recording what it was for, because removing it removes a
+    # real protection: three losses in a row is usually either a market the
+    # strategy does not suit or the beginning of revenge trading, and an hour
+    # away from the screen costs one setup and can save several. It also had
+    # a history — an earlier version cleared only on a WIN, which deadlocked
+    # an account for 37 hours, since the bot cannot win a trade it is
+    # forbidden from entering. The cooldown was the fix for that.
+    #
+    # What remains, and is what actually protects the account: the daily loss
+    # limit and the drawdown-from-peak limit below. Both are about how much
+    # money is gone, which is the question that matters — rather than how
+    # many results in a row were red, which a single mis-journaled close can
+    # get wrong.
+    #
+    # The streak is still COUNTED (strategy_session.consecutiveLosses) so the
+    # journal and the dashboard keep telling the truth about what happened.
+    # It just no longer stops anything.
     loss_s = get_symbol_session(user_id, symbol) if symbol else s
-    if loss_s["consecutiveLosses"] >= 3:
-        # Time-boxed, not permanent: this only clears on a WIN, and the bot
-        # can't win a trade it's forbidden from entering — that deadlocked a
-        # user for 37+ hours in production. Stand aside for the cooldown, then
-        # clear the streak so a fresh run of losses is needed to re-trigger it.
-        elapsed_min = (time.time() - loss_s["lastLossAt"]) / 60 if loss_s["lastLossAt"] else seykota_cooldown_min
-        if elapsed_min >= seykota_cooldown_min:
-            loss_s["consecutiveLosses"] = 0
-            _persist_session(user_id) if not symbol else _persist_symbol_session(user_id, symbol)
-        else:
-            left = int(seykota_cooldown_min - elapsed_min) + 1
-            where = f"{symbol}: " if symbol else ""
-            reasons.append(f"{where}3 consecutive losses — standing aside {left}m more (Seykota rule)")
     daily_dd_pct = (s["dailyPnL"] / start_balance) * 100 if start_balance else 0
     if daily_dd_pct < -abs(max_daily_loss_pct):
         reasons.append(f"Daily loss exceeded -{abs(max_daily_loss_pct):g}% "

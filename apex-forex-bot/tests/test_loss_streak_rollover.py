@@ -1,7 +1,14 @@
-"""A loss streak from yesterday must not still be halving today's positions.
+"""A loss streak from yesterday must not carry into today.
 
-The risk ladder is deliberate: two losses in a row halve the next position, three
-or more quarter it. What was not deliberate is how long that lasted.
+THE RISK LADDER THIS ORIGINALLY PROTECTED HAS SINCE BEEN REMOVED — two losses
+no longer halve a position and three no longer quarter it. The rollover still
+earns its place: the streak is still COUNTED, for the journal and the
+dashboard, and a counter that carries yesterday's losses forever misreports
+what happened today.
+
+The history below is kept because it is the reason the check exists at all,
+and because the bug was never the ladder — it was a check that ran once per
+process and so never ran again.
 
 The clearing check was written and it was correct — and it ran exactly once, in
 the loop's SETUP, before the `while True`. So it was evaluated once per process.
@@ -108,12 +115,17 @@ check("no streak stays no streak", simulate(0, yday_loss) == 0)
 check("a streak with no recorded loss time is left alone",
       simulate(2, 0) == 2, "clearing on missing data would erase a real brake")
 
-print("\n4. The ladder it feeds is unchanged")
-check("two losses still halve", "elif loss_streak == 2:" in SRC and "0.5" in SRC)
-check("three or more still quarter", "if loss_streak >= 3:" in SRC and "0.25" in SRC)
+print("\n4. The ladder it used to feed is gone")
+# The rollover itself still earns its place: the streak is still COUNTED for
+# the journal and the dashboard, and a counter that carries yesterday's losses
+# forever misreports what happened today. What it no longer feeds is a
+# position-size cut — the owner removed that after it quartered his trades for
+# two days and turned winners into three-dollar results.
+check("two losses no longer halve size", "elif loss_streak == 2:" not in SRC)
+check("three or more no longer quarter it", "if loss_streak >= 3:" not in SRC)
 check("the longer-horizon guards are untouched",
       "max_dd_pct" in SRC and "max_daily_loss_pct" in SRC,
-      "the daily clear is safe precisely because drawdown caps still apply")
+      "with the streak brake gone, these are the whole protection")
 
 print("\n5. The two counters can no longer disagree indefinitely")
 # strategy_session already rolled over on lastResetDay; loss_streak did not.

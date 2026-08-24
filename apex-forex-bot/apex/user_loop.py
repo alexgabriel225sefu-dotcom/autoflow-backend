@@ -3328,10 +3328,25 @@ def _loop(user_id, alert_fn, gen=None):
                 risk_mult = strategies.druckenmiller_multiplier(
                     confidence, signal.get("criteriaScore", 0),
                     strat_data.get("livermore"), strat_data.get("turtle"))
-                if loss_streak >= 3:
-                    risk_mult *= 0.25
-                elif loss_streak == 2:
-                    risk_mult *= 0.5
+                # The loss-streak risk ladder (2 losses → half size, 3+ →
+                # quarter) is REMOVED at the owner's instruction, after it
+                # quartered his positions for two days on a demo account and
+                # then produced winners worth two or three dollars.
+                #
+                # The argument for it was real: after a run of losses you are
+                # either in a market that does not suit the strategy or you
+                # are about to revenge-trade, and both are cheaper at quarter
+                # size. The argument against it is also real, and it is his to
+                # weigh: it cuts size hardest exactly when the account is
+                # already down, so the recovery is slowest at the worst
+                # moment, and a streak counted off a mis-journaled close
+                # shrinks real trades for a reason that never happened.
+                #
+                # What still limits size, and is NOT this: the per-trade risk
+                # setting (/risk), max_daily_loss_pct, max_dd_pct, and the
+                # volatile-regime cut below — that last one reads the market
+                # in front of it rather than the last three results, which is
+                # why it stays.
                 if regime.get("regime") == "volatile":
                     risk_mult *= 0.5
                 # Size off the account's starting balance (adjusted only for
