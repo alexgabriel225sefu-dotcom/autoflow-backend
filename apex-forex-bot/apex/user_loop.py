@@ -2142,6 +2142,60 @@ def _loop(user_id, alert_fn, gen=None):
                         if alert_fn:
                             alert_fn(user_id, {"action": _act, "symbol": symbol,
                                                "sl": moved, "side": _side})
+
+                # ── Every OTHER open position gets the same management ──
+                #
+                # _manage_trailing above only ever sees the FOCUSED symbol, and
+                # the focus cannot move while the account is at max positions:
+                # the rescan that re-picks it is gated on `slot_free`, which is
+                # `open_count < maxpos`. So with maxpos=2 and two positions
+                # open, the second one had no trailing stop and no break-even
+                # for as long as both were open. Its original stop was still at
+                # the broker — the loss was bounded — but a winner never
+                # ratcheted, never moved to break-even, and gave its gains back.
+                #
+                # Only positions THIS process opened are touched: entry_risk_by_sym
+                # is the record of that. A position belonging to another bot on
+                # the same account is left entirely alone.
+                if (not cfg.PAPER_TRADING) and all_positions:
+                    for _op in all_positions:
+                        _osym = _op.get("symbol")
+                        if not _osym or _nrm(_osym) == _nrm(symbol):
+                            continue
+                        _orisk = entry_risk_by_sym.get(_nrm(_osym))
+                        if _orisk is None:
+                            continue
+                        try:
+                            _ob, _oa = broker.get_bid_ask(_osym)
+                            _opx = (_ob + _oa) / 2 if (_ob and _oa) else None
+                            if not _opx:
+                                continue
+                            _omoved = _manage_trailing(broker, cfg, _op, _osym,
+                                                       _opx, initial_risk=_orisk)
+                        except Exception as _oe:
+                            print(f"[UserLoop:{user_id}] trailing {_osym}: {_oe}")
+                            continue
+                        if _omoved is None:
+                            continue
+                        _od = pos_details.setdefault(_nrm(_osym), {})
+                        _oentry = _op.get("entryPrice") or _od.get("entry")
+                        _oside = _op.get("side")
+                        try:
+                            _oentry = float(_oentry or 0)
+                        except (TypeError, ValueError):
+                            _oentry = 0.0
+                        _osafe = bool(_oentry) and (
+                            (_oside == "BUY" and _omoved >= _oentry)
+                            or (_oside == "SELL" and _omoved <= _oentry))
+                        _ometa = entry_meta_by_sym.setdefault(_nrm(_osym), {})
+                        if _osafe and not _ometa.get("breakevenAnnounced"):
+                            _ometa["breakevenAnnounced"] = True
+                            _oact = "STOP_BREAKEVEN"
+                        else:
+                            _oact = "STOP_MOVED"
+                        if alert_fn:
+                            alert_fn(user_id, {"action": _oact, "symbol": _osym,
+                                               "sl": _omoved, "side": _oside})
                 prev_balance = paper_balance
                 try:
                     paper_balance = broker.get_balance()
