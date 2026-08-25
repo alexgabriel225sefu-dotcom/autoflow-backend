@@ -3486,26 +3486,57 @@ def _loop(user_id, alert_fn, gen=None):
                     # branch would be read too late to stop anything.
                     units = forex.round_units(max(units, floor), symbol)
                     _budget = sizing_balance * per_trade_risk
+                    # The client's OWN hard limit, not a multiple of the sizing
+                    # target. A broker minimum is not negotiable, so refusing
+                    # everything above the target refused gold outright — and
+                    # 1 oz risks 1.49% of this account against a 4% daily stop
+                    # the client set themselves. What must never happen is a
+                    # single trade that can trip that stop on its own.
+                    _hard = sizing_balance * (
+                        float(getattr(cfg, "MAX_DAILY_LOSS_PCT", 4.0)) / 100.0)
                     if not forex.floor_risk_ok(units, symbol, price,
-                                               stop_pips_eff, _budget):
+                                               stop_pips_eff, _budget,
+                                               hard_ceiling_usd=_hard):
                         # Name the numbers. "Minimum lot too big" alone leaves
                         # the client with a symbol that silently never trades
                         # and no way to tell whether that is a bug, a market
                         # condition, or something they can act on. It is the
                         # third, and the two levers are in the message.
                         try:
-                            _would = (units * forex.pip_value_per_unit(symbol, price)
-                                      * abs(stop_pips_eff))
+                            _would = forex.floor_risk_at(units, symbol, price,
+                                                         stop_pips_eff)
                             _pct = (_would / sizing_balance * 100) if sizing_balance else 0
                             _skip(f"{symbol}: broker minimum is "
                                   f"{units:g} {forex.unit_label(symbol)}, which risks "
-                                  f"${_would:.2f} ({_pct:.2f}% of the account) against "
-                                  f"your ${_budget:.2f} limit — raise /risk or trade a "
-                                  f"smaller-lot instrument")
+                                  f"${_would:.2f} ({_pct:.2f}% of the account) — past "
+                                  f"your {getattr(cfg, 'MAX_DAILY_LOSS_PCT', 4.0):g}% "
+                                  f"daily-loss limit, so one trade could stop the day "
+                                  f"by itself")
                         except Exception:
                             _skip("minimum lot on this instrument would risk more "
-                                  "than the configured risk per trade")
+                                  "than the daily-loss limit")
                         entry_ok = False
+                    else:
+                        # Allowed, but the size is NOT what the risk setting
+                        # asked for. Saying so is the whole difference between
+                        # this and the bug it replaces, which did exactly the
+                        # same thing without telling anyone.
+                        try:
+                            _would = forex.floor_risk_at(units, symbol, price,
+                                                         stop_pips_eff)
+                            if _would > _budget * 1.10:
+                                dash["minLotNotice"] = {
+                                    "symbol": symbol, "units": units,
+                                    "riskUsd": round(_would, 2),
+                                    "pct": round(_would / sizing_balance * 100, 2)
+                                    if sizing_balance else None,
+                                    "targetUsd": round(_budget, 2)}
+                                print(f"[UserLoop:{user_id}] {symbol}: broker minimum "
+                                      f"{units:g} {forex.unit_label(symbol)} risks "
+                                      f"${_would:.2f} vs the ${_budget:.2f} target "
+                                      f"— allowed, under the daily-loss limit")
+                        except Exception:
+                            pass
                 if not entry_ok:
                     pass  # margin too small — skip to CLOSE handling below
                 else:

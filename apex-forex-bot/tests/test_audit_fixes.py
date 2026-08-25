@@ -138,12 +138,39 @@ def _final(broker):
 
 
 _one_oz = _final(_BrokerMin(1.0))
-check("a 1 oz broker minimum is seen by the risk check",
+check("the broker's 1 oz minimum is what the check sees",
+      abs(_one_oz - 1.0) < 1e-9,
+      f"{_one_oz} — a generic guess would have left this at 0.34")
+
+# RISK_PER_TRADE is a SIZING TARGET, not a hard limit. The hard limits are the
+# ones the client set as limits. Refusing everything above the target was this
+# suite's first answer and it was wrong: it refused gold outright, because a
+# broker minimum is not negotiable and no size both clears 1 oz and hits 0.5%
+# of $3,221 over a $48 ATR stop. One ounce risks 1.49% against a 4% daily-loss
+# limit — a trade this account can plainly afford.
+#
+# What was actually wrong with the original `max(units, floor)` was that it
+# exceeded the target SILENTLY and WITHOUT BOUND. Both of those are what these
+# checks now hold.
+_DAILY = 0.04
+check("gold trades on an account that can afford it",
+      forex.floor_risk_ok(_one_oz, "XAUUSD", _XAU_PX, _XAU_STOP, _budget,
+                          hard_ceiling_usd=_BAL * _DAILY) is True,
+      f"1 oz risks "
+      f"${forex.floor_risk_at(_one_oz, 'XAUUSD', _XAU_PX, _XAU_STOP):.2f} "
+      f"= {forex.floor_risk_at(_one_oz, 'XAUUSD', _XAU_PX, _XAU_STOP) / _BAL * 100:.2f}% "
+      f"against a {_DAILY * 100:g}% daily limit")
+for _small in (500.0, 300.0):
+    check(f"…and is refused on a ${_small:.0f} account",
+          forex.floor_risk_ok(_one_oz, "XAUUSD", _XAU_PX, _XAU_STOP,
+                              _small * 0.005,
+                              hard_ceiling_usd=_small * _DAILY) is False,
+          f"{forex.floor_risk_at(_one_oz, 'XAUUSD', _XAU_PX, _XAU_STOP) / _small * 100:.1f}% "
+          f"of the account — one trade could stop the day by itself")
+check("no ceiling given keeps the strict behaviour",
       forex.floor_risk_ok(_one_oz, "XAUUSD", _XAU_PX, _XAU_STOP, _budget) is False,
-      f"{_one_oz} oz risks "
-      f"${_one_oz * forex.pip_value_per_unit('XAUUSD', _XAU_PX) * _XAU_STOP:.2f} "
-      f"against a ${_budget:.2f} budget")
-check("a broker that answers small changes nothing",
+      "every caller that does not pass one must stay as it was")
+check("a size at the target passes either way",
       forex.floor_risk_ok(_final(_BrokerMin(0.01)), "XAUUSD", _XAU_PX,
                           _XAU_STOP, _budget) is True)
 check("a broker that will not answer falls back, it does not assume zero",
@@ -154,9 +181,14 @@ check("a broker without the method is handled",
 check("a broker that raises is handled",
       user_loop.broker_min_units(
           type("B", (), {"min_units": lambda *_a, **_k: 1 / 0})(), "XAUUSD", 0.01) == 0.01)
-check("the refusal names the numbers and the lever",
-      "raise /risk" in LSRC and "of the account) against" in LSRC,
-      "'minimum lot too big' leaves a symbol that silently never trades")
+check("the loop passes the client's own daily limit as the ceiling",
+      "hard_ceiling_usd=_hard" in LSRC and "MAX_DAILY_LOSS_PCT" in LSRC,
+      "an arbitrary multiple of the target would be my number, not theirs")
+check("a refusal names the daily limit it broke",
+      "daily-loss limit" in LSRC and "stop the day" in LSRC)
+check("an allowed overshoot is DISCLOSED, not silent",
+      "minLotNotice" in LSRC,
+      "doing it quietly is the bug this replaces, not the fix")
 
 check("the guard is read before the order branch, not inside it",
       LSRC.index("floor_risk_ok(units, symbol, price")

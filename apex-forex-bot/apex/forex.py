@@ -220,27 +220,56 @@ def calc_units(balance: float, risk_pct: float, stop_pips: float,
 
 
 
+def floor_risk_at(units: float, instrument: str, price: float,
+                  stop_pips: float) -> float:
+    """What taking `units` actually loses if the stop is hit, in dollars."""
+    if not stop_pips:
+        return 0.0
+    return abs(units) * pip_value_per_unit(instrument, price) * abs(stop_pips)
+
+
 def floor_risk_ok(units: float, instrument: str, price: float,
                   stop_pips: float, risk_budget_usd: float,
+                  hard_ceiling_usd: float = None,
                   tolerance: float = 0.10) -> bool:
-    """True when taking `units` keeps the loss at the stop inside the budget.
+    """Is it acceptable to take `units`, given the broker's minimum lot?
 
-    The minimum-lot floor (`min_units`) used to be applied as a bare
-    `max(units, floor)`, with nothing checking that the floor still respected
-    the risk budget. Whenever the risk-correct size came out BELOW the floor —
-    which happens on wide stops and on small accounts — the floor won and the
-    trade silently carried more risk than the client configured, without limit:
-    on a $3,243 account at 0.5%, a 200-pip EUR_USD stop risked 1.23x the
-    budget and a 500-pip stop 3.08x. It gets worse as the account shrinks,
-    so it bites hardest exactly after a drawdown.
+    TWO different limits, and conflating them was the mistake here.
 
-    `tolerance` absorbs ordinary lot-step rounding; beyond it the caller must
-    refuse the trade rather than quietly take a bigger one.
+    RISK_PER_TRADE is a SIZING TARGET. It says how big a position to compute,
+    not how big a position the account may ever hold. The hard limits are the
+    ones the client set as limits: MAX_DAILY_LOSS_PCT and MAX_DD_PCT.
+
+    That distinction matters because a broker minimum is not negotiable. Gold
+    at this broker is 1 oz minimum; 0.5% of $3,221 over a $48 ATR stop is
+    0.33 oz. There is no size that both clears the minimum and hits the
+    target — the only ways to "fix" it are a tighter stop (a $16 stop on an
+    instrument with a $19 ATR is inside the noise and would be stopped out for
+    nothing) or refusing gold entirely. Refusing was this function's first
+    answer, and it was wrong: 1 oz risks 1.49% of that account against a 4%
+    daily-loss limit the client themselves set. That is a trade they can
+    plainly afford.
+
+    What was ACTUALLY wrong with the original `max(units, floor)` was not that
+    it exceeded the target — it was that it did so SILENTLY and WITHOUT BOUND.
+    On a small enough account or a wide enough stop it could be 10x or 50x,
+    and nothing anywhere said so.
+
+    So: exceeding the target is allowed, exceeding `hard_ceiling_usd` is not,
+    and the caller discloses whenever it happens. With no ceiling given the
+    target is the only limit, which keeps every existing caller strict.
+
+    `tolerance` absorbs ordinary lot-step rounding.
     """
     if not risk_budget_usd or risk_budget_usd <= 0 or not stop_pips:
         return True
-    loss = abs(units) * pip_value_per_unit(instrument, price) * abs(stop_pips)
-    return loss <= risk_budget_usd * (1.0 + tolerance)
+    loss = floor_risk_at(units, instrument, price, stop_pips)
+    if loss <= risk_budget_usd * (1.0 + tolerance):
+        return True
+    if hard_ceiling_usd and hard_ceiling_usd > 0:
+        return loss <= hard_ceiling_usd
+    return False
+
 
 def required_margin(units: int, instrument: str, price: float, leverage: float = 30) -> float:
     notional = units * (1.0 if instrument.upper().startswith("USD_") else price)
