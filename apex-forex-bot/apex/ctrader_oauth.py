@@ -81,6 +81,10 @@ ALLOW_STATELESS = (os.getenv("CTRADER_ALLOW_STATELESS_CALLBACK", "")
                    .strip().lower() in ("1", "true", "yes", "on"))
 
 
+class OAuthSigningSecretMissing(RuntimeError):
+    """No secret is available to sign the OAuth `state` parameter."""
+
+
 class StatelessCallbackInProduction(RuntimeError):
     """Raised at startup when production is configured to trust unsigned
     callbacks. Refusing to boot is the point: a service that starts in this
@@ -110,6 +114,14 @@ def assert_safe_config():
     else's real money. So it fails at startup, loudly, before the first
     callback can arrive.
     """
+    # A signing secret is not optional. Checked here so the failure lands at
+    # startup rather than on the first client who tries to link an account.
+    if not (cfg.TELEGRAM_BOT_TOKEN or cfg.CTRADER_CLIENT_SECRET):
+        raise OAuthSigningSecretMissing(
+            "No OAuth state signing secret is configured. `state` is what "
+            "proves a callback belongs to the chat that began the flow, so "
+            "without it one person's broker account can be bound to another "
+            "person's chat. Set TELEGRAM_BOT_TOKEN (or CTRADER_CLIENT_SECRET).")
     if ALLOW_STATELESS and _production():
         raise StatelessCallbackInProduction(
             "CTRADER_ALLOW_STATELESS_CALLBACK is on and this is production. "
@@ -236,8 +248,27 @@ def _consume_state(state) -> bool:
 
 
 def _secret() -> bytes:
-    # Bot token is secret and always set; fall back to client secret.
-    return (cfg.TELEGRAM_BOT_TOKEN or cfg.CTRADER_CLIENT_SECRET or "apex").encode()
+    """The key that signs the OAuth `state`. No literal fallback.
+
+    This used to end in `or "apex"` — a string published in this repository.
+    `state` is what proves a callback belongs to the chat that started the
+    flow; anyone who can forge one can bind THEIR cTrader account to SOMEBODY
+    ELSE'S Telegram chat, or the reverse. A signing key readable from the
+    source is not a key.
+
+    The bot token is always set in any deployment that can talk to Telegram at
+    all, so this is unreachable in practice — which is exactly why it must
+    raise rather than paper over it. An unreachable branch that silently
+    weakens a signature is the kind that gets reached after some future
+    refactor moves config loading around.
+    """
+    raw = cfg.TELEGRAM_BOT_TOKEN or cfg.CTRADER_CLIENT_SECRET
+    if not raw:
+        raise OAuthSigningSecretMissing(
+            "No OAuth state signing secret: set TELEGRAM_BOT_TOKEN (or "
+            "CTRADER_CLIENT_SECRET). Without one, a callback cannot be tied "
+            "to the chat that started it.")
+    return raw.encode()
 
 
 def make_state(chat_id) -> str:

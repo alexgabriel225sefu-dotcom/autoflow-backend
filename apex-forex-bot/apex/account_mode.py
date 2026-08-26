@@ -98,13 +98,27 @@ def resolve(user, *, allow_broker=True):
     return UNVERIFIED, "unknown"
 
 
-def badge(mode) -> str:
-    """The label the client sees. UNVERIFIED never borrows either other word."""
-    return {
+def badge(mode, source=None) -> str:
+    """The label the client sees. UNVERIFIED never borrows either other word.
+
+    `source` distinguishes an answer the broker just gave from one read back
+    out of our own record. Both are real information — `ctrader_env` is
+    written from the broker's answer at link time — but a stored value can be
+    stale, and "🧪 DEMO" reads as a fact the client can act on. When it came
+    from the stored flag rather than the live account, the label says so
+    instead of quietly presenting yesterday's answer as today's.
+
+    Omitting `source` keeps the plain label, for callers that have no source
+    to report.
+    """
+    label = {
         LIVE: "🔴 LIVE",
         DEMO: "🧪 DEMO",
         SIMULATION: "📝 SIMULATION",
     }.get(mode, "🟠 VERIFICATION REQUIRED")
+    if source == "stored-env" and mode in (LIVE, DEMO):
+        return f"{label} (unconfirmed)"
+    return label
 
 
 def is_real_money(mode) -> bool:

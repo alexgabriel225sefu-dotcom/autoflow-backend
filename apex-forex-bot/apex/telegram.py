@@ -761,9 +761,15 @@ def _mode_label(user):
     u = user or {}
     if u.get("paper", True):
         return "📝 Paper · simulated"
-    return ("🔴 LIVE · real money"
-            if (u.get("ctrader_env") or "demo").lower() == "live"
-            else "🧪 Demo")
+    # Ask what the account actually IS, do not read back what we stored.
+    # A stored value can be stale, wrong, or simply absent — and this used to
+    # default to "demo", so an account whose environment could not be
+    # established rendered as Demo. That is the dangerous direction: the
+    # client reads "🧪 Demo", believes nothing real is at stake, and behaves
+    # accordingly. UNVERIFIED is its own answer and says so.
+    from apex import account_mode as _am
+    _mode, _src = _am.resolve(u)
+    return _am.badge(_mode, _src)
 
 
 def _guard_label(chat_id):
@@ -5863,9 +5869,25 @@ def _license_ok(chat_id, text):
             "Still stuck after that? supportaicashsystem@gmail.com")
         return False
     try:
-        user_store.update(cid, {"license_key": key})
-    except Exception:
-        pass
+        if not user_store.update(cid, {"license_key": key}, strict=True):
+            raise RuntimeError("licence key not persisted")
+    except Exception as e:
+        # The licence IS valid — the verifier said so. But the key is what
+        # gets this client back in without a round trip, and access.grant()
+        # is about to run on the strength of this return value. Returning True
+        # here hands out access while losing the only record of why: the next
+        # restart re-verifies from scratch, and if the verifier is down by
+        # then the paying client is locked out of an account we already
+        # activated. Half an activation reported as a whole one.
+        print(f"[TELEGRAM] licence verified for {cid} but NOT persisted ({e}) "
+              f"— refusing to report activation")
+        send_to(chat_id,
+                "⏳ <b>Almost there.</b>\n\n"
+                "Your licence checked out, but we could not save it just now. "
+                "Tap the activation link again in a moment — nothing is lost "
+                "and you will not be charged twice.\n\n"
+                "Still stuck? supportaicashsystem@gmail.com")
+        return False
     return True
 
 

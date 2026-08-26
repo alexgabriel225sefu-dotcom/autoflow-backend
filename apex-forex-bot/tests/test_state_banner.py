@@ -100,12 +100,23 @@ check("unread account → unknown, not Paper",
       "unknown" in tg._mode_label(None).lower(), tg._mode_label(None))
 check("a genuinely empty record is still Paper",
       "paper" in tg._mode_label({}).lower(), tg._mode_label({}))
+# The fixtures now carry broker credentials, because the label stopped being
+# a read-back of `ctrader_env` and became an answer about the ACCOUNT. A
+# record holding the string "live" with no token and no account id is not a
+# live account — it is a record nobody finished linking, and calling it LIVE
+# was the same misreporting in the other direction.
+_LIVE = {"paper": False, "ctrader_env": "live",
+         "ctrader_access_token": "t", "ctrader_account_id": 1}
+_DEMO = {"paper": False, "ctrader_env": "demo",
+         "ctrader_access_token": "t", "ctrader_account_id": 1}
 check("a live record still reads LIVE",
-      "LIVE" in tg._mode_label({"paper": False, "ctrader_env": "live"}),
-      tg._mode_label({"paper": False, "ctrader_env": "live"}))
+      "LIVE" in tg._mode_label(_LIVE), tg._mode_label(_LIVE))
 check("a demo record still reads Demo",
-      "Demo" in tg._mode_label({"paper": False, "ctrader_env": "demo"}),
-      tg._mode_label({"paper": False, "ctrader_env": "demo"}))
+      "DEMO" in tg._mode_label(_DEMO).upper(), tg._mode_label(_DEMO))
+check("an env string with no linked account is neither",
+      "VERIFICATION" in tg._mode_label(
+          {"paper": False, "ctrader_env": "live"}).upper(),
+      tg._mode_label({"paper": False, "ctrader_env": "live"}))
 
 print("\n3. The normal path is unchanged")
 try:
