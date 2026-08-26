@@ -21,6 +21,15 @@ _SETTABLE = {
     # call and a demo client is trading real money. There is exactly one
     # authoritative live-activation path, and it is not this one.
     "max_trades_day", "max_dd_pct", "max_daily_loss_pct", "trailing",
+    # Total risk allowed across all concurrent positions. The loop sizes each
+    # trade at min(risk, max_total_risk / maxpos), so with the default 5% and
+    # maxpos=2 no trade can exceed 2.5% no matter what `risk` says — and until
+    # now that ceiling could only be moved by editing the store directly.
+    # A cap the operator cannot reach is not a policy, it is a dead end: the
+    # client raises `risk`, nothing changes, and there is nothing in the
+    # interface explaining why. It sits alongside the other limits and is
+    # bounded by the same validation.
+    "max_total_risk",
     "breakeven_r", "news_filter", "session_filter", "exit_mode", "style",
     # Whether the calendar PUSHES messages. Distinct from news_filter, which
     # decides whether the bot stands aside for releases — a client can want
@@ -82,7 +91,7 @@ _BOOL_KEYS = {"autopilot", "paper", "trailing", "news_filter", "news_alerts",
 _LIST_KEYS = {"autopilot_universe", "watchlist", "session_filter"}
 _INT_KEYS = {"min_confidence", "max_trades_day", "maxpos", "loss_streak"}
 _FLOAT_KEYS = {"risk", "sl_pips", "tp_pips", "leverage", "max_dd_pct",
-               "max_daily_loss_pct", "breakeven_r"}
+               "max_daily_loss_pct", "breakeven_r", "max_total_risk"}
 # Keys whose value is one of a fixed set. Passing these through untyped is not
 # harmless: apex.automation.mode() falls back to the MOST PERMISSIVE level for
 # anything it does not recognise, so `automation=aproval` (typo) would have
