@@ -202,6 +202,31 @@ for p in ("strict", "expect_version"):
     check(f"update() takes {p}", p in _sig.parameters)
 check("PersistenceError exists to carry it", hasattr(user_store, "PersistenceError"))
 
+print("\n6. The readiness probe can see a dead licence store")
+# supabase-js does NOT throw on a failure — it returns { error }. The probe
+# was `try { await ...; dbConnect = true } catch { dbConnect = false }`, so it
+# set dbConnect = TRUE for a database that could not be reached at all, and
+# sale_ready with it. Proven against a real paused project: the call returns
+# `error: TypeError: fetch failed` and never raises, so the old code reported
+# a healthy licence store while there was none.
+#
+# This matters beyond a status page. A Supabase project in this account has no
+# tables whatsoever; if SUPABASE_URL points at it every activation fails, and
+# the one endpoint meant to say so was answering "fine".
+SERVER = open(os.path.join(os.path.dirname(ROOT), "server.js"),
+              encoding="utf-8").read()
+_probe = SERVER.split("let dbConnect = false;")[1][:900]
+check("the probe reads the error field, not just a throw",
+      "const { error }" in _probe and "if (error)" in _probe,
+      "supabase-js reports failure in `error` and does not raise")
+check("a fault is still recorded when the call DOES throw",
+      "catch (e) { dbFault = _licenceStoreFault(e); }" in _probe)
+check("the kind of fault is reported, not just a boolean",
+      "supabase_fault:" in SERVER,
+      "a missing table and a missing network need opposite fixes")
+check("supabase_connects is still a critical check",
+      "'supabase_connects'" in SERVER.split("const critical =")[1][:200])
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")

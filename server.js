@@ -70,10 +70,24 @@ app.get('/api/health', async (req, res) => {
     (has('BREVO_SMTP_USER') && has('BREVO_SMTP_PASS')) ||
     (has('GMAIL_USER') && has('GMAIL_APP_PASSWORD'));
 
+  // Reads the ERROR, not just whether the call threw. supabase-js reports a
+  // missing table in `error` and does not raise, so this used to set
+  // dbConnect = true for a database with no `licenses` table at all — and
+  // sale_ready with it. The one probe meant to warn that the licence store is
+  // unusable was blind to the most complete way for it to be unusable.
+  //
+  // A real Supabase project in this account has no tables whatsoever; if
+  // SUPABASE_URL ever points at it, every activation fails and this endpoint
+  // said everything was fine.
   let dbConnect = false;
+  let dbFault = null;
   if (supabase) {
-    try { await supabase.from('licenses').select('*', { count: 'exact', head: true }); dbConnect = true; }
-    catch (e) { dbConnect = false; }
+    try {
+      const { error } = await supabase.from('licenses')
+        .select('*', { count: 'exact', head: true });
+      if (error) { dbFault = _licenceStoreFault(error); }
+      else { dbConnect = true; }
+    } catch (e) { dbFault = _licenceStoreFault(e); }
   }
 
   const checks = {
@@ -82,6 +96,10 @@ app.get('/api/health', async (req, res) => {
     supabase_url:         has('SUPABASE_URL'),
     supabase_key:         has('SUPABASE_SERVICE_KEY'),
     supabase_connects:    dbConnect,
+    // Named separately because the two need opposite responses: SCHEMA means
+    // the deployment points at the wrong or unmigrated database and will not
+    // fix itself; UNREACHABLE clears on its own.
+    supabase_fault:       dbFault,
     email_delivery:       emailReady,
     // RECOMMENDED — degraded experience if missing, but sale still completes
     ai_fallback:          has('GROQ_API_KEY') || has('ANTHROPIC_API_KEY') || has('GOOGLE_AI_API_KEY'),
