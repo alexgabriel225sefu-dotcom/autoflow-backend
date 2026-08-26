@@ -1,11 +1,21 @@
 -- Apex — the two tables server.js cannot work without.
 --
--- WHY THIS EXISTS: all three Supabase projects on this account were found to
--- contain ZERO tables. The licence system had therefore never had a database
--- behind it — which is exactly why /api/verify-license used to grant on an
--- HMAC signature alone, and why removing that fail-open would have refused
--- every activation. A signature proves the key was minted here; only this
--- table knows whether it was PAID FOR, refunded, or an expired trial.
+-- WHY THIS EXISTS: to make the schema explicit and version-controlled, and to
+-- guarantee `bot_configs` exists — server.js carried it only as a comment
+-- ("Table needed: CREATE TABLE bot_configs ...") and nothing created it.
+--
+-- CORRECTION, recorded because the first version of this file said the
+-- opposite: an earlier check reported all three projects as having ZERO
+-- tables. That was a query artifact — listing tables on a PAUSED project
+-- returns an empty list rather than an error. Queried once they were actually
+-- ACTIVE_HEALTHY, `aicashsystem` holds 15 tables and `Autoflow` 5, both
+-- including `licenses`. The schema was there; the reading was wrong.
+--
+-- What IS true: `licenses` contains 0 rows. So no licence has ever been
+-- issued through it, which is why verification granted on an HMAC signature
+-- alone — there was nothing to consult. A signature proves the key was minted
+-- here; only this table knows whether it was PAID FOR, refunded, or an
+-- expired trial.
 --
 -- Columns are derived from server.js, not invented: every one below is read
 -- or written by code in that file.
