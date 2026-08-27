@@ -617,17 +617,12 @@ def _start_dashboard_server():
                 self.send_header("Content-Length", str(len(payload)))
                 self.end_headers()
                 self.wfile.write(payload)
-            elif self.path == "/api/mt/sync":
-                from apex.brokers import mtbridge
-                length = int(self.headers.get("Content-Length") or 0)
-                body = self.rfile.read(min(length, 1_000_000)).decode("utf-8", "replace")
-                status, text = mtbridge.handle_sync(body)
-                payload = text.encode()
-                self.send_response(status)
-                self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.send_header("Content-Length", str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
+            # /api/mt/sync is gone. It handed the request body to the
+            # MetaTrader bridge — an execution path for a broker this build no
+            # longer supports, reachable over HTTP and bypassing the BROKER
+            # allowlist that config.py enforces at import. One production
+            # trading path means one, including the ones that answer on a
+            # different route.
             else:
                 self.send_response(404)
                 self.end_headers()

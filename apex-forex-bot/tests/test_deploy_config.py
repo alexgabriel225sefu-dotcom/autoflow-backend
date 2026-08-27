@@ -215,6 +215,27 @@ try:
     os.environ.pop("BROKER", None)
     importlib.reload(_cfg)
     check("an unset BROKER defaults to ctrader", _cfg.BROKER == "ctrader", _cfg.BROKER)
+
+    # config.py is not the only door. get_broker() resolves whatever name it is
+    # handed, so get_broker("mt") loaded the MetaTrader bridge regardless of
+    # what BROKER had been set to. An allowlist with a second entrance is not
+    # an allowlist.
+    from apex.brokers import get_broker  # noqa: E402
+    check("get_broker() with no argument returns cTrader",
+          get_broker().__broker_name__ == "ctrader")
+    for dead in ("mt", "td", "metaapi", "yahoo", "oanda", "binance"):
+        try:
+            get_broker(dead)
+            check(f"get_broker({dead!r}) is refused", False, "it loaded a module")
+        except ValueError:
+            check(f"get_broker({dead!r}) is refused", True)
+
+    # …and the HTTP route that reached one directly is gone.
+    BOT_SRC = open(os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "apex", "bot.py"), encoding="utf-8").read()
+    check("/api/mt/sync no longer answers",
+          'elif self.path == "/api/mt/sync":' not in BOT_SRC,
+          "an unauthenticated route still reaches the MetaTrader bridge")
 finally:
     if _saved is None:
         os.environ.pop("BROKER", None)

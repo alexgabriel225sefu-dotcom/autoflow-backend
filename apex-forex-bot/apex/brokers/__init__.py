@@ -10,12 +10,19 @@ Every connector exposes the same interface:
 import importlib
 from apex import config as cfg
 
+# cTrader only.
+#
+# The registry listed five brokers, and get_broker() resolves whatever name it
+# is given — so get_broker("mt") loaded the MetaTrader bridge regardless of
+# what config.py had decided about BROKER. An allowlist with a second door is
+# not an allowlist.
+#
+# The mtbridge, twelvedata, metaapi and yahoo modules remain on disk: two of
+# them have tests that import them directly, and deleting a test to tidy a
+# registry is the wrong trade. They are simply no longer reachable through the
+# factory, which is the only way the engine obtains a broker.
 _REGISTRY = {
-    "mt":        "apex.brokers.mtbridge",   # MetaTrader 5 via ApexBridge EA
-    "td":        "apex.brokers.twelvedata", # Twelve Data — free forex data, paper only
-    "metaapi":   "apex.brokers.metaapi",    # MetaAPI — connect any MT4/MT5 via cloud
-    "ctrader":   "apex.brokers.ctrader",    # cTrader Open API — free, any cTrader broker
-    "yahoo":     "apex.brokers.yahoo",      # Yahoo Finance — free, no account needed
+    "ctrader":   "apex.brokers.ctrader",    # cTrader Open API — the only path
 }
 
 

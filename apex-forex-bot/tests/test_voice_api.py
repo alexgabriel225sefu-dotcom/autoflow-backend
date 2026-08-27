@@ -292,8 +292,12 @@ check("the route exists", '"/api/voice"' in BOT)
 # Scope the read to the branch's own body. A substring check against the whole
 # file — or even the text after the route — matches the COMMENT explaining why
 # the operator token is not used here, so it would pass on prose alone.
+# The end marker used to be the /api/mt/sync branch. That route was removed —
+# it was an execution path for a broker this build no longer supports — so the
+# slice now ends at the do_POST handler's final `else`, which is structural
+# rather than a route name that can disappear again.
 VOICE_BRANCH = BOT.split('elif self.path == "/api/voice":')[1].split(
-    'elif self.path == "/api/mt/sync":')[0]
+    "            else:\n                self.send_response(404)")[0]
 check("identity comes from the per-client voice token",
       "voice_api.ask(" in VOICE_BRANCH and "voice_api.confirm(" in VOICE_BRANCH,
       VOICE_BRANCH[:200])
