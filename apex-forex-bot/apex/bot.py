@@ -142,11 +142,31 @@ def load_remote():
         print("⚠️   load_remote: LICENSE_KEY not set — skipping remote config.")
         return False
     try:
-        r = requests.get(f"{server}/api/bot-config",
-                         params={"key": key}, timeout=10,
-                         headers={"User-Agent": f"{cfg.BOT_NAME.replace(' ', '')}/1.0"})
+        # Two steps, because the licence key is an entitlement rather than a
+        # bearer token. It used to be sent as ?key=<licence> — a permanent
+        # credential in a query string, so it reached every proxy and access
+        # log between here and the licence server, and anything that read one
+        # of those logs held standing access to this client's broker
+        # configuration.
+        #
+        # Now it is POSTed once and exchanged for a token that expires in ten
+        # minutes and carries one scope: bot:config:read.
+        ua = {"User-Agent": f"{cfg.BOT_NAME.replace(' ', '')}/1.0"}
+        sr = requests.post(f"{server}/api/bot-session",
+                           json={"licenseKey": key}, timeout=10, headers=ua)
+        if sr.status_code != 200:
+            # Never log the body of a failed auth response and never the key.
+            print(f"⚠️   load_remote: licence exchange returned {sr.status_code}.")
+            return False
+        session_token = (sr.json() or {}).get("token")
+        if not session_token:
+            print("⚠️   load_remote: licence exchange returned no token.")
+            return False
+
+        r = requests.get(f"{server}/api/bot-config", timeout=10,
+                         headers={**ua, "Authorization": f"Bearer {session_token}"})
         if r.status_code != 200:
-            print(f"⚠️   load_remote: server returned {r.status_code} — {r.text[:200]}")
+            print(f"⚠️   load_remote: config fetch returned {r.status_code}.")
             print('     → Did you complete the configurator and click "Save Config & Deploy"?')
             return False
         data = r.json()

@@ -5,6 +5,148 @@ const { createClient } = require('@supabase/supabase-js');
 const Anthropic = require('@anthropic-ai/sdk');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+
+// A correlation id for an error the client must not see the inside of.
+//
+// Routes used to return the driver's own message — `detail: error.message` —
+// which hands out schema, table names, constraint names, internal hostnames
+// and sometimes a connection string to anyone who can provoke a failure. The
+// client now gets a generic sentence plus this id; the log gets the real
+// exception under the same id, so an operator can still find it in one grep.
+function _errId(e) {
+  const id = crypto.randomBytes(6).toString('hex');
+  try {
+    console.error(`[ERR ${id}]`, (e && (e.stack || e.message)) || String(e));
+  } catch (_) { /* logging must never be the thing that fails a request */ }
+  return id;
+}
+
+// ── Owner-secret gate ───────────────────────────────────
+// Routes were gated by `?secret=<BOT_EMAIL_SECRET>`.
+//
+// BOT_EMAIL_SECRET is not an ordinary password: _licSecrets() derives the
+// licence-signing key from it. Anything that learns it can MINT licence keys
+// that verify. Putting it in a query string put it in every proxy log, access
+// log and browser history along the way — and one of those routes sends email
+// to an address the caller chooses, so a leaked secret is also a mail relay.
+//
+// It moves to a header, the comparison becomes constant-time, and a request
+// that still carries it in the URL is refused rather than accepted, because
+// such a request has already leaked it.
+function _ownerSecretPresentInUrl(req) {
+  return Boolean(req.query && req.query.secret);
+}
+
+function _ownerSecretOk(req) {
+  const expected = process.env.BOT_EMAIL_SECRET || '';
+  if (!expected) return false;               // unset is a misconfiguration, not permission
+  if (_ownerSecretPresentInUrl(req)) return false;
+  const supplied = String((req.headers && req.headers['x-owner-secret']) || '');
+  if (!supplied) return false;
+  const a = Buffer.from(supplied, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  // Length is compared separately because timingSafeEqual throws on a
+  // mismatch; the length of this secret is not the part worth protecting.
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function _denyOwner(req, res) {
+  if (_ownerSecretPresentInUrl(req)) {
+    return res.status(403).json({
+      error: 'A secret in the URL is not accepted.',
+      code: 'SECRET_IN_URL',
+      detail: 'Send it as the X-Owner-Secret header. A URL reaches proxy logs, access logs and browser history.',
+    });
+  }
+  return res.status(403).json({ error: 'Forbidden' });
+}
+
+// ── Outbound URL safety (SSRF) ──────────────────────────
+// A user-supplied callback URL is a request this server makes on the caller's
+// behalf, from inside the private network. Checking the hostname STRING
+// against a list of private prefixes lets through everything that is
+// 127.0.0.1 without spelling it that way:
+//
+//     http://2130706433/          decimal integer
+//     http://0177.0.0.1/          octal
+//     http://[::ffff:127.0.0.1]/  IPv4-mapped IPv6
+//     http://metadata.internal/   a NAME that resolves privately
+//
+// The last is the general case: no string inspection can tell where a hostname
+// points. So this RESOLVES the name and requires every resolved address to be
+// public, which also disposes of the numeric encodings.
+//
+// LIMITATION, stated rather than implied: this does not defeat DNS rebinding.
+// Between this lookup and the request the name can be re-answered privately;
+// closing that needs the socket pinned to the checked address, which fetch()
+// does not expose.
+const _dnsp = require('dns').promises;
+const _net = require('net');
+
+function _isPublicIp(ip) {
+  if (_net.isIPv4(ip)) {
+    const p = ip.split('.').map(Number);
+    if (p[0] === 0 || p[0] === 10 || p[0] === 127) return false;
+    if (p[0] === 169 && p[1] === 254) return false;                // link-local + cloud metadata
+    if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return false;
+    if (p[0] === 192 && p[1] === 168) return false;
+    if (p[0] === 192 && p[1] === 0 && p[2] === 0) return false;
+    if (p[0] === 100 && p[1] >= 64 && p[1] <= 127) return false;   // CGNAT
+    if (p[0] >= 224) return false;                                  // multicast + reserved
+    return true;
+  }
+  if (_net.isIPv6(ip)) {
+    const a = ip.toLowerCase();
+    if (a === '::' || a === '::1') return false;
+    if (a.startsWith('fe8') || a.startsWith('fe9') ||
+        a.startsWith('fea') || a.startsWith('feb')) return false;   // link-local
+    if (a.startsWith('fc') || a.startsWith('fd')) return false;     // unique local
+    if (a.startsWith('ff')) return false;                           // multicast
+    // IPv4-mapped IPv6 — judge the embedded IPv4. BOTH spellings matter:
+    // `new URL()` rewrites ::ffff:127.0.0.1 into ::ffff:7f00:1, so a check
+    // that understood only the dotted form let the loopback straight through.
+    const dotted = a.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (dotted) return _isPublicIp(dotted[1]);
+    const hex = a.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (hex) {
+      const hi = parseInt(hex[1], 16), lo = parseInt(hex[2], 16);
+      return _isPublicIp([hi >> 8, hi & 0xff, lo >> 8, lo & 0xff].join('.'));
+    }
+    return true;
+  }
+  return false;
+}
+
+async function assertPublicHttpUrl(raw) {
+  let u;
+  try { u = new URL(String(raw)); }
+  catch (e) { throw new Error('callback URL is not a URL'); }
+
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    throw new Error('callback URL must be http or https');
+  }
+  if (u.username || u.password) {
+    throw new Error('callback URL must not carry credentials');
+  }
+
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  if (_net.isIP(host)) {
+    if (!_isPublicIp(host)) throw new Error('callback URL points at a private address');
+    return u;
+  }
+
+  let addrs;
+  try { addrs = await _dnsp.lookup(host, { all: true }); }
+  catch (e) { throw new Error('callback URL host does not resolve'); }
+  if (!addrs.length) throw new Error('callback URL host does not resolve');
+  // EVERY address, not the first: a name answering with one public and one
+  // private address must not be usable to reach the private one.
+  for (const { address } of addrs) {
+    if (!_isPublicIp(address)) throw new Error('callback URL resolves to a private address');
+  }
+  return u;
+}
 const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
 
 process.on('uncaughtException', err => console.error('UNCAUGHT EXCEPTION:', err.stack || err));
@@ -24,9 +166,63 @@ function _safeOrigin(req) {
   return _ALLOWED_ORIGINS.has(requested) ? requested : 'https://aicashsystem.space';
 }
 app.use(cors({
+  // An explicit allowlist, and credentials:true — which is exactly why it must
+  // never become '*'. A wildcard with credentials is rejected by browsers, and
+  // a reflected origin with credentials lets any site read authenticated
+  // responses. These three, or nothing.
   origin: ['https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'],
   credentials: true
 }));
+
+// ── Security headers ────────────────────────────────────
+// There were none. A site that renders licence keys, a configurator that
+// collects broker credentials, and JSON endpoints returning account data were
+// all served with no CSP, no nosniff, no referrer policy and no frame
+// protection.
+//
+// The referrer policy matters most: every page that ever carried a token or a
+// licence key in its URL handed that URL to any third-party destination the
+// user clicked through to.
+//
+// The CSP reflects what these pages actually load — dozens of them carry
+// inline <script>, so 'unsafe-inline' is present because removing it means
+// rewriting the pages, which is a deliberate piece of work rather than a side
+// effect of adding a header. It still shuts the doors that cost nothing: no
+// object, no <base> rewriting, no arbitrary form target, no framing.
+const _CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://js.stripe.com https://s3.tradingview.com https://telegram.org",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com",
+  "font-src 'self' data: https://fonts.gstatic.com https://api.fontshare.com https://cdn.fontshare.com",
+  "img-src 'self' data: blob: https:",
+  "connect-src 'self' https://api.stripe.com",
+  "frame-src https://js.stripe.com https://hooks.stripe.com",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self' https://checkout.stripe.com",
+  "frame-ancestors 'none'",
+].join('; ');
+
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Referrer-Policy', 'no-referrer');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=(self)');
+  res.set('Content-Security-Policy', _CSP);
+  // Render terminates TLS; the header says so. Two years with subdomains, and
+  // deliberately not preload — that is a one-way door for the whole domain and
+  // belongs to whoever owns it, not to this middleware.
+  if ((req.headers['x-forwarded-proto'] || 'https') !== 'http') {
+    res.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
+  }
+  // Anything under /api is either authenticated or a one-shot answer. Neither
+  // belongs in a shared cache.
+  if (req.path.startsWith('/api/')) {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+  }
+  next();
+});
 // Skip JSON body parsing where a webhook needs its untouched raw body.
 // The Meta webhook needs the raw body preserved too (HMAC signature check in
 // _metaVerifySignature can't hash a body that's already been re-serialized).
@@ -876,16 +1072,12 @@ app.post('/webhook/:webhookId', _webhookLimiter, async (req, res) => {
       aiReply = await callAI(automation.system_prompt, userMessage);
       if (automation.config?.callback_url) {
         try {
-          const _cbUrl = new URL(automation.config.callback_url);
-          if (!['http:','https:'].includes(_cbUrl.protocol)) throw new Error('bad protocol');
-          const _h = _cbUrl.hostname;
-          const _b = parseInt((_h.match(/^172\.(\d+)\./) || [])[1] || '0');
-          if (_h === 'localhost' || _h === '127.0.0.1' || _h === '0.0.0.0' || _h === '::1'
-            || _h.startsWith('169.254.') || _h.startsWith('10.') || _h.startsWith('192.168.')
-            || (_b >= 16 && _b <= 31)) throw new Error('private host');
+          await assertPublicHttpUrl(automation.config.callback_url);
           await fetch(automation.config.callback_url, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reply: aiReply, original: body })
+            body: JSON.stringify({ reply: aiReply, original: body }),
+            redirect: 'error',           // a 302 to 127.0.0.1 would bypass the check
+            signal: AbortSignal.timeout(10000),
           });
         } catch(cbErr) { console.error('Callback URL error:', cbErr.message); }
       }
@@ -1267,31 +1459,81 @@ function _hmacMac4(data, secret) {
   return [0, 1, 2, 3].map(i => _KEY_CHARS[mac[i] % 32]).join('');
 }
 
+// How much of a licence key is actually unguessable.
+//
+// The old key carried EIGHT characters of randomness. It looked like 64 bits
+// because it started from crypto.randomBytes(8), but `b % 32` keeps only five
+// bits of each byte and discards the other three — so the real figure was
+// 8 x 5 = 40 BITS. About a trillion keys: too few to rely on, and the sort of
+// number that looks fine until someone counts it.
+//
+// New keys carry 26 characters, which is 130 bits. The alphabet has exactly
+// 32 symbols and a byte has 256 values, so `% 32` divides evenly and every
+// symbol stays equally likely — a modulo that does not divide evenly is how a
+// "random" identifier quietly develops a bias.
+//
+// The trailing four characters are a checksum, not entropy, and are not
+// counted above. They exist so a mistyped key fails immediately rather than
+// after a database round trip.
+const _KEY_RANDOM_CHARS = 26;          // 26 x 5 = 130 bits
+const _KEY_MAC_CHARS = 4;
+
+function _randomKeyChars(n) {
+  // One byte per symbol, straight from the OS CSPRNG. Never Math.random,
+  // never a timestamp, never a counter: all three are predictable to anyone
+  // who knows roughly when a key was issued.
+  return Array.from(crypto.randomBytes(n)).map(b => _KEY_CHARS[b % 32]).join('');
+}
+
+function _groups(str, size) {
+  const out = [];
+  for (let i = 0; i < str.length; i += size) out.push(str.slice(i, i + size));
+  return out;
+}
+
 function _generateKey(prefix, product) {
   const secret = _licSecrets(product)[0];
-  const buf = crypto.randomBytes(8);
-  const rnd8 = Array.from(buf).map(b => _KEY_CHARS[b % 32]).join('');
-  const mac4 = _hmacMac4(rnd8, secret);
-  const full = rnd8 + mac4;
-  return `${prefix}-${full.slice(0, 4)}-${full.slice(4, 8)}-${full.slice(8, 12)}`;
+  const rnd = _randomKeyChars(_KEY_RANDOM_CHARS);
+  const full = rnd + _hmacMac4(rnd, secret);
+  return `${prefix}-${_groups(full, 5).join('-')}`;
 }
 
 function generateForexKey()   { return _generateKey('FORX', 'apex-forex'); }
 
-// Returns { valid, product } — product is 'apex-bot' | 'apex-forex' | null
+// Constant-time string comparison. `===` on a MAC returns as soon as two
+// characters differ, which leaks how much of a guess was correct.
+function _macEqual(a, b) {
+  const ba = Buffer.from(String(a), 'utf8');
+  const bb = Buffer.from(String(b), 'utf8');
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+
+// Returns { valid, product, legacy } — product is 'apex-forex' | null.
+//
+// Both key lengths are accepted so that keys already issued keep working;
+// `legacy` says which one was presented, so a caller can tell the holder to
+// re-issue. Everything minted from here on is the long form.
 function verifyLicenseKeyHmac(key) {
-  if (!key) return { valid: false, product: null };
-  const k = key.toUpperCase();
+  if (!key) return { valid: false, product: null, legacy: false };
+  const k = String(key).toUpperCase().trim();
   const prefixMap = { FORX: 'apex-forex' };
   for (const [prefix, product] of Object.entries(prefixMap)) {
-    const re = new RegExp(`^${prefix}-([A-Z2-9]{4})-([A-Z2-9]{4})-([A-Z2-9]{4})$`);
-    const m = k.match(re);
-    if (!m) continue;
-    const full = m[1] + m[2] + m[3];
-    const data = full.slice(0, 8), given = full.slice(8, 12);
-    if (_licSecrets(product).some(s => _hmacMac4(data, s) === given)) return { valid: true, product };
+    if (!k.startsWith(prefix + '-')) continue;
+    const body = k.slice(prefix.length + 1).split('-').join('');
+    if (!/^[A-Z2-9]+$/.test(body)) continue;
+
+    const expected = _KEY_RANDOM_CHARS + _KEY_MAC_CHARS;   // 30, current
+    const legacyLen = 8 + _KEY_MAC_CHARS;                  // 12, pre-2026
+    if (body.length !== expected && body.length !== legacyLen) continue;
+
+    const data = body.slice(0, body.length - _KEY_MAC_CHARS);
+    const given = body.slice(-_KEY_MAC_CHARS);
+    if (_licSecrets(product).some(sec => _macEqual(_hmacMac4(data, sec), given))) {
+      return { valid: true, product, legacy: body.length === legacyLen };
+    }
   }
-  return { valid: false, product: null };
+  return { valid: false, product: null, legacy: false };
 }
 
 app.post('/api/lead', _authLimiter, async (req, res) => {
@@ -1359,14 +1601,8 @@ async function _notifyAdminAlert(text, subject = 'Apex Trading Suite — alertă
   } catch (e) { addLog(`Admin alert email error: ${e.message}`, 'system', 'error'); }
 }
 
-function _ownerSecretOk(req) {
-  const secret = req.query.secret || req.headers['x-owner-secret'];
-  return process.env.BOT_EMAIL_SECRET && secret === process.env.BOT_EMAIL_SECRET;
-}
 app.get('/api/owner-license', async (req, res) => {
-  const secret = req.query.secret || req.headers['x-owner-secret'];
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
   const product = 'apex-forex';
   const key = generateForexKey();
@@ -1388,7 +1624,7 @@ app.get('/api/owner-license', async (req, res) => {
 // a paying customer gets, so the recipient's experience (license + the
 // "Open your bot on Telegram" button) is identical either way.
 app.post('/api/admin/grant-license', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
   const email = String(req.body?.email || '').trim().slice(0, 200);
   const name = String(req.body?.name || 'there').trim().slice(0, 100) || 'there';
@@ -1617,7 +1853,7 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
 // Issues a free-trial license: same key format/verification path as a paid one,
 // but flagged trial:true with an expires_at that /api/verify-license enforces.
 app.post('/api/admin/trial/issue', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
   const email = String(req.body?.email || '').trim().slice(0, 200);
   const product = 'apex-forex';
@@ -1627,7 +1863,7 @@ app.post('/api/admin/trial/issue', async (req, res) => {
   const { error } = await supabase.from('licenses').insert([{
     key, email, active: true, activated_at: null, product, trial: true, expires_at: expiresAt
   }]);
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return res.status(500).json({ error: 'Request failed.', id: _errId(error) });
   const botHandle = 'FOREX_APEX_BOT';
   addLog(`Trial issued: ${key} (${product}, ${days}d) for ${email || 'no email'}`, 'license', 'success');
   res.json({ key, product, expiresAt, telegramLink: `https://t.me/${botHandle}?start=${key}` });
@@ -1637,7 +1873,7 @@ app.post('/api/admin/trial/issue', async (req, res) => {
 // The bot's next /api/verify-license check (on startup/restart) will then reject them with
 // the "trial ended, get full access at aicashsystem.space" message.
 app.post('/api/admin/trial/finish', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
   const { data: rows } = await supabase.from('licenses')
     .select('key,email,product').eq('trial', true).eq('active', true);
@@ -1978,7 +2214,7 @@ app.get('/api/creatify/avatars', async (req, res) => {
     const r = await fetch('https://api.creatify.ai/api/ai-avatars/', { headers: _creatifyHdrs(req) });
     const d = await r.json();
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.post('/api/creatify/create', async (req, res) => {
@@ -1999,7 +2235,7 @@ app.post('/api/creatify/create', async (req, res) => {
     const d = await r.json();
     if (!r.ok) return res.status(r.status).json(d);
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.post('/api/creatify/render/:id', async (req, res) => {
@@ -2010,7 +2246,7 @@ app.post('/api/creatify/render/:id', async (req, res) => {
     });
     const d = await r.json();
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.get('/api/creatify/status/:id', async (req, res) => {
@@ -2019,7 +2255,7 @@ app.get('/api/creatify/status/:id', async (req, res) => {
     const r = await fetch(`https://api.creatify.ai/api/ai-ads/${req.params.id}/`, { headers: _creatifyHdrs(req) });
     const d = await r.json();
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 // ── HEYGEN API ROUTES ──
 const _heyHeaders = () => ({ 'X-Api-Key': HEYGEN_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json' });
@@ -2030,7 +2266,7 @@ app.get('/api/heygen/avatars', async (req, res) => {
     const r = await fetch('https://api.heygen.com/v2/avatars', { headers: _heyHeaders() });
     const d = await r.json();
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.get('/api/heygen/voices', async (req, res) => {
@@ -2039,7 +2275,7 @@ app.get('/api/heygen/voices', async (req, res) => {
     const r = await fetch('https://api.heygen.com/v2/voices', { headers: _heyHeaders() });
     const d = await r.json();
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.post('/api/heygen/generate', async (req, res) => {
@@ -2062,7 +2298,7 @@ app.post('/api/heygen/generate', async (req, res) => {
     const d = await r.json();
     if (d.error) return res.status(400).json({ error: d.error });
     res.json({ video_id: d.data?.video_id || d.video_id });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.get('/api/heygen/status/:id', async (req, res) => {
@@ -2073,7 +2309,7 @@ app.get('/api/heygen/status/:id', async (req, res) => {
     const r = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${req.params.id}`, { headers: hdrs });
     const d = await r.json();
     res.json(d.data || d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 // POST /api/heygen/photo-generate — talking photo video from base64 image
@@ -2114,7 +2350,7 @@ app.post('/api/heygen/photo-generate', async (req, res) => {
     const genData = await genResp.json();
     if (genData.error) return res.status(400).json({ error: genData.error });
     res.json({ video_id: genData.data?.video_id || genData.video_id });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 // Explicit HTML page routes
@@ -2241,17 +2477,13 @@ a{text-decoration:none}
 
 // ── EMAIL STATUS — requires owner secret
 app.get('/api/email-status', (req, res) => {
-  const secret = req.query.secret;
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   res.json({ resend: !!RESEND_API_KEY, brevo: !!BREVO_API_KEY, smtp: !!transporter, sender: SENDER_EMAIL || 'not set' });
 });
 
 // ── RESEND DNS RECORDS — requires owner secret
 app.get('/api/resend-dns', async (req, res) => {
-  const secret = req.query.secret;
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   if (!RESEND_API_KEY) return res.json({ error: 'RESEND_API_KEY not set' });
   try {
     const r = await fetch('https://api.resend.com/domains', {
@@ -2271,14 +2503,12 @@ app.get('/api/resend-dns', async (req, res) => {
         `Type: ${rec.type}\nHost: ${rec.name}\nValue: ${rec.value}\nPriority: ${rec.priority || 'N/A'}\n`
       ).join('\n---\n\n')
     );
-  } catch(e) { res.json({ error: e.message }); }
+  } catch(e) { res.json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 // ── DEBUG: test Resend directly — requires owner secret
 app.get('/api/test-resend', async (req, res) => {
-  const secret = req.query.secret;
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   if (!RESEND_API_KEY) return res.json({ error: 'RESEND_API_KEY not set' });
   const to = req.query.email || 'test@example.com';
   const resendFrom = process.env.RESEND_FROM || 'onboarding@resend.dev';
@@ -2291,14 +2521,12 @@ app.get('/api/test-resend', async (req, res) => {
     });
     const body = await r.json();
     res.json({ status: r.status, ok: r.ok, body, from: resendFrom });
-  } catch(e) { res.json({ error: e.message }); }
+  } catch(e) { res.json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 // GET /api/test-brevo?email=X — requires owner secret
 app.get('/api/test-brevo', async (req, res) => {
-  const secret = req.query.secret;
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   const to = req.query.email || SENDER_EMAIL;
   if (!BREVO_API_KEY) return res.json({ error: 'BREVO_API_KEY not set' });
   try {
@@ -2320,9 +2548,7 @@ app.get('/api/test-brevo', async (req, res) => {
 
 // GET /api/test-resend?secret=X&email=Y — debug Resend
 app.get('/api/test-resend', async (req, res) => {
-  const secret = req.query.secret;
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   const to = req.query.email || SENDER_EMAIL;
   const resendKey = process.env.RESEND_API_KEY;
   const resendFrom = process.env.RESEND_FROM;
@@ -2344,24 +2570,27 @@ app.get('/api/test-resend', async (req, res) => {
 // GET  (browser): /api/send-bot-email?secret=X&email=you@gmail.com&name=Alex
 // POST (curl):    /api/send-bot-email?secret=X  body: { email, name }
 app.get('/api/send-bot-email', async (req, res) => {
-  req.body = { email: req.query.email, name: req.query.name, secret: req.query.secret };
+  req.body = { email: req.query.email, name: req.query.name };
   // fall through to shared handler below
   return _sendBotEmailHandler(req, res);
 });
 app.post('/api/send-bot-email', async (req, res) => {
-  req.body.secret = req.body.secret || req.query.secret;
   return _sendBotEmailHandler(req, res);
 });
 async function _sendBotEmailHandler(req, res) {
-  const secret = req.query.secret || req.body.secret;
+  const secretOk = _ownerSecretOk(req);
   const adminSecret = process.env.BOT_EMAIL_SECRET || '';
   const isPreview = req.query.preview === '1';
 
   if (!adminSecret) {
     return res.status(403).json({ error: 'BOT_EMAIL_SECRET not set in env — add it on Render' });
   }
-  if (secret !== adminSecret) {
-    return res.status(403).json({ error: 'Wrong secret', hint: `Expected length: ${adminSecret.length} chars, got: ${(secret||'').length} chars` });
+  if (!secretOk) {
+    // The old reply included the expected character count. That is an oracle
+    // for the licence-signing secret: it tells anyone who asks exactly how
+    // long the value they are guessing is, removing the largest unknown
+    // before they start.
+    return _denyOwner(req, res);
   }
 
   // Preview mode — shows email in browser without actually sending (requires valid secret)
@@ -2515,18 +2744,29 @@ app.post('/api/builder/logo', auth, _aiLimiter, async (req, res) => {
 
 // ════════════════════════════════════════
 // ADMIN: SYNC BOT FILES → GitHub repo
-// Usage: GET /admin/sync-bot-repo?secret=BOT_EMAIL_SECRET&token=ghp_xxx
+// Usage: POST /admin/sync-bot-repo with X-Owner-Secret and X-GitHub-Token headers.
 // ════════════════════════════════════════
-app.get('/admin/sync-bot-repo', async (req, res) => {
-  const secret = req.query.secret || '';
-  // Token can come from the URL (?token=ghp_...) or, preferably, a Render env
-  // var GH_TOKEN so it stays out of browser history and URLs.
-  const ghToken = req.query.token || process.env.GH_TOKEN || '';
+app.post('/admin/sync-bot-repo', async (req, res) => {
+  // Was GET with ?secret=<owner secret>&token=ghp_.... Two credentials in one
+  // URL, on a route that WRITES to a GitHub repository — so a single proxy log
+  // line handed over both the owner secret and a token with repo scope.
+  //
+  // POST, both credentials in headers, and ?token= refused outright: a request
+  // that carried one has already published it, and the honest response is to
+  // fail and let the operator revoke rather than to accept it quietly.
+  if (req.query.token) {
+    return res.status(403).json({
+      error: 'A GitHub token in the URL is not accepted.',
+      code: 'TOKEN_IN_URL',
+      detail: 'This token has been written to the request log. Revoke it, then send it as the X-GitHub-Token header or set GH_TOKEN.',
+    });
+  }
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   const adminSecret = process.env.BOT_EMAIL_SECRET || '';
+  const ghToken = String(req.headers['x-github-token'] || process.env.GH_TOKEN || '');
+  if (!adminSecret) return res.status(500).json({ error: 'Service not configured.' });
 
-  if (!adminSecret) return res.status(500).json({ error: 'BOT_EMAIL_SECRET not set' });
-  if (secret !== adminSecret) return res.status(403).json({ error: 'Wrong secret' });
-  if (!ghToken) return res.status(400).json({ error: 'GitHub token required — add GH_TOKEN in Render env, or pass ?token=ghp_...' });
+  if (!ghToken) return res.status(400).json({ error: 'GitHub token required — set GH_TOKEN, or send the X-GitHub-Token header.' });
 
   const fs = require('fs');
   const OWNER = 'alexgabriel225sefu-dotcom';
@@ -2680,16 +2920,72 @@ function _botConfigKey() {
   if (!s) throw new Error('bot config encryption unavailable: JWT_SECRET/COOKIE_SECRET not set');
   return crypto.createHash('sha256').update(s).digest();
 }
+// AES-256-GCM, replacing AES-256-CBC.
+//
+// CBC encrypts but does not AUTHENTICATE. Anyone who could write the
+// bot_configs row could flip bits in the ciphertext and the server would
+// decrypt the result without complaint — and this blob decides RISK_PER_TRADE,
+// PAPER_TRADING and the broker environment of a bot that trades real money.
+// Silent corruption of a padding-correct block is a plausible outcome; a
+// padding oracle against an endpoint that reports decryption failure is
+// another. GCM's tag makes both a hard failure instead.
+//
+// FORMAT
+//   v2:<iv-hex>:<tag-hex>:<ciphertext-hex>     GCM, 96-bit IV, 128-bit tag
+//   <iv-hex>:<ciphertext-hex>                  legacy CBC, read-only
+//
+// A fresh random IV per operation, from the CSPRNG. GCM repeats catastrophically
+// under a reused nonce — it leaks the XOR of both plaintexts and, worse, the
+// authentication subkey — so the IV is never derived from anything.
+const _GCM_IV_BYTES = 12;      // 96 bits: the size GCM is specified for
+const _GCM_TAG_BYTES = 16;
+
 function encryptBotConfig(obj) {
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv('aes-256-cbc', _botConfigKey(), iv);
+  const iv = crypto.randomBytes(_GCM_IV_BYTES);
+  const cipher = crypto.createCipheriv('aes-256-gcm', _botConfigKey(), iv);
   const enc = Buffer.concat([cipher.update(JSON.stringify(obj), 'utf8'), cipher.final()]);
-  return iv.toString('hex') + ':' + enc.toString('hex');
+  return ['v2', iv.toString('hex'), cipher.getAuthTag().toString('hex'),
+          enc.toString('hex')].join(':');
 }
+
+// Returns { config, legacy }. `legacy` true means the row was written by the
+// CBC version and should be re-encrypted — see the read path below, which does
+// exactly that and persists the result, so a row migrates the first time it is
+// used and CBC is never written again.
+//
+// LIMITATION, stated rather than buried: legacy rows have no authentication
+// tag. There is no way to tell a genuine old ciphertext from one an attacker
+// altered while it was CBC — that information was never stored. Migration
+// therefore carries forward whatever is there; it cannot retroactively verify
+// it. The window closes as rows migrate, and only for rows that migrate.
 function decryptBotConfig(data) {
-  const [ivHex, encHex] = data.split(':');
-  const dc = crypto.createDecipheriv('aes-256-cbc', _botConfigKey(), Buffer.from(ivHex, 'hex'));
-  return JSON.parse(Buffer.concat([dc.update(Buffer.from(encHex, 'hex')), dc.final()]).toString('utf8'));
+  const str = String(data || '');
+  const parts = str.split(':');
+
+  if (parts[0] === 'v2') {
+    if (parts.length !== 4) throw new Error('bot config: malformed v2 record');
+    const [, ivHex, tagHex, encHex] = parts;
+    const iv = Buffer.from(ivHex, 'hex');
+    const tag = Buffer.from(tagHex, 'hex');
+    if (iv.length !== _GCM_IV_BYTES || tag.length !== _GCM_TAG_BYTES) {
+      throw new Error('bot config: malformed v2 record');
+    }
+    const dc = crypto.createDecipheriv('aes-256-gcm', _botConfigKey(), iv);
+    dc.setAuthTag(tag);
+    // final() throws when the tag does not verify. Deliberately NOT caught
+    // here: a failed tag means the ciphertext is not what was written, and
+    // continuing with the plaintext would defeat the point of having a tag.
+    const out = Buffer.concat([dc.update(Buffer.from(encHex, 'hex')), dc.final()]);
+    return { config: JSON.parse(out.toString('utf8')), legacy: false };
+  }
+
+  if (parts.length !== 2) throw new Error('bot config: unrecognised record');
+  const [ivHex, encHex] = parts;
+  const iv = Buffer.from(ivHex, 'hex');
+  if (iv.length !== 16) throw new Error('bot config: malformed legacy record');
+  const dc = crypto.createDecipheriv('aes-256-cbc', _botConfigKey(), iv);
+  const out = Buffer.concat([dc.update(Buffer.from(encHex, 'hex')), dc.final()]);
+  return { config: JSON.parse(out.toString('utf8')), legacy: true };
 }
 
 // POST /api/save-bot-config  — called by configurator when client clicks "Save & Deploy"
@@ -2698,36 +2994,201 @@ app.post('/api/save-bot-config', async (req, res) => {
   if (!key || !config || typeof config !== 'object') return res.status(400).json({ error: 'key and config required' });
   if (!supabase) return res.status(500).json({ error: 'Database not configured' });
 
-  const { data: lic } = await supabase.from('licenses').select('active').eq('key', key).eq('active', true).single();
-  if (!lic) return res.status(403).json({ error: 'Invalid or inactive license key' });
+  if (!verifyLicenseKeyHmac(key).valid) {
+    return res.status(403).json({ error: 'Invalid or inactive licence.' });
+  }
+  let lic = null;
+  try {
+    const r = await supabase.from('licenses').select('active').eq('key', key).eq('active', true).single();
+    lic = r.data;
+  } catch (e) {
+    // Fail closed: a database that cannot answer is not permission to write.
+    console.error('[SAVE-BOT-CONFIG] licence lookup failed', _errId(e));
+    return res.status(503).json({ error: 'Service unavailable. Try again shortly.' });
+  }
+  if (!lic) return res.status(403).json({ error: 'Invalid or inactive licence.' });
 
   const encrypted = encryptBotConfig(config);
   const { error } = await supabase.from('bot_configs').upsert(
     { license_key: key, config: encrypted, updated_at: new Date().toISOString() },
     { onConflict: 'license_key' }
   );
-  if (error) return res.status(500).json({ error: 'Save failed. Run: CREATE TABLE bot_configs (license_key TEXT PRIMARY KEY, config TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW());', detail: error.message });
+  if (error) {
+    // The old reply pasted the CREATE TABLE statement and the raw driver
+    // message to the client — schema and internals handed to anyone who could
+    // provoke a failure.
+    const id = _errId(error);
+    console.error(`[SAVE-BOT-CONFIG] upsert failed (id ${id})`);
+    return res.status(500).json({ error: 'Could not save configuration.', id });
+  }
+  // Configuration changed, so any token still holding the old view is stale.
+  _revokeBotSessionsFor(key);
   res.json({ success: true });
 });
 
-// GET /api/bot-config?key=APEX-XXXX  — called by bot on startup to fetch remote config
-app.get('/api/bot-config', async (req, res) => {
-  const key = (req.query.key || '').trim();
-  if (!key) return res.status(400).json({ error: 'key required' });
-  if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+// ════════════════════════════════════════
+// BOT SESSIONS — a licence key is an entitlement, not a bearer token.
+//
+// /api/bot-config?key=LICENSE_KEY made the licence key do both jobs: it
+// identified which customer this is AND authorised reading their stored
+// configuration, which contains broker credentials. That is wrong twice over.
+//
+//   * It is a permanent credential. A licence key does not expire, is printed
+//     in the customer's email, is pasted into a deployment dashboard, and is
+//     typed into a configurator. Anything that leaks it leaks standing access.
+//   * It was in the QUERY STRING, so it reached every proxy log, access log
+//     and browser history along the way.
+//
+// The licence is now presented once, in a POST body, and exchanged for a
+// short-lived opaque token that carries ONE scope: bot:config:read. That token
+// cannot manage licences, cannot write configuration, and cannot administer
+// anything — a compromise of the fetch path stays a compromise of the fetch
+// path.
+//
+// Tokens live in memory. This service runs a single instance, so that is
+// sufficient; it is stated because it would NOT be sufficient behind more
+// than one, where a restart or a second instance would reject live tokens.
+const BOT_SESSION_TTL_MS = 10 * 60 * 1000;      // 10 minutes
+const BOT_SESSION_MAX = 5000;
+const _botSessions = new Map();                 // token -> {licenseKey, product, scope, exp}
 
-  const { data: lic } = await supabase.from('licenses').select('active').eq('key', key).eq('active', true).single();
-  if (!lic) return res.status(403).json({ error: 'Invalid license key' });
-
-  const { data, error } = await supabase.from('bot_configs').select('config').eq('license_key', key).single();
-  if (error || !data) return res.status(404).json({ error: 'No config found for this key. Complete the configurator at aicashsystem.space/configurator first.' });
-
-  try {
-    const config = decryptBotConfig(data.config);
-    res.json({ success: true, config });
-  } catch(e) {
-    res.status(500).json({ error: 'Config decryption failed' });
+function _pruneBotSessions() {
+  const now = Date.now();
+  for (const [t, sess] of _botSessions) if (sess.exp <= now) _botSessions.delete(t);
+  if (_botSessions.size > BOT_SESSION_MAX) {
+    const oldest = [..._botSessions.entries()].sort((a, b) => a[1].exp - b[1].exp);
+    for (let i = 0; i < oldest.length / 2; i++) _botSessions.delete(oldest[i][0]);
   }
+}
+
+function _issueBotSession(licenseKey, product) {
+  _pruneBotSessions();
+  const token = crypto.randomBytes(32).toString('base64url');   // 256 bits
+  _botSessions.set(token, {
+    licenseKey, product, scope: 'bot:config:read',
+    exp: Date.now() + BOT_SESSION_TTL_MS,
+  });
+  return token;
+}
+
+// Returns the session, or null. Scope is checked here rather than at each
+// call site so a new protected route cannot forget to check it.
+function _botSession(req, requiredScope) {
+  const auth = String((req.get && req.get('authorization')) || '');
+  if (!/^Bearer /i.test(auth)) return null;
+  const token = auth.slice(7).trim();
+  if (!token) return null;
+  const sess = _botSessions.get(token);
+  if (!sess || sess.exp <= Date.now()) { _botSessions.delete(token); return null; }
+  if (requiredScope && sess.scope !== requiredScope) return null;
+  return sess;
+}
+
+function _revokeBotSessionsFor(licenseKey) {
+  for (const [t, sess] of _botSessions) if (sess.licenseKey === licenseKey) _botSessions.delete(t);
+}
+
+// POST /api/bot-session  { licenseKey }  -> { token, expiresIn, scope }
+app.post('/api/bot-session', _authLimiter, async (req, res) => {
+  const key = String((req.body && req.body.licenseKey) || '').trim();
+  if (!key) return res.status(400).json({ error: 'licenseKey required' });
+  if (!supabase) return res.status(503).json({ error: 'Service unavailable.' });
+
+  // Check the HMAC before touching the database: a key that was never minted
+  // here should cost an attacker a rejection, not a query.
+  const hm = verifyLicenseKeyHmac(key);
+  if (!hm.valid) return res.status(403).json({ error: 'Invalid or inactive licence.' });
+
+  let lic = null;
+  try {
+    const r = await supabase.from('licenses')
+      .select('active, product, expires_at, revoked_at')
+      .eq('key', key).single();
+    lic = r.data;
+  } catch (e) {
+    // Fail CLOSED. A database that cannot answer is not permission to proceed.
+    console.error('[BOT-SESSION] licence lookup failed', _errId(e));
+    return res.status(503).json({ error: 'Service unavailable. Try again shortly.' });
+  }
+
+  // One message for every rejection reason. "expired" vs "revoked" vs "no such
+  // licence" tells someone probing which keys exist.
+  const now = Date.now();
+  const ok = lic && lic.active === true
+    && !lic.revoked_at
+    && (!lic.expires_at || new Date(lic.expires_at).getTime() > now)
+    && (!lic.product || !hm.product || lic.product === hm.product);
+  if (!ok) return res.status(403).json({ error: 'Invalid or inactive licence.' });
+
+  const token = _issueBotSession(key, hm.product);
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    success: true, token, scope: 'bot:config:read',
+    expiresIn: Math.floor(BOT_SESSION_TTL_MS / 1000),
+    licenceFormat: hm.legacy ? 'legacy' : 'current',
+  });
+});
+
+// GET /api/bot-config  — Authorization: Bearer <bot-session token>
+app.get('/api/bot-config', async (req, res) => {
+  // A licence key in the URL is refused rather than ignored: the request has
+  // already written it into whatever logs sit in front of this service, and
+  // the operator should learn that from a failure.
+  if (req.query.key) {
+    return res.status(401).json({
+      error: 'A licence key in the URL is not accepted.',
+      code: 'LICENCE_IN_URL',
+      detail: 'POST {"licenseKey":"..."} to /api/bot-session and send the returned token as Authorization: Bearer <token>.',
+    });
+  }
+  const sess = _botSession(req, 'bot:config:read');
+  if (!sess) return res.status(401).json({ error: 'Authorization failed.' });
+  if (!supabase) return res.status(503).json({ error: 'Service unavailable.' });
+
+  let row = null;
+  try {
+    const r = await supabase.from('bot_configs').select('config')
+      .eq('license_key', sess.licenseKey).single();
+    row = r.data;
+    if (r.error && r.error.code !== 'PGRST116') throw r.error;
+  } catch (e) {
+    console.error('[BOT-CONFIG] read failed', _errId(e));
+    return res.status(503).json({ error: 'Service unavailable. Try again shortly.' });
+  }
+  if (!row) {
+    return res.status(404).json({ error: 'No configuration saved for this licence yet.' });
+  }
+
+  let decoded;
+  try {
+    decoded = decryptBotConfig(row.config);
+  } catch (e) {
+    // Never surface the cryptographic detail. A tag failure and a malformed
+    // record must look identical from outside, or the endpoint becomes an
+    // oracle. The correlation id is how the operator finds the real reason.
+    const id = _errId(e);
+    console.error(`[BOT-CONFIG] decrypt failed for a licence (id ${id})`);
+    return res.status(500).json({ error: 'Configuration unavailable.', id });
+  }
+
+  // Migrate a legacy CBC row to GCM the first time it is read, so the
+  // unauthenticated format disappears through use rather than through a
+  // migration nobody runs.
+  if (decoded.legacy) {
+    try {
+      await supabase.from('bot_configs').upsert(
+        { license_key: sess.licenseKey, config: encryptBotConfig(decoded.config),
+          updated_at: new Date().toISOString() },
+        { onConflict: 'license_key' });
+      console.log('[BOT-CONFIG] migrated one row from CBC to GCM');
+    } catch (e) {
+      // Serving the config still works; the row migrates on a later read.
+      console.error('[BOT-CONFIG] migration write failed', _errId(e));
+    }
+  }
+
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, config: decoded.config });
 });
 
 // ════════════════════════════════════════
@@ -2882,7 +3343,7 @@ async function _metaPost(platform, content, mediaUrl) {
 
 // POST /api/admin/social/post — { platform: 'facebook'|'instagram', content, media_url? }
 app.post('/api/admin/social/post', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   const { platform, content, media_url } = req.body || {};
   if (!['facebook', 'instagram'].includes(platform)) return res.status(400).json({ error: "platform must be 'facebook' or 'instagram'" });
   let postRow = null;
@@ -2898,7 +3359,7 @@ app.post('/api/admin/social/post', async (req, res) => {
     res.json({ ok: true, external_post_id: externalId });
   } catch (e) {
     if (supabase && postRow) await supabase.from('social_posts').update({ status: 'failed', error: e.message }).eq('id', postRow.id);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Request failed.', id: _errId(e) });
   }
 });
 
@@ -2995,7 +3456,7 @@ app.get('/auth/tiktok/callback', async (req, res) => {
 // TikTok's Content Posting API) — this posts via PULL_FROM_URL for a hosted
 // video file. { video_url, content }
 app.post('/api/admin/social/tiktok/post', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   const { video_url, content } = req.body || {};
   if (!video_url) return res.status(400).json({ error: 'video_url is required (TikTok posts video, not text/images)' });
   let postRow = null;
@@ -3020,7 +3481,7 @@ app.post('/api/admin/social/tiktok/post', async (req, res) => {
     res.json({ ok: true, publish_id: publishId, note: 'privacy_level is SELF_ONLY (TikTok default for unaudited apps) — switch to PUBLIC_TO_EVERYONE once your app passes Content Posting API review.' });
   } catch (e) {
     if (supabase && postRow) await supabase.from('social_posts').update({ status: 'failed', error: e.message }).eq('id', postRow.id);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Request failed.', id: _errId(e) });
   }
 });
 
@@ -3041,7 +3502,28 @@ app.use((err, req, res, next) => {
 // ════════════════════════════════════════
 // START SERVER
 // ════════════════════════════════════════
+// Exported so the security tests can exercise the licence and configuration
+// primitives directly instead of re-implementing them — a test that carries
+// its own copy of the crypto proves only that the copy works.
+module.exports = {
+  app,
+  _internal: {
+    generateForexKey, verifyLicenseKeyHmac,
+    encryptBotConfig, decryptBotConfig,
+    _issueBotSession, _botSession, _revokeBotSessionsFor,
+    assertPublicHttpUrl, _isPublicIp,
+    _ownerSecretOk, _ownerSecretPresentInUrl,
+    BOT_SESSION_TTL_MS,
+  },
+};
+
+// APEX_NO_LISTEN lets a test require this file without binding a port or
+// firing the self-test request. It is checked here and nowhere else, so it
+// cannot affect how the service behaves when it IS listening.
 const PORT = process.env.PORT || 3000;
+if (process.env.APEX_NO_LISTEN === 'true') {
+  console.log('APEX_NO_LISTEN=true — routes registered, not listening.');
+} else
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Blueprint Studio server running on port ${PORT} (0.0.0.0)`);
   addLog('Server started', 'system', 'success');
