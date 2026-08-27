@@ -44,8 +44,14 @@ LIVE_POS = {"symbol": "GBPUSD", "side": "BUY", "units": 5000.0,
             "positionId": 54669878, "initialStop": 1.357768}
 
 UID = "900001"
+# ctrader_access_token is present because account_mode.resolve() refuses to
+# look any further without one — an account with no token is UNVERIFIED, and
+# the order gate now declines new live orders on those. This fixture is about
+# ownership during a restart, so it has to get past that gate to test anything.
 user_store.save(UID, {"active": True, "paper": False, "symbol": "GBPUSD",
                       "ctrader_account_id": 47765456,
+                      "ctrader_access_token": "test-only-broker-token",
+                      "ctrader_env": "live",
                       "open_position_snapshot": dict(LIVE_POS),
                       "licence_key": "TEST-LICENCE"})
 
@@ -90,6 +96,13 @@ def owned(verdict, why="test"):
 _ent0 = gates.live_entitlement
 try:
     gates.live_entitlement = lambda uid, user=None: ("allowed", "test licence")
+    # The broker environment is checked before ownership too, for the same
+    # reason the comment above gives about entitlement: this account is
+    # paper=False, so without a broker-confirmed reading the gate refuses with
+    # ACCOUNT_MODE_UNVERIFIED and the ownership check never runs. Seeding the
+    # resolver's cache is what "the broker just answered LIVE" looks like.
+    from apex import account_mode as _am
+    _am._store("47765456", _am.LIVE)
     owned(False, "another instance holds the lease")
     d, _ = gates.authorize_order(UID, symbol="GBPUSD", side="BUY", units=5000.0,
                                  sl=1.35777, tp=1.36681, origin="signal",

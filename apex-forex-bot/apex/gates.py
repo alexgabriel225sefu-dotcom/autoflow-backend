@@ -35,6 +35,7 @@ than accidental.
 import time
 
 from apex import access, ledger, ownership, user_store
+from apex import account_mode
 
 # Verdicts. Strings rather than an enum so they survive the JSON round trip
 # through the control plane unchanged.
@@ -125,7 +126,45 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     if ent == "unknown" and live:
         return Decision(False, "ENTITLEMENT_UNKNOWN", why), None
 
-    # 2. Risk guard, as the LOOP published it. Recomputing here would advance
+    # 2. Broker environment. `live` above comes from the STORED paper flag,
+    #    which says what we last recorded — not what the account is now. When
+    #    the broker cannot be reached, account_mode resolves to UNVERIFIED, and
+    #    an account whose environment nobody can currently confirm must not
+    #    take on NEW live risk: the failure mode is opening a real-money
+    #    position while believing it is a demo.
+    #
+    #    Deliberately only on the OPEN path. authorize_close does not carry
+    #    this check, because an existing position must keep being managed
+    #    exactly when verification is degraded — refusing to close is the one
+    #    outcome worse than refusing to open.
+    if live:
+        try:
+            mode, _src = account_mode.resolve(u)
+        except Exception as e:
+            return Decision(False, "ACCOUNT_MODE_UNKNOWN",
+                            f"could not resolve the broker environment: "
+                            f"{str(e)[:80]}"), None
+        if mode not in (account_mode.LIVE, account_mode.DEMO):
+            return Decision(False, "ACCOUNT_MODE_UNVERIFIED",
+                            "the broker cannot confirm this account's "
+                            "environment; no new live orders until it can"), None
+        # A LIVE reading that came from our own stored flag is not confirmation.
+        # `_src == "broker"` means the account answered just now; "stored-env"
+        # means we are repeating what we last wrote down, and the whole reason
+        # that distinction exists is that it can be stale. Real money does not
+        # get opened on a stale reading.
+        #
+        # DEMO is deliberately NOT held to this. There is no real money at
+        # risk, and refusing to trade a demo account because a status lookup
+        # timed out would stop the product working for the case it is mostly
+        # used in — a cost with no matching danger.
+        if mode == account_mode.LIVE and _src != "broker":
+            return Decision(False, "LIVE_MODE_UNCONFIRMED",
+                            f"live account, but the environment came from "
+                            f"{_src} rather than the broker; no new real-money "
+                            "orders until the broker confirms"), None
+
+    # 3. Risk guard, as the LOOP published it. Recomputing here would advance
     #    the peak-balance and daily-reset state — a check must not move the
     #    thing it is checking.
     d = dash if dash is not None else _dash(user_id)
@@ -134,13 +173,13 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
         reasons = "; ".join(str(r) for r in (guard.get("reasons") or [])) or "risk limit"
         return Decision(False, "RISK_HALTED", reasons), None
 
-    # 3. Ownership. Another container managing the same account is worse than
+    # 4. Ownership. Another container managing the same account is worse than
     #    a missed entry, and an unverifiable lease is not ownership.
     own_ok, own_why = ownership.may_trade(user_id, live=live)
     if not own_ok:
         return Decision(False, "NOT_OWNER", own_why), None
 
-    # 4. Idempotency, last — so the claim is only taken for a request that has
+    # 5. Idempotency, last — so the claim is only taken for a request that has
     #    already cleared everything else.
     ok, why, rid = ledger.claim(user_id, symbol, side, units, sl, tp,
                                 fail_closed=live)

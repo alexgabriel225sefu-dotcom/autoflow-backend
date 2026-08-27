@@ -622,3 +622,75 @@ test('bot-config never answers without a scoped session, and never caches', () =
   // wrongly-scoped caller must get nothing at all — not a filtered subset.
   assert.match(route, /Authorization failed/, 'no 401 path');
 });
+
+// ── Finding 2: the remaining cases from the audit's own list ───────────
+test('a licence key in the query string cannot write configuration', () => {
+  const code = serverCode();
+  const idx = code.indexOf("app.post('/api/save-bot-config'");
+  const route = code.slice(idx, idx + 2600);
+  // The route takes its licence from the session and nothing else, so a query
+  // parameter has nowhere to land — and a body key is refused outright.
+  assert.ok(!/req\.query\.key/.test(route), 'the write route reads ?key=');
+  assert.match(route, /body\.key \|\| body\.licenseKey \|\| body\.licenceKey/,
+    'a licence key in the body is not detected');
+  assert.match(route, /LICENCE_NOT_ACCEPTED/);
+});
+
+test('changing configuration revokes the sessions that held the old view', () => {
+  const code = serverCode();
+  const idx = code.indexOf("app.post('/api/save-bot-config'");
+  const route = code.slice(idx, idx + 3400);
+  assert.match(route, /_revokeBotSessionsFor\(key\)/,
+    'a successful write leaves old sessions valid');
+});
+
+test('a licence that stops being valid invalidates its sessions', () => {
+  // Both the write path and the session-exchange path re-check the licence, so
+  // revocation or expiry inside the window ends the session rather than being
+  // noticed only at the next exchange.
+  const code = serverCode();
+  for (const routeName of ["app.post('/api/save-bot-config'", "app.post('/api/bot-session'"]) {
+    const idx = code.indexOf(routeName);
+    assert.ok(idx > 0, `${routeName} missing`);
+    const route = code.slice(idx, idx + 2600);
+    assert.match(route, /revoked_at/, `${routeName} ignores revoked_at`);
+    assert.match(route, /expires_at/, `${routeName} ignores expires_at`);
+  }
+  const save = code.slice(code.indexOf("app.post('/api/save-bot-config'"));
+  assert.match(save.slice(0, 3000), /_revokeBotSessionsFor\(key\)/);
+});
+
+test('a session issued for one licence carries only that licence', () => {
+  const a = _issueBotSession('FORX-OWN-A', 'apex-forex', 'bot:config:write');
+  const b = _issueBotSession('FORX-OWN-B', 'apex-forex', 'bot:config:write');
+  // The route uses sess.licenseKey, so this IS the ownership boundary.
+  assert.strictEqual(_botSession(fakeReq(`Bearer ${a}`), 'bot:config:write').licenseKey, 'FORX-OWN-A');
+  assert.strictEqual(_botSession(fakeReq(`Bearer ${b}`), 'bot:config:write').licenseKey, 'FORX-OWN-B');
+  const code = serverCode();
+  const route = code.slice(code.indexOf("app.post('/api/save-bot-config'"));
+  assert.match(route.slice(0, 2600), /const key = sess\.licenseKey/,
+    'the write target is not taken from the session');
+  _revokeBotSessionsFor('FORX-OWN-A');
+  _revokeBotSessionsFor('FORX-OWN-B');
+});
+
+// ── Finding 7: the rest of the secret-logging surface ──────────────────
+test('no OAuth code, refresh token or Railway token reaches a log call', () => {
+  const src = rawSource();
+  const offenders = src.split('\n')
+    .map((l, i) => [i + 1, l.trim()])
+    .filter(([, l]) => /(console\.(log|error|warn)|addLog)\(/.test(l))
+    .filter(([, l]) => /\$\{[^}]*\b(railwayToken|refresh_token|refreshToken|access_token|accessToken|authCode|oauthCode|code)\s*\}/.test(l));
+  assert.deepStrictEqual(offenders, [],
+    `credentials reach logs at: ${JSON.stringify(offenders)}`);
+});
+
+test('no environment secret is interpolated into a log call', () => {
+  const src = rawSource();
+  const offenders = src.split('\n')
+    .map((l, i) => [i + 1, l.trim()])
+    .filter(([, l]) => /(console\.(log|error|warn)|addLog)\(/.test(l))
+    .filter(([, l]) => /\$\{\s*process\.env\.[A-Z_]*(SECRET|TOKEN|KEY|PASSWORD)[A-Z_]*\s*\}/.test(l));
+  assert.deepStrictEqual(offenders, [],
+    `env secrets reach logs at: ${JSON.stringify(offenders)}`);
+});

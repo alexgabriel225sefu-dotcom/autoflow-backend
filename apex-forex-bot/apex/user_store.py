@@ -14,7 +14,19 @@ import requests as _req
 
 from apex import config as cfg
 
-_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "users")
+# Where the local JSON store lives.
+#
+# This was hardcoded, and 54 test files set DATA_DIR in their headers believing
+# it isolated them. It did not: every one of them shared this single directory,
+# so a fixture written by one test was visible to the next. test_restore_integrity
+# reads whatever users exist and asserts their tokens are encrypted, so a
+# leftover fixture from test_live_recovery_chain failed it — a real defect that
+# surfaced only because a fixture happened to gain a plaintext token.
+#
+# Production is unaffected either way: it runs on Redis (_USE_REDIS below) and
+# never sets DATA_DIR, so this falls through to the same default it always had.
+_DIR = os.getenv("DATA_DIR") or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "users")
 
 # ─── Field-level encryption for credentials at rest ──────
 # Broker tokens and user-supplied AI keys are the fields that matter if the
