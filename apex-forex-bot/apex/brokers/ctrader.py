@@ -36,6 +36,7 @@ import threading
 import requests
 
 from apex import config as cfg
+from apex import candle_cache
 
 # Protobuf message definitions come from the official package. We use ONLY the
 # generated message classes — not the Twisted-based Client.
@@ -558,7 +559,27 @@ class CtraderBroker:
         return round((bid + ask) / 2, 6)
 
     def get_candles(self, instrument=None, interval=None, limit=None, to_ts=None):
-        """Trendbars, oldest first.
+        """Trendbars, oldest first. Shared across accounts — see apex/candle_cache.
+
+        Trendbars are public market data: EURUSD M5 bars are the same for every
+        account, and the only per-account part of the request is which socket it
+        travels down. cTrader allows 5 historical requests per second PER
+        CONNECTION regardless of how many accounts are authorised through it, so
+        one copy per user put a ceiling of roughly 187 concurrent clients on the
+        whole product. The cache collapses those into one fetch.
+
+        The live quote (`get_price`) is deliberately NOT cached: the spread
+        check depends on it being current.
+        """
+        return candle_cache.get(
+            lambda: self._get_candles_uncached(instrument, interval, limit, to_ts),
+            instrument=instrument or self._c.SYMBOL,
+            interval=interval or self._c.TIMEFRAME,
+            limit=limit, to_ts=to_ts)
+
+    def _get_candles_uncached(self, instrument=None, interval=None, limit=None,
+                              to_ts=None):
+        """The real fetch. Called on a cache miss, and by nothing else.
 
         `to_ts` (unix seconds) ends the window somewhere other than now, which
         is what lets a caller page backwards through history: fetch, then ask
