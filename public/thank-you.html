@@ -165,7 +165,10 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
           progressTextEl.textContent = 'Done!';
           var botUsername = isForex ? 'FOREX_APEX_BOT' : 'ApexTradeBot_official_bot';
           var tgLink = 'https://t.me/' + botUsername + '?start=' + encodeURIComponent(d.licenseKey);
-          document.getElementById('readyTitle').textContent = isForex ? 'Your Forex bot is ready.' : 'Your Crypto bot is ready.';
+          // Forex is the only product. The crypto branch named a bot that can no
+          // longer be bought or deployed, so a buyer reaching it saw a promise
+          // nothing behind the page could keep.
+          document.getElementById('readyTitle').textContent = 'Your Forex bot is ready.';
           document.getElementById('readySub').textContent = 'Tap the button below — Telegram opens and your ' + (isForex ? 'Forex' : 'Crypto') + ' bot activates automatically. No setup required.';
           document.getElementById('tgBtn').href = tgLink;
           setTimeout(function(){ show('stateReady'); }, 400);

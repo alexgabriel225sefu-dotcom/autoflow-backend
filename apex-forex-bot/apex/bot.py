@@ -20,12 +20,10 @@ broker = get_broker()
 
 
 def broker_label():
-    if cfg.BROKER == "ctrader":
-        return f"cTrader ({cfg.CTRADER_ENV})"
-    if cfg.BROKER == "mt":
-        return "MT BRIDGE"
-    if cfg.BROKER == "td":
-        return "TWELVE DATA"
+    # cTrader is the only execution path this build has, and config.py now
+    # refuses to import with BROKER set to anything else. The MT BRIDGE and
+    # TWELVE DATA branches below this were unreachable, and an unreachable
+    # branch that names a broker reads like a supported one.
     return f"cTrader ({cfg.CTRADER_ENV})"
 
 
@@ -247,16 +245,6 @@ def validate():
         else:
             print("⚠️  cTrader credentials missing (CTRADER_CLIENT_ID / CTRADER_CLIENT_SECRET).")
             print("    Clients won't be able to link accounts. Set them in Render env vars.")
-    elif cfg.BROKER == "mt":
-        if not cfg.MT_BRIDGE_SECRET:
-            print("⚠️  BROKER=mt needs MT_BRIDGE_SECRET.")
-        else:
-            print("🔗 MetaTrader bridge mode — waiting for the ApexBridge EA to sync.")
-    elif cfg.BROKER == "td":
-        if not cfg.TWELVE_DATA_KEY:
-            print("⚠️  BROKER=td needs TWELVE_DATA_KEY.")
-        else:
-            print("📡 Twelve Data mode.")
 
 
 def get_balance():

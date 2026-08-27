@@ -447,10 +447,7 @@ _BROKER_KEYS = {
 
 
 def _broker_label():
-    if cfg.BROKER == "ctrader":
-        return f"cTrader ({cfg.CTRADER_ENV})"
-    if cfg.BROKER == "mt":
-        return "MetaTrader Bridge"
+    # cTrader only — see apex/config.UnsupportedBroker.
     return f"cTrader ({cfg.CTRADER_ENV})"
 
 
@@ -5532,7 +5529,7 @@ def _handle_config(chat_id):
         for k in keys)
     paused = _bot_control.get("get_paused", lambda: False)()
     state_tag = "⏸️ PAUSED" if paused else "▶️ RUNNING"
-    key_title = "MT bridge" if cfg.BROKER == "mt" else "cTrader"
+    key_title = "cTrader"
     send_to(chat_id,
             f"⚙️ <b>Config</b>  [{state_tag}]\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"

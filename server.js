@@ -2394,7 +2394,7 @@ app.get(['/apex-bot', '/apex-bot.html', '/configurator', '/configurator.html',
 // they configured Binance keys and walked a client through deploying the
 // retired Railway image. Serving them would hand a buyer instructions for a
 // product that cannot be delivered. 'configurator-forex' is the live one.
-const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','setup-guide','configurator-forex','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','thank-you','chart','free','promo','guide'];
+const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','configurator-forex','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','thank-you','free','guide'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
