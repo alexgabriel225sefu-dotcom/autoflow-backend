@@ -442,7 +442,6 @@ def _load_runtime() -> dict:
 
 _BROKER_KEYS = {
     "ctrader": ["CTRADER_CLIENT_ID", "CTRADER_CLIENT_SECRET"],
-    "mt": ["MT_BRIDGE_SECRET"],
 }
 
 
@@ -490,7 +489,6 @@ _SETTABLE = {
 _SETTABLE_SECRETS = {
     "CTRADER_CLIENT_ID":     ("CTRADER_CLIENT_ID",     _secret(6)),
     "CTRADER_CLIENT_SECRET": ("CTRADER_CLIENT_SECRET", _secret(12)),
-    "MT_BRIDGE_SECRET":      ("MT_BRIDGE_SECRET",      _secret(16)),
 }
 
 _ALL_SETTABLE = {**_SETTABLE, **_SETTABLE_SECRETS}
@@ -1358,7 +1356,7 @@ def _handle_broker(chat_id, args):
     if b == "mt":
         send_to(chat_id,
                 "🔗 Broker set to <b>MetaTrader Bridge</b>.\n\n"
-                "1. Set a secret: <code>/setkeys MT_BRIDGE_SECRET=choose_something_long</code>\n"
+
                 "2. Install <b>ApexBridge.mq5</b> in MetaTrader (see docs/METATRADER.md)\n"
                 "3. Put the same secret + your bot URL in the EA settings\n\n"
                 "I'll start trading as soon as the EA connects.")

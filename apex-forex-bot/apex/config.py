@@ -80,13 +80,20 @@ CTRADER_SCOPE         = (os.getenv("CTRADER_SCOPE") or "trading").lower()
 # Where cTrader redirects after the client authorizes (OAuth callback):
 CTRADER_REDIRECT_URI  = os.getenv("CTRADER_REDIRECT_URI", "")
 
-# ─── MetaTrader bridge (BROKER=mt) ──────────────────────
+# ─── Non-production broker modules ──────────────────────
+# These belong to apex/brokers/{mtbridge,twelvedata,metaapi}.py, which are NOT
+# reachable in this build: _resolve_broker() above refuses BROKER=mt/td/metaapi
+# at import, and apex.brokers._REGISTRY holds cTrader alone, so get_broker()
+# cannot load them either.
+#
+# They are kept because two of them have tests that import them directly, and
+# deleting a test to tidy a config file is the wrong trade. The settings stay
+# with them for the same reason — the tests assign to these attributes.
+#
+# What matters is that no amount of setting them makes those brokers run.
+# Neither is settable through /setkeys or remote configuration any more.
 MT_BRIDGE_SECRET = os.getenv("MT_BRIDGE_SECRET", "")
-
-# ─── Twelve Data (BROKER=td) ────────────────────────────
 TWELVE_DATA_KEY = os.getenv("TWELVE_DATA_KEY", "")
-
-# ─── MetaAPI (BROKER=metaapi) ───────────────────────────
 METAAPI_TOKEN      = os.getenv("METAAPI_TOKEN", "")
 METAAPI_ACCOUNT_ID = os.getenv("METAAPI_ACCOUNT_ID", "")
 

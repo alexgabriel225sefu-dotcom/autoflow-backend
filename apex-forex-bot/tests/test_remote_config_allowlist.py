@@ -206,9 +206,11 @@ print("\n13. Provisioning credentials are a SEPARATE trust class")
 # injection, but any response from the licence server could still ROTATE the
 # bot's Telegram token, dashboard token or AI key as a side effect of a routine
 # configuration update. Whoever controls that response then controls the bot.
+# MT_BRIDGE_SECRET and TWELVE_DATA_KEY are absent from BOTH tables now: their
+# brokers cannot run, so a credential for them is dead configuration surface.
+# They are covered by the unknown-key checks above instead.
 for k in ("TELEGRAM_BOT_TOKEN", "DASHBOARD_TOKEN", "GROQ_API_KEY",
-          "GEMINI_API_KEY", "METAAPI_TOKEN", "AI_GATEWAY_KEY",
-          "MT_BRIDGE_SECRET", "TWELVE_DATA_KEY"):
+          "GEMINI_API_KEY", "METAAPI_TOKEN", "AI_GATEWAY_KEY"):
     check(f"{k} is refused by the RUNTIME path", refused(k, "x" * 40))
     check(f"…and the refusal says why, not just 'unknown'",
           "provisioning credential" in _why(k, "x" * 40), _why(k, "x" * 40))

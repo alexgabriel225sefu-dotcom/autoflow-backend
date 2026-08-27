@@ -199,10 +199,12 @@ _TRADING = {
 
 # Credentials. Same validation, but the VALUE is never echoed, logged or
 # audited — only the fact that the key changed.
+# MT_BRIDGE_SECRET was here. Its broker is refused by config._resolve_broker
+# and unreachable through apex.brokers.get_broker(), so accepting a credential
+# for it let an operator configure something that cannot run.
 _SECRETS = {
     "CTRADER_CLIENT_ID":     ("CTRADER_CLIENT_ID",     _secret(6)),
     "CTRADER_CLIENT_SECRET": ("CTRADER_CLIENT_SECRET", _secret(12)),
-    "MT_BRIDGE_SECRET":      ("MT_BRIDGE_SECRET",      _secret(16)),
 }
 
 # Provisioning credentials the configurator legitimately sends on first
@@ -211,7 +213,6 @@ _REMOTE_PROVISIONING = {
     "TELEGRAM_BOT_TOKEN": ("TELEGRAM_BOT_TOKEN", _secret(20)),
     "TELEGRAM_CHAT_ID":   ("TELEGRAM_CHAT_ID",   _chat_id),
     "DASHBOARD_TOKEN":    ("DASHBOARD_TOKEN",    _secret(16)),
-    "MT_BRIDGE_SECRET":   ("MT_BRIDGE_SECRET",   _secret(16)),
     "GROQ_API_KEY":       ("GROQ_API_KEY",       _secret(16)),
     "GEMINI_API_KEY":     ("GEMINI_API_KEY",     _secret(16)),
     "TWELVE_DATA_KEY":    ("TWELVE_DATA_KEY",    _secret(8)),
