@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
 <link rel="preconnect" href="https://telegram.org" crossorigin>
-<title>Apex Terminal</title>
+<title>Apex4Traders</title>
 <style>
 :root{--bg:#07090f;--card:rgba(255,255,255,.045);--line:rgba(255,255,255,.08);
   --t0:#eef1f6;--t1:#9aa3b2;--t2:#5b6472;--up:#2fd575;--dn:#ff4560;--acc:#ff2d4f;--gold:#f5b544}
@@ -125,10 +125,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 <div class="wrap">
   <div id="hero" class="rise">
     <div id="brandRow">
-      <div id="brand">APEX <b>TERMINAL</b></div>
+      <div id="brand">APEX<b>4TRADERS</b></div>
       <div id="modeBadge">— — —</div>
     </div>
-    <div id="statusLine">👀 Watching <b>—</b></div>
+    <div id="statusLine">Connecting…</div>
     <div id="balRow">
       <div>
         <div style="font-size:9.5px;font-weight:800;letter-spacing:.14em;color:var(--t2);margin-bottom:3px">EQUITY</div>
@@ -142,9 +142,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
   <div id="tiles" class="rise">
     <div class="tile"><b id="tWr">—</b><span>Win rate</span></div>
-    <div class="tile"><b id="tPf">—</b><span>$ won / $ lost</span></div>
-    <div class="tile"><b id="tDd">—</b><span>Biggest dip</span></div>
-    <div class="tile"><b id="tSk">—</b><span>Skipped today</span></div>
+    <div class="tile"><b id="tPf">—</b><span>Profit factor</span></div>
+    <div class="tile"><b id="tDd">—</b><span>Max drawdown</span></div>
+    <div class="tile"><b id="tSk">—</b><span>Filtered today</span></div>
   </div>
 
   <div class="card rise">
@@ -159,18 +159,18 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   </div>
 
   <div id="tabs" class="rise">
-    <div class="tab on" data-p="chart">📈 Chart</div>
-    <div class="tab" data-p="perf">💰 Stats</div>
-    <div class="tab" data-p="hist">🕘 History</div>
-    <div class="tab" data-p="news">📰 News</div>
-    <div class="tab" data-p="journal">🧾 Log</div>
+    <div class="tab on" data-p="chart">Chart</div>
+    <div class="tab" data-p="perf">Performance</div>
+    <div class="tab" data-p="hist">History</div>
+    <div class="tab" data-p="news">Events</div>
+    <div class="tab" data-p="journal">Execution</div>
   </div>
   <div class="panel on" id="p-chart"></div>
   <div class="panel" id="p-perf"><div class="empty">Loading…</div></div>
   <div class="panel" id="p-hist"><div class="empty">Loading your trades…</div></div>
   <div class="panel" id="p-news"><div class="empty">Loading events…</div></div>
   <div class="panel" id="p-journal">
-    <div id="jSwitch"><div class="on" data-j="trades">Recent</div><div data-j="skips">Skipped setups</div></div>
+    <div id="jSwitch"><div class="on" data-j="trades">Recent</div><div data-j="skips">Filtered signals</div></div>
     <div id="jTrades"><div class="empty">No trades yet.</div></div>
     <div id="jSkips" style="display:none"><div class="empty">Nothing skipped yet today.</div></div>
   </div>
@@ -371,9 +371,9 @@ async function refresh(){
   chip.className=(td.netPnl||0)<0?'neg':'';
 
   Q('statusLine').innerHTML = d.position
-    ? ((fl>=0?'🟢 In a ':'🔴 In a ')+(d.position.side==='BUY'?'BUY':'SELL')+' on <b>'+esc(lastSym)+'</b> — '
+    ? ((d.position.side==='BUY'?'Long ':'Short ')+'<b>'+esc(lastSym)+'</b> — '
        +(fl>=0?'up $':'down $')+Math.abs(fl).toFixed(2))
-    : '👀 Watching <b>'+esc(lastSym)+'</b> — no position, waiting for a setup';
+    : '<b>'+esc(lastSym)+'</b> — no open position, monitoring for entry conditions';
 
   const bp=[];
   if(d.strategy)bp.push(d.strategy);
@@ -407,10 +407,10 @@ async function refresh(){
   perf.innerHTML = st.trades ?
      '<div class="kv"><span>Closed trades</span><b>'+st.trades+' ('+st.wins+'W / '+st.losses+'L)</b></div>'
     +'<div class="kv"><span>Net P&L</span><b class="'+(st.netPnl>=0?'pnl-up':'pnl-dn')+'">'+money(st.netPnl)+'</b></div>'
-    +'<div class="kv"><span>$ won per $ lost</span><b>'+(st.profitFactor!=null?st.profitFactor:'—')+'</b></div>'
+    +'<div class="kv"><span>Profit factor</span><b>'+(st.profitFactor!=null?st.profitFactor:'—')+'</b></div>'
     +'<div class="kv"><span>Average win / loss</span><b>'+money(st.avgWin)+' / '+money(st.avgLoss)+'</b></div>'
     +'<div class="kv"><span>Best / worst trade</span><b>'+money(st.best)+' / '+money(st.worst)+'</b></div>'
-    +'<div class="kv"><span>Biggest dip from peak</span><b>'+(st.maxDrawdownPct!=null?st.maxDrawdownPct.toFixed(1)+'%':'—')+'</b></div>'
+    +'<div class="kv"><span>Max drawdown</span><b>'+(st.maxDrawdownPct!=null?st.maxDrawdownPct.toFixed(1)+'%':'—')+'</b></div>'
     : '<div class="empty">No closed trades yet — stats build as the bot works.</div>';
 
   // News. Prefer the rolling feed; fall back to newsToday so a page still
@@ -678,14 +678,17 @@ async function tick(){
       livePos=Object.assign(livePos||{},t.position);
       refreshEntryLine(livePos);
       const up=fl>=0;
-      Q('statusLine').innerHTML=(up?'🟢 In a ':'🔴 In a ')
-        +(t.position.side==='BUY'?'BUY':'SELL')+' on <b>'+esc(lastSym)+'</b> — '
+      // Direction comes from the POSITION, never from whether it is winning.
+      // The emoji this replaced was a profit indicator, and reusing it for
+      // side made a profitable short read as "Long SELL".
+      Q('statusLine').innerHTML=(t.position.side==='BUY'?'Long ':'Short ')
+        +'<b>'+esc(lastSym)+'</b> — '
         +(up?'up $':'down $')+Math.abs(fl).toFixed(2);
     }else if(livePos){
       // The position closed between full refreshes — clear it now rather than
       // leaving a dead trade on screen for the rest of the cycle.
       livePos=null; setLines(null); renderPositions([],0);
-      Q('statusLine').innerHTML='👀 Watching <b>'+esc(lastSym)+'</b> — no position, waiting for a setup';
+      Q('statusLine').innerHTML='<b>'+esc(lastSym)+'</b> — no open position, monitoring for entry conditions';
     }
   }catch(e){ freshness(); }
 }

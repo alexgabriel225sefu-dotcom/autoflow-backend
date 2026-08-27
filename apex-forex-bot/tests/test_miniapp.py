@@ -274,6 +274,21 @@ check("every call carries initData",
 check("and never in the query string",
       "init='+encodeURIComponent" not in HTML and "'init='" not in HTML,
       "initData is still being appended to a URL")
+# Position direction must come from the POSITION, never from whether it is
+# winning. The status line originally used a red/green emoji as a PROFIT
+# indicator; when those were replaced with "Long"/"Short" for the platform
+# rewrite, one of the two code paths kept keying off the P&L sign — so a
+# profitable short rendered as "Long SELL". On a trading screen that is the
+# kind of error someone acts on.
+check("direction is never derived from profit or loss",
+      "up?'Long" not in HTML and 'up?"Long' not in HTML,
+      "a winning short would display as Long")
+check("both status paths read the side from the position",
+      HTML.count("side==='BUY'?'Long ':'Short '") >= 2,
+      "one of the refresh paths is not using the position's own side")
+check("and the P&L wording is separate from the direction",
+      "up?'up $':'down $'" in HTML or "fl>=0?'up $':'down $'" in HTML)
+
 check("it never invents market data", "Math.random" not in HTML)
 for fake in ("10,142", "12,482", "1.08452"):
     check(f"no hardcoded {fake}", fake not in HTML)

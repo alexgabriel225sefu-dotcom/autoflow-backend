@@ -1820,9 +1820,10 @@ def _ob_step_connect(chat_id):
     send_to(chat_id,
             _ob_head(chat_id, "connect") +
             "<b>Connect your broker account.</b>\n\n"
-            "The bot never holds your money — it places orders on your own "
-            "cTrader account, which stays yours and which you can disconnect "
-            "at any time with /reset.\n\n"
+            "The platform places orders on your own cTrader account. Your "
+            "funds never leave your broker — the connection permits order "
+            "placement only, so deposits and withdrawals are not something "
+            "this software can reach. Disconnect any time with /reset.\n\n"
             f"<i>{note}</i>\n\n"
             "<i>Whether that account is demo or real money is something I read "
             "from the account itself once it's connected — you don't have to "
@@ -5325,13 +5326,18 @@ def send_activation_sequence(chat_id, paid: bool):
                    "• Start on a <b>demo account</b> first to test risk-free\n")
     send_to(chat_id,
             f"{welcome_head}\n\n"
-            "You now own a fully-hosted AI trading bot that runs on "
-            "<b>your own</b> trading account, controlled entirely from "
-            "this Telegram chat. No apps to install, no PC required.\n\n"
-            "⚠️ <b>Important — please read:</b>\n"
-            "• Trading involves risk — profits are not guaranteed\n"
-            "• Losses are possible and they are <b>yours</b>\n"
-            "• This is software, not financial advice\n"
+            "Your licence is active. You now operate a hosted trading "
+            "automation platform that executes on <b>your own</b> broker "
+            "account, configured and monitored from this chat. Nothing to "
+            "install, no PC or VPS to keep running.\n\n"
+            "<b>Before you start — please read</b>\n"
+            "• Trading carries risk of loss. Returns are not guaranteed and "
+            "cannot be.\n"
+            "• Any losses occur on <b>your</b> account and are <b>yours</b>.\n"
+            "• This is software you operate. It is not investment advice and "
+            "not a managed service.\n"
+            "• Your funds stay with your broker. The platform cannot deposit "
+            "or withdraw.\n"
             f"{risk_bullet}")
     broker_rows = _broker_signup_rows()
     if _LIVE_BROKER_REQUIRED:
@@ -5375,13 +5381,24 @@ def _handle_purchase(chat_id):
     # knows which Telegram chat to activate.
     link = f"{_PURCHASE_LINK}?client_reference_id={chat_id}"
     send_to(chat_id,
-            f"💳 <b>Get {cfg.BOT_NAME}</b>\n\n"
-            "One-time payment, $497 — lifetime access, no subscription.\n\n"
-            "Tap below to pay securely via Stripe. Your access activates "
-            "automatically the moment payment goes through — no key to copy, "
-            "no waiting.",
+            f"<b>{cfg.BOT_NAME} — Trading Automation Platform</b>\n\n"
+            "$497 one-time. Lifetime licence, no subscription.\n\n"
+            "<b>What the licence includes</b>\n"
+            "• <b>Strategy engine</b> — configure and automate your trading logic\n"
+            "• <b>Execution engine</b> — automated order placement through your broker\n"
+            "• <b>Risk controls</b> — position, exposure and daily-loss limits\n"
+            "• <b>Cloud execution</b> — runs 24/5, no PC or VPS required\n"
+            "• <b>Telegram control</b> — configure and monitor from this chat\n"
+            "• <b>Monitoring</b> — live positions, execution log, performance\n\n"
+            "<b>How it works</b>\n"
+            "You connect your own cTrader account. The platform sends order "
+            "instructions; your broker executes them. Your funds stay with your "
+            "broker at all times — the platform has no access to deposits or "
+            "withdrawals, and you can disconnect it whenever you want.\n\n"
+            "<i>Trading carries risk of loss. Apex4Traders is software you "
+            "operate — not investment advice, and not a managed service.</i>",
             extra={"reply_markup": {"inline_keyboard": [[
-                {"text": "💳 Buy now — $497", "url": link}]]}})
+                {"text": "Get the licence — $497", "url": link}]]}})
 
 
 def _handle_report(chat_id):
