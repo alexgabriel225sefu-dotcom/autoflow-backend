@@ -93,7 +93,7 @@ def _currency_legs(symbol):
         return []
     if len(s) == 6:
         return [s[:3], s[3:]]
-    # Everything this bot trades is a 6-character pair and takes the branch
+    # Everything this platform trades is a 6-character pair and takes the branch
     # above. The by-name split below is kept because returning NO legs is a
     # silent fail-open — high_impact_window([]) matches nothing and returns
     # None, so a symbol that slips past the 3+3 rule would trade straight
@@ -204,7 +204,7 @@ def flash_spike_pct_for(cfg, symbol):
 
 def max_spread_pct_for(cfg, symbol):
     """Optional %-of-price spread ceiling. Off unless an operator sets one:
-    every instrument this bot trades has a sane pip size, so MAX_SPREAD_PIPS
+    every instrument this platform trades has a sane pip size, so MAX_SPREAD_PIPS
     is the real guard. Kept as a per-symbol call so a future instrument with
     odd pip conventions has a place to be handled."""
     return float(getattr(cfg, "MAX_SPREAD_PCT", 0) or 0)
@@ -2037,7 +2037,7 @@ def _loop(user_id, alert_fn, gen=None):
                         "action": "DATA_ERROR",
                         "reason": ("the broker's price feed stopped sending new candles — "
                                    "reconnecting to the broker now. If it persists the broker "
-                                   "may be having a data issue; the bot resumes when prices move."),
+                                   "may be having a data issue; the platform resumes when prices move."),
                         "symbol": symbol,
                         "broker": dash.get("broker", "your broker"),
                     })
@@ -4194,7 +4194,7 @@ def force_trade(user_id, side, symbol=None, lots=None):
     # not fail loudly: it would size a position in the wrong currency, or trade
     # an exchange this bot has no calendar for.
     if not forex.is_tradeable(sym):
-        return {"ok": False, "error": f"{sym} isn't tradeable here — this bot trades "
+        return {"ok": False, "error": f"{sym} isn't tradeable here — this platform trades "
                                       "forex majors and metals. Try e.g. EUR_USD, "
                                       "USD_JPY or XAUUSD."}
     try:

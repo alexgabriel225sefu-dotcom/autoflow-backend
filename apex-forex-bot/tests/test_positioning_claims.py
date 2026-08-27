@@ -117,6 +117,42 @@ for path in CUSTOMER_FACING:
         hits = re.findall(pattern, text, re.I)
         check(f"{os.path.basename(path)}: no {pattern[:38]!r}", not hits, str(hits[:2]))
 
+print("\n4b. LANGUAGE: nothing still calls the product a bot")
+# The first pass at this used a regex whose character class excluded
+# backslashes, so it skipped every string containing \n — which is nearly
+# every alert the customer receives. It reported zero and was wrong. This one
+# allows escapes.
+_CODE_TOKENS = ("bot_token", "/bot", "api.telegram", "BOT_TOKEN", "botHandle",
+                "TELEGRAM]", "bot:on", "bot:off")
+_SPEAKS_TO_CUSTOMER = ("telegram.py", "screens.py", "user_loop.py", "webapp.py",
+                       "assistant.py", "news_alerts.py", "sentinel.py")
+for fname in _SPEAKS_TO_CUSTOMER:
+    path = os.path.join(APEX, fname)
+    if not os.path.exists(path):
+        continue
+    text = code_of(path)
+    hits = [m.group(1)[:60] for m in re.finditer(r'"((?:[^"\\]|\\.){6,200}?)"', text)
+            if not any(tok in m.group(1) for tok in _CODE_TOKENS)
+            and re.search(r"\b[Bb]ot\b", m.group(1))]
+    check(f"{fname}: no customer-facing 'bot'", not hits, str(hits[:2]))
+
+# The Mini App too, comments stripped.
+_mini = re.sub(r"//.*$", "", open(os.path.join(APEX, "static", "terminal.html"),
+                                 encoding="utf-8").read(), flags=re.M)
+check("terminal.html: no 'bot'", not re.search(r"\bbot\b", _mini, re.I))
+
+print("\n4c. LANGUAGE: the platform reports, it does not narrate")
+# A platform states what happened. First person ("I can't fetch prices",
+# "I retry every 30s") is a chatbot persona and undercuts the positioning.
+# The AI assistant's own conversational voice is a different thing and is
+# deliberately left alone — asking it a question IS a conversation.
+for fname in ("telegram.py", "screens.py", "user_loop.py"):
+    text = code_of(os.path.join(APEX, fname))
+    hits = [m.group(1)[:60] for m in re.finditer(r'"((?:[^"\\]|\\.){6,200}?)"', text)
+            if re.search(r"\bI (can\'t|cannot|retry|will|am|watch|check|read|found|see|auto)\b",
+                         m.group(1))]
+    check(f"{fname}: no first-person platform narration", not hits, str(hits[:2]))
+
 print("\n5. LANGUAGE: the honest framing IS present")
 check("the copy states the customer's money is never held",
       re.search(r"never holds your money|stays yours", tg, re.I) is not None,

@@ -584,7 +584,7 @@ _QUICK_HELP = (
     "to keep anything open — it runs in the cloud, 24/5.\n\n"
     "<b>You only need three things:</b>\n"
     "▶️ <b>Turn it ON</b> — it starts looking for setups\n"
-    "📈 <b>How am I doing</b> — balance, open trade, results\n"
+    "📈 <b>Performance</b> — balance, open trade, results\n"
     "🛡 <b>Risk</b> — how much of your account each trade may lose\n\n"
     "I message you when a trade opens, when it closes, and once at the end of "
     "the day. Nothing else, unless you ask for it with /verbose.\n\n"
@@ -1268,7 +1268,7 @@ def _ai_setup_screen(chat_id):
             "🥇 <b>Gemini</b> — free, 1,500/day → aistudio.google.com/apikey\n"
             "🥈 <b>Groq</b> — free, fast (key starts <code>gsk_</code>) → console.groq.com/keys\n"
 
-            "📋 <b>Just paste your key here</b> — I auto-detect which one it is and verify it.\n"
+            "📋 <b>Just paste your key here</b> — It is auto-detected and verified it.\n"
             "<i>Trading works fine without a key; this only powers the chat.</i>",
             _AI_KB)
 
@@ -1825,7 +1825,7 @@ def _ob_step_connect(chat_id):
             "placement only, so deposits and withdrawals are not something "
             "this software can reach. Disconnect any time with /reset.\n\n"
             f"<i>{note}</i>\n\n"
-            "<i>Whether that account is demo or real money is something I read "
+            "<i>Whether that account is demo or real money is read directly "
             "from the account itself once it's connected — you don't have to "
             "tell me, and I won't take your word for it.</i>",
             _kb([[("🔗 Connect my account", "go:connect")]]))
@@ -2470,9 +2470,9 @@ def _route_cb(chat_id, data):
         # told where the answer actually comes from and put back on the step
         # that reads it.
         send_to(chat_id,
-                "ℹ️ <b>I read that from your account now.</b>\n\n"
+                "ℹ️ <b>Read from your account just now.</b>\n\n"
                 "Whether you're on demo or real money is decided by the "
-                "account you connect, not by a setting — so I check with your "
+                "account you connect, not by a setting — so it is checked against your "
                 "broker instead of asking you.")
         return _ob_render(chat_id)
     if data.startswith("ob:style:"):
@@ -4890,14 +4890,14 @@ def _user_alert(uid, result):
     elif action == "AI_ERROR":
         send_to(uid,
                 f"⚠️ <b>AI temporarily unavailable</b>\n"
-                f"Bot continues with rule-based signals — trading is not interrupted.\n"
+                f"The platform continues on rule-based signals — trading is not interrupted.\n"
                 f"<i>{result.get('reason', '')[:120]}</i>")
     elif action == "DATA_ERROR":
         send_to(uid,
                 f"⚠️ <b>Market data problem</b> — {sym}\n"
-                f"I can't fetch prices from <b>{result.get('broker', 'your broker')}</b>:\n"
+                f"Cannot fetch prices from <b>{result.get('broker', 'your broker')}</b>:\n"
                 f"<i>{_esc(result.get('reason', '')[:160])}</i>\n\n"
-                "I retry every 30s automatically. If this keeps up, "
+                "Retrying automatically every 30s. If this keeps up, "
                 "send /ctrader to re-connect your account.")
     elif action == "STOP":
         reasons = ", ".join(result.get("reasons", ["risk limit"]))
@@ -5592,7 +5592,7 @@ _HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "/status — live trading snapshot\n"
                 "/ctrader — connect your cTrader account\n"
                 "/start — resume trading\n"
-                "/stop — pause your bot\n"
+                "/stop — pause automation\n"
                 "/controls or /settings — all controls explained\n"
                 "/purchase — buy your license ($497)\n"
                 "/help — this list\n\n"
@@ -5627,7 +5627,7 @@ _CONTROLS_TEXT = (
     "/stop — Pause the platform (no new trades; open positions keep their safety stop)\n"
     "/emergency — Stop new trades, or close every open position at once\n\n"
     "<b>📊 Trading</b>\n"
-    "/status — See your current position, balance, and bot state\n"
+    "/status — See your current position, balance, and automation state\n"
     "/open — Every position open right now, with live P&amp;L\n"
     "/performance — Results by day, week, month, method and instrument\n"
     "/report — Full trade journal with profit/loss breakdown\n"
@@ -5687,7 +5687,7 @@ _HELP_ADMIN = (f"📋 <b>{cfg.BOT_NAME.upper()} COMMANDS</b>\n"
                "/symbol &lt;PAIR&gt; — set pair\n"
                "/pairs — available instruments\n"
                "/watch — scan a basket, trade the strongest setup\n"
-               "/autopilot on — bot picks instruments too\n"
+               "/autopilot on — the platform selects instruments too\n"
                "/maxpos 5 — hold several trades at once\n"
                "/strategy — pick from STRATCOUNT methods (send it to see them)\n"
                "/builder — build a full strategy or 1-tap preset\n"
@@ -6463,7 +6463,7 @@ def alert_open(side, symbol, price, units, stop_loss, take_profit, druck_mult=1.
 
 
 def alert_close(reason, symbol, side, entry_price, close_price, pnl, balance, reasoning=""):
-    icons = {"TAKE_PROFIT": "🎯 TAKE PROFIT", "STOP_LOSS": "🛑 STOP LOSS", "AI_CLOSE": "🤖 AI CLOSE"}
+    icons = {"TAKE_PROFIT": "🎯 TAKE PROFIT", "STOP_LOSS": "🛑 STOP LOSS", "AI_CLOSE": "⚙️ Model exit"}
     d = "LONG" if side == "BUY" else "SHORT"
     pips = forex.to_pips(abs(close_price - entry_price), symbol)
     why = f"\n🧠 <i>{reasoning}</i>" if reasoning else _fx_close_why(reason)

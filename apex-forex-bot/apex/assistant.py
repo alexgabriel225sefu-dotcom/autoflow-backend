@@ -55,7 +55,7 @@ _TOOLS = [
     },
     {
         "name": "set_symbol",
-        "description": "Change which forex pair the bot auto-trades.",
+        "description": "Change which forex pair the platform auto-trades.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -77,7 +77,7 @@ _TOOLS = [
     },
     {
         "name": "pause_trading",
-        "description": "Pause auto-trading (bot stops opening new positions).",
+        "description": "Pause automation (no new positions are opened).",
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
