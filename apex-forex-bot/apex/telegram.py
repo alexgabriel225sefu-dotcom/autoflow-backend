@@ -240,7 +240,7 @@ def _handle_why_no_trade(chat_id):
     dash = user_loop.get_dash(chat_id) or {}
     if not user_loop.is_running(chat_id):
         return send_to(chat_id,
-                       "⏸ <b>The bot is OFF</b> — that's why nothing is "
+                       "⏸ <b>Automation is stopped</b> — that's why nothing is "
                        "happening. Send /start to switch it on.",
                        _dashboard_keyboard(chat_id))
     lines = ["🔍 <b>Why no trade right now</b>", ""]
@@ -580,7 +580,7 @@ def _handle_guide(chat_id):
 _QUICK_HELP = (
     "❓ <b>How this works</b>\n"
     "━━━━━━━━━━━━━━━━━━\n"
-    "The bot watches the market for you and trades on its own. You don't need "
+    "The platform watches the market for you and trades on its own. You don't need "
     "to keep anything open — it runs in the cloud, 24/5.\n\n"
     "<b>You only need three things:</b>\n"
     "▶️ <b>Turn it ON</b> — it starts looking for setups\n"
@@ -588,7 +588,7 @@ _QUICK_HELP = (
     "🛡 <b>Risk</b> — how much of your account each trade may lose\n\n"
     "I message you when a trade opens, when it closes, and once at the end of "
     "the day. Nothing else, unless you ask for it with /verbose.\n\n"
-    "<i>Trading carries risk. You can stop the bot any time with /stop — an "
+    "<i>Trading carries risk. You can stop automation any time with /stop — an "
     "open trade keeps its protective stop.</i>"
 )
 
@@ -692,7 +692,7 @@ def _handle_menu(chat_id):
     send_to(chat_id,
             f"☰ <b>{cfg.BOT_NAME.upper()} — Menu</b>\n"
             f"{_state_line(chat_id)}\n\n"
-            "<i>Everything the bot does, in one place. You can also type any "
+            "<i>Everything the platform does, in one place. You can also type any "
             "command directly — /allcommands lists them.</i>",
             _menu_kb(chat_id))
 
@@ -792,9 +792,9 @@ def _dashboard_keyboard(chat_id=None):
     rows = []
     if chat_id is not None:
         if user_loop.is_running(chat_id):
-            rows.append([{"text": "⏸  Turn bot OFF", "callback_data": "bot:off"}])
+            rows.append([{"text": "⏸  Stop automation", "callback_data": "bot:off"}])
         else:
-            rows.append([{"text": "▶️  Turn bot ON — start trading", "callback_data": "bot:on"}])
+            rows.append([{"text": "▶️  Start automation", "callback_data": "bot:on"}])
     term_url = DASHBOARD_URL or ((os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/") + "/app"
                                  if os.getenv("RENDER_EXTERNAL_URL") else "")
     if term_url:
@@ -923,8 +923,8 @@ def _handle_status(chat_id):
             is_open = forex.is_market_open()
             mode_label = "Paper" if paper else "Live"
             running = user_loop.is_running(chat_id)
-            header = ("✅ <b>BOT IS ON</b> — watching the market.\n\n" if running
-                      else "⏸ <b>BOT IS OFF</b> — tap ▶️ below to start.\n\n")
+            header = ("✅ <b>AUTOMATION ON</b> — watching the market.\n\n" if running
+                      else "⏸ <b>AUTOMATION OFF</b> — tap ▶️ below to start.\n\n")
             send_to(chat_id,
                     header + _state_line(chat_id) + "\n\n" +
                     f"{cfg.ASSET_EMOJI} <b>{cfg.BOT_NAME.upper()}</b>  {mode_label}\n"
@@ -937,7 +937,7 @@ def _handle_status(chat_id):
         dash = _get_dash()
     if not dash or not dash.get("broker"):
         return send_to(chat_id,
-            "⏸ <b>Bot is OFF.</b> Tap the button to start trading.",
+            "⏸ <b>Automation is stopped.</b> Tap the button to start trading.",
             _dashboard_keyboard(chat_id))
     chart = ""
     if _broker:
@@ -949,9 +949,9 @@ def _handle_status(chat_id):
     # Crystal-clear ON/OFF header so 'running but no position' never reads as
     # 'broken'. Running = watching, will trade when a valid setup appears.
     running = user_loop.is_running(chat_id)
-    header = ("✅ <b>BOT IS ON</b> — watching the market, it trades automatically when a valid setup appears.\n\n"
+    header = ("✅ <b>AUTOMATION ON</b> — watching the market, it trades automatically when a valid setup appears.\n\n"
               if running else
-              "⏸ <b>BOT IS OFF</b> — tap ▶️ below to start.\n\n")
+              "⏸ <b>AUTOMATION OFF</b> — tap ▶️ below to start.\n\n")
     # Demo-or-live, how much the bot may do alone, and whether the risk guard
     # is holding — the three things that must be visible wherever a client
     # might act on what they are reading. Plus, when this is a live account
@@ -976,7 +976,7 @@ def _handle_setup(chat_id):
                 f"🛠️ <b>{cfg.BOT_NAME.upper()} SETUP</b>\n\n"
                 "1/5 — <b>How do you want to trade?</b>\n\n"
                 "Reply <code>1</code> or <code>2</code>:\n"
-                "  <code>1</code> — 🧪 <b>Demo</b> (test the bot risk-free — note: free access "
+                "  <code>1</code> — 🧪 <b>Demo</b> (test it risk-free — note: free access "
                 f"needs a <b>live {_REQUIRED_BROKER_LABEL}</b> account, so this won't unlock trading).\n"
                 f"  <code>2</code> — 🔴 <b>Live</b> (real money via a live <b>{_REQUIRED_BROKER_LABEL}</b> "
                 "account — required for free access).\n\n"
@@ -990,7 +990,7 @@ def _handle_setup(chat_id):
                 "real market data, no risk).\n"
                 "  <code>2</code> — 🔴 <b>Live</b> (real money via <b>cTrader</b> — any broker "
                 "worldwide).\n\n"
-                "<i>Most people start with 1 (demo) to test the bot risk-free.</i>")
+                "<i>Most people start with 1 (demo) to test it risk-free.</i>")
 
 
 def _handle_wizard_reply(chat_id, raw, msg_id):
@@ -1014,7 +1014,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                         "🧪 <b>Demo mode</b>\n\n"
                         f"⚠️ Free access needs a <b>live {_REQUIRED_BROKER_LABEL}</b> account — "
                         "a demo account won't unlock trading. Create a demo only if you want "
-                        f"to test the bot first, then open a live {_REQUIRED_BROKER_LABEL} "
+                        f"to test it first, then open a live {_REQUIRED_BROKER_LABEL} "
                         "account when you're ready.\n\n"
                         "<b>Next:</b> Send <b>/ctrader</b> to connect your account.")
             else:
@@ -1070,7 +1070,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
             w["data"]["risk"] = risk_map[choice]
             w["step"] = "STYLE"
         send_to(chat_id,
-                "4/5 — <b>How should the bot trade?</b>\n\n"
+                "4/5 — <b>How should the platform trade?</b>\n\n"
                 "Reply <code>1</code>, <code>2</code> or <code>3</code>:\n"
                 "  <code>1</code> — 🛡 Defensive — only the strongest setups (fewer trades)\n"
                 "  <code>2</code> — ⚖️ Balanced — standard selectivity\n"
@@ -1094,7 +1094,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                 f"  • Risk per trade: <b>{risk_pct:g}%</b>\n"
                 f"  • Mode: <b>{'paper (simulated)' if d.get('paper') else 'LIVE funds'}</b>\n\n"
                 "By continuing you confirm that <b>you are solely responsible</b> for all "
-                "trades and any losses. The bot and its provider are not liable.\n\n"
+                "trades and any losses. The platform and its provider are not liable.\n\n"
                 "Reply <code>ACCEPT</code> to activate, or /cancel to abort.")
 
     elif step == "DISCLAIMER":
@@ -1166,13 +1166,13 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
         else:
             broker_str = f"cTrader ({user_data.get('ctrader_env', 'demo')})"
         send_to(chat_id,
-                f"✅ <b>Setup complete — bot is LIVE!</b>\n\n"
+                f"✅ <b>Setup complete — automation is live!</b>\n\n"
                 f"Broker: <b>{broker_str}</b>\n"
                 f"Pair: <b>{sym}</b>  (your choice)\n"
                 f"Risk/trade: <b>{risk_pct:g}%</b>  (your choice)\n"
                 f"Paper mode: <b>{paper_str}</b>\n\n"
                 f"⚡ Trading is active now. You'll get an alert on every trade,\n"
-                f"plus a heartbeat so you always know the bot is awake.\n"
+                f"plus a heartbeat so you always know the platform is awake.\n"
                 f"Change anything with /setup · /status to check · /stop to pause.\n\n"
                 f"🧠 <b>Want AI chat to help you trade?</b> Send /ai to connect a free "
                 f"Gemini or Groq key — your choice, both free.",
@@ -1262,7 +1262,7 @@ def _ai_setup_screen(chat_id):
     send_to(chat_id,
             "🧠 <b>Activate AI chat (helps you trade)</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "Your bot already trades on its built-in rule engine. A free AI key adds "
+            "Your automation already trades on its built-in rule engine. A free AI key adds "
             "<b>smart chat</b> — ask it to analyze a pair, explain a trade, or enter for you.\n\n"
             "⚠️ <b>AI chat needs a key — your choice, free or paid:</b>\n"
             "🥇 <b>Gemini</b> — free, 1,500/day → aistudio.google.com/apikey\n"
@@ -1284,7 +1284,7 @@ def _detect_ai_key(key, explicit=False):
     Prefixes are a hint, not a specification. Google AI Studio issued keys
     beginning `AIza` for years and now issues them beginning `AQ.`, and a
     client whose brand-new key was refused as "not an AI key" has no way to
-    know the bot is simply out of date — the key is right there in their hand,
+    know the platform is simply out of date — the key is right there in their hand,
     working. Any prefix list will go stale the same way.
 
     So `explicit` (the client typed /ai, /gemini or /key, or tapped a button)
@@ -1358,7 +1358,7 @@ def _handle_broker(chat_id, args):
                 "🔗 Broker set to <b>MetaTrader Bridge</b>.\n\n"
 
                 "2. Install <b>ApexBridge.mq5</b> in MetaTrader (see docs/METATRADER.md)\n"
-                "3. Put the same secret + your bot URL in the EA settings\n\n"
+                "3. Put the same secret + your automation URL in the EA settings\n\n"
                 "I'll start trading as soon as the EA connects.")
     else:
         send_to(chat_id, "✅ Broker set to <b>cTrader</b>. Use /ctrader to connect your account.")
@@ -1438,7 +1438,7 @@ def _handle_ctrader(chat_id):
                f"partner broker, <b>{_REQUIRED_BROKER_LABEL}</b> — a demo account or another "
                "broker won't unlock trading.\n\n")
     else:
-        tip = ("💡 <b>New here?</b> Start on a demo account — test the bot risk-free, "
+        tip = ("💡 <b>New here?</b> Start on a demo account — test it risk-free, "
                "switch to live when you're confident.\n\n")
     if broker_rows:
         tip += "Don't have a cTrader account yet? Create one below, then come back and Authorize.\n\n"
@@ -1459,7 +1459,7 @@ def _handle_ctrader(chat_id):
 
 
 def _apply_account(chat_id, ctid):
-    """Bind the bot to a linked cTrader account by id and restart the loop.
+    """Bind the platform to a linked cTrader account by id and restart the loop.
 
     Switching account is one of the moments the environment is re-read from
     the broker. The list this picks from is the broker's own answer, so a
@@ -1508,7 +1508,7 @@ def _apply_account(chat_id, ctid):
 
 
 def _handle_switch(chat_id):
-    """Let the client change which account the bot trades — pick a linked
+    """Let the client change which account the platform trades — pick a linked
     account, or disconnect and connect a different one (e.g. demo → live).
 
     The list is re-read from the broker first: an account removed at the
@@ -1599,7 +1599,7 @@ _RISK_TEXT = ("⚠️ <b>Risk disclaimer</b>\n\n"
 # not know what an Inverse Fair Value Gap is. The technical id stays visible
 # underneath — an experienced client wants it, and it is what /strategy takes.
 FRIENDLY_LABEL = {
-    "auto":            "🤖 Automatic — the bot picks the method",
+    "auto":            "🤖 Automatic — the platform picks the method",
     "trend":           "📈 Trend Follower — rides sustained moves",
     "mean_reversion":  "↩️ Bounce Trader — buys dips, sells spikes",
     "breakout":        "🚀 Breakout — enters when price escapes a range",
@@ -1669,7 +1669,7 @@ def already_onboarded(user):
     connects a broker used to call onboard_start() unconditionally, so a
     reconnect or an account switch threw a configured client back into
     "what do you want to trade?" while holding an open position — which is
-    indistinguishable from the bot having reset itself.
+    indistinguishable from the platform having reset itself.
     """
     return bool((user or {}).get("symbol") and (user or {}).get("strategy"))
 
@@ -1811,7 +1811,7 @@ def _ob_render(chat_id):
 def _ob_step_connect(chat_id):
     if _LIVE_BROKER_REQUIRED:
         note = (f"⚠️ Free access needs a <b>live {_REQUIRED_BROKER_LABEL}</b> "
-                "account. A demo account lets you watch the bot work, but it "
+                "account. A demo account lets you watch the platform work, but it "
                 "will not unlock trading.")
     else:
         note = ("Most people connect a demo account first — real market data, "
@@ -1932,7 +1932,7 @@ def _ob_step_instrument(chat_id):
                 syms = filtered
     except Exception as e:
         print(f"[TELEGRAM] onboard symbol filter failed, using full list: {e}")
-    rows = [[{"text": "🤖 Auto-Pilot — let the bot pick everything (recommended)", "callback_data": "ob:sym:__auto__"}]]
+    rows = [[{"text": "🤖 Auto-Pilot — let the platform pick everything (recommended)", "callback_data": "ob:sym:__auto__"}]]
     row = []
     for label, code in syms:
         row.append({"text": label, "callback_data": f"ob:sym:{code}"})
@@ -1944,7 +1944,7 @@ def _ob_step_instrument(chat_id):
     send_to(chat_id,
             _ob_head(chat_id, "method") +
             "<b>What should it trade?</b>\n\n"
-            "🤖 <b>Auto-Pilot</b> — the bot scans a basket of liquid "
+            "🤖 <b>Auto-Pilot</b> — the platform scans a basket of liquid "
             "instruments and takes the strongest setup anywhere, one position "
             "at a time.\n\n"
             "Or pick a single instrument and it watches only that.",
@@ -2026,7 +2026,7 @@ def _ob_step_tp(chat_id):
     kb = [[{"text": label, "callback_data": f"ob:tp:{key}"}] for key, label, _, _ in _OB_TP_OPTIONS]
     send_to(chat_id,
             f"🧭 <b>Take-profit target:</b>\n\n{lines}\n\n"
-            "<i>This decides when the bot closes a winning trade. Change it any time with /tp or /tptarget.</i>",
+            "<i>This decides when the platform closes a winning trade. Change it any time with /tp or /tptarget.</i>",
             extra={"reply_markup": {"inline_keyboard": kb}})
 
 
@@ -2067,7 +2067,7 @@ def _ob_summary(chat_id):
     from apex import automation
     u = user_store.load(chat_id)
     strat = friendly_strategy(u.get("strategy") or "auto")[0]
-    what = "🤖 Auto-Pilot — bot picks the instrument" if u.get("autopilot") \
+    what = "🤖 Auto-Pilot — the platform selects the instrument" if u.get("autopilot") \
         else f"<b>{_esc(u.get('symbol', '—'))}</b>"
     try:
         risk_pct = float(u.get("risk", cfg.RISK_PER_TRADE) or 0) * 100
@@ -2089,7 +2089,7 @@ def _ob_summary(chat_id):
             f"Max drawdown: <b>{u.get('max_dd_pct', '—')}%</b>\n"
             f"Automation: <b>{automation.label(automation.mode(u))}</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "<i>Check it over. Nothing is running yet — the bot starts when "
+            "<i>Check it over. Nothing is running yet — automation starts when "
             "you tap Start, and every line above can be changed afterwards.</i>",
             _kb([[("▶️ Start trading", "ob:go")],
                  [("🎯 Change method", "nav:strat"), ("🛡 Change risk", "nav:risk")],
@@ -2097,7 +2097,7 @@ def _ob_summary(chat_id):
 
 
 def _finish_onboard(chat_id):
-    """Start the bot, and say exactly what is now running."""
+    """Start automation, and say exactly what is now running."""
     from apex import automation
     u = user_store.load(chat_id)
     strat = friendly_strategy(u.get("strategy") or "mean_reversion")[0]
@@ -2110,7 +2110,7 @@ def _finish_onboard(chat_id):
              "It asks you before opening anything." if mode == "approval" else
              "It trades automatically when a valid setup appears.")
     send_to(chat_id,
-            "✅ <b>Bot is ON</b>\n"
+            "✅ <b>Automation is running</b>\n"
             f"{_state_line(chat_id)}\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"Trading: <b>{_esc(u.get('symbol', 'EUR_USD')) if not u.get('autopilot') else 'Auto-Pilot'}</b>\n"
@@ -2126,14 +2126,14 @@ _builder_drafts = {}  # chat_id -> {"i": step_index, "d": draft-fields dict}
 
 def _handle_builder(chat_id):
     """Entry: one-tap presets for THIS market + a custom step-by-step path.
-    Framed as a setup assistant — the bot executes what the user picks."""
+    Framed as a setup assistant — the platform executes what the user picks."""
     ps = builder.presets()
     rows = [[{"text": p["label"], "callback_data": f"bld:preset:{k}"}] for k, p in ps.items()]
     rows.append([{"text": "🛠 Custom (step by step)", "callback_data": "bld:custom"}])
     desc = "\n".join(f"<b>{p['label']}</b> — <i>{p['desc']}</i>" for p in ps.values())
     return send_to(chat_id,
         "⚙️ <b>Strategy Builder</b>\n\n"
-        "Compose how your bot trades. Pick a ready preset, or build it step by step. "
+        "Compose how your automation trades. Pick a ready preset, or build it step by step. "
         "Every choice changes real behaviour — you stay in control.\n\n"
         f"{desc}",
         extra={"reply_markup": {"inline_keyboard": rows}})
@@ -2153,7 +2153,7 @@ def _builder_preset(chat_id, key):
     running = _apply_builder_patch(chat_id, p["patch"])
     send_to(chat_id, builder.summary(dict(user_store.load(chat_id))))
     return send_to(chat_id,
-        f"✅ <b>{p['label']} applied.</b> The bot now trades with these settings."
+        f"✅ <b>{p['label']} applied.</b> The platform now trades with these settings."
         + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot is off — tap ▶️ to start.</i>"),
         _dashboard_keyboard(chat_id))
 
@@ -2205,7 +2205,7 @@ def _builder_activate(chat_id):
         return send_to(chat_id, "Nothing to activate — tap ⚙️ Build strategy to start.")
     running = _apply_builder_patch(chat_id, d)
     return send_to(chat_id,
-        "✅ <b>Strategy activated.</b> The bot now trades exactly this."
+        "✅ <b>Strategy activated.</b> The platform now trades exactly this."
         + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot is off — tap ▶️ to start.</i>"),
         _dashboard_keyboard(chat_id))
 
@@ -2425,7 +2425,7 @@ def _route_cb(chat_id, data):
             # Real money → require an explicit confirmation.
             return send_to(chat_id,
                 f"🔴 <b>Switch to LIVE account {ctid}?</b>\n\n"
-                "This account trades <b>REAL money</b>. The bot will place real orders on it. "
+                "This account trades <b>REAL money</b>. The platform will place real orders on it. "
                 "Make sure you've watched it work on demo first.\n\n"
                 "<i>You accept full responsibility for live trading — results are yours.</i>",
                 extra={"reply_markup": {"inline_keyboard": [[
@@ -2445,7 +2445,7 @@ def _route_cb(chat_id, data):
             print(f"[Telegram] could not clear the emergency hold for {chat_id}: {e}")
         _auto_start_user(chat_id)
         return send_to(chat_id,
-            "✅ <b>Bot is ON.</b>\nIt's watching the market now and will trade automatically "
+            "✅ <b>Automation is running.</b>\nIt's watching the market now and will trade automatically "
             "when a valid setup appears — you'll get an alert on every move.",
             _dashboard_keyboard(chat_id))
     if data == "bot:off":
@@ -2453,7 +2453,7 @@ def _route_cb(chat_id, data):
         if access.is_admin(str(chat_id)) and _bot_control.get("set_paused"):
             _bot_control["set_paused"](True)
         return send_to(chat_id,
-            "⏸ <b>Bot is OFF.</b>\nNo new trades will open. Any open position stays protected by its stop. "
+            "⏸ <b>Automation is stopped.</b>\nNo new trades will open. Any open position stays protected by its stop. "
             "Tap ▶️ to turn it back on.",
             _dashboard_keyboard(chat_id))
     # ── Onboarding. Every step ends by asking the wizard what comes next,
@@ -2543,7 +2543,7 @@ def _route_cb(chat_id, data):
         user_store.save(chat_id, {})
         return send_to(chat_id,
             "✅ <b>Reset complete.</b>\n\n"
-            "Your cTrader connection and all bot settings have been cleared. "
+            "Your cTrader connection and all platform settings have been cleared. "
             "Send /start whenever you're ready to connect an account and set up again.")
     if data == "reset:no":
         return send_to(chat_id, "Cancelled — nothing changed.")
@@ -2659,7 +2659,7 @@ def _handle_market(chat_id):
         # market. Say the read has not been taken rather than showing fewer
         # lines and letting them infer.
         lines.append("\n📊 <i>Trend, volatility and momentum have not been "
-                     "computed yet — the bot writes them on its next scan.</i>")
+                     "computed yet — the platform writes them on its next scan.</i>")
     lines.append(f"\n💡 <i>{sess['note']}</i>")
     lines.append("<i>How the market is moving right now — read before you trade.</i>")
     send_to(chat_id, "\n".join(lines),
@@ -2765,7 +2765,7 @@ def _handle_voice(chat_id, args=""):
         "🎙 <b>Voice control</b>\n"
         f"Key: <b>{'issued' if on else 'not set up'}</b>\n"
         f"Trade confirmation: <b>{'ON' if guard else 'OFF'}</b>\n\n"
-        "Ask your bot anything from your phone through Siri Shortcuts — "
+        "Ask the platform anything from your phone through Siri Shortcuts — "
         "balance, open positions, why it skipped a setup — and place or close "
         "trades by voice.\n\n"
         "<code>/voice new</code> — issue a key and get the setup steps\n"
@@ -2852,7 +2852,7 @@ def _screen_positions(chat_id):
     if not op and not oc:
         return send_to(chat_id, head +
                        "📭 <b>Nothing open.</b>\n\n"
-                       "The bot opens a position only when a setup passes every "
+                       "The platform opens a position only when a setup passes every "
                        "check. Most candidates are refused — that is the point, "
                        "and a refused trade costs nothing.",
                        _back_kb(chat_id, [[("📊 Overview", "nav:over"),
@@ -2880,7 +2880,7 @@ def _screen_positions(chat_id):
     if oc and oc > (1 if op else 0):
         extra = oc - (1 if op else 0)
         lines.append(f"\n📊 <b>+{extra} more open</b> on this account, each managed "
-                     f"by its own stop at the broker. The bot tracks one at a "
+                     f"by its own stop at the broker. The platform tracks one at a "
                      f"time here — the terminal and cTrader show them all.")
     fl = dash.get("floatingPnl")
     if isinstance(fl, (int, float)):
@@ -2967,7 +2967,7 @@ def _protection_stack(chat_id):
         f"• Daily loss stop at <b>{u.get('max_daily_loss_pct', '—')}%</b> and "
         f"drawdown stop at <b>{u.get('max_dd_pct', '—')}%</b> — both halt new "
         "trades on their own\n"
-        "• Three losses in a row on an instrument stands the bot aside on it\n"
+        "• Three losses in a row on an instrument stands the platform aside on it\n"
         "• High-impact news and violent candles suspend entries\n"
         "• Positions are flattened before the weekend gap\n\n"
         "<i>None of this makes a loss impossible. It caps how fast one can "
@@ -3011,7 +3011,7 @@ def _screen_automation(chat_id):
 
 
 def _screen_notifications(chat_id):
-    """What the bot will and will not message about — named, not numbered.
+    """What the platform will and will not message about — named, not numbered.
 
     The tiers come from `alert_policy`, which is the module the alert path
     actually consults. Listing them from a second hand-written table here is
@@ -3031,8 +3031,8 @@ def _screen_notifications(chat_id):
             "summary, the market opening and closing.</i>\n\n"
             "<b>Sent</b> — something changed you might want to act on:\n"
             "<i>a setup awaiting your approval, a signal on Signals Only, news "
-            "and volatility standing the bot aside, a degraded broker feed.</i>\n\n"
-            f"<b>Diagnostics</b> — how the bot is thinking: "
+            "and volatility standing the platform aside, a degraded broker feed.</i>\n\n"
+            f"<b>Diagnostics</b> — how the platform is deciding: "
             f"<b>{'shown' if on else 'hidden'}</b>\n"
             "<i>every trailing-stop move, skipped setups, refused-setup "
             "tracking, market pulses, heartbeats.</i>\n\n"
@@ -3063,7 +3063,7 @@ def _set_automation(chat_id, m):
                        "🚀 <b>Turn on Full Automation?</b>\n"
                        f"{_state_line(chat_id, guard=True)}\n"
                        "━━━━━━━━━━━━━━━━━━━━\n\n"
-                       "The bot will open and manage trades without asking you "
+                       "The platform will open and manage trades without asking you "
                        "first.\n\n" + _protection_stack(chat_id),
                        _back_kb(chat_id, [
                            [("✅ Yes — full automation", "am:go:full")],
@@ -3076,7 +3076,7 @@ def _apply_automation(chat_id, m):
     user_store.update(chat_id, automation.patch(m))
     running = _restart_user_loop(chat_id)
     tail = ("" if running or user_loop.is_running(chat_id)
-            else "\n\n⏸ <i>The bot is off — tap ▶️ to start it.</i>")
+            else "\n\n⏸ <i>The platform is off — tap ▶️ to start it.</i>")
     send_to(chat_id,
             f"✅ Automation set to <b>{automation.LABEL[m]}</b>.\n"
             f"<i>{automation.BLURB[m]}</i>{tail}",
@@ -3183,7 +3183,7 @@ def _live_activation_summary(chat_id, u, token):
     capped = min(risk, _LIVE_INITIAL_RISK_CAP)
     return (
         "🔴 <b>REAL MONEY ACTIVATION</b>\n\n"
-        "You are about to let the bot place orders with real funds.\n\n"
+        "You are about to let the platform place orders with real funds.\n\n"
         f"<b>Account:</b> <code>{u.get('ctrader_account_id', '—')}</code> (LIVE)\n"
         f"<b>Balance:</b> {('$%.2f' % bal) if isinstance(bal, (int, float)) else '—'}\n"
         f"<b>Risk / trade:</b> {capped:.2%}"
@@ -3266,7 +3266,7 @@ def _handle_paper(chat_id, args):
                   "just now</b> 🟠")
     send_to(chat_id, f"🔴 Paper trading <b>OFF</b> — orders now execute in {where}.\n"
                      f"{_st.env_badge}\n"
-                     "Send /start if the bot isn't running.")
+                     "Send /start if the platform isn't running.")
 
 
 # Risk tiers for the /risk button menu — each bundles the daily-loss/drawdown
@@ -3532,7 +3532,7 @@ def _handle_symbol(chat_id, args):
         cfg.SYMBOL = sym
     warn = ""
     if not running and not user_loop.is_running(chat_id):
-        warn += "\n⏸ <i>The bot is currently stopped — send /start to trade this symbol.</i>"
+        warn += "\n⏸ <i>The platform is currently stopped — send /start to trade this symbol.</i>"
     if is_ct and not _PAIR_RE.match(sym):
         s_norm = sym.replace("_", "")
         sugg = ("/sl 150 · /tp 300" if s_norm.startswith("XAU")
@@ -3702,7 +3702,7 @@ def _handle_strategy(chat_id, args):
             "riskiest option here."
             if want in ("grid", "martingale") else "")
     tail = ("Applied immediately — check /status." if running
-            else "⏸ The bot is currently <b>stopped</b> — send /start to begin trading with it.")
+            else "⏸ The platform is currently <b>stopped</b> — send /start to begin trading with it.")
     send_to(chat_id, f"🎯 Method set to <b>{label}</b>.\n<i>{blurb}</i>{warn}\n\n{tail}")
 
 
@@ -3713,7 +3713,7 @@ _AUTOPILOT_CANDIDATES = cfg.AUTOPILOT_UNIVERSE
 
 
 def _handle_maxpos(chat_id, args):
-    """Set how many positions the bot may hold at once (multi-position mode)."""
+    """Set how many positions the platform may hold at once (multi-position mode)."""
     arg = (args or "").strip()
     user = user_store.load(chat_id)
     if not arg:
@@ -3721,7 +3721,7 @@ def _handle_maxpos(chat_id, args):
         risk = float(user.get("max_total_risk", 0.05)) * 100
         return send_to(chat_id,
             f"📊 <b>Max positions: {cur}</b> · total-risk cap {risk:g}%\n\n"
-            "The bot can hold several trades at once and closes each on its own "
+            "The platform can hold several trades at once and closes each on its own "
             "target/stop. Total risk stays capped no matter how many are open.\n\n"
             "<code>/maxpos 5</code> — allow up to 5 at once (1–8)\n"
             "<code>/maxpos 1</code> — one at a time (default)")
@@ -3745,7 +3745,7 @@ def _handle_maxpos(chat_id, args):
 
 
 def _handle_autopilot(chat_id, args):
-    """Full hands-off mode: the bot picks the instruments itself from a curated
+    """Full hands-off mode: the platform picks the instruments itself from a curated
     liquid universe (validated against the client's broker) and trades the
     strongest setup anywhere — one position at a time."""
     arg = (args or "").strip().lower()
@@ -3803,7 +3803,7 @@ def _handle_watch(chat_id, args):
             "Usage:\n"
             "<code>/watch XAUUSD EURUSD GBPUSD</code> — scan a basket (max 6, anything from /pairs)\n"
             "<code>/watch off</code> — back to single-symbol mode\n\n"
-            "<i>The bot shops the whole basket every cycle and trades only the strongest "
+            "<i>The platform shops the whole basket every cycle and trades only the strongest "
             "setup — never more than one open position.</i>")
     if raw.lower() in ("off", "clear", "none"):
         user_store.update(chat_id, {"watchlist": []})
@@ -3998,7 +3998,7 @@ def _handle_atr(chat_id, args):
     else:
         msg = "📏 Dynamic ATR stops <b>OFF</b> — using your fixed /sl and /tp pip distances."
     if not running and not user_loop.is_running(chat_id):
-        msg += "\n⏸ <i>The bot is stopped — send /start to apply.</i>"
+        msg += "\n⏸ <i>The platform is stopped — send /start to apply.</i>"
     send_to(chat_id, msg)
 
 
@@ -4023,7 +4023,7 @@ def _handle_resetstats(chat_id):
     _st.reset_peak(_bal, user_id=str(chat_id))
     send_to(chat_id,
         "🧹 <b>Journal reset — clean slate.</b>\n\n"
-        "Performance stats now start fresh from this moment. Let the bot run "
+        "Performance stats now start fresh from this moment. Let the platform run "
         "undisturbed and check /stats in a week or two — that's the real,\n"
         "bug-free track record to judge it on.",
         _dashboard_keyboard(chat_id))
@@ -4036,7 +4036,7 @@ def _handle_stats(chat_id):
     dash = user_loop.get_dash(chat_id) or {}
     st = stats_mod.compute(trades, dash.get("skipsToday", 0))
     if not st["trades"]:
-        return send_to(chat_id, "📊 No closed trades in the journal yet — run the bot and stats will build up here.")
+        return send_to(chat_id, "📊 No closed trades in the journal yet — run the platform and stats will build up here.")
     pf = st["profitFactor"]
     pf_s = "∞" if pf == float("inf") else (f"{pf:.2f}" if pf is not None else "—")
     def money(v):
@@ -4197,7 +4197,7 @@ def _screen_perf_split(chat_id, by="strategy"):
 
 def _screen_emergency(chat_id):
     n = user_loop.open_position_count(chat_id)
-    count_line = ("<i>Open positions: not known yet — the bot has not reported "
+    count_line = ("<i>Open positions: not known yet — the platform has not reported "
                   "since it last started.</i>" if n is None else
                   f"<b>Open right now: {n} position{'s' if n != 1 else ''}</b>")
     running = user_loop.is_running(chat_id)
@@ -4207,7 +4207,7 @@ def _screen_emergency(chat_id):
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"{count_line}\n\n"
             "<b>⏸ Stop New Trades</b>\n"
-            "The bot stops looking for setups. Anything already open stays "
+            "The platform stops looking for setups. Anything already open stays "
             "open and keeps its stop-loss at the broker. Reversible — tap "
             "Resume whenever you want.\n\n"
             "<b>🔴 Close All Positions</b>\n"
@@ -4230,7 +4230,7 @@ def _screen_emergency_confirm(chat_id):
                        _back_kb(chat_id, [[("🚨 Emergency", "nav:emg")]]))
     what = ("every open position" if n is None
             else f"{n} open position{'s' if n != 1 else ''}")
-    unknown = ("\n\n⚠️ <i>The bot has not reported a position count since it "
+    unknown = ("\n\n⚠️ <i>The platform has not reported a position count since it "
                "last started, so it will close whatever it finds at the "
                "broker — which may be more than it is tracking.</i>"
                if n is None else "")
@@ -4241,7 +4241,7 @@ def _screen_emergency_confirm(chat_id):
             "This closes at the current market price, immediately, and "
             "<b>cannot be undone</b>. Any unrealised profit or loss becomes "
             "real the moment you tap.\n\n"
-            "<b>The bot also stops opening new positions.</b> An emergency "
+            "<b>The platform also stops opening new positions.</b> An emergency "
             "flatten that lets the next setup re-enter thirty seconds later is "
             "not an emergency stop — tap Resume when you want it watching "
             "again."
@@ -4297,7 +4297,7 @@ def _emergency_close_all(chat_id):
     if res.get("sweepError"):
         parts.append(f"\n⚠️ <i>Could not read the full position list: "
                      f"{_esc(str(res['sweepError']))}. Check cTrader.</i>")
-    parts.append("\n⏸ <b>The bot is now holding.</b> It will not open anything "
+    parts.append("\n⏸ <b>Automation is paused.</b> It will not open anything "
                  "new on this account until you resume it — that survives a "
                  "restart, so it stays held until you say otherwise.")
     send_to(chat_id, "🔴 <b>Emergency close</b>\n" + "\n".join(parts),
@@ -4309,14 +4309,14 @@ def _emergency_close_all(chat_id):
 # ─── Account ──────────────────────────────────────────────
 
 def _screen_account(chat_id, refresh=False):
-    """Which account, which environment, and what the bot may do on it."""
+    """Which account, which environment, and what the platform may do on it."""
     from apex import screens
     st = _ui(chat_id, refresh=refresh, force=refresh)
     u = st.user or {}
     if not st.connected:
         return send_to(chat_id,
                        screens.account(st) + "\n\n"
-                       "Connect a cTrader account and the bot can start. It "
+                       "Connect a cTrader account and the platform can start. It "
                        "never holds your money — it places orders on your own "
                        "account, which stays yours.",
                        _kb([[("🔗 Connect my account", "go:connect")],
@@ -4354,14 +4354,14 @@ def _screen_live_activation(chat_id):
                             [("🔁 Re-check with my broker", "acct:refresh")],
                             [("☰ Menu", "nav:menu")]]))
     unverified = ("\n⚠️ <i>Your broker did not re-confirm this account just "
-                  "now. The bot will still refuse a real order it cannot "
+                  "now. The platform will still refuse a real order it cannot "
                   "authorise.</i>\n" if not st.proven else "")
     send_to(chat_id,
             "🔴 <b>Real-money trading</b>\n"
             f"{_state_line(chat_id, guard=True)}\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"{unverified}\n"
-            "The bot is connected to a LIVE account but is still simulating. "
+            "The platform is connected to a LIVE account but is still simulating. "
             "Turning that off means the next setup places a real order.\n\n"
             + _protection_stack(chat_id) +
             "\n\nActivation needs a confirmation code you type back, and lands "
@@ -4485,7 +4485,7 @@ def _report_order_result(chat_id, result, side=None, sym=None):
                                "the order was not sent. Try again shortly.",
         "RISK_HALTED": "Trading is halted by your own risk limits (daily loss "
                        "or drawdown). It resumes when they reset.",
-        "NOT_OWNER": "Another copy of the bot is managing this account right "
+        "NOT_OWNER": "Another instance of the platform is managing this account right "
                      "now — try again in a moment.",
         "STORE_UNREACHABLE": "We could not reach your account record, so the "
                              "order was not sent. Try again shortly.",
@@ -4565,7 +4565,7 @@ def _handle_close(chat_id):
     reason = str(result.get("error") or "No open position")
     friendly = {
         "No open position to close": "There is nothing open to close.",
-        "NOT_OWNER": "Another copy of the bot is managing this account right "
+        "NOT_OWNER": "Another instance of the platform is managing this account right "
                      "now. It will close on its own — try again in a moment.",
         "DUPLICATE_CLOSE": "That close was already requested moments ago. "
                            "Check Positions before asking again.",
@@ -4862,7 +4862,7 @@ def _user_alert(uid, result):
                 "🔴 <b>Market closed</b> — weekend.\n"
                 + ("Your broker connection has been closed.\n"
                    if result.get("disconnected") else "")
-                + "Nothing trades until Sunday. The bot reconnects to your "
+                + "Nothing trades until Sunday. The platform reconnects to your "
                   "account by itself when the market reopens (~21:00 UTC) and "
                   "will message you then.")
     elif action == "MARKET_OPEN":
@@ -4870,20 +4870,20 @@ def _user_alert(uid, result):
             send_to(uid,
                     "🟢 <b>Market open</b> — the week has started.\n"
                     f"Account reconnected: <b>{result.get('detail', '')}</b>\n"
-                    "The bot is scanning for setups again.")
+                    "The platform is scanning for setups again.")
         else:
             # This is the message the whole reconnect check exists to produce.
             # Saying "market open" without it would read as good news while the
             # account is unreachable and nothing can trade.
             send_to(uid,
-                    "🟢 <b>Market open</b> — but the bot <b>cannot reach your "
+                    "🟢 <b>Market open</b> — but the platform <b>cannot reach your "
                     "account</b>.\n"
                     f"<i>{str(result.get('detail', ''))[:200]}</i>\n\n"
                     "No trades will be placed until this is fixed. Send "
                     "/ctrader to reconnect your account.")
     elif action == "HEARTBEAT":
         send_to(uid,
-                f"💓 <b>Bot alive</b> — {sym}\n"
+                f"💓 <b>Platform online</b> — {sym}\n"
                 f"Price: <b>{result.get('price', '—')}</b> | "
                 f"Balance: <b>${result.get('balance', 0):.2f}</b>"
                 f"{result.get('posInfo', '')}")
@@ -5050,7 +5050,7 @@ def _user_alert(uid, result):
             _what = ("<i>Approve places a <b>real order</b> on your live "
                      "account. Nothing opens until you tap it.</i>")
         elif _st.is_live:
-            _what = ("<i>This is a real account, but the bot is still "
+            _what = ("<i>This is a real account, but the platform is still "
                      "simulating on it — Approve records the trade and places "
                      "nothing at your broker.</i>")
         elif _st.is_demo:
@@ -5087,7 +5087,7 @@ def _user_alert(uid, result):
                 + _fx_why_block(result) +
                 "\n\n<i>You're on Signals Only, so I placed nothing. If you "
                 f"take this one yourself it is your own order{_where}, and "
-                "none of the bot's limits apply to it.</i>",
+                "none of the platform's limits apply to it.</i>",
                 _back_kb(uid, [[("🤖 Automation", "nav:auto"),
                                 ("📡 Market", "nav:mkt")]]))
     elif action in ("BUY", "SELL"):
@@ -5269,7 +5269,7 @@ _PROOF_SHOTS = [
 # losers) builds more trust than a highlight reel alone.
 _PROOF_VIDEO = ("ScreenRecording_08-01-2026 17-15-50_1.mov",
                 "🎥 A full week, unedited — wins <b>and</b> losses. "
-                "This is what actually running the bot looks like.")
+                "This is what actually running the platform looks like.")
 
 
 def send_proof_shots(chat_id):
@@ -5344,7 +5344,7 @@ def send_activation_sequence(chat_id, paid: bool):
         step1_body = (
             "📌 <b>Step 1 — Open a broker account</b>\n\n"
             f"You need a <b>live</b> cTrader account with <b>{_REQUIRED_BROKER_LABEL}</b> "
-            "— that's who verifies and funds your bot. If you don't have one yet, "
+            "— that's who verifies and funds your account. If you don't have one yet, "
             "open one below (takes 2 minutes).")
     else:
         step1_body = (
@@ -5367,7 +5367,7 @@ def send_activation_sequence(chat_id, paid: bool):
     send_to(chat_id,
             "💡 <b>Helpful links</b>\n\n"
             "• /controls (or /settings) — see every command and what it does\n"
-            "• /guide — how the bot works (visual guide)\n"
+            "• /guide — how the platform works (visual guide)\n"
             "• /help — quick command list\n"
             "• /terminal — live trading dashboard",
             extra={"reply_markup": {"inline_keyboard": tips_kb}})
@@ -5407,7 +5407,7 @@ def _handle_report(chat_id):
     if not trades:
         return send_to(chat_id,
                        "📒 <b>No closed trades yet.</b>\n"
-                       "Your tax journal fills up as the bot closes positions.")
+                       "Your tax journal fills up as the platform closes positions.")
     total_net = sum(t.get("netPnl", 0) or 0 for t in trades)
     total_cost = sum(t.get("costUsd", 0) or 0 for t in trades)
     total_gross = sum(t.get("grossPnl", 0) or 0 for t in trades)
@@ -5474,17 +5474,17 @@ def _handle_start(chat_id):
             and not (user.get("ctrader_access_token") and user.get("ctrader_account_id"))):
         return send_to(chat_id,
             "🔗 <b>First, connect your trading account.</b>\n\n"
-            "Tap below — it takes 30 seconds and then the bot sets itself up.",
+            "Tap below — it takes 30 seconds and then the platform configures itself.",
             extra={"reply_markup": {"inline_keyboard": [[
                 {"text": "🔗 Connect my account", "callback_data": "go:connect"}]]}})
     if user_loop.is_running(chat_id):
         return send_to(chat_id,
-            "✅ <b>Bot is already ON</b> — watching the market. It trades automatically when a valid setup appears.",
+            "✅ <b>Automation is already running</b> — watching the market. It trades automatically when a valid setup appears.",
             _dashboard_keyboard(chat_id))
 
     _auto_start_user(chat_id)
     send_to(chat_id,
-        "✅ <b>Bot is ON — trading now active.</b>\nIt watches the market and trades automatically on valid setups.",
+        "✅ <b>Automation is running — orders are now live.</b>\nIt watches the market and trades automatically on valid setups.",
         _dashboard_keyboard(chat_id))
 
 
@@ -5509,12 +5509,12 @@ def _handle_stop(chat_id):
         still = "\n\n📭 Nothing is open."
     else:
         still = ("\n\n<i>How many positions are open has not been reported "
-                 "since the bot last started — check Positions.</i>")
+                 "since the platform last started — check Positions.</i>")
     send_to(chat_id,
             "⏸ <b>Trading paused</b>\n"
             f"{_state_line(chat_id, guard=True)}\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "The bot has stopped looking for setups. <b>No new position will "
+            "The platform has stopped looking for setups. <b>No new position will "
             "be opened.</b>" + still,
             _back_kb(chat_id, [[("▶️ Resume trading", "nav:resume")],
                                [("📈 Positions", "nav:pos"),
@@ -5527,9 +5527,9 @@ def _handle_reset(chat_id):
     users stay allowed, they just start the setup over from scratch."""
     send_to(chat_id,
         "⚠️ <b>Full reset — are you sure?</b>\n\n"
-        "This disconnects your cTrader account from the bot and resets every "
+        "This disconnects your cTrader account from the platform and resets every "
         "setting (strategy, risk, pairs, symbol — everything) back to default. "
-        "Your broker account itself is untouched — this only clears the bot's "
+        "Your broker account itself is untouched — this only clears the platform's "
         "link to it.\n\n"
         "<i>This can't be undone.</i>",
         extra={"reply_markup": {"inline_keyboard": [[
@@ -5623,8 +5623,8 @@ _CONTROLS_TEXT = (
     "/menu — Overview, Positions, Strategy, Risk, Automation, Performance, "
     "Market, News, Settings, Help, Pause, Emergency\n\n"
     "<b>⏯ ON / OFF</b>\n"
-    "/start — Turn the bot ON (it watches the market and trades automatically)\n"
-    "/stop — Pause the bot (no new trades; open positions keep their safety stop)\n"
+    "/start — Turn the platform ON (it watches the market and trades automatically)\n"
+    "/stop — Pause the platform (no new trades; open positions keep their safety stop)\n"
     "/emergency — Stop new trades, or close every open position at once\n\n"
     "<b>📊 Trading</b>\n"
     "/status — See your current position, balance, and bot state\n"
@@ -5645,18 +5645,18 @@ _CONTROLS_TEXT = (
     "/tptarget 5 — Or target a % of your balance per win instead (scales with the account)\n"
     "/atr on|off — Use dynamic ATR-based stops\n"
     "/aiconfirm on|off — AI double-checks each entry (on) or pure rules (off)\n"
-    "/automation — How much the bot may do alone: Signals Only (it tells you "
+    "/automation — How much the platform may do on its own: Signals Only (it tells you "
     "and places nothing), Approval Required (it asks first), Full Automation\n"
     "/copilot on|off — Approve each trade before it opens (same setting, "
     "older name)\n"
     "/account — Which broker account you're on, and real-money activation\n"
     "/builder — Build a custom strategy step by step\n"
-    "/autopilot on — Let the bot pick the best instruments too\n"
+    "/autopilot on — Let the platform pick the best instruments too\n"
     "/maxpos 3 — Allow multiple positions at once\n\n"
     "<b>📰 Info</b>\n"
     "/news — Economic calendar · /news on|off for release alerts\n"
-    "/voice — Control the bot from your phone through Siri Shortcuts\n"
-    "/guide — How the bot works (visual guide)\n"
+    "/voice — Control the platform from your phone through Siri Shortcuts\n"
+    "/guide — How the platform works (visual guide)\n"
     "/purchase — Buy your license ($497 one-time)\n"
     "/help — Quick command list\n\n"
     f"{_DEMO_LIVE_CONTROLS}"
@@ -5750,7 +5750,7 @@ class LicenceGateDisabledInProduction(RuntimeError):
 
     Refusing to start is the point. REQUIRE_LICENSE=false is not a
     configuration choice in production, it is the entitlement control being
-    switched off — every chat that reaches the bot may trade, and the only
+    switched off — every chat that reaches the platform may trade, and the only
     record of that decision is one environment variable nobody re-reads.
 
     A missing variable already defaulted to ON. An explicit `false` used to be
@@ -6000,7 +6000,7 @@ def _revalidate_license(chat_id):
                   f"started; no new live orders until it clears")
             send_to(chat_id,
                     "⏳ <b>We can't reach the licence service right now.</b>\n\n"
-                    "Your bot keeps managing what is already open, but it will "
+                    "Your automation keeps managing what is already open, but it will "
                     "not open anything new on a live account until we can "
                     "confirm your licence. Nothing for you to do — this clears "
                     "itself.")
@@ -6483,7 +6483,7 @@ def alert_filtered(action, livermore, turtle):
 
 
 def alert_market_closed():
-    send("🕐 <b>Market closed</b> (weekend). The bot resumes automatically at the Sunday open (21:00 UTC).")
+    send("🕐 <b>Market closed</b> (weekend). The platform resumes automatically at the Sunday open (21:00 UTC).")
 
 
 def alert_start(symbol, timeframe, balance, mode):

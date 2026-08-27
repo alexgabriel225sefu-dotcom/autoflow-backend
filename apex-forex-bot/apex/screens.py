@@ -83,7 +83,7 @@ def home_head(state):
     s = state.state
     if s == "H":
         return ("🚨 <b>Emergency stop</b>",
-                "The bot is holding. No new positions will be opened on this "
+                "Automation is paused. No new positions will be opened on this "
                 "account until you resume it.\n\nAnything still open is listed "
                 "under Positions and keeps its stop at your broker.")
     if s == "G":
@@ -94,17 +94,17 @@ def home_head(state):
                 "again.")
     if s == "E":
         return ("🔌 <b>Your live account is not connected</b>",
-                "The bot cannot see your balance, your positions or the market "
+                "The platform cannot see your balance, your positions or the market "
                 "through this account, so it will not place anything.\n\n"
                 "Reconnect below and it picks up exactly where it was — your "
                 "settings are unchanged.")
     if s == "F":
         return ("🔌 <b>No demo account connected</b>",
-                "Connect an account and the bot can start showing you what it "
+                "Connect an account and the platform can start showing you what it "
                 "would do, with no money at risk.")
     if s == "D":
         return ("🟠 <b>Safety limits not confirmed</b>",
-                "This is a real-money account and the bot has not yet reported "
+                "This is a real-money account and the platform has not yet reported "
                 "your daily-loss and drawdown limits.\n\nUntil it does, no new "
                 "real-money position will be opened. That is deliberate: the "
                 "limits are what cap how fast a bad day can get worse, and "
@@ -117,7 +117,7 @@ def home_head(state):
             # only true if it is one.
             return ("🟠 <b>Verification required</b>",
                     "We could not confirm with your broker whether this "
-                    "account is a demo or real money.\n\nUntil we can, the bot "
+                    "account is a demo or real money.\n\nUntil we can, the platform "
                     "will not open a new position on it — and we will not "
                     "guess on screen either. Everything already open keeps its "
                     "stop at your broker.")
@@ -199,7 +199,7 @@ def account(state, account_id=None, account_count=None, balance=None):
                      "this bot. Switching between them changes which one the "
                      "bot trades — and the screens change with it.")
     if state.is_live and state.simulating:
-        lines.append("\n<i>This is a real account, but the bot is still "
+        lines.append("\n<i>This is a real account, but the platform is still "
                      "simulating on it. Nothing you see has touched your "
                      "money.</i>")
     return "\n".join(lines)
@@ -218,7 +218,7 @@ def account_switch(accounts, current_id):
     """The list. Every row states the environment before the number, because
     the number is the part nobody reads."""
     head = ("🔄 <b>Switch account</b>\n" + DIV + "\n\n"
-            "The bot trades exactly one account at a time. Whichever you pick "
+            "The platform trades exactly one account at a time. Whichever you pick "
             "becomes the account every screen is about.\n\n"
             "<i>🧪 DEMO — simulated money · 🔴 LIVE — real money</i>")
     rows = []
@@ -246,7 +246,7 @@ def order_unknown(state, side=None, symbol=None, detail=""):
     return (
         "⚠️ <b>ORDER STATUS UNKNOWN</b>\n"
         f"{banner(state, guard=False)}\n{DIV}\n\n"
-        f"The bot sent <b>{what}</b> to your broker and did not get an answer "
+        f"The platform sent <b>{what}</b> to your broker and did not get an answer "
         "back.\n\n"
         "<b>This does not mean it failed.</b> The order may have been filled, "
         "and it may not have been. We will not guess, and we will not send it "
@@ -254,7 +254,7 @@ def order_unknown(state, side=None, symbol=None, detail=""):
         "mistake.\n\n"
         "<b>What to do:</b> open your broker's own platform and look at your "
         "positions. That is the only place with the real answer right now.\n\n"
-        "The bot re-reads your account on its next check and this screen will "
+        "The platform re-reads your account on its next check and this screen will "
         "settle by itself."
         + (f"\n\n<i>Reported: {detail}</i>" if detail else ""))
 
@@ -269,11 +269,11 @@ def close_unknown(state, symbol=None, detail=""):
     return (
         "⚠️ <b>CLOSE STATUS UNKNOWN</b>\n"
         f"{banner(state, guard=False)}\n{DIV}\n\n"
-        f"The bot asked your broker to close <b>{symbol or 'your position'}</b> "
+        f"The platform asked your broker to close <b>{symbol or 'your position'}</b> "
         "and did not get an answer.\n\n"
         "<b>You may still be in this trade.</b> Open your broker's platform and "
         "check. If it is still open, close it there.\n\n"
-        "The bot will not send the request again on its own — repeating a close "
+        "The platform will not send the request again on its own — repeating a close "
         "that already went through can close a position you opened afterwards."
         + (f"\n\n<i>Reported: {detail}</i>" if detail else ""))
 
@@ -300,7 +300,7 @@ def position_detail(state, pos):
         f"Target: {p.get('takeProfit') or '—'}\n"
         f"P&amp;L: <b>{pnl_txt}</b>\n\n"
         "<i>The stop lives at your broker, so it protects this position even "
-        "if the bot is off.</i>")
+        "if the platform is off.</i>")
 
 
 def close_confirm(state, symbol=None):
@@ -331,7 +331,7 @@ def unavailable(state, what, why="", back="nav:menu"):
     return (f"📭 <b>{what} is not available right now</b>\n"
             f"{banner(state, guard=False)}\n{DIV}\n\n"
             + (f"{why}\n\n" if why else "")
-            + "The bot will not show you a made-up figure in its place. Try "
+            + "The platform will not show you a made-up figure in its place. Try "
               "again in a moment — this usually settles on the next check.")
 
 
