@@ -30,17 +30,29 @@ services:
     dockerContext: ./nova
     # Seed the config onto the disk ONCE, then start the gateway.
     #
-    # `cp -n` never overwrites: after first boot the disk copy is authoritative
-    # and OpenClaw rewrites it as settings change. Without seeding, the Telegram
+    # The `[ -f ... ] ||` guard means the copy happens only when the disk has no
+    # config: after first boot the disk copy is authoritative and OpenClaw
+    # rewrites it as settings change. Without seeding, the Telegram
     # allowlist would not exist until someone configured it by hand — leaving a
     # window where the default "pairing" policy is all that stands between the
     # bot and a stranger.
     #
     # `exec` replaces the shell so the gateway becomes PID 1's child under tini
     # and still receives SIGTERM for a graceful shutdown.
+    #
+    # `set -e` is the security-critical part. The image runs as `node`
+    # (uid 1000) and Render does not document the ownership of a freshly
+    # attached disk. Without `set -e`, a root-owned /data makes `mkdir` fail,
+    # the seed copy get skipped, and the gateway start ANYWAY — with no config,
+    # so `dmPolicy` falls back to the default "pairing" and the Telegram
+    # allowlist is simply absent. That is the exact window NOVA_SECURITY.md
+    # says must not exist. Now the container refuses to start instead, and the
+    # error is left on stderr rather than swallowed by 2>/dev/null.
     dockerCommand: >-
-      /bin/sh -c "mkdir -p \"$OPENCLAW_STATE_DIR\" &&
-      cp -n /seed/nova.json5 \"$OPENCLAW_STATE_DIR/openclaw.json\" 2>/dev/null;
+      /bin/sh -c "set -e;
+      mkdir -p \"$OPENCLAW_STATE_DIR\" \"$OPENCLAW_WORKSPACE_DIR\";
+      [ -f \"$OPENCLAW_STATE_DIR/openclaw.json\" ] ||
+      cp /seed/nova.json5 \"$OPENCLAW_STATE_DIR/openclaw.json\";
       exec node openclaw.mjs gateway --allow-unconfigured"
     healthCheckPath: /startupz   # Render admits traffic only once startup
                                  # completes, so a booting gateway is never

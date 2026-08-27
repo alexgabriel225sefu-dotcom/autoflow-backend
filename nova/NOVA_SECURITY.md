@@ -46,6 +46,14 @@ handshake. The seed config sets `allowlist` instead, and it is copied onto the
 disk on first boot — so there is no window between "service is live" and
 "someone configured the allowlist by hand".
 
+**That seed step fails closed.** The image runs as `node` (uid 1000) and
+Render does not document who owns a freshly attached disk. If `/data` turns
+out not to be writable, the start command exits non-zero and the container
+never reaches the gateway — because the alternative is a gateway that starts
+with no config at all, where `dmPolicy` falls back to the default `pairing`
+and the allowlist is silently absent. A service that will not boot is a
+visible problem; an unrestricted Telegram bot is not.
+
 To add someone: edit `channels.telegram.allowFrom` through the Control UI. Get
 a numeric id from @userinfobot.
 

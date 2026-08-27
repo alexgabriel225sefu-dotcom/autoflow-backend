@@ -54,7 +54,10 @@ In the Control UI, confirm:
 - `tools.profile` is `minimal`
 - `channels.telegram.dmPolicy` is `allowlist` and `allowFrom` contains your id
 
-If any is missing the seed did not run; check the build log for the `cp` step.
+If any is missing the seed did not run — but note the container is built to
+**refuse to start** in that case rather than come up unconfigured, so a live
+service with a missing allowlist should not be reachable. If you see one,
+treat it as a finding and stop the service.
 
 ## 6. Telegram
 
@@ -131,6 +134,7 @@ Tests 7, 10, 11 and 14 are the security ones. Do not skip them.
 | Symptom | Cause |
 |---|---|
 | Never goes live | `/startupz` failing — read the log before changing anything |
+| Exits at once, `mkdir` or `cp` error in the log | The disk is not writable by uid 1000. This is the container refusing to start rather than booting with no config — see §5. Fix the disk, do not remove `set -e` |
 | Killed, no error | out of memory → move to Pro |
 | Dashboard rejects the token | stale copy; re-read Environment |
 | Bot silent | `TELEGRAM_BOT_TOKEN` missing, or your id not in `allowFrom` |
