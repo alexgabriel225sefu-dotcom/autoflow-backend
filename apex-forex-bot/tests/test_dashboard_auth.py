@@ -94,8 +94,17 @@ check("no branch returns True on a missing token",
       not re.search(r"if not token:\s*\n\s*return True", body), body[:200])
 check("the missing-token branch returns False",
       re.search(r"if not token:\s*\n\s*return False", body) is not None)
+# The comparison moved into apex/http_session.verify_bootstrap when sessions
+# were added. What matters is that SOME constant-time primitive checks the
+# token and that nothing compares it with `==` — not which function holds the
+# call. Plain `==` on a secret leaks its length and matching prefix by timing.
+SESS = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "apex", "http_session.py")).read()
 check("comparison is constant-time, not ==",
-      "compare_digest" in body and not re.search(r"==\s*token", body), body[:300])
+      "compare_digest" in SESS and not re.search(r"==\s*token", SESS + body),
+      body[:300])
+check("_authorized delegates to the checked comparison",
+      "verify_bootstrap" in body, body[:300])
 
 print("\n── a missing token and a wrong token are different problems ──")
 deny = SRC[SRC.index("def _deny"):SRC.index("def do_POST")]
@@ -110,12 +119,29 @@ check("/health is answered before the auth gate",
 print("\n── setting a token must not break the dashboard ──")
 DASH = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                          "apex", "dashboard.py")).read()
-check("the shell reads its own token from the URL", "location.search" in DASH)
-check("status is fetched through the token helper",
-      "_api('/api/status')" in DASH, "still a bare fetch")
-check("candles too", "_api('/api/candles')" in DASH, "still a bare fetch")
+# The shell used to do exactly this:
+#     const _tok = new URLSearchParams(location.search).get('token')
+# and append it to every data call — putting the operator credential in the
+# address bar, the browser history, and every proxy log on the way. The
+# dashboard must still be able to load its data with a token configured, but
+# it must do so WITHOUT the token ever being in a URL.
+check("the shell no longer reads a token from its URL",
+      "location.search" not in DASH, "the URL token helper is still there")
+check("and does not build a ?token= query itself",
+      "'token=' +" not in DASH and "token=' + encodeURIComponent" not in DASH)
+check("data calls go through the credentialed helper",
+      "_fetch(('/api/status')" in DASH, "status is not sent with credentials")
+check("candles too", "_fetch(('/api/candles')" in DASH,
+      "candles is not sent with credentials")
+check("the helper sends the session cookie",
+      "credentials: 'same-origin'" in DASH)
+check("an expired session reloads into the login page rather than failing silently",
+      "401" in DASH and "location.reload()" in DASH)
 check("no bare data fetch is left behind",
-      "fetch('/api/" not in DASH, "a bare fetch('/api/...') remains")
+      "fetch('/api/status" not in DASH and "fetch('/api/candles" not in DASH,
+      "a bare data fetch remains")
+check("there IS a way to present the token that is not a URL",
+      "/api/session" in DASH and "current-password" in DASH)
 
 print("\n── the startup line must not still promise a public dashboard ──")
 check("it says disabled, not PUBLIC",

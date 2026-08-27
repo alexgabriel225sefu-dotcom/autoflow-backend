@@ -133,14 +133,16 @@ function parseTime(t){
 
 function loadCandles(){
 
-// Forward the dashboard token to every data call. The shell is served behind
-// the same auth as the APIs, but its fetches carried no token -- so the moment
-// DASHBOARD_TOKEN was set, the page loaded and then every panel 401'd. That
-// made "set a token" look like "break the dashboard", which is why running
-// without one felt like the only option.
-const _tok = new URLSearchParams(location.search).get('token') || '';
-const _api = (p) => _tok ? p + (p.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(_tok) : p;
-  fetch(_api('/api/candles')).then(r=>r.json()).then(d=>{
+// The shell used to read ?token= from its own URL and append it to every
+// data call, which put the operator credential in the address bar, the
+// browser history, and every proxy log between here and the browser.
+// Authentication is now an HttpOnly session cookie set by POST /api/session,
+// so the page never handles the token at all and script cannot read it.
+// same-origin sends the cookie without making the URL carry anything.
+const _api = (p) => p;
+const _fetch = (p, o) => _fetch((p), Object.assign({credentials: 'same-origin'}, o || {}))
+  .then(r => { if (r.status === 401) { location.reload(); throw new Error('session expired'); } return r; });
+  _fetch(('/api/candles')).then(r=>r.json()).then(d=>{
     if(!d.candles||!d.candles.length) return;
     const data = d.candles.map(c=>({
       time: parseTime(c.time),
@@ -194,7 +196,7 @@ function updateSLTP(pos){
 }
 
 function poll(){
-  fetch(_api('/api/status')).then(r=>r.json()).then(d=>{
+  _fetch(('/api/status')).then(r=>r.json()).then(d=>{
     const bal=d.balance||0, trades=d.trades||[], pos=d.openPosition;
     const start=d.startBalance||bal;
     const wins=trades.filter(t=>t.win), losses=trades.filter(t=>!t.win);
@@ -274,3 +276,59 @@ setInterval(poll, 5000);
 setInterval(loadCandles, 30000);
 </script>
 </body></html>"""
+
+
+# ─── Login page ──────────────────────────────────────────
+# Served instead of a bare 401 when a browser asks for the dashboard without a
+# session. The token is typed into a password field and POSTed as a body; it
+# never enters the URL, so it never reaches history, a proxy log or a Referer
+# header. autocomplete="current-password" lets a password manager hold it,
+# which is the behaviour we want over someone keeping it in a bookmark.
+_LOGIN_HTML = """<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apex - sign in</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#07090f;color:#eef1f6;font-family:-apple-system,system-ui,sans-serif;
+ display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+form{width:100%;max-width:340px}
+h1{font-size:11px;font-weight:800;letter-spacing:.28em;color:#5b6472;margin-bottom:18px}
+h1 b{color:#ff2d4f}
+input{width:100%;padding:13px 14px;border-radius:11px;border:1px solid rgba(255,255,255,.1);
+ background:rgba(255,255,255,.05);color:#eef1f6;font-size:15px;margin-bottom:10px}
+input:focus{outline:none;border-color:rgba(255,45,79,.5)}
+button{width:100%;padding:13px;border:0;border-radius:11px;background:#ff2d4f;color:#fff;
+ font-size:14px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+p{margin-top:12px;font-size:12.5px;color:#ff8fa0;min-height:18px}
+small{display:block;margin-top:16px;font-size:11px;color:#5b6472;line-height:1.5}
+</style></head><body>
+<form id="f" autocomplete="on">
+  <h1>APEX <b>TERMINAL</b></h1>
+  <input id="t" type="password" name="password" autocomplete="current-password"
+         placeholder="Dashboard token" required autofocus>
+  <button id="b" type="submit">Sign in</button>
+  <p id="e"></p>
+  <small>The token is sent in the request body and exchanged for a session
+  cookie. It is never placed in the address bar.</small>
+</form>
+<script>
+document.getElementById('f').addEventListener('submit', async function(ev){
+  ev.preventDefault();
+  var b=document.getElementById('b'), e=document.getElementById('e');
+  b.disabled=true; e.textContent='';
+  try{
+    var r=await fetch('/api/session',{method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:document.getElementById('t').value})});
+    if(r.ok){ location.replace('/'); return; }
+    var d=await r.json().catch(function(){return {};});
+    e.textContent=d.error||'Authorization failed.';
+  }catch(err){ e.textContent='Authorization failed.'; }
+  b.disabled=false;
+});
+</script></body></html>"""
+
+
+def render_login() -> str:
+    """The sign-in page. Static: it carries no account data and no token."""
+    return _LOGIN_HTML

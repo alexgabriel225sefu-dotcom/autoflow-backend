@@ -37,6 +37,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -105,12 +106,22 @@ BOT_SRC = open(os.path.join(ROOT, "apex", "bot.py"), encoding="utf-8").read()
 _client_routes = ("/api/app/data", "/api/app/tick", "/api/app/history")
 for r in _client_routes:
     seg = BOT_SRC.split(f'self.path.startswith("{r}")')
-    check(f"{r} authenticates by initData",
-          len(seg) > 1 and "webapp.validate(init" in seg[1][:900],
+    # The three routes used to each pull `init` out of the query string and
+    # call webapp.validate on it. They now share one helper that reads the
+    # header and REFUSES a query `init`. The requirement is unchanged — a
+    # client-data route must never take identity from the URL — so this
+    # follows the mechanism rather than the old spelling.
+    check(f"{r} authenticates by verified initData",
+          len(seg) > 1 and "self._telegram_identity()" in seg[1][:900],
           "a client-data route must never take identity from the URL")
+    check(f"{r} does not read init from the query string",
+          len(seg) > 1 and 'qs.get("init")' not in seg[1][:900])
 check("the identity comes from the VERIFIED payload, never a parameter",
       'chat_id = str(tg_user["id"])' in BOT_SRC
-      and 'qs.get("user' not in BOT_SRC)
+      and 'qs.get("user' not in BOT_SRC
+      and 'qs.get("init")' not in BOT_SRC)
+check("a query-string initData is refused rather than ignored",
+      "INIT_DATA_IN_URL" in BOT_SRC)
 # Behaviour, not the comment above it: the earlier version of this asserted
 # on the string "Fail CLOSED." and would have passed on a route that deleted
 # the check and kept the comment. test_prose_assertions.py caught exactly
@@ -119,8 +130,16 @@ _auth_body = BOT_SRC.split("def _authorized(self):")[1].split("\n        def ")[
 check("the token-gated route refuses when no token is configured",
       "if not token:" in _auth_body and "return False" in _auth_body,
       "a missing secret is a misconfiguration, not permission")
+# The comparison moved into apex/http_session.verify_bootstrap when the
+# dashboard stopped taking its token from the URL. The property under test is
+# that a constant-time primitive checks the token and nothing compares it with
+# `==` — not which function holds the call.
+_SESS_SRC = open(os.path.join(ROOT, "apex", "http_session.py"), encoding="utf-8").read()
 check("…and compares in constant time",
-      "hmac.compare_digest(" in _auth_body)
+      "hmac.compare_digest(" in _SESS_SRC and "verify_bootstrap" in _auth_body,
+      _auth_body[:200])
+check("…and nowhere compares the token with ==",
+      not re.search(r"==\s*token\b", _SESS_SRC + _auth_body))
 check("a denial is actually issued on failure",
       "if not self._authorized():" in BOT_SRC and "self._deny()" in BOT_SRC)
 

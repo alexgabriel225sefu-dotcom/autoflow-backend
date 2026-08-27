@@ -328,9 +328,14 @@ function freshness(){
 }
 setInterval(freshness,2000);
 
+// initData IS the credential: it is Telegram's HMAC over this user's
+// identity, and anyone holding a fresh one can act as them until it ages out.
+// It used to be appended to the query string, which put it in the browser's
+// history, in every proxy and access log on the way, and in the Referer
+// header of any outbound link. It travels as a header now, and the server
+// REFUSES a request that still carries it in the URL.
 async function api(path){
-  const sep = path.indexOf('?')<0?'?':'&';
-  const r = await fetch(path+sep+'init='+encodeURIComponent(initData));
+  const r = await fetch(path, {headers: {'Authorization': 'Telegram ' + initData}});
   if(!r.ok){
     let code=''; try{code=(await r.json()).code||'';}catch(e){}
     const err=new Error(code||('HTTP '+r.status)); err.status=r.status; err.code=code; throw err;

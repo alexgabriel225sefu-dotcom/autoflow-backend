@@ -266,8 +266,14 @@ check("history is a tab", 'data-p="hist"' in HTML)
 check("the replay screen exists", 'id="replay"' in HTML and 'id="rPlay"' in HTML)
 check("it calls the user-scoped endpoints",
       "/api/app/history" in HTML and "/api/app/replay?trade=" in HTML)
+# Every call must still be authenticated — but initData is the credential, so
+# it must not be in the URL. This previously asserted the query-string form,
+# which is the leak itself written down as a requirement.
 check("every call carries initData",
-      "init='+encodeURIComponent(initData)" in HTML)
+      "'Authorization': 'Telegram ' + initData" in HTML, "the api() helper is unauthenticated")
+check("and never in the query string",
+      "init='+encodeURIComponent" not in HTML and "'init='" not in HTML,
+      "initData is still being appended to a URL")
 check("it never invents market data", "Math.random" not in HTML)
 for fake in ("10,142", "12,482", "1.08452"):
     check(f"no hardcoded {fake}", fake not in HTML)
@@ -287,8 +293,14 @@ check("price precision comes from the broker, not a default",
 check("...and the payload carries it", '"digits"' in BOT_SRC and '"pipSize"' in BOT_SRC)
 check("prices render at that precision", "toFixed(DIGITS)" in HTML)
 check("there is a fast tick endpoint", "/api/app/tick" in HTML and "/api/app/tick" in BOT_SRC)
+# The three client-data routes each used to call webapp.validate on a query
+# parameter. They now share one helper that reads the header, so the count is
+# of routes reaching the gate rather than of copies of the same three lines.
 check("the tick is authenticated like every other route",
-      BOT_SRC.count("webapp.validate(init, cfg.TELEGRAM_BOT_TOKEN") >= 3)
+      BOT_SRC.count("self._telegram_identity()") >= 3,
+      "a client-data route is not going through the identity gate")
+check("and the verification itself still happens exactly once, in one place",
+      BOT_SRC.count("webapp.validate(") == 1)
 check("the candle GROWS instead of the series being redrawn",
       "series.update(lastBar)" in HTML and "growBar" in HTML)
 check("a stale tick never rewrites a closed bar",

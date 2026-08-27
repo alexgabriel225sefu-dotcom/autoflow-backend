@@ -12,9 +12,9 @@ import requests
 
 from apex import config as cfg
 from apex import indicators, ai, logger, strategies, telegram as tg, state, forex
-from apex import settings_policy
+from apex import settings_policy, http_session, http_security
 from apex.brokers import get_broker
-from apex.dashboard import render as render_dashboard
+from apex.dashboard import render as render_dashboard, render_login
 
 broker = get_broker()
 
@@ -277,29 +277,97 @@ def _start_dashboard_server():
             pass
 
         def _authorized(self):
-            """Fail CLOSED.
+            """Fail CLOSED, and never from the URL.
 
-            This used to `return True` whenever DASHBOARD_TOKEN was unset, so a
-            single missing environment variable silently published /api/status
-            — balance, open position and the trade journal — to anyone who
-            knew the URL, with no warning beyond one startup line. Verified
-            live: an unauthenticated GET returned 200.
+            Two things were wrong here, fixed in order of when they were found.
 
-            A missing secret is a misconfiguration, not permission. The caller
-            turns that into a 503 so the operator can tell "I forgot to set the
-            token" apart from "my token is wrong".
+            First, this used to `return True` whenever DASHBOARD_TOKEN was
+            unset, so one missing environment variable silently published
+            /api/status — balance, open position, trade journal — to anyone
+            who knew the URL. A missing secret is a misconfiguration, not
+            permission.
 
-            compare_digest keeps the comparison constant-time: plain `==` on
-            secrets leaks their length and prefix through timing.
+            Second, and the reason for the session layer: it accepted
+            `?token=`. A credential in a URL is a credential in the browser
+            history, in every proxy and access log along the way, in the
+            Referer header of any outbound link, and in any screenshot of the
+            address bar. Render logs request paths. Rotating a token that has
+            already been copied into all of those is not a rotation.
+
+            Query tokens are now REFUSED rather than ignored, because a
+            request carrying one has already leaked it and the operator needs
+            to find out from a failure rather than from a log review.
+
+            What is accepted:
+              Authorization: Bearer <DASHBOARD_TOKEN>   scripts and ops
+              Cookie: apex_session=<id>                 browsers, after login
             """
             if not token:
                 return False
-            qs = parse_qs(urlparse(self.path).query)
-            supplied = qs.get("token", [""])[0]
-            if not supplied:
-                supplied = (self.headers.get("Authorization") or
-                            "").removeprefix("Bearer ").strip()
-            return hmac.compare_digest(supplied, token)
+            if "token" in parse_qs(urlparse(self.path).query):
+                return False
+            supplied = (self.headers.get("Authorization") or
+                        "").removeprefix("Bearer ").strip()
+            if supplied:
+                return http_session.verify_bootstrap(supplied, token)
+            return http_session.valid(
+                http_session.parse_cookie(self.headers.get("Cookie") or ""))
+
+        def _used_query_token(self):
+            return "token" in parse_qs(urlparse(self.path).query)
+
+        def _telegram_identity(self):
+            """The verified Telegram user, or None. Never from the query string.
+
+            The Mini App sent `/api/app/data?init=<initData>`. initData IS the
+            credential — it is Telegram's HMAC over the user's identity, and
+            anyone holding a fresh one can act as that user until it ages out.
+            Putting it in a URL put it in exactly the places a URL goes:
+            proxy and access logs, the browser's own history, Referer headers.
+
+            It now travels in a header. A query `init` is REFUSED rather than
+            ignored, for the same reason as the dashboard token: a request
+            carrying one has already leaked it.
+
+            Accepted:
+                Authorization: Telegram <initData>
+                X-Telegram-Init-Data: <initData>
+
+            The identity returned is the one webapp.validate recovered from
+            the signed payload. No caller may pass a user id alongside it —
+            that is the whole point of verifying a signature.
+            """
+            from apex import webapp
+            if "init" in parse_qs(urlparse(self.path).query):
+                return None
+            if not http_security.MINIAPP.check(http_security.client_key(self)):
+                return None
+            raw = (self.headers.get("X-Telegram-Init-Data") or "").strip()
+            if not raw:
+                auth = (self.headers.get("Authorization") or "").strip()
+                if auth.lower().startswith("telegram "):
+                    raw = auth[9:].strip()
+            if not raw:
+                return None
+            tg_user = webapp.validate(raw, cfg.TELEGRAM_BOT_TOKEN or "")
+            if not tg_user or not tg_user.get("id"):
+                return None
+            return tg_user
+
+        def _used_query_init(self):
+            return "init" in parse_qs(urlparse(self.path).query)
+
+        def _telegram_denied(self):
+            """One refusal shape for every Mini App route."""
+            if self._used_query_init():
+                return self._json(401, {
+                    "error": "unauthorized",
+                    "code": "INIT_DATA_IN_URL",
+                    "detail": ("Telegram initData must be sent as the header "
+                               "'Authorization: Telegram <initData>'. A URL "
+                               "leaks it into history and proxy logs.")})
+            return self._json(401, {"error": "unauthorized",
+                                    "code": "TELEGRAM_AUTH_FAILED"})
 
         def _json(self, status, obj, cache=None, cache_key=None):
             """A JSON reply with no cache and an explicit length.
@@ -316,7 +384,34 @@ def _start_dashboard_server():
             body = json.dumps(obj).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Cache-Control", "no-store")
+            for h, v in http_security.headers(
+                    https=http_security.is_https(self.headers)).items():
+                self.send_header(h, v)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _reply(self, status, obj, extra_headers=()):
+            """JSON with the security headers and any extra header (Set-Cookie)."""
+            body = json.dumps(obj).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            for h, v in http_security.headers(
+                    https=http_security.is_https(self.headers)).items():
+                self.send_header(h, v)
+            for h, v in extra_headers:
+                self.send_header(h, v)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _html(self, status, markup):
+            body = markup.encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            for h, v in http_security.headers(
+                    https=http_security.is_https(self.headers)).items():
+                self.send_header(h, v)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -327,8 +422,17 @@ def _start_dashboard_server():
                 body = (b"503 - dashboard disabled. DASHBOARD_TOKEN is not set "
                         b"on this deployment, so these endpoints serve nothing.")
                 self.send_response(503)
+            elif self._used_query_token():
+                # Say plainly why this failed. Silently ignoring the parameter
+                # would leave an operator retrying a URL that cannot ever work.
+                body = (b"401 - unauthorized. A token in the URL is refused: it "
+                        b"leaks into browser history, proxy logs and Referer "
+                        b"headers. POST it to /api/session, or send "
+                        b"'Authorization: Bearer <token>'.")
+                self.send_response(401)
             else:
-                body = b"401 - unauthorized. Open with ?token=YOUR_DASHBOARD_TOKEN"
+                body = (b"401 - unauthorized. POST {\"token\":\"...\"} to "
+                        b"/api/session, or send 'Authorization: Bearer <token>'.")
                 self.send_response(401)
             self.send_header("Content-Type", "text/plain")
             self.send_header("Content-Length", str(len(body)))
@@ -336,6 +440,39 @@ def _start_dashboard_server():
             self.wfile.write(body)
 
         def do_POST(self):
+            # ── Dashboard login: the ONLY place the operator token is
+            # presented, and it arrives in a body rather than a URL. What goes
+            # back is a short-lived session id in an HttpOnly cookie.
+            if self.path == "/api/session":
+                if not token:
+                    return self._deny()
+                if not http_security.LOGIN.check(http_security.client_key(self)):
+                    # Generic on purpose: a different message for "too many
+                    # attempts" than for "wrong token" tells someone guessing
+                    # that they had otherwise reached the right endpoint.
+                    return self._reply(429, {"error": "Too many attempts. Try again shortly."})
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                    raw = self.rfile.read(min(length, 8192))
+                    supplied = (json.loads(raw or b"{}") or {}).get("token") or ""
+                except Exception:
+                    supplied = ""
+                if not http_session.verify_bootstrap(supplied, token):
+                    # No detail. "wrong token" and "malformed body" look the
+                    # same to the caller, and neither is written to the log.
+                    return self._reply(401, {"error": "Authorization failed."})
+                sid = http_session.create()
+                return self._reply(
+                    200, {"ok": True, "expiresInSeconds": http_session.TTL_S},
+                    [("Set-Cookie", http_session.set_cookie_value(sid, self.headers))])
+
+            if self.path == "/api/session/logout":
+                http_session.revoke(
+                    http_session.parse_cookie(self.headers.get("Cookie") or ""))
+                return self._reply(
+                    200, {"ok": True},
+                    [("Set-Cookie", http_session.clear_cookie_value(self.headers))])
+
             if self.path == "/api/stripe/webhook":
                 from apex import stripe_license
                 length = int(self.headers.get("Content-Length") or 0)
@@ -506,13 +643,9 @@ def _start_dashboard_server():
                 from apex import webapp, user_loop, user_store, news as news_mod
                 from apex import account_mode as _account_mode
                 qs = parse_qs(urlparse(self.path).query)
-                init = (qs.get("init") or [""])[0]
-                tg_user = webapp.validate(init, cfg.TELEGRAM_BOT_TOKEN or "")
-                if not tg_user or not tg_user.get("id"):
-                    self.send_response(401)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(b'{"error":"unauthorized"}')
+                tg_user = self._telegram_identity()
+                if not tg_user:
+                    self._telegram_denied()
                     return
                 chat_id = str(tg_user["id"])
                 try:
@@ -665,11 +798,9 @@ def _start_dashboard_server():
                 from apex import forex as fx_mod
                 from apex import miniapp_cache as _mc
                 qs = parse_qs(urlparse(self.path).query)
-                init = (qs.get("init") or [""])[0]
-                tg_user = webapp.validate(init, cfg.TELEGRAM_BOT_TOKEN or "")
-                if not tg_user or not tg_user.get("id"):
-                    self._json(401, {"error": "unauthorized",
-                                     "code": "TELEGRAM_AUTH_FAILED"})
+                tg_user = self._telegram_identity()
+                if not tg_user:
+                    self._telegram_denied()
                     return
                 chat_id = str(tg_user["id"])
                 # Serve a very recent answer rather than asking the broker again.
@@ -829,11 +960,9 @@ def _start_dashboard_server():
             if self.path.startswith("/api/app/history") or self.path.startswith("/api/app/replay"):
                 from apex import webapp, miniapp_api
                 qs = parse_qs(urlparse(self.path).query)
-                init = (qs.get("init") or [""])[0]
-                tg_user = webapp.validate(init, cfg.TELEGRAM_BOT_TOKEN or "")
-                if not tg_user or not tg_user.get("id"):
-                    self._json(401, {"error": "unauthorized",
-                                     "code": "TELEGRAM_AUTH_FAILED"})
+                tg_user = self._telegram_identity()
+                if not tg_user:
+                    self._telegram_denied()
                     return
                 chat_id = str(tg_user["id"])
                 try:
@@ -874,27 +1003,28 @@ def _start_dashboard_server():
                 self.wfile.write(payload)
                 return
             if not self._authorized():
-                self._deny()
+                # A browser asking for the dashboard PAGE gets a login form;
+                # only the data APIs get a bare 401. Returning 401 for the page
+                # left the operator with a dead end and no way to present the
+                # token except by putting it back in the URL.
+                wants_page = not self.path.startswith("/api/")
+                if wants_page and token and not self._used_query_token():
+                    self._html(200, render_login())
+                else:
+                    self._deny()
                 return
             if self.path.startswith("/api/status"):
-                body = json.dumps({**dash, "tickCount": tick_count, "candles": []}).encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(body)
+                # No Access-Control-Allow-Origin. This endpoint is
+                # authenticated and returns the live account; it carried "*",
+                # which invites any origin to read it. Same-origin only, so
+                # there is no CORS header to get wrong.
+                self._json(200, {**dash, "tickCount": tick_count, "candles": []})
             elif self.path.startswith("/api/candles"):
-                body = json.dumps({"candles": dash.get("candles", []), "symbol": dash["currentSymbol"], "timeframe": cfg.TIMEFRAME}).encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(body)
+                self._json(200, {"candles": dash.get("candles", []),
+                                 "symbol": dash["currentSymbol"],
+                                 "timeframe": cfg.TIMEFRAME})
             else:
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(render_dashboard({**dash, "tickCount": tick_count}).encode())
+                self._html(200, render_dashboard({**dash, "tickCount": tick_count}))
 
     # THREADING, not HTTPServer. The plain one handles exactly one request at a
     # time, so a single slow call froze the whole HTTP surface behind it: the
