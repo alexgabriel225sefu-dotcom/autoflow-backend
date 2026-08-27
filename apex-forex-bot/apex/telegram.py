@@ -467,51 +467,13 @@ def _broker_label():
 # category from trading settings so rotating a secret is never mixed up with
 # changing risk.
 
-def _num(cast, lo, hi):
-    def check(v):
-        try:
-            x = cast(str(v).strip())
-        except (TypeError, ValueError):
-            raise ValueError(f"expected a number between {lo} and {hi}")
-        if not (lo <= x <= hi):
-            raise ValueError(f"must be between {lo} and {hi}, got {x}")
-        return x
-    return check
-
-
-def _choice(*allowed):
-    def check(v):
-        s = str(v).strip().lower()
-        if s not in allowed:
-            raise ValueError("must be one of: " + ", ".join(allowed))
-        return s
-    return check
-
-
-def _flag(v):
-    s = str(v).strip().lower()
-    if s not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
-        raise ValueError("must be true or false")
-    return s in ("true", "1", "yes", "on")
-
-
-def _symbol(v):
-    s = re.sub(r"[^A-Z0-9]", "", str(v).strip().upper())
-    if not (5 <= len(s) <= 8) or not s.isalnum():
-        raise ValueError("expected a symbol like EURUSD or XAUUSD")
-    return s
-
-
-def _secret(min_len):
-    def check(v):
-        s = str(v).strip()
-        if len(s) < min_len:
-            raise ValueError(f"too short — expected at least {min_len} characters")
-        if any(c.isspace() for c in s):
-            raise ValueError("must not contain whitespace")
-        return s
-    return check
-
+# The validators live in apex/settings_policy so that a value means the same
+# thing wherever it arrives from — an admin typing /setkeys, or the licence
+# server's config blob. Two copies of "what is a valid RISK_PER_TRADE" is how
+# one of them quietly stops matching the other.
+from apex.settings_policy import (  # noqa: E402
+    _choice, _flag, _num, _secret, _symbol,
+)
 
 # key → (cfg attribute, validator). Trading settings: safe to echo back.
 _SETTABLE = {

@@ -12,6 +12,7 @@ import requests
 
 from apex import config as cfg
 from apex import indicators, ai, logger, strategies, telegram as tg, state, forex
+from apex import settings_policy
 from apex.brokers import get_broker
 from apex.dashboard import render as render_dashboard
 
@@ -56,41 +57,49 @@ def reload_broker_connector():
         print(f"[BOT] Broker reload error: {e}")
 
 
-def _apply_config(data, source="config"):
+def _apply_config(data, source="config", validate=None):
     """Apply a {ENV_NAME: value} dict to os.environ and the live cfg module.
 
-    Values arrive as strings (from the server) and are coerced to the type of
-    the existing cfg attribute, so "false" doesn't stay a truthy string and
-    "0.02" becomes a float. Shared by runtime.json and the remote loader.
+    Every key is checked against an allowlist BEFORE it reaches os.environ.
+    This used to be an unfiltered `os.environ[k] = str(v)` over whatever the
+    licence server returned, which is a remote write onto the process
+    environment — PATH, LD_PRELOAD and PYTHONPATH included, and each of those
+    turns a configuration fetch into code execution. See apex/settings_policy.
+
+    `validate` picks which allowlist applies, because the two callers do not
+    have the same trust: runtime.json holds what an authenticated admin set,
+    the remote loader holds whatever answered for the licence server.
+
+    Rejected keys are reported by NAME and never by value — a refused key can
+    still be carrying a credential.
     """
-    applied = 0
-    for k, v in data.items():
-        if v is None or v == "":
+    if validate is None:
+        validate = settings_policy.validate_operator
+
+    applied, refused = 0, []
+    for raw_key, raw_value in data.items():
+        if raw_value is None or raw_value == "":
             continue
-        os.environ[k] = str(v)
+        try:
+            key, value = validate(raw_key, raw_value)
+        except settings_policy.SettingRejected as e:
+            # Named, not swallowed: a security-relevant refusal that nobody
+            # can see is indistinguishable from one that never happened.
+            refused.append(str(e))
+            continue
+
+        os.environ[key] = str(value).lower() if isinstance(value, bool) else str(value)
         applied += 1
 
-    # Env var name → cfg attribute name where they differ
-    if "TRADE_SYMBOL" in data:
-        cfg.SYMBOL = str(data["TRADE_SYMBOL"])
-    if "SCAN_SYMBOLS" in data and data["SCAN_SYMBOLS"]:
-        cfg.SCAN_SYMBOLS = str(data["SCAN_SYMBOLS"]).split(",")
+        attr = settings_policy.cfg_attr(key)
+        if attr == "SCAN_SYMBOLS":
+            cfg.SCAN_SYMBOLS = str(value).split(",")
+        elif attr and hasattr(cfg, attr):
+            setattr(cfg, attr, value)
 
-    for k, v in data.items():
-        if v is None or v == "" or not hasattr(cfg, k):
-            continue
-        cur = getattr(cfg, k)
-        try:
-            if isinstance(cur, bool):
-                setattr(cfg, k, cfg._truthy(str(v)))
-            elif isinstance(cur, int) and not isinstance(cur, bool):
-                setattr(cfg, k, int(float(v)))
-            elif isinstance(cur, float):
-                setattr(cfg, k, float(v))
-            elif isinstance(cur, str):
-                setattr(cfg, k, str(v).lower() if k == "BROKER" else str(v))
-        except (ValueError, TypeError):
-            pass  # leave the default if the value can't be coerced
+    if refused:
+        print(f"[BOT] {source}: refused {len(refused)} setting(s) — "
+              + "; ".join(refused[:10]))
     return applied
 
 
@@ -154,7 +163,8 @@ def load_remote():
         skipped = [k for k in data["config"] if k in os.environ]
         if skipped:
             print(f"ℹ️   Keeping Railway env values (override saved config): {', '.join(skipped)}")
-        n = _apply_config(remote_cfg, "remote")
+        n = _apply_config(remote_cfg, "remote",
+                          validate=settings_policy.validate_remote)
         print(f"✅  Remote config loaded from license server ({n} settings).")
         return True
     except Exception as e:
