@@ -1,0 +1,68 @@
+# NOVA gateway on Render.
+#
+# NOT at the repository root, on purpose. The root render.yaml belongs to the
+# APEX sales site. Render lets you choose a custom blueprint path at setup, and
+# its spec states "services not included in your Blueprint are unaffected by
+# the sync" — so a NOVA sync can never reach APEX infrastructure.
+#
+# Values follow the official OpenClaw Render blueprint
+# (https://docs.openclaw.ai/install/render). Deviations are noted where they
+# occur; nothing here is invented.
+services:
+  - type: web
+    name: nova-gateway
+    runtime: docker
+    plan: starter          # Not free: Render rejects a blueprint that attaches
+                           # a persistent disk to a free instance, and without
+                           # the disk OpenClaw's state — config, memory, node
+                           # pairings — resets on every deploy. Free instances
+                           # also sleep after 15 minutes idle.
+                           #
+                           # NOTE, two official docs disagree:
+                           # render.com/docs/deploy-openclaw says "Pro is the
+                           # smallest instance type that supports OpenClaw";
+                           # docs.openclaw.ai/install/render uses starter. This
+                           # follows OpenClaw's own value. If the gateway is
+                           # OOM-killed, that is the symptom meaning "go Pro".
+    region: oregon         # Same region as the APEX bot, so a future
+                           # read-only link stays on Render's internal network.
+    dockerfilePath: ./nova/Dockerfile
+    dockerContext: ./nova
+    # Seed the config onto the disk ONCE, then start the gateway.
+    #
+    # `cp -n` never overwrites: after first boot the disk copy is authoritative
+    # and OpenClaw rewrites it as settings change. Without seeding, the Telegram
+    # allowlist would not exist until someone configured it by hand — leaving a
+    # window where the default "pairing" policy is all that stands between the
+    # bot and a stranger.
+    #
+    # `exec` replaces the shell so the gateway becomes PID 1's child under tini
+    # and still receives SIGTERM for a graceful shutdown.
+    dockerCommand: >-
+      /bin/sh -c "mkdir -p \"$OPENCLAW_STATE_DIR\" &&
+      cp -n /seed/nova.json5 \"$OPENCLAW_STATE_DIR/openclaw.json\" 2>/dev/null;
+      exec node openclaw.mjs gateway --allow-unconfigured"
+    healthCheckPath: /startupz   # Render admits traffic only once startup
+                                 # completes, so a booting gateway is never
+                                 # advertised as ready.
+    envVars:
+      - key: OPENCLAW_GATEWAY_PORT
+        value: "8080"
+      - key: OPENCLAW_STATE_DIR
+        value: /data/.openclaw
+      - key: OPENCLAW_WORKSPACE_DIR
+        value: /data/workspace
+      # Render generates a cryptographically secure value on first sync. This
+      # is the dashboard AND node credential. It never exists in Git.
+      - key: OPENCLAW_GATEWAY_TOKEN
+        generateValue: true
+      # sync:false = Render prompts for it and stores it as a secret.
+      # Intentionally empty here; fill them in the dashboard.
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+    disk:
+      name: nova-data
+      mountPath: /data
+      sizeGB: 1
