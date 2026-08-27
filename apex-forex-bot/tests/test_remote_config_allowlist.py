@@ -262,6 +262,31 @@ check("load_remote routes both classes",
       "validate_remote" in src and "_apply_provisioning" in src,
       "the loader does not use the split")
 
+print("\n16. The generated field allowlist still matches these tables")
+# server.js filters GET /api/bot-config down to config/bot-config-fields.json.
+# That file is generated from the tables above rather than hand-written in JS,
+# because a second copy is the one that drifts — and the failure is silent: add
+# a setting here only, and the bot quietly stops receiving it.
+import json  # noqa: E402
+_FIELDS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))), "config", "bot-config-fields.json")
+check("the generated file exists", os.path.exists(_FIELDS), _FIELDS)
+if os.path.exists(_FIELDS):
+    doc = json.load(open(_FIELDS, encoding="utf-8"))
+    check("runtime keys match REMOTE_SETTABLE",
+          sorted(doc.get("runtime", [])) == sorted(sp.REMOTE_SETTABLE),
+          "run scripts/gen_bot_config_fields.py — the two have drifted")
+    check("provisioning keys match REMOTE_PROVISIONING",
+          sorted(doc.get("provisioning", [])) == sorted(sp.REMOTE_PROVISIONING),
+          "run scripts/gen_bot_config_fields.py — the two have drifted")
+    every = set(doc.get("runtime", [])) | set(doc.get("provisioning", []))
+    for dangerous in ("PATH", "PYTHONPATH", "LD_PRELOAD", "TOKEN_ENCRYPTION_KEY",
+                      "JWT_SECRET", "COOKIE_SECRET", "STRIPE_WEBHOOK_SECRET",
+                      "LICENSE_SERVER", "CTRADER_CLIENT_SECRET",
+                      "CTRADER_ACCESS_TOKEN", "MT_BRIDGE_SECRET", "EV_GATE_MODE"):
+        check(f"{dangerous} is absent from the shipped allowlist",
+              dangerous not in every)
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} FAILED: {', '.join(failures[:10])}")

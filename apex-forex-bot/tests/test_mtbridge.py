@@ -19,7 +19,11 @@ os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 from apex import config as cfg  # noqa: E402
 from apex.brokers import mtbridge  # noqa: E402
 
-cfg.MT_BRIDGE_SECRET = "test-secret-123"
+# The bridge secret moved out of apex/config.py and into the module that reads
+# it: its broker cannot run in this build, so a credential in the production
+# config read like a live product setting. Same value, same assertions.
+from apex.brokers import mtbridge as _mtb  # noqa: E402
+_mtb.BRIDGE_SECRET = "test-secret-123"
 cfg.PAPER_TRADING = False
 
 

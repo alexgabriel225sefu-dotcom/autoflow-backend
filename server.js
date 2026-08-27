@@ -3016,6 +3016,44 @@ function decryptBotConfig(data) {
   return { config: JSON.parse(out.toString('utf8')), legacy: true };
 }
 
+// Which configuration keys the bot may receive.
+//
+// The stored blob can contain anything a configurator once wrote, including
+// keys for settings that no longer exist and credentials for brokers that can
+// no longer run. Returning all of it is gratuitous: the bot discards what it
+// cannot apply anyway, so everything else is a secret travelling for no reason.
+//
+// The list is generated from apex/settings_policy.py — the same allowlist that
+// decides what the bot will accept — rather than written out again here. A
+// second copy in JavaScript is the copy that drifts, and the failure is silent:
+// add a setting in Python only, and the bot quietly stops receiving it.
+const _BOT_CONFIG_FIELDS = (() => {
+  try {
+    const doc = JSON.parse(require('fs').readFileSync(
+      require('path').join(__dirname, 'config', 'bot-config-fields.json'), 'utf8'));
+    return new Set([...(doc.runtime || []), ...(doc.provisioning || [])]);
+  } catch (e) {
+    // Fail CLOSED-ish: an unreadable allowlist must not become "send
+    // everything". null means "filter unavailable", and the route refuses
+    // rather than guessing.
+    console.error('[BOT-CONFIG] field allowlist unreadable', _errId(e));
+    return null;
+  }
+})();
+
+function _filterBotConfig(config) {
+  if (!_BOT_CONFIG_FIELDS) return null;
+  const out = {};
+  let dropped = 0;
+  for (const [k, v] of Object.entries(config || {})) {
+    if (_BOT_CONFIG_FIELDS.has(String(k).toUpperCase())) out[k] = v;
+    else dropped++;
+  }
+  // Names only — a dropped key can still be carrying a credential.
+  if (dropped) console.log(`[BOT-CONFIG] withheld ${dropped} key(s) the bot cannot apply`);
+  return out;
+}
+
 // POST /api/save-bot-config  — called by configurator when client clicks "Save & Deploy"
 app.post('/api/save-bot-config', async (req, res) => {
   // The licence key used to BE the authorisation here: whoever held it could
@@ -3281,8 +3319,14 @@ app.get('/api/bot-config', async (req, res) => {
     }
   }
 
+  // Least privilege on the way out: only the keys the bot can actually apply.
+  const filtered = _filterBotConfig(decoded.config);
+  if (filtered === null) {
+    return res.status(503).json({ error: 'Configuration unavailable.' });
+  }
+
   res.set('Cache-Control', 'no-store');
-  res.json({ success: true, config: decoded.config });
+  res.json({ success: true, config: filtered });
 });
 
 // ════════════════════════════════════════
@@ -3648,6 +3692,7 @@ module.exports = {
     assertPublicHttpUrl, _isPublicIp,
     _ownerSecretOk, _ownerSecretPresentInUrl,
     _maskLicence, _maskEmail,
+    _filterBotConfig, _BOT_CONFIG_FIELDS,
     SCOPE_READ, SCOPE_WRITE,
     BOT_SESSION_TTL_MS,
   },

@@ -694,3 +694,65 @@ test('no environment secret is interpolated into a log call', () => {
   assert.deepStrictEqual(offenders, [],
     `env secrets reach logs at: ${JSON.stringify(offenders)}`);
 });
+
+// ── Finding 9: least privilege on the config response ──────────────────
+const { _filterBotConfig, _BOT_CONFIG_FIELDS } = _internal;
+
+test('the config response is filtered to keys the bot can apply', () => {
+  const out = _filterBotConfig({
+    RISK_PER_TRADE: '0.01',
+    TELEGRAM_BOT_TOKEN: 'provisioning-credential',
+    PATH: '/evil',
+    LD_PRELOAD: '/evil.so',
+    TOKEN_ENCRYPTION_KEY: 'every-stored-credential',
+    JWT_SECRET: 'signing',
+    LICENSE_SERVER: 'http://evil.invalid',
+    CTRADER_ACCESS_TOKEN: 'broker',
+    OANDA_API_TOKEN: 'a broker that no longer exists',
+    SOME_FORGOTTEN_KEY: 'x',
+  });
+  // Kept: a trading setting and a provisioning credential the bot needs.
+  assert.strictEqual(out.RISK_PER_TRADE, '0.01');
+  assert.strictEqual(out.TELEGRAM_BOT_TOKEN, 'provisioning-credential');
+  // Withheld: everything the bot would discard anyway, so sending it is a
+  // secret travelling for no reason.
+  for (const k of ['PATH', 'LD_PRELOAD', 'TOKEN_ENCRYPTION_KEY', 'JWT_SECRET',
+                   'LICENSE_SERVER', 'CTRADER_ACCESS_TOKEN', 'OANDA_API_TOKEN',
+                   'SOME_FORGOTTEN_KEY']) {
+    assert.ok(!(k in out), `${k} was returned to the caller`);
+  }
+});
+
+test('an unreadable allowlist refuses rather than sending everything', () => {
+  const code = serverCode();
+  assert.match(code, /if \(!_BOT_CONFIG_FIELDS\) return null;/,
+    'a missing allowlist does not stop the filter');
+  const idx = code.indexOf("app.get('/api/bot-config'");
+  const route = code.slice(idx, idx + 3200);
+  assert.match(route, /filtered === null/, 'the route does not check for it');
+  assert.match(route, /503/, 'it does not refuse when the filter is unavailable');
+});
+
+test('the allowlist is generated, not a second copy written by hand', () => {
+  const code = serverCode();
+  assert.match(code, /bot-config-fields\.json/,
+    'server.js carries its own hand-written key list');
+  const doc = JSON.parse(require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'config', 'bot-config-fields.json'), 'utf8'));
+  assert.ok(Array.isArray(doc.runtime) && doc.runtime.length > 10, 'runtime list looks wrong');
+  assert.ok(Array.isArray(doc.provisioning) && doc.provisioning.length > 3);
+  // The two classes stay disjoint on this side too, or the split means nothing.
+  const overlap = doc.runtime.filter(k => doc.provisioning.includes(k));
+  assert.deepStrictEqual(overlap, [], `classes overlap: ${overlap}`);
+  assert.strictEqual(_BOT_CONFIG_FIELDS.size, doc.runtime.length + doc.provisioning.length);
+});
+
+test('nothing dangerous is in the generated allowlist', () => {
+  for (const k of ['PATH', 'PYTHONPATH', 'LD_PRELOAD', 'TOKEN_ENCRYPTION_KEY',
+                   'JWT_SECRET', 'COOKIE_SECRET', 'STRIPE_WEBHOOK_SECRET',
+                   'LICENSE_SERVER', 'CTRADER_CLIENT_SECRET',
+                   'CTRADER_ACCESS_TOKEN', 'CTRADER_REFRESH_TOKEN',
+                   'MT_BRIDGE_SECRET', 'EV_GATE_MODE']) {
+    assert.ok(!_BOT_CONFIG_FIELDS.has(k), `${k} is in the field allowlist`);
+  }
+});
