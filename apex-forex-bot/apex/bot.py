@@ -101,6 +101,44 @@ def _apply_config(data, source="config", validate=None):
     return applied
 
 
+def _apply_provisioning(data):
+    """Apply first-deploy credentials. Never overwrite one already set.
+
+    This exists so one-click deployment keeps working — a fresh container has
+    no Telegram token, and the configurator is how it gets one — without
+    letting every subsequent configuration fetch rotate it. A bot that already
+    holds a credential has been provisioned; a response carrying a different
+    one is either a mistake or a takeover, and neither deserves a silent yes.
+
+    Values are never printed. A refusal names the key and says why.
+    """
+    applied, refused, held = 0, [], []
+    for raw_key, raw_value in (data or {}).items():
+        if raw_value is None or raw_value == "":
+            continue
+        try:
+            key, value = settings_policy.validate_provisioning(raw_key, raw_value)
+        except settings_policy.SettingRejected as e:
+            refused.append(str(e))
+            continue
+        if not settings_policy.provisioning_allowed(key, os.environ.get(key)):
+            held.append(key)
+            continue
+        os.environ[key] = str(value)
+        attr = settings_policy.cfg_attr(key)
+        if attr and hasattr(cfg, attr):
+            setattr(cfg, attr, value)
+        applied += 1
+
+    if held:
+        print(f"[BOT] provisioning: {len(held)} credential(s) already set, "
+              f"left alone — {', '.join(held)}")
+    if refused:
+        print(f"[BOT] provisioning: refused {len(refused)} — "
+              + "; ".join(refused[:5]))
+    return applied
+
+
 def _load_runtime_config():
     """Apply persistent settings saved by Telegram commands (runtime.json)."""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "runtime.json")
@@ -177,13 +215,29 @@ def load_remote():
         # without re-running the configurator (as the setup guide instructs).
         # runtime.json (Telegram overrides) is applied separately, after this,
         # and still wins — it is the live user-control layer.
-        remote_cfg = {k: v for k, v in data["config"].items() if k not in os.environ}
+        # Env vars set explicitly on the host win over the saved config, so a
+        # power user can flip a setting in Render without re-running the
+        # configurator.
+        incoming = {k: v for k, v in data["config"].items() if k not in os.environ}
         skipped = [k for k in data["config"] if k in os.environ]
         if skipped:
-            print(f"ℹ️   Keeping Railway env values (override saved config): {', '.join(skipped)}")
-        n = _apply_config(remote_cfg, "remote",
+            print(f"ℹ️   Keeping host env values (override saved config): {', '.join(skipped)}")
+
+        # Two paths, because "change my stop loss" and "replace my Telegram
+        # token" are not the same request. Runtime settings apply freely;
+        # provisioning credentials are delivered only where nothing is set
+        # yet, so a later response cannot silently rotate this bot's identity.
+        # See apex/settings_policy.
+        runtime = {k: v for k, v in incoming.items()
+                   if k.strip().upper() not in settings_policy.REMOTE_PROVISIONING}
+        provisioning = {k: v for k, v in incoming.items()
+                        if k.strip().upper() in settings_policy.REMOTE_PROVISIONING}
+
+        n = _apply_config(runtime, "remote",
                           validate=settings_policy.validate_remote)
-        print(f"✅  Remote config loaded from license server ({n} settings).")
+        p = _apply_provisioning(provisioning)
+        print(f"✅  Remote config loaded from license server "
+              f"({n} setting(s), {p} credential(s) provisioned).")
         return True
     except Exception as e:
         print(f"⚠️   Could not load remote config ({e}) — using env vars only.")

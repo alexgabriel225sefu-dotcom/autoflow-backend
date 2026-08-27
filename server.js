@@ -3289,9 +3289,44 @@ app.get('/api/bot-config', async (req, res) => {
 // RAILWAY AUTO-DEPLOY — client provides their Railway token,
 // we create project + service + variables + deploy for them.
 // ════════════════════════════════════════
-app.post('/api/railway-deploy', async (req, res) => {
+// TRUST MODEL, stated because this endpoint is unusual.
+//
+// The Railway token belongs to the CALLER and is used to create resources in
+// THEIR Railway account — so this service never needs to own it, and it is
+// never stored or logged. What it must check is the LICENCE, because the key
+// supplied here is written into the deployed service as LICENSE_KEY: it is the
+// entitlement the bot will present. It was not checked at all, so anyone could
+// deploy a bot carrying an invented one.
+//
+// A licence is not proof of identity for anything else. This endpoint deploys
+// the caller's own bot into the caller's own account with the caller's own
+// token, and grants nothing beyond that.
+app.post('/api/railway-deploy', _authLimiter, async (req, res) => {
   const { railwayToken, licenseKey, product } = req.body || {};
   if (!railwayToken || !licenseKey) return res.status(400).json({ error: 'railwayToken and licenseKey required' });
+
+  // Check the HMAC before touching either API: a key that was never minted
+  // here should cost a rejection, not a round trip.
+  if (!verifyLicenseKeyHmac(licenseKey).valid) {
+    return res.status(403).json({ error: 'Invalid or inactive licence.' });
+  }
+  if (!supabase) return res.status(503).json({ error: 'Service unavailable.' });
+  let lic = null;
+  try {
+    const r = await supabase.from('licenses')
+      .select('active, revoked_at, expires_at')
+      .eq('key', licenseKey).eq('active', true).single();
+    lic = r.data;
+  } catch (e) {
+    // Fail closed: a database that cannot answer is not permission to deploy.
+    console.error('[RAILWAY-DEPLOY] licence lookup failed', _errId(e));
+    return res.status(503).json({ error: 'Service unavailable. Try again shortly.' });
+  }
+  const licenceOk = lic && !lic.revoked_at
+    && (!lic.expires_at || new Date(lic.expires_at).getTime() > Date.now());
+  // One message for every rejection reason, so probing cannot map which keys
+  // exist, which are expired and which were revoked.
+  if (!licenceOk) return res.status(403).json({ error: 'Invalid or inactive licence.' });
 
   const RAILWAY_API = 'https://backboard.railway.com/graphql/v2';
   // One image. The apex-trade-bot image was the retired crypto product; it is
@@ -3317,7 +3352,7 @@ app.post('/api/railway-deploy', async (req, res) => {
     // 0) Validate token + get teamId (needed for team Railway accounts)
     const meRes = await gql(`query{ me{ id teams{ edges{ node{ id } } } } }`, {});
     const userId = meRes?.data?.me?.id;
-    if (!userId) return res.status(400).json({ error: 'Invalid Railway token — generate one at railway.com/account/tokens', detail: JSON.stringify(meRes).slice(0,300) });
+    if (!userId) return res.status(400).json({ error: 'That Railway token was not accepted. Generate one at railway.com/account/tokens.', id: _errId(new Error('railway: me query returned no user')) });
     const teamId = meRes?.data?.me?.teams?.edges?.[0]?.node?.id;
 
     // 1) Create project (include teamId if team account)
@@ -3327,7 +3362,7 @@ app.post('/api/railway-deploy', async (req, res) => {
       { input: projInput }
     );
     const projectId = proj?.data?.projectCreate?.id;
-    if (!projectId) return res.status(500).json({ error: 'Failed to create Railway project', detail: JSON.stringify(proj).slice(0,500) });
+    if (!projectId) return res.status(500).json({ error: 'Could not create the Railway project.', id: _errId(new Error('railway: projectCreate returned no id')) });
 
     // 1b) Fetch environment ID separately (Railway does not return it inline at creation)
     const envRes = await gql(
@@ -3335,7 +3370,7 @@ app.post('/api/railway-deploy', async (req, res) => {
       { id: projectId }
     );
     const envId = envRes?.data?.project?.environments?.edges?.[0]?.node?.id;
-    if (!envId) return res.status(500).json({ error: 'Failed to get Railway environment', detail: JSON.stringify(envRes).slice(0,500) });
+    if (!envId) return res.status(500).json({ error: 'Could not read the Railway environment.', id: _errId(new Error('railway: environment query returned no id')) });
 
     // 2) Create service (name only — Docker image set separately via serviceInstanceUpdate)
     const svc = await gql(
@@ -3343,7 +3378,7 @@ app.post('/api/railway-deploy', async (req, res) => {
       { projectId, input: { name: projectName } }
     );
     const serviceId = svc?.data?.serviceCreate?.id;
-    if (!serviceId) return res.status(500).json({ error: 'Failed to create Railway service', detail: JSON.stringify(svc).slice(0,300) });
+    if (!serviceId) return res.status(500).json({ error: 'Could not create the Railway service.', id: _errId(new Error('railway: serviceCreate returned no id')) });
 
     // 3) Set Docker image via serviceInstanceUpdate
     await gql(
@@ -3372,7 +3407,10 @@ app.post('/api/railway-deploy', async (req, res) => {
 
     res.json({ ok: true, projectId, serviceId, message: 'Bot deployed! Check Railway dashboard for your URL in ~2 minutes.' });
   } catch (e) {
-    res.status(500).json({ error: 'Deploy failed: ' + e.message });
+    // e.message can carry the upstream GraphQL body, and this route holds the
+    // caller's Railway token in scope — an exception raised anywhere inside it
+    // is the wrong thing to hand back.
+    res.status(500).json({ error: 'Deploy failed.', id: _errId(e) });
   }
 });
 
@@ -3390,8 +3428,10 @@ app.post('/api/railway-deploy', async (req, res) => {
 //   META_APP_ID, META_APP_SECRET, META_PAGE_ACCESS_TOKEN, META_PAGE_ID,
 //   META_IG_BUSINESS_ID, META_WEBHOOK_VERIFY_TOKEN (any string you pick)
 //   TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_REDIRECT_URI
-// Admin endpoints are protected by the owner secret
-// export above (BOT_EMAIL_SECRET), via ?secret= or X-Owner-Secret header.
+// Admin endpoints are protected by the owner secret (BOT_EMAIL_SECRET),
+// sent as the X-Owner-Secret header. A ?secret= query is refused: the
+// licence-signing key is derived from that value, so a URL copy of it is a
+// copy in every proxy log. See _ownerSecretOk.
 
 const _AUTO_REPLY_TEXT = "Hey! Thanks for reaching out 🙌 We're running a free Apex Trading Bot demo for the first testers — no cost, no risk (demo account only). Want in? Reply here and I'll get you set up.";
 

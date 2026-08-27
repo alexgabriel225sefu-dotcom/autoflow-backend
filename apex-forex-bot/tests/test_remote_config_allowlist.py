@@ -57,6 +57,15 @@ def refused(key, value="x"):
         return True
 
 
+def _why(key, value="x"):
+    """The refusal message for a key, or '' if it was accepted."""
+    try:
+        sp.validate_remote(key, value)
+        return ""
+    except sp.SettingRejected as e:
+        return str(e)
+
+
 print("\n🔒 REMOTE CONFIG — allowlist, not denylist\n")
 
 print("1. Process-control variables — the execution vector")
@@ -129,11 +138,23 @@ except sp.SettingRejected as e:
     check("the message names the key", "TOTALLY_UNKNOWN_KEY" in str(e), str(e))
     check("the message does NOT carry the value", SECRET not in str(e), str(e))
 
+# Secrets are validated on the PROVISIONING path now — the runtime path
+# refuses them by category before a validator ever sees the value, which is
+# itself the stronger answer. Both refusals must stay value-free.
 try:
     sp.validate_remote("DASHBOARD_TOKEN", "tiny-9f3a2b")
-    check("bad secret raised", False)
+    check("the runtime path refuses a credential", False)
 except sp.SettingRejected as e:
-    check("bad secret raised", True)
+    check("the runtime path refuses a credential", True)
+    check("without echoing it", "tiny-9f3a2b" not in str(e), str(e))
+    check("and says it is the wrong path, not an unknown key",
+          "provisioning credential" in str(e), str(e))
+
+try:
+    sp.validate_provisioning("DASHBOARD_TOKEN", "tiny-9f3a2b")
+    check("a too-short credential is refused on the provisioning path", False)
+except sp.SettingRejected as e:
+    check("a too-short credential is refused on the provisioning path", True)
     check("and does not echo the rejected secret", "tiny-9f3a2b" not in str(e), str(e))
     check("it says the value was withheld", "withheld" in str(e), str(e))
 
@@ -178,6 +199,66 @@ for m in re.finditer(r"_save_runtime\(\{(.*?)\}", tg_src, re.S):
 missing = sorted(k for k in saved if k not in sp.OPERATOR_SETTABLE)
 check(f"all {len(saved)} runtime.json keys survive the operator allowlist",
       not missing, f"would be dropped at startup: {missing}")
+
+print("\n13. Provisioning credentials are a SEPARATE trust class")
+# Before the split, REMOTE_SETTABLE was {**trading, **provisioning} and every
+# startup fetch applied the lot. The allowlist stopped arbitrary environment
+# injection, but any response from the licence server could still ROTATE the
+# bot's Telegram token, dashboard token or AI key as a side effect of a routine
+# configuration update. Whoever controls that response then controls the bot.
+for k in ("TELEGRAM_BOT_TOKEN", "DASHBOARD_TOKEN", "GROQ_API_KEY",
+          "GEMINI_API_KEY", "METAAPI_TOKEN", "AI_GATEWAY_KEY",
+          "MT_BRIDGE_SECRET", "TWELVE_DATA_KEY"):
+    check(f"{k} is refused by the RUNTIME path", refused(k, "x" * 40))
+    check(f"…and the refusal says why, not just 'unknown'",
+          "provisioning credential" in _why(k, "x" * 40), _why(k, "x" * 40))
+
+check("trading settings are NOT in the provisioning table",
+      not (set(sp.REMOTE_SETTABLE) & set(sp.REMOTE_PROVISIONING)),
+      "the two classes overlap, so the split means nothing")
+check("the runtime table is trading settings only",
+      all(not sp.is_secret_key(k) for k in sp.REMOTE_SETTABLE),
+      "a credential is still runtime-settable")
+
+print("\n14. …delivered once, never replaced")
+_before = os.environ.get("DASHBOARD_TOKEN")
+os.environ.pop("DASHBOARD_TOKEN", None)
+n1 = bot._apply_provisioning({"DASHBOARD_TOKEN": "first-value-0123456789abcdef"})
+check("a fresh container receives the credential", n1 == 1, f"applied={n1}")
+check("and it is actually set",
+      os.environ.get("DASHBOARD_TOKEN") == "first-value-0123456789abcdef")
+
+n2 = bot._apply_provisioning({"DASHBOARD_TOKEN": "attacker-value-0123456789ab"})
+check("a later response cannot replace it", n2 == 0, f"applied={n2}")
+check("the original value is untouched",
+      os.environ.get("DASHBOARD_TOKEN") == "first-value-0123456789abcdef",
+      "a config fetch rotated the bot's dashboard credential")
+
+check("provisioning_allowed says no once a value exists",
+      sp.provisioning_allowed("DASHBOARD_TOKEN", "already-set") is False)
+check("…and yes when nothing is set",
+      sp.provisioning_allowed("DASHBOARD_TOKEN", "") is True)
+check("…and no for a key that is not a provisioning credential",
+      sp.provisioning_allowed("RISK_PER_TRADE", "") is False)
+
+if _before is None:
+    os.environ.pop("DASHBOARD_TOKEN", None)
+else:
+    os.environ["DASHBOARD_TOKEN"] = _before
+
+print("\n15. Provisioning still refuses everything outside its own table")
+for k in ("PATH", "LD_PRELOAD", "TOKEN_ENCRYPTION_KEY", "LICENSE_SERVER",
+          "CTRADER_CLIENT_SECRET", "RISK_PER_TRADE", "JWT_SECRET",
+          "COOKIE_SECRET", "STRIPE_WEBHOOK_SECRET"):
+    try:
+        sp.validate_provisioning(k, "x" * 40)
+        check(f"{k} refused by the provisioning path", False, "accepted")
+    except sp.SettingRejected:
+        check(f"{k} refused by the provisioning path", True)
+
+check("load_remote routes both classes",
+      "validate_remote" in src and "_apply_provisioning" in src,
+      "the loader does not use the split")
 
 print("\n" + "=" * 50)
 if failures:

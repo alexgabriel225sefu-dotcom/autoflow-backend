@@ -570,3 +570,55 @@ test('the configurator presents the licence once, to the session endpoint', () =
   assert.ok(!/body:JSON\.stringify\(\{key:lk/.test(html),
     'it still sends the licence key as the authorisation');
 });
+
+// ── Railway deploy authorisation (Finding 8) ───────────────────────────
+test('the railway deploy route verifies the licence before doing anything', () => {
+  const code = serverCode();
+  const idx = code.indexOf("app.post('/api/railway-deploy'");
+  assert.ok(idx > 0, 'route missing');
+  const route = code.slice(idx, idx + 2200);
+  assert.match(route, /verifyLicenseKeyHmac\(licenseKey\)/,
+    'the licence key written into the deployed service is never verified');
+  assert.match(route, /from\('licenses'\)/, 'no authoritative licence lookup');
+  assert.match(route, /revoked_at/, 'a revoked licence can still deploy');
+  assert.match(route, /_authLimiter/, 'the route is not rate limited');
+});
+
+test('no upstream Railway response body is returned to the caller', () => {
+  const code = serverCode();
+  const idx = code.indexOf("app.post('/api/railway-deploy'");
+  const route = code.slice(idx, code.indexOf("app.post('/api/railway-deploy'") + 6000);
+  // JSON.stringify(<upstream>) in a reply hands the caller that account's ids
+  // and team structure, and on a failure path can carry more.
+  assert.ok(!/detail:\s*JSON\.stringify\(/.test(route),
+    'an upstream response body is still returned');
+  assert.ok(!/error:\s*'Deploy failed: '\s*\+\s*e\.message/.test(route),
+    'the catch still returns the exception message');
+});
+
+test('neither the Railway token nor the licence key is logged', () => {
+  const code = serverCode();
+  const idx = code.indexOf("app.post('/api/railway-deploy'");
+  const route = code.slice(idx, idx + 6000);
+  const logged = route.split('\n').filter(l =>
+    /(console\.(log|error|warn)|addLog)\(/.test(l) &&
+    /\$\{\s*(railwayToken|licenseKey)\s*\}/.test(l));
+  assert.deepStrictEqual(logged, [], `credentials logged at: ${JSON.stringify(logged)}`);
+  // The token may appear exactly once: in the outbound Authorization header
+  // to Railway, which is the whole point of the endpoint.
+  const authUses = (route.match(/Bearer \$\{railwayToken\}/g) || []).length;
+  assert.strictEqual(authUses, 1, `railwayToken used in ${authUses} header(s)`);
+});
+
+// ── bot-config least privilege (Finding 9) ─────────────────────────────
+test('bot-config never answers without a scoped session, and never caches', () => {
+  const code = serverCode();
+  const idx = code.indexOf("app.get('/api/bot-config'");
+  const route = code.slice(idx, idx + 2600);
+  assert.match(route, /_botSession\(req,\s*SCOPE_READ\)/, 'no scope required');
+  assert.match(route, /Cache-Control',\s*'no-store'/, 'the response is cacheable');
+  assert.match(route, /LICENCE_IN_URL/, 'a licence key in the URL is not refused');
+  // The configuration can contain credentials, so an unauthenticated or
+  // wrongly-scoped caller must get nothing at all — not a filtered subset.
+  assert.match(route, /Authorization failed/, 'no 401 path');
+});

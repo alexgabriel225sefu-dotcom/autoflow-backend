@@ -220,14 +220,36 @@ _REMOTE_PROVISIONING = {
     "AI_GATEWAY_KEY":     ("AI_GATEWAY_KEY",     _secret(16)),
 }
 
-# ─── The two allowlists ──────────────────────────────────
+# ─── The allowlists ──────────────────────────────────────
 OPERATOR_SECRETS = dict(_SECRETS)
 OPERATOR_SETTABLE = {**_TRADING, **_SECRETS}
 
-# The remote source gets trading settings plus first-deploy provisioning —
-# and NOT CTRADER_CLIENT_SECRET, which an operator may set by hand but a
-# config blob may not.
-REMOTE_SETTABLE = {**_TRADING, **_REMOTE_PROVISIONING}
+# REMOTE is split in two, because "change my stop loss" and "replace my
+# Telegram bot token" are not the same request and must not travel the same
+# path.
+#
+# Before this split, REMOTE_SETTABLE was {**_TRADING, **_REMOTE_PROVISIONING}
+# and load_remote() applied the lot on every startup. The allowlist stopped
+# arbitrary environment injection — that part worked — but any response from
+# the licence server could still ROTATE the bot's Telegram token, its dashboard
+# token or its AI key, silently, as a side effect of a routine configuration
+# fetch. Whoever controls that response then controls the bot's identity.
+#
+# RUNTIME    trading settings. Applied on every fetch, freely, because that is
+#            what remote configuration is for.
+# PROVISION  deployment credentials the configurator legitimately delivers on
+#            FIRST deploy. Same allowlist discipline, but applied only where
+#            the value is not already configured — see apply_provisioning().
+#
+# The practical rule: a credential may be delivered, never replaced. First
+# boot has nothing set, so one-click deployment still works exactly as before.
+# A later response arriving with a different token changes nothing and says so.
+REMOTE_SETTABLE = dict(_TRADING)
+REMOTE_PROVISIONING = dict(_REMOTE_PROVISIONING)
+
+# Everything the remote source may name at all, for callers that need to tell
+# "unknown key" from "known key, wrong path".
+REMOTE_KNOWN = {**REMOTE_SETTABLE, **REMOTE_PROVISIONING}
 
 # Every key whose value must stay out of logs, messages and audit records,
 # from either source.
@@ -265,8 +287,44 @@ def validate_operator(key, raw):
 
 
 def validate_remote(key, raw):
-    """(canonical_key, coerced_value) for remote configuration, or raise."""
+    """(canonical_key, coerced_value) for RUNTIME remote configuration.
+
+    Refuses provisioning credentials with a message that distinguishes them
+    from an unknown key, because "you sent this down the wrong path" and "this
+    key does not exist" are different problems for whoever is debugging.
+    """
+    k = str(key).strip().upper()
+    if k in REMOTE_PROVISIONING and k not in REMOTE_SETTABLE:
+        raise SettingRejected(
+            f"{k}: a provisioning credential cannot be changed by a runtime "
+            "configuration update")
     return _validate(REMOTE_SETTABLE, key, raw, "remote config")
+
+
+def validate_provisioning(key, raw):
+    """(canonical_key, coerced_value) for a FIRST-DEPLOY credential, or raise.
+
+    Validation only. Whether the value may actually be applied is decided by
+    apply_provisioning(), which refuses to overwrite something already set.
+    """
+    return _validate(REMOTE_PROVISIONING, key, raw, "provisioning")
+
+
+def provisioning_allowed(key, current_value) -> bool:
+    """May this provisioning credential be applied?
+
+    Only when nothing is configured yet. A bot that already has a Telegram
+    token has been provisioned; a later response carrying a different one is
+    either a mistake or an attempt to take the bot over, and there is no
+    version of "silently rotate the identity of a running trading bot" that is
+    the right default.
+
+    Rotation stays possible — through the operator path, by an admin who is
+    authenticated and audited.
+    """
+    if str(key).strip().upper() not in REMOTE_PROVISIONING:
+        return False
+    return not (current_value or "").strip()
 
 
 def cfg_attr(key):
