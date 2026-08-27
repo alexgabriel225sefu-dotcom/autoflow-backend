@@ -154,7 +154,11 @@ _timeframe = _choice("m1", "m5", "m15", "m30", "h1", "h4", "d1")
 # ─── Trading settings ────────────────────────────────────
 # Safe to echo back in a message or an audit line: none is a credential.
 _TRADING = {
-    "BROKER":                  ("BROKER",                  _choice("ctrader", "mt")),
+    # cTrader only. The MT branch was still settable here even though
+    # SUPPORTED_BROKERS has said ["ctrader"] for some time, so a remote
+    # config or an admin could name an execution path the engine no longer
+    # has.
+    "BROKER":                  ("BROKER",                  _choice("ctrader")),
     "PAPER_TRADING":           ("PAPER_TRADING",           _flag),
     "PAPER_BALANCE":           ("PAPER_BALANCE",           _num(float, 1.0, 10_000_000.0)),
     "TRADE_SYMBOL":            ("SYMBOL",                  _symbol),

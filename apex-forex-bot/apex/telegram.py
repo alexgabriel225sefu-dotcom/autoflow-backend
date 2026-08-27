@@ -477,7 +477,7 @@ from apex.settings_policy import (  # noqa: E402
 
 # key → (cfg attribute, validator). Trading settings: safe to echo back.
 _SETTABLE = {
-    "BROKER":           ("BROKER",           _choice("ctrader", "mt")),
+    "BROKER":           ("BROKER",           _choice("ctrader")),
     "PAPER_TRADING":    ("PAPER_TRADING",    _flag),
     "TRADE_SYMBOL":     ("SYMBOL",           _symbol),
     "RISK_PER_TRADE":   ("RISK_PER_TRADE",   _num(float, 0.0001, 0.10)),
@@ -5733,12 +5733,29 @@ _DEPLOY_URL = ""
 # Outside production, open access stays the default so local work does not
 # need a licence server. `_is_production()` is deliberately inverted: an unset
 # or unfamiliar APP_ENV counts as production.
-def _license_required() -> bool:
-    raw = (os.getenv("REQUIRE_LICENSE") or "").strip().lower()
-    if raw in ("1", "true", "yes"):
-        return True
-    if raw in ("0", "false", "no"):
-        return False
+class LicenceGateDisabledInProduction(RuntimeError):
+    """Raised at import when production is configured to skip the licence gate.
+
+    Refusing to start is the point. REQUIRE_LICENSE=false is not a
+    configuration choice in production, it is the entitlement control being
+    switched off — every chat that reaches the bot may trade, and the only
+    record of that decision is one environment variable nobody re-reads.
+
+    A missing variable already defaulted to ON. An explicit `false` used to be
+    honoured, which meant the control could be removed by someone who had
+    environment access and no intention of announcing it. Now that
+    configuration cannot boot, so the failure is visible immediately and in the
+    deploy log rather than discovered later from the trades.
+    """
+
+
+def _production() -> bool:
+    """Fail-closed environment detection, shared with the store layer.
+
+    Deliberately NOT "development unless told otherwise": an unset or
+    unfamiliar APP_ENV counts as production, because the deployment that
+    forgot to set it is exactly the one that must not get the loose rules.
+    """
     try:
         from apex import user_store as _us
         return _us._is_production()
@@ -5746,11 +5763,26 @@ def _license_required() -> bool:
         return True                      # cannot tell → the safe direction
 
 
+def _license_required() -> bool:
+    raw = (os.getenv("REQUIRE_LICENSE") or "").strip().lower()
+    if raw in ("1", "true", "yes"):
+        return True
+    if raw in ("0", "false", "no"):
+        if _production():
+            raise LicenceGateDisabledInProduction(
+                "REQUIRE_LICENSE=false and this is production. The licence "
+                "gate is what decides who may trade at all; it cannot be "
+                "turned off here. Remove the variable (production defaults to "
+                "ON), or set APP_ENV=dev if this is genuinely a development "
+                "deployment.")
+        return False
+    return _production()
+
+
 _LICENSE_REQUIRED = _license_required()
 if _LICENSE_REQUIRED and not (os.getenv("REQUIRE_LICENSE") or "").strip():
     print("[Telegram] REQUIRE_LICENSE is not set and this is production — "
-          "the licence gate is ON. Set REQUIRE_LICENSE=false explicitly to "
-          "run open access.")
+          "the licence gate is ON, which is the default and the safe value.")
 
 
 def _license_ok(chat_id, text):

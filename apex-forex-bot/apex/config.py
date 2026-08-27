@@ -35,8 +35,35 @@ def _truthy(v: str) -> bool:
 
 
 # ─── Broker ─────────────────────────────────────────────
-BROKER = (os.getenv("BROKER") or "ctrader").lower()
 SUPPORTED_BROKERS = ["ctrader"]
+
+
+class UnsupportedBroker(RuntimeError):
+    """BROKER names an execution path this build does not have.
+
+    SUPPORTED_BROKERS said ["ctrader"] and one Telegram command checked it, but
+    nothing stopped the environment from setting BROKER=mt or BROKER=oanda —
+    the engine simply took a different branch. That is the wrong shape for a
+    trading system: an unsupported broker is not a degraded mode, it is a
+    configuration that cannot place a correct order, and starting anyway means
+    finding out from the account.
+
+    Refusing at import makes the failure appear in the deploy log instead.
+    """
+
+
+def _resolve_broker() -> str:
+    raw = (os.getenv("BROKER") or "ctrader").strip().lower()
+    if raw not in SUPPORTED_BROKERS:
+        raise UnsupportedBroker(
+            f"BROKER={raw!r} is not supported. This build executes through "
+            f"{', '.join(SUPPORTED_BROKERS)} only — the MT bridge, Twelve Data, "
+            "OANDA and MetaAPI paths are gone. Set BROKER=ctrader or remove the "
+            "variable.")
+    return raw
+
+
+BROKER = _resolve_broker()
 
 # ─── cTrader Open API (BROKER=ctrader) ──────────────────
 # App credentials (per business, once) from openapi.ctrader.com/apps:

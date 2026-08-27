@@ -761,9 +761,17 @@ def _start_dashboard_server():
                         # stored flag — and reported as unverified rather than
                         # guessed, so a demo account can never be shown as LIVE
                         # because a lookup failed. See apex/account_mode.py.
+                        # badge() takes BOTH values. resolve() returns
+                        # (mode, source), and the source is what turns
+                        # "🔴 LIVE" into "🔴 LIVE (unconfirmed)" when the
+                        # answer came from our own stored flag rather than
+                        # from the broker just now. Passing only the mode
+                        # threw that distinction away and rendered a stale
+                        # reading as a fact the client can act on — which is
+                        # precisely the case the source field exists for.
                         "account": (lambda _m: {
                             "mode": _m[0], "source": _m[1],
-                            "badge": _account_mode.badge(_m[0]),
+                            "badge": _account_mode.badge(_m[0], _m[1]),
                             "realMoney": _account_mode.is_real_money(_m[0]),
                         })(_account_mode.resolve(u)),
                         "timeframeUsed": tf_used,

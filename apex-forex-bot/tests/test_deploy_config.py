@@ -112,6 +112,117 @@ for sibling in ("ruflo-mcp", "web", "public", "scripts"):
     check(f"{sibling} does not trigger a restart", not hit,
           "an unrelated commit restarting the loop can orphan an open position")
 
+
+# ─────────────────────────────────────────────────────────
+# ONE production trading deployment path.
+#
+# The repository carried a second one: .github/workflows/deploy-forex-bot.yml
+# SSH'd into an Oracle Cloud VM, wrote an .env containing
+#
+#     BYPASS_LICENSE=true
+#     BROKER=oanda
+#     OANDA_ENV=practice
+#
+# installed a systemd unit and started the bot — with real production secrets
+# (FOREX_TELEGRAM_BOT_TOKEN, GROQ_API_KEY) handed to that VM.
+#
+# Two problems, and the second is why deleting it beat fixing it: it disabled
+# the entitlement gate, and it could not work anyway, because the engine's
+# SUPPORTED_BROKERS is ["ctrader"] so BROKER=oanda is refused at startup. A
+# dead path that still carried live credentials.
+#
+# Production is Render, deploying from the branch on every commit. These
+# checks fail if a second path reappears.
+import re  # noqa: E402
+
+WORKFLOWS = os.path.join(REPO_ROOT, ".github", "workflows")
+
+# Each of these is a control being switched off, not a preference.
+FORBIDDEN_IN_DEPLOY = (
+    r"BYPASS_LICENSE\s*=\s*true",     # removes the entitlement gate entirely
+    r"BROKER\s*=\s*oanda",            # brokers the engine no longer has, so
+    r"BROKER\s*=\s*mt\b",             # naming one is either dead config or a
+    r"BROKER\s*=\s*td\b",             # path around the cTrader-only layer
+    r"BROKER\s*=\s*metaapi",
+    r"OANDA_ENV",
+    r"REQUIRE_LICENSE\s*=\s*false",
+)
+
+print("\n🚀  ONE PRODUCTION PATH — no second way to start a trading process")
+
+check("the legacy VM workflow is gone",
+      not os.path.exists(os.path.join(WORKFLOWS, "deploy-forex-bot.yml")),
+      "the second production trading path is back")
+
+if os.path.isdir(WORKFLOWS):
+    wf = sorted(f for f in os.listdir(WORKFLOWS) if f.endswith((".yml", ".yaml")))
+    check(f"{len(wf)} workflow(s) scanned", bool(wf))
+    for fn in wf:
+        text = open(os.path.join(WORKFLOWS, fn), encoding="utf-8").read()
+        hits = [p for p in FORBIDDEN_IN_DEPLOY if re.search(p, text, re.I)]
+        check(f"{fn} switches nothing off", not hits, f"contains {hits}")
+
+# Deployment-shaped files only. A scan over the whole tree would match this
+# file's own list of what it forbids — the prose-assertion trap.
+deploy_files = []
+for dirpath, dirs, files in os.walk(REPO_ROOT):
+    dirs[:] = [d for d in dirs
+               if d not in ("node_modules", ".git", "tests", ".agents", ".claude")]
+    for fn in files:
+        if fn == "Dockerfile" or fn.endswith((".yml", ".yaml", ".sh")):
+            deploy_files.append(os.path.join(dirpath, fn))
+
+offenders = []
+for path in deploy_files:
+    try:
+        text = open(path, encoding="utf-8", errors="replace").read()
+    except OSError:
+        continue
+    for pat in (r"BYPASS_LICENSE\s*=\s*true", r"BROKER\s*=\s*oanda", r"OANDA_ENV\s*="):
+        if re.search(pat, text, re.I):
+            offenders.append(os.path.relpath(path, REPO_ROOT))
+check(f"{len(deploy_files)} deployment file(s) carry no disabled control",
+      not offenders, f"offenders: {sorted(set(offenders))}")
+
+print("\n🔒  THE BROKER ALLOWLIST IS ENFORCED, NOT JUST DECLARED")
+# SUPPORTED_BROKERS said ["ctrader"] and one Telegram command checked it, but
+# nothing stopped the environment from naming another — the engine just took a
+# different branch. An unsupported broker is not a degraded mode; it is a
+# configuration that cannot place a correct order.
+import importlib  # noqa: E402
+# This file's original checks are purely static, so it never needed the package
+# on the path. The broker allowlist is a runtime property, so it does.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-oauth-signing-secret")
+import apex.config as _cfg  # noqa: E402
+
+_saved = os.environ.get("BROKER")
+try:
+    for bad in ("mt", "td", "oanda", "metaapi", "binance", "nonsense"):
+        os.environ["BROKER"] = bad
+        try:
+            importlib.reload(_cfg)
+            check(f"BROKER={bad} is refused", False, f"accepted as {_cfg.BROKER!r}")
+        except _cfg.UnsupportedBroker:
+            check(f"BROKER={bad} is refused", True)
+    for good in ("ctrader", "CTRADER", "  ctrader  "):
+        os.environ["BROKER"] = good
+        importlib.reload(_cfg)
+        check(f"BROKER={good!r} is accepted", _cfg.BROKER == "ctrader", _cfg.BROKER)
+    os.environ.pop("BROKER", None)
+    importlib.reload(_cfg)
+    check("an unset BROKER defaults to ctrader", _cfg.BROKER == "ctrader", _cfg.BROKER)
+finally:
+    if _saved is None:
+        os.environ.pop("BROKER", None)
+    else:
+        os.environ["BROKER"] = _saved
+    importlib.reload(_cfg)
+
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")
