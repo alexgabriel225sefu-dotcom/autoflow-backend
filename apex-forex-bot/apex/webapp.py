@@ -116,7 +116,10 @@ def _asset_swaps(html: str) -> str:
     one product, so there is one copy.
     """
     from apex import config as cfg
-    out = html.replace("Apex Forex Bot", cfg.BOT_NAME)
+    # Both spellings, so the Mini App title follows BOT_NAME whether the
+    # bundled HTML still carries the old product name or the new one.
+    out = html.replace("Apex Forex Bot", cfg.BOT_NAME).replace(
+        "Apex4Traders", cfg.BOT_NAME)
     out = _broker_gate_swaps(out)
     return out
 

@@ -147,7 +147,23 @@ if PRODUCT != "forex":
         f"PRODUCT={PRODUCT!r} is not supported. This is the Forex product and "
         "it is the only one: the crypto build was removed. Set PRODUCT=forex."
     )
-BOT_NAME = os.getenv("BOT_NAME") or "Apex Forex Bot"
+# The product name, and the positioning that goes with it.
+#
+# "Apex Forex Bot" described the thing accurately in 2025 and describes it
+# badly now. Two reasons, and the second matters more than the first:
+#
+#   * the market is saturated with "trading bots" — the word itself now reads
+#     as a signal about the seller rather than the software;
+#   * "bot" invites the reading that this trades FOR the customer with THEIR
+#     money, which is not what happens. Apex4Traders is automation
+#     infrastructure: the customer keeps their funds, their broker account and
+#     their relationship with the broker, and the broker executes.
+#
+# That distinction is not marketing. It is enforced by the architecture and
+# verifiable: the cTrader Open API exposes no withdrawal request at all, so
+# fund movement is not something this software could do if it wanted to.
+# CTRADER_SCOPE below is "trading" — place and manage orders, nothing else.
+BOT_NAME = os.getenv("BOT_NAME") or "Apex4Traders"
 ASSET_EMOJI = os.getenv("ASSET_EMOJI") or "💱"
 ASSET_NOUN = os.getenv("ASSET_NOUN") or "forex"
 LICENSE_PRODUCT = os.getenv("LICENSE_PRODUCT") or "apex-forex"
