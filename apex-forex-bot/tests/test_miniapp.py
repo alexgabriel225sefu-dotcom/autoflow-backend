@@ -358,11 +358,30 @@ def _signed(auth_date=None, omit_date=False):
 _now = int(_time.time())
 check("a fresh signature is accepted",
       (webapp.validate(_signed(), BOT_TOKEN) or {}).get("id") == 7585109158)
-check("a signature from within the window still works",
-      (webapp.validate(_signed(_now - 23 * 3600), BOT_TOKEN) or {}).get("id")
-      == 7585109158, "a session open all day must not be logged out")
-check("a stale one is refused", webapp.validate(_signed(_now - 25 * 3600),
-                                                BOT_TOKEN) is None)
+# The window was 24 hours, and this asserted that a day-old signature still
+# worked — "a session open all day must not be logged out". initData IS the
+# credential: whoever holds a fresh one can read this client's balance, open
+# positions and full trade journal as them, so a day-long window turned a
+# single capture into a day of impersonation. It is one hour now, bounded and
+# clamped in apex/webapp.py, and the checks follow the real window rather than
+# a fixed number so they keep meaning something if it is tuned again.
+_WINDOW = webapp._MAX_AGE_S
+check("the production window is an hour, not a day",
+      _WINDOW <= 3600, f"window is {_WINDOW}s")
+check("a signature from inside the window still works",
+      (webapp.validate(_signed(_now - int(_WINDOW * 0.5)), BOT_TOKEN) or {}).get("id")
+      == 7585109158, "a live terminal session must not be logged out mid-use")
+check("one just inside the edge works",
+      (webapp.validate(_signed(_now - (_WINDOW - 60)), BOT_TOKEN) or {}).get("id")
+      == 7585109158)
+check("a stale one is refused",
+      webapp.validate(_signed(_now - (_WINDOW + 60)), BOT_TOKEN) is None)
+check("a day-old signature is now refused",
+      webapp.validate(_signed(_now - 24 * 3600), BOT_TOKEN) is None,
+      "the whole point of shortening the window")
+check("the window cannot be configured away",
+      webapp._resolve_max_age.__doc__ is not None
+      and webapp._MAX_ALLOWED_AGE_S <= 6 * 3600)
 check("a month-old capture is refused",
       webapp.validate(_signed(_now - 30 * 86400), BOT_TOKEN) is None,
       "this is the replay the check exists for")

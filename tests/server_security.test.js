@@ -439,3 +439,134 @@ test('security headers are set on every response', () => {
   assert.ok(!/Access-Control-Allow-Origin['"]?\s*[,:]\s*['"]\*/.test(code),
     'a wildcard CORS header is still set');
 });
+
+// ── Licence masking in logs (Finding 1) ────────────────────────────────
+const { _maskLicence } = _internal;
+
+test('a masked licence discloses the prefix and first group only', () => {
+  const key = generateForexKey();
+  const masked = _maskLicence(key);
+  const parts = key.split('-');
+  assert.ok(masked.startsWith(parts[0] + '-' + parts[1] + '-'), masked);
+  // Every group after the first is gone.
+  for (const g of parts.slice(2)) {
+    assert.ok(!masked.includes(g), `group ${g} survived masking: ${masked}`);
+  }
+  assert.ok(masked !== key, 'masking returned the key unchanged');
+});
+
+test('masking handles legacy keys, empty values and odd shapes', () => {
+  assert.strictEqual(_maskLicence('FORX-ABCD-EFGH-JKLM'), 'FORX-ABCD-****-****');
+  assert.strictEqual(_maskLicence(''), '(none)');
+  assert.strictEqual(_maskLicence(null), '(none)');
+  assert.strictEqual(_maskLicence(undefined), '(none)');
+  assert.ok(!_maskLicence('nodashes-at-all').includes('nodashes-at-all'));
+});
+
+test('no log call in server.js interpolates a complete licence key', () => {
+  const code = serverCode();
+  // addLog / console.* whose template carries a bare ${key} or ${licenseKey}.
+  const offenders = code.split('\n')
+    .map((l, i) => [i + 1, l.trim()])
+    .filter(([, l]) =>
+      /(addLog|console\.(log|error|warn))\(/.test(l) &&
+      /\$\{\s*(key|licenseKey|licenceKey|revoked\[0\]\.key)\s*\}/.test(l));
+  assert.deepStrictEqual(offenders, [],
+    `complete licence keys reach logs at: ${JSON.stringify(offenders)}`);
+});
+
+test('the five licence lifecycle log sites all mask', () => {
+  const code = serverCode();
+  for (const marker of ['Granted ${product} license',
+                        'Trial issued',
+                        'License activated',
+                        'Forex Bot sold',
+                        'License revoked']) {
+    const idx = code.indexOf(marker);
+    assert.ok(idx > 0, `log site missing: ${marker}`);
+    const line = code.slice(code.lastIndexOf('\n', idx) + 1, code.indexOf('\n', idx));
+    assert.match(line, /_maskLicence\(/, `not masked: ${line.trim().slice(0, 110)}`);
+  }
+});
+
+// ── Scoped config sessions (Finding 2) ─────────────────────────────────
+test('read and write are separate scopes, and read cannot write', () => {
+  const r = _issueBotSession('FORX-SCOPES', 'apex-forex', 'bot:config:read');
+  const w = _issueBotSession('FORX-SCOPES', 'apex-forex', 'bot:config:write');
+
+  assert.ok(_botSession(fakeReq(`Bearer ${r}`), 'bot:config:read'), 'read token cannot read');
+  assert.strictEqual(_botSession(fakeReq(`Bearer ${r}`), 'bot:config:write'), null,
+    'a READ token satisfied the write scope');
+
+  assert.ok(_botSession(fakeReq(`Bearer ${w}`), 'bot:config:write'), 'write token cannot write');
+  assert.strictEqual(_botSession(fakeReq(`Bearer ${w}`), 'bot:config:read'), null,
+    'a WRITE token satisfied the read scope — scopes must be disjoint');
+  _revokeBotSessionsFor('FORX-SCOPES');
+});
+
+test('an unknown scope cannot be issued', () => {
+  for (const bad of ['admin', 'bot:config:*', '', 'bot:config:read ', 'root']) {
+    assert.throws(() => _issueBotSession('FORX-X', 'apex-forex', bad),
+      `scope ${JSON.stringify(bad)} was issued`);
+  }
+});
+
+test('save-bot-config refuses a licence key as authentication', () => {
+  const code = serverCode();
+  const idx = code.indexOf("app.post('/api/save-bot-config'");
+  assert.ok(idx > 0);
+  const route = code.slice(idx, idx + 2600);
+  assert.match(route, /LICENCE_NOT_ACCEPTED/,
+    'a licence key in the body is not refused');
+  assert.match(route, /_botSession\(req,\s*SCOPE_WRITE\)/,
+    'the write route does not require the write scope');
+  assert.match(route, /INSUFFICIENT_SCOPE/,
+    'a read token is not distinguished from no token');
+  // The licence written to must come from the session, never the request.
+  assert.match(route, /const key = sess\.licenseKey/,
+    'the target licence is not taken from the session');
+  assert.ok(!/const \{ key, config \} = req\.body/.test(route),
+    'the route still destructures a licence key out of the body');
+});
+
+test('a session is bound to its own licence — A cannot write B', () => {
+  const a = _issueBotSession('FORX-AAAA', 'apex-forex', 'bot:config:write');
+  const sess = _botSession(fakeReq(`Bearer ${a}`), 'bot:config:write');
+  // The route uses sess.licenseKey and ignores anything in the body, so the
+  // only licence this token can ever address is its own.
+  assert.strictEqual(sess.licenseKey, 'FORX-AAAA');
+  const b = _issueBotSession('FORX-BBBB', 'apex-forex', 'bot:config:write');
+  assert.strictEqual(_botSession(fakeReq(`Bearer ${b}`), 'bot:config:write').licenseKey,
+    'FORX-BBBB');
+  _revokeBotSessionsFor('FORX-AAAA');
+  assert.strictEqual(_botSession(fakeReq(`Bearer ${a}`), 'bot:config:write'), null);
+  assert.ok(_botSession(fakeReq(`Bearer ${b}`), 'bot:config:write'),
+    'revoking one licence revoked another');
+  _revokeBotSessionsFor('FORX-BBBB');
+});
+
+test('a write session expires like any other', () => {
+  const w = _issueBotSession('FORX-EXPW', 'apex-forex', 'bot:config:write');
+  const sess = _botSession(fakeReq(`Bearer ${w}`), 'bot:config:write');
+  sess.exp = Date.now() - 1;
+  assert.strictEqual(_botSession(fakeReq(`Bearer ${w}`), 'bot:config:write'), null,
+    'an expired write token still authenticated');
+});
+
+test('licence validity is re-checked at write time, not only at issue', () => {
+  const route = serverCode().slice(serverCode().indexOf("app.post('/api/save-bot-config'"));
+  assert.match(route.slice(0, 2600), /revoked_at/,
+    'a licence revoked inside the session window would still write');
+  assert.match(route.slice(0, 2600), /_revokeBotSessionsFor\(key\)/,
+    'sessions are not revoked when the licence stops being valid');
+});
+
+test('the configurator presents the licence once, to the session endpoint', () => {
+  const html = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'public', 'configurator-forex.html'), 'utf8');
+  assert.match(html, /\/api\/bot-session/, 'the configurator does not exchange the licence');
+  assert.match(html, /scope:\s*'bot:config:write'/, 'it does not request the write scope');
+  assert.match(html, /'Authorization':\s*'Bearer '\s*\+\s*token/, 'it does not send the token');
+  assert.ok(!/body:JSON\.stringify\(\{key:lk/.test(html),
+    'it still sends the licence key as the authorisation');
+});

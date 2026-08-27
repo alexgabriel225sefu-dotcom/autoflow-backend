@@ -499,6 +499,15 @@ _SETTABLE_SECRETS = {
 _ALL_SETTABLE = {**_SETTABLE, **_SETTABLE_SECRETS}
 
 
+# Licence key shape and masking live in apex/licence_format, which imports
+# nothing — two generators mint these keys and three places consume them, so
+# the format cannot sit in a module that half of them stub out in tests.
+# Re-exported here because callers already reach for tg.mask_licence.
+from apex.licence_format import (  # noqa: E402,F401
+    licence_shape_ok, mask_licence,
+)
+
+
 def is_secret_key(key):
     return str(key).strip().upper() in _SETTABLE_SECRETS
 
@@ -5792,10 +5801,23 @@ def _license_ok(chat_id, text):
             "Already bought? Open the activation link from your purchase email.\n\n"
             f"New here? Send /purchase — instant access, no waiting.")
         return False
-    if not re.match(rf'^{cfg.LICENSE_KEY_PREFIX}-[A-Z2-9]{{4}}-[A-Z2-9]{{4}}-[A-Z2-9]{{4}}$', key):
+    # Two shapes are accepted, and both are deliberate.
+    #
+    #   LEGACY   PREFIX-XXXX-XXXX-XXXX          12 characters, ~60 bits
+    #   CURRENT  PREFIX-XXXXX-...-XXXXX         30 characters, 130 bits
+    #
+    # The legacy form carried too little entropy for a bearer credential and is
+    # no longer minted, but keys already in customers' inboxes must keep
+    # working — refusing them here would lock out every existing buyer to fix a
+    # problem that only affects keys issued from now on.
+    #
+    # This is a SHAPE check, not authorisation: it exists so an obvious typo
+    # fails immediately instead of after a database round trip. The
+    # authoritative check is the HMAC plus the licence record, below.
+    if not licence_shape_ok(key, cfg.LICENSE_KEY_PREFIX):
         send_to(chat_id,
             "❌ <b>That doesn't look like a valid key.</b>\n\n"
-            f"Use the <code>{cfg.LICENSE_KEY_PREFIX}-XXXX-XXXX-XXXX</code> key from your purchase email, "
+            f"Use the <code>{cfg.LICENSE_KEY_PREFIX}-…</code> key from your purchase email, "
             "or join https://t.me/Apex4Traders to get one")
         return False
     # FAIL CLOSED for a first-time chat. Everything above this point has

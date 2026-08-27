@@ -12,10 +12,54 @@ import hashlib
 from urllib.parse import parse_qsl
 
 
-# How long a signed initData string stays acceptable. Telegram signs it once
-# when the Mini App opens and the page reuses that same string for every poll,
-# so this has to cover a realistic session rather than a request.
-_MAX_AGE_S = int(os.getenv("MINIAPP_INITDATA_MAX_AGE_S", str(24 * 3600)))
+# How long a signed initData string stays acceptable.
+#
+# Telegram signs it once when the Mini App opens and the page reuses that same
+# string for every poll, so this has to cover a realistic session rather than a
+# single request. It was 24 hours, which is a realistic session only in the
+# sense that a day contains one — and initData IS the credential: whoever holds
+# a fresh one can read that client's balance, open positions and full trade
+# journal as them. A day-long window turns a single capture into a day of
+# impersonation.
+#
+# One hour covers an actual sitting with the terminal open. Reopening the Mini
+# App mints a fresh string, so the cost of being wrong is a reload, while the
+# cost of being too generous is measured in hours of someone else's account.
+_DEFAULT_MAX_AGE_S = 3600
+# A ceiling, because a configurable security control with no bound is a
+# control anyone with environment access can switch off by setting it to a
+# year. Six hours is the most this will honour whatever the variable says.
+_MAX_ALLOWED_AGE_S = 6 * 3600
+
+
+def _resolve_max_age():
+    """The freshness window, clamped. Never zero, never negative, never absent.
+
+    A bad value falls back to the default rather than disabling the check:
+    0 and -1 are the two spellings of "never expire" that a misconfiguration
+    reaches for, and neither may mean that here.
+    """
+    raw = os.getenv("MINIAPP_INITDATA_MAX_AGE_S")
+    if raw is None or str(raw).strip() == "":
+        return _DEFAULT_MAX_AGE_S
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        print("[WebApp] MINIAPP_INITDATA_MAX_AGE_S is not a number — "
+              f"using the {_DEFAULT_MAX_AGE_S}s default")
+        return _DEFAULT_MAX_AGE_S
+    if value <= 0:
+        print("[WebApp] MINIAPP_INITDATA_MAX_AGE_S must be positive — "
+              f"using the {_DEFAULT_MAX_AGE_S}s default")
+        return _DEFAULT_MAX_AGE_S
+    if value > _MAX_ALLOWED_AGE_S:
+        print(f"[WebApp] MINIAPP_INITDATA_MAX_AGE_S={value}s exceeds the "
+              f"{_MAX_ALLOWED_AGE_S}s maximum — clamped")
+        return _MAX_ALLOWED_AGE_S
+    return value
+
+
+_MAX_AGE_S = _resolve_max_age()
 # Tolerance for clock skew between Telegram and this host. A timestamp further
 # ahead than this was not produced by a clock we should trust.
 _FUTURE_SKEW_S = 300

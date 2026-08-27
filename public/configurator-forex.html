@@ -521,7 +521,21 @@ document.getElementById('genBtn').addEventListener('click',async()=>{
   btn.disabled=true;btn.textContent='Saving…';
   document.getElementById('savingMsg').style.display='block';
   try{
-    const r=await fetch('/api/save-bot-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:lk,config:buildConfig()})});
+    // Two steps. The licence key is presented ONCE, to the session endpoint,
+    // and exchanged for a token that expires in ten minutes and carries only
+    // bot:config:write. It used to be sent as the authorisation on every save,
+    // which made a never-expiring credential the thing that could rewrite the
+    // trading configuration.
+    const sr=await fetch('/api/bot-session',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({licenseKey:lk,scope:'bot:config:write'})});
+    if(!sr.ok){
+      const e=await sr.json().catch(()=>({}));
+      throw new Error(e.error||'Could not verify that licence key.');
+    }
+    const {token}=await sr.json();
+    const r=await fetch('/api/save-bot-config',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({config:buildConfig()})});
     const data=await r.json();
     document.getElementById('savingMsg').style.display='none';
     if(data.success){

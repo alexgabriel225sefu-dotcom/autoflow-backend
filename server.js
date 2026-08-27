@@ -598,6 +598,30 @@ function addLog(msg, type = 'info', status = 'success') {
   if (logs.length > 200) logs.pop();
 }
 // Mask a customer email before it goes into the (dashboard-readable) log store.
+// A licence key is an entitlement credential: whoever holds one can claim the
+// product. It was being written into addLog() on grant, trial, activation,
+// sale and revocation — and those lines reach Render's log stream, any log
+// aggregator in front of it, support exports and screenshots. A log store is
+// not a credential store, and treating it as one means every future log leak
+// is also a licence leak.
+//
+// What is kept is enough to correlate an operational event with a customer:
+// the product prefix and the first group. For the current 26-character format
+// that discloses 25 bits and leaves 105 unguessable; for a legacy key it
+// discloses 20 of 60. Neither is usable as a credential, and both are
+// distinctive enough to answer "which licence was that" in a log.
+//
+// Deliberately NOT a hash: a stable SHA of the key is itself a durable
+// identifier an attacker can correlate across systems, and it invites someone
+// to build a rainbow table over a keyspace we control the format of.
+function _maskLicence(key) {
+  const s = String(key || '').trim();
+  if (!s) return '(none)';
+  const parts = s.split('-');
+  if (parts.length < 3) return s.slice(0, 4) + '****';     // unrecognised shape
+  return [parts[0], parts[1], ...parts.slice(2).map(() => '****')].join('-');
+}
+
 function _maskEmail(email) {
   const s = String(email || '');
   const at = s.indexOf('@');
@@ -1653,7 +1677,7 @@ app.post('/api/admin/grant-license', async (req, res) => {
     const subject = '🤖 Your Apex Forex Bot — License Key inside';
     const sent = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
     const botHandle = 'FOREX_APEX_BOT';
-    addLog(`Granted ${product} license: ${key} for ${_maskEmail(email)}${sent.ok ? '' : ' (email FAILED to send)'}`, 'license', sent.ok ? 'success' : 'warn');
+    addLog(`Granted ${product} license: ${_maskLicence(key)} for ${_maskEmail(email)}${sent.ok ? '' : ' (email FAILED to send)'}`, 'license', sent.ok ? 'success' : 'warn');
     results.push({ product, key, emailSent: sent.ok, telegramLink: `https://t.me/${botHandle}?start=${key}` });
   }
   res.json({ email, results });
@@ -1865,7 +1889,7 @@ app.post('/api/admin/trial/issue', async (req, res) => {
   }]);
   if (error) return res.status(500).json({ error: 'Request failed.', id: _errId(error) });
   const botHandle = 'FOREX_APEX_BOT';
-  addLog(`Trial issued: ${key} (${product}, ${days}d) for ${email || 'no email'}`, 'license', 'success');
+  addLog(`Trial issued: ${_maskLicence(key)} (${product}, ${days}d) for ${_maskEmail(email) || 'no email'}`, 'license', 'success');
   res.json({ key, product, expiresAt, telegramLink: `https://t.me/${botHandle}?start=${key}` });
 });
 
@@ -1996,7 +2020,7 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
     }], { onConflict: 'key' });
     if (error) addLog(`[${provider}] License DB error: ${error.message}`, 'license', 'error');
   }
-  addLog(`[${provider}] License activated: ${licenseKey} for ${_maskEmail(email)} (${product})`, 'license', 'success');
+  addLog(`[${provider}] License activated: ${_maskLicence(licenseKey)} for ${_maskEmail(email)} (${product})`, 'license', 'success');
 
   if (isNew && email) {
     const html = _buildForexEmailHtml(_he(buyerName || 'there'), _he(email), licenseKey);
@@ -2007,11 +2031,15 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
       _notifyAdminAlert(
         `⚠️ Customer paid (${provider}) but the license email FAILED to send.\n\n` +
         `Product: Forex\nEmail: ${email}\nRef: ${piRef}\n` +
-        `License key: ${licenseKey}\nError: ${result.error}\n\nSend the key to them manually until this is fixed.`
+        `License: ${_maskLicence(licenseKey)} (${_maskEmail(email)})\n` +
+        `Error: ${result.error}\n\n` +
+        `The full key is in the licenses table for this email. It is deliberately ` +
+        `not repeated here: an inbox is not a credential store, and this message ` +
+        `exists because delivery already failed once.`
       );
     } else addLog(`[${provider}] Forex email sent to ${email}`, 'email', 'success');
   }
-  if (isNew) addLog(`[${provider}] Forex Bot sold: ${email} — key: ${licenseKey}`, 'payment', 'success');
+  if (isNew) addLog(`[${provider}] Forex Bot sold: ${_maskEmail(email)} — key: ${_maskLicence(licenseKey)}`, 'payment', 'success');
 }
 const _fulfillStripeOrder = (args) => _fulfillOrder({ provider: 'Stripe', ...args });
 
@@ -2053,7 +2081,7 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
         const { data: revoked } = await supabase.from('licenses')
           .update({ active: false, refunded: true, refunded_at: new Date().toISOString() })
           .eq('payment_intent_id', piRef).select('key,product');
-        if (revoked?.length) addLog(`[Stripe] License revoked (${event.type}): ${revoked[0].key} (${revoked[0].product})`, 'license', 'warn');
+        if (revoked?.length) addLog(`[Stripe] License revoked (${event.type}): ${_maskLicence(revoked[0].key)} (${revoked[0].product})`, 'license', 'warn');
       }
     }
     res.json({ received: true });
@@ -2990,23 +3018,73 @@ function decryptBotConfig(data) {
 
 // POST /api/save-bot-config  — called by configurator when client clicks "Save & Deploy"
 app.post('/api/save-bot-config', async (req, res) => {
-  const { key, config } = req.body || {};
-  if (!key || !config || typeof config !== 'object') return res.status(400).json({ error: 'key and config required' });
-  if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+  // The licence key used to BE the authorisation here: whoever held it could
+  // rewrite the stored configuration — which decides RISK_PER_TRADE, the
+  // broker environment and PAPER_TRADING — forever, because a licence key does
+  // not expire. The read path was moved to short-lived sessions in the
+  // previous pass and this one was left behind, so the credential kept its
+  // most dangerous power while appearing to have lost it.
+  //
+  // Now it needs a session with bot:config:write, obtained by presenting the
+  // licence once to /api/bot-session.
+  const body = req.body || {};
 
-  if (!verifyLicenseKeyHmac(key).valid) {
-    return res.status(403).json({ error: 'Invalid or inactive licence.' });
+  // A licence key in the body is refused rather than ignored. Accepting the
+  // session while tolerating the key alongside it leaves callers sending the
+  // credential indefinitely, and the point is that it stops travelling.
+  if (body.key || body.licenseKey || body.licenceKey) {
+    return res.status(401).json({
+      error: 'A licence key is not accepted here.',
+      code: 'LICENCE_NOT_ACCEPTED',
+      detail: 'POST {"licenseKey":"...","scope":"bot:config:write"} to /api/bot-session and send the returned token as Authorization: Bearer <token>.',
+    });
   }
+
+  const sess = _botSession(req, SCOPE_WRITE);
+  if (!sess) {
+    // A read token reaching here is the case worth being explicit about: it
+    // is a valid credential, just not for this.
+    const anyScope = _botSession(req, null);
+    if (anyScope) {
+      return res.status(403).json({
+        error: 'This session cannot modify configuration.',
+        code: 'INSUFFICIENT_SCOPE',
+        required: SCOPE_WRITE,
+      });
+    }
+    return res.status(401).json({ error: 'Authorization failed.' });
+  }
+
+  const config = body.config;
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    return res.status(400).json({ error: 'config required' });
+  }
+  if (!supabase) return res.status(503).json({ error: 'Service unavailable.' });
+
+  // The licence being written to comes from the SESSION, never from the
+  // request. A caller must not be able to name a different licence alongside
+  // a valid session and have their configuration land on someone else's bot.
+  const key = sess.licenseKey;
+
   let lic = null;
   try {
-    const r = await supabase.from('licenses').select('active').eq('key', key).eq('active', true).single();
+    const r = await supabase.from('licenses')
+      .select('active, revoked_at, expires_at')
+      .eq('key', key).eq('active', true).single();
     lic = r.data;
   } catch (e) {
     // Fail closed: a database that cannot answer is not permission to write.
     console.error('[SAVE-BOT-CONFIG] licence lookup failed', _errId(e));
     return res.status(503).json({ error: 'Service unavailable. Try again shortly.' });
   }
-  if (!lic) return res.status(403).json({ error: 'Invalid or inactive licence.' });
+  // Re-checked at write time, not just at session issue: a licence can be
+  // revoked or expire inside the session's ten-minute window.
+  const stillValid = lic && !lic.revoked_at
+    && (!lic.expires_at || new Date(lic.expires_at).getTime() > Date.now());
+  if (!stillValid) {
+    _revokeBotSessionsFor(key);
+    return res.status(403).json({ error: 'Invalid or inactive licence.' });
+  }
 
   const encrypted = encryptBotConfig(config);
   const { error } = await supabase.from('bot_configs').upsert(
@@ -3061,11 +3139,20 @@ function _pruneBotSessions() {
   }
 }
 
-function _issueBotSession(licenseKey, product) {
+// Scopes are explicit and disjoint. A token issued to READ configuration must
+// not be able to WRITE it: the configuration decides RISK_PER_TRADE, the
+// broker environment and PAPER_TRADING, so a read path compromise must not
+// become a write path compromise.
+const SCOPE_READ = 'bot:config:read';
+const SCOPE_WRITE = 'bot:config:write';
+const _VALID_SCOPES = new Set([SCOPE_READ, SCOPE_WRITE]);
+
+function _issueBotSession(licenseKey, product, scope = SCOPE_READ) {
+  if (!_VALID_SCOPES.has(scope)) throw new Error('unknown scope');
   _pruneBotSessions();
   const token = crypto.randomBytes(32).toString('base64url');   // 256 bits
   _botSessions.set(token, {
-    licenseKey, product, scope: 'bot:config:read',
+    licenseKey, product, scope,
     exp: Date.now() + BOT_SESSION_TTL_MS,
   });
   return token;
@@ -3120,10 +3207,17 @@ app.post('/api/bot-session', _authLimiter, async (req, res) => {
     && (!lic.product || !hm.product || lic.product === hm.product);
   if (!ok) return res.status(403).json({ error: 'Invalid or inactive licence.' });
 
-  const token = _issueBotSession(key, hm.product);
+  // The caller asks for one scope and gets exactly that one. Defaulting to
+  // read means a client that forgets to ask cannot accidentally hold write.
+  const wanted = String((req.body && req.body.scope) || SCOPE_READ);
+  if (!_VALID_SCOPES.has(wanted)) {
+    return res.status(400).json({ error: 'Unknown scope requested.' });
+  }
+
+  const token = _issueBotSession(key, hm.product, wanted);
   res.set('Cache-Control', 'no-store');
   res.json({
-    success: true, token, scope: 'bot:config:read',
+    success: true, token, scope: wanted,
     expiresIn: Math.floor(BOT_SESSION_TTL_MS / 1000),
     licenceFormat: hm.legacy ? 'legacy' : 'current',
   });
@@ -3141,7 +3235,7 @@ app.get('/api/bot-config', async (req, res) => {
       detail: 'POST {"licenseKey":"..."} to /api/bot-session and send the returned token as Authorization: Bearer <token>.',
     });
   }
-  const sess = _botSession(req, 'bot:config:read');
+  const sess = _botSession(req, SCOPE_READ);
   if (!sess) return res.status(401).json({ error: 'Authorization failed.' });
   if (!supabase) return res.status(503).json({ error: 'Service unavailable.' });
 
@@ -3513,6 +3607,8 @@ module.exports = {
     _issueBotSession, _botSession, _revokeBotSessionsFor,
     assertPublicHttpUrl, _isPublicIp,
     _ownerSecretOk, _ownerSecretPresentInUrl,
+    _maskLicence, _maskEmail,
+    SCOPE_READ, SCOPE_WRITE,
     BOT_SESSION_TTL_MS,
   },
 };

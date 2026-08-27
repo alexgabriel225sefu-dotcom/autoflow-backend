@@ -25,6 +25,18 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 
+# A TEST-ONLY OAuth state signing secret.
+#
+# apex/ctrader_oauth refuses to mint an OAuth `state` without one, and that
+# refusal is correct production behaviour under test elsewhere: `state` is what
+# proves a callback belongs to the chat that began the flow, so an unsigned one
+# lets somebody's broker account be bound to somebody else's chat. The fix is
+# to give the TEST a secret, never to give production a fallback.
+#
+# setdefault, so a caller that exports its own value keeps it. This is a fake
+# constant with no meaning outside this process.
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-oauth-signing-secret")
+
 import importlib  # noqa: E402
 import subprocess  # noqa: E402
 

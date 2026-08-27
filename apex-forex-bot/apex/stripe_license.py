@@ -16,15 +16,47 @@ import hashlib
 import secrets
 
 from apex import config as cfg
+from apex.licence_format import mask_licence
 from apex import user_store
 
-_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ23456789"  # matches ^[A-Z2-9]{4}$ groups
+# 32 symbols, with I and O removed so they cannot be misread as 1 and 0.
+# The previous alphabet included both, which made 34 symbols and produced keys
+# a customer could mistype in a way that looks like a server fault.
+_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 _SIG_TOLERANCE_SEC = 300  # reject replayed/stale webhook deliveries
+
+# How much of a licence key is unguessable.
+#
+# This generator produced THREE four-character groups: 12 symbols over a
+# 32-symbol alphabet, so 12 x 5 = 60 BITS. A licence key is a bearer
+# credential — it is what a buyer presents to claim the product — and 60 bits
+# is not enough for one. Keys now carry 30 characters: 150 bits.
+#
+# The shape matches what the licence server mints, so both generators produce
+# keys the same validator accepts. apex.telegram.licence_shape_ok holds that
+# pattern, and it still accepts the legacy 12-character form because keys
+# already in customers' inboxes must keep working.
+# 30, not 26, for two reasons: 30 divides evenly into the five-character
+# groups the format uses (26 left a one-character orphan group that the shape
+# validator correctly refused), and it matches the total body length the
+# licence server produces, so both generators emit keys the same validator
+# accepts. 30 x 5 = 150 bits.
+_KEY_RANDOM_CHARS = 30
+_KEY_GROUP = 5
 
 
 def generate_license_key() -> str:
-    group = lambda: "".join(secrets.choice(_ALPHABET) for _ in range(4))
-    return f"{cfg.LICENSE_KEY_PREFIX}-{group()}-{group()}-{group()}"
+    """A new licence key. 150 bits from the OS CSPRNG, never anything else.
+
+    `secrets` reads the operating system's cryptographic source. Not
+    `random` (a Mersenne Twister whose state is recoverable from output),
+    not a timestamp, not a counter, not a hash of the buyer's email — every
+    one of those is predictable to someone who knows roughly when a key was
+    issued or who it was issued to.
+    """
+    body = "".join(secrets.choice(_ALPHABET) for _ in range(_KEY_RANDOM_CHARS))
+    groups = [body[i:i + _KEY_GROUP] for i in range(0, len(body), _KEY_GROUP)]
+    return f"{cfg.LICENSE_KEY_PREFIX}-" + "-".join(groups)
 
 
 def _verify_signature(payload: bytes, sig_header: str, secret: str) -> bool:
@@ -197,6 +229,9 @@ def handle_webhook(raw_body: bytes, sig_header: str):
         print(f"[Stripe] activation notify failed for {chat_id} "
               f"(licence IS active): {e}")
 
-    print(f"[Stripe] activated {chat_id} with license {key} "
+    # The key is masked: this line reaches Render's log stream, and a log store
+    # is not a credential store. The prefix and first group are enough to tie
+    # the event to a customer without carrying the credential itself.
+    print(f"[Stripe] activated {chat_id} with license {mask_licence(key)} "
           f"(session={session.get('id')})")
     return 200, b"ok"
