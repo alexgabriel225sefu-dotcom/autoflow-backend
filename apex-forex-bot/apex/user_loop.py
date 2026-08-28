@@ -1670,6 +1670,35 @@ def _loop(user_id, alert_fn, gen=None):
         lst.insert(0, {"time": datetime.now().strftime("%H:%M"), "reason": str(reason)[:120]})
         del lst[30:]
 
+        # The dashboard copy above is in memory, last thirty, and carries no
+        # symbol — a restart erased the answer to "why didn't it trade this
+        # morning". This writes the same refusal to the persistent decision log
+        # WITH the symbol and the strategy version that refused it, which is
+        # what "Why didn't APEX trade?" is answered from.
+        #
+        # Wrapped and swallowed on purpose: journalling must never be able to
+        # interfere with a trading decision. A lost event costs an explanation;
+        # a raised exception here would cost an execution.
+        try:
+            from apex import trade_events as _te
+            _sid = getattr(cfg, "STRATEGY", None)
+            # The version is looked up from the registry rather than assumed.
+            # An event that names a version it did not verify is worse than one
+            # that leaves it unknown — replay reads these as provenance.
+            _sver = None
+            try:
+                from apex import strategy_api as _sapi
+                _s = _sapi.get(_sid) if _sid else None
+                _sver = getattr(_s, "strategy_version", None) if _s else None
+            except Exception:
+                pass
+            _te.record(user_id, _te.DECISION_DECLINED, symbol=symbol,
+                       strategy_id=_sid, strategy_version=_sver,
+                       payload={"reason": str(reason)[:400],
+                                "skipsToday": dash.get("skipsToday")})
+        except Exception as _e:
+            print(f"[UserLoop:{user_id}] decision log (skip) failed: {_e}")
+
         # Every refusal goes to stdout too. The dashboard keeps the last 30 and
         # Telegram deliberately shows each distinct reason once per three
         # hours — both are the right behaviour for a person, and both make the
@@ -3754,6 +3783,35 @@ def _loop(user_id, alert_fn, gen=None):
                                     "entryStrategyId": signal.get("strategy_id"),
                                     "entryStrategyVersion": signal.get("strategy_version"),
                                 })
+                                # The same facts, appended to the decision log
+                                # as an immutable event. The snapshot above is
+                                # attached to a position and disappears when it
+                                # closes; this is what a replay timeline and
+                                # "why did APEX enter?" read months later, with
+                                # the strategy version that actually decided it.
+                                try:
+                                    from apex import trade_events as _te
+                                    _te.record(
+                                        user_id, _te.ORDER_FILLED, symbol=symbol,
+                                        position_id=open_pos.get("positionId"),
+                                        strategy_id=signal.get("strategy_id"),
+                                        strategy_version=signal.get("strategy_version"),
+                                        payload={
+                                            "side": action,
+                                            "entryPrice": open_pos.get("entryPrice"),
+                                            "stopLoss": open_pos.get("stopLoss"),
+                                            "takeProfit": open_pos.get("takeProfit"),
+                                            "units": open_pos.get("units"),
+                                            "confidence": confidence,
+                                            "regime": (regime or {}).get("regime"),
+                                            "slPips": round(float(stop_pips_eff), 2),
+                                            "spreadPips": spread,
+                                            "probability": (ev_verdict or {}).get("probability"),
+                                            "evR": (ev_verdict or {}).get("ev_r"),
+                                            "reasoning": str(signal.get("reasoning") or "")[:400],
+                                        })
+                                except Exception as _ee:
+                                    print(f"[UserLoop:{user_id}] decision log (fill) failed: {_ee}")
                                 # Keep a copy OUTSIDE the position dict. The
                                 # next tick throws this dict away and replaces
                                 # it with a fresh broker read; without the copy

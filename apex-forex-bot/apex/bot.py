@@ -972,6 +972,80 @@ def _start_dashboard_server():
             # is never called from here: it advances the peak-balance and
             # daily-reset state as a side effect, so drawing a badge with it
             # would move the circuit breakers.
+            # ── APEX Intelligence ───────────────────────────────────
+            # Four concepts, kept apart because merging them is how a UI starts
+            # claiming things the system never decided:
+            #
+            #   market    what the market shows       (dash["market"], regime)
+            #   strategy  what the strategy detected  (sentinel, institutional)
+            #   risk      whether trading is allowed  (riskGuard)
+            #   decision  what APEX actually did      (the decision log)
+            #
+            # A market observation is not a signal, and a signal is not a
+            # decision. Nothing here is computed for display: every field is
+            # read from state the engine published, and a field the engine did
+            # not publish comes back null so the screen can say "not available"
+            # rather than draw a zero.
+            if self.path.startswith("/api/app/intelligence"):
+                from apex import user_loop as _n_ul, user_store as _n_us
+                from apex import ui_state as _n_ui, trade_events as _n_te
+                _n_user = self._telegram_identity()
+                if not _n_user:
+                    self._telegram_denied()
+                    return
+                _n_chat = str(_n_user["id"])
+                _n_qs = parse_qs(urlparse(self.path).query)
+                _n_sym = (_n_qs.get("sym") or [""])[0].upper()[:16] or None
+                try:
+                    _n_dash = _n_ul.get_dash(_n_chat) or {}
+                except Exception as _n_e:
+                    self._json(200, {"available": False,
+                                     "reason": "INTELLIGENCE_UNAVAILABLE",
+                                     "detail": str(_n_e)[:120]})
+                    return
+                if not _n_dash:
+                    # No loop state at all. Said plainly: an empty analysis
+                    # object would read as "the market is featureless".
+                    self._json(200, {"available": False,
+                                     "reason": "NO_PLATFORM_STATE"})
+                    return
+
+                _n_focus = _n_sym or _n_dash.get("symbol")
+                _n_state, _n_reasons = _n_ui.risk_state(_n_chat)
+                _n_guard = _n_dash.get("riskGuard") or {}
+                # Recorded refusals for this symbol — the "why didn't APEX
+                # trade" answer. Empty means unrecorded, never "no reason".
+                try:
+                    _n_declines = _n_te.declines(_n_chat, symbol=_n_focus, limit=10)
+                except Exception:
+                    _n_declines = []
+
+                self._json(200, {
+                    "available": True,
+                    "symbol": _n_focus,
+                    # Only true when the loop is watching this instrument; a
+                    # market reading for one symbol must never be shown under
+                    # another's name.
+                    "isFocus": bool(_n_focus and _n_focus == _n_dash.get("symbol")),
+                    "market": _n_dash.get("market"),
+                    "regime": _n_dash.get("regime"),
+                    "strategy": {
+                        "label": _n_dash.get("strategy"),
+                        "sentinel": _n_dash.get("sentinel"),
+                        "institutional": _n_dash.get("institutional"),
+                    },
+                    "risk": {
+                        "engine": _n_state,
+                        "halted": bool(_n_guard.get("halted")),
+                        "reasons": _n_reasons or list(_n_guard.get("reasons") or []),
+                    },
+                    "decision": {
+                        "declines": _n_declines,
+                        "recorded": bool(_n_declines),
+                    },
+                    "evCalibration": _n_dash.get("evCalibration"),
+                })
+                return
             if self.path.startswith("/api/app/risk"):
                 from apex import user_loop, user_store, strategies as _st
                 from apex import forex as _fx, config as _cfg, ui_state as _ui
