@@ -936,7 +936,7 @@ def _start_dashboard_server():
                     return
                 chat_id = str(tg_user["id"])
                 try:
-                    dash = user_loop.get_dash(chat_id) or {}
+                    _r_dash = user_loop.get_dash(chat_id) or {}
                     u = user_store.load(chat_id) or {}
                 except Exception as e:
                     self._json(200, {"available": False,
@@ -944,36 +944,36 @@ def _start_dashboard_server():
                                      "detail": str(e)[:120]})
                     return
 
-                guard = dash.get("riskGuard")
-                state, reasons = _ui.risk_state(chat_id)
-                sess = {}
+                _r_guard = _r_dash.get("riskGuard")
+                _r_state, _r_reasons = _ui.risk_state(chat_id)
+                _r_sess = {}
                 try:
-                    sess = _st.get_session(chat_id) or {}
+                    _r_sess = _st.get_session(chat_id) or {}
                 except Exception as e:
                     print(f"[Risk] session unreadable for {chat_id}: {e}")
 
-                positions = [p for p in (dash.get("positions") or []) if p.get("symbol")]
-                exposure = []
-                for pos in positions:
+                _r_positions = [p for p in (_r_dash.get("positions") or []) if p.get("symbol")]
+                _r_exposure = []
+                for pos in _r_positions:
                     try:
-                        bias = _fx.usd_exposure(pos["symbol"], pos.get("side") or "")
+                        _r_bias = _fx.usd_exposure(pos["symbol"], pos.get("side") or "")
                     except Exception:
-                        bias = 0
-                    exposure.append({
+                        _r_bias = 0
+                    _r_exposure.append({
                         "symbol": pos["symbol"],
                         "side": pos.get("side"),
-                        "usdBias": bias,
+                        "usdBias": _r_bias,
                         "pnlUsd": pos.get("pnlUsd"),
                     })
 
-                stats = dash.get("stats") or {}
+                _r_stats = _r_dash.get("stats") or {}
                 self._json(200, {
                     "available": True,
                     # UNKNOWN is a third answer and never renders as OK.
-                    "engine": state,
-                    "halted": bool((guard or {}).get("halted")),
-                    "reasons": reasons or list((guard or {}).get("reasons") or []),
-                    "guardSeen": bool(guard),
+                    "engine": _r_state,
+                    "halted": bool((_r_guard or {}).get("halted")),
+                    "reasons": _r_reasons or list((_r_guard or {}).get("reasons") or []),
+                    "guardSeen": bool(_r_guard),
                     "limits": {
                         "riskPerTradePct": round(float(
                             u.get("risk_per_trade") or getattr(_cfg, "RISK_PER_TRADE", 0)) * 100, 3),
@@ -981,14 +981,14 @@ def _start_dashboard_server():
                         "maxDrawdownPct": float(getattr(_cfg, "MAX_DD_PCT", 20.0)),
                     },
                     "today": {
-                        "pnl": sess.get("dailyPnL"),
-                        "pnlPct": sess.get("dailyPnLPct"),
-                        "trades": sess.get("dailyTrades"),
+                        "pnl": _r_sess.get("dailyPnL"),
+                        "pnlPct": _r_sess.get("dailyPnLPct"),
+                        "trades": _r_sess.get("dailyTrades"),
                     },
-                    "drawdownPct": stats.get("maxDrawdownPct"),
-                    "peakBalance": sess.get("peakBalance"),
-                    "openPositions": len(positions),
-                    "exposure": exposure,
+                    "drawdownPct": _r_stats.get("maxDrawdownPct"),
+                    "peakBalance": _r_sess.get("peakBalance"),
+                    "openPositions": len(_r_positions),
+                    "exposure": _r_exposure,
                 })
                 return
             if self.path.startswith("/api/app/markets"):
@@ -1008,11 +1008,11 @@ def _start_dashboard_server():
                                      "reason": "MARKET_DATA_UNAVAILABLE",
                                      "detail": str(e)[:120]})
                     return
-                snap = _mk.snapshot(br)
-                forex, metals = _mk.universe()
-                self._json(200, {"rows": snap["rows"], "asOf": snap["asOf"],
-                                 "stale": bool(snap.get("stale")),
-                                 "forex": forex, "metals": metals,
+                _m_snap = _mk.snapshot(br)
+                _m_forex, _m_metals = _mk.universe()
+                self._json(200, {"rows": _m_snap["rows"], "asOf": _m_snap["asOf"],
+                                 "stale": bool(_m_snap.get("stale")),
+                                 "forex": _m_forex, "metals": _m_metals,
                                  "available": True})
                 return
             if self.path.startswith("/api/app/tick"):

@@ -18,6 +18,7 @@ would move the circuit breakers every time someone opened a screen.
 Run: python tests/test_risk_screen.py
 """
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -50,7 +51,17 @@ check("no order path is reachable from this route",
       "place_order" not in CODE and "close_position" not in CODE)
 
 print("\n2. Unknown is a third answer")
-check("the route reports the engine state verbatim", '"engine": state' in CODE)
+check("the route reports the engine state verbatim", '"engine": _r_state' in CODE)
+# do_GET is one long method and bot.py has a module-level `dash`. A route that
+# binds a bare `dash`, `stats` or `state` makes that name local to the WHOLE
+# method and breaks every branch above it — this exact bug shipped once and
+# took out the dashboard session. Every local these routes introduce is
+# prefixed, and that is checked rather than remembered.
+_locals = set(re.findall(r'^\s+([a-z][\w]*)\s*=(?!=)', CODE, re.M))
+_allowed = {"tg_user", "chat_id", "u"}   # already method-locals in every route
+check(f"no route local can shadow the enclosing scope ({sorted(_locals - _allowed)})",
+      not (_locals - _allowed),
+      "prefix it: a bare name here is an UnboundLocalError somewhere else")
 check("it says whether a guard was ever published", '"guardSeen"' in CODE)
 check("the screen has a distinct class for unknown", "#rEngine.unk" in HTML)
 check("...that is not the OK colour",
