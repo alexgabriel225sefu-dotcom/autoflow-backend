@@ -1120,6 +1120,154 @@ def _start_dashboard_server():
             # the trading loop already holds in memory plus one shared markets
             # snapshot, so N clients cost N dict reads rather than N round
             # trips to cTrader.
+            # ── Trading account ─────────────────────────────────────
+            # Identity of the account, never its credentials. No access token,
+            # no refresh token, and the account number is masked: the client
+            # already knows which account is theirs, and a full number on a
+            # screen is a number in a screenshot.
+            # ── Symbol detail ───────────────────────────────────────
+            # One instrument's chart and quote, for a client who tapped a row
+            # in Markets. The symbol is a FILTER and nothing else: it is
+            # checked against the platform's own universe before it reaches a
+            # broker, so a crafted value cannot make us fetch something the
+            # engine does not trade.
+            #
+            # Candles go through broker.get_candles, which routes through
+            # candle_cache — so two clients looking at the same instrument and
+            # timeframe cost one historical request, not two.
+            if self.path.startswith("/api/app/symbol"):
+                from apex import user_loop as _y_ul, user_store as _y_us
+                from apex import markets as _y_mk
+                _y_user = self._telegram_identity()
+                if not _y_user:
+                    self._telegram_denied()
+                    return
+                _y_chat = str(_y_user["id"])
+                _y_qs = parse_qs(urlparse(self.path).query)
+                _y_sym = (_y_qs.get("sym") or [""])[0].upper()[:16]
+                _y_tf = (_y_qs.get("tf") or ["15m"])[0].lower()[:4]
+                _y_fx, _y_me = _y_mk.universe()
+                if _y_sym not in set(_y_fx) | set(_y_me):
+                    # Refused by name. An instrument the platform does not
+                    # trade must not become a broker request just because a
+                    # query string asked for it.
+                    self._json(400, {"available": False,
+                                     "reason": "UNKNOWN_INSTRUMENT"})
+                    return
+                if _y_tf not in ("1m", "5m", "15m", "1h", "4h", "1d"):
+                    _y_tf = "15m"
+                try:
+                    _y_rec = _y_us.load(_y_chat) or {}
+                    _y_br, _y_cfg = _y_ul._make_broker(_y_rec)
+                except Exception as _y_e:
+                    self._json(200, {"available": False,
+                                     "reason": "MARKET_DATA_UNAVAILABLE",
+                                     "detail": str(_y_e)[:120]})
+                    return
+                _y_candles, _y_bid, _y_ask = [], None, None
+                try:
+                    _y_candles = _y_br.get_candles(_y_sym, _y_tf, 150) or []
+                except Exception as _y_e:
+                    print(f"[Symbol] candles failed for {_y_sym}: {_y_e}")
+                try:
+                    _y_bid, _y_ask = _y_br.get_bid_ask(_y_sym)
+                except Exception:
+                    pass
+                if not _y_candles:
+                    self._json(200, {"available": False, "symbol": _y_sym,
+                                     "reason": "MARKET_DATA_UNAVAILABLE"})
+                    return
+                # Spread is derived from two quotes the broker just gave, and
+                # is omitted entirely when either is missing rather than
+                # computed from a stale one.
+                _y_spread = None
+                if _y_bid is not None and _y_ask is not None:
+                    try:
+                        from apex import forex as _y_fxm
+                        _y_spread = round(_y_fxm.to_pips(
+                            abs(float(_y_ask) - float(_y_bid)), _y_sym), 2)
+                    except Exception:
+                        _y_spread = None
+                # The client's own open position on THIS instrument, so the
+                # chart can draw entry/SL/TP. Read from the loop's dash, never
+                # from the request.
+                _y_pos = None
+                try:
+                    for _y_p in ((_y_ul.get_dash(_y_chat) or {}).get("positions") or []):
+                        if str(_y_p.get("symbol") or "").upper() == _y_sym:
+                            _y_pos = {"side": _y_p.get("side"),
+                                      "entryPrice": _y_p.get("entryPrice"),
+                                      "stopLoss": _y_p.get("stopLoss"),
+                                      "takeProfit": _y_p.get("takeProfit"),
+                                      "pnlUsd": _y_p.get("pnlUsd")}
+                            break
+                except Exception:
+                    pass
+                self._json(200, {"available": True, "symbol": _y_sym,
+                                 "timeframe": _y_tf, "candles": _y_candles,
+                                 "bid": _y_bid, "ask": _y_ask,
+                                 "spreadPips": _y_spread, "position": _y_pos})
+                return
+
+            if self.path.startswith("/api/app/account"):
+                from apex import user_store as _c_us, user_loop as _c_ul
+                from apex import ui_state as _c_ui, account_mode as _c_am
+                _c_user = self._telegram_identity()
+                if not _c_user:
+                    self._telegram_denied()
+                    return
+                _c_chat = str(_c_user["id"])
+                try:
+                    _c_rec = _c_us.load(_c_chat) or {}
+                    _c_dash = _c_ul.get_dash(_c_chat) or {}
+                except Exception as _c_e:
+                    self._json(200, {"available": False,
+                                     "reason": "ACCOUNT_UNAVAILABLE",
+                                     "detail": str(_c_e)[:120]})
+                    return
+                _c_env, _c_proven, _c_why = _c_ui.environment(_c_rec)
+                _c_mode, _c_src = _c_am.resolve(_c_rec)
+                _c_num = str(_c_rec.get("ctrader_account_id") or "")
+                self._json(200, {
+                    "available": True,
+                    "broker": _c_dash.get("broker") or "cTrader",
+                    "connected": bool(_c_rec.get("_connected_ctrader")),
+                    "environment": {"env": _c_env, "proven": bool(_c_proven),
+                                    "detail": _c_why,
+                                    "badge": _c_am.badge(_c_mode, _c_src)},
+                    # Last four only. Enough to tell two accounts apart.
+                    "accountMask": ("••••" + _c_num[-4:]) if _c_num else None,
+                    "balance": _c_dash.get("balance"),
+                    "equity": _c_dash.get("equityLive"),
+                    "brokerHealth": _c_dash.get("brokerHealth"),
+                })
+                return
+
+            # ── Alerts ──────────────────────────────────────────────
+            # Assembled from what actually happened: refusals and fills from
+            # the decision log, and the risk engine's own verdict. Nothing is
+            # generated, so an empty list means nothing was recorded rather
+            # than nothing occurred.
+            if self.path.startswith("/api/app/alerts"):
+                from apex import trade_events as _l_te, ui_state as _l_ui
+                _l_user = self._telegram_identity()
+                if not _l_user:
+                    self._telegram_denied()
+                    return
+                _l_chat = str(_l_user["id"])
+                try:
+                    _l_rows = _l_te.recent(_l_chat, limit=40)["events"]
+                except Exception as _l_e:
+                    self._json(200, {"available": False,
+                                     "reason": "ALERTS_UNAVAILABLE",
+                                     "detail": str(_l_e)[:120]})
+                    return
+                _l_state, _l_reasons = _l_ui.risk_state(_l_chat)
+                self._json(200, {"available": True, "events": _l_rows,
+                                 "risk": {"engine": _l_state,
+                                          "reasons": _l_reasons}})
+                return
+
             if self.path.startswith("/api/app/stream"):
                 from apex import stream as _v_st
                 _v_user = self._telegram_identity()

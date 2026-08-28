@@ -164,6 +164,47 @@ check("free margin is not derived and shown as a broker fact",
 check("markets polls on its own cadence, not the position tick",
       "setInterval(()=>loadMarkets(), 30000)" in HTML)
 
+print("\n8. Symbol detail refuses an instrument the platform does not trade")
+SYM = BOT[BOT.index('if self.path.startswith("/api/app/symbol")'):]
+SYM = SYM[:SYM.index('if self.path.startswith("/api/app/account")')]
+SYMC = "\n".join(l for l in SYM.splitlines() if not l.strip().startswith("#"))
+check("the symbol is checked against the universe BEFORE a broker is built",
+      SYMC.index("_y_mk.universe()") < SYMC.index("_make_broker"),
+      "a crafted value must not become a broker request")
+check("an unknown instrument is refused by name", "UNKNOWN_INSTRUMENT" in SYMC)
+check("the timeframe is an allowlist, not free text",
+      '("1m", "5m", "15m", "1h", "4h", "1d")' in SYMC)
+check("the symbol is length-clamped", "[:16]" in SYMC)
+check("candles go through the broker's cached path",
+      "_y_br.get_candles(" in SYMC,
+      "get_candles routes through candle_cache, so two clients on the same "
+      "instrument cost one historical request")
+check("no candles is stated, not drawn as an empty chart",
+      "MARKET_DATA_UNAVAILABLE" in SYMC)
+check("spread is omitted when either quote is missing",
+      "_y_bid is not None and _y_ask is not None" in SYMC,
+      "a spread computed from one live and one stale quote is a made-up number")
+check("the position drawn on the chart is read server-side",
+      "get_dash(_y_chat)" in SYMC and '"position"' in SYMC)
+check("...and is never taken from the request",
+      "_y_qs.get(\"pos\")" not in SYMC and '"entryPrice"' in SYMC)
+check("identity is checked first",
+      SYMC.index("_telegram_identity") < SYMC.index("_y_mk.universe()"))
+import re as _re
+check("every route local is prefixed",
+      not {m.group(1) for m in _re.finditer(r'^\s+([a-z][\w]*) = (?!=)', SYMC, _re.M)})
+
+print("\n9. The screen opens an instrument, and says when it cannot")
+check("a market row opens the instrument", "openSymbol(row.dataset.sym)" in HTML)
+check("the screen exists", 'id="s-symbol"' in HTML and 'id="symChart"' in HTML)
+check("it has its own chart object, not a shared one", "symChart=mkChart(" in HTML)
+check("an untraded instrument is worded plainly",
+      "not one the platform trades" in HTML)
+check("unavailable data is worded, not blanked",
+      "Market data for this instrument is unavailable" in HTML)
+check("a missing quote renders as unavailable, not zero",
+      'class="na">Not available' in HTML)
+
 mk.reset()
 print("\n" + "=" * 50)
 _redis.terminate()
