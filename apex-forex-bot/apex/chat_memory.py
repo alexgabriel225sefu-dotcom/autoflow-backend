@@ -129,8 +129,8 @@ def allow(user_id):
     user_id = str(user_id)
     if _window_count(user_id, 60, PER_MIN):
         return False, ("⏳ Too many messages in a row. Give it a moment — the "
-                       "limit exists so the bot always has capacity left for "
-                       "trading.")
+                       "limit exists so the platform always has capacity left "
+                       "for trading.")
     if _window_count(user_id, 3600, PER_HOUR):
         return False, ("⏳ You've hit the hourly message limit. It resets "
                        "within the hour. Your trading is unaffected.")

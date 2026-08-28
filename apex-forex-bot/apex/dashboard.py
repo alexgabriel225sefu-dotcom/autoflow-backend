@@ -1,4 +1,4 @@
-"""Live web dashboard — MT5-style with candlestick chart.
+"""Live web dashboard — candlestick chart over the connected cTrader account.
 
 Renders a static shell; data fetched client-side from /api/status and
 /api/candles every 5 seconds. Uses TradingView Lightweight Charts for
@@ -7,7 +7,11 @@ the candlestick chart with BUY/SELL markers and SL/TP lines.
 
 
 def render(dash):
-    return """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+    from apex import config as cfg
+    return _DASH_HTML.replace("Apex Forex Bot", cfg.BOT_NAME)
+
+
+_DASH_HTML = """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Apex Forex Bot — Live Trading</title>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
@@ -286,7 +290,7 @@ setInterval(loadCandles, 30000);
 # which is the behaviour we want over someone keeping it in a bookmark.
 _LOGIN_HTML = """<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Apex - sign in</title><style>
+<title>Sign in</title><style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07090f;color:#eef1f6;font-family:-apple-system,system-ui,sans-serif;
  display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}

@@ -87,7 +87,7 @@ def home_head(state):
                 "account until you resume it.\n\nAnything still open is listed "
                 "under Positions and keeps its stop at your broker.")
     if s == "G":
-        return ("⏸ <b>Bot is off</b>",
+        return ("⏸ <b>Execution paused</b>",
                 "It is not looking for setups and will not open anything.\n\n"
                 "Open positions are untouched and still protected by their "
                 "stops at your broker. Tap Resume when you want it watching "
@@ -196,8 +196,8 @@ def account(state, account_id=None, account_count=None, balance=None):
     lines.append(f"Balance: <b>{_fmt_money(balance)}</b>")
     if isinstance(account_count, int) and account_count > 1:
         lines.append(f"\nYou have <b>{account_count}</b> accounts linked to "
-                     "this bot. Switching between them changes which one the "
-                     "bot trades — and the screens change with it.")
+                     "this platform. Switching between them changes which one "
+                     "it trades — and the screens change with it.")
     if state.is_live and state.simulating:
         lines.append("\n<i>This is a real account, but the platform is still "
                      "simulating on it. Nothing you see has touched your "

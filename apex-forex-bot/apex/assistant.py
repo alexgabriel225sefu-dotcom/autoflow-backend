@@ -87,14 +87,14 @@ _TOOLS = [
     },
 ]
 
-_SYSTEM = """You are Apex, an intelligent forex trading assistant inside a Telegram bot.
+_SYSTEM = """You are Apex, the assistant of a hosted forex execution platform, operated through Telegram.
 
 You help users trade: analyze forex markets, execute trades, explain P&L, manage settings.
 
 RULES:
 - Be concise — Telegram messages, 2-4 sentences max unless analysis is requested
 - LANGUAGE: ALWAYS reply in English, whatever language the user writes in.
-  The bot's own messages (buttons, trade alerts, the daily summary) are all
+  The platform's own messages (buttons, trade alerts, the daily summary) are all
   English, so mirroring the user's language made a single chat bilingual —
   an English "Position closed" next to a Romanian answer about it. One
   language throughout is clearer than each message being individually
@@ -494,7 +494,7 @@ def _local_status(user_id: str, voice: bool = False) -> str:
         tail = "" if voice else "\n   Close with <code>/close</code>"
         lines.append(f"{head}\n{levels}{tail}")
     else:
-        lines.append("📭 <b>No open position.</b> Bot is scanning automatically.")
+        lines.append("📭 <b>No open position.</b> The platform is scanning for a setup.")
         if not voice:
             lines.append(f"<i>Force entry:</i> <code>/buy {symbol}</code> "
                          f"or <code>/sell {symbol}</code>")

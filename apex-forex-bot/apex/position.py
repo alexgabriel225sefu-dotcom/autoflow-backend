@@ -36,7 +36,7 @@ def check_position(pos, price):
                 or (side == "SELL" and price <= entry - one_r and be_price < pos["stopLoss"])):
             pos["stopLoss"] = be_price
             pos["beDone"] = True
-            logger.info(f"🛡️ Breakeven: SL moved to {be_price:.5f} — risk-free trade")
+            logger.info(f"🛡️ Breakeven: SL moved to {be_price:.5f}")
 
     # Trailing stop (strâns în runner mode — Seykota: let profits run)
     if cfg.TRAILING_STOP:

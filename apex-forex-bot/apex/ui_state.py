@@ -344,7 +344,7 @@ def automation_label(state):
     if state.emergency:
         return f"{label} · ⏸ held by emergency stop"
     if not state.running:
-        return f"{label} · ⏸ bot is off"
+        return f"{label} · ⏸ execution paused"
     if blocked:
         return f"{label} · ⏸ waiting on {blocked[0]}"
     return f"{label} · ⏸ not active yet"

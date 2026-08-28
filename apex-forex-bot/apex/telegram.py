@@ -976,7 +976,7 @@ def _handle_setup(chat_id):
                 f"🛠️ <b>{cfg.BOT_NAME.upper()} SETUP</b>\n\n"
                 "1/5 — <b>How do you want to trade?</b>\n\n"
                 "Reply <code>1</code> or <code>2</code>:\n"
-                "  <code>1</code> — 🧪 <b>Demo</b> (test it risk-free — note: free access "
+                "  <code>1</code> — 🧪 <b>Demo</b> (no capital at risk — note: free access "
                 f"needs a <b>live {_REQUIRED_BROKER_LABEL}</b> account, so this won't unlock trading).\n"
                 f"  <code>2</code> — 🔴 <b>Live</b> (real money via a live <b>{_REQUIRED_BROKER_LABEL}</b> "
                 "account — required for free access).\n\n"
@@ -987,10 +987,10 @@ def _handle_setup(chat_id):
                 "1/5 — <b>How do you want to trade?</b>\n\n"
                 "Reply <code>1</code> or <code>2</code>:\n"
                 "  <code>1</code> — 🧪 <b>Demo</b> (free demo account on cTrader — "
-                "real market data, no risk).\n"
+                "real market data, no capital at risk).\n"
                 "  <code>2</code> — 🔴 <b>Live</b> (real money via <b>cTrader</b> — any broker "
                 "worldwide).\n\n"
-                "<i>Most people start with 1 (demo) to test it risk-free.</i>")
+                "<i>Most people start with 1 (demo), where no capital is at risk.</i>")
 
 
 def _handle_wizard_reply(chat_id, raw, msg_id):
@@ -1032,7 +1032,7 @@ def _handle_wizard_reply(chat_id, raw, msg_id):
                 send_to(chat_id,
                         "🔴 <b>Live trading — via cTrader</b>\n\n"
                         f"Free access runs through a live <b>{_REQUIRED_BROKER_LABEL}</b> "
-                        "account specifically — that's who verifies and funds your free bot.\n\n"
+                        "account specifically — that's who verifies and funds your free access.\n\n"
                         "<b>Next step:</b>\n"
                         "1️⃣ Send <b>/ctrader</b> → tap <b>Authorize</b> → log in and approve\n\n"
                         "<i>Send /ctrader now to link your account.</i>")
@@ -1438,7 +1438,7 @@ def _handle_ctrader(chat_id):
                f"partner broker, <b>{_REQUIRED_BROKER_LABEL}</b> — a demo account or another "
                "broker won't unlock trading.\n\n")
     else:
-        tip = ("💡 <b>New here?</b> Start on a demo account — test it risk-free, "
+        tip = ("💡 <b>New here?</b> Start on a demo account — no capital at risk, "
                "switch to live when you're confident.\n\n")
     if broker_rows:
         tip += "Don't have a cTrader account yet? Create one below, then come back and Authorize.\n\n"
@@ -2154,7 +2154,7 @@ def _builder_preset(chat_id, key):
     send_to(chat_id, builder.summary(dict(user_store.load(chat_id))))
     return send_to(chat_id,
         f"✅ <b>{p['label']} applied.</b> The platform now trades with these settings."
-        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot is off — tap ▶️ to start.</i>"),
+        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Execution is paused — tap ▶️ to start.</i>"),
         _dashboard_keyboard(chat_id))
 
 
@@ -2206,7 +2206,7 @@ def _builder_activate(chat_id):
     running = _apply_builder_patch(chat_id, d)
     return send_to(chat_id,
         "✅ <b>Strategy activated.</b> The platform now trades exactly this."
-        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot is off — tap ▶️ to start.</i>"),
+        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Execution is paused — tap ▶️ to start.</i>"),
         _dashboard_keyboard(chat_id))
 
 
@@ -3024,8 +3024,8 @@ def _screen_notifications(chat_id):
             "🔔 <b>Notifications</b>\n"
             f"{_state_line(chat_id)}\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "<b>Always sent</b> — what happened to your money, and whether the "
-            "bot is running:\n"
+            "<b>Always sent</b> — what happened to your money, and whether "
+            "execution is running:\n"
             "<i>positions opened and closed, a stop that moved past your entry, "
             "a position left without a stop, an exit that failed, the daily "
             "summary, the market opening and closing.</i>\n\n"
@@ -3740,7 +3740,7 @@ def _handle_maxpos(chat_id, args):
            f"Up to {n} trades at once — each risks ~{per:.1f}% so all {n} together "
            f"never risk more than 5% of the account. Correlated same-direction "
            f"trades are limited automatically.\n")
-        + ("" if running or user_loop.is_running(chat_id) else "⏸ <i>Bot stopped — tap ▶️ to start.</i>"),
+        + ("" if running or user_loop.is_running(chat_id) else "⏸ <i>Execution stopped — tap ▶️ to start.</i>"),
         _dashboard_keyboard(chat_id))
 
 
@@ -3786,7 +3786,7 @@ def _handle_autopilot(chat_id, args):
         f"I'll scan these every cycle and trade the strongest setup anywhere — one position at a time:\n"
         f"<b>{' · '.join(universe)}</b>\n\n"
         "You stay in control: /symbol or /watch to take over, /autopilot off to stop."
-        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot stopped — tap ▶️ to start.</i>"),
+        + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Execution stopped — tap ▶️ to start.</i>"),
         _dashboard_keyboard(chat_id))
 
 
@@ -3809,7 +3809,7 @@ def _handle_watch(chat_id, args):
         user_store.update(chat_id, {"watchlist": []})
         running = _restart_user_loop(chat_id)
         return send_to(chat_id, "👁 Watchlist cleared — back to single-symbol mode (/symbol)."
-                       + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot stopped — /start to run.</i>"))
+                       + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Execution stopped — /start to run.</i>"))
     syms = [w.upper().replace("/", "_").replace("-", "_") for w in raw.split()][:6]
     # Forex majors + metals only — anything the order path would refuse must
     # not reach the basket, or it becomes a dead slot in the scan budget.
@@ -3840,7 +3840,7 @@ def _handle_watch(chat_id, args):
             f"👁 <b>Watchlist set:</b> {' · '.join(syms)}\n\n"
             "Every cycle I scan all of them and take only the strongest setup — "
             "one open position at a time, risk rules unchanged."
-            + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Bot stopped — send /start to begin.</i>"))
+            + ("" if running or user_loop.is_running(chat_id) else "\n⏸ <i>Execution stopped — send /start to begin.</i>"))
 
 
 def _handle_pairs(chat_id):
@@ -3878,7 +3878,7 @@ def _handle_pairs(chat_id):
         return f"\n<b>{title}</b>\n{' · '.join(cut)}{extra}\n"
     send_to(chat_id,
             f"💱 <b>Your broker offers {len(names)} instruments — "
-            f"{len(fx) + len(metals)} of them are tradeable by this bot:</b>\n"
+            f"{len(fx) + len(metals)} of them are tradeable on this platform:</b>\n"
             + _sec("Forex", fx, 36)
             + _sec("Metals", metals, 8)
             + (f"\nThe other <b>{other}</b> (crypto, indices, stock CFDs, crosses without a "
@@ -5323,7 +5323,7 @@ def send_activation_sequence(chat_id, paid: bool):
                      "🎉 <b>Welcome — you're in!</b>")
     risk_bullet = (f"• Free access requires a <b>live {_REQUIRED_BROKER_LABEL}</b> account\n"
                    if (_LIVE_BROKER_REQUIRED and not paid) else
-                   "• Start on a <b>demo account</b> first to test risk-free\n")
+                   "• Start on a <b>demo account</b> first — no capital at risk\n")
     send_to(chat_id,
             f"{welcome_head}\n\n"
             "Your licence is active. You now operate a hosted trading "
@@ -5885,7 +5885,7 @@ def _license_ok(chat_id, text):
         if not data.get("valid"):
             send_to(chat_id,
                 f"❌ <b>{data.get('message', 'License not found.')}</b>\n\n"
-                "Need help? supportaicashsystem@gmail.com")
+                f"Need help? {cfg.SUPPORT_EMAIL}")
             return False
     except Exception as e:
         print(f"[TELEGRAM] ⛔ verify-license unavailable ({e}) — DENYING a "
@@ -5894,7 +5894,7 @@ def _license_ok(chat_id, text):
             "⏳ <b>We can't check that key right now.</b>\n\n"
             "Our licence service isn't responding. Your key is fine — please "
             "try the activation link again in a few minutes.\n\n"
-            "Still stuck after that? supportaicashsystem@gmail.com")
+            f"Still stuck after that? {cfg.SUPPORT_EMAIL}")
         return False
     try:
         if not user_store.update(cid, {"license_key": key}, strict=True):
@@ -5914,7 +5914,7 @@ def _license_ok(chat_id, text):
                 "Your licence checked out, but we could not save it just now. "
                 "Tap the activation link again in a moment — nothing is lost "
                 "and you will not be charged twice.\n\n"
-                "Still stuck? supportaicashsystem@gmail.com")
+                f"Still stuck? {cfg.SUPPORT_EMAIL}")
         return False
     return True
 
@@ -5988,7 +5988,7 @@ def _revalidate_license(chat_id):
                     "⛔ <b>We still cannot verify your licence.</b>\n\n"
                     f"It has been unverifiable for over {_GRACE_MAX_S // 3600}h, "
                     "so access is paused. Nothing was lost — contact "
-                    "supportaicashsystem@gmail.com and it is restored as soon "
+                    f"{cfg.SUPPORT_EMAIL} and it is restored as soon "
                     "as verification works again.")
             return False
         if not u.get("license_grace_since"):
@@ -6029,7 +6029,7 @@ def _revalidate_license(chat_id):
             pass
         send_to(chat_id,
                 f"⛔ <b>{data.get('message', 'Your license is no longer active.')}</b>\n"
-                "Questions? supportaicashsystem@gmail.com")
+                f"Questions? {cfg.SUPPORT_EMAIL}")
         return False
 
     # Verified. Clear any grace marker so live trading resumes.
@@ -6257,7 +6257,7 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         send_to(chat_id,
                 "🔊 <b>Detailed alerts ON</b> — you'll now also see "
                 "every skipped setup, each stop trail and the "
-                "bot's internal checks.\nSend /verbose again to go "
+                "platform's internal checks.\nSend /verbose again to go "
                 "back to quiet."
                 if _on else
                 "🔇 <b>Quiet mode</b> — you'll get trades, the "
