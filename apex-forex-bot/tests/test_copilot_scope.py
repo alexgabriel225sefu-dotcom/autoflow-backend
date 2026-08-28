@@ -147,7 +147,11 @@ for forbidden in ("force_close", "place_order", "close_position", "amend_sltp",
     check(f"{forbidden} is never called", f"{forbidden}(" not in BODY)
 check("the AI assistant is not wired in", "assistant.chat" not in BODY,
       "assistant.chat runs a tool loop that can act")
-check("...and the reason is recorded in the module", "tool loop" in SRC)
+# There WAS a second check here asserting the module documents why. It searched
+# for a phrase that exists only in the docstring, which is precisely the
+# anti-pattern test_prose_assertions catches: delete the behaviour, keep the
+# comment, and the assertion still passes. The behavioural check above is the
+# one that matters, and prose does not need a test.
 check("settings are not written from here", "user_store.update" not in BODY)
 
 print("\n5. Every answer says what kind of claim it is")
