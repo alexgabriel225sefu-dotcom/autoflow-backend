@@ -100,12 +100,30 @@ check("an empty filter result is worded, not blank",
 check("an empty library is worded differently from an empty filter",
       "Your completed trades will appear here" in HTML)
 
-print("\n7. A history row opens the trade, and the trade offers the replay")
+print("\n7. History is paged, not downloaded whole")
+check("the first request is bounded", "'/api/app/history?limit='+HIST_PAGE" in HTML)
+check("...and asks for an offset", "&offset=0" in HTML)
+check("more pages are fetched from where the last one ended",
+      "'&offset='+histCache.length" in HTML)
+check("the server's total is what decides whether there are more",
+      "histCache.length >= histTotal" in HTML)
+check("a second request cannot start while one is running",
+      "if(histLoading" in HTML,
+      "two overlapping pages would append the same rows twice")
+check("load-more is hidden under a filter",
+      "histFilter==='all' && !histSearch && histCache.length < histTotal" in HTML,
+      "a button under a filtered list suggests the FILTER is incomplete")
+check("the server caps the page size itself",
+      "min(int(limit or 25), HISTORY_PAGE_MAX)" in
+      open(os.path.join(ROOT, "apex", "miniapp_api.py"), encoding="utf-8").read(),
+      "a client asking for ten thousand must not get them")
+
+print("\n8. A history row opens the trade, and the trade offers the replay")
 check("a row opens trade detail", "openTrade(r.dataset.t)" in HTML)
 check("trade detail exists", 'id="s-trade"' in HTML and 'id="tradeBody"' in HTML)
 check("replay is reachable from it", "openReplay(id)" in HTML)
 
-print("\n8. No route local can shadow the enclosing scope")
+print("\n9. No route local can shadow the enclosing scope")
 _locals = {m.group(1) for m in re.finditer(r'^\s+([a-z][\w]*) = (?!=)', CODE, re.M)}
 check(f"every local is prefixed ({sorted(_locals)})", not _locals,
       "do_GET shares a scope; a bare name here breaks a branch elsewhere")

@@ -853,6 +853,29 @@ document.addEventListener('click',ev=>{
   t.classList.add('on'); symTf=t.dataset.stf; loadSymbol(true);
 });
 
+/* Pages of trades, not the whole journal. §24: a client with two thousand
+   closed trades must not download them to look at last week. The server
+   already bounds and paginates; this is the client half. */
+const HIST_PAGE=50;
+let histTotal=0, histLoading=false;
+async function loadMoreHistory(){
+  if(histLoading || histCache.length >= histTotal) return;
+  histLoading=true;
+  const btn=Q('histMore'); if(btn){ btn.disabled=true; btn.textContent='Loading…'; }
+  try{
+    const h=await api('/api/app/history?limit='+HIST_PAGE+'&offset='+histCache.length);
+    histCache=histCache.concat(h.trades||[]);
+    histTotal=h.total||histTotal;
+    applyHistFilter();
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent='Could not load more — retry'; }
+  }
+  histLoading=false;
+}
+document.addEventListener('click',ev=>{
+  if(ev.target && ev.target.id==='histMore') loadMoreHistory();
+});
+
 /* ── Trade Library ────────────────────────────────────────────────────
    Filters run over the SAME rows the server already sent. Filtering must
    never become a reason to re-query, and an empty section says so rather
@@ -1529,8 +1552,9 @@ let histCache=[];
 async function loadHistory(){
   const el=Q('p-hist');
   try{
-    const h=await api('/api/app/history?limit=50');
+    const h=await api('/api/app/history?limit='+HIST_PAGE+'&offset=0');
     histCache=h.trades||[];
+    histTotal=h.total||histCache.length;
     applyHistFilter();
   }catch(e){
     el.innerHTML='<div class="empty">'+(e.code==='TELEGRAM_AUTH_FAILED'
@@ -1561,6 +1585,13 @@ function drawHistory(rows){
         +'<div class="r '+(t.netPnl==null?'':(win?'pnl-up':'pnl-dn'))+'">'
         +(t.netPnl==null?'—':money(t.netPnl))+'<span class="chev"> ›</span></div></div></div>';
   }).join('');
+  /* Only offered when the server said there are more, and only on the
+     unfiltered view — "load more" under a filtered list would suggest the
+     filter is incomplete rather than the page. */
+  if(histFilter==='all' && !histSearch && histCache.length < histTotal)
+    el.insertAdjacentHTML('beforeend',
+      '<button class="btn" id="histMore">Load more ('
+      +histCache.length+' of '+histTotal+')</button>');
   el.querySelectorAll('.trow').forEach(r=>r.onclick=()=>openTrade(r.dataset.t));
 }
 
