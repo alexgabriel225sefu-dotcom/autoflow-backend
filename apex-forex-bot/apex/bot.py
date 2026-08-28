@@ -535,6 +535,51 @@ def _start_dashboard_server():
                     200, {"ok": True},
                     [("Set-Cookie", http_session.clear_cookie_value(self.headers))])
 
+            # ── Close a position from the Mini App ──────────────────
+            # This is the ONE financial action the Mini App can take, and it
+            # creates no new path to the broker. It calls the same
+            # user_loop.force_close every other origin calls, which routes
+            # through gates.authorize_close — entitlement, ownership,
+            # idempotency and the audit line all happen there, unchanged.
+            # Only the origin differs, so a close from here is distinguishable
+            # in the audit trail from /close or the control plane.
+            #
+            # The position is never named by the caller. Whatever the client
+            # has on screen, the position closed is the one the server holds
+            # for that chat: a position id from a frontend is a request to
+            # close something, not proof of the right to.
+            if self.path == "/api/app/close":
+                from apex import user_loop as _c_ul
+                _c_user = self._telegram_identity()
+                if not _c_user:
+                    self._telegram_denied()
+                    return
+                _c_chat = str(_c_user["id"])
+                if not http_security.MINIAPP.check(http_security.client_key(self)):
+                    self._reply(429, {"ok": False, "error": "RATE_LIMITED",
+                                      "message": "Too many requests. Try again shortly."})
+                    return
+                try:
+                    _c_res = _c_ul.force_close(_c_chat, origin="miniapp")
+                except Exception as _c_e:
+                    # The request reached the broker path and we do not know
+                    # how far it got. Saying "failed" would invite a retry that
+                    # could close a position twice; §"ORDER STATUS UNKNOWN" is
+                    # the honest answer.
+                    print(f"[MiniApp] close raised for {_c_chat}: {_c_e}")
+                    self._reply(502, {"ok": False, "error": "CLOSE_STATUS_UNKNOWN",
+                                      "message": "The platform is verifying the "
+                                                 "broker state. Do not retry yet."})
+                    return
+                if _c_res.get("ok"):
+                    self._reply(200, {"ok": True, "symbol": _c_res.get("symbol"),
+                                      "price": _c_res.get("price")})
+                else:
+                    # A refusal is a refusal, not an error: nothing was closed,
+                    # and the reason is the gate's own.
+                    self._reply(200, {"ok": False, "error": _c_res.get("error"),
+                                      "detail": _c_res.get("detail")})
+                return
             if self.path == "/api/stripe/webhook":
                 from apex import stripe_license
                 length = int(self.headers.get("Content-Length") or 0)
