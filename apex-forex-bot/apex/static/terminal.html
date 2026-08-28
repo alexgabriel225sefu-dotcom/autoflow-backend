@@ -55,6 +55,26 @@ body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Disp
 #bottomnav div.on{color:var(--t0)} #bottomnav div.on em{opacity:1}
 .sec-h{font-size:var(--fs-xs);font-weight:800;letter-spacing:.16em;text-transform:uppercase;
   color:var(--t2);margin:var(--sp5) var(--sp4) var(--sp2)}
+#greet{padding:var(--sp4) var(--sp4) 0;font-size:var(--fs-md);color:var(--t1);font-weight:600}
+/* Account card */
+#acctCard{margin:var(--sp3) var(--sp4) 0;padding:var(--sp4);border:1px solid var(--line);
+  border-radius:var(--r-lg);background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.015))}
+#acctTop{display:flex;justify-content:space-between;align-items:baseline;gap:var(--sp3);margin-bottom:var(--sp3)}
+#acctBroker{font-size:var(--fs-md);font-weight:800}
+#acctEnv{font-size:var(--fs-xs);font-weight:800;letter-spacing:.09em;color:var(--t2)}
+.kvr{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--line)}
+.kvr:last-of-type{border-bottom:none}
+.kvr span{color:var(--t1)} .kvr b{font-variant-numeric:tabular-nums}
+.kvr b.na{color:var(--t2);font-weight:600}
+.note{font-size:11px;color:var(--t2);margin-top:var(--sp2);line-height:1.45}
+/* Market rows */
+.mrow{display:flex;justify-content:space-between;align-items:center;gap:var(--sp3);
+  padding:11px var(--sp4);border-bottom:1px solid var(--line);cursor:pointer}
+.mrow:last-child{border-bottom:none}
+.msym{font-size:var(--fs-md);font-weight:800;letter-spacing:.02em}
+.mpx{font-size:12px;color:var(--t1);font-variant-numeric:tabular-nums;margin-top:1px}
+.mchg{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
+.mchg.up{color:var(--up)} .mchg.dn{color:var(--dn)} .mchg.na{color:var(--t2);font-weight:600}
 body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(70% 32% at 50% -4%,rgba(255,45,79,.16),transparent 70%)}
 .wrap{position:relative;z-index:1}
@@ -176,6 +196,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 </div>
 <div class="wrap">
 <section class="screen on" id="s-home">
+  <div id="greet">Welcome back</div>
   <div id="hero" class="rise">
     <div id="brandRow">
       <div id="brand">APEX<b>4TRADERS</b></div>
@@ -200,6 +221,21 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
     <div class="tile"><b id="tSk">—</b><span>Filtered today</span></div>
   </div>
 
+  <div class="sec-h">Account</div>
+  <div id="acctCard">
+    <div id="acctTop"><div id="acctBroker">—</div><div id="acctEnv">—</div></div>
+    <div class="kvr"><span>Balance</span><b id="acBal">—</b></div>
+    <div class="kvr"><span>Equity</span><b id="acEq">—</b></div>
+    <div class="kvr"><span>Open P&amp;L</span><b id="acFloat">—</b></div>
+    <div class="kvr"><span>Free margin</span><b id="acFree" class="na">—</b></div>
+    <div class="kvr"><span>Margin level</span><b id="acML" class="na">—</b></div>
+    <!-- Balance and equity are the broker's own figures. Free margin and
+         margin level are not in cTrader's account response, so they are shown
+         as unavailable rather than derived from leverage and passed off as
+         the broker's number. -->
+    <div class="note" id="acNote">Free margin and margin level are not reported by the cTrader account API.</div>
+  </div>
+
   <div class="sec-h">Open positions</div>
   <div id="homePos"><div class="empty">Loading…</div></div>
   <div class="sec-h">Market snapshot</div>
@@ -207,6 +243,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 </section>
 
 <section class="screen" id="s-markets">
+  <div class="sec-h">Forex</div>
+  <div id="mkForex"><div class="empty">Loading markets…</div></div>
+  <div class="sec-h">Metals</div>
+  <div id="mkMetals"><div class="empty">Loading markets…</div></div>
+  <div class="sec-h" id="mkChartH">Chart</div>
   <div class="card rise">
     <div class="card-h"><b id="cSym">—</b><span id="cMeta"><i id="liveDot"></i>loading…</span></div>
     <div id="chart"></div>
@@ -448,6 +489,74 @@ setInterval(freshness,2000);
 // history, in every proxy and access log on the way, and in the Referer
 // header of any outbound link. It travels as a header now, and the server
 // REFUSES a request that still carries it in the URL.
+/* ── Home: account card ───────────────────────────────────────────────
+   Balance and equity are the broker's own numbers, passed straight through.
+   Free margin and margin level are NOT in cTrader's account response, so
+   they stay "—" with the reason printed under the card. Deriving them from
+   leverage and showing them beside two real figures would make a guess look
+   like a fourth broker fact. */
+function renderAccount(d){
+  const a=d.account||{}, set=(id,v,cls)=>{const e=Q(id);if(!e)return;
+    e.textContent=v;e.className=cls||'';};
+  const br=Q('acctBroker'); if(br) br.textContent = d.broker || 'No account connected';
+  const ev=Q('acctEnv');
+  if(ev) ev.textContent = String(a.badge||'—').replace(/[^\x20-\x7E]/g,'').trim().toUpperCase();
+  const bal=d.balance, eq=(d.equityLive!=null?d.equityLive:d.equity), fl=d.floatingPnl;
+  set('acBal', bal!=null?'$'+Number(bal).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):'—', bal!=null?'':'na');
+  set('acEq',  eq!=null?'$'+Number(eq).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):'—', eq!=null?'':'na');
+  set('acFloat', fl!=null?money(fl):'—', fl==null?'na':(fl>=0?'pnl-up':'pnl-dn'));
+}
+
+/* ── Markets ──────────────────────────────────────────────────────────
+   One shared snapshot serves every client (see apex/markets.py). A symbol
+   the broker did not price is rendered as unavailable — never as 0.00, and
+   never as the last price it happened to have. */
+function marketRow(r){
+  if(!r.available) return '<div class="mrow"><div><div class="msym">'+esc(r.symbol)
+    +'</div><div class="mpx">unavailable</div></div><div class="mchg na">—</div></div>';
+  const up=r.changePct>=0;
+  return '<div class="mrow" data-sym="'+esc(r.symbol)+'"><div>'
+    +'<div class="msym">'+esc(r.symbol)+'</div>'
+    +'<div class="mpx">'+Number(r.price).toLocaleString(undefined,{maximumFractionDigits:5})+'</div></div>'
+    +'<div class="mchg '+(up?'up':'dn')+'">'+(up?'+':'')+r.changePct.toFixed(2)+'%</div></div>';
+}
+let mktAt=0;
+async function loadMarkets(force){
+  if(!force && Date.now()-mktAt < 20000) return;
+  const F=Q('mkForex'), M=Q('mkMetals'), H=Q('homeMkt');
+  try{
+    const d=await api('/api/app/markets');
+    mktAt=Date.now();
+    if(!d.available){
+      const msg='<div class="empty">Market data unavailable right now.</div>';
+      if(F)F.innerHTML=msg; if(M)M.innerHTML=msg; if(H)H.innerHTML=msg; return;
+    }
+    const by={}; (d.rows||[]).forEach(r=>by[r.symbol]=r);
+    const draw=(list)=>(list||[]).map(sym=>by[sym]?marketRow(by[sym]):'').join('');
+    if(F)F.innerHTML=draw(d.forex)||'<div class="empty">No forex instruments.</div>';
+    if(M)M.innerHTML=draw(d.metals)||'<div class="empty">No metals.</div>';
+    /* Home shows a short overview, not the whole board. */
+    if(H)H.innerHTML=draw((d.forex||[]).slice(0,3).concat((d.metals||[]).slice(0,1)))
+      ||'<div class="empty">No market data.</div>';
+    if(d.stale){
+      const w='<div class="empty">Showing the last snapshot — the broker did not answer.</div>';
+      if(F)F.insertAdjacentHTML('afterbegin',w);
+    }
+  }catch(e){
+    const msg='<div class="empty">Market data unavailable ('+esc(e.message||'error')+').</div>';
+    if(F&&!F.querySelector('.mrow'))F.innerHTML=msg;
+    if(M&&!M.querySelector('.mrow'))M.innerHTML=msg;
+    if(H&&!H.querySelector('.mrow'))H.innerHTML=msg;
+  }
+}
+/* Tapping a market row or a Home position goes where the detail lives. */
+document.addEventListener('click',ev=>{
+  const row=ev.target.closest&&ev.target.closest('[data-goto],[data-sym]');
+  if(!row)return;
+  if(row.dataset.goto) showScreen(row.dataset.goto);
+  else if(row.dataset.sym) showScreen('markets');
+});
+
 async function api(path){
   const r = await fetch(path, {headers: {'Authorization': 'Telegram ' + initData}});
   if(!r.ok){
@@ -462,6 +571,7 @@ async function refresh(){
   const d = await api('/api/app/data?tf='+encodeURIComponent(TF));
   Q('err').style.display='none'; lastOk=Date.now(); failStreak=0; everLoaded=true; freshness();
   setBadge(d.account, d.broker);
+  renderAccount(d);
   applyPrecision(d.digits);
   if(d.pipSize) PIP=d.pipSize;
   TFSEC=TF_SECONDS[d.timeframeUsed||TF]||TFSEC;
@@ -593,7 +703,21 @@ async function refresh(){
 function renderPositions(list, count){
   const host=Q('posList'); if(!host)return;
   const rows=(list||[]).filter(p=>p&&p.symbol);
-  if(!rows.length){host.innerHTML='';host.style.display='none';return;}
+  /* Home carries a compact copy so the first screen answers "am I in
+     anything" without a tap. Same rows, same source — never a second
+     count computed a different way. */
+  const home=Q('homePos');
+  if(home) home.innerHTML = rows.length
+    ? rows.map(p=>{
+        const known=p.pnlUsd!=null, up=known&&p.pnlUsd>=0;
+        return '<div class="mrow" data-goto="portfolio"><div>'
+          +'<div class="msym">'+esc(String(p.symbol).replace('_','/'))+'</div>'
+          +'<div class="mpx">'+(p.side==='SELL'?'SELL':'BUY')+(p.units!=null?' \u00b7 '+p.units:'')+'</div></div>'
+          +'<div class="mchg '+(known?(up?'up':'dn'):'na')+'">'
+          +(known?money(p.pnlUsd):'price pending')+'</div></div>';
+      }).join('')
+    : '<div class="empty">No open positions.</div>';
+  if(!rows.length){host.innerHTML='<div class="empty">No open positions.</div>';host.style.display='block';return;}
   host.style.display='block';
   host.innerHTML=rows.map(p=>{
     const dir=p.side==='SELL'?'🔴 SHORT':'🟢 LONG';
@@ -811,8 +935,22 @@ async function tick(){
    positions and the money are on screen while /api/app/data is still fetching
    150 candles, stats, news and the journal. Painting the cheap thing first is
    the difference between "instant" and "loading". */
+/* The client's own first name, from Telegram's signed payload. Not a stored
+   profile — nothing here is worth a round trip, and it is already in hand. */
+try{
+  const who = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  const h = new Date().getHours();
+  const part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  Q('greet').textContent = who && who.first_name
+    ? part + ', ' + String(who.first_name).slice(0, 24) : part;
+}catch(e){}
+
 tick().finally(()=>{ setInterval(tick, 1500); });
 refresh().finally(()=>{ setInterval(refresh, 6000); });
+/* Markets is its own cadence. The snapshot is shared and changes on the day,
+   not on the tick, so polling it beside the position feed would spend the
+   broker's historical allowance for a number that has not moved. */
+loadMarkets(true).finally(()=>{ setInterval(()=>loadMarkets(), 30000); });
 </script>
 </body>
 </html>
