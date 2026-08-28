@@ -7,10 +7,54 @@
 <title>Apex4Traders</title>
 <style>
 :root{--bg:#07090f;--card:rgba(255,255,255,.045);--line:rgba(255,255,255,.08);
-  --t0:#eef1f6;--t1:#9aa3b2;--t2:#5b6472;--up:#2fd575;--dn:#ff4560;--acc:#ff2d4f;--gold:#f5b544}
+  --t0:#eef1f6;--t1:#9aa3b2;--t2:#5b6472;--up:#2fd575;--dn:#ff4560;--acc:#ff2d4f;--gold:#f5b544;
+  /* APEX4TRADERS design system.
+     One scale for spacing, one for type. Every screen composes from these, so
+     a card on Home and a card on Risk are the same object rather than two that
+     happen to look alike. Status colours are separate from accent colours: an
+     environment badge must never borrow the brand red. */
+  --sp1:4px;--sp2:8px;--sp3:12px;--sp4:16px;--sp5:24px;--sp6:32px;
+  --fs-mega:34px;--fs-xl:22px;--fs-lg:17px;--fs-md:14px;--fs-sm:12.5px;--fs-xs:10.5px;
+  --r-sm:9px;--r-md:14px;--r-lg:18px;
+  --st-live:#ff4560;--st-demo:#2fd575;--st-unver:#f5b544;--st-off:#5b6472;
+  /* Telegram draws its own chrome top and bottom; the shell has to sit inside
+     it or the nav lands under the home indicator on an iPhone. */
+  --safe-b:env(safe-area-inset-bottom,0px);--nav-h:58px;--top-h:62px}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
-  overflow-x:hidden;padding-bottom:34px}
+  overflow-x:hidden;padding-top:var(--top-h);
+  padding-bottom:calc(var(--nav-h) + var(--safe-b) + var(--sp4))}
+/* ── AppShell ───────────────────────────────────────────────────────
+   TopBar and BottomNavigation are fixed and always present. The
+   environment badge lives in the TopBar rather than inside a screen,
+   because "which account is this" must be answerable without scrolling
+   and without remembering which tab you came from. */
+#topbar{position:fixed;top:0;left:0;right:0;z-index:20;background:rgba(7,9,15,.92);
+  backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+#tbRow{display:flex;align-items:center;gap:var(--sp3);padding:9px var(--sp4) 0}
+#tbBack{font-size:20px;color:var(--t1);width:22px;visibility:hidden;cursor:pointer;line-height:1}
+#tbBack.on{visibility:visible}
+#tbTitle{flex:1;font-size:12px;font-weight:800;letter-spacing:.22em;color:var(--t0)}
+#tbTitle b{color:var(--acc)}
+#tbAct{font-size:15px;color:var(--t2)}
+#envBadge{padding:3px var(--sp4) 9px;font-size:var(--fs-xs);font-weight:800;letter-spacing:.1em;
+  color:var(--t2);display:flex;align-items:center;gap:7px}
+#envBadge i{width:7px;height:7px;border-radius:50%;background:var(--st-off);display:inline-block;flex:none}
+#envBadge.live i{background:var(--st-live)} #envBadge.demo i{background:var(--st-demo)}
+#envBadge.unver i{background:var(--st-unver)} #envBadge.sim i{background:var(--st-off)}
+#envBadge.live{color:#ff97a8} #envBadge.demo{color:#8fe7b6}
+#envBadge.unver{color:#f7d08a} 
+.screen{display:none}
+.screen.on{display:block;animation:rise .32s both}
+#bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;
+  background:rgba(7,9,15,.94);backdrop-filter:blur(18px);border-top:1px solid var(--line);
+  padding-bottom:var(--safe-b)}
+#bottomnav div{flex:1;text-align:center;padding:9px 2px 8px;font-size:9.5px;font-weight:700;
+  color:var(--t2);letter-spacing:.04em;cursor:pointer}
+#bottomnav div em{display:block;font-style:normal;font-size:17px;margin-bottom:2px;opacity:.55}
+#bottomnav div.on{color:var(--t0)} #bottomnav div.on em{opacity:1}
+.sec-h{font-size:var(--fs-xs);font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--t2);margin:var(--sp5) var(--sp4) var(--sp2)}
 body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(70% 32% at 50% -4%,rgba(255,45,79,.16),transparent 70%)}
 .wrap{position:relative;z-index:1}
@@ -122,7 +166,16 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 </style>
 </head>
 <body>
+<div id="topbar">
+  <div id="tbRow">
+    <span id="tbBack">&lsaquo;</span>
+    <div id="tbTitle">APEX<b>4TRADERS</b></div>
+    <span id="tbAct">&#9679;</span>
+  </div>
+  <div id="envBadge"><i></i><span id="envText">CONNECTING…</span></div>
+</div>
 <div class="wrap">
+<section class="screen on" id="s-home">
   <div id="hero" class="rise">
     <div id="brandRow">
       <div id="brand">APEX<b>4TRADERS</b></div>
@@ -147,33 +200,54 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
     <div class="tile"><b id="tSk">—</b><span>Filtered today</span></div>
   </div>
 
+  <div class="sec-h">Open positions</div>
+  <div id="homePos"><div class="empty">Loading…</div></div>
+  <div class="sec-h">Market snapshot</div>
+  <div id="homeMkt"><div class="empty">Loading…</div></div>
+</section>
+
+<section class="screen" id="s-markets">
   <div class="card rise">
     <div class="card-h"><b id="cSym">—</b><span id="cMeta"><i id="liveDot"></i>loading…</span></div>
     <div id="chart"></div>
-    <div id="eqChart"></div>
     <div id="tfBar">
       <div data-tf="1m">1m</div><div data-tf="5m">5m</div><div class="on" data-tf="15m">15m</div>
       <div data-tf="1h">1h</div><div data-tf="4h">4h</div><div data-tf="1d">1d</div>
     </div>
-    <div id="posList"></div>
+    
   </div>
 
-  <div id="tabs" class="rise">
-    <div class="tab on" data-p="chart">Chart</div>
-    <div class="tab" data-p="perf">Performance</div>
-    <div class="tab" data-p="hist">History</div>
-    <div class="tab" data-p="news">Events</div>
-    <div class="tab" data-p="journal">Execution</div>
-  </div>
   <div class="panel on" id="p-chart"></div>
-  <div class="panel" id="p-perf"><div class="empty">Loading…</div></div>
-  <div class="panel" id="p-hist"><div class="empty">Loading your trades…</div></div>
-  <div class="panel" id="p-news"><div class="empty">Loading events…</div></div>
-  <div class="panel" id="p-journal">
+  <div class="sec-h">Economic events</div>
+  <div class="panel on" id="p-news"><div class="empty">Loading events…</div></div>
+</section>
+
+<section class="screen" id="s-portfolio">
+  <div class="sec-h">Open positions</div>
+  <div id="posList"></div>
+  <div class="sec-h">Performance</div>
+  <div class="card rise" style="margin-top:0"><div id="eqChart"></div></div>
+  <div class="panel on" id="p-perf"><div class="empty">Loading…</div></div>
+  <div class="sec-h">Execution log</div>
+  <div class="panel on" id="p-journal">
     <div id="jSwitch"><div class="on" data-j="trades">Recent</div><div data-j="skips">Filtered signals</div></div>
     <div id="jTrades"><div class="empty">No trades yet.</div></div>
     <div id="jSkips" style="display:none"><div class="empty">Nothing skipped yet today.</div></div>
   </div>
+</section>
+
+<section class="screen" id="s-history">
+  <div class="sec-h">Trade history</div>
+  <div class="panel on" id="p-hist"><div class="empty">Loading your trades…</div></div>
+</section>
+
+<section class="screen" id="s-risk">
+  <div class="sec-h">Risk centre</div>
+  <!-- Every value here is rendered from the risk engine's own state. Until it
+       answers, the screen says so rather than showing a zero that reads as
+       "no risk". -->
+  <div id="riskBody"><div class="empty">Loading risk state…</div></div>
+</section>
 </div>
 
 <div id="replay">
@@ -184,6 +258,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div id="rBody"></div>
 </div>
 
+<nav id="bottomnav">
+  <div class="on" data-s="home"><em>&#127968;</em>Home</div>
+  <div data-s="markets"><em>&#128200;</em>Markets</div>
+  <div data-s="portfolio"><em>&#128188;</em>Portfolio</div>
+  <div data-s="history"><em>&#128202;</em>History</div>
+  <div data-s="risk"><em>&#128737;</em>Risk</div>
+</nav>
 <div id="err"></div>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <!-- Served from this deployment, not unpkg: a third-party CDN round-trip sat on
@@ -254,18 +335,38 @@ function refreshEntryLine(pos){
 }
 
 /* ── tabs ── */
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
-  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
-  t.classList.add('on'); Q('p-'+t.dataset.p).classList.add('on');
-  const perf = t.dataset.p==='perf';
-  chartEl.style.display = perf?'none':'block';
-  eqEl.style.display = perf?'block':'none';
-  Q('tfBar').style.display = perf?'none':'flex';
-  Q('cSym').textContent = perf?'Equity curve':lastSym;
-  if(t.dataset.p==='hist') loadHistory();
-  setTimeout(()=>{if(eqChart)eqChart.timeScale().fitContent();},50);
-});
+/* ── Screen router ────────────────────────────────────────────────────
+   Five destinations behind one persistent shell. Routing is hash-based so
+   Telegram's own back gesture and the shell's back arrow both land on a
+   previous screen instead of closing the Mini App — inside Telegram a
+   history entry is the only thing that makes "back" mean anything.
+   Screens are shown, never rebuilt: every element keeps its id, so the
+   data layer goes on writing to the same nodes it always did. */
+const SCREENS={home:'APEX4TRADERS',markets:'MARKETS',portfolio:'PORTFOLIO',
+               history:'TRADE HISTORY',risk:'RISK CENTRE'};
+let screenNow='home';
+function showScreen(name,push){
+  if(!SCREENS[name])name='home';
+  screenNow=name;
+  document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('on',x.id==='s-'+name));
+  document.querySelectorAll('#bottomnav div').forEach(x=>x.classList.toggle('on',x.dataset.s===name));
+  Q('tbTitle').innerHTML = name==='home' ? 'APEX<b>4TRADERS</b>' : SCREENS[name];
+  Q('tbBack').classList.toggle('on',name!=='home');
+  Q('cSym').textContent = lastSym;
+  if(name==='history') loadHistory();
+  if(push!==false && location.hash!=='#'+name) location.hash=name;
+  window.scrollTo(0,0);
+  /* Both charts are laid out while hidden, so they measure 0 wide until the
+     screen they live on is visible. Re-fit after the paint that shows it. */
+  setTimeout(()=>{
+    if(chart&&name==='markets'){chart.applyOptions({width:chartEl.clientWidth});chart.timeScale().fitContent();}
+    if(eqChart&&name==='portfolio'){eqChart.applyOptions({width:eqEl.clientWidth});eqChart.timeScale().fitContent();}
+  },60);
+}
+document.querySelectorAll('#bottomnav div').forEach(d=>d.onclick=()=>showScreen(d.dataset.s));
+Q('tbBack').onclick=()=>history.back();
+window.addEventListener('hashchange',()=>showScreen((location.hash||'#home').slice(1),false));
+showScreen((location.hash||'#home').slice(1),false);
 document.querySelectorAll('#jSwitch div').forEach(d=>d.onclick=()=>{
   document.querySelectorAll('#jSwitch div').forEach(x=>x.classList.remove('on')); d.classList.add('on');
   Q('jTrades').style.display=d.dataset.j==='trades'?'block':'none';
@@ -280,12 +381,25 @@ document.querySelectorAll('#tfBar div').forEach(d=>d.onclick=()=>{
 });
 
 /* ── the badge. Renders the backend verdict and nothing else. ── */
-function setBadge(acct){
+function setBadge(acct,broker){
+  /* Written in two places on purpose. The hero badge is where a client
+     already looks; the TopBar one is what makes the environment answerable
+     from Markets, History or Risk without scrolling back to Home. Both are
+     driven by the SAME server-resolved value — the Mini App never decides
+     for itself whether an account is live. */
+  const cls = !acct ? '' : (acct.mode==='LIVE'?'live' : acct.mode==='DEMO'?'demo'
+              : acct.mode==='SIMULATION'?'sim' : 'unver');
   const b=Q('modeBadge');
-  if(!acct){b.className='';b.textContent='— — —';return;}
-  b.textContent=acct.badge||'—';
-  b.className = acct.mode==='LIVE'?'live' : acct.mode==='DEMO'?'demo'
-              : acct.mode==='SIMULATION'?'sim' : 'unver';
+  if(b){ b.className=cls; b.textContent = acct ? (acct.badge||'—') : '— — —'; }
+  const e=Q('envBadge'), et=Q('envText');
+  if(e&&et){
+    e.className=cls;
+    /* The emoji is stripped: the dot beside it already carries the colour,
+       and §20 forbids leaning on colour alone — the WORD is what stays. */
+    et.textContent = acct ? String(acct.badge||'—').replace(/[^\x20-\x7E]/g,'').trim().toUpperCase()
+                          : 'ACCOUNT UNAVAILABLE';
+    if(acct&&broker) et.textContent += ' \u00b7 ' + String(broker).toUpperCase();
+  }
 }
 
 let first=true,lastSym='—',lastOk=0,failStreak=0,everLoaded=false;
@@ -347,7 +461,7 @@ async function refresh(){
  try{
   const d = await api('/api/app/data?tf='+encodeURIComponent(TF));
   Q('err').style.display='none'; lastOk=Date.now(); failStreak=0; everLoaded=true; freshness();
-  setBadge(d.account);
+  setBadge(d.account, d.broker);
   applyPrecision(d.digits);
   if(d.pipSize) PIP=d.pipSize;
   TFSEC=TF_SECONDS[d.timeframeUsed||TF]||TFSEC;

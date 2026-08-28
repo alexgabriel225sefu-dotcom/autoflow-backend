@@ -262,7 +262,20 @@ check("...and has a distinct class for unverified",
       "unver" in HTML, "an unknown account must not borrow the demo styling")
 check("timeframes are selectable", all(f'data-tf="{t}"' in HTML
                                        for t in ("1m", "5m", "15m", "1h", "4h", "1d")))
-check("history is a tab", 'data-p="hist"' in HTML)
+# History moved from a tab strip to a bottom-navigation destination when the
+# terminal became a five-screen platform shell. The invariant is unchanged and
+# checked harder than before: the screen exists, navigation reaches it, and
+# opening it still loads the user's trades.
+check("history is a navigation destination", 'data-s="history"' in HTML)
+check("...with a screen behind it", 'id="s-history"' in HTML and 'id="p-hist"' in HTML)
+check("...that loads trades when opened",
+      "if(name==='history') loadHistory();" in HTML)
+check("every destination has a screen",
+      all(f'id="s-{s}"' in HTML for s in
+          ("home", "markets", "portfolio", "history", "risk")))
+check("the environment badge is in the persistent shell, not one screen",
+      'id="envBadge"' in HTML and HTML.index('id="envBadge"') < HTML.index('id="s-home"'),
+      "it must be answerable from every screen without scrolling")
 check("the replay screen exists", 'id="replay"' in HTML and 'id="rPlay"' in HTML)
 check("it calls the user-scoped endpoints",
       "/api/app/history" in HTML and "/api/app/replay?trade=" in HTML)
