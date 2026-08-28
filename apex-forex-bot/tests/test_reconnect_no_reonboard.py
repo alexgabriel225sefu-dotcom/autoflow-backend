@@ -83,8 +83,20 @@ check("it shows the stop and target", "SL {pos.get('sl')}" in _sum)
 check("and says so explicitly when there is none", "No open position" in _sum)
 check("it restates the live settings rather than asking again",
       "Your setup is unchanged" in _sum)
-check("it points at a command that exists", "/settings" in _sum
-      and 'cmd_l in ("/controls", "/settings")' in _TG_EARLY)
+# /settings was dispatched alongside /controls; it now opens the platform's
+# own Settings screen while /controls keeps the text guide. The invariant is
+# unchanged and checked harder: the command the summary names must be
+# dispatched, and must reach a handler rather than falling through.
+check("it points at a command that exists", "/settings" in _sum)
+check("...and /settings is dispatched", 'cmd_l == "/settings"' in _TG_EARLY
+      or 'cmd_l in ("/controls", "/settings")' in _TG_EARLY)
+check("...to a real handler, not a fall-through",
+      "_open_platform(chat_id, \"settings\")" in _TG_EARLY
+      or '_CONTROLS_TEXT' in _TG_EARLY)
+check("...and /controls still answers too",
+      'cmd_l == "/controls"' in _TG_EARLY
+      or 'cmd_l in ("/controls", "/settings")' in _TG_EARLY,
+      "a command in muscle memory must not become silence")
 check("the summary exists once and both paths use it",
       _TG_EARLY.count("def reconnect_summary") == 1
       and "tg.reconnect_summary(" in SRC
