@@ -2498,9 +2498,85 @@ def _loop(user_id, alert_fn, gen=None):
             # Price the position before publishing it: /status and the web
             # terminal both show floating P&L, and both read it off this dict.
             dash["openPosition"] = _price_open_position(open_pos, symbol, price)
-            _float = float((dash["openPosition"] or {}).get("pnlUsd") or 0.0)
+
+            # ── The account's money, published once ──────────────────────
+            #
+            # This block replaces a floating figure that was the FOCUSED
+            # position's P&L alone. Every reader of the dash — Telegram's
+            # /status, the SSE stream, the risk screen's exposure list, the
+            # symbol chart's entry lines, and the copilot's "what is open?"
+            # — took that as the account's number. With two trades open, the
+            # client was shown one trade's P&L labelled as the account's, and
+            # `dash["positions"]` was never written at all, so the stream
+            # published an empty list that blanked the Mini App's position
+            # panel between polls and the copilot answered "you have no open
+            # positions" as a FACT while holding two.
+            #
+            # The figures now come from cTrader itself. netUnrealizedPnL is
+            # net of swap and commission, which is why a locally multiplied
+            # number could never match the client's own terminal no matter
+            # how carefully it was computed.
+            _pos_rows = list(all_positions or [])
+            if not _pos_rows and open_pos:
+                _pos_rows = [dict(open_pos, symbol=open_pos.get("symbol") or symbol)]
+            _pnl_by_id, _pnl_source = {}, None
+            if _pos_rows and not cfg.PAPER_TRADING:
+                try:
+                    _pnl_by_id = broker.get_positions_pnl()
+                    _pnl_source = "broker"
+                except Exception as e:
+                    # Never fatal: this decorates the dashboard. The fallback
+                    # is the old local estimate, but it is LABELLED as one so
+                    # no screen presents it as the broker's own figure.
+                    print(f"[UserLoop:{user_id}] unrealised P&L read: {e}")
+                    _pnl_source = None
+
+            _priced, _unpriced, _float = [], 0, 0.0
+            for _p in _pos_rows:
+                _row = dict(_p)
+                _net = _pnl_by_id.get(str(_p.get("positionId")))
+                if _net is None:
+                    # No broker figure for this position — fall back to the
+                    # local estimate, and only for the symbol we have a fresh
+                    # price for. An unpriced position is reported as unpriced;
+                    # counting it as zero would understate the client's
+                    # exposure in the one direction that matters.
+                    # Drop any P&L already on the row before estimating:
+                    # _price_open_position returns the input untouched when it
+                    # cannot price, and a stale figure surviving that would be
+                    # read as a fresh one.
+                    _row.pop("pnlUsd", None)
+                    _est = _price_open_position(
+                        _row, _row.get("symbol") or symbol,
+                        price if _nrm(_row.get("symbol") or symbol) == _nrm(symbol) else None)
+                    _net = (_est or {}).get("pnlUsd")
+                    if _net is not None:
+                        _row["pnlPips"] = (_est or {}).get("pnlPips")
+                        _row["pnlSource"] = "estimated"
+                else:
+                    _row["pnlSource"] = "broker"
+                if _net is None:
+                    _unpriced += 1
+                    _row["pnlUsd"] = None
+                else:
+                    _row["pnlUsd"] = round(float(_net), 2)
+                    _float += float(_net)
+                _priced.append(_row)
+
+            dash["positions"] = _priced
             dash["floatingPnl"] = round(_float, 2)
             dash["equityLive"] = round(float(paper_balance or 0) + _float, 2)
+            # What the equity figure is worth. "broker" means every open
+            # position carried cTrader's own net P&L and the number matches
+            # the client's terminal. "estimated" means it was multiplied here
+            # and will differ by swap and commission. "partial" means at least
+            # one position could not be priced at all, so the figure is a
+            # floor, not the account's equity — a screen must say so rather
+            # than print it as fact.
+            dash["equitySource"] = (
+                "partial" if _unpriced else (_pnl_source or
+                ("broker" if not _pos_rows else "estimated")))
+            dash["unpricedPositions"] = _unpriced
             # openCount is read off the broker at the top of the tick; a close
             # that happens later in the SAME tick clears openPosition but
             # leaves the count at 1, and /status falls through to "1 position

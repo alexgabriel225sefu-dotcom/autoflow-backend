@@ -976,28 +976,42 @@ def _start_dashboard_server():
                             pos["pnlUsd"] = round(fx_mod.pnl_usd(
                                 pos["side"], pos["entryPrice"], last_px, units_, live_symbol), 2)
                     # Live account money, exactly like a cTrader terminal:
-                    #   Equity = Balance + floating (unrealized) P&L.
-                    # Floating from every open position, priced at the freshest
-                    # close we can read (focused symbol is already priced above).
-                    floating = float(pos.get("pnlUsd") or 0) if pos else 0.0
-                    if pos is not None:
-                        try:
-                            all_pos = br.get_all_positions() if not u.get("paper", True) else []
-                        except Exception:
-                            all_pos = []
-                        for ap in all_pos or []:
-                            if ap.get("symbol") == live_symbol:
-                                continue  # already counted via the focused pos
-                            try:
-                                apx = br.get_candles(ap["symbol"], ucfg.TIMEFRAME, 2)
-                                apx = apx[-1]["close"] if apx else None
-                                un = ap.get("units") or 0
-                                if apx and ap.get("entryPrice") and un:
-                                    floating += float(fx_mod.pnl_usd(
-                                        ap["side"], ap["entryPrice"], apx, un, ap["symbol"]))
-                            except Exception:
-                                pass
-                    equity_live = round(float(balance_live or 0) + floating, 2)
+                    #   Equity = Balance + unrealised P&L.
+                    #
+                    # This used to re-derive the figure here, priced locally
+                    # per non-focused position. That was a THIRD implementation
+                    # of the same number — the loop had one and the poll route
+                    # below had another — and all three could disagree, which
+                    # is exactly what a client saw when Telegram, this screen
+                    # and cTrader each showed a different equity for the same
+                    # account.
+                    #
+                    # (Route paths are deliberately not spelled out in this
+                    # comment: the test suite slices bot.py on those literals
+                    # to check each route in isolation, and a path named in
+                    # prose moves the slice boundary.)
+                    #
+                    # The loop now publishes cTrader's own net figure once per
+                    # tick. Reading it costs nothing and cannot drift from what
+                    # the other screens say, because there is no longer another
+                    # copy to drift from.
+                    floating = udash.get("floatingPnl")
+                    if floating is None:
+                        floating = float(pos.get("pnlUsd") or 0) if pos else 0.0
+                    floating = float(floating)
+                    # Composed from the balance THIS response reports, not
+                    # copied from the loop's. The loop's balance can be a tick
+                    # behind a fresh broker read, and an equity that does not
+                    # equal the balance plus the floating figure printed beside
+                    # it reads as a broken number even when both halves are
+                    # individually right.
+                    equity_live = (round(float(balance_live) + floating, 2)
+                                   if balance_live is not None
+                                   else udash.get("equityLive"))
+                    # How much the number above is worth. The screen needs this
+                    # to know whether it may present equity as the account's
+                    # own figure or must say it is incomplete.
+                    equity_source = udash.get("equitySource")
                     # The panel's own view: a rolling window, medium impact
                     # included. `upcoming()`/`today()` answer the trading
                     # guard's question (is a HIGH-impact release near?) and a
@@ -1040,6 +1054,8 @@ def _start_dashboard_server():
                         "balance": balance_live,
                         "equityLive": equity_live,
                         "floatingPnl": round(floating, 2),
+                        "equitySource": equity_source,
+                        "unpricedPositions": udash.get("unpricedPositions") or 0,
                         "price": last_px,
                         "regime": udash.get("regime"),
                         "sessions": fx_mod.active_sessions(),
@@ -1789,6 +1805,18 @@ def _start_dashboard_server():
                         if priced < PRICE_BUDGET:
                             px_ = _price_for(psym); priced += 1
                         pp, pu = _pnl(p, px_)
+                        # Prefer cTrader's own net figure for this position.
+                        # The local estimate above is a mid-price multiplication
+                        # with no swap and no commission in it, so it disagrees
+                        # with the client's cTrader terminal by a few cents that
+                        # grow every day the position is held. Where the loop
+                        # has the broker's number, that is the one shown.
+                        _brk = next((_q for _q in (udash.get("positions") or [])
+                                     if str(_q.get("positionId") or "")
+                                     == str(p.get("positionId") or "-")), None)
+                        if _brk and _brk.get("pnlSource") == "broker" \
+                                and _brk.get("pnlUsd") is not None:
+                            pu = _brk["pnlUsd"]
                         positions_out.append({
                             "symbol": psym, "side": p.get("side"),
                             "entryPrice": p.get("entryPrice"),
@@ -1824,13 +1852,18 @@ def _start_dashboard_server():
                                 _bal = None
                         if _bal is not None:
                             balance = _bal
-                    # Floating is the sum across EVERY position we could price,
-                    # not just the focused one — otherwise equity silently
-                    # ignores the other open trade.
-                    if positions_out:
-                        floating = float(sum(p["pnlUsd"] or 0 for p in positions_out))
-                    else:
-                        floating = float(pnl_usd or 0)
+                    # Floating comes from the loop, which reads cTrader's own
+                    # net unrealised P&L. Summing `positions_out` here was the
+                    # closest of the three old implementations, but it still
+                    # counted a position it could not price as zero — so an
+                    # account with one unpriceable trade reported an equity
+                    # that was confidently wrong rather than admittedly
+                    # incomplete.
+                    floating = udash.get("floatingPnl")
+                    if floating is None:
+                        floating = (float(sum(p["pnlUsd"] or 0 for p in positions_out))
+                                    if positions_out else float(pnl_usd or 0))
+                    floating = float(floating)
 
                     self._json(200, {
                         "symbol": sym, "price": price, "bid": bid, "ask": ask,
@@ -1840,6 +1873,8 @@ def _start_dashboard_server():
                         "balance": balance,
                         "equityLive": (float(balance) + floating) if balance is not None else None,
                         "floatingPnl": floating,
+                        "equitySource": udash.get("equitySource"),
+                        "unpricedPositions": udash.get("unpricedPositions") or 0,
                         "positions": positions_out,
                         "openCount": len(positions_out) or (1 if pos else 0),
                         "position": (None if not pos else {

@@ -58,6 +58,7 @@ try:
         ProtoOASymbolByIdReq, ProtoOASymbolByIdRes, ProtoOAAmendPositionSLTPReq,
         ProtoOADealListReq, ProtoOADealListRes,
         ProtoOAGetDynamicLeverageByIDReq, ProtoOAGetDynamicLeverageByIDRes,
+        ProtoOAGetPositionUnrealizedPnLReq, ProtoOAGetPositionUnrealizedPnLRes,
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
@@ -732,6 +733,50 @@ class CtraderBroker:
                 "takeProfit": p.takeProfit if p.HasField("takeProfit") else None,
                 "positionId": p.positionId,
             })
+        return out
+
+    def get_positions_pnl(self):
+        """cTrader's OWN unrealised P&L per open position.
+
+        This is the number the client sees in their cTrader terminal, and it is
+        the reason this method exists. Everything else here priced a position by
+        re-reading candles and multiplying — which drifts from the broker for
+        three reasons no amount of care fixes locally: the candle close is not
+        the bid/ask the position is actually marked at, swap accrues daily and
+        is invisible to us, and the entry commission is already deducted on the
+        broker's side. A client comparing the two screens sees two different
+        numbers for the same trade and has no way to know which is real.
+
+        `netUnrealizedPnL` is net of swap and commission, so summing it over
+        every position gives exactly cTrader's
+
+            Equity = Balance + Unrealised P&L
+
+        Cost is ONE non-historical request. That matters: cTrader allows 50/s
+        for these against 5/s for historical data, so this is far cheaper than
+        the per-symbol candle reads it replaces, not more expensive.
+
+        Returns {positionId(str): net_pnl_float} — empty dict when the account
+        is flat. Raises on a broker failure, because a caller must be able to
+        tell "no positions" from "we could not ask"; silently returning {} would
+        turn an outage into a confident report of zero.
+        """
+        if getattr(self._c, "PAPER_TRADING", True):
+            return {}
+        req = ProtoOAGetPositionUnrealizedPnLReq()
+        req.ctidTraderAccountId = self._ctid()
+        res = self._rpc(req, ProtoOAGetPositionUnrealizedPnLRes)
+        # moneyDigits is REQUIRED on this response, but defaulting to 2 rather
+        # than trusting that keeps a malformed reply from moving the decimal
+        # point on a client's equity by two places.
+        digits = getattr(res, "moneyDigits", 2) or 2
+        scale = 10 ** digits
+        out = {}
+        for row in res.positionUnrealizedPnL:
+            try:
+                out[str(row.positionId)] = row.netUnrealizedPnL / scale
+            except Exception:
+                continue
         return out
 
     def get_open_trades(self):
