@@ -155,6 +155,23 @@ process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION:', er
 const app = express();
 app.set('trust proxy', 1);
 const rateLimit = require('express-rate-limit');
+// ── Brand ───────────────────────────────────────────────
+// One place decides what the product is called, where a buyer goes to get it,
+// and which inbox answers them. These used to be literals scattered across
+// email bodies, licence refusals and an OG card, which is how a customer could
+// pay for Apex4Traders and receive mail from "AI Cash Systems" pointing at a
+// domain that no longer resolves.
+//
+// There is no website right now. The Telegram bot IS the product surface, so
+// every "where do I get this" answer points at the bot, not at a domain.
+const BRAND         = process.env.BRAND_NAME || 'Apex4Traders';
+const BOT_HANDLE    = process.env.TELEGRAM_BOT_USERNAME || 'FOREX_APEX_BOT';
+const ACCESS_URL    = `https://t.me/${BOT_HANDLE}`;
+// Kept as the default because it is the inbox that actually receives mail
+// today. Set SUPPORT_EMAIL the day an @apex4traders address exists — nothing
+// else has to change.
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'supportaicashsystem@gmail.com';
+
 const _ALLOWED_ORIGINS = new Set([
   'https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'
 ]);
@@ -163,7 +180,14 @@ const _ALLOWED_ORIGINS = new Set([
 // return/cancel URLs (checkout, Stripe Connect onboarding, etc).
 function _safeOrigin(req) {
   const requested = req.headers.origin || '';
-  return _ALLOWED_ORIGINS.has(requested) ? requested : 'https://aicashsystem.space';
+  if (_ALLOWED_ORIGINS.has(requested)) return requested;
+  // Fall back to the host actually serving this request, not to a hard-coded
+  // domain. The old fallback sent a buyer who had just paid to a site that no
+  // longer resolves; this app serves /thank-you itself, so its own host is the
+  // one origin guaranteed to be reachable.
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+  const host  = req.get('host');
+  return host ? `${proto}://${host}` : ACCESS_URL;
 }
 app.use(cors({
   // An explicit allowlist, and credentials:true — which is exactly why it must
@@ -324,13 +348,15 @@ app.get('/api/health', async (req, res) => {
 const _setupChatLimiter = rateLimit({ windowMs: 60*1000, max: 15, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many messages — please wait a minute.' } });
 
-const SETUP_SYSTEM = `You are a concise support assistant for Apex Forex Bot — an
-AI forex trading bot that runs on our servers and is controlled through Telegram.
+const SETUP_SYSTEM = `You are a concise support assistant for ${BRAND} — a hosted
+platform that executes forex strategies on the client's own cTrader account and
+is operated through Telegram.
 Help users get started. Be short and direct (2-4 sentences max). No markdown headers. Use plain text.
-IMPORTANT: Always reply in the SAME language the user wrote in. Detect it automatically.
+IMPORTANT: Always reply in English, whatever language the question was written in.
+The whole platform speaks one language, and support is part of the platform.
 
-THERE IS NOTHING TO DEPLOY. No Railway, no Docker, no exchange API key. The bot
-is hosted; the client only opens Telegram.
+THERE IS NOTHING TO DEPLOY. No Railway, no Docker, no exchange API key. The
+platform is hosted and managed; the client only opens Telegram.
 
 SETUP STEPS:
 1. Open the Telegram link from the purchase email (it carries the licence key).
@@ -345,7 +371,7 @@ COMMON ERRORS:
 - "Invalid license key" -> open the key via the Telegram link from the email.
 - "Not activated" -> still in demo; live activation is deliberate and separate.
 - No trades yet -> normal, forex moves at macro pace (0-3 trades a day).
-SUPPORT EMAIL: supportaicashsystem@gmail.com`;
+SUPPORT EMAIL: ${SUPPORT_EMAIL}`;
 
 app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
   const { message, history = [] } = req.body || {};
@@ -356,25 +382,24 @@ app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
   // Detects language (EN/RO) and responds accordingly
   function staticFallback(msg) {
     const m = msg.toLowerCase();
-    const isEN = /\b(the|is|are|do|can|how|what|where|when|why|i|you|my|your|help|please|and|or|not|have|get|set|need|want|does)\b/.test(m);
-    const T = (ro, en) => isEN ? en : ro;
-
+    // Keyword matching still accepts Romanian words, because visitors type them
+    // — but every answer comes back in English, like the rest of the platform.
     if (m.includes('license') || m.includes('licenta') || m.includes('cheie') || m.includes('key'))
-      return T('Cheia ai primit-o pe email dupa cumparare — deschide linkul de Telegram din acel email si contul se activeaza singur. Daca nu l-ai primit, verifica Spam sau scrie la supportaicashsystem@gmail.com.', 'Your key was emailed after purchase — open the Telegram link in that email and the account activates itself. If it never arrived, check Spam or email supportaicashsystem@gmail.com.');
+      return `Your licence key is emailed the moment payment clears. Opening the Telegram link in that email activates your account — there is nothing to copy by hand. If it never arrived, check Spam, then email ${SUPPORT_EMAIL}.`;
     if (m.includes('ctrader') || m.includes('broker') || m.includes('cont') || m.includes('account'))
-      return T('Conectezi contul cTrader din bot, cand te intreaba. Un cont demo e perfect si e varianta implicita.', 'You connect your cTrader account from inside the bot when it asks. A demo account is fine and is the default.');
+      return 'You connect your cTrader account from inside the platform, when it asks. A demo account is the default and is enough to see everything working.';
     if (m.includes('demo') || m.includes('live') || m.includes('real money') || m.includes('bani reali'))
-      return T('Botul porneste in DEMO. Trecerea pe live e un pas separat pe care il faci tu explicit.', 'The bot starts in DEMO. Going live is a separate step you take explicitly.');
+      return 'Every account starts in demo. Moving to live money is a separate, deliberate step that you take yourself — nothing switches on its own.';
     if (m.includes('crypto') || m.includes('bitcoin') || m.includes('btc') || m.includes('stock'))
-      return T('Botul tranzactioneaza doar forex (perechi cu USD) si metale. Crypto, indici si actiuni nu sunt suportate.', 'The bot trades forex pairs with a USD leg, plus metals. Crypto, indices and stock CFDs are not supported.');
+      return 'Execution covers forex pairs with a USD leg, plus metals. Crypto, indices and stock CFDs are not supported.';
     if (m.includes('deploy') || m.includes('railway') || m.includes('docker') || m.includes('server'))
-      return T('Nu ai nimic de instalat — botul ruleaza pe serverele noastre. Deschizi doar Telegram.', 'There is nothing to deploy — the bot runs on our servers. You only open Telegram.');
+      return 'There is nothing to deploy. The platform is hosted and managed — you open Telegram, and that is the whole setup.';
     if (m.includes('trade') || m.includes('tranzac') || m.includes('no trades'))
-      return T('Normal la inceput: forexul se misca lent, 0-3 tranzactii pe zi.', 'Normal early on: forex moves at macro pace, 0-3 trades a day.');
+      return 'Normal early on. Forex moves at macro pace, so 0-3 positions a day is the expected rate — a quiet day is the strategy working, not a fault.';
     if (m.includes('hello') || m.includes('hi') || m.includes('hey') || m.includes('salut') || m.includes('buna') || m.includes('help'))
-      return T('Salut! Sunt asistentul Apex Forex Bot. Te pot ajuta cu activare, conectare cTrader, demo vs live.', 'Hi! I am the Apex Forex Bot assistant. I can help with activation, connecting cTrader, demo vs live.');
+      return `This is the ${BRAND} assistant. I can help with activation, connecting your cTrader account, and moving from demo to live.`;
     if (m.includes('support') || m.includes('contact') || m.includes('email') || m.includes('suport'))
-      return T('Suport direct: supportaicashsystem@gmail.com.', 'Direct support: supportaicashsystem@gmail.com.');
+      return `Direct support: ${SUPPORT_EMAIL}.`;
   }
 
   try {
@@ -470,8 +495,8 @@ const JWT_SECRET = process.env.JWT_SECRET || (() => {
 const COOKIE_SECRET = process.env.COOKIE_SECRET || JWT_SECRET + '-cookie';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const SENDER_EMAIL = process.env.SENDER_EMAIL || process.env.BREVO_SMTP_USER || 'supportaicashsystem@gmail.com';
-const SENDER_NAME  = process.env.SENDER_NAME  || 'AI Cash Systems';
+const SENDER_EMAIL = process.env.SENDER_EMAIL || process.env.BREVO_SMTP_USER || SUPPORT_EMAIL;
+const SENDER_NAME  = process.env.SENDER_NAME  || BRAND;
 
 // ── UNIVERSAL EMAIL SENDER ──────────────────────────────────
 // Priority: Resend → Brevo API → SMTP transporter
@@ -481,7 +506,8 @@ async function _sendEmail({ to, subject, html, fromName }) {
 
   // 1. Resend (fastest, works immediately)
   if (RESEND_API_KEY) {
-    // RESEND_FROM must be set to a verified Resend sender, e.g. "Apex Bot <bot@aicashsystem.space>"
+    // RESEND_FROM must be set to a verified Resend sender on the domain
+    // registered with Resend, e.g. "Apex4Traders <bot@your-verified-domain>"
     // Without it, emails may be blocked. Set RESEND_FROM in Render env vars.
     const resendFrom = process.env.RESEND_FROM;
     if (!resendFrom) { console.warn('[WARN] RESEND_FROM not set — Resend will likely reject the send. Set it to a verified sender.'); }
@@ -901,7 +927,7 @@ async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
       <p style="font-size:11px;text-transform:uppercase;color:#E53E2E;margin-bottom:6px">AI Reply</p>
       <p style="font-size:14px;color:#222;line-height:1.6;margin:0">${_he(aiMsg).replace(/\n/g,'<br>')}</p>
     </div>
-    <p style="color:#ccc;font-size:11px;margin-top:18px;text-align:center">AutoFlow · aicashsystem.space</p>
+    <p style="color:#ccc;font-size:11px;margin-top:18px;text-align:center">${BRAND}</p>
   </div>`;
   await _sendEmail({ to, subject, html });
 }
@@ -1576,13 +1602,13 @@ app.post('/api/lead', _authLimiter, async (req, res) => {
   res.json({ ok: true });
 });
 
-async function _notifyAdminAlert(text, subject = 'Apex Trading Suite — alertă') {
+async function _notifyAdminAlert(text, subject = `${BRAND} — alert`) {
   const hook = process.env.MAKE_ALERT_WEBHOOK;
   if (hook) {
     try {
       const r = await fetch(hook, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, text, site: 'aicashsystem.space', at: new Date().toISOString() }),
+        body: JSON.stringify({ subject, text, site: BRAND, at: new Date().toISOString() }),
         signal: AbortSignal.timeout(10000)
       });
       if (r.ok) return;
@@ -1618,7 +1644,7 @@ async function _notifyAdminAlert(text, subject = 'Apex Trading Suite — alertă
   }
   try {
     const res = await _sendEmail({
-      to: adminEmail, subject, fromName: 'Apex Alerts',
+      to: adminEmail, subject, fromName: BRAND,
       html: `<pre style="font:14px/1.6 -apple-system,Segoe UI,sans-serif;white-space:pre-wrap">${_he(text)}</pre>`
     });
     if (!res.ok) addLog(`Admin alert undeliverable on every channel: ${res.error}`, 'system', 'error');
@@ -1674,8 +1700,8 @@ app.post('/api/admin/grant-license', async (req, res) => {
       continue;
     }
     const html = _buildForexEmailHtml(_he(name), _he(email), key);
-    const subject = '🤖 Your Apex Forex Bot — License Key inside';
-    const sent = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
+    const subject = `${BRAND} — your licence key and access link`;
+    const sent = await _sendEmail({ to: email, subject, html, fromName: BRAND });
     const botHandle = 'FOREX_APEX_BOT';
     addLog(`Granted ${product} license: ${_maskLicence(key)} for ${_maskEmail(email)}${sent.ok ? '' : ' (email FAILED to send)'}`, 'license', sent.ok ? 'success' : 'warn');
     results.push({ product, key, emailSent: sent.ok, telegramLink: `https://t.me/${botHandle}?start=${key}` });
@@ -1744,7 +1770,7 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
   const hmacResult = verifyLicenseKeyHmac(key);
   if (hmacResult.valid) {
     if (claimedProduct && hmacResult.product && claimedProduct !== hmacResult.product) {
-      return res.json({ valid: false, message: `Wrong license type. This key is for ${hmacResult.product}. Purchase the correct bot at aicashsystem.space` });
+      return res.json({ valid: false, message: `This key unlocks ${hmacResult.product}, not this workspace. Open ${ACCESS_URL} to get access to this one.` });
     }
     // No database configured at all is not the same as a database that cannot
     // be read: it is a deployment that never records payments, so there is
@@ -1793,7 +1819,7 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
       return res.json({ valid: false, message: 'This licence is not registered. If you have just paid, wait a minute and tap the link in your email.' });
     }
     if (row.refunded === true) {
-      return res.json({ valid: false, message: 'This license was refunded and is no longer active. Repurchase at aicashsystem.space' });
+      return res.json({ valid: false, message: `This licence was refunded, so access is closed. Open ${ACCESS_URL} to start again.` });
     }
     if (row.active !== true) {
       return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
@@ -1802,8 +1828,8 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
       supabase.from('licenses').update({ active: false }).eq('key', key)
         .then(() => {}).catch(() => {});
       return res.json({ valid: false, message: row.trial === true
-        ? 'Your free trial has ended. For full access, get your bot at aicashsystem.space'
-        : 'This licence has expired. Renew at aicashsystem.space' });
+        ? `Your trial has ended. Open ${ACCESS_URL} to keep your account running.`
+        : `This licence has expired. Open ${ACCESS_URL} to renew it.` });
     }
     if (claimedProduct && row.product && claimedProduct !== row.product) {
       return res.json({ valid: false, message: `Wrong license type. This key is for ${row.product}.` });
@@ -1826,7 +1852,7 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
   // knows. That case genuinely cannot be answered while the store is down, so
   // it gets the 503 below rather than a false "invalid".
   if (!/^FORX-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(String(key).toUpperCase())) {
-    return res.json({ valid: false, message: 'Invalid license key. Purchase at aicashsystem.space' });
+    return res.json({ valid: false, message: `That licence key was not recognised. Open ${ACCESS_URL} to get one.` });
   }
   if (!supabase) {
     addLog('verify-license: no licence store configured — DENYING legacy lookup', 'license', 'error');
@@ -1852,7 +1878,7 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
     // only `active` here would have let a refunded or expired legacy key
     // through on a route that skips the signature entirely.
     if (lrow.refunded === true) {
-      return res.json({ valid: false, message: 'This license was refunded and is no longer active. Repurchase at aicashsystem.space' });
+      return res.json({ valid: false, message: `This licence was refunded, so access is closed. Open ${ACCESS_URL} to start again.` });
     }
     if (lrow.active !== true) {
       return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
@@ -1861,8 +1887,8 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
       supabase.from('licenses').update({ active: false }).eq('key', key)
         .then(() => {}).catch(() => {});
       return res.json({ valid: false, message: lrow.trial === true
-        ? 'Your free trial has ended. For full access, get your bot at aicashsystem.space'
-        : 'This licence has expired. Renew at aicashsystem.space' });
+        ? `Your trial has ended. Open ${ACCESS_URL} to keep your account running.`
+        : `This licence has expired. Open ${ACCESS_URL} to renew it.` });
     }
     if (claimedProduct && lrow.product && claimedProduct !== lrow.product) {
       return res.json({ valid: false, message: `Wrong license type. This key is for ${lrow.product}.` });
@@ -1870,7 +1896,7 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
     return res.json({ valid: true, message: 'License valid (legacy)', product: lrow.product });
   }
 
-  return res.json({ valid: false, message: 'Invalid license key. Purchase at aicashsystem.space' });
+  return res.json({ valid: false, message: `That licence key was not recognised. Open ${ACCESS_URL} to get one.` });
 });
 
 // POST /api/admin/trial/issue?secret=... — { email, product, days? } -> { key, telegramLink, expiresAt }
@@ -1895,7 +1921,7 @@ app.post('/api/admin/trial/issue', async (req, res) => {
 
 // POST /api/admin/trial/finish?secret=... — cuts off every still-active trial license at once.
 // The bot's next /api/verify-license check (on startup/restart) will then reject them with
-// the "trial ended, get full access at aicashsystem.space" message.
+// the "trial ended, open the platform to keep your account running" message.
 app.post('/api/admin/trial/finish', async (req, res) => {
   if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
@@ -2024,8 +2050,8 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
 
   if (isNew && email) {
     const html = _buildForexEmailHtml(_he(buyerName || 'there'), _he(email), licenseKey);
-    const subject = '🤖 Your Apex Forex Bot — License Key inside';
-    const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
+    const subject = `${BRAND} — your licence key and access link`;
+    const result = await _sendEmail({ to: email, subject, html, fromName: BRAND });
     if (!result.ok) {
       addLog(`[${provider}] Email NOT sent for ${_maskEmail(email)} — ${result.error}`, 'email', 'error');
       _notifyAdminAlert(
@@ -2159,7 +2185,7 @@ app.get('/debug', auth, (req, res) => {
 
 // Favicon + OG image (3-candle logo)
 const _LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#060608"/><rect x="3" y="19" width="5" height="10" rx="2.5" fill="#ff2d4f" opacity=".45"/><rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="#ff2d4f" opacity=".72"/><rect x="20" y="6" width="5" height="23" rx="2.5" fill="#ff2d4f"/><circle cx="22.5" cy="5" r="3.1" fill="#ff5c74"/></svg>';
-const _OG_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#060608"/><rect x="480" y="340" width="60" height="190" rx="12" fill="#ff2d4f" opacity=".45"/><rect x="570" y="220" width="60" height="310" rx="12" fill="#ff2d4f" opacity=".72"/><rect x="660" y="120" width="60" height="410" rx="12" fill="#ff2d4f"/><circle cx="690" cy="96" r="34" fill="#ff5c74"/><text x="600" y="520" font-family="system-ui,sans-serif" font-weight="700" font-size="38" fill="#f5f5f7" text-anchor="middle">Apex Trading Suite</text><text x="600" y="568" font-family="system-ui,sans-serif" font-size="22" fill="#9696a0" text-anchor="middle">Fully-Hosted AI Forex Trading Bot · $497</text></svg>';
+const _OG_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#060608"/><rect x="480" y="340" width="60" height="190" rx="12" fill="#ff2d4f" opacity=".45"/><rect x="570" y="220" width="60" height="310" rx="12" fill="#ff2d4f" opacity=".72"/><rect x="660" y="120" width="60" height="410" rx="12" fill="#ff2d4f"/><circle cx="690" cy="96" r="34" fill="#ff5c74"/><text x="600" y="520" font-family="system-ui,sans-serif" font-weight="700" font-size="38" fill="#f5f5f7" text-anchor="middle">${BRAND}</text><text x="600" y="568" font-family="system-ui,sans-serif" font-size="22" fill="#9696a0" text-anchor="middle">Automated forex execution, hosted and managed · $497</text></svg>';
 app.get('/favicon.svg', (req, res) => { res.setHeader('Content-Type','image/svg+xml'); res.setHeader('Cache-Control','public,max-age=86400'); res.end(_LOGO_SVG); });
 app.get('/favicon.ico', (req, res) => { res.setHeader('Content-Type','image/svg+xml'); res.setHeader('Cache-Control','public,max-age=86400'); res.end(_LOGO_SVG); });
 app.get('/og.svg', (req, res) => { res.setHeader('Content-Type','image/svg+xml'); res.setHeader('Cache-Control','public,max-age=3600'); res.end(_OG_SVG); });
@@ -2198,7 +2224,7 @@ app.get('/configurator-forex', (req, res) => {
 
 // POST /api/demo/generate — public, rate-limited (3 req/IP/day)
 const _demoLimiter = rateLimit({ windowMs: 24*60*60*1000, max: 5, standardHeaders: true, legacyHeaders: false,
-  handler: (req,res) => res.status(429).json({ error: 'Demo limit reached. Get full access at aicashsystem.space' }) });
+  handler: (req,res) => res.status(429).json({ error: `Demo limit reached. Open ${ACCESS_URL} for full access.` }) });
 app.post('/api/demo/generate', _demoLimiter, async (req, res) => {
   const { desc } = req.body;
   if (!desc || desc.length < 10) return res.status(400).json({ error: 'Describe your automation' });
@@ -2484,13 +2510,13 @@ a{text-decoration:none}
 </td></tr>
 
 <tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 28px">
-  <p style="margin:0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you requested immediate supply and waived the 14-day withdrawal right per Art. 16(m) EU Directive 2011/83/EU. All sales final once access is delivered. <a href="https://aicashsystem.space/terms" style="color:#52525b">Terms</a></p>
+  <p style="margin:0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you requested immediate supply and waived the 14-day withdrawal right per Art. 16(m) EU Directive 2011/83/EU. All sales final once access is delivered. <a href="${ACCESS_URL}" style="color:#52525b">Terms</a></p>
 </td></tr>
 
 <tr><td align="center" style="background:#0c0c0f;border:1px solid rgba(255,255,255,0.08);border-top:1px solid rgba(255,255,255,0.05);border-radius:0 0 20px 20px;padding:28px 40px 32px">
   <p style="margin:0 0 8px;font-size:13px;color:#71717a;font-family:Arial,sans-serif">Need help? We're here for you:</p>
-  <a href="mailto:supportaicashsystem@gmail.com" style="color:#ff6b7a;font-size:14px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">supportaicashsystem@gmail.com</a>
-  <p style="margin:20px 0 0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif">&copy; 2025 Apex Trading Suite &nbsp;&middot;&nbsp; <a href="https://aicashsystem.space" style="color:#3f3f46;text-decoration:none">aicashsystem.space</a></p>
+  <a href="mailto:${SUPPORT_EMAIL}" style="color:#ff6b7a;font-size:14px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">${SUPPORT_EMAIL}</a>
+  <p style="margin:20px 0 0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif">&copy; 2026 ${BRAND} &nbsp;&middot;&nbsp; <a href="${ACCESS_URL}" style="color:#3f3f46;text-decoration:none">Open the platform</a></p>
 </td></tr>
 
 <tr><td style="height:40px;font-size:0;line-height:0">&nbsp;</td></tr>
@@ -2518,7 +2544,7 @@ app.get('/api/resend-dns', async (req, res) => {
       headers: { 'Authorization': `Bearer ${RESEND_API_KEY}` },
     });
     const data = await r.json();
-    const domain = (data.data || []).find(d => d.name === 'aicashsystem.space');
+    const domain = (data.data || []).find(d => d.name === (process.env.RESEND_DOMAIN || 'aicashsystem.space'));
     if (!domain) return res.json({ error: 'Domain not found in Resend', allDomains: data.data || [], rawResponse: data });
     // Get full domain details
     const r2 = await fetch(`https://api.resend.com/domains/${domain.id}`, {
@@ -2649,7 +2675,7 @@ async function _sendBotEmailHandler(req, res) {
     catch(e) { /* non-fatal */ }
   }
 
-  const result = await _sendEmail({ to: email, subject: '🤖 Your Apex Trade Bot is ready — access inside', html: botEmailHtml, fromName: 'Apex.Bot' });
+  const result = await _sendEmail({ to: email, subject: `${BRAND} — your account is ready`, html: botEmailHtml, fromName: BRAND });
   return res.json({ success: result.ok, to: email, licenseKey: testKey, method: result.method, error: result.error });
 }
 
@@ -2824,23 +2850,23 @@ app.post('/admin/sync-bot-repo', async (req, res) => {
   }
   const filesToPush = walk(botDir);
 
-  const readmeContent = `# Apex Forex Bot 🤖
+  const readmeContent = `# ${BRAND}
 
-AI-powered forex trading bot (OANDA + MT5 bridge). Deploy with one click on Railway — runs 24/7, never sleeps.
+Automated forex execution on cTrader. The platform is hosted and managed — there
+is nothing to install, deploy or keep running.
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/${OWNER}/${REPO})
+## Access
+Open the platform on Telegram: [${ACCESS_URL}](${ACCESS_URL})
 
-## Setup
-The only variable you set is your license key — everything else is configured
-on [aicashsystem.space/configurator-forex](https://aicashsystem.space/configurator-forex)
-and loaded automatically at startup.
+Your licence key arrives by email after purchase. Opening the Telegram link from
+that email activates the account; no configuration is copied by hand.
 
 | Variable | Value |
 |----------|-------|
-| \`LICENSE_KEY\` | Your key from purchase email |
+| \`LICENSE_KEY\` | Your key from the purchase email |
 
-## License
-Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsystem.space).
+## Licence
+Requires a valid licence key. Open [${ACCESS_URL}](${ACCESS_URL}) to get one.
 `;
 
   const results = [];
