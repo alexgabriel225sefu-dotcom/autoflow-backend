@@ -1947,9 +1947,7 @@ async function refresh(){
   bv.textContent='$'+eq.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
   if(prev!=null&&eq!==prev){bv.classList.remove('up','dn');void bv.offsetWidth;
     bv.classList.add(eq>prev?'up':'dn');setTimeout(()=>bv.classList.remove('up','dn'),600);}
-  const fl=d.floatingPnl||0;
-  Q('balSub').innerHTML='Balance $'+(d.balance||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})
-    +(d.position?' · <span class="'+(fl>=0?'pnl-up':'pnl-dn')+'">Floating '+money(fl)+'</span>':'');
+  Q('balSub').innerHTML=balanceLine(d);
 
   const st=d.stats||{}, td=st.today||{};
   const chip=Q('dayChip');
@@ -2351,6 +2349,30 @@ function growBar(price, ts){
   try{ series.update(lastBar); }catch(e){}
 }
 
+/* One balance line for both the full refresh and the poll. Both used to build
+   it inline, and both gated the floating figure on there being a FOCUSED
+   position — so a client holding a trade the platform was not currently
+   watching saw a balance with no floating P&L beside it at all.
+
+   The caveat matters as much as the number: "estimated" is multiplied here and
+   is missing swap and commission, so it will not match cTrader to the cent,
+   and "partial" means a position could not be priced and the equity above is a
+   floor rather than the account's. Neither may be shown as a plain figure. */
+function balanceLine(d){
+  const fl = Number(d.floatingPnl||0);
+  const has = (d.positions && d.positions.length) || d.position || fl !== 0;
+  let note='';
+  if(d.equitySource==='estimated')
+    note=' <span class="na">· estimated, cTrader is exact</span>';
+  else if(d.equitySource==='partial')
+    note=' <span class="na">· incomplete, '+(d.unpricedPositions||0)
+        +' position(s) unpriced</span>';
+  return 'Balance $'+Number(d.balance||0).toLocaleString(undefined,
+           {minimumFractionDigits:2,maximumFractionDigits:2})
+    + (has ? ' · <span class="'+(fl>=0?'pnl-up':'pnl-dn')+'">Floating '
+             +money(fl)+'</span>' : '')
+    + note;
+}
 async function tick(){
   try{
     const t=await api('/api/app/tick');
@@ -2375,9 +2397,7 @@ async function tick(){
         setTimeout(()=>bv.classList.remove('up','dn'),600);
       }
     }
-    const fl=t.floatingPnl||0;
-    Q('balSub').innerHTML='Balance $'+(t.balance||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})
-      +(t.position?' · <span class="'+(fl>=0?'pnl-up':'pnl-dn')+'">Floating '+money(fl)+'</span>':'');
+    Q('balSub').innerHTML=balanceLine(t);
 
     renderPositions(t.positions, t.openCount);
     if(t.position){
@@ -2482,6 +2502,7 @@ function applyStream(ev){
       }
     }
     if(ev.positions) renderPositions(ev.positions, ev.openCount);
+    if(ev.balance!=null) Q('balSub').innerHTML=balanceLine(ev);
     setConn(ev.brokerHealth==='ok'?'live':'delayed');
   }
   if(ev.type==='market.tick' && ev.rows){

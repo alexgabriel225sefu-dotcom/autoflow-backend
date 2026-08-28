@@ -2883,9 +2883,25 @@ def _screen_positions(chat_id):
         lines.append(f"\n📊 <b>+{extra} more open</b> on this account, each managed "
                      f"by its own stop at the broker. The platform tracks one at a "
                      f"time here — the terminal and cTrader show them all.")
+    # The account's floating P&L across EVERY open position, from cTrader's
+    # own net figure. This line used to print the focused position's P&L under
+    # an account-wide label, so a client holding two trades read one trade's
+    # result as the account's and it never matched their cTrader screen.
     fl = dash.get("floatingPnl")
     if isinstance(fl, (int, float)):
-        lines.append(f"\n💵 Floating P&amp;L: <b>{'+' if fl >= 0 else '−'}${abs(fl):.2f}</b>")
+        src = dash.get("equitySource")
+        note = ("" if src == "broker"
+                else "  <i>(estimated — cTrader is the exact figure)</i>"
+                if src == "estimated"
+                else f"  <i>(incomplete — {dash.get('unpricedPositions') or 0} "
+                     f"position(s) could not be priced)</i>" if src == "partial"
+                else "")
+        lines.append(f"\n💵 Floating P&amp;L: "
+                     f"<b>{'+' if fl >= 0 else '−'}${abs(fl):.2f}</b>{note}")
+        eq = dash.get("equityLive")
+        if isinstance(eq, (int, float)):
+            lines.append(f"📊 Equity: <b>${eq:,.2f}</b>"
+                         f"  <i>balance + floating, as cTrader computes it</i>")
 
     send_to(chat_id, head + "\n".join(lines),
             _back_kb(chat_id, [[("🔍 Position details", "pos:detail")],

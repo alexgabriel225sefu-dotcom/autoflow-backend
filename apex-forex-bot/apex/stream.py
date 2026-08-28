@@ -151,7 +151,8 @@ def _account_event(chat_id):
         {"symbol": p.get("symbol"), "side": p.get("side"),
          "entryPrice": p.get("entryPrice"), "stopLoss": p.get("stopLoss"),
          "takeProfit": p.get("takeProfit"), "pnlUsd": p.get("pnlUsd"),
-         "pnlPips": p.get("pnlPips")}
+         "pnlPips": p.get("pnlPips"), "positionId": p.get("positionId"),
+         "units": p.get("units"), "pnlSource": p.get("pnlSource")}
         for p in (dash.get("positions") or []) if p.get("symbol")
     ]
     return {
@@ -160,6 +161,12 @@ def _account_event(chat_id):
         "balance": dash.get("balance"),
         "equity": dash.get("equityLive"),
         "floatingPnl": dash.get("floatingPnl"),
+        # Whether the two figures above are cTrader's own. Until the loop
+        # published a positions list, this event carried an empty one and an
+        # equity that reflected a single position — so the Mini App blanked its
+        # position panel on every stream tick and restored it on the next poll.
+        "equitySource": dash.get("equitySource"),
+        "unpricedPositions": dash.get("unpricedPositions") or 0,
         "symbol": dash.get("symbol"),
         "price": dash.get("currentPrice"),
         "brokerHealth": dash.get("brokerHealth"),
