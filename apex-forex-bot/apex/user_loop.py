@@ -871,6 +871,20 @@ def _log_trade(user_id, record, pos=None):
                   f"{row.get('symbol')} netPnl={row.get('netPnl')}")
             return False
         user_store.append_trade(user_id, row)
+        try:
+            from apex import trade_events as _te4
+            _te4.record(user_id, _te4.POSITION_CLOSED,
+                        symbol=row.get("symbol"),
+                        position_id=row.get("positionId"),
+                        strategy_id=row.get("strategyId"),
+                        strategy_version=row.get("strategyVersion"),
+                        payload={"side": row.get("side"), "entry": row.get("entry"),
+                                 "exit": row.get("exit"), "netPnl": row.get("netPnl"),
+                                 "grossPnl": row.get("grossPnl"),
+                                 "costUsd": row.get("costUsd"),
+                                 "action": row.get("action"), "mode": row.get("mode")})
+        except Exception as _e4:
+            print(f"[UserLoop:{user_id}] decision log (close) failed: {_e4}")
         return True
     except Exception as e:
         print(f"[UserLoop:{user_id}] trade-log failed: {e}")
@@ -1066,7 +1080,8 @@ def drop_broker_connection(user) -> bool:
     return True
 
 
-def _manage_trailing(broker, cfg, pos, symbol, price, initial_risk=None):
+def _manage_trailing(broker, cfg, pos, symbol, price, initial_risk=None,
+                     user_id=None):
     """Trailing stop + break-even (Strategy Builder exit modes). Moves the SL
     only in the favourable direction — never loosens it, never closes the trade.
     Real-broker only (needs a live positionId + amend_sltp). Returns the new SL
@@ -1129,6 +1144,20 @@ def _manage_trailing(broker, cfg, pos, symbol, price, initial_risk=None):
             if broker.amend_sltp(pid, sl=new_sl,
                                  tp=(pos.get("takeProfit") or pos.get("tp")),
                                  instrument=symbol):
+                # A stop that moved is part of the trade's story: on replay it
+                # is the difference between "it ran" and "it was managed".
+                try:
+                    from apex import trade_events as _te5
+                    if user_id is None:
+                        # Better silent than filed under a user this function
+                        # was never told about.
+                        raise RuntimeError("no user_id passed to _manage_trailing")
+                    _te5.record(user_id, _te5.STOP_UPDATED, symbol=symbol,
+                                position_id=pid,
+                                payload={"from": cur_sl, "to": new_sl,
+                                         "side": side, "price": price})
+                except Exception as _e5:
+                    print(f"[Trailing] decision log (stop) failed: {_e5}")
                 return new_sl
     except Exception as e:
         print(f"[Trailing] manage failed: {e}")
@@ -2143,7 +2172,8 @@ def _loop(user_id, alert_fn, gen=None):
                 if open_pos and not cfg.PAPER_TRADING:
                     moved = _manage_trailing(
                         broker, cfg, open_pos, symbol, price,
-                        initial_risk=entry_risk_by_sym.get(_nrm(symbol)))
+                        initial_risk=entry_risk_by_sym.get(_nrm(symbol)),
+                        user_id=user_id)
                     if moved is not None:
                         open_pos["stopLoss"] = open_pos["sl"] = moved
                         # A trailing stop moves many times per trade — nine
@@ -2200,7 +2230,8 @@ def _loop(user_id, alert_fn, gen=None):
                             if not _opx:
                                 continue
                             _omoved = _manage_trailing(broker, cfg, _op, _osym,
-                                                       _opx, initial_risk=_orisk)
+                                                       _opx, initial_risk=_orisk,
+                                                       user_id=user_id)
                         except Exception as _oe:
                             print(f"[UserLoop:{user_id}] trailing {_osym}: {_oe}")
                             continue
@@ -3647,6 +3678,23 @@ def _loop(user_id, alert_fn, gen=None):
                             dash=dash)
                         gates.audit(user_id, f"{action} {symbol}", _decision,
                                     origin="signal", rid=_rid)
+                        # The gate's verdict, either way. Swallowed on purpose:
+                        # journalling must never affect execution.
+                        try:
+                            from apex import trade_events as _te2
+                            _te2.record(
+                                user_id,
+                                _te2.ORDER_AUTHORIZED if _decision else _te2.ORDER_REJECTED,
+                                symbol=symbol,
+                                strategy_id=signal.get("strategy_id"),
+                                strategy_version=signal.get("strategy_version"),
+                                payload={"side": action, "units": units,
+                                         "sl": sl_price, "tp": tp_price,
+                                         "reason": getattr(_decision, "reason", None),
+                                         "detail": str(getattr(_decision, "detail", ""))[:200],
+                                         "rid": _rid})
+                        except Exception as _e2:
+                            print(f"[UserLoop:{user_id}] decision log (gate) failed: {_e2}")
                         if not _decision:
                             order_ok = False
                             print(f"[UserLoop:{user_id}] BLOCKED {action} {symbol}: "
@@ -3661,6 +3709,17 @@ def _loop(user_id, alert_fn, gen=None):
                                     "units": units, "reason": _decision.reason})
                         else:
                             try:
+                                try:
+                                    from apex import trade_events as _te3
+                                    _te3.record(user_id, _te3.ORDER_SUBMITTED,
+                                                symbol=symbol,
+                                                strategy_id=signal.get("strategy_id"),
+                                                strategy_version=signal.get("strategy_version"),
+                                                payload={"side": action, "units": units,
+                                                         "sl": sl_price, "tp": tp_price,
+                                                         "rid": _rid})
+                                except Exception as _e3:
+                                    print(f"[UserLoop:{user_id}] decision log (submit) failed: {_e3}")
                                 _order_res = broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
                                 ledger.record(_rid, _order_res)
                             except Exception as oe:
