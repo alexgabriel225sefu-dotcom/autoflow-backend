@@ -75,8 +75,22 @@ check("a refusal is 200 with a reason, not an error",
       'self._reply(200, {"ok": False, "error": _c_res.get("error")' in CODE)
 check("the screen shows unknown as its own outcome",
       "Close status unknown" in HTML)
-check("...and repeats the do-not-retry instruction",
-      HTML.count("Do not retry yet") >= 2, "both the thrown and the network case")
+# Counting the phrase was a proxy for the real property, and it stopped being
+# one when both paths started sharing a renderer. What must hold is that BOTH
+# failure paths land on the unknown outcome, and that the unknown outcome is
+# what carries the instruction — one occurrence reached from two places is
+# stronger than two copies that can drift apart.
+_CLOSE = HTML[HTML.index("async function doClose"):]
+_CLOSE = _CLOSE[:_CLOSE.index("\n}")]
+check("the 502 path routes to the unknown outcome",
+      _CLOSE.count("showOrder('close_unknown'") == 2,
+      "both the broker's own CLOSE_STATUS_UNKNOWN and a thrown request")
+check("...and the unknown outcome carries the do-not-retry instruction",
+      "Do not retry yet" in HTML
+      and "close_unknown" in HTML[:HTML.index("Do not retry yet") + 400])
+check("...and says why retrying is the wrong move",
+      "close the position\n                   +'twice" in HTML
+      or "twice" in HTML)
 check("a refusal says nothing was closed", "Nothing was closed" in HTML)
 check("the UI never retries on its own",
       "doClose()" not in HTML.replace("onGo || null", "").replace("askClose(pos)", "")

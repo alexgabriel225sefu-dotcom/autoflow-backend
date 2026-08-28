@@ -141,3 +141,75 @@ Pre-existing: `/api/app/data`, `/api/app/tick`, `/api/app/history`,
   from recorded state or are UNKNOWN.
 - Automation writes land on the client's own user_store record, never on
   os.environ — a per-client change must not become process-wide.
+
+## Mockup audit — closed out
+
+The exhaustive pass against the mockup found 32 of 41 elements missing. All of
+them are now built, verified by the gated suite (113 files) and by the Chromium
+boot test (zero page errors, 18 screens, no 375px overflow).
+
+Built in this pass:
+
+- **Splash** (§1) — four steps that tick from what actually happened, not a
+  timer, with a 6s hard clear. A splash that can outlive the app is worse
+  than none.
+- **TopBar** — bell to Alerts, kebab to Settings, and a global search that
+  filters markets and trade ids from data already in hand. Searching is never
+  a reason to query.
+- **Environment banners** (§5) — DEMO says "No real funds are at risk";
+  an environment the broker has not confirmed says new live orders are
+  unavailable, with [Retry connection].
+- **Outage banner** (§22) — one voice. Appears after three consecutive
+  failures, states that positions and stops are held by the broker and are
+  unaffected by this screen, and carries the only [Retry].
+- **Position detail** (`#s-position`) — volume, entry, current, SL, TP, R
+  multiple (or "Not recorded"), opened, status. R needs a recorded stop
+  distance; without one there is no R to show.
+- **Order/close outcome** (`#s-order`, §21) — six outcomes with wording that
+  is true of each. Opening and closing fail differently: "nothing was closed"
+  and "no new position was created" are not interchangeable. Unknown is its
+  own outcome and never collapses into failure.
+- **Portfolio** — empty state names the state and offers [Explore markets];
+  rows open the detail; Home carries [View all positions].
+- **History** (§9) — grouped by day from each trade's own timestamp. A trade
+  with no recorded time groups under "Date not recorded", never silently
+  under today.
+- **Intelligence** (§12) — setup-strength bar, shown only when the platform
+  scored the instrument. An empty bar at 0% reads as a weak setup rather than
+  as no reading.
+- **Replay** (§14) — outcome from the recorded exit reason, and
+  [Replay again] / [Back to trade history]. "TP hit" is only claimed when the
+  exit reason says so; inferring it from a positive P&L would turn a manual
+  close into a target hit.
+- **Risk** (§15) — the eight engine checks, ticked from the engine's own
+  verdict. An unread state shows every line as unknown: a green tick nobody
+  verified is worse than no list.
+- **Automation** (§16) — Manual / Assisted / Automatic as the server reports
+  them. Selecting one routes to `/automation` in chat, where the same
+  authorisation runs as for every other change.
+- **Alerts** (§19) — grouped Risk / Trades / Market by event type, never by
+  whether the wording sounds urgent.
+- **Ask** (§13) — answers carry structured `facts` from the server, plus
+  [View chart] / [View position]. A number with no stated source is
+  indistinguishable from an invented one.
+- **Account / Security** — [Manage account] and [Log out other sessions] both
+  say the truth: credentials are handled in chat, and there is no second
+  session to end.
+
+### One test was rewritten, not deleted
+
+`test_miniapp_close.py` asserted `HTML.count("Do not retry yet") >= 2`. That
+count was a proxy for "both failure paths tell the client not to retry", and
+it stopped being one when both paths started sharing a renderer. It now asserts
+that both paths route to `close_unknown` and that `close_unknown` carries the
+instruction — one occurrence reached from two places, which cannot drift apart
+the way two copies can.
+
+### The two rules that keep costing time
+
+1. Never call `showScreen()` during script evaluation. It reads `let`s
+   declared further down; the throw stops the whole script and every handler
+   below it never exists. Tests stay green and the app is dead.
+2. Every route local in `do_GET`/`do_POST` must be prefixed. A bare name makes
+   itself local to the whole method and raises UnboundLocalError in every
+   branch above it.

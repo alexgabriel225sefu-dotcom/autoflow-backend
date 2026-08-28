@@ -103,7 +103,7 @@ const { chromium } = require('playwright-core');
   const out = [];
   const all = ['home','markets','portfolio','history','intelligence','automation',
                'ask','risk','settings','account','alerts','notifications',
-               'security','preferences','symbol','trade'];
+               'security','preferences','symbol','trade','position','order'];
   for (const s of all) {
     await p.evaluate(n => { location.hash = n; }, s);
     await p.waitForTimeout(220);
