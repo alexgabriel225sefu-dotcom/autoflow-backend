@@ -68,6 +68,14 @@ def _num(v):
 
 
 def _reply(kind, text, **extra):
+    """One answer.
+
+    `facts` is the structured half the screen renders as labelled rows. It
+    exists so a number on screen carries its own label and source instead of
+    being read out of a sentence — a figure with no stated origin is
+    indistinguishable from an invented one. Every fact here is a value the
+    platform already recorded; nothing is derived to fill a row.
+    """
     out = {"kind": kind, "text": text}
     out.update(extra)
     return out
@@ -83,12 +91,17 @@ def _risk(chat_id):
     if state == "RISK_HOLDING" or guard.get("halted"):
         why = ", ".join(reasons or guard.get("reasons") or ["a risk limit"])
         return _reply(FACT, f"Trading is paused by the risk engine: {why}.",
-                      screen="risk")
+                      screen="risk",
+                      facts=[{"label": "Risk engine", "value": "Paused"},
+                             {"label": "Reason", "value": why}])
     if state == "RISK_OK":
         limit = getattr(cfg, "MAX_DAILY_LOSS_PCT", None)
         tail = f" The daily loss limit is {limit}%." if limit is not None else ""
         return _reply(FACT, "The risk engine reports you are within limits." + tail,
-                      screen="risk")
+                      screen="risk",
+                      facts=[{"label": "Risk engine", "value": "Within limits"},
+                             {"label": "Daily loss limit",
+                              "value": None if limit is None else f"{limit}%"}])
     # Not OK and not holding. Saying "you're fine" here would be inventing the
     # reassuring half of a state we could not read.
     return _reply(UNKNOWN,
@@ -110,9 +123,18 @@ def _positions(chat_id):
                  else ("+" if pnl >= 0 else "−") + f"${abs(pnl):,.2f}")
         parts.append(f"{str(p['symbol']).replace('_', '/')} "
                      f"{p.get('side') or ''} · {money}")
+    # `position` names the instrument the screen can open — the first one when
+    # several are held, since a single button cannot mean all of them.
     return _reply(FACT, f"{len(rows)} open position"
                         f"{'s' if len(rows) != 1 else ''}:\n" + "\n".join(parts),
-                  screen="portfolio")
+                  screen="portfolio",
+                  position=(rows[0].get("symbol") if len(rows) == 1 else None),
+                  symbol=(rows[0].get("symbol") if len(rows) == 1 else None),
+                  facts=[{"label": "Open positions", "value": len(rows)}] +
+                        [{"label": str(p["symbol"]).replace("_", "/"),
+                          "value": ("not yet priced" if _num(p.get("pnlUsd")) is None
+                                    else f"{_num(p.get('pnlUsd')):+,.2f} USD")}
+                         for p in rows[:8]])
 
 
 def _best_trade(chat_id, worst=False):
@@ -131,7 +153,13 @@ def _best_trade(chat_id, worst=False):
         f"{str(pick.get('symbol') or '?').replace('_', '/')} "
         f"{pick.get('side') or ''} {sign}${abs(net):,.2f} on "
         f"{str(pick.get('time') or '')[:16]}.",
-        screen="history", tradeId=pick.get("positionId"))
+        screen="history", tradeId=pick.get("positionId"),
+        symbol=pick.get("symbol"),
+        facts=[{"label": "Instrument",
+                "value": str(pick.get("symbol") or "?").replace("_", "/")},
+               {"label": "Direction", "value": pick.get("side")},
+               {"label": "Net result", "value": f"{sign}${abs(net):,.2f}"},
+               {"label": "Closed", "value": str(pick.get("time") or "")[:16]}])
 
 
 def _why_no_trade(chat_id, symbol):
@@ -168,7 +196,12 @@ def _market(chat_id):
     return _reply(OBSERVATION,
                   f"What the platform currently sees on {sym} — "
                   + ", ".join(bits) + ". This is an observation, not a signal "
-                  "and not a decision.", screen="intelligence")
+                  "and not a decision.", screen="intelligence",
+                  symbol=dash.get("symbol"),
+                  facts=[{"label": "Instrument", "value": sym},
+                         {"label": "Trend", "value": m.get("trend")},
+                         {"label": "Momentum", "value": m.get("momentum")},
+                         {"label": "Volatility", "value": m.get("volatility")}])
 
 
 # ── Routing ─────────────────────────────────────────────────────────────
