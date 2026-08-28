@@ -125,6 +125,9 @@ body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Disp
   border-radius:var(--r-md);padding:12px 14px;font-size:14px;font-family:inherit}
 #askGo{background:var(--acc);border:none;color:#fff;border-radius:var(--r-md);
   padding:0 18px;font-size:16px;cursor:pointer}
+.srch{display:block;width:calc(100% - 2*var(--sp4));margin:var(--sp2) var(--sp4) 0;
+  background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--t0);
+  border-radius:var(--r-sm);padding:9px 12px;font-size:13px;font-family:inherit}
 #symChart{height:44vh}
 .tfrow{display:flex;gap:5px;margin:var(--sp2) var(--sp4) 0}
 .tfrow div{flex:1;text-align:center;padding:8px 2px;border:1px solid var(--line);
@@ -351,8 +354,18 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 </section>
 
 <section class="screen" id="s-history">
-  <div class="sec-h">Trade history</div>
+  <div class="sec-h">Your trade library</div>
+  <div id="histFilter" class="tfrow">
+    <div class="on" data-hf="all">All</div><div data-hf="wins">Wins</div>
+    <div data-hf="losses">Learning</div><div data-hf="best">Best</div>
+  </div>
+  <input id="histSearch" class="srch" placeholder="Filter by symbol" maxlength="12">
   <div class="panel on" id="p-hist"><div class="empty">Loading your trades…</div></div>
+</section>
+
+<section class="screen" id="s-trade">
+  <div class="sec-h">Trade</div>
+  <div id="tradeBody"><div class="empty">Loading…</div></div>
 </section>
 
 <section class="screen" id="s-symbol">
@@ -544,7 +557,7 @@ const SCREENS={home:'APEX4TRADERS',markets:'MARKETS',portfolio:'PORTFOLIO',
                history:'TRADE HISTORY',intelligence:'APEX INTELLIGENCE',
                automation:'AUTOMATION',ask:'ASK APEX',risk:'RISK CENTRE',
                settings:'SETTINGS',account:'TRADING ACCOUNT',alerts:'ALERTS',
-               symbol:'MARKET'};
+               symbol:'MARKET',trade:'TRADE'};
 let screenNow='home';
 function showScreen(name,push){
   if(!SCREENS[name])name='home';
@@ -561,6 +574,7 @@ function showScreen(name,push){
   if(name==='ask') initAsk();
   if(name==='account') loadAccount(true);
   if(name==='alerts') loadAlerts(true);
+  if(name==='trade' && tradeCur) loadTrade(tradeCur);
   if(push!==false && location.hash!=='#'+name) location.hash=name;
   window.scrollTo(0,0);
   /* Both charts are laid out while hidden, so they measure 0 wide until the
@@ -838,6 +852,97 @@ document.addEventListener('click',ev=>{
   document.querySelectorAll('#symTf div').forEach(x=>x.classList.remove('on'));
   t.classList.add('on'); symTf=t.dataset.stf; loadSymbol(true);
 });
+
+/* ── Trade Library ────────────────────────────────────────────────────
+   Filters run over the SAME rows the server already sent. Filtering must
+   never become a reason to re-query, and an empty section says so rather
+   than showing a placeholder trade. */
+let histFilter='all', histSearch='';
+function applyHistFilter(){
+  let rows=(histCache||[]).slice();
+  if(histSearch)
+    rows=rows.filter(t=>String(t.symbol||'').toUpperCase().indexOf(histSearch)>=0);
+  if(histFilter==='wins')   rows=rows.filter(t=>t.win===true);
+  if(histFilter==='losses') rows=rows.filter(t=>t.win===false);
+  if(histFilter==='best')
+    rows=rows.filter(t=>t.netPnl!=null).sort((a,b)=>b.netPnl-a.netPnl).slice(0,10);
+  drawHistory(rows);
+}
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest&&ev.target.closest('[data-hf]');
+  if(!t)return;
+  document.querySelectorAll('#histFilter div').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); histFilter=t.dataset.hf; applyHistFilter();
+});
+document.addEventListener('input',ev=>{
+  if(ev.target && ev.target.id==='histSearch'){
+    histSearch=String(ev.target.value||'').toUpperCase(); applyHistFilter();
+  }
+});
+
+/* ── Trade detail ─────────────────────────────────────────────────────
+   R multiple and duration are derived SERVER-side from the trade's own
+   recorded stop distance and timestamps, and come back null when those were
+   never stored. An absent measurement is shown as absent. */
+let tradeCur=null;
+function openTrade(id){ tradeCur=id; showScreen('trade'); loadTrade(id); }
+async function loadTrade(id){
+  const H=Q('tradeBody'); if(!H) return;
+  H.innerHTML='<div class="empty">Loading…</div>';
+  try{
+    const d=await api('/api/app/trade?id='+encodeURIComponent(id));
+    if(!d.available){
+      H.innerHTML='<div class="empty">'
+        +(d.reason==='TRADE_NOT_FOUND'?'That trade is not in your history.'
+          :'This trade could not be read just now.')+'</div>';
+      return;
+    }
+    const t=d.trade||{}, win=(t.netPnl!=null&&t.netPnl>=0);
+    const dur=t.durationSec==null?null
+      :(t.durationSec>=3600?Math.round(t.durationSec/360)/10+'h'
+        :Math.round(t.durationSec/60)+'m');
+    let h='<div style="padding:0 var(--sp4) var(--sp3)">'
+      +'<div style="font-size:var(--fs-xl);font-weight:800">'
+      +esc(String(t.symbol||'').replace('_','/'))+' '+esc(t.side||'')+'</div>'
+      +'<div style="font-size:var(--fs-mega);font-weight:800;'
+      +'font-variant-numeric:tabular-nums" class="'+(win?'pnl-up':'pnl-dn')+'">'
+      +(t.netPnl==null?'—':money(t.netPnl))+'</div>'
+      +(t.rMultiple!=null?'<div class="mpx">'+(t.rMultiple>=0?'+':'')+t.rMultiple+'R</div>':'')
+      +'</div>';
+    h+='<div style="margin:0 var(--sp4)">'
+      +'<div class="kvr"><span>Entry</span><b>'+(t.entry==null?'—':t.entry)+'</b></div>'
+      +'<div class="kvr"><span>Exit</span><b>'+(t.exit==null?'—':t.exit)+'</b></div>'
+      +'<div class="kvr"><span>R multiple</span><b'+(t.rMultiple==null
+        ?' class="na">Not recorded':'>'+t.rMultiple)+'</b></div>'
+      +'<div class="kvr"><span>Duration</span><b'+(dur==null
+        ?' class="na">Not recorded':'>'+dur)+'</b></div>'
+      +'<div class="kvr"><span>Environment</span><b>'+esc(String(t.mode||'—').toUpperCase())+'</b></div>'
+      +'<div class="kvr"><span>Strategy</span><b>'+esc(t.strategyId||'—')
+      +(t.strategyVersion?' v'+esc(t.strategyVersion):'')+'</b></div>'
+      +'<div class="kvr"><span>Result</span><b>'+esc(t.action||'—')+'</b></div>'
+      +'</div>';
+    h+='<div class="sec-h">Decision timeline</div>';
+    if(d.eventsRecorded){
+      h+=d.events.map(function(ev){
+        const when=new Date((ev.ts||0)*1000).toISOString().slice(11,19);
+        const pl=ev.payload||{};
+        const bit=pl.reason||pl.side||pl.to||'';
+        return '<div class="item" style="margin:0 var(--sp4)"><b>'
+          +esc(_EVT_LABEL[ev.type]||ev.type)+'</b>'
+          +'<div class="sub">'+esc(when)+' UTC'+(bit?' \u00b7 '+esc(String(bit)):'')
+          +(ev.strategy_version?' \u00b7 v'+esc(ev.strategy_version):'')+'</div></div>';
+      }).join('');
+    }else{
+      h+='<div class="empty">No recorded decision events for this trade. The '
+        +'decision log began after it closed — nothing is reconstructed.</div>';
+    }
+    h+='<button class="btn" id="tradeReplay">Replay this trade</button>';
+    H.innerHTML=h;
+    Q('tradeReplay').onclick=()=>openReplay(id);
+  }catch(e){
+    H.innerHTML='<div class="empty">This trade could not be read just now.</div>';
+  }
+}
 
 let acctAt=0;
 async function loadAccount(force){
@@ -1426,8 +1531,24 @@ async function loadHistory(){
   try{
     const h=await api('/api/app/history?limit=50');
     histCache=h.trades||[];
-    if(!histCache.length){el.innerHTML='<div class="empty">No closed trades yet.</div>';return;}
-    el.innerHTML=histCache.map(t=>{
+    applyHistFilter();
+  }catch(e){
+    el.innerHTML='<div class="empty">'+(e.code==='TELEGRAM_AUTH_FAILED'
+      ? 'Open this from your Telegram chat to see your trades.'
+      : 'Your trade history is temporarily unavailable.')+'</div>';
+  }
+}
+/* Drawing is separate from fetching so a filter reuses the rows the server
+   already sent. Filtering must never become a reason to re-query. */
+function drawHistory(rows){
+  const el=Q('p-hist'); if(!el) return;
+  if(!rows.length){
+    el.innerHTML='<div class="empty">'
+      +(histCache.length ? 'No trades match this filter.'
+                         : 'Your completed trades will appear here.')+'</div>';
+    return;
+  }
+  el.innerHTML=rows.map(t=>{
       const win=t.win===true, dir=(t.side==='SELL')?'🔴 SHORT':'🟢 LONG';
       const md=(t.mode||'').toLowerCase();
       const badge=md==='live'?'<span class="chip live">LIVE</span>'
@@ -1439,13 +1560,8 @@ async function loadHistory(){
         +(t.entry!=null&&t.exit!=null?' · '+num(t.entry)+' → '+num(t.exit):'')+'</div></div>'
         +'<div class="r '+(t.netPnl==null?'':(win?'pnl-up':'pnl-dn'))+'">'
         +(t.netPnl==null?'—':money(t.netPnl))+'<span class="chev"> ›</span></div></div></div>';
-    }).join('');
-    el.querySelectorAll('.trow').forEach(r=>r.onclick=()=>openReplay(r.dataset.t));
-  }catch(e){
-    el.innerHTML='<div class="empty">'+(e.code==='TELEGRAM_AUTH_FAILED'
-      ? 'Open this from your Telegram chat to see your trades.'
-      : 'Your trade history is temporarily unavailable.')+'</div>';
-  }
+  }).join('');
+  el.querySelectorAll('.trow').forEach(r=>r.onclick=()=>openTrade(r.dataset.t));
 }
 
 /* ── REPLAY ── */
