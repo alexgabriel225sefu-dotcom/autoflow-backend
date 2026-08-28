@@ -125,6 +125,15 @@ body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Disp
   border-radius:var(--r-md);padding:12px 14px;font-size:14px;font-family:inherit}
 #askGo{background:var(--acc);border:none;color:#fff;border-radius:var(--r-md);
   padding:0 18px;font-size:16px;cursor:pointer}
+#symChart{height:44vh}
+.tfrow{display:flex;gap:5px;margin:var(--sp2) var(--sp4) 0}
+.tfrow div{flex:1;text-align:center;padding:8px 2px;border:1px solid var(--line);
+  border-radius:var(--r-sm);font-size:11.5px;font-weight:700;color:var(--t1);
+  background:var(--card);cursor:pointer}
+.tfrow div.on{color:#fff;background:rgba(255,45,79,.13);border-color:rgba(255,45,79,.4)}
+#symHead{padding:var(--sp3) var(--sp4) 0}
+#symHead .s{font-size:var(--fs-xl);font-weight:800}
+#symHead .p{font-size:var(--fs-lg);font-variant-numeric:tabular-nums;margin-top:2px}
 .pill{background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--t0);
   border-radius:var(--r-sm);padding:5px 14px;font-size:12px;font-weight:800;
   cursor:pointer;font-family:inherit}
@@ -346,6 +355,17 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div class="panel on" id="p-hist"><div class="empty">Loading your trades…</div></div>
 </section>
 
+<section class="screen" id="s-symbol">
+  <div id="symHead"></div>
+  <div class="card rise"><div id="symChart"></div></div>
+  <div id="symTf" class="tfrow">
+    <div data-stf="1m">1m</div><div data-stf="5m">5m</div>
+    <div class="on" data-stf="15m">15m</div><div data-stf="1h">1h</div>
+    <div data-stf="4h">4h</div><div data-stf="1d">1d</div>
+  </div>
+  <div id="symBody"><div class="empty">Loading market data…</div></div>
+</section>
+
 <section class="screen" id="s-settings">
   <div class="sec-h">Settings</div>
   <div id="setList">
@@ -523,7 +543,8 @@ function refreshEntryLine(pos){
 const SCREENS={home:'APEX4TRADERS',markets:'MARKETS',portfolio:'PORTFOLIO',
                history:'TRADE HISTORY',intelligence:'APEX INTELLIGENCE',
                automation:'AUTOMATION',ask:'ASK APEX',risk:'RISK CENTRE',
-               settings:'SETTINGS',account:'TRADING ACCOUNT',alerts:'ALERTS'};
+               settings:'SETTINGS',account:'TRADING ACCOUNT',alerts:'ALERTS',
+               symbol:'MARKET'};
 let screenNow='home';
 function showScreen(name,push){
   if(!SCREENS[name])name='home';
@@ -738,6 +759,86 @@ async function askSend(q){
    Identity, never credentials. The account number is masked to its last
    four: the client knows which account is theirs, and a full number on a
    screen is a number in a screenshot. */
+/* ── Symbol detail ────────────────────────────────────────────────────
+   A chart for one instrument, opened from a Markets row. Its own chart
+   object: the Markets/Portfolio charts are bound to their own elements and
+   sharing one would make the back button redraw the wrong screen. */
+let symChart=null, symSeries=null, symCur='', symTf='15m', symLines=[];
+function openSymbol(sym){
+  symCur=String(sym||'').toUpperCase();
+  showScreen('symbol');
+  Q('symHead').innerHTML='<div class="s">'+esc(symCur.replace('_','/'))+'</div>'
+    +'<div class="p" id="symPx">—</div>';
+  loadSymbol(true);
+}
+async function loadSymbol(force){
+  const H=Q('symBody'); if(!H||!symCur) return;
+  if(!symChart){
+    try{
+      symChart=mkChart(Q('symChart'));
+      symSeries=symChart.addCandlestickSeries({upColor:'#2fd575',downColor:'#ff4560',
+        borderUpColor:'#2fd575',borderDownColor:'#ff4560',
+        wickUpColor:'#2fd575',wickDownColor:'#ff4560'});
+    }catch(e){ /* the chart library is optional; the quote below is not */ }
+  }
+  try{
+    const d=await api('/api/app/symbol?sym='+encodeURIComponent(symCur)
+      +'&tf='+encodeURIComponent(symTf));
+    if(!d.available){
+      H.innerHTML='<div class="empty">'
+        +(d.reason==='UNKNOWN_INSTRUMENT'
+          ? 'This instrument is not one the platform trades.'
+          : 'Market data for this instrument is unavailable right now.')+'</div>';
+      return;
+    }
+    if(symSeries&&d.candles&&d.candles.length){
+      symSeries.setData(d.candles);
+      symChart.timeScale().fitContent();
+      /* Entry, stop and target come from the client's OWN open position on
+         this instrument, read server-side. Nothing is drawn from a value the
+         page was given by the request. */
+      symLines.forEach(l=>symSeries.removePriceLine(l)); symLines=[];
+      if(d.position){
+        const mk=(px,c,t)=>{ if(px) symLines.push(symSeries.createPriceLine(
+          {price:px,color:c,lineWidth:1,lineStyle:2,title:t})); };
+        mk(d.position.entryPrice,'#eef1f6','ENTRY');
+        mk(d.position.stopLoss,'#ff4560','SL');
+        mk(d.position.takeProfit,'#2fd575','TP');
+      }
+    }
+    const px=Q('symPx');
+    if(px) px.textContent = d.bid!=null
+      ? Number(d.bid).toLocaleString(undefined,{maximumFractionDigits:5}) : '—';
+    let h='<div class="sec-h">Price</div><div style="margin:0 var(--sp4)">'
+      +'<div class="kvr"><span>Bid</span><b'+(d.bid==null?' class="na">Not available'
+        :'>'+Number(d.bid).toLocaleString(undefined,{maximumFractionDigits:5}))+'</b></div>'
+      +'<div class="kvr"><span>Ask</span><b'+(d.ask==null?' class="na">Not available'
+        :'>'+Number(d.ask).toLocaleString(undefined,{maximumFractionDigits:5}))+'</b></div>'
+      +'<div class="kvr"><span>Spread</span><b'+(d.spreadPips==null?' class="na">Not available'
+        :'>'+d.spreadPips+' pips')+'</b></div></div>';
+    if(d.position){
+      const p=d.position, known=p.pnlUsd!=null;
+      h+='<div class="sec-h">Your position</div><div style="margin:0 var(--sp4)">'
+        +'<div class="kvr"><span>Direction</span><b>'+esc(p.side||'—')+'</b></div>'
+        +'<div class="kvr"><span>Entry</span><b>'+(p.entryPrice||'—')+'</b></div>'
+        +'<div class="kvr"><span>Open P&amp;L</span><b class="'
+        +(known?(p.pnlUsd>=0?'pnl-up':'pnl-dn'):'na')+'">'
+        +(known?money(p.pnlUsd):'Not available')+'</b></div></div>';
+    }
+    h+='<button class="btn" data-goto="intelligence">Analyze with APEX Intelligence</button>';
+    H.innerHTML=h;
+  }catch(e){
+    H.innerHTML='<div class="empty">Market data for this instrument is unavailable ('
+      +esc(e.message||'error')+').</div>';
+  }
+}
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest&&ev.target.closest('[data-stf]');
+  if(!t)return;
+  document.querySelectorAll('#symTf div').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); symTf=t.dataset.stf; loadSymbol(true);
+});
+
 let acctAt=0;
 async function loadAccount(force){
   if(!force && Date.now()-acctAt < 8000) return;
@@ -1127,7 +1228,7 @@ document.addEventListener('click',ev=>{
   const row=ev.target.closest&&ev.target.closest('[data-goto],[data-sym]');
   if(!row)return;
   if(row.dataset.goto) showScreen(row.dataset.goto);
-  else if(row.dataset.sym) showScreen('markets');
+  else if(row.dataset.sym) openSymbol(row.dataset.sym);
 });
 document.addEventListener('click',ev=>{
   const b=ev.target.closest&&ev.target.closest('[data-close]');

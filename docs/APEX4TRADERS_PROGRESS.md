@@ -70,7 +70,7 @@ Two branches, kept identical in content:
 |---|---|---|
 | 1 Design system + navigation | done | tokens, TopBar, EnvironmentBadge, bottom nav, hash router |
 | 2 Home + Account | done | account card reads the broker's own figures |
-| 3 Markets | partial | list + shared snapshot done; **symbol detail not built** |
+| 3 Markets | done | list, shared snapshot, and symbol detail with its own chart |
 | 4 Positions + close | done | `POST /api/app/close` → `user_loop.force_close(origin="miniapp")` |
 | 5 History | done | pre-existing, wired into the new shell |
 | 6 Trade Replay | done | pre-existing; broker-anchored historical bars |
@@ -107,6 +107,7 @@ GET  /api/app/risk           risk engine state, presentation only
 GET  /api/app/intelligence   market / strategy / risk / decision, kept apart
 GET  /api/app/automation     status + the writable list, from the policy
 POST /api/app/automation     the ONLY write gate is validate_miniapp
+GET  /api/app/symbol         one instrument; symbol checked against the universe
 GET  /api/app/account        identity only; number masked, no tokens
 GET  /api/app/alerts         recorded events + risk verdict
 GET  /api/app/stream         SSE; auth before open, per-chat account events
@@ -129,8 +130,10 @@ Pre-existing: `/api/app/data`, `/api/app/tick`, `/api/app/history`,
   there — deliberately, per "do not create duplicate tables".
 - Mobile and Telegram Desktop rendering is **unverified** — built mobile-first
   with safe-area handling, but never seen on a device.
-- Symbol detail (a chart per instrument from the Markets list) is still the
-  one screen from the brief that does not exist.
+- All twelve screens from the brief now exist: Home, Markets, Symbol detail,
+  Portfolio, History, Replay, Intelligence, Risk, Automation, Ask APEX,
+  Settings, Trading Account, Alerts. Account/Alerts/Symbol are reachable
+  contextually rather than from the bottom bar, which is what §26 asks for.
 - The Copilot serves NO generated text. `apex.assistant.chat()` runs a tool
   loop that can act and answers via a send function, so wiring it into a
   natural-language surface would give it a path §18 forbids. Answers come
