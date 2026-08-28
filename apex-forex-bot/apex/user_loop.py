@@ -846,7 +846,13 @@ def _log_trade(user_id, record, pos=None):
         "tpPips":      src.get("entryTpPips"),
         "probability": src.get("entryProbability"),
         "evR":         src.get("entryEvR"),
-        "side":        src.get("entrySide"),
+        # `entrySide` comes from the decision snapshot taken when the trade
+        # opened. When that snapshot is gone — a restart, or a position the
+        # broker closed after the loop forgot it — the caller may still know
+        # the direction from the position it reconciled against, so fall back
+        # to it. Without this the row is filed with no side at all, and the
+        # journal reader draws a missing side as LONG.
+        "side":        src.get("entrySide") or src.get("side"),
         # ── §14 reproducibility ──
         # Which strategy, at which version, opened this trade. Without both,
         # comparing strategies on real results is guesswork: the journal knows
@@ -1866,6 +1872,13 @@ def _loop(user_id, alert_fn, gen=None):
                         est_pnl = _deal["netPnl"]
                         gross_pnl = _deal["grossPnl"]
                         cost_usd = _deal["commissionUsd"]
+                        # The exit price came back with the P&L and was being
+                        # thrown away: `xp` was only ever set in the fallback
+                        # branch below, so every trade closed the NORMAL way
+                        # (the broker's own SL/TP) was journalled with no exit
+                        # at all — and therefore no R multiple, and no exit
+                        # marker on its replay.
+                        xp = _deal.get("exitPrice") or xp
                     else:
                         try:
                             if det.get("entry") and det.get("units"):
@@ -1882,9 +1895,28 @@ def _loop(user_id, alert_fn, gen=None):
                                     xp = None
                         except Exception:
                             est_pnl = None
+                    # cTrader's own balance after this close. Every OTHER close
+                    # path does `paper_balance += net` before journalling; this
+                    # one never did, so each broker-closed trade was filed with
+                    # the balance from before its own P&L, and the running
+                    # figure stayed stale until some later read corrected it.
+                    # Taking the broker's number rather than adding our own is
+                    # also the only version that cannot drift.
+                    _bal_after = (_deal or {}).get("balance")
+                    if _bal_after is not None:
+                        paper_balance = float(_bal_after)
+                    elif est_pnl is not None:
+                        paper_balance += float(est_pnl)
                     now2 = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     rec = {"action": "CLOSE", "symbol": det.get("symbol", cs),
                            "entryPrice": det.get("entry"), "price": xp,
+                           # Direction, from the position we recorded when it
+                           # opened. It was absent here, and the journal reader
+                           # renders a missing side as LONG — so a losing SELL
+                           # closed by its stop was shown to the client as a
+                           # long trade. pos_details has carried it all along.
+                           "side": det.get("side"),
+                           "positionId": det.get("positionId"),
                            "grossPnl": gross_pnl, "costUsd": cost_usd, "netPnl": est_pnl,
                            "balance": round(paper_balance, 2), "time": now2}
                     # These are the SL/TP hits — the single most informative
